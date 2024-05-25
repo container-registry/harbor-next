@@ -219,8 +219,7 @@ func (d *Driver) Delete(_ context.Context, path string) error {
 	return nil
 }
 
-func (d *Driver) URLFor(_ context.Context, path string, options map[string]interface{}) (string, error) {
-
+func (d *Driver) URLFor(_ context.Context, _ string, _ map[string]interface{}) (string, error) {
 	return "", fmt.Errorf("URLFor is not implemented")
 }
 
@@ -273,7 +272,7 @@ func (d *Driver) getClient(registry *model.Registry) (*clientWrapper, error) {
 		conf.User = registry.Credential.AccessKey
 		conf.Auth = append(conf.Auth, ssh.Password(registry.Credential.AccessSecret))
 	}
-	hostname := fmt.Sprintf("%s:%s", u.Hostname(), u.Port())
+	hostname := fmt.Sprintf("%s:%s", u.Hostname(), port)
 
 	conn, err := ssh.Dial("tcp", hostname, conf)
 	if err != nil {

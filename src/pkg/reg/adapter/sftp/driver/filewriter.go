@@ -49,11 +49,9 @@ func (fw *fileWriter) Close() error {
 	if fw.closed {
 		return fmt.Errorf("already closed")
 	}
-
 	if err := fw.bw.Flush(); err != nil {
 		return err
 	}
-
 	if err := fw.file.Close(); err != nil {
 		return err
 	}

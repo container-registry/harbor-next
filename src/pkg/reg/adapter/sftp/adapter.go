@@ -31,14 +31,11 @@ type factory struct {
 
 // Create ...
 func (f *factory) Create(r *model.Registry) (adapter.Adapter, error) {
-
 	driver := sftpdriver.NewDriver(r)
-
 	ns, err := storage.NewRegistry(context.TODO(), driver)
 	if err != nil {
 		return nil, err
 	}
-
 	return &sftpAdapter{
 		regModel: r,
 		registry: ns,
@@ -61,10 +58,8 @@ type sftpAdapter struct {
 	registry distribution.Namespace
 }
 
-func (a *sftpAdapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, error) {
-
+func (a *sftpAdapter) FetchArtifacts(_ []*model.Filter) ([]*model.Resource, error) {
 	ctx := context.Background()
-
 	var repos = make([]string, 1000)
 
 	_, err := a.registry.Repositories(ctx, repos, "")
@@ -119,10 +114,7 @@ func (a *sftpAdapter) ManifestExist(repository, ref string) (exist bool, desc *d
 
 	tagService := repo.Tags(ctx)
 
-	var (
-		opts []distribution.ManifestServiceOption
-		d    digest.Digest
-	)
+	var d digest.Digest
 
 	if !strings.HasPrefix(ref, "sha256:") {
 		// looks like a tag
@@ -134,7 +126,6 @@ func (a *sftpAdapter) ManifestExist(repository, ref string) (exist bool, desc *d
 			}
 			return false, nil, fmt.Errorf("unable to get tag %s: %v", ref, err)
 		}
-		opts = append(opts, distribution.WithTag(ref))
 		d = descriptor.Digest
 	} else {
 		d = digest.Digest(ref)
@@ -154,7 +145,7 @@ func (a *sftpAdapter) ManifestExist(repository, ref string) (exist bool, desc *d
 	return true, &descriptor, nil
 }
 
-func (a *sftpAdapter) PullManifest(repository, ref string, acceptedMediaTypes ...string) (distribution.Manifest, string, error) {
+func (a *sftpAdapter) PullManifest(repository, ref string, _ ...string) (distribution.Manifest, string, error) {
 	ctx := context.Background()
 
 	repo, err := a.getRepo(ctx, repository, ref)
@@ -274,15 +265,14 @@ func (a *sftpAdapter) PullBlob(repository, d string) (int64, io.ReadCloser, erro
 	if err != nil {
 		return 0, nil, fmt.Errorf("unable to open blob: %v", err)
 	}
-
 	return descriptor.Size, readSeeker, nil
 }
 
-func (a *sftpAdapter) PullBlobChunk(repository, digest string, blobSize, start, end int64) (size int64, blob io.ReadCloser, err error) {
+func (a *sftpAdapter) PullBlobChunk(_, _ string, _, _, _ int64) (size int64, blob io.ReadCloser, err error) {
 	return 0, nil, fmt.Errorf("PullBlobChunk is not implemented")
 }
 
-func (a *sftpAdapter) PushBlobChunk(repository, digest string, size int64, chunk io.Reader, start, end int64, location string) (nextUploadLocation string, endRange int64, err error) {
+func (a *sftpAdapter) PushBlobChunk(_, _ string, _ int64, _ io.Reader, _, _ int64, _ string) (nextUploadLocation string, endRange int64, err error) {
 	return "", 0, fmt.Errorf("PushBlobChunk is not implemented")
 }
 
@@ -319,7 +309,7 @@ func (a *sftpAdapter) PushBlob(repository, d string, size int64, r io.Reader) er
 	return nil
 }
 
-func (a *sftpAdapter) MountBlob(srcRepository, digest, dstRepository string) (err error) {
+func (a *sftpAdapter) MountBlob(_, _, _ string) (err error) {
 	return fmt.Errorf("MountBlob is not implemented")
 }
 
@@ -328,9 +318,7 @@ func (a *sftpAdapter) CanBeMount(_ string) (mount bool, repository string, err e
 }
 
 func (a *sftpAdapter) DeleteTag(r, tag string) error {
-
 	ctx := context.Background()
-
 	named, err := reference.WithName(r)
 	if err != nil {
 		return fmt.Errorf("ref %s error: %v", r, err)
@@ -339,12 +327,10 @@ func (a *sftpAdapter) DeleteTag(r, tag string) error {
 	if err != nil {
 		return fmt.Errorf("unable to get repo %s: %v", r, err)
 	}
-
 	return repo.Tags(ctx).Untag(ctx, tag)
 }
 
 func (a *sftpAdapter) ListTags(r string) ([]string, error) {
-
 	ctx := context.Background()
 
 	named, err := reference.WithName(r)
@@ -362,7 +348,7 @@ func (a *sftpAdapter) ListTags(r string) ([]string, error) {
 	return tags, nil
 }
 
-func (a *sftpAdapter) PrepareForPush(resources []*model.Resource) error {
+func (a *sftpAdapter) PrepareForPush(_ []*model.Resource) error {
 	return nil
 }
 
@@ -385,7 +371,6 @@ func (a *sftpAdapter) getRepo(ctx context.Context, repository, ref string) (dist
 		return nil, fmt.Errorf("unable to build reference: %v", err)
 	}
 	return a.registry.Repository(ctx, named)
-
 }
 
 func (a *sftpAdapter) Info() (*model.RegistryInfo, error) {
