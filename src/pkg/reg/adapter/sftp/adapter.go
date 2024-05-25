@@ -292,7 +292,9 @@ func (a *sftpAdapter) PushBlob(repository, d string, size int64, r io.Reader) er
 	if err != nil {
 		return fmt.Errorf("unable to create blob: %v", err)
 	}
-	defer writer.Cancel(ctx)
+	defer func() {
+		_ = writer.Cancel(ctx)
+	}()
 
 	_, err = writer.ReadFrom(r)
 	if err != nil {

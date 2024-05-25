@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/docker/distribution/registry/storage/driver"
-	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
 	sftppkg "github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
@@ -48,7 +47,7 @@ func (d *Driver) GetContent(_ context.Context, path string) ([]byte, error) {
 	file, err := client.Open(client.normaliseBasePath(path))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, storagedriver.PathNotFoundError{}
+			return nil, driver.PathNotFoundError{}
 		}
 		return nil, fmt.Errorf("unable to open file: %v", err)
 	}
@@ -91,7 +90,7 @@ func (d *Driver) Reader(_ context.Context, path string, offset int64) (io.ReadCl
 	file, err := client.Open(client.normaliseBasePath(path))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, storagedriver.PathNotFoundError{}
+			return nil, driver.PathNotFoundError{}
 		}
 		return nil, err
 	}
@@ -102,7 +101,7 @@ func (d *Driver) Reader(_ context.Context, path string, offset int64) (io.ReadCl
 		return nil, err
 	} else if seekPos < offset {
 		file.Close()
-		return nil, storagedriver.InvalidOffsetError{Path: path, Offset: offset}
+		return nil, driver.InvalidOffsetError{Path: path, Offset: offset}
 	}
 	return file, nil
 }
@@ -153,7 +152,7 @@ func (d *Driver) Stat(_ context.Context, path string) (driver.FileInfo, error) {
 	stat, err := client.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, storagedriver.PathNotFoundError{Path: path}
+			return nil, driver.PathNotFoundError{Path: path}
 		}
 		return nil, err
 	}
@@ -174,7 +173,7 @@ func (d *Driver) List(_ context.Context, path string) ([]string, error) {
 	files, err := client.ReadDir(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, storagedriver.PathNotFoundError{Path: path}
+			return nil, driver.PathNotFoundError{Path: path}
 		}
 		return nil, fmt.Errorf("read dir error: %v", err)
 	}
