@@ -68,7 +68,7 @@ func (a *sftpAdapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource
 	var repos = make([]string, 1000)
 
 	_, err := a.registry.Repositories(ctx, repos, "")
-	if err != nil && !errors.As(err, &io.EOF) {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, fmt.Errorf("unable to get repositories: %v", err)
 	}
 	var resources []*model.Resource
@@ -145,7 +145,7 @@ func (a *sftpAdapter) ManifestExist(repository, ref string) (exist bool, desc *d
 	if err != nil {
 		if err != nil {
 			switch {
-			case errors.As(err, &distribution.ErrBlobUnknown):
+			case errors.Is(err, distribution.ErrBlobUnknown):
 				return false, nil, nil
 			}
 		}
@@ -248,7 +248,7 @@ func (a *sftpAdapter) BlobExist(repository, d string) (exist bool, err error) {
 	_, err = blobs.Stat(ctx, digest.Digest(d))
 	if err != nil {
 		switch {
-		case errors.As(err, &distribution.ErrBlobUnknown):
+		case errors.Is(err, distribution.ErrBlobUnknown):
 			return false, nil
 		}
 	}

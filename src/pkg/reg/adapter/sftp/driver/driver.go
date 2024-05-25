@@ -55,7 +55,7 @@ func (d *Driver) GetContent(_ context.Context, path string) ([]byte, error) {
 	return io.ReadAll(file)
 }
 
-func (d *Driver) PutContent(ctx context.Context, p string, content []byte) error {
+func (d *Driver) PutContent(_ context.Context, p string, content []byte) error {
 
 	client, err := d.getClient(d.regModel)
 	if err != nil {
@@ -79,7 +79,7 @@ func (d *Driver) PutContent(ctx context.Context, p string, content []byte) error
 	return err
 }
 
-func (d *Driver) Reader(ctx context.Context, path string, offset int64) (io.ReadCloser, error) {
+func (d *Driver) Reader(_ context.Context, path string, offset int64) (io.ReadCloser, error) {
 	if offset > 0 {
 		return nil, fmt.Errorf("offset is not supported")
 	}
@@ -107,7 +107,7 @@ func (d *Driver) Reader(ctx context.Context, path string, offset int64) (io.Read
 	return file, nil
 }
 
-func (d *Driver) Writer(ctx context.Context, path string, append bool) (driver.FileWriter, error) {
+func (d *Driver) Writer(_ context.Context, path string, append bool) (driver.FileWriter, error) {
 	if append {
 		return nil, fmt.Errorf("append is not supported")
 	}
@@ -143,7 +143,7 @@ func (d *Driver) Writer(ctx context.Context, path string, append bool) (driver.F
 	return newFileWriter(file, client, offset), nil
 }
 
-func (d *Driver) Stat(ctx context.Context, path string) (driver.FileInfo, error) {
+func (d *Driver) Stat(_ context.Context, path string) (driver.FileInfo, error) {
 	client, err := d.getClient(d.regModel)
 	if err != nil {
 		return nil, err
@@ -164,7 +164,7 @@ func (d *Driver) Stat(ctx context.Context, path string) (driver.FileInfo, error)
 	}, nil
 }
 
-func (d *Driver) List(ctx context.Context, path string) ([]string, error) {
+func (d *Driver) List(_ context.Context, path string) ([]string, error) {
 	client, err := d.getClient(d.regModel)
 	if err != nil {
 		return nil, fmt.Errorf("list error: %v", err)
@@ -186,7 +186,7 @@ func (d *Driver) List(ctx context.Context, path string) ([]string, error) {
 	return result, nil
 }
 
-func (d *Driver) Move(ctx context.Context, sourcePath string, destPath string) error {
+func (d *Driver) Move(_ context.Context, sourcePath string, destPath string) error {
 	client, err := d.getClient(d.regModel)
 	if err != nil {
 		return err
@@ -202,7 +202,7 @@ func (d *Driver) Move(ctx context.Context, sourcePath string, destPath string) e
 	return client.Rename(sourcePath, destPath)
 }
 
-func (d *Driver) Delete(ctx context.Context, path string) error {
+func (d *Driver) Delete(_ context.Context, path string) error {
 	client, err := d.getClient(d.regModel)
 	if err != nil {
 		return err
@@ -219,12 +219,12 @@ func (d *Driver) Delete(ctx context.Context, path string) error {
 	return nil
 }
 
-func (d *Driver) URLFor(ctx context.Context, path string, options map[string]interface{}) (string, error) {
+func (d *Driver) URLFor(_ context.Context, path string, options map[string]interface{}) (string, error) {
 
 	return "", fmt.Errorf("URLFor is not implemented")
 }
 
-func (d *Driver) Walk(ctx context.Context, path string, f driver.WalkFn) error {
+func (d *Driver) Walk(_ context.Context, path string, f driver.WalkFn) error {
 	client, err := d.getClient(d.regModel)
 	if err != nil {
 		return err
