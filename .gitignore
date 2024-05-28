@@ -58,3 +58,7 @@ src/server/v2.0/restapi/
 
 harborclient/
 openapi-generator-cli.jar
+.gitlab-ci-local-env
+.gitlab-ci-local-variables.yml
+.gitlab-ci-local/.gitignore
+.gitlab-ci-local

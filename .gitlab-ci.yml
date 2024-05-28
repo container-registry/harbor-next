@@ -1,0 +1,109 @@
+image: docker:dind
+
+services:
+  - docker:dind
+
+variables:
+  GIT_DEPTH: "1"
+  DOCKER_DRIVER: "overlay2"
+  DOCKER_TLS_CERTDIR: ""
+  DOCKER_BUILDKIT: "1"
+  REGISTRY_DOMAIN: "8gears.container-registry.com"
+
+before_script:
+  - apk add --purge --no-cache make bash git docker-compose curl
+  - mkdir -p $HOME/.docker/
+  - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
+stages:
+  - build
+
+build-portal:
+  stage: build
+  variables:
+    DOCKERIMAGENAME_PORTAL: "${REGISTRY_DOMAIN}/container-registry/harbor-portal"
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ /cr\/.*/
+    - if: $CI_COMMIT_BRANCH =~ /^feature\/sftp-replication/
+  script:
+    - env
+    - export BASEIMAGETAG=$(cat ./VERSION)
+    - export VERSIONTAG=$(cat ./VERSION)-sftp-replication
+    - mv setting-container-registry.json src/portal/src/setting.json
+    - cp -a container-registry-logo.svg src/portal/src/images/
+    - make build -e BUILDTARGET="_build_prepare _build_portal" -e BASEIMAGETAG="$BASEIMAGETAG" -e DEVFLAG=false -e VERSIONTAG=$VERSIONTAG -e DOCKERIMAGENAME_PORTAL="$DOCKERIMAGENAME_PORTAL"
+    - docker push "${DOCKERIMAGENAME_PORTAL}:${VERSIONTAG}"
+
+
+build-portal-advantest:
+  stage: build
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ /cr\/.*/
+    - if: $CI_COMMIT_BRANCH =~ /^feature\/sftp-replication/
+  variables:
+    DOCKERIMAGENAME_PORTAL: "${REGISTRY_DOMAIN}/container-registry/harbor-portal"
+    NG_BUILD_ARGS: '--prod --base-href /admin-console/ --deploy-url /admin-console/'
+  script:
+    - export BASEIMAGETAG=$(cat ./VERSION)
+    - export VERSIONTAG="$(cat ./VERSION)-advantest-sftp-replication"
+    - mv setting-advantest.json src/portal/src/setting.json
+    - cp -a advantest-logo.svg src/portal/src/images/
+    - make build -e BUILDTARGET="_build_prepare _build_portal" -e BASEIMAGETAG=$BASEIMAGETAG -e DEVFLAG=false -e VERSIONTAG=$VERSIONTAG -e DOCKERIMAGENAME_PORTAL="$DOCKERIMAGENAME_PORTAL"
+    - docker push "${DOCKERIMAGENAME_PORTAL}:${VERSIONTAG}"
+
+build-core:
+  stage: build
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ /cr\/.*/
+    - if: $CI_COMMIT_BRANCH =~ /^feature\/sftp-replication/
+  variables:
+    DOCKERIMAGENAME_CORE: "${REGISTRY_DOMAIN}/container-registry/harbor-core"
+  script:
+    - export BASEIMAGETAG=$(cat ./VERSION)
+    - export VERSIONTAG=$(cat ./VERSION)-sftp-replication
+    #- make update_prepare_version check_environment versions_prepare compile_core DEVFLAG="false" BASEIMAGETAG="$BASEIMAGETAG" VERSIONTAG="$VERSIONTAG"
+    #- make -f make/photon/Makefile _build_core BASEIMAGETAG="$BASEIMAGETAG" DOCKERIMAGENAME_CORE="$DOCKERIMAGENAME_CORE" VERSIONTAG="$VERSIONTAG"
+    - make versions_prepare compile_core build -e BUILDTARGET="_build_prepare _build_core" -e BASEIMAGETAG="$BASEIMAGETAG" -e DEVFLAG=false -e VERSIONTAG=$VERSIONTAG -e DOCKERIMAGENAME_CORE="$DOCKERIMAGENAME_CORE"
+    - docker push "${DOCKERIMAGENAME_CORE}:${VERSIONTAG}"
+
+build-registry:
+  stage: build
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ /cr\/.*/
+    - if: $CI_COMMIT_BRANCH =~ /^feature\/sftp-replication/
+  variables:
+    DOCKERIMAGENAME_REG: "${REGISTRY_DOMAIN}/container-registry/registry-photon"
+  script:
+    - export BASEIMAGETAG=$(cat ./VERSION)
+    - export VERSIONTAG=$(cat ./VERSION)-sftp-replication
+    - make versions_prepare build -e BUILDTARGET="_build_prepare _build_registry" -e BASEIMAGETAG="$BASEIMAGETAG" -e DEVFLAG=false -e VERSIONTAG=$VERSIONTAG -e DOCKERIMAGENAME_REG="$DOCKERIMAGENAME_REG"
+    - docker push "${DOCKERIMAGENAME_REG}:${VERSIONTAG}"
+  allow_failure: true
+
+build-jobservice:
+  stage: build
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ /cr\/.*/
+    - if: $CI_COMMIT_BRANCH =~ /^feature\/sftp-replication/
+  variables:
+    DOCKERIMAGENAME_JOBSERVICE: "${REGISTRY_DOMAIN}/container-registry/harbor-jobservice"
+  script:
+    - export BASEIMAGETAG=$(cat ./VERSION)
+    - export VERSIONTAG=$(cat ./VERSION)-sftp-replication
+
+    #- echo "$CR_REGISTRY_PASS" | docker login -u "$CR_REGISTRY_USER" --password-stdin c8n.io
+    #- make check_environment versions_prepare compile_jobservice DEVFLAG="false" BASEIMAGETAG="$BASEIMAGETAG" VERSIONTAG="$VERSIONTAG"
+    - make versions_prepare compile_jobservice build -e BUILDTARGET="_build_prepare _build_jobservice" -e BASEIMAGETAG="$BASEIMAGETAG" -e DEVFLAG=false -e VERSIONTAG=$VERSIONTAG -e DOCKERIMAGENAME_JOBSERVICE="$DOCKERIMAGENAME_JOBSERVICE"
+    - docker push "$DOCKERIMAGENAME_JOBSERVICE":"$VERSIONTAG"
+
+build-exporter:
+  stage: build
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ /cr\/.*/
+    - if: $CI_COMMIT_BRANCH =~ /^feature\/sftp-replication/
+  variables:
+    DOCKERIMAGENAME_EXPORTER: "${REGISTRY_DOMAIN}/container-registry/harbor-exporter"
+  script:
+    - export BASEIMAGETAG=$(cat ./VERSION)
+    - export VERSIONTAG=$(cat ./VERSION)-sftp-replication
+    - make versions_prepare build -e BUILDTARGET="_build_prepare _compile_and_build_exporter" -e BASEIMAGETAG="$BASEIMAGETAG" -e DEVFLAG=false -e VERSIONTAG=$VERSIONTAG -e DOCKERIMAGENAME_EXPORTER="$DOCKERIMAGENAME_EXPORTER"
+    - docker push "${DOCKERIMAGENAME_EXPORTER}:${VERSIONTAG}"
