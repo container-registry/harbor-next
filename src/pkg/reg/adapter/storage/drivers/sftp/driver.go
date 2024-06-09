@@ -164,7 +164,6 @@ func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, erro
 	if err != nil {
 		return nil, err
 	}
-
 	p = client.normaliseBasePath(p)
 	stat, err := client.Stat(p)
 	if err != nil {
@@ -188,6 +187,8 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 	}
 	p = client.normaliseBasePath(p)
 
+	spew.Dump("path", p)
+
 	files, err := client.ReadDir(p)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -200,9 +201,6 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 	for _, file := range files {
 		result = append(result, path.Join(p, file.Name()))
 	}
-
-	spew.Dump(result)
-
 	return result, nil
 }
 
@@ -257,9 +255,9 @@ func (d *driver) getClient() (*clientWrapper, error) {
 	d.clientLock.Lock()
 	defer d.clientLock.Unlock()
 
-	if d.client != nil {
-		return d.client, nil
-	}
+	//if d.client != nil {
+	//	return d.client, nil
+	//}
 
 	fmt.Println("################# CONNECT!!!!! ##################")
 
@@ -308,7 +306,7 @@ func (d *driver) Health(_ context.Context) error {
 		return err
 	}
 	defer client.Close()
-	return err
+	return nil
 }
 
 func New(regModel *model.Registry) storagedriver.StorageDriver {

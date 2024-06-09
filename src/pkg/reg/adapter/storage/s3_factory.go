@@ -25,7 +25,7 @@ type s3Factory struct {
 // Create ...
 func (f *s3Factory) Create(r *model.Registry) (regadapter.Adapter, error) {
 
-	fmt.Println("1!!!!!!!!!!!!! S3 FACTORY CREATE !!!!!!!!!!!!!!!")
+	fmt.Println("!!!!!!!!!!!!!! S3 FACTORY CREATE !!!!!!!!!!!!!!!")
 	driverParams := s3.DriverParameters{}
 
 	if r.Credential != nil {
