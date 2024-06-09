@@ -302,6 +302,7 @@ func (d *driver) getClient() (*clientWrapper, error) {
 func (d *driver) Health(_ context.Context) error {
 	fmt.Println("--------------- HEALTH CHECK ----------------")
 	d.resetClient()
+	defer d.resetClient()
 	client, err := d.getClient()
 	if err != nil {
 		return err
