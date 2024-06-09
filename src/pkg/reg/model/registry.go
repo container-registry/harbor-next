@@ -36,9 +36,9 @@ const (
 	RegistryTypeGithubCR         = "github-ghcr"
 	RegistryTypeVolcCR           = "volcengine-cr"
 	RegistryTypeSFTP             = "sftp"
-
-	RegistryTypeHelmHub     = "helm-hub"
-	RegistryTypeArtifactHub = "artifact-hub"
+	RegistryTypeS3               = "s3"
+	RegistryTypeHelmHub          = "helm-hub"
+	RegistryTypeArtifactHub      = "artifact-hub"
 
 	FilterStyleTypeText  = "input"
 	FilterStyleTypeRadio = "radio"

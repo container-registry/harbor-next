@@ -1,4 +1,4 @@
-package driver
+package sftp
 
 import (
 	"bufio"

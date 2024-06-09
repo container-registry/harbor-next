@@ -1,4 +1,4 @@
-package driver
+package sftp
 
 import (
 	storagedriver "github.com/docker/distribution/registry/storage/driver"

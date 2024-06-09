@@ -1,9 +1,12 @@
-package driver
+package sftp
 
 import (
 	"context"
 	"fmt"
-	"github.com/docker/distribution/registry/storage/driver"
+	"github.com/davecgh/go-spew/spew"
+	storagedriver "github.com/docker/distribution/registry/storage/driver"
+	"github.com/docker/distribution/registry/storage/driver/base"
+	"github.com/goharbor/harbor/src/pkg/reg/adapter/storage/health"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
 	sftppkg "github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
@@ -11,18 +14,32 @@ import (
 	"net/url"
 	"os"
 	"path"
-	"strings"
 	"sync"
 )
 
-type Driver struct {
+const (
+	DriverName         = "sftp"
+	defaultConcurrency = 10
+)
+
+type driver struct {
 	regModel   *model.Registry
 	client     *clientWrapper
 	clientLock *sync.Mutex
 }
 
-func (d *Driver) Name() string {
-	return "sftp"
+func (d *driver) Name() string {
+	return DriverName
+}
+
+type baseEmbed struct {
+	base.Base
+}
+
+// Driver is a storagedriver.StorageDriver implementation backed by a local
+// filesystem. All provided paths will be subpaths of the RootDirectory.
+type Driver struct {
+	baseEmbed
 }
 
 type clientWrapper struct {
@@ -30,16 +47,12 @@ type clientWrapper struct {
 	basePath string
 }
 
-func (c clientWrapper) normaliseBasePath(path string) string {
-	return normalisePath(c.basePath, path)
+func (c clientWrapper) normaliseBasePath(p string) string {
+	return path.Join(c.basePath, p)
 }
 
-func normalisePath(base, path string) string {
-	return fmt.Sprintf("%s/%s", strings.TrimRight(base, "/"), strings.TrimLeft(path, "/"))
-}
-
-func (d *Driver) GetContent(_ context.Context, path string) ([]byte, error) {
-	client, err := d.getClient(d.regModel)
+func (d *driver) GetContent(_ context.Context, path string) ([]byte, error) {
+	client, err := d.getClient()
 	if err != nil {
 		return nil, err
 	}
@@ -47,20 +60,21 @@ func (d *Driver) GetContent(_ context.Context, path string) ([]byte, error) {
 	file, err := client.Open(client.normaliseBasePath(path))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, driver.PathNotFoundError{}
+			return nil, storagedriver.PathNotFoundError{}
 		}
 		return nil, fmt.Errorf("unable to open file: %v", err)
 	}
 	return io.ReadAll(file)
 }
 
-func (d *Driver) PutContent(_ context.Context, p string, content []byte) error {
+func (d *driver) PutContent(_ context.Context, p string, content []byte) error {
 
-	client, err := d.getClient(d.regModel)
+	client, err := d.getClient()
 	if err != nil {
 		return err
 	}
-	client.normaliseBasePath(p)
+
+	p = client.normaliseBasePath(p)
 
 	if err := client.MkdirAll(path.Dir(p)); err != nil {
 		return fmt.Errorf("unable to create directory: %v", err)
@@ -78,11 +92,12 @@ func (d *Driver) PutContent(_ context.Context, p string, content []byte) error {
 	return err
 }
 
-func (d *Driver) Reader(_ context.Context, path string, offset int64) (io.ReadCloser, error) {
+func (d *driver) Reader(_ context.Context, path string, offset int64) (io.ReadCloser, error) {
+
 	if offset > 0 {
 		return nil, fmt.Errorf("offset is not supported")
 	}
-	client, err := d.getClient(d.regModel)
+	client, err := d.getClient()
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +105,7 @@ func (d *Driver) Reader(_ context.Context, path string, offset int64) (io.ReadCl
 	file, err := client.Open(client.normaliseBasePath(path))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, driver.PathNotFoundError{}
+			return nil, storagedriver.PathNotFoundError{}
 		}
 		return nil, err
 	}
@@ -101,17 +116,18 @@ func (d *Driver) Reader(_ context.Context, path string, offset int64) (io.ReadCl
 		return nil, err
 	} else if seekPos < offset {
 		file.Close()
-		return nil, driver.InvalidOffsetError{Path: path, Offset: offset}
+		return nil, storagedriver.InvalidOffsetError{Path: path, Offset: offset}
 	}
 	return file, nil
 }
 
-func (d *Driver) Writer(_ context.Context, path string, append bool) (driver.FileWriter, error) {
+func (d *driver) Writer(_ context.Context, path string, append bool) (storagedriver.FileWriter, error) {
+
 	if append {
 		return nil, fmt.Errorf("append is not supported")
 	}
 
-	client, err := d.getClient(d.regModel)
+	client, err := d.getClient()
 	if err != nil {
 		return nil, err
 	}
@@ -142,51 +158,56 @@ func (d *Driver) Writer(_ context.Context, path string, append bool) (driver.Fil
 	return newFileWriter(file, client, offset), nil
 }
 
-func (d *Driver) Stat(_ context.Context, path string) (driver.FileInfo, error) {
-	client, err := d.getClient(d.regModel)
+func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, error) {
+
+	client, err := d.getClient()
 	if err != nil {
 		return nil, err
 	}
 
-	path = client.normaliseBasePath(path)
-	stat, err := client.Stat(path)
+	p = client.normaliseBasePath(p)
+	stat, err := client.Stat(p)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, driver.PathNotFoundError{Path: path}
+			return nil, storagedriver.PathNotFoundError{Path: p}
 		}
 		return nil, err
 	}
 
 	return fileInfo{
 		FileInfo: stat,
-		path:     path,
+		path:     p,
 	}, nil
 }
 
-func (d *Driver) List(_ context.Context, path string) ([]string, error) {
-	client, err := d.getClient(d.regModel)
+func (d *driver) List(_ context.Context, p string) ([]string, error) {
+
+	client, err := d.getClient()
 	if err != nil {
 		return nil, fmt.Errorf("list error: %v", err)
 	}
-	path = client.normaliseBasePath(path)
+	p = client.normaliseBasePath(p)
 
-	files, err := client.ReadDir(path)
+	files, err := client.ReadDir(p)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, driver.PathNotFoundError{Path: path}
+			return nil, storagedriver.PathNotFoundError{Path: p}
 		}
 		return nil, fmt.Errorf("read dir error: %v", err)
 	}
 	var result []string
 
 	for _, file := range files {
-		result = append(result, normalisePath(path, file.Name()))
+		result = append(result, path.Join(p, file.Name()))
 	}
+
+	spew.Dump(result)
+
 	return result, nil
 }
 
-func (d *Driver) Move(_ context.Context, sourcePath string, destPath string) error {
-	client, err := d.getClient(d.regModel)
+func (d *driver) Move(_ context.Context, sourcePath string, destPath string) error {
+	client, err := d.getClient()
 	if err != nil {
 		return err
 	}
@@ -201,8 +222,8 @@ func (d *Driver) Move(_ context.Context, sourcePath string, destPath string) err
 	return client.Rename(sourcePath, destPath)
 }
 
-func (d *Driver) Delete(_ context.Context, path string) error {
-	client, err := d.getClient(d.regModel)
+func (d *driver) Delete(_ context.Context, path string) error {
+	client, err := d.getClient()
 	if err != nil {
 		return err
 	}
@@ -218,33 +239,21 @@ func (d *Driver) Delete(_ context.Context, path string) error {
 	return nil
 }
 
-func (d *Driver) URLFor(_ context.Context, _ string, _ map[string]interface{}) (string, error) {
+func (d *driver) URLFor(_ context.Context, _ string, _ map[string]interface{}) (string, error) {
 	return "", fmt.Errorf("URLFor is not implemented")
 }
 
-func (d *Driver) Walk(_ context.Context, path string, f driver.WalkFn) error {
-	client, err := d.getClient(d.regModel)
-	if err != nil {
-		return err
-	}
-	path = client.normaliseBasePath(path)
-	walker := client.Walk(path)
-
-	for walker.Step() {
-		if walker.Err() != nil {
-			continue
-		}
-		if err = f(&fileInfo{
-			FileInfo: walker.Stat(),
-			path:     normalisePath(path, walker.Path()),
-		}); err != nil {
-			return err
-		}
-	}
-	return nil
+func (d *driver) Walk(ctx context.Context, path string, f storagedriver.WalkFn) error {
+	return storagedriver.WalkFallback(ctx, d, path, f)
 }
 
-func (d *Driver) getClient(registry *model.Registry) (*clientWrapper, error) {
+func (d *driver) resetClient() {
+	d.clientLock.Lock()
+	defer d.clientLock.Unlock()
+	d.client = nil
+}
+
+func (d *driver) getClient() (*clientWrapper, error) {
 	d.clientLock.Lock()
 	defer d.clientLock.Unlock()
 
@@ -252,7 +261,9 @@ func (d *Driver) getClient(registry *model.Registry) (*clientWrapper, error) {
 		return d.client, nil
 	}
 
-	u, err := url.Parse(registry.URL)
+	fmt.Println("################# CONNECT!!!!! ##################")
+
+	u, err := url.Parse(d.regModel.URL)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse registry URL: %v", err)
 	}
@@ -263,13 +274,13 @@ func (d *Driver) getClient(registry *model.Registry) (*clientWrapper, error) {
 	}
 
 	conf := &ssh.ClientConfig{}
-	if registry.Insecure {
+	if d.regModel.Insecure {
 		conf.HostKeyCallback = ssh.InsecureIgnoreHostKey()
 	}
 
-	if registry.Credential != nil {
-		conf.User = registry.Credential.AccessKey
-		conf.Auth = append(conf.Auth, ssh.Password(registry.Credential.AccessSecret))
+	if d.regModel.Credential != nil {
+		conf.User = d.regModel.Credential.AccessKey
+		conf.Auth = append(conf.Auth, ssh.Password(d.regModel.Credential.AccessSecret))
 	}
 	hostname := fmt.Sprintf("%s:%s", u.Hostname(), port)
 
@@ -277,7 +288,6 @@ func (d *Driver) getClient(registry *model.Registry) (*clientWrapper, error) {
 	if err != nil {
 		return nil, fmt.Errorf("dial %s error: %v", hostname, err)
 	}
-
 	c, err := sftppkg.NewClient(conn)
 	if err != nil {
 		return nil, err
@@ -289,7 +299,26 @@ func (d *Driver) getClient(registry *model.Registry) (*clientWrapper, error) {
 	}
 	return d.client, nil
 }
-
-func NewDriver(regModel *model.Registry) *Driver {
-	return &Driver{regModel: regModel, clientLock: &sync.Mutex{}}
+func (d *driver) Health(_ context.Context) error {
+	fmt.Println("--------------- HEALTH CHECK ----------------")
+	d.resetClient()
+	client, err := d.getClient()
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+	return err
 }
+
+func New(regModel *model.Registry) storagedriver.StorageDriver {
+
+	return &Driver{
+		baseEmbed: baseEmbed{
+			Base: base.Base{
+				StorageDriver: base.NewRegulator(&driver{regModel: regModel, clientLock: &sync.Mutex{}}, defaultConcurrency),
+			},
+		},
+	}
+}
+
+var _ health.Checker = (*driver)(nil)
