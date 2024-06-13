@@ -3,18 +3,18 @@ package sftp
 import (
 	"context"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/docker/distribution/registry/storage/driver/base"
 	"github.com/goharbor/harbor/src/pkg/reg/adapter/storage/health"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
 	sftppkg "github.com/pkg/sftp"
+	"github.com/silenceper/pool"
 	"golang.org/x/crypto/ssh"
 	"io"
 	"net/url"
 	"os"
 	"path"
-	"sync"
+	"time"
 )
 
 const (
@@ -23,9 +23,8 @@ const (
 )
 
 type driver struct {
-	regModel   *model.Registry
-	client     *clientWrapper
-	clientLock *sync.Mutex
+	regModel *model.Registry
+	pool     pool.Pool
 }
 
 func (d *driver) Name() string {
@@ -56,6 +55,7 @@ func (d *driver) GetContent(_ context.Context, path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer d.putClient(client)
 
 	file, err := client.Open(client.normaliseBasePath(path))
 	if err != nil {
@@ -73,6 +73,7 @@ func (d *driver) PutContent(_ context.Context, p string, content []byte) error {
 	if err != nil {
 		return err
 	}
+	defer d.putClient(client)
 
 	p = client.normaliseBasePath(p)
 
@@ -101,6 +102,7 @@ func (d *driver) Reader(_ context.Context, path string, offset int64) (io.ReadCl
 	if err != nil {
 		return nil, err
 	}
+	defer d.putClient(client)
 
 	file, err := client.Open(client.normaliseBasePath(path))
 	if err != nil {
@@ -132,8 +134,9 @@ func (d *driver) Writer(_ context.Context, path string, append bool) (storagedri
 		return nil, err
 	}
 
-	path = client.normaliseBasePath(path)
+	defer d.putClient(client)
 
+	path = client.normaliseBasePath(path)
 	file, err := client.Create(path)
 	if err != nil {
 		return nil, fmt.Errorf("client create sftp error: %v", err)
@@ -164,6 +167,8 @@ func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, erro
 	if err != nil {
 		return nil, err
 	}
+	defer d.putClient(client)
+
 	p = client.normaliseBasePath(p)
 	stat, err := client.Stat(p)
 	if err != nil {
@@ -185,9 +190,10 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list error: %v", err)
 	}
-	p = client.normaliseBasePath(p)
 
-	spew.Dump("path", p)
+	defer d.putClient(client)
+
+	p = client.normaliseBasePath(p)
 
 	files, err := client.ReadDir(p)
 	if err != nil {
@@ -201,6 +207,7 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 	for _, file := range files {
 		result = append(result, path.Join(p, file.Name()))
 	}
+
 	return result, nil
 }
 
@@ -209,7 +216,8 @@ func (d *driver) Move(_ context.Context, sourcePath string, destPath string) err
 	if err != nil {
 		return err
 	}
-
+	defer d.putClient(client)
+	//
 	sourcePath = client.normaliseBasePath(sourcePath)
 	destPath = client.normaliseBasePath(destPath)
 
@@ -225,6 +233,8 @@ func (d *driver) Delete(_ context.Context, path string) error {
 	if err != nil {
 		return err
 	}
+	defer d.putClient(client)
+	//
 
 	path = client.normaliseBasePath(path)
 	if err := client.RemoveAll(path); err != nil && !os.IsNotExist(err) {
@@ -245,79 +255,97 @@ func (d *driver) Walk(ctx context.Context, path string, f storagedriver.WalkFn) 
 	return storagedriver.WalkFallback(ctx, d, path, f)
 }
 
-func (d *driver) resetClient() {
-	d.clientLock.Lock()
-	defer d.clientLock.Unlock()
-	d.client = nil
-}
-
 func (d *driver) getClient() (*clientWrapper, error) {
-	d.clientLock.Lock()
-	defer d.clientLock.Unlock()
 
-	//if d.client != nil {
-	//	return d.client, nil
-	//}
-
-	fmt.Println("################# CONNECT!!!!! ##################")
-
-	u, err := url.Parse(d.regModel.URL)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse registry URL: %v", err)
-	}
-
-	port := u.Port()
-	if port == "" {
-		port = "22"
-	}
-
-	conf := &ssh.ClientConfig{}
-	if d.regModel.Insecure {
-		conf.HostKeyCallback = ssh.InsecureIgnoreHostKey()
-	}
-
-	if d.regModel.Credential != nil {
-		conf.User = d.regModel.Credential.AccessKey
-		conf.Auth = append(conf.Auth, ssh.Password(d.regModel.Credential.AccessSecret))
-	}
-	hostname := fmt.Sprintf("%s:%s", u.Hostname(), port)
-
-	conn, err := ssh.Dial("tcp", hostname, conf)
-	if err != nil {
-		return nil, fmt.Errorf("dial %s error: %v", hostname, err)
-	}
-	c, err := sftppkg.NewClient(conn)
+	client, err := d.pool.Get()
 	if err != nil {
 		return nil, err
 	}
-
-	d.client = &clientWrapper{
-		Client:   c,
-		basePath: u.Path,
-	}
-	return d.client, nil
+	return client.(*clientWrapper), nil
 }
+
+func (d *driver) putClient(c *clientWrapper) {
+	_ = d.pool.Put(c)
+}
+
 func (d *driver) Health(_ context.Context) error {
 	fmt.Println("--------------- HEALTH CHECK ----------------")
-	d.resetClient()
-	defer d.resetClient()
+
 	client, err := d.getClient()
 	if err != nil {
 		return err
 	}
-	defer client.Close()
-	return nil
+	defer d.putClient(client)
+	return err
 }
 
-func New(regModel *model.Registry) storagedriver.StorageDriver {
+func New(regModel *model.Registry) (storagedriver.StorageDriver, error) {
+
+	//Create a connection pool: Initialize the number of connections to 5, the maximum idle connection is 20, and the maximum concurrent connection is 30
+	poolConfig := &pool.Config{
+		InitialCap: 1,
+		MaxIdle:    1,
+		MaxCap:     2,
+		Factory: func() (interface{}, error) {
+			u, err := url.Parse(regModel.URL)
+			if err != nil {
+				return nil, fmt.Errorf("unable to parse registry URL: %v", err)
+			}
+
+			port := u.Port()
+			if port == "" {
+				port = "22"
+			}
+
+			conf := &ssh.ClientConfig{}
+			if regModel.Insecure {
+				conf.HostKeyCallback = ssh.InsecureIgnoreHostKey()
+			}
+
+			if regModel.Credential != nil {
+				conf.User = regModel.Credential.AccessKey
+				conf.Auth = append(conf.Auth, ssh.Password(regModel.Credential.AccessSecret))
+			}
+			hostname := fmt.Sprintf("%s:%s", u.Hostname(), port)
+
+			conn, err := ssh.Dial("tcp", hostname, conf)
+			if err != nil {
+				return nil, fmt.Errorf("dial %s error: %v", hostname, err)
+			}
+			c, err := sftppkg.NewClient(conn)
+			if err != nil {
+				return nil, err
+			}
+			return &clientWrapper{
+				Client:   c,
+				basePath: u.Path,
+			}, nil
+		},
+		Close: func(v interface{}) error {
+			return v.(*clientWrapper).Close()
+		},
+		Ping: func(v interface{}) error {
+			return nil
+		},
+		//The maximum idle time of the connection, the connection exceeding this time will be closed, which can avoid the problem of automatic failure when connecting to EOF when idle
+		IdleTimeout: 15 * time.Second,
+	}
+
+	p, err := pool.NewChannelPool(poolConfig)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Driver{
 		baseEmbed: baseEmbed{
 			Base: base.Base{
-				StorageDriver: base.NewRegulator(&driver{regModel: regModel, clientLock: &sync.Mutex{}}, defaultConcurrency),
+				StorageDriver: base.NewRegulator(&driver{
+					regModel: regModel,
+					pool:     p,
+				}, defaultConcurrency),
 			},
 		},
-	}
+	}, nil
 }
 
 var _ health.Checker = (*driver)(nil)

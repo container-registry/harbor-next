@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/reference"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
@@ -31,6 +30,7 @@ type adapter struct {
 
 func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, error) {
 	fmt.Println("Fetch artifacts")
+
 	ctx := context.Background()
 	var repoNames = make([]string, 1000)
 
@@ -38,8 +38,6 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, fmt.Errorf("unable to get repositories: %v", err)
 	}
-
-	spew.Dump("repoNames", repoNames)
 
 	if len(repoNames) == 0 {
 		return nil, nil
@@ -51,8 +49,6 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 			Name: repoName,
 		})
 	}
-
-	spew.Dump("filters", filters)
 
 	repositories, err = filter.DoFilterRepositories(repositories, filters)
 	if err != nil {
