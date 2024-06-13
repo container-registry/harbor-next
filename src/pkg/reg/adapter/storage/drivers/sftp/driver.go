@@ -200,7 +200,7 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 		if os.IsNotExist(err) {
 			return nil, storagedriver.PathNotFoundError{Path: p}
 		}
-		return nil, fmt.Errorf("read dir error: %v", err)
+		return nil, fmt.Errorf("read dir %s error: %v", p, err)
 	}
 	var result []string
 
@@ -256,7 +256,6 @@ func (d *driver) Walk(ctx context.Context, path string, f storagedriver.WalkFn) 
 }
 
 func (d *driver) getClient() (*clientWrapper, error) {
-
 	client, err := d.pool.Get()
 	if err != nil {
 		return nil, err
@@ -269,8 +268,6 @@ func (d *driver) putClient(c *clientWrapper) {
 }
 
 func (d *driver) Health(_ context.Context) error {
-	fmt.Println("--------------- HEALTH CHECK ----------------")
-
 	client, err := d.getClient()
 	if err != nil {
 		return err
@@ -285,7 +282,7 @@ func New(regModel *model.Registry) (storagedriver.StorageDriver, error) {
 	poolConfig := &pool.Config{
 		InitialCap: 1,
 		MaxIdle:    1,
-		MaxCap:     2,
+		MaxCap:     3,
 		Factory: func() (interface{}, error) {
 			u, err := url.Parse(regModel.URL)
 			if err != nil {
@@ -322,9 +319,11 @@ func New(regModel *model.Registry) (storagedriver.StorageDriver, error) {
 			}, nil
 		},
 		Close: func(v interface{}) error {
+			fmt.Println("!!!! CLOSING")
 			return v.(*clientWrapper).Close()
 		},
 		Ping: func(v interface{}) error {
+			fmt.Println("!!!! PING")
 			return nil
 		},
 		//The maximum idle time of the connection, the connection exceeding this time will be closed, which can avoid the problem of automatic failure when connecting to EOF when idle
