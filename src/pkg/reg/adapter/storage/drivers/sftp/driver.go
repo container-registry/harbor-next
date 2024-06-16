@@ -185,7 +185,6 @@ func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, erro
 }
 
 func (d *driver) List(_ context.Context, p string) ([]string, error) {
-
 	client, err := d.getClient()
 	if err != nil {
 		return nil, fmt.Errorf("list error: %v", err)
@@ -319,11 +318,9 @@ func New(regModel *model.Registry) (storagedriver.StorageDriver, error) {
 			}, nil
 		},
 		Close: func(v interface{}) error {
-			fmt.Println("!!!! CLOSING")
 			return v.(*clientWrapper).Close()
 		},
 		Ping: func(v interface{}) error {
-			fmt.Println("!!!! PING")
 			return nil
 		},
 		//The maximum idle time of the connection, the connection exceeding this time will be closed, which can avoid the problem of automatic failure when connecting to EOF when idle

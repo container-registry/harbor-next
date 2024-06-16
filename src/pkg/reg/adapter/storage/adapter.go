@@ -8,11 +8,13 @@ import (
 	"github.com/docker/distribution/reference"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/goharbor/harbor/src/common/utils"
+	"github.com/goharbor/harbor/src/lib/log"
 	regadapter "github.com/goharbor/harbor/src/pkg/reg/adapter"
 	"github.com/goharbor/harbor/src/pkg/reg/adapter/storage/health"
 	"github.com/goharbor/harbor/src/pkg/reg/filter"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
 	"github.com/opencontainers/go-digest"
+
 	"io"
 	"strings"
 )
@@ -29,7 +31,7 @@ type adapter struct {
 }
 
 func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, error) {
-	fmt.Println("Fetch artifacts")
+	log.Debugf("FetchArtifacts.filters: %#v\n", filters)
 
 	ctx := context.Background()
 	var repoNames = make([]string, 1000)
