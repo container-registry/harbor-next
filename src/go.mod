@@ -202,3 +202,7 @@ replace (
 	github.com/gomodule/redigo => github.com/gomodule/redigo v1.8.8
 	google.golang.org/api => google.golang.org/api v0.0.0-20160322025152-9bf6e6e569ff
 )
+
+replace (
+	github.com/pkg/sftp => ./pkg/reg/adapter/storage/drivers/sftp/sftpfork
+)
