@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/reference"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
@@ -30,7 +31,8 @@ type adapter struct {
 }
 
 func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, error) {
-	fmt.Printf("FetchArtifacts. Filters: %+v\n", filters)
+	fmt.Printf("FetchArtifacts")
+	spew.Dump(filters)
 
 	ctx := context.Background()
 	var repoNames = make([]string, 1000)
@@ -55,7 +57,7 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("FetchArtifacts. Filtered repositories: %+v\n", repositories)
+	spew.Dump("FetchArtifacts. Filtered repositories", repositories)
 
 	runner := utils.NewLimitedConcurrentRunner(10)
 
@@ -89,7 +91,7 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 			if err != nil {
 				return fmt.Errorf("failed to list artifacts of repository %s: %v", repo, err)
 			}
-			fmt.Printf("filtered tags for repository %s: %+v\n", repo.Name, artifacts)
+			spew.Dump("filtered tags for repository", repo.Name, artifacts)
 
 			if len(artifacts) == 0 {
 				return nil
