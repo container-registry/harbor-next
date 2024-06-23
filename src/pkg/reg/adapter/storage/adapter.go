@@ -30,7 +30,7 @@ type adapter struct {
 }
 
 func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, error) {
-	fmt.Printf("FetchArtifacts. Filters: %#v\n", filters)
+	fmt.Printf("FetchArtifacts. Filters: %+v\n", filters)
 
 	ctx := context.Background()
 	var repoNames = make([]string, 1000)
@@ -55,7 +55,7 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("FetchArtifacts. Filtered repositories: %#v\n", repositories)
+	fmt.Printf("FetchArtifacts. Filtered repositories: %+v\n", repositories)
 
 	runner := utils.NewLimitedConcurrentRunner(10)
 
@@ -89,7 +89,7 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 			if err != nil {
 				return fmt.Errorf("failed to list artifacts of repository %s: %v", repo, err)
 			}
-			fmt.Printf("filtered tags for repository %s: %#v\n", repo, artifacts)
+			fmt.Printf("filtered tags for repository %s: %+v\n", repo.Name, artifacts)
 
 			if len(artifacts) == 0 {
 				return nil
