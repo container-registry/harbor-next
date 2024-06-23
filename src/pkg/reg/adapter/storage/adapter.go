@@ -111,6 +111,10 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 		})
 	}
 
+	if err := runner.Wait(); err != nil {
+		return nil, err
+	}
+
 	var resources []*model.Resource
 
 	for _, r := range rawResources {
@@ -119,6 +123,8 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 		}
 		resources = append(resources, r)
 	}
+
+	fmt.Println("resource length !!!!!", len(resources))
 	return resources, nil
 }
 
