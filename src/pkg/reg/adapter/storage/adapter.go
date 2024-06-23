@@ -8,7 +8,6 @@ import (
 	"github.com/docker/distribution/reference"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/goharbor/harbor/src/common/utils"
-	"github.com/goharbor/harbor/src/lib/log"
 	regadapter "github.com/goharbor/harbor/src/pkg/reg/adapter"
 	"github.com/goharbor/harbor/src/pkg/reg/adapter/storage/health"
 	"github.com/goharbor/harbor/src/pkg/reg/filter"
@@ -31,7 +30,7 @@ type adapter struct {
 }
 
 func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, error) {
-	log.Debugf("FetchArtifacts. Filters: %#v\n", filters)
+	fmt.Printf("FetchArtifacts. Filters: %#v\n", filters)
 
 	ctx := context.Background()
 	var repoNames = make([]string, 1000)
@@ -56,7 +55,7 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("FetchArtifacts. Filtered repositories: %#v\n", repositories)
+	fmt.Printf("FetchArtifacts. Filtered repositories: %#v\n", repositories)
 
 	runner := utils.NewLimitedConcurrentRunner(10)
 
@@ -90,6 +89,7 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 			if err != nil {
 				return fmt.Errorf("failed to list artifacts of repository %s: %v", repo, err)
 			}
+			fmt.Printf("filtered tags for repository %s: %#v\n", repo, artifacts)
 
 			if len(artifacts) == 0 {
 				return nil
