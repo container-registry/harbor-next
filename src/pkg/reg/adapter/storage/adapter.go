@@ -31,7 +31,7 @@ type adapter struct {
 }
 
 func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, error) {
-	log.Debugf("FetchArtifacts.filters: %#v\n", filters)
+	log.Debugf("FetchArtifacts. Filters: %#v\n", filters)
 
 	ctx := context.Background()
 	var repoNames = make([]string, 1000)
@@ -56,6 +56,7 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 	if err != nil {
 		return nil, err
 	}
+	log.Debugf("FetchArtifacts. Filtered repositories: %#v\n", repositories)
 
 	runner := utils.NewLimitedConcurrentRunner(10)
 
