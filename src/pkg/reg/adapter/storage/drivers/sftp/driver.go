@@ -95,14 +95,10 @@ func (d *driver) PutContent(_ context.Context, p string, content []byte) error {
 
 func (d *driver) Reader(_ context.Context, path string, offset int64) (io.ReadCloser, error) {
 
-	if offset > 0 {
-		return nil, fmt.Errorf("offset is not supported")
-	}
 	client, err := d.getClient()
 	if err != nil {
 		return nil, err
 	}
-	defer d.putClient(client)
 
 	file, err := client.Open(client.normaliseBasePath(path))
 	if err != nil {
@@ -120,7 +116,8 @@ func (d *driver) Reader(_ context.Context, path string, offset int64) (io.ReadCl
 		file.Close()
 		return nil, storagedriver.InvalidOffsetError{Path: path, Offset: offset}
 	}
-	return file, nil
+
+	return newFileReader(file, d.pool, client), nil
 }
 
 func (d *driver) Writer(_ context.Context, path string, append bool) (storagedriver.FileWriter, error) {
@@ -133,8 +130,6 @@ func (d *driver) Writer(_ context.Context, path string, append bool) (storagedri
 	if err != nil {
 		return nil, err
 	}
-
-	defer d.putClient(client)
 
 	path = client.normaliseBasePath(path)
 	file, err := client.Create(path)
@@ -158,7 +153,7 @@ func (d *driver) Writer(_ context.Context, path string, append bool) (storagedri
 		}
 		offset = n
 	}
-	return newFileWriter(file, client, offset), nil
+	return newFileWriter(file, d.pool, client, offset), nil
 }
 
 func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, error) {
