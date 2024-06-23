@@ -13,7 +13,7 @@ type fileReader struct {
 }
 
 func (f fileReader) Close() error {
-	if err := f.Close(); err != nil {
+	if err := f.File.Close(); err != nil {
 		return err
 	}
 	return f.pool.Put(f.client)

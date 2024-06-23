@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/reference"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
@@ -31,8 +30,6 @@ type adapter struct {
 }
 
 func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, error) {
-	fmt.Printf("FetchArtifacts")
-	spew.Dump(filters)
 
 	ctx := context.Background()
 	var repoNames = make([]string, 1000)
@@ -57,7 +54,6 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 	if err != nil {
 		return nil, err
 	}
-	spew.Dump("FetchArtifacts. Filtered repositories", repositories)
 
 	runner := utils.NewLimitedConcurrentRunner(10)
 
@@ -67,6 +63,10 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 		index := i
 
 		runner.AddTask(func() error {
+			if repo.Name == "" {
+				return nil
+			}
+
 			named, err := reference.WithName(repo.Name)
 			if err != nil {
 				return fmt.Errorf("ref %s error: %v", repo.Name, err)
@@ -91,7 +91,6 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 			if err != nil {
 				return fmt.Errorf("failed to list artifacts of repository %s: %v", repo, err)
 			}
-			spew.Dump("filtered tags for repository", repo.Name, artifacts)
 
 			if len(artifacts) == 0 {
 				return nil
@@ -111,7 +110,7 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 		})
 	}
 
-	if err := runner.Wait(); err != nil {
+	if err = runner.Wait(); err != nil {
 		return nil, err
 	}
 
@@ -123,8 +122,6 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 		}
 		resources = append(resources, r)
 	}
-
-	fmt.Println("resource length !!!!!", len(resources))
 	return resources, nil
 }
 
