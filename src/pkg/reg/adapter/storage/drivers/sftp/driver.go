@@ -1,6 +1,7 @@
 package sftp
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/desops/sshpool"
@@ -16,7 +17,7 @@ import (
 
 const (
 	DriverName         = "sftp"
-	defaultConcurrency = 5
+	defaultConcurrency = 1
 )
 
 type driver struct {
@@ -39,7 +40,7 @@ type Driver struct {
 	baseEmbed
 }
 
-func (d *driver) GetContent(_ context.Context, path string) ([]byte, error) {
+func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
 
 	fmt.Println("GetContent", path)
 
@@ -49,42 +50,32 @@ func (d *driver) GetContent(_ context.Context, path string) ([]byte, error) {
 	}
 	defer session.Put()
 
-	file, err := session.Open(d.normaliseBasePath(path))
+	rc, err := d.Reader(ctx, path, 0)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, storagedriver.PathNotFoundError{}
-		}
-		return nil, fmt.Errorf("unable to open file: %v", err)
+		return nil, err
 	}
-	return io.ReadAll(file)
+
+	//defer rc.Close()
+
+	return io.ReadAll(rc)
 }
 
-func (d *driver) PutContent(_ context.Context, p string, content []byte) error {
+func (d *driver) PutContent(ctx context.Context, p string, contents []byte) error {
 
 	fmt.Println("PutContent", p)
 
-	session, err := d.getSFTP()
+	writer, err := d.Writer(ctx, p, false)
 	if err != nil {
 		return err
 	}
-	defer session.Put()
 
-	p = d.normaliseBasePath(p)
-
-	if err := session.MkdirAll(path.Dir(p)); err != nil {
-		return fmt.Errorf("unable to create directory: %v", err)
-	}
-
-	file, err := session.Create(p)
+	defer writer.Close()
+	_, err = io.Copy(writer, bytes.NewReader(contents))
 	if err != nil {
-		return fmt.Errorf("put content file create error: %v", err)
+		writer.Cancel()
+		return err
 	}
-	defer file.Close()
-	_, err = file.Write(content)
-	if err != nil {
-		return fmt.Errorf("file write error: %v", err)
-	}
-	return err
+	return writer.Commit()
 }
 
 func (d *driver) Reader(_ context.Context, path string, offset int64) (io.ReadCloser, error) {
@@ -108,12 +99,14 @@ func (d *driver) Reader(_ context.Context, path string, offset int64) (io.ReadCl
 	seekPos, err := file.Seek(offset, io.SeekStart)
 
 	if err != nil {
+		//file.Close()
 		return nil, err
 	} else if seekPos < offset {
+		//file.Close()
 		return nil, storagedriver.InvalidOffsetError{Path: path, Offset: offset}
 	}
 
-	return io.NopCloser(file), nil
+	return file, nil
 }
 
 func (d *driver) Writer(_ context.Context, path string, append bool) (storagedriver.FileWriter, error) {
