@@ -5,29 +5,24 @@ import (
 	"fmt"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/pkg/sftp"
-	"github.com/silenceper/pool"
 )
 
 var _ storagedriver.FileWriter = &fileWriter{}
 
 type fileWriter struct {
 	file      *sftp.File
-	pool      pool.Pool
 	size      int64
 	bw        *bufio.Writer
-	client    *clientWrapper
 	closed    bool
 	committed bool
 	cancelled bool
 }
 
-func newFileWriter(file *sftp.File, pool pool.Pool, client *clientWrapper, size int64) *fileWriter {
+func newFileWriter(file *sftp.File, size int64) *fileWriter {
 	return &fileWriter{
-		file:   file,
-		client: client,
-		pool:   pool,
-		size:   size,
-		bw:     bufio.NewWriter(file),
+		file: file,
+		size: size,
+		bw:   bufio.NewWriter(file),
 	}
 }
 
@@ -59,7 +54,6 @@ func (fw *fileWriter) Close() error {
 		return err
 	}
 
-	_ = fw.pool.Put(fw.client)
 	fw.closed = true
 	return nil
 }
@@ -73,7 +67,7 @@ func (fw *fileWriter) Cancel() error {
 	if err := fw.file.Close(); err != nil {
 		return err
 	}
-	return fw.pool.Put(fw.client)
+	return nil
 }
 
 func (fw *fileWriter) Commit() error {

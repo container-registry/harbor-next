@@ -34,6 +34,7 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 	ctx := context.Background()
 	var repoNames = make([]string, 1000)
 
+	// @todo do iteration using last
 	_, err := a.registry.Repositories(ctx, repoNames, "")
 	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, fmt.Errorf("unable to get repositories: %v", err)
@@ -285,10 +286,11 @@ func (a *adapter) PullBlob(repository, d string) (int64, io.ReadCloser, error) {
 	if err != nil {
 		return 0, nil, fmt.Errorf("unable to open blob: %v", err)
 	}
-	return descriptor.Size, readSeeker, nil
+
+	return descriptor.Size, io.NopCloser(readSeeker), nil
 }
 
-func (a *adapter) PullBlobChunk(_, _ string, _, _, _ int64) (size int64, blob io.ReadCloser, err error) {
+func (a *adapter) PullBlobChunk(repository, d string, _, start, end int64) (size int64, blob io.ReadCloser, err error) {
 	return 0, nil, fmt.Errorf("PullBlobChunk is not implemented")
 }
 
@@ -334,7 +336,7 @@ func (a *adapter) MountBlob(_, _, _ string) (err error) {
 }
 
 func (a *adapter) CanBeMount(_ string) (mount bool, repository string, err error) {
-	return false, "", nil
+	return false, "", fmt.Errorf("unable to mount")
 }
 
 func (a *adapter) DeleteTag(r, tag string) error {
