@@ -46,7 +46,11 @@ func (f *PoolFactory) Get(regModel model.Registry) (*sshpool.Pool, error) {
 		port = "22"
 	}
 
-	pool := sshpool.New(config, nil)
+	pool := sshpool.New(config, &sshpool.PoolConfig{
+		Debug:          true,
+		MaxConnections: 5,
+		MaxSessions:    5,
+	})
 	f.registry[regModel] = pool
 
 	return pool, nil
