@@ -48,7 +48,13 @@ func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer session.Put()
+
+	defer func() {
+		if err != nil {
+			session.Close()
+		}
+		session.Put()
+	}()
 
 	rc, err := d.Reader(ctx, path, 0)
 	if err != nil {
@@ -81,12 +87,19 @@ func (d *driver) PutContent(ctx context.Context, p string, contents []byte) erro
 func (d *driver) Reader(_ context.Context, path string, offset int64) (io.ReadCloser, error) {
 
 	fmt.Println("READER", path, "OFFSET", offset)
+	var err error
 
 	session, err := d.getSFTP()
 	if err != nil {
 		return nil, err
 	}
-	defer session.Put()
+
+	defer func() {
+		if err != nil {
+			session.Close()
+		}
+		session.Put()
+	}()
 
 	file, err := session.Open(d.normaliseBasePath(path))
 	if err != nil {
@@ -117,7 +130,13 @@ func (d *driver) Writer(_ context.Context, path string, append bool) (storagedri
 	if err != nil {
 		return nil, err
 	}
-	defer session.Put()
+
+	defer func() {
+		if err != nil {
+			session.Close()
+		}
+		session.Put()
+	}()
 
 	path = d.normaliseBasePath(path)
 	file, err := session.Create(path)
@@ -147,7 +166,13 @@ func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, erro
 	if err != nil {
 		return nil, err
 	}
-	defer session.Put()
+
+	defer func() {
+		if err != nil {
+			session.Close()
+		}
+		session.Put()
+	}()
 
 	p = d.normaliseBasePath(p)
 	stat, err := session.Stat(p)
@@ -171,7 +196,13 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer session.Put()
+
+	defer func() {
+		if err != nil {
+			session.Close()
+		}
+		session.Put()
+	}()
 
 	p = d.normaliseBasePath(p)
 
@@ -198,6 +229,7 @@ func (d *driver) Move(_ context.Context, sourcePath string, destPath string) err
 	if err != nil {
 		return err
 	}
+
 	defer session.Put()
 
 	//
