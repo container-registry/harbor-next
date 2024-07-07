@@ -51,6 +51,7 @@ func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
 
 	defer func() {
 		if err != nil {
+			fmt.Println("ERR", err)
 			session.Close()
 		}
 		session.Put()
@@ -79,6 +80,8 @@ func (d *driver) PutContent(ctx context.Context, p string, contents []byte) erro
 	_, err = io.Copy(writer, bytes.NewReader(contents))
 	if err != nil {
 		writer.Cancel()
+		fmt.Println("ERR", err)
+
 		return err
 	}
 	return writer.Commit()
@@ -96,6 +99,7 @@ func (d *driver) Reader(_ context.Context, path string, offset int64) (io.ReadCl
 
 	defer func() {
 		if err != nil {
+			fmt.Println("ERR", err)
 			session.Close()
 		}
 		session.Put()
@@ -110,7 +114,6 @@ func (d *driver) Reader(_ context.Context, path string, offset int64) (io.ReadCl
 	}
 
 	seekPos, err := file.Seek(offset, io.SeekStart)
-
 	if err != nil {
 		//file.Close()
 		return nil, err
@@ -133,6 +136,7 @@ func (d *driver) Writer(_ context.Context, path string, append bool) (storagedri
 
 	defer func() {
 		if err != nil {
+			fmt.Println("ERR", err)
 			session.Close()
 		}
 		session.Put()
@@ -169,6 +173,8 @@ func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, erro
 
 	defer func() {
 		if err != nil {
+			fmt.Println("ERR", err)
+
 			session.Close()
 		}
 		session.Put()
@@ -199,6 +205,8 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 
 	defer func() {
 		if err != nil {
+			fmt.Println("ERR", err)
+
 			session.Close()
 		}
 		session.Put()
@@ -279,7 +287,7 @@ func (d *driver) Health(_ context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer session.Put()
+	session.Put()
 
 	return err
 }
