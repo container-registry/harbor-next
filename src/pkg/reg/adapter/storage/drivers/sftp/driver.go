@@ -51,7 +51,7 @@ func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
 
 	defer func() {
 		if err != nil {
-			fmt.Println("ERR", err)
+			fmt.Printf("GetContent %s ERR: %v\n", path, err)
 			session.Close()
 		}
 		session.Put()
@@ -80,8 +80,7 @@ func (d *driver) PutContent(ctx context.Context, p string, contents []byte) erro
 	_, err = io.Copy(writer, bytes.NewReader(contents))
 	if err != nil {
 		writer.Cancel()
-		fmt.Println("ERR", err)
-
+		fmt.Printf("putcontent %s ERR: %v\n", p, err)
 		return err
 	}
 	return writer.Commit()
@@ -99,7 +98,7 @@ func (d *driver) Reader(_ context.Context, path string, offset int64) (io.ReadCl
 
 	defer func() {
 		if err != nil {
-			fmt.Println("ERR", err)
+			fmt.Printf("Reader %s ERR %v", path, err)
 			session.Close()
 		}
 		session.Put()
@@ -136,7 +135,7 @@ func (d *driver) Writer(_ context.Context, path string, append bool) (storagedri
 
 	defer func() {
 		if err != nil {
-			fmt.Println("ERR", err)
+			fmt.Printf("writer %s ERR: %v", path, err)
 			session.Close()
 		}
 		session.Put()
@@ -173,7 +172,7 @@ func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, erro
 
 	defer func() {
 		if err != nil {
-			fmt.Println("ERR", err)
+			fmt.Printf("STAT %s ERR: %v", p, err)
 
 			session.Close()
 		}
