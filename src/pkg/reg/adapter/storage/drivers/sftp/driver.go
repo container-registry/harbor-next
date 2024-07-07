@@ -80,15 +80,15 @@ func (d *driver) PutContent(ctx context.Context, p string, contents []byte) erro
 	_, err = io.Copy(writer, bytes.NewReader(contents))
 	if err != nil {
 		writer.Cancel()
-		fmt.Printf("putcontent %s ERR: %v\n", p, err)
+		fmt.Printf("Putcontent %s ERR: %v\n", p, err)
 		return err
 	}
 	return writer.Commit()
 }
 
-func (d *driver) Reader(_ context.Context, path string, offset int64) (io.ReadCloser, error) {
+func (d *driver) Reader(_ context.Context, p string, offset int64) (io.ReadCloser, error) {
 
-	fmt.Println("READER", path, "OFFSET", offset)
+	fmt.Println("READER", p, "OFFSET", offset)
 	var err error
 
 	session, err := d.getSFTP()
@@ -98,16 +98,16 @@ func (d *driver) Reader(_ context.Context, path string, offset int64) (io.ReadCl
 
 	defer func() {
 		if err != nil {
-			fmt.Printf("Reader %s ERR %v", path, err)
+			fmt.Printf("Reader %s ERR: %v\n", p, err)
 			session.Close()
 		}
 		session.Put()
 	}()
 
-	file, err := session.Open(d.normaliseBasePath(path))
+	file, err := session.Open(d.normaliseBasePath(p))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, storagedriver.PathNotFoundError{}
+			return nil, storagedriver.PathNotFoundError{Path: p}
 		}
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func (d *driver) Reader(_ context.Context, path string, offset int64) (io.ReadCl
 		return nil, err
 	} else if seekPos < offset {
 		//file.Close()
-		return nil, storagedriver.InvalidOffsetError{Path: path, Offset: offset}
+		return nil, storagedriver.InvalidOffsetError{Path: p, Offset: offset}
 	}
 
 	return file, nil
@@ -135,7 +135,7 @@ func (d *driver) Writer(_ context.Context, path string, append bool) (storagedri
 
 	defer func() {
 		if err != nil {
-			fmt.Printf("writer %s ERR: %v", path, err)
+			fmt.Printf("Writer %s ERR: %v\n", path, err)
 			session.Close()
 		}
 		session.Put()
@@ -172,7 +172,7 @@ func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, erro
 
 	defer func() {
 		if err != nil {
-			fmt.Printf("STAT %s ERR: %v", p, err)
+			fmt.Printf("STAT %s ERR: %v\n", p, err)
 
 			session.Close()
 		}
