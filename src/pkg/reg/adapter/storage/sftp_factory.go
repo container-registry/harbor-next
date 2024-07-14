@@ -30,11 +30,6 @@ func (f *sftpFactory) Create(r *model.Registry) (regadapter.Adapter, error) {
 		return nil, err
 	}
 
-	//driver := filesystem.New(filesystem.DriverParameters{
-	//	RootDirectory: "./",
-	//	MaxThreads:    64,
-	//})
-
 	ns, err := storage.NewRegistry(context.TODO(), driver)
 	if err != nil {
 		return nil, err

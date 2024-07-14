@@ -17,7 +17,7 @@ import (
 
 const (
 	DriverName         = "sftp"
-	defaultConcurrency = 1
+	defaultConcurrency = 5
 )
 
 type driver struct {
@@ -62,15 +62,13 @@ func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
 		return nil, err
 	}
 
-	//defer rc.Close()
-
+	defer rc.Close()
 	return io.ReadAll(rc)
 }
 
 func (d *driver) PutContent(ctx context.Context, p string, contents []byte) error {
 
 	fmt.Println("PutContent", p)
-
 	writer, err := d.Writer(ctx, p, false)
 	if err != nil {
 		return err
