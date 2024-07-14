@@ -124,9 +124,9 @@ func (d *driver) Reader(_ context.Context, p string, offset int64) (io.ReadClose
 	return file, nil
 }
 
-func (d *driver) Writer(_ context.Context, path string, append bool) (storagedriver.FileWriter, error) {
+func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver.FileWriter, error) {
 
-	fmt.Println("Writer", path, append)
+	fmt.Println("Writer", p, append)
 
 	session, err := d.getSFTP()
 	if err != nil {
@@ -135,16 +135,21 @@ func (d *driver) Writer(_ context.Context, path string, append bool) (storagedri
 
 	defer func() {
 		if err != nil {
-			fmt.Printf("Writer %s ERR: %v\n", path, err)
+			fmt.Printf("Writer %s ERR: %v\n", p, err)
 			session.Close()
 		}
 		session.Put()
 	}()
 
-	path = d.normaliseBasePath(path)
-	file, err := session.Create(path)
+	p = d.normaliseBasePath(p)
+
+	if err = session.MkdirAll(path.Dir(p)); err != nil {
+		return nil, fmt.Errorf("unable to create directory %s: %v", path.Dir(p), err)
+	}
+
+	file, err := session.Create(p)
 	if err != nil {
-		return nil, fmt.Errorf("client create sftp error: %v", err)
+		return nil, fmt.Errorf("file create error: %v", err)
 	}
 
 	var offset int64
@@ -173,7 +178,6 @@ func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, erro
 	defer func() {
 		if err != nil {
 			fmt.Printf("STAT %s ERR: %v\n", p, err)
-
 			session.Close()
 		}
 		session.Put()
@@ -204,7 +208,7 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 
 	defer func() {
 		if err != nil {
-			fmt.Println("ERR", err)
+			fmt.Println("List ERR", err)
 			session.Close()
 		}
 		session.Put()
