@@ -13,7 +13,6 @@ import (
 	"github.com/goharbor/harbor/src/pkg/reg/filter"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
 	"github.com/opencontainers/go-digest"
-
 	"io"
 	"strings"
 )
@@ -199,7 +198,7 @@ func (a *adapter) PullManifest(repository, ref string, _ ...string) (distributio
 
 	manifest, err := manifestService.Get(ctx, d, opts...)
 	if err != nil {
-		return nil, "", fmt.Errorf("unable to get manifest by digest %v using %T : %v", d, manifestService, err)
+		return nil, "", fmt.Errorf("unable to get manifest: %v", err)
 	}
 
 	return manifest, d.String(), err
@@ -214,19 +213,39 @@ func (a *adapter) PushManifest(repository, ref, mediaType string, payload []byte
 		return "", fmt.Errorf("get repo error: %v", err)
 	}
 
-	descriptor, err := repo.Blobs(ctx).Put(ctx, mediaType, payload)
+	_manifests, err := repo.Manifests(ctx)
 	if err != nil {
-		return "", fmt.Errorf("push manifest error: %v", err)
+		return "", fmt.Errorf("unable to get manifest service: %v", err)
+	}
+
+	manifest, desc, err := distribution.UnmarshalManifest(mediaType, payload)
+	if err != nil {
+		return "", fmt.Errorf("unable to unmarshal manifest: %v", err)
+	}
+
+	var options = []distribution.ManifestServiceOption{
+		distribution.WithManifestMediaTypes([]string{mediaType}),
+	}
+
+	if !strings.HasPrefix(ref, "sha256") {
+		options = append(options, distribution.WithTag(ref))
+	}
+
+	dig, err := _manifests.Put(ctx, manifest, options...)
+	if err != nil {
+		return "", fmt.Errorf("unable to put manifest: %v", err)
 	}
 
 	if strings.HasPrefix(ref, "sha256") {
-		return descriptor.Digest.String(), nil
+		return "", nil
 	}
 
-	if err = repo.Tags(ctx).Tag(ctx, ref, descriptor); err != nil {
-		return "", fmt.Errorf("unable to tag %s: %v", ref, err)
+	tags := repo.Tags(ctx)
+	err = tags.Tag(ctx, ref, desc)
+	if err != nil {
+		return "", fmt.Errorf("unable to tag manifest: %v", err)
 	}
-	return descriptor.Digest.String(), nil
+	return dig.String(), nil
 }
 
 func (a *adapter) DeleteManifest(repository, ref string) error {
@@ -245,7 +264,28 @@ func (a *adapter) DeleteManifest(repository, ref string) error {
 	if err != nil {
 		return err
 	}
-	return manifests.Delete(ctx, digest.Digest(ref))
+
+	d := digest.Digest(ref)
+	err = manifests.Delete(ctx, d)
+	if err != nil {
+		return err
+	}
+
+	tagService := repo.Tags(ctx)
+
+	// search tags with digest
+	referencedTags, err := tagService.Lookup(ctx, distribution.Descriptor{Digest: d})
+	if err != nil {
+		return err
+	}
+
+	for _, tag := range referencedTags {
+		if err := tagService.Untag(ctx, tag); err != nil {
+
+			return err
+		}
+	}
+	return nil
 }
 
 func (a *adapter) BlobExist(repository, d string) (exist bool, err error) {
@@ -306,9 +346,7 @@ func (a *adapter) PushBlob(repository, d string, size int64, r io.Reader) error 
 		return fmt.Errorf("get repo error: %v", err)
 	}
 
-	blobs := repo.Blobs(ctx)
-
-	writer, err := blobs.Create(ctx)
+	writer, err := repo.Blobs(ctx).Create(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to create blob: %v", err)
 	}
@@ -320,7 +358,6 @@ func (a *adapter) PushBlob(repository, d string, size int64, r io.Reader) error 
 	if err != nil {
 		return fmt.Errorf("writer is unable to write: %v", err)
 	}
-
 	_, err = writer.Commit(ctx, distribution.Descriptor{
 		Size:   size,
 		Digest: digest.Digest(d),

@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/docker/distribution/registry/storage"
+	"github.com/docker/distribution/registry/storage/driver/filesystem"
 	"github.com/goharbor/harbor/src/lib/log"
 	regadapter "github.com/goharbor/harbor/src/pkg/reg/adapter"
-	sftpdriver "github.com/goharbor/harbor/src/pkg/reg/adapter/storage/drivers/sftp"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
 )
 
@@ -26,10 +26,15 @@ type sftpFactory struct {
 func (f *sftpFactory) Create(r *model.Registry) (regadapter.Adapter, error) {
 
 	fmt.Println("!!!!!!!!!!!!! SFTP FACTORY CREATE !!!!!!!!!!!!!!!")
-	driver, err := sftpdriver.New(r)
-	if err != nil {
-		return nil, err
-	}
+	//driver, err := sftpdriver.New(r)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	driver := filesystem.New(filesystem.DriverParameters{
+		RootDirectory: "./",
+		MaxThreads:    64,
+	})
 
 	ns, err := storage.NewRegistry(context.TODO(), driver)
 	if err != nil {
