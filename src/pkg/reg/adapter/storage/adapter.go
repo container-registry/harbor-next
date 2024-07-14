@@ -373,7 +373,7 @@ func (a *adapter) MountBlob(_, _, _ string) (err error) {
 }
 
 func (a *adapter) CanBeMount(_ string) (mount bool, repository string, err error) {
-	return false, "", fmt.Errorf("unable to mount")
+	return false, "", nil
 }
 
 func (a *adapter) DeleteTag(r, tag string) error {
