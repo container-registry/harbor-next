@@ -231,7 +231,7 @@ func (a *adapter) PushManifest(repository, ref, mediaType string, payload []byte
 		options = append(options, distribution.WithTag(ref))
 	}
 
-	dig, err := _manifests.Put(ctx, manifest, options...)
+	_, err = _manifests.Put(ctx, manifest, options...)
 	if err != nil {
 		return "", fmt.Errorf("unable to put manifest: %v", err)
 	}
@@ -245,7 +245,7 @@ func (a *adapter) PushManifest(repository, ref, mediaType string, payload []byte
 	if err != nil {
 		return "", fmt.Errorf("unable to tag manifest: %v", err)
 	}
-	return dig.String(), nil
+	return desc.Digest.String(), nil
 }
 
 func (a *adapter) DeleteManifest(repository, ref string) error {

@@ -143,8 +143,10 @@ func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver
 
 	p = d.normaliseBasePath(p)
 
-	if err = session.MkdirAll(path.Dir(p)); err != nil {
-		return nil, fmt.Errorf("unable to create directory %s: %v", path.Dir(p), err)
+	dir := path.Dir(p)
+
+	if err = session.MkdirAll(dir); err != nil {
+		return nil, fmt.Errorf("unable to create directory %s: %v", dir, err)
 	}
 
 	file, err := session.Create(p)
