@@ -199,7 +199,7 @@ func (a *adapter) PullManifest(repository, ref string, _ ...string) (distributio
 
 	manifest, err := manifestService.Get(ctx, d, opts...)
 	if err != nil {
-		return nil, "", fmt.Errorf("unable to get manifest using %T : %v", manifestService, err)
+		return nil, "", fmt.Errorf("unable to get manifest by digest %v using %T : %v", d, manifestService, err)
 	}
 
 	return manifest, d.String(), err
