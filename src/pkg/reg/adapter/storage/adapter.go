@@ -200,8 +200,7 @@ func (a *adapter) PullManifest(repository, ref string, _ ...string) (distributio
 
 	manifest, err := manifestService.Get(ctx, d, opts...)
 	if err != nil {
-		spew.Dump(manifestService)
-
+		spew.Dump(manifest)
 		return nil, "", fmt.Errorf("unable to get manifest: %v", err)
 	}
 
