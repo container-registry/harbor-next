@@ -18,7 +18,6 @@ import (
 	"errors"
 	"net/http"
 	"os"
-	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -193,7 +192,6 @@ func (t *transfer) copy(src *repository, dst *repository, override bool, opts *t
 			if e == errStopped {
 				return nil
 			}
-			debug.PrintStack()
 			t.logger.Errorf(e.Error())
 			err = e
 		}

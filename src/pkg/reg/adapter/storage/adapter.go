@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/reference"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
@@ -199,6 +200,8 @@ func (a *adapter) PullManifest(repository, ref string, _ ...string) (distributio
 
 	manifest, err := manifestService.Get(ctx, d, opts...)
 	if err != nil {
+		spew.Dump(manifestService)
+
 		return nil, "", fmt.Errorf("unable to get manifest: %v", err)
 	}
 

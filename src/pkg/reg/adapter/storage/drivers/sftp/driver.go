@@ -205,7 +205,6 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 	defer func() {
 		if err != nil {
 			fmt.Println("ERR", err)
-
 			session.Close()
 		}
 		session.Put()
