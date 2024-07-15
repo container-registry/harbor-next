@@ -34,8 +34,7 @@ type baseEmbed struct {
 	base.Base
 }
 
-// Driver is a storagedriver.StorageDriver implementation backed by a local
-// filesystem. All provided paths will be subpaths of the RootDirectory.
+// Driver is a storagedriver.StorageDriver implementation
 type Driver struct {
 	baseEmbed
 }
