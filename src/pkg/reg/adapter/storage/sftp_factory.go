@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"github.com/docker/distribution/registry/storage"
+	"github.com/docker/libtrust"
 	"github.com/goharbor/harbor/src/lib/log"
 	regadapter "github.com/goharbor/harbor/src/pkg/reg/adapter"
 	sftpdriver "github.com/goharbor/harbor/src/pkg/reg/adapter/storage/drivers/sftp"
@@ -30,7 +31,12 @@ func (f *sftpFactory) Create(r *model.Registry) (regadapter.Adapter, error) {
 		return nil, err
 	}
 
-	ns, err := storage.NewRegistry(context.TODO(), driver, storage.EnableSchema1, storage.EnableDelete)
+	trustKey, err := libtrust.GenerateECP256PrivateKey()
+	if err != nil {
+		return nil, err
+	}
+
+	ns, err := storage.NewRegistry(context.TODO(), driver, storage.EnableSchema1, storage.EnableDelete, storage.Schema1SigningKey(trustKey))
 	if err != nil {
 		return nil, err
 	}
