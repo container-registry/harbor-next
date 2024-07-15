@@ -82,6 +82,9 @@ func (fw *fileWriter) Commit() error {
 	if err := fw.bw.Flush(); err != nil {
 		return err
 	}
+	if err := fw.file.Close(); err != nil {
+		return err
+	}
 	fw.committed = true
 	return nil
 }

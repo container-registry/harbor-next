@@ -290,7 +290,6 @@ func (d *driver) Health(_ context.Context) error {
 		return err
 	}
 	session.Put()
-
 	return err
 }
 
@@ -332,6 +331,7 @@ func (d *driver) normaliseBasePath(p string) string {
 }
 
 func (d *driver) getSFTP() (*sshpool.SFTPSession, error) {
+
 	return d.pool.GetSFTP(d.hostname)
 }
 

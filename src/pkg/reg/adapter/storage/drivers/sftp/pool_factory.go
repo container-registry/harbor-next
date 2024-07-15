@@ -48,8 +48,8 @@ func (f *PoolFactory) Get(regModel model.Registry) (*sshpool.Pool, error) {
 
 	pool := sshpool.New(config, &sshpool.PoolConfig{
 		Debug:          true,
-		MaxConnections: 5,
-		MaxSessions:    5,
+		MaxConnections: 30,
+		MaxSessions:    30,
 	})
 	f.registry[regModel] = pool
 
