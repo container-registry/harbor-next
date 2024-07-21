@@ -25,7 +25,6 @@ type sftpFactory struct {
 // Create ...
 func (f *sftpFactory) Create(r *model.Registry) (regadapter.Adapter, error) {
 
-	//fmt.Println("!!!!!!!!!!!!! SFTP FACTORY CREATE !!!!!!!!!!!!!!!")
 	driver, err := sftpdriver.New(r)
 	if err != nil {
 		return nil, err

@@ -4,26 +4,29 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/desops/sshpool"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/docker/distribution/registry/storage/driver/base"
+	sshpool "github.com/goharbor/harbor/src/pkg/reg/adapter/storage/drivers/sftp/pool"
 	"github.com/goharbor/harbor/src/pkg/reg/adapter/storage/health"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
+	"github.com/pkg/sftp"
+	"golang.org/x/crypto/ssh"
 	"io"
 	"net/url"
 	"os"
 	"path"
+	"strconv"
+	"time"
 )
 
 const (
 	DriverName         = "sftp"
-	defaultConcurrency = 5
+	defaultConcurrency = 1
 )
 
 type driver struct {
-	pool     *sshpool.Pool
-	basePath string
-	hostname string
+	basePath  string
+	sshConfig *sshpool.SSHConfig
 }
 
 func (d *driver) Name() string {
@@ -34,27 +37,18 @@ type baseEmbed struct {
 	base.Base
 }
 
-// Driver is a storagedriver.StorageDriver implementation
+// Driver is a storagedriver.StorageDriver implementation backed by a local
+// filesystem. All provided paths will be subpaths of the RootDirectory.
 type Driver struct {
 	baseEmbed
 }
 
+var sshPool = sshpool.NewPool(&sshpool.PoolConfig{
+	GCInterval: 10 * time.Second,
+	MaxConns:   10,
+})
+
 func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
-
-	fmt.Println("GetContent", path)
-
-	session, err := d.getSFTP()
-	if err != nil {
-		return nil, err
-	}
-
-	defer func() {
-		if err != nil {
-			fmt.Printf("GetContent %s ERR: %v\n", path, err)
-			session.Close()
-		}
-		session.Put()
-	}()
 
 	rc, err := d.Reader(ctx, path, 0)
 	if err != nil {
@@ -77,34 +71,27 @@ func (d *driver) PutContent(ctx context.Context, p string, contents []byte) erro
 	_, err = io.Copy(writer, bytes.NewReader(contents))
 	if err != nil {
 		writer.Cancel()
-		fmt.Printf("Putcontent %s ERR: %v\n", p, err)
+		fmt.Println("ERR", err)
+
 		return err
 	}
 	return writer.Commit()
 }
 
-func (d *driver) Reader(_ context.Context, p string, offset int64) (io.ReadCloser, error) {
+func (d *driver) Reader(_ context.Context, path string, offset int64) (io.ReadCloser, error) {
 
-	fmt.Println("READER", p, "OFFSET", offset)
+	fmt.Println("READER", path, "OFFSET", offset)
 	var err error
 
-	session, err := d.getSFTP()
+	session, cl, err := d.getSFTP()
 	if err != nil {
 		return nil, err
 	}
 
-	defer func() {
-		if err != nil {
-			fmt.Printf("Reader %s ERR: %v\n", p, err)
-			session.Close()
-		}
-		session.Put()
-	}()
-
-	file, err := session.Open(d.normaliseBasePath(p))
+	file, err := session.Open(d.normaliseBasePath(path))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, storagedriver.PathNotFoundError{Path: p}
+			return nil, storagedriver.PathNotFoundError{Path: path}
 		}
 		return nil, err
 	}
@@ -115,35 +102,29 @@ func (d *driver) Reader(_ context.Context, p string, offset int64) (io.ReadClose
 		return nil, err
 	} else if seekPos < offset {
 		//file.Close()
-		return nil, storagedriver.InvalidOffsetError{Path: p, Offset: offset}
+		return nil, storagedriver.InvalidOffsetError{Path: path, Offset: offset}
 	}
 
-	return file, nil
+	r := reader{
+		File:  file,
+		close: cl,
+	}
+	return r, nil
 }
 
 func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver.FileWriter, error) {
 
-	fmt.Println("Writer", p, append)
-
-	session, err := d.getSFTP()
+	session, _, err := d.getSFTP()
 	if err != nil {
 		return nil, err
 	}
 
-	defer func() {
-		if err != nil {
-			fmt.Printf("Writer %s ERR: %v\n", p, err)
-			session.Close()
-		}
-		session.Put()
-	}()
+	//defer cl()
 
 	p = d.normaliseBasePath(p)
 
-	dir := path.Dir(p)
-
-	if err = session.MkdirAll(dir); err != nil {
-		return nil, fmt.Errorf("unable to create directory %s: %v", dir, err)
+	if err = session.MkdirAll(path.Dir(p)); err != nil {
+		return nil, fmt.Errorf("unable to create directory %s: %v", path.Dir(p), err)
 	}
 
 	file, err := session.Create(p)
@@ -167,20 +148,12 @@ func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver
 
 func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, error) {
 
-	fmt.Println("Stat", p)
-
-	session, err := d.getSFTP()
+	session, cl, err := d.getSFTP()
 	if err != nil {
 		return nil, err
 	}
 
-	defer func() {
-		if err != nil {
-			fmt.Printf("STAT %s ERR: %v\n", p, err)
-			session.Close()
-		}
-		session.Put()
-	}()
+	defer cl()
 
 	p = d.normaliseBasePath(p)
 	stat, err := session.Stat(p)
@@ -198,20 +171,13 @@ func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, erro
 }
 
 func (d *driver) List(_ context.Context, p string) ([]string, error) {
-	fmt.Println("List", p)
 
-	session, err := d.getSFTP()
+	session, cl, err := d.getSFTP()
 	if err != nil {
 		return nil, err
 	}
 
-	defer func() {
-		if err != nil {
-			fmt.Println("List ERR", err)
-			session.Close()
-		}
-		session.Put()
-	}()
+	defer cl()
 
 	p = d.normaliseBasePath(p)
 
@@ -234,12 +200,12 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 func (d *driver) Move(_ context.Context, sourcePath string, destPath string) error {
 	fmt.Println("Move", sourcePath, destPath)
 
-	session, err := d.getSFTP()
+	session, cl, err := d.getSFTP()
 	if err != nil {
 		return err
 	}
 
-	defer session.Put()
+	defer cl()
 
 	//
 	sourcePath = d.normaliseBasePath(sourcePath)
@@ -253,13 +219,11 @@ func (d *driver) Move(_ context.Context, sourcePath string, destPath string) err
 }
 
 func (d *driver) Delete(_ context.Context, path string) error {
-	fmt.Println("Delete", path)
-
-	session, err := d.getSFTP()
+	session, cl, err := d.getSFTP()
 	if err != nil {
 		return err
 	}
-	defer session.Put()
+	defer cl()
 	//
 
 	path = d.normaliseBasePath(path)
@@ -274,8 +238,6 @@ func (d *driver) Delete(_ context.Context, path string) error {
 }
 
 func (d *driver) URLFor(_ context.Context, _ string, _ map[string]interface{}) (string, error) {
-	fmt.Println("URLFor")
-
 	return "", fmt.Errorf("URLFor is not implemented")
 }
 
@@ -284,11 +246,11 @@ func (d *driver) Walk(ctx context.Context, path string, f storagedriver.WalkFn) 
 }
 
 func (d *driver) Health(_ context.Context) error {
-	session, err := d.getSFTP()
+	_, cl, err := d.getSFTP()
 	if err != nil {
 		return err
 	}
-	session.Put()
+	cl()
 	return err
 }
 
@@ -297,41 +259,51 @@ func New(regModel *model.Registry) (storagedriver.StorageDriver, error) {
 		return nil, fmt.Errorf("internal error")
 	}
 
-	pool, err := poolFactory.Get(*regModel)
-	if err != nil {
-		return nil, err
-	}
-
 	u, err := url.Parse(regModel.URL)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse registry URL: %v", err)
 	}
 
-	var port = u.Port()
+	config := &sshpool.SSHConfig{
+		Host: u.Hostname(),
+	}
+	if regModel.Insecure {
+		config.HostKeyCallback = ssh.InsecureIgnoreHostKey()
+	}
+
+	if regModel.Credential != nil {
+		config.User = regModel.Credential.AccessKey
+		config.Auth = append(config.Auth, ssh.Password(regModel.Credential.AccessSecret))
+	}
+
+	port := u.Port()
 	if port == "" {
 		port = "22"
+	}
+
+	portInt, err := strconv.Atoi(port)
+	if err == nil {
+		config.Port = portInt
 	}
 
 	return &Driver{
 		baseEmbed: baseEmbed{
 			Base: base.Base{
 				StorageDriver: base.NewRegulator(&driver{
-					pool:     pool,
-					hostname: fmt.Sprintf("%s:%s", u.Hostname(), port),
-					basePath: u.Path,
+					sshConfig: config,
+					basePath:  u.Path,
 				}, defaultConcurrency),
 			},
 		},
 	}, nil
 }
 
-func (d *driver) normaliseBasePath(p string) string {
-	return path.Join(d.basePath, p)
+func (d *driver) getSFTP() (*sftp.Client, func(), error) {
+	return sshPool.NewSFTPSession(d.sshConfig)
 }
 
-func (d *driver) getSFTP() (*sshpool.SFTPSession, error) {
-
-	return d.pool.GetSFTP(d.hostname)
+func (d *driver) normaliseBasePath(p string) string {
+	return path.Join(d.basePath, p)
 }
 
 var _ health.Checker = (*driver)(nil)

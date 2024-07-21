@@ -33,7 +33,7 @@ func (f *s3Factory) Create(r *model.Registry) (regadapter.Adapter, error) {
 
 	driver, err := s3.New(driverParams)
 
-	ns, err := storage.NewRegistry(context.TODO(), driver, storage.EnableSchema1, storage.EnableDelete)
+	ns, err := storage.NewRegistry(context.TODO(), driver)
 	if err != nil {
 		return nil, err
 	}
