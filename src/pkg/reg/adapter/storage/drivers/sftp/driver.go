@@ -41,6 +41,7 @@ type baseEmbed struct {
 // filesystem. All provided paths will be subpaths of the RootDirectory.
 type Driver struct {
 	baseEmbed
+	driver *driver
 }
 
 var sshPool = sshpool.NewPool(&sshpool.PoolConfig{
@@ -235,13 +236,13 @@ func (d *driver) Walk(ctx context.Context, path string, f storagedriver.WalkFn) 
 	return storagedriver.WalkFallback(ctx, d, path, f)
 }
 
-func (d *driver) Health(_ context.Context) error {
-	c, cl, err := d.getSFTP()
+func (d *Driver) Health(_ context.Context) error {
+	client, cl, err := d.driver.getSFTP()
 	if err != nil {
 		return err
 	}
 	defer cl()
-	_, err = c.Getwd()
+	_, err = client.Getwd()
 	return err
 }
 
@@ -277,13 +278,16 @@ func New(regModel *model.Registry) (storagedriver.StorageDriver, error) {
 		config.Port = portInt
 	}
 
+	d := &driver{
+		sshConfig: config,
+		basePath:  u.Path,
+	}
+
 	return &Driver{
+		driver: d,
 		baseEmbed: baseEmbed{
 			Base: base.Base{
-				StorageDriver: base.NewRegulator(&driver{
-					sshConfig: config,
-					basePath:  u.Path,
-				}, defaultConcurrency),
+				StorageDriver: base.NewRegulator(d, defaultConcurrency),
 			},
 		},
 	}, nil
@@ -297,4 +301,4 @@ func (d *driver) normaliseBasePath(p string) string {
 	return path.Join(d.basePath, p)
 }
 
-var _ health.Checker = (*driver)(nil)
+var _ health.Checker = (*Driver)(nil)

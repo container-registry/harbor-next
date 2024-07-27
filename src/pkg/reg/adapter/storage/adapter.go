@@ -412,9 +412,10 @@ func (a *adapter) PrepareForPush(_ []*model.Resource) error {
 }
 
 func (a *adapter) HealthCheck() (string, error) {
+
 	checker, ok := a.driver.(health.Checker)
 	if !ok {
-		return model.Healthy, nil
+		return model.Unhealthy, nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
