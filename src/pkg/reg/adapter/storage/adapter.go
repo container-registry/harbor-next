@@ -15,6 +15,7 @@ import (
 	"github.com/opencontainers/go-digest"
 	"io"
 	"strings"
+	"time"
 )
 
 var (
@@ -237,7 +238,7 @@ func (a *adapter) PushManifest(repository, ref, mediaType string, payload []byte
 	}
 
 	if strings.HasPrefix(ref, "sha256") {
-		return "", nil
+		return desc.Digest.String(), nil
 	}
 
 	tags := repo.Tags(ctx)
@@ -281,7 +282,6 @@ func (a *adapter) DeleteManifest(repository, ref string) error {
 
 	for _, tag := range referencedTags {
 		if err := tagService.Untag(ctx, tag); err != nil {
-
 			return err
 		}
 	}
@@ -416,7 +416,10 @@ func (a *adapter) HealthCheck() (string, error) {
 	if !ok {
 		return model.Healthy, nil
 	}
-	if err := checker.Health(context.Background()); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := checker.Health(ctx); err != nil {
 		return model.Unhealthy, err
 	}
 	return model.Healthy, nil

@@ -60,8 +60,6 @@ func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
 }
 
 func (d *driver) PutContent(ctx context.Context, p string, contents []byte) error {
-
-	fmt.Println("PutContent", p)
 	writer, err := d.Writer(ctx, p, false)
 	if err != nil {
 		return err
@@ -70,17 +68,13 @@ func (d *driver) PutContent(ctx context.Context, p string, contents []byte) erro
 	defer writer.Close()
 	_, err = io.Copy(writer, bytes.NewReader(contents))
 	if err != nil {
-		writer.Cancel()
-		fmt.Println("ERR", err)
-
+		_ = writer.Cancel()
 		return err
 	}
 	return writer.Commit()
 }
 
 func (d *driver) Reader(_ context.Context, path string, offset int64) (io.ReadCloser, error) {
-
-	fmt.Println("READER", path, "OFFSET", offset)
 	var err error
 
 	session, cl, err := d.getSFTP()
@@ -118,8 +112,6 @@ func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver
 	if err != nil {
 		return nil, err
 	}
-
-	//defer cl()
 
 	p = d.normaliseBasePath(p)
 
@@ -178,7 +170,6 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 	}
 
 	defer cl()
-
 	p = d.normaliseBasePath(p)
 
 	files, err := session.ReadDir(p)
@@ -198,7 +189,6 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 }
 
 func (d *driver) Move(_ context.Context, sourcePath string, destPath string) error {
-	fmt.Println("Move", sourcePath, destPath)
 
 	session, cl, err := d.getSFTP()
 	if err != nil {
@@ -246,11 +236,12 @@ func (d *driver) Walk(ctx context.Context, path string, f storagedriver.WalkFn) 
 }
 
 func (d *driver) Health(_ context.Context) error {
-	_, cl, err := d.getSFTP()
+	c, cl, err := d.getSFTP()
 	if err != nil {
 		return err
 	}
-	cl()
+	defer cl()
+	_, err = c.Getwd()
 	return err
 }
 
