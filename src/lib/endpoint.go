@@ -40,10 +40,15 @@ func ValidateURL(s string, requiredSchemas ...string) (string, error) {
 	if len(requiredSchemas) == 0 {
 		requiredSchemas = []string{"http", "https", "s3", "sftp", "ftp"}
 	}
+	var found bool
 	for _, schema := range requiredSchemas {
 		if url.Scheme != schema {
-			return "", errors.New(nil).WithCode(errors.BadRequestCode).WithMessage("invalid scheme: %s", url.Scheme)
+			continue
 		}
+		found = true
+	}
+	if !found {
+		return "", errors.New(nil).WithCode(errors.BadRequestCode).WithMessage("invalid scheme: %s", url.Scheme)
 	}
 	// To avoid SSRF security issue, refer to #3755 for more detail
 	return fmt.Sprintf("%s://%s%s", url.Scheme, url.Host, url.Path), nil
