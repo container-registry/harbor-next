@@ -2,11 +2,14 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"github.com/docker/distribution/registry/storage"
 	"github.com/docker/distribution/registry/storage/driver/s3-aws"
 	"github.com/goharbor/harbor/src/lib/log"
 	regadapter "github.com/goharbor/harbor/src/pkg/reg/adapter"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
+	"net/url"
+	"strings"
 )
 
 func init() {
@@ -24,7 +27,35 @@ type s3Factory struct {
 // Create ...
 func (f *s3Factory) Create(r *model.Registry) (regadapter.Adapter, error) {
 
-	driverParams := s3.DriverParameters{}
+	u, err := url.Parse(r.URL)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse registry URL: %v", err)
+	}
+
+	pathParts := strings.Split(u.Path, "/")
+	if len(pathParts) == 0 {
+		return nil, fmt.Errorf("invalid registry URL: no folder defined which can be used as a bucket name")
+	}
+
+	driverParams := s3.DriverParameters{
+		Bucket: pathParts[0],
+	}
+
+	if u.Query().Get("secure") == "false" {
+		driverParams.Secure = false
+	}
+
+	if u.Query().Get("region") == "" {
+		return nil, fmt.Errorf("invalid registry URL: missing region param")
+	}
+
+	if !strings.Contains(u.Hostname(), "s3.amazonaws.com") {
+		driverParams.RegionEndpoint = u.Hostname()
+	}
+
+	if len(pathParts) > 1 {
+		driverParams.RootDirectory = strings.Join(pathParts[1:], "/")
+	}
 
 	if r.Credential != nil {
 		driverParams.AccessKey = r.Credential.AccessKey
