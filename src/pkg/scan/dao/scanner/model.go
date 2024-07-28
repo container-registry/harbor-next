@@ -105,7 +105,7 @@ func (r *Registration) Validate(checkUUID bool) error {
 		return errors.New("missing registration name")
 	}
 
-	url, err := lib.ValidateHTTPURL(r.URL)
+	url, err := lib.ValidateURL(r.URL)
 	if err != nil {
 		return errors.Wrap(err, "scanner registration validate")
 	}
