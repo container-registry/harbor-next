@@ -7,6 +7,7 @@ import (
 	"github.com/docker/distribution/registry/storage/driver/s3-aws"
 	"github.com/goharbor/harbor/src/lib/log"
 	regadapter "github.com/goharbor/harbor/src/pkg/reg/adapter"
+	s3driver "github.com/goharbor/harbor/src/pkg/reg/adapter/storage/drivers/s3"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
 	"net/url"
 	"strings"
@@ -63,8 +64,11 @@ func (f *s3Factory) Create(r *model.Registry) (regadapter.Adapter, error) {
 	}
 
 	driver, err := s3.New(driverParams)
+	if err != nil {
+		return nil, err
+	}
 
-	ns, err := storage.NewRegistry(context.TODO(), driver)
+	ns, err := storage.NewRegistry(context.TODO(), &s3driver.Driver{Driver: driver})
 	if err != nil {
 		return nil, err
 	}
