@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/distribution/registry/storage"
 	"github.com/docker/libtrust"
 	"github.com/goharbor/harbor/src/lib/log"
@@ -25,6 +26,7 @@ type sftpFactory struct {
 // Create ...
 func (f *sftpFactory) Create(r *model.Registry) (regadapter.Adapter, error) {
 
+	spew.Dump("FACTORY CREATE", r)
 	driver, err := sftpdriver.New(r)
 	if err != nil {
 		return nil, err

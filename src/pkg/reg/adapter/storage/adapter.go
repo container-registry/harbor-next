@@ -156,11 +156,9 @@ func (a *adapter) ManifestExist(repository, ref string) (exist bool, desc *distr
 	blobs := repo.Blobs(ctx)
 	descriptor, err := blobs.Stat(ctx, d)
 	if err != nil {
-		if err != nil {
-			switch {
-			case errors.Is(err, distribution.ErrBlobUnknown):
-				return false, nil, nil
-			}
+		switch {
+		case errors.Is(err, distribution.ErrBlobUnknown):
+			return false, nil, nil
 		}
 		return false, nil, fmt.Errorf("manifest check (blob sata) error: %v", err)
 	}
@@ -421,7 +419,7 @@ func (a *adapter) HealthCheck() (string, error) {
 	defer cancel()
 
 	if err := checker.Health(ctx); err != nil {
-		return model.Unhealthy, err
+		return model.Unhealthy, nil
 	}
 	return model.Healthy, nil
 }
