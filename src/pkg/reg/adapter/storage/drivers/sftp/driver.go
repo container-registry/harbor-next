@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/docker/distribution/registry/storage/driver/base"
 	sshpool "github.com/goharbor/harbor/src/pkg/reg/adapter/storage/drivers/sftp/pool"
@@ -17,7 +16,6 @@ import (
 	"os"
 	"path"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -118,10 +116,8 @@ func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver
 
 	p = d.normaliseBasePath(p)
 
-	dir := fmt.Sprintf("./%s", strings.TrimLeft(path.Dir(p), "/"))
-
-	if err = session.MkdirAll(dir); err != nil {
-		return nil, fmt.Errorf("unable to create directory %s: %v", dir, err)
+	if err = session.MkdirAll(path.Dir(p)); err != nil {
+		return nil, fmt.Errorf("unable to create directory %s: %v", path.Dir(p), err)
 	}
 
 	file, err := session.Create(p)
@@ -246,8 +242,7 @@ func (d *Driver) Health(_ context.Context) error {
 		return err
 	}
 	defer cl()
-	wd, err := client.Getwd()
-	spew.Dump(wd)
+	_, err = client.Getwd()
 	return err
 }
 
