@@ -63,16 +63,21 @@ func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
 func (d *driver) PutContent(ctx context.Context, p string, contents []byte) error {
 	writer, err := d.Writer(ctx, p, false)
 	if err != nil {
-		return err
+		return fmt.Errorf("writer error: %v", err)
 	}
 
 	defer writer.Close()
 	_, err = io.Copy(writer, bytes.NewReader(contents))
 	if err != nil {
 		_ = writer.Cancel()
-		return err
+		return fmt.Errorf("writer error: %v", err)
 	}
-	return writer.Commit()
+
+	err = writer.Commit()
+	if err != nil {
+		return fmt.Errorf("commit error: %v", err)
+	}
+	return nil
 }
 
 func (d *driver) Reader(_ context.Context, path string, offset int64) (io.ReadCloser, error) {
@@ -133,7 +138,7 @@ func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver
 		err = file.Truncate(0)
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("file seek/truncate error: %v", err)
 	}
 
 	return newFileWriter(file, offset), nil
