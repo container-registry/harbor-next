@@ -17,7 +17,6 @@ import (
 	"os"
 	"path"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -118,7 +117,7 @@ func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver
 
 	p = d.normaliseBasePath(p)
 
-	if err = session.MkdirAll(path.Dir(p)); err != nil {
+	if err = session.MkdirAll(fmt.Sprintf("./%s", path.Dir(p))); err != nil {
 		return nil, fmt.Errorf("unable to create directory %s: %v", path.Dir(p), err)
 	}
 
@@ -301,8 +300,7 @@ func (d *driver) getSFTP() (*sftp.Client, func(), error) {
 }
 
 func (d *driver) normaliseBasePath(p string) string {
-	fullpath := path.Join(d.basePath, p)
-	return fmt.Sprintf("./%s", strings.TrimLeft(fullpath, "/"))
+	return path.Join(d.basePath, p)
 }
 
 var _ health.Checker = (*Driver)(nil)
