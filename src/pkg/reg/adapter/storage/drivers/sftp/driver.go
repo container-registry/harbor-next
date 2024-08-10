@@ -242,7 +242,7 @@ func (d *Driver) Health(_ context.Context) error {
 		return err
 	}
 	defer cl()
-	_, err = client.Getwd()
+	_, err = client.ReadDir("")
 	return err
 }
 
