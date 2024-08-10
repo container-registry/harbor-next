@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/docker/distribution/registry/storage/driver/base"
 	sshpool "github.com/goharbor/harbor/src/pkg/reg/adapter/storage/drivers/sftp/pool"
@@ -242,7 +243,8 @@ func (d *Driver) Health(_ context.Context) error {
 		return err
 	}
 	defer cl()
-	_, err = client.ReadDir("/")
+	wd, err := client.Getwd()
+	spew.Dump(wd)
 	return err
 }
 
