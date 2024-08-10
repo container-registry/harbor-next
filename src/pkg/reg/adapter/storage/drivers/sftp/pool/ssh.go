@@ -32,10 +32,11 @@ type SSHConfig struct {
 // String returns a hash string generated from the SSH config parameters.
 func (c *SSHConfig) String() string {
 	return fmt.Sprintf(
-		"%s@%s:%d",
+		"%s@%s:%d%c",
 		c.User,
 		c.Host,
 		c.Port,
+		c.Auth,
 	)
 }
 

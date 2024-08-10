@@ -17,6 +17,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -300,7 +301,8 @@ func (d *driver) getSFTP() (*sftp.Client, func(), error) {
 }
 
 func (d *driver) normaliseBasePath(p string) string {
-	return path.Join(d.basePath, p)
+	fullpath := path.Join(d.basePath, p)
+	return fmt.Sprintf("./%s", strings.TrimLeft(fullpath, "/"))
 }
 
 var _ health.Checker = (*Driver)(nil)
