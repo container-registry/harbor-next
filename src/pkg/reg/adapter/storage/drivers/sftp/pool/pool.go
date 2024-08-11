@@ -146,7 +146,7 @@ func (p *SSHPool) NewSFTPSession(cfg *SSHConfig) (*sftp.Client, func(), error) {
 		p.table[conn.Hash()] = conn
 	}
 
-	session, err := sftp.NewClient(conn.client)
+	session, err := sftp.NewClient(conn.client, sftp.UseConcurrentWrites(false), sftp.UseConcurrentReads(false))
 	if err != nil {
 		return nil, nil, err
 	}
