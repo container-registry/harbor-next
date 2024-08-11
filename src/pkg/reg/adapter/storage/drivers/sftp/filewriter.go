@@ -5,6 +5,7 @@ import (
 	"fmt"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/pkg/sftp"
+	"os"
 )
 
 var _ storagedriver.FileWriter = &fileWriter{}
@@ -47,13 +48,18 @@ func (fw *fileWriter) Close() error {
 	if fw.closed {
 		return fmt.Errorf("already closed")
 	}
+
 	if err := fw.bw.Flush(); err != nil {
 		return err
 	}
-	if err := fw.file.Close(); err != nil {
+
+	if err := fw.file.Sync(); err != nil {
 		return err
 	}
 
+	if err := fw.file.Close(); err != nil {
+		return err
+	}
 	fw.closed = true
 	return nil
 }
@@ -64,10 +70,8 @@ func (fw *fileWriter) Cancel() error {
 	}
 
 	fw.cancelled = true
-	if err := fw.file.Close(); err != nil {
-		return err
-	}
-	return nil
+	fw.file.Close()
+	return os.Remove(fw.file.Name())
 }
 
 func (fw *fileWriter) Commit() error {
@@ -82,6 +86,11 @@ func (fw *fileWriter) Commit() error {
 	if err := fw.bw.Flush(); err != nil {
 		return err
 	}
+
+	if err := fw.file.Sync(); err != nil {
+		return err
+	}
+
 	fw.committed = true
 	return nil
 }

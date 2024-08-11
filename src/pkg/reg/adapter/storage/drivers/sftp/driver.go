@@ -185,6 +185,7 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 	}
 
 	defer cl()
+
 	p = d.normaliseBasePath(p)
 
 	files, err := session.ReadDir(p)
