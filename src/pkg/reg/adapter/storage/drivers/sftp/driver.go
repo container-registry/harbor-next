@@ -51,6 +51,7 @@ var sshPool = sshpool.NewPool(&sshpool.PoolConfig{
 
 func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
 
+	fmt.Println("GET CONTENT", path)
 	rc, err := d.Reader(ctx, path, 0)
 	if err != nil {
 		return nil, err
@@ -61,6 +62,8 @@ func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
 }
 
 func (d *driver) PutContent(ctx context.Context, p string, contents []byte) error {
+	fmt.Println("PUT CONTENT", p)
+
 	writer, err := d.Writer(ctx, p, false)
 	if err != nil {
 		return fmt.Errorf("writer error: %v", err)
@@ -81,6 +84,7 @@ func (d *driver) PutContent(ctx context.Context, p string, contents []byte) erro
 }
 
 func (d *driver) Reader(_ context.Context, path string, offset int64) (io.ReadCloser, error) {
+	fmt.Println("GET READER", path)
 	var err error
 
 	session, cl, err := d.getSFTP()
@@ -114,6 +118,8 @@ func (d *driver) Reader(_ context.Context, path string, offset int64) (io.ReadCl
 
 func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver.FileWriter, error) {
 
+	fmt.Println("GET WRITER", p)
+
 	session, _, err := d.getSFTP()
 	if err != nil {
 		return nil, err
@@ -145,6 +151,7 @@ func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver
 }
 
 func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, error) {
+	fmt.Println("GET STAT", p)
 
 	session, cl, err := d.getSFTP()
 	if err != nil {
@@ -169,6 +176,8 @@ func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, erro
 }
 
 func (d *driver) List(_ context.Context, p string) ([]string, error) {
+
+	fmt.Println("GET LIST", p)
 
 	session, cl, err := d.getSFTP()
 	if err != nil {
@@ -196,6 +205,8 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 
 func (d *driver) Move(_ context.Context, sourcePath string, destPath string) error {
 
+	fmt.Println("MOVE", sourcePath)
+
 	session, cl, err := d.getSFTP()
 	if err != nil {
 		return err
@@ -215,6 +226,8 @@ func (d *driver) Move(_ context.Context, sourcePath string, destPath string) err
 }
 
 func (d *driver) Delete(_ context.Context, path string) error {
+	fmt.Println("DELETE", path)
+
 	session, cl, err := d.getSFTP()
 	if err != nil {
 		return err
@@ -238,6 +251,8 @@ func (d *driver) URLFor(_ context.Context, _ string, _ map[string]interface{}) (
 }
 
 func (d *driver) Walk(ctx context.Context, path string, f storagedriver.WalkFn) error {
+	fmt.Println("WALK", path)
+
 	return storagedriver.WalkFallback(ctx, d, path, f)
 }
 
