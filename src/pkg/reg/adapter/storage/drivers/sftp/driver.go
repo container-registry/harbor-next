@@ -304,6 +304,9 @@ func New(regModel *model.Registry) (storagedriver.StorageDriver, error) {
 		basePath:  u.Path,
 	}
 
+	// return simple driver
+	return d, nil
+
 	return &Driver{
 		driver: d,
 		baseEmbed: baseEmbed{
