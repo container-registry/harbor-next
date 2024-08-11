@@ -278,8 +278,7 @@ func New(regModel *model.Registry) (storagedriver.StorageDriver, error) {
 	}
 
 	config := &sshpool.SSHConfig{
-		Host:         u.Hostname(),
-		TCPKeepAlive: true,
+		Host: u.Hostname(),
 	}
 	if regModel.Insecure {
 		config.HostKeyCallback = ssh.InsecureIgnoreHostKey()
