@@ -45,7 +45,7 @@ type Driver struct {
 }
 
 var sshPool = sshpool.NewPool(&sshpool.PoolConfig{
-	GCInterval: 10 * time.Second,
+	GCInterval: time.Second,
 	MaxConns:   1,
 })
 
