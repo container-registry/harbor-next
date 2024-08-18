@@ -362,18 +362,20 @@ func (a *adapter) PushBlobChunk(repository, d string, size int64, chunk io.Reade
 		return "", 0, fmt.Errorf("unable to read blob: %v", err)
 	}
 
-	fmt.Println("writer ID", writer.ID())
+	id := writer.ID()
 
-	fmt.Println("READ", read)
+	fmt.Println("writer ID", writer.ID())
+	fmt.Println("READ successfully", read)
+
+	fmt.Println("writer size", writer.Size())
 
 	// if end commit
 	// else just write
-
 	defer func() {
 		_ = writer.Cancel(ctx)
 	}()
 
-	return "", start + read, nil
+	return id, start + read, nil
 }
 
 func (a *adapter) PushBlob(repository, d string, size int64, r io.Reader) error {
