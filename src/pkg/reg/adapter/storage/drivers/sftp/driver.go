@@ -271,7 +271,6 @@ func New(regModel *model.Registry) (storagedriver.StorageDriver, error) {
 		Host:               u.Hostname(),
 		TCPKeepAlive:       true,
 		TCPKeepAlivePeriod: time.Minute,
-		Timeout:            90 * time.Minute,
 	}
 	if regModel.Insecure {
 		config.HostKeyCallback = ssh.InsecureIgnoreHostKey()
