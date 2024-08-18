@@ -113,7 +113,7 @@ func NewSSHConn(ctx context.Context, cfg SSHConfig) (*SSHConn, error) {
 
 	clientConn, chans, reqs, err := ssh.NewClientConn(tcpConn, addr, clientConfig)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ssh new client conn: %w", err)
 	}
 
 	// SSH client
@@ -139,7 +139,7 @@ func NewSSHConn(ctx context.Context, cfg SSHConfig) (*SSHConn, error) {
 
 	// This regularly sends keepalive packets
 	go func() {
-		t := time.NewTicker(time.Minute)
+		t := time.NewTicker(time.Second * 20)
 		defer t.Stop()
 
 		for {
@@ -179,7 +179,7 @@ func (c *SSHConn) Hash() string {
 func (c *SSHConn) NewSession(envs map[string]string) (*ssh.Session, error) {
 	session, err := c.client.NewSession()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("new session: %w", err)
 	}
 
 	for k, v := range envs {

@@ -2,6 +2,7 @@ package sshpool
 
 import (
 	"context"
+	"fmt"
 	"github.com/pkg/sftp"
 	"io"
 	"sort"
@@ -141,14 +142,14 @@ func (p *SSHPool) NewSFTPSession(cfg *SSHConfig) (*sftp.Client, func(), error) {
 	if !found {
 		conn, err = NewSSHConn(p.ctx, *cfg)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("new sftp conn: %w", err)
 		}
 		p.table[conn.Hash()] = conn
 	}
 
 	session, err := sftp.NewClient(conn.client, sftp.UseConcurrentWrites(false), sftp.UseConcurrentReads(false))
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("new client: %w", err)
 	}
 
 	conn.IncrRefCount()

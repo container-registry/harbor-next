@@ -59,7 +59,6 @@ func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
 			// return error as it is to be asserted properly
 			return nil, err
 		}
-
 		return nil, fmt.Errorf("get content %s error: %v", path, err)
 	}
 
