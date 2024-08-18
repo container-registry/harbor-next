@@ -413,6 +413,7 @@ func (a *adapter) HealthCheck() (string, error) {
 
 	checker, ok := a.driver.(health.Checker)
 	if !ok {
+		fmt.Println("Registry does not support checker interface")
 		return model.Unhealthy, nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
