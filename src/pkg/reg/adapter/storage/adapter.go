@@ -334,7 +334,7 @@ func (a *adapter) PullBlobChunk(repository, d string, _, start, end int64) (size
 
 func (a *adapter) PushBlobChunk(repository, d string, size int64, chunk io.Reader, start, end int64, location string) (nextUploadLocation string, endRange int64, err error) {
 
-	fmt.Println("PushBlobChunk", repository, d, size, start, end, location)
+	fmt.Println("PushBlobChunk", repository, d, size, start, end, "location", location)
 
 	ctx := context.Background()
 
@@ -368,12 +368,6 @@ func (a *adapter) PushBlobChunk(repository, d string, size int64, chunk io.Reade
 	fmt.Println("READ successfully", read)
 
 	fmt.Println("writer size", writer.Size())
-
-	// if end commit
-	// else just write
-	defer func() {
-		_ = writer.Cancel(ctx)
-	}()
 
 	return id, start + read, nil
 }
