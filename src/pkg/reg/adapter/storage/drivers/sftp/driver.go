@@ -47,7 +47,7 @@ type Driver struct {
 
 var sshPool = sshpool.NewPool(&sshpool.PoolConfig{
 	GCInterval: time.Second * 5,
-	MaxConns:   1,
+	MaxConns:   30,
 })
 
 func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
@@ -271,6 +271,7 @@ func New(regModel *model.Registry) (storagedriver.StorageDriver, error) {
 		Host:               u.Hostname(),
 		TCPKeepAlive:       true,
 		TCPKeepAlivePeriod: time.Minute,
+		Timeout:            30 * time.Minute,
 	}
 	if regModel.Insecure {
 		config.HostKeyCallback = ssh.InsecureIgnoreHostKey()
