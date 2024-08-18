@@ -10,7 +10,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// SSHConn defines the configuration options of the SSH connection.
+// SSHConfig defines the configuration options of the SSH connection.
 type SSHConfig struct {
 	User string
 	Host string
@@ -139,7 +139,7 @@ func NewSSHConn(ctx context.Context, cfg SSHConfig) (*SSHConn, error) {
 
 	// This regularly sends keepalive packets
 	go func() {
-		t := time.NewTicker(time.Second * 20)
+		t := time.NewTicker(time.Minute)
 		defer t.Stop()
 
 		for {

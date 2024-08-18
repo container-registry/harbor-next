@@ -17,9 +17,10 @@ type fileWriter struct {
 	closed    bool
 	committed bool
 	cancelled bool
+	closer    func()
 }
 
-func newFileWriter(file *sftp.File, size int64) *fileWriter {
+func newFileWriter(file *sftp.File, size int64, closer func()) *fileWriter {
 	return &fileWriter{
 		file: file,
 		size: size,
@@ -57,9 +58,10 @@ func (fw *fileWriter) Close() error {
 		return err
 	}
 
-	if err := fw.file.Close(); err != nil {
-		return err
+	if fw.closer != nil {
+		fw.closer()
 	}
+
 	fw.closed = true
 	return nil
 }
@@ -70,7 +72,6 @@ func (fw *fileWriter) Cancel() error {
 	}
 
 	fw.cancelled = true
-	fw.file.Close()
 	return os.Remove(fw.file.Name())
 }
 

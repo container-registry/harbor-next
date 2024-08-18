@@ -46,7 +46,7 @@ type Driver struct {
 }
 
 var sshPool = sshpool.NewPool(&sshpool.PoolConfig{
-	GCInterval: time.Second,
+	GCInterval: time.Second * 5,
 	MaxConns:   1,
 })
 
@@ -118,7 +118,7 @@ func (d *driver) Reader(_ context.Context, p string, offset int64) (io.ReadClose
 
 func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver.FileWriter, error) {
 
-	session, _, err := d.getSFTP()
+	session, closer, err := d.getSFTP()
 	if err != nil {
 		return nil, fmt.Errorf("writer %s get sftp session failed: %v", p, err)
 	}
@@ -147,7 +147,7 @@ func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver
 		return nil, fmt.Errorf("file seek/truncate %s error: %v", p, err)
 	}
 
-	return newFileWriter(file, offset), nil
+	return newFileWriter(file, offset, closer), nil
 }
 
 func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, error) {
@@ -268,7 +268,9 @@ func New(regModel *model.Registry) (storagedriver.StorageDriver, error) {
 	}
 
 	config := &sshpool.SSHConfig{
-		Host: u.Hostname(),
+		Host:               u.Hostname(),
+		TCPKeepAlive:       true,
+		TCPKeepAlivePeriod: time.Minute,
 	}
 	if regModel.Insecure {
 		config.HostKeyCallback = ssh.InsecureIgnoreHostKey()
