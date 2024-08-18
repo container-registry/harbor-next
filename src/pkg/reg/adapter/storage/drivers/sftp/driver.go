@@ -132,7 +132,7 @@ func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver
 		return nil, fmt.Errorf("unable to create directory %s: %v", dir, err)
 	}
 
-	file, err := session.Create(p)
+	file, err := session.OpenFile(p, os.O_RDWR|os.O_CREATE)
 	if err != nil {
 		return nil, fmt.Errorf("file create %s error: %v", p, err)
 	}
