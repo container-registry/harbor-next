@@ -3,6 +3,7 @@ package sftp
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/docker/distribution/registry/storage/driver/base"
@@ -52,6 +53,13 @@ var sshPool = sshpool.NewPool(&sshpool.PoolConfig{
 func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
 	rc, err := d.Reader(ctx, path, 0)
 	if err != nil {
+
+		var pathNotFoundError storagedriver.PathNotFoundError
+		if errors.As(err, &pathNotFoundError) {
+			// return error as it is to be asserted properly
+			return nil, err
+		}
+
 		return nil, fmt.Errorf("get content %s error: %v", path, err)
 	}
 
