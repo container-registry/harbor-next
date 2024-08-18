@@ -415,10 +415,11 @@ func (a *adapter) HealthCheck() (string, error) {
 	if !ok {
 		return model.Unhealthy, nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	if err := checker.Health(ctx); err != nil {
+		fmt.Println("HEALTH CHECK ERROR", err)
 		return model.Unhealthy, nil
 	}
 	return model.Healthy, nil
