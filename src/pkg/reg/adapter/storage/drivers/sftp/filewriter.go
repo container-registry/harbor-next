@@ -5,7 +5,6 @@ import (
 	"fmt"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/pkg/sftp"
-	"os"
 )
 
 var _ storagedriver.FileWriter = &fileWriter{}
@@ -22,9 +21,10 @@ type fileWriter struct {
 
 func newFileWriter(file *sftp.File, size int64, closer func()) *fileWriter {
 	return &fileWriter{
-		file: file,
-		size: size,
-		bw:   bufio.NewWriter(file),
+		file:   file,
+		size:   size,
+		bw:     bufio.NewWriter(file),
+		closer: closer,
 	}
 }
 
@@ -58,21 +58,22 @@ func (fw *fileWriter) Close() error {
 		return err
 	}
 
+	fw.closed = true
+
 	if fw.closer != nil {
 		fw.closer()
 	}
-
-	fw.closed = true
 	return nil
 }
 
+// Cancel @todo add file delete
 func (fw *fileWriter) Cancel() error {
 	if fw.closed {
 		return fmt.Errorf("already closed")
 	}
 
 	fw.cancelled = true
-	return os.Remove(fw.file.Name())
+	return nil
 }
 
 func (fw *fileWriter) Commit() error {
@@ -83,15 +84,12 @@ func (fw *fileWriter) Commit() error {
 	} else if fw.cancelled {
 		return fmt.Errorf("already cancelled")
 	}
-
 	if err := fw.bw.Flush(); err != nil {
 		return err
 	}
-
 	if err := fw.file.Sync(); err != nil {
 		return err
 	}
-
 	fw.committed = true
 	return nil
 }

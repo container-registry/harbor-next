@@ -354,7 +354,7 @@ func (a *adapter) PushBlob(repository, d string, size int64, r io.Reader) error 
 
 	_, err = writer.ReadFrom(r)
 	if err != nil {
-		return fmt.Errorf("writer is unable to write: %v", err)
+		return fmt.Errorf("writer unable to read from reader: %v", err)
 	}
 	_, err = writer.Commit(ctx, distribution.Descriptor{
 		Size:   size,
@@ -420,7 +420,6 @@ func (a *adapter) HealthCheck() (string, error) {
 	defer cancel()
 
 	if err := checker.Health(ctx); err != nil {
-		fmt.Println("HEALTH CHECK ERROR", err)
 		return model.Unhealthy, nil
 	}
 	return model.Healthy, nil
