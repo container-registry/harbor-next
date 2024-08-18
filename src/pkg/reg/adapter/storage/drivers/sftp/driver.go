@@ -50,11 +50,9 @@ var sshPool = sshpool.NewPool(&sshpool.PoolConfig{
 })
 
 func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
-
-	fmt.Println("GET CONTENT", path)
 	rc, err := d.Reader(ctx, path, 0)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get content %s error: %v", path, err)
 	}
 
 	defer rc.Close()
@@ -62,42 +60,38 @@ func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
 }
 
 func (d *driver) PutContent(ctx context.Context, p string, contents []byte) error {
-	fmt.Println("PUT CONTENT", p)
-
 	writer, err := d.Writer(ctx, p, false)
 	if err != nil {
-		return fmt.Errorf("writer error: %v", err)
+		return fmt.Errorf("put content %s error: %v", p, err)
 	}
 
 	defer writer.Close()
 	_, err = io.Copy(writer, bytes.NewReader(contents))
 	if err != nil {
 		_ = writer.Cancel()
-		return fmt.Errorf("writer error: %v", err)
+		return fmt.Errorf("put content %s error: %v", p, err)
 	}
 
 	err = writer.Commit()
 	if err != nil {
-		return fmt.Errorf("commit error: %v", err)
+		return fmt.Errorf("put content %s error: %v", p, err)
 	}
 	return nil
 }
 
-func (d *driver) Reader(_ context.Context, path string, offset int64) (io.ReadCloser, error) {
-	fmt.Println("GET READER", path)
+func (d *driver) Reader(_ context.Context, p string, offset int64) (io.ReadCloser, error) {
 	var err error
-
 	session, cl, err := d.getSFTP()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reader %s sftp session failed: %v", p, err)
 	}
 
-	file, err := session.Open(d.normaliseBasePath(path))
+	file, err := session.Open(d.normaliseBasePath(p))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, storagedriver.PathNotFoundError{Path: path}
+			return nil, storagedriver.PathNotFoundError{Path: p, DriverName: DriverName}
 		}
-		return nil, err
+		return nil, fmt.Errorf("reader open %s: %v", p, err)
 	}
 
 	seekPos, err := file.Seek(offset, io.SeekStart)
@@ -106,9 +100,8 @@ func (d *driver) Reader(_ context.Context, path string, offset int64) (io.ReadCl
 		return nil, err
 	} else if seekPos < offset {
 		//file.Close()
-		return nil, storagedriver.InvalidOffsetError{Path: path, Offset: offset}
+		return nil, storagedriver.InvalidOffsetError{Path: p, Offset: offset, DriverName: DriverName}
 	}
-
 	r := reader{
 		File:  file,
 		close: cl,
@@ -118,22 +111,22 @@ func (d *driver) Reader(_ context.Context, path string, offset int64) (io.ReadCl
 
 func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver.FileWriter, error) {
 
-	fmt.Println("GET WRITER", p)
-
 	session, _, err := d.getSFTP()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("writer %s get sftp session failed: %v", p, err)
 	}
 
 	p = d.normaliseBasePath(p)
 
-	if err = session.MkdirAll(path.Dir(p)); err != nil {
-		return nil, fmt.Errorf("unable to create directory %s: %v", path.Dir(p), err)
+	dir := path.Dir(p)
+
+	if err = session.MkdirAll(dir); err != nil {
+		return nil, fmt.Errorf("unable to create directory %s: %v", dir, err)
 	}
 
 	file, err := session.Create(p)
 	if err != nil {
-		return nil, fmt.Errorf("file create error: %v", err)
+		return nil, fmt.Errorf("file create %s error: %v", p, err)
 	}
 
 	var offset int64
@@ -144,18 +137,17 @@ func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver
 		err = file.Truncate(0)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("file seek/truncate error: %v", err)
+		return nil, fmt.Errorf("file seek/truncate %s error: %v", p, err)
 	}
 
 	return newFileWriter(file, offset), nil
 }
 
 func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, error) {
-	fmt.Println("GET STAT", p)
 
 	session, cl, err := d.getSFTP()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("stat %s get sftp session failed: %v", p, err)
 	}
 
 	defer cl()
@@ -166,7 +158,7 @@ func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, erro
 		if os.IsNotExist(err) {
 			return nil, storagedriver.PathNotFoundError{Path: p}
 		}
-		return nil, err
+		return nil, fmt.Errorf("stat %s: %v", p, err)
 	}
 
 	return fileInfo{
@@ -177,11 +169,9 @@ func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, erro
 
 func (d *driver) List(_ context.Context, p string) ([]string, error) {
 
-	fmt.Println("GET LIST", p)
-
 	session, cl, err := d.getSFTP()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("list %s get sftp session failed: %v", p, err)
 	}
 
 	defer cl()
@@ -206,15 +196,12 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 
 func (d *driver) Move(_ context.Context, sourcePath string, destPath string) error {
 
-	fmt.Println("MOVE", sourcePath)
-
 	session, cl, err := d.getSFTP()
 	if err != nil {
-		return err
+		return fmt.Errorf("move %s get sftp session failed: %v", sourcePath, err)
 	}
 
 	defer cl()
-
 	//
 	sourcePath = d.normaliseBasePath(sourcePath)
 	destPath = d.normaliseBasePath(destPath)
@@ -226,23 +213,21 @@ func (d *driver) Move(_ context.Context, sourcePath string, destPath string) err
 	return session.Rename(sourcePath, destPath)
 }
 
-func (d *driver) Delete(_ context.Context, path string) error {
-	fmt.Println("DELETE", path)
-
+func (d *driver) Delete(_ context.Context, p string) error {
 	session, cl, err := d.getSFTP()
 	if err != nil {
-		return err
+		return fmt.Errorf("delete %s get sftp session failed: %v", p, err)
 	}
 	defer cl()
 	//
 
-	path = d.normaliseBasePath(path)
-	if err := session.RemoveAll(path); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("unable to remove all %s: %v", path, err)
+	p = d.normaliseBasePath(p)
+	if err := session.RemoveAll(p); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("unable to remove all %s: %v", p, err)
 	}
 
-	if err = session.Remove(path); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("remove %s error: %v", path, err)
+	if err = session.Remove(p); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove %s error: %v", p, err)
 	}
 	return nil
 }
@@ -252,8 +237,6 @@ func (d *driver) URLFor(_ context.Context, _ string, _ map[string]interface{}) (
 }
 
 func (d *driver) Walk(ctx context.Context, path string, f storagedriver.WalkFn) error {
-	fmt.Println("WALK", path)
-
 	return storagedriver.WalkFallback(ctx, d, path, f)
 }
 
