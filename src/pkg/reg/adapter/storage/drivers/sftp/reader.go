@@ -6,10 +6,13 @@ import (
 
 type reader struct {
 	*sftp.File
-	close func()
+	closer func()
 }
 
 func (r reader) Close() error {
-	r.close()
+	if r.closer != nil {
+		r.closer()
+	}
+
 	return r.File.Close()
 }

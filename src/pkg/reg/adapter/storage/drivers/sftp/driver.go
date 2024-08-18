@@ -73,6 +73,7 @@ func (d *driver) PutContent(ctx context.Context, p string, contents []byte) erro
 	}
 
 	defer writer.Close()
+
 	_, err = io.Copy(writer, bytes.NewReader(contents))
 	if err != nil {
 		_ = writer.Cancel()
@@ -103,15 +104,13 @@ func (d *driver) Reader(_ context.Context, p string, offset int64) (io.ReadClose
 
 	seekPos, err := file.Seek(offset, io.SeekStart)
 	if err != nil {
-		//file.Close()
 		return nil, err
 	} else if seekPos < offset {
-		//file.Close()
 		return nil, storagedriver.InvalidOffsetError{Path: p, Offset: offset, DriverName: DriverName}
 	}
 	r := reader{
-		File:  file,
-		close: cl,
+		File:   file,
+		closer: cl,
 	}
 	return r, nil
 }
