@@ -117,6 +117,8 @@ func (d *driver) Reader(_ context.Context, p string, offset int64) (io.ReadClose
 
 func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver.FileWriter, error) {
 
+	fmt.Println("WRITER", p, append)
+
 	session, closer, err := d.getSFTP()
 	if err != nil {
 		return nil, fmt.Errorf("writer %s get sftp session failed: %v", p, err)
