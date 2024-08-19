@@ -35,7 +35,7 @@ func (f *sftpFactory) Create(r *model.Registry) (regadapter.Adapter, error) {
 		return nil, err
 	}
 
-	ns, err := storage.NewRegistry(context.Background(), driver, storage.EnableSchema1, storage.EnableDelete, storage.Schema1SigningKey(trustKey))
+	ns, err := storage.NewRegistry(context.Background(), driver, storage.EnableSchema1, storage.EnableDelete, storage.Schema1SigningKey(trustKey), storage.DisableDigestResumption)
 	if err != nil {
 		return nil, err
 	}

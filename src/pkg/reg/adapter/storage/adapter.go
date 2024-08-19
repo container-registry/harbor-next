@@ -359,7 +359,7 @@ func (a *adapter) PushBlobChunk(repository, d string, size int64, chunk io.Reade
 
 	_, err = writer.ReadFrom(chunk)
 	if err != nil {
-		return "", 0, fmt.Errorf("unable to read blob: %v", err)
+		return "", 0, fmt.Errorf("unable to read from chunk: %v", err)
 	}
 
 	if writer.Size() < size {
