@@ -147,19 +147,6 @@ func (p *SSHPool) NewSFTPSession(cfg *SSHConfig) (*sftp.Client, func(), error) {
 		p.table[conn.Hash()] = conn
 	}
 
-	if _, _, err := conn.client.Conn.SendRequest("keepalive@golang.org", true, nil); err != nil {
-		if found {
-			// reused connection
-			// delete it and try again
-			_ = conn.Close()
-			delete(p.table, conn.Hash())
-			return p.NewSFTPSession(cfg)
-		} else {
-			// new connection fail, give up
-			return nil, nil, fmt.Errorf("test new sftp conn: %w", err)
-		}
-	}
-
 	// options meant to improve speed
 	session, err := sftp.NewClient(conn.client, sftp.UseConcurrentReads(true),
 		sftp.UseConcurrentWrites(true),

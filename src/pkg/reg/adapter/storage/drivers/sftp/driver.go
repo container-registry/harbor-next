@@ -47,7 +47,7 @@ type Driver struct {
 
 var sshPool = sshpool.NewPool(&sshpool.PoolConfig{
 	GCInterval: time.Second,
-	MaxConns:   3,
+	MaxConns:   5,
 })
 
 func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
