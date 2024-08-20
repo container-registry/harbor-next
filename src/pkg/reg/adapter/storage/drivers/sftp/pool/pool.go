@@ -147,6 +147,10 @@ func (p *SSHPool) NewSFTPSession(cfg *SSHConfig) (*sftp.Client, func(), error) {
 		p.table[conn.Hash()] = conn
 	}
 
+	if _, _, err := conn.client.Conn.SendRequest("keepalive@golang.org", true, nil); err != nil {
+		fmt.Printf("!!!! test conn error: %v\n", err)
+	}
+
 	session, err := sftp.NewClient(conn.client, sftp.UseConcurrentReads(true),
 		sftp.UseConcurrentWrites(true),
 		sftp.UseConcurrentReads(true),
@@ -159,7 +163,6 @@ func (p *SSHPool) NewSFTPSession(cfg *SSHConfig) (*sftp.Client, func(), error) {
 	}
 
 	conn.IncrRefCount()
-
 	return session, func() {
 		conn.DecrRefCount()
 		_ = session.Close()
