@@ -364,8 +364,6 @@ func (a *adapter) PushBlobChunk(repository, d string, size int64, chunk io.Reade
 
 	if writer.Size() < size {
 		// another chunk needed
-
-		fmt.Println("RETURN", writer.ID(), writer.Size())
 		return writer.ID(), writer.Size(), nil
 	}
 

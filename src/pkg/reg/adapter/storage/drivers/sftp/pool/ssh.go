@@ -164,7 +164,6 @@ func NewSSHConn(ctx context.Context, cfg SSHConfig) (*SSHConn, error) {
 // Close closes a connection and all its resources.
 func (c *SSHConn) Close() error {
 	c.cancel()
-
 	return c.client.Close()
 }
 
@@ -205,6 +204,7 @@ func (c *SSHConn) IncrRefCount() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.refCount += 1
+	fmt.Println("INCR", c.refCount)
 	c.accessTime = time.Now()
 }
 
@@ -213,6 +213,7 @@ func (c *SSHConn) DecrRefCount() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.refCount -= 1
+	fmt.Println("DECR", c.refCount)
 	c.accessTime = time.Now()
 }
 
