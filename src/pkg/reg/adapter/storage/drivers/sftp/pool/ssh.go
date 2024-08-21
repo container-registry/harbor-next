@@ -204,7 +204,6 @@ func (c *SSHConn) IncrRefCount() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.refCount += 1
-	fmt.Println("INCR", c.refCount)
 	c.accessTime = time.Now()
 }
 
@@ -213,7 +212,6 @@ func (c *SSHConn) DecrRefCount() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.refCount -= 1
-	fmt.Println("DECR", c.refCount)
 	c.accessTime = time.Now()
 }
 

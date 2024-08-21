@@ -22,7 +22,7 @@ import (
 
 const (
 	DriverName         = "sftp"
-	defaultConcurrency = 1
+	defaultConcurrency = 3
 )
 
 type driver struct {
@@ -116,8 +116,6 @@ func (d *driver) Reader(_ context.Context, p string, offset int64) (io.ReadClose
 }
 
 func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver.FileWriter, error) {
-
-	fmt.Println("WRITER", p, append)
 
 	session, closer, err := d.getSFTP()
 	if err != nil {
