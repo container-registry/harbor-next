@@ -75,6 +75,10 @@ func NewSSHConn(ctx context.Context, cfg SSHConfig) (*SSHConn, error) {
 
 	addr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
 
+	if cfg.MaxSessions == 0 {
+		cfg.MaxSessions = 10
+	}
+
 	// TCP connection
 	tcpConn, err := func() (c net.Conn, err error) {
 		if cfg.Timeout == 0 {

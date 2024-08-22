@@ -151,6 +151,9 @@ func (p *SSHPool) NewSFTPSession(cfg *SSHConfig) (*sftp.Client, func(), error) {
 		p.table[conn.Hash()] = conn
 	}
 
+	// try to inc sessions
+	conn.IncrRefCount()
+
 	// options meant to improve speed
 	session, err := sftp.NewClient(conn.client, sftp.UseConcurrentReads(true),
 		sftp.UseConcurrentWrites(true),
@@ -160,10 +163,12 @@ func (p *SSHPool) NewSFTPSession(cfg *SSHConfig) (*sftp.Client, func(), error) {
 	)
 
 	if err != nil {
+		//failed, give up and decrement
+		defer conn.DecrRefCount()
 		return nil, nil, fmt.Errorf("new client error: %w ref count: %d", err, conn.RefCount())
 	}
 
-	conn.IncrRefCount()
+	// all good, provide session and it's closer
 	return session, func() {
 		conn.DecrRefCount()
 		_ = session.Close()
