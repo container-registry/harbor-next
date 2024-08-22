@@ -22,7 +22,7 @@ import (
 
 const (
 	DriverName         = "sftp"
-	defaultConcurrency = 3
+	defaultConcurrency = 1
 )
 
 type driver struct {
