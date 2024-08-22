@@ -17,6 +17,9 @@ type SSHConfig struct {
 	Port int
 	Auth []ssh.AuthMethod
 
+	//MaxSessions is a maximum number of sessions per connection Default is 10
+	MaxSessions int
+
 	// Timeout is the maximum amount of time for the TCP connection to establish.
 	Timeout time.Duration
 
@@ -53,10 +56,12 @@ type SSHConn struct {
 	cancel func()
 
 	// Protects access to fields below
-	mu         sync.Mutex
-	lastErr    error
-	refCount   int
+	mu      sync.Mutex
+	lastErr error
+
 	accessTime time.Time
+
+	sessionLimit chan struct{}
 }
 
 // NewSSHConn creates and configures new SSH connection according to the given SSH config.
@@ -129,12 +134,13 @@ func NewSSHConn(ctx context.Context, cfg SSHConfig) (*SSHConn, error) {
 
 	ctx, cancel := context.WithCancel(ctx)
 	conn := &SSHConn{
-		client:     client,
-		cfg:        cfg,
-		hash:       cfg.String(),
-		ctx:        ctx,
-		cancel:     cancel,
-		accessTime: time.Now(),
+		client:       client,
+		cfg:          cfg,
+		hash:         cfg.String(),
+		ctx:          ctx,
+		cancel:       cancel,
+		accessTime:   time.Now(),
+		sessionLimit: make(chan struct{}, cfg.MaxSessions),
 	}
 
 	// This regularly sends keepalive packets
@@ -194,16 +200,15 @@ func (c *SSHConn) NewSession(envs map[string]string) (*ssh.Session, error) {
 // RefCount returns the reference count of this connection,
 // which can be interpreted as the number of active sessions.
 func (c *SSHConn) RefCount() int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.refCount
+	return len(c.sessionLimit)
 }
 
-// DecrRefCount increments the reference counter.
+// IncrRefCount increments the reference counter.
 func (c *SSHConn) IncrRefCount() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.refCount += 1
+	c.sessionLimit <- struct{}{}
+
 	c.accessTime = time.Now()
 }
 
@@ -211,7 +216,7 @@ func (c *SSHConn) IncrRefCount() {
 func (c *SSHConn) DecrRefCount() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.refCount -= 1
+	<-c.sessionLimit
 	c.accessTime = time.Now()
 }
 

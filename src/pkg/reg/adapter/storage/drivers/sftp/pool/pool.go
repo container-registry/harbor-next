@@ -58,6 +58,9 @@ func NewPool(cfg *PoolConfig) *SSHPool {
 	if cfg == nil {
 		cfg = &PoolConfig{GCInterval: 30 * time.Second}
 	}
+	if cfg.MaxConns == 0 {
+		cfg.MaxConns = 5
+	}
 
 	p := SSHPool{
 		PoolConfig: *cfg,
@@ -113,6 +116,7 @@ func (p *SSHPool) collect() {
 
 			for _, c := range s[p.MaxConns:] {
 				if c.RefCount() > 0 {
+					// do not gc connections with open sessions
 					continue
 				}
 				delete(p.table, c.Hash())
@@ -156,7 +160,7 @@ func (p *SSHPool) NewSFTPSession(cfg *SSHConfig) (*sftp.Client, func(), error) {
 	)
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("new client error: %w ref count: %d", err, conn.refCount)
+		return nil, nil, fmt.Errorf("new client error: %w ref count: %d", err, conn.RefCount())
 	}
 
 	conn.IncrRefCount()
