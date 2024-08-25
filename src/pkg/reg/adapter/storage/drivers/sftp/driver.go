@@ -96,6 +96,7 @@ func (d *driver) Reader(_ context.Context, p string, offset int64) (io.ReadClose
 
 	file, err := session.Open(d.normaliseBasePath(p))
 	if err != nil {
+		cl()
 		if os.IsNotExist(err) {
 			return nil, storagedriver.PathNotFoundError{Path: p, DriverName: DriverName}
 		}
@@ -104,10 +105,15 @@ func (d *driver) Reader(_ context.Context, p string, offset int64) (io.ReadClose
 
 	seekPos, err := file.Seek(offset, io.SeekStart)
 	if err != nil {
+		cl()
 		return nil, err
-	} else if seekPos < offset {
+	}
+
+	if seekPos < offset {
+		cl()
 		return nil, storagedriver.InvalidOffsetError{Path: p, Offset: offset, DriverName: DriverName}
 	}
+
 	r := reader{
 		File:   file,
 		closer: cl,
@@ -117,21 +123,22 @@ func (d *driver) Reader(_ context.Context, p string, offset int64) (io.ReadClose
 
 func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver.FileWriter, error) {
 
-	session, closer, err := d.getSFTP()
+	session, cl, err := d.getSFTP()
 	if err != nil {
 		return nil, fmt.Errorf("writer %s get sftp session failed: %v", p, err)
 	}
 
 	p = d.normaliseBasePath(p)
-
 	dir := path.Dir(p)
 
 	if err = session.MkdirAll(dir); err != nil {
+		cl()
 		return nil, fmt.Errorf("unable to create directory %s: %v", dir, err)
 	}
 
 	file, err := session.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_APPEND)
 	if err != nil {
+		cl()
 		return nil, fmt.Errorf("file create %s error: %v", p, err)
 	}
 
@@ -143,10 +150,11 @@ func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver
 		err = file.Truncate(0)
 	}
 	if err != nil {
+		cl()
 		return nil, fmt.Errorf("file seek/truncate %s error: %v", p, err)
 	}
 
-	return newFileWriter(file, offset, closer), nil
+	return newFileWriter(file, offset, cl), nil
 }
 
 func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, error) {

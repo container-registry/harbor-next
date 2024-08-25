@@ -50,20 +50,20 @@ func (fw *fileWriter) Close() error {
 		return fmt.Errorf("already closed")
 	}
 
+	if fw.closer != nil {
+		fw.closer()
+		fw.closed = true
+	}
+	// closing anyway even if followed errored
+
 	if err := fw.bw.Flush(); err != nil {
 		return err
 	}
-
 	if err := fw.file.Sync(); err != nil {
 		return err
 	}
 
-	fw.closed = true
-
-	if fw.closer != nil {
-		fw.closer()
-	}
-	return nil
+	return fw.file.Close()
 }
 
 // Cancel @todo add file delete
@@ -71,7 +71,6 @@ func (fw *fileWriter) Cancel() error {
 	if fw.closed {
 		return fmt.Errorf("already closed")
 	}
-
 	fw.cancelled = true
 	return nil
 }
