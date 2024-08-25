@@ -46,8 +46,8 @@ type Driver struct {
 }
 
 var sshPool = sshpool.NewPool(&sshpool.PoolConfig{
-	GCInterval: time.Second,
-	MaxConns:   3,
+	GCInterval: time.Second * 5,
+	MaxConns:   10,
 })
 
 func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
@@ -254,14 +254,8 @@ func (d *driver) Walk(ctx context.Context, path string, f storagedriver.WalkFn) 
 	return storagedriver.WalkFallback(ctx, d, path, f)
 }
 
-func (d *Driver) Health(_ context.Context) error {
-	client, cl, err := d.driver.getSFTP()
-	if err != nil {
-		return err
-	}
-	defer cl()
-	_, err = client.Getwd()
-	return err
+func (d *Driver) Health(ctx context.Context) error {
+	return d.driver.Health(ctx)
 }
 
 func New(regModel *model.Registry) (storagedriver.StorageDriver, error) {
@@ -304,14 +298,26 @@ func New(regModel *model.Registry) (storagedriver.StorageDriver, error) {
 		basePath:  u.Path,
 	}
 
-	return &Driver{
-		driver: d,
-		baseEmbed: baseEmbed{
-			Base: base.Base{
-				StorageDriver: base.NewRegulator(d, defaultConcurrency),
-			},
-		},
-	}, nil
+	//return &Driver{
+	//  driver: d,
+	//  baseEmbed: baseEmbed{
+	//    Base: base.Base{
+	//      StorageDriver: base.NewRegulator(d, defaultConcurrency),
+	//    },
+	//  },
+	//}, nil
+
+	return d, nil
+}
+
+func (d *driver) Health(ctx context.Context) error {
+	client, cl, err := d.getSFTP()
+	if err != nil {
+		return err
+	}
+	defer cl()
+	_, err = client.Getwd()
+	return err
 }
 
 func (d *driver) getSFTP() (*sftp.Client, func(), error) {
@@ -322,4 +328,5 @@ func (d *driver) normaliseBasePath(p string) string {
 	return path.Join(d.basePath, p)
 }
 
+var _ health.Checker = (*driver)(nil)
 var _ health.Checker = (*Driver)(nil)

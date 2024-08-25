@@ -31,6 +31,7 @@ type adapter struct {
 
 func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, error) {
 
+	fmt.Println("FetchArtifacts")
 	ctx := context.Background()
 	var repoNames = make([]string, 1000)
 
@@ -127,6 +128,8 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 }
 
 func (a *adapter) ManifestExist(repository, ref string) (exist bool, desc *distribution.Descriptor, err error) {
+
+	fmt.Println("ManifestExist", repository, ref)
 	ctx := context.Background()
 
 	repo, err := a.getRepo(ctx, repository, ref)
@@ -166,6 +169,7 @@ func (a *adapter) ManifestExist(repository, ref string) (exist bool, desc *distr
 }
 
 func (a *adapter) PullManifest(repository, ref string, _ ...string) (distribution.Manifest, string, error) {
+	fmt.Println("PullManifest", repository, ref)
 	ctx := context.Background()
 
 	repo, err := a.getRepo(ctx, repository, ref)
@@ -205,6 +209,8 @@ func (a *adapter) PullManifest(repository, ref string, _ ...string) (distributio
 
 // PushManifest manifests are blobs actually
 func (a *adapter) PushManifest(repository, ref, mediaType string, payload []byte) (string, error) {
+
+	fmt.Println("PushManifest", repository, ref, mediaType, len(payload))
 	ctx := context.Background()
 
 	repo, err := a.getRepo(ctx, repository, ref)
@@ -248,6 +254,7 @@ func (a *adapter) PushManifest(repository, ref, mediaType string, payload []byte
 }
 
 func (a *adapter) DeleteManifest(repository, ref string) error {
+	fmt.Println("DeleteManifest", repository, ref)
 	ctx := context.Background()
 
 	named, err := reference.WithName(repository)
@@ -329,13 +336,13 @@ func (a *adapter) PullBlob(repository, d string) (int64, io.ReadCloser, error) {
 }
 
 func (a *adapter) PullBlobChunk(repository, d string, _, start, end int64) (size int64, blob io.ReadCloser, err error) {
+	fmt.Println("PullBlobChunk", repository, d, start, end)
 	return 0, nil, fmt.Errorf("PullBlobChunk is not implemented")
 }
 
 func (a *adapter) PushBlobChunk(repository, d string, size int64, chunk io.Reader, start, end int64, location string) (nextUploadLocation string, endRange int64, err error) {
 
 	fmt.Println("PushBlobChunk", repository, d, size, start, end, "location", location)
-
 	ctx := context.Background()
 
 	repo, err := a.getRepo(ctx, repository, d)

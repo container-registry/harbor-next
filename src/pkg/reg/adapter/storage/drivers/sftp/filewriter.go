@@ -50,10 +50,14 @@ func (fw *fileWriter) Close() error {
 		return fmt.Errorf("already closed")
 	}
 
-	if fw.closer != nil {
+	defer func() {
+		if fw.closer == nil {
+			return
+		}
 		fw.closer()
 		fw.closed = true
-	}
+	}()
+
 	// closing anyway even if followed errored
 
 	if err := fw.bw.Flush(); err != nil {
