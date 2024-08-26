@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/docker/distribution/registry/storage/driver/base"
 	sshpool "github.com/goharbor/harbor/src/pkg/reg/adapter/storage/drivers/sftp/pool"
@@ -95,6 +94,7 @@ func (d *driver) Reader(_ context.Context, p string, offset int64) (io.ReadClose
 		return nil, fmt.Errorf("reader %s sftp session failed: %v", p, err)
 	}
 
+	fmt.Println("Reader", d.normaliseBasePath(p))
 	file, err := session.Open(d.normaliseBasePath(p))
 	if err != nil {
 		cl()
@@ -130,6 +130,8 @@ func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver
 	}
 
 	p = d.normaliseBasePath(p)
+
+	fmt.Println("Writer", p)
 	dir := path.Dir(p)
 
 	if err = session.MkdirAll(dir); err != nil {
@@ -184,7 +186,6 @@ func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, erro
 
 func (d *driver) List(_ context.Context, p string) ([]string, error) {
 
-	spew.Dump("List", p)
 	session, cl, err := d.getSFTP()
 	if err != nil {
 		return nil, fmt.Errorf("list %s get sftp session failed: %v", p, err)
@@ -194,11 +195,9 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 
 	p = d.normaliseBasePath(p)
 
+	fmt.Println("List", p)
+
 	files, err := session.ReadDir(p)
-
-	spew.Dump("normalised path", p)
-
-	spew.Dump(files, err)
 
 	if err != nil {
 		if os.IsNotExist(err) {

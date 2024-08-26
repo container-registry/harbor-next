@@ -36,6 +36,7 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 
 	// @todo do iteration using last
 	_, err := a.registry.Repositories(ctx, repoNames, "")
+	spew.Dump("Repositories", err, repoNames)
 	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, fmt.Errorf("unable to get repositories: %v", err)
 	}
@@ -56,6 +57,8 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 	if err != nil {
 		return nil, err
 	}
+
+	spew.Dump("repositories filtered", repositories)
 
 	runner := utils.NewLimitedConcurrentRunner(10)
 
@@ -124,6 +127,7 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 		}
 		resources = append(resources, r)
 	}
+	spew.Dump("result", resources)
 	return resources, nil
 }
 
