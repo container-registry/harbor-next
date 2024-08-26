@@ -32,11 +32,12 @@ type adapter struct {
 
 func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, error) {
 	ctx := context.Background()
-	var repoNames = make([]string, 1000)
+	var repoNames = make([]string, 10)
 
 	// @todo do iteration using last
 	_, err := a.registry.Repositories(ctx, repoNames, "")
 	spew.Dump("Repositories", err, repoNames)
+
 	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, fmt.Errorf("unable to get repositories: %v", err)
 	}

@@ -210,6 +210,7 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 	for _, file := range files {
 		result = append(result, path.Join(p, file.Name()))
 	}
+	fmt.Println("List result", result)
 	return result, nil
 }
 
