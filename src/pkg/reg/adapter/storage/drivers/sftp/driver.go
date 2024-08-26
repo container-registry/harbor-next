@@ -196,6 +196,8 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 
 	files, err := session.ReadDir(p)
 
+	spew.Dump("normalised path", p)
+
 	spew.Dump(files, err)
 
 	if err != nil {
@@ -209,7 +211,6 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 	for _, file := range files {
 		result = append(result, path.Join(p, file.Name()))
 	}
-
 	return result, nil
 }
 
