@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/docker/distribution/registry/storage/driver/base"
 	sshpool "github.com/goharbor/harbor/src/pkg/reg/adapter/storage/drivers/sftp/pool"
@@ -183,6 +184,7 @@ func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, erro
 
 func (d *driver) List(_ context.Context, p string) ([]string, error) {
 
+	spew.Dump("List", p)
 	session, cl, err := d.getSFTP()
 	if err != nil {
 		return nil, fmt.Errorf("list %s get sftp session failed: %v", p, err)
@@ -193,6 +195,9 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 	p = d.normaliseBasePath(p)
 
 	files, err := session.ReadDir(p)
+
+	spew.Dump(files, err)
+
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, storagedriver.PathNotFoundError{Path: p}

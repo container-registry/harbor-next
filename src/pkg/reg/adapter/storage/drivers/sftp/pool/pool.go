@@ -126,7 +126,7 @@ func (p *SSHPool) collect() {
 		}()
 
 		for _, c := range needClose {
-			c.Close()
+			_ = c.Close()
 		}
 	}
 }

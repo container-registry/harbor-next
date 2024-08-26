@@ -20,7 +20,6 @@ func (c *conn) Read(b []byte) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-
 	return c.Conn.Read(b)
 }
 
@@ -30,6 +29,5 @@ func (c *conn) Write(b []byte) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-
 	return c.Conn.Write(b)
 }

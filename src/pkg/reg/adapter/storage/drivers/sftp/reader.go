@@ -13,6 +13,5 @@ func (r reader) Close() error {
 	if r.closer != nil {
 		r.closer()
 	}
-
 	return r.File.Close()
 }
