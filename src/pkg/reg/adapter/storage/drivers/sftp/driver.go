@@ -211,6 +211,7 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 	var result []string
 
 	for _, file := range files {
+
 		result = append(result, path.Join(p, file.Name()))
 	}
 	fmt.Println("List result", result)
@@ -259,8 +260,14 @@ func (d *driver) URLFor(_ context.Context, _ string, _ map[string]interface{}) (
 	return "", fmt.Errorf("URLFor is not implemented")
 }
 
-func (d *driver) Walk(ctx context.Context, path string, f storagedriver.WalkFn) error {
-	return storagedriver.WalkFallback(ctx, d, path, f)
+func (d *driver) Walk(ctx context.Context, p string, f storagedriver.WalkFn) error {
+
+	fmt.Println("WALK", p)
+
+	p = d.normaliseBasePath(p)
+	fmt.Println("WALK NORMALISED", p)
+
+	return storagedriver.WalkFallback(ctx, d, p, f)
 }
 
 func (d *Driver) Health(ctx context.Context) error {

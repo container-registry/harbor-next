@@ -32,7 +32,7 @@ type adapter struct {
 
 func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, error) {
 	ctx := context.Background()
-	var repoNames = make([]string, 10)
+	var repoNames = make([]string, 0, 1000)
 
 	// @todo do iteration using last
 	_, err := a.registry.Repositories(ctx, repoNames, "")
