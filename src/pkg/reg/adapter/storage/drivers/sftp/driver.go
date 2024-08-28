@@ -170,8 +170,6 @@ func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, erro
 
 	defer cl()
 
-	p = d.normaliseBasePath(p)
-	fmt.Println("Stat normalised", p)
 	stat, err := session.Stat(p)
 	if err != nil {
 		if os.IsNotExist(err) {
