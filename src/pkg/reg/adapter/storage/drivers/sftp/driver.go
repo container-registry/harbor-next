@@ -162,6 +162,7 @@ func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver
 
 func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, error) {
 
+	fmt.Println("STAT", p)
 	session, cl, err := d.getSFTP()
 	if err != nil {
 		return nil, fmt.Errorf("stat %s get sftp session failed: %v", p, err)
@@ -170,6 +171,7 @@ func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, erro
 	defer cl()
 
 	p = d.normaliseBasePath(p)
+	fmt.Println("Stat normalised", p)
 	stat, err := session.Stat(p)
 	if err != nil {
 		if os.IsNotExist(err) {
