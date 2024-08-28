@@ -170,6 +170,9 @@ func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, erro
 
 	defer cl()
 
+	p = d.normaliseBasePath(p)
+
+	fmt.Println("Stat normalised", p)
 	stat, err := session.Stat(p)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -193,11 +196,11 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 
 	defer cl()
 
-	p = d.normaliseBasePath(p)
+	pn := d.normaliseBasePath(p)
 
 	fmt.Println("List", p)
 
-	files, err := session.ReadDir(p)
+	files, err := session.ReadDir(pn)
 
 	if err != nil {
 		if os.IsNotExist(err) {
