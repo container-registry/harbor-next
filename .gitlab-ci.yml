@@ -9,8 +9,10 @@ variables:
   DOCKER_TLS_CERTDIR: ""
   DOCKER_BUILDKIT: "1"
   REGISTRY_DOMAIN: "8gears.container-registry.com"
+  DOCKER_HOST: tcp://docker:2375
 
 before_script:
+  - docker info
   - apk add --purge --no-cache make bash git docker-compose curl
   - mkdir -p $HOME/.docker/
   - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
