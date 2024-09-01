@@ -10,6 +10,7 @@ variables:
   DOCKER_BUILDKIT: "1"
   REGISTRY_DOMAIN: "8gears.container-registry.com"
   DOCKER_HOST: tcp://docker:2375
+  DOCKER_DEFAULT_PLATFORM: linux/amd64
 
 before_script:
   - docker info
