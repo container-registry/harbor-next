@@ -22,13 +22,14 @@ import (
 )
 
 const (
-	DriverName         = "sftp"
-	defaultConcurrency = 1
+	DriverName = "sftp"
+	//defaultConcurrency = 1
 )
 
 type driver struct {
 	basePath  string
 	sshConfig *sshpool.SSHConfig
+	sshPool   *sshpool.SSHPool
 }
 
 func (d *driver) Name() string {
@@ -45,11 +46,6 @@ type Driver struct {
 	baseEmbed
 	driver *driver
 }
-
-var sshPool = sshpool.NewPool(&sshpool.PoolConfig{
-	GCInterval: time.Second * 5,
-	MaxConns:   10,
-})
 
 func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
 	rc, err := d.Reader(ctx, path, 0)
@@ -95,8 +91,6 @@ func (d *driver) Reader(_ context.Context, p string, offset int64) (io.ReadClose
 		return nil, fmt.Errorf("reader %s sftp session failed: %v", p, err)
 	}
 
-	fmt.Println("Reader normalised", d.addBasePath(p))
-
 	file, err := session.Open(d.addBasePath(p))
 	if err != nil {
 		cl()
@@ -133,7 +127,6 @@ func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver
 
 	p = d.addBasePath(p)
 
-	fmt.Println("Writer", p)
 	dir := path.Dir(p)
 
 	if err = session.MkdirAll(dir); err != nil {
@@ -164,7 +157,6 @@ func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver
 
 func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, error) {
 
-	fmt.Println("STAT", p)
 	session, cl, err := d.getSFTP()
 	if err != nil {
 		return nil, fmt.Errorf("stat %s get sftp session failed: %v", p, err)
@@ -174,7 +166,6 @@ func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, erro
 
 	p = d.addBasePath(p)
 
-	fmt.Println("Stat normalised", p)
 	stat, err := session.Stat(p)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -198,8 +189,6 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 
 	defer cl()
 
-	fmt.Println("List", p)
-
 	pn := d.addBasePath(p)
 	files, err := session.ReadDir(pn)
 
@@ -216,7 +205,6 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 
 		result = append(result, path.Join(p, file.Name()))
 	}
-	fmt.Println("List result", result)
 	return result, nil
 }
 
@@ -263,13 +251,7 @@ func (d *driver) URLFor(_ context.Context, _ string, _ map[string]interface{}) (
 }
 
 func (d *driver) Walk(ctx context.Context, p string, f storagedriver.WalkFn) error {
-
-	fmt.Println("WALK", p)
-
-	fmt.Println("WALK NORMALISED", p)
 	return storagedriver.WalkFallback(ctx, d, p, func(fi storagedriver.FileInfo) error {
-
-		fmt.Println("normalise path from", fi.Path(), "to", d.trimBasePath(fi.Path()))
 		// manipulate file info to trim base path, harbor should know nothing about it
 		return f(fileInfoMock{
 			path:    d.trimBasePath(fi.Path()),
@@ -319,9 +301,15 @@ func New(regModel *model.Registry) (storagedriver.StorageDriver, error) {
 		config.Port = portInt
 	}
 
+	sshPool := sshpool.NewPool(&sshpool.PoolConfig{
+		GCInterval: time.Second * 5,
+		MaxConns:   10,
+	})
+
 	d := &driver{
 		sshConfig: config,
 		basePath:  u.Path,
+		sshPool:   sshPool,
 	}
 
 	//return &Driver{
@@ -347,7 +335,7 @@ func (d *driver) Health(ctx context.Context) error {
 }
 
 func (d *driver) getSFTP() (*sftp.Client, func(), error) {
-	return sshPool.NewSFTPSession(d.sshConfig)
+	return d.sshPool.NewSFTPSession(d.sshConfig)
 }
 
 func (d *driver) addBasePath(p string) string {

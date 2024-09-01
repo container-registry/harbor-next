@@ -27,6 +27,8 @@ build-portal:
   rules:
     - if: $CI_COMMIT_BRANCH =~ /cr\/.*/
     - if: $CI_COMMIT_BRANCH =~ /^feature\/sftp-replication/
+      changes:
+        - 'src/portal/**/*'
   script:
     - env
     - export BASEIMAGETAG=$(cat ./VERSION)

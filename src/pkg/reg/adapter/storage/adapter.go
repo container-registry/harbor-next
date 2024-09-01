@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/reference"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
@@ -51,8 +50,6 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 		if repoName == "" {
 			continue
 		}
-		fmt.Println("Repo name", repoName)
-
 		repositories = append(repositories, &model.Repository{
 			Name: repoName,
 		})
@@ -62,8 +59,6 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 	if err != nil {
 		return nil, err
 	}
-
-	spew.Dump("repositories filtered", repositories)
 
 	runner := utils.NewLimitedConcurrentRunner(10)
 
@@ -132,7 +127,6 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 		}
 		resources = append(resources, r)
 	}
-	spew.Dump("result", resources)
 	return resources, nil
 }
 
