@@ -36,19 +36,23 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 
 	// @todo do iteration using last
 	_, err := a.registry.Repositories(ctx, repoNames, "")
-	spew.Dump("Repositories", err, repoNames)
 
 	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, fmt.Errorf("unable to get repositories: %v", err)
 	}
 
-	spew.Dump(repoNames)
 	if len(repoNames) == 0 {
 		return nil, nil
 	}
 
 	var repositories []*model.Repository
+
 	for _, repoName := range repoNames {
+		if repoName == "" {
+			continue
+		}
+		fmt.Println("Repo name", repoName)
+
 		repositories = append(repositories, &model.Repository{
 			Name: repoName,
 		})
