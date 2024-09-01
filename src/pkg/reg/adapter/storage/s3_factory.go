@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/docker/distribution/registry/storage"
 	"github.com/docker/distribution/registry/storage/driver/s3-aws"
+	"github.com/docker/libtrust"
 	"github.com/goharbor/harbor/src/lib/log"
 	regadapter "github.com/goharbor/harbor/src/pkg/reg/adapter"
 	s3driver "github.com/goharbor/harbor/src/pkg/reg/adapter/storage/drivers/s3"
@@ -63,15 +64,28 @@ func (f *s3Factory) Create(r *model.Registry) (regadapter.Adapter, error) {
 		driverParams.SecretKey = r.Credential.AccessSecret
 	}
 
-	driver, err := s3.New(driverParams)
+	driverS3, err := s3.New(driverParams)
 	if err != nil {
 		return nil, err
 	}
 
-	ns, err := storage.NewRegistry(context.TODO(), &s3driver.Driver{Driver: driver})
+	trustKey, err := libtrust.GenerateECP256PrivateKey()
 	if err != nil {
 		return nil, err
 	}
+
+	driver := &s3driver.Driver{Driver: driverS3}
+
+	ns, err := storage.NewRegistry(context.Background(), driver,
+		storage.EnableSchema1,
+		storage.EnableDelete,
+		storage.Schema1SigningKey(trustKey),
+		storage.DisableDigestResumption)
+
+	if err != nil {
+		return nil, err
+	}
+
 	return &adapter{
 		regModel: r,
 		driver:   driver,

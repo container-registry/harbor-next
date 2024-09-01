@@ -11,7 +11,8 @@ type Driver struct {
 }
 
 func (d Driver) Health(ctx context.Context) error {
-	return nil
+	_, err := d.List(ctx, "")
+	return err
 }
 
 var _ health.Checker = (*Driver)(nil)
