@@ -266,7 +266,6 @@ func (d *driver) Walk(ctx context.Context, p string, f storagedriver.WalkFn) err
 
 	fmt.Println("WALK", p)
 
-	p = d.addBasePath(p)
 	fmt.Println("WALK NORMALISED", p)
 	return storagedriver.WalkFallback(ctx, d, p, func(fi storagedriver.FileInfo) error {
 
