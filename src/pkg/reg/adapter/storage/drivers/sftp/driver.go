@@ -94,7 +94,8 @@ func (d *driver) Reader(_ context.Context, p string, offset int64) (io.ReadClose
 		return nil, fmt.Errorf("reader %s sftp session failed: %v", p, err)
 	}
 
-	fmt.Println("Reader", d.normaliseBasePath(p))
+	fmt.Println("Reader normalised", d.normaliseBasePath(p))
+
 	file, err := session.Open(d.normaliseBasePath(p))
 	if err != nil {
 		cl()
@@ -196,11 +197,9 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 
 	defer cl()
 
-	pn := d.normaliseBasePath(p)
-
 	fmt.Println("List", p)
 
-	files, err := session.ReadDir(pn)
+	files, err := session.ReadDir(p)
 
 	if err != nil {
 		if os.IsNotExist(err) {
