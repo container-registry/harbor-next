@@ -26,10 +26,14 @@ const (
 	//defaultConcurrency = 1
 )
 
+var sshPool = sshpool.NewPool(&sshpool.PoolConfig{
+	GCInterval: time.Second * 5,
+	MaxConns:   10,
+})
+
 type driver struct {
 	basePath  string
 	sshConfig *sshpool.SSHConfig
-	sshPool   *sshpool.SSHPool
 }
 
 func (d *driver) Name() string {
@@ -301,15 +305,9 @@ func New(regModel *model.Registry) (storagedriver.StorageDriver, error) {
 		config.Port = portInt
 	}
 
-	sshPool := sshpool.NewPool(&sshpool.PoolConfig{
-		GCInterval: time.Second * 5,
-		MaxConns:   10,
-	})
-
 	d := &driver{
 		sshConfig: config,
 		basePath:  u.Path,
-		sshPool:   sshPool,
 	}
 
 	//return &Driver{
@@ -335,7 +333,7 @@ func (d *driver) Health(ctx context.Context) error {
 }
 
 func (d *driver) getSFTP() (*sftp.Client, func(), error) {
-	return d.sshPool.NewSFTPSession(d.sshConfig)
+	return sshPool.NewSFTPSession(d.sshConfig)
 }
 
 func (d *driver) addBasePath(p string) string {
