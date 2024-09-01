@@ -198,8 +198,9 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 
 	defer cl()
 
-	pn := d.addBasePath(p)
+	fmt.Println("List", p)
 
+	pn := d.addBasePath(p)
 	files, err := session.ReadDir(pn)
 
 	if err != nil {
@@ -269,6 +270,7 @@ func (d *driver) Walk(ctx context.Context, p string, f storagedriver.WalkFn) err
 	fmt.Println("WALK NORMALISED", p)
 	return storagedriver.WalkFallback(ctx, d, p, func(fi storagedriver.FileInfo) error {
 
+		fmt.Println("normalise path from", fi.Path(), "to", d.trimBasePath(fi.Path()))
 		// manipulate file info to trim base path, harbor should know nothing about it
 		return f(fileInfoMock{
 			path:    d.trimBasePath(fi.Path()),
@@ -354,7 +356,7 @@ func (d *driver) addBasePath(p string) string {
 }
 
 func (d *driver) trimBasePath(p string) string {
-	return strings.TrimSuffix(p, d.basePath)
+	return strings.TrimPrefix(p, d.basePath)
 }
 
 var _ health.Checker = (*driver)(nil)
