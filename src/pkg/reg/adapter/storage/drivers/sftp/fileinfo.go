@@ -39,3 +39,37 @@ func (fi fileInfo) ModTime() time.Time {
 func (fi fileInfo) IsDir() bool {
 	return fi.FileInfo.IsDir()
 }
+
+type fileInfoMock struct {
+	path string
+
+	// Size is current length in bytes of the file. The value of this field
+	// can be used to write to the end of the file at path. The value is
+	// meaningless if IsDir is set to true.
+	size int64
+
+	// ModTime returns the modification time for the file. For backends that
+	// don't have a modification time, the creation time should be returned.
+	modTime time.Time
+
+	// IsDir returns true if the path is a directory.
+	isDir bool
+}
+
+func (f fileInfoMock) Path() string {
+	return f.path
+}
+
+func (f fileInfoMock) Size() int64 {
+	return f.size
+}
+
+func (f fileInfoMock) ModTime() time.Time {
+	return f.modTime
+}
+
+func (f fileInfoMock) IsDir() bool {
+	return f.isDir
+}
+
+var _ storagedriver.FileInfo = fileInfoMock{}

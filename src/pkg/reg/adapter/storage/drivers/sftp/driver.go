@@ -17,6 +17,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -94,9 +95,9 @@ func (d *driver) Reader(_ context.Context, p string, offset int64) (io.ReadClose
 		return nil, fmt.Errorf("reader %s sftp session failed: %v", p, err)
 	}
 
-	fmt.Println("Reader normalised", d.normaliseBasePath(p))
+	fmt.Println("Reader normalised", d.addBasePath(p))
 
-	file, err := session.Open(d.normaliseBasePath(p))
+	file, err := session.Open(d.addBasePath(p))
 	if err != nil {
 		cl()
 		if os.IsNotExist(err) {
@@ -130,7 +131,7 @@ func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver
 		return nil, fmt.Errorf("writer %s get sftp session failed: %v", p, err)
 	}
 
-	p = d.normaliseBasePath(p)
+	p = d.addBasePath(p)
 
 	fmt.Println("Writer", p)
 	dir := path.Dir(p)
@@ -171,7 +172,7 @@ func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, erro
 
 	defer cl()
 
-	p = d.normaliseBasePath(p)
+	p = d.addBasePath(p)
 
 	fmt.Println("Stat normalised", p)
 	stat, err := session.Stat(p)
@@ -197,9 +198,9 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 
 	defer cl()
 
-	fmt.Println("List", p)
+	pn := d.addBasePath(p)
 
-	files, err := session.ReadDir(p)
+	files, err := session.ReadDir(pn)
 
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -210,6 +211,7 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 	var result []string
 
 	for _, file := range files {
+		// trim base path
 
 		result = append(result, path.Join(p, file.Name()))
 	}
@@ -226,8 +228,8 @@ func (d *driver) Move(_ context.Context, sourcePath string, destPath string) err
 
 	defer cl()
 	//
-	sourcePath = d.normaliseBasePath(sourcePath)
-	destPath = d.normaliseBasePath(destPath)
+	sourcePath = d.addBasePath(sourcePath)
+	destPath = d.addBasePath(destPath)
 
 	if err := session.MkdirAll(path.Dir(destPath)); err != nil {
 		return fmt.Errorf("unable to create destPath directory: %v", err)
@@ -244,7 +246,7 @@ func (d *driver) Delete(_ context.Context, p string) error {
 	defer cl()
 	//
 
-	p = d.normaliseBasePath(p)
+	p = d.addBasePath(p)
 	if err := session.RemoveAll(p); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("unable to remove all %s: %v", p, err)
 	}
@@ -263,10 +265,18 @@ func (d *driver) Walk(ctx context.Context, p string, f storagedriver.WalkFn) err
 
 	fmt.Println("WALK", p)
 
-	p = d.normaliseBasePath(p)
+	p = d.addBasePath(p)
 	fmt.Println("WALK NORMALISED", p)
+	return storagedriver.WalkFallback(ctx, d, p, func(fi storagedriver.FileInfo) error {
 
-	return storagedriver.WalkFallback(ctx, d, p, f)
+		// manipulate file info to trim base path, harbor should know nothing about it
+		return f(fileInfoMock{
+			path:    d.trimBasePath(fi.Path()),
+			isDir:   fi.IsDir(),
+			size:    fi.Size(),
+			modTime: fi.ModTime(),
+		})
+	})
 }
 
 func (d *Driver) Health(ctx context.Context) error {
@@ -339,8 +349,12 @@ func (d *driver) getSFTP() (*sftp.Client, func(), error) {
 	return sshPool.NewSFTPSession(d.sshConfig)
 }
 
-func (d *driver) normaliseBasePath(p string) string {
+func (d *driver) addBasePath(p string) string {
 	return path.Join(d.basePath, p)
+}
+
+func (d *driver) trimBasePath(p string) string {
+	return strings.TrimSuffix(p, d.basePath)
 }
 
 var _ health.Checker = (*driver)(nil)
