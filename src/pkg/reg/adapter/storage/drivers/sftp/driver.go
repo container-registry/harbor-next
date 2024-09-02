@@ -13,7 +13,6 @@ import (
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 	"io"
-	"math/rand/v2"
 	"net/url"
 	"os"
 	"path"
@@ -90,10 +89,7 @@ func (d *driver) PutContent(ctx context.Context, p string, contents []byte) erro
 }
 
 func (d *driver) Reader(_ context.Context, p string, offset int64) (io.ReadCloser, error) {
-
-	readerID := rand.IntN(1000000)
-
-	fmt.Printf("Reader %d\n", readerID)
+	fmt.Println("Reader", p, offset)
 
 	var err error
 	session, cl, err := d.getSFTP()
@@ -123,13 +119,14 @@ func (d *driver) Reader(_ context.Context, p string, offset int64) (io.ReadClose
 
 	r := reader{
 		File:   file,
-		num:    readerID,
 		closer: cl,
 	}
 	return r, nil
 }
 
 func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver.FileWriter, error) {
+
+	fmt.Println("Writer", p, append)
 
 	session, cl, err := d.getSFTP()
 	if err != nil {

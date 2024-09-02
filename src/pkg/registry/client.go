@@ -537,7 +537,6 @@ func (c *client) monolithicBlobUpload(location, digest string, size int64, data 
 	if err != nil {
 		return err
 	}
-	fmt.Println("monolithicBlobUpload", location, digest, size)
 	req, err := http.NewRequest(http.MethodPut, url, data)
 	if err != nil {
 		return err

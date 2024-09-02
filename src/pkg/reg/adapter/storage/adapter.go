@@ -34,7 +34,7 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 	ctx := context.Background()
 	var repoNames = make([]string, 1000)
 
-	fmt.Println("Fetching repository names")
+	fmt.Println("FetchArtifacts")
 	// @todo do iteration using last
 	_, err := a.registry.Repositories(ctx, repoNames, "")
 
@@ -216,7 +216,7 @@ func (a *adapter) PullManifest(repository, ref string, _ ...string) (distributio
 // PushManifest manifests are blobs actually
 func (a *adapter) PushManifest(repository, ref, mediaType string, payload []byte) (string, error) {
 
-	fmt.Println("pushManifest", repository, ref, mediaType, payload)
+	fmt.Println("PushManifest", repository, ref, mediaType, payload)
 
 	ctx := context.Background()
 
@@ -375,6 +375,8 @@ func (a *adapter) PullBlobChunk(repository, d string, totalSize, start, end int6
 		return 0, nil, fmt.Errorf("unable to open blob: %v", err)
 	}
 
+	defer readSeeker.Close()
+
 	_, err = readSeeker.Seek(end-start, int(start))
 	if err != nil {
 		return 0, nil, fmt.Errorf("unable to seek blob: %v", err)
@@ -384,8 +386,6 @@ func (a *adapter) PullBlobChunk(repository, d string, totalSize, start, end int6
 	if err != nil {
 		return 0, nil, fmt.Errorf("unable to read blob chunk: %v", err)
 	}
-	fmt.Println("Blob chunk size read", len(chunk))
-
 	return descriptor.Size, io.NopCloser(bytes.NewReader(chunk)), nil
 }
 
