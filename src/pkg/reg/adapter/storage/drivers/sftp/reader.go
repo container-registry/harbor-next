@@ -12,7 +12,7 @@ type reader struct {
 }
 
 func (r reader) Close() error {
-	fmt.Printf("reader.Close %d", r.num)
+	fmt.Printf("reader.Close %d\n", r.num)
 	if r.closer != nil {
 		r.closer()
 	}

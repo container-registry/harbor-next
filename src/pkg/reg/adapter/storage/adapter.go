@@ -343,8 +343,14 @@ func (a *adapter) PullBlob(repository, d string) (int64, io.ReadCloser, error) {
 	if err != nil {
 		return 0, nil, fmt.Errorf("unable to open blob: %v", err)
 	}
+	defer readSeeker.Close()
 
-	return descriptor.Size, readSeeker, nil
+	data, err := io.ReadAll(readSeeker)
+	if err != nil {
+		return 0, nil, fmt.Errorf("unable to read blob: %v", err)
+	}
+
+	return descriptor.Size, io.NopCloser(bytes.NewReader(data)), nil
 }
 
 func (a *adapter) PullBlobChunk(repository, d string, totalSize, start, end int64) (size int64, blob io.ReadCloser, err error) {

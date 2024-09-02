@@ -93,7 +93,7 @@ func (d *driver) Reader(_ context.Context, p string, offset int64) (io.ReadClose
 
 	readerID := rand.IntN(1000000)
 
-	fmt.Printf("Reader %d ", readerID)
+	fmt.Printf("Reader %d\n", readerID)
 
 	var err error
 	session, cl, err := d.getSFTP()
