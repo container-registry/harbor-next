@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -333,8 +334,9 @@ func (a *adapter) PullBlob(repository, d string) (int64, io.ReadCloser, error) {
 	return descriptor.Size, readSeeker, nil
 }
 
-func (a *adapter) PullBlobChunk(repository, d string, _, start, end int64) (size int64, blob io.ReadCloser, err error) {
+func (a *adapter) PullBlobChunk(repository, d string, totalSize, start, end int64) (size int64, blob io.ReadCloser, err error) {
 
+	fmt.Println("PullBlobChunk ", repository, d, "total", totalSize, "start", start, "end", end)
 	ctx := context.Background()
 
 	repo, err := a.getRepo(ctx, repository, d)
@@ -359,7 +361,13 @@ func (a *adapter) PullBlobChunk(repository, d string, _, start, end int64) (size
 		return 0, nil, fmt.Errorf("unable to seek blob: %v", err)
 	}
 
-	return descriptor.Size, readSeeker, nil
+	chunk, err := io.ReadAll(readSeeker)
+	if err != nil {
+		return 0, nil, fmt.Errorf("unable to read blob chunk: %v", err)
+	}
+	fmt.Println("Blob chunk size read", len(chunk))
+
+	return descriptor.Size, io.NopCloser(bytes.NewReader(chunk)), nil
 }
 
 func (a *adapter) PushBlobChunk(repository, d string, size int64, chunk io.Reader, start, end int64, location string) (nextUploadLocation string, endRange int64, err error) {
