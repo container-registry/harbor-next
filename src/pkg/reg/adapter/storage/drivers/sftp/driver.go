@@ -289,7 +289,7 @@ func New(regModel *model.Registry) (storagedriver.StorageDriver, error) {
 	if regModel.Insecure {
 		config.HostKeyCallback = ssh.InsecureIgnoreHostKey()
 	} else {
-		return fmt.Errorf("verifying remove certificate is not implemented")
+		return nil, fmt.Errorf("verifying remove certificate is not implemented")
 	}
 
 	if regModel.Credential != nil {
