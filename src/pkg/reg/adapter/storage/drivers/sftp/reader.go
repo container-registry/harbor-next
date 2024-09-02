@@ -7,11 +7,12 @@ import (
 
 type reader struct {
 	*sftp.File
+	num    int
 	closer func()
 }
 
 func (r reader) Close() error {
-	fmt.Println("reader.Close")
+	fmt.Printf("reader.Close %d", r.num)
 	if r.closer != nil {
 		r.closer()
 	}
