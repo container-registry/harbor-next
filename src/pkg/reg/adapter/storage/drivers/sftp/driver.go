@@ -89,6 +89,9 @@ func (d *driver) PutContent(ctx context.Context, p string, contents []byte) erro
 }
 
 func (d *driver) Reader(_ context.Context, p string, offset int64) (io.ReadCloser, error) {
+
+	fmt.Println("Reader", p, offset)
+
 	var err error
 	session, cl, err := d.getSFTP()
 	if err != nil {
