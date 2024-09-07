@@ -45,6 +45,7 @@ func (f *s3Factory) Create(r *model.Registry) (regadapter.Adapter, error) {
 
 	driverParams := s3.DriverParameters{
 		Bucket: pathParts[0],
+		Region: "auto",
 	}
 
 	//if u.Query().Get("secure") == "false" {
@@ -68,6 +69,7 @@ func (f *s3Factory) Create(r *model.Registry) (regadapter.Adapter, error) {
 		driverParams.SecretKey = r.Credential.AccessSecret
 	}
 
+	spew.Dump(driverParams)
 	driverS3, err := s3.New(driverParams)
 	if err != nil {
 		return nil, err
