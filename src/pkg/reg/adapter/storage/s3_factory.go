@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/distribution/registry/storage"
 	"github.com/docker/distribution/registry/storage/driver/s3-aws"
 	"github.com/docker/libtrust"
@@ -28,6 +29,9 @@ type s3Factory struct {
 
 // Create ...
 func (f *s3Factory) Create(r *model.Registry) (regadapter.Adapter, error) {
+
+	fmt.Println("s3 factory Create")
+	spew.Dump(r)
 
 	u, err := url.Parse(r.URL)
 	if err != nil {
