@@ -38,7 +38,7 @@ func (f *s3Factory) Create(r *model.Registry) (regadapter.Adapter, error) {
 		return nil, fmt.Errorf("unable to parse registry URL: %v", err)
 	}
 
-	pathParts := strings.Split(u.Path, "/")
+	pathParts := strings.Split(strings.Trim(u.Path, "/"), "/")
 	if len(pathParts) == 0 {
 		return nil, fmt.Errorf("invalid registry URL: no folder defined which can be used as a bucket name")
 	}
