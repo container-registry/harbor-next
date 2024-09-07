@@ -12,7 +12,7 @@ type Driver struct {
 }
 
 func (d Driver) Health(ctx context.Context) error {
-	_, err := d.List(ctx, "")
+	_, err := d.List(ctx, "/")
 	spew.Dump(err)
 	return err
 }
