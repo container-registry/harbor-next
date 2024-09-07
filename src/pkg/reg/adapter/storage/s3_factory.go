@@ -47,13 +47,13 @@ func (f *s3Factory) Create(r *model.Registry) (regadapter.Adapter, error) {
 		Bucket: pathParts[0],
 	}
 
-	if u.Query().Get("secure") == "false" {
-		driverParams.Secure = false
-	}
-
-	if u.Query().Get("region") == "" {
-		return nil, fmt.Errorf("invalid registry URL: missing region param")
-	}
+	//if u.Query().Get("secure") == "false" {
+	//	driverParams.Secure = false
+	//}
+	//
+	//if u.Query().Get("region") == "" {
+	//	return nil, fmt.Errorf("invalid registry URL: missing region param")
+	//}
 
 	if !strings.Contains(u.Hostname(), "s3.amazonaws.com") {
 		driverParams.RegionEndpoint = u.Hostname()
