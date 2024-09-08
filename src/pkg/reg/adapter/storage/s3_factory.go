@@ -16,6 +16,21 @@ import (
 	"strings"
 )
 
+const minChunkSize = 5 << 20
+
+const defaultChunkSize = 2 * minChunkSize
+
+const defaultMultipartCopyChunkSize = 32 << 20
+
+// defaultMultipartCopyMaxConcurrency defines the default maximum number
+// of concurrent Upload Part - Copy operations for a multipart copy.
+const defaultMultipartCopyMaxConcurrency = 100
+
+// defaultMultipartCopyThresholdSize defines the default object size
+// above which multipart copy will be used. (PUT Object - Copy is used
+// for objects at or below this size.)  Empirically, 32 MB is optimal.
+const defaultMultipartCopyThresholdSize = 32 << 20
+
 func init() {
 	err := regadapter.RegisterFactory(model.RegistryTypeS3, &s3Factory{})
 	if err != nil {
@@ -45,17 +60,23 @@ func (f *s3Factory) Create(r *model.Registry) (regadapter.Adapter, error) {
 	}
 
 	driverParams := s3.DriverParameters{
-		Bucket: pathParts[0],
-		Region: "auto",
+		Bucket:                      pathParts[0],
+		Region:                      "auto",
+		MultipartCopyChunkSize:      defaultMultipartCopyChunkSize,
+		MultipartCopyMaxConcurrency: defaultMultipartCopyMaxConcurrency,
+		MultipartCopyThresholdSize:  defaultMultipartCopyThresholdSize,
+		ChunkSize:                   defaultChunkSize,
 	}
 
-	//if u.Query().Get("secure") == "false" {
-	//	driverParams.Secure = false
-	//}
-	//
-	//if u.Query().Get("region") == "" {
-	//	return nil, fmt.Errorf("invalid registry URL: missing region param")
-	//}
+	// @todo does not work
+	if u.Query().Get("secure") == "false" {
+		driverParams.Secure = false
+	}
+
+	//  @todo does not work
+	if u.Query().Get("region") == "" {
+		return nil, fmt.Errorf("invalid registry URL: missing region param")
+	}
 
 	if !strings.Contains(u.Hostname(), "s3.amazonaws.com") {
 		driverParams.RegionEndpoint = u.Hostname()
