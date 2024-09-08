@@ -74,8 +74,8 @@ func (f *s3Factory) Create(r *model.Registry) (regadapter.Adapter, error) {
 	}
 
 	//  @todo does not work
-	if u.Query().Get("region") == "" {
-		return nil, fmt.Errorf("invalid registry URL: missing region param")
+	if u.Query().Get("region") != "" {
+		driverParams.Region = u.Query().Get("region")
 	}
 
 	if !strings.Contains(u.Hostname(), "s3.amazonaws.com") {
