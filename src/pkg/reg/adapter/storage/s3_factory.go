@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	awss3 "github.com/aws/aws-sdk-go/service/s3"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/distribution/registry/storage"
 	"github.com/docker/distribution/registry/storage/driver/s3-aws"
@@ -68,6 +69,8 @@ func (f *s3Factory) Create(r *model.Registry) (regadapter.Adapter, error) {
 		driverParams.AccessKey = r.Credential.AccessKey
 		driverParams.SecretKey = r.Credential.AccessSecret
 	}
+	// default ACL
+	driverParams.ObjectACL = awss3.ObjectCannedACLPrivate
 
 	spew.Dump(driverParams)
 	driverS3, err := s3.New(driverParams)
