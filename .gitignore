@@ -58,3 +58,5 @@ src/server/v2.0/restapi/
 
 harborclient/
 openapi-generator-cli.jar
+
+bin/
