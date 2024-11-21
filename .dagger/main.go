@@ -42,35 +42,42 @@ type Harbor struct {
 }
 
 func (m *Harbor) BuildAllImages(ctx context.Context) []*dagger.Container {
-	var buildImages []*dagger.Container
-	for _, platform := range SupportedPlatforms {
-		for _, pkg := range packages {
-			image := m.BuildImage(ctx, platform, pkg)
-			buildImages = append(buildImages, image)
-		}
-		// build portal
+	metdata := m.buildAllImages(ctx)
+	images := make([]*dagger.Container, len(metdata))
+	for i, meta := range metdata {
+		images[i] = meta.Container
 	}
-	return buildImages
+	return images
 }
 
 func (m *Harbor) buildAllImages(ctx context.Context) []*BuildMetadata {
 	var buildMetadata []*BuildMetadata
 	for _, platform := range SupportedPlatforms {
 		for _, pkg := range packages {
-			image := m.buildImage(ctx, platform, pkg)
-			buildImages = append(buildImages, image)
+			img := m.BuildImage(ctx, platform, pkg)
+			buildMetadata = append(buildMetadata, &BuildMetadata{
+				Package:    pkg,
+				BinaryPath: fmt.Sprintf("bin/%s/%s", platform, pkg),
+				Container:  img,
+				Platform:   platform,
+			})
 		}
 		// build portal
 	}
-	return buildImages
+	return buildMetadata
 }
 
 func (m *Harbor) BuildImage(ctx context.Context, platform string, pkg string) *dagger.Container {
-	bc := m.buildBinary(ctx, platform, pkg)
+	return m.buildImage(ctx, platform, pkg).Container
+}
+
+func (m *Harbor) buildImage(ctx context.Context, platform string, pkg string) *BuildMetadata {
+	build := m.buildBinary(ctx, platform, pkg)
 	img := dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(platform)}).
-		WithFile("/"+pkg, bc.Container.File(bc.BinaryPath)).
+		WithFile("/"+pkg, build.Container.File(build.BinaryPath)).
 		WithEntrypoint([]string{"/" + pkg})
-	return img
+	build.Container = img
+	return build
 }
 
 func (m *Harbor) BuildAllBinaries(ctx context.Context) *dagger.Directory {
