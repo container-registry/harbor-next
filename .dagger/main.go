@@ -29,9 +29,9 @@ type BuildMetadata struct {
 }
 
 func New(
-	// Local or remote directory with source code, defaults to "./"
-	// +optional
-	// +defaultPath="./"
+// Local or remote directory with source code, defaults to "./"
+// +optional
+// +defaultPath="./"
 	source *dagger.Directory,
 ) *Harbor {
 	return &Harbor{Source: source}
@@ -39,6 +39,19 @@ func New(
 
 type Harbor struct {
 	Source *dagger.Directory
+}
+
+func (m *Harbor) ExportAllImages(ctx context.Context) (string, error) {
+	metdata := m.buildAllImages(ctx)
+	for _, meta := range metdata {
+		export, err := meta.Container.Export(ctx, fmt.Sprintf("bin/container/%s/%s.tgz", meta.Platform, meta.Package))
+		export, err := meta.Container.AsTarball(ctx, fmt.Sprintf("bin/container/%s/%s.tgz", meta.Platform, meta.Package))
+		println(export)
+		if err != nil {
+			return "", err
+		}
+	}
+	return "bin/container", nil
 }
 
 func (m *Harbor) BuildAllImages(ctx context.Context) []*dagger.Container {
