@@ -76,6 +76,7 @@ import (
 	pkguser "github.com/goharbor/harbor/src/pkg/user"
 	"github.com/goharbor/harbor/src/pkg/version"
 	"github.com/goharbor/harbor/src/server"
+	_ "golang.org/x/crypto/x509roots/fallback"
 )
 
 const (

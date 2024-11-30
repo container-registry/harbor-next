@@ -15,23 +15,25 @@ const (
 	GORELEASER_VERSION   = "v2.3.2"
 )
 
+type Package string
+type Platform string
+
 var (
-	SupportedPlatforms = []string{"linux/arm64", "linux/amd64"}
-	packages           = []string{"core", "jobservice", "registryctl", "cmd/exporter", "cmd/standalone-db-migrator"}
+	targetPlatforms = []Platform{"linux/arm64", "linux/amd64"}
+	packages        = []Package{"core", "jobservice", "registryctl", "cmd/exporter", "cmd/standalone-db-migrator"}
 	//packages = []string{"core", "jobservice"}
 )
 
 type BuildMetadata struct {
-	Package    string
+	Package    Package
 	BinaryPath string
 	Container  *dagger.Container
-	Platform   string
+	Platform   Platform
 }
 
 func New(
-// Local or remote directory with source code, defaults to "./"
-// +optional
-// +defaultPath="./"
+	// +optional
+	// +defaultPath="./"
 	source *dagger.Directory,
 ) *Harbor {
 	return &Harbor{Source: source}
@@ -41,17 +43,90 @@ type Harbor struct {
 	Source *dagger.Directory
 }
 
-func (m *Harbor) ExportAllImages(ctx context.Context) (string, error) {
-	metdata := m.buildAllImages(ctx)
-	for _, meta := range metdata {
-		export, err := meta.Container.Export(ctx, fmt.Sprintf("bin/container/%s/%s.tgz", meta.Platform, meta.Package))
-		export, err := meta.Container.AsTarball(ctx, fmt.Sprintf("bin/container/%s/%s.tgz", meta.Platform, meta.Package))
-		println(export)
-		if err != nil {
-			return "", err
+func (m *Harbor) PublishImageAllImages(
+	ctx context.Context,
+	registry, registryUsername string,
+	imageTags []string,
+	registryPassword *dagger.Secret) string {
+
+	allImages := m.buildAllImages(ctx)
+
+	for i, tag := range imageTags {
+		imageTags[i] = strings.TrimSpace(tag)
+		if strings.HasPrefix(imageTags[i], "v") {
+			imageTags[i] = strings.TrimPrefix(imageTags[i], "v")
 		}
 	}
-	return "bin/container", nil
+	fmt.Printf("provided tags: %s\n", imageTags)
+
+	platformVariantsContainer := make(map[Package][]*dagger.Container)
+	for _, meta := range allImages {
+		platformVariantsContainer[meta.Package] = append(platformVariantsContainer[meta.Package], meta.Container)
+	}
+
+	for pkg, imgs := range platformVariantsContainer {
+		for _, imageTag := range imageTags {
+			_, err := dag.Container().WithRegistryAuth(registry, registryUsername, registryPassword).Publish(ctx,
+				fmt.Sprintf("%s/%s/%s:%s", registry, "harbor", pkg, imageTag),
+				dagger.ContainerPublishOpts{PlatformVariants: imgs},
+			)
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
+	return "allImageAddrs"
+}
+
+func (m *Harbor) PublishImage(
+	ctx context.Context,
+	registry, registryUsername string,
+	imageTags []string,
+	registryPassword *dagger.Secret) []string {
+
+	releaseImages := []*dagger.Container{}
+
+	for i, tag := range imageTags {
+		imageTags[i] = strings.TrimSpace(tag)
+		if strings.HasPrefix(imageTags[i], "v") {
+			imageTags[i] = strings.TrimPrefix(imageTags[i], "v")
+		}
+	}
+	fmt.Printf("provided tags: %s\n", imageTags)
+
+	for _, platform := range targetPlatforms {
+		for _, pkg := range packages {
+			build := m.buildImage(ctx, platform, pkg)
+			if strings.HasPrefix(string(platform), "linux") {
+				releaseImages = append(releaseImages, build.Container)
+			}
+		}
+	}
+
+	imageAddrs := []string{}
+	for _, imageTag := range imageTags {
+		addr, err := dag.Container().WithRegistryAuth(registry, registryUsername, registryPassword).
+			Publish(ctx,
+				fmt.Sprintf("%s/%s/harbor-cli:%s", registry, "harbor-cli", imageTag),
+				dagger.ContainerPublishOpts{PlatformVariants: releaseImages},
+			)
+
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("Published image address: %s\n", addr)
+		imageAddrs = append(imageAddrs, addr)
+	}
+	return imageAddrs
+}
+
+func (m *Harbor) ExportAllImages(ctx context.Context) *dagger.Directory {
+	metdata := m.buildAllImages(ctx)
+	artifacts := dag.Directory()
+	for _, meta := range metdata {
+		artifacts = artifacts.WithFile(fmt.Sprintf("containers/%s/%s.tgz", meta.Platform, meta.Package), meta.Container.AsTarball())
+	}
+	return artifacts
 }
 
 func (m *Harbor) BuildAllImages(ctx context.Context) []*dagger.Container {
@@ -65,7 +140,7 @@ func (m *Harbor) BuildAllImages(ctx context.Context) []*dagger.Container {
 
 func (m *Harbor) buildAllImages(ctx context.Context) []*BuildMetadata {
 	var buildMetadata []*BuildMetadata
-	for _, platform := range SupportedPlatforms {
+	for _, platform := range targetPlatforms {
 		for _, pkg := range packages {
 			img := m.BuildImage(ctx, platform, pkg)
 			buildMetadata = append(buildMetadata, &BuildMetadata{
@@ -75,22 +150,26 @@ func (m *Harbor) buildAllImages(ctx context.Context) []*BuildMetadata {
 				Platform:   platform,
 			})
 		}
-		// build portal
 	}
 	return buildMetadata
 }
 
-func (m *Harbor) BuildImage(ctx context.Context, platform string, pkg string) *dagger.Container {
-	return m.buildImage(ctx, platform, pkg).Container
+func (m *Harbor) BuildImage(ctx context.Context, platform Platform, pkg Package) *dagger.Container {
+	buildMtd := m.buildImage(ctx, platform, pkg)
+	if pkg == "core" {
+		buildMtd.Container = buildMtd.Container.WithDirectory("/migrations", m.Source.Directory("make/migrations"))
+	}
+	return buildMtd.Container
+
 }
 
-func (m *Harbor) buildImage(ctx context.Context, platform string, pkg string) *BuildMetadata {
-	build := m.buildBinary(ctx, platform, pkg)
-	img := dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(platform)}).
-		WithFile("/"+pkg, build.Container.File(build.BinaryPath)).
-		WithEntrypoint([]string{"/" + pkg})
-	build.Container = img
-	return build
+func (m *Harbor) buildImage(ctx context.Context, platform Platform, pkg Package) *BuildMetadata {
+	buildMtd := m.buildBinary(ctx, platform, pkg)
+	img := dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(string(platform))}).
+		WithFile("/"+string(pkg), buildMtd.Container.File(buildMtd.BinaryPath)).
+		WithEntrypoint([]string{"/" + string(pkg)})
+	buildMtd.Container = img
+	return buildMtd
 }
 
 func (m *Harbor) BuildAllBinaries(ctx context.Context) *dagger.Directory {
@@ -100,29 +179,27 @@ func (m *Harbor) BuildAllBinaries(ctx context.Context) *dagger.Directory {
 		output = output.WithFile(build.BinaryPath, build.Container.File(build.BinaryPath))
 	}
 	return output
-
 }
 
 func (m *Harbor) buildAllBinaries(ctx context.Context) []*BuildMetadata {
 	var buildContainers []*BuildMetadata
-	for _, platform := range SupportedPlatforms {
+	for _, platform := range targetPlatforms {
 		for _, pkg := range packages {
 			buildContainer := m.buildBinary(ctx, platform, pkg)
 			buildContainers = append(buildContainers, buildContainer)
 		}
-		// build portal
 	}
 	return buildContainers
 }
 
-func (m *Harbor) BuildBinary(ctx context.Context, platform string, pkg string) *dagger.File {
+func (m *Harbor) BuildBinary(ctx context.Context, platform Platform, pkg Package) *dagger.File {
 	build := m.buildBinary(ctx, platform, pkg)
 	return build.Container.File(build.BinaryPath)
 }
 
-func (m *Harbor) buildBinary(ctx context.Context, platform string, pkg string) *BuildMetadata {
+func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package) *BuildMetadata {
 
-	os, arch, err := parsePlatform(platform)
+	os, arch, err := parsePlatform(string(platform))
 	if err != nil {
 		log.Fatalf("Error parsing platform: %v", err)
 	}
@@ -135,7 +212,7 @@ func (m *Harbor) buildBinary(ctx context.Context, platform string, pkg string) *
 		WithEnvVariable("GOMODCACHE", "/go/pkg/mod").
 		WithMountedCache("/go/build-cache", dag.CacheVolume("go-build-"+GO_VERSION)).
 		WithEnvVariable("GOCACHE", "/go/build-cache").
-		WithMountedDirectory("/harbor", m.Source). // Ensure the source directory with go.mod is mounted
+		WithMountedDirectory("/harbor", m.Source).
 		WithWorkdir("/harbor/src/").
 		WithEnvVariable("GOOS", os).
 		WithEnvVariable("GOARCH", arch).
@@ -150,10 +227,9 @@ func (m *Harbor) buildBinary(ctx context.Context, platform string, pkg string) *
 	}
 }
 
-func (m *Harbor) buildPortal(ctx context.Context, platform string, pkg string) *dagger.Directory {
+func (m *Harbor) buildPortal(ctx context.Context, platform Platform, pkg Package) *dagger.Directory {
 	fmt.Println("🛠️  Building Harbor Core...")
-	// Define the path for the binary output
-	os, arch, err := parsePlatform(platform)
+	os, arch, err := parsePlatform(string(platform))
 
 	if err != nil {
 		log.Fatalf("Error parsing platform: %v", err)
@@ -167,7 +243,7 @@ func (m *Harbor) buildPortal(ctx context.Context, platform string, pkg string) *
 		WithEnvVariable("GOMODCACHE", "/go/pkg/mod").
 		WithMountedCache("/go/build-cache", dag.CacheVolume("go-build-"+GO_VERSION)).
 		WithEnvVariable("GOCACHE", "/go/build-cache").
-		WithMountedDirectory("/harbor", m.Source). // Ensure the source directory with go.mod is mounted
+		WithMountedDirectory("/harbor", m.Source).
 		WithWorkdir("/harbor").
 		WithEnvVariable("GOOS", os).
 		WithEnvVariable("GOARCH", arch).

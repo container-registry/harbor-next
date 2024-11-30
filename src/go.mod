@@ -78,7 +78,10 @@ require (
 	sigs.k8s.io/yaml v1.4.0
 )
 
-require github.com/prometheus/client_model v0.6.1
+require (
+	github.com/prometheus/client_model v0.6.1
+	golang.org/x/crypto/x509roots/fallback v0.0.0-20241127184453-8c4e668694cc
+)
 
 require (
 	cloud.google.com/go/compute/metadata v0.5.0 // indirect
