@@ -212,7 +212,7 @@ func parse(s string) (string, string, error) {
 	matches := reference.ReferenceRegexp.FindStringSubmatch(s)
 	if matches == nil {
 		return "", "", errors.New(nil).WithCode(errors.BadRequestCode).
-			WithMessage("invalid input: %s", s)
+			WithMessagef("invalid input: %s", s)
 	}
 	repository := matches[1]
 	reference := matches[2]
@@ -220,7 +220,7 @@ func parse(s string) (string, string, error) {
 		_, err := digest.Parse(matches[3])
 		if err != nil {
 			return "", "", errors.New(nil).WithCode(errors.BadRequestCode).
-				WithMessage("invalid input: %s", s)
+				WithMessagef("invalid input: %s", s)
 		}
 		reference = matches[3]
 	}
@@ -238,7 +238,8 @@ func (a *artifactAPI) CreateTag(ctx context.Context, params operation.CreateTagP
 
 	art, err := a.artCtl.GetByReference(ctx, fmt.Sprintf("%s/%s", params.ProjectName, params.RepositoryName),
 		params.Reference, &artifact.Option{
-			WithTag: true,
+			WithTag:   true,
+			WithLabel: true,
 		})
 	if err != nil {
 		return a.SendError(ctx, err)
@@ -256,6 +257,7 @@ func (a *artifactAPI) CreateTag(ctx context.Context, params operation.CreateTagP
 	notification.AddEvent(ctx, &metadata.CreateTagEventMetadata{
 		Ctx:              ctx,
 		Tag:              tag.Name,
+		Labels:           art.AbstractLabelNames(),
 		AttachedArtifact: &art.Artifact,
 	})
 
@@ -270,7 +272,7 @@ func (a *artifactAPI) requireNonProxyCacheProject(ctx context.Context, name stri
 	}
 	if pro.IsProxy() {
 		return errors.New(nil).WithCode(errors.MethodNotAllowedCode).
-			WithMessage("the operation isn't supported for a proxy cache project")
+			WithMessagef("the operation isn't supported for a proxy cache project")
 	}
 	return nil
 }
@@ -281,7 +283,8 @@ func (a *artifactAPI) DeleteTag(ctx context.Context, params operation.DeleteTagP
 	}
 	artifact, err := a.artCtl.GetByReference(ctx, fmt.Sprintf("%s/%s", params.ProjectName, params.RepositoryName),
 		params.Reference, &artifact.Option{
-			WithTag: true,
+			WithTag:   true,
+			WithLabel: true,
 		})
 	if err != nil {
 		return a.SendError(ctx, err)
@@ -295,7 +298,7 @@ func (a *artifactAPI) DeleteTag(ctx context.Context, params operation.DeleteTagP
 	}
 	// the tag not found
 	if id == 0 {
-		err = errors.New(nil).WithCode(errors.NotFoundCode).WithMessage(
+		err = errors.New(nil).WithCode(errors.NotFoundCode).WithMessagef(
 			"tag %s attached to artifact %d not found", params.TagName, artifact.ID)
 		return a.SendError(ctx, err)
 	}
@@ -307,6 +310,7 @@ func (a *artifactAPI) DeleteTag(ctx context.Context, params operation.DeleteTagP
 	notification.AddEvent(ctx, &metadata.DeleteTagEventMetadata{
 		Ctx:              ctx,
 		Tag:              params.TagName,
+		Labels:           artifact.AbstractLabelNames(),
 		AttachedArtifact: &artifact.Artifact,
 	})
 
@@ -428,7 +432,7 @@ func (a *artifactAPI) GetVulnerabilitiesAddition(ctx context.Context, params ope
 
 	content, _ := json.Marshal(vulnerabilities)
 
-	return middleware.ResponderFunc(func(w http.ResponseWriter, p runtime.Producer) {
+	return middleware.ResponderFunc(func(w http.ResponseWriter, _ runtime.Producer) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write(content)
 	})
@@ -449,7 +453,7 @@ func (a *artifactAPI) GetAddition(ctx context.Context, params operation.GetAddit
 		return a.SendError(ctx, err)
 	}
 
-	return middleware.ResponderFunc(func(w http.ResponseWriter, p runtime.Producer) {
+	return middleware.ResponderFunc(func(w http.ResponseWriter, _ runtime.Producer) {
 		w.Header().Set("Content-Type", addition.ContentType)
 		_, _ = w.Write(addition.Content)
 	})
@@ -496,7 +500,7 @@ func (a *artifactAPI) RequireLabelInProject(ctx context.Context, projectID, labe
 		return err
 	}
 	if l.Scope == common.LabelScopeProject && l.ProjectID != projectID {
-		return errors.NotFoundError(nil).WithMessage("project id %d, label %d not found", projectID, labelID)
+		return errors.NotFoundError(nil).WithMessagef("project id %d, label %d not found", projectID, labelID)
 	}
 	return nil
 }
