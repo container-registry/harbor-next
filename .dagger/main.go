@@ -43,11 +43,81 @@ type Harbor struct {
 	Source *dagger.Directory
 }
 
-func (m *Harbor) PublishImageAllImages(
+func (m *Harbor) PublishAndSignAllImages(
+	ctx context.Context,
+	registry string,
+	registryUsername string,
+	registryPassword *dagger.Secret,
+	imageTags []string,
+	// +optional
+	githubToken *dagger.Secret,
+	// +optional
+	actionsIdTokenRequestToken *dagger.Secret,
+	// +optional
+	actionsIdTokenRequestUrl string,
+) (string, error) {
+
+	imageAddrs := m.PublishAllImages(ctx, registry, registryUsername, imageTags, registryPassword)
+	_, err := m.Sign(
+		ctx,
+		githubToken,
+		actionsIdTokenRequestUrl,
+		actionsIdTokenRequestToken,
+		registryUsername,
+		registryPassword,
+		imageAddrs[0],
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to sign image: %w", err)
+	}
+
+	fmt.Printf("Signed image: %s\n", imageAddrs)
+	return imageAddrs[0], nil
+}
+
+// Sign signs a container image using Cosign, works also with GitHub Actions
+func (m *Harbor) Sign(ctx context.Context,
+	// +optional
+	githubToken *dagger.Secret,
+	// +optional
+	actionsIdTokenRequestUrl string,
+	// +optional
+	actionsIdTokenRequestToken *dagger.Secret,
+	registryUsername string,
+	registryPassword *dagger.Secret,
+	imageAddr string,
+) (string, error) {
+
+	registryPasswordPlain, _ := registryPassword.Plaintext(ctx)
+
+	cosing_ctr := dag.Container().From("cgr.dev/chainguard/cosign")
+
+	// If githubToken is provided, use it to sign the image. (GitHub Actions) use case
+	if githubToken != nil {
+		if actionsIdTokenRequestUrl == "" || actionsIdTokenRequestToken == nil {
+			return "", fmt.Errorf("actionsIdTokenRequestUrl (exist=%s) and actionsIdTokenRequestToken (exist=%t) must be provided when githubToken is provided", actionsIdTokenRequestUrl, actionsIdTokenRequestToken != nil)
+		}
+		fmt.Printf("Setting the ENV Vars GITHUB_TOKEN, ACTIONS_ID_TOKEN_REQUEST_URL, ACTIONS_ID_TOKEN_REQUEST_TOKEN to sign with GitHub Token")
+		cosing_ctr = cosing_ctr.WithSecretVariable("GITHUB_TOKEN", githubToken).
+			WithEnvVariable("ACTIONS_ID_TOKEN_REQUEST_URL", actionsIdTokenRequestUrl).
+			WithSecretVariable("ACTIONS_ID_TOKEN_REQUEST_TOKEN", actionsIdTokenRequestToken)
+	}
+
+	return cosing_ctr.WithSecretVariable("REGISTRY_PASSWORD", registryPassword).
+		WithExec([]string{"cosign", "env"}).
+		WithExec([]string{"cosign", "sign", "--yes", "--recursive",
+			"--registry-username", registryUsername,
+			"--registry-password", registryPasswordPlain,
+			imageAddr,
+			"--timeout", "1m",
+		}).Stdout(ctx)
+}
+
+func (m *Harbor) PublishAllImages(
 	ctx context.Context,
 	registry, registryUsername string,
 	imageTags []string,
-	registryPassword *dagger.Secret) string {
+	registryPassword *dagger.Secret) []string {
 
 	allImages := m.buildAllImages(ctx)
 
@@ -64,18 +134,24 @@ func (m *Harbor) PublishImageAllImages(
 		platformVariantsContainer[meta.Package] = append(platformVariantsContainer[meta.Package], meta.Container)
 	}
 
+	var imageAddresses []string
 	for pkg, imgs := range platformVariantsContainer {
 		for _, imageTag := range imageTags {
-			_, err := dag.Container().WithRegistryAuth(registry, registryUsername, registryPassword).Publish(ctx,
+			container := dag.Container().WithRegistryAuth(registry, registryUsername, registryPassword)
+			imgAddress, err := container.Publish(ctx,
 				fmt.Sprintf("%s/%s/%s:%s", registry, "harbor", pkg, imageTag),
 				dagger.ContainerPublishOpts{PlatformVariants: imgs},
 			)
 			if err != nil {
-				panic(err)
+				fmt.Printf("Failed to publish image: %s/%s/%s:%s\n", registry, "harbor", pkg, imageTag)
+				fmt.Printf("Error: %s\n", err)
+				continue
 			}
+			imageAddresses = append(imageAddresses, imgAddress)
+			fmt.Printf("Published image: %s\n", imgAddress)
 		}
 	}
-	return "allImageAddrs"
+	return imageAddresses
 }
 
 func (m *Harbor) PublishImage(
