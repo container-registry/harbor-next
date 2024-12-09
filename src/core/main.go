@@ -28,6 +28,8 @@ import (
 
 	"github.com/beego/beego/v2/server/web"
 
+	_ "golang.org/x/crypto/x509roots/fallback"
+
 	"github.com/goharbor/harbor/src/common/dao"
 	common_http "github.com/goharbor/harbor/src/common/http"
 	configCtl "github.com/goharbor/harbor/src/controller/config"
@@ -76,7 +78,6 @@ import (
 	pkguser "github.com/goharbor/harbor/src/pkg/user"
 	"github.com/goharbor/harbor/src/pkg/version"
 	"github.com/goharbor/harbor/src/server"
-	_ "golang.org/x/crypto/x509roots/fallback"
 )
 
 const (

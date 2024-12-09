@@ -43,6 +43,31 @@ type Harbor struct {
 	Source *dagger.Directory
 }
 
+// LintReport Executes the Linter and writes the linting results to a file golangci-linter-report.sarif
+func (m *Harbor) LintReport(ctx context.Context) (string, error) {
+	report := "golangci-lint-report.sarif"
+	output, _ := m.Source.File(report).Name(ctx)
+	return m.linter(ctx).WithExec([]string{"golangci-lint", "run",
+		"--out-format", "sarif:" + report,
+		"--issues-exit-code", "0"}).File(report).Export(ctx, report)
+}
+
+// Lint Run the linter golangci-linter
+func (m *Harbor) Lint(ctx context.Context) (string, error) {
+	return m.linter(ctx).WithExec([]string{"golangci-lint", "run"}).Stderr(ctx)
+}
+
+func (m *Harbor) linter(ctx context.Context) *dagger.Container {
+	fmt.Printf("👀 Running linter")
+	linter := dag.Container().
+		From("golangci/golangci-lint:"+GOLANGCILINT_VERSION+"-alpine").
+		WithMountedCache("/lint-cache", dag.CacheVolume("/lint-cache")).
+		WithEnvVariable("GOLANGCI_LINT_CACHE", "/lint-cache").
+		WithMountedDirectory("/harbor", m.Source).
+		WithWorkdir("/harbor/src/")
+	return linter
+}
+
 func (m *Harbor) PublishAndSignAllImages(
 	ctx context.Context,
 	registry string,
