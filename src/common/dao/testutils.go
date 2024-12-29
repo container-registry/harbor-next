@@ -92,10 +92,10 @@ func initDatabaseForTest(db *models.Database) orm.Ormer {
 		log.Fatal(err)
 		return nil
 	}
-	if err := database.UpgradeSchema(); err != nil {
-		log.Fatal(err)
-		return nil
-	}
+	//if err := database.UpgradeSchema(); err != nil {
+	//	log.Fatal(err)
+	//	return nil
+	//}
 
 	if alias != "default" {
 		return orm.NewOrmUsingDB(alias)

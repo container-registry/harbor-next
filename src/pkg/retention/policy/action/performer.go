@@ -16,6 +16,7 @@ package action
 
 import (
 	"context"
+	"github.com/goharbor/harbor/src/pkg/immutable/match"
 
 	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/lib/log"
@@ -60,11 +61,12 @@ func (ra *retainAction) Perform(ctx context.Context, candidates []*selector.Cand
 		retainedShare[c.Hash()] = true
 	}
 
+	matcher := rule.NewRuleMatcher()
 	for _, c := range ra.all {
 		if _, ok := retainedShare[c.Hash()]; ok {
 			continue
 		}
-		if isImmutable(ctx, c) {
+		if isImmutable(ctx, matcher, c) {
 			immutableShare[c.Hash()] = true
 		}
 	}
@@ -93,14 +95,15 @@ func (ra *retainAction) Perform(ctx context.Context, candidates []*selector.Cand
 	return
 }
 
-func isImmutable(ctx context.Context, c *selector.Candidate) bool {
+func isImmutable(ctx context.Context, matcher match.ImmutableTagMatcher, c *selector.Candidate) bool {
 	projectID := c.NamespaceID
 	repo := c.Repository
 	_, repoName := utils.ParseRepository(repo)
-	matched, err := rule.NewRuleMatcher().Match(ctx, projectID, selector.Candidate{
-		Repository:  repoName,
-		Tags:        c.Tags,
-		NamespaceID: projectID,
+	matched, err := matcher.Match(ctx, projectID, selector.Candidate{
+		Repository: repoName,
+		Tags:       c.Tags,
+		PulledTime: c.PulledTime,
+		PushedTime: c.PushedTime,
 	})
 	if err != nil {
 		log.Error(err)

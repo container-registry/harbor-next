@@ -114,12 +114,12 @@ func (c *controller) Start(ctx context.Context, policy *replicationmodel.Policy,
 
 	monitorClient, err := jobmonitor.JobServiceMonitorClient()
 	if err != nil {
-		return 0, errors.New(nil).WithCode(errors.PreconditionCode).WithMessage("unable to get job monitor's client: %v", err)
+		return 0, errors.New(nil).WithCode(errors.PreconditionCode).WithMessagef("unable to get job monitor's client: %v", err)
 	}
 
 	observations, err := monitorClient.WorkerObservations()
 	if err != nil {
-		return 0, errors.New(nil).WithCode(errors.PreconditionCode).WithMessage("unable to get jobs observations: %v", err)
+		return 0, errors.New(nil).WithCode(errors.PreconditionCode).WithMessagef("unable to get jobs observations: %v", err)
 	}
 	id, err := c.execMgr.Create(ctx, job.ReplicationVendorType, policy.ID, trigger, extra)
 	if err != nil {

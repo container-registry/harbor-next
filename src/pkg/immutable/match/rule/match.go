@@ -16,6 +16,8 @@ package rule
 
 import (
 	"context"
+	"github.com/goharbor/harbor/src/pkg/retention/policy/rule"
+	policyruleindex "github.com/goharbor/harbor/src/pkg/retention/policy/rule/index"
 
 	"github.com/goharbor/harbor/src/controller/immutable"
 	"github.com/goharbor/harbor/src/lib/q"
@@ -83,6 +85,23 @@ func (rm *Matcher) Match(ctx context.Context, pid int64, c iselector.Candidate) 
 			continue
 		}
 
+		params := rule.Parameters{}
+		for k, v := range r.Parameters {
+			params[k] = v
+		}
+
+		evaluator, err := policyruleindex.Get(r.Template, params)
+		if err != nil {
+			return false, err
+		}
+
+		ruleCandidates, err := evaluator.Process(cands)
+		if err != nil {
+			return false, err
+		}
+		if len(ruleCandidates) == 0 {
+			continue
+		}
 		return true, nil
 	}
 	return false, nil
