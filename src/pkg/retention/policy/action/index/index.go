@@ -15,6 +15,7 @@
 package index
 
 import (
+	"github.com/goharbor/harbor/src/pkg/immutable/match/rule"
 	"sync"
 
 	"github.com/goharbor/harbor/src/lib/errors"
@@ -26,7 +27,7 @@ var index sync.Map
 
 func init() {
 	// Register retain action
-	Register(action.Retain, action.NewRetainAction)
+	Register(action.Retain, action.NewRetainAction(rule.NewRuleMatcher()))
 }
 
 // Register the performer with the corresponding action

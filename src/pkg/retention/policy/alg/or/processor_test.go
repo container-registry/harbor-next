@@ -16,6 +16,7 @@ package or
 
 import (
 	"errors"
+	rule2 "github.com/goharbor/harbor/src/pkg/immutable/match/rule"
 	"testing"
 	"time"
 
@@ -87,7 +88,8 @@ func (suite *ProcessorTestSuite) TearDownSuite() {
 // TestProcess tests process method
 func (suite *ProcessorTestSuite) TestProcess() {
 
-	perf := action.NewRetainAction(suite.all, false)
+	factory := action.NewRetainAction(rule2.NewRuleMatcher())
+	perf := factory(suite.all, false)
 
 	params := make([]*alg.Parameter, 0)
 	lastxParams := make(map[string]rule.Parameter)
@@ -129,7 +131,8 @@ func (suite *ProcessorTestSuite) TestProcess() {
 
 // TestProcess2 ...
 func (suite *ProcessorTestSuite) TestProcess2() {
-	perf := action.NewRetainAction(suite.all, false)
+	factory := action.NewRetainAction(rule2.NewRuleMatcher())
+	perf := factory(suite.all, false)
 
 	params := make([]*alg.Parameter, 0)
 	alwaysParams := make(map[string]rule.Parameter)

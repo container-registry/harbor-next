@@ -16,12 +16,10 @@ package action
 
 import (
 	"context"
-	"github.com/goharbor/harbor/src/pkg/immutable/match"
-
 	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/selector"
-	"github.com/goharbor/harbor/src/pkg/immutable/match/rule"
+	"github.com/goharbor/harbor/src/pkg/immutable/match"
 	"github.com/goharbor/harbor/src/pkg/retention/dep"
 )
 
@@ -50,7 +48,8 @@ type PerformerFactory func(params interface{}, isDryRun bool) Performer
 type retainAction struct {
 	all []*selector.Candidate
 	// Indicate if it is a dry run
-	isDryRun bool
+	isDryRun            bool
+	immutableTagMatcher match.ImmutableTagMatcher
 }
 
 // Perform the action
@@ -61,12 +60,11 @@ func (ra *retainAction) Perform(ctx context.Context, candidates []*selector.Cand
 		retainedShare[c.Hash()] = true
 	}
 
-	matcher := rule.NewRuleMatcher()
 	for _, c := range ra.all {
 		if _, ok := retainedShare[c.Hash()]; ok {
 			continue
 		}
-		if isImmutable(ctx, matcher, c) {
+		if ra.isImmutable(ctx, c) {
 			immutableShare[c.Hash()] = true
 		}
 	}
@@ -95,11 +93,11 @@ func (ra *retainAction) Perform(ctx context.Context, candidates []*selector.Cand
 	return
 }
 
-func isImmutable(ctx context.Context, matcher match.ImmutableTagMatcher, c *selector.Candidate) bool {
+func (ra *retainAction) isImmutable(ctx context.Context, c *selector.Candidate) bool {
 	projectID := c.NamespaceID
 	repo := c.Repository
 	_, repoName := utils.ParseRepository(repo)
-	matched, err := matcher.Match(ctx, projectID, selector.Candidate{
+	matched, err := ra.immutableTagMatcher.Match(ctx, projectID, selector.Candidate{
 		Repository: repoName,
 		Tags:       c.Tags,
 		PulledTime: c.PulledTime,
@@ -112,19 +110,22 @@ func isImmutable(ctx context.Context, matcher match.ImmutableTagMatcher, c *sele
 	return matched
 }
 
-// NewRetainAction is factory method for RetainAction
-func NewRetainAction(params interface{}, isDryRun bool) Performer {
-	if params != nil {
-		if all, ok := params.([]*selector.Candidate); ok {
-			return &retainAction{
-				all:      all,
-				isDryRun: isDryRun,
+// NewRetainAction returns factory method for RetainAction
+func NewRetainAction(m match.ImmutableTagMatcher) PerformerFactory {
+	return func(params interface{}, isDryRun bool) Performer {
+		if params != nil {
+			if all, ok := params.([]*selector.Candidate); ok {
+				ra := &retainAction{
+					all:      all,
+					isDryRun: isDryRun,
+				}
+				return ra
 			}
 		}
-	}
-
-	return &retainAction{
-		all:      make([]*selector.Candidate, 0),
-		isDryRun: isDryRun,
+		return &retainAction{
+			all:                 make([]*selector.Candidate, 0),
+			isDryRun:            isDryRun,
+			immutableTagMatcher: m,
+		}
 	}
 }
