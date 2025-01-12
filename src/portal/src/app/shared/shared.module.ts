@@ -11,82 +11,88 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import {NgModule} from '@angular/core';
-import {RouterModule} from '@angular/router';
-import {TranslateModule, TranslateStore} from '@ngx-translate/core';
-import {FormsModule, ReactiveFormsModule} from '@angular/forms';
-import {DateValidatorDirective} from './directives/date-validator.directive';
-import {PortValidatorDirective} from './directives/port.directive';
-import {MaxLengthExtValidatorDirective} from './directives/max-length-ext.directive';
-import {ErrorHandler} from './units/error-handler';
-import {ClarityIconsApi} from '@clr/icons/clr-icons-api';
-import {ClarityModule} from '@clr/angular';
-import {MarkdownModule} from 'ngx-markdown';
-import {CommonModule} from '@angular/common';
-import {ClipboardModule} from './components/third-party/ngx-clipboard';
-import {InlineAlertComponent} from './components/inline-alert/inline-alert.component';
-import {NewUserFormComponent} from './components/new-user-form/new-user-form.component';
-import {MessageComponent} from './components/global-message/message.component';
-import {NavigatorComponent} from './components/navigator/navigator.component';
-import {SearchResultComponent} from './components/global-search/search-result.component';
-import {GlobalSearchComponent} from './components/global-search/global-search.component';
-import {AboutDialogComponent} from './components/about-dialog/about-dialog.component';
+import { NgModule } from '@angular/core';
+import { RouterModule } from '@angular/router';
+import { TranslateModule, TranslateStore } from '@ngx-translate/core';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { DateValidatorDirective } from './directives/date-validator.directive';
+import { PortValidatorDirective } from './directives/port.directive';
+import { MaxLengthExtValidatorDirective } from './directives/max-length-ext.directive';
+import { ErrorHandler } from './units/error-handler';
+import { ClarityIconsApi } from '@clr/icons/clr-icons-api';
+import { ClarityModule } from '@clr/angular';
+import { MarkdownModule } from 'ngx-markdown';
+import { CommonModule } from '@angular/common';
+import { ClipboardModule } from './components/third-party/ngx-clipboard';
+import { InlineAlertComponent } from './components/inline-alert/inline-alert.component';
+import { NewUserFormComponent } from './components/new-user-form/new-user-form.component';
+import { MessageComponent } from './components/global-message/message.component';
+import { NavigatorComponent } from './components/navigator/navigator.component';
+import { SearchResultComponent } from './components/global-search/search-result.component';
+import { GlobalSearchComponent } from './components/global-search/global-search.component';
+import { AboutDialogComponent } from './components/about-dialog/about-dialog.component';
 import {
-  LabelDefaultService,
-  LabelService,
-  ProjectDefaultService,
-  ProjectService,
-  ReplicationDefaultService,
-  ReplicationService,
-  ScanningResultDefaultService,
-  ScanningResultService,
-  SystemInfoDefaultService,
-  SystemInfoService,
-  UserPermissionDefaultService,
-  UserPermissionService,
+    LabelDefaultService,
+    LabelService,
+    ProjectDefaultService,
+    ProjectService,
+    ReplicationDefaultService,
+    ReplicationService,
+    ScanningResultDefaultService,
+    ScanningResultService,
+    SystemInfoDefaultService,
+    SystemInfoService,
+    UserPermissionDefaultService,
+    UserPermissionService,
 } from './services';
-import {FilterComponent} from './components/filter/filter.component';
-import {GaugeComponent} from './components/gauge/gauge.component';
-import {ConfirmationDialogComponent} from './components/confirmation-dialog';
-import {ListRepositoryROComponent} from './components/list-repository-ro/list-repository-ro.component';
-import {OperationComponent} from './components/operation/operation.component';
-import {ViewTokenComponent} from './components/view-token/view-token.component';
-import {PushImageButtonComponent} from './components/push-image/push-image.component';
-import {CopyInputComponent} from './components/push-image/copy-input.component';
-import {ListProjectROComponent} from './components/list-project-ro/list-project-ro.component';
-import {CronScheduleComponent, CronTooltipComponent,} from './components/cron-schedule';
-import {LabelComponent} from './components/label/label.component';
-import {LabelSignPostComponent} from './components/label/label-signpost/label-signpost.component';
-import {LabelPieceComponent} from './components/label/label-piece/label-piece.component';
-import {CreateEditLabelComponent} from './components/label/create-edit-label/create-edit-label.component';
-import {DatePickerComponent} from './components/datetime-picker/datetime-picker.component';
-import {EndpointDefaultService, EndpointService,} from './services/endpoint.service';
-import {ImageNameInputComponent} from './components/image-name-input/image-name-input.component';
-import {MessageHandlerService} from './services/message-handler.service';
-import {HttpClientTestingModule} from '@angular/common/http/testing';
-import {RouterTestingModule} from '@angular/router/testing';
-import {BrowserAnimationsModule} from '@angular/platform-browser/animations';
-import {HarborDatetimePipe} from './pipes/harbor-datetime.pipe';
-import {CallbackPipe} from './pipes/callback.pipe';
-import {RemainingTimeComponent} from './components/remaining-time/remaining-time.component';
-import {LabelSelectorComponent} from './components/label-selector/label-selector.component';
-import {ScrollSectionDirective} from './directives/scroll/scroll-section.directive';
-import {ScrollAnchorDirective} from './directives/scroll/scroll-anchor.directive';
-import {AppLevelAlertsComponent} from './components/app-level-alerts/app-level-alerts.component';
+import { FilterComponent } from './components/filter/filter.component';
+import { GaugeComponent } from './components/gauge/gauge.component';
+import { ConfirmationDialogComponent } from './components/confirmation-dialog';
+import { ListRepositoryROComponent } from './components/list-repository-ro/list-repository-ro.component';
+import { OperationComponent } from './components/operation/operation.component';
+import { ViewTokenComponent } from './components/view-token/view-token.component';
+import { PushImageButtonComponent } from './components/push-image/push-image.component';
+import { CopyInputComponent } from './components/push-image/copy-input.component';
+import { ListProjectROComponent } from './components/list-project-ro/list-project-ro.component';
+import {
+    CronScheduleComponent,
+    CronTooltipComponent,
+} from './components/cron-schedule';
+import { LabelComponent } from './components/label/label.component';
+import { LabelSignPostComponent } from './components/label/label-signpost/label-signpost.component';
+import { LabelPieceComponent } from './components/label/label-piece/label-piece.component';
+import { CreateEditLabelComponent } from './components/label/create-edit-label/create-edit-label.component';
+import { DatePickerComponent } from './components/datetime-picker/datetime-picker.component';
+import {
+    EndpointDefaultService,
+    EndpointService,
+} from './services/endpoint.service';
+import { ImageNameInputComponent } from './components/image-name-input/image-name-input.component';
+import { MessageHandlerService } from './services/message-handler.service';
+import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { RouterTestingModule } from '@angular/router/testing';
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+import { HarborDatetimePipe } from './pipes/harbor-datetime.pipe';
+import { CallbackPipe } from './pipes/callback.pipe';
+import { RemainingTimeComponent } from './components/remaining-time/remaining-time.component';
+import { LabelSelectorComponent } from './components/label-selector/label-selector.component';
+import { ScrollSectionDirective } from './directives/scroll/scroll-section.directive';
+import { ScrollAnchorDirective } from './directives/scroll/scroll-anchor.directive';
+import { AppLevelAlertsComponent } from './components/app-level-alerts/app-level-alerts.component';
 // import echarts
 import * as echarts from 'echarts/core';
-import {PieChart} from 'echarts/charts';
+import { PieChart } from 'echarts/charts';
 import {
-  DatasetComponent,
-  GridComponent,
-  LegendComponent,
-  TitleComponent,
-  TooltipComponent,
-  TransformComponent,
+    DatasetComponent,
+    GridComponent,
+    LegendComponent,
+    TitleComponent,
+    TooltipComponent,
+    TransformComponent,
 } from 'echarts/components';
-import {LabelLayout, UniversalTransition} from 'echarts/features';
-import {CanvasRenderer} from 'echarts/renderers';
-import {RobotPermissionsPanelComponent} from './components/robot-permissions-panel/robot-permissions-panel.component';
+import { LabelLayout, UniversalTransition } from 'echarts/features';
+import { CanvasRenderer } from 'echarts/renderers';
+import { RobotPermissionsPanelComponent } from './components/robot-permissions-panel/robot-permissions-panel.component';
 
 // register necessary components
 echarts.use([
@@ -185,7 +191,7 @@ ClarityIcons.add({
         DatePickerComponent,
         ImageNameInputComponent,
         HarborDatetimePipe,
-      CallbackPipe,
+        CallbackPipe,
         RemainingTimeComponent,
         LabelSelectorComponent,
         AppLevelAlertsComponent,
@@ -229,7 +235,7 @@ ClarityIcons.add({
         DatePickerComponent,
         ImageNameInputComponent,
         HarborDatetimePipe,
-      CallbackPipe,
+        CallbackPipe,
         RemainingTimeComponent,
         LabelSelectorComponent,
         AppLevelAlertsComponent,
