@@ -33,7 +33,7 @@ func ValidateURL(s string, requiredSchemas ...string) (string, error) {
 	if !strings.Contains(s, "://") {
 		s = "http://" + s
 	}
-	url, err := url.Parse(s)
+	url_, err := url.Parse(s)
 	if err != nil {
 		return "", errors.New(nil).WithCode(errors.BadRequestCode).WithMessagef("invalid URL: %s", err.Error())
 	}
@@ -42,14 +42,14 @@ func ValidateURL(s string, requiredSchemas ...string) (string, error) {
 	}
 	var found bool
 	for _, schema := range requiredSchemas {
-		if url.Scheme != schema {
+		if url_.Scheme != schema {
 			continue
 		}
 		found = true
 	}
 	if !found {
-		return "", errors.New(nil).WithCode(errors.BadRequestCode).WithMessage("invalid scheme: %s", url.Scheme)
+		return "", errors.New(nil).WithCode(errors.BadRequestCode).WithMessagef("invalid scheme: %s", url_.Scheme)
 	}
 	// To avoid SSRF security issue, refer to #3755 for more detail
-	return fmt.Sprintf("%s://%s%s", url.Scheme, url.Host, url.Path), nil
+	return fmt.Sprintf("%s://%s%s", url_.Scheme, url_.Host, url_.Path), nil
 }
