@@ -46,7 +46,7 @@ type Harbor struct {
 // LintReport Executes the Linter and writes the linting results to a file golangci-linter-report.sarif
 func (m *Harbor) LintReport(ctx context.Context) (string, error) {
 	report := "golangci-lint-report.sarif"
-	output, _ := m.Source.File(report).Name(ctx)
+	// output, _ := m.Source.File(report).Name(ctx)
 	return m.linter(ctx).WithExec([]string{"golangci-lint", "run",
 		"--out-format", "sarif:" + report,
 		"--issues-exit-code", "0"}).File(report).Export(ctx, report)
