@@ -15,13 +15,15 @@ const (
 	GORELEASER_VERSION   = "v2.3.2"
 )
 
-type Package string
-type Platform string
+type (
+	Package  string
+	Platform string
+)
 
 var (
 	targetPlatforms = []Platform{"linux/arm64", "linux/amd64"}
 	packages        = []Package{"core", "jobservice", "registryctl", "cmd/exporter", "cmd/standalone-db-migrator"}
-	//packages = []string{"core", "jobservice"}
+	// packages = []string{"core", "jobservice"}
 )
 
 type BuildMetadata struct {
@@ -46,10 +48,12 @@ type Harbor struct {
 // LintReport Executes the Linter and writes the linting results to a file golangci-linter-report.sarif
 func (m *Harbor) LintReport(ctx context.Context) (string, error) {
 	report := "golangci-lint-report.sarif"
-	output, _ := m.Source.File(report).Name(ctx)
-	return m.linter(ctx).WithExec([]string{"golangci-lint", "run",
+	// output, _ = m.Source.File(report).Name(ctx)
+	return m.linter(ctx).WithExec([]string{
+		"golangci-lint", "run",
 		"--out-format", "sarif:" + report,
-		"--issues-exit-code", "0"}).File(report).Export(ctx, report)
+		"--issues-exit-code", "0",
+	}).File(report).Export(ctx, report)
 }
 
 // Lint Run the linter golangci-linter
@@ -72,6 +76,7 @@ func (m *Harbor) PublishAndSignAllImages(
 	ctx context.Context,
 	registry string,
 	registryUsername string,
+	version string,
 	registryPassword *dagger.Secret,
 	imageTags []string,
 	// +optional
@@ -81,8 +86,7 @@ func (m *Harbor) PublishAndSignAllImages(
 	// +optional
 	actionsIdTokenRequestUrl string,
 ) (string, error) {
-
-	imageAddrs := m.PublishAllImages(ctx, registry, registryUsername, imageTags, registryPassword)
+	imageAddrs := m.PublishAllImages(ctx, registry, registryUsername, imageTags, registryPassword, version)
 	_, err := m.Sign(
 		ctx,
 		githubToken,
@@ -112,7 +116,6 @@ func (m *Harbor) Sign(ctx context.Context,
 	registryPassword *dagger.Secret,
 	imageAddr string,
 ) (string, error) {
-
 	registryPasswordPlain, _ := registryPassword.Plaintext(ctx)
 
 	cosing_ctr := dag.Container().From("cgr.dev/chainguard/cosign")
@@ -130,7 +133,8 @@ func (m *Harbor) Sign(ctx context.Context,
 
 	return cosing_ctr.WithSecretVariable("REGISTRY_PASSWORD", registryPassword).
 		WithExec([]string{"cosign", "env"}).
-		WithExec([]string{"cosign", "sign", "--yes", "--recursive",
+		WithExec([]string{
+			"cosign", "sign", "--yes", "--recursive",
 			"--registry-username", registryUsername,
 			"--registry-password", registryPasswordPlain,
 			imageAddr,
@@ -138,13 +142,15 @@ func (m *Harbor) Sign(ctx context.Context,
 		}).Stdout(ctx)
 }
 
+// to-do: going to work on this
 func (m *Harbor) PublishAllImages(
 	ctx context.Context,
 	registry, registryUsername string,
 	imageTags []string,
-	registryPassword *dagger.Secret) []string {
-
-	allImages := m.buildAllImages(ctx)
+	registryPassword *dagger.Secret,
+	version string,
+) []string {
+	allImages := m.buildAllImages(ctx, version)
 
 	for i, tag := range imageTags {
 		imageTags[i] = strings.TrimSpace(tag)
@@ -183,8 +189,9 @@ func (m *Harbor) PublishImage(
 	ctx context.Context,
 	registry, registryUsername string,
 	imageTags []string,
-	registryPassword *dagger.Secret) []string {
-
+	registryPassword *dagger.Secret,
+	version string,
+) []string {
 	releaseImages := []*dagger.Container{}
 
 	for i, tag := range imageTags {
@@ -197,7 +204,7 @@ func (m *Harbor) PublishImage(
 
 	for _, platform := range targetPlatforms {
 		for _, pkg := range packages {
-			build := m.buildImage(ctx, platform, pkg)
+			build := m.buildImage(ctx, platform, pkg, version)
 			if strings.HasPrefix(string(platform), "linux") {
 				releaseImages = append(releaseImages, build.Container)
 			}
@@ -211,7 +218,6 @@ func (m *Harbor) PublishImage(
 				fmt.Sprintf("%s/%s/harbor-cli:%s", registry, "harbor-cli", imageTag),
 				dagger.ContainerPublishOpts{PlatformVariants: releaseImages},
 			)
-
 		if err != nil {
 			panic(err)
 		}
@@ -221,8 +227,8 @@ func (m *Harbor) PublishImage(
 	return imageAddrs
 }
 
-func (m *Harbor) ExportAllImages(ctx context.Context) *dagger.Directory {
-	metdata := m.buildAllImages(ctx)
+func (m *Harbor) ExportAllImages(ctx context.Context, version string) *dagger.Directory {
+	metdata := m.buildAllImages(ctx, version)
 	artifacts := dag.Directory()
 	for _, meta := range metdata {
 		artifacts = artifacts.WithFile(fmt.Sprintf("containers/%s/%s.tgz", meta.Platform, meta.Package), meta.Container.AsTarball())
@@ -230,8 +236,8 @@ func (m *Harbor) ExportAllImages(ctx context.Context) *dagger.Directory {
 	return artifacts
 }
 
-func (m *Harbor) BuildAllImages(ctx context.Context) []*dagger.Container {
-	metdata := m.buildAllImages(ctx)
+func (m *Harbor) BuildAllImages(ctx context.Context, version string) []*dagger.Container {
+	metdata := m.buildAllImages(ctx, version)
 	images := make([]*dagger.Container, len(metdata))
 	for i, meta := range metdata {
 		images[i] = meta.Container
@@ -239,11 +245,11 @@ func (m *Harbor) BuildAllImages(ctx context.Context) []*dagger.Container {
 	return images
 }
 
-func (m *Harbor) buildAllImages(ctx context.Context) []*BuildMetadata {
+func (m *Harbor) buildAllImages(ctx context.Context, version string) []*BuildMetadata {
 	var buildMetadata []*BuildMetadata
 	for _, platform := range targetPlatforms {
 		for _, pkg := range packages {
-			img := m.BuildImage(ctx, platform, pkg)
+			img := m.BuildImage(ctx, platform, pkg, version)
 			buildMetadata = append(buildMetadata, &BuildMetadata{
 				Package:    pkg,
 				BinaryPath: fmt.Sprintf("bin/%s/%s", platform, pkg),
@@ -255,17 +261,16 @@ func (m *Harbor) buildAllImages(ctx context.Context) []*BuildMetadata {
 	return buildMetadata
 }
 
-func (m *Harbor) BuildImage(ctx context.Context, platform Platform, pkg Package) *dagger.Container {
-	buildMtd := m.buildImage(ctx, platform, pkg)
+func (m *Harbor) BuildImage(ctx context.Context, platform Platform, pkg Package, version string) *dagger.Container {
+	buildMtd := m.buildImage(ctx, platform, pkg, version)
 	if pkg == "core" {
 		buildMtd.Container = buildMtd.Container.WithDirectory("/migrations", m.Source.Directory("make/migrations"))
 	}
 	return buildMtd.Container
-
 }
 
-func (m *Harbor) buildImage(ctx context.Context, platform Platform, pkg Package) *BuildMetadata {
-	buildMtd := m.buildBinary(ctx, platform, pkg)
+func (m *Harbor) buildImage(ctx context.Context, platform Platform, pkg Package, version string) *BuildMetadata {
+	buildMtd := m.buildBinary(ctx, platform, pkg, version)
 	img := dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(string(platform))}).
 		WithFile("/"+string(pkg), buildMtd.Container.File(buildMtd.BinaryPath)).
 		WithEntrypoint([]string{"/" + string(pkg)})
@@ -273,36 +278,46 @@ func (m *Harbor) buildImage(ctx context.Context, platform Platform, pkg Package)
 	return buildMtd
 }
 
-func (m *Harbor) BuildAllBinaries(ctx context.Context) *dagger.Directory {
+func (m *Harbor) BuildAllBinaries(ctx context.Context, version string) *dagger.Directory {
 	output := dag.Directory()
-	builds := m.buildAllBinaries(ctx)
+	builds := m.buildAllBinaries(ctx, version)
 	for _, build := range builds {
 		output = output.WithFile(build.BinaryPath, build.Container.File(build.BinaryPath))
 	}
 	return output
 }
 
-func (m *Harbor) buildAllBinaries(ctx context.Context) []*BuildMetadata {
+func (m *Harbor) buildAllBinaries(ctx context.Context, version string) []*BuildMetadata {
 	var buildContainers []*BuildMetadata
 	for _, platform := range targetPlatforms {
 		for _, pkg := range packages {
-			buildContainer := m.buildBinary(ctx, platform, pkg)
+			buildContainer := m.buildBinary(ctx, platform, pkg, version)
 			buildContainers = append(buildContainers, buildContainer)
 		}
 	}
 	return buildContainers
 }
 
-func (m *Harbor) BuildBinary(ctx context.Context, platform Platform, pkg Package) *dagger.File {
-	build := m.buildBinary(ctx, platform, pkg)
+// builds binary for the specified package
+func (m *Harbor) BuildBinary(ctx context.Context, platform Platform, pkg Package, version string) *dagger.File {
+	build := m.buildBinary(ctx, platform, pkg, version)
 	return build.Container.File(build.BinaryPath)
 }
 
-func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package) *BuildMetadata {
+func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package, version string) *BuildMetadata {
+	var ldflags string
+	goflags := "-buildvcs=false"
 
 	os, arch, err := parsePlatform(string(platform))
 	if err != nil {
 		log.Fatalf("Error parsing platform: %v", err)
+	}
+
+	gitCommit := m.fetchGitCommit(ctx)
+	if pkg == "core" {
+		ldflags = fmt.Sprintf(`-X github.com/goharbor/harbor/src/pkg/version.GitCommit=%s
+                    -X github.com/goharbor/harbor/src/pkg/version.ReleaseVersion=%s
+      `, gitCommit, version)
 	}
 
 	outputPath := fmt.Sprintf("bin/%s/%s", platform, pkg)
@@ -318,7 +333,7 @@ func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package
 		WithEnvVariable("GOOS", os).
 		WithEnvVariable("GOARCH", arch).
 		WithEnvVariable("CGO_ENABLED", "0").
-		WithExec([]string{"go", "build", "-o", outputPath, "-ldflags", "-extldflags=-static -s -w", src})
+		WithExec([]string{"go", "build", goflags, "-o", outputPath, "-ldflags", ldflags, "-extldflags=-static -s -w", src})
 
 	return &BuildMetadata{
 		Package:    pkg,
@@ -331,7 +346,6 @@ func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package
 func (m *Harbor) buildPortal(ctx context.Context, platform Platform, pkg Package) *dagger.Directory {
 	fmt.Println("🛠️  Building Harbor Core...")
 	os, arch, err := parsePlatform(string(platform))
-
 	if err != nil {
 		log.Fatalf("Error parsing platform: %v", err)
 	}
@@ -358,4 +372,16 @@ func parsePlatform(platform string) (string, string, error) {
 		return "", "", fmt.Errorf("invalid platform format: %s. Should be os/arch. E.g. darwin/amd64", platform)
 	}
 	return parts[0], parts[1], nil
+}
+
+func (m *Harbor) fetchGitCommit(ctx context.Context) string {
+	// temp container with git installed
+	temp := dag.Container().
+		From("golang:latest").
+		WithMountedDirectory("/src", m.Source).
+		WithWorkdir("/src")
+
+	gitCommit, _ := temp.WithExec([]string{"git", "rev-parse", "--short=8", "HEAD", "--always"}).Stdout(ctx)
+
+	return gitCommit
 }
