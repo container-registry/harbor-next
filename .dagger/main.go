@@ -61,7 +61,7 @@ func (m *Harbor) Lint(ctx context.Context) (string, error) {
 	return m.linter(ctx).WithExec([]string{"golangci-lint", "run"}).Stderr(ctx)
 }
 
-func (m *Harbor) linter(ctx context.Context) *dagger.Container {
+func (m *Harbor) linter(_ context.Context) *dagger.Container {
 	fmt.Printf("👀 Running linter")
 	linter := dag.Container().
 		From("golangci/golangci-lint:"+GOLANGCILINT_VERSION+"-alpine").
@@ -305,7 +305,7 @@ func (m *Harbor) BuildBinary(ctx context.Context, platform Platform, pkg Package
 }
 
 func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package, version string) *BuildMetadata {
-	var ldflags string
+	ldflags := "-extldflags=-static -s -w"
 	goflags := "-buildvcs=false"
 
 	os, arch, err := parsePlatform(string(platform))
@@ -315,6 +315,10 @@ func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package
 
 	gitCommit := m.fetchGitCommit(ctx)
 	if pkg == "core" {
+		m.lintAPIs(ctx)
+		dirWithSwagger := m.genAPIs(ctx)
+		m.Source = dirWithSwagger
+
 		ldflags = fmt.Sprintf(`-X github.com/goharbor/harbor/src/pkg/version.GitCommit=%s
                     -X github.com/goharbor/harbor/src/pkg/version.ReleaseVersion=%s
       `, gitCommit, version)
@@ -333,7 +337,7 @@ func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package
 		WithEnvVariable("GOOS", os).
 		WithEnvVariable("GOARCH", arch).
 		WithEnvVariable("CGO_ENABLED", "0").
-		WithExec([]string{"go", "build", goflags, "-o", outputPath, "-ldflags", ldflags, "-extldflags=-static -s -w", src})
+		WithExec([]string{"go", "build", goflags, "-o", outputPath, "-ldflags", ldflags, src})
 
 	return &BuildMetadata{
 		Package:    pkg,
@@ -384,4 +388,40 @@ func (m *Harbor) fetchGitCommit(ctx context.Context) string {
 	gitCommit, _ := temp.WithExec([]string{"git", "rev-parse", "--short=8", "HEAD", "--always"}).Stdout(ctx)
 
 	return gitCommit
+}
+
+func (m *Harbor) genAPIs(_ context.Context) *dagger.Directory {
+	SWAGGER_VERSION := "v0.25.0"
+	SWAGGER_SPEC := "api/v2.0/swagger.yaml"
+	TARGET_DIR := "src/server/v2.0"
+	APP_NAME := "harbor"
+
+	temp := dag.Container().
+		From("quay.io/goswagger/swagger:"+SWAGGER_VERSION).
+		WithMountedDirectory("/src", m.Source).
+		WithWorkdir("/src").
+		WithExec([]string{"swagger", "version"}).
+		// Clean up old generated code and create necessary directories
+		WithExec([]string{"rm", "-rf", TARGET_DIR + "/{models,restapi}"}).
+		WithExec([]string{"mkdir", "-p", TARGET_DIR}).
+		// Generate the server files using the Swagger tool
+		WithExec([]string{"swagger", "generate", "server", "--template-dir=./tools/swagger/templates", "--exclude-main", "--additional-initialism=CVE", "--additional-initialism=GC", "--additional-initialism=OIDC", "-f", SWAGGER_SPEC, "-A", APP_NAME, "--target", TARGET_DIR}).
+		Directory("/src")
+
+	return temp
+}
+
+func (m *Harbor) lintAPIs(_ context.Context) *dagger.Directory {
+	//   docker build -f ./tools/spectral/Dockerfile --build-arg GOLANG=<GOBUILDIMAGE> --build-arg SPECTRAL_VERSION=v6.11.1 -t <IMAGENAMESPACE>/spectral:v6.11.1 .
+	// docker run --rm -v $(pwd)/api/v2.0:/api -w /api <IMAGENAMESPACE>/spectral:v6.11.1 lint ./swagger.yaml
+
+	temp := dag.Container().
+		From("stoplight/spectral:6.11.1").
+		WithMountedDirectory("/src", m.Source).
+		WithWorkdir("/src").
+		WithExec([]string{"spectral", "--version"}).
+		WithExec([]string{"spectral", "lint", "./api/v2.0/swagger.yaml"}).
+		Directory("/src")
+
+	return temp
 }
