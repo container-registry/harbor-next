@@ -204,11 +204,6 @@ func (m *Harbor) PublishImage(
 	}
 	fmt.Printf("provided tags: %s\n", imageTags)
 
-	// platformVariantsContainer := make(map[Package][]*dagger.Container)
-	// for _, meta := range BuildImage {
-	// 	platformVariantsContainer[meta.Package] = append(platformVariantsContainer[meta.Package], meta.Container)
-	// }
-
 	var (
 		imageAddresses []string
 		images         []*dagger.Container
@@ -229,24 +224,6 @@ func (m *Harbor) PublishImage(
 	}
 
 	return imageAddresses
-
-	// for pkg, imgs := range platformVariantsContainer {
-	// 	for _, imageTag := range imageTags {
-	// 		container := dag.Container().WithRegistryAuth(registry, registryUsername, registryPassword)
-	// 		imgAddress, err := container.Publish(ctx,
-	// 			fmt.Sprintf("%s/%s/%s:%s", registry, "harbor", pkg, imageTag),
-	// 			dagger.ContainerPublishOpts{PlatformVariants: imgs},
-	// 		)
-	// 		if err != nil {
-	// 			fmt.Printf("Failed to publish image: %s/%s/%s:%s\n", registry, "harbor", pkg, imageTag)
-	// 			fmt.Printf("Error: %s\n", err)
-	// 			continue
-	// 		}
-	// 		imageAddresses = append(imageAddresses, imgAddress)
-	// 		fmt.Printf("Published image: %s\n", imgAddress)
-	// 	}
-	// }
-	// return imageAddresses
 }
 
 func (m *Harbor) ExportAllImages(ctx context.Context, version string) *dagger.Directory {
