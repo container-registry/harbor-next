@@ -185,14 +185,16 @@ func (m *Harbor) PublishAllImages(
 	return imageAddresses
 }
 
+// publishes the specific package with the given tag and version
 func (m *Harbor) PublishImage(
 	ctx context.Context,
 	registry, registryUsername string,
 	imageTags []string,
+	pkg Package,
 	registryPassword *dagger.Secret,
 	version string,
 ) []string {
-	releaseImages := []*dagger.Container{}
+	BuildImage := m.BuildImage(ctx, targetPlatforms[1], pkg, version)
 
 	for i, tag := range imageTags {
 		imageTags[i] = strings.TrimSpace(tag)
@@ -202,29 +204,49 @@ func (m *Harbor) PublishImage(
 	}
 	fmt.Printf("provided tags: %s\n", imageTags)
 
-	for _, platform := range targetPlatforms {
-		for _, pkg := range packages {
-			build := m.buildImage(ctx, platform, pkg, version)
-			if strings.HasPrefix(string(platform), "linux") {
-				releaseImages = append(releaseImages, build.Container)
-			}
+	// platformVariantsContainer := make(map[Package][]*dagger.Container)
+	// for _, meta := range BuildImage {
+	// 	platformVariantsContainer[meta.Package] = append(platformVariantsContainer[meta.Package], meta.Container)
+	// }
+
+	var (
+		imageAddresses []string
+		images         []*dagger.Container
+	)
+	images = append(images, BuildImage)
+	for _, imageTag := range imageTags {
+		container := BuildImage.WithRegistryAuth(registry, registryUsername, registryPassword)
+		imgAddress, err := container.Publish(ctx,
+			fmt.Sprintf("%s/%s/%s:%s", registry, "harbor", pkg, imageTag),
+		)
+		if err != nil {
+			fmt.Printf("Failed to publish image: %s/%s/%s:%s\n", registry, "harbor", pkg, imageTag)
+			fmt.Printf("Error: %s\n", err)
+			continue
 		}
+		imageAddresses = append(imageAddresses, imgAddress)
+		fmt.Printf("Published image: %s\n", imgAddress)
 	}
 
-	imageAddrs := []string{}
-	for _, imageTag := range imageTags {
-		addr, err := dag.Container().WithRegistryAuth(registry, registryUsername, registryPassword).
-			Publish(ctx,
-				fmt.Sprintf("%s/%s/harbor-cli:%s", registry, "harbor-cli", imageTag),
-				dagger.ContainerPublishOpts{PlatformVariants: releaseImages},
-			)
-		if err != nil {
-			panic(err)
-		}
-		fmt.Printf("Published image address: %s\n", addr)
-		imageAddrs = append(imageAddrs, addr)
-	}
-	return imageAddrs
+	return imageAddresses
+
+	// for pkg, imgs := range platformVariantsContainer {
+	// 	for _, imageTag := range imageTags {
+	// 		container := dag.Container().WithRegistryAuth(registry, registryUsername, registryPassword)
+	// 		imgAddress, err := container.Publish(ctx,
+	// 			fmt.Sprintf("%s/%s/%s:%s", registry, "harbor", pkg, imageTag),
+	// 			dagger.ContainerPublishOpts{PlatformVariants: imgs},
+	// 		)
+	// 		if err != nil {
+	// 			fmt.Printf("Failed to publish image: %s/%s/%s:%s\n", registry, "harbor", pkg, imageTag)
+	// 			fmt.Printf("Error: %s\n", err)
+	// 			continue
+	// 		}
+	// 		imageAddresses = append(imageAddresses, imgAddress)
+	// 		fmt.Printf("Published image: %s\n", imgAddress)
+	// 	}
+	// }
+	// return imageAddresses
 }
 
 func (m *Harbor) ExportAllImages(ctx context.Context, version string) *dagger.Directory {
@@ -264,7 +286,9 @@ func (m *Harbor) buildAllImages(ctx context.Context, version string) []*BuildMet
 func (m *Harbor) BuildImage(ctx context.Context, platform Platform, pkg Package, version string) *dagger.Container {
 	buildMtd := m.buildImage(ctx, platform, pkg, version)
 	if pkg == "core" {
-		buildMtd.Container = buildMtd.Container.WithDirectory("/migrations", m.Source.Directory("make/migrations"))
+		buildMtd.Container = buildMtd.Container.WithDirectory("/migrations", m.Source.Directory("make/migrations")).
+			WithDirectory("/icons", m.Source.Directory("icons")).
+			WithDirectory("/views", m.Source.Directory("src/core/views"))
 	}
 	return buildMtd.Container
 }
@@ -412,9 +436,6 @@ func (m *Harbor) genAPIs(_ context.Context) *dagger.Directory {
 }
 
 func (m *Harbor) lintAPIs(_ context.Context) *dagger.Directory {
-	//   docker build -f ./tools/spectral/Dockerfile --build-arg GOLANG=<GOBUILDIMAGE> --build-arg SPECTRAL_VERSION=v6.11.1 -t <IMAGENAMESPACE>/spectral:v6.11.1 .
-	// docker run --rm -v $(pwd)/api/v2.0:/api -w /api <IMAGENAMESPACE>/spectral:v6.11.1 lint ./swagger.yaml
-
 	temp := dag.Container().
 		From("stoplight/spectral:6.11.1").
 		WithMountedDirectory("/src", m.Source).
