@@ -1,9 +1,7 @@
 package sftp
 
 import (
-	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/docker/distribution/registry/storage/driver/base"
@@ -51,45 +49,60 @@ type Driver struct {
 	driver *driver
 }
 
-func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
-	rc, err := d.Reader(ctx, path, 0)
-	if err != nil {
+func (d *driver) GetContent(ctx context.Context, p string) ([]byte, error) {
 
-		var pathNotFoundError storagedriver.PathNotFoundError
-		if errors.As(err, &pathNotFoundError) {
-			// return error as it is to be asserted properly
-			return nil, err
-		}
-		return nil, fmt.Errorf("get content %s error: %v", path, err)
+	var err error
+	session, cl, err := d.getSFTP()
+	if err != nil {
+		return nil, fmt.Errorf("reader %s sftp session failed: %v", p, err)
 	}
 
-	defer rc.Close()
-	return io.ReadAll(rc)
+	defer cl()
+	file, err := session.Open(d.addBasePath(p))
+
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, storagedriver.PathNotFoundError{Path: p, DriverName: DriverName}
+		}
+	}
+
+	defer file.Close()
+
+	data, err := io.ReadAll(file)
+
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, storagedriver.PathNotFoundError{Path: p, DriverName: DriverName}
+		}
+	}
+	return data, err
 }
 
 func (d *driver) PutContent(ctx context.Context, p string, contents []byte) error {
-	writer, err := d.Writer(ctx, p, false)
+
+	session, cl, err := d.getSFTP()
 	if err != nil {
-		return fmt.Errorf("put content %s error: %v", p, err)
+		return fmt.Errorf("putcontent %s get sftp session failed: %v", p, err)
 	}
 
-	defer writer.Close()
+	defer cl()
+	p = d.addBasePath(p)
 
-	_, err = io.Copy(writer, bytes.NewReader(contents))
-	if err != nil {
-		_ = writer.Cancel()
-		return fmt.Errorf("put content %s error: %v", p, err)
+	dir := path.Dir(p)
+	if err = session.MkdirAll(dir); err != nil {
+		return fmt.Errorf("putcontent: unable to create directory %s: %v", dir, err)
 	}
 
-	err = writer.Commit()
+	file, err := session.Create(p)
 	if err != nil {
-		return fmt.Errorf("put content %s error: %v", p, err)
+		return fmt.Errorf("putcontent: file create %s error: %v", p, err)
 	}
-	return nil
+
+	_, err = file.Write(contents)
+	return err
 }
 
 func (d *driver) Reader(_ context.Context, p string, offset int64) (io.ReadCloser, error) {
-	fmt.Println("Reader", p, offset)
 
 	var err error
 	session, cl, err := d.getSFTP()
@@ -126,8 +139,6 @@ func (d *driver) Reader(_ context.Context, p string, offset int64) (io.ReadClose
 
 func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver.FileWriter, error) {
 
-	fmt.Println("Writer", p, append)
-
 	session, cl, err := d.getSFTP()
 	if err != nil {
 		return nil, fmt.Errorf("writer %s get sftp session failed: %v", p, err)
@@ -142,7 +153,7 @@ func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver
 		return nil, fmt.Errorf("unable to create directory %s: %v", dir, err)
 	}
 
-	file, err := session.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_APPEND)
+	file, err := session.Create(p)
 	if err != nil {
 		cl()
 		return nil, fmt.Errorf("file create %s error: %v", p, err)
@@ -152,8 +163,6 @@ func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver
 
 	if append {
 		offset, err = file.Seek(0, io.SeekEnd)
-	} else {
-		err = file.Truncate(0)
 	}
 	if err != nil {
 		cl()

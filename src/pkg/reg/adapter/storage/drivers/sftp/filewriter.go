@@ -1,7 +1,6 @@
 package sftp
 
 import (
-	"bufio"
 	"fmt"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/pkg/sftp"
@@ -12,7 +11,6 @@ var _ storagedriver.FileWriter = &fileWriter{}
 type fileWriter struct {
 	file      *sftp.File
 	size      int64
-	bw        *bufio.Writer
 	closed    bool
 	committed bool
 	cancelled bool
@@ -23,7 +21,6 @@ func newFileWriter(file *sftp.File, size int64, closer func()) *fileWriter {
 	return &fileWriter{
 		file:   file,
 		size:   size,
-		bw:     bufio.NewWriter(file),
 		closer: closer,
 	}
 }
@@ -36,7 +33,8 @@ func (fw *fileWriter) Write(p []byte) (int, error) {
 	} else if fw.cancelled {
 		return 0, fmt.Errorf("already cancelled")
 	}
-	n, err := fw.bw.Write(p)
+
+	n, err := fw.file.Write(p)
 	fw.size += int64(n)
 	return n, err
 }
@@ -58,15 +56,6 @@ func (fw *fileWriter) Close() error {
 		fw.closed = true
 	}()
 
-	// closing anyway even if followed errored
-
-	if err := fw.bw.Flush(); err != nil {
-		return err
-	}
-	if err := fw.file.Sync(); err != nil {
-		return err
-	}
-
 	return fw.file.Close()
 }
 
@@ -86,12 +75,6 @@ func (fw *fileWriter) Commit() error {
 		return fmt.Errorf("already committed")
 	} else if fw.cancelled {
 		return fmt.Errorf("already cancelled")
-	}
-	if err := fw.bw.Flush(); err != nil {
-		return err
-	}
-	if err := fw.file.Sync(); err != nil {
-		return err
 	}
 	fw.committed = true
 	return nil
