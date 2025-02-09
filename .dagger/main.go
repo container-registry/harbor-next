@@ -152,12 +152,12 @@ func (m *Harbor) PublishAllImages(
 ) []string {
 	allImages := m.buildAllImages(ctx, version)
 
-	for i, tag := range imageTags {
-		imageTags[i] = strings.TrimSpace(tag)
-		if strings.HasPrefix(imageTags[i], "v") {
-			imageTags[i] = strings.TrimPrefix(imageTags[i], "v")
-		}
-	}
+	// for i, tag := range imageTags {
+	// 	imageTags[i] = strings.TrimSpace(tag)
+	// 	if strings.HasPrefix(imageTags[i], "v") {
+	// 		imageTags[i] = strings.TrimPrefix(imageTags[i], "v")
+	// 	}
+	// }
 	fmt.Printf("provided tags: %s\n", imageTags)
 
 	platformVariantsContainer := make(map[Package][]*dagger.Container)
@@ -196,12 +196,13 @@ func (m *Harbor) PublishImage(
 ) []string {
 	BuildImage := m.BuildImage(ctx, targetPlatforms[1], pkg, version)
 
-	for i, tag := range imageTags {
-		imageTags[i] = strings.TrimSpace(tag)
-		if strings.HasPrefix(imageTags[i], "v") {
-			imageTags[i] = strings.TrimPrefix(imageTags[i], "v")
-		}
-	}
+	// why do we need this @vad1mo any ideas??
+	// for i, tag := range imageTags {
+	// 	imageTags[i] = strings.TrimSpace(tag)
+	// 	if strings.HasPrefix(imageTags[i], "v") {
+	// 		imageTags[i] = strings.TrimPrefix(imageTags[i], "v")
+	// 	}
+	// }
 	fmt.Printf("provided tags: %s\n", imageTags)
 
 	var (
@@ -269,9 +270,6 @@ func (m *Harbor) BuildImage(ctx context.Context, platform Platform, pkg Package,
 		buildMtd.Container = buildMtd.Container.WithDirectory("/migrations", m.Source.Directory("make/migrations")).
 			WithDirectory("/icons", m.Source.Directory("icons")).
 			WithDirectory("/views", m.Source.Directory("src/core/views"))
-	}
-	if pkg == "jobservice" {
-		buildMtd.Container = buildMtd.Container.WithMountedDirectory("/var/log/jobs", m.Source.Directory("make/migrations"))
 	}
 	return buildMtd.Container
 }
