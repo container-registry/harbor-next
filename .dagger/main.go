@@ -263,12 +263,15 @@ func (m *Harbor) buildAllImages(ctx context.Context, version string) []*BuildMet
 func (m *Harbor) BuildImage(ctx context.Context, platform Platform, pkg Package, version string) *dagger.Container {
 	buildMtd := m.buildImage(ctx, platform, pkg, version)
 	if pkg == "core" {
-    // the only thing missing here is the healthcheck
-    // we can add those by updating the docker compose since dagger currently doesn't support healthchecks
-    // issue: https://github.com/dagger/dagger/issues/9515
+		// the only thing missing here is the healthcheck
+		// we can add those by updating the docker compose since dagger currently doesn't support healthchecks
+		// issue: https://github.com/dagger/dagger/issues/9515
 		buildMtd.Container = buildMtd.Container.WithDirectory("/migrations", m.Source.Directory("make/migrations")).
 			WithDirectory("/icons", m.Source.Directory("icons")).
 			WithDirectory("/views", m.Source.Directory("src/core/views"))
+	}
+	if pkg == "jobservice" {
+		buildMtd.Container = buildMtd.Container.WithMountedDirectory("/var/log/jobs", m.Source.Directory("make/migrations"))
 	}
 	return buildMtd.Container
 }
@@ -276,8 +279,12 @@ func (m *Harbor) BuildImage(ctx context.Context, platform Platform, pkg Package,
 func (m *Harbor) buildImage(ctx context.Context, platform Platform, pkg Package, version string) *BuildMetadata {
 	buildMtd := m.buildBinary(ctx, platform, pkg, version)
 	img := dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(string(platform))}).
-		WithFile("/"+string(pkg), buildMtd.Container.File(buildMtd.BinaryPath)).
-		WithEntrypoint([]string{"/" + string(pkg)})
+		WithFile("/"+string(pkg), buildMtd.Container.File(buildMtd.BinaryPath))
+	if pkg == "jobservice" {
+		img = img.WithEntrypoint([]string{"/" + string(pkg), "-c", "/etc/jobservice/config.yml"})
+	} else {
+		img = img.WithEntrypoint([]string{"/" + string(pkg)})
+	}
 	buildMtd.Container = img
 	return buildMtd
 }
