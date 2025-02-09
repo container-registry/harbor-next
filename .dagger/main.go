@@ -13,6 +13,10 @@ const (
 	GO_VERSION           = "latest"
 	SYFT_VERSION         = "v1.9.0"
 	GORELEASER_VERSION   = "v2.3.2"
+	// version of registry for pulling the source code
+	REGISTRY_SRC_TAG = "v2.8.3"
+	// source of upstream distribution code
+	DISTRIBUTION_SRC = "https://github.com/distribution/distribution.git"
 )
 
 type (
@@ -271,7 +275,39 @@ func (m *Harbor) BuildImage(ctx context.Context, platform Platform, pkg Package,
 			WithDirectory("/icons", m.Source.Directory("icons")).
 			WithDirectory("/views", m.Source.Directory("src/core/views"))
 	}
+	if pkg == "registryctl" {
+		// COPY ./make/photon/registry/binary/registry /usr/bin/registry_DO_NOT_USE_GC
+		// COPY ./make/photon/registryctl/harbor_registryctl /home/harbor
+		//
+		// HEALTHCHECK CMD curl --fail -s http://localhost:8080/api/health || curl -sk --fail --key /etc/harbor/ssl/registryctl.key --cert /etc/harbor/ssl/registryctl.crt https://localhost:8443/api/health || exit 1
+		//
+		// ENTRYPOINT
+		// /home/harbor/harbor_registryctl -c /etc/registryctl/config.yml
+		regBinary := m.registryBuilder(ctx)
+		buildMtd.Container = buildMtd.Container.WithFile("/usr/bin/registry_DO_NOT_USE_GC", regBinary)
+	}
 	return buildMtd.Container
+}
+
+func (m *Harbor) registryBuilder(ctx context.Context) *dagger.File {
+	registryBinary := dag.Container().From("golang:latest").
+		WithMountedCache("/go/pkg/mod", dag.CacheVolume("go-mod-"+GO_VERSION)).
+		WithEnvVariable("GOMODCACHE", "/go/pkg/mod").
+		WithMountedCache("/go/build-cache", dag.CacheVolume("go-build-"+GO_VERSION)).
+		WithEnvVariable("GOCACHE", "/go/build-cache").
+		WithMountedDirectory("/harbor", m.Source).
+		WithWorkdir("/harbor/.dagger/").
+		WithExec([]string{"git", "clone", "-b", REGISTRY_SRC_TAG, DISTRIBUTION_SRC}).
+		WithWorkdir("distribution").
+		WithExec([]string{"git", "apply", "/harbor/.dagger/registry/redis.patch"}).
+		WithExec([]string{"echo", "build the registry binary"}).
+		WithEnvVariable("DISTRIBUTION_DIR", "/harbor/.dagger/distribution").
+		WithEnvVariable("BUILDTAGS", "include_oss include_gcs").
+		WithEnvVariable("GO111MODULE", "auto").
+		WithExec([]string{"CGO_ENABLED=0", "make", "PREFIX=/go", "clean", "binaries"}).
+		File("bin/registry")
+
+	return registryBinary
 }
 
 func (m *Harbor) buildImage(ctx context.Context, platform Platform, pkg Package, version string) *BuildMetadata {
@@ -280,6 +316,8 @@ func (m *Harbor) buildImage(ctx context.Context, platform Platform, pkg Package,
 		WithFile("/"+string(pkg), buildMtd.Container.File(buildMtd.BinaryPath))
 	if pkg == "jobservice" {
 		img = img.WithEntrypoint([]string{"/" + string(pkg), "-c", "/etc/jobservice/config.yml"})
+	} else if pkg == "registryctl" {
+		img = img.WithEntrypoint([]string{"/" + string(pkg), "-c", "/etc/registryctl/config.yml"})
 	} else {
 		img = img.WithEntrypoint([]string{"/" + string(pkg)})
 	}
