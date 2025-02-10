@@ -290,21 +290,23 @@ func (m *Harbor) BuildImage(ctx context.Context, platform Platform, pkg Package,
 }
 
 func (m *Harbor) registryBuilder(ctx context.Context) *dagger.File {
-	registryBinary := dag.Container().From("golang:latest").
+	registryBinary := dag.Container().From("golang:1.23.2").
 		WithMountedCache("/go/pkg/mod", dag.CacheVolume("go-mod-"+GO_VERSION)).
 		WithEnvVariable("GOMODCACHE", "/go/pkg/mod").
 		WithMountedCache("/go/build-cache", dag.CacheVolume("go-build-"+GO_VERSION)).
 		WithEnvVariable("GOCACHE", "/go/build-cache").
 		WithMountedDirectory("/harbor", m.Source).
 		WithWorkdir("/harbor/.dagger/").
+		WithEnvVariable("DISTRIBUTION_DIR", "/go/src/github.com/docker/distribution").
+		WithEnvVariable("BUILDTAGS", "include_oss include_gcs").
+		WithEnvVariable("GO111MODULE", "auto").
+		WithEnvVariable("CGO_ENABLED", "0").
+    WithWorkdir("/go/src/github.com/docker").
 		WithExec([]string{"git", "clone", "-b", REGISTRY_SRC_TAG, DISTRIBUTION_SRC}).
 		WithWorkdir("distribution").
 		WithExec([]string{"git", "apply", "/harbor/.dagger/registry/redis.patch"}).
 		WithExec([]string{"echo", "build the registry binary"}).
-		WithEnvVariable("DISTRIBUTION_DIR", "/harbor/.dagger/distribution").
-		WithEnvVariable("BUILDTAGS", "include_oss include_gcs").
-		WithEnvVariable("GO111MODULE", "auto").
-		WithExec([]string{"CGO_ENABLED=0", "make", "PREFIX=/go", "clean", "binaries"}).
+		WithExec([]string{"make", "PREFIX=/go", "clean", "binaries"}).
 		File("bin/registry")
 
 	return registryBinary
