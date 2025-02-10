@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -34,7 +33,6 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 	ctx := context.Background()
 	var repoNames = make([]string, 1000)
 
-	fmt.Println("FetchArtifacts")
 	// @todo do iteration using last
 	_, err := a.registry.Repositories(ctx, repoNames, "")
 
@@ -135,8 +133,6 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 func (a *adapter) ManifestExist(repository, ref string) (exist bool, desc *distribution.Descriptor, err error) {
 	ctx := context.Background()
 
-	fmt.Println("ManifestExist", repository, ref)
-
 	repo, err := a.getRepo(ctx, repository, ref)
 	if err != nil {
 		return false, nil, fmt.Errorf("get repo error: %v", err)
@@ -149,6 +145,7 @@ func (a *adapter) ManifestExist(repository, ref string) (exist bool, desc *distr
 	if !strings.HasPrefix(ref, "sha256:") {
 		// looks like a tag
 		descriptor, err := tagService.Get(ctx, ref)
+
 		if err != nil {
 			var errTagUnknown distribution.ErrTagUnknown
 			if errors.As(err, &errTagUnknown) {
@@ -175,8 +172,6 @@ func (a *adapter) ManifestExist(repository, ref string) (exist bool, desc *distr
 
 func (a *adapter) PullManifest(repository, ref string, _ ...string) (distribution.Manifest, string, error) {
 	ctx := context.Background()
-
-	fmt.Println("PullManifest", repository, ref)
 
 	repo, err := a.getRepo(ctx, repository, ref)
 	if err != nil {
@@ -215,8 +210,6 @@ func (a *adapter) PullManifest(repository, ref string, _ ...string) (distributio
 
 // PushManifest manifests are blobs actually
 func (a *adapter) PushManifest(repository, ref, mediaType string, payload []byte) (string, error) {
-
-	fmt.Println("PushManifest", repository, ref, mediaType, payload)
 
 	ctx := context.Background()
 
@@ -263,8 +256,6 @@ func (a *adapter) PushManifest(repository, ref, mediaType string, payload []byte
 func (a *adapter) DeleteManifest(repository, ref string) error {
 	ctx := context.Background()
 
-	fmt.Println("DeleteManifest", repository, ref)
-
 	named, err := reference.WithName(repository)
 	if err != nil {
 		return err
@@ -304,8 +295,6 @@ func (a *adapter) DeleteManifest(repository, ref string) error {
 func (a *adapter) BlobExist(repository, d string) (exist bool, err error) {
 	ctx := context.Background()
 
-	fmt.Println("BlobExist", repository, d)
-
 	repo, err := a.getRepo(ctx, repository, d)
 	if err != nil {
 		return false, fmt.Errorf("get repo error: %v", err)
@@ -325,8 +314,6 @@ func (a *adapter) BlobExist(repository, d string) (exist bool, err error) {
 func (a *adapter) PullBlob(repository, d string) (int64, io.ReadCloser, error) {
 	ctx := context.Background()
 
-	fmt.Println("PullBlob ", repository, d)
-
 	repo, err := a.getRepo(ctx, repository, d)
 	if err != nil {
 		return 0, nil, fmt.Errorf("get repo error: %v", err)
@@ -343,19 +330,11 @@ func (a *adapter) PullBlob(repository, d string) (int64, io.ReadCloser, error) {
 	if err != nil {
 		return 0, nil, fmt.Errorf("unable to open blob: %v", err)
 	}
-	defer readSeeker.Close()
-
-	data, err := io.ReadAll(readSeeker)
-	if err != nil {
-		return 0, nil, fmt.Errorf("unable to read blob: %v", err)
-	}
-
-	return descriptor.Size, io.NopCloser(bytes.NewReader(data)), nil
+	return descriptor.Size, io.NopCloser(readSeeker), nil
 }
 
 func (a *adapter) PullBlobChunk(repository, d string, totalSize, start, end int64) (size int64, blob io.ReadCloser, err error) {
 
-	fmt.Println("PullBlobChunk ", repository, d, "total", totalSize, "start", start, "end", end)
 	ctx := context.Background()
 
 	repo, err := a.getRepo(ctx, repository, d)
@@ -375,23 +354,16 @@ func (a *adapter) PullBlobChunk(repository, d string, totalSize, start, end int6
 		return 0, nil, fmt.Errorf("unable to open blob: %v", err)
 	}
 
-	defer readSeeker.Close()
-
 	_, err = readSeeker.Seek(end-start, int(start))
 	if err != nil {
 		return 0, nil, fmt.Errorf("unable to seek blob: %v", err)
 	}
 
-	chunk, err := io.ReadAll(readSeeker)
-	if err != nil {
-		return 0, nil, fmt.Errorf("unable to read blob chunk: %v", err)
-	}
-	return descriptor.Size, io.NopCloser(bytes.NewReader(chunk)), nil
+	return descriptor.Size, io.NopCloser(readSeeker), nil
 }
 
 func (a *adapter) PushBlobChunk(repository, d string, size int64, chunk io.Reader, start, end int64, location string) (nextUploadLocation string, endRange int64, err error) {
 
-	fmt.Println("PushBlobChunk ", repository, d, "total", size, "start", start, "end", end)
 	ctx := context.Background()
 
 	repo, err := a.getRepo(ctx, repository, d)
@@ -414,7 +386,6 @@ func (a *adapter) PushBlobChunk(repository, d string, size int64, chunk io.Reade
 	}
 
 	defer writer.Close()
-
 	_, err = writer.ReadFrom(chunk)
 	if err != nil {
 		return "", 0, fmt.Errorf("unable to read from chunk: %v", err)

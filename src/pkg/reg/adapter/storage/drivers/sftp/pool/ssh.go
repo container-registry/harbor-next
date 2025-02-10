@@ -60,8 +60,6 @@ type SSHConn struct {
 	lastErr error
 
 	accessTime time.Time
-
-	sessionLimit chan struct{}
 }
 
 // NewSSHConn creates and configures new SSH connection according to the given SSH config.
@@ -133,18 +131,16 @@ func NewSSHConn(ctx context.Context, cfg SSHConfig) (*SSHConn, error) {
 			client.Close()
 		}
 	}()
-
 	clientOk = true
 
 	ctx, cancel := context.WithCancel(ctx)
-	conn := &SSHConn{
-		client:       client,
-		cfg:          cfg,
-		hash:         cfg.String(),
-		ctx:          ctx,
-		cancel:       cancel,
-		accessTime:   time.Now(),
-		sessionLimit: make(chan struct{}, cfg.MaxSessions),
+	con := &SSHConn{
+		client:     client,
+		cfg:        cfg,
+		hash:       cfg.String(),
+		ctx:        ctx,
+		cancel:     cancel,
+		accessTime: time.Now(),
 	}
 
 	// This regularly sends keepalive packets
@@ -154,21 +150,21 @@ func NewSSHConn(ctx context.Context, cfg SSHConfig) (*SSHConn, error) {
 
 		for {
 			select {
-			case <-conn.ctx.Done():
+			case <-con.ctx.Done():
 				return
 			case <-t.C:
 			}
 
 			if _, _, err := client.Conn.SendRequest("keepalive@golang.org", true, nil); err != nil {
-				conn.mu.Lock()
-				conn.lastErr = err
-				conn.mu.Unlock()
+				con.mu.Lock()
+				con.lastErr = err
+				con.mu.Unlock()
 				return
 			}
 		}
 	}()
 
-	return conn, nil
+	return con, nil
 }
 
 // Close closes a connection and all its resources.
@@ -180,48 +176,6 @@ func (c *SSHConn) Close() error {
 // Hash returns a hash string generated from the SSH config parameters.
 func (c *SSHConn) Hash() string {
 	return c.hash
-}
-
-// NewSession opens and configures a new session for this SSH connection.
-//
-// If `envs` is not nil then it will be applied to any command executed via this session.
-func (c *SSHConn) NewSession(envs map[string]string) (*ssh.Session, error) {
-	session, err := c.client.NewSession()
-	if err != nil {
-		return nil, fmt.Errorf("new session: %w", err)
-	}
-
-	for k, v := range envs {
-		if err := session.Setenv(k, v); err != nil {
-			session.Close()
-			return nil, err
-		}
-	}
-
-	return session, nil
-}
-
-// RefCount returns the reference count of this connection,
-// which can be interpreted as the number of active sessions.
-func (c *SSHConn) RefCount() int {
-	return len(c.sessionLimit)
-}
-
-// IncrRefCount increments the reference counter.
-func (c *SSHConn) IncrRefCount() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.sessionLimit <- struct{}{}
-
-	c.accessTime = time.Now()
-}
-
-// DecrRefCount decrements the reference counter.
-func (c *SSHConn) DecrRefCount() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	<-c.sessionLimit
-	c.accessTime = time.Now()
 }
 
 // AccessTime returns last access time to this connection.

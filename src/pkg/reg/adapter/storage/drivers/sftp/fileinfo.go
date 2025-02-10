@@ -1,9 +1,10 @@
 package sftp
 
 import (
-	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"os"
 	"time"
+
+	storagedriver "github.com/docker/distribution/registry/storage/driver"
 )
 
 type fileInfo struct {

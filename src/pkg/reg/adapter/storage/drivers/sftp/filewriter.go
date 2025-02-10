@@ -14,14 +14,12 @@ type fileWriter struct {
 	closed    bool
 	committed bool
 	cancelled bool
-	closer    func()
 }
 
-func newFileWriter(file *sftp.File, size int64, closer func()) *fileWriter {
+func newFileWriter(file *sftp.File, size int64) *fileWriter {
 	return &fileWriter{
-		file:   file,
-		size:   size,
-		closer: closer,
+		file: file,
+		size: size,
 	}
 }
 
@@ -48,15 +46,12 @@ func (fw *fileWriter) Close() error {
 		return fmt.Errorf("already closed")
 	}
 
-	defer func() {
-		if fw.closer == nil {
-			return
-		}
-		fw.closer()
-		fw.closed = true
-	}()
+	if err := fw.file.Close(); err != nil {
+		return err
+	}
 
-	return fw.file.Close()
+	fw.closed = true
+	return nil
 }
 
 // Cancel @todo add file delete
