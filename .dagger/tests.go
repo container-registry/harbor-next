@@ -24,6 +24,7 @@ func (m *Harbor) Lint(ctx context.Context) (string, error) {
 func (m *Harbor) lint(ctx context.Context) *dagger.Container {
 	fmt.Println("👀 Running linter.")
   m.lintAPIs(ctx)
+  m.mocksCheck(ctx)
 	m.Source = m.genAPIs(ctx)
 	linter := dag.Container().
 		From("golangci/golangci-lint:"+GOLANGCILINT_VERSION+"-alpine").

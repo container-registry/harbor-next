@@ -274,7 +274,7 @@ func (m *Harbor) registryBuilder(ctx context.Context) *dagger.File {
 		WithEnvVariable("BUILDTAGS", "include_oss include_gcs").
 		WithEnvVariable("GO111MODULE", "auto").
 		WithEnvVariable("CGO_ENABLED", "0").
-    WithWorkdir("/go/src/github.com/docker").
+		WithWorkdir("/go/src/github.com/docker").
 		WithExec([]string{"git", "clone", "-b", REGISTRY_SRC_TAG, DISTRIBUTION_SRC}).
 		WithWorkdir("distribution").
 		WithExec([]string{"git", "apply", "/harbor/.dagger/registry/redis.patch"}).
@@ -370,7 +370,7 @@ func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package
 }
 
 func (m *Harbor) buildPortal(ctx context.Context, platform Platform, pkg Package) *dagger.Directory {
-	fmt.Println("🛠️  Building Harbor Core...")
+	fmt.Println("🛠️  Building Harbor Portal...")
 	os, arch, err := parsePlatform(string(platform))
 	if err != nil {
 		log.Fatalf("Error parsing platform: %v", err)
@@ -443,4 +443,23 @@ func (m *Harbor) lintAPIs(_ context.Context) *dagger.Directory {
 		Directory("/src")
 
 	return temp
+}
+
+// Check for outdated mocks
+func (m *Harbor) mocksCheck(_ context.Context) *dagger.Directory {
+	// script to check if mocks are outdated
+	script := `
+    res=$(git status -s src/ | awk '{ printf("%s\n", $2) }' | egrep .*.go)
+    if [ -n "$res" ]; then
+      echo "Mocks of the interface are out of date..."
+      echo "$res"
+      exit 1
+    fi
+	`
+
+	return dag.Container().From("golang:latest").
+		WithMountedDirectory("/src", m.Source).
+		WithWorkdir("/src").
+		WithExec([]string{"sh", "-c", script}).
+		Directory("/src")
 }
