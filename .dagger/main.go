@@ -17,6 +17,7 @@ const (
 	REGISTRY_SRC_TAG = "v2.8.3"
 	// source of upstream distribution code
 	DISTRIBUTION_SRC = "https://github.com/distribution/distribution.git"
+	NPM_REGISTRY     = "https://registry.npmjs.org"
 )
 
 type (
@@ -26,7 +27,7 @@ type (
 
 var (
 	targetPlatforms = []Platform{"linux/arm64", "linux/amd64"}
-	packages        = []Package{"core", "jobservice", "registryctl", "registry", "portal", "cmd/exporter", "cmd/standalone-db-migrator"}
+	packages        = []Package{"core", "jobservice", "registryctl", "portal", "registry", "cmd/exporter", "cmd/standalone-db-migrator"}
 	// packages = []string{"core", "jobservice"}
 )
 
@@ -252,6 +253,7 @@ func (m *Harbor) BuildImage(ctx context.Context, platform Platform, pkg Package,
 		regBinary := m.registryBuilder(ctx)
 		buildMtd.Container = buildMtd.Container.WithFile("/usr/bin/registry_DO_NOT_USE_GC", regBinary)
 	}
+
 	return buildMtd.Container
 }
 
@@ -279,6 +281,16 @@ func (m *Harbor) registryBuilder(ctx context.Context) *dagger.File {
 }
 
 func (m *Harbor) buildImage(ctx context.Context, platform Platform, pkg Package, version string) *BuildMetadata {
+	if pkg == "portal" {
+		portal := m.buildPortal(ctx)
+		return &BuildMetadata{
+			Package:    pkg,
+			BinaryPath: "nil",
+			Container:  portal,
+			Platform:   platform,
+		}
+	}
+
 	buildMtd := m.buildBinary(ctx, platform, pkg, version)
 	img := dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(string(platform))}).
 		WithFile("/"+string(pkg), buildMtd.Container.File(buildMtd.BinaryPath))
@@ -362,27 +374,49 @@ func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package
 	}
 }
 
-func (m *Harbor) buildPortal(ctx context.Context, platform Platform, pkg Package) *dagger.Directory {
+func (m *Harbor) buildPortal(ctx context.Context) *dagger.Container {
 	fmt.Println("🛠️  Building Harbor Portal...")
-	os, arch, err := parsePlatform(string(platform))
-	if err != nil {
-		log.Fatalf("Error parsing platform: %v", err)
-	}
 
-	outputPath := fmt.Sprintf("bin/%s/%s", platform, pkg)
-	src := fmt.Sprintf("src/%s/main.go", pkg)
-	builder := dag.Container().
-		From("golang:latest").
-		WithMountedCache("/go/pkg/mod", dag.CacheVolume("go-mod-"+GO_VERSION)).
-		WithEnvVariable("GOMODCACHE", "/go/pkg/mod").
-		WithMountedCache("/go/build-cache", dag.CacheVolume("go-build-"+GO_VERSION)).
-		WithEnvVariable("GOCACHE", "/go/build-cache").
+	m.Source = m.genAPIs(ctx)
+
+	swaggerYaml := dag.Container().From("alpine:latest").
 		WithMountedDirectory("/harbor", m.Source).
 		WithWorkdir("/harbor").
-		WithEnvVariable("GOOS", os).
-		WithEnvVariable("GOARCH", arch).
-		WithExec([]string{"go", "build", "-o", outputPath, src})
-	return builder.Directory(outputPath)
+		File("api/v2.0/swagger.yaml")
+
+	LICENSE := dag.Container().From("alpine:latest").
+		WithMountedDirectory("/harbor", m.Source).
+		WithWorkdir("/harbor").
+		WithExec([]string{"ls"}).
+		File("LICENSE")
+
+	builder := dag.Container().
+		From("node:16.18.0").
+		WithMountedDirectory("/harbor", m.Source).
+		WithWorkdir("/harbor/src/portal").
+		WithFile("swagger.yaml", swaggerYaml).
+		WithEnvVariable("NPM_CONFIG_REGISTRY", NPM_REGISTRY).
+		WithExec([]string{"npm", "install", "--unsafe-perm"}).
+		WithExec([]string{"npm", "run", "generate-build-timestamp"}).
+		WithExec([]string{"node", "--max_old_space_size=2048", "node_modules/@angular/cli/bin/ng", "build", "--configuration", "production"}).
+		WithExec([]string{"npm", "install", "js-yaml@4.1.0"}).
+		WithExec([]string{"sh", "-c", fmt.Sprintf("node -e \"const yaml = require('js-yaml'); const fs = require('fs'); const swagger = yaml.load(fs.readFileSync('swagger.yaml', 'utf8')); fs.writeFileSync('swagger.json', JSON.stringify(swagger));\" ")}).
+		WithFile("dist/LICENSE", LICENSE).
+		WithWorkdir("app-swagger-ui").
+		WithExec([]string{"npm", "install", "--unsafe-perm"}).
+		WithExec([]string{"npm", "run", "build"}).
+		WithWorkdir("/harbor/src/portal")
+
+	deployer := dag.Container().From("nginx:alpine").
+		WithDirectory("/usr/share/nginx/html", builder.Directory("/harbor/src/portal/dist")).
+		WithFile("/usr/share/nginx/html", builder.File("/harbor/src/portal/swagger.json")).
+		WithDirectory("/usr/share/nginx/html", builder.Directory("/harbor/src/portal/app-swagger-ui/dist")).
+		WithExposedPort(80).
+		WithExposedPort(443).
+		WithUser("nginx").
+		WithEntrypoint([]string{"nginx", "-g", "daemon off;"})
+
+	return deployer
 }
 
 func parsePlatform(platform string) (string, string, error) {
