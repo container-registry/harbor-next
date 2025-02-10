@@ -27,23 +27,21 @@ func (m *Harbor) lint(_ context.Context) *dagger.Container {
 		From("golangci/golangci-lint:"+GOLANGCILINT_VERSION+"-alpine").
 		WithMountedCache("/lint-cache", dag.CacheVolume("/lint-cache")).
 		WithEnvVariable("GOLANGCI_LINT_CACHE", "/lint-cache").
-		WithMountedDirectory("/src", m.Source).
-		WithWorkdir("/src").
+		WithMountedDirectory("/harbor", m.Source).
+		WithWorkdir("/harbor/src").
 		WithExec([]string{"golangci-lint", "cache", "clean"})
 
 	return linter
 }
 
-func (m *Harbor) GoVulnCheck(_ context.Context) *dagger.Container {
-	fmt.Println("👀 Running linter and printing results to file golangci-lint.txt.")
-	linter := dag.Container().
-		From("golang:"+GO_VERSION+"-alpine").
-		// WithMountedCache("/lint-cache", dag.CacheVolume("/lint-cache")).
-		// WithEnvVariable("GOLANGCI_LINT_CACHE", "/lint-cache").
+// Check vulnerabilities in go-code
+func (m *Harbor) GoVulnCheck(ctx context.Context) (string, error) {
+	fmt.Println("👀 Running Go vulnerabilities check")
+	m.Source = m.genAPIs(ctx)
+	return dag.Container().
+		From("golang:alpine").
 		WithMountedDirectory("/harbor", m.Source).
 		WithWorkdir("/harbor/src").
 		WithExec([]string{"go", "install", "golang.org/x/vuln/cmd/govulncheck@latest"}).
-		Terminal()
-
-	return linter
+		WithExec([]string{"/go/bin/govulncheck", "-show", "verbose", "./..."}).Stdout(ctx)
 }
