@@ -26,7 +26,7 @@ type (
 
 var (
 	targetPlatforms = []Platform{"linux/arm64", "linux/amd64"}
-	packages        = []Package{"core", "jobservice", "registryctl", "cmd/exporter", "cmd/standalone-db-migrator"}
+	packages        = []Package{"core", "jobservice", "registryctl", "registry", "portal", "cmd/exporter", "cmd/standalone-db-migrator"}
 	// packages = []string{"core", "jobservice"}
 )
 
@@ -249,13 +249,6 @@ func (m *Harbor) BuildImage(ctx context.Context, platform Platform, pkg Package,
 			WithDirectory("/views", m.Source.Directory("src/core/views"))
 	}
 	if pkg == "registryctl" {
-		// COPY ./make/photon/registry/binary/registry /usr/bin/registry_DO_NOT_USE_GC
-		// COPY ./make/photon/registryctl/harbor_registryctl /home/harbor
-		//
-		// HEALTHCHECK CMD curl --fail -s http://localhost:8080/api/health || curl -sk --fail --key /etc/harbor/ssl/registryctl.key --cert /etc/harbor/ssl/registryctl.crt https://localhost:8443/api/health || exit 1
-		//
-		// ENTRYPOINT
-		// /home/harbor/harbor_registryctl -c /etc/registryctl/config.yml
 		regBinary := m.registryBuilder(ctx)
 		buildMtd.Container = buildMtd.Container.WithFile("/usr/bin/registry_DO_NOT_USE_GC", regBinary)
 	}
