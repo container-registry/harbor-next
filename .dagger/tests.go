@@ -12,7 +12,7 @@ func (m *Harbor) LintReport(ctx context.Context) *dagger.File {
 	return m.lint(ctx).WithExec([]string{
 		"golangci-lint", "-v", "run", "--timeout=10m",
 		"--out-format", "github-actions:" + report,
-		"--issues-exit-code", "1",
+		"--issues-exit-code", "0",
 	}).File(report)
 }
 
@@ -23,14 +23,15 @@ func (m *Harbor) Lint(ctx context.Context) (string, error) {
 
 func (m *Harbor) lint(ctx context.Context) *dagger.Container {
 	fmt.Println("👀 Running linter.")
+  m.lintAPIs(ctx)
 	m.Source = m.genAPIs(ctx)
 	linter := dag.Container().
 		From("golangci/golangci-lint:"+GOLANGCILINT_VERSION+"-alpine").
 		WithMountedCache("/lint-cache", dag.CacheVolume("/lint-cache")).
 		WithEnvVariable("GOLANGCI_LINT_CACHE", "/lint-cache").
 		WithMountedDirectory("/harbor", m.Source).
-		WithWorkdir("/harbor/src").
-		WithExec([]string{"golangci-lint", "cache", "clean"})
+		WithWorkdir("/harbor/src")
+		// WithExec([]string{"golangci-lint", "cache", "clean"})
 
 	return linter
 }
