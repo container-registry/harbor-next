@@ -432,34 +432,3 @@ func (m *Harbor) genAPIs(_ context.Context) *dagger.Directory {
 
 	return temp
 }
-
-func (m *Harbor) lintAPIs(_ context.Context) *dagger.Directory {
-	temp := dag.Container().
-		From("stoplight/spectral:6.11.1").
-		WithMountedDirectory("/src", m.Source).
-		WithWorkdir("/src").
-		WithExec([]string{"spectral", "--version"}).
-		WithExec([]string{"spectral", "lint", "./api/v2.0/swagger.yaml"}).
-		Directory("/src")
-
-	return temp
-}
-
-// Check for outdated mocks
-func (m *Harbor) mocksCheck(_ context.Context) *dagger.Directory {
-	// script to check if mocks are outdated
-	script := `
-    res=$(git status -s src/ | awk '{ printf("%s\n", $2) }' | egrep .*.go)
-    if [ -n "$res" ]; then
-      echo "Mocks of the interface are out of date..."
-      echo "$res"
-      exit 1
-    fi
-	`
-
-	return dag.Container().From("golang:latest").
-		WithMountedDirectory("/src", m.Source).
-		WithWorkdir("/src").
-		WithExec([]string{"sh", "-c", script}).
-		Directory("/src")
-}

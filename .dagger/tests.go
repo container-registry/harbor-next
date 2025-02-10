@@ -23,8 +23,8 @@ func (m *Harbor) Lint(ctx context.Context) (string, error) {
 
 func (m *Harbor) lint(ctx context.Context) *dagger.Container {
 	fmt.Println("👀 Running linter.")
-  m.lintAPIs(ctx)
-  m.mocksCheck(ctx)
+	m.lintAPIs(ctx).Sync(ctx)
+	m.mocksCheck(ctx).Sync(ctx)
 	m.Source = m.genAPIs(ctx)
 	linter := dag.Container().
 		From("golangci/golangci-lint:"+GOLANGCILINT_VERSION+"-alpine").
@@ -57,4 +57,35 @@ func (m *Harbor) GoVulnCheck(ctx context.Context) (string, error) {
 func (m *Harbor) GoVulnCheckReport(ctx context.Context) (string, error) {
 	fmt.Println("👀 Generating Vulnerability Report")
 	return m.goVulnCheck(ctx).WithExec([]string{"govulncheck", "-format", "sarif", "./..."}).Stdout(ctx)
+}
+
+func (m *Harbor) lintAPIs(_ context.Context) *dagger.Directory {
+	temp := dag.Container().
+		From("stoplight/spectral:6.11.1").
+		WithMountedDirectory("/src", m.Source).
+		WithWorkdir("/src").
+		WithExec([]string{"spectral", "--version"}).
+		WithExec([]string{"spectral", "lint", "./api/v2.0/swagger.yaml"}).
+		Directory("/src")
+
+	return temp
+}
+
+// Check for outdated mocks
+func (m *Harbor) mocksCheck(_ context.Context) *dagger.Directory {
+	// script to check if mocks are outdated
+	script := `
+    res=$(git status -s src/ | awk '{ printf("%s\n", $2) }' | egrep .*.go)
+    if [ -n "$res" ]; then
+      echo "Mocks of the interface are out of date..."
+      echo "$res"
+      exit 1
+    fi
+	`
+
+	return dag.Container().From("golang:latest").
+		WithMountedDirectory("/src", m.Source).
+		WithWorkdir("/src").
+		WithExec([]string{"sh", "-c", script}).
+		Directory("/src")
 }
