@@ -408,12 +408,14 @@ func (m *Harbor) buildPortal(ctx context.Context) *dagger.Container {
 		WithWorkdir("/harbor/src/portal")
 
 	deployer := dag.Container().From("nginx:alpine").
+		WithFile("/usr/share/nginx/html/swagger.json", builder.File("/harbor/src/portal/swagger.json")).
 		WithDirectory("/usr/share/nginx/html", builder.Directory("/harbor/src/portal/dist")).
-		WithFile("/usr/share/nginx/html", builder.File("/harbor/src/portal/swagger.json")).
 		WithDirectory("/usr/share/nginx/html", builder.Directory("/harbor/src/portal/app-swagger-ui/dist")).
-		WithExposedPort(80).
-		WithExposedPort(443).
-		WithUser("nginx").
+		WithWorkdir("/usr/share/nginx/html").
+		WithExec([]string{"ls"}).
+		WithWorkdir("/").
+		WithExposedPort(8080).
+		WithExposedPort(8443).
 		WithEntrypoint([]string{"nginx", "-g", "daemon off;"})
 
 	return deployer
