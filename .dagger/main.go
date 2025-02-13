@@ -291,6 +291,16 @@ func (m *Harbor) buildImage(ctx context.Context, platform Platform, pkg Package,
 		}
 	}
 
+	if pkg == "registry" {
+		registry := m.buildRegistry(ctx)
+		return &BuildMetadata{
+			Package:    pkg,
+			BinaryPath: "nil",
+			Container:  registry,
+			Platform:   platform,
+		}
+	}
+
 	buildMtd := m.buildBinary(ctx, platform, pkg, version)
 	img := dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(string(platform))}).
 		WithFile("/"+string(pkg), buildMtd.Container.File(buildMtd.BinaryPath))
@@ -372,6 +382,17 @@ func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package
 		Container:  builder,
 		Platform:   platform,
 	}
+}
+
+func (m *Harbor) buildRegistry(ctx context.Context) *dagger.Container {
+	fmt.Println("🛠️  Building Harbor Registry...")
+
+	regBinary := m.registryBuilder(ctx)
+	return dag.Container().
+		WithFile("/usr/bin/registry_DO_NOT_USE_GC", regBinary).
+		WithExposedPort(5000).
+		WithExposedPort(5443).
+		WithEntrypoint([]string{"/usr/bin/registry_DO_NOT_USE_GC", "serve", "/etc/registry/config.yml"})
 }
 
 func (m *Harbor) buildPortal(ctx context.Context) *dagger.Container {
