@@ -27,7 +27,7 @@ type (
 
 var (
 	targetPlatforms = []Platform{"linux/arm64", "linux/amd64"}
-	packages        = []Package{"core", "jobservice", "registryctl", "portal", "registry", "cmd/exporter", "cmd/standalone-db-migrator"}
+	packages        = []Package{"core", "jobservice", "registryctl", "portal", "registry", "nginx", "cmd/exporter", "cmd/standalone-db-migrator"}
 	// packages = []string{"core", "jobservice"}
 )
 
@@ -301,6 +301,16 @@ func (m *Harbor) buildImage(ctx context.Context, platform Platform, pkg Package,
 		}
 	}
 
+  if pkg == "nginx" {
+		nginx := m.buildNginx(ctx)
+		return &BuildMetadata{
+			Package:    pkg,
+			BinaryPath: "nil",
+			Container:  nginx,
+			Platform:   platform,
+		}
+  }
+
 	buildMtd := m.buildBinary(ctx, platform, pkg, version)
 	img := dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(string(platform))}).
 		WithFile("/"+string(pkg), buildMtd.Container.File(buildMtd.BinaryPath))
@@ -382,6 +392,15 @@ func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package
 		Container:  builder,
 		Platform:   platform,
 	}
+}
+
+func (m *Harbor) buildNginx(ctx context.Context) *dagger.Container {
+	fmt.Println("🛠️  Building Harbor Nginx...")
+
+	return dag.Container().
+    From("nginx:alpine").
+		WithExposedPort(8080).
+		WithEntrypoint([]string{"nginx", "-g", "daemon off;"})
 }
 
 func (m *Harbor) buildRegistry(ctx context.Context) *dagger.Container {
