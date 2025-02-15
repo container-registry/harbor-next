@@ -26,7 +26,7 @@ type (
 )
 
 var (
-	targetPlatforms = []Platform{"linux/arm64", "linux/amd64"}
+	targetPlatforms = []Platform{"linux/amd64"} // removing arm64 since portal, registry, nginx doesn't support arm64
 	packages        = []Package{"core", "jobservice", "registryctl", "portal", "registry", "nginx", "cmd/exporter", "cmd/standalone-db-migrator"}
 	// packages = []string{"core", "jobservice"}
 )
