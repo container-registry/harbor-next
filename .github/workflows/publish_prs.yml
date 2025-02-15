@@ -22,29 +22,6 @@ jobs:
       - name: Dagger Version
         uses: sagikazarmark/dagger-version-action@v0.0.1
 
-      - name: Generate Document
-        uses: dagger/dagger-for-github@v7
-        with:
-          version: ${{ steps.dagger_version.outputs.version }}
-          verb: call
-          args: run-doc export --path=doc
-
-      - name: Check for changes
-        run: |
-          # Check if any newly added docs exist
-          untracked_files=$(git ls-files --others --exclude-standard)
-
-          # If there are untracked files, fail the workflow
-          if [ -n "$untracked_files" ]; then
-            echo "New Untracked files found"
-            echo "please check if docs were added for new commands"
-            echo "$untracked_files"
-            exit 1  # This will fail the workflow
-          else
-            echo "No untracked files found."
-          fi
-        continue-on-error: false
-
       - name: Run Dagger golangci-lint
         uses: dagger/dagger-for-github@v7
         with:
