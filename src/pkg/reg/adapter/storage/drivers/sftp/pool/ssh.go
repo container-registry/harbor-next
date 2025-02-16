@@ -1,3 +1,17 @@
+// Copyright Project Harbor Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package sshpool
 
 import (
@@ -6,6 +20,8 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/goharbor/harbor/src/lib/log"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -60,6 +76,8 @@ type SSHConn struct {
 	lastErr error
 
 	accessTime time.Time
+
+	sessionLimit chan struct{}
 }
 
 // NewSSHConn creates and configures new SSH connection according to the given SSH config.
@@ -70,8 +88,8 @@ func NewSSHConn(ctx context.Context, cfg SSHConfig) (*SSHConn, error) {
 	if ctx == nil {
 		ctx = context.TODO()
 	}
-
 	addr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
+	log.Debugf("create a new SSH connection for %s", addr)
 
 	if cfg.MaxSessions == 0 {
 		cfg.MaxSessions = 10
@@ -100,7 +118,8 @@ func NewSSHConn(ctx context.Context, cfg SSHConfig) (*SSHConn, error) {
 			}
 		}
 
-		if cfg.Timeout != 0 {
+		if cfg.Timeout > 0 {
+			// wrap a connection
 			return &conn{c, cfg.Timeout, cfg.Timeout}, nil
 		}
 
@@ -128,19 +147,20 @@ func NewSSHConn(ctx context.Context, cfg SSHConfig) (*SSHConn, error) {
 	var clientOk bool
 	defer func() {
 		if !clientOk {
-			client.Close()
+			_ = client.Close()
 		}
 	}()
 	clientOk = true
 
 	ctx, cancel := context.WithCancel(ctx)
 	con := &SSHConn{
-		client:     client,
-		cfg:        cfg,
-		hash:       cfg.String(),
-		ctx:        ctx,
-		cancel:     cancel,
-		accessTime: time.Now(),
+		client:       client,
+		cfg:          cfg,
+		hash:         cfg.String(),
+		ctx:          ctx,
+		cancel:       cancel,
+		accessTime:   time.Now(),
+		sessionLimit: make(chan struct{}, cfg.MaxSessions),
 	}
 
 	// This regularly sends keepalive packets
@@ -183,6 +203,48 @@ func (c *SSHConn) AccessTime() time.Time {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.accessTime
+}
+
+// NewSession opens and configures a new session for this SSH connection.
+//
+// If `envs` is not nil then it will be applied to any command executed via this session.
+func (c *SSHConn) NewSession(envs map[string]string) (*ssh.Session, error) {
+	session, err := c.client.NewSession()
+	if err != nil {
+		return nil, fmt.Errorf("new session: %w", err)
+	}
+
+	for k, v := range envs {
+		if err := session.Setenv(k, v); err != nil {
+			session.Close()
+			return nil, err
+		}
+	}
+
+	return session, nil
+}
+
+// RefCount returns the reference count of this connection,
+// which can be interpreted as the number of active sessions.
+func (c *SSHConn) RefCount() int {
+	return len(c.sessionLimit)
+}
+
+// IncrRefCount increments the reference counter.
+func (c *SSHConn) IncrRefCount() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.sessionLimit <- struct{}{}
+
+	c.accessTime = time.Now()
+}
+
+// DecrRefCount decrements the reference counter.
+func (c *SSHConn) DecrRefCount() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	<-c.sessionLimit
+	c.accessTime = time.Now()
 }
 
 // Err returns an error that broke this connection.

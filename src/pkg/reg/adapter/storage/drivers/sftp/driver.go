@@ -1,9 +1,22 @@
+// Copyright Project Harbor Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package sftp
 
 import (
 	"context"
 	"fmt"
-	"github.com/pkg/sftp"
 	"io"
 	"net/url"
 	"os"
@@ -11,6 +24,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/pkg/sftp"
+
+	"github.com/goharbor/harbor/src/lib/log"
 
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/docker/distribution/registry/storage/driver/base"
@@ -23,12 +40,10 @@ import (
 
 const (
 	DriverName = "sftp"
-	//defaultConcurrency = 1
 )
 
 var sshPool = sshpool.NewPool(&sshpool.PoolConfig{
-	GCInterval: 0,
-	MaxConns:   10,
+	GCInterval: time.Minute,
 })
 
 type driver struct {
@@ -51,14 +66,16 @@ type Driver struct {
 	driver *driver
 }
 
-func (d *driver) GetContent(ctx context.Context, p string) ([]byte, error) {
+func (d *driver) GetContent(_ context.Context, p string) ([]byte, error) {
+	log.Debugf("get content of %s", p)
+
 	var err error
-	session, err := d.getSFTP()
+	session, release, err := d.getSFTP()
 	if err != nil {
-		_ = session.Close()
 		return nil, fmt.Errorf("reader %s sftp session failed: %v", p, err)
 	}
 
+	defer release()
 	file, err := session.Open(d.addBasePath(p))
 
 	if err != nil {
@@ -69,7 +86,10 @@ func (d *driver) GetContent(ctx context.Context, p string) ([]byte, error) {
 		return nil, err
 	}
 
-	defer file.Close()
+	defer func() {
+		// session closes by file
+		_ = file.Close()
+	}()
 
 	data, err := io.ReadAll(file)
 	if err != nil {
@@ -78,16 +98,18 @@ func (d *driver) GetContent(ctx context.Context, p string) ([]byte, error) {
 		}
 		return nil, err
 	}
-
 	return data, err
 }
 
-func (d *driver) PutContent(ctx context.Context, p string, contents []byte) error {
-	session, err := d.getSFTP()
+func (d *driver) PutContent(_ context.Context, p string, contents []byte) error {
+	log.Debugf("put content for %s with length %d", p, len(contents))
+
+	session, release, err := d.getSFTP()
 	if err != nil {
 		return fmt.Errorf("putcontent %s get sftp session failed: %v", p, err)
 	}
 
+	defer release()
 	p = d.addBasePath(p)
 
 	dir := path.Dir(p)
@@ -103,15 +125,19 @@ func (d *driver) PutContent(ctx context.Context, p string, contents []byte) erro
 		return fmt.Errorf("putcontent: file create %s error: %v", p, err)
 	}
 
-	defer file.Close()
+	// session closes by file
+	defer func() {
+		_ = file.Close()
+	}()
 	_, err = file.Write(contents)
 	return err
 }
 
 func (d *driver) Reader(_ context.Context, p string, offset int64) (io.ReadCloser, error) {
+	log.Debugf("reader for %s with offset %d", p, offset)
 
 	var err error
-	session, err := d.getSFTP()
+	session, release, err := d.getSFTP()
 	if err != nil {
 		return nil, fmt.Errorf("reader %s sftp session failed: %v", p, err)
 	}
@@ -136,12 +162,14 @@ func (d *driver) Reader(_ context.Context, p string, offset int64) (io.ReadClose
 		return nil, storagedriver.InvalidOffsetError{Path: p, Offset: offset, DriverName: DriverName}
 	}
 
-	return file, nil
+	//
+	return sshpool.NewCloser(file, release), nil
 }
 
-func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver.FileWriter, error) {
+func (d *driver) Writer(_ context.Context, p string, a bool) (storagedriver.FileWriter, error) {
+	log.Debugf("writer for %s with append %v", p, a)
 
-	session, err := d.getSFTP()
+	session, release, err := d.getSFTP()
 	if err != nil {
 		return nil, fmt.Errorf("writer %s get sftp session failed: %v", p, err)
 	}
@@ -154,25 +182,12 @@ func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver
 		return nil, fmt.Errorf("unable to create directory %s: %v", dir, err)
 	}
 
-	var offset int64
+	var (
+		offset int64
+		file   *sftp.File
+	)
 
-	var file *sftp.File
-
-	if !append {
-
-		file, err = session.OpenFile(p, os.O_RDWR|os.O_CREATE|os.O_TRUNC)
-		if err != nil {
-			session.Close()
-			return nil, fmt.Errorf("open %s: %v", p, err)
-		}
-
-		err := file.Truncate(0)
-		if err != nil {
-			_ = file.Close()
-			return nil, err
-		}
-	} else {
-
+	if a {
 		file, err = session.OpenFile(p, os.O_RDWR|os.O_APPEND)
 		if err != nil {
 			_ = session.Close()
@@ -185,20 +200,40 @@ func (d *driver) Writer(_ context.Context, p string, append bool) (storagedriver
 			return nil, err
 		}
 		offset = n
+	} else {
+
+		file, err = session.OpenFile(p, os.O_RDWR|os.O_CREATE|os.O_TRUNC)
+		if err != nil {
+			_ = session.Close()
+			return nil, fmt.Errorf("open %s: %v", p, err)
+		}
+
+		err = file.Truncate(0)
+		if err != nil {
+			_ = file.Close()
+			return nil, err
+		}
 	}
 
 	// connection closes with the file
-	return newFileWriter(file, offset), nil
+	return newFileWriter(file, offset, release), nil
 }
 
 func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, error) {
+	log.Debugf("stat of %s", p)
+	defer func() {
+		log.Debugf("stat of %s acquired", p)
+	}()
 
-	session, err := d.getSFTP()
+	session, release, err := d.getSFTP()
 	if err != nil {
 		return nil, fmt.Errorf("stat %s get sftp session failed: %v", p, err)
 	}
 
-	defer session.Close()
+	defer func() {
+		release()
+		_ = session.Close()
+	}()
 
 	p = d.addBasePath(p)
 
@@ -217,13 +252,17 @@ func (d *driver) Stat(_ context.Context, p string) (storagedriver.FileInfo, erro
 }
 
 func (d *driver) List(_ context.Context, p string) ([]string, error) {
+	log.Debugf("list of %s", p)
 
-	session, err := d.getSFTP()
+	session, release, err := d.getSFTP()
 	if err != nil {
 		return nil, fmt.Errorf("list %s get sftp session failed: %v", p, err)
 	}
 
-	defer session.Close()
+	defer func() {
+		release()
+		_ = session.Close()
+	}()
 
 	pn := d.addBasePath(p)
 	files, err := session.ReadDir(pn)
@@ -244,13 +283,17 @@ func (d *driver) List(_ context.Context, p string) ([]string, error) {
 }
 
 func (d *driver) Move(_ context.Context, sourcePath string, destPath string) error {
+	log.Debugf("move %s to %s", sourcePath, destPath)
 
-	session, err := d.getSFTP()
+	session, release, err := d.getSFTP()
 	if err != nil {
 		return fmt.Errorf("move %s get sftp session failed: %v", sourcePath, err)
 	}
 
-	defer session.Close()
+	defer func() {
+		release()
+		_ = session.Close()
+	}()
 	//
 	sourcePath = d.addBasePath(sourcePath)
 	destPath = d.addBasePath(destPath)
@@ -263,12 +306,17 @@ func (d *driver) Move(_ context.Context, sourcePath string, destPath string) err
 }
 
 func (d *driver) Delete(_ context.Context, p string) error {
+	log.Debugf("delete %s", p)
 
-	session, err := d.getSFTP()
+	session, release, err := d.getSFTP()
 	if err != nil {
 		return fmt.Errorf("delete %s get sftp session failed: %v", p, err)
 	}
-	defer session.Close()
+
+	defer func() {
+		release()
+		_ = session.Close()
+	}()
 	//
 
 	p = d.addBasePath(p)
@@ -282,11 +330,13 @@ func (d *driver) Delete(_ context.Context, p string) error {
 	return nil
 }
 
-func (d *driver) URLFor(_ context.Context, _ string, _ map[string]interface{}) (string, error) {
+func (d *driver) URLFor(_ context.Context, p string, _ map[string]interface{}) (string, error) {
+	log.Debugf("URL for %s", p)
 	return "", fmt.Errorf("URLFor is not implemented")
 }
 
 func (d *driver) Walk(ctx context.Context, p string, f storagedriver.WalkFn) error {
+	log.Debugf("walk %s", p)
 	return storagedriver.WalkFallback(ctx, d, p, func(fi storagedriver.FileInfo) error {
 		// manipulate file info to trim base path, harbor should know nothing about it
 		return f(fileInfoMock{
@@ -344,29 +394,23 @@ func New(regModel *model.Registry) (storagedriver.StorageDriver, error) {
 		basePath:  u.Path,
 	}
 
-	//return &Driver{
-	//	driver: d,
-	//	baseEmbed: baseEmbed{
-	//		Base: base.Base{
-	//			StorageDriver: base.NewRegulator(d, 1),
-	//		},
-	//	},
-	//}, nil
-
 	return d, nil
 }
 
-func (d *driver) Health(ctx context.Context) error {
-	session, err := d.getSFTP()
+func (d *driver) Health(_ context.Context) error {
+	session, release, err := d.getSFTP()
 	if err != nil {
 		return err
 	}
-	defer session.Close()
+	defer func() {
+		release()
+		_ = session.Close()
+	}()
 	_, err = session.Getwd()
 	return err
 }
 
-func (d *driver) getSFTP() (*sftp.Client, error) {
+func (d *driver) getSFTP() (*sftp.Client, func(), error) {
 	return sshPool.NewSFTPSession(d.sshConfig)
 }
 

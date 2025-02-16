@@ -12,10 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package health
+package sshpool
 
-import "context"
+import "io"
 
-type Checker interface {
-	Health(ctx context.Context) error
+type Closer struct {
+	reader   io.ReadCloser
+	callback func()
 }
+
+func NewCloser(reader io.ReadCloser, callback func()) *Closer {
+	return &Closer{reader: reader, callback: callback}
+}
+
+func (c Closer) Read(p []byte) (n int, err error) {
+	return c.reader.Read(p)
+}
+
+func (c Closer) Close() error {
+	defer c.callback()
+	return c.reader.Close()
+}
+
+var _ io.ReadCloser = (*Closer)(nil)

@@ -1,21 +1,37 @@
+// Copyright Project Harbor Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package storage
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"strings"
+	"time"
+
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/reference"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
+	"github.com/opencontainers/go-digest"
+
 	"github.com/goharbor/harbor/src/common/utils"
 	regadapter "github.com/goharbor/harbor/src/pkg/reg/adapter"
 	"github.com/goharbor/harbor/src/pkg/reg/adapter/storage/health"
 	"github.com/goharbor/harbor/src/pkg/reg/filter"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
-	"github.com/opencontainers/go-digest"
-	"io"
-	"strings"
-	"time"
 )
 
 var (
@@ -210,7 +226,6 @@ func (a *adapter) PullManifest(repository, ref string, _ ...string) (distributio
 
 // PushManifest manifests are blobs actually
 func (a *adapter) PushManifest(repository, ref, mediaType string, payload []byte) (string, error) {
-
 	ctx := context.Background()
 
 	repo, err := a.getRepo(ctx, repository, ref)
@@ -333,7 +348,7 @@ func (a *adapter) PullBlob(repository, d string) (int64, io.ReadCloser, error) {
 	return descriptor.Size, io.NopCloser(readSeeker), nil
 }
 
-func (a *adapter) PullBlobChunk(repository, d string, totalSize, start, end int64) (size int64, blob io.ReadCloser, err error) {
+func (a *adapter) PullBlobChunk(repository, d string, _, start, end int64) (size int64, blob io.ReadCloser, err error) {
 
 	ctx := context.Background()
 
@@ -362,7 +377,7 @@ func (a *adapter) PullBlobChunk(repository, d string, totalSize, start, end int6
 	return descriptor.Size, io.NopCloser(readSeeker), nil
 }
 
-func (a *adapter) PushBlobChunk(repository, d string, size int64, chunk io.Reader, start, end int64, location string) (nextUploadLocation string, endRange int64, err error) {
+func (a *adapter) PushBlobChunk(repository, d string, size int64, chunk io.Reader, start, _ int64, location string) (nextUploadLocation string, endRange int64, err error) {
 
 	ctx := context.Background()
 
@@ -482,7 +497,6 @@ func (a *adapter) PrepareForPush(_ []*model.Resource) error {
 }
 
 func (a *adapter) HealthCheck() (string, error) {
-
 	checker, ok := a.driver.(health.Checker)
 	if !ok {
 		return model.Unhealthy, nil

@@ -1,11 +1,28 @@
+// Copyright Project Harbor Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package sshpool
 
 import (
 	"context"
 	"fmt"
-	"github.com/pkg/sftp"
 	"io"
-	"log"
+
+	"github.com/pkg/sftp"
+
+	"github.com/goharbor/harbor/src/lib/log"
+
 	"sort"
 	"sync"
 	"time"
@@ -15,10 +32,6 @@ import (
 type PoolConfig struct {
 	// GCInterval specifies the frequency of Garbage Collector.
 	GCInterval time.Duration
-
-	// MaxConns is a maximum number of connections. GC will remove
-	// the oldest connection from the pool if this limit is exceeded.
-	MaxConns int
 }
 
 type SSHPool struct {
@@ -40,9 +53,6 @@ func NewPool(cfg *PoolConfig) *SSHPool {
 	if cfg == nil {
 		cfg = &PoolConfig{GCInterval: 30 * time.Second}
 	}
-	if cfg.MaxConns == 0 {
-		cfg.MaxConns = 5
-	}
 
 	p := SSHPool{
 		PoolConfig: *cfg,
@@ -54,7 +64,6 @@ func NewPool(cfg *PoolConfig) *SSHPool {
 	if p.GCInterval > 0 {
 		go p.collect()
 	}
-
 	return &p
 }
 
@@ -84,10 +93,6 @@ func (p *SSHPool) collect() {
 				}
 			}
 
-			if p.MaxConns == 0 || len(p.table) <= p.MaxConns {
-				return out
-			}
-
 			// Releasing the oldest connections
 			s := make([]*SSHConn, 0, len(p.table))
 			for _, c := range p.table {
@@ -96,8 +101,12 @@ func (p *SSHPool) collect() {
 
 			sort.SliceStable(s, func(i, j int) bool { return s[i].AccessTime().Unix() > s[j].AccessTime().Unix() })
 
-			for _, c := range s[p.MaxConns:] {
-
+			for _, c := range s {
+				if c.RefCount() > 0 {
+					log.Debugf("skip from cleaning because connection has still %d active sessions", c.RefCount())
+					// do not gc connections with open sessions
+					continue
+				}
 				delete(p.table, c.Hash())
 				out = append(out, c)
 			}
@@ -105,32 +114,37 @@ func (p *SSHPool) collect() {
 		}()
 
 		for _, c := range needClose {
-			log.Println("closing connection automatically")
+			log.Debugf("closing connection automatically")
 			_ = c.Close()
 		}
 	}
 }
 
-// NewSession creates and configures a new session reusing an existing
+// NewSFTPSession creates and configures a new session reusing an existing
 // SSH connection if possible.
-//
+// IMPORTANT release function does not close the session, close it manually expplicitly or via readerCloser
 // If no connection exists, or there are any problems with connection
 // a new connection will be created and added to the pool. After this
 // a new session will be set up.
-func (p *SSHPool) NewSFTPSession(cfg *SSHConfig) (*sftp.Client, error) {
+func (p *SSHPool) NewSFTPSession(cfg *SSHConfig) (*sftp.Client, func(), error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	var err error
 	con, found := p.table[cfg.String()]
 	if !found {
+		// create a new connection if limit is full
 		con, err = NewSSHConn(p.ctx, *cfg)
 		if err != nil {
-			return nil, fmt.Errorf("new sftp conn: %w", err)
+			return nil, nil, fmt.Errorf("new sftp conn: %w", err)
 		}
 		p.table[con.Hash()] = con
 	}
 
+	// increment and maybe sleep
+	con.IncrRefCount()
+
+	// create sftp session here
 	session, err := sftp.NewClient(con.client,
 		sftp.UseConcurrentWrites(false),
 		sftp.UseConcurrentReads(false),
@@ -138,11 +152,12 @@ func (p *SSHPool) NewSFTPSession(cfg *SSHConfig) (*sftp.Client, error) {
 
 	if err != nil {
 		//failed, give up and decrement
-		return nil, fmt.Errorf("new client error: %w", err)
+		con.DecrRefCount()
+		return nil, nil, fmt.Errorf("new client error: %w", err)
 	}
 
 	// all good, provide session and it's closer
-	return session, nil
+	return session, con.DecrRefCount, nil
 }
 
 // CloseConn closes and removes a connection corresponding to the given config
@@ -161,7 +176,6 @@ func (p *SSHPool) CloseConn(cfg *SSHConfig) {
 
 // Close closes the pool, thus destroying all connections.
 // The pool cannot be used anymore after this call.
-// @todo finalizer?
 func (p *SSHPool) Close() {
 	p.cancel()
 
