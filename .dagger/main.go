@@ -26,7 +26,7 @@ type (
 )
 
 var (
-	targetPlatforms = []Platform{"linux/amd64"} // removing arm64 since portal, registry, nginx doesn't support arm64
+	targetPlatforms = []Platform{"linux/amd64", "linux/arm64"}
 	packages        = []Package{"core", "jobservice", "registryctl", "portal", "registry", "nginx", "cmd/exporter", "cmd/standalone-db-migrator"}
 	// packages = []string{"core", "jobservice"}
 )
@@ -281,46 +281,48 @@ func (m *Harbor) registryBuilder(ctx context.Context) *dagger.File {
 }
 
 func (m *Harbor) buildImage(ctx context.Context, platform Platform, pkg Package, version string) *BuildMetadata {
+	var (
+		buildMtd *BuildMetadata
+		img      *dagger.Container
+	)
+
 	if pkg == "portal" {
-		portal := m.buildPortal(ctx)
-		return &BuildMetadata{
+		img = m.buildPortal(ctx, platform)
+		buildMtd = &BuildMetadata{
 			Package:    pkg,
 			BinaryPath: "nil",
-			Container:  portal,
+			Container:  img,
 			Platform:   platform,
 		}
-	}
-
-	if pkg == "registry" {
-		registry := m.buildRegistry(ctx)
-		return &BuildMetadata{
+	} else if pkg == "registry" {
+		img = m.buildRegistry(ctx, platform)
+		buildMtd = &BuildMetadata{
 			Package:    pkg,
 			BinaryPath: "nil",
-			Container:  registry,
+			Container:  img,
 			Platform:   platform,
 		}
-	}
-
-  if pkg == "nginx" {
-		nginx := m.buildNginx(ctx)
-		return &BuildMetadata{
+	} else if pkg == "nginx" {
+		img = m.buildNginx(ctx, platform)
+		buildMtd = &BuildMetadata{
 			Package:    pkg,
 			BinaryPath: "nil",
-			Container:  nginx,
+			Container:  img,
 			Platform:   platform,
 		}
-  }
-
-	buildMtd := m.buildBinary(ctx, platform, pkg, version)
-	img := dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(string(platform))}).
-		WithFile("/"+string(pkg), buildMtd.Container.File(buildMtd.BinaryPath))
-	if pkg == "jobservice" {
-		img = img.WithEntrypoint([]string{"/" + string(pkg), "-c", "/etc/jobservice/config.yml"})
-	} else if pkg == "registryctl" {
-		img = img.WithEntrypoint([]string{"/" + string(pkg), "-c", "/etc/registryctl/config.yml"})
 	} else {
-		img = img.WithEntrypoint([]string{"/" + string(pkg)})
+		buildMtd = m.buildBinary(ctx, platform, pkg, version)
+		img = dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(string(platform))}).
+			WithFile("/"+string(pkg), buildMtd.Container.File(buildMtd.BinaryPath))
+
+		// Set entrypoint
+		if pkg == "jobservice" {
+			img = img.WithEntrypoint([]string{"/" + string(pkg), "-c", "/etc/jobservice/config.yml"})
+		} else if pkg == "registryctl" {
+			img = img.WithEntrypoint([]string{"/" + string(pkg), "-c", "/etc/registryctl/config.yml"})
+		}
 	}
+
 	buildMtd.Container = img
 	return buildMtd
 }
@@ -394,27 +396,27 @@ func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package
 	}
 }
 
-func (m *Harbor) buildNginx(ctx context.Context) *dagger.Container {
+func (m *Harbor) buildNginx(ctx context.Context, platform Platform) *dagger.Container {
 	fmt.Println("🛠️  Building Harbor Nginx...")
 
-	return dag.Container().
-    From("nginx:alpine").
+	return dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(string(platform))}).
+		From("nginx:alpine").
 		WithExposedPort(8080).
 		WithEntrypoint([]string{"nginx", "-g", "daemon off;"})
 }
 
-func (m *Harbor) buildRegistry(ctx context.Context) *dagger.Container {
+func (m *Harbor) buildRegistry(ctx context.Context, platform Platform) *dagger.Container {
 	fmt.Println("🛠️  Building Harbor Registry...")
 
 	regBinary := m.registryBuilder(ctx)
-	return dag.Container().
+	return dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(string(platform))}).
 		WithFile("/usr/bin/registry_DO_NOT_USE_GC", regBinary).
 		WithExposedPort(5000).
 		WithExposedPort(5443).
 		WithEntrypoint([]string{"/usr/bin/registry_DO_NOT_USE_GC", "serve", "/etc/registry/config.yml"})
 }
 
-func (m *Harbor) buildPortal(ctx context.Context) *dagger.Container {
+func (m *Harbor) buildPortal(ctx context.Context, platform Platform) *dagger.Container {
 	fmt.Println("🛠️  Building Harbor Portal...")
 
 	m.Source = m.genAPIs(ctx)
@@ -447,7 +449,7 @@ func (m *Harbor) buildPortal(ctx context.Context) *dagger.Container {
 		WithExec([]string{"npm", "run", "build"}).
 		WithWorkdir("/harbor/src/portal")
 
-	deployer := dag.Container().From("nginx:alpine").
+	deployer := dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(string(platform))}).From("nginx:alpine").
 		WithFile("/usr/share/nginx/html/swagger.json", builder.File("/harbor/src/portal/swagger.json")).
 		WithDirectory("/usr/share/nginx/html", builder.Directory("/harbor/src/portal/dist")).
 		WithDirectory("/usr/share/nginx/html", builder.Directory("/harbor/src/portal/app-swagger-ui/dist")).
