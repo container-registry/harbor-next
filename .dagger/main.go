@@ -8,6 +8,11 @@ import (
 	"strings"
 )
 
+// to-do: update registry to v3
+// to-do: add documentation
+// to-do: add trivy-adapter
+// to-do: stop usage of shell things. No shell spawning
+
 const (
 	GOLANGCILINT_VERSION = "v1.61.0"
 	GO_VERSION           = "latest"
