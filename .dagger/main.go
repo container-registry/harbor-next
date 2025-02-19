@@ -23,6 +23,11 @@ const (
 	// source of upstream distribution code
 	DISTRIBUTION_SRC = "https://github.com/distribution/distribution.git"
 	NPM_REGISTRY     = "https://registry.npmjs.org"
+	// trivy-adapter
+	TRIVYVERSION               = "v0.56.1"
+	TRIVYADAPTERVERSION        = "v0.32.0-rc.1"
+	TRIVY_DOWNLOAD_URL         = "https://github.com/aquasecurity/trivy/releases/download/$(TRIVYVERSION)/trivy_$(TRIVYVERSION:v%=%)_Linux-64bit.tar.gz"
+	TRIVY_ADAPTER_DOWNLOAD_URL = "https://github.com/goharbor/harbor-scanner-trivy/archive/refs/tags/$(TRIVYADAPTERVERSION).tar.gz"
 )
 
 type (
@@ -291,7 +296,15 @@ func (m *Harbor) buildImage(ctx context.Context, platform Platform, pkg Package,
 		img      *dagger.Container
 	)
 
-	if pkg == "portal" {
+	if pkg == "trivy-adapter" {
+		img = m.buildTrivyAdapter(ctx, platform)
+		buildMtd = &BuildMetadata{
+			Package:    pkg,
+			BinaryPath: "nil",
+			Container:  img,
+			Platform:   platform,
+		}
+	} else if pkg == "portal" {
 		img = m.buildPortal(ctx, platform)
 		buildMtd = &BuildMetadata{
 			Package:    pkg,
@@ -418,6 +431,31 @@ func (m *Harbor) buildRegistry(ctx context.Context, platform Platform) *dagger.C
 		WithFile("/usr/bin/registry_DO_NOT_USE_GC", regBinary).
 		WithExposedPort(5000).
 		WithExposedPort(5443).
+		WithEntrypoint([]string{"/usr/bin/registry_DO_NOT_USE_GC", "serve", "/etc/registry/config.yml"})
+}
+
+func (m *Harbor) buildTrivyAdapter(ctx context.Context, platform Platform) *dagger.Container {
+	fmt.Println("🛠️  Building Trivy Adapter...")
+
+  trivyBinaries := dag.Container().From("golang:1.23.2").
+		WithWorkdir("/go/src/github.com/goharbor/").
+		WithExec([]string{"git", "clone", "-b", TRIVYADAPTERVERSION, "https://github.com/goharbor/harbor-scanner-trivy.git"}).
+		WithWorkdir("harbor-scanner-trivy").
+		WithEnvVariable("GOMODCACHE", "/go/pkg/mod").
+		WithMountedCache("/go/build-cache", dag.CacheVolume("go-build-"+GO_VERSION)).
+		WithEnvVariable("GOCACHE", "/go/build-cache").
+		WithEnvVariable("DISTRIBUTION_DIR", "/go/src/github.com/docker/distribution").
+		WithEnvVariable("BUILDTAGS", "include_oss include_gcs").
+		WithEnvVariable("GO111MODULE", "auto").
+		WithEnvVariable("CGO_ENABLED", "0").
+		WithExec([]string{"go", "build", "-o", "scanner-trivy", "cmd/scanner-trivy/main.go"}).
+    Directory("scanner-trivy")
+
+  // trivyBinary
+
+	return dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(string(platform))}).
+		WithExposedPort(8080).
+		WithExposedPort(8443).
 		WithEntrypoint([]string{"/usr/bin/registry_DO_NOT_USE_GC", "serve", "/etc/registry/config.yml"})
 }
 
