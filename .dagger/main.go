@@ -24,10 +24,14 @@ const (
 	DISTRIBUTION_SRC = "https://github.com/distribution/distribution.git"
 	NPM_REGISTRY     = "https://registry.npmjs.org"
 	// trivy-adapter
-	TRIVYVERSION               = "v0.56.1"
-	TRIVYADAPTERVERSION        = "v0.32.0-rc.1"
-	TRIVY_DOWNLOAD_URL         = "https://github.com/aquasecurity/trivy/releases/download/$(TRIVYVERSION)/trivy_$(TRIVYVERSION:v%=%)_Linux-64bit.tar.gz"
-	TRIVY_ADAPTER_DOWNLOAD_URL = "https://github.com/goharbor/harbor-scanner-trivy/archive/refs/tags/$(TRIVYADAPTERVERSION).tar.gz"
+	TRIVYVERSION        = "v0.56.1"
+	TRIVYADAPTERVERSION = "v0.32.0-rc.1"
+)
+
+var (
+	TRIVY_VERSION_NO_PREFIX    = strings.TrimPrefix(TRIVYVERSION, "v")
+	TRIVY_DOWNLOAD_URL         = "https://github.com/aquasecurity/trivy/releases/download/" + TRIVYVERSION + "/trivy_" + TRIVY_VERSION_NO_PREFIX + "_Linux-64bit.tar.gz"
+	TRIVY_ADAPTER_DOWNLOAD_URL = "https://github.com/goharbor/harbor-scanner-trivy/archive/refs/tags/" + TRIVYADAPTERVERSION + ".tar.gz"
 )
 
 type (
@@ -437,7 +441,7 @@ func (m *Harbor) buildRegistry(ctx context.Context, platform Platform) *dagger.C
 func (m *Harbor) buildTrivyAdapter(ctx context.Context, platform Platform) *dagger.Container {
 	fmt.Println("🛠️  Building Trivy Adapter...")
 
-  trivyBinaries := dag.Container().From("golang:1.23.2").
+	trivyBinDir := dag.Container().From("golang:1.23.2").
 		WithWorkdir("/go/src/github.com/goharbor/").
 		WithExec([]string{"git", "clone", "-b", TRIVYADAPTERVERSION, "https://github.com/goharbor/harbor-scanner-trivy.git"}).
 		WithWorkdir("harbor-scanner-trivy").
@@ -448,15 +452,24 @@ func (m *Harbor) buildTrivyAdapter(ctx context.Context, platform Platform) *dagg
 		WithEnvVariable("BUILDTAGS", "include_oss include_gcs").
 		WithEnvVariable("GO111MODULE", "auto").
 		WithEnvVariable("CGO_ENABLED", "0").
-		WithExec([]string{"go", "build", "-o", "scanner-trivy", "cmd/scanner-trivy/main.go"}).
-    Directory("scanner-trivy")
+		WithExec([]string{"go", "build", "-o", "./binary/scanner-trivy", "cmd/scanner-trivy/main.go"}).
+		WithExec([]string{"wget", "-O", "trivyDownload", TRIVY_DOWNLOAD_URL}).
+		WithExec([]string{"tar", "-zxv", "-f", "trivyDownload"}).
+		WithExec([]string{"cp", "trivy", "./binary/trivy"}).
+		Directory("binary")
 
-  // trivyBinary
+	trivyAdapter := trivyBinDir.File("./trivy")
+	trivyScanner := trivyBinDir.File("./scanner-trivy")
 
 	return dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(string(platform))}).
+		From("aquasec/trivy:"+TRIVY_VERSION_NO_PREFIX).
+		WithFile("/home/scanner/bin/scanner-trivy", trivyScanner).
+		WithFile("/usr/local/bin/trivy", trivyAdapter).
+		// ENV TRIVY_VERSION=${trivy_version}
+		WithEnvVariable("TRIVY_VERSION", TRIVYVERSION).
 		WithExposedPort(8080).
 		WithExposedPort(8443).
-		WithEntrypoint([]string{"/usr/bin/registry_DO_NOT_USE_GC", "serve", "/etc/registry/config.yml"})
+		WithEntrypoint([]string{"/home/scanner/bin/scanner-trivy"})
 }
 
 func (m *Harbor) buildPortal(ctx context.Context, platform Platform) *dagger.Container {
