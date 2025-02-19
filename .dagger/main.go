@@ -32,7 +32,7 @@ type (
 
 var (
 	targetPlatforms = []Platform{"linux/amd64", "linux/arm64"}
-	packages        = []Package{"core", "jobservice", "registryctl", "portal", "registry", "nginx", "cmd/exporter", "cmd/standalone-db-migrator"}
+	packages        = []Package{"core", "jobservice", "registryctl", "portal", "registry", "nginx", "cmd/exporter", "cmd/standalone-db-migrator", "trivy-adapter"}
 	// packages = []string{"core", "jobservice"}
 )
 
