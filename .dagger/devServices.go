@@ -11,6 +11,7 @@ import (
 // jobservice: Background jobs, which require the core service to be available.
 // proxy: The last service to start as it routes traffic to all the other services.
 
+
 func (m *Harbor) DbService() *dagger.Service {
 	postgres := dag.Container().From("goharbor/harbor-db:dev").
 		WithExposedPort(5432).
@@ -26,3 +27,15 @@ func (m *Harbor) RedisService() *dagger.Service {
 		AsService()
 }
 
+func (m *Harbor) RegistryService(ctx context.Context) *dagger.Service {
+	regConfigDir := m.Source.Directory(".dagger/config/registry")
+
+	// 5001 is can be used to debug according to config
+	reg := m.buildRegistry(ctx, DEV_PLATFORM).
+		WithMountedDirectory("/etc/registry", regConfigDir).
+		WithServiceBinding("redis", m.RedisService()).
+		WithExposedPort(5000).
+		// WithExposedPort(5001).
+		AsService()
+	return reg
+}
