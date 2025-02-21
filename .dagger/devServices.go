@@ -19,3 +19,10 @@ func (m *Harbor) DbService() *dagger.Service {
 	return postgres
 }
 
+func (m *Harbor) RedisService() *dagger.Service {
+	return dag.Container().
+		From("goharbor/redis-photon:dev").
+		WithExposedPort(6379).
+		AsService()
+}
+
