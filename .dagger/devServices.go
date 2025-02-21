@@ -15,6 +15,23 @@ import (
 // portal: The user-facing portal can be started after core.
 // proxy: The last service to start as it routes traffic to all the other services.
 
+func (m *Harbor) JobService(ctx context.Context) *dagger.Service {
+	jobSrvConfig := m.Source.File(".dagger/config/jobservice/config.yml")
+	envFile := m.Source.File(".dagger/config/jobservice/env")
+	run_script := m.Source.File(".dagger/config/run_env.sh")
+
+	regCtl := m.BuildImage(ctx, DEV_PLATFORM, "jobservice", DEV_VERSION).
+		WithMountedFile("/etc/jobservice/config.yml", jobSrvConfig).
+		WithMountedFile("/envFile", envFile).
+		WithMountedFile("/run_core", run_script).
+    // JobService needs core to be up but this creates infinite loop
+		WithServiceBinding("core", m.CoreService(ctx)).
+		WithExposedPort(8080).
+    WithEntrypoint([]string{"/run_script", "/jobservice"}).
+		AsService()
+	return regCtl
+}
+
 // currently not working as expected don't know why should figure out
 func (m *Harbor) CoreService(ctx context.Context) *dagger.Service {
 	coreConfig := m.Source.File(".dagger/config/core/app.conf")
