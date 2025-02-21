@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"dagger/harbor/internal/dagger"
+	"fmt"
+	"os"
+	"strings"
 )
 
 // registryctl: Registry controller for interacting with the registry.
@@ -11,6 +15,27 @@ import (
 // portal: The user-facing portal can be started after core.
 // proxy: The last service to start as it routes traffic to all the other services.
 
+// currently not working as expected don't know why should figure out
+func (m *Harbor) CoreService(ctx context.Context) *dagger.Service {
+	coreConfig := m.Source.File(".dagger/config/core/app.conf")
+	envFile := m.Source.File(".dagger/config/core/env")
+	run_script := m.Source.File(".dagger/config/run_env.sh")
+
+	core := m.BuildImage(ctx, DEV_PLATFORM, "core", DEV_VERSION).
+		WithMountedFile("/etc/core/app.conf", coreConfig).
+		WithMountedFile("/envFile", envFile).
+		WithMountedFile("/run_script", run_script).
+		WithServiceBinding("redis", m.RedisService(ctx)).
+		WithServiceBinding("registry", m.RegistryService(ctx)).
+		WithServiceBinding("postgresql", m.DbService(ctx)).
+		// WithServiceBinding("jobservice", m.JobService(ctx)).
+		WithExposedPort(8080).
+		WithExposedPort(80).
+    WithEntrypoint([]string{"/run_script", "/core"}).
+		AsService()
+
+	return core
+}
 
 func (m *Harbor) RegistryCtlService(ctx context.Context) *dagger.Service {
 	regConfigDir := m.Source.Directory(".dagger/config/registry")
