@@ -1,4 +1,3 @@
-# edited env file for dev
 CONFIG_PATH=/etc/core/app.conf
 UAA_CA_ROOT=/etc/core/certificates/uaa_ca.pem
 _REDIS_URL_CORE=redis://redis:6379?idle_timeout_seconds=30
@@ -23,8 +22,8 @@ PORTAL_URL=http://portal:8080
 TOKEN_SERVICE_URL=http://core:8080/service/token
 HARBOR_ADMIN_PASSWORD=Harbor12345
 MAX_JOB_WORKERS=10
-CORE_SECRET=Harbor12345
-JOBSERVICE_SECRET=Harbor12345
+CORE_SECRET=D1fWkYKg6OQgISeP
+JOBSERVICE_SECRET=gVQJX0AlVjstElN8
 WITH_TRIVY=False
 CORE_URL=http://core:8080
 CORE_LOCAL_URL=http://127.0.0.1:8080
@@ -35,10 +34,8 @@ READ_ONLY=false
 RELOAD_KEY=
 REGISTRY_CONTROLLER_URL=http://registryctl:8080
 REGISTRY_CREDENTIAL_USERNAME=harbor_registry_user
-REGISTRY_CREDENTIAL_PASSWORD=Harbor12345
-
-# the below are unedited from original env
-CSRF_KEY=s3jYHNJtffkV8dwKavKsXbkHswtJtDk3
+REGISTRY_CREDENTIAL_PASSWORD=TRJUhYbJgSjXZWAj3oLEet3ugJ3nAOk3
+CSRF_KEY=
 ROBOT_SCANNER_NAME_PREFIX=FFTP6U3S
 PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE=docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,quay,docker-registry,github-ghcr,jfrog-artifactory
 
