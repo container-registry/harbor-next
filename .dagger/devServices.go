@@ -11,18 +11,19 @@ import (
 // portal: The user-facing portal can be started after core.
 // proxy: The last service to start as it routes traffic to all the other services.
 
+
 func (m *Harbor) RegistryCtlService(ctx context.Context) *dagger.Service {
 	regConfigDir := m.Source.Directory(".dagger/config/registry")
 	regCtlConfig := m.Source.File(".dagger/config/registryctl/config.yml")
 
-	regCtl := m.BuildImage(ctx, DEV_PLATFORM, "registryctl", "v3.0").
+	regCtl := m.BuildImage(ctx, DEV_PLATFORM, "registryctl", DEV_VERSION).
 		WithMountedDirectory("/etc/registry", regConfigDir).
 		WithMountedFile("/etc/registryctl/config.yml", regCtlConfig).
 		// - ./common/config/registryctl/env envs are similar to this
 		WithEnvVariable("JOBSERVICE_SECRET", "Harbor12345").
 		WithEnvVariable("CORE_SECRET", "Harbor12345").
-		WithServiceBinding("redis", m.RedisService()).
-		WithServiceBinding("registry", m.RedisService()).
+		WithServiceBinding("redis", m.RedisService(ctx)).
+		WithServiceBinding("registry", m.RegistryService(ctx)).
 		AsService()
 	return regCtl
 }
