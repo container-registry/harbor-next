@@ -27,6 +27,7 @@ const (
 	TRIVYVERSION        = "v0.56.1"
 	TRIVYADAPTERVERSION = "v0.32.0-rc.1"
 	DEV_PLATFORM        = "linux/amd64"
+	DEV_VERSION         = "dev"
 )
 
 var (
