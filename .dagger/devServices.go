@@ -11,6 +11,21 @@ import (
 // jobservice: Background jobs, which require the core service to be available.
 // proxy: The last service to start as it routes traffic to all the other services.
 
+func (m *Harbor) RegistryCtlService(ctx context.Context) *dagger.Service {
+	regConfigDir := m.Source.Directory(".dagger/config/registry")
+	regCtlConfig := m.Source.File(".dagger/config/registryctl/config.yml")
+
+	regCtl := m.BuildImage(ctx, DEV_PLATFORM, "registryctl", "v3.0").
+		WithMountedDirectory("/etc/registry", regConfigDir).
+		WithMountedFile("/etc/registryctl/config.yml", regCtlConfig).
+		// - ./common/config/registryctl/env envs are similar to this
+		WithEnvVariable("JOBSERVICE_SECRET", "Harbor12345").
+		WithEnvVariable("CORE_SECRET", "Harbor12345").
+		WithServiceBinding("redis", m.RedisService()).
+		WithServiceBinding("registry", m.RedisService()).
+		AsService()
+	return regCtl
+}
 
 func (m *Harbor) DbService() *dagger.Service {
 	postgres := dag.Container().From("goharbor/harbor-db:dev").
