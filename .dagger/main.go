@@ -8,9 +8,9 @@ import (
 	"strings"
 )
 
+// to-do: dagger dev
 // to-do: update registry to v3
 // to-do: add documentation
-// to-do: add trivy-adapter
 // to-do: stop usage of shell things. No shell spawning
 
 const (
@@ -26,6 +26,7 @@ const (
 	// trivy-adapter
 	TRIVYVERSION        = "v0.56.1"
 	TRIVYADAPTERVERSION = "v0.32.0-rc.1"
+	DEV_PLATFORM        = "linux/amd64"
 )
 
 var (
@@ -265,7 +266,8 @@ func (m *Harbor) BuildImage(ctx context.Context, platform Platform, pkg Package,
 	}
 	if pkg == "registryctl" {
 		regBinary := m.registryBuilder(ctx)
-		buildMtd.Container = buildMtd.Container.WithFile("/usr/bin/registry_DO_NOT_USE_GC", regBinary)
+		buildMtd.Container = buildMtd.Container.WithFile("/usr/bin/registry_DO_NOT_USE_GC", regBinary).
+			WithExposedPort(8080)
 	}
 
 	return buildMtd.Container
@@ -534,7 +536,7 @@ func (m *Harbor) fetchGitCommit(ctx context.Context) string {
 		WithMountedDirectory("/src", m.Source).
 		WithWorkdir("/src")
 
-	gitCommit, _ := temp.WithExec([]string{"git", "rev-parse", "--short=8", "HEAD", "--always"}).Stdout(ctx)
+	gitCommit, _ := temp.WithExec([]string{"git", "rev-parse", "--short=8", "HEAD"}).Stdout(ctx)
 
 	return gitCommit
 }
