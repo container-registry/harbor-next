@@ -337,7 +337,7 @@ func (m *Harbor) buildImage(ctx context.Context, platform Platform, pkg Package,
 		}
 	} else {
 		buildMtd = m.buildBinary(ctx, platform, pkg, version)
-		img = dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(string(platform))}).
+    img = dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(string(platform))}).From("busybox:latest").
 			WithFile("/"+string(pkg), buildMtd.Container.File(buildMtd.BinaryPath))
 
 		// Set entrypoint
