@@ -11,22 +11,17 @@ import (
 // portal: The user-facing portal can be started after core.
 // proxy: The last service to start as it routes traffic to all the other services.
 
+// not working as expected
 func (m *Harbor) PortalService(ctx context.Context) *dagger.Service {
-	nginxConfig := m.Source.File(".dagger/config/portal/nginx.conf")
+	nginxConfig := m.Source.File(".dagger/config/proxy/nginx.conf")
 
-	regCtl := m.BuildImage(ctx, DEV_PLATFORM, "portal", DEV_VERSION).
+	portal := m.BuildImage(ctx, DEV_PLATFORM, "portal", DEV_VERSION).
+		// portal := dag.Container().From("goharbor/harbor-portal:dev").
 		WithMountedFile("/etc/nginx/nginx.conf", nginxConfig).
-		WithServiceBinding("core", m.CoreService(ctx)).
-		// WithServiceBinding("jobservice", m.JobService(ctx)).
-		// WithServiceBinding("postgresql", m.DbService(ctx)).
-		// WithServiceBinding("redis", m.RedisService(ctx)).
-		// WithServiceBinding("registry", m.RegistryService(ctx)).
-		// WithServiceBinding("registryctl", m.RegistryCtlService(ctx)).
-		WithExposedPort(8090).
 		WithExposedPort(8080).
-		WithExposedPort(8443).
+		WithoutExposedPort(8443).
 		AsService()
-	return regCtl
+	return portal
 }
 
 func (m *Harbor) JobService(ctx context.Context) *dagger.Service {
