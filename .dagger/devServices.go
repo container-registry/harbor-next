@@ -46,8 +46,7 @@ func (m *Harbor) JobService(ctx context.Context) *dagger.Service {
 	return regCtl
 }
 
-// currently not working as expected don't know why should figure out
-func (m *Harbor) CoreService(ctx context.Context) *dagger.Service {
+func (m *Harbor) coreService(ctx context.Context) *dagger.Service {
 	coreConfig := m.Source.File(".dagger/config/core/app.conf")
 	envFile := m.Source.File(".dagger/config/core/env")
 	run_script := m.Source.File(".dagger/config/run_env.sh")
@@ -56,13 +55,9 @@ func (m *Harbor) CoreService(ctx context.Context) *dagger.Service {
 		WithMountedFile("/etc/core/app.conf", coreConfig).
 		WithMountedFile("/envFile", envFile).
 		WithMountedFile("/run_script", run_script).
-		WithServiceBinding("redis", m.RedisService(ctx)).
-		WithServiceBinding("registry", m.RegistryService(ctx)).
-		WithServiceBinding("postgresql", m.DbService(ctx)).
-		// WithServiceBinding("jobservice", m.JobService(ctx)).
 		WithExposedPort(8080).
-		WithExposedPort(80).
-    WithEntrypoint([]string{"/run_script", "/core"}).
+		// WithExposedPort(80).
+		WithEntrypoint([]string{"/run_script", "/core"}).
 		AsService()
 
 	return core
@@ -71,16 +66,17 @@ func (m *Harbor) CoreService(ctx context.Context) *dagger.Service {
 func (m *Harbor) RegistryCtlService(ctx context.Context) *dagger.Service {
 	regConfigDir := m.Source.Directory(".dagger/config/registry")
 	regCtlConfig := m.Source.File(".dagger/config/registryctl/config.yml")
+	envFile := m.Source.File(".dagger/config/jobservice/env")
+	run_script := m.Source.File(".dagger/config/run_env.sh")
 
 	regCtl := m.BuildImage(ctx, DEV_PLATFORM, "registryctl", DEV_VERSION).
 		WithMountedDirectory("/etc/registry", regConfigDir).
 		WithMountedFile("/etc/registryctl/config.yml", regCtlConfig).
-		// - ./common/config/registryctl/env envs are similar to this
-		WithEnvVariable("JOBSERVICE_SECRET", "Harbor12345").
-		WithEnvVariable("CORE_SECRET", "Harbor12345").
-		WithServiceBinding("redis", m.RedisService(ctx)).
-		WithServiceBinding("registry", m.RegistryService(ctx)).
+		WithMountedFile("/envFile", envFile).
+		WithMountedFile("/run_script", run_script).
+    WithEntrypoint([]string{"/run_script", "/registryctl -c /etc/registryctl/config.yml"}).
 		AsService()
+
 	return regCtl
 }
 
