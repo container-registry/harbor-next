@@ -34,16 +34,15 @@ func (m *Harbor) JobService(ctx context.Context) *dagger.Service {
 	envFile := m.Source.File(".dagger/config/jobservice/env")
 	run_script := m.Source.File(".dagger/config/run_env.sh")
 
-	regCtl := m.BuildImage(ctx, DEV_PLATFORM, "jobservice", DEV_VERSION).
+	jobSrv := m.BuildImage(ctx, DEV_PLATFORM, "jobservice", DEV_VERSION).
 		WithMountedFile("/etc/jobservice/config.yml", jobSrvConfig).
+		WithMountedDirectory("/var/log/jobs", m.Source.Directory(".dagger/config/jobservice")).
 		WithMountedFile("/envFile", envFile).
-		WithMountedFile("/run_core", run_script).
-    // JobService needs core to be up but this creates infinite loop
-		WithServiceBinding("core", m.CoreService(ctx)).
+		WithMountedFile("/run_script", run_script).
 		WithExposedPort(8080).
-    WithEntrypoint([]string{"/run_script", "/jobservice"}).
+		WithEntrypoint([]string{"/run_script", "/jobservice -c /etc/jobservice/config.yml"}).
 		AsService()
-	return regCtl
+	return jobSrv
 }
 
 func (m *Harbor) coreService(ctx context.Context) *dagger.Service {
