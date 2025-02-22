@@ -34,7 +34,7 @@ validation:
 compatibility:
   schema1:
     enabled: true
-# auth:
-#   htpasswd:
-#     realm: harbor-registry-basic-realm
-#     path: /etc/registry/passwd
+auth:
+  htpasswd:
+    realm: harbor-registry-basic-realm
+    path: /etc/registry/passwd

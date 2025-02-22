@@ -12,6 +12,3 @@ HTTPS_PROXY=
 NO_PROXY=db,localhost,redis,log,exporter,postgresql,trivy-adapter,portal,.internal,registry,127.0.0.1,jobservice,nginx,.local,core,registryctl
 REGISTRY_CREDENTIAL_USERNAME=harbor_registry_user
 REGISTRY_CREDENTIAL_PASSWORD=TRJUhYbJgSjXZWAj3oLEet3ugJ3nAOk3
-
-
-
