@@ -280,16 +280,15 @@ func (m *Harbor) registryBuilder(ctx context.Context) *dagger.File {
 		WithEnvVariable("GOMODCACHE", "/go/pkg/mod").
 		WithMountedCache("/go/build-cache", dag.CacheVolume("go-build-"+GO_VERSION)).
 		WithEnvVariable("GOCACHE", "/go/build-cache").
-		WithMountedDirectory("/harbor", m.Source).
-		WithWorkdir("/harbor/.dagger/").
 		WithEnvVariable("DISTRIBUTION_DIR", "/go/src/github.com/docker/distribution").
 		WithEnvVariable("BUILDTAGS", "include_oss include_gcs").
 		WithEnvVariable("GO111MODULE", "auto").
 		WithEnvVariable("CGO_ENABLED", "0").
+		WithMountedFile("/redis.patch", m.Source.File(".dagger/registry/redis.patch")).
 		WithWorkdir("/go/src/github.com/docker").
 		WithExec([]string{"git", "clone", "-b", REGISTRY_SRC_TAG, DISTRIBUTION_SRC}).
 		WithWorkdir("distribution").
-		WithExec([]string{"git", "apply", "/harbor/.dagger/registry/redis.patch"}).
+		WithExec([]string{"git", "apply", "/redis.patch"}).
 		WithExec([]string{"echo", "build the registry binary"}).
 		WithExec([]string{"make", "PREFIX=/go", "clean", "binaries"}).
 		File("bin/registry")
@@ -337,7 +336,7 @@ func (m *Harbor) buildImage(ctx context.Context, platform Platform, pkg Package,
 		}
 	} else {
 		buildMtd = m.buildBinary(ctx, platform, pkg, version)
-    img = dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(string(platform))}).From("busybox:latest").
+		img = dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(string(platform))}).From("busybox:latest").
 			WithFile("/"+string(pkg), buildMtd.Container.File(buildMtd.BinaryPath))
 
 		// Set entrypoint
@@ -406,8 +405,9 @@ func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package
 		WithEnvVariable("GOMODCACHE", "/go/pkg/mod").
 		WithMountedCache("/go/build-cache", dag.CacheVolume("go-build-"+GO_VERSION)).
 		WithEnvVariable("GOCACHE", "/go/build-cache").
-		WithMountedDirectory("/harbor", m.Source).
-		WithWorkdir("/harbor/src/").
+		// update for better caching
+		WithMountedDirectory("/src", m.Source.Directory("./src")).
+		WithWorkdir("/src").
 		WithEnvVariable("GOOS", os).
 		WithEnvVariable("GOARCH", arch).
 		WithEnvVariable("CGO_ENABLED", "0").
@@ -481,9 +481,10 @@ func (m *Harbor) buildPortal(ctx context.Context, platform Platform) *dagger.Con
 	m.Source = m.genAPIs(ctx)
 
 	swaggerYaml := dag.Container().From("alpine:latest").
-		WithMountedDirectory("/harbor", m.Source).
-		WithWorkdir("/harbor").
-		File("api/v2.0/swagger.yaml")
+		// for better caching
+		WithMountedDirectory("/api", m.Source.Directory("./api")).
+		WithWorkdir("/api").
+		File("v2.0/swagger.yaml")
 
 	LICENSE := dag.Container().From("alpine:latest").
 		WithMountedDirectory("/harbor", m.Source).
@@ -493,8 +494,10 @@ func (m *Harbor) buildPortal(ctx context.Context, platform Platform) *dagger.Con
 
 	builder := dag.Container().
 		From("node:16.18.0").
-		WithMountedDirectory("/harbor", m.Source).
-		WithWorkdir("/harbor/src/portal").
+		WithMountedCache("/root/.npm", dag.CacheVolume("node")).
+		// for better caching
+		WithMountedDirectory("/portal", m.Source.Directory("./src/portal")).
+		WithWorkdir("/portal").
 		WithFile("swagger.yaml", swaggerYaml).
 		WithEnvVariable("NPM_CONFIG_REGISTRY", NPM_REGISTRY).
 		WithExec([]string{"npm", "install", "--unsafe-perm"}).
@@ -506,12 +509,12 @@ func (m *Harbor) buildPortal(ctx context.Context, platform Platform) *dagger.Con
 		WithWorkdir("app-swagger-ui").
 		WithExec([]string{"npm", "install", "--unsafe-perm"}).
 		WithExec([]string{"npm", "run", "build"}).
-		WithWorkdir("/harbor/src/portal")
+		WithWorkdir("/portal")
 
 	deployer := dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(string(platform))}).From("nginx:alpine").
-		WithFile("/usr/share/nginx/html/swagger.json", builder.File("/harbor/src/portal/swagger.json")).
-		WithDirectory("/usr/share/nginx/html", builder.Directory("/harbor/src/portal/dist")).
-		WithDirectory("/usr/share/nginx/html", builder.Directory("/harbor/src/portal/app-swagger-ui/dist")).
+		WithFile("/usr/share/nginx/html/swagger.json", builder.File("/portal/swagger.json")).
+		WithDirectory("/usr/share/nginx/html", builder.Directory("/portal/dist")).
+		WithDirectory("/usr/share/nginx/html", builder.Directory("/portal/app-swagger-ui/dist")).
 		WithWorkdir("/usr/share/nginx/html").
 		WithExec([]string{"ls"}).
 		WithWorkdir("/").
