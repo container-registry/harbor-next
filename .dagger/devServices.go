@@ -5,11 +5,17 @@ import (
 	"dagger/harbor/internal/dagger"
 )
 
-// registryctl: Registry controller for interacting with the registry.
-// core: The business logic service that relies on the database, registry, and Redis.
-// jobservice: Background jobs, which require the core service to be available.
-// portal: The user-facing portal can be started after core.
-// proxy: The last service to start as it routes traffic to all the other services.
+func (m *Harbor) NginxService(ctx context.Context) *dagger.Service {
+	nginxConfig := m.Source.File(".dagger/config/proxy/nginx.conf")
+
+	nginxSrv := m.BuildImage(ctx, DEV_PLATFORM, "nginx", DEV_VERSION).
+		// nginxSrv := dag.Container().From("goharbor/nginx-photon:dev").
+		WithMountedFile("/etc/nginx/nginx.conf", nginxConfig).
+		WithExposedPort(8080).
+		WithoutExposedPort(8443).
+		AsService()
+	return nginxSrv
+}
 
 // not working as expected
 func (m *Harbor) PortalService(ctx context.Context) *dagger.Service {
