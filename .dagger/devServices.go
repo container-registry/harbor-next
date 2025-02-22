@@ -1,12 +1,8 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"dagger/harbor/internal/dagger"
-	"fmt"
-	"os"
-	"strings"
 )
 
 // registryctl: Registry controller for interacting with the registry.
@@ -115,42 +111,4 @@ func (m *Harbor) RegistryService(ctx context.Context) *dagger.Service {
 		// WithExposedPort(5001).
 		AsService()
 	return reg
-}
-
-// loads environment variables from a file and applies them to a container
-func loadEnvArgs(container *dagger.Container, envFilePath string) (*dagger.Container, error) {
-	// Open the .env file
-	file, err := os.Open(envFilePath)
-	if err != nil {
-		return nil, fmt.Errorf("error opening .env file: %v", err)
-	}
-	defer file.Close()
-
-	// Read the .env file line by line
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		// Skip empty lines and comments
-		if strings.TrimSpace(line) == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		// Split the line into key=value
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) == 2 {
-			key := strings.TrimSpace(parts[0])
-			value := strings.TrimSpace(parts[1])
-
-			// Apply the environment variable to the container
-			container = container.WithEnvVariable(key, value)
-		}
-	}
-
-	// Check for scanning errors
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("error reading the .env file: %v", err)
-	}
-
-	// Return the updated container
-	return container, nil
 }
