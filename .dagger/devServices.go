@@ -84,7 +84,7 @@ func (m *Harbor) RegistryCtlService(ctx context.Context) *dagger.Service {
 	return regCtl
 }
 
-func (m *Harbor) DbService(ctx context.Context) *dagger.Service {
+func (m *Harbor) PostgresService(ctx context.Context) *dagger.Service {
 	postgres := dag.Container().From("goharbor/harbor-db:dev").
 		WithExposedPort(5432).
 		WithEnvVariable("POSTGRES_PASSWORD", "root123").
@@ -103,12 +103,11 @@ func (m *Harbor) RegistryService(ctx context.Context) *dagger.Service {
 	regConfigDir := m.Source.Directory(".dagger/config/registry")
 
 	// 5001 is can be used to debug according to config
-	// reg := m.buildRegistry(ctx, DEV_PLATFORM).
 	reg := m.BuildImage(ctx, DEV_PLATFORM, "registry", DEV_VERSION).
 		WithMountedDirectory("/etc/registry", regConfigDir).
-		WithServiceBinding("redis", m.RedisService(ctx)).
 		WithExposedPort(5000).
-		// WithExposedPort(5001).
+		WithoutExposedPort(5001).
+		WithoutExposedPort(5443).
 		AsService()
 	return reg
 }
