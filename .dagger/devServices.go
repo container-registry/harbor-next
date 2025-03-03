@@ -40,6 +40,7 @@ func (m *Harbor) JobService(ctx context.Context) *dagger.Service {
 		WithMountedDirectory("/var/log/jobs", m.Source.Directory(".dagger/config/jobservice")).
 		WithMountedFile("/envFile", envFile).
 		WithMountedFile("/run_script", run_script).
+		WithExec([]string{"chmod", "+x", "/run_script"}).
 		WithExposedPort(8080).
 		WithEntrypoint([]string{"/run_script", "/jobservice -c /etc/jobservice/config.yml"}).
 		AsService()
@@ -74,7 +75,7 @@ func (m *Harbor) RegistryCtlService(ctx context.Context) *dagger.Service {
 		WithMountedFile("/etc/registryctl/config.yml", regCtlConfig).
 		WithMountedFile("/envFile", envFile).
 		WithMountedFile("/run_script", run_script).
-    WithEntrypoint([]string{"/run_script", "/registryctl -c /etc/registryctl/config.yml"}).
+		WithEntrypoint([]string{"/run_script", "/registryctl -c /etc/registryctl/config.yml"}).
 		AsService()
 
 	return regCtl

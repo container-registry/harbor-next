@@ -275,7 +275,7 @@ func (m *Harbor) BuildImage(ctx context.Context, platform Platform, pkg Package,
 }
 
 func (m *Harbor) registryBuilder(ctx context.Context) *dagger.File {
-	registryBinary := dag.Container().From("golang:1.23.2").
+	registry := dag.Container().From("golang:1.22.3").
 		WithMountedCache("/go/pkg/mod", dag.CacheVolume("go-mod-"+GO_VERSION)).
 		WithEnvVariable("GOMODCACHE", "/go/pkg/mod").
 		WithMountedCache("/go/build-cache", dag.CacheVolume("go-build-"+GO_VERSION)).
@@ -289,8 +289,11 @@ func (m *Harbor) registryBuilder(ctx context.Context) *dagger.File {
 		WithExec([]string{"git", "clone", "-b", REGISTRY_SRC_TAG, DISTRIBUTION_SRC}).
 		WithWorkdir("distribution").
 		WithExec([]string{"git", "apply", "/redis.patch"}).
-		WithExec([]string{"echo", "build the registry binary"}).
-		WithExec([]string{"make", "PREFIX=/go", "clean", "binaries"}).
+		WithExec([]string{"echo", "build the registry binary"})
+
+	registryBinary := registry.
+		// to-do: check possible ways to remove make clean bin/registry
+		WithExec([]string{"make", "clean", "bin/registry"}).
 		File("bin/registry")
 
 	return registryBinary
