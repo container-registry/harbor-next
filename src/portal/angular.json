@@ -59,11 +59,7 @@
           },
           "configurations": {
             "production": {
-              "optimization": {
-                "styles": {
-                  "inlineCritical": false
-                }
-              },
+              "optimization": false,
               "outputHashing": "all",
               "sourceMap": false,
               "namedChunks": false,
