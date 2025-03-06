@@ -35,12 +35,17 @@ func New(
 	// +defaultPath="./"
 	// +ignore=["bin"]
 	source *dagger.Directory,
+	// +optional
+	// +defaultPath="./"
+	// +ignore=[".dagger", ".github", "contrib", "docs", "icons", "tests", "make", "bin", "*.md"]
+	filteredSrc *dagger.Directory,
 ) *Harbor {
-	return &Harbor{Source: source}
+	return &Harbor{Source: source, FilteredSrc: filteredSrc}
 }
 
 type Harbor struct {
-	Source *dagger.Directory
+	Source      *dagger.Directory
+	FilteredSrc *dagger.Directory
 }
 
 func (m *Harbor) PublishAndSignAllImages(
@@ -366,8 +371,10 @@ func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package
 		version := m.getVersion(ctx)
 
 		m.lintAPIs(ctx)
+		// srcWithSwagger = m.genAPIs(ctx)
+		// m.Source = srcWithSwagger
 		srcWithSwagger = m.genAPIs(ctx)
-		m.Source = srcWithSwagger
+		m.FilteredSrc = m.FilteredSrc.WithDirectory("/src/server/v2.0", srcWithSwagger)
 
 		ldflags = fmt.Sprintf(`-X github.com/goharbor/harbor/src/pkg/version.GitCommit=%s
                     -X github.com/goharbor/harbor/src/pkg/version.ReleaseVersion=%s
@@ -383,7 +390,7 @@ func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package
 		WithMountedCache("/go/build-cache", dag.CacheVolume("go-build-"+GO_VERSION)).
 		WithEnvVariable("GOCACHE", "/go/build-cache").
 		// update for better caching
-		WithMountedDirectory("/src", m.Source.Directory("./src")).
+		WithMountedDirectory("/src", m.FilteredSrc.Directory("./src")).
 		WithWorkdir("/src").
 		WithEnvVariable("GOOS", os).
 		WithEnvVariable("GOARCH", arch).
@@ -518,7 +525,7 @@ func (m *Harbor) fetchGitCommit(ctx context.Context) string {
 	// temp container with git installed
 	temp := dag.Container().
 		From("golang:latest").
-		WithDirectory("/src", m.Source, dirOpts).
+		WithDirectory("/src", m.FilteredSrc, dirOpts).
 		WithWorkdir("/src")
 
 	gitCommit, _ := temp.WithExec([]string{"git", "rev-parse", "--short=8", "HEAD"}).Stdout(ctx)
@@ -534,7 +541,7 @@ func (m *Harbor) genAPIs(_ context.Context) *dagger.Directory {
 
 	temp := dag.Container().
 		From("quay.io/goswagger/swagger:"+SWAGGER_VERSION).
-		WithMountedDirectory("/src", m.Source).
+		WithMountedDirectory("/src", m.FilteredSrc).
 		WithWorkdir("/src").
 		WithExec([]string{"swagger", "version"}).
 		// Clean up old generated code and create necessary directories
@@ -542,7 +549,8 @@ func (m *Harbor) genAPIs(_ context.Context) *dagger.Directory {
 		WithExec([]string{"mkdir", "-p", TARGET_DIR}).
 		// Generate the server files using the Swagger tool
 		WithExec([]string{"swagger", "generate", "server", "--template-dir=./tools/swagger/templates", "--exclude-main", "--additional-initialism=CVE", "--additional-initialism=GC", "--additional-initialism=OIDC", "-f", SWAGGER_SPEC, "-A", APP_NAME, "--target", TARGET_DIR}).
-		Directory("/src")
+		WithExec([]string{"ls", "-la"}).
+		Directory("/src/src/server/v2.0")
 
 	return temp
 }
@@ -554,7 +562,7 @@ func (m *Harbor) getVersion(ctx context.Context) string {
 
 	temp := dag.Container().
 		From("golang:latest").
-		WithDirectory("/src", m.Source, dirOpts).
+		WithDirectory("/src", m.FilteredSrc, dirOpts).
 		WithWorkdir("/src").
 		WithExec([]string{"ls", "-la"})
 
