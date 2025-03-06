@@ -511,10 +511,14 @@ func parsePlatform(platform string) (string, string, error) {
 }
 
 func (m *Harbor) fetchGitCommit(ctx context.Context) string {
+	dirOpts := dagger.ContainerWithDirectoryOpts{
+		Include: []string{".git"},
+	}
+
 	// temp container with git installed
 	temp := dag.Container().
 		From("golang:latest").
-		WithMountedDirectory("/src", m.Source).
+		WithDirectory("/src", m.Source, dirOpts).
 		WithWorkdir("/src")
 
 	gitCommit, _ := temp.WithExec([]string{"git", "rev-parse", "--short=8", "HEAD"}).Stdout(ctx)
@@ -544,7 +548,6 @@ func (m *Harbor) genAPIs(_ context.Context) *dagger.Directory {
 }
 
 func (m *Harbor) getVersion(ctx context.Context) string {
-	// temp container with git installed
 	dirOpts := dagger.ContainerWithDirectoryOpts{
 		Include: []string{"VERSION"},
 	}
