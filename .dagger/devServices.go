@@ -8,7 +8,7 @@ import (
 func (m *Harbor) NginxService(ctx context.Context) *dagger.Service {
 	nginxConfig := m.Source.File(".dagger/config/proxy/nginx.conf")
 
-	nginxSrv := m.BuildImage(ctx, DEV_PLATFORM, "nginx", DEV_VERSION).
+	nginxSrv := m.BuildImage(ctx, DEV_PLATFORM, "nginx").
 		// nginxSrv := dag.Container().From("goharbor/nginx-photon:dev").
 		WithMountedFile("/etc/nginx/nginx.conf", nginxConfig).
 		WithExposedPort(8080).
@@ -21,7 +21,7 @@ func (m *Harbor) NginxService(ctx context.Context) *dagger.Service {
 func (m *Harbor) PortalService(ctx context.Context) *dagger.Service {
 	nginxConfig := m.Source.File(".dagger/config/proxy/nginx.conf")
 
-	portal := m.BuildImage(ctx, DEV_PLATFORM, "portal", DEV_VERSION).
+	portal := m.BuildImage(ctx, DEV_PLATFORM, "portal").
 		// portal := dag.Container().From("goharbor/harbor-portal:dev").
 		WithMountedFile("/etc/nginx/nginx.conf", nginxConfig).
 		WithExposedPort(8080).
@@ -35,7 +35,7 @@ func (m *Harbor) JobService(ctx context.Context) *dagger.Service {
 	envFile := m.Source.File(".dagger/config/jobservice/env")
 	run_script := m.Source.File(".dagger/config/run_env.sh")
 
-	jobSrv := m.BuildImage(ctx, DEV_PLATFORM, "jobservice", DEV_VERSION).
+	jobSrv := m.BuildImage(ctx, DEV_PLATFORM, "jobservice").
 		WithMountedFile("/etc/jobservice/config.yml", jobSrvConfig).
 		WithMountedDirectory("/var/log/jobs", m.Source.Directory(".dagger/config/jobservice")).
 		WithMountedFile("/envFile", envFile).
@@ -52,7 +52,7 @@ func (m *Harbor) coreService(ctx context.Context) *dagger.Service {
 	envFile := m.Source.File(".dagger/config/core/env")
 	run_script := m.Source.File(".dagger/config/run_env.sh")
 
-	core := m.BuildImage(ctx, DEV_PLATFORM, "core", DEV_VERSION).
+	core := m.BuildImage(ctx, DEV_PLATFORM, "core").
 		WithMountedFile("/etc/core/app.conf", coreConfig).
 		WithMountedFile("/envFile", envFile).
 		WithMountedFile("/run_script", run_script).
@@ -70,7 +70,7 @@ func (m *Harbor) RegistryCtlService(ctx context.Context) *dagger.Service {
 	envFile := m.Source.File(".dagger/config/jobservice/env")
 	run_script := m.Source.File(".dagger/config/run_env.sh")
 
-	regCtl := m.BuildImage(ctx, DEV_PLATFORM, "registryctl", DEV_VERSION).
+	regCtl := m.BuildImage(ctx, DEV_PLATFORM, "registryctl").
 		WithMountedDirectory("/etc/registry", regConfigDir).
 		WithMountedFile("/etc/registryctl/config.yml", regCtlConfig).
 		WithMountedFile("/envFile", envFile).
@@ -100,7 +100,7 @@ func (m *Harbor) RegistryService(ctx context.Context) *dagger.Service {
 	regConfigDir := m.Source.Directory(".dagger/config/registry")
 
 	// 5001 is can be used to debug according to config
-	reg := m.BuildImage(ctx, DEV_PLATFORM, "registry", DEV_VERSION).
+	reg := m.BuildImage(ctx, DEV_PLATFORM, "registry").
 		WithMountedDirectory("/etc/registry", regConfigDir).
 		WithExposedPort(5000).
 		WithoutExposedPort(5001).

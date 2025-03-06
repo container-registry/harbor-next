@@ -46,7 +46,6 @@ func (m *Harbor) PublishAndSignAllImages(
 	ctx context.Context,
 	registry string,
 	registryUsername string,
-	version string,
 	registryPassword *dagger.Secret,
 	imageTags []string,
 	// +optional
@@ -56,7 +55,7 @@ func (m *Harbor) PublishAndSignAllImages(
 	// +optional
 	actionsIdTokenRequestUrl string,
 ) (string, error) {
-	imageAddrs := m.PublishAllImages(ctx, registry, registryUsername, imageTags, registryPassword, version)
+	imageAddrs := m.PublishAllImages(ctx, registry, registryUsername, imageTags, registryPassword)
 	_, err := m.Sign(
 		ctx,
 		githubToken,
@@ -118,9 +117,8 @@ func (m *Harbor) PublishAllImages(
 	registry, registryUsername string,
 	imageTags []string,
 	registryPassword *dagger.Secret,
-	version string,
 ) []string {
-	allImages := m.buildAllImages(ctx, version)
+	allImages := m.buildAllImages(ctx)
 
 	// for i, tag := range imageTags {
 	// 	imageTags[i] = strings.TrimSpace(tag)
@@ -162,9 +160,7 @@ func (m *Harbor) PublishImage(
 	imageTags []string,
 	pkg Package,
 	registryPassword *dagger.Secret,
-	version string,
 ) []string {
-	BuildImage := m.BuildImage(ctx, targetPlatforms[1], pkg, version)
 
 	// why do we need this @vad1mo any ideas??
 	// for i, tag := range imageTags {
@@ -197,8 +193,8 @@ func (m *Harbor) PublishImage(
 	return imageAddresses
 }
 
-func (m *Harbor) ExportAllImages(ctx context.Context, version string) *dagger.Directory {
-	metdata := m.buildAllImages(ctx, version)
+func (m *Harbor) ExportAllImages(ctx context.Context) *dagger.Directory {
+	metdata := m.buildAllImages(ctx)
 	artifacts := dag.Directory()
 	for _, meta := range metdata {
 		artifacts = artifacts.WithFile(fmt.Sprintf("containers/%s/%s.tgz", meta.Platform, meta.Package), meta.Container.AsTarball())
@@ -206,8 +202,8 @@ func (m *Harbor) ExportAllImages(ctx context.Context, version string) *dagger.Di
 	return artifacts
 }
 
-func (m *Harbor) BuildAllImages(ctx context.Context, version string) []*dagger.Container {
-	metdata := m.buildAllImages(ctx, version)
+func (m *Harbor) BuildAllImages(ctx context.Context) []*dagger.Container {
+	metdata := m.buildAllImages(ctx)
 	images := make([]*dagger.Container, len(metdata))
 	for i, meta := range metdata {
 		images[i] = meta.Container
@@ -215,11 +211,11 @@ func (m *Harbor) BuildAllImages(ctx context.Context, version string) []*dagger.C
 	return images
 }
 
-func (m *Harbor) buildAllImages(ctx context.Context, version string) []*BuildMetadata {
+func (m *Harbor) buildAllImages(ctx context.Context) []*BuildMetadata {
 	var buildMetadata []*BuildMetadata
 	for _, platform := range targetPlatforms {
 		for _, pkg := range packages {
-			img := m.BuildImage(ctx, platform, pkg, version)
+			img := m.BuildImage(ctx, platform, pkg)
 			buildMetadata = append(buildMetadata, &BuildMetadata{
 				Package:    pkg,
 				BinaryPath: fmt.Sprintf("bin/%s/%s", platform, pkg),
@@ -231,8 +227,8 @@ func (m *Harbor) buildAllImages(ctx context.Context, version string) []*BuildMet
 	return buildMetadata
 }
 
-func (m *Harbor) BuildImage(ctx context.Context, platform Platform, pkg Package, version string) *dagger.Container {
-	buildMtd := m.buildImage(ctx, platform, pkg, version)
+func (m *Harbor) BuildImage(ctx context.Context, platform Platform, pkg Package) *dagger.Container {
+	buildMtd := m.buildImage(ctx, platform, pkg)
 	if pkg == "core" {
 		// the only thing missing here is the healthcheck
 		// we can add those by updating the docker compose since dagger currently doesn't support healthchecks
@@ -253,8 +249,8 @@ func (m *Harbor) BuildImage(ctx context.Context, platform Platform, pkg Package,
 func (m *Harbor) registryBuilder(ctx context.Context) *dagger.File {
 	registry := dag.Container().From("golang:1.22.3").
 		WithMountedCache("/go/pkg/mod", dag.CacheVolume("go-mod-"+GO_VERSION)).
-		WithEnvVariable("GOMODCACHE", "/go/pkg/mod").
 		WithMountedCache("/go/build-cache", dag.CacheVolume("go-build-"+GO_VERSION)).
+		WithEnvVariable("GOMODCACHE", "/go/pkg/mod").
 		WithEnvVariable("GOCACHE", "/go/build-cache").
 		WithEnvVariable("DISTRIBUTION_DIR", "/go/src/github.com/docker/distribution").
 		WithEnvVariable("BUILDTAGS", "include_oss include_gcs").
@@ -275,7 +271,7 @@ func (m *Harbor) registryBuilder(ctx context.Context) *dagger.File {
 	return registryBinary
 }
 
-func (m *Harbor) buildImage(ctx context.Context, platform Platform, pkg Package, version string) *BuildMetadata {
+func (m *Harbor) buildImage(ctx context.Context, platform Platform, pkg Package) *BuildMetadata {
 	var (
 		buildMtd *BuildMetadata
 		img      *dagger.Container
@@ -314,7 +310,7 @@ func (m *Harbor) buildImage(ctx context.Context, platform Platform, pkg Package,
 			Platform:   platform,
 		}
 	} else {
-		buildMtd = m.buildBinary(ctx, platform, pkg, version)
+		buildMtd = m.buildBinary(ctx, platform, pkg)
 		img = dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(string(platform))}).From("busybox:latest").
 			WithFile("/"+string(pkg), buildMtd.Container.File(buildMtd.BinaryPath))
 
@@ -330,20 +326,20 @@ func (m *Harbor) buildImage(ctx context.Context, platform Platform, pkg Package,
 	return buildMtd
 }
 
-func (m *Harbor) BuildAllBinaries(ctx context.Context, version string) *dagger.Directory {
+func (m *Harbor) BuildAllBinaries(ctx context.Context) *dagger.Directory {
 	output := dag.Directory()
-	builds := m.buildAllBinaries(ctx, version)
+	builds := m.buildAllBinaries(ctx)
 	for _, build := range builds {
 		output = output.WithFile(build.BinaryPath, build.Container.File(build.BinaryPath))
 	}
 	return output
 }
 
-func (m *Harbor) buildAllBinaries(ctx context.Context, version string) []*BuildMetadata {
+func (m *Harbor) buildAllBinaries(ctx context.Context) []*BuildMetadata {
 	var buildContainers []*BuildMetadata
 	for _, platform := range targetPlatforms {
 		for _, pkg := range packages {
-			buildContainer := m.buildBinary(ctx, platform, pkg, version)
+			buildContainer := m.buildBinary(ctx, platform, pkg)
 			buildContainers = append(buildContainers, buildContainer)
 		}
 	}
@@ -351,12 +347,13 @@ func (m *Harbor) buildAllBinaries(ctx context.Context, version string) []*BuildM
 }
 
 // builds binary for the specified package
-func (m *Harbor) BuildBinary(ctx context.Context, platform Platform, pkg Package, version string) *dagger.File {
-	build := m.buildBinary(ctx, platform, pkg, version)
+func (m *Harbor) BuildBinary(ctx context.Context, platform Platform, pkg Package) *dagger.File {
+	build := m.buildBinary(ctx, platform, pkg)
 	return build.Container.File(build.BinaryPath)
 }
 
-func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package, version string) *BuildMetadata {
+func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package) *BuildMetadata {
+	var srcWithSwagger *dagger.Directory
 	ldflags := "-extldflags=-static -s -w"
 	goflags := "-buildvcs=false"
 
@@ -365,8 +362,9 @@ func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package
 		log.Fatalf("Error parsing platform: %v", err)
 	}
 
-	gitCommit := m.fetchGitCommit(ctx)
 	if pkg == "core" {
+		gitCommit := m.fetchGitCommit(ctx)
+		version := m.getVersion(ctx)
 		m.lintAPIs(ctx)
 		dirWithSwagger := m.genAPIs(ctx)
 		m.Source = dirWithSwagger
@@ -543,4 +541,20 @@ func (m *Harbor) genAPIs(_ context.Context) *dagger.Directory {
 		Directory("/src")
 
 	return temp
+}
+
+func (m *Harbor) getVersion(ctx context.Context) string {
+	// temp container with git installed
+	dirOpts := dagger.ContainerWithDirectoryOpts{
+		Include: []string{"VERSION"},
+	}
+
+	temp := dag.Container().
+		From("golang:latest").
+		WithDirectory("/src", m.Source, dirOpts).
+		WithWorkdir("/src").
+		WithExec([]string{"ls", "-la"})
+
+	version, _ := temp.WithExec([]string{"cat", "VERSION"}).Stdout(ctx)
+	return version
 }
