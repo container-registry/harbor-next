@@ -33,11 +33,11 @@ type BuildMetadata struct {
 func New(
 	// +optional
 	// +defaultPath="./"
-	// +ignore=["bin"]
+	// +ignore=["bin", "node_modules"]
 	source *dagger.Directory,
 	// +optional
 	// +defaultPath="./"
-	// +ignore=[".dagger", ".github", "contrib", "docs", "icons", "tests", "make", "bin", "*.md"]
+	// +ignore=[".dagger", "node_modules", ".github", "contrib", "docs", "icons", "tests", "make", "bin", "*.md"]
 	filteredSrc *dagger.Directory,
 ) *Harbor {
 	return &Harbor{Source: source, FilteredSrc: filteredSrc}
@@ -477,29 +477,66 @@ func (m *Harbor) buildPortal(ctx context.Context, platform Platform) *dagger.Con
 		WithExec([]string{"ls"}).
 		File("LICENSE")
 
-	builder := dag.Container().
-		From("oven/bun:latest").
-		WithMountedCache("~/.bun/install/cache", dag.CacheVolume("bun"), dagger.ContainerWithMountedCacheOpts{}).
+	// before := dag.Container().
+	//    From("node:16.18.0").
+	// 	WithMountedCache(USER_HOME_DIR+"/.bun/install/cache", dag.CacheVolume("bun")).
+	// 	WithMountedCache(USER_HOME_DIR+"/.npm", dag.CacheVolume("node")).
+	//    WithMountedCache("/root/.npm", dag.CacheVolume("node-16")).
+	// 	// for better caching
+	// 	WithMountedDirectory("/harbor", m.Source).
+	// 	WithWorkdir("/harbor/src/portal").
+	// 	WithEnvVariable("NPM_CONFIG_REGISTRY", NPM_REGISTRY).
+	// 	WithEnvVariable("BUN_INSTALL_CACHE_DIR", "/root/.bun/install/cache").
+	//    // $BUN_INSTALL_CACHE_DIR
+	// 	// WithExec([]string{"bun", "pm", "trust", "--all"}).
+	// 	WithFile("swagger.yaml", swaggerYaml).
+	// 	WithExec([]string{"npm", "install", "--unsafe-perm"}).
+	// 	WithExec([]string{"npm", "run", "generate-build-timestamp"}).
+	// 	WithExec([]string{"npm", "run", "release"})
+
+	before := dag.Container().
+		From("oven/bun:1.2.4").
+		WithMountedCache(USER_HOME_DIR+"/.bun/install/cache", dag.CacheVolume("bun")).
+		WithMountedCache("/root/.npm", dag.CacheVolume("node-16")).
+		WithMountedCache("/root/.angular", dag.CacheVolume("angular")).
 		// for better caching
-		WithMountedDirectory("/portal", m.FilteredSrc.Directory("./src/portal")).
-		WithWorkdir("/portal").
-		WithFile("swagger.yaml", swaggerYaml).
+		WithMountedDirectory("/harbor", m.Source).
+		WithWorkdir("/harbor/src/portal").
 		WithEnvVariable("NPM_CONFIG_REGISTRY", NPM_REGISTRY).
-		WithExec([]string{"bun", "install", "--production"}).
+		WithEnvVariable("BUN_INSTALL_CACHE_DIR", "/root/.bun/install/cache").
+		// $BUN_INSTALL_CACHE_DIR
+		// WithExec([]string{"bun", "pm", "trust", "--all"}).
+		WithFile("swagger.yaml", swaggerYaml).
+		WithExec([]string{"apt", "update"}).
+		WithExec([]string{"apt", "install", "unzip"}).
+		WithExec([]string{"bun", "install"}).
+		WithExec([]string{"bun", "pm", "trust", "--all"}).
+		WithExec([]string{"bun", "install", "--no-verify"}).
+		WithExec([]string{"ls", "-al"}).
 		WithExec([]string{"bun", "run", "generate-build-timestamp"}).
-		WithExec([]string{"bun", "--max_old_space_size=2048", "node_modules/@angular/cli/bin/ng", "build", "--configuration", "production"}).
+		WithExec([]string{"bun", "run", "node", "--max_old_space_size=2048", "node_modules/@angular/cli/bin/ng", "build", "--configuration", "production"})
+
+	builder := before.
 		WithExec([]string{"bun", "install", "js-yaml@4.1.0"}).
 		WithExec([]string{"sh", "-c", fmt.Sprintf("bun -e \"const yaml = require('js-yaml'); const fs = require('fs'); const swagger = yaml.load(fs.readFileSync('swagger.yaml', 'utf8')); fs.writeFileSync('swagger.json', JSON.stringify(swagger));\" ")}).
-		WithFile("dist/LICENSE", LICENSE).
-		WithWorkdir("app-swagger-ui").
-		WithExec([]string{"bun", "install", "--unsafe-perm"}).
-		WithExec([]string{"bun", "run", "build"}).
-		WithWorkdir("/portal")
+		WithFile("/harbor/src/portal/dist/LICENSE", LICENSE)
+
+	builderDir := builder.Directory("/harbor")
+
+	// swagger UI only supports npm some edge case error
+	swagger := dag.Container().From("node:16.18.0").
+		WithMountedCache("/root/.npm", dag.CacheVolume("node-16")).
+		WithMountedCache("/root/.angular", dag.CacheVolume("angular")).
+		WithMountedDirectory("/harbor", builderDir).
+		WithWorkdir("/harbor/src/portal/app-swagger-ui").
+		WithExec([]string{"npm", "install", "--unsafe-perm"}).
+		WithExec([]string{"npm", "run", "build"}).
+		WithWorkdir("/harbor/src/portal")
 
 	deployer := dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(string(platform))}).From("nginx:alpine").
-		WithFile("/usr/share/nginx/html/swagger.json", builder.File("/portal/swagger.json")).
-		WithDirectory("/usr/share/nginx/html", builder.Directory("/portal/dist")).
-		WithDirectory("/usr/share/nginx/html", builder.Directory("/portal/app-swagger-ui/dist")).
+		WithFile("/usr/share/nginx/html/swagger.json", builder.File("/harbor/src/portal/swagger.json")).
+		WithDirectory("/usr/share/nginx/html", builder.Directory("/harbor/src/portal/dist")).
+		WithDirectory("/usr/share/nginx/html", swagger.Directory("/harbor/src/portal/app-swagger-ui/dist")).
 		WithWorkdir("/usr/share/nginx/html").
 		WithExec([]string{"ls"}).
 		WithWorkdir("/").

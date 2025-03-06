@@ -1,6 +1,9 @@
 package main
 
-import "strings"
+import (
+	"os"
+	"strings"
+)
 
 const (
 	GOLANGCILINT_VERSION = "v1.61.0"
@@ -23,4 +26,5 @@ var (
 	TRIVY_VERSION_NO_PREFIX    = strings.TrimPrefix(TRIVYVERSION, "v")
 	TRIVY_DOWNLOAD_URL         = "https://github.com/aquasecurity/trivy/releases/download/" + TRIVYVERSION + "/trivy_" + TRIVY_VERSION_NO_PREFIX + "_Linux-64bit.tar.gz"
 	TRIVY_ADAPTER_DOWNLOAD_URL = "https://github.com/goharbor/harbor-scanner-trivy/archive/refs/tags/" + TRIVYADAPTERVERSION + ".tar.gz"
+  USER_HOME_DIR, _ = os.UserHomeDir()
 )
