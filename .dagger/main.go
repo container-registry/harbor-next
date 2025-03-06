@@ -462,37 +462,38 @@ func (m *Harbor) buildTrivyAdapter(ctx context.Context, platform Platform) *dagg
 func (m *Harbor) buildPortal(ctx context.Context, platform Platform) *dagger.Container {
 	fmt.Println("🛠️  Building Harbor Portal...")
 
-	m.Source = m.genAPIs(ctx)
+	srcWithSwagger := m.genAPIs(ctx)
+	m.FilteredSrc = m.FilteredSrc.WithDirectory("/src/server/v2.0", srcWithSwagger)
 
 	swaggerYaml := dag.Container().From("alpine:latest").
 		// for better caching
-		WithMountedDirectory("/api", m.Source.Directory("./api")).
+		WithMountedDirectory("/api", m.FilteredSrc.Directory("./api")).
 		WithWorkdir("/api").
 		File("v2.0/swagger.yaml")
 
 	LICENSE := dag.Container().From("alpine:latest").
-		WithMountedDirectory("/harbor", m.Source).
+		WithMountedDirectory("/harbor", m.FilteredSrc).
 		WithWorkdir("/harbor").
 		WithExec([]string{"ls"}).
 		File("LICENSE")
 
 	builder := dag.Container().
-		From("node:16.18.0").
-		WithMountedCache("/root/.npm", dag.CacheVolume("node")).
+		From("oven/bun:latest").
+		WithMountedCache("~/.bun/install/cache", dag.CacheVolume("bun"), dagger.ContainerWithMountedCacheOpts{}).
 		// for better caching
-		WithMountedDirectory("/portal", m.Source.Directory("./src/portal")).
+		WithMountedDirectory("/portal", m.FilteredSrc.Directory("./src/portal")).
 		WithWorkdir("/portal").
 		WithFile("swagger.yaml", swaggerYaml).
 		WithEnvVariable("NPM_CONFIG_REGISTRY", NPM_REGISTRY).
-		WithExec([]string{"npm", "install", "--unsafe-perm"}).
-		WithExec([]string{"npm", "run", "generate-build-timestamp"}).
-		WithExec([]string{"node", "--max_old_space_size=2048", "node_modules/@angular/cli/bin/ng", "build", "--configuration", "production"}).
-		WithExec([]string{"npm", "install", "js-yaml@4.1.0"}).
-		WithExec([]string{"sh", "-c", fmt.Sprintf("node -e \"const yaml = require('js-yaml'); const fs = require('fs'); const swagger = yaml.load(fs.readFileSync('swagger.yaml', 'utf8')); fs.writeFileSync('swagger.json', JSON.stringify(swagger));\" ")}).
+		WithExec([]string{"bun", "install", "--production"}).
+		WithExec([]string{"bun", "run", "generate-build-timestamp"}).
+		WithExec([]string{"bun", "--max_old_space_size=2048", "node_modules/@angular/cli/bin/ng", "build", "--configuration", "production"}).
+		WithExec([]string{"bun", "install", "js-yaml@4.1.0"}).
+		WithExec([]string{"sh", "-c", fmt.Sprintf("bun -e \"const yaml = require('js-yaml'); const fs = require('fs'); const swagger = yaml.load(fs.readFileSync('swagger.yaml', 'utf8')); fs.writeFileSync('swagger.json', JSON.stringify(swagger));\" ")}).
 		WithFile("dist/LICENSE", LICENSE).
 		WithWorkdir("app-swagger-ui").
-		WithExec([]string{"npm", "install", "--unsafe-perm"}).
-		WithExec([]string{"npm", "run", "build"}).
+		WithExec([]string{"bun", "install", "--unsafe-perm"}).
+		WithExec([]string{"bun", "run", "build"}).
 		WithWorkdir("/portal")
 
 	deployer := dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(string(platform))}).From("nginx:alpine").
