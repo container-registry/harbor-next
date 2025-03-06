@@ -33,6 +33,7 @@ type BuildMetadata struct {
 func New(
 	// +optional
 	// +defaultPath="./"
+	// +ignore=["bin"]
 	source *dagger.Directory,
 ) *Harbor {
 	return &Harbor{Source: source}
@@ -111,23 +112,16 @@ func (m *Harbor) Sign(ctx context.Context,
 		}).Stdout(ctx)
 }
 
-// to-do: going to work on this
+// Publishes All Images and variants
 func (m *Harbor) PublishAllImages(
 	ctx context.Context,
 	registry, registryUsername string,
 	imageTags []string,
 	registryPassword *dagger.Secret,
 ) []string {
-	allImages := m.buildAllImages(ctx)
-
-	// for i, tag := range imageTags {
-	// 	imageTags[i] = strings.TrimSpace(tag)
-	// 	if strings.HasPrefix(imageTags[i], "v") {
-	// 		imageTags[i] = strings.TrimPrefix(imageTags[i], "v")
-	// 	}
-	// }
 	fmt.Printf("provided tags: %s\n", imageTags)
 
+	allImages := m.buildAllImages(ctx)
 	platformVariantsContainer := make(map[Package][]*dagger.Container)
 	for _, meta := range allImages {
 		platformVariantsContainer[meta.Package] = append(platformVariantsContainer[meta.Package], meta.Container)
@@ -161,33 +155,38 @@ func (m *Harbor) PublishImage(
 	pkg Package,
 	registryPassword *dagger.Secret,
 ) []string {
-
-	// why do we need this @vad1mo any ideas??
-	// for i, tag := range imageTags {
-	// 	imageTags[i] = strings.TrimSpace(tag)
-	// 	if strings.HasPrefix(imageTags[i], "v") {
-	// 		imageTags[i] = strings.TrimPrefix(imageTags[i], "v")
-	// 	}
-	// }
-	fmt.Printf("provided tags: %s\n", imageTags)
-
 	var (
 		imageAddresses []string
 		images         []*dagger.Container
 	)
-	images = append(images, BuildImage)
-	for _, imageTag := range imageTags {
-		container := BuildImage.WithRegistryAuth(registry, registryUsername, registryPassword)
-		imgAddress, err := container.Publish(ctx,
-			fmt.Sprintf("%s/%s/%s:%s", registry, "harbor", pkg, imageTag),
-		)
-		if err != nil {
-			fmt.Printf("Failed to publish image: %s/%s/%s:%s\n", registry, "harbor", pkg, imageTag)
-			fmt.Printf("Error: %s\n", err)
-			continue
+
+	fmt.Printf("provided tags: %s\n", imageTags)
+
+	for _, platform := range targetPlatforms {
+		BuildImage := m.BuildImage(ctx, platform, pkg)
+		images = append(images, BuildImage)
+	}
+
+	platformVariantsContainer := make(map[Package][]*dagger.Container)
+	for _, image := range images {
+		platformVariantsContainer[pkg] = append(platformVariantsContainer[pkg], image)
+	}
+
+	for pkg, imgs := range platformVariantsContainer {
+		for _, imageTag := range imageTags {
+			container := dag.Container().WithRegistryAuth(registry, registryUsername, registryPassword)
+			imgAddress, err := container.Publish(ctx,
+				fmt.Sprintf("%s/%s/%s:%s", registry, "harbor-next", pkg, imageTag),
+				dagger.ContainerPublishOpts{PlatformVariants: imgs},
+			)
+			if err != nil {
+				fmt.Printf("Failed to publish image: %s/%s/%s:%s\n", registry, "harbor-next", pkg, imageTag)
+				fmt.Printf("Error: %s\n", err)
+				continue
+			}
+			imageAddresses = append(imageAddresses, imgAddress)
+			fmt.Printf("Published image: %s\n", imgAddress)
 		}
-		imageAddresses = append(imageAddresses, imgAddress)
-		fmt.Printf("Published image: %s\n", imgAddress)
 	}
 
 	return imageAddresses
@@ -365,9 +364,10 @@ func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package
 	if pkg == "core" {
 		gitCommit := m.fetchGitCommit(ctx)
 		version := m.getVersion(ctx)
+
 		m.lintAPIs(ctx)
-		dirWithSwagger := m.genAPIs(ctx)
-		m.Source = dirWithSwagger
+		srcWithSwagger = m.genAPIs(ctx)
+		m.Source = srcWithSwagger
 
 		ldflags = fmt.Sprintf(`-X github.com/goharbor/harbor/src/pkg/version.GitCommit=%s
                     -X github.com/goharbor/harbor/src/pkg/version.ReleaseVersion=%s
