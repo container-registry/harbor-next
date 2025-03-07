@@ -389,7 +389,7 @@ func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package
 	outputPath := fmt.Sprintf("bin/%s/%s", platform, pkg)
 	src := fmt.Sprintf("%s/main.go", pkg)
 	builder := dag.Container().
-		From("golang:latest").
+		From("golang:1.23.2").
 		WithMountedCache("/go/pkg/mod", dag.CacheVolume("go-mod-"+GO_VERSION)).
 		WithEnvVariable("GOMODCACHE", "/go/pkg/mod").
 		WithMountedCache("/go/build-cache", dag.CacheVolume("go-build-"+GO_VERSION)).
@@ -517,7 +517,7 @@ func (m *Harbor) buildPortal(ctx context.Context, platform Platform) *dagger.Con
 		WithFile("swagger.yaml", swaggerYaml).
 		WithExec([]string{"apt", "update"}).
 		WithExec([]string{"apt", "install", "unzip"}).
-		WithExec([]string{"bun", "install"}).
+		WithExec([]string{"bun", "install", "--no-verify", "--unsafe-perm"}).
 		WithExec([]string{"bun", "pm", "trust", "--all"}).
 		WithExec([]string{"bun", "install", "--no-verify"}).
 		WithExec([]string{"ls", "-al"}).
@@ -525,7 +525,7 @@ func (m *Harbor) buildPortal(ctx context.Context, platform Platform) *dagger.Con
 		WithExec([]string{"bun", "run", "node", "--max_old_space_size=2048", "node_modules/@angular/cli/bin/ng", "build", "--configuration", "production"})
 
 	builder := before.
-		WithExec([]string{"bun", "install", "js-yaml@4.1.0"}).
+		WithExec([]string{"bun", "install", "js-yaml@4.1.0", "--no-verify"}).
 		WithExec([]string{"sh", "-c", fmt.Sprintf("bun -e \"const yaml = require('js-yaml'); const fs = require('fs'); const swagger = yaml.load(fs.readFileSync('swagger.yaml', 'utf8')); fs.writeFileSync('swagger.json', JSON.stringify(swagger));\" ")}).
 		WithFile("/harbor/src/portal/dist/LICENSE", LICENSE)
 
@@ -572,7 +572,7 @@ func (m *Harbor) fetchGitCommit(ctx context.Context) string {
 
 	// temp container with git installed
 	temp := dag.Container().
-		From("golang:latest").
+		From("golang:1.23.2").
 		WithDirectory("/src", m.FilteredSrc, dirOpts).
 		WithWorkdir("/src")
 
@@ -611,7 +611,7 @@ func (m *Harbor) getVersion(ctx context.Context) string {
 	}
 
 	temp := dag.Container().
-		From("golang:latest").
+		From("golang:1.23.2").
 		WithDirectory("/src", m.FilteredSrc, dirOpts).
 		WithWorkdir("/src").
 		WithExec([]string{"ls", "-la"})

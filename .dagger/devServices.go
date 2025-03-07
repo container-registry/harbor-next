@@ -82,7 +82,7 @@ func (m *Harbor) RegistryCtlService(ctx context.Context) *dagger.Service {
 }
 
 func (m *Harbor) PostgresService(ctx context.Context) *dagger.Service {
-	postgres := dag.Container().From("goharbor/harbor-db:dev").
+	postgres := dag.Container().From("goharbor/harbor-db:v2.12.2").
 		WithExposedPort(5432).
 		WithEnvVariable("POSTGRES_PASSWORD", "root123").
 		AsService()
@@ -91,7 +91,7 @@ func (m *Harbor) PostgresService(ctx context.Context) *dagger.Service {
 
 func (m *Harbor) RedisService(ctx context.Context) *dagger.Service {
 	return dag.Container().
-		From("goharbor/redis-photon:dev").
+		From("goharbor/redis-photon:v2.12.2").
 		WithExposedPort(6379).
 		AsService()
 }
