@@ -13,9 +13,9 @@ func (m *Harbor) DevServer(ctx context.Context) (*dagger.Service, error) {
 	redisSrv := m.RedisService(ctx)
 	regSrv := m.RegistryService(ctx)
 	regCtlSrv := m.RegistryCtlService(ctx)
-	coreSrv := m.coreService(ctx)
+	coreSrv := m.CoreService(ctx)
 	jobSrv := m.JobService(ctx)
-	portalSrv := m.PortalService(ctx)
+	// portalSrv := m.PortalService(ctx)
 	nginxSrv := m.NginxService(ctx)
 
 	_, err = postgresSrv.WithHostname("postgresql").Start(ctx)
@@ -42,10 +42,10 @@ func (m *Harbor) DevServer(ctx context.Context) (*dagger.Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, err = portalSrv.WithHostname("portal").Start(ctx)
-	if err != nil {
-		return nil, err
-	}
+	// _, err = portalSrv.WithHostname("portal").Start(ctx)
+	// if err != nil {
+	// 	return nil, err
+	// }
 	proxy, err := nginxSrv.WithHostname("proxy").Start(ctx)
 	if err != nil {
 		return nil, err

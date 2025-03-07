@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 envFile="/envFile"
 
@@ -22,11 +22,16 @@ while IFS='=' read -r key value; do
   echo "Set $key=$value"
 done < "$envFile"
 
+# Execute the core command directly
+# $1 &
+
+# Get process ID of previously ran command
+# pid=$!
+
 # Execute the command (passed as $1 arg)
-echo "Executing: $1 with debug enabled at port: $2"
+echo "Executing: $1, with pid: $pid, with debug enabled at port: $2"
 
 # Start the dlv process in the background
-/go/bin/dlv exec --headless --listen localhost:$2 "$1" &
-
-# Execute the second command directly
-eval "$1"
+# /root/go/bin/dlv exec --headless --listen localhost:$2 $1
+/root/go/bin/dlv --headless=true --listen=localhost:4001 --accept-multiclient --log-output=debugger,debuglineerr,gdbwire,lldbout,rpc --log=true --continue --api-version=2 exec /core
+# /root/go/bin/dlv --headless=true --listen=localhost:4001 --accept-multiclient --log-output=debugger,debuglineerr,gdbwire,lldbout,rpc --log=true --api-version=2 attach $pid

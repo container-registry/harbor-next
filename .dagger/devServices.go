@@ -12,6 +12,8 @@ func (m *Harbor) NginxService(ctx context.Context) *dagger.Service {
 		// nginxSrv := dag.Container().From("goharbor/nginx-photon:dev").
 		WithMountedFile("/etc/nginx/nginx.conf", nginxConfig).
 		WithExposedPort(8080).
+		// for debug
+		WithExposedPort(4001).
 		WithoutExposedPort(8443).
 		AsService()
 	return nginxSrv
@@ -47,19 +49,30 @@ func (m *Harbor) JobService(ctx context.Context) *dagger.Service {
 	return jobSrv
 }
 
-func (m *Harbor) coreService(ctx context.Context) *dagger.Service {
+func (m *Harbor) CoreService(ctx context.Context) *dagger.Service {
 	coreConfig := m.Source.File(".dagger/config/core/app.conf")
 	envFile := m.Source.File(".dagger/config/core/env")
-	run_script := m.Source.File(".dagger/config/run_env.sh")
+	run_script := m.Source.File(".dagger/config/run_debug.sh")
+	// run_script := m.Source.File(".dagger/config/run_env.sh")
 
 	core := m.BuildImage(ctx, DEV_PLATFORM, "core").
 		WithMountedFile("/etc/core/app.conf", coreConfig).
 		WithMountedFile("/envFile", envFile).
 		WithMountedFile("/run_script", run_script).
-		WithExposedPort(8080).
+		// why alpine instead of golang. because we get the below error
+		// [INFO] [/src/common/dao/base.go:72]: Register database completed
+		// [FATAL] [/src/core/main.go:203]: failed to migrate the database, error: open .: no such file or directory
+		WithExposedPort(8080, dagger.ContainerWithExposedPortOpts{ExperimentalSkipHealthcheck: true}).
+		// WithServiceBinding("redis", m.RedisService(ctx)).
+		// WithServiceBinding("postgresql", m.PostgresService(ctx)).
+		// WithServiceBinding("registry", m.RegistryService(ctx)).
+		// WithServiceBinding("registryctl", m.RegistryCtlService(ctx)).
 		// WithExposedPort(80).
-		WithEntrypoint([]string{"/run_script", "/core"}).
-		AsService()
+		WithExposedPort(4001, dagger.ContainerWithExposedPortOpts{ExperimentalSkipHealthcheck: true}).
+		// WithEntrypoint([]string{"/root/go/bin/dlv", "--headless=true", "--listen=localhost:4001", "--accept-multiclient", "--log-output=debugger,debuglineerr,gdbwire,lldbout,rpc", "--log=true", "--api-config=2", "exec", "/core"}).
+		// WithEntrypoint([]string{"/run_script", "/root/go/bin/dlv --headless=true --listen=localhost:4001 --accept-multiclient --log-output=debugger,debuglineerr,gdbwire,lldbout,rpc --log=true --api-config=2 exec /core"}).
+		WithEntrypoint([]string{"/run_script", "/core", "4001"}).
+		AsService(dagger.ContainerAsServiceOpts{InsecureRootCapabilities: true})
 
 	return core
 }
