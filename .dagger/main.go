@@ -348,12 +348,12 @@ func (m *Harbor) buildImage(ctx context.Context, platform Platform, pkg Package)
 				WithExec([]string{"go", "install", "github.com/go-delve/delve/cmd/dlv@latest"}).
 				WithExposedPort(8080).
 				WithExposedPort(4001, dagger.ContainerWithExposedPortOpts{ExperimentalSkipHealthcheck: true}).
-				WithEntrypoint([]string{"/" + string(pkg)}).
+				// WithEntrypoint([]string{"/" + string(pkg)}).
 				// /root/go/bin/dlv --headless=true --listen=localhost:4001 --accept-multiclient --log-output=debugger,debuglineerr,gdbwire,lldbout,rpc --log=true --continue --api-version=2 exec $pkg
 				WithEntrypoint(append([]string{
 					"/root/go/bin/dlv",
 					"--headless=true",
-					"--listen=localhost:" + DEBUG_PORT,
+					"--listen=0.0.0.0:" + DEBUG_PORT,
 					"--accept-multiclient",
 					"--log-output=debugger,debuglineerr,gdbwire,lldbout,rpc",
 					"--log=true",
