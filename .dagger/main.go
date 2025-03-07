@@ -9,7 +9,6 @@ import (
 )
 
 // to-do: update registry to v3
-// to-do: add documentation
 // to-do: stop usage of shell things. No shell spawning
 
 type (
@@ -48,6 +47,7 @@ type Harbor struct {
 	FilteredSrc *dagger.Directory
 }
 
+// build, publish and sign all images
 func (m *Harbor) PublishAndSignAllImages(
 	ctx context.Context,
 	registry string,
@@ -152,7 +152,7 @@ func (m *Harbor) PublishAllImages(
 	return imageAddresses
 }
 
-// publishes the specific package with the given tag and version
+// publishes the specific image with the given tag
 func (m *Harbor) PublishImage(
 	ctx context.Context,
 	registry, registryUsername string,
@@ -197,6 +197,7 @@ func (m *Harbor) PublishImage(
 	return imageAddresses
 }
 
+// export all images as Tarball
 func (m *Harbor) ExportAllImages(ctx context.Context) *dagger.Directory {
 	metdata := m.buildAllImages(ctx)
 	artifacts := dag.Directory()
@@ -206,6 +207,7 @@ func (m *Harbor) ExportAllImages(ctx context.Context) *dagger.Directory {
 	return artifacts
 }
 
+// build all images
 func (m *Harbor) BuildAllImages(ctx context.Context) []*dagger.Container {
 	metdata := m.buildAllImages(ctx)
 	images := make([]*dagger.Container, len(metdata))
@@ -231,6 +233,7 @@ func (m *Harbor) buildAllImages(ctx context.Context) []*BuildMetadata {
 	return buildMetadata
 }
 
+// build single specified images
 func (m *Harbor) BuildImage(ctx context.Context, platform Platform, pkg Package) *dagger.Container {
 	buildMtd := m.buildImage(ctx, platform, pkg)
 	if pkg == "core" {
@@ -250,6 +253,7 @@ func (m *Harbor) BuildImage(ctx context.Context, platform Platform, pkg Package)
 	return buildMtd.Container
 }
 
+// internal function to build registry
 func (m *Harbor) registryBuilder(ctx context.Context) *dagger.File {
 	registry := dag.Container().From("golang:1.22.3").
 		WithMountedCache("/go/pkg/mod", dag.CacheVolume("go-mod-"+GO_VERSION)).
@@ -330,6 +334,7 @@ func (m *Harbor) buildImage(ctx context.Context, platform Platform, pkg Package)
 	return buildMtd
 }
 
+// build all binaries and return directory containing all binaries
 func (m *Harbor) BuildAllBinaries(ctx context.Context) *dagger.Directory {
 	output := dag.Directory()
 	builds := m.buildAllBinaries(ctx)
@@ -405,6 +410,7 @@ func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package
 	}
 }
 
+// internal function to build Nginx
 func (m *Harbor) buildNginx(ctx context.Context, platform Platform) *dagger.Container {
 	fmt.Println("🛠️  Building Harbor Nginx...")
 
@@ -425,6 +431,7 @@ func (m *Harbor) buildRegistry(ctx context.Context, platform Platform) *dagger.C
 		WithEntrypoint([]string{"/usr/bin/registry_DO_NOT_USE_GC", "serve", "/etc/registry/config.yml"})
 }
 
+// internal function to build Trivy Adapter
 func (m *Harbor) buildTrivyAdapter(ctx context.Context, platform Platform) *dagger.Container {
 	fmt.Println("🛠️  Building Trivy Adapter...")
 
@@ -459,6 +466,7 @@ func (m *Harbor) buildTrivyAdapter(ctx context.Context, platform Platform) *dagg
 		WithEntrypoint([]string{"/home/scanner/bin/scanner-trivy"})
 }
 
+// internal function to build harbor-portal
 func (m *Harbor) buildPortal(ctx context.Context, platform Platform) *dagger.Container {
 	fmt.Println("🛠️  Building Harbor Portal...")
 
@@ -547,6 +555,7 @@ func (m *Harbor) buildPortal(ctx context.Context, platform Platform) *dagger.Con
 	return deployer
 }
 
+// use to parse given platform as string
 func parsePlatform(platform string) (string, string, error) {
 	parts := strings.Split(platform, "/")
 	if len(parts) != 2 {
@@ -555,6 +564,7 @@ func parsePlatform(platform string) (string, string, error) {
 	return parts[0], parts[1], nil
 }
 
+// fetches git commit
 func (m *Harbor) fetchGitCommit(ctx context.Context) string {
 	dirOpts := dagger.ContainerWithDirectoryOpts{
 		Include: []string{".git"},
@@ -571,6 +581,7 @@ func (m *Harbor) fetchGitCommit(ctx context.Context) string {
 	return gitCommit
 }
 
+// generate APIs
 func (m *Harbor) genAPIs(_ context.Context) *dagger.Directory {
 	SWAGGER_VERSION := "v0.25.0"
 	SWAGGER_SPEC := "api/v2.0/swagger.yaml"
@@ -593,6 +604,7 @@ func (m *Harbor) genAPIs(_ context.Context) *dagger.Directory {
 	return temp
 }
 
+// get version from VERSION file
 func (m *Harbor) getVersion(ctx context.Context) string {
 	dirOpts := dagger.ContainerWithDirectoryOpts{
 		Include: []string{"VERSION"},
