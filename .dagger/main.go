@@ -401,7 +401,7 @@ func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package
 	var srcWithSwagger *dagger.Directory
 	// ldflags := "-extldflags=-static -s -w"
 	// for debug
-	ldflags := "-extldflags=-static -s"
+	ldflags := ""
 	goflags := "-buildvcs=false"
 	gcflags := `all=-N -l`
 
@@ -439,7 +439,7 @@ func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package
 		WithEnvVariable("GOOS", os).
 		WithEnvVariable("GOARCH", arch).
 		WithEnvVariable("CGO_ENABLED", "0").
-		WithExec([]string{"go", "build", goflags, "-gcflags", gcflags, "-o", outputPath, "-ldflags", ldflags, src})
+		WithExec([]string{"go", "build", goflags, "-gcflags=" + gcflags, "-o", outputPath, "-ldflags", ldflags, src})
 
 	return &BuildMetadata{
 		Package:    pkg,
