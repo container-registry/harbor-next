@@ -38,13 +38,18 @@ func New(
 	// +defaultPath="./"
 	// +ignore=[".dagger", "node_modules", ".github", "contrib", "docs", "icons", "tests", "make", "bin", "*.md"]
 	filteredSrc *dagger.Directory,
+	// +optional
+	// +defaultPath="./"
+	// +ignore=["*", "!.dagger"]
+	onlyDagger *dagger.Directory,
 ) *Harbor {
-	return &Harbor{Source: source, FilteredSrc: filteredSrc}
+	return &Harbor{Source: source, FilteredSrc: filteredSrc, OnlyDagger: onlyDagger}
 }
 
 type Harbor struct {
 	Source      *dagger.Directory
 	FilteredSrc *dagger.Directory
+	OnlyDagger  *dagger.Directory
 }
 
 // build, publish and sign all images
@@ -264,10 +269,10 @@ func (m *Harbor) registryBuilder(ctx context.Context) *dagger.File {
 		WithEnvVariable("BUILDTAGS", "include_oss include_gcs").
 		WithEnvVariable("GO111MODULE", "auto").
 		WithEnvVariable("CGO_ENABLED", "0").
-		WithMountedFile("/redis.patch", m.Source.File(".dagger/registry/redis.patch")).
 		WithWorkdir("/go/src/github.com/docker").
 		WithExec([]string{"git", "clone", "-b", REGISTRY_SRC_TAG, DISTRIBUTION_SRC}).
 		WithWorkdir("distribution").
+		WithFile("/redis.patch", m.OnlyDagger.File("./.dagger/registry/redis.patch")).
 		WithExec([]string{"git", "apply", "/redis.patch"}).
 		WithExec([]string{"echo", "build the registry binary"})
 
@@ -319,14 +324,45 @@ func (m *Harbor) buildImage(ctx context.Context, platform Platform, pkg Package)
 		}
 	} else {
 		buildMtd = m.buildBinary(ctx, platform, pkg)
-		img = dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(string(platform))}).From("busybox:latest").
+		img = dag.Container(dagger.ContainerOpts{Platform: dagger.Platform(string(platform))}).From("alpine:latest").
 			WithFile("/"+string(pkg), buildMtd.Container.File(buildMtd.BinaryPath))
 
-		// Set entrypoint
+		// // Set entrypoint
+		// if pkg == "jobservice" {
+		// 	img = img.WithEntrypoint([]string{"/" + string(pkg), "-c", "/etc/jobservice/config.yml"})
+		// } else if pkg == "registryctl" {
+		// 	img = img.WithEntrypoint([]string{"/" + string(pkg), "-c", "/etc/registryctl/config.yml"})
+		// }
+
+		// Set entrypoint based on package
+		entrypoint := []string{"/" + string(pkg)}
 		if pkg == "jobservice" {
-			img = img.WithEntrypoint([]string{"/" + string(pkg), "-c", "/etc/jobservice/config.yml"})
+			entrypoint = append(entrypoint, "-c", "/etc/jobservice/config.yml")
 		} else if pkg == "registryctl" {
-			img = img.WithEntrypoint([]string{"/" + string(pkg), "-c", "/etc/registryctl/config.yml"})
+			entrypoint = append(entrypoint, "-c", "/etc/registryctl/config.yml")
+		}
+
+		if DEBUG {
+			img = img.
+				WithExec([]string{"apk", "add", "go"}).
+				WithExec([]string{"go", "install", "github.com/go-delve/delve/cmd/dlv@latest"}).
+				WithExposedPort(8080).
+				WithExposedPort(4001, dagger.ContainerWithExposedPortOpts{ExperimentalSkipHealthcheck: true}).
+				WithEntrypoint([]string{"/" + string(pkg)}).
+				// /root/go/bin/dlv --headless=true --listen=localhost:4001 --accept-multiclient --log-output=debugger,debuglineerr,gdbwire,lldbout,rpc --log=true --continue --api-version=2 exec $pkg
+				WithEntrypoint(append([]string{
+					"/root/go/bin/dlv",
+					"--headless=true",
+					"--listen=localhost:" + DEBUG_PORT,
+					"--accept-multiclient",
+					"--log-output=debugger,debuglineerr,gdbwire,lldbout,rpc",
+					"--log=true",
+					"--continue",
+					"--api-version=2",
+					"exec",
+				}, entrypoint...))
+		} else {
+			img = img.WithEntrypoint(entrypoint)
 		}
 	}
 
@@ -363,13 +399,19 @@ func (m *Harbor) BuildBinary(ctx context.Context, platform Platform, pkg Package
 
 func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package) *BuildMetadata {
 	var srcWithSwagger *dagger.Directory
-	ldflags := "-extldflags=-static -s -w"
+	// ldflags := "-extldflags=-static -s -w"
+	// for debug
+	ldflags := "-extldflags=-static -s"
 	goflags := "-buildvcs=false"
+	gcflags := `all=-N -l`
 
 	os, arch, err := parsePlatform(string(platform))
 	if err != nil {
 		log.Fatalf("Error parsing platform: %v", err)
 	}
+
+	srcWithSwagger = m.genAPIs(ctx)
+	m.FilteredSrc = m.FilteredSrc.WithDirectory("/src/server/v2.0", srcWithSwagger)
 
 	if pkg == "core" {
 		gitCommit := m.fetchGitCommit(ctx)
@@ -378,9 +420,6 @@ func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package
 		m.lintAPIs(ctx)
 		// srcWithSwagger = m.genAPIs(ctx)
 		// m.Source = srcWithSwagger
-		srcWithSwagger = m.genAPIs(ctx)
-		m.FilteredSrc = m.FilteredSrc.WithDirectory("/src/server/v2.0", srcWithSwagger)
-
 		ldflags = fmt.Sprintf(`-X github.com/goharbor/harbor/src/pkg/version.GitCommit=%s
                     -X github.com/goharbor/harbor/src/pkg/version.ReleaseVersion=%s
       `, gitCommit, version)
@@ -400,7 +439,7 @@ func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package
 		WithEnvVariable("GOOS", os).
 		WithEnvVariable("GOARCH", arch).
 		WithEnvVariable("CGO_ENABLED", "0").
-		WithExec([]string{"go", "build", goflags, "-o", outputPath, "-ldflags", ldflags, src})
+		WithExec([]string{"go", "build", goflags, "-gcflags", gcflags, "-o", outputPath, "-ldflags", ldflags, src})
 
 	return &BuildMetadata{
 		Package:    pkg,
@@ -469,9 +508,6 @@ func (m *Harbor) buildTrivyAdapter(ctx context.Context, platform Platform) *dagg
 // internal function to build harbor-portal
 func (m *Harbor) buildPortal(ctx context.Context, platform Platform) *dagger.Container {
 	fmt.Println("🛠️  Building Harbor Portal...")
-
-	srcWithSwagger := m.genAPIs(ctx)
-	m.FilteredSrc = m.FilteredSrc.WithDirectory("/src/server/v2.0", srcWithSwagger)
 
 	swaggerYaml := dag.Container().From("alpine:latest").
 		// for better caching
