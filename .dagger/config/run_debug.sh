@@ -33,5 +33,5 @@ echo "Executing: $1, with pid: $pid, with debug enabled at port: $2"
 
 # Start the dlv process in the background
 # /root/go/bin/dlv exec --headless --listen localhost:$2 $1
-/root/go/bin/dlv --headless=true --listen=localhost:4001 --accept-multiclient --log-output=debugger,debuglineerr,gdbwire,lldbout,rpc --log=true --continue --api-version=2 exec /core
+dlv --headless=true --listen=localhost:4001 --accept-multiclient --log-output=debugger,debuglineerr,gdbwire,lldbout,rpc --log=true --continue --api-version=2 exec /core
 # /root/go/bin/dlv --headless=true --listen=localhost:4001 --accept-multiclient --log-output=debugger,debuglineerr,gdbwire,lldbout,rpc --log=true --api-version=2 attach $pid

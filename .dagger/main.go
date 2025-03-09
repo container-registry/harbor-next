@@ -345,8 +345,7 @@ func (m *Harbor) buildImage(ctx context.Context, platform Platform, pkg Package)
 
 		if DEBUG {
 			img = img.
-				WithExec([]string{"apk", "add", "go"}).
-				WithExec([]string{"go", "install", "github.com/go-delve/delve/cmd/dlv@latest"}).
+        WithExec([]string{"apk", "add", "delve=1.23.1-r2"}).
 				WithExposedPort(8080).
 				WithExposedPort(4001, dagger.ContainerWithExposedPortOpts{ExperimentalSkipHealthcheck: true}).
 				// WithEntrypoint([]string{"/" + string(pkg)}).
@@ -399,12 +398,16 @@ func (m *Harbor) BuildBinary(ctx context.Context, platform Platform, pkg Package
 }
 
 func (m *Harbor) buildBinary(ctx context.Context, platform Platform, pkg Package) *BuildMetadata {
-	var srcWithSwagger *dagger.Directory
-	// ldflags := "-extldflags=-static -s -w"
-	// for debug
-	ldflags := ""
+	var (
+		srcWithSwagger *dagger.Directory
+		ldflags        string
+	)
+
+	if !DEBUG {
+		ldflags = "-extldflags=-static -s -w"
+	}
 	goflags := "-buildvcs=false"
-	gcflags := `all=-N -l`
+	gcflags := "all=-N -l"
 
 	os, arch, err := parsePlatform(string(platform))
 	if err != nil {
