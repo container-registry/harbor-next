@@ -17,8 +17,8 @@ type (
 )
 
 var (
-	// targetPlatforms = []Platform{"linux/amd64", "linux/arm64"}
-	targetPlatforms = []Platform{"linux/amd64"}
+	targetPlatforms = []Platform{"linux/amd64", "linux/arm64"}
+	// targetPlatforms = []Platform{"linux/amd64"}
 	packages        = []Package{"core", "jobservice", "registryctl", "portal", "registry", "nginx", "cmd/exporter", "trivy-adapter"}
 	// packages = []string{"core", "jobservice"}
 )
@@ -351,7 +351,7 @@ func (m *Harbor) buildImage(ctx context.Context, platform Platform, pkg Package)
 				// WithEntrypoint([]string{"/" + string(pkg)}).
 				// /root/go/bin/dlv --headless=true --listen=localhost:4001 --accept-multiclient --log-output=debugger,debuglineerr,gdbwire,lldbout,rpc --log=true --continue --api-version=2 exec $pkg
 				WithEntrypoint(append([]string{
-					"/root/go/bin/dlv",
+					"dlv",
 					"--headless=true",
 					"--listen=0.0.0.0:" + DEBUG_PORT,
 					"--accept-multiclient",
@@ -630,7 +630,7 @@ func (m *Harbor) genAPIs(_ context.Context) *dagger.Directory {
 
 	temp := dag.Container().
 		From("quay.io/goswagger/swagger:"+SWAGGER_VERSION).
-		WithMountedDirectory("/src", m.FilteredSrc).
+		WithDirectory("/src", m.FilteredSrc).
 		WithWorkdir("/src").
 		WithExec([]string{"swagger", "version"}).
 		// Clean up old generated code and create necessary directories
