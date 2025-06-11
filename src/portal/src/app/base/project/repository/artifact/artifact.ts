@@ -115,6 +115,18 @@ export function hasPullCommand(artifact: Artifact): boolean {
     );
 }
 
+export function getPullCommandForTop(url: string, client: Clients): string {
+    if (url) {
+        if (Object.values(Clients).includes(client)) {
+            if (client == 'custom') {
+                return `${getCustomContainerRuntime()} pull ${url}`;
+            }
+            return `${client} pull ${url}`;
+        }
+    }
+    return null;
+}
+
 export function getPullCommandByDigest(
     artifactType: string,
     url: string,
