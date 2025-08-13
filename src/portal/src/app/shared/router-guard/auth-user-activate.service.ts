@@ -74,16 +74,16 @@ export class AuthCheckGuard {
                                 this.appConfigService.getConfig()
                                     .primary_auth_mode
                             ) {
-                                window.location.href =
-                                    '/c/oidc/login?redirect_url=' +
-                                    encodeURI(state.url);
-                                return observer.next(false);
+                                // window.location.href =
+                                    // '/c/oidc/login?redirect_url=' +
+                                    // encodeURI(state.url);
+                                return observer.next(true);
                             }
-                            this.router.navigate(
-                                [CommonRoutes.EMBEDDED_SIGN_IN],
-                                navigatorExtra
-                            );
-                            return observer.next(false);
+                            // this.router.navigate(
+                            //     [CommonRoutes.EMBEDDED_SIGN_IN],
+                            //     navigatorExtra
+                            // );
+                            return observer.next(true);
                         } else {
                             return observer.next(true);
                         }

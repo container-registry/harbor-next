@@ -145,6 +145,7 @@
         "PREFERENCES": "Preferences",
         "CHANGE_PWD": "修改密码",
         "ABOUT": "关于",
+        "LOGIN": "Log In",
         "LOGOUT": "退出"
     },
     "GLOBAL_SEARCH": {

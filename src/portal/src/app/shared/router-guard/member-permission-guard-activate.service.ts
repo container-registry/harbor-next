@@ -66,8 +66,8 @@ export class MemberPermissionGuard {
                         observer.next(permissionRouter);
                     },
                     error: error => {
-                        this.router.navigate([CommonRoutes.HARBOR_DEFAULT]);
-                        observer.next(false);
+                        // this.router.navigate([CommonRoutes.HARBOR_DEFAULT]);
+                        observer.next(true);
                         this.errorHandler.error(error);
                     },
                 });

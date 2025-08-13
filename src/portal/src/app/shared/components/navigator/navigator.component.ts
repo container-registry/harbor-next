@@ -206,6 +206,27 @@ export class NavigatorComponent implements OnInit {
         });
     }
 
+    logIn(): void {
+        let state = this.router.routerState.snapshot;
+        let navigatorExtra: NavigationExtras = {
+            queryParams: { redirect_url: state.url },
+        };
+
+        // if primary auth mode enabled, skip the first step
+        if (
+            this.appConfigService.getConfig().auth_mode ==
+                CONFIG_AUTH_MODE.OIDC_AUTH &&
+            this.appConfigService.getConfig().primary_auth_mode
+        ) {
+            window.location.href =
+                '/c/oidc/login?redirect_url=' + encodeURI(state.url);
+            return;
+        }
+
+        // if not primary auth mode
+        this.router.navigate([CommonRoutes.EMBEDDED_SIGN_IN], navigatorExtra);
+    }
+
     // Log out system
     logOut(): void {
         // Call the service to send out the http request
