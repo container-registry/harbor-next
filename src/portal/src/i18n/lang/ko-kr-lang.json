@@ -145,6 +145,7 @@
         "PREFERENCES": "Preferences",
         "CHANGE_PWD": "비밀번호 변경",
         "ABOUT": "About",
+        "LOGIN": "Log In",
         "LOGOUT": "로그아웃"
     },
     "GLOBAL_SEARCH": {
