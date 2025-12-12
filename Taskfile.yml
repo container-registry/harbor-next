@@ -1,0 +1,113 @@
+version: '3'
+
+output: prefixed
+
+set:
+  - errexit
+  - pipefail
+
+dotenv:
+  - .env
+  - .env.local
+
+vars:
+  GIT_COMMIT:
+    sh: git rev-parse --short=8 HEAD || echo "unknown"
+  VERSION:
+    sh: cat VERSION 2>/dev/null | tr -d '\n' || echo "dev"
+  TIMESTAMP:
+    sh: date -u +%Y%m%d%H%M%S
+
+  GO_VERSION: "1.24.6"
+  SWAGGER_VERSION: "v0.31.0"
+  GOLANGCILINT_VERSION: "latest"
+  DELVE_VERSION: "v1.25.1"
+  BUN_VERSION: "1.2.13"
+  NODE_VERSION: "16.18.0"
+  SPECTRAL_VERSION: "6.14.2"
+  TRIVY_VERSION: "0.64.1"
+
+  GOBUILD_FLAGS: "-buildvcs=false"
+
+  DISTRIBUTION_SRC: "https://github.com/distribution/distribution.git"
+  REGISTRY_SRC_TAG: "v3.0.0"
+
+  NPM_REGISTRY: "https://registry.npmjs.org/"
+
+includes:
+  build: ./taskfiles/build.yml
+  image: ./taskfiles/image.yml
+  test: ./taskfiles/test.yml
+  dev: ./taskfiles/dev.yml
+
+tasks:
+  default:
+    desc: "🚀 Start full development environment (foreground, auto-cleanup on exit)"
+    cmds:
+      - task: dev:up
+
+  build:
+    desc: "📦 Build all binaries"
+    cmds:
+      - task: build:all-binaries
+
+  test:
+    desc: "🧪 Run all tests"
+    cmds:
+      - task: test:all
+
+  images:
+    desc: "🐳 Build all Docker images"
+    cmds:
+      - task: image:all-images
+
+  clean:
+    desc: "🧹 Clean all build artifacts"
+    cmds:
+      - task: build:clean
+      - task: image:clean
+      - task: test:clean
+      - task: dev:clean
+      - echo "✅ All artifacts cleaned"
+
+  info:
+    desc: "ℹ️  Show build information and global variables"
+    silent: true
+    cmds:
+      - |
+        echo ""
+        echo "═══════════════════════════════════════════════════════════"
+        echo "  🚢 Harbor Build Information"
+        echo "═══════════════════════════════════════════════════════════"
+        echo ""
+        echo "Build Metadata:"
+        echo "  Version:        {{.VERSION}}"
+        echo "  Git Commit:     {{.GIT_COMMIT}}"
+        echo "  Build Time:     {{.TIMESTAMP}}"
+        echo ""
+        echo "Tool Versions:"
+        echo "  Go:             {{.GO_VERSION}}"
+        echo "  Swagger:        {{.SWAGGER_VERSION}}"
+        echo "  GolangCI-Lint:  {{.GOLANGCILINT_VERSION}}"
+        echo "  Delve:          {{.DELVE_VERSION}}"
+        echo "  Bun:            {{.BUN_VERSION}}"
+        echo "  Node:           {{.NODE_VERSION}}"
+        echo "  Spectral:       {{.SPECTRAL_VERSION}}"
+        echo "  Trivy:          {{.TRIVY_VERSION}}"
+        echo ""
+        echo "Build Configuration:"
+        echo "  Go Build Flags: {{.GOBUILD_FLAGS}}"
+        echo ""
+        echo "External Dependencies:"
+        echo "  Distribution:   {{.DISTRIBUTION_SRC}}"
+        echo "  Registry Tag:   {{.REGISTRY_SRC_TAG}}"
+        echo "  NPM Registry:   {{.NPM_REGISTRY}}"
+        echo ""
+        echo "═══════════════════════════════════════════════════════════"
+        echo ""
+
+  setup:
+    desc: "🔧 Setup development environment"
+    cmds:
+      - task: dev:setup
+

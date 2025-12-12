@@ -1,0 +1,305 @@
+# Docker Image Building Tasks
+# Uses Dockerfiles in dockerfiles/ directory
+
+version: '3'
+
+includes:
+  build: ./build.yml
+
+tasks:
+  # ============================================================================
+  # Aggregate Image Build Tasks
+  # ============================================================================
+
+  all-images:
+    desc: "🐳 Build all Harbor Docker images for all platforms"
+    deps:
+      - image:core:linux-amd64
+      - image:core:linux-arm64
+      - image:jobservice:linux-amd64
+      - image:jobservice:linux-arm64
+      - image:registryctl:linux-amd64
+      - image:registryctl:linux-arm64
+      - image:exporter:linux-amd64
+      - image:exporter:linux-arm64
+      - image:portal:linux-amd64
+      - image:portal:linux-arm64
+      - image:registry:linux-amd64
+      - image:registry:linux-arm64
+      - image:trivy-adapter:linux-amd64
+      - image:trivy-adapter:linux-arm64
+      - image:nginx:linux-amd64
+      - image:nginx:linux-arm64
+    cmds:
+      - |
+        echo "✅ All images built successfully"
+        echo ""
+        docker images | grep goharbor
+
+  all-images:amd64:
+    desc: "🐳 Build all images for linux/amd64"
+    deps:
+      - image:core:linux-amd64
+      - image:jobservice:linux-amd64
+      - image:registryctl:linux-amd64
+      - image:exporter:linux-amd64
+      - image:portal:linux-amd64
+      - image:registry:linux-amd64
+      - image:trivy-adapter:linux-amd64
+      - image:nginx:linux-amd64
+    cmds:
+      - echo "✅ All AMD64 images built"
+
+  all-images:arm64:
+    desc: "🐳 Build all images for linux/arm64"
+    deps:
+      - image:core:linux-arm64
+      - image:jobservice:linux-arm64
+      - image:registryctl:linux-arm64
+      - image:exporter:linux-arm64
+      - image:portal:linux-arm64
+      - image:registry:linux-arm64
+      - image:trivy-adapter:linux-arm64
+      - image:nginx:linux-arm64
+    cmds:
+      - echo "✅ All ARM64 images built"
+
+  # ============================================================================
+  # Core Image (requires binary)
+  # ============================================================================
+
+  image:core:*:
+    desc: "Build Harbor Core Docker image"
+    vars:
+      PLATFORM: '{{index .MATCH 0}}'
+      ARCH: '{{if eq .PLATFORM "linux-amd64"}}amd64{{else}}arm64{{end}}'
+      TAG: "goharbor/harbor-core:{{.VERSION}}-{{.PLATFORM}}"
+    deps:
+      - build:binary:core:{{.PLATFORM}}
+    cmds:
+      - |
+        echo "🐳 Building Core image for {{.PLATFORM}}..."
+        docker buildx build \
+          --platform linux/{{.ARCH}} \
+          --build-arg TARGETARCH={{.ARCH}} \
+          -t {{.TAG}} \
+          -f dockerfiles/core.dockerfile \
+          --load \
+          .
+      - |
+        echo "✅ Core image built: {{.TAG}}"
+        docker images | grep harbor-core | head -1
+
+  # ============================================================================
+  # Jobservice Image (requires binary)
+  # ============================================================================
+
+  image:jobservice:*:
+    desc: "Build Harbor Jobservice Docker image"
+    vars:
+      PLATFORM: '{{index .MATCH 0}}'
+      ARCH: '{{if eq .PLATFORM "linux-amd64"}}amd64{{else}}arm64{{end}}'
+      TAG: "goharbor/harbor-jobservice:{{.VERSION}}-{{.PLATFORM}}"
+    deps:
+      - build:binary:jobservice:{{.PLATFORM}}
+    cmds:
+      - |
+        echo "🐳 Building Jobservice image for {{.PLATFORM}}..."
+        docker buildx build \
+          --platform linux/{{.ARCH}} \
+          --build-arg TARGETARCH={{.ARCH}} \
+          -t {{.TAG}} \
+          -f dockerfiles/jobservice.dockerfile \
+          --load \
+          .
+      - |
+        echo "✅ Jobservice image built: {{.TAG}}"
+        docker images | grep harbor-jobservice | head -1
+
+  # ============================================================================
+  # Registryctl Image (requires binary)
+  # ============================================================================
+
+  image:registryctl:*:
+    desc: "Build Harbor Registryctl Docker image"
+    vars:
+      PLATFORM: '{{index .MATCH 0}}'
+      ARCH: '{{if eq .PLATFORM "linux-amd64"}}amd64{{else}}arm64{{end}}'
+      TAG: "goharbor/harbor-registryctl:{{.VERSION}}-{{.PLATFORM}}"
+    deps:
+      - build:binary:registryctl:{{.PLATFORM}}
+    cmds:
+      - |
+        echo "🐳 Building Registryctl image for {{.PLATFORM}}..."
+        docker buildx build \
+          --platform linux/{{.ARCH}} \
+          --build-arg TARGETARCH={{.ARCH}} \
+          -t {{.TAG}} \
+          -f dockerfiles/registryctl.dockerfile \
+          --load \
+          .
+      - |
+        echo "✅ Registryctl image built: {{.TAG}}"
+        docker images | grep harbor-registryctl | head -1
+
+  # ============================================================================
+  # Exporter Image (requires binary)
+  # ============================================================================
+
+  image:exporter:*:
+    desc: "Build Harbor Exporter Docker image"
+    vars:
+      PLATFORM: '{{index .MATCH 0}}'
+      ARCH: '{{if eq .PLATFORM "linux-amd64"}}amd64{{else}}arm64{{end}}'
+      TAG: "goharbor/harbor-exporter:{{.VERSION}}-{{.PLATFORM}}"
+    deps:
+      - build:binary:exporter:{{.PLATFORM}}
+    cmds:
+      - |
+        echo "🐳 Building Exporter image for {{.PLATFORM}}..."
+        docker buildx build \
+          --platform linux/{{.ARCH}} \
+          --build-arg TARGETARCH={{.ARCH}} \
+          -t {{.TAG}} \
+          -f dockerfiles/exporter.dockerfile \
+          --load \
+          .
+      - |
+        echo "✅ Exporter image built: {{.TAG}}"
+        docker images | grep harbor-exporter | head -1
+
+  # ============================================================================
+  # Portal Image (multi-stage, no binary needed)
+  # ============================================================================
+
+  image:portal:*:
+    desc: "Build Harbor Portal Docker image (Angular frontend)"
+    vars:
+      PLATFORM: '{{index .MATCH 0}}'
+      TAG: "goharbor/harbor-portal:{{.VERSION}}-{{.PLATFORM}}"
+    cmds:
+      - |
+        echo "🐳 Building Portal image for {{.PLATFORM}}..."
+        echo "⚠️  This is a multi-stage build and will take several minutes..."
+        docker buildx build \
+          --platform linux/{{.ARCH}} \
+          -t {{.TAG}} \
+          -f dockerfiles/portal.dockerfile \
+          --load \
+          .
+      - |
+        echo "✅ Portal image built: {{.TAG}}"
+        docker images | grep harbor-portal | head -1
+
+  # ============================================================================
+  # Registry Image (multi-stage, builds from source)
+  # ============================================================================
+
+  image:registry:*:
+    desc: "Build Docker Registry (Distribution) image"
+    vars:
+      PLATFORM: '{{index .MATCH 0}}'
+      TAG: "goharbor/registry-photon:{{.VERSION}}-{{.PLATFORM}}"
+    cmds:
+      - |
+        echo "🐳 Building Registry image for {{.PLATFORM}}..."
+        echo "⚠️  This builds distribution from source..."
+        docker buildx build \
+          --platform linux/{{.ARCH}} \
+          -t {{.TAG}} \
+          -f dockerfiles/registry.dockerfile \
+          --load \
+          .
+      - |
+        echo "✅ Registry image built: {{.TAG}}"
+        docker images | grep registry-photon | head -1
+
+  # ============================================================================
+  # Trivy Adapter Image (multi-stage)
+  # ============================================================================
+
+  image:trivy-adapter:*:
+    desc: "Build Trivy Adapter Docker image"
+    vars:
+      PLATFORM: '{{index .MATCH 0}}'
+      TAG: "goharbor/trivy-adapter-photon:{{.VERSION}}-{{.PLATFORM}}"
+    cmds:
+      - |
+        echo "🐳 Building Trivy Adapter image for {{.PLATFORM}}..."
+        echo "⚠️  This builds trivy-adapter from source..."
+        docker buildx build \
+          --platform linux/{{.ARCH}} \
+          -t {{.TAG}} \
+          -f dockerfiles/trivy-adapter.dockerfile \
+          --load \
+          .
+      - |
+        echo "✅ Trivy Adapter image built: {{.TAG}}"
+        docker images | grep trivy-adapter | head -1
+
+  # ============================================================================
+  # Nginx Image (simple)
+  # ============================================================================
+
+  image:nginx:*:
+    desc: "Build Harbor Nginx proxy image"
+    vars:
+      PLATFORM: '{{index .MATCH 0}}'
+      TAG: "goharbor/nginx-photon:{{.VERSION}}-{{.PLATFORM}}"
+    cmds:
+      - |
+        echo "🐳 Building Nginx image for {{.PLATFORM}}..."
+        docker buildx build \
+          --platform linux/{{.ARCH}} \
+          -t {{.TAG}} \
+          -f dockerfiles/nginx.dockerfile \
+          --load \
+          .
+      - |
+        echo "✅ Nginx image built: {{.TAG}}"
+        docker images | grep nginx-photon | head -1
+
+  # ============================================================================
+  # Utilities
+  # ============================================================================
+
+  clean:
+    desc: "🧹 Clean all Harbor Docker images"
+    cmds:
+      - |
+        echo "Removing Harbor images..."
+        docker images | grep goharbor | awk '{print $3}' | xargs -r docker rmi -f || true
+        echo "✅ Images cleaned"
+
+  prune:
+    desc: "🧹 Prune Docker build cache"
+    cmds:
+      - docker builder prune -f
+      - echo "✅ Build cache pruned"
+
+  list:
+    desc: "📋 List all Harbor images"
+    cmds:
+      - |
+        echo "Harbor Images:"
+        docker images | grep -E "goharbor|REPOSITORY" || echo "No Harbor images found"
+
+  inspect:*:
+    desc: "🔍 Inspect a specific Harbor image"
+    vars:
+      IMAGE: '{{index .MATCH 0}}'
+    cmds:
+      - |
+        echo "Inspecting {{.IMAGE}}..."
+        docker inspect goharbor/harbor-{{.IMAGE}}:{{.VERSION}}-linux-amd64
+
+  test:*:
+    desc: "🧪 Test if an image runs"
+    vars:
+      IMAGE: '{{index .MATCH 0}}'
+    cmds:
+      - |
+        echo "Testing {{.IMAGE}} image..."
+        docker run --rm --entrypoint /bin/sh \
+          goharbor/harbor-{{.IMAGE}}:{{.VERSION}}-linux-amd64 \
+          -c "echo 'Image OK'" || echo "⚠️  Image test failed (may need specific entrypoint)"

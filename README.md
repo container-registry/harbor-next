@@ -62,6 +62,40 @@ If you want to deploy Harbor on Kubernetes, please use the **[Harbor chart](http
 
 Refer to the **[documentation](https://goharbor.io/docs/)** for more details on how to use Harbor.
 
+## Development
+
+Harbor uses [Taskfile](https://taskfile.dev) for local development and building. This provides a fast, hybrid development environment with hot reload capabilities.
+
+### Quick Start
+
+**Prerequisites:**
+- [Task](https://taskfile.dev/installation/) v3.x
+- Docker 20.10.10+
+- Go 1.24.6+
+- Node.js 16+
+
+**Get Started:**
+```bash
+# Install Task
+brew install go-task/tap/go-task  # macOS
+# or: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d  # Linux
+
+# Start DevEnv
+task
+
+# Open http://localhost:4200
+```
+
+**Common Commands:**
+```bash
+task build               # Build all binaries
+task images              # Build all Docker images
+task test                # Run all tests
+task test:lint           # Run linters
+task clean               # Clean build artifacts
+task -l                  # Show all available tasks
+```
+
 ## OCI Distribution Conformance Tests
 
 Check the OCI distribution conformance tests [report](https://storage.googleapis.com/harbor-conformance-test/report.html) of Harbor.

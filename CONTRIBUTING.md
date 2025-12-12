@@ -139,6 +139,35 @@ The folder graph below shows the structure of the source code folder `harbor/src
 
 ### Setup Development Environment
 
+#### Prerequisites
+
+Before starting, ensure you have the following installed:
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| Go | 1.24.6+ | Backend development |
+| Node.js | 18+ | Frontend development |
+| Docker | 20.10+ | Infrastructure services |
+| Docker Compose | 2.0+ | Container orchestration |
+| Task | 3.0+ | Build automation (replaces Make) |
+
+Install Task (task runner):
+```bash
+# macOS
+brew install go-task
+
+# Linux
+sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
+
+# Windows
+choco install go-task
+```
+
+Install development tools:
+```bash
+task setup  # Installs Air (hot reload) and Delve (debugger)
+```
+
 #### Go
 Harbor backend is written in [Go](http://golang.org/). If you don't have a Harbor backend service development environment, please [set one up](https://golang.org/doc/install).
 
@@ -198,6 +227,117 @@ Harbor web UI is built based on [Clarity](https://vmware.github.io/clarity/) and
 To run the Web UI code, please refer to the UI [start](https://github.com/goharbor/harbor/tree/main/src/portal) guideline.
 
 To run the code, please refer to the [build](https://goharbor.io/docs/edge/build-customize-contribute/compile-guide/) guideline.
+
+### Running Harbor Locally
+
+This section explains how to spin up a fully functional Harbor instance on your local machine for development and testing.
+
+#### Quick Start
+
+```bash
+task dev:up
+# running `task` will call the default task `dev:up`   
+```
+
+This starts:
+- **PostgreSQL** on `localhost:5432`
+- **Redis/Valkey** on `localhost:6379`
+- **Docker Registry** on `localhost:50000`
+- **Harbor Core API** on `localhost:8080` (with hot reload)
+- **Harbor Portal** on `localhost:4200` (with HMR)
+
+Press `Ctrl+C` to stop all services (auto-cleanup enabled).
+
+#### Running Services Individually
+
+For more control, start services separately:
+
+```bash
+# 1. Start infrastructure (PostgreSQL, Redis, Registry)
+task dev:infra:up
+
+# 2. In a new terminal - Start Core API with hot reload
+task dev:backend:core
+
+# 3. In another terminal - Start Portal with hot module replacement
+task dev:frontend
+```
+
+#### Accessing Harbor
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| Portal (Web UI) | http://localhost:4200 | admin / Harbor12345 |
+| API | http://localhost:8080/api/v2.0 | admin / Harbor12345 |
+| API Health | http://localhost:8080/api/v2.0/ping | - |
+
+#### Testing with Docker CLI
+
+To push/pull images to your local Harbor instance, you need to configure Docker to communicate with Harbor running on your host machine.
+
+**Important:** On Docker Desktop (macOS/Windows), Docker runs inside a Linux VM. Use `host.docker.internal` to reach services on your host.
+
+**Step 1: Configure Docker Insecure Registries**
+
+Add to `~/.docker/daemon.json`:
+```json
+{
+  "insecure-registries": [
+    "host.docker.internal:8080"
+  ]
+}
+```
+
+Restart Docker Desktop after making this change.
+
+**Step 2: Login to Harbor**
+
+```bash
+# Login using host.docker.internal (NOT localhost)
+docker login -u admin -p Harbor12345 host.docker.internal:8080
+```
+
+**Step 3: Push an Image**
+
+```bash
+# Create a test project in Harbor UI first (e.g., "library")
+# Then tag and push an image:
+docker pull alpine
+docker tag alpine host.docker.internal:8080/library/alpine:latest
+docker push host.docker.internal:8080/library/alpine:latest
+```
+
+**Why `host.docker.internal` instead of `localhost`?**
+
+On Docker Desktop, `localhost` inside the Docker VM refers to the VM itself, not your host machine. `host.docker.internal` is Docker's special hostname that resolves to the host.
+
+**Note for Windows Users:** We recommend using WSL2 (Windows Subsystem for Linux) for Harbor development. WSL2 provides a native Linux environment with better Docker integration. When using WSL2 with Docker Desktop's WSL2 backend, you can use `localhost` directly as services run in the same network namespace.
+
+#### Debugging
+
+Start Core with Delve debugger attached:
+```bash
+task dev:debug:core  # Debugger on port 4001
+```
+
+Connect with VS Code or `dlv connect localhost:4001`.
+
+#### Database Operations
+
+```bash
+task dev:db:shell    # Open PostgreSQL shell
+task dev:db:migrate  # Run migrations
+task dev:db:reset    # Reset database (deletes all data)
+```
+
+#### Useful Commands
+
+```bash
+task dev:status      # Show status of all services
+task dev:infra:logs  # View infrastructure logs
+task dev:clean       # Clean up all containers and temp files
+task --list-all      # List all available tasks
+```
 
 ## Contribute Workflow
 

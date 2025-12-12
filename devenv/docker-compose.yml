@@ -1,0 +1,202 @@
+# Docker Compose - Local DevEnv
+# All Harbor services run in containers with hot reload
+# Services communicate via Docker network (no localhost issues)
+
+services:
+  postgresql:
+    image: postgres:16-alpine
+    container_name: harbor-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root123
+      POSTGRES_DB: registry
+    ports:
+      - "5432:5432"
+    volumes:
+      - harbor-postgres-data:/var/lib/postgresql/data
+      - ../make/migrations:/migrations
+
+  redis:
+    image: valkey/valkey:latest
+    container_name: harbor-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - harbor-redis-data:/data
+
+  registry:
+    image: distribution/distribution:latest
+    container_name: harbor-registry
+    environment:
+      OTEL_TRACES_EXPORTER: none
+      OTEL_SDK_DISABLED: "true"
+    ports:
+      - "50000:5000"
+    volumes:
+      - harbor-registry-data:/var/lib/registry
+      - ../devenv/registry.config.yml:/etc/registry/config.yml:ro
+
+  # Core API - starts with: docker compose --profile core up
+  core:
+    build:
+      context: ..
+      dockerfile: dockerfiles/dev.dockerfile
+    container_name: harbor-core
+    profiles: [core]
+    volumes:
+      - ..:/app
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    ports:
+      - "8080:8080"
+      - "2345:2345"
+    environment:
+      # Database
+      POSTGRESQL_HOST: postgresql
+      POSTGRESQL_PORT: "5432"
+      POSTGRESQL_USERNAME: postgres
+      POSTGRESQL_PASSWORD: root123
+      POSTGRESQL_DATABASE: registry
+      POSTGRESQL_SSLMODE: disable
+      POSTGRES_MIGRATION_SCRIPTS_PATH: make/migrations/postgresql/
+      # Redis
+      _REDIS_URL_CORE: redis://redis:6379/1
+      _REDIS_URL_REG: redis://redis:6379/2
+      # Registry
+      REGISTRY_URL: http://registry:5000
+      REGISTRY_CONTROLLER_URL: http://registryctl:8080
+      REGISTRY_CREDENTIAL_USERNAME: ""
+      REGISTRY_CREDENTIAL_PASSWORD: ""
+      # Core settings
+      EXT_ENDPOINT: http://core:8080
+      CORE_URL: http://core:8080
+      HARBOR_ADMIN_PASSWORD: Harbor12345
+      CACHE_ENABLED: "false"
+      LOG_LEVEL: debug
+      # Token signing key
+      TOKEN_PRIVATE_KEY_PATH: devenv/token_service_key.pem
+      # JobService
+      JOBSERVICE_URL: http://jobservice:8888
+      CORE_SECRET: devenv-secret-do-not-use-in-production
+      JOBSERVICE_SECRET: devenv-secret-do-not-use-in-production
+      # Trivy scanner
+      TRIVY_ADAPTER_URL: http://trivy-adapter:8080
+      WITH_TRIVY: "true"
+    command: air -c devenv/air.core.toml
+    depends_on:
+      - postgresql
+      - redis
+      - registry
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/api/v2.0/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # JobService - starts with: docker compose --profile jobservice up
+  jobservice:
+    build:
+      context: ..
+      dockerfile: dockerfiles/dev.dockerfile
+    container_name: harbor-jobservice
+    profiles: [jobservice]
+    volumes:
+      - ..:/app
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    ports:
+      - "8888:8888"
+      - "2346:2346"
+    environment:
+      # Database
+      POSTGRESQL_HOST: postgresql
+      POSTGRESQL_PORT: "5432"
+      POSTGRESQL_USERNAME: postgres
+      POSTGRESQL_PASSWORD: root123
+      POSTGRESQL_DATABASE: registry
+      POSTGRESQL_SSLMODE: disable
+      # Redis
+      REDIS_URL: redis://redis:6379
+      # Core
+      CORE_URL: http://core:8080
+      CORE_SECRET: devenv-secret-do-not-use-in-production
+      JOBSERVICE_SECRET: devenv-secret-do-not-use-in-production
+      # Registry
+      REGISTRY_URL: http://registry:5000
+      REGISTRY_CONTROLLER_URL: http://registryctl:8080
+      REGISTRY_CREDENTIAL_USERNAME: ""
+      REGISTRY_CREDENTIAL_PASSWORD: ""
+      TOKEN_SERVICE_URL: http://core:8080/service/token
+      LOG_LEVEL: debug
+    command: air -c devenv/air.jobservice.toml
+    depends_on:
+      core:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8888/api/v1/stats"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # Trivy scanner adapter - starts with: docker compose --profile trivy up
+  trivy-adapter:
+    image: goharbor/trivy-adapter-photon:v2.14.0
+    container_name: harbor-trivy
+    profiles: [trivy]
+    environment:
+      SCANNER_LOG_LEVEL: debug
+      SCANNER_REDIS_URL: redis://redis:6379
+      SCANNER_STORE_REDIS_URL: redis://redis:6379
+      SCANNER_STORE_REDIS_NAMESPACE: harbor.scanner.trivy:store
+      SCANNER_JOB_QUEUE_REDIS_URL: redis://redis:6379
+      SCANNER_JOB_QUEUE_REDIS_NAMESPACE: harbor.scanner.trivy:job-queue
+      SCANNER_TRIVY_CACHE_DIR: /tmp/trivy
+      SCANNER_TRIVY_REPORTS_DIR: /tmp/reports
+      SCANNER_TRIVY_VULN_TYPE: os,library
+      SCANNER_TRIVY_SEVERITY: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+      SCANNER_TRIVY_INSECURE: "true"
+      SCANNER_API_SERVER_ADDR: ":8080"
+    ports:
+      - "8081:8080"
+    tmpfs:
+      - /tmp:size=2G,mode=1777
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/probe/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Portal (Angular UI) - starts with: docker compose --profile portal up
+  portal:
+    build:
+      context: ..
+      dockerfile: dockerfiles/dev.portal.dockerfile
+    container_name: harbor-portal
+    profiles: [portal]
+    volumes:
+      - ../src/portal:/app
+      - ../api/v2.0/swagger.yaml:/app/swagger.yaml:ro
+      - portal-node-modules:/app/node_modules
+      - portal-npm-cache:/root/.npm
+      - portal-angular-cache:/app/.angular
+    ports:
+      - "4200:4200"
+    environment:
+      NODE_OPTIONS: "--max_old_space_size=2048"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:4200"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  harbor-postgres-data:
+  harbor-redis-data:
+  harbor-registry-data:
+  go-mod-cache:
+  go-build-cache:
+  portal-node-modules:
+  portal-npm-cache:
+  portal-angular-cache:

@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git log:*)",
+      "Bash(task build:gen-apis:*)",
+      "Bash(curl:*)",
+      "Bash(PGPASSWORD=root123 psql:*)",
+      "Skill(taskfile)",
+      "WebSearch",
+      "Bash(cat:*)",
+      "Bash(openssl x509:*)",
+      "Bash(lsof -nP -iTCP:4200)",
+      "Bash(air --help:*)",
+      "Skill(delve-mcp)",
+      "mcp__delve-mcp__set_breakpoint",
+      "mcp__delve-mcp__continue",
+      "mcp__delve-mcp__list_breakpoints",
+      "mcp__delve-mcp__close",
+      "Bash(docker compose:*)",
+      "Bash(DOCKER_CLI_DEBUG=1 docker login:*)",
+      "Bash(docker system info:*)",
+      "Bash(docker login:*)",
+      "Bash(lsof:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(git rev-parse:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(docker-compose:*)",
+      "Bash(pgrep:*)",
+      "Bash(xargs:*)",
+      "Bash(task --list)",
+      "Bash(docker manifest inspect:*)",
+      "Bash(go build:*)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "Dagger",
+    "gopls",
+    "delve-mcp"
+  ]
+}

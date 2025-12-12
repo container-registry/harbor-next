@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "Dagger": {
+      "command": "dagger",
+      "args": ["mcp"],
+      "timeout": 300000
+    },
+    "gopls": {
+      "command": "gopls",
+      "args": ["mcp"]
+    },
+    "delve-mcp": {
+      "command": "/Users/vadim/go/bin/mcp-go-debugger",
+      "args": []
+    }
+  }
+}

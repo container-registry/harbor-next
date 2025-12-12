@@ -1,0 +1,167 @@
+# Harbor Dockerfiles
+
+This directory contains Dockerfiles for building Harbor component images. These Dockerfiles are based on the logic extracted from `.dagger/main.go`.
+
+## Overview
+
+All Dockerfiles support multi-architecture builds (linux/amd64, linux/arm64) using `TARGETARCH` build argument.
+
+**Image Types:**
+- **Production images**: Use scratch/minimal base images for security and size
+- **Debug support**: Use `docker debug` or `podman debug` instead of separate debug images
+
+## Components
+
+### Binary-Based Services (Production - FROM scratch)
+
+These services use pre-built Go binaries with minimal base images:
+
+- **`core.dockerfile`** - Harbor Core API service (scratch + CA certs + binary + runtime deps)
+- **`jobservice.dockerfile`** - Background job processing service (scratch + CA certs + binary)
+- **`registryctl.dockerfile`** - Registry controller service (scratch + CA certs + binary)
+- **`exporter.dockerfile`** - Prometheus metrics exporter (scratch + CA certs + binary)
+
+**Build Context Requirements:**
+- Binary must be at: `bin/linux-${TARGETARCH}/<service-name>`
+- Example: `bin/linux-amd64/core`
+
+**Build Command Example:**
+```bash
+# Build binary first
+task build:binary:core:linux-amd64
+
+# Build image
+docker buildx build \
+  --platform linux/amd64 \
+  --build-arg TARGETARCH=amd64 \
+  -t goharbor/harbor-core:dev \
+  -f dockerfiles/core.dockerfile \
+  .
+```
+
+### Multi-Stage Build Services
+
+These services include build stages:
+
+- **`portal.dockerfile`** - Angular frontend (Node.js + Bun build → Nginx:alpine)
+  - Builds Angular app with Swagger UI
+  - Final stage: nginx:alpine
+  - Includes CA certificates
+
+- **`registry.dockerfile`** - Docker Distribution registry (golang:alpine build → scratch)
+  - Clones and builds distribution/distribution v3.0.0
+  - Includes CVE-2025-22872 fix
+  - Final stage: scratch with CA certs
+  - Sets OTEL_TRACES_EXPORTER=none
+
+- **`trivy-adapter.dockerfile`** - Trivy vulnerability scanner (golang build → aquasec/trivy:0.58.1)
+  - Builds harbor-scanner-trivy v0.33.2
+  - Downloads trivy binary v0.64.1
+  - Final stage: aquasec/trivy:0.58.1 base image
+
+- **`nginx.dockerfile`** - Nginx reverse proxy (nginx:alpine)
+  - Minimal nginx:alpine with CA certs
+  - No custom config in image (config provided at runtime)
+
+**Build Command Example:**
+```bash
+docker buildx build \
+  --platform linux/amd64 \
+  -t goharbor/harbor-portal:dev \
+  -f dockerfiles/portal.dockerfile \
+  .
+```
+
+## Debugging
+
+Instead of maintaining separate debug images, use Docker/Podman debug tools:
+
+**Docker Debug:**
+```bash
+# Start container
+docker run -d --name harbor-core goharbor/harbor-core:dev
+
+# Attach debugger
+docker debug harbor-core
+```
+
+**Podman Debug (experimental):**
+```bash
+# Start container
+podman run -d --name harbor-core goharbor/harbor-core:dev
+
+# Debug (if available in your podman version)
+podman debug harbor-core
+```
+
+## Directory Structure
+
+```
+dockerfiles/
+├── README.md                    # This file
+├── core.dockerfile              # Core service (scratch base)
+├── jobservice.dockerfile        # Job service (scratch base)
+├── registryctl.dockerfile       # Registry controller (scratch base)
+├── exporter.dockerfile          # Metrics exporter (scratch base)
+├── portal.dockerfile            # Angular frontend (nginx:alpine)
+├── registry.dockerfile          # Docker registry (scratch base)
+├── trivy-adapter.dockerfile     # Trivy scanner (aquasec/trivy base)
+└── nginx.dockerfile             # Nginx proxy (nginx:alpine)
+```
+
+## Usage with Taskfile
+
+These Dockerfiles are used by Taskfile tasks in `taskfiles/image.yml`:
+
+```bash
+# Build single image
+task image:image:core:linux-amd64
+
+# Build all images
+task image:all-images
+```
+
+## Runtime Dependencies
+
+Some services require additional files:
+
+- **Core**: `/migrations` (from `make/migrations`), `/icons`, `/views` (from `src/core/views`)
+- **Portal**: `.dagger/config/portal/nginx.conf` (nginx configuration)
+- **Jobservice**: Config mounted at `/etc/jobservice/config.yml`
+- **Registryctl**: Config mounted at `/etc/registryctl/config.yml`
+- **Registry**: Config mounted at `/etc/registry/config.yml`
+
+## Differences from make/photon
+
+These Dockerfiles **do not use** the legacy Dockerfiles in `make/photon/`. Key differences:
+
+- ✅ Based on current Dagger implementation (.dagger/main.go)
+- ✅ Production images use **scratch** base (not Alpine) for security
+- ✅ Support for multi-architecture builds (linux/amd64, linux/arm64)
+- ✅ Optimized layer caching
+- ✅ Minimal attack surface (scratch base = no shell, no package manager)
+- ✅ Clear separation of build and runtime stages
+- ✅ Use docker/podman debug instead of debug images
+
+## Image Base Summary
+
+| Component | Base Image | Size | Notes |
+|-----------|------------|------|-------|
+| core | scratch | Minimal | CA certs + binary + deps |
+| jobservice | scratch | Minimal | CA certs + binary |
+| registryctl | scratch | Minimal | CA certs + binary |
+| exporter | scratch | Minimal | CA certs + binary |
+| portal | nginx:alpine | ~50MB | Includes built Angular app |
+| registry | scratch | Minimal | CA certs + registry binary |
+| trivy-adapter | aquasec/trivy:0.58.1 | ~400MB | Includes trivy scanner |
+| nginx | nginx:alpine | ~45MB | Minimal reverse proxy |
+
+## Notes
+
+- **Scratch base images** have no shell, no package manager - maximum security
+- CA certificates are copied from Alpine for HTTPS support
+- Binary-based images expect binaries to be built before image build
+- Multi-stage builds happen entirely in Docker (no pre-built binaries needed)
+- Portal requires Bun 1.2.13 for faster builds
+- Registry includes CVE-2025-22872 security fix
+- All images follow Dagger logic from `.dagger/main.go`
