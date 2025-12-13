@@ -183,13 +183,14 @@ services:
       - portal-angular-cache:/app/.angular
     ports:
       - "4200:4200"
+      - "9229:9229"  # Node.js debugger
     environment:
-      NODE_OPTIONS: "--max_old_space_size=2048"
+      NODE_OPTIONS: "--max_old_space_size=2048 --inspect=0.0.0.0:9229"
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:4200"]
       interval: 10s
       timeout: 5s
-      retries: 30
+      retries: 3
 
 volumes:
   harbor-postgres-data:

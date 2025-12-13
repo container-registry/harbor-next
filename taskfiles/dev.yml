@@ -61,13 +61,14 @@ tasks:
       - task build:gen-apis
       - defer: { task: dev:down }
       - |
-        echo "Portal:     http://localhost:4200/"
-        echo "API:        http://localhost:8080/api/v2.0"
-        echo "JobService: http://localhost:8888"
-        echo "Trivy:      http://localhost:8081"
-        echo "Delve Core: localhost:2345"
-        echo "Delve Job:  localhost:2346"
-      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile portal --profile core --profile jobservice --profile trivy up --build
+        echo "Portal:      http://localhost:4200/"
+        echo "API:         http://localhost:8080/api/v2.0"
+        echo "JobService:  http://localhost:8888"
+        echo "Trivy:       http://localhost:8081"
+        echo "Debug Portal: chrome://inspect (port 9229)"
+        echo "Debug Core:   localhost:2345"
+        echo "Debug Job:    localhost:2346"
+      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile trivy up --build
 
   down:
     desc: Stop all dev environment services
