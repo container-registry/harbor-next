@@ -919,7 +919,8 @@
     "PAGE_NOT_FOUND": {
         "MAIN_TITLE": "Sayfa Bulunamadı",
         "SUB_TITLE": "Ana sayfaya yönlendiriliyor",
-        "UNIT": "saniyeler..."
+        "UNIT": "saniyeler...",
+        "REDIRECTING": "Projeniz bulunuyor..."
     },
     "ABOUT": {
         "VERSION": "Versiyon",

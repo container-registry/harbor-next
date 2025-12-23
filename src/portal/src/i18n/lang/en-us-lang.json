@@ -919,7 +919,8 @@
     "PAGE_NOT_FOUND": {
         "MAIN_TITLE": "Page not found",
         "SUB_TITLE": "Redirecting to main page in",
-        "UNIT": "seconds..."
+        "UNIT": "seconds...",
+        "REDIRECTING": "Locating your project..."
     },
     "ABOUT": {
         "VERSION": "Version",

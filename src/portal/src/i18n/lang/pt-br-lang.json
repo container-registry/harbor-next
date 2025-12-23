@@ -922,7 +922,8 @@
     "PAGE_NOT_FOUND": {
         "MAIN_TITLE": "Página não encontrada",
         "SUB_TITLE": "Redirecionando para a página principal em",
-        "UNIT": "segundos..."
+        "UNIT": "segundos...",
+        "REDIRECTING": "Localizando seu projeto..."
     },
     "ABOUT": {
         "VERSION": "Versão",

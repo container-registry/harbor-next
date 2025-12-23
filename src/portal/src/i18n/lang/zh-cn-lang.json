@@ -921,7 +921,8 @@
     "PAGE_NOT_FOUND": {
         "MAIN_TITLE": "页面不存在",
         "SUB_TITLE": "正在重定向到首页：",
-        "UNIT": "秒..."
+        "UNIT": "秒...",
+        "REDIRECTING": "正在查找您的项目..."
     },
     "ABOUT": {
         "VERSION": "版本",

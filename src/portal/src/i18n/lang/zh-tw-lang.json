@@ -918,9 +918,10 @@
         "TEST_OIDC_SUCCESS": "已驗證 OIDC 伺服器的連線。"
     },
     "PAGE_NOT_FOUND": {
-        "MAIN_TITLE": "找不到頁面",
-        "SUB_TITLE": "將在",
-        "UNIT": "秒後重新導向至主頁..."
+        "MAIN_TITLE": "頁面不存在",
+        "SUB_TITLE": "正在重新導向到首頁：",
+        "UNIT": "秒...",
+        "REDIRECTING": "正在查找您的項目..."
     },
     "ABOUT": {
         "VERSION": "版本",

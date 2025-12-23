@@ -1,14 +1,25 @@
 <div class="wrapper-back">
-    <div>
-        <clr-icon shape="warning" class="is-warning" size="96"></clr-icon>
-        <span class="status-code">404</span>
-        <span class="status-text">{{
-            'PAGE_NOT_FOUND.MAIN_TITLE' | translate
-        }}</span>
-    </div>
-    <div class="status-subtitle">
-        {{ 'PAGE_NOT_FOUND.SUB_TITLE' | translate }}
-        <span class="second-number">{{ leftSeconds }}</span>
-        {{ 'PAGE_NOT_FOUND.UNIT' | translate }}
-    </div>
+    <ng-container *ngIf="isCheckingPullUrl; else notFoundContent">
+        <div>
+            <span class="spinner spinner-lg"></span>
+        </div>
+        <div class="status-subtitle">
+            {{ 'PAGE_NOT_FOUND.REDIRECTING' | translate }}
+        </div>
+    </ng-container>
+
+    <ng-template #notFoundContent>
+        <div>
+            <clr-icon shape="warning" class="is-warning" size="96"></clr-icon>
+            <span class="status-code">404</span>
+            <span class="status-text">{{
+                'PAGE_NOT_FOUND.MAIN_TITLE' | translate
+            }}</span>
+        </div>
+        <div class="status-subtitle">
+            {{ 'PAGE_NOT_FOUND.SUB_TITLE' | translate }}
+            <span class="second-number">{{ leftSeconds }}</span>
+            {{ 'PAGE_NOT_FOUND.UNIT' | translate }}
+        </div>
+    </ng-template>
 </div>
