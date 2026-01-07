@@ -16,8 +16,9 @@ import { ErrorHandler } from '../../../shared/units/error-handler';
 import { finalize } from 'rxjs/operators';
 import { AuditlogService } from '../../../../../ng-swagger-gen/services/auditlog.service';
 import { AuditLogExt } from '../../../../../ng-swagger-gen/models/audit-log-ext';
-import { ClrDatagridStateInterface } from '@clr/angular';
+import { ClrDatagridStateInterface, ClrLoadingState } from '@clr/angular';
 import {
+    downloadJson,
     getPageSizeFromLocalStorage,
     PageSizeMapKeys,
     setPageSizeToLocalStorage,
@@ -40,6 +41,7 @@ export class AuditLogComponent {
     );
     currentPage: number = 1; // Double bound to pagination component
     totalCount: number = 0;
+    downloadBtnState: ClrLoadingState = ClrLoadingState.DEFAULT;
 
     constructor(
         private logService: AuditlogService,
@@ -114,5 +116,47 @@ export class AuditLogComponent {
                     this.errorHandler.error(error);
                 }
             );
+    }
+
+    downloadAuditLogs(): void {
+        this.downloadBtnState = ClrLoadingState.LOADING;
+        const allLogs: AuditLogExt[] = [];
+        const maxLogs = 10000;
+        const pageSize = 100;
+
+        const fetchPage = (page: number) => {
+            const params: ListAuditLogExtsParams = {
+                page: page,
+                pageSize: pageSize,
+            };
+            this.logService.listAuditLogExtsResponse(params).subscribe(
+                response => {
+                    const logs = response.body as AuditLogExt[];
+                    allLogs.push(...logs);
+
+                    const totalCount = parseInt(
+                        response.headers.get('x-total-count') || '0',
+                        10
+                    );
+                    const hasMore =
+                        logs.length === pageSize &&
+                        allLogs.length < maxLogs &&
+                        allLogs.length < totalCount;
+
+                    if (hasMore) {
+                        fetchPage(page + 1);
+                    } else {
+                        downloadJson(allLogs, 'audit-logs.json');
+                        this.downloadBtnState = ClrLoadingState.DEFAULT;
+                    }
+                },
+                error => {
+                    this.errorHandler.error(error);
+                    this.downloadBtnState = ClrLoadingState.DEFAULT;
+                }
+            );
+        };
+
+        fetchPage(1);
     }
 }
