@@ -9,6 +9,7 @@ set:
 dotenv:
   - .env
   - .env.local
+  - devenv/ports.env
 
 vars:
   GIT_COMMIT:

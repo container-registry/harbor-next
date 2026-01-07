@@ -33,7 +33,7 @@ src/portal/typings/
 .vscode/
 **/node_modules
 **/ssl/
-**/proxy.config.mjs
+src/portal/proxy.config.mjs
 
 src/portal/src/**/*.js
 src/portal/src/**/*.js.map
@@ -62,3 +62,4 @@ openapi-generator-cli.jar
 tests/e2e_setup/robotvars.py
 .task/checksum
 devenv/token_service_key.pem
+tmp/

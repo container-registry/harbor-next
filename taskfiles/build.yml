@@ -114,8 +114,8 @@ tasks:
         sh: echo {{.PLATFORM}} | cut -d- -f2
       OUTPUT: "bin/{{.PLATFORM}}/core"
     deps:
-    dir: src
       - gen-apis
+    dir: src
     env:
       GOOS: "{{.GOOS}}"
       GOARCH: "{{.GOARCH}}"
@@ -251,6 +251,7 @@ tasks:
 
   gen-apis:
     desc: "Generate API server code from OpenAPI spec"
+    run: once
     sources:
       - "api/v2.0/swagger.yaml"
       - "tools/swagger/templates/**/*"
