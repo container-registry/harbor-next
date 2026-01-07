@@ -40,6 +40,14 @@
         </div>
     </div>
     <div>
+        <button
+            type="button"
+            class="btn btn-secondary mb-1"
+            [clrLoading]="downloadBtnState"
+            (click)="downloadAuditLogs()">
+            <clr-icon shape="download" size="16"></clr-icon>
+            {{ 'AUDIT_LOG.DOWNLOAD' | translate }}
+        </button>
         <clr-datagrid (clrDgRefresh)="load($event)" [clrDgLoading]="loading">
             <clr-dg-column class="width-140">{{
                 'AUDIT_LOG.TIMESTAMP' | translate

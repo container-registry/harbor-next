@@ -498,7 +498,8 @@
         "OF": "of",
         "NOT_FOUND": "We couldn't find any logs!",
         "RESOURCE": "Resource",
-        "RESOURCE_TYPE": "Resource Type"
+        "RESOURCE_TYPE": "Resource Type",
+        "DOWNLOAD": "Download"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Trigger",
