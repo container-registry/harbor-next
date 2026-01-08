@@ -138,6 +138,37 @@ services:
       timeout: 3s
       retries: 30
 
+  # RegistryCtl - starts with: docker compose --profile registryctl up
+  registryctl:
+    build:
+      context: ..
+      dockerfile: dockerfiles/dev.dockerfile
+    container_name: harbor-registryctl
+    profiles: [registryctl]
+    volumes:
+      - ..:/app
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+      - harbor-registry-data:/var/lib/registry
+      - ../devenv/registry.config.yml:/etc/registry/config.yml:ro
+    ports:
+      - "8085:8080"
+      - "2347:2347"
+    environment:
+      PORT: "8080"
+      LOG_LEVEL: debug
+      REGISTRY_CONFIG: /etc/registry/config.yml
+      CORE_SECRET: devenv-secret-do-not-use-in-production
+      JOBSERVICE_SECRET: devenv-secret-do-not-use-in-production
+    command: air -c devenv/air.registryctl.toml
+    depends_on:
+      - registry
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
   # Trivy scanner adapter - starts with: docker compose --profile trivy up
   trivy-adapter:
     image: goharbor/trivy-adapter-photon:v2.14.0
@@ -177,7 +208,7 @@ services:
     profiles: [portal]
     volumes:
       - ../src/portal:/app
-      - ../api/v2.0/swagger.yaml:/app/swagger.yaml:ro
+      - ../api/v2.0/swagger.yaml:/swagger.yaml:ro
       - portal-node-modules:/app/node_modules
       - portal-npm-cache:/root/.npm
       - portal-angular-cache:/app/.angular
@@ -185,7 +216,8 @@ services:
       - "4200:4200"
       - "9229:9229"  # Node.js debugger
     environment:
-      NODE_OPTIONS: "--max_old_space_size=2048 --inspect=0.0.0.0:9229"
+      NODE_OPTIONS: "--max_old_space_size=2048"
+      HARBOR_PROXY_TARGET: "http://core:8080"
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:4200"]
       interval: 10s
