@@ -55,25 +55,27 @@ tasks:
   # Full Development Environment (Containerized)
   # ---------------------------------------------------------------------------
   up:
-    desc: Start full dev environment (Portal, Core, JobService, Trivy)
+    desc: Start full dev environment (Portal, Core, JobService, RegistryCtl, Trivy)
     deps: [gen:private-key]
     cmds:
       - task build:gen-apis
       - defer: { task: dev:down }
       - |
-        echo "Portal:      http://localhost:4200/"
-        echo "API:         http://localhost:8080/api/v2.0"
-        echo "JobService:  http://localhost:8888"
-        echo "Trivy:       http://localhost:8081"
+        echo "Portal:       http://localhost:4200/"
+        echo "API:          http://localhost:8080/api/v2.0"
+        echo "JobService:   http://localhost:8888"
+        echo "RegistryCtl:  http://localhost:8085"
+        echo "Trivy:        http://localhost:8081"
         echo "Debug Portal: chrome://inspect (port 9229)"
         echo "Debug Core:   localhost:2345"
         echo "Debug Job:    localhost:2346"
-      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile trivy up --build
+        echo "Debug RegCtl: localhost:2347"
+      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy up --build
 
   down:
     desc: Stop all dev environment services
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile portal --profile core --profile jobservice --profile trivy down
+      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy down
       - echo "Dev environment stopped"
 
   # ---------------------------------------------------------------------------
@@ -101,27 +103,27 @@ tasks:
   infra:remove:
     desc: Remove infrastructure and all volumes
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile trivy down -v
+      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy down -v
 
   # ---------------------------------------------------------------------------
   # Backend Services (Containerized)
   # ---------------------------------------------------------------------------
   backend:up:
-    desc: Start Core + JobService containers with hot reload
+    desc: Start Core + JobService + RegistryCtl containers with hot reload
     deps: [gen:private-key]
     cmds:
       - task build:gen-apis
-      - docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice up -d --build
+      - docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice --profile registryctl up -d --build
 
   backend:down:
-    desc: Stop Core + JobService containers
+    desc: Stop Core + JobService + RegistryCtl containers
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice down
+      - docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice --profile registryctl down
 
   backend:logs:
     desc: View backend container logs
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice logs -f
+      - docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice --profile registryctl logs -f
 
   backend:logs:core:
     desc: View Core container logs
@@ -133,10 +135,15 @@ tasks:
     cmds:
       - docker compose -f {{.COMPOSE_FILE}} logs -f jobservice
 
+  backend:logs:registryctl:
+    desc: View RegistryCtl container logs
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} logs -f registryctl
+
   backend:restart:
     desc: Restart backend containers
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice restart
+      - docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice --profile registryctl restart
 
   # ---------------------------------------------------------------------------
   # Frontend (Native - alternative to containerized portal)
@@ -202,7 +209,7 @@ tasks:
   clean:
     desc: Clean temporary files and all containers/volumes
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile trivy down -v
+      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy down -v
       - pkill -f "ng serve" || true
       - rm -rf tmp/
       - rm -f build-errors.log
@@ -212,9 +219,9 @@ tasks:
   status:
     desc: Show status of all development services
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile trivy ps
+      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy ps
 
   logs:
     desc: View all container logs
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile trivy logs -f
+      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy logs -f
