@@ -236,7 +236,12 @@ services:
 
 volumes:
   harbor-postgres-data:
+    name: ${PROJECT_PREFIX:-harbor}-postgres-data
   harbor-redis-data:
+    name: ${PROJECT_PREFIX:-harbor}-redis-data
   harbor-registry-data:
+    name: ${PROJECT_PREFIX:-harbor}-registry-data
   go-mod-cache:
+    name: ${PROJECT_PREFIX:-harbor}-go-mod-cache
   go-build-cache:
+    name: ${PROJECT_PREFIX:-harbor}-go-build-cache
