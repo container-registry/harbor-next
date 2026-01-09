@@ -30,7 +30,8 @@
       "Bash(xargs:*)",
       "Bash(task --list)",
       "Bash(docker manifest inspect:*)",
-      "Bash(go build:*)"
+      "Bash(go build:*)",
+      "Bash(ls:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

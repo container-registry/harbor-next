@@ -4,12 +4,145 @@ vars:
   # Paths
   COMPOSE_FILE: devenv/docker-compose.yml
   TOKEN_KEY_FILE: devenv/token_service_key.pem
+  PORTS_ENV_FILE: devenv/ports.env
 
   # Database (only vars used in task commands)
   POSTGRES_USER: postgres
   POSTGRES_DB: registry
 
+  # Port defaults (overridden by ports.env)
+  CORE_PORT: '{{.CORE_PORT | default "8080"}}'
+  PORTAL_PORT: '{{.PORTAL_PORT | default "4200"}}'
+  PROJECT_PREFIX: '{{.PROJECT_PREFIX | default "harbor"}}'
+  # Unique suffix based on directory path (same worktree = same prefix)
+  DIR_HASH:
+    sh: echo "$(pwd)" | md5sum | head -c 4
+
 tasks:
+  # ---------------------------------------------------------------------------
+  # Port and Container Name Management
+  # ---------------------------------------------------------------------------
+  ports:init:
+    desc: Create ports.env if it doesn't exist
+    internal: true
+    status:
+      - test -f {{.PORTS_ENV_FILE}}
+    cmds:
+      - |
+        cat > {{.PORTS_ENV_FILE}} << 'EOF'
+        # Harbor Development Environment - Port Configuration
+        # Modify these values to avoid conflicts with other services
+
+        # Core API port (default: 8080)
+        CORE_PORT=8080
+
+        # Portal UI port (default: 4200)
+        PORTAL_PORT=4200
+        EOF
+      - echo "Created {{.PORTS_ENV_FILE}} with default values"
+
+  ports:check:
+    desc: Check for port conflicts and resolve interactively
+    internal: true
+    deps: [ports:init]
+    cmds:
+      - |
+        check_port() {
+          local port=$1
+          local name=$2
+          if ss -tuln 2>/dev/null | grep -q ":${port} " || \
+             lsof -i ":${port}" >/dev/null 2>&1; then
+            return 0  # port is in use
+          fi
+          return 1  # port is free
+        }
+
+        find_free_port() {
+          local port=$1
+          while check_port "$port" ""; do
+            port=$((port + 1))
+          done
+          echo "$port"
+        }
+
+        update_ports_env() {
+          local var=$1
+          local value=$2
+          if grep -q "^${var}=" {{.PORTS_ENV_FILE}}; then
+            sed -i "s/^${var}=.*/${var}=${value}/" {{.PORTS_ENV_FILE}}
+          else
+            echo "${var}=${value}" >> {{.PORTS_ENV_FILE}}
+          fi
+        }
+
+        CORE_PORT={{.CORE_PORT}}
+        PORTAL_PORT={{.PORTAL_PORT}}
+        CHANGED=false
+
+        # Check Core port
+        if check_port "$CORE_PORT" "Core"; then
+          NEW_PORT=$(find_free_port "$CORE_PORT")
+          echo ""
+          echo "Port $CORE_PORT (Core) is already in use."
+          echo "Suggested alternative: $NEW_PORT"
+          printf "Use port $NEW_PORT for Core? [Y/n]: "
+          read response
+          if [[ -z "$response" || "$response" =~ ^[Yy] ]]; then
+            CORE_PORT=$NEW_PORT
+            CHANGED=true
+            printf "Save to ports.env for future sessions? [y/N]: "
+            read save
+            if [[ "$save" =~ ^[Yy] ]]; then
+              update_ports_env "CORE_PORT" "$CORE_PORT"
+              echo "Saved CORE_PORT=$CORE_PORT to {{.PORTS_ENV_FILE}}"
+            fi
+          else
+            echo "Keeping port $CORE_PORT. Please free it manually or edit {{.PORTS_ENV_FILE}}"
+            exit 1
+          fi
+        fi
+
+        # Check Portal port
+        if check_port "$PORTAL_PORT" "Portal"; then
+          NEW_PORT=$(find_free_port "$PORTAL_PORT")
+          echo ""
+          echo "Port $PORTAL_PORT (Portal) is already in use."
+          echo "Suggested alternative: $NEW_PORT"
+          printf "Use port $NEW_PORT for Portal? [Y/n]: "
+          read response
+          if [[ -z "$response" || "$response" =~ ^[Yy] ]]; then
+            PORTAL_PORT=$NEW_PORT
+            CHANGED=true
+            printf "Save to ports.env for future sessions? [y/N]: "
+            read save
+            if [[ "$save" =~ ^[Yy] ]]; then
+              update_ports_env "PORTAL_PORT" "$PORTAL_PORT"
+              echo "Saved PORTAL_PORT=$PORTAL_PORT to {{.PORTS_ENV_FILE}}"
+            fi
+          else
+            echo "Keeping port $PORTAL_PORT. Please free it manually or edit {{.PORTS_ENV_FILE}}"
+            exit 1
+          fi
+        fi
+
+        # Export for docker-compose (with directory-based suffix for unique container names)
+        echo "CORE_PORT=$CORE_PORT" > /tmp/harbor-ports.env
+        echo "PORTAL_PORT=$PORTAL_PORT" >> /tmp/harbor-ports.env
+        echo "PROJECT_PREFIX={{.PROJECT_PREFIX}}-{{.DIR_HASH}}" >> /tmp/harbor-ports.env
+
+  env:prepare:
+    desc: Prepare environment (check ports)
+    internal: true
+    cmds:
+      - task: ports:check
+      - |
+        # Source the resolved values
+        if [ -f /tmp/harbor-ports.env ]; then
+          source /tmp/harbor-ports.env
+          export CORE_PORT PORTAL_PORT PROJECT_PREFIX
+        fi
+
+
   # ---------------------------------------------------------------------------
   # Tool Installation
   # ---------------------------------------------------------------------------
@@ -33,9 +166,20 @@ tasks:
           TOOL_PKG: '{{.ITEM.pkg}}'
       - echo "All development tools installed"
 
+  require-docker:
+    internal: true
+    run: once
+    silent: true
+    preconditions:
+      - sh: command -v docker
+        msg: "Docker is not installed. Please install Docker first."
+      - sh: docker info > /dev/null 2>&1
+        msg: "Docker daemon is not running. Please start Docker first."
+
   require-step:
     internal: true
     run: once
+    silent: true
     status:
       - command -v step
     cmds:
@@ -56,8 +200,9 @@ tasks:
   # ---------------------------------------------------------------------------
   up:
     desc: Start full dev environment (Portal, Core, JobService, RegistryCtl, Trivy)
-    deps: [gen:private-key]
+    deps: [require-docker, gen:private-key]
     cmds:
+      - task: env:prepare
       - task build:gen-apis
       - defer: { task: dev:down }
       - |
@@ -70,12 +215,20 @@ tasks:
         echo "Debug Core:   localhost:2345"
         echo "Debug Job:    localhost:2346"
         echo "Debug RegCtl: localhost:2347"
-      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy up --build
+      - |
+        # Load resolved ports for docker-compose
+        if [ -f /tmp/harbor-ports.env ]; then
+          source /tmp/harbor-ports.env
+          export CORE_PORT PORTAL_PORT PROJECT_PREFIX
+        fi
+        docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy up --build
 
   down:
     desc: Stop all dev environment services
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy down
+      - |
+        export PROJECT_PREFIX="{{.PROJECT_PREFIX}}-{{.DIR_HASH}}"
+        docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy down
       - echo "Dev environment stopped"
 
   # ---------------------------------------------------------------------------
@@ -83,8 +236,16 @@ tasks:
   # ---------------------------------------------------------------------------
   infra:up:
     desc: Start infrastructure only (PostgreSQL, Redis, Registry)
+    deps: [require-docker]
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} up -d
+      - task: env:prepare
+      - |
+        # Load resolved config for docker-compose
+        if [ -f /tmp/harbor-ports.env ]; then
+          source /tmp/harbor-ports.env
+          export CORE_PORT PORTAL_PORT PROJECT_PREFIX
+        fi
+        docker compose -f {{.COMPOSE_FILE}} up -d
       - |
         echo "Waiting for PostgreSQL..."
         timeout=60 elapsed=0
@@ -98,52 +259,85 @@ tasks:
   infra:down:
     desc: Stop infrastructure services
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} down
+      - |
+        export PROJECT_PREFIX="{{.PROJECT_PREFIX}}-{{.DIR_HASH}}"
+        docker compose -f {{.COMPOSE_FILE}} down
 
   infra:remove:
     desc: Remove infrastructure and all volumes
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy down -v
+      - |
+        export PROJECT_PREFIX="{{.PROJECT_PREFIX}}-{{.DIR_HASH}}"
+        docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy down -v
 
   # ---------------------------------------------------------------------------
   # Backend Services (Containerized)
   # ---------------------------------------------------------------------------
   backend:up:
     desc: Start Core + JobService + RegistryCtl containers with hot reload
-    deps: [gen:private-key]
+    deps: [require-docker, gen:private-key]
     cmds:
+      - task: env:prepare
       - task build:gen-apis
-      - docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice --profile registryctl up -d --build
+      - |
+        # Load resolved ports for docker-compose
+        if [ -f /tmp/harbor-ports.env ]; then
+          source /tmp/harbor-ports.env
+          export CORE_PORT PORTAL_PORT PROJECT_PREFIX
+        fi
+        docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice --profile registryctl up -d --build
+      - |
+        # Load resolved ports
+        if [ -f /tmp/harbor-ports.env ]; then
+          source /tmp/harbor-ports.env
+        else
+          CORE_PORT={{.CORE_PORT}}
+        fi
+        echo ""
+        echo "API: http://localhost:${CORE_PORT}/api/v2.0"
+        echo ""
 
   backend:down:
     desc: Stop Core + JobService + RegistryCtl containers
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice --profile registryctl down
+      - |
+        export PROJECT_PREFIX="{{.PROJECT_PREFIX}}-{{.DIR_HASH}}"
+        docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice --profile registryctl down
 
   backend:logs:
     desc: View backend container logs
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice --profile registryctl logs -f
+      - |
+        export PROJECT_PREFIX="{{.PROJECT_PREFIX}}-{{.DIR_HASH}}"
+        docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice --profile registryctl logs -f
 
   backend:logs:core:
     desc: View Core container logs
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} logs -f core
+      - |
+        export PROJECT_PREFIX="{{.PROJECT_PREFIX}}-{{.DIR_HASH}}"
+        docker compose -f {{.COMPOSE_FILE}} logs -f core
 
   backend:logs:jobservice:
     desc: View JobService container logs
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} logs -f jobservice
+      - |
+        export PROJECT_PREFIX="{{.PROJECT_PREFIX}}-{{.DIR_HASH}}"
+        docker compose -f {{.COMPOSE_FILE}} logs -f jobservice
 
   backend:logs:registryctl:
     desc: View RegistryCtl container logs
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} logs -f registryctl
+      - |
+        export PROJECT_PREFIX="{{.PROJECT_PREFIX}}-{{.DIR_HASH}}"
+        docker compose -f {{.COMPOSE_FILE}} logs -f registryctl
 
   backend:restart:
     desc: Restart backend containers
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice --profile registryctl restart
+      - |
+        export PROJECT_PREFIX="{{.PROJECT_PREFIX}}-{{.DIR_HASH}}"
+        docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice --profile registryctl restart
 
   # ---------------------------------------------------------------------------
   # Frontend (Native - alternative to containerized portal)
@@ -182,13 +376,20 @@ tasks:
     desc: Run database migrations
     cmds:
       - |
+        export PROJECT_PREFIX="{{.PROJECT_PREFIX}}-{{.DIR_HASH}}"
         echo "Running migrations..."
-        docker compose -f {{.COMPOSE_FILE}} exec -T postgresql \
-          psql -U {{.POSTGRES_USER}} -d {{.POSTGRES_DB}} -f /migrations/postgresql/0180_2.15.0_schema.up.sql
+        docker compose -f {{.COMPOSE_FILE}} exec -T postgresql sh -c '
+          for f in /migrations/postgresql/*.up.sql; do
+            echo "Applying: $(basename $f)"
+            psql -U {{.POSTGRES_USER}} -d {{.POSTGRES_DB}} -f "$f" -q
+          done
+        '
       - echo "Migrations complete"
 
   db:reset:
     desc: Reset database to clean state
+    env:
+      PROJECT_PREFIX: "{{.PROJECT_PREFIX}}-{{.DIR_HASH}}"
     cmds:
       - |
         echo "WARNING: This will delete all data. Continue? (Ctrl+C to cancel)"
@@ -201,7 +402,9 @@ tasks:
   db:shell:
     desc: Open PostgreSQL shell
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} exec postgresql psql -U {{.POSTGRES_USER}} -d {{.POSTGRES_DB}}
+      - |
+        export PROJECT_PREFIX="{{.PROJECT_PREFIX}}-{{.DIR_HASH}}"
+        docker compose -f {{.COMPOSE_FILE}} exec postgresql psql -U {{.POSTGRES_USER}} -d {{.POSTGRES_DB}}
 
   # ---------------------------------------------------------------------------
   # Utilities
@@ -209,7 +412,9 @@ tasks:
   clean:
     desc: Clean temporary files and all containers/volumes
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy down -v
+      - |
+        export PROJECT_PREFIX="{{.PROJECT_PREFIX}}-{{.DIR_HASH}}"
+        docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy down -v
       - pkill -f "ng serve" || true
       - rm -rf tmp/
       - rm -f build-errors.log
@@ -219,9 +424,13 @@ tasks:
   status:
     desc: Show status of all development services
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy ps
+      - |
+        export PROJECT_PREFIX="{{.PROJECT_PREFIX}}-{{.DIR_HASH}}"
+        docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy ps
 
   logs:
     desc: View all container logs
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy logs -f
+      - |
+        export PROJECT_PREFIX="{{.PROJECT_PREFIX}}-{{.DIR_HASH}}"
+        docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy logs -f

@@ -1,11 +1,16 @@
 # Docker Compose - Local DevEnv
 # All Harbor services run in containers with hot reload
 # Services communicate via Docker network (no localhost issues)
+#
+# Port configuration: see ports.env (loaded by Taskfile)
+# - CORE_PORT: Core API port (default: 8080)
+# - PORTAL_PORT: Portal UI port (default: 4200)
+# - PROJECT_PREFIX: Container name prefix (default: harbor)
 
 services:
   postgresql:
     image: postgres:16-alpine
-    container_name: harbor-db
+    container_name: ${PROJECT_PREFIX:-harbor}-db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: root123
@@ -18,7 +23,7 @@ services:
 
   redis:
     image: valkey/valkey:latest
-    container_name: harbor-redis
+    container_name: ${PROJECT_PREFIX:-harbor}-redis
     ports:
       - "6379:6379"
     volumes:
@@ -26,7 +31,7 @@ services:
 
   registry:
     image: distribution/distribution:latest
-    container_name: harbor-registry
+    container_name: ${PROJECT_PREFIX:-harbor}-registry
     environment:
       OTEL_TRACES_EXPORTER: none
       OTEL_SDK_DISABLED: "true"
@@ -41,15 +46,15 @@ services:
     build:
       context: ..
       dockerfile: dockerfiles/dev.dockerfile
-    container_name: harbor-core
+    container_name: ${PROJECT_PREFIX:-harbor}-core
     profiles: [core]
     volumes:
       - ..:/app
       - go-mod-cache:/go/pkg/mod
       - go-build-cache:/root/.cache/go-build
     ports:
-      - "8080:8080"
-      - "2345:2345"
+      - "${CORE_PORT:-8080}:8080"
+      # - "2345:2345"  # Debug port (uncomment if needed)
     environment:
       # Database
       POSTGRESQL_HOST: postgresql
@@ -82,7 +87,11 @@ services:
       # Trivy scanner
       TRIVY_ADAPTER_URL: http://trivy-adapter:8080
       WITH_TRIVY: "true"
-    command: air -c devenv/air.core.toml
+      # Proxy cache and replication
+      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
+      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr
+    # Symlink views/ is required - beego looks for views/404.tpl relative to WORKDIR, core panics without it
+    command: sh -c "ln -sf src/core/views views && air -c devenv/air.core.toml"
     depends_on:
       - postgresql
       - redis
@@ -98,15 +107,15 @@ services:
     build:
       context: ..
       dockerfile: dockerfiles/dev.dockerfile
-    container_name: harbor-jobservice
+    container_name: ${PROJECT_PREFIX:-harbor}-jobservice
     profiles: [jobservice]
     volumes:
       - ..:/app
       - go-mod-cache:/go/pkg/mod
       - go-build-cache:/root/.cache/go-build
-    ports:
-      - "8888:8888"
-      - "2346:2346"
+    # ports:
+    #   - "8888:8888"  # JobService API (uncomment if needed)
+    #   - "2346:2346"  # Debug port (uncomment if needed)
     environment:
       # Database
       POSTGRESQL_HOST: postgresql
@@ -172,7 +181,7 @@ services:
   # Trivy scanner adapter - starts with: docker compose --profile trivy up
   trivy-adapter:
     image: goharbor/trivy-adapter-photon:v2.14.0
-    container_name: harbor-trivy
+    container_name: ${PROJECT_PREFIX:-harbor}-trivy
     profiles: [trivy]
     environment:
       SCANNER_LOG_LEVEL: debug
@@ -204,20 +213,21 @@ services:
     build:
       context: ..
       dockerfile: dockerfiles/dev.portal.dockerfile
-    container_name: harbor-portal
+    container_name: ${PROJECT_PREFIX:-harbor}-portal
     profiles: [portal]
     volumes:
-      - ../src/portal:/app
-      - ../api/v2.0/swagger.yaml:/swagger.yaml:ro
-      - portal-node-modules:/app/node_modules
-      - portal-npm-cache:/root/.npm
-      - portal-angular-cache:/app/.angular
+      - ../src/portal/src:/app/src
+      - ../src/portal/angular.json:/app/angular.json:ro
+      - ../src/portal/tsconfig.json:/app/tsconfig.json:ro
+      - ../src/portal/tsconfig.app.json:/app/tsconfig.app.json:ro
+      - ./proxy.config.mjs:/app/proxy.config.mjs:ro
     ports:
-      - "4200:4200"
-      - "9229:9229"  # Node.js debugger
+      - "${PORTAL_PORT:-4200}:4200"
     environment:
-      NODE_OPTIONS: "--max_old_space_size=2048"
       HARBOR_PROXY_TARGET: "http://core:8080"
+    depends_on:
+      core:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:4200"]
       interval: 10s
@@ -230,6 +240,3 @@ volumes:
   harbor-registry-data:
   go-mod-cache:
   go-build-cache:
-  portal-node-modules:
-  portal-npm-cache:
-  portal-angular-cache:

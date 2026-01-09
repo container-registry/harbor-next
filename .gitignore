@@ -62,4 +62,4 @@ openapi-generator-cli.jar
 tests/e2e_setup/robotvars.py
 .task/checksum
 devenv/token_service_key.pem
-tmp
+tmp/
