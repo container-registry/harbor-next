@@ -90,8 +90,7 @@ services:
       # Proxy cache and replication
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr
-    # Symlink views/ is required - beego looks for views/404.tpl relative to WORKDIR, core panics without it
-    command: sh -c "ln -sf src/core/views views && air -c devenv/air.core.toml"
+    command: air -c devenv/air.core.toml
     depends_on:
       - postgresql
       - redis
@@ -217,10 +216,12 @@ services:
     profiles: [portal]
     volumes:
       - ../src/portal/src:/app/src
+      - ../src/portal/scripts:/app/scripts:ro
       - ../src/portal/angular.json:/app/angular.json:ro
       - ../src/portal/tsconfig.json:/app/tsconfig.json:ro
       - ../src/portal/tsconfig.app.json:/app/tsconfig.app.json:ro
       - ./proxy.config.mjs:/app/proxy.config.mjs:ro
+      - ../api/v2.0/swagger.yaml:/swagger.yaml:ro
     ports:
       - "${PORTAL_PORT:-4200}:4200"
     environment:

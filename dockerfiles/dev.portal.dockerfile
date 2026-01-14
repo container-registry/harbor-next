@@ -7,13 +7,12 @@ RUN apk add --no-cache nodejs
 
 WORKDIR /app
 
-# Copy everything needed for install
+# Copy package files for dependency installation
 COPY src/portal/package.json src/portal/bun.lock* ./
-COPY src/portal/scripts ./scripts
-COPY api/v2.0/swagger.yaml ./swagger.yaml
 
-# Install deps at build time (cached by Docker layer)
-RUN bun install
+# Install deps at build time (skip postinstall - swagger.yaml will be mounted at runtime)
+RUN bun install --ignore-scripts
 
-# Source code mounted at runtime via docker-compose
-CMD ["bun", "run", "start", "--", "--proxy-config", "proxy.config.mjs"]
+# Source code and swagger.yaml mounted at runtime via docker-compose
+# Run postinstall to generate API client, then start dev server
+CMD ["sh", "-c", "bun run postinstall && bun run start -- --proxy-config proxy.config.mjs"]

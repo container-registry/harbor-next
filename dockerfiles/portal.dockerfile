@@ -24,8 +24,8 @@ WORKDIR /harbor/src/portal
 COPY src/portal/package.json src/portal/package-lock.json ./
 COPY src/portal ./
 
-# Copy swagger.yaml for API generation
-COPY --from=extractor /swagger.yaml ./swagger.yaml
+# Copy swagger.yaml for API generation (script checks /swagger.yaml at root)
+COPY --from=extractor /swagger.yaml /swagger.yaml
 
 # Install dependencies
 RUN bun install
@@ -34,9 +34,9 @@ RUN bun install
 RUN bun run generate-build-timestamp && \
     bun run node --max_old_space_size=2048 node_modules/@angular/cli/bin/ng build --configuration production
 
-# Convert swagger.yaml to JSON
+# Convert swagger.yaml to JSON for /swagger.json endpoint
 RUN bun install js-yaml@4.1.0 --no-verify && \
-    bun -e "const yaml = require('js-yaml'); const fs = require('fs'); const swagger = yaml.load(fs.readFileSync('swagger.yaml', 'utf8')); fs.writeFileSync('swagger.json', JSON.stringify(swagger));"
+    bun -e "const yaml = require('js-yaml'); const fs = require('fs'); const swagger = yaml.load(fs.readFileSync('/swagger.yaml', 'utf8')); fs.writeFileSync('swagger.json', JSON.stringify(swagger));"
 
 # Copy LICENSE to dist
 COPY --from=extractor /LICENSE ./dist/LICENSE
