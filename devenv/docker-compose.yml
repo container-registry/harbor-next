@@ -52,6 +52,8 @@ services:
       - ..:/app
       - go-mod-cache:/go/pkg/mod
       - go-build-cache:/root/.cache/go-build
+      # Mount views directly to where beego expects them (avoids symlink leaking to host)
+      - ../src/core/views:/app/views:ro
     ports:
       - "${CORE_PORT:-8080}:8080"
       # - "2345:2345"  # Debug port (uncomment if needed)
