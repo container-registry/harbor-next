@@ -1,0 +1,159 @@
+# GitHub Actions Labeler Configuration
+# This file automatically labels pull requests based on the files changed.
+# Used with the actions/labeler workflow.
+#
+# Documentation: https://github.com/actions/labeler
+
+# =============================================================================
+# COMPONENT LABELS
+# =============================================================================
+
+component/core:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/core/**'
+          - 'src/server/**'
+          - 'src/controller/**'
+          - 'src/cmd/**'
+
+component/portal:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/portal/**'
+
+component/jobservice:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/jobservice/**'
+
+component/registry:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/registryctl/**'
+
+component/chartserver:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/chartserver/**'
+
+component/replication:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/replication/**'
+          - 'src/controller/replication/**'
+          - 'src/pkg/reg/**'
+
+component/scan:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/pkg/scan/**'
+          - 'src/controller/scan/**'
+          - 'src/pkg/scanner/**'
+
+component/gc:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/controller/gc/**'
+          - 'src/pkg/gc/**'
+
+# =============================================================================
+# TYPE LABELS
+# =============================================================================
+
+kind/documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.md'
+          - 'docs/**'
+          - 'contrib/**/*.md'
+
+kind/tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'tests/**'
+          - 'src/testing/**'
+          - '**/*_test.go'
+          - '**/*.spec.ts'
+          - '**/*.test.ts'
+
+kind/ci-cd:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+          - '.github/workflows/**'
+          - 'Makefile'
+          - 'make/**'
+
+kind/build:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'Dockerfile*'
+          - 'docker-compose*.yml'
+          - 'make/**'
+          - 'Makefile'
+
+# =============================================================================
+# DEPENDENCY LABELS
+# =============================================================================
+
+dependencies/go:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'go.mod'
+          - 'go.sum'
+          - 'src/go.mod'
+          - 'src/go.sum'
+
+dependencies/npm:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/portal/package.json'
+          - 'src/portal/package-lock.json'
+          - 'src/portal/yarn.lock'
+
+# =============================================================================
+# INFRASTRUCTURE LABELS
+# =============================================================================
+
+area/helm:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'contrib/helm/**'
+          - '**/Chart.yaml'
+          - '**/values.yaml'
+
+area/api:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'api/**'
+          - 'src/server/v2.0/**'
+          - '**/swagger.yaml'
+          - '**/swagger.json'
+
+area/database:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/common/dao/**'
+          - 'src/pkg/*/dao/**'
+          - 'make/migrations/**'
+
+area/security:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/common/security/**'
+          - 'src/common/secret/**'
+          - 'src/core/auth/**'
+          - 'src/pkg/oidc/**'
+          - 'src/pkg/ldap/**'
+          - 'SECURITY.md'
+
+# =============================================================================
+# SIZE LABELS (based on lines changed - requires size plugin)
+# =============================================================================
+
+size/XS:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*'
+    all:
+      - head-branch: '^(?!dependabot)'

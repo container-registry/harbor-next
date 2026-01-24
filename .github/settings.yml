@@ -1,0 +1,257 @@
+# Repository Settings Configuration
+# This file configures repository settings when used with the Probot Settings app
+# https://github.com/probot/settings
+#
+# Note: This requires the "Settings" GitHub App to be installed on the repository
+# https://github.com/apps/settings
+
+# =============================================================================
+# REPOSITORY SETTINGS
+# =============================================================================
+repository:
+  name: harbor
+  description: "An open source trusted cloud native registry project that stores, signs, and scans content."
+  homepage: https://goharbor.io
+  topics:
+    - container-registry
+    - docker-registry
+    - harbor
+    - cncf
+    - kubernetes
+    - cloud-native
+    - oci
+    - helm
+    - security
+    - vulnerability-scanning
+  private: false
+  has_issues: true
+  has_projects: true
+  has_wiki: false
+  has_downloads: true
+  has_discussions: true
+  default_branch: main
+  allow_squash_merge: true
+  allow_merge_commit: true
+  allow_rebase_merge: true
+  allow_auto_merge: false
+  delete_branch_on_merge: true
+  allow_update_branch: true
+  squash_merge_commit_title: PR_TITLE
+  squash_merge_commit_message: PR_BODY
+  merge_commit_title: PR_TITLE
+  merge_commit_message: PR_BODY
+
+# =============================================================================
+# LABELS
+# These labels will be created/updated in the repository
+# =============================================================================
+labels:
+  # Kind labels
+  - name: kind/bug
+    color: "d73a4a"
+    description: "Something isn't working"
+  - name: kind/enhancement
+    color: "a2eeef"
+    description: "New feature or request"
+  - name: kind/question
+    color: "d876e3"
+    description: "Further information is requested"
+  - name: kind/documentation
+    color: "0075ca"
+    description: "Improvements or additions to documentation"
+  - name: kind/tests
+    color: "bfd4f2"
+    description: "Test improvements or additions"
+  - name: kind/ci-cd
+    color: "fbca04"
+    description: "CI/CD pipeline changes"
+  - name: kind/build
+    color: "f9d0c4"
+    description: "Build system changes"
+  - name: kind/proposal
+    color: "5319e7"
+    description: "Feature proposal requiring discussion"
+
+  # Status labels
+  - name: needs-triage
+    color: "ededed"
+    description: "Needs triage from maintainers"
+  - name: needs-more-info
+    color: "fef2c0"
+    description: "Waiting for more information from reporter"
+  - name: needs-investigation
+    color: "fbca04"
+    description: "Requires investigation"
+  - name: blocked
+    color: "b60205"
+    description: "Blocked by another issue or external dependency"
+  - name: wontfix
+    color: "ffffff"
+    description: "This will not be worked on"
+  - name: duplicate
+    color: "cfd3d7"
+    description: "This issue or pull request already exists"
+  - name: invalid
+    color: "e4e669"
+    description: "This doesn't seem right"
+
+  # Priority labels
+  - name: priority/critical
+    color: "b60205"
+    description: "Critical priority - must be fixed immediately"
+  - name: priority/high
+    color: "d93f0b"
+    description: "High priority"
+  - name: priority/medium
+    color: "fbca04"
+    description: "Medium priority"
+  - name: priority/low
+    color: "0e8a16"
+    description: "Low priority"
+
+  # Component labels
+  - name: component/core
+    color: "1d76db"
+    description: "Core API server"
+  - name: component/portal
+    color: "1d76db"
+    description: "Web UI (Portal)"
+  - name: component/jobservice
+    color: "1d76db"
+    description: "Job Service component"
+  - name: component/registry
+    color: "1d76db"
+    description: "Registry controller"
+  - name: component/chartserver
+    color: "1d76db"
+    description: "Chart server component"
+  - name: component/replication
+    color: "1d76db"
+    description: "Replication feature"
+  - name: component/scan
+    color: "1d76db"
+    description: "Vulnerability scanning"
+  - name: component/gc
+    color: "1d76db"
+    description: "Garbage collection"
+
+  # Area labels
+  - name: area/api
+    color: "c5def5"
+    description: "API related"
+  - name: area/helm
+    color: "c5def5"
+    description: "Helm chart related"
+  - name: area/database
+    color: "c5def5"
+    description: "Database related"
+  - name: area/security
+    color: "c5def5"
+    description: "Security related"
+
+  # Dependency labels
+  - name: dependencies/go
+    color: "0366d6"
+    description: "Go dependencies"
+  - name: dependencies/npm
+    color: "0366d6"
+    description: "NPM dependencies"
+
+  # Size labels
+  - name: size/XS
+    color: "3CBF00"
+    description: "Extra small PR (< 10 lines)"
+  - name: size/S
+    color: "5D9801"
+    description: "Small PR (10-100 lines)"
+  - name: size/M
+    color: "7F7203"
+    description: "Medium PR (100-500 lines)"
+  - name: size/L
+    color: "A14C05"
+    description: "Large PR (500-1000 lines)"
+  - name: size/XL
+    color: "C32607"
+    description: "Extra large PR (> 1000 lines)"
+
+  # Release note labels
+  - name: release-note/ignore-for-release
+    color: "e99695"
+    description: "Exclude from release notes"
+  - name: release-note/new-feature
+    color: "c2e0c6"
+    description: "New feature for release notes"
+  - name: release-note/update
+    color: "c2e0c6"
+    description: "Update for release notes"
+  - name: release-note/enhancement
+    color: "c2e0c6"
+    description: "Enhancement for release notes"
+  - name: release-note/community
+    color: "c2e0c6"
+    description: "Community contribution for release notes"
+  - name: release-note/breaking-change
+    color: "d93f0b"
+    description: "Breaking change for release notes"
+  - name: release-note/docs
+    color: "c2e0c6"
+    description: "Documentation for release notes"
+  - name: release-note/infra
+    color: "c2e0c6"
+    description: "Infrastructure for release notes"
+  - name: release-note/deprecation
+    color: "e99695"
+    description: "Deprecation for release notes"
+  - name: release-note/bump-version
+    color: "c2e0c6"
+    description: "Version bump for release notes"
+
+  # Contribution labels
+  - name: good first issue
+    color: "7057ff"
+    description: "Good for newcomers"
+  - name: help wanted
+    color: "008672"
+    description: "Extra attention is needed"
+  - name: hacktoberfest
+    color: "ff7518"
+    description: "Hacktoberfest participation"
+
+# =============================================================================
+# BRANCH PROTECTION RULES
+# =============================================================================
+branches:
+  - name: main
+    protection:
+      required_pull_request_reviews:
+        required_approving_review_count: 2
+        dismiss_stale_reviews: true
+        require_code_owner_reviews: true
+        require_last_push_approval: true
+      required_status_checks:
+        strict: true
+        contexts:
+          - "CI"
+          - "DCO"
+      enforce_admins: false
+      required_linear_history: false
+      allow_force_pushes: false
+      allow_deletions: false
+      block_creations: false
+      required_conversation_resolution: true
+      restrictions: null
+
+  - name: "release-*"
+    protection:
+      required_pull_request_reviews:
+        required_approving_review_count: 2
+        dismiss_stale_reviews: true
+        require_code_owner_reviews: true
+      required_status_checks:
+        strict: true
+        contexts:
+          - "CI"
+          - "DCO"
+      enforce_admins: false
+      allow_force_pushes: false
+      allow_deletions: false

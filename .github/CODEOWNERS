@@ -1,0 +1,88 @@
+# Harbor CODEOWNERS
+#
+# This file defines the code owners for the Harbor repository.
+# Code owners are automatically requested for review when someone opens a pull request
+# that modifies code they own. Draft pull requests do not trigger automatic review requests.
+#
+# For more information, see:
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# The order matters: later rules override earlier ones for the same paths.
+
+# =============================================================================
+# DEFAULT OWNERS
+# These owners will be requested for review on any file change unless overridden
+# =============================================================================
+*                                   @goharbor/maintainers
+
+# =============================================================================
+# CORE COMPONENTS
+# =============================================================================
+
+# API and Core Server
+/src/core/                          @goharbor/maintainers
+/src/server/                        @goharbor/maintainers
+/src/controller/                    @goharbor/maintainers
+/src/pkg/                           @goharbor/maintainers
+/api/                               @goharbor/maintainers
+
+# Job Service
+/src/jobservice/                    @goharbor/maintainers
+
+# Registry Controller
+/src/registryctl/                   @goharbor/maintainers
+
+# Chart Server
+/src/chartserver/                   @goharbor/maintainers
+
+# Common utilities
+/src/common/                        @goharbor/maintainers
+
+# =============================================================================
+# WEB UI (Portal)
+# =============================================================================
+/src/portal/                        @goharbor/maintainers
+
+# =============================================================================
+# TESTING
+# =============================================================================
+/src/testing/                       @goharbor/maintainers
+/tests/                             @goharbor/maintainers
+
+# =============================================================================
+# BUILD AND DEPLOYMENT
+# =============================================================================
+/make/                              @goharbor/maintainers
+/Makefile                           @goharbor/maintainers
+/docker-compose*.yml                @goharbor/maintainers
+
+# =============================================================================
+# DOCUMENTATION
+# =============================================================================
+/docs/                              @goharbor/maintainers
+*.md                                @goharbor/maintainers
+LICENSE                             @goharbor/maintainers
+
+# =============================================================================
+# CI/CD AND GITHUB CONFIGURATION
+# =============================================================================
+/.github/                           @goharbor/maintainers
+/.github/workflows/                 @goharbor/maintainers
+/.github/ISSUE_TEMPLATE/            @goharbor/maintainers
+
+# =============================================================================
+# SECURITY
+# Sensitive files that require careful review
+# =============================================================================
+SECURITY.md                         @goharbor/security-team @goharbor/maintainers
+/src/common/secret/                 @goharbor/security-team @goharbor/maintainers
+/src/core/auth/                     @goharbor/security-team @goharbor/maintainers
+/src/common/security/               @goharbor/security-team @goharbor/maintainers
+
+# =============================================================================
+# DEPENDENCIES
+# =============================================================================
+go.mod                              @goharbor/maintainers
+go.sum                              @goharbor/maintainers
+/src/portal/package.json            @goharbor/maintainers
+/src/portal/package-lock.json       @goharbor/maintainers

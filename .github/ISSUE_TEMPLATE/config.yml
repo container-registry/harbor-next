@@ -1,0 +1,17 @@
+blank_issues_enabled: false
+contact_links:
+  - name: GitHub Discussions
+    url: https://github.com/goharbor/harbor/discussions
+    about: Ask questions, share ideas, and discuss with the Harbor community
+  - name: Documentation
+    url: https://goharbor.io/docs/
+    about: Read the official Harbor documentation before reporting issues
+  - name: Slack Community
+    url: https://cloud-native.slack.com/archives/CC1E09J6S
+    about: Join #harbor on CNCF Slack for real-time community support
+  - name: Security Vulnerabilities
+    url: https://github.com/goharbor/harbor/blob/main/SECURITY.md
+    about: Report security vulnerabilities privately following our security policy
+  - name: Feature Proposals
+    url: https://github.com/goharbor/community/tree/main/proposals
+    about: Submit detailed proposals for major new features

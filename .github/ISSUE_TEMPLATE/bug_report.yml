@@ -1,0 +1,191 @@
+name: Bug Report
+description: Report a bug to help us improve Harbor
+title: "[Bug]: "
+labels: ["kind/bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to report a bug! Please fill out the form below to help us diagnose and fix the issue.
+
+        **Before submitting:**
+        - Search [existing issues](https://github.com/goharbor/harbor/issues) to avoid duplicates
+        - Check the [documentation](https://goharbor.io/docs/) for solutions
+        - Review [SECURITY.md](https://github.com/goharbor/harbor/blob/main/SECURITY.md) if this is a security vulnerability
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: Describe the bug...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen
+      placeholder: Describe what you expected...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual Behavior
+      description: What actually happened
+      placeholder: Describe what actually happened...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Detailed steps to reproduce the behavior
+      placeholder: |
+        1. Deploy Harbor with '...'
+        2. Navigate to '...'
+        3. Run command '...'
+        4. See error
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: "## Environment"
+
+  - type: input
+    id: harbor-version
+    attributes:
+      label: Harbor Version
+      description: "What version of Harbor are you running?"
+      placeholder: "e.g., v2.10.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment-method
+    attributes:
+      label: Deployment Method
+      description: "How did you deploy Harbor?"
+      options:
+        - "Docker Compose (Online Installer)"
+        - "Docker Compose (Offline Installer)"
+        - "Helm Chart"
+        - "Operator"
+        - "Other (please specify in additional context)"
+    validations:
+      required: true
+
+  - type: input
+    id: docker-version
+    attributes:
+      label: Docker Engine Version
+      description: "Output of `docker version`"
+      placeholder: "e.g., 24.0.7"
+    validations:
+      required: false
+
+  - type: input
+    id: docker-compose-version
+    attributes:
+      label: Docker Compose Version
+      description: "Output of `docker compose version`"
+      placeholder: "e.g., v2.21.0"
+    validations:
+      required: false
+
+  - type: input
+    id: kubernetes-version
+    attributes:
+      label: Kubernetes Version
+      description: "Output of `kubectl version` (if using Helm/Operator)"
+      placeholder: "e.g., v1.28.0"
+    validations:
+      required: false
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating System / Platform
+      description: "What OS and platform are you running Harbor on?"
+      placeholder: "e.g., Ubuntu 22.04 on AWS, CentOS 8 on VMware"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: storage-backend
+    attributes:
+      label: Storage Backend
+      description: "What storage backend are you using?"
+      options:
+        - "Local filesystem"
+        - "AWS S3"
+        - "Azure Blob Storage"
+        - "Google Cloud Storage"
+        - "OpenStack Swift"
+        - "Alibaba Cloud OSS"
+        - "Other (please specify in additional context)"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: database
+    attributes:
+      label: Database
+      description: "What database are you using?"
+      options:
+        - "Internal PostgreSQL (bundled)"
+        - "External PostgreSQL"
+        - "Other (please specify in additional context)"
+    validations:
+      required: false
+
+  - type: textarea
+    id: harbor-config
+    attributes:
+      label: Harbor Configuration
+      description: "Paste relevant parts of your `harbor.yml` (remove sensitive data!)"
+      placeholder: |
+        # Paste relevant config here...
+        # IMPORTANT: Remove passwords, secrets, and sensitive information!
+      render: yaml
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      description: "Paste relevant log output from `/var/log/harbor/` or `docker compose logs`"
+      placeholder: |
+        # Paste logs here...
+        # IMPORTANT: Remove sensitive information!
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: "Add any other context about the problem here (screenshots, network topology, etc.)"
+      placeholder: |
+        Any additional information...
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues to ensure this bug hasn't been reported before
+          required: true
+        - label: I have removed all sensitive information (passwords, tokens, IPs) from logs and config
+          required: true
+        - label: This is NOT a security vulnerability (those should be reported via SECURITY.md)
+          required: true

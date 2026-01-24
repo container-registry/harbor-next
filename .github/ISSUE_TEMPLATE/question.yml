@@ -1,0 +1,84 @@
+name: Question
+description: Ask a question about Harbor usage or configuration
+title: "[Question]: "
+labels: ["kind/question", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question about Harbor? We're here to help!
+
+        **Before asking:**
+        - Check the [documentation](https://goharbor.io/docs/) - it may already have your answer
+        - Search [existing issues](https://github.com/goharbor/harbor/issues) for similar questions
+        - Consider using [GitHub Discussions](https://github.com/goharbor/harbor/discussions) for general questions
+        - Join our [Slack channel](https://cloud-native.slack.com/archives/CC1E09J6S) for real-time help
+
+        **Note:** For bug reports or feature requests, please use the appropriate templates instead.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: What would you like to know?
+      placeholder: |
+        Please be as specific as possible. Include context about what you're trying to accomplish.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: topic
+    attributes:
+      label: Topic Area
+      description: What area does your question relate to?
+      options:
+        - "Installation / Deployment"
+        - "Configuration"
+        - "Authentication / Authorization (LDAP, OIDC, etc.)"
+        - "Replication"
+        - "Vulnerability Scanning"
+        - "Garbage Collection"
+        - "API Usage"
+        - "Helm Chart deployment"
+        - "High Availability"
+        - "Performance / Scaling"
+        - "Migration / Upgrade"
+        - "Integration with CI/CD"
+        - "Other"
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Provide any relevant context about your environment or use case
+      placeholder: |
+        - Harbor version:
+        - Deployment method:
+        - What you've already tried:
+        - Relevant documentation you've consulted:
+    validations:
+      required: false
+
+  - type: textarea
+    id: what-tried
+    attributes:
+      label: What have you already tried?
+      description: List any troubleshooting steps or research you've done
+      placeholder: |
+        - Checked documentation page X
+        - Tried configuration Y
+        - Searched issues for Z
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched the documentation
+          required: true
+        - label: I have searched existing issues for similar questions
+          required: true
