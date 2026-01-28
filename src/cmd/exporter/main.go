@@ -54,6 +54,8 @@ func main() {
 			MaxOpenConns:    viper.GetInt("database.max_open_conns"),
 			ConnMaxLifetime: getConnMaxLifetime(viper.GetString("database.conn_max_lifetime")),
 			ConnMaxIdleTime: getConnMaxIdleTime(viper.GetString("database.conn_max_idle_time")),
+			UseIAMAuth:      viper.GetBool("database.use_iam_auth"),
+			AWSRegion:       viper.GetString("database.aws_region"),
 		},
 	}
 	if err := dao.InitDatabase(dbCfg); err != nil {

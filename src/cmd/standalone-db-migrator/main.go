@@ -26,16 +26,19 @@ import (
 
 // key: env var, value: default value
 var defaultAttrs = map[string]string{
-	"POSTGRESQL_HOST":     "localhost",
-	"POSTGRESQL_PORT":     "5432",
-	"POSTGRESQL_USERNAME": "postgres",
-	"POSTGRESQL_PASSWORD": "password",
-	"POSTGRESQL_DATABASE": "registry",
-	"POSTGRESQL_SSLMODE":  "disable",
+	"POSTGRESQL_HOST":         "localhost",
+	"POSTGRESQL_PORT":         "5432",
+	"POSTGRESQL_USERNAME":     "postgres",
+	"POSTGRESQL_PASSWORD":     "password",
+	"POSTGRESQL_DATABASE":     "registry",
+	"POSTGRESQL_SSLMODE":      "disable",
+	"POSTGRESQL_USE_IAM_AUTH": "false",
+	"POSTGRESQL_AWS_REGION":   "",
 }
 
 func main() {
 	p, _ := strconv.Atoi(getAttr("POSTGRESQL_PORT"))
+	useIAMAuth := getAttr("POSTGRESQL_USE_IAM_AUTH") == "true"
 	db := &models.Database{
 		Type: "postgresql",
 		PostGreSQL: &models.PostGreSQL{
@@ -47,6 +50,8 @@ func main() {
 			SSLMode:      getAttr("POSTGRESQL_SSLMODE"),
 			MaxIdleConns: 5,
 			MaxOpenConns: 5,
+			UseIAMAuth:   useIAMAuth,
+			AWSRegion:    getAttr("POSTGRESQL_AWS_REGION"),
 		},
 	}
 
