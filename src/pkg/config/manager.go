@@ -171,6 +171,8 @@ func (c *CfgManager) GetDatabaseCfg() *models.Database {
 			MaxOpenConns:    c.Get(ctx, common.PostGreSQLMaxOpenConns).GetInt(),
 			ConnMaxLifetime: c.Get(ctx, common.PostGreSQLConnMaxLifetime).GetDuration(),
 			ConnMaxIdleTime: c.Get(ctx, common.PostGreSQLConnMaxIdleTime).GetDuration(),
+			UseIAMAuth:      c.Get(ctx, common.PostGreSQLUseIAMAuth).GetBool(),
+			AWSRegion:       c.Get(ctx, common.PostGreSQLAWSRegion).GetString(),
 		},
 	}
 }
