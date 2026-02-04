@@ -2,10 +2,9 @@
 # All Harbor services run in containers with hot reload
 # Services communicate via Docker network (no localhost issues)
 #
-# Port configuration: see ports.env (loaded by Taskfile)
-# - CORE_PORT: Core API port (default: 8080)
-# - PORTAL_PORT: Portal UI port (default: 4200)
-# - PROJECT_PREFIX: Container name prefix (default: harbor)
+# Port configuration: controlled by SLOT variable in Taskfile
+# Use SLOT=0 (default) for standard ports, SLOT=1 for +100 offset, etc.
+# - PROJECT_PREFIX: Container name prefix (default: harbor-0)
 
 services:
   postgresql:
@@ -16,7 +15,7 @@ services:
       POSTGRES_PASSWORD: root123
       POSTGRES_DB: registry
     ports:
-      - "5432:5432"
+      - "${PORT_POSTGRES:-5432}:5432"
     volumes:
       - harbor-postgres-data:/var/lib/postgresql/data
       - ../make/migrations:/migrations
@@ -25,7 +24,7 @@ services:
     image: valkey/valkey:latest
     container_name: ${PROJECT_PREFIX:-harbor}-redis
     ports:
-      - "6379:6379"
+      - "${PORT_REDIS:-6379}:6379"
     volumes:
       - harbor-redis-data:/data
 
@@ -36,7 +35,7 @@ services:
       OTEL_TRACES_EXPORTER: none
       OTEL_SDK_DISABLED: "true"
     ports:
-      - "50000:5000"
+      - "${PORT_REGISTRY:-50000}:5000"
     volumes:
       - harbor-registry-data:/var/lib/registry
       - ../devenv/registry.config.yml:/etc/registry/config.yml:ro
@@ -55,8 +54,8 @@ services:
       # Mount views directly to where beego expects them (avoids symlink leaking to host)
       - ../src/core/views:/app/views:ro
     ports:
-      - "${CORE_PORT:-8080}:8080"
-      # - "2345:2345"  # Debug port (uncomment if needed)
+      - "${PORT_CORE:-8080}:8080"
+      # - "${PORT_DEBUG_CORE:-2345}:2345"  # Debug port (uncomment if needed)
     environment:
       # Database
       POSTGRESQL_HOST: postgresql
@@ -153,7 +152,7 @@ services:
     build:
       context: ..
       dockerfile: dockerfiles/dev.dockerfile
-    container_name: harbor-registryctl
+    container_name: ${PROJECT_PREFIX:-harbor}-registryctl
     profiles: [registryctl]
     volumes:
       - ..:/app
@@ -162,8 +161,8 @@ services:
       - harbor-registry-data:/var/lib/registry
       - ../devenv/registry.config.yml:/etc/registry/config.yml:ro
     ports:
-      - "8085:8080"
-      - "2347:2347"
+      - "${PORT_REGISTRYCTL:-8085}:8080"
+      - "${PORT_DEBUG_REGISTRYCTL:-2347}:2347"
     environment:
       PORT: "8080"
       LOG_LEVEL: debug
@@ -198,7 +197,7 @@ services:
       SCANNER_TRIVY_INSECURE: "true"
       SCANNER_API_SERVER_ADDR: ":8080"
     ports:
-      - "8081:8080"
+      - "${PORT_TRIVY:-8081}:8080"
     tmpfs:
       - /tmp:size=2G,mode=1777
     depends_on:
@@ -225,7 +224,7 @@ services:
       - ./proxy.config.mjs:/app/proxy.config.mjs:ro
       - ../api/v2.0/swagger.yaml:/swagger.yaml:ro
     ports:
-      - "${PORTAL_PORT:-4200}:4200"
+      - "${PORT_PORTAL:-4200}:4200"
     environment:
       HARBOR_PROXY_TARGET: "http://core:8080"
     depends_on:
