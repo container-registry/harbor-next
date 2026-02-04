@@ -1,0 +1,326 @@
+# Binary Building Tasks
+# Cross-platform Go binary compilation
+
+version: '3'
+
+vars:
+  # LDFLAGS for production builds (stripped, optimized)
+  LDFLAGS_PROD: "-extldflags=-static -s -w"
+
+  # LDFLAGS for debug builds (no stripping)
+  LDFLAGS_DEBUG: ""
+
+  # GCFLAGS for debug builds (disable optimizations)
+  GCFLAGS_DEBUG: "all=-N -l"
+
+  # Core-specific LDFLAGS with version info
+  CORE_LDFLAGS: |
+    -X github.com/goharbor/harbor/src/pkg/version.GitCommit={{.GIT_COMMIT}}
+    -X github.com/goharbor/harbor/src/pkg/version.ReleaseVersion={{.VERSION}}
+
+tasks:
+  # ============================================================================
+  # Aggregate Build Tasks
+  # ============================================================================
+
+  all-binaries:
+    desc: "📦 Build all Harbor binaries for all platforms"
+    deps:
+      - binary:core:linux-amd64
+      - binary:core:linux-arm64
+      - binary:jobservice:linux-amd64
+      - binary:jobservice:linux-arm64
+      - binary:registryctl:linux-amd64
+      - binary:registryctl:linux-arm64
+      - binary:exporter:linux-amd64
+      - binary:exporter:linux-arm64
+    cmds:
+      - |
+        echo "✅ All binaries built successfully"
+        echo ""
+        echo "Binaries:"
+        find bin -type f -exec ls -lh {} \;
+
+  all-binaries:amd64:
+    desc: "📦 Build all binaries for linux/amd64"
+    deps:
+      - binary:core:linux-amd64
+      - binary:jobservice:linux-amd64
+      - binary:registryctl:linux-amd64
+      - binary:exporter:linux-amd64
+    cmds:
+      - echo "✅ All AMD64 binaries built"
+
+  all-binaries:arm64:
+    desc: "📦 Build all binaries for linux/arm64"
+    deps:
+      - binary:core:linux-arm64
+      - binary:jobservice:linux-arm64
+      - binary:registryctl:linux-arm64
+      - binary:exporter:linux-arm64
+    cmds:
+      - echo "✅ All ARM64 binaries built"
+
+  # ============================================================================
+  # Core Binary (with version info)
+  # ============================================================================
+
+  binary:core:*:
+    desc: "Build Harbor core binary"
+    vars:
+      PLATFORM: '{{index .MATCH 0}}'
+      GOOS:
+        sh: echo {{.PLATFORM}} | cut -d- -f1
+      GOARCH:
+        sh: echo {{.PLATFORM}} | cut -d- -f2
+      OUTPUT: "bin/{{.PLATFORM}}/core"
+    sources:
+      - "src/core/**/*.go"
+      - "src/controller/**/*.go"
+      - "src/pkg/**/*.go"
+      - "src/lib/**/*.go"
+      - "src/server/**/*.go"
+      - "go.mod"
+      - "go.sum"
+    generates:
+      - "{{.OUTPUT}}"
+    deps:
+      - gen-apis
+    dir: src
+    env:
+      GOOS: "{{.GOOS}}"
+      GOARCH: "{{.GOARCH}}"
+      CGO_ENABLED: "0"
+    cmds:
+      - mkdir -p $(dirname ../{{.OUTPUT}})
+      - |
+        echo "🔨 Building core for {{.PLATFORM}}..."
+        go build {{.GOBUILD_FLAGS}} \
+          -gcflags="" \
+          -ldflags="{{.LDFLAGS_PROD}} {{.CORE_LDFLAGS}}" \
+          -o ../{{.OUTPUT}} \
+          ./core/main.go
+      - |
+        echo "✅ Core binary built: ../{{.OUTPUT}}"
+        ls -lh ../{{.OUTPUT}}
+
+  binary:core:*:debug:
+    desc: "Build Harbor core binary with debug symbols"
+    vars:
+      PLATFORM: '{{index .MATCH 0}}'
+      GOOS:
+        sh: echo {{.PLATFORM}} | cut -d- -f1
+      GOARCH:
+        sh: echo {{.PLATFORM}} | cut -d- -f2
+      OUTPUT: "bin/{{.PLATFORM}}/core"
+    deps:
+      - gen-apis
+    dir: src
+    env:
+      GOOS: "{{.GOOS}}"
+      GOARCH: "{{.GOARCH}}"
+      CGO_ENABLED: "0"
+    cmds:
+      - mkdir -p $(dirname ../{{.OUTPUT}})
+      - |
+        echo "🔨 Building core (debug) for {{.PLATFORM}}..."
+        go build {{.GOBUILD_FLAGS}} \
+          -gcflags="{{.GCFLAGS_DEBUG}}" \
+          -ldflags="{{.LDFLAGS_DEBUG}} {{.CORE_LDFLAGS}}" \
+          -o ../{{.OUTPUT}} \
+          ./core/main.go
+        echo "✅ Core binary (debug) built: ../{{.OUTPUT}}"
+
+  # ============================================================================
+  # Jobservice Binary
+  # ============================================================================
+
+  binary:jobservice:*:
+    desc: "Build Harbor jobservice binary"
+    vars:
+      PLATFORM: '{{index .MATCH 0}}'
+      GOOS:
+        sh: echo {{.PLATFORM}} | cut -d- -f1
+      GOARCH:
+        sh: echo {{.PLATFORM}} | cut -d- -f2
+      OUTPUT: "bin/{{.PLATFORM}}/jobservice"
+    sources:
+      - "src/jobservice/**/*.go"
+      - "src/pkg/**/*.go"
+      - "src/lib/**/*.go"
+      - "go.mod"
+      - "go.sum"
+    generates:
+      - "{{.OUTPUT}}"
+    dir: src
+    env:
+      GOOS: "{{.GOOS}}"
+      GOARCH: "{{.GOARCH}}"
+      CGO_ENABLED: "0"
+    cmds:
+      - mkdir -p $(dirname ../{{.OUTPUT}})
+      - |
+        echo "🔨 Building jobservice for {{.PLATFORM}}..."
+        go build {{.GOBUILD_FLAGS}} \
+          -ldflags="{{.LDFLAGS_PROD}}" \
+          -o ../{{.OUTPUT}} \
+          ./jobservice/main.go
+      - |
+        echo "✅ Jobservice binary built: ../{{.OUTPUT}}"
+        ls -lh ../{{.OUTPUT}}
+
+  # ============================================================================
+  # Registryctl Binary
+  # ============================================================================
+
+  binary:registryctl:*:
+    desc: "Build Harbor registryctl binary"
+    vars:
+      PLATFORM: '{{index .MATCH 0}}'
+      GOOS:
+        sh: echo {{.PLATFORM}} | cut -d- -f1
+      GOARCH:
+        sh: echo {{.PLATFORM}} | cut -d- -f2
+      OUTPUT: "bin/{{.PLATFORM}}/registryctl"
+    sources:
+      - "src/registryctl/**/*.go"
+      - "src/pkg/**/*.go"
+      - "src/lib/**/*.go"
+      - "go.mod"
+      - "go.sum"
+    generates:
+      - "{{.OUTPUT}}"
+    dir: src
+    env:
+      GOOS: "{{.GOOS}}"
+      GOARCH: "{{.GOARCH}}"
+      CGO_ENABLED: "0"
+    cmds:
+      - mkdir -p $(dirname ../{{.OUTPUT}})
+      - |
+        echo "🔨 Building registryctl for {{.PLATFORM}}..."
+        go build {{.GOBUILD_FLAGS}} \
+          -ldflags="{{.LDFLAGS_PROD}}" \
+          -o ../{{.OUTPUT}} \
+          ./registryctl/main.go
+      - |
+        echo "✅ Registryctl binary built: ../{{.OUTPUT}}"
+        ls -lh ../{{.OUTPUT}}
+
+  # ============================================================================
+  # Exporter Binary
+  # ============================================================================
+
+  binary:exporter:*:
+    desc: "Build Harbor metrics exporter binary"
+    vars:
+      PLATFORM: '{{index .MATCH 0}}'
+      GOOS:
+        sh: echo {{.PLATFORM}} | cut -d- -f1
+      GOARCH:
+        sh: echo {{.PLATFORM}} | cut -d- -f2
+      OUTPUT: "bin/{{.PLATFORM}}/harbor-exporter"
+    sources:
+      - "src/cmd/exporter/**/*.go"
+      - "src/pkg/**/*.go"
+      - "src/lib/**/*.go"
+      - "go.mod"
+      - "go.sum"
+    generates:
+      - "{{.OUTPUT}}"
+    dir: src
+    env:
+      GOOS: "{{.GOOS}}"
+      GOARCH: "{{.GOARCH}}"
+      CGO_ENABLED: "0"
+    cmds:
+      - mkdir -p $(dirname ../{{.OUTPUT}})
+      - |
+        echo "🔨 Building harbor-exporter for {{.PLATFORM}}..."
+        go build {{.GOBUILD_FLAGS}} \
+          -ldflags="{{.LDFLAGS_PROD}}" \
+          -o ../{{.OUTPUT}} \
+          ./cmd/exporter/main.go
+      - |
+        echo "✅ Exporter binary built: ../{{.OUTPUT}}"
+        ls -lh ../{{.OUTPUT}}
+
+  # ============================================================================
+  # API Generation (Swagger)
+  # ============================================================================
+
+  gen-apis:
+    desc: "Generate API server code from OpenAPI spec"
+    run: once
+    sources:
+      - "api/v2.0/swagger.yaml"
+      - "tools/swagger/templates/**/*"
+    generates:
+      - "src/server/v2.0/models/*.go"
+      - "src/server/v2.0/restapi/**/*.go"
+    cmds:
+      - mkdir -p src/server/v2.0
+      - |
+        echo "🔧 Generating API code from OpenAPI spec..."
+        docker run --rm \
+          -v $(pwd):/src \
+          -w /src \
+          quay.io/goswagger/swagger:{{.SWAGGER_VERSION}} \
+          generate server \
+          --template-dir=./tools/swagger/templates \
+          --exclude-main \
+          --additional-initialism=CVE \
+          --additional-initialism=GC \
+          --additional-initialism=OIDC \
+          -f ./api/v2.0/swagger.yaml \
+          -A harbor \
+          --target ./src/server/v2.0
+      - |
+        echo "✅ API code generated"
+        echo "   Models: src/server/v2.0/models/"
+        echo "   REST API: src/server/v2.0/restapi/"
+
+  gen-apis:frontend:
+    desc: "Generate frontend API code from OpenAPI spec"
+    sources:
+      - "api/v2.0/swagger.yaml"
+    generates:
+      - "src/portal/ng-swagger-gen/models.ts"
+    method: checksum
+    cmds:
+      - |
+        cd src/portal && \
+        echo "🔧 Generating frontend API code from OpenAPI spec..." && \
+        node scripts/convert-yaml-to-json.js && \
+        npx ng-swagger-gen -i ng-swagger-gen/swagger.json -o ng-swagger-gen && \
+        node scripts/delete-swagger-json.js && \
+        echo "✅ Frontend API code generated"
+
+  # ============================================================================
+  # Utilities
+  # ============================================================================
+
+  clean:
+    desc: "🧹 Clean all built binaries and generated API code"
+    cmds:
+      - rm -rf bin/
+      - rm -rf src/server/v2.0/models/
+      - rm -rf src/server/v2.0/restapi/
+      - rm -rf src/portal/ng-swagger-gen/models/ src/portal/ng-swagger-gen/services/
+      - rm -f src/portal/ng-swagger-gen/models.ts src/portal/ng-swagger-gen/services.ts
+      - rm -f src/portal/ng-swagger-gen/api.module.ts src/portal/ng-swagger-gen/api-configuration.ts
+      - rm -f src/portal/ng-swagger-gen/base-service.ts src/portal/ng-swagger-gen/strict-http-response.ts
+      - echo "✅ Binaries and generated API code cleaned"
+
+  verify:
+    desc: "✅ Verify all binaries are executable"
+    cmds:
+      - |
+        echo "Verifying binaries..."
+        for binary in $(find bin -type f); do
+          if file $binary | grep -q "executable"; then
+            echo "✅ $binary"
+          else
+            echo "❌ $binary (not executable)"
+          fi
+        done

@@ -1,0 +1,15 @@
+# Docker Registry (Distribution) Configuration - Development Environment
+# All settings hardcoded for local development (localhost)
+version: 0.1
+storage:
+  cache:
+    blobdescriptor: inmemory
+  filesystem:
+    rootdirectory: /storage
+  delete:
+    enabled: false
+http:
+  addr: :5000
+  secret: placeholder
+  debug:
+    addr: localhost:5001
