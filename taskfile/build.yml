@@ -43,7 +43,7 @@ tasks:
       GOOS: '{{index (splitList "-" .PLATFORM) 0}}'
       GOARCH: '{{index (splitList "-" .PLATFORM) 1}}'
       OUTPUT: 'bin/{{.PLATFORM}}/{{.OUTPUT_NAME}}'
-      LDFLAGS: '{{.LDFLAGS | default .LDFLAGS_PROD}}'
+      GO_LDFLAGS: '{{.GO_LDFLAGS | default .LDFLAGS_PROD}}'
       GCFLAGS: '{{.GCFLAGS | default ""}}'
     dir: src
     env:
@@ -53,7 +53,7 @@ tasks:
     cmds:
       - cmd: mkdir -p $(dirname ../{{.OUTPUT}})
         silent: true
-      - go build {{.GOBUILD_FLAGS}} -gcflags="{{.GCFLAGS}}" -ldflags="{{.LDFLAGS}} {{.VERSION_LDFLAGS}}" -o ../{{.OUTPUT}} {{.MAIN_PATH}}
+      - go build {{.GOBUILD_FLAGS}} -gcflags="{{.GCFLAGS}}" -ldflags="{{.GO_LDFLAGS}} {{.VERSION_LDFLAGS}}" -o ../{{.OUTPUT}} {{.MAIN_PATH}}
 
   # --- Binary Tasks ---
 
@@ -86,7 +86,7 @@ tasks:
           PLATFORM: '{{index .MATCH 0}}'
           MAIN_PATH: ./core/main.go
           OUTPUT_NAME: core
-          LDFLAGS: ''
+          GO_LDFLAGS: ''
           GCFLAGS: '{{.GCFLAGS_DEBUG}}'
 
   binary:jobservice:*:

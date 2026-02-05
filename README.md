@@ -96,13 +96,19 @@ task
 
 **Common Commands:**
 ```bash
+task                     # Start full dev environment (foreground)
+task setup               # Install development tools
 task build               # Build all binaries
 task images              # Build all Docker images
 task test                # Run all tests
 task test:lint           # Run linters
+task test:unit           # Run unit tests only
 task clean               # Clean build artifacts
+task info                # Show build information
 task -l                  # Show all available tasks
 ```
+
+See [devenv/README.md](devenv/README.md) for detailed development environment commands.
 
 ## OCI Distribution Conformance Tests
 

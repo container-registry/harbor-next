@@ -21,6 +21,7 @@ task dev:infra:up
 All services run in containers:
 - **Core** - Harbor API with Air hot reload (port 8080, Delve 2345)
 - **JobService** - Background jobs with Air hot reload (port 8888, Delve 2346)
+- **RegistryCtl** - Registry controller for storage operations (port 8085)
 - **Trivy Adapter** - Vulnerability scanner (port 8081)
 - **PostgreSQL** - Database (port 5432)
 - **Redis/Valkey** - Cache/queue (port 6379)
@@ -95,7 +96,10 @@ task dev:infra:remove    # Remove with volumes
 
 ### Frontend
 ```bash
-task dev:frontend        # Start Angular with HMR (runs natively)
+task dev:frontend:native     # Start Angular with HMR (runs natively)
+task dev:frontend:build      # Build frontend for production
+task dev:frontend:test       # Run frontend tests in watch mode
+task dev:frontend:test:once  # Run frontend tests once
 ```
 
 ### Database
@@ -103,6 +107,23 @@ task dev:frontend        # Start Angular with HMR (runs natively)
 task dev:db:shell        # Open PostgreSQL shell
 task dev:db:migrate      # Run migrations
 task dev:db:reset        # Reset to clean state
+```
+
+### Utilities
+```bash
+task dev:gen:private-key # Generate RSA private key for token signing
+task dev:info            # Show current SLOT and port assignments
+task dev:logs            # View all container logs
+```
+
+### Build & Test (see main README)
+```bash
+task build               # Build all binaries
+task build:gen-apis      # Generate API server code from OpenAPI spec
+task test                # Run all tests
+task test:lint           # Run Go linters
+task test:unit           # Run Go unit tests
+task test:quick          # Quick validation (fast checks only)
 ```
 
 ## Hot Reload
