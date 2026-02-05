@@ -21,6 +21,13 @@ vars:
   DISTRIBUTION_SRC: "https://github.com/distribution/distribution.git"
   NPM_REGISTRY: "https://registry.npmjs.org/"
 
+  # Multi-arch image build configuration
+  # Registry: 8gears.container-registry.com/8gcr/<image>:<version>
+  IMAGE_REGISTRY: '{{.IMAGE_REGISTRY | default "8gears.container-registry.com"}}'
+  IMAGE_NAMESPACE: '{{.IMAGE_NAMESPACE | default "8gcr"}}'
+  IMAGE_PLATFORMS: '{{.IMAGE_PLATFORMS | default "linux/amd64,linux/arm64"}}'
+  IMAGE_BUILDER: "harbor-multiarch"
+
 includes:
   build: ./taskfile/build.yml
   image: ./taskfile/image.yml
@@ -44,7 +51,7 @@ tasks:
       - task: test:all
 
   images:
-    desc: "🐳 Build all Docker images"
+    desc: "🐳 Build all Docker images (use PUSH=false PLATFORMS=linux/arm64 for local)"
     cmds:
       - task: image:all-images
 

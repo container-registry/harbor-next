@@ -4,7 +4,7 @@ This directory contains Dockerfiles for building Harbor component images.
 
 ## Overview
 
-All Dockerfiles support multi-architecture builds (linux/amd64, linux/arm64) using `TARGETARCH` build argument.
+All Dockerfiles support multi-architecture builds (linux/amd64, linux/arm64). BuildKit sets `TARGETARCH` automatically per platform, so you don't need to pass it manually.
 
 **Image Types:**
 - **Production images**: Use scratch/minimal base images for security and size
@@ -22,7 +22,7 @@ These services use pre-built Go binaries with minimal base images:
 - **`exporter.dockerfile`** - Prometheus metrics exporter (scratch + CA certs + binary)
 
 **Build Context Requirements:**
-- Binary must be at: `bin/linux-${TARGETARCH}/<service-name>`
+- Binary must be at: `bin/linux-${TARGETARCH}/<service-name>` (BuildKit sets `TARGETARCH`)
 - Example: `bin/linux-amd64/core`
 
 **Build Command Example:**
@@ -30,10 +30,9 @@ These services use pre-built Go binaries with minimal base images:
 # Build binary first
 task build:binary:core:linux-amd64
 
-# Build image
+# Build image (TARGETARCH is set by BuildKit)
 docker buildx build \
   --platform linux/amd64 \
-  --build-arg TARGETARCH=amd64 \
   -t goharbor/harbor-core:dev \
   -f dockerfile/core.dockerfile \
   .
