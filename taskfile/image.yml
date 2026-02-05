@@ -1,5 +1,6 @@
 # Docker Image Building Tasks
 # Uses Dockerfiles in dockerfile/ directory
+# Must be run via root Taskfile (task image:*) - vars inherited from versions.env
 
 version: '3'
 
@@ -199,13 +200,15 @@ tasks:
     desc: "Build Docker Registry (Distribution) image"
     vars:
       PLATFORM: '{{index .MATCH 0}}'
+      ARCH: '{{if eq .PLATFORM "linux-amd64"}}amd64{{else}}arm64{{end}}'
       TAG: "goharbor/registry-photon:{{.VERSION}}-{{.PLATFORM}}"
     cmds:
       - |
         echo "🐳 Building Registry image for {{.PLATFORM}}..."
-        echo "⚠️  This builds distribution from source..."
         docker buildx build \
           --platform linux/{{.ARCH}} \
+          --build-arg GO_VERSION={{.GO_VERSION}} \
+          --build-arg DISTRIBUTION_VERSION={{.DISTRIBUTION_VERSION}} \
           -t {{.TAG}} \
           -f dockerfile/registry.dockerfile \
           --load \
