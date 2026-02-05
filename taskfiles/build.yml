@@ -69,10 +69,8 @@ tasks:
     desc: "Build Harbor core binary"
     vars:
       PLATFORM: '{{index .MATCH 0}}'
-      GOOS:
-        sh: echo {{.PLATFORM}} | cut -d- -f1
-      GOARCH:
-        sh: echo {{.PLATFORM}} | cut -d- -f2
+      GOOS: '{{index (splitList "-" .PLATFORM) 0}}'
+      GOARCH: '{{index (splitList "-" .PLATFORM) 1}}'
       OUTPUT: "bin/{{.PLATFORM}}/core"
     sources:
       - "src/core/**/*.go"
@@ -108,10 +106,8 @@ tasks:
     desc: "Build Harbor core binary with debug symbols"
     vars:
       PLATFORM: '{{index .MATCH 0}}'
-      GOOS:
-        sh: echo {{.PLATFORM}} | cut -d- -f1
-      GOARCH:
-        sh: echo {{.PLATFORM}} | cut -d- -f2
+      GOOS: '{{index (splitList "-" .PLATFORM) 0}}'
+      GOARCH: '{{index (splitList "-" .PLATFORM) 1}}'
       OUTPUT: "bin/{{.PLATFORM}}/core"
     deps:
       - gen-apis
@@ -139,10 +135,8 @@ tasks:
     desc: "Build Harbor jobservice binary"
     vars:
       PLATFORM: '{{index .MATCH 0}}'
-      GOOS:
-        sh: echo {{.PLATFORM}} | cut -d- -f1
-      GOARCH:
-        sh: echo {{.PLATFORM}} | cut -d- -f2
+      GOOS: '{{index (splitList "-" .PLATFORM) 0}}'
+      GOARCH: '{{index (splitList "-" .PLATFORM) 1}}'
       OUTPUT: "bin/{{.PLATFORM}}/jobservice"
     sources:
       - "src/jobservice/**/*.go"
@@ -177,10 +171,8 @@ tasks:
     desc: "Build Harbor registryctl binary"
     vars:
       PLATFORM: '{{index .MATCH 0}}'
-      GOOS:
-        sh: echo {{.PLATFORM}} | cut -d- -f1
-      GOARCH:
-        sh: echo {{.PLATFORM}} | cut -d- -f2
+      GOOS: '{{index (splitList "-" .PLATFORM) 0}}'
+      GOARCH: '{{index (splitList "-" .PLATFORM) 1}}'
       OUTPUT: "bin/{{.PLATFORM}}/registryctl"
     sources:
       - "src/registryctl/**/*.go"
@@ -215,10 +207,8 @@ tasks:
     desc: "Build Harbor metrics exporter binary"
     vars:
       PLATFORM: '{{index .MATCH 0}}'
-      GOOS:
-        sh: echo {{.PLATFORM}} | cut -d- -f1
-      GOARCH:
-        sh: echo {{.PLATFORM}} | cut -d- -f2
+      GOOS: '{{index (splitList "-" .PLATFORM) 0}}'
+      GOARCH: '{{index (splitList "-" .PLATFORM) 1}}'
       OUTPUT: "bin/{{.PLATFORM}}/harbor-exporter"
     sources:
       - "src/cmd/exporter/**/*.go"
@@ -249,9 +239,17 @@ tasks:
   # API Generation (Swagger)
   # ============================================================================
 
+  require-swagger:
+    desc: "Install go-swagger if not present"
+    internal: true
+    status:
+      - command -v swagger
+    cmds:
+      - go install github.com/go-swagger/go-swagger/cmd/swagger@{{.SWAGGER_VERSION}}
+
   gen-apis:
     desc: "Generate API server code from OpenAPI spec"
-    run: once
+    deps: [require-swagger]
     sources:
       - "api/v2.0/swagger.yaml"
       - "tools/swagger/templates/**/*"
@@ -261,12 +259,7 @@ tasks:
     cmds:
       - mkdir -p src/server/v2.0
       - |
-        echo "🔧 Generating API code from OpenAPI spec..."
-        docker run --rm \
-          -v $(pwd):/src \
-          -w /src \
-          quay.io/goswagger/swagger:{{.SWAGGER_VERSION}} \
-          generate server \
+        swagger generate server \
           --template-dir=./tools/swagger/templates \
           --exclude-main \
           --additional-initialism=CVE \
@@ -275,10 +268,6 @@ tasks:
           -f ./api/v2.0/swagger.yaml \
           -A harbor \
           --target ./src/server/v2.0
-      - |
-        echo "✅ API code generated"
-        echo "   Models: src/server/v2.0/models/"
-        echo "   REST API: src/server/v2.0/restapi/"
 
   gen-apis:frontend:
     desc: "Generate frontend API code from OpenAPI spec"
@@ -287,14 +276,11 @@ tasks:
     generates:
       - "src/portal/ng-swagger-gen/models.ts"
     method: checksum
+    dir: src/portal
     cmds:
-      - |
-        cd src/portal && \
-        echo "🔧 Generating frontend API code from OpenAPI spec..." && \
-        node scripts/convert-yaml-to-json.js && \
-        npx ng-swagger-gen -i ng-swagger-gen/swagger.json -o ng-swagger-gen && \
-        node scripts/delete-swagger-json.js && \
-        echo "✅ Frontend API code generated"
+      - node scripts/convert-yaml-to-json.js
+      - npx ng-swagger-gen -i ng-swagger-gen/swagger.json -o ng-swagger-gen
+      - node scripts/delete-swagger-json.js
 
   # ============================================================================
   # Utilities
