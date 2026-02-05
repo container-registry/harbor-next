@@ -157,6 +157,52 @@ Connect your IDE debugger to these ports. The services start immediately (`--con
 - **Harbor Admin**: `admin` / `Harbor12345`
 - **PostgreSQL**: `postgres` / `root123`
 
+## Pushing Images to Harbor
+
+Once the dev environment is running, you can push container images to test the full workflow.
+
+### Docker Desktop Configuration
+
+Add `localhost:8080` to your Docker daemon's insecure registries. In Docker Desktop, go to **Settings > Docker Engine** and add:
+
+```json
+{
+  "insecure-registries": [
+    "localhost:8080"
+  ]
+}
+```
+
+Restart Docker Desktop after making this change.
+
+### Push Workflow
+
+```bash
+# 1. Log in to Harbor (default admin credentials)
+docker login localhost:8080 -u admin -p Harbor12345
+
+# 2. Tag an image for Harbor (images go into projects, "library" is the default)
+docker pull hello-world
+docker tag hello-world:latest localhost:8080/library/hello-world:latest
+
+# 3. Push the image
+docker push localhost:8080/library/hello-world:latest
+
+# 4. Verify via API
+curl -s -u admin:Harbor12345 http://localhost:8080/api/v2.0/projects/library/repositories | python3 -m json.tool
+
+# 5. Pull it back
+docker pull localhost:8080/library/hello-world:latest
+```
+
+### Notes
+
+- The `library` project is created automatically during database migration and is public by default.
+- All images must be pushed to a project: `localhost:8080/<project>/<image>:<tag>`.
+- You can create additional projects via the Portal at `http://localhost:4200` or the API.
+- If using a non-default SLOT (e.g., `SLOT=1`), the Core port shifts accordingly (e.g., `8180`). Update the insecure-registries entry to match.
+- **Pushing via Portal port (4200) does not work.** Harbor Core sets `EXT_ENDPOINT` to its internal Docker hostname (`core:8080`), so the `WWW-Authenticate` token realm in `/v2/` responses points to `core:8080`, which the host Docker client cannot resolve. Always push directly to the Core port (8080).
+
 ## Troubleshooting
 
 ### First-time startup is slow

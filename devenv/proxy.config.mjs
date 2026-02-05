@@ -1,5 +1,5 @@
 // Proxy config for Docker dev environment
-// Routes API calls to the core container
+// Routes API and Docker V2 calls to the core container
 export default [
   {
     context: [
@@ -11,7 +11,9 @@ export default [
       "/swagger.json",
       "/swagger2.json",
       "/devcenter-api-2.0",
-      "/swagger-ui.bundle.js"
+      "/swagger-ui.bundle.js",
+      "/v2",
+      "/service"
     ],
     target: "http://core:8080",
     secure: false,
