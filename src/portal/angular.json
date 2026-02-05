@@ -86,7 +86,7 @@
           "options": {
             "browserTarget": "harbor-portal:build",
             "proxyConfig": "proxy.config.mjs",
-            "allowedHosts": ["macfly4200.8gears.ch", "localhost"]
+            "allowedHosts": ["localhost"]
           },
           "configurations": {
             "production": {
