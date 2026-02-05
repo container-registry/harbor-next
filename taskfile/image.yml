@@ -177,6 +177,7 @@ tasks:
     desc: "Build Harbor Portal Docker image (Angular frontend)"
     vars:
       PLATFORM: '{{index .MATCH 0}}'
+      ARCH: '{{if eq .PLATFORM "linux-amd64"}}amd64{{else}}arm64{{end}}'
       TAG: "goharbor/harbor-portal:{{.VERSION}}-{{.PLATFORM}}"
     cmds:
       - |
@@ -186,6 +187,7 @@ tasks:
           --platform linux/{{.ARCH}} \
           -t {{.TAG}} \
           -f dockerfile/portal.dockerfile \
+          --build-arg BUN_VERSION={{.BUN_VERSION}} \
           --load \
           .
       - |
@@ -225,6 +227,7 @@ tasks:
     desc: "Build Trivy Adapter Docker image"
     vars:
       PLATFORM: '{{index .MATCH 0}}'
+      ARCH: '{{if eq .PLATFORM "linux-amd64"}}amd64{{else}}arm64{{end}}'
       TAG: "goharbor/trivy-adapter-photon:{{.VERSION}}-{{.PLATFORM}}"
     cmds:
       - |
@@ -248,6 +251,7 @@ tasks:
     desc: "Build Harbor Nginx proxy image"
     vars:
       PLATFORM: '{{index .MATCH 0}}'
+      ARCH: '{{if eq .PLATFORM "linux-amd64"}}amd64{{else}}arm64{{end}}'
       TAG: "goharbor/nginx-photon:{{.VERSION}}-{{.PLATFORM}}"
     cmds:
       - |

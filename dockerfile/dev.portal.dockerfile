@@ -1,15 +1,12 @@
 # Development Dockerfile for Harbor Portal
 # Deps installed at build time, source mounted at runtime for HMR
 
-FROM oven/bun:1-alpine
-
+ARG BUN_VERSION
+FROM oven/bun:${BUN_VERSION}-alpine
 RUN apk add --no-cache nodejs
-
 WORKDIR /app
-
 # Copy package files for dependency installation
 COPY src/portal/package.json src/portal/bun.lock* ./
-
 # Install deps at build time (skip postinstall - swagger.yaml will be mounted at runtime)
 RUN bun install --ignore-scripts
 

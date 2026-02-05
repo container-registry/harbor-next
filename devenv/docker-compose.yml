@@ -213,6 +213,8 @@ services:
     build:
       context: ..
       dockerfile: dockerfile/dev.portal.dockerfile
+      args:
+        BUN_VERSION: ${BUN_VERSION}
     container_name: ${PROJECT_PREFIX:-harbor}-portal
     profiles: [portal]
     volumes:
