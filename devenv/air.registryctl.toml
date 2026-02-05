@@ -13,8 +13,8 @@ tmp_dir = "tmp"
   args_bin = []
 
   # Delve debugger on port 2347, starts immediately (--continue)
-  # Attach anytime with: dlv connect 127.0.0.1:2347
-  full_bin = "dlv exec ./tmp/registryctl --listen=127.0.0.1:2347 --headless=true --api-version=2 --accept-multiclient --continue --"
+  # Attach anytime with: dlv connect localhost:2347
+  full_bin = "dlv exec ./tmp/registryctl --listen=0.0.0.0:2347 --headless=true --api-version=2 --accept-multiclient --continue --"
 
   # Watch src directory for Go files only
   include_dir = ["src"]

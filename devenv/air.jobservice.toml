@@ -17,7 +17,7 @@ tmp_dir = "tmp"
 
   # Run via Delve debugger - allows attaching debugger at any time
   # Port 2346 for Jobservice (Core uses 2345), --continue starts immediately without waiting for debugger
-  full_bin = "dlv exec ./tmp/jobservice --listen=127.0.0.1:2346 --headless=true --api-version=2 --accept-multiclient --continue -- -c devenv/jobservice.config.yml"
+  full_bin = "dlv exec ./tmp/jobservice --listen=0.0.0.0:2346 --headless=true --api-version=2 --accept-multiclient --continue -- -c devenv/jobservice.config.yml"
 
   # Watch these directories
   include_dir = ["src"]
