@@ -1,15 +1,11 @@
 # Docker Compose - Local DevEnv
 # All Harbor services run in containers with hot reload
-# Services communicate via Docker network (no localhost issues)
-#
 # Port configuration: controlled by SLOT variable in Taskfile
 # Use SLOT=0 (default) for standard ports, SLOT=1 for +100 offset, etc.
-# - PROJECT_PREFIX: Container name prefix (default: harbor-0)
 
 services:
   postgresql:
     image: postgres:16-alpine
-    container_name: ${PROJECT_PREFIX:-harbor}-db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: root123
@@ -22,7 +18,6 @@ services:
 
   redis:
     image: valkey/valkey:latest
-    container_name: ${PROJECT_PREFIX:-harbor}-redis
     ports:
       - "${PORT_REDIS:-6379}:6379"
     volumes:
@@ -30,7 +25,6 @@ services:
 
   registry:
     image: distribution/distribution:latest
-    container_name: ${PROJECT_PREFIX:-harbor}-registry
     environment:
       OTEL_TRACES_EXPORTER: none
       OTEL_SDK_DISABLED: "true"
@@ -47,7 +41,6 @@ services:
       dockerfile: dockerfile/dev.core.dockerfile
       args:
         GO_VERSION: ${GO_VERSION}
-    container_name: ${PROJECT_PREFIX:-harbor}-core
     profiles: [core]
     volumes:
       - ..:/app
@@ -98,11 +91,7 @@ services:
       - postgresql
       - redis
       - registry
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/api/v2.0/ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 30
+
 
   # JobService - starts with: docker compose --profile jobservice up
   jobservice:
@@ -111,7 +100,6 @@ services:
       dockerfile: dockerfile/dev.core.dockerfile
       args:
         GO_VERSION: ${GO_VERSION}
-    container_name: ${PROJECT_PREFIX:-harbor}-jobservice
     profiles: [jobservice]
     volumes:
       - ..:/app
@@ -145,11 +133,6 @@ services:
     depends_on:
       core:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8888/api/v1/stats"]
-      interval: 5s
-      timeout: 3s
-      retries: 30
 
   # RegistryCtl - starts with: docker compose --profile registryctl up
   registryctl:
@@ -158,7 +141,6 @@ services:
       dockerfile: dockerfile/dev.core.dockerfile
       args:
         GO_VERSION: ${GO_VERSION}
-    container_name: ${PROJECT_PREFIX:-harbor}-registryctl
     profiles: [registryctl]
     volumes:
       - ..:/app
@@ -178,16 +160,10 @@ services:
     command: air -c devenv/air.registryctl.toml
     depends_on:
       - registry
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/api/health"]
-      interval: 5s
-      timeout: 3s
-      retries: 30
 
   # Trivy scanner adapter - starts with: docker compose --profile trivy up
   trivy-adapter:
     image: goharbor/trivy-adapter-photon:v2.14.0
-    container_name: ${PROJECT_PREFIX:-harbor}-trivy
     profiles: [trivy]
     environment:
       SCANNER_LOG_LEVEL: debug
@@ -208,11 +184,7 @@ services:
       - /tmp:size=2G,mode=1777
     depends_on:
       - redis
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/probe/healthy"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+
 
   # Portal (Angular UI) - starts with: docker compose --profile portal up
   portal:
@@ -221,7 +193,6 @@ services:
       dockerfile: dockerfile/dev.portal.dockerfile
       args:
         BUN_VERSION: ${BUN_VERSION}
-    container_name: ${PROJECT_PREFIX:-harbor}-portal
     profiles: [portal]
     volumes:
       - ../src/portal/src:/app/src
@@ -238,11 +209,6 @@ services:
     depends_on:
       core:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:4200"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
 
 volumes:
   harbor-postgres-data:
