@@ -115,7 +115,7 @@ These Dockerfiles are used by Taskfile tasks in `taskfile/image.yml`:
 
 ```bash
 # Build single image
-task image:image:core:linux-amd64
+task image:core:linux-amd64
 
 # Build all images
 task image:all-images
