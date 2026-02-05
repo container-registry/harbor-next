@@ -12,9 +12,6 @@ This directory contains all configuration files needed to run Harbor locally for
 # Start full dev environment with Trivy scanner
 task dev:up
 
-# Start without Trivy (faster startup)
-task dev:up:simple
-
 # Start infrastructure only (for native development)
 task dev:infra:up
 ```
