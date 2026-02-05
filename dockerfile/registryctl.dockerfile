@@ -1,5 +1,4 @@
 # Dockerfile for Harbor Registryctl (Production)
-# Based on .dagger/main.go buildImage logic (lines 432-472)
 # Uses scratch base with only CA certs and binary
 
 FROM scratch

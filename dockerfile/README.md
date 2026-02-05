@@ -1,6 +1,6 @@
 # Harbor Dockerfiles
 
-This directory contains Dockerfiles for building Harbor component images. These Dockerfiles are based on the logic extracted from `.dagger/main.go`.
+This directory contains Dockerfiles for building Harbor component images.
 
 ## Overview
 
@@ -126,7 +126,7 @@ task image:all-images
 Some services require additional files:
 
 - **Core**: `/migrations` (from `make/migrations`), `/icons`, `/views` (from `src/core/views`)
-- **Portal**: `.dagger/config/portal/nginx.conf` (nginx configuration)
+- **Portal**: `config/portal/nginx.conf` (nginx configuration)
 - **Jobservice**: Config mounted at `/etc/jobservice/config.yml`
 - **Registryctl**: Config mounted at `/etc/registryctl/config.yml`
 - **Registry**: Config mounted at `/etc/registry/config.yml`
@@ -135,7 +135,7 @@ Some services require additional files:
 
 These Dockerfiles **do not use** the legacy Dockerfiles in `make/photon/`. Key differences:
 
-- ✅ Based on current Dagger implementation (.dagger/main.go)
+- ✅ Uses modern multi-stage Dockerfile patterns
 - ✅ Production images use **scratch** base (not Alpine) for security
 - ✅ Support for multi-architecture builds (linux/amd64, linux/arm64)
 - ✅ Optimized layer caching
@@ -164,4 +164,4 @@ These Dockerfiles **do not use** the legacy Dockerfiles in `make/photon/`. Key d
 - Multi-stage builds happen entirely in Docker (no pre-built binaries needed)
 - Portal requires Bun (version from `BUN_VERSION`) for faster builds
 - Registry includes CVE-2025-22872 security fix
-- All images follow Dagger logic from `.dagger/main.go`
+- All images use modern multi-stage build patterns

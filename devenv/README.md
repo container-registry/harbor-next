@@ -29,15 +29,15 @@ All services run in containers:
 - **Redis/Valkey** - Cache/queue (port 6379)
 - **Distribution** - Docker Registry (port 50000)
 
-```
-                    ┌─────────────────────────────────────────┐
-                    │            Docker Network               │
-                    │                                         │
+```SVGBob
+                    ┌────────────────────────────────────────┐
+                    │            Docker Network              │
+                    │                                        │
 ┌──────────┐        │  ┌──────┐  ┌───────────┐  ┌───────┐    │
 │  Portal  │◄───────┼─►│ Core │◄─│ JobService│◄─│ Trivy │    │
 │ :4200    │        │  │:8080 │  │   :8888   │  │ :8081 │    │
 └──────────┘        │  └──┬───┘  └─────┬─────┘  └───────┘    │
-   (native)         │     │            │                      │
+   (native)         │     │            │                     │
                     │  ┌──▼────────────▼──┐                  │
                     │  │    PostgreSQL    │                  │
                     │  │      :5432       │                  │
@@ -50,7 +50,7 @@ All services run in containers:
                     │  │    Registry      │                  │
                     │  │     :50000       │                  │
                     │  └──────────────────┘                  │
-                    └─────────────────────────────────────────┘
+                    └────────────────────────────────────────┘
 ```
 
 ## Directory Structure

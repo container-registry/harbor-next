@@ -31,7 +31,6 @@ tmp_dir = "tmp"
     "tmp",
     "node_modules",
     ".git",
-    ".dagger",
     ".task",
     "api",
     "devenv",

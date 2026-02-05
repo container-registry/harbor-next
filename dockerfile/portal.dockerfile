@@ -1,5 +1,4 @@
 # Dockerfile for Harbor Portal (Angular Frontend)
-# Based on .dagger/main.go buildPortal logic
 
 # Stage 1: Extract swagger.yaml and LICENSE
 FROM alpine:latest AS extractor
@@ -70,7 +69,7 @@ COPY --from=builder /harbor/src/portal/swagger.json /usr/share/nginx/html/swagge
 COPY --from=swagger-builder /harbor/src/portal/app-swagger-ui/dist /usr/share/nginx/html
 
 # Copy nginx configuration
-COPY .dagger/config/portal/nginx.conf /etc/nginx/nginx.conf
+COPY config/portal/nginx.conf /etc/nginx/nginx.conf
 
 WORKDIR /usr/share/nginx/html
 

@@ -1,5 +1,4 @@
 # Dockerfile for Harbor Nginx Proxy
-# Based on .dagger/main.go buildNginx logic (lines 566-574)
 
 FROM nginx:alpine
 

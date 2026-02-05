@@ -1,5 +1,4 @@
 # Dockerfile for Harbor Trivy Adapter
-# Based on .dagger/main.go buildTrivyAdapter logic (lines 595-629)
 
 ARG GO_VERSION=1.25.6
 ARG HARBOR_SCANNER_TRIVY_VERSION=v0.33.2
