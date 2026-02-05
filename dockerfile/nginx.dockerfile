@@ -2,8 +2,7 @@
 
 FROM nginx:alpine
 
-# Copy CA certificates
-COPY --from=alpine:latest /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+RUN apk add --no-cache ca-certificates
 
 WORKDIR /
 
