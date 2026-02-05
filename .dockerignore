@@ -1,5 +1,6 @@
 # Build artifacts
 bin/
+!bin/linux-*/
 tmp/
 dist/
 *.tgz
