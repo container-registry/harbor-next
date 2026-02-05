@@ -79,7 +79,7 @@ Harbor Next uses [Taskfile](https://taskfile.dev) for local development and in p
 **Prerequisites:**
 - [Task](https://taskfile.dev/installation/) v3.x
 - Docker 20.10.10+
-- Go 1.24.6+
+- Go 1.25.6+
 - Node.js 16+
 
 **Get Started:**

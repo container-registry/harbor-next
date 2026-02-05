@@ -18,7 +18,7 @@ vars:
   TIMESTAMP:
     sh: date -u +%Y%m%d%H%M%S
 
-  GO_VERSION: "1.24.6"
+  GO_VERSION: "1.25.6"
   SWAGGER_VERSION: "v0.31.0"
   GOLANGCILINT_VERSION: "latest"
   DELVE_VERSION: "v1.25.1"

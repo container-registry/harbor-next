@@ -1,7 +1,7 @@
 # Dockerfile for Harbor Registry (Docker Distribution)
 # Based on .dagger/main.go buildRegistry logic (lines 576-592)
 
-FROM golang:1.24.6-alpine AS versioner
+FROM golang:1.25.6-alpine AS versioner
 
 # Clone distribution repository
 WORKDIR /go/src/github.com/docker
@@ -22,7 +22,7 @@ RUN cd distribution && \
     echo "-X ${PKG}/version.version=${VERSION#v} -X ${PKG}/version.revision=${REVISION} -X ${PKG}/version.mainpkg=${PKG}" > /tmp/.ldflags
 
 # Build stage
-FROM golang:1.24.6-alpine AS builder
+FROM golang:1.25.6-alpine AS builder
 COPY --from=versioner /go/src/github.com/docker/distribution /go/src/github.com/docker/distribution
 COPY --from=versioner /tmp/.ldflags /tmp/.ldflags
 

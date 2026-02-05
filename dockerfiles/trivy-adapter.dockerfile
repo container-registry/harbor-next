@@ -1,7 +1,7 @@
 # Dockerfile for Harbor Trivy Adapter
 # Based on .dagger/main.go buildTrivyAdapter logic (lines 595-629)
 
-FROM golang:1.24.6 AS builder
+FROM golang:1.25.6 AS builder
 
 # Build trivy-adapter (lines 598-614)
 WORKDIR /go/src/github.com/goharbor/
