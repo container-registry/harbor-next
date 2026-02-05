@@ -44,7 +44,7 @@ services:
   core:
     build:
       context: ..
-      dockerfile: dockerfile/dev.dockerfile
+      dockerfile: dockerfile/dev.core.dockerfile
     container_name: ${PROJECT_PREFIX:-harbor}-core
     profiles: [core]
     volumes:
@@ -106,7 +106,7 @@ services:
   jobservice:
     build:
       context: ..
-      dockerfile: dockerfile/dev.dockerfile
+      dockerfile: dockerfile/dev.core.dockerfile
     container_name: ${PROJECT_PREFIX:-harbor}-jobservice
     profiles: [jobservice]
     volumes:
@@ -151,7 +151,7 @@ services:
   registryctl:
     build:
       context: ..
-      dockerfile: dockerfile/dev.dockerfile
+      dockerfile: dockerfile/dev.core.dockerfile
     container_name: ${PROJECT_PREFIX:-harbor}-registryctl
     profiles: [registryctl]
     volumes:

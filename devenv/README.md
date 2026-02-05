@@ -63,7 +63,7 @@ devenv/
 └── README.md                  # This file
 
 dockerfile/
-└── dev.dockerfile             # Dev image with Go, Air, and Delve
+└── dev.core.dockerfile        # Dev image with Go, Air, and Delve
 ```
 
 ## Development Commands

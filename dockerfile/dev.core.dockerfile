@@ -1,7 +1,8 @@
 # Development Dockerfile for Harbor Core and JobService
 # Includes Go toolchain, Air (hot reload), and Delve (debugger)
 
-FROM golang:1.25.6-alpine
+ARG GO_VERSION
+FROM golang:${GO_VERSION}-alpine
 
 # Install git (required for go mod download) and other tools
 RUN apk add --no-cache git
