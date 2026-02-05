@@ -34,9 +34,10 @@ for _, {{ varname .Child.ValueExpression }} := range {{ .ValueExpression }} {
 {{ if not .Child.Parent -}}
 {{ varname .ID }} := swag.JoinByFormat({{ varname .Child.ValueExpression }}R, {{ printf "%q" .CollectionFormat }})
 if len({{ varname .ID }}) > 0 {
-  hv := {{ varname .ID }}[0]
-  if hv != "" {
-    rw.Header().Set({{ printf "%q" .Name }}, hv)
+  for _, hv := range {{ varname .ID }} {
+    if hv != "" {
+      rw.Header().Add({{ printf "%q" .Name }}, hv)
+    }
   }
 }
 {{ else -}}
@@ -123,7 +124,7 @@ if code <= 0 {
       {{ if and .IsPrimitive .IsCustomFormatter (not (stringContains .Zero "(\"")) }}{{ varname .ID}}Default.UnmarshalText([]byte({{ printf "%q" .Default }}))
       {{ else if .IsArray -}}
           {{ if or ( and .Child.IsPrimitive .Child.IsCustomFormatter ) .Child.IsArray -}}
-          if err := json.Unmarshal([]byte(`{{printf "%s" (json .Default)}}`), &{{ varname .ID }}Default); err != nil {
+          if err := json.Unmarshal([]byte({{printf "%q" (json .Default)}}), &{{ varname .ID }}Default); err != nil {
             // panics if specification is invalid
             msg := fmt.Sprintf("invalid default value for header {{ varname .ID }}: %v",err)
             panic(msg)

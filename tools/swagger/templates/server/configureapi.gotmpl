@@ -8,9 +8,7 @@ package {{ .APIPackage }}
 
 import (
 	"context"
-	"crypto/tls"
 	"net/http"
-	"log"
 	"fmt"
 
 	"github.com/go-openapi/errors"
@@ -29,7 +27,7 @@ type contextKey string
 const AuthKey contextKey = "Auth"
 
 {{ range .OperationGroups -}}
-// go:generate mockery -name {{ pascalize .Name}}API -inpkg
+//go:generate mockery -name {{ pascalize .Name}}API -inpkg
 
 /* {{ pascalize .Name }}API {{ .Description }} */
 type {{ pascalize .Name }}API interface {
@@ -79,9 +77,9 @@ type Config struct {
 
 	// Authenticator to use for all APIKey authentication
 	APIKeyAuthenticator func(string, string, security.TokenAuthentication) runtime.Authenticator
-	// Authenticator to use for all Bearer authentication
-	BasicAuthenticator func(security.UserPassAuthentication) runtime.Authenticator
 	// Authenticator to use for all Basic authentication
+	BasicAuthenticator func(security.UserPassAuthentication) runtime.Authenticator
+	// Authenticator to use for all Bearer authentication
 	BearerAuthenticator func(string, security.ScopedTokenAuthentication) runtime.Authenticator
 }
 

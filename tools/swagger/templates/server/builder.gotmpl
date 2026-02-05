@@ -210,7 +210,7 @@ func ({{.ReceiverName}} *{{ pascalize .Name }}API) SetDefaultProduces(mediaType 
 	{{.ReceiverName}}.defaultProduces = mediaType
 }
 
-// SetDefaultConsumes returns the default consumes media type
+// SetDefaultConsumes sets the default consumes media type
 func ({{.ReceiverName}} *{{ pascalize .Name }}API) SetDefaultConsumes(mediaType string) {
 	{{.ReceiverName}}.defaultConsumes = mediaType
 }
@@ -456,7 +456,7 @@ func ({{.ReceiverName}} *{{ pascalize .Name }}API) AddMiddlewareFor(method, path
   }
   {{.ReceiverName}}.Init()
   if h, ok := {{.ReceiverName}}.handlers[um][path]; ok {
-    {{.ReceiverName}}.handlers[method][path] = builder(h)
+    {{.ReceiverName}}.handlers[um][path] = builder(h)
   }
 }
 

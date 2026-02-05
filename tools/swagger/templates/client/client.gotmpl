@@ -63,7 +63,7 @@ type Client struct {
 {{ blockcomment .Description }}{{ end }}{{ else if .Description}}{{ blockcomment .Description }}{{ else }}{{ humanize .Name }} API{{ end }}
 */
 func (a *Client) {{ pascalize .Name }}(ctx context.Context, params *{{ pascalize .Name }}Params{{ if .HasStreamingResponse }}, writer io.Writer{{ end }}) {{ if .SuccessResponse }}({{ range .SuccessResponses }}*{{ pascalize .Name }}, {{ end }}{{ end }}error{{ if .SuccessResponse }}){{ end }} {
-  {{ $length := len .SuccessResponses }}
+  {{ $length := len .SuccessResponses }}{{ $responses := .SuccessResponses }}
   {{ if .SuccessResponse }}result{{else}}_{{ end }}, err := a.transport.Submit(&runtime.ClientOperation{
     ID: {{ printf "%q" .Name }},
     Method: {{ printf "%q" .Method }},
@@ -80,12 +80,12 @@ func (a *Client) {{ pascalize .Name }}(ctx context.Context, params *{{ pascalize
     Client:  params.HTTPClient,
   })
   if err != nil {
-    return {{ if .SuccessResponse }}{{ padSurround "nil" "nil" 0 $length }}, {{ end }}err
+    return {{ if .SuccessResponse }}{{ range $i, $_ := $responses }}{{ if $i }}, {{ end }}nil{{ end }}, {{ end }}err
   }
   {{ if .SuccessResponse }}{{ if eq $length 1 }}return result.(*{{ pascalize .SuccessResponse.Name }}), nil{{ else }}switch value := result.(type) { {{ range $i, $v := .SuccessResponses }}
     case *{{ pascalize $v.Name }}:
-      return {{ padSurround "value" "nil" $i $length }}, nil{{ end }} }
-  return {{ padSurround "nil" "nil" 0 $length }}, nil{{ end }}
+      return {{ $index := $i }}{{ range $j, $_ := $responses }}{{ if $j }}, {{ end }}{{ if eq $j $index }}value{{ else }}nil{{ end }}{{ end }}, nil{{ end }} }
+  return {{ range $i, $_ := $responses }}{{ if $i }}, {{ end }}nil{{ end }}, nil{{ end }}
   {{ else }}return nil{{ end }}
 
 }
