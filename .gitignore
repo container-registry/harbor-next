@@ -66,3 +66,4 @@ devenv/ports.env
 .env
 .env.local
 tmp/
+bin
