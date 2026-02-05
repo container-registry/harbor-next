@@ -55,7 +55,7 @@ tasks:
     cmds:
       - for:
           - { name: air, pkg: 'github.com/air-verse/air@latest' }
-          - { name: dlv, pkg: 'github.com/go-delve/delve/cmd/dlv@latest' }
+          - { name: dlv, pkg: 'github.com/go-delve/delve/cmd/dlv@{{.DELVE_VERSION}}' }
           - { name: govulncheck, pkg: 'golang.org/x/vuln/cmd/govulncheck@latest' }
         task: tools:install
         vars:

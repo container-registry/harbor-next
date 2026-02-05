@@ -1,22 +1,31 @@
 # Dockerfile for Harbor Trivy Adapter
 # Based on .dagger/main.go buildTrivyAdapter logic (lines 595-629)
 
-FROM golang:1.25.6 AS builder
+ARG GO_VERSION=1.25.6
+ARG HARBOR_SCANNER_TRIVY_VERSION=v0.33.2
+ARG TRIVY_VERSION=0.64.1
+ARG TRIVY_BASE_IMAGE_VERSION=0.58.1
+
+FROM golang:${GO_VERSION} AS builder
+
+ARG HARBOR_SCANNER_TRIVY_VERSION
+ARG TRIVY_VERSION
 
 # Build trivy-adapter (lines 598-614)
 WORKDIR /go/src/github.com/goharbor/
-RUN git clone -b v0.33.2 https://github.com/goharbor/harbor-scanner-trivy.git && \
+RUN git clone -b ${HARBOR_SCANNER_TRIVY_VERSION} https://github.com/goharbor/harbor-scanner-trivy.git && \
     cd harbor-scanner-trivy && \
     CGO_ENABLED=0 go build -o ./binary/scanner-trivy cmd/scanner-trivy/main.go
 
 # Download trivy binary
 RUN cd harbor-scanner-trivy && \
-    wget -O trivyDownload https://github.com/aquasecurity/trivy/releases/download/v0.64.1/trivy_0.64.1_Linux-64bit.tar.gz && \
+    wget -O trivyDownload https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz && \
     tar -zxvf trivyDownload && \
     cp trivy ./binary/trivy
 
 # Final stage - use aquasec/trivy base image (line 620)
-FROM aquasec/trivy:0.58.1
+ARG TRIVY_BASE_IMAGE_VERSION
+FROM aquasec/trivy:${TRIVY_BASE_IMAGE_VERSION}
 
 # Copy CA certificates
 COPY --from=alpine:latest /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
@@ -26,7 +35,8 @@ COPY --from=builder /go/src/github.com/goharbor/harbor-scanner-trivy/binary/scan
 COPY --from=builder /go/src/github.com/goharbor/harbor-scanner-trivy/binary/trivy /usr/local/bin/trivy
 
 # Set environment variable (line 625)
-ENV TRIVY_VERSION=v0.33.2
+ARG HARBOR_SCANNER_TRIVY_VERSION
+ENV SCANNER_VERSION=${HARBOR_SCANNER_TRIVY_VERSION}
 
 WORKDIR /
 

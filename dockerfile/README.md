@@ -49,15 +49,15 @@ These services include build stages:
   - Includes CA certificates
 
 - **`registry.dockerfile`** - Docker Distribution registry (golang:alpine build → scratch)
-  - Clones and builds distribution/distribution v3.0.0
+  - Clones and builds distribution/distribution (version from `DISTRIBUTION_VERSION`)
   - Includes CVE-2025-22872 fix
   - Final stage: scratch with CA certs
   - Sets OTEL_TRACES_EXPORTER=none
 
-- **`trivy-adapter.dockerfile`** - Trivy vulnerability scanner (golang build → aquasec/trivy:0.58.1)
-  - Builds harbor-scanner-trivy v0.33.2
-  - Downloads trivy binary v0.64.1
-  - Final stage: aquasec/trivy:0.58.1 base image
+- **`trivy-adapter.dockerfile`** - Trivy vulnerability scanner (golang build → aquasec/trivy base)
+  - Builds harbor-scanner-trivy (version from `HARBOR_SCANNER_TRIVY_VERSION`)
+  - Downloads trivy binary (version from `TRIVY_VERSION`)
+  - Final stage: aquasec/trivy base image (version from `TRIVY_BASE_IMAGE_VERSION`)
 
 - **`nginx.dockerfile`** - Nginx reverse proxy (nginx:alpine)
   - Minimal nginx:alpine with CA certs
@@ -153,7 +153,7 @@ These Dockerfiles **do not use** the legacy Dockerfiles in `make/photon/`. Key d
 | exporter | scratch | Minimal | CA certs + binary |
 | portal | nginx:alpine | ~50MB | Includes built Angular app |
 | registry | scratch | Minimal | CA certs + registry binary |
-| trivy-adapter | aquasec/trivy:0.58.1 | ~400MB | Includes trivy scanner |
+| trivy-adapter | aquasec/trivy (TRIVY_BASE_IMAGE_VERSION) | ~400MB | Includes trivy scanner |
 | nginx | nginx:alpine | ~45MB | Minimal reverse proxy |
 
 ## Notes
@@ -162,6 +162,6 @@ These Dockerfiles **do not use** the legacy Dockerfiles in `make/photon/`. Key d
 - CA certificates are copied from Alpine for HTTPS support
 - Binary-based images expect binaries to be built before image build
 - Multi-stage builds happen entirely in Docker (no pre-built binaries needed)
-- Portal requires Bun 1.2.13 for faster builds
+- Portal requires Bun (version from `BUN_VERSION`) for faster builds
 - Registry includes CVE-2025-22872 security fix
 - All images follow Dagger logic from `.dagger/main.go`
