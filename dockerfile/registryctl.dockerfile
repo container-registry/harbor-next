@@ -1,10 +1,14 @@
 # Dockerfile for Harbor Registryctl (Production)
 # Uses scratch base with only CA certs and binary
 
+ARG LPROBE_VERSION
+FROM ghcr.io/fivexl/lprobe:${LPROBE_VERSION} AS lprobe
+
 FROM scratch
 
 # Copy CA certificates from Alpine
 COPY --from=alpine:latest /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=lprobe /lprobe /lprobe
 
 # Copy binary from build context
 ARG TARGETARCH

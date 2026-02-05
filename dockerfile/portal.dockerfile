@@ -1,6 +1,7 @@
 # Dockerfile for Harbor Portal (Angular Frontend) on Nginx
 
 ARG BUN_VERSION
+ARG LPROBE_VERSION
 
 #
 # Build Angular application and Swagger UI
@@ -19,8 +20,11 @@ RUN cd app-swagger-ui && bun install --ignore-scripts && bun run build
 
 #
 # RUNTIME
+FROM ghcr.io/fivexl/lprobe:${LPROBE_VERSION} AS lprobe
+
 FROM nginx:alpine
 RUN apk add --no-cache ca-certificates
+COPY --from=lprobe /lprobe /lprobe
 COPY --from=builder /harbor/src/portal/dist /usr/share/nginx/html
 COPY --from=builder /harbor/src/portal/swagger.json /usr/share/nginx/html/swagger.json
 COPY --from=builder /harbor/src/portal/app-swagger-ui/dist /usr/share/nginx/html

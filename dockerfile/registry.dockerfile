@@ -4,6 +4,7 @@
 # Versions from Taskfile.yml
 ARG GO_VERSION
 ARG DISTRIBUTION_VERSION
+ARG LPROBE_VERSION
 
 FROM golang:${GO_VERSION}-alpine AS builder
 
@@ -25,9 +26,12 @@ RUN apk add --no-cache git && \
     /go/bin/registry --version
 
 # Final stage
+FROM ghcr.io/fivexl/lprobe:${LPROBE_VERSION} AS lprobe
+
 FROM scratch
 
-COPY --from=alpine:3.21 /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=alpine:latest /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=lprobe /lprobe /lprobe
 COPY --from=builder /go/bin/registry /usr/bin/registry_DO_NOT_USE_GC
 
 ENV OTEL_TRACES_EXPORTER=none

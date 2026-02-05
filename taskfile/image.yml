@@ -67,6 +67,7 @@ tasks:
       docker buildx build
       --builder {{.IMAGE_BUILDER}}
       --platform {{.PLATFORMS}}
+      --build-arg LPROBE_VERSION={{.LPROBE_VERSION}}
       {{.BUILD_ARGS}}
       -t {{.TAG_PREFIX}}{{.IMAGE_NAME}}:{{.VERSION}}
       -f dockerfile/{{.DOCKERFILE}}
