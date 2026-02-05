@@ -65,7 +65,7 @@ devenv/
 ├── registry.passwd            # Registry HTTP basic auth credentials
 └── README.md                  # This file
 
-dockerfiles/
+dockerfile/
 └── dev.dockerfile             # Dev image with Go, Air, and Delve
 ```
 

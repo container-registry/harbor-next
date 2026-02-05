@@ -1,5 +1,5 @@
 # Docker Image Building Tasks
-# Uses Dockerfiles in dockerfiles/ directory
+# Uses Dockerfiles in dockerfile/ directory
 
 version: '3'
 
@@ -83,7 +83,7 @@ tasks:
           --platform linux/{{.ARCH}} \
           --build-arg TARGETARCH={{.ARCH}} \
           -t {{.TAG}} \
-          -f dockerfiles/core.dockerfile \
+          -f dockerfile/core.dockerfile \
           --load \
           .
       - |
@@ -109,7 +109,7 @@ tasks:
           --platform linux/{{.ARCH}} \
           --build-arg TARGETARCH={{.ARCH}} \
           -t {{.TAG}} \
-          -f dockerfiles/jobservice.dockerfile \
+          -f dockerfile/jobservice.dockerfile \
           --load \
           .
       - |
@@ -135,7 +135,7 @@ tasks:
           --platform linux/{{.ARCH}} \
           --build-arg TARGETARCH={{.ARCH}} \
           -t {{.TAG}} \
-          -f dockerfiles/registryctl.dockerfile \
+          -f dockerfile/registryctl.dockerfile \
           --load \
           .
       - |
@@ -161,7 +161,7 @@ tasks:
           --platform linux/{{.ARCH}} \
           --build-arg TARGETARCH={{.ARCH}} \
           -t {{.TAG}} \
-          -f dockerfiles/exporter.dockerfile \
+          -f dockerfile/exporter.dockerfile \
           --load \
           .
       - |
@@ -184,7 +184,7 @@ tasks:
         docker buildx build \
           --platform linux/{{.ARCH}} \
           -t {{.TAG}} \
-          -f dockerfiles/portal.dockerfile \
+          -f dockerfile/portal.dockerfile \
           --load \
           .
       - |
@@ -207,7 +207,7 @@ tasks:
         docker buildx build \
           --platform linux/{{.ARCH}} \
           -t {{.TAG}} \
-          -f dockerfiles/registry.dockerfile \
+          -f dockerfile/registry.dockerfile \
           --load \
           .
       - |
@@ -230,7 +230,7 @@ tasks:
         docker buildx build \
           --platform linux/{{.ARCH}} \
           -t {{.TAG}} \
-          -f dockerfiles/trivy-adapter.dockerfile \
+          -f dockerfile/trivy-adapter.dockerfile \
           --load \
           .
       - |
@@ -252,7 +252,7 @@ tasks:
         docker buildx build \
           --platform linux/{{.ARCH}} \
           -t {{.TAG}} \
-          -f dockerfiles/nginx.dockerfile \
+          -f dockerfile/nginx.dockerfile \
           --load \
           .
       - |

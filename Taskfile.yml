@@ -35,10 +35,10 @@ vars:
   NPM_REGISTRY: "https://registry.npmjs.org/"
 
 includes:
-  build: ./taskfiles/build.yml
-  image: ./taskfiles/image.yml
-  test: ./taskfiles/test.yml
-  dev: ./taskfiles/dev.yml
+  build: ./taskfile/build.yml
+  image: ./taskfile/image.yml
+  test: ./taskfile/test.yml
+  dev: ./taskfile/dev.yml
 
 tasks:
   default:

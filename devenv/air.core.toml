@@ -35,9 +35,9 @@ tmp_dir = "tmp"
     ".task",
     "api",
     "devenv",
-    "dockerfiles",
+    "dockerfile",
     "make",
-    "taskfiles",
+    "taskfile",
     "tests",
   ]
   exclude_file = []

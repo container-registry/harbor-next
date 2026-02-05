@@ -35,7 +35,7 @@ docker buildx build \
   --platform linux/amd64 \
   --build-arg TARGETARCH=amd64 \
   -t goharbor/harbor-core:dev \
-  -f dockerfiles/core.dockerfile \
+  -f dockerfile/core.dockerfile \
   .
 ```
 
@@ -68,7 +68,7 @@ These services include build stages:
 docker buildx build \
   --platform linux/amd64 \
   -t goharbor/harbor-portal:dev \
-  -f dockerfiles/portal.dockerfile \
+  -f dockerfile/portal.dockerfile \
   .
 ```
 
@@ -97,7 +97,7 @@ podman debug harbor-core
 ## Directory Structure
 
 ```
-dockerfiles/
+dockerfile/
 ├── README.md                    # This file
 ├── core.dockerfile              # Core service (scratch base)
 ├── jobservice.dockerfile        # Job service (scratch base)
@@ -111,7 +111,7 @@ dockerfiles/
 
 ## Usage with Taskfile
 
-These Dockerfiles are used by Taskfile tasks in `taskfiles/image.yml`:
+These Dockerfiles are used by Taskfile tasks in `taskfile/image.yml`:
 
 ```bash
 # Build single image

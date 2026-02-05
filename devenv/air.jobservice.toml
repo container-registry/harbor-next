@@ -28,17 +28,24 @@ tmp_dir = "tmp"
   # Include specific files
   include_file = []
 
-  # Exclude these directories
+  # Exclude non-Go directories
   exclude_dir = [
-    "assets",
-    "tmp",
-    "vendor",
-    "testdata",
-    "node_modules",
+    "src/assets",
+    "src/bin",
     "src/portal",
-    "bin",
+    "src/testdata",
+    "src/vendor",
+    "tmp",
+    "node_modules",
     ".git",
-    ".dagger"
+    ".dagger",
+    ".task",
+    "api",
+    "devenv",
+    "dockerfile",
+    "make",
+    "taskfile",
+    "tests",
   ]
 
   # Exclude specific files
