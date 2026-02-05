@@ -1,236 +1,179 @@
 # Docker Image Building Tasks
-# Uses Dockerfiles in dockerfile/ directory
-# Must be run via root Taskfile (task image:*) - vars inherited from versions.env
 #
-# Configuration (in root Taskfile.yml):
-#   IMAGE_REGISTRY:   8gears.container-registry.com
-#   IMAGE_NAMESPACE:  8gcr/goharbor
-#   IMAGE_PLATFORMS:  linux/amd64,linux/arm64
-#
-# Full image path: IMAGE_REGISTRY/IMAGE_NAMESPACE/<image>:<version>
-# Example: 8gears.container-registry.com/8gcr/goharbor/harbor-core:v2.15.0
+# CI-aware: local builds native arch only, CI builds all platforms
+# PUSH=false forces native arch (--load requires single platform)
 #
 # Usage:
-#   task image:core                              # multi-arch, push to registry
-#   task image:core PUSH=false                   # build for native arch, load locally
-#   task image:core IMAGE_PLATFORMS=linux/arm64  # single arch, push
-#   task image:core PUSH=false IMAGE_PLATFORMS=linux/amd64  # specific arch, load locally
-#   task images                                  # all images, push to registry
-#   task images PUSH=false                       # all images, native arch, local
+#   task image:core                         # CI: multi-arch push, local: native push
+#   task image:core PUSH=false              # load locally (native arch)
+#   task image:all-images                   # all images
 
 version: '3'
 
 includes:
-  build: ./build.yml
+  build:
+    taskfile: ./build.yml
+    internal: true
 
 vars:
-  # Detect native architecture
-  NATIVE_ARCH:
-    sh: |
-      case "$(uname -m)" in
-        x86_64|amd64) echo "linux/amd64" ;;
-        arm64|aarch64) echo "linux/arm64" ;;
-        *) echo "linux/amd64" ;;
-      esac
+  IS_CI:
+    sh: '[ -n "${CI:-}${GITHUB_ACTIONS:-}${GITLAB_CI:-}${JENKINS_URL:-}" ] && echo "true" || echo "false"'
+  PUSH: '{{.PUSH | default "true"}}'
+  PLATFORMS: '{{.PLATFORMS | default (ternary (printf "linux/%s" ARCH) (ternary .IMAGE_PLATFORMS (printf "linux/%s" ARCH) (eq .IS_CI "true")) (eq .PUSH "false"))}}'
 
 tasks:
-  # ============================================================================
-  # Aggregate Build Tasks
-  # ============================================================================
-
   all-images:
-    desc: "🐳 Build all Harbor Docker images"
-    deps:
-      - buildx:setup
+    desc: "Build all Harbor Docker images"
+    deps: [buildx:setup]
     cmds:
       - for: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter, nginx]
         task: '{{.ITEM}}'
-      - echo "✅ All images built"
 
-  # ============================================================================
-  # Buildx Builder Setup
-  # ============================================================================
+  # --- Buildx ---
 
   buildx:setup:
-    desc: "🔧 Create buildx builder for multi-platform builds"
+    internal: true
+    run: once
+    status:
+      - docker buildx inspect {{.IMAGE_BUILDER}} >/dev/null 2>&1
     cmds:
-      - |
-        if docker buildx inspect {{.IMAGE_BUILDER}} >/dev/null 2>&1; then
-          echo "Builder '{{.IMAGE_BUILDER}}' already exists"
-        else
-          echo "Creating builder '{{.IMAGE_BUILDER}}'..."
-          docker buildx create \
-            --name {{.IMAGE_BUILDER}} \
-            --driver docker-container \
-            --bootstrap
-        fi
+      - docker buildx create --name {{.IMAGE_BUILDER}} --driver docker-container --bootstrap
       - docker buildx use {{.IMAGE_BUILDER}}
 
   buildx:remove:
-    desc: "🧹 Remove the multi-arch buildx builder"
-    cmds:
-      - |
-        if docker buildx inspect {{.IMAGE_BUILDER}} >/dev/null 2>&1; then
-          docker buildx rm {{.IMAGE_BUILDER}}
-          echo "✅ Builder '{{.IMAGE_BUILDER}}' removed"
-        else
-          echo "Builder '{{.IMAGE_BUILDER}}' does not exist"
-        fi
+    desc: "Remove the multi-arch buildx builder"
+    cmd: docker buildx rm {{.IMAGE_BUILDER}} 2>/dev/null || true
 
   buildx:list:
-    desc: "📋 List available buildx builders"
-    cmds:
-      - docker buildx ls
+    desc: "List available buildx builders"
+    cmd: docker buildx ls
 
-  # ============================================================================
-  # Internal build task - called by public tasks with specific vars
-  # ============================================================================
+  # --- Internal ---
 
   _build:
     internal: true
+    label: 'image:{{.IMAGE_NAME}}'
+    requires:
+      vars: [IMAGE_NAME, DOCKERFILE]
     vars:
-      # When PUSH=false, default to native arch (--load requires single platform)
-      PUSH: '{{.PUSH | default "true"}}'
-      PLATFORMS: '{{.PLATFORMS | default (ternary .NATIVE_ARCH .IMAGE_PLATFORMS (eq .PUSH "false"))}}'
-      OUTPUT: '{{if eq .PUSH "true"}}--push{{else}}--load{{end}}'
-      TAG_PREFIX: '{{if eq .PUSH "true"}}{{.IMAGE_REGISTRY}}/{{.IMAGE_NAMESPACE}}/{{end}}'
+      OUTPUT: '{{ternary "--push" "--load" (eq .PUSH "true")}}'
+      TAG_PREFIX: '{{ternary (printf "%s/%s/" .IMAGE_REGISTRY .IMAGE_NAMESPACE) "" (eq .PUSH "true")}}'
     preconditions:
-      - sh: |
-          if [ "{{.PUSH}}" != "false" ]; then
-            exit 0
-          fi
-          if echo "{{.PLATFORMS}}" | tr -d ' ' | grep -q ','; then
-            exit 1
-          fi
-          exit 0
-        msg: "PUSH=false requires a single platform (e.g., PLATFORMS=linux/amd64)."
-    deps:
-      - buildx:setup
-    cmds:
-      - |
-        docker buildx build \
-          --builder {{.IMAGE_BUILDER}} \
-          --platform {{.PLATFORMS}} \
-          {{.BUILD_ARGS}} \
-          -t {{.TAG_PREFIX}}{{.IMAGE_NAME}}:{{.VERSION}} \
-          -f dockerfile/{{.DOCKERFILE}} \
-          {{.OUTPUT}} \
-          .
-      - echo "✅ {{.IMAGE_NAME}}:{{.VERSION}} built (push={{.PUSH}}, platforms={{.PLATFORMS}})"
-
-  # ============================================================================
-  # Internal task to build binaries based on PLATFORMS
-  # ============================================================================
+      - sh: '[ "{{.PUSH}}" = "true" ] || ! echo "{{.PLATFORMS}}" | grep -q ","'
+        msg: "PUSH=false requires single platform (--load limitation)"
+    deps: [buildx:setup]
+    cmd: >-
+      docker buildx build
+      --builder {{.IMAGE_BUILDER}}
+      --platform {{.PLATFORMS}}
+      {{.BUILD_ARGS}}
+      -t {{.TAG_PREFIX}}{{.IMAGE_NAME}}:{{.VERSION}}
+      -f dockerfile/{{.DOCKERFILE}}
+      {{.OUTPUT}}
+      .
 
   _build-binaries:
     internal: true
-    vars:
-      PUSH: '{{.PUSH | default "true"}}'
-      PLATFORMS: '{{.PLATFORMS | default (ternary .NATIVE_ARCH .IMAGE_PLATFORMS (eq .PUSH "false"))}}'
+    requires:
+      vars: [SERVICE]
     cmds:
-      # Build amd64 binary if needed
-      - |
-        if printf '%s' "{{.PLATFORMS}}" | tr ',' '\n' | tr -d ' ' | grep -qx "linux/amd64"; then
-          task build:binary:{{.SERVICE}}:linux-amd64
-        else
-          :
-        fi
-      # Build arm64 binary if needed
-      - |
-        if printf '%s' "{{.PLATFORMS}}" | tr ',' '\n' | tr -d ' ' | grep -qx "linux/arm64"; then
-          task build:binary:{{.SERVICE}}:linux-arm64
-        else
-          :
-        fi
+      - for: { var: PLATFORMS, split: ',' }
+        task: 'build:binary:{{.SERVICE}}:{{.ITEM | trim | replace "/" "-"}}'
 
-  # ============================================================================
-  # Public Image Build Tasks
-  # ============================================================================
+  _binary-image:
+    internal: true
+    requires:
+      vars: [SERVICE]
+    cmds:
+      - task: _build-binaries
+        vars:
+          SERVICE: '{{.SERVICE}}'
+      - task: _build
+        vars:
+          IMAGE_NAME: 'harbor-{{.SERVICE}}'
+          DOCKERFILE: '{{.SERVICE}}.dockerfile'
+
+  # --- Go Services (require pre-built binaries) ---
 
   core:
-    desc: "🐳 Build Harbor Core image"
+    desc: "Build Harbor Core image"
     cmds:
-      - task: _build-binaries
-        vars: { SERVICE: core, PUSH: "{{.PUSH}}", PLATFORMS: "{{.PLATFORMS}}" }
-      - task: _build
-        vars: { IMAGE_NAME: harbor-core, DOCKERFILE: core.dockerfile, BUILD_ARGS: "", PUSH: "{{.PUSH}}", PLATFORMS: "{{.PLATFORMS}}" }
+      - task: _binary-image
+        vars:
+          SERVICE: core
 
   jobservice:
-    desc: "🐳 Build Harbor Jobservice image"
+    desc: "Build Harbor Jobservice image"
     cmds:
-      - task: _build-binaries
-        vars: { SERVICE: jobservice, PUSH: "{{.PUSH}}", PLATFORMS: "{{.PLATFORMS}}" }
-      - task: _build
-        vars: { IMAGE_NAME: harbor-jobservice, DOCKERFILE: jobservice.dockerfile, BUILD_ARGS: "", PUSH: "{{.PUSH}}", PLATFORMS: "{{.PLATFORMS}}" }
+      - task: _binary-image
+        vars:
+          SERVICE: jobservice
 
   registryctl:
-    desc: "🐳 Build Harbor Registryctl image"
+    desc: "Build Harbor Registryctl image"
     cmds:
-      - task: _build-binaries
-        vars: { SERVICE: registryctl, PUSH: "{{.PUSH}}", PLATFORMS: "{{.PLATFORMS}}" }
-      - task: _build
-        vars: { IMAGE_NAME: harbor-registryctl, DOCKERFILE: registryctl.dockerfile, BUILD_ARGS: "", PUSH: "{{.PUSH}}", PLATFORMS: "{{.PLATFORMS}}" }
+      - task: _binary-image
+        vars:
+          SERVICE: registryctl
 
   exporter:
-    desc: "🐳 Build Harbor Exporter image"
+    desc: "Build Harbor Exporter image"
     cmds:
-      - task: _build-binaries
-        vars: { SERVICE: exporter, PUSH: "{{.PUSH}}", PLATFORMS: "{{.PLATFORMS}}" }
-      - task: _build
-        vars: { IMAGE_NAME: harbor-exporter, DOCKERFILE: exporter.dockerfile, BUILD_ARGS: "", PUSH: "{{.PUSH}}", PLATFORMS: "{{.PLATFORMS}}" }
+      - task: _binary-image
+        vars:
+          SERVICE: exporter
+
+  # --- Standalone Images ---
 
   portal:
-    desc: "🐳 Build Harbor Portal image"
+    desc: "Build Harbor Portal image"
     cmds:
       - task: _build
-        vars: { IMAGE_NAME: harbor-portal, DOCKERFILE: portal.dockerfile, BUILD_ARGS: "--build-arg BUN_VERSION={{.BUN_VERSION}}", PUSH: "{{.PUSH}}", PLATFORMS: "{{.PLATFORMS}}" }
+        vars:
+          IMAGE_NAME: harbor-portal
+          DOCKERFILE: portal.dockerfile
+          BUILD_ARGS: '--build-arg BUN_VERSION={{.BUN_VERSION}}'
 
   registry:
-    desc: "🐳 Build Docker Registry image"
+    desc: "Build Docker Registry image"
     cmds:
       - task: _build
-        vars: { IMAGE_NAME: harbor-registry, DOCKERFILE: registry.dockerfile, BUILD_ARGS: "--build-arg GO_VERSION={{.GO_VERSION}} --build-arg DISTRIBUTION_VERSION={{.DISTRIBUTION_VERSION}}", PUSH: "{{.PUSH}}", PLATFORMS: "{{.PLATFORMS}}" }
+        vars:
+          IMAGE_NAME: harbor-registry
+          DOCKERFILE: registry.dockerfile
+          BUILD_ARGS: '--build-arg GO_VERSION={{.GO_VERSION}} --build-arg DISTRIBUTION_VERSION={{.DISTRIBUTION_VERSION}}'
 
   trivy-adapter:
-    desc: "🐳 Build Trivy Adapter image"
+    desc: "Build Trivy Adapter image"
     cmds:
       - task: _build
-        vars: { IMAGE_NAME: harbor-trivy-adapter, DOCKERFILE: trivy-adapter.dockerfile, BUILD_ARGS: "", PUSH: "{{.PUSH}}", PLATFORMS: "{{.PLATFORMS}}" }
+        vars:
+          IMAGE_NAME: harbor-trivy-adapter
+          DOCKERFILE: trivy-adapter.dockerfile
 
   nginx:
-    desc: "🐳 Build Harbor Nginx image"
+    desc: "Build Harbor Nginx image"
     cmds:
       - task: _build
-        vars: { IMAGE_NAME: harbor-nginx, DOCKERFILE: nginx.dockerfile, BUILD_ARGS: "", PUSH: "{{.PUSH}}", PLATFORMS: "{{.PLATFORMS}}" }
+        vars:
+          IMAGE_NAME: harbor-nginx
+          DOCKERFILE: nginx.dockerfile
 
-  # ============================================================================
-  # Utilities
-  # ============================================================================
+  # --- Utilities ---
 
   clean:
-    desc: "🧹 Clean all Harbor Docker images"
-    cmds:
-      - |
-        echo "Removing Harbor images..."
-        docker images | grep -E "harbor" | awk '{print $3}' | sort -u | xargs -r docker rmi -f || true
-        echo "✅ Images cleaned"
+    desc: "Remove all local Harbor Docker images"
+    cmd: docker images --format '{{`{{.ID}}`}}' --filter 'reference=*harbor*' | xargs -r docker rmi -f
+    ignore_error: true
 
   prune:
-    desc: "🧹 Prune Docker build cache"
-    cmds:
-      - docker builder prune -f
-      - echo "✅ Build cache pruned"
+    desc: "Prune Docker build cache"
+    cmd: docker builder prune -f
 
   list:
-    desc: "📋 List all Harbor images"
-    cmds:
-      - |
-        echo "Harbor Images:"
-        docker images | grep -E "harbor|REPOSITORY" || echo "No Harbor images found"
+    desc: "List all Harbor images"
+    cmd: docker images --filter 'reference=*harbor*'
 
   inspect:*:
-    desc: "🔍 Inspect a multi-arch manifest"
-    vars:
-      IMAGE: '{{index .MATCH 0}}'
-    cmds:
-      - docker buildx imagetools inspect {{.IMAGE_REGISTRY}}/{{.IMAGE_NAMESPACE}}/{{.IMAGE}}:{{.VERSION}}
+    desc: "Inspect a multi-arch manifest"
+    cmd: docker buildx imagetools inspect {{.IMAGE_REGISTRY}}/{{.IMAGE_NAMESPACE}}/{{index .MATCH 0}}:{{.VERSION}}

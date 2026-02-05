@@ -1,280 +1,183 @@
-# Binary Building Tasks
 # Cross-platform Go binary compilation
+#
+# CI-aware: local builds native arch only, CI builds all platforms
+# Explicit PLATFORMS=... always wins
 
 version: '3'
 
 vars:
-  # LDFLAGS for production builds (stripped, optimized)
   LDFLAGS_PROD: "-extldflags=-static -s -w"
-
-  # LDFLAGS for debug builds (no stripping)
-  LDFLAGS_DEBUG: ""
-
-  # GCFLAGS for debug builds (disable optimizations)
   GCFLAGS_DEBUG: "all=-N -l"
-
-  # Core-specific LDFLAGS with version info
-  CORE_LDFLAGS: |
-    -X github.com/goharbor/harbor/src/pkg/version.GitCommit={{.GIT_COMMIT}}
-    -X github.com/goharbor/harbor/src/pkg/version.ReleaseVersion={{.VERSION}}
+  VERSION_LDFLAGS: '-X github.com/goharbor/harbor/src/pkg/version.GitCommit={{.GIT_COMMIT}} -X github.com/goharbor/harbor/src/pkg/version.ReleaseVersion={{.VERSION}}'
+  DEFAULT_PLATFORMS: '{{.IMAGE_PLATFORMS | default "linux/amd64,linux/arm64"}}'
+  IS_CI:
+    sh: '[ -n "${CI:-}${GITHUB_ACTIONS:-}${GITLAB_CI:-}${JENKINS_URL:-}" ] && echo "true" || echo "false"'
+  PLATFORMS: '{{.PLATFORMS | default (ternary .DEFAULT_PLATFORMS (printf "linux/%s" ARCH) (eq .IS_CI "true"))}}'
 
 tasks:
-  # ============================================================================
-  # Aggregate Build Tasks
-  # ============================================================================
-
   all-binaries:
-    desc: "📦 Build all Harbor binaries for all platforms"
-    deps:
-      - binary:core:linux-amd64
-      - binary:core:linux-arm64
-      - binary:jobservice:linux-amd64
-      - binary:jobservice:linux-arm64
-      - binary:registryctl:linux-amd64
-      - binary:registryctl:linux-arm64
-      - binary:exporter:linux-amd64
-      - binary:exporter:linux-arm64
+    desc: "Build all Harbor binaries (CI-aware)"
     cmds:
-      - |
-        echo "✅ All binaries built successfully"
-        echo ""
-        echo "Binaries:"
-        find bin -type f -exec ls -lh {} \;
+      - for: { var: PLATFORMS, split: ',' }
+        task: _build-platform
+        vars: { PLATFORM: '{{.ITEM | trim | replace "/" "-"}}' }
+      - cmd: 'echo "Binaries:"; find bin -type f -exec ls -lh {} \;'
+        silent: true
 
-  all-binaries:amd64:
-    desc: "📦 Build all binaries for linux/amd64"
-    deps:
-      - binary:core:linux-amd64
-      - binary:jobservice:linux-amd64
-      - binary:registryctl:linux-amd64
-      - binary:exporter:linux-amd64
+  _build-platform:
+    internal: true
+    requires:
+      vars: [PLATFORM]
     cmds:
-      - echo "✅ All AMD64 binaries built"
+      - for: [core, jobservice, registryctl, exporter]
+        task: 'binary:{{.ITEM}}:{{.PLATFORM}}'
 
-  all-binaries:arm64:
-    desc: "📦 Build all binaries for linux/arm64"
-    deps:
-      - binary:core:linux-arm64
-      - binary:jobservice:linux-arm64
-      - binary:registryctl:linux-arm64
-      - binary:exporter:linux-arm64
+  # --- Internal Go Build ---
+
+  _go-build:
+    internal: true
+    label: 'build:{{.OUTPUT_NAME}}:{{.PLATFORM}}'
+    requires:
+      vars: [PLATFORM, MAIN_PATH, OUTPUT_NAME]
+    vars:
+      GOOS: '{{index (splitList "-" .PLATFORM) 0}}'
+      GOARCH: '{{index (splitList "-" .PLATFORM) 1}}'
+      OUTPUT: 'bin/{{.PLATFORM}}/{{.OUTPUT_NAME}}'
+      LDFLAGS: '{{.LDFLAGS | default .LDFLAGS_PROD}}'
+      GCFLAGS: '{{.GCFLAGS | default ""}}'
+    dir: src
+    env:
+      GOOS: '{{.GOOS}}'
+      GOARCH: '{{.GOARCH}}'
+      CGO_ENABLED: '0'
     cmds:
-      - echo "✅ All ARM64 binaries built"
+      - cmd: mkdir -p $(dirname ../{{.OUTPUT}})
+        silent: true
+      - go build {{.GOBUILD_FLAGS}} -gcflags="{{.GCFLAGS}}" -ldflags="{{.LDFLAGS}} {{.VERSION_LDFLAGS}}" -o ../{{.OUTPUT}} {{.MAIN_PATH}}
 
-  # ============================================================================
-  # Core Binary (with version info)
-  # ============================================================================
+  # --- Binary Tasks ---
 
   binary:core:*:
     desc: "Build Harbor core binary"
-    vars:
-      PLATFORM: '{{index .MATCH 0}}'
-      GOOS: '{{index (splitList "-" .PLATFORM) 0}}'
-      GOARCH: '{{index (splitList "-" .PLATFORM) 1}}'
-      OUTPUT: "bin/{{.PLATFORM}}/core"
     sources:
-      - "src/core/**/*.go"
-      - "src/controller/**/*.go"
-      - "src/pkg/**/*.go"
-      - "src/lib/**/*.go"
-      - "src/server/**/*.go"
-      - "go.mod"
-      - "go.sum"
+      - src/core/**/*.go
+      - src/controller/**/*.go
+      - src/server/**/*.go
+      - src/pkg/**/*.go
+      - src/lib/**/*.go
+      - src/go.mod
+      - src/go.sum
     generates:
-      - "{{.OUTPUT}}"
-    deps:
-      - gen-apis
-    dir: src
-    env:
-      GOOS: "{{.GOOS}}"
-      GOARCH: "{{.GOARCH}}"
-      CGO_ENABLED: "0"
+      - bin/{{index .MATCH 0}}/core
+    deps: [gen-apis]
     cmds:
-      - mkdir -p $(dirname ../{{.OUTPUT}})
-      - |
-        echo "🔨 Building core for {{.PLATFORM}}..."
-        go build {{.GOBUILD_FLAGS}} \
-          -gcflags="" \
-          -ldflags="{{.LDFLAGS_PROD}} {{.CORE_LDFLAGS}}" \
-          -o ../{{.OUTPUT}} \
-          ./core/main.go
-      - |
-        echo "✅ Core binary built: ../{{.OUTPUT}}"
-        ls -lh ../{{.OUTPUT}}
+      - task: _go-build
+        vars:
+          PLATFORM: '{{index .MATCH 0}}'
+          MAIN_PATH: ./core/main.go
+          OUTPUT_NAME: core
 
   binary:core:*:debug:
     desc: "Build Harbor core binary with debug symbols"
-    vars:
-      PLATFORM: '{{index .MATCH 0}}'
-      GOOS: '{{index (splitList "-" .PLATFORM) 0}}'
-      GOARCH: '{{index (splitList "-" .PLATFORM) 1}}'
-      OUTPUT: "bin/{{.PLATFORM}}/core"
-    deps:
-      - gen-apis
-    dir: src
-    env:
-      GOOS: "{{.GOOS}}"
-      GOARCH: "{{.GOARCH}}"
-      CGO_ENABLED: "0"
+    deps: [gen-apis]
     cmds:
-      - mkdir -p $(dirname ../{{.OUTPUT}})
-      - |
-        echo "🔨 Building core (debug) for {{.PLATFORM}}..."
-        go build {{.GOBUILD_FLAGS}} \
-          -gcflags="{{.GCFLAGS_DEBUG}}" \
-          -ldflags="{{.LDFLAGS_DEBUG}} {{.CORE_LDFLAGS}}" \
-          -o ../{{.OUTPUT}} \
-          ./core/main.go
-        echo "✅ Core binary (debug) built: ../{{.OUTPUT}}"
-
-  # ============================================================================
-  # Jobservice Binary
-  # ============================================================================
+      - task: _go-build
+        vars:
+          PLATFORM: '{{index .MATCH 0}}'
+          MAIN_PATH: ./core/main.go
+          OUTPUT_NAME: core
+          LDFLAGS: ''
+          GCFLAGS: '{{.GCFLAGS_DEBUG}}'
 
   binary:jobservice:*:
     desc: "Build Harbor jobservice binary"
-    vars:
-      PLATFORM: '{{index .MATCH 0}}'
-      GOOS: '{{index (splitList "-" .PLATFORM) 0}}'
-      GOARCH: '{{index (splitList "-" .PLATFORM) 1}}'
-      OUTPUT: "bin/{{.PLATFORM}}/jobservice"
     sources:
-      - "src/jobservice/**/*.go"
-      - "src/pkg/**/*.go"
-      - "src/lib/**/*.go"
-      - "go.mod"
-      - "go.sum"
+      - src/jobservice/**/*.go
+      - src/pkg/**/*.go
+      - src/lib/**/*.go
+      - src/go.mod
+      - src/go.sum
     generates:
-      - "{{.OUTPUT}}"
-    dir: src
-    env:
-      GOOS: "{{.GOOS}}"
-      GOARCH: "{{.GOARCH}}"
-      CGO_ENABLED: "0"
+      - bin/{{index .MATCH 0}}/jobservice
     cmds:
-      - mkdir -p $(dirname ../{{.OUTPUT}})
-      - |
-        echo "🔨 Building jobservice for {{.PLATFORM}}..."
-        go build {{.GOBUILD_FLAGS}} \
-          -ldflags="{{.LDFLAGS_PROD}}" \
-          -o ../{{.OUTPUT}} \
-          ./jobservice/main.go
-      - |
-        echo "✅ Jobservice binary built: ../{{.OUTPUT}}"
-        ls -lh ../{{.OUTPUT}}
-
-  # ============================================================================
-  # Registryctl Binary
-  # ============================================================================
+      - task: _go-build
+        vars:
+          PLATFORM: '{{index .MATCH 0}}'
+          MAIN_PATH: ./jobservice/main.go
+          OUTPUT_NAME: jobservice
 
   binary:registryctl:*:
     desc: "Build Harbor registryctl binary"
-    vars:
-      PLATFORM: '{{index .MATCH 0}}'
-      GOOS: '{{index (splitList "-" .PLATFORM) 0}}'
-      GOARCH: '{{index (splitList "-" .PLATFORM) 1}}'
-      OUTPUT: "bin/{{.PLATFORM}}/registryctl"
     sources:
-      - "src/registryctl/**/*.go"
-      - "src/pkg/**/*.go"
-      - "src/lib/**/*.go"
-      - "go.mod"
-      - "go.sum"
+      - src/registryctl/**/*.go
+      - src/pkg/**/*.go
+      - src/lib/**/*.go
+      - src/go.mod
+      - src/go.sum
     generates:
-      - "{{.OUTPUT}}"
-    dir: src
-    env:
-      GOOS: "{{.GOOS}}"
-      GOARCH: "{{.GOARCH}}"
-      CGO_ENABLED: "0"
+      - bin/{{index .MATCH 0}}/registryctl
     cmds:
-      - mkdir -p $(dirname ../{{.OUTPUT}})
-      - |
-        echo "🔨 Building registryctl for {{.PLATFORM}}..."
-        go build {{.GOBUILD_FLAGS}} \
-          -ldflags="{{.LDFLAGS_PROD}}" \
-          -o ../{{.OUTPUT}} \
-          ./registryctl/main.go
-      - |
-        echo "✅ Registryctl binary built: ../{{.OUTPUT}}"
-        ls -lh ../{{.OUTPUT}}
-
-  # ============================================================================
-  # Exporter Binary
-  # ============================================================================
+      - task: _go-build
+        vars:
+          PLATFORM: '{{index .MATCH 0}}'
+          MAIN_PATH: ./registryctl/main.go
+          OUTPUT_NAME: registryctl
 
   binary:exporter:*:
-    desc: "Build Harbor metrics exporter binary"
-    vars:
-      PLATFORM: '{{index .MATCH 0}}'
-      GOOS: '{{index (splitList "-" .PLATFORM) 0}}'
-      GOARCH: '{{index (splitList "-" .PLATFORM) 1}}'
-      OUTPUT: "bin/{{.PLATFORM}}/harbor-exporter"
+    desc: "Build Harbor exporter binary"
     sources:
-      - "src/cmd/exporter/**/*.go"
-      - "src/pkg/**/*.go"
-      - "src/lib/**/*.go"
-      - "go.mod"
-      - "go.sum"
+      - src/cmd/exporter/**/*.go
+      - src/pkg/**/*.go
+      - src/lib/**/*.go
+      - src/go.mod
+      - src/go.sum
     generates:
-      - "{{.OUTPUT}}"
-    dir: src
-    env:
-      GOOS: "{{.GOOS}}"
-      GOARCH: "{{.GOARCH}}"
-      CGO_ENABLED: "0"
+      - bin/{{index .MATCH 0}}/harbor-exporter
     cmds:
-      - mkdir -p $(dirname ../{{.OUTPUT}})
-      - |
-        echo "🔨 Building harbor-exporter for {{.PLATFORM}}..."
-        go build {{.GOBUILD_FLAGS}} \
-          -ldflags="{{.LDFLAGS_PROD}}" \
-          -o ../{{.OUTPUT}} \
-          ./cmd/exporter/main.go
-      - |
-        echo "✅ Exporter binary built: ../{{.OUTPUT}}"
-        ls -lh ../{{.OUTPUT}}
+      - task: _go-build
+        vars:
+          PLATFORM: '{{index .MATCH 0}}'
+          MAIN_PATH: ./cmd/exporter/main.go
+          OUTPUT_NAME: harbor-exporter
 
-  # ============================================================================
-  # API Generation (Swagger)
-  # ============================================================================
+  # --- API Generation ---
 
   require-swagger:
-    desc: "Install go-swagger if not present"
     internal: true
+    run: once
     status:
       - command -v swagger
-    cmds:
-      - go install github.com/go-swagger/go-swagger/cmd/swagger@{{.SWAGGER_VERSION}}
+    cmd: go install github.com/go-swagger/go-swagger/cmd/swagger@{{.SWAGGER_VERSION}}
 
   gen-apis:
     desc: "Generate API server code from OpenAPI spec"
+    run: once
     deps: [require-swagger]
     sources:
-      - "api/v2.0/swagger.yaml"
-      - "tools/swagger/templates/**/*"
+      - api/v2.0/swagger.yaml
+      - tools/swagger/templates/**/*
     generates:
-      - "src/server/v2.0/models/*.go"
-      - "src/server/v2.0/restapi/**/*.go"
+      - src/server/v2.0/models/*.go
+      - src/server/v2.0/restapi/**/*.go
     cmds:
       - mkdir -p src/server/v2.0
-      - |
-        swagger generate server \
-          --template-dir=./tools/swagger/templates \
-          --exclude-main \
-          --additional-initialism=CVE \
-          --additional-initialism=GC \
-          --additional-initialism=OIDC \
-          -f ./api/v2.0/swagger.yaml \
-          -A harbor \
-          --target ./src/server/v2.0
+      - >-
+        swagger generate server
+        --template-dir=./tools/swagger/templates
+        --exclude-main
+        --additional-initialism=CVE
+        --additional-initialism=GC
+        --additional-initialism=OIDC
+        -f ./api/v2.0/swagger.yaml
+        -A harbor
+        --target ./src/server/v2.0
 
   gen-apis:frontend:
     desc: "Generate frontend API code from OpenAPI spec"
     sources:
-      - "api/v2.0/swagger.yaml"
+      - api/v2.0/swagger.yaml
     generates:
-      - "src/portal/ng-swagger-gen/models.ts"
+      - src/portal/ng-swagger-gen/models.ts
     method: checksum
     dir: src/portal
     cmds:
@@ -282,31 +185,23 @@ tasks:
       - npx ng-swagger-gen -i ng-swagger-gen/swagger.json -o ng-swagger-gen
       - node scripts/delete-swagger-json.js
 
-  # ============================================================================
-  # Utilities
-  # ============================================================================
+  # --- Utilities ---
 
   clean:
-    desc: "🧹 Clean all built binaries and generated API code"
+    desc: "Clean all built binaries and generated API code"
     cmds:
-      - rm -rf bin/
-      - rm -rf src/server/v2.0/models/
-      - rm -rf src/server/v2.0/restapi/
+      - rm -rf bin/ src/server/v2.0/models/ src/server/v2.0/restapi/
       - rm -rf src/portal/ng-swagger-gen/models/ src/portal/ng-swagger-gen/services/
-      - rm -f src/portal/ng-swagger-gen/models.ts src/portal/ng-swagger-gen/services.ts
-      - rm -f src/portal/ng-swagger-gen/api.module.ts src/portal/ng-swagger-gen/api-configuration.ts
-      - rm -f src/portal/ng-swagger-gen/base-service.ts src/portal/ng-swagger-gen/strict-http-response.ts
-      - echo "✅ Binaries and generated API code cleaned"
+      - rm -f src/portal/ng-swagger-gen/*.ts
 
   verify:
-    desc: "✅ Verify all binaries are executable"
+    desc: "Verify all binaries are executable"
+    preconditions:
+      - sh: test -d bin
+        msg: "No binaries found. Run 'task build:all-binaries' first."
+    vars:
+      BINARIES:
+        sh: find bin -type f
     cmds:
-      - |
-        echo "Verifying binaries..."
-        for binary in $(find bin -type f); do
-          if file $binary | grep -q "executable"; then
-            echo "✅ $binary"
-          else
-            echo "❌ $binary (not executable)"
-          fi
-        done
+      - for: { var: BINARIES }
+        cmd: 'file {{.ITEM}} | grep -q "executable" && echo "ok {{.ITEM}}" || echo "FAIL {{.ITEM}}"'
