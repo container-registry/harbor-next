@@ -45,6 +45,8 @@ services:
     build:
       context: ..
       dockerfile: dockerfile/dev.core.dockerfile
+      args:
+        GO_VERSION: ${GO_VERSION}
     container_name: ${PROJECT_PREFIX:-harbor}-core
     profiles: [core]
     volumes:
@@ -107,6 +109,8 @@ services:
     build:
       context: ..
       dockerfile: dockerfile/dev.core.dockerfile
+      args:
+        GO_VERSION: ${GO_VERSION}
     container_name: ${PROJECT_PREFIX:-harbor}-jobservice
     profiles: [jobservice]
     volumes:
@@ -152,6 +156,8 @@ services:
     build:
       context: ..
       dockerfile: dockerfile/dev.core.dockerfile
+      args:
+        GO_VERSION: ${GO_VERSION}
     container_name: ${PROJECT_PREFIX:-harbor}-registryctl
     profiles: [registryctl]
     volumes:
