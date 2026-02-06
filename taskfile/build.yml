@@ -28,9 +28,11 @@ tasks:
     internal: true
     requires:
       vars: [PLATFORM]
-    cmds:
-      - for: [core, jobservice, registryctl, exporter]
-        task: 'binary:{{.ITEM}}:{{.PLATFORM}}'
+    deps:
+      - task: 'binary:core:{{.PLATFORM}}'
+      - task: 'binary:jobservice:{{.PLATFORM}}'
+      - task: 'binary:registryctl:{{.PLATFORM}}'
+      - task: 'binary:exporter:{{.PLATFORM}}'
 
   # --- Internal Go Build ---
 
@@ -61,6 +63,7 @@ tasks:
     desc: "Build Harbor core binary"
     sources:
       - src/core/**/*.go
+      - src/common/**/*.go
       - src/controller/**/*.go
       - src/server/**/*.go
       - src/pkg/**/*.go
