@@ -169,7 +169,15 @@ services:
   # Trivy scanner adapter - starts with: docker compose --profile trivy up
   trivy-adapter:
     container_name: ${PROJECT_PREFIX:-harbor-0}-trivy-adapter
-    image: goharbor/trivy-adapter-photon:v2.14.0
+    build:
+      context: ..
+      dockerfile: dockerfile/trivy-adapter.dockerfile
+      args:
+        GO_VERSION: ${GO_VERSION}
+        HARBOR_SCANNER_TRIVY_VERSION: ${HARBOR_SCANNER_TRIVY_VERSION}
+        TRIVY_VERSION: ${TRIVY_VERSION}
+        TRIVY_BASE_IMAGE_VERSION: ${TRIVY_BASE_IMAGE_VERSION}
+        LPROBE_VERSION: ${LPROBE_VERSION}
     profiles: [trivy]
     environment:
       SCANNER_LOG_LEVEL: debug
