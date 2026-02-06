@@ -1,0 +1,87 @@
+# Air configuration for Harbor RegistryCtl
+# Hot reload with Delve debugger always enabled
+
+root = "."
+testdata_dir = "src/testdata"
+tmp_dir = "tmp"
+
+[build]
+  # Build with debug flags for Delve (-N disables optimizations, -l disables inlining)
+  cmd = "cd src && CGO_ENABLED=0 go build -gcflags=all='-N -l' -trimpath -o ../tmp/registryctl ./registryctl/main.go"
+
+  bin = "tmp/registryctl"
+  args_bin = []
+
+  # Delve debugger on port 2347, starts immediately (--continue)
+  # Attach anytime with: dlv connect localhost:2347
+  full_bin = "dlv exec ./tmp/registryctl --listen=0.0.0.0:2347 --headless=true --api-version=2 --accept-multiclient --continue --"
+
+  # Watch src directory for Go files only
+  include_dir = ["src"]
+  include_ext = ["go"]
+  include_file = []
+
+  # Exclude non-Go directories
+  exclude_dir = [
+    "src/assets",
+    "src/bin",
+    "src/portal",
+    "src/testdata",
+    "src/vendor",
+    "tmp",
+    "node_modules",
+    ".git",
+    ".task",
+    "api",
+    "devenv",
+    "dockerfile",
+    "make",
+    "taskfile",
+    "tests",
+  ]
+  exclude_file = []
+  exclude_regex = ["_test\\.go$", "mock_.*\\.go$"]
+  exclude_unchanged = true
+  follow_symlink = false
+
+  # Rebuild delay - balance between responsiveness and avoiding rapid rebuilds
+  delay = 500
+
+  stop_on_error = true
+  send_interrupt = true
+
+  # Give Delve time to detach cleanly (reduces "broken pipe" errors)
+  kill_delay = "10s"
+
+  rerun = false
+  rerun_delay = 500
+  log = "tmp/build-errors.log"
+
+  poll = false
+  poll_interval = 0
+
+[color]
+  # Customize output colors
+  main = "magenta"
+  watcher = "cyan"
+  build = "yellow"
+  runner = "green"
+  app = ""
+
+[log]
+  # Show only main log
+  main_only = true
+
+  # Show time in logs
+  time = true
+
+[misc]
+  # Keep tmp directory on exit to cache compiled binary across restarts
+  clean_on_exit = false
+
+[screen]
+  # Clear screen on rebuild
+  clear_on_rebuild = true
+
+  # Keep scroll position
+  keep_scroll = true
