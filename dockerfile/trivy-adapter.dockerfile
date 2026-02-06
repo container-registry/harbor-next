@@ -7,27 +7,25 @@ ARG LPROBE_VERSION
 FROM golang:${GO_VERSION} AS builder
 
 ARG HARBOR_SCANNER_TRIVY_VERSION
-ARG TRIVY_VERSION
+ARG TARGETARCH
 
 WORKDIR /go/src/github.com/goharbor/
 RUN git clone -b ${HARBOR_SCANNER_TRIVY_VERSION} https://github.com/goharbor/harbor-scanner-trivy.git && \
     cd harbor-scanner-trivy && \
-    CGO_ENABLED=0 go build -o ./binary/scanner-trivy cmd/scanner-trivy/main.go
+    CGO_ENABLED=0 GOARCH=${TARGETARCH} go build -o ./binary/scanner-trivy cmd/scanner-trivy/main.go
 
-# Download trivy binary
-RUN cd harbor-scanner-trivy && \
-    wget -O trivyDownload https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz && \
-    tar -zxvf trivyDownload && \
-    cp trivy ./binary/trivy
-
-ARG TRIVY_BASE_IMAGE_VERSION
+FROM aquasec/trivy:${TRIVY_VERSION} AS trivy-binary
 FROM ghcr.io/fivexl/lprobe:${LPROBE_VERSION} AS lprobe
 
 FROM aquasec/trivy:${TRIVY_BASE_IMAGE_VERSION}
 COPY --from=alpine:latest /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=lprobe /lprobe /lprobe
 COPY --from=builder /go/src/github.com/goharbor/harbor-scanner-trivy/binary/scanner-trivy /home/scanner/bin/scanner-trivy
-COPY --from=builder /go/src/github.com/goharbor/harbor-scanner-trivy/binary/trivy /usr/local/bin/trivy
+COPY --from=trivy-binary /usr/local/bin/trivy /usr/local/bin/trivy
+
+RUN addgroup -S scanner && adduser -S -G scanner -h /home/scanner scanner && \
+    chown -R scanner:scanner /home/scanner && \
+    chown scanner:scanner /usr/local/bin/trivy
 
 ARG HARBOR_SCANNER_TRIVY_VERSION
 ENV SCANNER_VERSION=${HARBOR_SCANNER_TRIVY_VERSION}
@@ -36,4 +34,5 @@ WORKDIR /
 EXPOSE 8080
 EXPOSE 8443
 
+USER scanner
 ENTRYPOINT ["/home/scanner/bin/scanner-trivy"]
