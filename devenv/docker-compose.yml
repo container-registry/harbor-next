@@ -5,7 +5,6 @@
 
 services:
   postgresql:
-    container_name: ${PROJECT_PREFIX:-harbor-0}-postgresql
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: postgres
@@ -18,7 +17,6 @@ services:
       - ../make/migrations:/migrations
 
   redis:
-    container_name: ${PROJECT_PREFIX:-harbor-0}-redis
     image: valkey/valkey:latest
     ports:
       - "${PORT_REDIS:-6379}:6379"
@@ -26,7 +24,6 @@ services:
       - harbor-redis-data:/data
 
   registry:
-    container_name: ${PROJECT_PREFIX:-harbor-0}-registry
     image: distribution/distribution:latest
     environment:
       OTEL_TRACES_EXPORTER: none
@@ -39,7 +36,6 @@ services:
 
   # Core API - starts with: docker compose --profile core up
   core:
-    container_name: ${PROJECT_PREFIX:-harbor-0}-core
     build:
       context: ..
       dockerfile: dockerfile/dev.core.dockerfile
@@ -99,7 +95,6 @@ services:
 
   # JobService - starts with: docker compose --profile jobservice up
   jobservice:
-    container_name: ${PROJECT_PREFIX:-harbor-0}-jobservice
     build:
       context: ..
       dockerfile: dockerfile/dev.core.dockerfile
@@ -140,7 +135,6 @@ services:
 
   # RegistryCtl - starts with: docker compose --profile registryctl up
   registryctl:
-    container_name: ${PROJECT_PREFIX:-harbor-0}-registryctl
     build:
       context: ..
       dockerfile: dockerfile/dev.core.dockerfile
@@ -168,7 +162,6 @@ services:
 
   # Trivy scanner adapter - starts with: docker compose --profile trivy up
   trivy-adapter:
-    container_name: ${PROJECT_PREFIX:-harbor-0}-trivy-adapter
     build:
       context: ..
       dockerfile: dockerfile/trivy-adapter.dockerfile
@@ -202,7 +195,6 @@ services:
 
   # Portal (Angular UI) - starts with: docker compose --profile portal up
   portal:
-    container_name: ${PROJECT_PREFIX:-harbor-0}-portal
     build:
       context: ..
       dockerfile: dockerfile/dev.portal.dockerfile
