@@ -25,10 +25,15 @@ vars:
 tasks:
   all-images:
     desc: "Build all Harbor Docker images"
-    deps: [buildx:setup]
-    cmds:
-      - for: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter, nginx]
-        task: '{{.ITEM}}'
+    deps:
+      - core
+      - jobservice
+      - registryctl
+      - exporter
+      - portal
+      - registry
+      - trivy-adapter
+      - nginx
 
   # --- Buildx ---
 
