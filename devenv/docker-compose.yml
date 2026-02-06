@@ -131,8 +131,7 @@ services:
       LOG_LEVEL: debug
     command: air -c devenv/air.jobservice.toml
     depends_on:
-      core:
-        condition: service_healthy
+      - core
 
   # RegistryCtl - starts with: docker compose --profile registryctl up
   registryctl:
@@ -207,8 +206,7 @@ services:
     environment:
       HARBOR_PROXY_TARGET: "http://core:8080"
     depends_on:
-      core:
-        condition: service_healthy
+      - core
 
 volumes:
   harbor-postgres-data:
