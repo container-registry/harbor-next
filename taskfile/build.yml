@@ -176,8 +176,12 @@ tasks:
     desc: "Generate frontend API code from OpenAPI spec"
     sources:
       - api/v2.0/swagger.yaml
+      - src/portal/scripts/convert-yaml-to-json.js
+      - src/portal/scripts/delete-swagger-json.js
     generates:
+      - src/portal/ng-swagger-gen/swagger.json
       - src/portal/ng-swagger-gen/models.ts
+      - src/portal/ng-swagger-gen/**/*.ts
     method: checksum
     dir: src/portal
     cmds:
