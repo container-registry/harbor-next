@@ -50,7 +50,7 @@ services:
       - ../src/core/views:/app/views:ro
     ports:
       - "${PORT_CORE:-8080}:8080"
-      # - "${PORT_DEBUG_CORE:-2345}:2345"  # Debug port (uncomment if needed)
+      # - "127.0.0.1:${PORT_DEBUG_CORE:-2345}:2345"  # Debug port (uncomment if needed)
     environment:
       # Database
       POSTGRESQL_HOST: postgresql
@@ -107,7 +107,7 @@ services:
       - go-build-cache:/root/.cache/go-build
     # ports:
     #   - "8888:8888"  # JobService API (uncomment if needed)
-    #   - "2346:2346"  # Debug port (uncomment if needed)
+    #   - "127.0.0.1:2346:2346"  # Debug port (uncomment if needed)
     environment:
       # Database
       POSTGRESQL_HOST: postgresql
@@ -149,7 +149,7 @@ services:
       - ../devenv/registry.config.yml:/etc/registry/config.yml:ro
     ports:
       - "${PORT_REGISTRYCTL:-8085}:8080"
-      - "${PORT_DEBUG_REGISTRYCTL:-2347}:2347"
+      - "127.0.0.1:${PORT_DEBUG_REGISTRYCTL:-2347}:2347"
     environment:
       PORT: "8080"
       LOG_LEVEL: debug
