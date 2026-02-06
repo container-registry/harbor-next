@@ -21,7 +21,7 @@ task dev:infra:up
 All services run in containers:
 - **Core** - Harbor API with Air hot reload (port 8080, Delve 2345)
 - **JobService** - Background jobs with Air hot reload (port 8888, Delve 2346)
-- **RegistryCtl** - Registry controller for storage operations (port 8085)
+- **RegistryCtl** - Registry controller with Air hot reload (port 8085, Delve 2347)
 - **Trivy Adapter** - Vulnerability scanner (port 8081)
 - **PostgreSQL** - Database (port 5432)
 - **Redis/Valkey** - Cache/queue (port 6379)
