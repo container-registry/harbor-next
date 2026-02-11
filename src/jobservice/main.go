@@ -19,6 +19,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"time"
 
 	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/jobservice/common/utils"
@@ -27,7 +28,10 @@ import (
 	"github.com/goharbor/harbor/src/jobservice/job/impl"
 	"github.com/goharbor/harbor/src/jobservice/logger"
 	"github.com/goharbor/harbor/src/jobservice/runtime"
+	"github.com/goharbor/harbor/src/lib"
 	cfgLib "github.com/goharbor/harbor/src/lib/config"
+	"github.com/goharbor/harbor/src/lib/log"
+	"github.com/goharbor/harbor/src/lib/retry"
 	tracelib "github.com/goharbor/harbor/src/lib/trace"
 	_ "github.com/goharbor/harbor/src/pkg/accessory/model/base"
 	_ "github.com/goharbor/harbor/src/pkg/accessory/model/cosign"
@@ -41,8 +45,20 @@ import (
 )
 
 func main() {
+	// Start pprof server
+	lib.StartPprof()
+
 	cfgLib.DefaultCfgManager = common.RestCfgManager
-	if err := cfgLib.DefaultMgr().Load(context.Background()); err != nil {
+	if err := retry.Retry(func() error {
+		return cfgLib.DefaultMgr().Load(context.Background())
+	},
+		retry.InitialInterval(500*time.Millisecond),
+		retry.MaxInterval(10*time.Second),
+		retry.Timeout(5*time.Minute),
+		retry.Callback(func(err error, sleep time.Duration) {
+			log.Debugf("failed to load configuration from core, retry after %s: %v", sleep, err)
+		}),
+	); err != nil {
 		panic(fmt.Sprintf("failed to load configuration, error: %v", err))
 	}
 
