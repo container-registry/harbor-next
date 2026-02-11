@@ -1,0 +1,229 @@
+# Docker Compose - Local DevEnv
+# All Harbor services run in containers with hot reload
+# Port configuration: controlled by SLOT variable in Taskfile
+# Use SLOT=0 (default) for standard ports, SLOT=1 for +100 offset, etc.
+
+services:
+  postgresql:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root123
+      POSTGRES_DB: registry
+    ports:
+      - "${PORT_POSTGRES:-5432}:5432"
+    volumes:
+      - harbor-postgres-data:/var/lib/postgresql/data
+      - ../make/migrations:/migrations
+
+  redis:
+    image: valkey/valkey:latest
+    ports:
+      - "${PORT_REDIS:-6379}:6379"
+    volumes:
+      - harbor-redis-data:/data
+
+  registry:
+    image: distribution/distribution:latest
+    environment:
+      OTEL_TRACES_EXPORTER: none
+      OTEL_SDK_DISABLED: "true"
+    ports:
+      - "${PORT_REGISTRY:-50000}:5000"
+    volumes:
+      - harbor-registry-data:/var/lib/registry
+      - ../devenv/registry.config.yml:/etc/registry/config.yml:ro
+
+  # Core API - starts with: docker compose --profile core up
+  core:
+    build:
+      context: ..
+      dockerfile: dockerfile/dev.core.dockerfile
+      args:
+        GO_VERSION: ${GO_VERSION}
+    profiles: [core]
+    volumes:
+      - ..:/app
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+      # Mount views directly to where beego expects them (avoids symlink leaking to host)
+      - ../src/core/views:/app/views:ro
+    ports:
+      - "${PORT_CORE:-8080}:8080"
+      # - "127.0.0.1:${PORT_DEBUG_CORE:-2345}:2345"  # Debug port (uncomment if needed)
+    environment:
+      # Database
+      POSTGRESQL_HOST: postgresql
+      POSTGRESQL_PORT: "5432"
+      POSTGRESQL_USERNAME: postgres
+      POSTGRESQL_PASSWORD: root123
+      POSTGRESQL_DATABASE: registry
+      POSTGRESQL_SSLMODE: disable
+      POSTGRES_MIGRATION_SCRIPTS_PATH: make/migrations/postgresql/
+      # Redis
+      _REDIS_URL_CORE: redis://redis:6379/1
+      _REDIS_URL_REG: redis://redis:6379/2
+      # Registry
+      REGISTRY_URL: http://registry:5000
+      REGISTRY_CONTROLLER_URL: http://registryctl:8080
+      REGISTRY_CREDENTIAL_USERNAME: ""
+      REGISTRY_CREDENTIAL_PASSWORD: ""
+      # Core settings
+      EXT_ENDPOINT: http://core:8080
+      CORE_URL: http://core:8080
+      HARBOR_ADMIN_PASSWORD: Harbor12345
+      CACHE_ENABLED: "false"
+      LOG_LEVEL: debug
+      # Token signing key
+      TOKEN_PRIVATE_KEY_PATH: devenv/token_service_key.pem
+      # JobService
+      JOBSERVICE_URL: http://jobservice:8888
+      CORE_SECRET: devenv-secret-do-not-use-in-production
+      JOBSERVICE_SECRET: devenv-secret-do-not-use-in-production
+      # Trivy scanner
+      TRIVY_ADAPTER_URL: http://trivy-adapter:8080
+      WITH_TRIVY: "true"
+      # Proxy cache and replication
+      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
+      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr
+    command: air -c devenv/air.core.toml
+    depends_on:
+      - postgresql
+      - redis
+      - registry
+
+
+  # JobService - starts with: docker compose --profile jobservice up
+  jobservice:
+    build:
+      context: ..
+      dockerfile: dockerfile/dev.core.dockerfile
+      args:
+        GO_VERSION: ${GO_VERSION}
+    profiles: [jobservice]
+    volumes:
+      - ..:/app
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    # ports:
+    #   - "8888:8888"  # JobService API (uncomment if needed)
+    #   - "127.0.0.1:2346:2346"  # Debug port (uncomment if needed)
+    environment:
+      # Database
+      POSTGRESQL_HOST: postgresql
+      POSTGRESQL_PORT: "5432"
+      POSTGRESQL_USERNAME: postgres
+      POSTGRESQL_PASSWORD: root123
+      POSTGRESQL_DATABASE: registry
+      POSTGRESQL_SSLMODE: disable
+      # Redis
+      REDIS_URL: redis://redis:6379
+      # Core
+      CORE_URL: http://core:8080
+      CORE_SECRET: devenv-secret-do-not-use-in-production
+      JOBSERVICE_SECRET: devenv-secret-do-not-use-in-production
+      # Registry
+      REGISTRY_URL: http://registry:5000
+      REGISTRY_CONTROLLER_URL: http://registryctl:8080
+      REGISTRY_CREDENTIAL_USERNAME: ""
+      REGISTRY_CREDENTIAL_PASSWORD: ""
+      TOKEN_SERVICE_URL: http://core:8080/service/token
+      LOG_LEVEL: debug
+    command: air -c devenv/air.jobservice.toml
+    depends_on:
+      - core
+
+  # RegistryCtl - starts with: docker compose --profile registryctl up
+  registryctl:
+    build:
+      context: ..
+      dockerfile: dockerfile/dev.core.dockerfile
+      args:
+        GO_VERSION: ${GO_VERSION}
+    profiles: [registryctl]
+    volumes:
+      - ..:/app
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+      - harbor-registry-data:/var/lib/registry
+      - ../devenv/registry.config.yml:/etc/registry/config.yml:ro
+    ports:
+      - "${PORT_REGISTRYCTL:-8085}:8080"
+      - "127.0.0.1:${PORT_DEBUG_REGISTRYCTL:-2347}:2347"
+    environment:
+      PORT: "8080"
+      LOG_LEVEL: debug
+      REGISTRY_CONFIG: /etc/registry/config.yml
+      CORE_SECRET: devenv-secret-do-not-use-in-production
+      JOBSERVICE_SECRET: devenv-secret-do-not-use-in-production
+    command: air -c devenv/air.registryctl.toml
+    depends_on:
+      - registry
+
+  # Trivy scanner adapter - starts with: docker compose --profile trivy up
+  trivy-adapter:
+    build:
+      context: ..
+      dockerfile: dockerfile/trivy-adapter.dockerfile
+      args:
+        GO_VERSION: ${GO_VERSION}
+        HARBOR_SCANNER_TRIVY_VERSION: ${HARBOR_SCANNER_TRIVY_VERSION}
+        TRIVY_VERSION: ${TRIVY_VERSION}
+        TRIVY_BASE_IMAGE_VERSION: ${TRIVY_BASE_IMAGE_VERSION}
+        LPROBE_VERSION: ${LPROBE_VERSION}
+    profiles: [trivy]
+    environment:
+      SCANNER_LOG_LEVEL: debug
+      SCANNER_REDIS_URL: redis://redis:6379
+      SCANNER_STORE_REDIS_URL: redis://redis:6379
+      SCANNER_STORE_REDIS_NAMESPACE: harbor.scanner.trivy:store
+      SCANNER_JOB_QUEUE_REDIS_URL: redis://redis:6379
+      SCANNER_JOB_QUEUE_REDIS_NAMESPACE: harbor.scanner.trivy:job-queue
+      SCANNER_TRIVY_CACHE_DIR: /tmp/trivy
+      SCANNER_TRIVY_REPORTS_DIR: /tmp/reports
+      SCANNER_TRIVY_VULN_TYPE: os,library
+      SCANNER_TRIVY_SEVERITY: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+      SCANNER_TRIVY_INSECURE: "true"
+      SCANNER_API_SERVER_ADDR: ":8080"
+    ports:
+      - "${PORT_TRIVY:-8081}:8080"
+    tmpfs:
+      - /tmp:size=2G,mode=1777
+    depends_on:
+      - redis
+
+
+  # Portal (Angular UI) - starts with: docker compose --profile portal up
+  portal:
+    build:
+      context: ..
+      dockerfile: dockerfile/dev.portal.dockerfile
+      args:
+        BUN_VERSION: ${BUN_VERSION}
+    profiles: [portal]
+    volumes:
+      - ../src/portal/src:/app/src
+      - ../src/portal/scripts:/app/scripts:ro
+      - ../src/portal/angular.json:/app/angular.json:ro
+      - ../src/portal/tsconfig.json:/app/tsconfig.json:ro
+      - ../src/portal/tsconfig.app.json:/app/tsconfig.app.json:ro
+      - ./proxy.config.mjs:/app/proxy.config.mjs:ro
+      - ../api/v2.0/swagger.yaml:/swagger.yaml:ro
+    ports:
+      - "${PORT_PORTAL:-4200}:4200"
+    environment:
+      HARBOR_PROXY_TARGET: "http://core:8080"
+    depends_on:
+      - core
+
+volumes:
+  harbor-postgres-data:
+    name: ${PROJECT_PREFIX:-harbor}-postgres-data
+  harbor-redis-data:
+    name: ${PROJECT_PREFIX:-harbor}-redis-data
+  harbor-registry-data:
+    name: ${PROJECT_PREFIX:-harbor}-registry-data
+  go-mod-cache:
+    name: ${PROJECT_PREFIX:-harbor}-go-mod-cache
+  go-build-cache:
+    name: ${PROJECT_PREFIX:-harbor}-go-build-cache

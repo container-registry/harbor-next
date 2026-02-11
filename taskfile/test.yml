@@ -1,0 +1,219 @@
+# Testing and Quality Assurance Tasks
+# Linting, vulnerability scanning, and tests
+
+version: '3'
+
+includes:
+  build:
+    taskfile: ./build.yml
+    internal: true
+
+tasks:
+  # ============================================================================
+  # Linting Tasks
+  # ============================================================================
+
+  lint:
+    desc: "Run Go linters (golangci-lint)"
+    cmds:
+      - task build:gen-apis
+      - |
+        echo "🔍 Running golangci-lint..."
+        docker run --rm \
+          -v $(pwd):/harbor \
+          -w /harbor/src \
+          golangci/golangci-lint:{{.GOLANGCILINT_VERSION}}-alpine \
+          golangci-lint -v run --timeout=10m
+
+  lint:report:
+    desc: "Generate lint report for CI"
+    cmds:
+      - task build:gen-apis
+      - |
+        echo "📊 Generating lint report..."
+        docker run --rm \
+          -v $(pwd):/harbor \
+          -w /harbor/src \
+          golangci/golangci-lint:{{.GOLANGCILINT_VERSION}}-alpine \
+          golangci-lint -v run --timeout=10m \
+          --out-format github-actions \
+          --issues-exit-code 0 > golangci-lint.report
+        echo "✅ Report saved to: golangci-lint.report"
+
+  lint:api:
+    desc: "Lint OpenAPI spec with Spectral"
+    sources:
+      - "api/v2.0/swagger.yaml"
+    cmds:
+      - |
+        echo "🔍 Linting OpenAPI spec..."
+        docker run --rm \
+          -v $(pwd):/src \
+          -w /src \
+          stoplight/spectral:{{.SPECTRAL_VERSION}} \
+          lint ./api/v2.0/swagger.yaml
+
+  # ============================================================================
+  # Vulnerability Scanning
+  # ============================================================================
+
+  vuln-check:
+    desc: "Check for Go vulnerabilities (govulncheck)"
+    cmds:
+      - |
+        if ! command -v govulncheck &> /dev/null; then
+          echo "Installing govulncheck..."
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+        fi
+      - |
+        echo "🔒 Running govulncheck..."
+        cd src && govulncheck -show verbose ./...
+
+  vuln-report:
+    desc: "Generate vulnerability report in SARIF format"
+    cmds:
+      - |
+        if ! command -v govulncheck &> /dev/null; then
+          echo "Installing govulncheck..."
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+        fi
+      - |
+        echo "📊 Generating vulnerability report..."
+        cd src && govulncheck -format sarif ./... > ../govulncheck.sarif
+        echo "✅ SARIF report saved to: govulncheck.sarif"
+
+  # ============================================================================
+  # Unit Tests
+  # ============================================================================
+
+  unit:
+    desc: "Run Go unit tests"
+    cmds:
+      - |
+        echo "🧪 Running unit tests..."
+        cd src && go test -v -race -cover ./...
+
+  unit:coverage:
+    desc: "Run unit tests with coverage report"
+    cmds:
+      - |
+        echo "🧪 Running unit tests with coverage..."
+        cd src && go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+        go tool cover -html=coverage.out -o coverage.html
+        echo "✅ Coverage report: src/coverage.html"
+
+  unit:watch:
+    desc: "Run unit tests in watch mode"
+    cmds:
+      - |
+        if ! command -v watchexec &> /dev/null; then
+          echo "❌ watchexec not found. Install with: brew install watchexec"
+          exit 1
+        fi
+      - |
+        echo "🧪 Running tests in watch mode..."
+        cd src && watchexec -e go -r -- go test -v ./...
+
+  # ============================================================================
+  # Integration Tests
+  # ============================================================================
+
+  integration:
+    desc: "Run integration tests"
+    cmds:
+      - |
+        echo "🧪 Running integration tests..."
+        ./tests/ci/api_run.sh
+
+  # ============================================================================
+  # Mock Validation
+  # ============================================================================
+
+  check-mocks:
+    desc: "Verify mock files are up to date"
+    cmds:
+      - |
+        echo "Checking mocks..."
+        res=$(git status -s src/ | awk '{ printf("%s\n", $2) }' | grep -E '.*.go' || true)
+        if [ -n "$res" ]; then
+          echo "❌ Mock files are out of date:"
+          echo "$res"
+          exit 1
+        fi
+        echo "✅ All mock files are up to date"
+
+  generate-mocks:
+    desc: "Generate mock files"
+    cmds:
+      - |
+        if ! command -v mockery &> /dev/null; then
+          echo "Installing mockery..."
+          go install github.com/vektra/mockery/v2@latest
+        fi
+      - |
+        echo "🔧 Generating mocks..."
+        cd src && mockery --all --dir . --output ./testing/mocks
+      - echo "✅ Mocks generated"
+
+  # ============================================================================
+  # Frontend Tests
+  # ============================================================================
+
+  frontend:test:
+    desc: "Run frontend tests once"
+    dir: src/portal
+    cmds:
+      - npm run test -- --watch=false
+
+  frontend:test:watch:
+    desc: "Run frontend tests in watch mode"
+    dir: src/portal
+    cmds:
+      - npm run test -- --watch
+
+  frontend:lint:
+    desc: "Lint frontend code"
+    dir: src/portal
+    cmds:
+      - npm run lint
+
+  # ============================================================================
+  # Aggregate Test Tasks
+  # ============================================================================
+
+  all:
+    desc: "Run all tests and checks"
+    cmds:
+      - task: lint:api
+      - task: lint
+      - task: vuln-check
+      - task: unit
+      - echo "✅ All tests passed!"
+
+  ci:
+    desc: "Run CI checks (for GitHub Actions)"
+    cmds:
+      - task: lint:api
+      - task: lint:report
+      - task: vuln-report
+      - task: unit:coverage
+      - echo "✅ CI checks complete"
+
+  quick:
+    desc: "Quick validation (fast checks only)"
+    cmds:
+      - task: lint:api
+      - task: unit
+      - echo "✅ Quick validation passed"
+
+  # ============================================================================
+  # Utilities
+  # ============================================================================
+
+  clean:
+    desc: "Clean test artifacts"
+    cmds:
+      - rm -f golangci-lint.report
+      - rm -f govulncheck.sarif
+      - rm -f src/coverage.out src/coverage.html
+      - echo "✅ Test artifacts cleaned"
