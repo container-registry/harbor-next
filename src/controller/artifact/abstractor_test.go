@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/docker/distribution"
+	"github.com/docker/distribution/manifest/manifestlist"
 	"github.com/docker/distribution/manifest/schema1"
 	"github.com/docker/distribution/manifest/schema2"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -306,14 +307,21 @@ func (a *abstractorTestSuite) SetupTest() {
 	a.argMgr = &tart.Manager{}
 	a.blobMgr = &tblob.Manager{}
 	a.abstractor = &abstractor{
-		artMgr:  a.argMgr,
-		blobMgr: a.blobMgr,
-		regCli:  a.regCli,
+		regCli: a.regCli,
 	}
 	a.processor = &tpro.Processor{}
 	// clear all registered processors
 	processor.Registry = map[string]processor.Processor{}
 	processor.Registry[schema2.MediaTypeImageConfig] = a.processor
+	// clear and re-register manifest abstractors with mock dependencies
+	ManifestAbstractorRegistry = map[string]ManifestAbstractor{}
+	ManifestAbstractorRegistry[""] = &v1ManifestAbstractor{blobMgr: a.blobMgr}
+	ManifestAbstractorRegistry["application/json"] = &v1ManifestAbstractor{blobMgr: a.blobMgr}
+	ManifestAbstractorRegistry[schema1.MediaTypeSignedManifest] = &v1ManifestAbstractor{blobMgr: a.blobMgr}
+	ManifestAbstractorRegistry[v1.MediaTypeImageManifest] = &v2ManifestAbstractor{}
+	ManifestAbstractorRegistry[schema2.MediaTypeManifest] = &v2ManifestAbstractor{}
+	ManifestAbstractorRegistry[v1.MediaTypeImageIndex] = &indexManifestAbstractor{artMgr: a.argMgr}
+	ManifestAbstractorRegistry[manifestlist.MediaTypeManifestList] = &indexManifestAbstractor{artMgr: a.argMgr}
 }
 
 // docker manifest v1
