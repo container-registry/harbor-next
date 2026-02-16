@@ -70,6 +70,55 @@ If you want to deploy Harbor on Kubernetes, please use the **[Harbor chart](http
 
 Refer to the **[documentation](https://goharbor.io/docs/)** for more details on how to use Harbor.
 
+## Development
+
+Harbor Next uses [Taskfile](https://taskfile.dev) for local development and in pipelines for a fast, hybrid development environment with hot reload capabilities.
+
+### Prerequisites
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| [Task](https://taskfile.dev/installation/) | v3.x | Build system (replaces Make) |
+| [Docker](https://docs.docker.com/get-docker/) / [Podman](https://podman.io/) | 20.10.10+ | Dev environment, linting, image builds |
+| [Go](https://go.dev/dl/) | see `versions.env` | Backend compilation and tests |
+| [Bun](https://bun.sh) | see `versions.env` | Frontend dependency management |
+| [Node.js](https://nodejs.org/) | 16+ | Frontend build, tests, and API codegen |
+| Git | any | Required by build metadata and mock checks |
+
+Additional Go tools (`swagger`, `air`, `dlv`, `govulncheck`, `step`) are auto-installed on first use via `go install` or by running `task setup`.
+
+### Quick Start
+
+```bash
+# Install Task
+brew install go-task/tap/go-task  # macOS
+# or: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d  # Linux
+
+# Start DevEnv
+task
+
+# Open http://localhost:4200
+```
+
+### Common Commands
+
+```bash
+task                     # Start full dev environment (foreground)
+task setup               # Install development tools (air, dlv, govulncheck)
+task build               # Build all binaries (alias: task b:all-binaries)
+task images              # Build all Docker images
+task test                # Run all tests (alias: task t:all)
+task test:lint           # Run linters
+task test:unit           # Run unit tests only
+task clean               # Clean build artifacts
+task info                # Show build info and tool versions
+task -l                  # List all available tasks
+```
+
+Namespace aliases: `b:` (build), `t:` (test), `img:` (image), `d:` (dev).
+
+See [devenv/README.md](devenv/README.md) for detailed development environment commands.
+
 ## OCI Distribution Conformance Tests
 
 Check the OCI distribution conformance tests [report](https://storage.googleapis.com/harbor-conformance-test/report.html) of Harbor.

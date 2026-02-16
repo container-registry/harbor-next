@@ -1,0 +1,276 @@
+version: '3'
+
+vars:
+  # Paths
+  COMPOSE_FILE: devenv/docker-compose.yml
+  TOKEN_KEY_FILE: devenv/token_service_key.pem
+
+  # Database (only vars used in task commands)
+  POSTGRES_USER: postgres
+  POSTGRES_DB: registry
+
+  # Slot-based port allocation: SLOT=0 gives default ports, SLOT=1 offsets +100, etc.
+  SLOT: '{{.SLOT | default "0"}}'
+
+  PORT_CORE:         '{{ add 8080  (mul (atoi .SLOT) 100) }}'
+  PORT_PORTAL:       '{{ add 4200  (mul (atoi .SLOT) 100) }}'
+  PORT_POSTGRES:     '{{ add 5432  (mul (atoi .SLOT) 100) }}'
+  PORT_REDIS:        '{{ add 6379  (mul (atoi .SLOT) 100) }}'
+  PORT_REGISTRY:     '{{ add 50000 (mul (atoi .SLOT) 100) }}'
+  PORT_REGISTRYCTL:  '{{ add 8085  (mul (atoi .SLOT) 100) }}'
+  PORT_TRIVY:        '{{ add 8081  (mul (atoi .SLOT) 100) }}'
+  PORT_DEBUG_CORE:   '{{ add 2345  (mul (atoi .SLOT) 100) }}'
+  PORT_DEBUG_JOB:    '{{ add 2346  (mul (atoi .SLOT) 100) }}'
+  PORT_DEBUG_REGCTL: '{{ add 2347  (mul (atoi .SLOT) 100) }}'
+
+  PROJECT_PREFIX: 'harbor-{{.SLOT}}'
+
+  # Docker Compose profile strings (reused across multiple tasks)
+  ALL_PROFILES: "--profile portal --profile core --profile jobservice --profile registryctl --profile trivy"
+  APP_PROFILES: "--profile portal --profile core --profile jobservice --profile registryctl"
+
+env:
+  COMPOSE_PROJECT_NAME:   '{{.PROJECT_PREFIX}}'
+  PROJECT_PREFIX:         '{{.PROJECT_PREFIX}}'
+  PORT_CORE:              '{{.PORT_CORE}}'
+  PORT_PORTAL:            '{{.PORT_PORTAL}}'
+  PORT_POSTGRES:          '{{.PORT_POSTGRES}}'
+  PORT_REDIS:             '{{.PORT_REDIS}}'
+  PORT_REGISTRY:          '{{.PORT_REGISTRY}}'
+  PORT_REGISTRYCTL:       '{{.PORT_REGISTRYCTL}}'
+  PORT_TRIVY:             '{{.PORT_TRIVY}}'
+  PORT_DEBUG_CORE:        '{{.PORT_DEBUG_CORE}}'
+  PORT_DEBUG_JOBSERVICE:  '{{.PORT_DEBUG_JOB}}'
+  PORT_DEBUG_REGISTRYCTL: '{{.PORT_DEBUG_REGCTL}}'
+
+tasks:
+  # ---------------------------------------------------------------------------
+  # Tool Installation
+  # ---------------------------------------------------------------------------
+  tools:install:
+    internal: true
+    status:
+      - test -x {{.GOPATH_BIN}}/{{.TOOL_NAME}}
+    cmd: go install {{.TOOL_PKG}}
+
+  setup:
+    desc: Install Go development tools (air, dlv, govulncheck)
+    cmds:
+      - for:
+          - { name: air, pkg: 'github.com/air-verse/air@{{.AIR_VERSION}}' }
+          - { name: dlv, pkg: 'github.com/go-delve/delve/cmd/dlv@{{.DELVE_VERSION}}' }
+          - { name: govulncheck, pkg: 'golang.org/x/vuln/cmd/govulncheck@latest' }
+        task: tools:install
+        vars:
+          TOOL_NAME: '{{.ITEM.name}}'
+          TOOL_PKG: '{{.ITEM.pkg}}'
+      - echo "All development tools installed"
+
+  require-docker:
+    internal: true
+    run: once
+    silent: true
+    preconditions:
+      - sh: command -v docker
+        msg: "Docker is not installed. Please install Docker first."
+      - sh: docker info > /dev/null 2>&1
+        msg: "Docker daemon is not running. Please start Docker first."
+
+  gen:private-key:
+    desc: Generate RSA 4096 key for token signing (skipped if exists)
+    status:
+      - test -f {{.TOKEN_KEY_FILE}}
+    cmds:
+      - openssl genpkey -algorithm RSA -out {{.TOKEN_KEY_FILE}} -pkeyopt rsa_keygen_bits:4096
+      - chmod 600 {{.TOKEN_KEY_FILE}}
+      - echo "Generated {{.TOKEN_KEY_FILE}}"
+
+  # ---------------------------------------------------------------------------
+  # Info
+  # ---------------------------------------------------------------------------
+  info:
+    desc: Print SLOT, port assignments, and service URLs
+    silent: true
+    cmd: |
+      echo ""
+      echo "Harbor Dev Environment (SLOT={{.SLOT}})"
+      echo "================================"
+      echo "  Portal:       http://localhost:{{.PORT_PORTAL}}"
+      echo "  Core API:     http://localhost:{{.PORT_CORE}}/api/v2.0"
+      echo "  PostgreSQL:   localhost:{{.PORT_POSTGRES}}"
+      echo "  Redis:        localhost:{{.PORT_REDIS}}"
+      echo "  Registry:     localhost:{{.PORT_REGISTRY}}"
+      echo "  RegistryCtl:  localhost:{{.PORT_REGISTRYCTL}}"
+      echo "  Trivy:        localhost:{{.PORT_TRIVY}}"
+      echo "  Prefix:       {{.PROJECT_PREFIX}}"
+      echo ""
+
+  # ---------------------------------------------------------------------------
+  # Full Development Environment (Containerized)
+  # ---------------------------------------------------------------------------
+  up:
+    desc: "Start all services with hot reload in foreground (SKIP_TRIVY=true to exclude Trivy)"
+    deps: [require-docker, gen:private-key]
+    vars:
+      TRIVY_PROFILE: '{{if ne .SKIP_TRIVY "true"}}--profile trivy{{end}}'
+    cmds:
+      - task: :build:gen-apis
+      - task: frontend:install
+      - task: :build:gen-apis:frontend
+      - defer: { task: dev:down, vars: { SKIP_TRIVY: "{{.SKIP_TRIVY}}" } }
+      - task: info
+      - docker compose -f {{.COMPOSE_FILE}} {{.APP_PROFILES}} {{.TRIVY_PROFILE}} up --build
+
+  down:
+    desc: Stop and remove all dev environment containers
+    vars:
+      TRIVY_PROFILE: '{{if ne .SKIP_TRIVY "true"}}--profile trivy{{end}}'
+    cmd: docker compose -f {{.COMPOSE_FILE}} {{.APP_PROFILES}} {{.TRIVY_PROFILE}} down
+
+  # ---------------------------------------------------------------------------
+  # Infrastructure (Docker Compose)
+  # ---------------------------------------------------------------------------
+  infra:up:
+    desc: Start PostgreSQL, Redis, and Registry (waits for DB readiness)
+    deps: [require-docker]
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} up -d
+      - |
+        echo "Waiting for PostgreSQL..."
+        timeout=60 elapsed=0
+        until docker compose -f {{.COMPOSE_FILE}} exec -T postgresql pg_isready -U postgres > /dev/null 2>&1; do
+          [ $elapsed -ge $timeout ] && echo "PostgreSQL failed to start" && exit 1
+          sleep 2; elapsed=$((elapsed + 2))
+        done
+      - echo "Infrastructure ready"
+      - docker compose -f {{.COMPOSE_FILE}} ps
+
+  infra:down:
+    desc: Stop PostgreSQL, Redis, and Registry containers
+    cmd: docker compose -f {{.COMPOSE_FILE}} down
+
+  infra:remove:
+    desc: Stop all containers and delete all named volumes
+    cmd: docker compose -f {{.COMPOSE_FILE}} {{.ALL_PROFILES}} down -v
+
+  # ---------------------------------------------------------------------------
+  # Backend Services (Containerized)
+  # ---------------------------------------------------------------------------
+  backend:up:
+    desc: Build and start Core, JobService, RegistryCtl with hot reload
+    deps: [require-docker, gen:private-key]
+    cmds:
+      - task: :build:gen-apis
+      - docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice --profile registryctl up -d --build
+      - |
+        echo ""
+        echo "API: http://localhost:{{.PORT_CORE}}/api/v2.0"
+        echo ""
+
+  backend:down:
+    desc: Stop and remove Core, JobService, RegistryCtl (keeps infra running)
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} stop core jobservice registryctl
+      - docker compose -f {{.COMPOSE_FILE}} rm -f core jobservice registryctl
+
+  backend:logs:
+    desc: Tail logs from Core, JobService, and RegistryCtl
+    cmd: docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice --profile registryctl logs -f
+
+  backend:logs:*:
+    desc: "Tail logs for a specific backend service (core, jobservice, registryctl)"
+    cmd: docker compose -f {{.COMPOSE_FILE}} logs -f {{index .MATCH 0}}
+
+  backend:restart:
+    desc: Restart Core, JobService, and RegistryCtl containers
+    cmd: docker compose -f {{.COMPOSE_FILE}} restart core jobservice registryctl
+
+  # ---------------------------------------------------------------------------
+  # Frontend (Native - alternative to containerized portal)
+  # ---------------------------------------------------------------------------
+  frontend:install:
+    internal: true
+    dir: src/portal
+    preconditions:
+      - sh: command -v bun
+        msg: "bun is required for native frontend dev. Install: https://bun.sh"
+    sources:
+      - package.json
+      - bun.lock
+    generates:
+      - node_modules/.bun-integrity
+    cmd: bun install --ignore-scripts
+
+  frontend:native:
+    desc: Serve Portal with ng serve on host (alternative to containerized portal)
+    silent: true
+    dir: src/portal
+    deps: [frontend:install]
+    cmds:
+      - task: :build:gen-apis:frontend
+      - exec ./node_modules/.bin/ng serve --host 0.0.0.0 --hmr --disable-host-check
+
+  frontend:build:
+    desc: Build Portal for production
+    dir: src/portal
+    cmd: npm run build
+
+  frontend:test:
+    desc: Run frontend tests in watch mode
+    dir: src/portal
+    cmd: npm run test -- --watch
+
+  frontend:test:once:
+    desc: Run frontend tests once
+    dir: src/portal
+    cmd: npm run test -- --watch=false
+
+  # ---------------------------------------------------------------------------
+  # Database Operations
+  # ---------------------------------------------------------------------------
+  db:migrate:
+    desc: Run pending database migrations against local PostgreSQL
+    dir: src
+    env:
+      POSTGRESQL_HOST: localhost
+      POSTGRESQL_PORT: '{{.PORT_POSTGRES}}'
+      POSTGRESQL_USERNAME: '{{.POSTGRES_USER}}'
+      POSTGRESQL_PASSWORD: root123
+      POSTGRESQL_DATABASE: '{{.POSTGRES_DB}}'
+      POSTGRESQL_SSLMODE: disable
+      POSTGRES_MIGRATION_SCRIPTS_PATH: ../make/migrations/postgresql/
+    cmd: go run ./cmd/standalone-db-migrator/main.go
+
+  db:reset:
+    desc: Drop database, recreate it, and apply all migrations from scratch
+    prompt: "This will delete all data in {{.POSTGRES_DB}}. Continue?"
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} exec -T postgresql dropdb -U {{.POSTGRES_USER}} {{.POSTGRES_DB}} --if-exists
+      - docker compose -f {{.COMPOSE_FILE}} exec -T postgresql createdb -U {{.POSTGRES_USER}} {{.POSTGRES_DB}}
+      - task: db:migrate
+      - echo "Database reset complete"
+
+  db:shell:
+    desc: Open interactive psql session on the dev database
+    cmd: docker compose -f {{.COMPOSE_FILE}} exec postgresql psql -U {{.POSTGRES_USER}} -d {{.POSTGRES_DB}}
+
+  # ---------------------------------------------------------------------------
+  # Utilities
+  # ---------------------------------------------------------------------------
+  clean:
+    desc: Remove all containers, volumes, node_modules, and temp files
+    cmds:
+      - docker compose -f {{.COMPOSE_FILE}} {{.ALL_PROFILES}} down -v
+      - pkill -f "ng serve" || true
+      - rm -rf tmp/
+      - rm -rf src/portal/node_modules
+      - rm -f build-errors.log
+      - rm -f {{.TOKEN_KEY_FILE}}
+
+  status:
+    desc: Show container status for all services
+    cmd: docker compose -f {{.COMPOSE_FILE}} {{.ALL_PROFILES}} ps
+
+  logs:
+    desc: Tail logs from all containers
+    cmd: docker compose -f {{.COMPOSE_FILE}} {{.ALL_PROFILES}} logs -f
