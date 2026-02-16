@@ -135,7 +135,7 @@ tasks:
     internal: true
     run: once
     status:
-      - command -v swagger
+      - test -x {{.GOPATH_BIN}}/swagger
     cmd: go install github.com/go-swagger/go-swagger/cmd/swagger@{{.SWAGGER_VERSION}}
 
   gen-apis:
@@ -151,7 +151,7 @@ tasks:
     cmds:
       - mkdir -p src/server/v2.0
       - >-
-        swagger generate server
+        {{.GOPATH_BIN}}/swagger generate server
         --template-dir=./tools/swagger/templates
         --exclude-main
         --additional-initialism=CVE

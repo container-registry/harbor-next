@@ -52,20 +52,20 @@ tasks:
     internal: true
     run: once
     status:
-      - command -v govulncheck
+      - test -x {{.GOPATH_BIN}}/govulncheck
     cmd: go install golang.org/x/vuln/cmd/govulncheck@latest
 
   vuln-check:
     desc: "Scan Go dependencies for known vulnerabilities"
     deps: [_require-govulncheck]
     dir: src
-    cmd: govulncheck -show verbose ./...
+    cmd: "{{.GOPATH_BIN}}/govulncheck -show verbose ./..."
 
   vuln-report:
     desc: "Scan Go dependencies and write SARIF report to govulncheck.sarif"
     deps: [_require-govulncheck]
     dir: src
-    cmd: govulncheck -format sarif ./... > ../govulncheck.sarif
+    cmd: "{{.GOPATH_BIN}}/govulncheck -format sarif ./... > ../govulncheck.sarif"
 
   # ============================================================================
   # Unit Tests
@@ -118,14 +118,14 @@ tasks:
     internal: true
     run: once
     status:
-      - command -v mockery
+      - test -x {{.GOPATH_BIN}}/mockery
     cmd: go install github.com/vektra/mockery/v2@latest
 
   generate-mocks:
     desc: "Regenerate all mock files with mockery"
     deps: [_require-mockery]
     dir: src
-    cmd: mockery --all --dir . --output ./testing/mocks
+    cmd: "{{.GOPATH_BIN}}/mockery --all --dir . --output ./testing/mocks"
 
   # ============================================================================
   # Frontend Tests

@@ -17,6 +17,8 @@ vars:
   TIMESTAMP:
     sh: date -u +%Y%m%d%H%M%S
 
+  GOPATH_BIN:
+    sh: echo "$(go env GOPATH)/bin"
   GOBUILD_FLAGS: "-buildvcs=false"
   DISTRIBUTION_SRC: "https://github.com/distribution/distribution.git"
   NPM_REGISTRY: "https://registry.npmjs.org/"

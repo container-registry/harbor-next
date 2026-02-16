@@ -50,7 +50,7 @@ tasks:
   tools:install:
     internal: true
     status:
-      - command -v {{.TOOL_NAME}}
+      - test -x {{.GOPATH_BIN}}/{{.TOOL_NAME}}
     cmd: go install {{.TOOL_PKG}}
 
   setup:
