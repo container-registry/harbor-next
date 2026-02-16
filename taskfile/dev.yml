@@ -210,12 +210,20 @@ tasks:
   # ---------------------------------------------------------------------------
   # Frontend (Native - alternative to containerized portal)
   # ---------------------------------------------------------------------------
+  frontend:install:
+    internal: true
+    dir: src/portal
+    sources:
+      - package.json
+      - package-lock.json
+    cmd: bun install --ignore-scripts
+
   frontend:native:
     desc: Start Portal natively (alternative to --profile portal)
     silent: true
     dir: src/portal
+    deps: [frontend:install]
     cmds:
-      - '[ ! -d "node_modules" ] && npm install || true'
       - task: :build:gen-apis:frontend
       - exec ./node_modules/.bin/ng serve --host 0.0.0.0 --hmr --disable-host-check
 
