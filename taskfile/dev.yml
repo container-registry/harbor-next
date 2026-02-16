@@ -73,22 +73,12 @@ tasks:
       - sh: docker info > /dev/null 2>&1
         msg: "Docker daemon is not running. Please start Docker first."
 
-  require-step:
-    internal: true
-    run: once
-    silent: true
-    status:
-      - command -v step
-    cmds:
-      - go install github.com/smallstep/cli/cmd/step@latest
-
   gen:private-key:
-    desc: Generate RSA private key for token signing
-    deps: [require-step]
+    desc: Generate RSA 4096 key for token signing (skipped if exists)
     status:
       - test -f {{.TOKEN_KEY_FILE}}
     cmds:
-      - step crypto keypair /dev/null {{.TOKEN_KEY_FILE}} --kty RSA --size 4096 --no-password --insecure --force
+      - openssl genpkey -algorithm RSA -out {{.TOKEN_KEY_FILE}} -pkeyopt rsa_keygen_bits:4096
       - chmod 600 {{.TOKEN_KEY_FILE}}
       - echo "Generated {{.TOKEN_KEY_FILE}}"
 
