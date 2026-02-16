@@ -182,7 +182,8 @@ tasks:
   backend:down:
     desc: Stop Core + JobService + RegistryCtl containers
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice --profile registryctl down
+      - docker compose -f {{.COMPOSE_FILE}} stop core jobservice registryctl
+      - docker compose -f {{.COMPOSE_FILE}} rm -f core jobservice registryctl
 
   backend:logs:
     desc: View backend container logs
@@ -207,7 +208,7 @@ tasks:
   backend:restart:
     desc: Restart backend containers
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice --profile registryctl restart
+      - docker compose -f {{.COMPOSE_FILE}} restart core jobservice registryctl
 
   # ---------------------------------------------------------------------------
   # Frontend (Native - alternative to containerized portal)
@@ -257,6 +258,7 @@ tasks:
   # ---------------------------------------------------------------------------
   db:migrate:
     desc: Run incremental database migrations via golang-migrate
+    dir: src
     cmds:
       - |
         echo "Running migrations..."
@@ -266,8 +268,8 @@ tasks:
         POSTGRESQL_PASSWORD=root123 \
         POSTGRESQL_DATABASE={{.POSTGRES_DB}} \
         POSTGRESQL_SSLMODE=disable \
-        POSTGRES_MIGRATION_SCRIPTS_PATH=make/migrations/postgresql/ \
-        go run src/cmd/standalone-db-migrator/main.go
+        POSTGRES_MIGRATION_SCRIPTS_PATH=../make/migrations/postgresql/ \
+        go run ./cmd/standalone-db-migrator/main.go
 
   db:init-schema:
     desc: Apply all migration SQL files from scratch (use after db:reset)

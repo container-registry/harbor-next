@@ -45,8 +45,8 @@ tasks:
       GOOS: '{{index (splitList "-" .PLATFORM) 0}}'
       GOARCH: '{{index (splitList "-" .PLATFORM) 1}}'
       OUTPUT: 'bin/{{.PLATFORM}}/{{.OUTPUT_NAME}}'
-      GO_LDFLAGS: '{{.GO_LDFLAGS | default .LDFLAGS_PROD}}'
-      GCFLAGS: '{{.GCFLAGS | default ""}}'
+      GO_LDFLAGS: '{{if eq (.DEBUG | default "") "true"}}{{else}}{{.LDFLAGS_PROD}}{{end}}'
+      GCFLAGS: '{{if eq (.DEBUG | default "") "true"}}{{.GCFLAGS_DEBUG}}{{end}}'
     dir: src
     env:
       GOOS: '{{.GOOS}}'
@@ -60,7 +60,7 @@ tasks:
   # --- Binary Tasks ---
 
   binary:core:*:
-    desc: "Build Harbor core binary"
+    desc: "Build Harbor core binary (use DEBUG=true for debug symbols)"
     sources:
       - src/core/**/*.go
       - src/common/**/*.go
@@ -79,18 +79,6 @@ tasks:
           PLATFORM: '{{index .MATCH 0}}'
           MAIN_PATH: ./core/main.go
           OUTPUT_NAME: core
-
-  binary:core:*:debug:
-    desc: "Build Harbor core binary with debug symbols"
-    deps: [gen-apis]
-    cmds:
-      - task: _go-build
-        vars:
-          PLATFORM: '{{index .MATCH 0}}'
-          MAIN_PATH: ./core/main.go
-          OUTPUT_NAME: core
-          GO_LDFLAGS: ''
-          GCFLAGS: '{{.GCFLAGS_DEBUG}}'
 
   binary:jobservice:*:
     desc: "Build Harbor jobservice binary"
