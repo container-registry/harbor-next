@@ -56,7 +56,7 @@ func main() {
 		retry.MaxInterval(10*time.Second),
 		retry.Timeout(5*time.Minute),
 		retry.Callback(func(err error, sleep time.Duration) {
-			log.Infof("failed to load configuration from core, retry after %s: %v", sleep, err)
+			log.Debugf("failed to load configuration from core, retry after %s: %v", sleep, err)
 		}),
 	); err != nil {
 		panic(fmt.Sprintf("failed to load configuration, error: %v", err))
