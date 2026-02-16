@@ -213,6 +213,9 @@ tasks:
   frontend:install:
     internal: true
     dir: src/portal
+    preconditions:
+      - sh: command -v bun
+        msg: "bun is required for native frontend dev. Install: https://bun.sh"
     sources:
       - package.json
       - package-lock.json
