@@ -71,8 +71,8 @@ dockerfile/
 
 ### Full Environment
 ```bash
-task dev:up              # Start everything (Core, JobService, Trivy, Portal)
-task dev:up:simple       # Start without Trivy
+task dev:up                    # Start everything (Core, JobService, Trivy, Portal)
+task dev:up SKIP_TRIVY=true    # Start without Trivy
 task dev:status          # Show running containers
 task dev:logs            # View all container logs
 task dev:clean           # Stop everything and remove volumes
