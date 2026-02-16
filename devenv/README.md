@@ -136,9 +136,10 @@ Volume mounts with VirtioFS (Docker Desktop 4.x+) provide fast file system event
 
 ## Debugging
 
-Both Core and JobService run under Delve debugger:
+Core, JobService, and RegistryCtl run under Delve debugger:
 - **Core**: `localhost:2345`
 - **JobService**: `localhost:2346`
+- **RegistryCtl**: `localhost:2347`
 
 Connect your IDE debugger to these ports. The services start immediately (`--continue` flag) - no need to wait for debugger attach.
 
