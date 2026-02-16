@@ -80,11 +80,11 @@ task dev:clean           # Stop everything and remove volumes
 
 ### Backend Only
 ```bash
-task dev:backend:up          # Start Core + JobService containers
-task dev:backend:down        # Stop backend containers
-task dev:backend:logs        # View backend logs
-task dev:backend:logs:core   # View Core logs only
-task dev:backend:restart     # Restart backend containers
+task dev:backend:up              # Start Core + JobService containers
+task dev:backend:down            # Stop backend containers
+task dev:backend:logs            # View backend logs
+task dev:backend:logs:<service>  # View logs for core, jobservice, or registryctl
+task dev:backend:restart         # Restart backend containers
 ```
 
 ### Infrastructure Only
@@ -106,7 +106,7 @@ task dev:frontend:test:once  # Run frontend tests once
 ```bash
 task dev:db:shell        # Open PostgreSQL shell
 task dev:db:migrate      # Run migrations
-task dev:db:reset        # Reset to clean state
+task dev:db:reset        # Reset to clean state (shows [y/N] prompt)
 ```
 
 ### Utilities

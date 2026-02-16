@@ -9,10 +9,7 @@ vars:
   LDFLAGS_PROD: "-extldflags=-static -s -w"
   GCFLAGS_DEBUG: "all=-N -l"
   VERSION_LDFLAGS: '-X github.com/goharbor/harbor/src/pkg/version.GitCommit={{.GIT_COMMIT}} -X github.com/goharbor/harbor/src/pkg/version.ReleaseVersion={{.VERSION}}'
-  DEFAULT_PLATFORMS: '{{.IMAGE_PLATFORMS | default "linux/amd64,linux/arm64"}}'
-  IS_CI:
-    sh: '[ -n "${CI:-}${GITHUB_ACTIONS:-}${GITLAB_CI:-}${JENKINS_URL:-}" ] && echo "true" || echo "false"'
-  PLATFORMS: '{{.PLATFORMS | default (ternary .DEFAULT_PLATFORMS (printf "linux/%s" ARCH) (eq .IS_CI "true"))}}'
+  PLATFORMS: '{{.PLATFORMS | default .CI_PLATFORMS}}'
 
 tasks:
   all-binaries:
@@ -38,6 +35,7 @@ tasks:
 
   _go-build:
     internal: true
+    run: when_changed
     label: 'build:{{.OUTPUT_NAME}}:{{.PLATFORM}}'
     requires:
       vars: [PLATFORM, MAIN_PATH, OUTPUT_NAME]

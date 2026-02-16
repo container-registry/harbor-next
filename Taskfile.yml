@@ -28,11 +28,24 @@ vars:
   IMAGE_PLATFORMS: '{{.IMAGE_PLATFORMS | default "linux/amd64,linux/arm64"}}'
   IMAGE_BUILDER: "harbor-multiarch"
 
+  # CI detection (shared by build.yml and image.yml)
+  IS_CI:
+    sh: '[ -n "${CI:-}${GITHUB_ACTIONS:-}${GITLAB_CI:-}${JENKINS_URL:-}" ] && echo "true" || echo "false"'
+  CI_PLATFORMS: '{{ternary .IMAGE_PLATFORMS (printf "linux/%s" ARCH) (eq .IS_CI "true")}}'
+
 includes:
-  build: ./taskfile/build.yml
-  image: ./taskfile/image.yml
-  test: ./taskfile/test.yml
-  dev: ./taskfile/dev.yml
+  build:
+    taskfile: ./taskfile/build.yml
+    aliases: [b]
+  image:
+    taskfile: ./taskfile/image.yml
+    aliases: [i]
+  test:
+    taskfile: ./taskfile/test.yml
+    aliases: [t]
+  dev:
+    taskfile: ./taskfile/dev.yml
+    aliases: [d]
 
 tasks:
   default:
@@ -57,12 +70,7 @@ tasks:
 
   clean:
     desc: "Remove all build artifacts, images, test output, and dev environment"
-    cmds:
-      - task: build:clean
-      - task: image:clean
-      - task: test:clean
-      - task: dev:clean
-      - echo "✅ All artifacts cleaned"
+    deps: [build:clean, image:clean, test:clean, dev:clean]
 
   info:
     desc: "Print version, tool versions, and build configuration"
@@ -71,7 +79,7 @@ tasks:
       - |
         echo ""
         echo "═══════════════════════════════════════════════════════════"
-        echo "  🚢 Harbor Build Information"
+        echo "  Harbor Build Information"
         echo "═══════════════════════════════════════════════════════════"
         echo ""
         echo "Build Metadata:"
@@ -108,4 +116,3 @@ tasks:
     desc: "Install Go development tools (air, dlv, govulncheck)"
     cmds:
       - task: dev:setup
-

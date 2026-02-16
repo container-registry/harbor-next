@@ -12,18 +12,22 @@ vars:
   # Slot-based port allocation: SLOT=0 gives default ports, SLOT=1 offsets +100, etc.
   SLOT: '{{.SLOT | default "0"}}'
 
-  PORT_CORE:         { sh: 'echo $((8080  + {{.SLOT}} * 100))' }
-  PORT_PORTAL:       { sh: 'echo $((4200  + {{.SLOT}} * 100))' }
-  PORT_POSTGRES:     { sh: 'echo $((5432  + {{.SLOT}} * 100))' }
-  PORT_REDIS:        { sh: 'echo $((6379  + {{.SLOT}} * 100))' }
-  PORT_REGISTRY:     { sh: 'echo $((50000 + {{.SLOT}} * 100))' }
-  PORT_REGISTRYCTL:  { sh: 'echo $((8085  + {{.SLOT}} * 100))' }
-  PORT_TRIVY:        { sh: 'echo $((8081  + {{.SLOT}} * 100))' }
-  PORT_DEBUG_CORE:   { sh: 'echo $((2345  + {{.SLOT}} * 100))' }
-  PORT_DEBUG_JOB:    { sh: 'echo $((2346  + {{.SLOT}} * 100))' }
-  PORT_DEBUG_REGCTL: { sh: 'echo $((2347  + {{.SLOT}} * 100))' }
+  PORT_CORE:         '{{ add 8080  (mul (atoi .SLOT) 100) }}'
+  PORT_PORTAL:       '{{ add 4200  (mul (atoi .SLOT) 100) }}'
+  PORT_POSTGRES:     '{{ add 5432  (mul (atoi .SLOT) 100) }}'
+  PORT_REDIS:        '{{ add 6379  (mul (atoi .SLOT) 100) }}'
+  PORT_REGISTRY:     '{{ add 50000 (mul (atoi .SLOT) 100) }}'
+  PORT_REGISTRYCTL:  '{{ add 8085  (mul (atoi .SLOT) 100) }}'
+  PORT_TRIVY:        '{{ add 8081  (mul (atoi .SLOT) 100) }}'
+  PORT_DEBUG_CORE:   '{{ add 2345  (mul (atoi .SLOT) 100) }}'
+  PORT_DEBUG_JOB:    '{{ add 2346  (mul (atoi .SLOT) 100) }}'
+  PORT_DEBUG_REGCTL: '{{ add 2347  (mul (atoi .SLOT) 100) }}'
 
   PROJECT_PREFIX: 'harbor-{{.SLOT}}'
+
+  # Docker Compose profile strings (reused across multiple tasks)
+  ALL_PROFILES: "--profile portal --profile core --profile jobservice --profile registryctl --profile trivy"
+  APP_PROFILES: "--profile portal --profile core --profile jobservice --profile registryctl"
 
 env:
   COMPOSE_PROJECT_NAME:   '{{.PROJECT_PREFIX}}'
@@ -47,8 +51,7 @@ tasks:
     internal: true
     status:
       - command -v {{.TOOL_NAME}}
-    cmds:
-      - go install {{.TOOL_PKG}}
+    cmd: go install {{.TOOL_PKG}}
 
   setup:
     desc: Install Go development tools (air, dlv, govulncheck)
@@ -88,20 +91,19 @@ tasks:
   info:
     desc: Print SLOT, port assignments, and service URLs
     silent: true
-    cmds:
-      - |
-        echo ""
-        echo "Harbor Dev Environment (SLOT={{.SLOT}})"
-        echo "================================"
-        echo "  Portal:       http://localhost:{{.PORT_PORTAL}}"
-        echo "  Core API:     http://localhost:{{.PORT_CORE}}/api/v2.0"
-        echo "  PostgreSQL:   localhost:{{.PORT_POSTGRES}}"
-        echo "  Redis:        localhost:{{.PORT_REDIS}}"
-        echo "  Registry:     localhost:{{.PORT_REGISTRY}}"
-        echo "  RegistryCtl:  localhost:{{.PORT_REGISTRYCTL}}"
-        echo "  Trivy:        localhost:{{.PORT_TRIVY}}"
-        echo "  Prefix:       {{.PROJECT_PREFIX}}"
-        echo ""
+    cmd: |
+      echo ""
+      echo "Harbor Dev Environment (SLOT={{.SLOT}})"
+      echo "================================"
+      echo "  Portal:       http://localhost:{{.PORT_PORTAL}}"
+      echo "  Core API:     http://localhost:{{.PORT_CORE}}/api/v2.0"
+      echo "  PostgreSQL:   localhost:{{.PORT_POSTGRES}}"
+      echo "  Redis:        localhost:{{.PORT_REDIS}}"
+      echo "  Registry:     localhost:{{.PORT_REGISTRY}}"
+      echo "  RegistryCtl:  localhost:{{.PORT_REGISTRYCTL}}"
+      echo "  Trivy:        localhost:{{.PORT_TRIVY}}"
+      echo "  Prefix:       {{.PROJECT_PREFIX}}"
+      echo ""
 
   # ---------------------------------------------------------------------------
   # Full Development Environment (Containerized)
@@ -117,15 +119,13 @@ tasks:
       - task: :build:gen-apis:frontend
       - defer: { task: dev:down, vars: { SKIP_TRIVY: "{{.SKIP_TRIVY}}" } }
       - task: info
-      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl {{.TRIVY_PROFILE}} up --build
+      - docker compose -f {{.COMPOSE_FILE}} {{.APP_PROFILES}} {{.TRIVY_PROFILE}} up --build
 
   down:
     desc: Stop and remove all dev environment containers
     vars:
       TRIVY_PROFILE: '{{if ne .SKIP_TRIVY "true"}}--profile trivy{{end}}'
-    cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl {{.TRIVY_PROFILE}} down
-      - echo "Dev environment stopped"
+    cmd: docker compose -f {{.COMPOSE_FILE}} {{.APP_PROFILES}} {{.TRIVY_PROFILE}} down
 
   # ---------------------------------------------------------------------------
   # Infrastructure (Docker Compose)
@@ -147,13 +147,11 @@ tasks:
 
   infra:down:
     desc: Stop PostgreSQL, Redis, and Registry containers
-    cmds:
-      - docker compose -f {{.COMPOSE_FILE}} down
+    cmd: docker compose -f {{.COMPOSE_FILE}} down
 
   infra:remove:
     desc: Stop all containers and delete all named volumes
-    cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy down -v
+    cmd: docker compose -f {{.COMPOSE_FILE}} {{.ALL_PROFILES}} down -v
 
   # ---------------------------------------------------------------------------
   # Backend Services (Containerized)
@@ -177,28 +175,15 @@ tasks:
 
   backend:logs:
     desc: Tail logs from Core, JobService, and RegistryCtl
-    cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice --profile registryctl logs -f
+    cmd: docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice --profile registryctl logs -f
 
-  backend:logs:core:
-    desc: Tail Core container logs
-    cmds:
-      - docker compose -f {{.COMPOSE_FILE}} logs -f core
-
-  backend:logs:jobservice:
-    desc: Tail JobService container logs
-    cmds:
-      - docker compose -f {{.COMPOSE_FILE}} logs -f jobservice
-
-  backend:logs:registryctl:
-    desc: Tail RegistryCtl container logs
-    cmds:
-      - docker compose -f {{.COMPOSE_FILE}} logs -f registryctl
+  backend:logs:*:
+    desc: "Tail logs for a specific backend service (core, jobservice, registryctl)"
+    cmd: docker compose -f {{.COMPOSE_FILE}} logs -f {{index .MATCH 0}}
 
   backend:restart:
     desc: Restart Core, JobService, and RegistryCtl containers
-    cmds:
-      - docker compose -f {{.COMPOSE_FILE}} restart core jobservice registryctl
+    cmd: docker compose -f {{.COMPOSE_FILE}} restart core jobservice registryctl
 
   # ---------------------------------------------------------------------------
   # Frontend (Native - alternative to containerized portal)
@@ -228,20 +213,17 @@ tasks:
   frontend:build:
     desc: Build Portal for production
     dir: src/portal
-    cmds:
-      - npm run build
+    cmd: npm run build
 
   frontend:test:
     desc: Run frontend tests in watch mode
     dir: src/portal
-    cmds:
-      - npm run test -- --watch
+    cmd: npm run test -- --watch
 
   frontend:test:once:
     desc: Run frontend tests once
     dir: src/portal
-    cmds:
-      - npm run test -- --watch=false
+    cmd: npm run test -- --watch=false
 
   # ---------------------------------------------------------------------------
   # Database Operations
@@ -249,24 +231,20 @@ tasks:
   db:migrate:
     desc: Run pending database migrations against local PostgreSQL
     dir: src
-    cmds:
-      - |
-        echo "Running migrations..."
-        POSTGRESQL_HOST=localhost \
-        POSTGRESQL_PORT={{.PORT_POSTGRES}} \
-        POSTGRESQL_USERNAME={{.POSTGRES_USER}} \
-        POSTGRESQL_PASSWORD=root123 \
-        POSTGRESQL_DATABASE={{.POSTGRES_DB}} \
-        POSTGRESQL_SSLMODE=disable \
-        POSTGRES_MIGRATION_SCRIPTS_PATH=../make/migrations/postgresql/ \
-        go run ./cmd/standalone-db-migrator/main.go
+    env:
+      POSTGRESQL_HOST: localhost
+      POSTGRESQL_PORT: '{{.PORT_POSTGRES}}'
+      POSTGRESQL_USERNAME: '{{.POSTGRES_USER}}'
+      POSTGRESQL_PASSWORD: root123
+      POSTGRESQL_DATABASE: '{{.POSTGRES_DB}}'
+      POSTGRESQL_SSLMODE: disable
+      POSTGRES_MIGRATION_SCRIPTS_PATH: ../make/migrations/postgresql/
+    cmd: go run ./cmd/standalone-db-migrator/main.go
 
   db:reset:
     desc: Drop database, recreate it, and apply all migrations from scratch
+    prompt: "This will delete all data in {{.POSTGRES_DB}}. Continue?"
     cmds:
-      - |
-        echo "WARNING: This will delete all data. Continue? (Ctrl+C to cancel)"
-        read -p "Press Enter to continue..."
       - docker compose -f {{.COMPOSE_FILE}} exec -T postgresql dropdb -U {{.POSTGRES_USER}} {{.POSTGRES_DB}} --if-exists
       - docker compose -f {{.COMPOSE_FILE}} exec -T postgresql createdb -U {{.POSTGRES_USER}} {{.POSTGRES_DB}}
       - task: db:migrate
@@ -274,8 +252,7 @@ tasks:
 
   db:shell:
     desc: Open interactive psql session on the dev database
-    cmds:
-      - docker compose -f {{.COMPOSE_FILE}} exec postgresql psql -U {{.POSTGRES_USER}} -d {{.POSTGRES_DB}}
+    cmd: docker compose -f {{.COMPOSE_FILE}} exec postgresql psql -U {{.POSTGRES_USER}} -d {{.POSTGRES_DB}}
 
   # ---------------------------------------------------------------------------
   # Utilities
@@ -283,20 +260,17 @@ tasks:
   clean:
     desc: Remove all containers, volumes, node_modules, and temp files
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy down -v
+      - docker compose -f {{.COMPOSE_FILE}} {{.ALL_PROFILES}} down -v
       - pkill -f "ng serve" || true
       - rm -rf tmp/
       - rm -rf src/portal/node_modules
       - rm -f build-errors.log
       - rm -f {{.TOKEN_KEY_FILE}}
-      - echo "Clean complete"
 
   status:
     desc: Show container status for all services
-    cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy ps
+    cmd: docker compose -f {{.COMPOSE_FILE}} {{.ALL_PROFILES}} ps
 
   logs:
     desc: Tail logs from all containers
-    cmds:
-      - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy logs -f
+    cmd: docker compose -f {{.COMPOSE_FILE}} {{.ALL_PROFILES}} logs -f

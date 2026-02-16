@@ -17,10 +17,8 @@ includes:
     internal: true
 
 vars:
-  IS_CI:
-    sh: '[ -n "${CI:-}${GITHUB_ACTIONS:-}${GITLAB_CI:-}${JENKINS_URL:-}" ] && echo "true" || echo "false"'
   PUSH: '{{.PUSH | default "true"}}'
-  PLATFORMS: '{{.PLATFORMS | default (ternary (printf "linux/%s" ARCH) (ternary .IMAGE_PLATFORMS (printf "linux/%s" ARCH) (eq .IS_CI "true")) (eq .PUSH "false"))}}'
+  PLATFORMS: '{{.PLATFORMS | default (ternary (printf "linux/%s" ARCH) .CI_PLATFORMS (eq .PUSH "false"))}}'
 
 tasks:
   all-images:

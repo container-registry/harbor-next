@@ -6,6 +6,7 @@ version: '3'
 includes:
   build:
     taskfile: ./build.yml
+    dir: ..
     internal: true
 
 tasks:
@@ -13,74 +14,58 @@ tasks:
   # Linting Tasks
   # ============================================================================
 
+  _golangci-lint:
+    internal: true
+    deps: [build:gen-apis]
+    cmd: >-
+      docker run --rm
+      -v $(pwd):/harbor -w /harbor/src
+      golangci/golangci-lint:{{.GOLANGCILINT_VERSION}}-alpine
+      golangci-lint -v run --timeout=10m {{.LINT_ARGS}}
+
   lint:
     desc: "Lint Go code with golangci-lint in Docker"
     cmds:
-      - task build:gen-apis
-      - |
-        echo "🔍 Running golangci-lint..."
-        docker run --rm \
-          -v $(pwd):/harbor \
-          -w /harbor/src \
-          golangci/golangci-lint:{{.GOLANGCILINT_VERSION}}-alpine \
-          golangci-lint -v run --timeout=10m
+      - task: _golangci-lint
 
   lint:report:
     desc: "Lint Go code and write report to golangci-lint.report"
     cmds:
-      - task build:gen-apis
-      - |
-        echo "📊 Generating lint report..."
-        docker run --rm \
-          -v $(pwd):/harbor \
-          -w /harbor/src \
-          golangci/golangci-lint:{{.GOLANGCILINT_VERSION}}-alpine \
-          golangci-lint -v run --timeout=10m \
-          --out-format github-actions \
-          --issues-exit-code 0 > golangci-lint.report
-        echo "✅ Report saved to: golangci-lint.report"
+      - task: _golangci-lint
+        vars: { LINT_ARGS: "--output.json.path golangci-lint.report --issues-exit-code 0" }
 
   lint:api:
     desc: "Lint swagger.yaml with Spectral in Docker"
     sources:
       - "api/v2.0/swagger.yaml"
-    cmds:
-      - |
-        echo "🔍 Linting OpenAPI spec..."
-        docker run --rm \
-          -v $(pwd):/src \
-          -w /src \
-          stoplight/spectral:{{.SPECTRAL_VERSION}} \
-          lint ./api/v2.0/swagger.yaml
+    cmd: >-
+      docker run --rm
+      -v $(pwd):/src -w /src
+      stoplight/spectral:{{.SPECTRAL_VERSION}}
+      lint ./api/v2.0/swagger.yaml
 
   # ============================================================================
   # Vulnerability Scanning
   # ============================================================================
 
+  _require-govulncheck:
+    internal: true
+    run: once
+    status:
+      - command -v govulncheck
+    cmd: go install golang.org/x/vuln/cmd/govulncheck@latest
+
   vuln-check:
     desc: "Scan Go dependencies for known vulnerabilities"
-    cmds:
-      - |
-        if ! command -v govulncheck &> /dev/null; then
-          echo "Installing govulncheck..."
-          go install golang.org/x/vuln/cmd/govulncheck@latest
-        fi
-      - |
-        echo "🔒 Running govulncheck..."
-        cd src && govulncheck -show verbose ./...
+    deps: [_require-govulncheck]
+    dir: src
+    cmd: govulncheck -show verbose ./...
 
   vuln-report:
     desc: "Scan Go dependencies and write SARIF report to govulncheck.sarif"
-    cmds:
-      - |
-        if ! command -v govulncheck &> /dev/null; then
-          echo "Installing govulncheck..."
-          go install golang.org/x/vuln/cmd/govulncheck@latest
-        fi
-      - |
-        echo "📊 Generating vulnerability report..."
-        cd src && govulncheck -format sarif ./... > ../govulncheck.sarif
-        echo "✅ SARIF report saved to: govulncheck.sarif"
+    deps: [_require-govulncheck]
+    dir: src
+    cmd: govulncheck -format sarif ./... > ../govulncheck.sarif
 
   # ============================================================================
   # Unit Tests
@@ -88,31 +73,23 @@ tasks:
 
   unit:
     desc: "Run Go unit tests with race detection"
-    cmds:
-      - |
-        echo "🧪 Running unit tests..."
-        cd src && go test -v -race -cover ./...
+    dir: src
+    cmd: go test -v -race -cover ./...
 
   unit:coverage:
     desc: "Run Go unit tests and generate HTML coverage report"
+    dir: src
     cmds:
-      - |
-        echo "🧪 Running unit tests with coverage..."
-        cd src && go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
-        go tool cover -html=coverage.out -o coverage.html
-        echo "✅ Coverage report: src/coverage.html"
+      - go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+      - go tool cover -html=coverage.out -o coverage.html
 
   unit:watch:
     desc: "Re-run Go unit tests on file changes (requires watchexec)"
-    cmds:
-      - |
-        if ! command -v watchexec &> /dev/null; then
-          echo "❌ watchexec not found. Install with: brew install watchexec"
-          exit 1
-        fi
-      - |
-        echo "🧪 Running tests in watch mode..."
-        cd src && watchexec -e go -r -- go test -v ./...
+    preconditions:
+      - sh: command -v watchexec
+        msg: "watchexec not found. Install: brew install watchexec"
+    dir: src
+    cmd: watchexec -e go -r -- go test -v ./...
 
   # ============================================================================
   # Integration Tests
@@ -120,10 +97,7 @@ tasks:
 
   integration:
     desc: "Run API integration tests (requires running dev environment)"
-    cmds:
-      - |
-        echo "🧪 Running integration tests..."
-        ./tests/ci/api_run.sh
+    cmd: ./tests/ci/api_run.sh
 
   # ============================================================================
   # Mock Validation
@@ -133,27 +107,25 @@ tasks:
     desc: "Verify generated mock files match committed versions"
     cmds:
       - |
-        echo "Checking mocks..."
         res=$(git status -s src/ | awk '{ printf("%s\n", $2) }' | grep -E '.*.go' || true)
         if [ -n "$res" ]; then
-          echo "❌ Mock files are out of date:"
+          echo "Mock files are out of date:"
           echo "$res"
           exit 1
         fi
-        echo "✅ All mock files are up to date"
+
+  _require-mockery:
+    internal: true
+    run: once
+    status:
+      - command -v mockery
+    cmd: go install github.com/vektra/mockery/v2@latest
 
   generate-mocks:
     desc: "Regenerate all mock files with mockery"
-    cmds:
-      - |
-        if ! command -v mockery &> /dev/null; then
-          echo "Installing mockery..."
-          go install github.com/vektra/mockery/v2@latest
-        fi
-      - |
-        echo "🔧 Generating mocks..."
-        cd src && mockery --all --dir . --output ./testing/mocks
-      - echo "✅ Mocks generated"
+    deps: [_require-mockery]
+    dir: src
+    cmd: mockery --all --dir . --output ./testing/mocks
 
   # ============================================================================
   # Frontend Tests
@@ -162,20 +134,17 @@ tasks:
   frontend:test:
     desc: "Run frontend tests once"
     dir: src/portal
-    cmds:
-      - npm run test -- --watch=false
+    cmd: npm run test -- --watch=false
 
   frontend:test:watch:
     desc: "Run frontend tests in watch mode"
     dir: src/portal
-    cmds:
-      - npm run test -- --watch
+    cmd: npm run test -- --watch
 
   frontend:lint:
     desc: "Lint frontend TypeScript code"
     dir: src/portal
-    cmds:
-      - npm run lint
+    cmd: npm run lint
 
   # ============================================================================
   # Aggregate Test Tasks
@@ -188,7 +157,6 @@ tasks:
       - task: lint
       - task: vuln-check
       - task: unit
-      - echo "✅ All tests passed!"
 
   ci:
     desc: "Run full CI pipeline with reports (lint, vuln scan, unit tests)"
@@ -197,14 +165,12 @@ tasks:
       - task: lint:report
       - task: vuln-report
       - task: unit:coverage
-      - echo "✅ CI checks complete"
 
   quick:
     desc: "Run API lint and unit tests only (fast validation)"
     cmds:
       - task: lint:api
       - task: unit
-      - echo "✅ Quick validation passed"
 
   # ============================================================================
   # Utilities
@@ -216,4 +182,3 @@ tasks:
       - rm -f golangci-lint.report
       - rm -f govulncheck.sarif
       - rm -f src/coverage.out src/coverage.html
-      - echo "✅ Test artifacts cleaned"

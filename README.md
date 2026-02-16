@@ -105,15 +105,17 @@ task
 ```bash
 task                     # Start full dev environment (foreground)
 task setup               # Install development tools (air, dlv, govulncheck)
-task build               # Build all binaries
+task build               # Build all binaries (alias: task b:all-binaries)
 task images              # Build all Docker images
-task test                # Run all tests
+task test                # Run all tests (alias: task t:all)
 task test:lint           # Run linters
 task test:unit           # Run unit tests only
 task clean               # Clean build artifacts
 task info                # Show build info and tool versions
 task -l                  # List all available tasks
 ```
+
+Namespace aliases: `b:` (build), `t:` (test), `img:` (image), `d:` (dev).
 
 See [devenv/README.md](devenv/README.md) for detailed development environment commands.
 
