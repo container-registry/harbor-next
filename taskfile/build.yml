@@ -173,9 +173,9 @@ tasks:
     method: checksum
     dir: src/portal
     cmds:
-      - node scripts/convert-yaml-to-json.js
+      - bun scripts/convert-yaml-to-json.js
       - ./node_modules/.bin/ng-swagger-gen -i ng-swagger-gen/swagger.json -o ng-swagger-gen
-      - node scripts/delete-swagger-json.js
+      - bun scripts/delete-swagger-json.js
 
   # --- Utilities ---
 
