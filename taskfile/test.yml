@@ -32,7 +32,7 @@ tasks:
     desc: "Lint Go code and write report to golangci-lint.report"
     cmds:
       - task: _golangci-lint
-        vars: { LINT_ARGS: "--output.json.path golangci-lint.report --issues-exit-code 0" }
+        vars: { LINT_ARGS: "--output.json.path /harbor/golangci-lint.report --issues-exit-code 0" }
 
   lint:api:
     desc: "Lint swagger.yaml with Spectral in Docker"
