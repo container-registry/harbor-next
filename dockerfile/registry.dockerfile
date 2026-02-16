@@ -1,9 +1,9 @@
 # Dockerfile for Harbor Registry (Docker Distribution)
 # https://github.com/distribution/distribution
 
-# Versions from Taskfile.yml
 ARG GO_VERSION
 ARG DISTRIBUTION_VERSION
+ARG ALPINE_VERSION
 ARG LPROBE_VERSION
 
 FROM golang:${GO_VERSION}-alpine AS builder
@@ -26,11 +26,12 @@ RUN apk add --no-cache git && \
     /go/bin/registry --version
 
 # Final stage
+FROM alpine:${ALPINE_VERSION} AS certs
 FROM ghcr.io/fivexl/lprobe:${LPROBE_VERSION} AS lprobe
 
 FROM scratch
 
-COPY --from=alpine:latest /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=lprobe /lprobe /lprobe
 COPY --from=builder /go/bin/registry /usr/bin/registry_DO_NOT_USE_GC
 

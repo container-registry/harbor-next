@@ -44,7 +44,7 @@ These services include build stages:
 
 - **`portal.dockerfile`** - Angular frontend (Node.js + Bun build → Nginx:alpine)
   - Builds Angular app with Swagger UI
-  - Final stage: nginx:alpine
+  - Final stage: nginx:${NGINX_VERSION}-alpine
   - Includes CA certificates
 
 - **`registry.dockerfile`** - Docker Distribution registry (golang:alpine build → scratch)
@@ -58,8 +58,8 @@ These services include build stages:
   - Downloads trivy binary (version from `TRIVY_VERSION`)
   - Final stage: aquasec/trivy base image (version from `TRIVY_BASE_IMAGE_VERSION`)
 
-- **`nginx.dockerfile`** - Nginx reverse proxy (nginx:alpine)
-  - Minimal nginx:alpine with CA certs
+- **`nginx.dockerfile`** - Nginx reverse proxy (nginx:${NGINX_VERSION}-alpine)
+  - Minimal nginx:${NGINX_VERSION}-alpine with CA certs
   - No custom config in image (config provided at runtime)
 
 **Build Command Example:**
@@ -102,10 +102,10 @@ dockerfile/
 ├── jobservice.dockerfile        # Job service (scratch base)
 ├── registryctl.dockerfile       # Registry controller (scratch base)
 ├── exporter.dockerfile          # Metrics exporter (scratch base)
-├── portal.dockerfile            # Angular frontend (nginx:alpine)
+├── portal.dockerfile            # Angular frontend (nginx:${NGINX_VERSION}-alpine)
 ├── registry.dockerfile          # Docker registry (scratch base)
 ├── trivy-adapter.dockerfile     # Trivy scanner (aquasec/trivy base)
-└── nginx.dockerfile             # Nginx proxy (nginx:alpine)
+└── nginx.dockerfile             # Nginx proxy (nginx:${NGINX_VERSION}-alpine)
 ```
 
 ## Usage with Taskfile
@@ -150,10 +150,10 @@ These Dockerfiles **do not use** the legacy Dockerfiles in `make/photon/`. Key d
 | jobservice | scratch | Minimal | CA certs + binary |
 | registryctl | scratch | Minimal | CA certs + binary |
 | exporter | scratch | Minimal | CA certs + binary |
-| portal | nginx:alpine | ~50MB | Includes built Angular app |
+| portal | nginx:${NGINX_VERSION}-alpine | ~50MB | Includes built Angular app |
 | registry | scratch | Minimal | CA certs + registry binary |
 | trivy-adapter | aquasec/trivy (TRIVY_BASE_IMAGE_VERSION) | ~400MB | Includes trivy scanner |
-| nginx | nginx:alpine | ~45MB | Minimal reverse proxy |
+| nginx | nginx:${NGINX_VERSION}-alpine | ~45MB | Minimal reverse proxy |
 
 ## Notes
 

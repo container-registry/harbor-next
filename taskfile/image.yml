@@ -73,6 +73,7 @@ tasks:
       --builder {{.IMAGE_BUILDER}}
       --platform {{.PLATFORMS}}
       --build-arg LPROBE_VERSION={{.LPROBE_VERSION}}
+      --build-arg ALPINE_VERSION={{.ALPINE_VERSION}}
       {{.BUILD_ARGS}}
       -t {{.TAG_PREFIX}}{{.IMAGE_NAME}}:{{.VERSION}}
       -f dockerfile/{{.DOCKERFILE}}
@@ -139,7 +140,7 @@ tasks:
         vars:
           IMAGE_NAME: harbor-portal
           DOCKERFILE: portal.dockerfile
-          BUILD_ARGS: '--build-arg BUN_VERSION={{.BUN_VERSION}}'
+          BUILD_ARGS: '--build-arg BUN_VERSION={{.BUN_VERSION}} --build-arg NGINX_VERSION={{.NGINX_VERSION}}'
 
   registry:
     desc: "Build Distribution Registry image"
@@ -166,6 +167,7 @@ tasks:
         vars:
           IMAGE_NAME: harbor-nginx
           DOCKERFILE: nginx.dockerfile
+          BUILD_ARGS: '--build-arg NGINX_VERSION={{.NGINX_VERSION}}'
 
   # --- Utilities ---
 

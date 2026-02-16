@@ -41,6 +41,8 @@ services:
       dockerfile: dockerfile/dev.core.dockerfile
       args:
         GO_VERSION: ${GO_VERSION}
+        AIR_VERSION: ${AIR_VERSION}
+        DELVE_VERSION: ${DELVE_VERSION}
     profiles: [core]
     volumes:
       - ..:/app
@@ -100,6 +102,8 @@ services:
       dockerfile: dockerfile/dev.core.dockerfile
       args:
         GO_VERSION: ${GO_VERSION}
+        AIR_VERSION: ${AIR_VERSION}
+        DELVE_VERSION: ${DELVE_VERSION}
     profiles: [jobservice]
     volumes:
       - ..:/app
@@ -140,6 +144,8 @@ services:
       dockerfile: dockerfile/dev.core.dockerfile
       args:
         GO_VERSION: ${GO_VERSION}
+        AIR_VERSION: ${AIR_VERSION}
+        DELVE_VERSION: ${DELVE_VERSION}
     profiles: [registryctl]
     volumes:
       - ..:/app
