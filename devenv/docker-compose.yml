@@ -209,6 +209,7 @@ services:
       - ../src/portal/tsconfig.app.json:/app/tsconfig.app.json:ro
       - ./proxy.config.mjs:/app/proxy.config.mjs:ro
       - ../api/v2.0/swagger.yaml:/swagger.yaml:ro
+      - portal-angular-cache:/app/.angular
     ports:
       - "${PORT_PORTAL:-4200}:4200"
     environment:
@@ -227,3 +228,5 @@ volumes:
     name: ${PROJECT_PREFIX:-harbor}-go-mod-cache
   go-build-cache:
     name: ${PROJECT_PREFIX:-harbor}-go-build-cache
+  portal-angular-cache:
+    name: ${PROJECT_PREFIX:-harbor}-portal-angular-cache
