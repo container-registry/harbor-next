@@ -221,9 +221,9 @@ tasks:
         msg: "bun is required for native frontend dev. Install: https://bun.sh"
     sources:
       - package.json
-      - package-lock.json
+      - bun.lock
     generates:
-      - node_modules/.package-lock.json
+      - node_modules/.bun-integrity
     cmd: bun install --ignore-scripts
 
   frontend:native:
