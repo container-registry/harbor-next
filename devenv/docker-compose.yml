@@ -207,8 +207,8 @@ services:
       - ../src/portal/angular.json:/app/angular.json:ro
       - ../src/portal/tsconfig.json:/app/tsconfig.json:ro
       - ../src/portal/tsconfig.app.json:/app/tsconfig.app.json:ro
-      - ./proxy.config.mjs:/app/proxy.config.mjs:ro
-      - ../api/v2.0/swagger.yaml:/swagger.yaml:ro
+      - ../src/portal/proxy.config.mjs:/app/proxy.config.mjs:ro
+      - ../src/portal/ng-swagger-gen:/app/ng-swagger-gen:ro
       - portal-angular-cache:/app/.angular
     ports:
       - "${PORT_PORTAL:-4200}:4200"

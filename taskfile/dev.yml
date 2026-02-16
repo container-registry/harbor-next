@@ -123,6 +123,8 @@ tasks:
       TRIVY_PROFILE: '{{if ne .SKIP_TRIVY "true"}}--profile trivy{{end}}'
     cmds:
       - task: :build:gen-apis
+      - task: frontend:install
+      - task: :build:gen-apis:frontend
       - defer: { task: dev:down, vars: { SKIP_TRIVY: "{{.SKIP_TRIVY}}" } }
       - task: info
       - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl {{.TRIVY_PROFILE}} up --build
@@ -219,6 +221,8 @@ tasks:
     sources:
       - package.json
       - package-lock.json
+    generates:
+      - node_modules/.package-lock.json
     cmd: bun install --ignore-scripts
 
   frontend:native:

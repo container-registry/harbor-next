@@ -182,14 +182,13 @@ tasks:
       - src/portal/scripts/convert-yaml-to-json.js
       - src/portal/scripts/delete-swagger-json.js
     generates:
-      - src/portal/ng-swagger-gen/swagger.json
       - src/portal/ng-swagger-gen/models.ts
       - src/portal/ng-swagger-gen/**/*.ts
     method: checksum
     dir: src/portal
     cmds:
       - node scripts/convert-yaml-to-json.js
-      - npx ng-swagger-gen -i ng-swagger-gen/swagger.json -o ng-swagger-gen
+      - ./node_modules/.bin/ng-swagger-gen -i ng-swagger-gen/swagger.json -o ng-swagger-gen
       - node scripts/delete-swagger-json.js
 
   # --- Utilities ---
