@@ -14,7 +14,7 @@ tasks:
   # ============================================================================
 
   lint:
-    desc: "Run Go linters (golangci-lint)"
+    desc: "Lint Go code with golangci-lint in Docker"
     cmds:
       - task build:gen-apis
       - |
@@ -26,7 +26,7 @@ tasks:
           golangci-lint -v run --timeout=10m
 
   lint:report:
-    desc: "Generate lint report for CI"
+    desc: "Lint Go code and write report to golangci-lint.report"
     cmds:
       - task build:gen-apis
       - |
@@ -41,7 +41,7 @@ tasks:
         echo "✅ Report saved to: golangci-lint.report"
 
   lint:api:
-    desc: "Lint OpenAPI spec with Spectral"
+    desc: "Lint swagger.yaml with Spectral in Docker"
     sources:
       - "api/v2.0/swagger.yaml"
     cmds:
@@ -58,7 +58,7 @@ tasks:
   # ============================================================================
 
   vuln-check:
-    desc: "Check for Go vulnerabilities (govulncheck)"
+    desc: "Scan Go dependencies for known vulnerabilities"
     cmds:
       - |
         if ! command -v govulncheck &> /dev/null; then
@@ -70,7 +70,7 @@ tasks:
         cd src && govulncheck -show verbose ./...
 
   vuln-report:
-    desc: "Generate vulnerability report in SARIF format"
+    desc: "Scan Go dependencies and write SARIF report to govulncheck.sarif"
     cmds:
       - |
         if ! command -v govulncheck &> /dev/null; then
@@ -87,14 +87,14 @@ tasks:
   # ============================================================================
 
   unit:
-    desc: "Run Go unit tests"
+    desc: "Run Go unit tests with race detection"
     cmds:
       - |
         echo "🧪 Running unit tests..."
         cd src && go test -v -race -cover ./...
 
   unit:coverage:
-    desc: "Run unit tests with coverage report"
+    desc: "Run Go unit tests and generate HTML coverage report"
     cmds:
       - |
         echo "🧪 Running unit tests with coverage..."
@@ -103,7 +103,7 @@ tasks:
         echo "✅ Coverage report: src/coverage.html"
 
   unit:watch:
-    desc: "Run unit tests in watch mode"
+    desc: "Re-run Go unit tests on file changes (requires watchexec)"
     cmds:
       - |
         if ! command -v watchexec &> /dev/null; then
@@ -119,7 +119,7 @@ tasks:
   # ============================================================================
 
   integration:
-    desc: "Run integration tests"
+    desc: "Run API integration tests (requires running dev environment)"
     cmds:
       - |
         echo "🧪 Running integration tests..."
@@ -130,7 +130,7 @@ tasks:
   # ============================================================================
 
   check-mocks:
-    desc: "Verify mock files are up to date"
+    desc: "Verify generated mock files match committed versions"
     cmds:
       - |
         echo "Checking mocks..."
@@ -143,7 +143,7 @@ tasks:
         echo "✅ All mock files are up to date"
 
   generate-mocks:
-    desc: "Generate mock files"
+    desc: "Regenerate all mock files with mockery"
     cmds:
       - |
         if ! command -v mockery &> /dev/null; then
@@ -172,7 +172,7 @@ tasks:
       - npm run test -- --watch
 
   frontend:lint:
-    desc: "Lint frontend code"
+    desc: "Lint frontend TypeScript code"
     dir: src/portal
     cmds:
       - npm run lint
@@ -182,7 +182,7 @@ tasks:
   # ============================================================================
 
   all:
-    desc: "Run all tests and checks"
+    desc: "Run all linters, vulnerability scan, and unit tests"
     cmds:
       - task: lint:api
       - task: lint
@@ -191,7 +191,7 @@ tasks:
       - echo "✅ All tests passed!"
 
   ci:
-    desc: "Run CI checks (for GitHub Actions)"
+    desc: "Run full CI pipeline with reports (lint, vuln scan, unit tests)"
     cmds:
       - task: lint:api
       - task: lint:report
@@ -200,7 +200,7 @@ tasks:
       - echo "✅ CI checks complete"
 
   quick:
-    desc: "Quick validation (fast checks only)"
+    desc: "Run API lint and unit tests only (fast validation)"
     cmds:
       - task: lint:api
       - task: unit
@@ -211,7 +211,7 @@ tasks:
   # ============================================================================
 
   clean:
-    desc: "Clean test artifacts"
+    desc: "Remove lint reports, SARIF files, and coverage output"
     cmds:
       - rm -f golangci-lint.report
       - rm -f govulncheck.sarif

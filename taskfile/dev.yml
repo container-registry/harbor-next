@@ -51,7 +51,7 @@ tasks:
       - go install {{.TOOL_PKG}}
 
   setup:
-    desc: Install required Go development tools (for native development)
+    desc: Install Go development tools (air, dlv, govulncheck)
     cmds:
       - for:
           - { name: air, pkg: 'github.com/air-verse/air@latest' }
@@ -86,7 +86,7 @@ tasks:
   # Info
   # ---------------------------------------------------------------------------
   info:
-    desc: Show current SLOT and port assignments
+    desc: Print SLOT, port assignments, and service URLs
     silent: true
     cmds:
       - |
@@ -107,7 +107,7 @@ tasks:
   # Full Development Environment (Containerized)
   # ---------------------------------------------------------------------------
   up:
-    desc: "Start full dev environment. Use SKIP_TRIVY=true to exclude Trivy."
+    desc: "Start all services with hot reload in foreground (SKIP_TRIVY=true to exclude Trivy)"
     deps: [require-docker, gen:private-key]
     vars:
       TRIVY_PROFILE: '{{if ne .SKIP_TRIVY "true"}}--profile trivy{{end}}'
@@ -120,7 +120,7 @@ tasks:
       - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl {{.TRIVY_PROFILE}} up --build
 
   down:
-    desc: Stop all dev environment services
+    desc: Stop and remove all dev environment containers
     vars:
       TRIVY_PROFILE: '{{if ne .SKIP_TRIVY "true"}}--profile trivy{{end}}'
     cmds:
@@ -131,7 +131,7 @@ tasks:
   # Infrastructure (Docker Compose)
   # ---------------------------------------------------------------------------
   infra:up:
-    desc: Start infrastructure only (PostgreSQL, Redis, Registry)
+    desc: Start PostgreSQL, Redis, and Registry (waits for DB readiness)
     deps: [require-docker]
     cmds:
       - docker compose -f {{.COMPOSE_FILE}} up -d
@@ -146,12 +146,12 @@ tasks:
       - docker compose -f {{.COMPOSE_FILE}} ps
 
   infra:down:
-    desc: Stop infrastructure services
+    desc: Stop PostgreSQL, Redis, and Registry containers
     cmds:
       - docker compose -f {{.COMPOSE_FILE}} down
 
   infra:remove:
-    desc: Remove infrastructure and all volumes
+    desc: Stop all containers and delete all named volumes
     cmds:
       - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy down -v
 
@@ -159,7 +159,7 @@ tasks:
   # Backend Services (Containerized)
   # ---------------------------------------------------------------------------
   backend:up:
-    desc: Start Core + JobService + RegistryCtl containers with hot reload
+    desc: Build and start Core, JobService, RegistryCtl with hot reload
     deps: [require-docker, gen:private-key]
     cmds:
       - task: :build:gen-apis
@@ -170,33 +170,33 @@ tasks:
         echo ""
 
   backend:down:
-    desc: Stop Core + JobService + RegistryCtl containers
+    desc: Stop and remove Core, JobService, RegistryCtl (keeps infra running)
     cmds:
       - docker compose -f {{.COMPOSE_FILE}} stop core jobservice registryctl
       - docker compose -f {{.COMPOSE_FILE}} rm -f core jobservice registryctl
 
   backend:logs:
-    desc: View backend container logs
+    desc: Tail logs from Core, JobService, and RegistryCtl
     cmds:
       - docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice --profile registryctl logs -f
 
   backend:logs:core:
-    desc: View Core container logs
+    desc: Tail Core container logs
     cmds:
       - docker compose -f {{.COMPOSE_FILE}} logs -f core
 
   backend:logs:jobservice:
-    desc: View JobService container logs
+    desc: Tail JobService container logs
     cmds:
       - docker compose -f {{.COMPOSE_FILE}} logs -f jobservice
 
   backend:logs:registryctl:
-    desc: View RegistryCtl container logs
+    desc: Tail RegistryCtl container logs
     cmds:
       - docker compose -f {{.COMPOSE_FILE}} logs -f registryctl
 
   backend:restart:
-    desc: Restart backend containers
+    desc: Restart Core, JobService, and RegistryCtl containers
     cmds:
       - docker compose -f {{.COMPOSE_FILE}} restart core jobservice registryctl
 
@@ -217,7 +217,7 @@ tasks:
     cmd: bun install --ignore-scripts
 
   frontend:native:
-    desc: Start Portal natively (alternative to --profile portal)
+    desc: Serve Portal with ng serve on host (alternative to containerized portal)
     silent: true
     dir: src/portal
     deps: [frontend:install]
@@ -226,7 +226,7 @@ tasks:
       - exec ./node_modules/.bin/ng serve --host 0.0.0.0 --hmr --disable-host-check
 
   frontend:build:
-    desc: Build frontend for production
+    desc: Build Portal for production
     dir: src/portal
     cmds:
       - npm run build
@@ -247,7 +247,7 @@ tasks:
   # Database Operations
   # ---------------------------------------------------------------------------
   db:migrate:
-    desc: Run incremental database migrations via golang-migrate
+    desc: Run pending database migrations against local PostgreSQL
     dir: src
     cmds:
       - |
@@ -262,7 +262,7 @@ tasks:
         go run ./cmd/standalone-db-migrator/main.go
 
   db:init-schema:
-    desc: Apply all migration SQL files from scratch (use after db:reset)
+    desc: Apply all migration SQL files from scratch (used by db:reset)
     cmds:
       - |
         echo "Applying all migrations from scratch..."
@@ -275,7 +275,7 @@ tasks:
       - echo "Schema init complete"
 
   db:reset:
-    desc: Reset database to clean state
+    desc: Drop database, recreate it, and apply all migrations from scratch
     cmds:
       - |
         echo "WARNING: This will delete all data. Continue? (Ctrl+C to cancel)"
@@ -286,7 +286,7 @@ tasks:
       - echo "Database reset complete"
 
   db:shell:
-    desc: Open PostgreSQL shell
+    desc: Open interactive psql session on the dev database
     cmds:
       - docker compose -f {{.COMPOSE_FILE}} exec postgresql psql -U {{.POSTGRES_USER}} -d {{.POSTGRES_DB}}
 
@@ -294,7 +294,7 @@ tasks:
   # Utilities
   # ---------------------------------------------------------------------------
   clean:
-    desc: Clean temporary files and all containers/volumes
+    desc: Remove all containers, volumes, node_modules, and temp files
     cmds:
       - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy down -v
       - pkill -f "ng serve" || true
@@ -305,11 +305,11 @@ tasks:
       - echo "Clean complete"
 
   status:
-    desc: Show status of all development services
+    desc: Show container status for all services
     cmds:
       - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy ps
 
   logs:
-    desc: View all container logs
+    desc: Tail logs from all containers
     cmds:
       - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy logs -f

@@ -36,7 +36,7 @@ includes:
 
 tasks:
   default:
-    desc: "Start full development environment (foreground, auto-cleanup on exit)"
+    desc: "Start all services with hot reload (foreground, stops on exit)"
     cmds:
       - task: dev:up
 
@@ -51,12 +51,12 @@ tasks:
       - task: test:all
 
   images:
-    desc: "Build all Docker images (use PUSH=false PLATFORMS=linux/arm64 for local)"
+    desc: "Build all container images (PUSH=false for local, PLATFORMS=linux/arm64 for single arch)"
     cmds:
       - task: image:all-images
 
   clean:
-    desc: "Clean all build artifacts"
+    desc: "Remove all build artifacts, images, test output, and dev environment"
     cmds:
       - task: build:clean
       - task: image:clean
@@ -65,7 +65,7 @@ tasks:
       - echo "✅ All artifacts cleaned"
 
   info:
-    desc: "Show build information and global variables"
+    desc: "Print version, tool versions, and build configuration"
     silent: true
     cmds:
       - |
@@ -101,7 +101,7 @@ tasks:
         echo ""
 
   setup:
-    desc: "Setup development environment"
+    desc: "Install Go development tools (air, dlv, govulncheck)"
     cmds:
       - task: dev:setup
 

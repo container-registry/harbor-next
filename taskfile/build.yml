@@ -16,7 +16,7 @@ vars:
 
 tasks:
   all-binaries:
-    desc: "Build all Harbor binaries (CI-aware)"
+    desc: "Build all Go binaries for detected platform (CI builds all platforms)"
     cmds:
       - for: { var: PLATFORMS, split: ',' }
         task: _build-platform
@@ -60,7 +60,7 @@ tasks:
   # --- Binary Tasks ---
 
   binary:core:*:
-    desc: "Build Harbor core binary (use DEBUG=true for debug symbols)"
+    desc: "Build core binary (DEBUG=true to include debug symbols)"
     sources:
       - src/core/**/*.go
       - src/common/**/*.go
@@ -81,7 +81,7 @@ tasks:
           OUTPUT_NAME: core
 
   binary:jobservice:*:
-    desc: "Build Harbor jobservice binary"
+    desc: "Build jobservice binary"
     sources:
       - src/jobservice/**/*.go
       - src/pkg/**/*.go
@@ -98,7 +98,7 @@ tasks:
           OUTPUT_NAME: jobservice
 
   binary:registryctl:*:
-    desc: "Build Harbor registryctl binary"
+    desc: "Build registryctl binary"
     sources:
       - src/registryctl/**/*.go
       - src/pkg/**/*.go
@@ -115,7 +115,7 @@ tasks:
           OUTPUT_NAME: registryctl
 
   binary:exporter:*:
-    desc: "Build Harbor exporter binary"
+    desc: "Build harbor-exporter binary"
     sources:
       - src/cmd/exporter/**/*.go
       - src/pkg/**/*.go
@@ -141,7 +141,7 @@ tasks:
     cmd: go install github.com/go-swagger/go-swagger/cmd/swagger@{{.SWAGGER_VERSION}}
 
   gen-apis:
-    desc: "Generate API server code from OpenAPI spec"
+    desc: "Generate Go server code from swagger.yaml"
     run: once
     deps: [require-swagger]
     sources:
@@ -164,7 +164,7 @@ tasks:
         --target ./src/server/v2.0
 
   gen-apis:frontend:
-    desc: "Generate frontend API code from OpenAPI spec"
+    desc: "Generate TypeScript API client from swagger.yaml"
     sources:
       - api/v2.0/swagger.yaml
       - src/portal/scripts/convert-yaml-to-json.js
@@ -182,14 +182,14 @@ tasks:
   # --- Utilities ---
 
   clean:
-    desc: "Clean all built binaries and generated API code"
+    desc: "Remove binaries and generated API code (Go and TypeScript)"
     cmds:
       - rm -rf bin/ src/server/v2.0/models/ src/server/v2.0/restapi/
       - rm -rf src/portal/ng-swagger-gen/models/ src/portal/ng-swagger-gen/services/
       - rm -f src/portal/ng-swagger-gen/*.ts
 
   verify:
-    desc: "Verify all binaries are executable"
+    desc: "Check that all built binaries are valid executables"
     preconditions:
       - sh: test -d bin
         msg: "No binaries found. Run 'task build:all-binaries' first."

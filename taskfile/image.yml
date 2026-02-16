@@ -24,7 +24,7 @@ vars:
 
 tasks:
   all-images:
-    desc: "Build all Harbor Docker images"
+    desc: "Build all container images"
     deps:
       - core
       - jobservice
@@ -47,7 +47,7 @@ tasks:
       - docker buildx use {{.IMAGE_BUILDER}}
 
   buildx:remove:
-    desc: "Remove the multi-arch buildx builder"
+    desc: "Remove the harbor-multiarch buildx builder instance"
     cmd: docker buildx rm {{.IMAGE_BUILDER}} 2>/dev/null || true
 
   buildx:list:
@@ -103,28 +103,28 @@ tasks:
   # --- Go Services (require pre-built binaries) ---
 
   core:
-    desc: "Build Harbor Core image"
+    desc: "Build Core image (compiles binary, then builds container)"
     cmds:
       - task: _binary-image
         vars:
           SERVICE: core
 
   jobservice:
-    desc: "Build Harbor Jobservice image"
+    desc: "Build JobService image (compiles binary, then builds container)"
     cmds:
       - task: _binary-image
         vars:
           SERVICE: jobservice
 
   registryctl:
-    desc: "Build Harbor Registryctl image"
+    desc: "Build RegistryCtl image (compiles binary, then builds container)"
     cmds:
       - task: _binary-image
         vars:
           SERVICE: registryctl
 
   exporter:
-    desc: "Build Harbor Exporter image"
+    desc: "Build Exporter image (compiles binary, then builds container)"
     cmds:
       - task: _binary-image
         vars:
@@ -133,7 +133,7 @@ tasks:
   # --- Standalone Images ---
 
   portal:
-    desc: "Build Harbor Portal image"
+    desc: "Build Portal image (Angular frontend on Nginx)"
     cmds:
       - task: _build
         vars:
@@ -142,7 +142,7 @@ tasks:
           BUILD_ARGS: '--build-arg BUN_VERSION={{.BUN_VERSION}}'
 
   registry:
-    desc: "Build Docker Registry image"
+    desc: "Build Distribution Registry image"
     cmds:
       - task: _build
         vars:
@@ -151,7 +151,7 @@ tasks:
           BUILD_ARGS: '--build-arg GO_VERSION={{.GO_VERSION}} --build-arg DISTRIBUTION_VERSION={{.DISTRIBUTION_VERSION}}'
 
   trivy-adapter:
-    desc: "Build Trivy Adapter image"
+    desc: "Build Trivy scanner adapter image"
     cmds:
       - task: _build
         vars:
@@ -160,7 +160,7 @@ tasks:
           BUILD_ARGS: '--build-arg GO_VERSION={{.GO_VERSION}} --build-arg HARBOR_SCANNER_TRIVY_VERSION={{.HARBOR_SCANNER_TRIVY_VERSION}} --build-arg TRIVY_VERSION={{.TRIVY_VERSION}} --build-arg TRIVY_BASE_IMAGE_VERSION={{.TRIVY_BASE_IMAGE_VERSION}}'
 
   nginx:
-    desc: "Build Harbor Nginx image"
+    desc: "Build Nginx reverse proxy image"
     cmds:
       - task: _build
         vars:
@@ -170,18 +170,18 @@ tasks:
   # --- Utilities ---
 
   clean:
-    desc: "Remove all local Harbor Docker images"
+    desc: "Remove all local harbor-* images"
     cmd: docker images --format '{{`{{.ID}}`}}' --filter 'reference=*harbor*' | xargs -r docker rmi -f
     ignore_error: true
 
   prune:
-    desc: "Prune Docker build cache"
+    desc: "Prune buildx build cache"
     cmd: docker builder prune -f
 
   list:
-    desc: "List all Harbor images"
+    desc: "List local harbor-* images"
     cmd: docker images --filter 'reference=*harbor*'
 
   inspect:*:
-    desc: "Inspect a multi-arch manifest"
+    desc: "Inspect multi-arch manifest in remote registry"
     cmd: docker buildx imagetools inspect {{.IMAGE_REGISTRY}}/{{.IMAGE_NAMESPACE}}/{{index .MATCH 0}}:{{.VERSION}}
