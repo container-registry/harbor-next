@@ -107,7 +107,7 @@ tasks:
     desc: "Verify generated mock files match committed versions"
     cmds:
       - |
-        res=$(git status -s src/ | awk '{ printf("%s\n", $2) }' | grep -E '.*.go' || true)
+        res=$(git status -s src/ | awk '{ printf("%s\n", $2) }' | grep -E '\.go$' || true)
         if [ -n "$res" ]; then
           echo "Mock files are out of date:"
           echo "$res"
