@@ -249,17 +249,31 @@ tasks:
   # Database Operations
   # ---------------------------------------------------------------------------
   db:migrate:
-    desc: Run database migrations
+    desc: Run incremental database migrations via golang-migrate
     cmds:
       - |
         echo "Running migrations..."
+        POSTGRESQL_HOST=localhost \
+        POSTGRESQL_PORT={{.PORT_POSTGRES}} \
+        POSTGRESQL_USERNAME={{.POSTGRES_USER}} \
+        POSTGRESQL_PASSWORD=root123 \
+        POSTGRESQL_DATABASE={{.POSTGRES_DB}} \
+        POSTGRESQL_SSLMODE=disable \
+        POSTGRES_MIGRATION_SCRIPTS_PATH=make/migrations/postgresql/ \
+        go run src/cmd/standalone-db-migrator/main.go
+
+  db:init-schema:
+    desc: Apply all migration SQL files from scratch (use after db:reset)
+    cmds:
+      - |
+        echo "Applying all migrations from scratch..."
         docker compose -f {{.COMPOSE_FILE}} exec -T postgresql sh -c '
           for f in /migrations/postgresql/*.up.sql; do
             echo "Applying: $(basename $f)"
             psql -U {{.POSTGRES_USER}} -d {{.POSTGRES_DB}} -f "$f" -q
           done
         '
-      - echo "Migrations complete"
+      - echo "Schema init complete"
 
   db:reset:
     desc: Reset database to clean state
@@ -269,7 +283,7 @@ tasks:
         read -p "Press Enter to continue..."
       - docker compose -f {{.COMPOSE_FILE}} exec -T postgresql dropdb -U {{.POSTGRES_USER}} {{.POSTGRES_DB}} --if-exists
       - docker compose -f {{.COMPOSE_FILE}} exec -T postgresql createdb -U {{.POSTGRES_USER}} {{.POSTGRES_DB}}
-      - task: db:migrate
+      - task: db:init-schema
       - echo "Database reset complete"
 
   db:shell:
@@ -286,6 +300,7 @@ tasks:
       - docker compose -f {{.COMPOSE_FILE}} --profile portal --profile core --profile jobservice --profile registryctl --profile trivy down -v
       - pkill -f "ng serve" || true
       - rm -rf tmp/
+      - rm -rf src/portal/node_modules
       - rm -f build-errors.log
       - rm -f {{.TOKEN_KEY_FILE}}
       - echo "Clean complete"
