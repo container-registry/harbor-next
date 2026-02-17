@@ -1,7 +1,7 @@
 # Development Dockerfile for Harbor Core and JobService
 # Includes Go toolchain, Air (hot reload), and Delve (debugger)
 
-ARG GO_VERSION
+ARG GO_VERSION=MISSING-BUILD-ARG
 FROM golang:${GO_VERSION}-alpine
 
 ARG AIR_VERSION

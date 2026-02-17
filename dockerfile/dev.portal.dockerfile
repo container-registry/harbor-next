@@ -1,7 +1,7 @@
 # Development Dockerfile for Harbor Portal
 # Deps installed at build time, source mounted at runtime for HMR
 
-ARG BUN_VERSION
+ARG BUN_VERSION=MISSING-BUILD-ARG
 FROM oven/bun:${BUN_VERSION}-alpine
 WORKDIR /app
 # Copy package files for dependency installation
