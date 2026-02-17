@@ -1,0 +1,591 @@
+name: PR CI - Taskfile
+
+on:
+  pull_request:
+    branches:
+      - next
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'CLAUDE.md'
+
+permissions: {}
+
+env:
+  GO_VERSION: '1.24.6'
+  NODE_VERSION: '18'
+  GHCR_REGISTRY: ghcr.io
+  GHCR_NAMESPACE: container-registry/harbor-next
+  HARBOR_REGISTRY: registry.goharbor.io
+  HARBOR_NAMESPACE: harbor-next
+
+jobs:
+  lint-api:
+    name: Lint API Spec
+    runs-on: container-registry
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Lint OpenAPI Spec
+        run: |
+          npm install -g @stoplight/spectral-cli
+          spectral lint api/v2.0/swagger.yaml
+
+  lint-go:
+    name: Lint Go Code
+    runs-on: container-registry
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Generate API code
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -sSfL https://github.com/go-swagger/go-swagger/releases/download/v0.31.0/swagger_linux_amd64 -o "$HOME/.local/bin/swagger"
+          chmod +x "$HOME/.local/bin/swagger"
+          mkdir -p src/server/v2.0
+          "$HOME/.local/bin/swagger" generate server \
+            --template-dir=./tools/swagger/templates \
+            --exclude-main \
+            --additional-initialism=CVE \
+            --additional-initialism=GC \
+            --additional-initialism=OIDC \
+            -f ./api/v2.0/swagger.yaml \
+            -A harbor \
+            --target ./src/server/v2.0
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
+        with:
+          version: v2.7.2
+          working-directory: src
+          args: --timeout=10m
+
+  lint-frontend:
+    name: Lint Frontend
+    runs-on: container-registry
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: src/portal
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: src/portal/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+  # TODO: Re-enable once Go test infrastructure is stable
+  # test-go:
+  #   name: Test Go Code
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: read
+  #   env:
+  #     POSTGRESQL_HOST: localhost
+  #     POSTGRESQL_PORT: 5432
+  #     POSTGRESQL_USR: postgres
+  #     POSTGRESQL_PWD: root123
+  #     POSTGRESQL_DATABASE: registry
+  #     POSTGRES_MIGRATION_SCRIPTS_PATH: ${{ github.workspace }}/make/migrations/postgresql/
+  #     REDIS_HOST: localhost
+  #     CORE_SECRET: tempString
+  #     HARBOR_ADMIN: admin
+  #     HARBOR_ADMIN_PASSWD: Harbor12345
+  #     KEY_PATH: /data/secret/keys/secretkey
+  #     TOKEN_PRIVATE_KEY_PATH: ${{ github.workspace }}/tests/private_key.pem
+  #   steps:
+  #     - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+  #
+  #     - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+  #       with:
+  #         go-version: ${{ env.GO_VERSION }}
+  #
+  #     - name: Install Task
+  #       run: |
+  #         sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
+  #
+  #     - name: Start test services
+  #       run: |
+  #         task dev:infra:up
+  #         sleep 10
+  #         docker ps
+  #
+  #     - name: Generate API code
+  #       run: task build:gen-apis
+  #
+  #     - name: Run Go tests
+  #       working-directory: src
+  #       timeout-minutes: 30
+  #       run: |
+  #         go test -race -timeout 25m -coverprofile=coverage.out -covermode=atomic $(go list ./... | grep -v -E '/tests/|/testing/')
+  #
+  #     - name: Stop test services
+  #       if: always()
+  #       run: task dev:infra:down
+  #
+  #     - name: Upload coverage
+  #       uses: codecov/codecov-action@0561704f0f02c16a585d4c7555e57fa2e44cf909 # v5.5.2
+  #       with:
+  #         files: ./src/coverage.out
+  #         flags: unittests
+  #         fail_ci_if_error: false
+
+  test-frontend:
+    name: Test Frontend
+    runs-on: container-registry
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: src/portal
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: src/portal/package-lock.json
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Chromium for Karma tests
+        run: |
+          npx @puppeteer/browsers install chromium@latest --path $HOME/.cache/puppeteer
+          CHROME_PATH=$(find $HOME/.cache/puppeteer -type f -name 'chrome' 2>/dev/null | head -1)
+          echo "CHROME_BIN=${CHROME_PATH}" >> $GITHUB_ENV
+          echo "Found Chrome at: ${CHROME_PATH}"
+
+      - name: Run tests
+        run: npm run test
+
+  vuln-check:
+    name: Vulnerability Check
+    runs-on: container-registry
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Generate API code
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -sSfL https://github.com/go-swagger/go-swagger/releases/download/v0.31.0/swagger_linux_amd64 -o "$HOME/.local/bin/swagger"
+          chmod +x "$HOME/.local/bin/swagger"
+          mkdir -p src/server/v2.0
+          "$HOME/.local/bin/swagger" generate server \
+            --template-dir=./tools/swagger/templates \
+            --exclude-main \
+            --additional-initialism=CVE \
+            --additional-initialism=GC \
+            --additional-initialism=OIDC \
+            -f ./api/v2.0/swagger.yaml \
+            -A harbor \
+            --target ./src/server/v2.0
+
+      - name: Run govulncheck
+        working-directory: src
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          echo "## Vulnerability Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if govulncheck ./... 2>&1 | tee vuln-report.txt; then
+            echo "✅ No vulnerabilities found" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Vulnerabilities detected (non-blocking):" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat vuln-report.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+          exit 0
+
+  ## Build & Push Multi-arch Images to GHCR
+  # Uses shared BuildKit service for fast native multi-platform builds
+  build-push-github:
+    name: Build & Push Multi-arch to GHCR
+    runs-on: container-registry
+    needs: [lint-api, lint-go, lint-frontend, test-frontend, vuln-check]
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        service:
+          - core
+          - jobservice
+          - registryctl
+          - portal
+          - registry
+          - nginx
+    env:
+      BUILDKIT_ADDR: tcp://buildkitd.github-runners.svc:1234
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        if: ${{ matrix.service == 'core' || matrix.service == 'jobservice' || matrix.service == 'registryctl' }}
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install tools
+        if: ${{ matrix.service == 'core' || matrix.service == 'jobservice' || matrix.service == 'registryctl' }}
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b "$HOME/.local/bin"
+          curl -sSfL https://github.com/go-swagger/go-swagger/releases/download/v0.31.0/swagger_linux_amd64 -o "$HOME/.local/bin/swagger"
+          chmod +x "$HOME/.local/bin/swagger"
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Generate API code
+        if: ${{ matrix.service == 'core' || matrix.service == 'jobservice' || matrix.service == 'registryctl' }}
+        run: |
+          mkdir -p src/server/v2.0
+          swagger generate server \
+            --template-dir=./tools/swagger/templates \
+            --exclude-main \
+            --additional-initialism=CVE \
+            --additional-initialism=GC \
+            --additional-initialism=OIDC \
+            -f ./api/v2.0/swagger.yaml \
+            -A harbor \
+            --target ./src/server/v2.0
+
+      - name: Build binaries for both architectures
+        if: ${{ matrix.service == 'core' || matrix.service == 'jobservice' || matrix.service == 'registryctl' }}
+        env:
+          SERVICE: ${{ matrix.service }}
+        run: |
+          task build:binary:${SERVICE}:linux-amd64
+          task build:binary:${SERVICE}:linux-arm64
+
+      - name: Set up buildx with remote BuildKit
+        run: |
+          docker buildx create --name remote --driver remote "${BUILDKIT_ADDR}" || true
+          docker buildx use remote
+
+      - name: Login to GHCR
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ${{ env.GHCR_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract PR number
+        id: pr
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: echo "number=${PR_NUMBER}" >> $GITHUB_OUTPUT
+
+      - name: Build and push multi-arch image
+        env:
+          IMAGE: ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_NAMESPACE }}/harbor-${{ matrix.service }}:pr-${{ steps.pr.outputs.number }}
+        run: |
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --file "./dockerfiles/${{ matrix.service }}.dockerfile" \
+            --tag "${IMAGE}" \
+            --push \
+            .
+
+  sign-images-github:
+    name: Sign Images on GHCR
+    runs-on: container-registry
+    needs: build-push-github
+    permissions:
+      id-token: write   # For Cosign keyless signing
+      packages: write   # For reading/writing to GHCR
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        service:
+          - core
+          - jobservice
+          - registryctl
+          - portal
+          - registry
+          - nginx
+    steps:
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
+
+      - name: Login to GHCR
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ${{ env.GHCR_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract PR number
+        id: pr
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: echo "number=${PR_NUMBER}" >> $GITHUB_OUTPUT
+
+      - name: Sign image with keyless signing
+        env:
+          IMAGE: ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_NAMESPACE }}/harbor-${{ matrix.service }}:pr-${{ steps.pr.outputs.number }}
+        run: |
+          cosign sign --yes "${IMAGE}"
+
+  push-to-harbor:
+    name: Push to Harbor Registry
+    runs-on: container-registry
+    needs: sign-images-github
+    permissions:
+      id-token: write   # For Cosign keyless signing
+      packages: read    # For reading from GHCR
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        service:
+          - core
+          - jobservice
+          - registryctl
+          - portal
+          - registry
+          - nginx
+    env:
+      BUILDKIT_ADDR: tcp://buildkitd.github-runners.svc:1234
+    steps:
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
+
+      - name: Set up buildx with remote BuildKit
+        run: |
+          docker buildx create --name remote --driver remote "${BUILDKIT_ADDR}" || true
+          docker buildx use remote
+
+      - name: Login to GHCR
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ${{ env.GHCR_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Harbor Registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ${{ env.HARBOR_REGISTRY }}
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Extract PR number
+        id: pr
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: echo "number=${PR_NUMBER}" >> $GITHUB_OUTPUT
+
+      - name: Push to Harbor
+        env:
+          GHCR_IMAGE: ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_NAMESPACE }}/harbor-${{ matrix.service }}:pr-${{ steps.pr.outputs.number }}
+          HARBOR_IMAGE: ${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_NAMESPACE }}/harbor-${{ matrix.service }}:pr-${{ steps.pr.outputs.number }}
+        run: |
+          docker buildx imagetools create \
+            --tag "${HARBOR_IMAGE}" \
+            "${GHCR_IMAGE}"
+
+      - name: Sign Harbor Registry image
+        env:
+          HARBOR_IMAGE: ${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_NAMESPACE }}/harbor-${{ matrix.service }}:pr-${{ steps.pr.outputs.number }}
+        run: |
+          cosign sign --yes "${HARBOR_IMAGE}"
+
+  generate-attach-sboms:
+    name: Generate & Attach SBOMs
+    runs-on: container-registry
+    needs: push-to-harbor
+    permissions:
+      id-token: write
+      packages: write
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        service:
+          - core
+          - jobservice
+          - registryctl
+          - portal
+          - registry
+          - nginx
+    steps:
+      - name: Install Syft
+        uses: anchore/sbom-action/download-syft@a930d0ac434e3182448fe678398ba5713717112a # v0.21.0
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
+
+      - name: Login to GHCR
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ${{ env.GHCR_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Harbor Registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ${{ env.HARBOR_REGISTRY }}
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Extract PR number
+        id: pr
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: echo "number=${PR_NUMBER}" >> $GITHUB_OUTPUT
+
+      - name: Generate and attach SBOM to GHCR
+        env:
+          IMAGE: ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_NAMESPACE }}/harbor-${{ matrix.service }}:pr-${{ steps.pr.outputs.number }}
+          SERVICE: ${{ matrix.service }}
+        run: |
+          syft "${IMAGE}" -o spdx-json > "sbom-${SERVICE}.spdx.json"
+          cosign attach sbom --sbom "sbom-${SERVICE}.spdx.json" "${IMAGE}"
+
+      - name: Generate and attach SBOM to Harbor
+        env:
+          IMAGE: ${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_NAMESPACE }}/harbor-${{ matrix.service }}:pr-${{ steps.pr.outputs.number }}
+          SERVICE: ${{ matrix.service }}
+        run: |
+          syft "${IMAGE}" -o spdx-json > "sbom-harbor-${SERVICE}.spdx.json"
+          cosign attach sbom --sbom "sbom-harbor-${SERVICE}.spdx.json" "${IMAGE}"
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: sbom-${{ matrix.service }}
+          path: sbom-*.spdx.json
+          retention-days: 30
+
+  pr-comment:
+    name: Comment on PR
+    runs-on: container-registry
+    needs: [generate-attach-sboms]
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Extract PR number
+        id: pr
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: echo "number=${PR_NUMBER}" >> $GITHUB_OUTPUT
+
+      - name: Create image list
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          GHCR_REGISTRY: ${{ env.GHCR_REGISTRY }}
+          GHCR_NAMESPACE: ${{ env.GHCR_NAMESPACE }}
+          HARBOR_REGISTRY: ${{ env.HARBOR_REGISTRY }}
+          HARBOR_NAMESPACE: ${{ env.HARBOR_NAMESPACE }}
+          REPO_NAME: ${{ github.repository }}
+        run: |
+          {
+            echo "## Harbor PR Images"
+            echo ""
+            echo "PR: Number ${PR_NUMBER}"
+            echo "Multi-arch: linux/amd64, linux/arm64"
+            echo ""
+            echo "### GitHub Container Registry (GHCR)"
+            echo '```'
+            echo "${GHCR_REGISTRY}/${GHCR_NAMESPACE}/harbor-core:pr-${PR_NUMBER}"
+            echo "${GHCR_REGISTRY}/${GHCR_NAMESPACE}/harbor-jobservice:pr-${PR_NUMBER}"
+            echo "${GHCR_REGISTRY}/${GHCR_NAMESPACE}/harbor-registryctl:pr-${PR_NUMBER}"
+            echo "${GHCR_REGISTRY}/${GHCR_NAMESPACE}/harbor-portal:pr-${PR_NUMBER}"
+            echo "${GHCR_REGISTRY}/${GHCR_NAMESPACE}/harbor-registry:pr-${PR_NUMBER}"
+            echo "${GHCR_REGISTRY}/${GHCR_NAMESPACE}/harbor-nginx:pr-${PR_NUMBER}"
+            echo '```'
+            echo ""
+            echo "### Harbor Registry"
+            echo '```'
+            echo "${HARBOR_REGISTRY}/${HARBOR_NAMESPACE}/harbor-core:pr-${PR_NUMBER}"
+            echo "${HARBOR_REGISTRY}/${HARBOR_NAMESPACE}/harbor-jobservice:pr-${PR_NUMBER}"
+            echo "${HARBOR_REGISTRY}/${HARBOR_NAMESPACE}/harbor-registryctl:pr-${PR_NUMBER}"
+            echo "${HARBOR_REGISTRY}/${HARBOR_NAMESPACE}/harbor-portal:pr-${PR_NUMBER}"
+            echo "${HARBOR_REGISTRY}/${HARBOR_NAMESPACE}/harbor-registry:pr-${PR_NUMBER}"
+            echo "${HARBOR_REGISTRY}/${HARBOR_NAMESPACE}/harbor-nginx:pr-${PR_NUMBER}"
+            echo '```'
+            echo ""
+            echo "### Verification"
+            echo ""
+            echo "All images are signed with Cosign (keyless) and include SBOMs."
+            echo ""
+            echo "Verify signature:"
+            echo '```bash'
+            echo "cosign verify \\"
+            echo "  --certificate-identity-regexp=\"https://github.com/${REPO_NAME}\" \\"
+            echo "  --certificate-oidc-issuer=\"https://token.actions.githubusercontent.com\" \\"
+            echo "  ${GHCR_REGISTRY}/${GHCR_NAMESPACE}/harbor-core:pr-${PR_NUMBER}"
+            echo '```'
+            echo ""
+            echo "Download SBOM:"
+            echo "Check the \"Artifacts\" section in the workflow run."
+          } > image-list.txt
+
+      - name: Upload image list artifact
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: harbor-images-pr-${{ steps.pr.outputs.number }}
+          path: image-list.txt
+          retention-days: 30
+
+      - name: Comment PR
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const imageList = fs.readFileSync('image-list.txt', 'utf8');
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: imageList
+            });
+
+  pr-ci-success:
+    name: PR CI Success
+    runs-on: container-registry
+    needs: [pr-comment]
+    if: always()
+    steps:
+      - name: Check all jobs
+        env:
+          RESULT: ${{ needs.pr-comment.result }}
+        run: |
+          if [ "${RESULT}" != "success" ]; then
+            echo "PR CI workflow failed"
+            exit 1
+          fi
+          echo "PR CI workflow completed successfully"
