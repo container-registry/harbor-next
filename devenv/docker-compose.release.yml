@@ -21,6 +21,8 @@ services:
     image: harbor-core:${HARBOR_TAG:-MISSING-HARBOR-TAG}
     build: !reset null
     command: !reset null
+    environment:
+      POSTGRES_MIGRATION_SCRIPTS_PATH: ""
     volumes: !override
       - ../devenv/token_service_key.pem:/devenv/token_service_key.pem:ro
 
@@ -51,7 +53,7 @@ services:
     image: harbor-nginx:${HARBOR_TAG:-MISSING-HARBOR-TAG}
     profiles: [portal]
     volumes:
-      - ../devenv/nginx.release.conf:/etc/nginx/nginx.conf:ro
+      - ../devenv/nginx.release.conf:/etc/nginx/conf.d/harbor.conf:ro
     ports:
       - "${PORT_NGINX:-8888}:8080"
     depends_on:
