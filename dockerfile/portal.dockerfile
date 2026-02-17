@@ -7,6 +7,7 @@ ARG LPROBE_VERSION
 #
 # Build Angular application and Swagger UI
 FROM oven/bun:${BUN_VERSION}-alpine AS builder
+# nodejs required: bun hangs on Angular/webpack build inside Docker (oven-sh/bun#15226)
 RUN apk add --no-cache nodejs yq
 WORKDIR /harbor/src/portal
 COPY src/portal/package.json src/portal/bun.lock* ./
@@ -15,7 +16,7 @@ COPY src/portal ./
 COPY api/v2.0/swagger.yaml /swagger.yaml
 RUN bun run postinstall && \
     bun run generate-build-timestamp && \
-    bun run node --max_old_space_size=2048 node_modules/@angular/cli/bin/ng build --configuration production
+    node --max_old_space_size=2048 node_modules/@angular/cli/bin/ng build --configuration production
 RUN yq -o=json /swagger.yaml > swagger.json
 COPY LICENSE ./dist/LICENSE
 RUN cd app-swagger-ui && bun install --ignore-scripts && bun run build
