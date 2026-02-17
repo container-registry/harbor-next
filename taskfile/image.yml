@@ -1,0 +1,187 @@
+# Docker Image Building Tasks
+#
+# CI-aware: local builds native arch only, CI builds all platforms
+# PUSH=false forces native arch (--load requires single platform)
+#
+# Usage:
+#   task image:core                         # CI: multi-arch push, local: native push
+#   task image:core PUSH=false              # load locally (native arch)
+#   task image:all-images                   # all images
+
+version: '3'
+
+includes:
+  build:
+    taskfile: ./build.yml
+    dir: ..
+    internal: true
+
+vars:
+  PUSH: '{{.PUSH | default "true"}}'
+  PLATFORMS: '{{.PLATFORMS | default (ternary (printf "linux/%s" ARCH) .CI_PLATFORMS (eq .PUSH "false"))}}'
+
+tasks:
+  all-images:
+    desc: "Build all container images"
+    deps:
+      - core
+      - jobservice
+      - registryctl
+      - exporter
+      - portal
+      - registry
+      - trivy-adapter
+      - nginx
+
+  # --- Buildx ---
+
+  buildx:setup:
+    internal: true
+    run: once
+    status:
+      - docker buildx inspect {{.IMAGE_BUILDER}} >/dev/null 2>&1
+    cmds:
+      - docker buildx create --name {{.IMAGE_BUILDER}} --driver docker-container --bootstrap
+      - docker buildx use {{.IMAGE_BUILDER}}
+
+  buildx:remove:
+    desc: "Remove the harbor-multiarch buildx builder instance"
+    cmd: docker buildx rm {{.IMAGE_BUILDER}} 2>/dev/null || true
+
+  buildx:list:
+    desc: "List available buildx builders"
+    cmd: docker buildx ls
+
+  # --- Internal ---
+
+  _build:
+    internal: true
+    label: 'image:{{.IMAGE_NAME}}'
+    requires:
+      vars: [IMAGE_NAME, DOCKERFILE]
+    vars:
+      OUTPUT: '{{ternary "--push" "--load" (eq .PUSH "true")}}'
+      TAG_PREFIX: '{{ternary (printf "%s/%s/" .IMAGE_REGISTRY .IMAGE_NAMESPACE) "" (eq .PUSH "true")}}'
+    preconditions:
+      - sh: '{{if and (ne .PUSH "true") (contains "," .PLATFORMS)}}exit 1{{end}}'
+        msg: "PUSH=false requires single platform (--load limitation)"
+    deps: [buildx:setup]
+    cmd: >-
+      docker buildx build
+      --builder {{.IMAGE_BUILDER}}
+      --platform {{.PLATFORMS}}
+      --build-arg LPROBE_VERSION={{.LPROBE_VERSION}}
+      --build-arg ALPINE_VERSION={{.ALPINE_VERSION}}
+      {{.BUILD_ARGS}}
+      -t {{.TAG_PREFIX}}{{.IMAGE_NAME}}:{{.VERSION}}
+      -f dockerfile/{{.DOCKERFILE}}
+      {{.OUTPUT}}
+      .
+
+  _build-binaries:
+    internal: true
+    requires:
+      vars: [SERVICE]
+    cmds:
+      - for: { var: PLATFORMS, split: ',' }
+        task: 'build:binary:{{.SERVICE}}:{{.ITEM | trim | replace "/" "-"}}'
+
+  _binary-image:
+    internal: true
+    requires:
+      vars: [SERVICE]
+    cmds:
+      - task: _build-binaries
+        vars:
+          SERVICE: '{{.SERVICE}}'
+      - task: _build
+        vars:
+          IMAGE_NAME: 'harbor-{{.SERVICE}}'
+          DOCKERFILE: '{{.SERVICE}}.dockerfile'
+
+  # --- Go Services (require pre-built binaries) ---
+
+  core:
+    desc: "Build Core image (compiles binary, then builds container)"
+    cmds:
+      - task: _binary-image
+        vars:
+          SERVICE: core
+
+  jobservice:
+    desc: "Build JobService image (compiles binary, then builds container)"
+    cmds:
+      - task: _binary-image
+        vars:
+          SERVICE: jobservice
+
+  registryctl:
+    desc: "Build RegistryCtl image (compiles binary, then builds container)"
+    cmds:
+      - task: _binary-image
+        vars:
+          SERVICE: registryctl
+
+  exporter:
+    desc: "Build Exporter image (compiles binary, then builds container)"
+    cmds:
+      - task: _binary-image
+        vars:
+          SERVICE: exporter
+
+  # --- Standalone Images ---
+
+  portal:
+    desc: "Build Portal image (Angular frontend on Nginx)"
+    cmds:
+      - task: _build
+        vars:
+          IMAGE_NAME: harbor-portal
+          DOCKERFILE: portal.dockerfile
+          BUILD_ARGS: '--build-arg BUN_VERSION={{.BUN_VERSION}} --build-arg NGINX_VERSION={{.NGINX_VERSION}}'
+
+  registry:
+    desc: "Build Distribution Registry image"
+    cmds:
+      - task: _build
+        vars:
+          IMAGE_NAME: harbor-registry
+          DOCKERFILE: registry.dockerfile
+          BUILD_ARGS: '--build-arg GO_VERSION={{.GO_VERSION}} --build-arg DISTRIBUTION_VERSION={{.DISTRIBUTION_VERSION}}'
+
+  trivy-adapter:
+    desc: "Build Trivy scanner adapter image"
+    cmds:
+      - task: _build
+        vars:
+          IMAGE_NAME: harbor-trivy-adapter
+          DOCKERFILE: trivy-adapter.dockerfile
+          BUILD_ARGS: '--build-arg GO_VERSION={{.GO_VERSION}} --build-arg HARBOR_SCANNER_TRIVY_VERSION={{.HARBOR_SCANNER_TRIVY_VERSION}} --build-arg TRIVY_VERSION={{.TRIVY_VERSION}} --build-arg TRIVY_BASE_IMAGE_VERSION={{.TRIVY_BASE_IMAGE_VERSION}}'
+
+  nginx:
+    desc: "Build Nginx reverse proxy image"
+    cmds:
+      - task: _build
+        vars:
+          IMAGE_NAME: harbor-nginx
+          DOCKERFILE: nginx.dockerfile
+          BUILD_ARGS: '--build-arg NGINX_VERSION={{.NGINX_VERSION}}'
+
+  # --- Utilities ---
+
+  clean:
+    desc: "Remove all local harbor-* images"
+    cmd: docker images --format '{{`{{.ID}}`}}' --filter 'reference=*harbor*' | xargs -r docker rmi -f
+    ignore_error: true
+
+  prune:
+    desc: "Prune buildx build cache"
+    cmd: docker builder prune -f
+
+  list:
+    desc: "List local harbor-* images"
+    cmd: docker images --filter 'reference=*harbor*'
+
+  inspect:*:
+    desc: "Inspect multi-arch manifest in remote registry"
+    cmd: docker buildx imagetools inspect {{.IMAGE_REGISTRY}}/{{.IMAGE_NAMESPACE}}/{{index .MATCH 0}}:{{.VERSION}}

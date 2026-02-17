@@ -1,0 +1,187 @@
+# Cross-platform Go binary compilation
+#
+# CI-aware: local builds native arch only, CI builds all platforms
+# Explicit PLATFORMS=... always wins
+
+version: '3'
+
+vars:
+  LDFLAGS_PROD: "-extldflags=-static -s -w"
+  GCFLAGS_DEBUG: "all=-N -l"
+  VERSION_LDFLAGS: '-X github.com/goharbor/harbor/src/pkg/version.GitCommit={{.GIT_COMMIT}} -X github.com/goharbor/harbor/src/pkg/version.ReleaseVersion={{.VERSION}}'
+  PLATFORMS: '{{.PLATFORMS | default .CI_PLATFORMS}}'
+
+tasks:
+  all-binaries:
+    desc: "Build all Go binaries for detected platform (CI builds all platforms)"
+    cmds:
+      - for: { var: PLATFORMS, split: ',' }
+        task: _build-platform
+        vars: { PLATFORM: '{{.ITEM | trim | replace "/" "-"}}' }
+      - cmd: 'echo "Binaries:"; find bin -type f -exec ls -lh {} \;'
+        silent: true
+
+  _build-platform:
+    internal: true
+    requires:
+      vars: [PLATFORM]
+    deps:
+      - task: 'binary:core:{{.PLATFORM}}'
+      - task: 'binary:jobservice:{{.PLATFORM}}'
+      - task: 'binary:registryctl:{{.PLATFORM}}'
+      - task: 'binary:exporter:{{.PLATFORM}}'
+
+  # --- Internal Go Build ---
+
+  _go-build:
+    internal: true
+    run: when_changed
+    label: 'build:{{.OUTPUT_NAME}}:{{.PLATFORM}}'
+    requires:
+      vars: [PLATFORM, MAIN_PATH, OUTPUT_NAME]
+    vars:
+      GOOS: '{{index (splitList "-" .PLATFORM) 0}}'
+      GOARCH: '{{index (splitList "-" .PLATFORM) 1}}'
+      OUTPUT: 'bin/{{.PLATFORM}}/{{.OUTPUT_NAME}}'
+      GO_LDFLAGS: '{{if eq (.DEBUG | default "") "true"}}{{else}}{{.LDFLAGS_PROD}}{{end}}'
+      GCFLAGS: '{{if eq (.DEBUG | default "") "true"}}{{.GCFLAGS_DEBUG}}{{end}}'
+    dir: src
+    env:
+      GOOS: '{{.GOOS}}'
+      GOARCH: '{{.GOARCH}}'
+      CGO_ENABLED: '0'
+    cmds:
+      - cmd: mkdir -p $(dirname ../{{.OUTPUT}})
+        silent: true
+      - go build {{.GOBUILD_FLAGS}} -gcflags="{{.GCFLAGS}}" -ldflags="{{.GO_LDFLAGS}} {{.VERSION_LDFLAGS}}" -o ../{{.OUTPUT}} {{.MAIN_PATH}}
+
+  # --- Binary Tasks ---
+
+  binary:core:*:
+    desc: "Build core binary (DEBUG=true to include debug symbols)"
+    sources:
+      - src/core/**/*.go
+      - src/common/**/*.go
+      - src/controller/**/*.go
+      - src/server/**/*.go
+      - src/pkg/**/*.go
+      - src/lib/**/*.go
+      - src/go.mod
+      - src/go.sum
+    generates:
+      - bin/{{index .MATCH 0}}/core
+    deps: [gen-apis]
+    cmds:
+      - task: _go-build
+        vars:
+          PLATFORM: '{{index .MATCH 0}}'
+          MAIN_PATH: ./core/main.go
+          OUTPUT_NAME: core
+
+  binary:jobservice:*:
+    desc: "Build jobservice binary"
+    sources:
+      - src/jobservice/**/*.go
+      - src/pkg/**/*.go
+      - src/lib/**/*.go
+      - src/go.mod
+      - src/go.sum
+    generates:
+      - bin/{{index .MATCH 0}}/jobservice
+    cmds:
+      - task: _go-build
+        vars:
+          PLATFORM: '{{index .MATCH 0}}'
+          MAIN_PATH: ./jobservice/main.go
+          OUTPUT_NAME: jobservice
+
+  binary:registryctl:*:
+    desc: "Build registryctl binary"
+    sources:
+      - src/registryctl/**/*.go
+      - src/pkg/**/*.go
+      - src/lib/**/*.go
+      - src/go.mod
+      - src/go.sum
+    generates:
+      - bin/{{index .MATCH 0}}/registryctl
+    cmds:
+      - task: _go-build
+        vars:
+          PLATFORM: '{{index .MATCH 0}}'
+          MAIN_PATH: ./registryctl/main.go
+          OUTPUT_NAME: registryctl
+
+  binary:exporter:*:
+    desc: "Build harbor-exporter binary"
+    sources:
+      - src/cmd/exporter/**/*.go
+      - src/pkg/**/*.go
+      - src/lib/**/*.go
+      - src/go.mod
+      - src/go.sum
+    generates:
+      - bin/{{index .MATCH 0}}/harbor-exporter
+    cmds:
+      - task: _go-build
+        vars:
+          PLATFORM: '{{index .MATCH 0}}'
+          MAIN_PATH: ./cmd/exporter/main.go
+          OUTPUT_NAME: harbor-exporter
+
+  # --- API Generation ---
+
+  require-swagger:
+    internal: true
+    run: once
+    status:
+      - test -x {{.GOPATH_BIN}}/swagger
+    cmd: go install github.com/go-swagger/go-swagger/cmd/swagger@{{.SWAGGER_VERSION}}
+
+  gen-apis:
+    desc: "Generate Go server code from swagger.yaml"
+    run: once
+    deps: [require-swagger]
+    sources:
+      - api/v2.0/swagger.yaml
+      - tools/swagger/templates/**/*
+    generates:
+      - src/server/v2.0/models/*.go
+      - src/server/v2.0/restapi/**/*.go
+    cmds:
+      - mkdir -p src/server/v2.0
+      - >-
+        {{.GOPATH_BIN}}/swagger generate server
+        --template-dir=./tools/swagger/templates
+        --exclude-main
+        --additional-initialism=CVE
+        --additional-initialism=GC
+        --additional-initialism=OIDC
+        -f ./api/v2.0/swagger.yaml
+        -A harbor
+        --target ./src/server/v2.0
+
+  gen-apis:frontend:
+    desc: "Generate TypeScript API client from swagger.yaml"
+    sources:
+      - api/v2.0/swagger.yaml
+      - src/portal/scripts/convert-yaml-to-json.js
+      - src/portal/scripts/delete-swagger-json.js
+    generates:
+      - src/portal/ng-swagger-gen/models.ts
+      - src/portal/ng-swagger-gen/**/*.ts
+    method: checksum
+    dir: src/portal
+    cmds:
+      - bun scripts/convert-yaml-to-json.js
+      - ./node_modules/.bin/ng-swagger-gen -i ng-swagger-gen/swagger.json -o ng-swagger-gen
+      - bun scripts/delete-swagger-json.js
+
+  # --- Utilities ---
+
+  clean:
+    desc: "Remove binaries and generated API code (Go and TypeScript)"
+    cmds:
+      - rm -rf bin/ src/server/v2.0/models/ src/server/v2.0/restapi/
+      - rm -rf src/portal/ng-swagger-gen/models/ src/portal/ng-swagger-gen/services/
+      - rm -f src/portal/ng-swagger-gen/*.ts

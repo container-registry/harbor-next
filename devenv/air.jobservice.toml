@@ -1,0 +1,109 @@
+# Air configuration for Harbor Jobservice
+# Hot reload for fast development iteration
+
+root = "."
+testdata_dir = "testdata"
+tmp_dir = "tmp"
+
+[build]
+  # Build command - includes debug flags for Delve compatibility
+  cmd = "cd src && CGO_ENABLED=0 go build -gcflags=all='-N -l' -o ../tmp/jobservice ./jobservice/main.go"
+
+  # Binary output path (used by full_bin)
+  bin = "tmp/jobservice"
+
+  # Arguments passed to the binary (not used when full_bin is set)
+  args_bin = []
+
+  # Run via Delve debugger - allows attaching debugger at any time
+  # Port 2346 for Jobservice (Core uses 2345), --continue starts immediately without waiting for debugger
+  full_bin = "dlv exec ./tmp/jobservice --listen=0.0.0.0:2346 --headless=true --api-version=2 --accept-multiclient --continue -- -c devenv/jobservice.config.yml"
+
+  # Watch these directories
+  include_dir = ["src"]
+
+  # Watch these file extensions
+  include_ext = ["go", "tpl", "tmpl", "html", "yml", "yaml"]
+
+  # Include specific files
+  include_file = []
+
+  # Exclude non-Go directories
+  exclude_dir = [
+    "src/assets",
+    "src/bin",
+    "src/portal",
+    "src/testdata",
+    "src/vendor",
+    "tmp",
+    "node_modules",
+    ".git",
+    ".task",
+    "api",
+    "devenv",
+    "dockerfile",
+    "make",
+    "taskfile",
+    "tests",
+  ]
+
+  # Exclude specific files
+  exclude_file = []
+
+  # Exclude test files
+  exclude_regex = ["_test\\.go$", "mock_.*\\.go$"]
+
+  # Exclude unchanged files
+  exclude_unchanged = true
+
+  # Follow symbolic links
+  follow_symlink = false
+
+  # Delay before restarting (ms)
+  delay = 1000
+
+  # Stop on build error
+  stop_on_error = true
+
+  # Send interrupt signal before killing process
+  send_interrupt = true
+
+  # Delay before killing process (ms)
+  kill_delay = "1s"
+
+  # Rerun binary on error
+  rerun = false
+  rerun_delay = 500
+
+  # Log file for build errors
+  log = "tmp/build-errors.log"
+
+  # Use polling instead of fsnotify (for NFS/Docker volumes)
+  poll = false
+  poll_interval = 0
+
+[color]
+  # Customize output colors
+  main = "magenta"
+  watcher = "cyan"
+  build = "yellow"
+  runner = "green"
+  app = ""
+
+[log]
+  # Show only main log
+  main_only = false
+
+  # Show time in logs
+  time = true
+
+[misc]
+  # Keep tmp directory on exit to cache compiled binary across restarts
+  clean_on_exit = false
+
+[screen]
+  # Clear screen on rebuild
+  clear_on_rebuild = true
+
+  # Keep scroll position
+  keep_scroll = false

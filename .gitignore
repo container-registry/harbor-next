@@ -60,3 +60,10 @@ src/server/v2.0/restapi/
 harborclient/
 openapi-generator-cli.jar
 tests/e2e_setup/robotvars.py
+.task/checksum
+devenv/token_service_key.pem
+devenv/ports.env
+.env
+.env.local
+tmp/
+bin
