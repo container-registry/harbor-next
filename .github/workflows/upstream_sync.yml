@@ -1,0 +1,79 @@
+name: Sync Upstream
+on:
+  schedule:
+    # Run daily at 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync_upstream:
+    # Skip PR trigger unless it's from fix-sync-upstream branch (for debugging)
+    if: github.event_name != 'pull_request' || github.head_ref == 'fix-sync-upstream'
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    name: Sync Upstream
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        ref: next
+        fetch-depth: 0
+
+    - name: Sync upstream and preserve .github folder
+      id: sync
+      run: |
+        set -e
+
+        # Configure git
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+        # Add upstream remote and fetch
+        git remote add upstream https://github.com/goharbor/harbor.git || true
+        git fetch upstream main
+
+        # Check if there are new commits in upstream that we don't have
+        UPSTREAM_COMMITS=$(git rev-list HEAD..upstream/main --count)
+        if [ "$UPSTREAM_COMMITS" -eq 0 ]; then
+          echo "No new commits to sync from upstream"
+          echo "has_changes=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        echo "Found $UPSTREAM_COMMITS new commits in upstream"
+        echo "has_changes=true" >> $GITHUB_OUTPUT
+        echo "commit_count=$UPSTREAM_COMMITS" >> $GITHUB_OUTPUT
+
+        # Save current .github folder before any merge
+        cp -r .github /tmp/.github-backup
+
+        # Merge upstream/main, preferring OUR changes on conflicts
+        if ! git merge upstream/main --no-edit -X ours; then
+          git checkout --ours . || true
+          git add .
+          git commit -m "Merge upstream/main (preferring our changes)" || true
+        fi
+
+        # Always restore .github folder to our version
+        rm -rf .github
+        cp -r /tmp/.github-backup .github
+
+    - name: Create Pull Request
+      if: steps.sync.outputs.has_changes == 'true'
+      uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7.0.11
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: "chore: sync with upstream goharbor/harbor"
+        signoff: true
+        branch: sync-upstream
+        branch-suffix: random
+        delete-branch: true
+        base: next
+        title: "chore: sync with upstream goharbor/harbor"
+        body: |
+          Automated PR to sync ${{ steps.sync.outputs.commit_count }} new commit(s) from upstream [goharbor/harbor](https://github.com/goharbor/harbor) main branch.
+
+          **Merge strategy:** Our changes in `next` are preserved on conflicts (upstream changes are additive only).
+
+          **Note:** The `.github` folder is preserved and not synced from upstream.
