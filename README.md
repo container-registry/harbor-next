@@ -85,7 +85,7 @@ Harbor Next uses [Taskfile](https://taskfile.dev) for local development and in p
 | [Node.js](https://nodejs.org/) | 16+ | Frontend build, tests, and API codegen |
 | Git | any | Required by build metadata and mock checks |
 
-Additional Go tools (`swagger`, `air`, `dlv`, `govulncheck`, `step`) are auto-installed on first use via `go install` or by running `task setup`.
+Additional Go tools (`air`, `dlv`, `govulncheck`) are auto-installed on first use via `go install` or by running `task setup`.
 
 ### Quick Start
 

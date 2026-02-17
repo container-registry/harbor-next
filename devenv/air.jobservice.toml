@@ -51,7 +51,7 @@ tmp_dir = "tmp"
   exclude_file = []
 
   # Exclude test files
-  exclude_regex = ["_test.go"]
+  exclude_regex = ["_test\\.go$", "mock_.*\\.go$"]
 
   # Exclude unchanged files
   exclude_unchanged = true

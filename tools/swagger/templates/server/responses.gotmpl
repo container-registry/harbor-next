@@ -158,7 +158,7 @@ func ({{ .ReceiverName }} *{{ pascalize .Name }}) SetStatusCode(code int) {
 // With{{ pascalize .Name }} adds the {{ camelize .Name  }} to the {{ humanize $.Name }} response
 func ({{ $.ReceiverName }} *{{ pascalize $.Name }}) With{{ pascalize .Name }}({{ varname .Name  }} {{ .GoType}}) *{{ pascalize $.Name }} {
   {{ $.ReceiverName }}.{{ pascalize .Name }} = {{ varname .Name  }}
-  return {{ .ReceiverName }}
+  return {{ $.ReceiverName }}
 }
 
 // Set{{ pascalize .Name }} sets the {{ camelize .Name  }} to the {{ humanize $.Name }} response
@@ -260,7 +260,7 @@ func (*{{ pascalize .Name }}NotImplementedResponder) {{ pascalize .Name }}Respon
 func {{ pascalize .Name }}NotImplemented() {{ pascalize .Name }}Responder {
   return &{{ pascalize .Name }}NotImplementedResponder{
     middleware.NotImplemented(
-      "operation authentication.{{ pascalize .Name }} has not yet been implemented",
+      "operation {{ .Package }}.{{ pascalize .Name }} has not yet been implemented",
       ),
   }
 }

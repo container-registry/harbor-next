@@ -1,9 +1,8 @@
 # Development Dockerfile for Harbor Portal
 # Deps installed at build time, source mounted at runtime for HMR
 
-ARG BUN_VERSION
+ARG BUN_VERSION=MISSING-BUILD-ARG
 FROM oven/bun:${BUN_VERSION}-alpine
-RUN apk add --no-cache nodejs
 WORKDIR /app
 # Copy package files for dependency installation
 COPY src/portal/package.json src/portal/bun.lock* ./
@@ -11,4 +10,4 @@ COPY src/portal/package.json src/portal/bun.lock* ./
 RUN bun install --ignore-scripts
 
 # Source code and generated API client mounted at runtime via docker-compose
-CMD ["node", "--max_old_space_size=2048", "./node_modules/@angular/cli/bin/ng", "serve", "--host", "0.0.0.0", "--hmr", "--disable-host-check"]
+CMD ["bun", "./node_modules/@angular/cli/bin/ng", "serve", "--host", "0.0.0.0", "--hmr", "--disable-host-check"]
