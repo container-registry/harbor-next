@@ -12,27 +12,27 @@
 
 services:
   registry:
-    image: harbor-registry:${HARBOR_TAG}
+    image: harbor-registry:${HARBOR_TAG:-MISSING-HARBOR-TAG}
     volumes: !override
       - harbor-registry-data:/var/lib/registry
       - ../devenv/registry.config.yml:/etc/registry/config.yml:ro
 
   core:
-    image: harbor-core:${HARBOR_TAG}
+    image: harbor-core:${HARBOR_TAG:-MISSING-HARBOR-TAG}
     build: !reset null
     command: !reset null
     volumes: !override
       - ../devenv/token_service_key.pem:/devenv/token_service_key.pem:ro
 
   jobservice:
-    image: harbor-jobservice:${HARBOR_TAG}
+    image: harbor-jobservice:${HARBOR_TAG:-MISSING-HARBOR-TAG}
     build: !reset null
     command: !reset null
     volumes: !override
       - ../devenv/jobservice.config.yml:/etc/jobservice/config.yml:ro
 
   registryctl:
-    image: harbor-registryctl:${HARBOR_TAG}
+    image: harbor-registryctl:${HARBOR_TAG:-MISSING-HARBOR-TAG}
     build: !reset null
     command: !reset null
     volumes: !override
@@ -41,14 +41,14 @@ services:
       - ../devenv/registryctl.config.yml:/etc/registryctl/config.yml:ro
 
   portal:
-    image: harbor-portal:${HARBOR_TAG}
+    image: harbor-portal:${HARBOR_TAG:-MISSING-HARBOR-TAG}
     build: !reset null
     volumes: !override []
     ports: !override
       - "${PORT_PORTAL:-4200}:8080"
 
   nginx:
-    image: harbor-nginx:${HARBOR_TAG}
+    image: harbor-nginx:${HARBOR_TAG:-MISSING-HARBOR-TAG}
     profiles: [portal]
     volumes:
       - ../devenv/nginx.release.conf:/etc/nginx/nginx.conf:ro
@@ -59,7 +59,7 @@ services:
       - portal
 
   exporter:
-    image: harbor-exporter:${HARBOR_TAG}
+    image: harbor-exporter:${HARBOR_TAG:-MISSING-HARBOR-TAG}
     profiles: [core]
     environment:
       HARBOR_DATABASE_HOST: postgresql
