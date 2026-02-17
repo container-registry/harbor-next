@@ -1,0 +1,120 @@
+version: '3'
+
+output: prefixed
+
+set:
+  - errexit
+  - pipefail
+
+dotenv:
+  - versions.env
+
+vars:
+  GIT_COMMIT:
+    sh: git rev-parse --short=8 HEAD || echo "unknown"
+  VERSION:
+    sh: cat VERSION 2>/dev/null | tr -d '\n' || echo "dev"
+  TIMESTAMP:
+    sh: date -u +%Y%m%d%H%M%S
+
+  GOPATH_BIN:
+    sh: echo "${GOBIN:-$(go env GOPATH)/bin}"
+  GOBUILD_FLAGS: "-buildvcs=false"
+  DISTRIBUTION_SRC: "https://github.com/distribution/distribution.git"
+  NPM_REGISTRY: "https://registry.npmjs.org/"
+
+  # Multi-arch image build configuration
+  # Registry: 8gears.container-registry.com/8gcr/<image>:<version>
+  IMAGE_REGISTRY: '{{.IMAGE_REGISTRY | default "8gears.container-registry.com"}}'
+  IMAGE_NAMESPACE: '{{.IMAGE_NAMESPACE | default "8gcr"}}'
+  IMAGE_PLATFORMS: '{{.IMAGE_PLATFORMS | default "linux/amd64,linux/arm64"}}'
+  IMAGE_BUILDER: "harbor-multiarch"
+
+  # CI detection (shared by build.yml and image.yml)
+  IS_CI:
+    sh: '[ -n "${CI:-}${GITHUB_ACTIONS:-}${GITLAB_CI:-}${JENKINS_URL:-}" ] && echo "true" || echo "false"'
+  CI_PLATFORMS: '{{ternary .IMAGE_PLATFORMS (printf "linux/%s" ARCH) (eq .IS_CI "true")}}'
+
+includes:
+  build:
+    taskfile: ./taskfile/build.yml
+    aliases: [b]
+  image:
+    taskfile: ./taskfile/image.yml
+    aliases: [i]
+  test:
+    taskfile: ./taskfile/test.yml
+    aliases: [t]
+  dev:
+    taskfile: ./taskfile/dev.yml
+    aliases: [d]
+
+tasks:
+  default:
+    desc: "Start all services with hot reload (foreground, stops on exit)"
+    cmds:
+      - task: dev:up
+
+  build:
+    desc: "Build all binaries"
+    cmds:
+      - task: build:all-binaries
+
+  test:
+    desc: "Run all tests"
+    cmds:
+      - task: test:all
+
+  images:
+    desc: "Build all container images (PUSH=false for local, PLATFORMS=linux/arm64 for single arch)"
+    cmds:
+      - task: image:all-images
+
+  clean:
+    desc: "Remove all build artifacts, images, test output, and dev environment"
+    deps: [build:clean, image:clean, test:clean, dev:clean]
+
+  info:
+    desc: "Print version, tool versions, and build configuration"
+    silent: true
+    cmds:
+      - |
+        echo ""
+        echo "═══════════════════════════════════════════════════════════"
+        echo "  Harbor Build Information"
+        echo "═══════════════════════════════════════════════════════════"
+        echo ""
+        echo "Build Metadata:"
+        echo "  Version:        {{.VERSION}}"
+        echo "  Git Commit:     {{.GIT_COMMIT}}"
+        echo "  Build Time:     {{.TIMESTAMP}}"
+        echo ""
+        echo "Tool Versions:"
+        echo "  Go:             {{.GO_VERSION}}"
+        echo "  Swagger:        {{.SWAGGER_VERSION}}"
+        echo "  GolangCI-Lint:  {{.GOLANGCILINT_VERSION}}"
+        echo "  Delve:          {{.DELVE_VERSION}}"
+        echo "  Air:            {{.AIR_VERSION}}"
+        echo "  Bun:            {{.BUN_VERSION}}"
+        echo "  Spectral:       {{.SPECTRAL_VERSION}}"
+        echo "  Trivy:          {{.TRIVY_VERSION}}"
+        echo ""
+        echo "Base Images:"
+        echo "  Alpine:         {{.ALPINE_VERSION}}"
+        echo "  Nginx:          {{.NGINX_VERSION}}"
+        echo ""
+        echo "Build Configuration:"
+        echo "  Go Build Flags: {{.GOBUILD_FLAGS}}"
+        echo ""
+        echo "External Dependencies:"
+        echo "  Distribution:   {{.DISTRIBUTION_SRC}}"
+        echo "  Distribution:   {{.DISTRIBUTION_VERSION}}"
+        echo "  NPM Registry:   {{.NPM_REGISTRY}}"
+        echo ""
+        echo "═══════════════════════════════════════════════════════════"
+        echo ""
+
+  setup:
+    desc: "Install Go development tools (air, dlv, govulncheck)"
+    cmds:
+      - task: dev:setup

@@ -4,15 +4,15 @@
   "description": "Harbor UI with Clarity",
   "angular-cli": {},
   "scripts": {
-    "postinstall": "node scripts/convert-yaml-to-json.js && ng-swagger-gen -i ng-swagger-gen/swagger.json -o ng-swagger-gen && node scripts/delete-swagger-json.js",
-    "start": "node --max_old_space_size=2048 ./node_modules/@angular/cli/bin/ng serve --ssl true --host 0.0.0.0",
-    "start:prod": "node --max_old_space_size=2048 ./node_modules/@angular/cli/bin/ng serve --ssl true --host 0.0.0.0 --configuration production",
-    "start_default_port": "node --max_old_space_size=2048 ./node_modules/@angular/cli/bin/ng serve --ssl true --host 0.0.0.0 --port 443 --disable-host-check",
+    "postinstall": "bun scripts/convert-yaml-to-json.js && ng-swagger-gen -i ng-swagger-gen/swagger.json -o ng-swagger-gen && bun scripts/delete-swagger-json.js",
+    "start": "bun ./node_modules/@angular/cli/bin/ng serve --host 0.0.0.0",
+    "start:prod": "bun ./node_modules/@angular/cli/bin/ng serve --host 0.0.0.0 --configuration production",
+    "start_default_port": "bun ./node_modules/@angular/cli/bin/ng serve --host 0.0.0.0 --port 443 --disable-host-check",
     "lint": "ng lint",
     "lint_fix": "ng lint --fix",
     "lint:style": "npx stylelint \"**/*.scss\"",
     "lint_fix:style": "npx stylelint \"**/*.scss\" --fix",
-    "test": "node --max_old_space_size=2048 ./node_modules/@angular/cli/bin/ng test --code-coverage",
+    "test": "bun ./node_modules/@angular/cli/bin/ng test --code-coverage",
     "test:watch": "ng test --code-coverage --watch",
     "test:debug": "ng test --code-coverage --source-map false",
     "test:chrome": "ng test --code-coverage --browsers Chrome",
@@ -22,8 +22,9 @@
     "build": "ng build --aot",
     "release": "ng build --configuration production",
     "build-mock-api-server": "tsc -p server",
-    "mock-api-server": "npm run build-mock-api-server && node server/dist/server/src/mock-api.js",
-    "generate-build-timestamp": "node scripts/generate-build-timestamp.js"
+    "mock-api-server": "bun run build-mock-api-server && bun server/dist/server/src/mock-api.js",
+    "generate-build-timestamp": "bun scripts/generate-build-timestamp.js",
+    "i18n:check": "bun scripts/find-missing-i18n.js"
   },
   "private": true,
   "dependencies": {
