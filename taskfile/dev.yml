@@ -3,6 +3,7 @@ version: '3'
 vars:
   # Paths
   COMPOSE_FILE: devenv/docker-compose.yml
+  COMPOSE_RELEASE_FILE: devenv/docker-compose.release.yml
   TOKEN_KEY_FILE: devenv/token_service_key.pem
 
   # Database (only vars used in task commands)
@@ -126,6 +127,29 @@ tasks:
     vars:
       TRIVY_PROFILE: '{{if ne .SKIP_TRIVY "true"}}--profile trivy{{end}}'
     cmd: docker compose -f {{.COMPOSE_FILE}} {{.APP_PROFILES}} {{.TRIVY_PROFILE}} down
+
+  # ---------------------------------------------------------------------------
+  # Release Image Smoke Test
+  # ---------------------------------------------------------------------------
+  up-release:
+    desc: "Start release images for smoke testing (TAG to override VERSION file)"
+    deps: [require-docker, gen:private-key]
+    vars:
+      TAG: '{{.TAG | default .VERSION}}'
+    env:
+      HARBOR_TAG: '{{.TAG}}'
+    cmds:
+      - defer: { task: down-release, vars: { TAG: "{{.TAG}}" } }
+      - task: info
+      - docker compose -f {{.COMPOSE_FILE}} -f {{.COMPOSE_RELEASE_FILE}} {{.APP_PROFILES}} up
+
+  down-release:
+    desc: Stop and remove release smoke test containers
+    vars:
+      TAG: '{{.TAG | default .VERSION}}'
+    env:
+      HARBOR_TAG: '{{.TAG}}'
+    cmd: docker compose -f {{.COMPOSE_FILE}} -f {{.COMPOSE_RELEASE_FILE}} {{.APP_PROFILES}} down
 
   # ---------------------------------------------------------------------------
   # Infrastructure (Docker Compose)

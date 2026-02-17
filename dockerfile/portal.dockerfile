@@ -34,7 +34,11 @@ COPY --from=builder /harbor/src/portal/app-swagger-ui/dist /usr/share/nginx/html
 COPY config/portal/nginx.conf /etc/nginx/nginx.conf
 WORKDIR /usr/share/nginx/html
 
+RUN chgrp -R 0 /var/cache/nginx /var/log/nginx /etc/nginx/conf.d && \
+    chmod -R g=u /var/cache/nginx /var/log/nginx /etc/nginx/conf.d
+
 EXPOSE 8080
 EXPOSE 8443
 
+USER nginx
 ENTRYPOINT ["nginx", "-g", "daemon off;"]

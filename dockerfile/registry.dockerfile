@@ -27,11 +27,14 @@ RUN apk add --no-cache git && \
 
 # Final stage
 FROM alpine:${ALPINE_VERSION} AS certs
+RUN addgroup -S -g 10000 harbor && adduser -S -G harbor -u 10000 harbor
+
 FROM ghcr.io/fivexl/lprobe:${LPROBE_VERSION} AS lprobe
 
 FROM scratch
 
 COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=certs /etc/passwd /etc/group /etc/
 COPY --from=lprobe /lprobe /lprobe
 COPY --from=builder /go/bin/registry /usr/bin/registry_DO_NOT_USE_GC
 
@@ -40,4 +43,5 @@ ENV OTEL_TRACES_EXPORTER=none
 EXPOSE 5000
 EXPOSE 5443
 
+USER harbor
 ENTRYPOINT ["/usr/bin/registry_DO_NOT_USE_GC", "serve", "/etc/registry/config.yml"]

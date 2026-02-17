@@ -1,0 +1,79 @@
+# Docker Compose Override — Release Image Smoke Test
+# Swaps dev builds for locally-built release images to verify
+# they start correctly as non-root without permission errors.
+#
+# Requires Docker Compose v2.24+ (for !reset and !override)
+#
+# Usage:
+#   HARBOR_TAG=v2.15.0 docker compose -f devenv/docker-compose.yml \
+#     -f devenv/docker-compose.release.yml \
+#     --profile core --profile portal up
+#   or: task dev:up-release [TAG=v2.15.0]
+
+services:
+  registry:
+    image: harbor-registry:${HARBOR_TAG}
+    volumes: !override
+      - harbor-registry-data:/var/lib/registry
+      - ../devenv/registry.config.yml:/etc/registry/config.yml:ro
+
+  core:
+    image: harbor-core:${HARBOR_TAG}
+    build: !reset null
+    command: !reset null
+    volumes: !override
+      - ../devenv/token_service_key.pem:/devenv/token_service_key.pem:ro
+
+  jobservice:
+    image: harbor-jobservice:${HARBOR_TAG}
+    build: !reset null
+    command: !reset null
+    volumes: !override
+      - ../devenv/jobservice.config.yml:/etc/jobservice/config.yml:ro
+
+  registryctl:
+    image: harbor-registryctl:${HARBOR_TAG}
+    build: !reset null
+    command: !reset null
+    volumes: !override
+      - harbor-registry-data:/var/lib/registry
+      - ../devenv/registry.config.yml:/etc/registry/config.yml:ro
+      - ../devenv/registryctl.config.yml:/etc/registryctl/config.yml:ro
+
+  portal:
+    image: harbor-portal:${HARBOR_TAG}
+    build: !reset null
+    volumes: !override []
+    ports: !override
+      - "${PORT_PORTAL:-4200}:8080"
+
+  nginx:
+    image: harbor-nginx:${HARBOR_TAG}
+    profiles: [portal]
+    volumes:
+      - ../devenv/nginx.release.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "${PORT_NGINX:-8888}:8080"
+    depends_on:
+      - core
+      - portal
+
+  exporter:
+    image: harbor-exporter:${HARBOR_TAG}
+    profiles: [core]
+    environment:
+      HARBOR_DATABASE_HOST: postgresql
+      HARBOR_DATABASE_PORT: "5432"
+      HARBOR_DATABASE_USERNAME: postgres
+      HARBOR_DATABASE_PASSWORD: root123
+      HARBOR_DATABASE_DBNAME: registry
+      HARBOR_DATABASE_SSLMODE: disable
+      HARBOR_METRIC_PATH: /metrics
+      HARBOR_METRIC_PORT: "8080"
+      HARBOR_SERVICE_HOST: core
+      HARBOR_SERVICE_PORT: "8080"
+    ports:
+      - "${PORT_EXPORTER:-9090}:8080"
+    depends_on:
+      - core
+      - postgresql

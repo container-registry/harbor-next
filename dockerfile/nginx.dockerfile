@@ -12,5 +12,9 @@ COPY --from=lprobe /lprobe /lprobe
 
 WORKDIR /
 
+RUN chgrp -R 0 /var/cache/nginx /var/log/nginx /etc/nginx/conf.d && \
+    chmod -R g=u /var/cache/nginx /var/log/nginx /etc/nginx/conf.d
+
 EXPOSE 8080
+USER nginx
 ENTRYPOINT ["nginx", "-g", "daemon off;"]
