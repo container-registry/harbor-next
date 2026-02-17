@@ -106,7 +106,7 @@ dockerfile/
 ├── portal.dockerfile            # Angular frontend (nginx:${NGINX_VERSION}-alpine)
 ├── registry.dockerfile          # Docker registry (scratch base)
 ├── trivy-adapter.dockerfile     # Trivy scanner (aquasec/trivy base)
-└── nginx.dockerfile             # Nginx proxy (dhi.io/nginx:debian13)
+└── nginx.dockerfile             # Nginx proxy (dhi.io/nginx:${NGINX_VERSION}-debian13)
 ```
 
 ## Usage with Taskfile
