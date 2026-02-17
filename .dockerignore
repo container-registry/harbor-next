@@ -20,7 +20,7 @@ src/portal/dist/
 .vscode/
 .claude/
 .task/
-*.DS_Store
+**/.DS_Store
 
 # Documentation (not needed in images)
 doc/
