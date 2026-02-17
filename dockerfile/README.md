@@ -42,9 +42,9 @@ docker buildx build \
 
 These services include build stages:
 
-- **`portal.dockerfile`** - Angular frontend (Node.js + Bun build → Nginx:alpine)
+- **`portal.dockerfile`** - Angular frontend (Node.js + Bun build → nginx:alpine)
   - Builds Angular app with Swagger UI
-  - Final stage: nginx:${NGINX_VERSION}-alpine
+  - Final stage: `nginx:${NGINX_VERSION}-alpine`
   - Includes CA certificates
 
 - **`registry.dockerfile`** - Docker Distribution registry (golang:alpine build → scratch)
@@ -58,8 +58,9 @@ These services include build stages:
   - Downloads trivy binary (version from `TRIVY_VERSION`)
   - Final stage: aquasec/trivy base image (version from `TRIVY_BASE_IMAGE_VERSION`)
 
-- **`nginx.dockerfile`** - Nginx reverse proxy (nginx:${NGINX_VERSION}-alpine)
-  - Minimal nginx:${NGINX_VERSION}-alpine with CA certs
+- **`nginx.dockerfile`** - Nginx reverse proxy ([DHI](#docker-hardened-images-dhi) base)
+  - Uses `dhi.io/nginx:${NGINX_VERSION}-debian13` (non-root, CIS-compliant)
+  - Runs as UID 65532 (nginx); OpenShift-compatible (GID 0 write access)
   - No custom config in image (config provided at runtime)
 
 **Build Command Example:**
@@ -105,7 +106,7 @@ dockerfile/
 ├── portal.dockerfile            # Angular frontend (nginx:${NGINX_VERSION}-alpine)
 ├── registry.dockerfile          # Docker registry (scratch base)
 ├── trivy-adapter.dockerfile     # Trivy scanner (aquasec/trivy base)
-└── nginx.dockerfile             # Nginx proxy (nginx:${NGINX_VERSION}-alpine)
+└── nginx.dockerfile             # Nginx proxy (dhi.io/nginx:${NGINX_VERSION}-debian13)
 ```
 
 ## Usage with Taskfile
@@ -153,7 +154,15 @@ These Dockerfiles **do not use** the legacy Dockerfiles in `make/photon/`. Key d
 | portal | nginx:${NGINX_VERSION}-alpine | ~50MB | Includes built Angular app |
 | registry | scratch | Minimal | CA certs + registry binary |
 | trivy-adapter | aquasec/trivy (TRIVY_BASE_IMAGE_VERSION) | ~400MB | Includes trivy scanner |
-| nginx | nginx:${NGINX_VERSION}-alpine | ~45MB | Minimal reverse proxy |
+| nginx | dhi.io/nginx:${NGINX_VERSION}-debian13 | ~80MB | [DHI](#docker-hardened-images-dhi), non-root, CIS-compliant |
+
+## Docker Hardened Images (DHI)
+
+The `nginx.dockerfile` uses a base image from `dhi.io`, a commercial registry providing Docker Hardened Images. These are CIS-benchmark-compliant, non-root images rebuilt on a regular cadence with CVE patches.
+
+**For CI / contributors:**
+- Pulling from `dhi.io` requires authentication. Set `DHI_USERNAME` and `DHI_PASSWORD` and run `docker login dhi.io` before building.
+- If you don't have DHI credentials, you can substitute `nginx:${NGINX_VERSION}-alpine` for local development, but the production image intentionally uses DHI for its hardened, non-root configuration.
 
 ## Notes
 
