@@ -10,9 +10,9 @@ const outputDir = 'ng-swagger-gen';
 //convert swagger.yaml to swagger.json
 const yaml = require('js-yaml');
 const fs = require('fs');
-//when building portal container(production build), the input path is './swagger.yaml'. Refer to portal Dockerfile
-if (fs.existsSync('swagger.yaml')) {
-   inputFile = 'swagger.yaml';
+//when building portal container (dev or production), the input path is '/swagger.yaml'. Refer to portal Dockerfile
+if (fs.existsSync('/swagger.yaml')) {
+   inputFile = '/swagger.yaml';
 }
 if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir);

@@ -8,9 +8,7 @@ package {{ .APIPackage }}
 
 import (
 	"context"
-	"crypto/tls"
 	"net/http"
-	"log"
 	"fmt"
 
 	"github.com/go-openapi/errors"
@@ -29,7 +27,7 @@ type contextKey string
 const AuthKey contextKey = "Auth"
 
 {{ range .OperationGroups -}}
-// go:generate mockery -name {{ pascalize .Name}}API -inpkg
+//go:generate mockery --name {{ pascalize .Name}}API --inpackage
 
 /* {{ pascalize .Name }}API {{ .Description }} */
 type {{ pascalize .Name }}API interface {
@@ -79,9 +77,9 @@ type Config struct {
 
 	// Authenticator to use for all APIKey authentication
 	APIKeyAuthenticator func(string, string, security.TokenAuthentication) runtime.Authenticator
-	// Authenticator to use for all Bearer authentication
-	BasicAuthenticator func(security.UserPassAuthentication) runtime.Authenticator
 	// Authenticator to use for all Basic authentication
+	BasicAuthenticator func(security.UserPassAuthentication) runtime.Authenticator
+	// Authenticator to use for all Bearer authentication
 	BearerAuthenticator func(string, security.ScopedTokenAuthentication) runtime.Authenticator
 }
 
@@ -137,7 +135,7 @@ func HandlerAPI(c Config) (http.Handler, *{{.Package}}.{{ pascalize .Name }}API,
 	{{ if .IsBasicAuth -}}
 	api.{{ pascalize .ID }}Auth = func(user string, pass string) ({{if not ( eq .Principal "any" )}}*{{ end }}{{.Principal}}, error) {
         if c.Auth{{ pascalize .ID }} == nil {
-            return "", nil
+            return {{ if eq .Principal "any" }}""{{ else }}nil{{ end }}, errors.New(401, "auth {{ pascalize .ID }} handler not configured")
         }
 		return c.Auth{{ pascalize .ID }}(user, pass)
 	}
@@ -145,7 +143,7 @@ func HandlerAPI(c Config) (http.Handler, *{{.Package}}.{{ pascalize .Name }}API,
 	{{ if .IsAPIKeyAuth -}}
 	api.{{ pascalize .ID }}Auth = func(token string) ({{if not ( eq .Principal "any" )}}*{{ end }}{{.Principal}}, error) {
 	    if c.Auth{{ pascalize .ID }} == nil {
-	        return token, nil
+	        return {{ if eq .Principal "any" }}""{{ else }}nil{{ end }}, errors.New(401, "auth {{ pascalize .ID }} handler not configured")
 	    }
 		return c.Auth{{ pascalize .ID }}(token)
 	}
@@ -153,7 +151,7 @@ func HandlerAPI(c Config) (http.Handler, *{{.Package}}.{{ pascalize .Name }}API,
 	{{ if .IsOAuth2 -}}
 	api.{{ pascalize .ID }}Auth = func(token string, scopes []string) ({{if not ( eq .Principal "any" )}}*{{ end }}{{.Principal}}, error) {
         if c.Auth{{ pascalize .ID }} == nil {
-            return token, nil
+            return {{ if eq .Principal "any" }}""{{ else }}nil{{ end }}, errors.New(401, "auth {{ pascalize .ID }} handler not configured")
         }
 		return c.Auth{{ pascalize .ID }}(token, scopes)
 	}

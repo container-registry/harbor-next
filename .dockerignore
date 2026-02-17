@@ -1,6 +1,31 @@
+# Build artifacts
+bin/
+!bin/linux-*/
+tmp/
+dist/
+*.tgz
+
+# Dependencies & caches
 src/portal/node_modules/
+src/portal/.angular/
+src/portal/dist/
+
+# Git & CI
+.git/
+.gitlab-ci-local/
+.github/
+
+# IDE & tools
+.idea/
+.vscode/
+.claude/
+.task/
+**/.DS_Store
+
+# Documentation (not needed in images)
 doc/
 docs/
-.git
+*.md
+
+# Config templates
 make/common/config/
-harbor-offline-installer-*.tgz
