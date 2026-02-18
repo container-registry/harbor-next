@@ -1,0 +1,45 @@
+import HttpsProxyAgent from 'https-proxy-agent';
+// Proxy target - configurable for Docker (core:8080) vs local (localhost:8080)
+const proxyTarget = process.env.HARBOR_PROXY_TARGET || "http://localhost:8080";
+// Define the proxy configuration
+const HarborProxyConfig = [
+  {
+    "context": [
+      "/api",
+      "/c",
+      "/i18n",
+      "/chartrepo",
+      "/LICENSE",
+      "/swagger.json",
+      "/swagger2.json",
+      "/devcenter-api-2.0",
+      "/swagger-ui.bundle.js",
+      "/v2",
+      "/service"
+    ],
+    "target": proxyTarget,
+    "secure": false,
+    "changeOrigin": false,
+    "logLevel": "debug"
+  }
+];
+// Define if you use agent
+const useAgent = false;
+// Specify an agent server, if empty, will read it from environment variable http_proxy or HTTP_PROXY
+const specifiedAgentServer = "${An agent server}";
+
+function setupForCorporateProxy(proxyConfig) {
+  if (useAgent) {
+    const agentServer = process.env.http_proxy || process.env.HTTP_PROXY || specifiedAgentServer;
+    if (agentServer) {
+      const agent = new HttpsProxyAgent(agentServer);
+      console.log('Using corporate agent server: ' + agentServer);
+      proxyConfig.forEach(function(entry) {
+        entry.agent = agent;
+      });
+    }
+  }
+  return proxyConfig;
+}
+
+export default setupForCorporateProxy(HarborProxyConfig);
