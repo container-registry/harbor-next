@@ -789,6 +789,41 @@ func (c *controller) populateAccessories(ctx context.Context, art *Artifact) {
 		return
 	}
 	art.Accessories = accs
+
+	// Check for inherited Cosign signatures from parent OCI Index
+	hasCosign := false
+	for _, acc := range accs {
+		if acc.GetData().Type == accessorymodel.TypeCosignSignature {
+			hasCosign = true
+			break
+		}
+	}
+
+	// If the child is not signed, look up its parents to see if they are signed
+	if !hasCosign {
+		parents, err := c.artMgr.ListReferences(ctx, &q.Query{
+			Keywords: map[string]any{"ChildID": art.ID},
+		})
+		if err != nil {
+			log.Errorf("failed to list parent references of artifact %d: %v", art.ID, err)
+			return
+		}
+		if len(parents) == 0 {
+			return
+		}
+		for _, p := range parents {
+			parentAccs, err := c.accessoryMgr.List(ctx, q.New(q.KeyWords{"SubjectArtifactID": p.ParentID}))
+			if err != nil {
+				continue
+			}
+			for _, pAcc := range parentAccs {
+				if pAcc.GetData().Type == accessorymodel.TypeCosignSignature {
+					art.InheritedAccessories = append(art.InheritedAccessories, pAcc)
+					return
+				}
+			}
+		}
+	}
 }
 
 // HasUnscannableLayer check if it is a in-toto sbom, if it contains any blob with a content_type is application/vnd.in-toto+json, then consider as in-toto sbom
