@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -362,14 +363,14 @@ func (a *artifactAPI) ListTags(ctx context.Context, params operation.ListTagsPar
 }
 
 func (a *artifactAPI) ListAccessories(ctx context.Context, params operation.ListAccessoriesParams) middleware.Responder {
-	if err := a.RequireProjectAccess(ctx, params.ProjectName, rbac.ActionList, rbac.ResourceAccessory); err != nil {
-		return a.SendError(ctx, err)
-	}
-	// set query
-	query, err := a.BuildQuery(ctx, params.Q, params.Sort, params.Page, params.PageSize)
-	if err != nil {
-		return a.SendError(ctx, err)
-	}
+        if err := a.RequireProjectAccess(ctx, params.ProjectName, rbac.ActionList, rbac.ResourceAccessory); err != nil {
+                return a.SendError(ctx, err)
+        }
+        // set query
+        query, err := a.BuildQuery(ctx, params.Q, params.Sort, params.Page, params.PageSize)
+        if err != nil {
+                return a.SendError(ctx, err)
+        }
 
 	// RENAMED from 'artifact' to 'art' to avoid shadowing the 'artifact' package
 	art, err := a.artCtl.GetByReference(ctx, fmt.Sprintf("%s/%s", params.ProjectName, params.RepositoryName), params.Reference, nil)
@@ -388,20 +389,21 @@ func (a *artifactAPI) ListAccessories(ctx context.Context, params operation.List
 		return a.SendError(ctx, err)
 	}
 
-	// If no direct signature found, check for Cosign signatures inherited from a parent OCI index.
-	if len(accs) == 0 {
-		// Use strings.Contains because the UI sends a list of types (e.g. type={signature.cosign ...})
-		if strings.Contains(lib.StringValue(params.Q), "signature.cosign") {
+	// If no direct Cosign signature found, check for inherited ones from a parent OCI index.
+	hasCosign := slices.ContainsFunc(accs, func(acc accessorymodel.Accessory) bool {
+		return acc.GetData().Type == accessorymodel.TypeCosignSignature
+	})
+	if !hasCosign {
+		if strings.Contains(lib.StringValue(params.Q), accessorymodel.TypeCosignSignature) {
 			artWithAccs, err := a.artCtl.Get(ctx, art.ID, &artifact.Option{WithAccessory: true})
 			if err != nil {
 				log.Warningf("failed to get artifact %d with accessories for inheritance check: %v", art.ID, err)
 			} else if artWithAccs != nil {
-				// Combine direct and inherited accessories
 				allAccs := append(artWithAccs.Accessories, artWithAccs.InheritedAccessories...)
 				for _, acc := range allAccs {
 					if acc.GetData().Type == accessorymodel.TypeCosignSignature {
 						accs = append(accs, acc)
-						total = 1
+						total++
 						break
 					}
 				}
