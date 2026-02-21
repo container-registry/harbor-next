@@ -361,39 +361,59 @@ func (a *artifactAPI) ListTags(ctx context.Context, params operation.ListTagsPar
 }
 
 func (a *artifactAPI) ListAccessories(ctx context.Context, params operation.ListAccessoriesParams) middleware.Responder {
-	if err := a.RequireProjectAccess(ctx, params.ProjectName, rbac.ActionList, rbac.ResourceAccessory); err != nil {
-		return a.SendError(ctx, err)
-	}
-	// set query
-	query, err := a.BuildQuery(ctx, params.Q, params.Sort, params.Page, params.PageSize)
-	if err != nil {
-		return a.SendError(ctx, err)
-	}
+        if err := a.RequireProjectAccess(ctx, params.ProjectName, rbac.ActionList, rbac.ResourceAccessory); err != nil {
+                return a.SendError(ctx, err)
+        }
+        // set query
+        query, err := a.BuildQuery(ctx, params.Q, params.Sort, params.Page, params.PageSize)
+        if err != nil {
+                return a.SendError(ctx, err)
+        }
 
-	artifact, err := a.artCtl.GetByReference(ctx, fmt.Sprintf("%s/%s", params.ProjectName, params.RepositoryName), params.Reference, nil)
-	if err != nil {
-		return a.SendError(ctx, err)
-	}
-	query.Keywords["SubjectArtifactID"] = artifact.ID
+        // RENAMED from 'artifact' to 'art' to avoid shadowing the 'artifact' package
+        art, err := a.artCtl.GetByReference(ctx, fmt.Sprintf("%s/%s", params.ProjectName, params.RepositoryName), params.Reference, nil)
+        if err != nil {
+                return a.SendError(ctx, err)
+        }
+        query.Keywords["SubjectArtifactID"] = art.ID
 
-	// list accessories according to the query
-	total, err := a.accMgr.Count(ctx, query)
-	if err != nil {
-		return a.SendError(ctx, err)
-	}
-	accs, err := a.accMgr.List(ctx, query)
-	if err != nil {
-		return a.SendError(ctx, err)
-	}
+        // 1. Get the direct accessories
+        total, err := a.accMgr.Count(ctx, query)
+        if err != nil {
+                return a.SendError(ctx, err)
+        }
+        accs, err := a.accMgr.List(ctx, query)
+        if err != nil {
+                return a.SendError(ctx, err)
+        }
 
-	var res []*models.Accessory
-	for _, acc := range accs {
-		res = append(res, model.NewAccessory(acc.GetData()).ToSwagger())
-	}
-	return operation.NewListAccessoriesOK().
-		WithXTotalCount(total).
-		WithLink(a.Links(ctx, params.HTTPRequest.URL, total, query.PageNumber, query.PageSize).String()).
-		WithPayload(res)
+        // If no signature found, check for inherited signatures
+        if len(accs) == 0 && strings.Contains(lib.StringValue(params.Q), "signature.cosign") {
+                // Use artifact.Option (the package type) 
+                parents, _ := a.artCtl.GetByReference(ctx, fmt.Sprintf("%s/%s", params.ProjectName, params.RepositoryName), params.Reference, &artifact.Option{WithTag: true})
+                if parents != nil {
+                        // List parents to check for their signatures
+                        pRefs, _ := a.artCtl.Get(ctx, art.ID, &artifact.Option{WithAccessory: true})
+                        if pRefs != nil && len(pRefs.Accessories) > 0 {
+                                for _, acc := range pRefs.Accessories {
+                                        if acc.GetData().Type == "signature.cosign" {
+                                                accs = append(accs, acc)
+                                                total = 1
+                                                break
+                                        }
+                                }
+                        }
+                }
+        }
+
+        var res []*models.Accessory
+        for _, acc := range accs {
+                res = append(res, model.NewAccessory(acc.GetData()).ToSwagger())
+        }
+        return operation.NewListAccessoriesOK().
+                WithXTotalCount(total).
+                WithLink(a.Links(ctx, params.HTTPRequest.URL, total, query.PageNumber, query.PageSize).String()).
+                WithPayload(res)
 }
 
 func (a *artifactAPI) GetVulnerabilitiesAddition(ctx context.Context, params operation.GetVulnerabilitiesAdditionParams) middleware.Responder {
