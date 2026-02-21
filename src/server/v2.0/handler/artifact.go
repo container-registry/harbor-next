@@ -363,14 +363,14 @@ func (a *artifactAPI) ListTags(ctx context.Context, params operation.ListTagsPar
 }
 
 func (a *artifactAPI) ListAccessories(ctx context.Context, params operation.ListAccessoriesParams) middleware.Responder {
-        if err := a.RequireProjectAccess(ctx, params.ProjectName, rbac.ActionList, rbac.ResourceAccessory); err != nil {
-                return a.SendError(ctx, err)
-        }
-        // set query
-        query, err := a.BuildQuery(ctx, params.Q, params.Sort, params.Page, params.PageSize)
-        if err != nil {
-                return a.SendError(ctx, err)
-        }
+	if err := a.RequireProjectAccess(ctx, params.ProjectName, rbac.ActionList, rbac.ResourceAccessory); err != nil {
+		return a.SendError(ctx, err)
+	}
+	// set query
+	query, err := a.BuildQuery(ctx, params.Q, params.Sort, params.Page, params.PageSize)
+	if err != nil {
+		return a.SendError(ctx, err)
+	}
 
 	// RENAMED from 'artifact' to 'art' to avoid shadowing the 'artifact' package
 	art, err := a.artCtl.GetByReference(ctx, fmt.Sprintf("%s/%s", params.ProjectName, params.RepositoryName), params.Reference, nil)
