@@ -82,7 +82,7 @@ tasks:
     status:
       - test -f {{.TOKEN_KEY_FILE}}
     cmds:
-      - openssl genpkey -algorithm RSA -out {{.TOKEN_KEY_FILE}} -pkeyopt rsa_keygen_bits:4096
+      - openssl genrsa -traditional -out {{.TOKEN_KEY_FILE}} 4096
       - chmod 600 {{.TOKEN_KEY_FILE}}
       - echo "Generated {{.TOKEN_KEY_FILE}}"
 
