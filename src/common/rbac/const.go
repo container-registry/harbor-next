@@ -121,6 +121,7 @@ func (n *NolimitProvider) GetPermissions(s scope) []*types.Policy {
 		return append(n.BaseProvider.GetPermissions(ScopeSystem),
 			&types.Policy{Resource: ResourceRobot, Action: ActionCreate},
 			&types.Policy{Resource: ResourceRobot, Action: ActionRead},
+			&types.Policy{Resource: ResourceRobot, Action: ActionUpdate},
 			&types.Policy{Resource: ResourceRobot, Action: ActionList},
 			&types.Policy{Resource: ResourceRobot, Action: ActionDelete},
 
@@ -145,6 +146,7 @@ func (n *NolimitProvider) GetPermissions(s scope) []*types.Policy {
 		return append(n.BaseProvider.GetPermissions(ScopeProject),
 			&types.Policy{Resource: ResourceRobot, Action: ActionCreate},
 			&types.Policy{Resource: ResourceRobot, Action: ActionRead},
+			&types.Policy{Resource: ResourceRobot, Action: ActionUpdate},
 			&types.Policy{Resource: ResourceRobot, Action: ActionList},
 			&types.Policy{Resource: ResourceRobot, Action: ActionDelete},
 

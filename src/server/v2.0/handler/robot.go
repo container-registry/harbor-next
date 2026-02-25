@@ -88,6 +88,11 @@ func (rAPI *robotAPI) CreateRobot(ctx context.Context, params operation.CreateRo
 		if s.User() == nil {
 			return rAPI.SendError(ctx, errors.New(nil).WithMessage("invalid security context: empty robot account"))
 		}
+		// Prevent nesting: a robot created by another robot cannot create its own children
+		if s.User().CreatorType == "robot" {
+			return rAPI.SendError(ctx, errors.ForbiddenError(nil).WithMessage(
+				"child robot accounts cannot create further child robot accounts"))
+		}
 		if !isValidPermissionScope(params.Robot.Permissions, s.User().Permissions) {
 			return rAPI.SendError(ctx, errors.New(nil).WithMessagef("permission scope is invalid. It must be equal to or more restrictive than the creator robot's permissions: %s", s.User().Name).WithCode(errors.DENIED))
 		}
@@ -274,6 +279,21 @@ func (rAPI *robotAPI) RefreshSec(ctx context.Context, params operation.RefreshSe
 		return rAPI.SendError(ctx, err)
 	}
 
+	sc, err := rAPI.GetSecurityContext(ctx)
+	if err != nil {
+		return rAPI.SendError(ctx, err)
+	}
+	if s, ok := sc.(*robotSc.SecurityContext); ok {
+		callerRobot := s.User()
+		if callerRobot == nil {
+			return rAPI.SendError(ctx, errors.New(nil).WithMessage("invalid security context: empty robot account"))
+		}
+		if r.CreatorType != "robot" || r.CreatorRef != callerRobot.ID {
+			return rAPI.SendError(ctx, errors.ForbiddenError(nil).WithMessage(
+				"a robot can only refresh secrets of robot accounts it created"))
+		}
+	}
+
 	var secret string
 	robotSec := &models.RobotSec{}
 	if params.RobotSec.Secret != "" {
@@ -394,6 +414,29 @@ func (rAPI *robotAPI) updateV2Robot(ctx context.Context, params operation.Update
 	if err := rAPI.requireAccess(ctx, r, rbac.ActionUpdate); err != nil {
 		return err
 	}
+
+	sc, err := rAPI.GetSecurityContext(ctx)
+	if err != nil {
+		return err
+	}
+	if s, ok := sc.(*robotSc.SecurityContext); ok {
+		callerRobot := s.User()
+		if callerRobot == nil {
+			return errors.New(nil).WithMessage("invalid security context: empty robot account")
+		}
+		// Only allow updating robots that this robot created
+		if r.CreatorType != "robot" || r.CreatorRef != callerRobot.ID {
+			return errors.ForbiddenError(nil).WithMessage(
+				"a robot can only update robot accounts it created")
+		}
+		// Ensure new permissions are a subset of the caller's permissions
+		if !isValidPermissionScope(params.Robot.Permissions, callerRobot.Permissions) {
+			return errors.DeniedError(nil).WithMessagef(
+				"permission scope is invalid. It must be equal to or more restrictive than the parent robot's permissions: %s",
+				callerRobot.Name)
+		}
+	}
+
 	if params.Robot.Level != r.Level || params.Robot.Name != r.Name {
 		return errors.BadRequestError(nil).WithMessage("cannot update the level or name of robot")
 	}

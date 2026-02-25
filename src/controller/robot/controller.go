@@ -27,6 +27,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
+	"github.com/goharbor/harbor/src/lib/orm"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/lib/retry"
 	"github.com/goharbor/harbor/src/pkg"
@@ -154,10 +155,34 @@ func (d *controller) Delete(ctx context.Context, id int64, option ...*Option) er
 	if err != nil {
 		return err
 	}
-	if err := d.robotMgr.Delete(ctx, id); err != nil {
-		return err
-	}
-	if err := d.rbacMgr.DeletePermissionsByRole(ctx, ROBOTTYPE, id); err != nil {
+
+	// Convert child robots into standalone robots and delete parent atomically
+	if err := orm.WithTransaction(func(ctx context.Context) error {
+		children, err := d.robotMgr.List(ctx, &q.Query{
+			Keywords: map[string]any{
+				"CreatorRef":  id,
+				"CreatorType": "robot",
+			},
+		})
+		if err != nil {
+			return err
+		}
+		if len(children) > 0 {
+			log.Infof("converting %d child robot(s) to standalone before deleting parent robot %d", len(children), id)
+			for _, child := range children {
+				child.CreatorRef = 0
+				child.CreatorType = ""
+				if err := d.robotMgr.Update(ctx, child, "creator_ref", "creator_type"); err != nil {
+					return err
+				}
+			}
+		}
+
+		if err := d.robotMgr.Delete(ctx, id); err != nil {
+			return err
+		}
+		return d.rbacMgr.DeletePermissionsByRole(ctx, ROBOTTYPE, id)
+	})(ctx); err != nil {
 		return err
 	}
 	// fire event
