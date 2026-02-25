@@ -311,7 +311,14 @@ func (rAPI *robotAPI) requireAccess(ctx context.Context, r *robot.Robot, action 
 		} else if r.ProjectName != "" {
 			ns = r.ProjectName
 		}
-		return rAPI.RequireProjectAccess(ctx, ns, action, rbac.ResourceRobot)
+		// Try project-level access first
+		if err := rAPI.RequireProjectAccess(ctx, ns, action, rbac.ResourceRobot); err != nil {
+			// Fall back to system-level access (system robots managing project robots)
+			if sysErr := rAPI.RequireSystemAccess(ctx, action, rbac.ResourceRobot); sysErr != nil {
+				return err // Return original project-level error
+			}
+		}
+		return nil
 	}
 
 	return errors.ForbiddenError(nil)
