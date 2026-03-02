@@ -44,101 +44,39 @@ func TestGenerate(t *testing.T) {
 	assert.NotNil(t, vt.Generate(req4))
 }
 
+func makeClaims(iat *time.Time, access []*registry_token.ResourceActions) *v2TokenClaims {
+	rc := jwt.RegisteredClaims{}
+	if iat != nil {
+		rc.IssuedAt = jwt.NewNumericDate(*iat)
+	}
+	return &v2TokenClaims{
+		Claims: v2.Claims{RegisteredClaims: rc},
+		Access: access,
+	}
+}
+
 func TestTokenIssuedAfterProjectCreation(t *testing.T) {
 	logger := log.DefaultLogger()
+	projectCreated := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	before := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	after := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
 
-	projectCreation := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	repoAccess := []*registry_token.ResourceActions{{Type: "repository", Name: "myproject/myimage"}}
+	catalogAccess := []*registry_token.ResourceActions{{Type: "registry", Name: "catalog"}}
+	proj := &proModels.Project{Name: "myproject", CreationTime: projectCreated}
 
 	tests := []struct {
 		name     string
 		claims   *v2TokenClaims
 		project  *proModels.Project
-		projErr  error
 		expected bool
 	}{
-		{
-			name: "token issued after project creation - allowed",
-			claims: &v2TokenClaims{
-				Claims: v2.Claims{
-					RegisteredClaims: jwt.RegisteredClaims{
-						IssuedAt: jwt.NewNumericDate(time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)),
-					},
-				},
-				Access: []*registry_token.ResourceActions{
-					{Type: "repository", Name: "myproject/myimage"},
-				},
-			},
-			project:  &proModels.Project{Name: "myproject", CreationTime: projectCreation},
-			expected: true,
-		},
-		{
-			name: "token issued before project creation - rejected",
-			claims: &v2TokenClaims{
-				Claims: v2.Claims{
-					RegisteredClaims: jwt.RegisteredClaims{
-						IssuedAt: jwt.NewNumericDate(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
-					},
-				},
-				Access: []*registry_token.ResourceActions{
-					{Type: "repository", Name: "myproject/myimage"},
-				},
-			},
-			project:  &proModels.Project{Name: "myproject", CreationTime: projectCreation},
-			expected: false,
-		},
-		{
-			name: "non-repository access entry - skipped",
-			claims: &v2TokenClaims{
-				Claims: v2.Claims{
-					RegisteredClaims: jwt.RegisteredClaims{
-						IssuedAt: jwt.NewNumericDate(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
-					},
-				},
-				Access: []*registry_token.ResourceActions{
-					{Type: "registry", Name: "catalog"},
-				},
-			},
-			expected: true,
-		},
-		{
-			name: "missing issued-at claim - rejected",
-			claims: &v2TokenClaims{
-				Claims: v2.Claims{
-					RegisteredClaims: jwt.RegisteredClaims{},
-				},
-				Access: []*registry_token.ResourceActions{
-					{Type: "repository", Name: "myproject/myimage"},
-				},
-			},
-			expected: false,
-		},
-		{
-			name: "empty access list - allowed",
-			claims: &v2TokenClaims{
-				Claims: v2.Claims{
-					RegisteredClaims: jwt.RegisteredClaims{
-						IssuedAt: jwt.NewNumericDate(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
-					},
-				},
-				Access: []*registry_token.ResourceActions{},
-			},
-			expected: true,
-		},
-		{
-			name: "token issued at exact project creation time - allowed",
-			claims: &v2TokenClaims{
-				Claims: v2.Claims{
-					RegisteredClaims: jwt.RegisteredClaims{
-						IssuedAt: jwt.NewNumericDate(projectCreation),
-					},
-				},
-				Access: []*registry_token.ResourceActions{
-					{Type: "repository", Name: "myproject/myimage"},
-				},
-			},
-			project:  &proModels.Project{Name: "myproject", CreationTime: projectCreation},
-			expected: true,
-		},
+		{"after creation - allowed", makeClaims(&after, repoAccess), proj, true},
+		{"before creation - rejected", makeClaims(&before, repoAccess), proj, false},
+		{"exact creation time - allowed", makeClaims(&projectCreated, repoAccess), proj, true},
+		{"non-repo access - skipped", makeClaims(&before, catalogAccess), nil, true},
+		{"no iat - rejected", makeClaims(nil, repoAccess), nil, false},
+		{"empty access - allowed", makeClaims(&before, nil), nil, true},
 	}
 
 	for _, tt := range tests {
@@ -148,9 +86,8 @@ func TestTokenIssuedAfterProjectCreation(t *testing.T) {
 
 			mockCtl := &projecttesting.Controller{}
 			project_ctl.Ctl = mockCtl
-
-			if tt.project != nil || tt.projErr != nil {
-				mock.OnAnything(mockCtl, "GetByName").Return(tt.project, tt.projErr)
+			if tt.project != nil {
+				mock.OnAnything(mockCtl, "GetByName").Return(tt.project, nil)
 			}
 
 			result := tokenIssuedAfterProjectCreation(context.Background(), logger, tt.claims)
