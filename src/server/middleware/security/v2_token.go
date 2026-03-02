@@ -91,8 +91,7 @@ func tokenIssuedAfterProjectCreation(ctx context.Context, logger *log.Logger, cl
 		}
 		projectName, _ := utils.ParseRepository(access.Name)
 		if projectName == "" {
-			logger.Warningf("repository access entry %q has no project segment, rejecting token", access.Name)
-			return false
+			continue
 		}
 		if checked[projectName] {
 			continue

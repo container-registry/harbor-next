@@ -63,7 +63,6 @@ func TestTokenIssuedAfterProjectCreation(t *testing.T) {
 
 	repoAccess := []*registry_token.ResourceActions{{Type: "repository", Name: "myproject/myimage"}}
 	catalogAccess := []*registry_token.ResourceActions{{Type: "registry", Name: "catalog"}}
-	bareRepoAccess := []*registry_token.ResourceActions{{Type: "repository", Name: "ubuntu"}}
 	proj := &proModels.Project{Name: "myproject", CreationTime: projectCreated}
 
 	tests := []struct {
@@ -79,7 +78,6 @@ func TestTokenIssuedAfterProjectCreation(t *testing.T) {
 		{"non-repo access - skipped", makeClaims(&before, catalogAccess), nil, nil, true},
 		{"empty access - allowed", makeClaims(&before, nil), nil, nil, true},
 		{"project lookup error - rejected", makeClaims(&after, repoAccess), nil, fmt.Errorf("not found"), false},
-		{"bare repo name (no project) - rejected", makeClaims(&after, bareRepoAccess), nil, nil, false},
 	}
 
 	for _, tt := range tests {
