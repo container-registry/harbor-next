@@ -91,7 +91,7 @@ func tokenIssuedAfterProjectCreation(ctx context.Context, logger *log.Logger, cl
 		return false
 	}
 	iat := claims.IssuedAt.Time
-	if iat.Before(p.CreationTime) {
+	if iat.Add(common.JwtLeeway).Before(p.CreationTime) {
 		logger.Warningf("bearer token issued at %v is before project %q creation time %v, rejecting",
 			iat, info.ProjectName, p.CreationTime)
 		return false
