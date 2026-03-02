@@ -78,13 +78,8 @@ func (vt *v2Token) Generate(req *http.Request) security.Context {
 	return v2token.New(req.Context(), claims.Subject, claims.Access)
 }
 
-// tokenIssuedAfterProjectCreation checks that the token was not issued before
-// the target project was created. This prevents tokens from a deleted project
-// being reused against a new project with the same name.
-//
-// The project name comes from the request URL (set by the artifactinfo
-// middleware which runs before security). For non-repository requests
-// (e.g. /v2/, /v2/_catalog) there is no project — the check is skipped.
+// tokenIssuedAfterProjectCreation prevents tokens from a deleted project
+// granting access to a new project recreated with the same name.
 func tokenIssuedAfterProjectCreation(ctx context.Context, logger *log.Logger, claims *v2TokenClaims) bool {
 	info := lib.GetArtifactInfo(ctx)
 	if info.ProjectName == "" {
