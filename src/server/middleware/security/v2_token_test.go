@@ -63,19 +63,23 @@ func TestTokenIssuedAfterProjectCreation(t *testing.T) {
 
 	repoAccess := []*registry_token.ResourceActions{{Type: "repository", Name: "myproject/myimage"}}
 	catalogAccess := []*registry_token.ResourceActions{{Type: "registry", Name: "catalog"}}
+	bareRepoAccess := []*registry_token.ResourceActions{{Type: "repository", Name: "ubuntu"}}
 	proj := &proModels.Project{Name: "myproject", CreationTime: projectCreated}
 
 	tests := []struct {
-		name     string
-		claims   *v2TokenClaims
-		project  *proModels.Project
-		expected bool
+		name    string
+		claims  *v2TokenClaims
+		project *proModels.Project
+		projErr error
+		allowed bool
 	}{
-		{"after creation - allowed", makeClaims(&after, repoAccess), proj, true},
-		{"before creation - rejected", makeClaims(&before, repoAccess), proj, false},
-		{"exact creation time - allowed", makeClaims(&projectCreated, repoAccess), proj, true},
-		{"non-repo access - skipped", makeClaims(&before, catalogAccess), nil, true},
-		{"empty access - allowed", makeClaims(&before, nil), nil, true},
+		{"after creation - allowed", makeClaims(&after, repoAccess), proj, nil, true},
+		{"before creation - rejected", makeClaims(&before, repoAccess), proj, nil, false},
+		{"exact creation time - allowed", makeClaims(&projectCreated, repoAccess), proj, nil, true},
+		{"non-repo access - skipped", makeClaims(&before, catalogAccess), nil, nil, true},
+		{"empty access - allowed", makeClaims(&before, nil), nil, nil, true},
+		{"project lookup error - rejected", makeClaims(&after, repoAccess), nil, fmt.Errorf("not found"), false},
+		{"bare repo name (no project) - rejected", makeClaims(&after, bareRepoAccess), nil, nil, false},
 	}
 
 	for _, tt := range tests {
@@ -85,12 +89,12 @@ func TestTokenIssuedAfterProjectCreation(t *testing.T) {
 
 			mockCtl := &projecttesting.Controller{}
 			project_ctl.Ctl = mockCtl
-			if tt.project != nil {
-				mock.OnAnything(mockCtl, "GetByName").Return(tt.project, nil)
+			if tt.project != nil || tt.projErr != nil {
+				mock.OnAnything(mockCtl, "GetByName").Return(tt.project, tt.projErr)
 			}
 
 			result := tokenIssuedAfterProjectCreation(context.Background(), logger, tt.claims)
-			assert.Equal(t, tt.expected, result)
+			assert.Equal(t, tt.allowed, result)
 		})
 	}
 }

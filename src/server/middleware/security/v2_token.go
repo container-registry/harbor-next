@@ -83,6 +83,7 @@ func (vt *v2Token) Generate(req *http.Request) security.Context {
 // being reused against a new project with the same name.
 func tokenIssuedAfterProjectCreation(ctx context.Context, logger *log.Logger, claims *v2TokenClaims) bool {
 	iat := claims.IssuedAt.Time
+	checked := make(map[string]bool)
 
 	for _, access := range claims.Access {
 		if access.Type != "repository" {
@@ -90,6 +91,10 @@ func tokenIssuedAfterProjectCreation(ctx context.Context, logger *log.Logger, cl
 		}
 		projectName, _ := utils.ParseRepository(access.Name)
 		if projectName == "" {
+			logger.Warningf("repository access entry %q has no project segment, rejecting token", access.Name)
+			return false
+		}
+		if checked[projectName] {
 			continue
 		}
 		p, err := project_ctl.Ctl.GetByName(ctx, projectName)
@@ -102,6 +107,7 @@ func tokenIssuedAfterProjectCreation(ctx context.Context, logger *log.Logger, cl
 				iat, projectName, p.CreationTime)
 			return false
 		}
+		checked[projectName] = true
 	}
 	return true
 }
