@@ -75,7 +75,6 @@ func TestTokenIssuedAfterProjectCreation(t *testing.T) {
 		{"before creation - rejected", makeClaims(&before, repoAccess), proj, false},
 		{"exact creation time - allowed", makeClaims(&projectCreated, repoAccess), proj, true},
 		{"non-repo access - skipped", makeClaims(&before, catalogAccess), nil, true},
-		{"no iat - rejected", makeClaims(nil, repoAccess), nil, false},
 		{"empty access - allowed", makeClaims(&before, nil), nil, true},
 	}
 

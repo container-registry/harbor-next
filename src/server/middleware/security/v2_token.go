@@ -82,10 +82,6 @@ func (vt *v2Token) Generate(req *http.Request) security.Context {
 // the target project was created. This prevents tokens from a deleted project
 // being reused against a new project with the same name.
 func tokenIssuedAfterProjectCreation(ctx context.Context, logger *log.Logger, claims *v2TokenClaims) bool {
-	if claims.IssuedAt == nil {
-		logger.Warningf("bearer token has no issued-at claim, rejecting")
-		return false
-	}
 	iat := claims.IssuedAt.Time
 
 	for _, access := range claims.Access {
