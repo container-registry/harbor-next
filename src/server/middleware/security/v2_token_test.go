@@ -14,6 +14,7 @@ import (
 
 	project_ctl "github.com/goharbor/harbor/src/controller/project"
 	"github.com/goharbor/harbor/src/core/service/token"
+	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/orm"
@@ -44,14 +45,13 @@ func TestGenerate(t *testing.T) {
 	assert.NotNil(t, vt.Generate(req4))
 }
 
-func makeClaims(iat *time.Time, access []*registry_token.ResourceActions) *v2TokenClaims {
-	rc := jwt.RegisteredClaims{}
-	if iat != nil {
-		rc.IssuedAt = jwt.NewNumericDate(*iat)
-	}
+func makeClaimsWithIAT(iat time.Time) *v2TokenClaims {
 	return &v2TokenClaims{
-		Claims: v2.Claims{RegisteredClaims: rc},
-		Access: access,
+		Claims: v2.Claims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				IssuedAt: jwt.NewNumericDate(iat),
+			},
+		},
 	}
 }
 
@@ -61,23 +61,21 @@ func TestTokenIssuedAfterProjectCreation(t *testing.T) {
 	before := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	after := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
 
-	repoAccess := []*registry_token.ResourceActions{{Type: "repository", Name: "myproject/myimage"}}
-	catalogAccess := []*registry_token.ResourceActions{{Type: "registry", Name: "catalog"}}
 	proj := &proModels.Project{Name: "myproject", CreationTime: projectCreated}
 
 	tests := []struct {
-		name    string
-		claims  *v2TokenClaims
-		project *proModels.Project
-		projErr error
-		allowed bool
+		name        string
+		projectName string
+		iat         time.Time
+		project     *proModels.Project
+		projErr     error
+		allowed     bool
 	}{
-		{"after creation - allowed", makeClaims(&after, repoAccess), proj, nil, true},
-		{"before creation - rejected", makeClaims(&before, repoAccess), proj, nil, false},
-		{"exact creation time - allowed", makeClaims(&projectCreated, repoAccess), proj, nil, true},
-		{"non-repo access - skipped", makeClaims(&before, catalogAccess), nil, nil, true},
-		{"empty access - allowed", makeClaims(&before, nil), nil, nil, true},
-		{"project lookup error - rejected", makeClaims(&after, repoAccess), nil, fmt.Errorf("not found"), false},
+		{"after creation - allowed", "myproject", after, proj, nil, true},
+		{"before creation - rejected", "myproject", before, proj, nil, false},
+		{"exact creation time - allowed", "myproject", projectCreated, proj, nil, true},
+		{"no project in context - skipped", "", after, nil, nil, true},
+		{"project lookup error - rejected", "myproject", after, nil, fmt.Errorf("not found"), false},
 	}
 
 	for _, tt := range tests {
@@ -91,7 +89,12 @@ func TestTokenIssuedAfterProjectCreation(t *testing.T) {
 				mock.OnAnything(mockCtl, "GetByName").Return(tt.project, tt.projErr)
 			}
 
-			result := tokenIssuedAfterProjectCreation(context.Background(), logger, tt.claims)
+			ctx := context.Background()
+			if tt.projectName != "" {
+				ctx = lib.WithArtifactInfo(ctx, lib.ArtifactInfo{ProjectName: tt.projectName})
+			}
+
+			result := tokenIssuedAfterProjectCreation(ctx, logger, makeClaimsWithIAT(tt.iat))
 			assert.Equal(t, tt.allowed, result)
 		})
 	}

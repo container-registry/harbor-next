@@ -26,9 +26,9 @@ import (
 	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/common/security"
 	"github.com/goharbor/harbor/src/common/security/v2token"
-	"github.com/goharbor/harbor/src/common/utils"
 	project_ctl "github.com/goharbor/harbor/src/controller/project"
 	svc_token "github.com/goharbor/harbor/src/core/service/token"
+	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/pkg/token"
 	v2 "github.com/goharbor/harbor/src/pkg/token/claims/v2"
@@ -81,32 +81,25 @@ func (vt *v2Token) Generate(req *http.Request) security.Context {
 // tokenIssuedAfterProjectCreation checks that the token was not issued before
 // the target project was created. This prevents tokens from a deleted project
 // being reused against a new project with the same name.
+//
+// The project name comes from the request URL (set by the artifactinfo
+// middleware which runs before security). For non-repository requests
+// (e.g. /v2/, /v2/_catalog) there is no project — the check is skipped.
 func tokenIssuedAfterProjectCreation(ctx context.Context, logger *log.Logger, claims *v2TokenClaims) bool {
+	info := lib.GetArtifactInfo(ctx)
+	if info.ProjectName == "" {
+		return true
+	}
+	p, err := project_ctl.Ctl.GetByName(ctx, info.ProjectName)
+	if err != nil {
+		logger.Warningf("failed to get project %q for token validation: %v", info.ProjectName, err)
+		return false
+	}
 	iat := claims.IssuedAt.Time
-	checked := make(map[string]bool)
-
-	for _, access := range claims.Access {
-		if access.Type != "repository" {
-			continue
-		}
-		projectName, _ := utils.ParseRepository(access.Name)
-		if projectName == "" {
-			continue
-		}
-		if checked[projectName] {
-			continue
-		}
-		p, err := project_ctl.Ctl.GetByName(ctx, projectName)
-		if err != nil {
-			logger.Warningf("failed to get project %q for token validation: %v", projectName, err)
-			return false
-		}
-		if iat.Before(p.CreationTime) {
-			logger.Warningf("bearer token issued at %v is before project %q creation time %v, rejecting",
-				iat, projectName, p.CreationTime)
-			return false
-		}
-		checked[projectName] = true
+	if iat.Before(p.CreationTime) {
+		logger.Warningf("bearer token issued at %v is before project %q creation time %v, rejecting",
+			iat, info.ProjectName, p.CreationTime)
+		return false
 	}
 	return true
 }
