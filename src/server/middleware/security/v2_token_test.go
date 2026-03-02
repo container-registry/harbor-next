@@ -1,17 +1,26 @@
 package security
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	registry_token "github.com/docker/distribution/registry/auth/token"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	project_ctl "github.com/goharbor/harbor/src/controller/project"
 	"github.com/goharbor/harbor/src/core/service/token"
 	"github.com/goharbor/harbor/src/lib/config"
+	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/orm"
+	proModels "github.com/goharbor/harbor/src/pkg/project/models"
+	v2 "github.com/goharbor/harbor/src/pkg/token/claims/v2"
+	projecttesting "github.com/goharbor/harbor/src/testing/controller/project"
+	"github.com/goharbor/harbor/src/testing/mock"
 )
 
 func TestGenerate(t *testing.T) {
@@ -33,4 +42,119 @@ func TestGenerate(t *testing.T) {
 	require.Nil(t, err2)
 	req4.Header.Set("Authorization", fmt.Sprintf("Bearer %s", mt2.Token))
 	assert.NotNil(t, vt.Generate(req4))
+}
+
+func TestTokenIssuedAfterProjectCreation(t *testing.T) {
+	logger := log.DefaultLogger()
+
+	projectCreation := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name     string
+		claims   *v2TokenClaims
+		project  *proModels.Project
+		projErr  error
+		expected bool
+	}{
+		{
+			name: "token issued after project creation - allowed",
+			claims: &v2TokenClaims{
+				Claims: v2.Claims{
+					RegisteredClaims: jwt.RegisteredClaims{
+						IssuedAt: jwt.NewNumericDate(time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)),
+					},
+				},
+				Access: []*registry_token.ResourceActions{
+					{Type: "repository", Name: "myproject/myimage"},
+				},
+			},
+			project:  &proModels.Project{Name: "myproject", CreationTime: projectCreation},
+			expected: true,
+		},
+		{
+			name: "token issued before project creation - rejected",
+			claims: &v2TokenClaims{
+				Claims: v2.Claims{
+					RegisteredClaims: jwt.RegisteredClaims{
+						IssuedAt: jwt.NewNumericDate(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
+					},
+				},
+				Access: []*registry_token.ResourceActions{
+					{Type: "repository", Name: "myproject/myimage"},
+				},
+			},
+			project:  &proModels.Project{Name: "myproject", CreationTime: projectCreation},
+			expected: false,
+		},
+		{
+			name: "non-repository access entry - skipped",
+			claims: &v2TokenClaims{
+				Claims: v2.Claims{
+					RegisteredClaims: jwt.RegisteredClaims{
+						IssuedAt: jwt.NewNumericDate(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
+					},
+				},
+				Access: []*registry_token.ResourceActions{
+					{Type: "registry", Name: "catalog"},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "missing issued-at claim - rejected",
+			claims: &v2TokenClaims{
+				Claims: v2.Claims{
+					RegisteredClaims: jwt.RegisteredClaims{},
+				},
+				Access: []*registry_token.ResourceActions{
+					{Type: "repository", Name: "myproject/myimage"},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "empty access list - allowed",
+			claims: &v2TokenClaims{
+				Claims: v2.Claims{
+					RegisteredClaims: jwt.RegisteredClaims{
+						IssuedAt: jwt.NewNumericDate(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
+					},
+				},
+				Access: []*registry_token.ResourceActions{},
+			},
+			expected: true,
+		},
+		{
+			name: "token issued at exact project creation time - allowed",
+			claims: &v2TokenClaims{
+				Claims: v2.Claims{
+					RegisteredClaims: jwt.RegisteredClaims{
+						IssuedAt: jwt.NewNumericDate(projectCreation),
+					},
+				},
+				Access: []*registry_token.ResourceActions{
+					{Type: "repository", Name: "myproject/myimage"},
+				},
+			},
+			project:  &proModels.Project{Name: "myproject", CreationTime: projectCreation},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			origCtl := project_ctl.Ctl
+			defer func() { project_ctl.Ctl = origCtl }()
+
+			mockCtl := &projecttesting.Controller{}
+			project_ctl.Ctl = mockCtl
+
+			if tt.project != nil || tt.projErr != nil {
+				mock.OnAnything(mockCtl, "GetByName").Return(tt.project, tt.projErr)
+			}
+
+			result := tokenIssuedAfterProjectCreation(context.Background(), logger, tt.claims)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }

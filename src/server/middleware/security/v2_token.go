@@ -15,6 +15,7 @@
 package security
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
@@ -25,6 +26,8 @@ import (
 	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/common/security"
 	"github.com/goharbor/harbor/src/common/security/v2token"
+	"github.com/goharbor/harbor/src/common/utils"
+	project_ctl "github.com/goharbor/harbor/src/controller/project"
 	svc_token "github.com/goharbor/harbor/src/core/service/token"
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/pkg/token"
@@ -69,5 +72,40 @@ func (vt *v2Token) Generate(req *http.Request) security.Context {
 		logger.Warningf("invalid token claims.")
 		return nil
 	}
+	if !tokenIssuedAfterProjectCreation(req.Context(), logger, claims) {
+		return nil
+	}
 	return v2token.New(req.Context(), claims.Subject, claims.Access)
+}
+
+// tokenIssuedAfterProjectCreation checks that the token was not issued before
+// the target project was created. This prevents tokens from a deleted project
+// being reused against a new project with the same name.
+func tokenIssuedAfterProjectCreation(ctx context.Context, logger *log.Logger, claims *v2TokenClaims) bool {
+	if claims.IssuedAt == nil {
+		logger.Warningf("bearer token has no issued-at claim, rejecting")
+		return false
+	}
+	iat := claims.IssuedAt.Time
+
+	for _, access := range claims.Access {
+		if access.Type != "repository" {
+			continue
+		}
+		projectName, _ := utils.ParseRepository(access.Name)
+		if projectName == "" {
+			continue
+		}
+		p, err := project_ctl.Ctl.GetByName(ctx, projectName)
+		if err != nil {
+			logger.Warningf("failed to get project %q for token validation: %v", projectName, err)
+			return false
+		}
+		if iat.Before(p.CreationTime) {
+			logger.Warningf("bearer token issued at %v is before project %q creation time %v, rejecting",
+				iat, projectName, p.CreationTime)
+			return false
+		}
+	}
+	return true
 }
