@@ -174,7 +174,8 @@
         "DISTRIBUTIONS": {
             "NAME": "Distribuciones",
             "INSTANCES": "Instancias"
-        }
+        },
+        "SUBSCRIPTION": "Subscription"
     },
     "USER": {
         "ADD_ACTION": "Nuevo Usuario",
