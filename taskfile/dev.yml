@@ -264,6 +264,7 @@ tasks:
     internal: true
     status: ['test -f {{.TOKEN_KEY_FILE_LOCAL}}']
     cmds:
+      - mkdir -p $(dirname {{.TOKEN_KEY_FILE_LOCAL}})
       - openssl genpkey -algorithm RSA -outform PEM -pkeyopt rsa_keygen_bits:4096 | openssl rsa -traditional -out {{.TOKEN_KEY_FILE_LOCAL}}
       - chmod 644 {{.TOKEN_KEY_FILE_LOCAL}}
 
