@@ -1,8 +1,10 @@
 version: '3'
 
-# Updates Kroki SVGBob diagram URLs in markdown files.
+# Documentation generation tasks:
+# - helm-docs: Generate chart README from values.yaml annotations
+# - svgbob:    Update Kroki SVGBob diagram URLs in all markdown files
 #
-# Structure in .md files:
+# SVGBob structure in .md files:
 #   <!--
 #   ```SVGBob
 #   <ascii diagram>
@@ -12,9 +14,22 @@ version: '3'
 #
 # If the image link is missing, it will be added automatically.
 
+vars:
+  CHART_DIR: deploy/chart
+
 tasks:
   default:
-    desc: Update Kroki URLs in all markdown files
+    desc: "Generate all docs (helm-docs + SVGBob diagrams)"
+    cmds:
+      - task: helm-docs
+      - task: svgbob
+
+  helm-docs:
+    desc: "Generate chart README from values.yaml annotations"
+    cmd: helm-docs --chart-search-root={{.CHART_DIR}}
+
+  svgbob:
+    desc: "Update Kroki SVGBob diagram URLs in all markdown files"
     aliases: [kroki]
     silent: true
     vars:
