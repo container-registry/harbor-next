@@ -4,7 +4,31 @@
   "title": "Harbor Next Helm Chart Values",
   "description": "Schema for Harbor Next Helm chart values.yaml validation",
   "type": "object",
-  "required": ["externalURL", "harborAdminPassword"],
+  "required": ["externalURL"],
+  "allOf": [
+    {
+      "anyOf": [
+        {
+          "required": ["harborAdminPassword"],
+          "properties": {
+            "harborAdminPassword": {
+              "type": "string",
+              "minLength": 8
+            }
+          }
+        },
+        {
+          "required": ["existingSecretAdminPassword"],
+          "properties": {
+            "existingSecretAdminPassword": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    }
+  ],
   "properties": {
     "image": {
       "type": "object",
@@ -22,13 +46,22 @@
       "type": "array",
       "description": "List of image pull secrets",
       "items": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
+        "oneOf": [
+          {
+            "type": "string",
+            "minLength": 1
+          },
+          {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": ["name"]
           }
-        },
-        "required": ["name"]
+        ]
       }
     },
     "nameOverride": {
@@ -53,8 +86,19 @@
     },
     "harborAdminPassword": {
       "type": "string",
-      "description": "Harbor admin password (initial setup)",
-      "minLength": 8
+      "description": "Harbor admin password (initial setup)"
+    },
+    "existingSecretAdminPassword": {
+      "type": "string",
+      "description": "Existing secret containing the admin password"
+    },
+    "existingSecretAdminPasswordKey": {
+      "type": "string",
+      "description": "Key in existing admin password secret"
+    },
+    "existingSecretSecretKey": {
+      "type": "string",
+      "description": "Existing secret containing the encryption key"
     },
     "secretKey": {
       "type": "string",
@@ -62,11 +106,143 @@
       "minLength": 0,
       "maxLength": 16
     },
+    "global": {
+      "type": "object",
+      "description": "Global defaults inherited by all components",
+      "properties": {
+        "revisionHistoryLimit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "priorityClassName": {
+          "type": "string"
+        }
+      }
+    },
+    "imageCredentials": {
+      "type": "object",
+      "properties": {
+        "registry": { "type": "string" },
+        "username": { "type": "string" },
+        "password": { "type": "string" },
+        "email": { "type": "string" }
+      }
+    },
+    "cache": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "expireHours": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "proxy": {
+      "type": "object",
+      "properties": {
+        "httpProxy": { "type": ["string", "null"] },
+        "httpsProxy": { "type": ["string", "null"] },
+        "noProxy": { "type": "string" },
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["core", "jobservice", "registry", "trivy"]
+          }
+        }
+      }
+    },
+    "expose": {
+      "type": "object",
+      "properties": {
+        "clusterIP": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "name": { "type": "string" },
+            "staticClusterIP": { "type": "string" },
+            "ports": {
+              "type": "object",
+              "properties": {
+                "http": { "type": "integer", "minimum": 1, "maximum": 65535 },
+                "https": { "type": "integer", "minimum": 1, "maximum": 65535 }
+              }
+            },
+            "annotations": { "type": "object", "additionalProperties": { "type": "string" } },
+            "labels": { "type": "object", "additionalProperties": { "type": "string" } }
+          }
+        },
+        "nodePort": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "name": { "type": "string" },
+            "ports": {
+              "type": "object",
+              "properties": {
+                "http": {
+                  "type": "object",
+                  "properties": {
+                    "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+                    "nodePort": { "type": "integer", "minimum": 1, "maximum": 65535 }
+                  }
+                },
+                "https": {
+                  "type": "object",
+                  "properties": {
+                    "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+                    "nodePort": { "type": "integer", "minimum": 1, "maximum": 65535 }
+                  }
+                }
+              }
+            },
+            "annotations": { "type": "object", "additionalProperties": { "type": "string" } },
+            "labels": { "type": "object", "additionalProperties": { "type": "string" } }
+          }
+        },
+        "loadBalancer": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "name": { "type": "string" },
+            "IP": { "type": "string" },
+            "ports": {
+              "type": "object",
+              "properties": {
+                "http": { "type": "integer", "minimum": 1, "maximum": 65535 },
+                "https": { "type": "integer", "minimum": 1, "maximum": 65535 }
+              }
+            },
+            "sourceRanges": { "type": "array", "items": { "type": "string" } },
+            "annotations": { "type": "object", "additionalProperties": { "type": "string" } },
+            "labels": { "type": "object", "additionalProperties": { "type": "string" } }
+          }
+        },
+        "route": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "host": { "type": "string" },
+            "annotations": { "type": "object", "additionalProperties": { "type": "string" } },
+            "labels": { "type": "object", "additionalProperties": { "type": "string" } },
+            "tls": {
+              "type": "object",
+              "properties": {
+                "termination": { "type": "string", "enum": ["edge", "passthrough", "reencrypt"] },
+                "insecureEdgeTerminationPolicy": { "type": "string", "enum": ["Allow", "Disable", "Redirect"] }
+              }
+            }
+          }
+        }
+      }
+    },
     "ingress": {
       "type": "object",
       "description": "Ingress configuration",
       "properties": {
         "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "autoGenCert": {
           "type": "boolean",
           "default": true
         },
@@ -79,6 +255,16 @@
             "type": "string"
           }
         },
+        "labels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "core": {
+          "type": "string",
+          "description": "Legacy hostname override for generated ingress certificate"
+        },
         "hosts": {
           "type": "array",
           "items": {
@@ -86,21 +272,6 @@
             "properties": {
               "host": {
                 "type": "string"
-              },
-              "paths": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "path": {
-                      "type": "string"
-                    },
-                    "pathType": {
-                      "type": "string",
-                      "enum": ["Prefix", "Exact", "ImplementationSpecific"]
-                    }
-                  }
-                }
               }
             }
           }
@@ -298,6 +469,9 @@
         },
         "existingSecret": {
           "type": "string"
+        },
+        "existingSecretKey": {
+          "type": "string"
         }
       }
     },
@@ -358,10 +532,16 @@
     "trivy": {
       "type": "object",
       "description": "Trivy scanner subchart configuration",
+      "allOf": [
+        { "$ref": "#/$defs/harborComponent" }
+      ],
       "properties": {
         "enabled": {
           "type": "boolean",
           "default": false
+        },
+        "persistence": {
+          "$ref": "#/$defs/persistence"
         }
       }
     },
@@ -404,6 +584,10 @@
       "type": "object",
       "description": "Monitoring configuration",
       "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
         "serviceMonitor": {
           "type": "object",
           "properties": {
@@ -463,14 +647,14 @@
         "requests": {
           "type": "object",
           "properties": {
-            "cpu": { "type": "string" },
+            "cpu": { "type": ["string", "integer", "number"] },
             "memory": { "type": "string" }
           }
         },
         "limits": {
           "type": "object",
           "properties": {
-            "cpu": { "type": "string" },
+            "cpu": { "type": ["string", "integer", "number"] },
             "memory": { "type": "string" }
           }
         }
@@ -547,6 +731,9 @@
           "additionalProperties": {
             "type": "string"
           }
+        },
+        "automountServiceAccountToken": {
+          "type": "boolean"
         }
       }
     },
@@ -629,6 +816,22 @@
             },
             "required": ["name"]
           }
+        },
+        "initContainers": {
+          "type": "array"
+        },
+        "topologySpreadConstraints": {
+          "type": "array"
+        },
+        "deploymentStrategy": {
+          "type": "object"
+        },
+        "priorityClassName": {
+          "type": "string"
+        },
+        "revisionHistoryLimit": {
+          "type": "integer",
+          "minimum": 0
         },
         "image": {
           "$ref": "#/$defs/imageSpec"

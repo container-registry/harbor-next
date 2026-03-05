@@ -1,6 +1,10 @@
 {{- if .Values.tls.certManager.enabled }}
 {{- $fullname := include "harbor.fullname" . }}
-{{- range .Values.ingress.hosts }}
+{{- $ingressHosts := .Values.ingress.hosts -}}
+{{- if eq (len $ingressHosts) 0 -}}
+{{- $ingressHosts = list (dict "host" (include "harbor.ingress.primaryHost" .)) -}}
+{{- end -}}
+{{- range $ingressHosts }}
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate

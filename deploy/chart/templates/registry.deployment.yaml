@@ -19,6 +19,8 @@ spec:
       annotations:
         checksum/configmap: {{ include (print $.Template.BasePath "/registry.configmap.yaml") . | sha256sum }}
         checksum/secret: {{ include (print $.Template.BasePath "/registry.secret.yaml") . | sha256sum }}
+        checksum/registryctl-configmap: {{ include (print $.Template.BasePath "/registryctl.configmap.yaml") . | sha256sum }}
+        checksum/registryctl-secret: {{ include (print $.Template.BasePath "/registryctl.secret.yaml") . | sha256sum }}
         {{- with .Values.registry.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -88,6 +90,8 @@ spec:
             - mountPath: /etc/registry/config.yml
               name: registry-config
               subPath: config.yml
+            - name: tmp
+              mountPath: /tmp
         - name: registryctl
           securityContext:
             {{- toYaml .Values.registry.securityContext | nindent 12 }}
@@ -102,6 +106,10 @@ spec:
                 name: {{ include "harbor.registry.name" . }}
             - secretRef:
                 name: {{ include "harbor.registry.name" . }}
+            - configMapRef:
+                name: {{ include "harbor.fullname" . }}-registryctl
+            - secretRef:
+                name: {{ include "harbor.fullname" . }}-registryctl
           env:
             {{- if .Values.registry.existingSecret }}
             - name: REGISTRY_HTTP_SECRET
@@ -158,7 +166,11 @@ spec:
             - name: registry-config
               mountPath: /etc/registryctl/config.yml
               subPath: ctl-config.yml
+            - name: tmp
+              mountPath: /tmp
       volumes:
+        - name: tmp
+          emptyDir: {}
         - name: registry-htpasswd
           secret:
             items:

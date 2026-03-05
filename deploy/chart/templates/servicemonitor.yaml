@@ -15,6 +15,14 @@ spec:
   selector:
     matchLabels:
       {{- include "harbor.selectorLabels" . | nindent 6 }}
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values:
+          - core
+          - exporter
+          - jobservice
+          - registry
   namespaceSelector:
     matchNames:
       - {{ .Release.Namespace }}

@@ -409,7 +409,12 @@ tests:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
+      jobservice.extraEnv:
+        - name: CUSTOM_VAR
+          value: custom-value
     asserts:
-      - equal:
-          path: spec.template.spec.containers[0].name
-          value: jobservice
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: CUSTOM_VAR
+            value: custom-value

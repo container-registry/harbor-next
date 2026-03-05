@@ -1,8 +1,12 @@
 {{/*
 Expand the name of the chart.
 */}}
+{{- define "harbor.dnsSafeName" -}}
+{{- regexReplaceAll "-+" (regexReplaceAll "[^a-z0-9-]+" (lower .) "-") "-" | trimAll "-" -}}
+{{- end }}
+
 {{- define "harbor.name" -}}
-{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+{{- include "harbor.dnsSafeName" (default .Chart.Name .Values.nameOverride) | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
@@ -12,10 +16,10 @@ If release name contains chart name it will be used as a full name.
 */}}
 {{- define "harbor.fullname" -}}
 {{- if .Values.fullnameOverride }}
-{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
+{{- include "harbor.dnsSafeName" .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
-{{- $name := default .Chart.Name .Values.nameOverride }}
-{{- if contains $name .Release.Name }}
+{{- $name := include "harbor.name" . }}
+{{- if contains $name (lower .Release.Name) }}
 {{- .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- else }}
 {{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
@@ -27,7 +31,7 @@ If release name contains chart name it will be used as a full name.
 Create chart name and version as used by the chart label.
 */}}
 {{- define "harbor.chart" -}}
-{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+{{- printf "%s-%s" (include "harbor.name" .) .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
@@ -272,6 +276,28 @@ Validate required values
 {{- end }}
 {{- if and (not .Values.harborAdminPassword) (not .Values.existingSecretAdminPassword) }}
 {{- fail "harborAdminPassword or existingSecretAdminPassword is required. Please set one in your values." }}
+{{- end }}
+{{- $enabledExposeMethods := 0 }}
+{{- if .Values.ingress.enabled }}
+{{- $enabledExposeMethods = add1 $enabledExposeMethods }}
+{{- end }}
+{{- if .Values.gateway.enabled }}
+{{- $enabledExposeMethods = add1 $enabledExposeMethods }}
+{{- end }}
+{{- if .Values.expose.clusterIP.enabled }}
+{{- $enabledExposeMethods = add1 $enabledExposeMethods }}
+{{- end }}
+{{- if .Values.expose.nodePort.enabled }}
+{{- $enabledExposeMethods = add1 $enabledExposeMethods }}
+{{- end }}
+{{- if .Values.expose.loadBalancer.enabled }}
+{{- $enabledExposeMethods = add1 $enabledExposeMethods }}
+{{- end }}
+{{- if .Values.expose.route.enabled }}
+{{- $enabledExposeMethods = add1 $enabledExposeMethods }}
+{{- end }}
+{{- if gt $enabledExposeMethods 1 }}
+{{- fail "Only one expose method can be enabled at a time (ingress, gateway, expose.clusterIP, expose.nodePort, expose.loadBalancer, expose.route)." }}
 {{- end }}
 {{- end }}
 

@@ -5,6 +5,8 @@ templates:
   - templates/registry.configmap.yaml
   - templates/registry.secret.yaml
   - templates/registry.pvc.yaml
+  - templates/registryctl.configmap.yaml
+  - templates/registryctl.secret.yaml
 tests:
   - it: should create registry deployment with default values
     template: templates/registry.deployment.yaml
@@ -160,5 +162,5 @@ tests:
       registry.persistence.existingClaim: my-existing-pvc
     asserts:
       - equal:
-          path: spec.template.spec.volumes[2].persistentVolumeClaim.claimName
+          path: spec.template.spec.volumes[3].persistentVolumeClaim.claimName
           value: my-existing-pvc

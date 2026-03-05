@@ -3,8 +3,12 @@ Harbor has been installed!
 
 1. Get the Harbor URL:
 {{- if .Values.ingress.enabled }}
+{{- if gt (len .Values.ingress.hosts) 0 }}
 {{- range .Values.ingress.hosts }}
    Harbor URL: http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+{{- else }}
+   Harbor URL: {{ include "harbor.externalURL" . }}
 {{- end }}
 {{- else if .Values.gateway.enabled }}
 {{- range .Values.gateway.hostnames }}
@@ -22,10 +26,16 @@ Harbor has been installed!
 
 3. To push images:
 {{- if .Values.ingress.enabled }}
+{{- if gt (len .Values.ingress.hosts) 0 }}
 {{- range .Values.ingress.hosts }}
    docker login {{ .host }}
    docker tag myimage:latest {{ .host }}/library/myimage:latest
    docker push {{ .host }}/library/myimage:latest
+{{- end }}
+{{- else }}
+   docker login {{ (urlParse .Values.externalURL).host }}
+   docker tag myimage:latest {{ (urlParse .Values.externalURL).host }}/library/myimage:latest
+   docker push {{ (urlParse .Values.externalURL).host }}/library/myimage:latest
 {{- end }}
 {{- end }}
 

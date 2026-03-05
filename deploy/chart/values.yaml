@@ -86,7 +86,7 @@ proxy:
 # ============================================================================
 # 2. EXPOSE / INGRESS / GATEWAY
 # ============================================================================
-# Multiple expose methods are available. Enable only one at a time:
+# Multiple expose methods are available. Enable only one at a time (enforced by template validation):
 #   - ingress (default) — Kubernetes Ingress resource
 #   - gateway — Gateway API HTTPRoute
 #   - expose.clusterIP — Direct ClusterIP service (for in-cluster or port-forward access)
@@ -188,14 +188,12 @@ ingress:
     # nginx.ingress.kubernetes.io/ssl-redirect: "true"
   # -- Ingress labels
   labels: {}
-  # -- Harbor core hostname (REQUIRED when ingress enabled)
+  # -- Hostname override used by auto-generated ingress certificate
+  # Defaults to first ingress host, or externalURL hostname when ingress.hosts is empty
   core: ""
   # -- Additional ingress hosts
   hosts: []
     # - host: harbor.example.com
-    #   paths:
-    #     - path: /
-    #       pathType: Prefix
   # -- Ingress TLS configuration
   tls: []
     # - secretName: harbor-tls
@@ -539,7 +537,7 @@ registry:
     runAsNonRoot: true
     runAsUser: 10000
     runAsGroup: 10000
-    # readOnlyRootFilesystem: true
+    readOnlyRootFilesystem: true
     allowPrivilegeEscalation: false
     capabilities:
       drop:
