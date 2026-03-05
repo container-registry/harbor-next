@@ -50,7 +50,7 @@ oc wait -n vad1mo-dev --for=condition=ready pod -l app.kubernetes.io/instance=ha
 HARBOR_URL=harbor-next-vad1mo-dev.apps.rm1.0a51.p1.openshiftapps.com
 
 # Login
-echo 'Harbor12345' | docker login ${HARBOR_URL} -u admin --password-stdin
+echo "${HARBOR_ADMIN_PASSWORD}" | docker login ${HARBOR_URL} -u admin --password-stdin
 
 # Push a test image
 docker pull alpine:latest
@@ -67,11 +67,11 @@ If Trivy is enabled, trigger and check a scan:
 
 ```bash
 # Trigger scan via Harbor API
-curl -s -u admin:Harbor12345 \
+curl -s -u "admin:${HARBOR_ADMIN_PASSWORD}" \
   -X POST "https://${HARBOR_URL}/api/v2.0/projects/library/repositories/alpine/artifacts/test/scan"
 
 # Check scan result (wait a minute for scan to complete)
-curl -s -u admin:Harbor12345 \
+curl -s -u "admin:${HARBOR_ADMIN_PASSWORD}" \
   "https://${HARBOR_URL}/api/v2.0/projects/library/repositories/alpine/artifacts/test?with_scan_overview=true" | jq .scan_overview
 ```
 

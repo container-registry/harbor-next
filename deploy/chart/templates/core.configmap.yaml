@@ -57,12 +57,8 @@ data:
   CHART_CACHE_DRIVER: "redis"
   _REDIS_URL_CORE: {{ include "harbor.redis.url.core" . | quote }}
   _REDIS_URL_REG: {{ include "harbor.redis.url.registry" . | quote }}
-  {{- if or (and (eq .Values.valkey.type "internal") .Values.valkey.internal.harborDatabaseIndex) (and (eq .Values.valkey.type "external") .Values.externalRedis.harborDatabaseIndex) }}
   _REDIS_URL_HARBOR: {{ include "harbor.redis.url.harbor" . | quote }}
-  {{- end }}
-  {{- if or (and (eq .Values.valkey.type "internal") .Values.redis.internal.cacheLayerDatabaseIndex) (and (eq .Values.valkey.type "external") .Values.externalRedis.cacheLayerDatabaseIndex) }}
-  _REDIS_URL_CACHE_LAYER: {{ include "harbor.redis.url.cache" . }}
-  {{- end }}  
+  _REDIS_URL_CACHE_LAYER: {{ include "harbor.redis.url.cache" . | quote }}
   # Logging
   LOG_LEVEL: {{ .Values.logLevel | default "info" | quote }}
 

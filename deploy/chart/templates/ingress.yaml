@@ -24,7 +24,7 @@ spec:
         {{- range .hosts }}
         - {{ . | quote }}
         {{- end }}
-      {{- if eq (include "harbor.autoGenCert" $root) "true" }}
+      {{- if or (eq (include "harbor.autoGenCert" $root) "true") .secretName }}
       secretName: {{ .secretName | default (include "harbor.ingress.secret" $root) }}
       {{- end }}
     {{- end }}

@@ -115,7 +115,7 @@ Built-in `values.schema.json` provides:
 
 ## Prerequisites
 
-- Kubernetes 1.33+ (we follow [endoflife.date/kubernetes](https://endoflife.date/kubernetes) for supported versions)
+- Kubernetes 1.28+ (we follow [endoflife.date/kubernetes](https://endoflife.date/kubernetes) for supported versions)
 - Helm 3.x
 - **External PostgreSQL database** (required)
 - PV provisioner (for filesystem storage)
@@ -460,7 +460,7 @@ helm unittest .
 ### Lint Chart
 
 ```bash
-helm lint . --set externalURL=https://example.com --set database.host=db
+helm lint . --set externalURL=https://example.com --set database.host=db --set harborAdminPassword=changeme123
 ```
 
 ### Render Templates
@@ -469,6 +469,7 @@ helm lint . --set externalURL=https://example.com --set database.host=db
 helm template test . \
   --set externalURL=https://example.com \
   --set database.host=db \
+  --set harborAdminPassword=changeme123 \
   --debug
 ```
 

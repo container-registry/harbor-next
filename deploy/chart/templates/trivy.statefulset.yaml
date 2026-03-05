@@ -31,11 +31,11 @@ spec:
     spec:
       {{- include "harbor.imagePullSecrets" . | nindent 6 }}
       volumes:
-      {{- if .Values.trivy.persistence.enabled }}
+      {{- if and .Values.trivy.persistence.enabled .Values.trivy.persistence.existingClaim }}
       - name: "data"
         persistentVolumeClaim:
-          claimName: {{ .Values.trivy.persistence.existingClaim | default "data-" (include "harbor.trivy" .) }}
-      {{- else }}
+          claimName: {{ .Values.trivy.persistence.existingClaim }}
+      {{- else if not .Values.trivy.persistence.enabled }}
       - name: "data"
         emptyDir: {}
       {{- end }}

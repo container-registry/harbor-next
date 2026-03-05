@@ -12,8 +12,8 @@ spec:
       targetPort: {{ include "harbor.registry.port" . }}
       protocol: TCP
     - name: http-controller
-      port: {{ include "harbor.portal.service.port" . }}
-      targetPort: {{ include "harbor.portal.service.port" . }}
+      port: {{ include "harbor.registryctl.port" . }}
+      targetPort: {{ include "harbor.registryctl.port" . }}
       protocol: TCP
     - name: {{ include "harbor.metrics.portName" . | quote }}
       port: {{ include "harbor.metrics.port" . }}

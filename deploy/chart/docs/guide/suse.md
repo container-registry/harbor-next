@@ -25,19 +25,19 @@ Set it as default:
 kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
 ```
 
-We then create this storage class and set it as default:
+Alternatively, create a custom storage class:
 
 ```yaml
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  annotations:
-    storageclass.kubernetes.io/is-default-class: "true"
   name: local
 provisioner: rancher.io/local-path
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
 ```
+
+> **Note:** Only one StorageClass should be marked as default. The `local-path` class above is already set as default in the previous step.
 
 We deploy our external Postgresql database with the Bitnami Helm chart:
 

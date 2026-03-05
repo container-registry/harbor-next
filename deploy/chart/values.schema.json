@@ -4,7 +4,7 @@
   "title": "Harbor Next Helm Chart Values",
   "description": "Schema for Harbor Next Helm chart values.yaml validation",
   "type": "object",
-  "required": ["externalURL"],
+  "required": ["externalURL", "harborAdminPassword"],
   "properties": {
     "image": {
       "type": "object",
@@ -257,10 +257,12 @@
     "database": {
       "type": "object",
       "description": "External database configuration (required)",
+      "required": ["host"],
       "properties": {
         "host": {
           "type": "string",
-          "description": "Database host"
+          "description": "Database host",
+          "minLength": 1
         },
         "port": {
           "type": "integer",

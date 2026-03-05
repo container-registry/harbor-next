@@ -42,7 +42,7 @@ logLevel: info
 
 # -- Harbor admin password (initial setup)
 # @default -- "Harbor12345"
-harborAdminPassword: "Harbor12345"
+harborAdminPassword: ""
 
 # -- Secret key for encryption (16 characters)
 # Used for encrypting credentials stored in the database

@@ -128,7 +128,7 @@ data:
     redis:
       addrs:
         - {{ include "harbor.redis.host" . }}:{{ include "harbor.redis.port" . }}
-      {{- if eq "valkey+sentinel" (include "harbor.redis.scheme" .) }}
+      {{- if contains "sentinel" (include "harbor.redis.scheme" .) }}
       sentinelMasterSet: {{ include "harbor.redis.masterSet" . }}
       {{- end }}
       db: {{ include "harbor.redis.url.registry.num" . }}

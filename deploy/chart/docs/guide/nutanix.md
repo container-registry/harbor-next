@@ -240,11 +240,18 @@ extraManifests:
 
 #### Other Settings
 
-Set the replica count for each pod as required. For example, to run 3 replicas:
+Set the replica count per component as required. For example:
 
 ```yaml
-replicas: 3
+core:
+  replicas: 3
+registry:
+  replicas: 3
+portal:
+  replicas: 2
 ```
+
+> **Note:** `externalURL` is required. Set it to the URL users will access Harbor at (e.g., `externalURL: "https://harbor1.example.com"`).
 
 ### Apply Manifests
 

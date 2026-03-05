@@ -16,15 +16,15 @@ OpenShift requires specific annotations and host configurations for routing to w
 2. Set the `core` and `hosts` fields to the provided URL.
 
 ```yaml
-annotations:
-  route.openshift.io/termination: edge
-
-core: "alex-container-regis-dev.apps.rm2.thpm.p1.openshiftapps.com"
-hosts:
-  - host: alex-container-regis-dev.apps.rm2.thpm.p1.openshiftapps.com
-    paths:
-      - path: /
-        pathType: Prefix
+ingress:
+  annotations:
+    route.openshift.io/termination: edge
+  core: "alex-container-regis-dev.apps.rm2.thpm.p1.openshiftapps.com"
+  hosts:
+    - host: alex-container-regis-dev.apps.rm2.thpm.p1.openshiftapps.com
+      paths:
+        - path: /
+          pathType: Prefix
 ```
 
 ### Manage Security Contexts

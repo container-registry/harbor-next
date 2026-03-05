@@ -6,11 +6,10 @@ metadata:
   labels:
     {{- include "harbor.componentLabels" (dict "root" . "component" "core") | nindent 4 }}
 spec:
-  {{- if .Values.core.pdb.minAvailable }}
-  minAvailable: {{ .Values.core.pdb.minAvailable }}
-  {{- end }}
-  {{- if .Values.core.pdb.maxUnavailable }}
+  {{- if hasKey .Values.core.pdb "maxUnavailable" }}
   maxUnavailable: {{ .Values.core.pdb.maxUnavailable }}
+  {{- else if hasKey .Values.core.pdb "minAvailable" }}
+  minAvailable: {{ .Values.core.pdb.minAvailable }}
   {{- end }}
   selector:
     matchLabels:

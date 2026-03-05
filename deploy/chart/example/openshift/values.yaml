@@ -10,6 +10,9 @@
 # -- External URL (OpenShift route)
 externalURL: "https://harbor-next-vad1mo-dev.apps.rm1.0a51.p1.openshiftapps.com"
 
+# -- Harbor admin password (REQUIRED - change this!)
+harborAdminPassword: "CHANGEME"
+
 # -- Ingress with OpenShift route annotations
 ingress:
   enabled: true
@@ -35,7 +38,7 @@ database:
   host: postgres.vad1mo-dev.svc.cluster.local
   port: 5432
   username: harbor
-  password: harbordbpass
+  password: CHANGEME
   database: registry
   sslmode: disable
 
@@ -176,7 +179,7 @@ extraManifests:
       name: postgres-secret
     stringData:
       POSTGRESQL_USER: harbor
-      POSTGRESQL_PASSWORD: harbordbpass
+      POSTGRESQL_PASSWORD: CHANGEME
       POSTGRESQL_DATABASE: registry
   - apiVersion: v1
     kind: PersistentVolumeClaim

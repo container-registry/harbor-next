@@ -76,5 +76,8 @@ ingress:
 Install or upgrade Harbor in the default namespace.
 
 ```bash
-helm upgrade --install test-1 .
+helm upgrade --install test-1 . \
+  --set externalURL=https://harbor.localhost \
+  --set database.host=harbor-db-rw \
+  --set harborAdminPassword=Harbor12345
 ```

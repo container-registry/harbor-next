@@ -1,8 +1,11 @@
 # Harbor Helm Chart - k3d Local Development Values
-# Usage: helm install harbor . -n harbor -f examples/k3d-local.yaml
+# Usage: helm install harbor . -n harbor -f example/k3d-local.yaml
 
 # External URL for Harbor (use localhost with k3d port mapping)
 externalURL: "https://harbor.localhost"
+
+# Harbor admin password (REQUIRED - change this!)
+harborAdminPassword: "Harbor12345"
 
 # Ingress configuration for k3d (uses Traefik by default)
 ingress:

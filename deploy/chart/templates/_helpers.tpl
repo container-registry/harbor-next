@@ -172,10 +172,18 @@ Return image pull policy
 Return image pull secrets
 */}}
 {{- define "harbor.imagePullSecrets" -}}
-{{- if .Values.imagePullSecrets }}
+{{- $hasSecrets := or .Values.imagePullSecrets (and .Values.imageCredentials .Values.imageCredentials.registry) }}
+{{- if $hasSecrets }}
 imagePullSecrets:
 {{- range .Values.imagePullSecrets }}
+{{- if kindIs "map" . }}
+  - name: {{ .name }}
+{{- else }}
   - name: {{ . }}
+{{- end }}
+{{- end }}
+{{- if and .Values.imageCredentials .Values.imageCredentials.registry }}
+  - name: {{ .Release.Name }}-registry-creds
 {{- end }}
 {{- end }}
 {{- end }}
@@ -243,7 +251,7 @@ Return the Redis host
 */}}
 {{- define "harbor.redis.host" -}}
 {{- if .Values.valkey.enabled }}
-{{- printf "valkey" }}
+{{- .Values.valkey.fullnameOverride | default (printf "%s-valkey" .Release.Name) }}
 {{- else }}
 {{- .Values.externalRedis.host }}
 {{- end }}
@@ -253,11 +261,7 @@ Return the Redis host
 Return the Redis host with port
 */}}
 {{- define "harbor.redis.hostWithPort" -}}
-{{- if .Values.valkey.enabled }}
-{{- .Release.Name }}-valkey:6379
-{{- else }}
-{{- .Values.externalRedis.host }}:{{ .Values.externalRedis.port | default 6379 }}
-{{- end }}
+{{- include "harbor.redis.host" . }}:{{ include "harbor.redis.port" . }}
 {{- end }}
 
 {{/*
@@ -316,6 +320,10 @@ Return the Redis URL for Harbor core
   {{ include "harbor.redis.url" . }}/0?idle_timeout_seconds=30
 {{- end -}}
 
+{{- define "harbor.redis.masterSet" -}}
+{{- .Values.externalRedis.sentinelMasterSet -}}
+{{- end -}}
+
 {{- define "harbor.redis.scheme" -}}
   {{- if .Values.valkey.enabled -}}
     {{- print "redis" -}}
@@ -328,7 +336,7 @@ Return the Redis URL for Harbor core
   {{- end -}}
 {{- end -}}
 
-/*scheme://[:password@]addr/db_index?idle_timeout_seconds=30*/
+{{/* scheme://[:password@]addr/db_index?idle_timeout_seconds=30 */}}
 {{- define "harbor.redis.url.harbor" -}}
     {{ include "harbor.redis.url" . }}/6?idle_timeout_seconds=30
 {{- end -}}
@@ -440,7 +448,14 @@ Container port
 Return the Registry controller internal URL
 */}}
 {{- define "harbor.registryctl.url" -}}
-http://{{ include "harbor.fullname" . }}-registry:8080
+http://{{ include "harbor.fullname" . }}-registry:{{ include "harbor.registryctl.port" . }}
+{{- end }}
+
+{{/*
+Registryctl container port
+*/}}
+{{- define "harbor.registryctl.port" -}}
+8080
 {{- end }}
 
 {{/*
@@ -575,6 +590,9 @@ Validate required values
 {{- end }}
 {{- if not .Values.database.host }}
 {{- fail "database.host is required. Please set database.host in your values." }}
+{{- end }}
+{{- if not .Values.harborAdminPassword }}
+{{- fail "harborAdminPassword is required. Please set harborAdminPassword in your values (minimum 8 characters)." }}
 {{- end }}
 {{- end }}
 

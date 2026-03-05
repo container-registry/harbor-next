@@ -17,22 +17,22 @@ tasks:
   lint:
     desc: Lint the Helm chart
     cmds:
-      - helm lint {{.CHART_DIR}}
+      - helm lint {{.CHART_DIR}} --set externalURL=https://harbor.example.com --set database.host=postgres.example.com --set harborAdminPassword=changeme123
 
   template:
     desc: Render templates locally
     cmds:
-      - helm template test {{.CHART_DIR}} --set externalURL=https://harbor.example.com --set database.host=postgres.example.com
+      - helm template test {{.CHART_DIR}} --set externalURL=https://harbor.example.com --set database.host=postgres.example.com --set harborAdminPassword=changeme123
 
   template:debug:
     desc: Render templates with debug output
     cmds:
-      - helm template test {{.CHART_DIR}} --debug --set externalURL=https://harbor.example.com --set database.host=postgres.example.com
+      - helm template test {{.CHART_DIR}} --debug --set externalURL=https://harbor.example.com --set database.host=postgres.example.com --set harborAdminPassword=changeme123
 
   validate:
     desc: Validate rendered templates against Kubernetes API
     cmds:
-      - helm template test {{.CHART_DIR}} --set externalURL=https://harbor.example.com --set database.host=postgres.example.com | kubectl apply --dry-run=client -f -
+      - helm template test {{.CHART_DIR}} --set externalURL=https://harbor.example.com --set database.host=postgres.example.com --set harborAdminPassword=changeme123 | kubectl apply --dry-run=client -f -
 
   # ============================================================================
   # Documentation
