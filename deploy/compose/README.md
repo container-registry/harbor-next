@@ -1,6 +1,6 @@
-# Harbor Production Compose
+# Harbor Compose
 
-Minimal Docker Compose deployment for Harbor.
+Minimal Docker Compose deployment for Harbor
 
 ## Prerequisites
 
@@ -17,7 +17,8 @@ cp .env.example .env
 # Edit .env — fill in HARBOR_TAG, EXT_ENDPOINT, and all secrets
 
 # 2. Generate token signing key (must be PKCS#1 / "RSA PRIVATE KEY" format)
-openssl genrsa -traditional -out config/token_service_key.pem 4096
+openssl genpkey -algorithm RSA -outform PEM -pkeyopt rsa_keygen_bits:4096 \
+  | openssl rsa -out config/token_service_key.pem
 
 # 3. Start
 docker compose up -d
@@ -49,6 +50,13 @@ To enable HTTPS termination at the portal:
    ```
 
 3. Set `EXT_ENDPOINT=https://your-domain` in `.env`.
+
+## Image Repository
+
+`.env.example` defaults to pulling from the remote registry (`8gears.container-registry.com/8gcr/`).
+To use locally built images instead, set `IMAGE_REPO=` (empty) in `.env`.
+
+Images resolve to `${IMAGE_REPO}harbor-core:${HARBOR_TAG}`, so the value must end with `/`.
 
 ## Architecture
 
