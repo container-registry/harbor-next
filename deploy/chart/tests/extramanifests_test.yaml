@@ -6,6 +6,7 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       extraManifests:
         - apiVersion: v1
           kind: ConfigMap
@@ -27,6 +28,7 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       extraManifests:
         - apiVersion: v1
           kind: ConfigMap
@@ -42,6 +44,7 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       extraTemplateManifests:
         - |
           apiVersion: v1
@@ -64,6 +67,7 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       extraManifests: []
       extraTemplateManifests: []
     asserts:

@@ -1,0 +1,154 @@
+# Helm Chart Quality Tasks
+# Linting, security scanning, and validation for CI/CD
+# ct, kube-linter, trivy run via Docker; kubescape uses local binary
+
+version: '3'
+
+vars:
+  CHART_DIR: deploy/chart
+  CHART_NAME: harbor-next
+
+  # Tool versions
+  CT_VERSION: '{{.CT_VERSION | default "3.12.0"}}'
+  KUBE_LINTER_VERSION: '{{.KUBE_LINTER_VERSION | default "0.7.3"}}'
+  # Minimum required values for schema validation
+  HELM_SET: >-
+    --set externalURL=https://harbor.example.com
+    --set database.host=db.example.com
+    --set harborAdminPassword=changeme123
+
+tasks:
+  # ============================================================================
+  # Individual Checks
+  # ============================================================================
+
+  helm-lint:
+    desc: "Lint chart with helm lint"
+    cmd: helm lint {{.CHART_DIR}} {{.HELM_SET}}
+
+  helm-template:
+    desc: "Render templates and check for errors"
+    cmd: helm template test {{.CHART_DIR}} {{.HELM_SET}} > /dev/null
+
+  ct-lint:
+    desc: "Lint chart with chart-testing (ct)"
+    cmd: >-
+      docker run --rm
+      -v $(pwd):/workdir -w /workdir
+      quay.io/helmpack/chart-testing:v{{.CT_VERSION}}
+      ct lint
+      --charts {{.CHART_DIR}}
+      --validate-maintainers=false
+
+  kube-linter:
+    desc: "Lint rendered manifests with kube-linter"
+    cmds:
+      - >-
+        helm template test {{.CHART_DIR}} {{.HELM_SET}}
+        | docker run --rm -i
+        stackrox/kube-linter:v{{.KUBE_LINTER_VERSION}}
+        lint --format=plain -
+
+  trivy-chart:
+    desc: "Scan chart for misconfigurations with Trivy"
+    cmds:
+      - >-
+        helm template test {{.CHART_DIR}} {{.HELM_SET}}
+        > {{.CHART_DIR}}/.trivy-manifests.yaml
+      - defer: rm -f {{.CHART_DIR}}/.trivy-manifests.yaml
+      - >-
+        docker run --rm
+        -v $(pwd)/{{.CHART_DIR}}:/chart
+        aquasec/trivy:{{.TRIVY_VERSION}}
+        config /chart/.trivy-manifests.yaml
+        --severity HIGH,CRITICAL
+        --exit-code 1
+
+  trivy-chart:report:
+    desc: "Scan chart with Trivy and output SARIF report"
+    cmds:
+      - >-
+        helm template test {{.CHART_DIR}} {{.HELM_SET}}
+        > {{.CHART_DIR}}/.trivy-manifests.yaml
+      - defer: rm -f {{.CHART_DIR}}/.trivy-manifests.yaml
+      - >-
+        docker run --rm
+        -v $(pwd)/{{.CHART_DIR}}:/chart
+        -v $(pwd):/out
+        aquasec/trivy:{{.TRIVY_VERSION}}
+        config /chart/.trivy-manifests.yaml
+        --severity HIGH,CRITICAL
+        --format sarif
+        --output /out/trivy-chart.sarif
+
+  _require-kubescape:
+    internal: true
+    run: once
+    preconditions:
+      - sh: command -v kubescape
+        msg: "kubescape not found. Install: brew install kubescape"
+
+  kubescape:
+    desc: "Scan rendered manifests with Kubescape (NSA + MITRE frameworks)"
+    deps: [_require-kubescape]
+    cmd: >-
+      helm template test {{.CHART_DIR}} {{.HELM_SET}}
+      | kubescape scan framework nsa,mitre -
+      --compliance-threshold 0
+
+  kubescape:report:
+    desc: "Scan with Kubescape and output SARIF report"
+    deps: [_require-kubescape]
+    cmd: >-
+      helm template test {{.CHART_DIR}} {{.HELM_SET}}
+      | kubescape scan framework nsa,mitre -
+      --format sarif
+      --output kubescape.sarif
+
+  unittest:
+    desc: "Run helm unittest"
+    cmd: helm unittest {{.CHART_DIR}}
+
+  # ============================================================================
+  # Aggregate Tasks
+  # ============================================================================
+
+  lint:
+    desc: "Run all linters (helm lint, ct lint, kube-linter)"
+    cmds:
+      - task: helm-lint
+      - task: ct-lint
+      - task: kube-linter
+
+  security:
+    desc: "Run all security scanners (Trivy, Kubescape)"
+    cmds:
+      - task: trivy-chart
+      - task: kubescape
+
+  ci:
+    desc: "Full CI quality gate (lint + security + unittest)"
+    cmds:
+      - task: helm-lint
+      - task: helm-template
+      - task: ct-lint
+      - task: kube-linter
+      - task: unittest
+      - task: trivy-chart
+      - task: kubescape
+
+  ci:report:
+    desc: "CI with SARIF reports for GitHub/GitLab integration"
+    cmds:
+      - task: helm-lint
+      - task: helm-template
+      - task: ct-lint
+      - task: kube-linter
+      - task: unittest
+      - task: trivy-chart:report
+      - task: kubescape:report
+
+  clean:
+    desc: "Remove generated reports"
+    cmds:
+      - rm -f trivy-chart.sarif kubescape.sarif

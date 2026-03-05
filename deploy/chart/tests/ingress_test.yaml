@@ -8,6 +8,7 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       ingress.enabled: true
       ingress.hosts:
         - host: harbor.example.com
@@ -26,6 +27,7 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       ingress.enabled: false
     asserts:
       - hasDocuments:
@@ -36,6 +38,7 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       ingress.enabled: true
       ingress.className: nginx
       ingress.hosts:
@@ -53,6 +56,7 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       ingress.enabled: true
       ingress.annotations:
         kubernetes.io/ingress.class: nginx
@@ -75,6 +79,7 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       ingress.enabled: true
       ingress.hosts:
         - host: harbor.example.com
@@ -98,6 +103,7 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       gateway.enabled: true
       gateway.hostnames:
         - harbor.example.com
@@ -119,6 +125,7 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       gateway.enabled: false
     asserts:
       - hasDocuments:
@@ -129,6 +136,7 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       ingress.enabled: true
       ingress.hosts:
         - host: harbor.example.com

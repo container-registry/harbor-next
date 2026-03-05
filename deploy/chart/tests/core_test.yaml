@@ -4,19 +4,20 @@ templates:
   - templates/core.service.yaml
   - templates/core.configmap.yaml
   - templates/core.secret.yaml
-  - templates/core.serviceaccount.yaml
+  - templates/serviceaccounts.yaml
 tests:
   - it: should create core deployment with default values
     template: templates/core.deployment.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
     asserts:
       - isKind:
           of: Deployment
       - equal:
           path: metadata.name
-          value: RELEASE-NAME-harbor-core
+          value: RELEASE-NAME-harbor-next-core
       - equal:
           path: spec.replicas
           value: 1
@@ -29,6 +30,7 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       core.replicas: 3
     asserts:
       - equal:
@@ -40,6 +42,7 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       core.image.repository: goharbor/harbor-core
       core.image.tag: "2.10.0"
     asserts:
@@ -52,6 +55,7 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
     asserts:
       - isKind:
           of: Service
@@ -70,6 +74,7 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
     asserts:
       - isKind:
           of: ConfigMap
@@ -92,33 +97,36 @@ tests:
           value: "TXlTZWNyZXRQYXNzd29yZA=="
 
   - it: should create service account when enabled
-    template: templates/core.serviceaccount.yaml
+    template: templates/serviceaccounts.yaml
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-harbor-next-core
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       core.serviceAccount.create: true
     asserts:
       - isKind:
           of: ServiceAccount
-      - equal:
-          path: metadata.name
-          value: RELEASE-NAME-harbor-core
 
-  - it: should not create service account when disabled
-    template: templates/core.serviceaccount.yaml
+  - it: should not create core service account when disabled
+    template: templates/serviceaccounts.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       core.serviceAccount.create: false
     asserts:
       - hasDocuments:
-          count: 0
+          count: 4
 
   - it: should apply pod annotations
     template: templates/core.deployment.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       core.podAnnotations:
         prometheus.io/scrape: "true"
     asserts:
@@ -131,6 +139,7 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       core.nodeSelector:
         disktype: ssd
     asserts:
@@ -143,6 +152,7 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       core.tolerations:
         - key: "node-role.kubernetes.io/control-plane"
           operator: "Exists"
@@ -157,6 +167,7 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       core.resources:
         limits:
           cpu: 1000m

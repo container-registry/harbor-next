@@ -11,12 +11,13 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
     asserts:
       - isKind:
           of: Deployment
       - equal:
           path: metadata.name
-          value: RELEASE-NAME-harbor-registry
+          value: RELEASE-NAME-harbor-next-registry
       - equal:
           path: spec.replicas
           value: 1
@@ -29,6 +30,7 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
     asserts:
       - equal:
           path: spec.template.spec.containers[0].name
@@ -42,18 +44,19 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
     asserts:
       - isKind:
           of: Service
       - equal:
           path: spec.ports[0].name
-          value: http
+          value: http-registry
       - equal:
           path: spec.ports[0].port
           value: 5000
       - equal:
           path: spec.ports[1].name
-          value: ctl
+          value: http-controller
       - equal:
           path: spec.ports[1].port
           value: 8080
@@ -63,6 +66,7 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       registry.storage.type: filesystem
       registry.persistence.enabled: true
       registry.persistence.size: 100Gi
@@ -78,6 +82,7 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       registry.storage.type: s3
       registry.persistence.enabled: true
     asserts:
@@ -89,6 +94,7 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       registry.storage.type: filesystem
       registry.persistence.enabled: false
     asserts:
@@ -100,40 +106,42 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       registry.storage.type: filesystem
       registry.storage.filesystem.rootdirectory: /data
     asserts:
-      - equal:
-          path: data.REGISTRY_STORAGE
-          value: "filesystem"
-      - equal:
-          path: data.REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY
-          value: "/data"
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["config.yml"]
+          pattern: "filesystem:"
+      - matchRegex:
+          path: data["config.yml"]
+          pattern: "rootdirectory: /data"
 
   - it: should configure S3 storage in configmap
     template: templates/registry.configmap.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       registry.storage.type: s3
       registry.storage.s3.region: us-west-2
       registry.storage.s3.bucket: my-harbor-bucket
     asserts:
-      - equal:
-          path: data.REGISTRY_STORAGE
-          value: "s3"
-      - equal:
-          path: data.REGISTRY_STORAGE_S3_REGION
-          value: "us-west-2"
-      - equal:
-          path: data.REGISTRY_STORAGE_S3_BUCKET
-          value: "my-harbor-bucket"
+      - matchRegex:
+          path: data["config.yml"]
+          pattern: "region: us-west-2"
+      - matchRegex:
+          path: data["config.yml"]
+          pattern: "bucket: my-harbor-bucket"
 
   - it: should use existing PVC when specified
     template: templates/registry.pvc.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       registry.storage.type: filesystem
       registry.persistence.enabled: true
       registry.persistence.existingClaim: my-existing-pvc
@@ -146,11 +154,11 @@ tests:
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
       registry.storage.type: filesystem
       registry.persistence.enabled: true
       registry.persistence.existingClaim: my-existing-pvc
     asserts:
-      # storage volume is at index 1 (index 0 is tmp emptyDir)
       - equal:
-          path: spec.template.spec.volumes[1].persistentVolumeClaim.claimName
+          path: spec.template.spec.volumes[2].persistentVolumeClaim.claimName
           value: my-existing-pvc
