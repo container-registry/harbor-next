@@ -1,27 +1,43 @@
 # Local Harbor
 
-Minimal local deployment of Harbor.
+Minimal local deployment of Harbor. TLS is disabled via `/dev/null` mounts in `.env.example`.
 
 ## Prerequisites
 
 - Docker Engine 24+ with Compose v2.24+
-- Pre-built Harbor images (`task image:all-images PUSH=false`)
+- Pre-built Harbor images (`task image:all-images`) or pull from remote registry
 
-## Start
+## Quick Start (Taskfile)
+
+```bash
+task dev:release:up                                                # local images
+task dev:release:up IMAGE_REPO=8gears.container-registry.com/8gcr/ # remote images
+task dev:release:up TAG=v2.14.0                                    # specific tag
+```
+
+Runs in foreground, auto-cleans on Ctrl+C. To stop manually:
+
+```bash
+task dev:release:down          # keep data
+task dev:release:down:clean    # remove volumes
+```
+
+## Manual Start
 
 ```bash
 cd deploy/compose/example/local
 cp .env.example .env
-openssl genpkey -algorithm RSA -out ../../config/token_service_key.pem -pkeyopt rsa_keygen_bits:4096
+openssl genpkey -algorithm RSA -outform PEM -pkeyopt rsa_keygen_bits:4096 \
+  | openssl rsa -out ../../config/token_service_key.pem
 docker compose -f ../../docker-compose.yaml --env-file .env up -d
 ```
 
 Open http://localhost and login with `admin` / `Harbor12345`.
 
-## Push / Pull
+## Push / Pull Images
 
 ```bash
-docker login localhost -u admin -p Harbor12345
+echo 'Harbor12345' | docker login localhost -u admin --password-stdin
 docker tag alpine localhost/library/alpine:test
 docker push localhost/library/alpine:test
 docker pull localhost/library/alpine:test
@@ -36,7 +52,7 @@ docker compose -f ../../docker-compose.yaml --env-file .env down -v     # destro
 
 ## Optional: HTTPS with mkcert
 
-For trusted local TLS, install [mkcert](https://github.com/FiloSottile/mkcert) (`brew install mkcert`) and generate certificates:
+For trusted local TLS, install [mkcert](https://github.com/FiloSottile/mkcert) (`brew install mkcert`):
 
 ```bash
 mkcert -install
@@ -45,12 +61,10 @@ mkcert -cert-file certs/tls.crt -key-file certs/tls.key localhost 127.0.0.1 ::1
 ```
 
 Update `.env`:
-```
-EXT_ENDPOINT=https://localhost
-```
-
-Start with both compose files — the local overlay adds TLS volumes and the HTTPS port:
 
 ```bash
-docker compose -f ../../docker-compose.yaml -f docker-compose.yaml --env-file .env up -d
+EXT_ENDPOINT=https://localhost
+TLS_CONF=./config/nginx/tls.conf
+TLS_CERT=./example/local/certs/tls.crt
+TLS_KEY=./example/local/certs/tls.key
 ```

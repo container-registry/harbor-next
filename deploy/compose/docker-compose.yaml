@@ -3,13 +3,12 @@ services:
     image: ${IMAGE_REPO:-}harbor-portal:${HARBOR_TAG}
     volumes:
       - ./config/nginx/proxy.conf:/etc/nginx/proxy.d/proxy.conf:ro
-      # Uncomment for TLS:
-      # - ./config/nginx/tls.conf:/etc/nginx/proxy.d/tls.conf:ro
-      # - ./config/certs/tls.crt:/etc/nginx/ssl/tls.crt:ro
-      # - ./config/certs/tls.key:/etc/nginx/ssl/tls.key:ro
+      - ${TLS_CONF:-./config/nginx/tls.conf}:/etc/nginx/proxy.d/tls.conf:ro
+      - ${TLS_CERT:-./config/certs/tls.crt}:/etc/nginx/ssl/tls.crt:ro
+      - ${TLS_KEY:-./config/certs/tls.key}:/etc/nginx/ssl/tls.key:ro
     ports:
       - "${PORT_HTTP:-80}:8080"
-      # - "${PORT_HTTPS:-443}:8443"  # Uncomment for TLS
+      - "${PORT_HTTPS:-443}:8443"
     depends_on:
       core:
         condition: service_healthy
