@@ -8,7 +8,7 @@ storage:
     enabled: true
 http:
   addr: :5000
-  secret: placeholder
+  secret: set-via-REGISTRY_HTTP_SECRET-env
   relativeurls: true
   debug:
     addr: localhost:5001

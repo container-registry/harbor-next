@@ -41,7 +41,7 @@ RUN ["/tmp/busybox", "sh", "-c", "\
     /tmp/busybox chgrp -R 0 /var/cache/nginx /var/log/nginx /etc/nginx/conf.d /etc/nginx/proxy.d /run/nginx && \
     /tmp/busybox chmod -R g=u /var/cache/nginx /var/log/nginx /etc/nginx/conf.d /etc/nginx/proxy.d /run/nginx && \
     /tmp/busybox rm /tmp/busybox"]
-USER 65532
+USER 65532:0
 
 EXPOSE 8080
 ENTRYPOINT ["nginx", "-g", "daemon off;"]

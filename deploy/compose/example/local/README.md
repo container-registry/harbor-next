@@ -28,7 +28,7 @@ task dev:release:down:clean    # remove volumes
 cd deploy/compose/example/local
 cp .env.example .env
 openssl genpkey -algorithm RSA -outform PEM -pkeyopt rsa_keygen_bits:4096 \
-  | openssl rsa -out ../../config/token_service_key.pem
+  | openssl rsa -traditional -out ../../config/token_service_key.pem
 docker compose -f ../../docker-compose.yaml --env-file .env up -d
 ```
 
@@ -36,11 +36,13 @@ Open http://localhost and login with `admin` / `Harbor12345`.
 
 ## Push / Pull Images
 
+TLS is disabled, so Docker requires the explicit port to use HTTP:
+
 ```bash
-echo 'Harbor12345' | docker login localhost -u admin --password-stdin
-docker tag alpine localhost/library/alpine:test
-docker push localhost/library/alpine:test
-docker pull localhost/library/alpine:test
+echo 'Harbor12345' | docker login localhost:80 -u admin --password-stdin
+docker tag alpine localhost:80/library/alpine:test
+docker push localhost:80/library/alpine:test
+docker pull localhost:80/library/alpine:test
 ```
 
 ## Stop

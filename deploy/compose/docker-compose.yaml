@@ -128,6 +128,8 @@ services:
     volumes:
       - ./config/registry.yml:/etc/registry/config.yml:ro
       - registry-data:/var/lib/registry
+    environment:
+      REGISTRY_HTTP_SECRET: ${CORE_SECRET}
     healthcheck:
       test: ["CMD", "/lprobe", "-port", "5001", "-endpoint", "/debug/health"]
       interval: 5s
@@ -204,7 +206,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: valkey/valkey:latest
+    image: valkey/valkey:8
     volumes:
       - redis-data:/data
     healthcheck:
