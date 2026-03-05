@@ -62,6 +62,27 @@ data:
   # Logging
   LOG_LEVEL: {{ .Values.logLevel | default "info" | quote }}
 
+  # Cache configuration
+  CACHE_ENABLED: {{ .Values.cache.enabled | quote }}
+  {{- if .Values.cache.enabled }}
+  CACHE_EXPIRE_HOURS: {{ .Values.cache.expireHours | quote }}
+  {{- end }}
+
+  # Core-specific settings
+  {{- if .Values.core.configureUserSettings }}
+  CONFIG_OVERWRITE_JSON: {{ .Values.core.configureUserSettings | quote }}
+  {{- end }}
+  {{- if .Values.core.quotaUpdateProvider }}
+  QUOTA_UPDATE_PROVIDER: {{ .Values.core.quotaUpdateProvider | quote }}
+  {{- end }}
+  {{- if .Values.core.artifactPullAsyncFlushDuration }}
+  ARTIFACT_PULL_ASYNC_FLUSH_DURATION: {{ .Values.core.artifactPullAsyncFlushDuration | quote }}
+  {{- end }}
+  {{- if .Values.core.gdpr }}
+  GDPR_DELETE_USER: {{ .Values.core.gdpr.deleteUser | quote }}
+  GDPR_AUDIT_LOGS: {{ .Values.core.gdpr.auditLogsCompliant | quote }}
+  {{- end }}
+
   # Config via toEnvVars
   {{- if .Values.core.config }}
   {{- include "harbor.toEnvVars" (dict "values" .Values.core.config "prefix" "" "isSecret" false) | nindent 2 }}

@@ -4,6 +4,10 @@ metadata:
   name: {{ include "harbor.fullname" . }}-core
   labels:
     {{- include "harbor.componentLabels" (dict "root" . "component" "core") | nindent 4 }}
+  {{- with .Values.core.serviceAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   type: ClusterIP
   ports:

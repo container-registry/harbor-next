@@ -7,6 +7,11 @@ metadata:
     {{- include "harbor.componentLabels" (dict "root" . "component" "exporter") | nindent 4 }}
 spec:
   replicas: {{ .Values.exporter.replicas }}
+  revisionHistoryLimit: {{ .Values.exporter.revisionHistoryLimit | default .Values.global.revisionHistoryLimit }}
+  {{- with .Values.exporter.deploymentStrategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "exporter") | nindent 6 }}
@@ -24,8 +29,16 @@ spec:
     spec:
       {{- include "harbor.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "harbor.serviceAccountName" (dict "root" . "component" "exporter" "serviceAccount" .Values.exporter.serviceAccount) }}
+      automountServiceAccountToken: {{ .Values.exporter.serviceAccount.automountServiceAccountToken | default false }}
+      {{- with (.Values.exporter.priorityClassName | default .Values.global.priorityClassName) }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
       securityContext:
         {{- toYaml .Values.exporter.podSecurityContext | nindent 8 }}
+      {{- with .Values.exporter.initContainers }}
+      initContainers:
+        {{- tpl (toYaml .) $ | nindent 8 }}
+      {{- end }}
       containers:
         - name: exporter
           securityContext:
@@ -110,6 +123,10 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+      {{- with .Values.exporter.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- tpl (toYaml .) $ | nindent 8 }}
+      {{- end }}
       {{- with .Values.exporter.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

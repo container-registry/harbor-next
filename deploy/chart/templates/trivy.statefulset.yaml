@@ -10,6 +10,7 @@ metadata:
     app.kubernetes.io/component: trivy
 spec:
   replicas: {{ .Values.trivy.replicas }}
+  revisionHistoryLimit: {{ .Values.trivy.revisionHistoryLimit | default .Values.global.revisionHistoryLimit }}
   serviceName: {{  template "harbor.trivy" . }}
   selector:
     matchLabels:
@@ -39,23 +40,22 @@ spec:
       - name: "data"
         emptyDir: {}
       {{- end }}
-{{- if .Values.trivy.serviceAccountName }}
-      serviceAccountName: {{ .Values.trivy.serviceAccountName }}
-{{- end }}
-      automountServiceAccountToken: {{ .Values.trivy.automountServiceAccountToken | default false }}
-{{- with .Values.trivy.topologySpreadConstraints}}
+      {{- if .Values.trivy.serviceAccount.create }}
+      serviceAccountName: {{ include "harbor.serviceAccountName" (dict "root" . "component" "trivy" "serviceAccount" .Values.trivy.serviceAccount) }}
+      {{- else if .Values.trivy.serviceAccount.name }}
+      serviceAccountName: {{ .Values.trivy.serviceAccount.name }}
+      {{- end }}
+      automountServiceAccountToken: {{ .Values.trivy.serviceAccount.automountServiceAccountToken | default false }}
+      {{- with (.Values.trivy.priorityClassName | default .Values.global.priorityClassName) }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      {{- with .Values.trivy.topologySpreadConstraints }}
       topologySpreadConstraints:
-{{- range . }}
-      - {{ . | toYaml | indent 8 | trim }}
-        labelSelector:
-          matchLabels:
-{{ include "harbor.matchLabels" $ | indent 12 }}
-            component: trivy
-{{- end }}
-{{- end }}
+        {{- tpl (toYaml .) $ | nindent 8 }}
+      {{- end }}
       {{- with .Values.trivy.initContainers }}
       initContainers:
-        {{- toYaml . | nindent 8 }}
+        {{- tpl (toYaml .) $ | nindent 8 }}
       {{- end }}
       containers:
         - name: trivy

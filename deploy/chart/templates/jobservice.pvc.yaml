@@ -5,10 +5,13 @@ metadata:
   name: {{ include "harbor.fullname" . }}-jobservice
   labels:
     {{- include "harbor.componentLabels" (dict "root" . "component" "jobservice") | nindent 4 }}
-  {{- with .Values.jobservice.persistence.annotations }}
   annotations:
+    {{- if eq .Values.jobservice.persistence.resourcePolicy "keep" }}
+    helm.sh/resource-policy: keep
+    {{- end }}
+    {{- with .Values.jobservice.persistence.annotations }}
     {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- end }}
 spec:
   accessModes:
     {{- toYaml .Values.jobservice.persistence.accessModes | nindent 4 }}

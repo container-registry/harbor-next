@@ -12,14 +12,16 @@ data:
   REGISTRY_URL: {{ include "harbor.registry.url" . | quote }}
   REGISTRY_CONTROLLER_URL: {{ include "harbor.registryctl.url" . | quote }}
 
-  JOBSERVICE_WEBHOOK_JOB_MAX_RETRY: {{ include "harbor.jobservice.notification.webhook_job_max_retry" . | quote }}
-  JOBSERVICE_WEBHOOK_JOB_HTTP_CLIENT_TIMEOUT: {{ include "harbor.jobservice.notification.webhook_job_http_client_timeout" . | quote }}
+  JOBSERVICE_WEBHOOK_JOB_MAX_RETRY: {{ .Values.jobservice.notification.webhook_job_max_retry | quote }}
+  JOBSERVICE_WEBHOOK_JOB_HTTP_CLIENT_TIMEOUT: {{ .Values.jobservice.notification.webhook_job_http_client_timeout | quote }}
 
   # Redis configuration
   _REDIS_URL_CORE: {{ include "harbor.redis.url.core" . | quote }}
   _REDIS_URL_CACHE_LAYER: {{ include "harbor.redis.url.cache" . | quote }}
-  CACHE_ENABLED: "true"
-  CACHE_EXPIRE_HOURS: "24"
+  CACHE_ENABLED: {{ .Values.cache.enabled | quote }}
+  {{- if .Values.cache.enabled }}
+  CACHE_EXPIRE_HOURS: {{ .Values.cache.expireHours | quote }}
+  {{- end }}
 
   # Logging
   LOG_LEVEL: {{ .Values.logLevel | default "info" | quote }}

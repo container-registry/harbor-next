@@ -17,14 +17,26 @@ data:
         namespace: "harbor_job_service_namespace"
         idle_timeout_second: 3600
     job_loggers:
+      {{- if has "file" .Values.jobservice.jobLoggers }}
       - name: "FILE"
         level: {{ .Values.logLevel | upper }}
-        settings: # Customized settings of logger
+        settings:
           base_dir: "/var/log/jobs"
         sweeper:
-          duration: 14 #days
-          settings: # Customized settings of sweeper
+          duration: {{ .Values.jobservice.loggerSweeperDuration | default 14 }} #days
+          settings:
             work_dir: "/var/log/jobs"
+      {{- end }}
+      {{- if has "database" .Values.jobservice.jobLoggers }}
+      - name: "DB"
+        level: {{ .Values.logLevel | upper }}
+        sweeper:
+          duration: {{ .Values.jobservice.loggerSweeperDuration | default 14 }} #days
+      {{- end }}
+      {{- if has "stdout" .Values.jobservice.jobLoggers }}
+      - name: "STD_OUTPUT"
+        level: {{ .Values.logLevel | upper }}
+      {{- end }}
     metric:
       enabled: {{ .Values.metrics.enabled }}
       path: "{{ include "harbor.metrics.path" . }}"
@@ -34,7 +46,5 @@ data:
       - name: "STD_OUTPUT"
         level: {{ .Values.logLevel | upper }}
     reaper:
-      # the max time to wait for a task to finish, if unfinished after max_update_hours, the task will be mark as error, but the task will continue to run, default value is 24
-      max_update_hours: {{ include "harbor.jobservice.reaper.max_update_hours" . }}
-      # the max time for execution in running state without new task created
-      max_dangling_hours: {{ include "harbor.jobservice.reaper.max_dangling_hours" . }}
+      max_update_hours: {{ .Values.jobservice.reaper.max_update_hours | default 24 }}
+      max_dangling_hours: {{ .Values.jobservice.reaper.max_dangling_hours | default 168 }}

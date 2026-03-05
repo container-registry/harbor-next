@@ -5,10 +5,13 @@ metadata:
   name: {{ include "harbor.fullname" . }}-registry
   labels:
     {{- include "harbor.componentLabels" (dict "root" . "component" "registry") | nindent 4 }}
-  {{- with .Values.registry.persistence.annotations }}
   annotations:
+    {{- if eq .Values.registry.persistence.resourcePolicy "keep" }}
+    helm.sh/resource-policy: keep
+    {{- end }}
+    {{- with .Values.registry.persistence.annotations }}
     {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- end }}
 spec:
   accessModes:
     {{- toYaml .Values.registry.persistence.accessModes | nindent 4 }}

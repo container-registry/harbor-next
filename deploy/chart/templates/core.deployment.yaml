@@ -6,6 +6,11 @@ metadata:
     {{- include "harbor.componentLabels" (dict "root" . "component" "core") | nindent 4 }}
 spec:
   replicas: {{ .Values.core.replicas }}
+  revisionHistoryLimit: {{ .Values.core.revisionHistoryLimit | default .Values.global.revisionHistoryLimit }}
+  {{- with .Values.core.deploymentStrategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "core") | nindent 6 }}
@@ -25,8 +30,16 @@ spec:
     spec:
       {{- include "harbor.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "harbor.serviceAccountName" (dict "root" . "component" "core" "serviceAccount" .Values.core.serviceAccount) }}
+      automountServiceAccountToken: {{ .Values.core.serviceAccount.automountServiceAccountToken | default false }}
+      {{- with (.Values.core.priorityClassName | default .Values.global.priorityClassName) }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
       securityContext:
         {{- toYaml .Values.core.podSecurityContext | nindent 8 }}
+      {{- with .Values.core.initContainers }}
+      initContainers:
+        {{- tpl (toYaml .) $ | nindent 8 }}
+      {{- end }}
       containers:
         - name: core
           securityContext:
@@ -46,6 +59,13 @@ spec:
             - secretRef:
                 name: {{ include "harbor.fullname" . }}-core
           env:
+            {{- if .Values.existingSecretAdminPassword }}
+            - name: HARBOR_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecretAdminPassword }}
+                  key: {{ .Values.existingSecretAdminPasswordKey | default "HARBOR_ADMIN_PASSWORD" }}
+            {{- end }}
             - name: CORE_SECRET
               valueFrom:
                 secretKeyRef:
@@ -83,6 +103,15 @@ spec:
               port: core-http
             initialDelaySeconds: 20
             periodSeconds: 10
+          {{- if .Values.core.startupProbe.enabled }}
+          startupProbe:
+            httpGet:
+              path: /api/v2.0/ping
+              port: core-http
+            initialDelaySeconds: {{ .Values.core.startupProbe.initialDelaySeconds }}
+            periodSeconds: 10
+            failureThreshold: 12
+          {{- end }}
           resources:
             {{- toYaml .Values.core.resources | nindent 12 }}
           volumeMounts:
@@ -115,8 +144,8 @@ spec:
                 path: key
         - name: token-service-private-key
           secret:
-            {{- if .Values.core.secretName }}
-            secretName: {{ .Values.core.secretName }}
+            {{- if .Values.core.tokenSecretName }}
+            secretName: {{ .Values.core.tokenSecretName }}
             {{- else }}
             secretName: {{ template "harbor.core" . }}
             {{- end }}
@@ -124,6 +153,10 @@ spec:
           emptyDir: {}
         - name: tmp
           emptyDir: {}
+      {{- with .Values.core.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- tpl (toYaml .) $ | nindent 8 }}
+      {{- end }}
       {{- with .Values.core.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

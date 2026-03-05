@@ -591,8 +591,8 @@ Validate required values
 {{- if not .Values.database.host }}
 {{- fail "database.host is required. Please set database.host in your values." }}
 {{- end }}
-{{- if not .Values.harborAdminPassword }}
-{{- fail "harborAdminPassword is required. Please set harborAdminPassword in your values (minimum 8 characters)." }}
+{{- if and (not .Values.harborAdminPassword) (not .Values.existingSecretAdminPassword) }}
+{{- fail "harborAdminPassword or existingSecretAdminPassword is required. Please set one in your values." }}
 {{- end }}
 {{- end }}
 
@@ -625,29 +625,20 @@ Container port
 {{ include "harbor.redis.url" . }}
 {{- end -}}
 
-{{/*
-the max time to wait for a task to finish, if unfinished after max_update_hours, the task will be mark as error, but the task will continue to run, default value is 24
-*/}}
 {{- define "harbor.jobservice.reaper.max_update_hours" -}}
-24
+{{ .Values.jobservice.reaper.max_update_hours | default 24 }}
 {{- end }}
 
-{{/*
-the max time for execution in running state without new task created
-*/}}
 {{- define "harbor.jobservice.reaper.max_dangling_hours" -}}
-168
+{{ .Values.jobservice.reaper.max_dangling_hours | default 168 }}
 {{- end }}
 
 {{- define "harbor.jobservice.notification.webhook_job_max_retry" -}}
-3
+{{ .Values.jobservice.notification.webhook_job_max_retry | default 3 }}
 {{- end }}
 
-{{/*
-in seconds
-*/}}
 {{- define "harbor.jobservice.notification.webhook_job_http_client_timeout" -}}
-3
+{{ .Values.jobservice.notification.webhook_job_http_client_timeout | default 3 }}
 {{- end }}
 
 {{- define "harbor.jobservice.secretName" -}}

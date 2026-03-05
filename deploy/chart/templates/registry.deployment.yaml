@@ -6,9 +6,11 @@ metadata:
     {{- include "harbor.componentLabels" (dict "root" . "component" "registry") | nindent 4 }}
 spec:
   replicas: {{ .Values.registry.replicas }}
-  revisionHistoryLimit: 10
+  revisionHistoryLimit: {{ .Values.registry.revisionHistoryLimit | default .Values.global.revisionHistoryLimit }}
+  {{- with .Values.registry.deploymentStrategy }}
   strategy:
-    type: RollingUpdate
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "registry") | nindent 6 }}
@@ -28,8 +30,16 @@ spec:
     spec:
       {{- include "harbor.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "harbor.serviceAccountName" (dict "root" . "component" "registry" "serviceAccount" .Values.registry.serviceAccount) }}
+      automountServiceAccountToken: {{ .Values.registry.serviceAccount.automountServiceAccountToken | default false }}
+      {{- with (.Values.registry.priorityClassName | default .Values.global.priorityClassName) }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
       securityContext:
         {{- toYaml .Values.registry.podSecurityContext | nindent 8 }}
+      {{- with .Values.registry.initContainers }}
+      initContainers:
+        {{- tpl (toYaml .) $ | nindent 8 }}
+      {{- end }}
       containers:
         - name: registry
           securityContext:
@@ -170,6 +180,10 @@ spec:
           secret:
             secretName: {{ include "harbor.fullname" . }}-registry-gcs
         {{- end }}
+      {{- with .Values.registry.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- tpl (toYaml .) $ | nindent 8 }}
+      {{- end }}
       {{- with .Values.registry.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

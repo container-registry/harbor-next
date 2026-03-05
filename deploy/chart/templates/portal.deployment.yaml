@@ -6,6 +6,11 @@ metadata:
     {{- include "harbor.componentLabels" (dict "root" . "component" "portal") | nindent 4 }}
 spec:
   replicas: {{ .Values.portal.replicas }}
+  revisionHistoryLimit: {{ .Values.portal.revisionHistoryLimit | default .Values.global.revisionHistoryLimit }}
+  {{- with .Values.portal.deploymentStrategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "portal") | nindent 6 }}
@@ -23,8 +28,16 @@ spec:
     spec:
       {{- include "harbor.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "harbor.serviceAccountName" (dict "root" . "component" "portal" "serviceAccount" .Values.portal.serviceAccount) }}
+      automountServiceAccountToken: {{ .Values.portal.serviceAccount.automountServiceAccountToken | default false }}
+      {{- with (.Values.portal.priorityClassName | default .Values.global.priorityClassName) }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
       securityContext:
         {{- toYaml .Values.portal.podSecurityContext | nindent 8 }}
+      {{- with .Values.portal.initContainers }}
+      initContainers:
+        {{- tpl (toYaml .) $ | nindent 8 }}
+      {{- end }}
       containers:
         - name: portal
           securityContext:
@@ -65,6 +78,10 @@ spec:
             name: "{{ template "harbor.portal" . }}"
         - name: tmp
           emptyDir: {}
+      {{- with .Values.portal.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- tpl (toYaml .) $ | nindent 8 }}
+      {{- end }}
       {{- with .Values.portal.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
