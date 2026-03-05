@@ -1062,9 +1062,9 @@ tls:
       # name: letsencrypt-prod
       # kind: ClusterIssuer
     # -- Certificate duration
-    duration: 2160h # 90 days
+    duration: 2160h  # 90 days
     # -- Certificate renewal before expiry
-    renewBefore: 360h # 15 days
+    renewBefore: 360h  # 15 days
 
   # -- Custom TLS secrets (alternative to cert-manager)
   customSecrets:
@@ -1156,4 +1156,3 @@ trace:
     insecure: true
     # timeout is in seconds
     timeout: 10
-
