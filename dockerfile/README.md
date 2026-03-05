@@ -48,9 +48,9 @@ docker buildx build --platform linux/amd64 -t harbor-portal:dev -f dockerfile/po
 
 ## Docker Hardened Images (DHI)
 
-`portal.dockerfile` uses `dhi.io/nginx` — a CIS-benchmark-compliant, non-root base image rebuilt on a regular cadence with CVE patches.
+`portal.dockerfile` uses `dhi.io/nginx` (via our proxy at `8gears.container-registry.com/dhi.io/nginx`) — a CIS-benchmark-compliant, non-root base image rebuilt on a regular cadence with CVE patches.
 
-Pulling from `dhi.io` requires authentication. Set `DHI_USERNAME`/`DHI_PASSWORD` and run `docker login dhi.io` before building.
+Pulling requires authentication against our proxy. Run `docker login 8gears.container-registry.com` before building.
 
 ## Design Decisions
 

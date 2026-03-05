@@ -25,7 +25,7 @@ RUN cd app-swagger-ui && bun install --ignore-scripts && bun run build
 # RUNTIME
 FROM ghcr.io/fivexl/lprobe:${LPROBE_VERSION} AS lprobe
 
-FROM dhi.io/nginx:${NGINX_VERSION}-debian13
+FROM 8gears.container-registry.com/dhi.io/nginx:${NGINX_VERSION}-debian13
 COPY --from=lprobe /lprobe /lprobe
 COPY --from=builder /bin/busybox.static /tmp/busybox
 COPY --from=builder /harbor/src/portal/dist /usr/share/nginx/html
