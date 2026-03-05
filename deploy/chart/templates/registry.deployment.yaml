@@ -180,19 +180,4 @@ spec:
           secret:
             secretName: {{ include "harbor.fullname" . }}-registry-gcs
         {{- end }}
-      {{- with .Values.registry.topologySpreadConstraints }}
-      topologySpreadConstraints:
-        {{- tpl (toYaml .) $ | nindent 8 }}
-      {{- end }}
-      {{- with .Values.registry.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.registry.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.registry.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      {{- include "harbor.podScheduling" (dict "component" .Values.registry "root" $) | nindent 6 }}

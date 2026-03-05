@@ -123,20 +123,5 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
-      {{- with .Values.exporter.topologySpreadConstraints }}
-      topologySpreadConstraints:
-        {{- tpl (toYaml .) $ | nindent 8 }}
-      {{- end }}
-      {{- with .Values.exporter.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.exporter.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.exporter.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      {{- include "harbor.podScheduling" (dict "component" .Values.exporter "root" $) | nindent 6 }}
 {{- end }}

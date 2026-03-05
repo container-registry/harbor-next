@@ -106,19 +106,4 @@ spec:
           {{- end }}
         - name: tmp
           emptyDir: {}
-      {{- with .Values.jobservice.topologySpreadConstraints }}
-      topologySpreadConstraints:
-        {{- tpl (toYaml .) $ | nindent 8 }}
-      {{- end }}
-      {{- with .Values.jobservice.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.jobservice.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.jobservice.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      {{- include "harbor.podScheduling" (dict "component" .Values.jobservice "root" $) | nindent 6 }}

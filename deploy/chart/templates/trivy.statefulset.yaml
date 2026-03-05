@@ -2,67 +2,47 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ template "harbor.trivy" . }}
-  namespace: {{ .Release.Namespace | quote }}
+  name: {{ include "harbor.fullname" . }}-trivy
   labels:
-{{ include "harbor.labels" . | indent 4 }}
-    component: trivy
-    app.kubernetes.io/component: trivy
+    {{- include "harbor.componentLabels" (dict "root" . "component" "trivy") | nindent 4 }}
 spec:
   replicas: {{ .Values.trivy.replicas }}
   revisionHistoryLimit: {{ .Values.trivy.revisionHistoryLimit | default .Values.global.revisionHistoryLimit }}
-  serviceName: {{  template "harbor.trivy" . }}
+  serviceName: {{ include "harbor.fullname" . }}-trivy
   selector:
     matchLabels:
       {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "trivy") | nindent 6 }}
   template:
     metadata:
-      labels:
-{{ include "harbor.labels" . | indent 8 }}
-        component: trivy
-        app.kubernetes.io/component: trivy
-{{- if .Values.trivy.podLabels }}
-{{ toYaml .Values.trivy.podLabels | indent 8 }}
-{{- end }}
       annotations:
-        checksum/secret: {{ include (print $.Template.BasePath "/trivy.secret.yaml") . | sha256sum }} 
-{{- if .Values.trivy.podAnnotations }}
-{{ toYaml .Values.trivy.podAnnotations | indent 8 }}
-{{- end }}
+        checksum/secret: {{ include (print $.Template.BasePath "/trivy.secret.yaml") . | sha256sum }}
+        {{- with .Values.trivy.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "trivy") | nindent 8 }}
+        {{- with .Values.trivy.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       {{- include "harbor.imagePullSecrets" . | nindent 6 }}
-      volumes:
-      {{- if and .Values.trivy.persistence.enabled .Values.trivy.persistence.existingClaim }}
-      - name: "data"
-        persistentVolumeClaim:
-          claimName: {{ .Values.trivy.persistence.existingClaim }}
-      {{- else if not .Values.trivy.persistence.enabled }}
-      - name: "data"
-        emptyDir: {}
-      {{- end }}
-      {{- if .Values.trivy.serviceAccount.create }}
       serviceAccountName: {{ include "harbor.serviceAccountName" (dict "root" . "component" "trivy" "serviceAccount" .Values.trivy.serviceAccount) }}
-      {{- else if .Values.trivy.serviceAccount.name }}
-      serviceAccountName: {{ .Values.trivy.serviceAccount.name }}
-      {{- end }}
       automountServiceAccountToken: {{ .Values.trivy.serviceAccount.automountServiceAccountToken | default false }}
       {{- with (.Values.trivy.priorityClassName | default .Values.global.priorityClassName) }}
       priorityClassName: {{ . | quote }}
       {{- end }}
-      {{- with .Values.trivy.topologySpreadConstraints }}
-      topologySpreadConstraints:
-        {{- tpl (toYaml .) $ | nindent 8 }}
-      {{- end }}
+      securityContext:
+        {{- toYaml .Values.trivy.podSecurityContext | nindent 8 }}
       {{- with .Values.trivy.initContainers }}
       initContainers:
         {{- tpl (toYaml .) $ | nindent 8 }}
       {{- end }}
       containers:
         - name: trivy
-          image: {{ include "harbor.image" (dict "imageRoot" .Values.trivy.image "global" .Values.image "chart" .Chart) }}
-          imagePullPolicy: {{ .Values.imagePullPolicy }}
           securityContext:
             {{- toYaml .Values.trivy.securityContext | nindent 12 }}
+          image: {{ include "harbor.image" (dict "imageRoot" .Values.trivy.image "global" .Values.image "chart" .Chart) }}
+          imagePullPolicy: {{ include "harbor.imagePullPolicy" . }}
           env:
           {{- if has "trivy" .Values.proxy.components }}
             - name: HTTP_PROXY
@@ -70,7 +50,7 @@ spec:
             - name: HTTPS_PROXY
               value: "{{ .Values.proxy.httpsProxy }}"
             - name: NO_PROXY
-              value: "{{ template "harbor.noProxy" . }}"
+              value: "{{ include "harbor.noProxy" . }}"
           {{- end }}
             - name: "SCANNER_LOG_LEVEL"
               value: {{ .Values.logLevel | quote }}
@@ -87,7 +67,7 @@ spec:
             - name: "SCANNER_TRIVY_GITHUB_TOKEN"
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "harbor.trivy" . }}
+                  name: {{ include "harbor.fullname" . }}-trivy
                   key: gitHubToken
             - name: "SCANNER_TRIVY_SEVERITY"
               value: {{ .Values.trivy.severity | quote }}
@@ -112,21 +92,21 @@ spec:
             - name: "SCANNER_REDIS_URL"
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "harbor.trivy" . }}
+                  name: {{ include "harbor.fullname" . }}-trivy
                   key: redisURL
             - name: "SCANNER_STORE_REDIS_URL"
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "harbor.trivy" . }}
+                  name: {{ include "harbor.fullname" . }}-trivy
                   key: redisURL
             - name: "SCANNER_JOB_QUEUE_REDIS_URL"
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "harbor.trivy" . }}
+                  name: {{ include "harbor.fullname" . }}-trivy
                   key: redisURL
-{{- with .Values.trivy.extraEnvVars }}
-{{- toYaml . | nindent 12 }}
-{{- end }}
+            {{- with .Values.trivy.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           ports:
             - name: api-server
               containerPort: 8080
@@ -153,7 +133,17 @@ spec:
             successThreshold: 1
             failureThreshold: 3
           resources:
-{{ toYaml .Values.trivy.resources | indent 12 }}
+            {{- toYaml .Values.trivy.resources | nindent 12 }}
+      volumes:
+      {{- if and .Values.trivy.persistence.enabled .Values.trivy.persistence.existingClaim }}
+      - name: "data"
+        persistentVolumeClaim:
+          claimName: {{ .Values.trivy.persistence.existingClaim }}
+      {{- else if not .Values.trivy.persistence.enabled }}
+      - name: "data"
+        emptyDir: {}
+      {{- end }}
+      {{- include "harbor.podScheduling" (dict "component" .Values.trivy "root" $) | nindent 6 }}
 {{- if and .Values.trivy.persistence.enabled (not .Values.trivy.persistence.existingClaim) }}
   volumeClaimTemplates:
   - apiVersion: v1

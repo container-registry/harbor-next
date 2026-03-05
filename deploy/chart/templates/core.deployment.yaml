@@ -153,19 +153,4 @@ spec:
           emptyDir: {}
         - name: tmp
           emptyDir: {}
-      {{- with .Values.core.topologySpreadConstraints }}
-      topologySpreadConstraints:
-        {{- tpl (toYaml .) $ | nindent 8 }}
-      {{- end }}
-      {{- with .Values.core.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.core.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.core.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      {{- include "harbor.podScheduling" (dict "component" .Values.core "root" $) | nindent 6 }}

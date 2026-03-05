@@ -78,19 +78,4 @@ spec:
             name: "{{ template "harbor.portal" . }}"
         - name: tmp
           emptyDir: {}
-      {{- with .Values.portal.topologySpreadConstraints }}
-      topologySpreadConstraints:
-        {{- tpl (toYaml .) $ | nindent 8 }}
-      {{- end }}
-      {{- with .Values.portal.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.portal.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.portal.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      {{- include "harbor.podScheduling" (dict "component" .Values.portal "root" $) | nindent 6 }}
