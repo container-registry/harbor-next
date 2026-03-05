@@ -85,7 +85,7 @@ tasks:
       - test -f {{.TOKEN_KEY_FILE}}
     cmds:
       - openssl genpkey -algorithm RSA -outform PEM -pkeyopt rsa_keygen_bits:4096 | openssl rsa -traditional -out {{.TOKEN_KEY_FILE}}
-      - chmod 600 {{.TOKEN_KEY_FILE}}
+      - chmod 644 {{.TOKEN_KEY_FILE}}
       - echo "Generated {{.TOKEN_KEY_FILE}}"
 
   # ---------------------------------------------------------------------------
@@ -265,7 +265,7 @@ tasks:
     status: ['test -f {{.TOKEN_KEY_FILE_LOCAL}}']
     cmds:
       - openssl genpkey -algorithm RSA -outform PEM -pkeyopt rsa_keygen_bits:4096 | openssl rsa -traditional -out {{.TOKEN_KEY_FILE_LOCAL}}
-      - chmod 600 {{.TOKEN_KEY_FILE_LOCAL}}
+      - chmod 644 {{.TOKEN_KEY_FILE_LOCAL}}
 
   release:up:
     desc: "Start release images locally (IMAGE_REPO= for remote, empty for local)"

@@ -21,6 +21,8 @@ services:
 
   core:
     image: ${IMAGE_REPO:-}harbor-core:${HARBOR_TAG}
+    tmpfs:
+      - /tmp:size=256M,mode=1777
     volumes:
       - ./config/token_service_key.pem:/etc/core/token_service_key.pem:ro
     environment:
@@ -31,9 +33,9 @@ services:
       POSTGRESQL_PASSWORD: ${DB_PASSWORD}
       POSTGRESQL_DATABASE: ${DB_NAME:-registry}
       POSTGRESQL_SSLMODE: ${DB_SSLMODE:-disable}
-      # Redis
-      _REDIS_URL_CORE: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}/1
-      _REDIS_URL_REG: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}/2
+      # Redis — DB indexes follow upstream: core=0, registry=1, jobservice=2, trivy=5
+      _REDIS_URL_CORE: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}/0
+      _REDIS_URL_REG: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}/1
       # Registry
       REGISTRY_URL: http://registry:5000
       REGISTRY_CONTROLLER_URL: http://registryctl:8080
@@ -72,6 +74,8 @@ services:
 
   jobservice:
     image: ${IMAGE_REPO:-}harbor-jobservice:${HARBOR_TAG}
+    tmpfs:
+      - /tmp:size=256M,mode=1777
     volumes:
       - ./config/jobservice.yml:/etc/jobservice/config.yml:ro
     environment:
@@ -103,6 +107,8 @@ services:
 
   registryctl:
     image: ${IMAGE_REPO:-}harbor-registryctl:${HARBOR_TAG}
+    tmpfs:
+      - /tmp:size=256M,mode=1777
     volumes:
       - ./config/registryctl.yml:/etc/registryctl/config.yml:ro
       - ./config/registry.yml:/etc/registry/config.yml:ro
@@ -141,10 +147,10 @@ services:
     image: ${IMAGE_REPO:-}harbor-trivy-adapter:${HARBOR_TAG}
     environment:
       SCANNER_LOG_LEVEL: ${LOG_LEVEL:-info}
-      SCANNER_REDIS_URL: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}
-      SCANNER_STORE_REDIS_URL: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}
+      SCANNER_REDIS_URL: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}/5
+      SCANNER_STORE_REDIS_URL: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}/5
       SCANNER_STORE_REDIS_NAMESPACE: harbor.scanner.trivy:store
-      SCANNER_JOB_QUEUE_REDIS_URL: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}
+      SCANNER_JOB_QUEUE_REDIS_URL: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}/5
       SCANNER_JOB_QUEUE_REDIS_NAMESPACE: harbor.scanner.trivy:job-queue
       SCANNER_TRIVY_CACHE_DIR: /tmp/trivy
       SCANNER_TRIVY_REPORTS_DIR: /tmp/reports
@@ -165,6 +171,8 @@ services:
 
   exporter:
     image: ${IMAGE_REPO:-}harbor-exporter:${HARBOR_TAG}
+    tmpfs:
+      - /tmp:size=256M,mode=1777
     environment:
       HARBOR_DATABASE_HOST: postgresql
       HARBOR_DATABASE_PORT: "5432"
@@ -191,7 +199,7 @@ services:
     restart: unless-stopped
 
   postgresql:
-    image: postgres:16-alpine
+    image: postgres:${POSTGRES_VERSION:-16}-alpine
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
@@ -206,7 +214,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: valkey/valkey:8
+    image: valkey/valkey:${VALKEY_VERSION:-8}
     volumes:
       - redis-data:/data
     healthcheck:
