@@ -105,8 +105,7 @@ dockerfile/
 ├── exporter.dockerfile          # Metrics exporter (scratch base)
 ├── portal.dockerfile            # Angular frontend (nginx:alpine)
 ├── registry.dockerfile          # Docker registry (scratch base)
-├── trivy-adapter.dockerfile     # Trivy scanner (aquasec/trivy base)
-└── nginx.dockerfile             # Nginx proxy (dhi.io/nginx:debian13)
+└── trivy-adapter.dockerfile     # Trivy scanner (aquasec/trivy base)
 ```
 
 ## Usage with Taskfile
