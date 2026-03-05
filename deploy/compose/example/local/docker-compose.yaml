@@ -1,0 +1,11 @@
+# Local TLS override — extends the parent compose via COMPOSE_FILE in .env
+# Paths resolve relative to the parent compose dir (deploy/compose/)
+
+services:
+  portal:
+    volumes:
+      - ./config/nginx/tls.conf:/etc/nginx/proxy.d/tls.conf:ro
+      - ./example/local/certs/tls.crt:/etc/nginx/ssl/tls.crt:ro
+      - ./example/local/certs/tls.key:/etc/nginx/ssl/tls.key:ro
+    ports:
+      - "${PORT_HTTPS:-443}:8443"

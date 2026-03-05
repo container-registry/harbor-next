@@ -1,0 +1,221 @@
+services:
+  portal:
+    image: harbor-portal:${HARBOR_TAG}
+    volumes:
+      - ./config/nginx/proxy.conf:/etc/nginx/proxy.d/proxy.conf:ro
+      # Uncomment for TLS:
+      # - ./config/nginx/tls.conf:/etc/nginx/proxy.d/tls.conf:ro
+      # - ./config/certs/tls.crt:/etc/nginx/ssl/tls.crt:ro
+      # - ./config/certs/tls.key:/etc/nginx/ssl/tls.key:ro
+    ports:
+      - "${PORT_HTTP:-80}:8080"
+      # - "${PORT_HTTPS:-443}:8443"  # Uncomment for TLS
+    depends_on:
+      core:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/lprobe", "-port", "8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  core:
+    image: harbor-core:${HARBOR_TAG}
+    volumes:
+      - ./config/token_service_key.pem:/etc/core/token_service_key.pem:ro
+    environment:
+      # Database
+      POSTGRESQL_HOST: postgresql
+      POSTGRESQL_PORT: "5432"
+      POSTGRESQL_USERNAME: ${DB_USER:-postgres}
+      POSTGRESQL_PASSWORD: ${DB_PASSWORD}
+      POSTGRESQL_DATABASE: ${DB_NAME:-registry}
+      POSTGRESQL_SSLMODE: ${DB_SSLMODE:-disable}
+      # Redis
+      _REDIS_URL_CORE: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}/1
+      _REDIS_URL_REG: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}/2
+      # Registry
+      REGISTRY_URL: http://registry:5000
+      REGISTRY_CONTROLLER_URL: http://registryctl:8080
+      REGISTRY_CREDENTIAL_USERNAME: ${REGISTRY_CREDENTIAL_USERNAME:-}
+      REGISTRY_CREDENTIAL_PASSWORD: ${REGISTRY_CREDENTIAL_PASSWORD:-}
+      # Core
+      EXT_ENDPOINT: ${EXT_ENDPOINT}  # Required: public URL (e.g. https://registry.example.com)
+      CORE_URL: http://core:8080
+      HARBOR_ADMIN_PASSWORD: ${HARBOR_ADMIN_PASSWORD}
+      CACHE_ENABLED: ${CACHE_ENABLED:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TOKEN_PRIVATE_KEY_PATH: /etc/core/token_service_key.pem
+      # JobService
+      JOBSERVICE_URL: http://jobservice:8888
+      CORE_SECRET: ${CORE_SECRET}
+      JOBSERVICE_SECRET: ${JOBSERVICE_SECRET}
+      # Trivy
+      TRIVY_ADAPTER_URL: http://trivy-adapter:8080
+      WITH_TRIVY: ${WITH_TRIVY:-true}
+      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
+      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      registry:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/lprobe", "-port", "8080", "-endpoint", "/api/v2.0/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  jobservice:
+    image: harbor-jobservice:${HARBOR_TAG}
+    volumes:
+      - ./config/jobservice.yml:/etc/jobservice/config.yml:ro
+    environment:
+      POSTGRESQL_HOST: postgresql
+      POSTGRESQL_PORT: "5432"
+      POSTGRESQL_USERNAME: ${DB_USER:-postgres}
+      POSTGRESQL_PASSWORD: ${DB_PASSWORD}
+      POSTGRESQL_DATABASE: ${DB_NAME:-registry}
+      POSTGRESQL_SSLMODE: ${DB_SSLMODE:-disable}
+      REDIS_URL: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}
+      CORE_URL: http://core:8080
+      CORE_SECRET: ${CORE_SECRET}
+      JOBSERVICE_SECRET: ${JOBSERVICE_SECRET}
+      REGISTRY_URL: http://registry:5000
+      REGISTRY_CONTROLLER_URL: http://registryctl:8080
+      REGISTRY_CREDENTIAL_USERNAME: ${REGISTRY_CREDENTIAL_USERNAME:-}
+      REGISTRY_CREDENTIAL_PASSWORD: ${REGISTRY_CREDENTIAL_PASSWORD:-}
+      TOKEN_SERVICE_URL: http://core:8080/service/token
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      core:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/lprobe", "-port", "8888", "-endpoint", "/api/v1/stats"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  registryctl:
+    image: harbor-registryctl:${HARBOR_TAG}
+    volumes:
+      - ./config/registryctl.yml:/etc/registryctl/config.yml:ro
+      - ./config/registry.yml:/etc/registry/config.yml:ro
+      - registry-data:/var/lib/registry
+    environment:
+      PORT: "8080"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      REGISTRY_CONFIG: /etc/registry/config.yml
+      CORE_SECRET: ${CORE_SECRET}
+      JOBSERVICE_SECRET: ${JOBSERVICE_SECRET}
+    depends_on:
+      registry:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/lprobe", "-port", "8080", "-endpoint", "/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  registry:
+    image: harbor-registry:${HARBOR_TAG}
+    volumes:
+      - ./config/registry.yml:/etc/registry/config.yml:ro
+      - registry-data:/var/lib/registry
+    healthcheck:
+      test: ["CMD", "/lprobe", "-port", "5001", "-endpoint", "/debug/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  trivy-adapter:
+    image: harbor-trivy-adapter:${HARBOR_TAG}
+    environment:
+      SCANNER_LOG_LEVEL: ${LOG_LEVEL:-info}
+      SCANNER_REDIS_URL: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}
+      SCANNER_STORE_REDIS_URL: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}
+      SCANNER_STORE_REDIS_NAMESPACE: harbor.scanner.trivy:store
+      SCANNER_JOB_QUEUE_REDIS_URL: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}
+      SCANNER_JOB_QUEUE_REDIS_NAMESPACE: harbor.scanner.trivy:job-queue
+      SCANNER_TRIVY_CACHE_DIR: /tmp/trivy
+      SCANNER_TRIVY_REPORTS_DIR: /tmp/reports
+      SCANNER_TRIVY_VULN_TYPE: os,library
+      SCANNER_TRIVY_SEVERITY: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+      SCANNER_API_SERVER_ADDR: ":8080"
+    tmpfs:
+      - /tmp:size=2G,mode=1777
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/lprobe", "-port", "8080", "-endpoint", "/probe/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  exporter:
+    image: harbor-exporter:${HARBOR_TAG}
+    environment:
+      HARBOR_DATABASE_HOST: postgresql
+      HARBOR_DATABASE_PORT: "5432"
+      HARBOR_DATABASE_USERNAME: ${DB_USER:-postgres}
+      HARBOR_DATABASE_PASSWORD: ${DB_PASSWORD}
+      HARBOR_DATABASE_DBNAME: ${DB_NAME:-registry}
+      HARBOR_DATABASE_SSLMODE: ${DB_SSLMODE:-disable}
+      HARBOR_EXPORTER_METRICS_PATH: /metrics
+      HARBOR_EXPORTER_PORT: "8080"
+      HARBOR_SERVICE_HOST: core
+      HARBOR_SERVICE_PORT: "8080"
+      HARBOR_SERVICE_SCHEME: http
+      HARBOR_REDIS_URL: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}/2
+      HARBOR_REDIS_NAMESPACE: harbor_job_service_namespace
+      HARBOR_REDIS_TIMEOUT: "3600"
+    depends_on:
+      core:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/lprobe", "-port", "8080", "-endpoint", "/metrics"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  postgresql:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-registry}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${DB_USER:-postgres}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: valkey/valkey:latest
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
+  registry-data:
