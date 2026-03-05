@@ -136,12 +136,13 @@ Volume mounts with VirtioFS (Docker Desktop 4.x+) provide fast file system event
 
 ## Debugging
 
-Core, JobService, and RegistryCtl run under Delve debugger:
-- **Core**: `localhost:2345`
-- **JobService**: `localhost:2346`
-- **RegistryCtl**: `localhost:2347`
+All Go services run under Delve with `--continue` (no need to wait for debugger attach). Host port mappings are commented out by default to save resources — uncomment them in `docker-compose.yml` when needed:
 
-Connect your IDE debugger to these ports. The services start immediately (`--continue` flag) - no need to wait for debugger attach.
+- **Core**: container `:2345` → host `${PORT_DEBUG_CORE:-2345}` (commented out)
+- **JobService**: container `:2346` → host `:2346` (commented out)
+- **RegistryCtl**: container `:2347` → host `${PORT_DEBUG_REGISTRYCTL:-2347}` (active)
+
+To enable Core/JobService debugging, uncomment the port mappings in `devenv/docker-compose.yml` and restart.
 
 ## Service URLs
 
