@@ -7,6 +7,7 @@ This directory contains example values files for deploying Harbor in different e
 | File | Description |
 |------|-------------|
 | `k3d-local.yaml` | Local development with k3d cluster |
+| [`openshift/`](openshift/) | OpenShift deployment with ttl.sh images and edge-terminated routes |
 
 ## Usage
 

@@ -7,6 +7,11 @@
 #   task image:core                         # CI: multi-arch push, local: native push
 #   task image:core PUSH=false              # load locally (native arch)
 #   task image:all-images                   # all images
+#
+# Cross-arch builds from local machine:
+#   IMAGE_PLATFORMS is only used when IS_CI=true. To build multi-arch images
+#   locally (e.g. for a remote amd64 cluster), override PLATFORMS directly:
+#     task image:all-images PLATFORMS=linux/amd64,linux/arm64 IMAGE_REGISTRY=ttl.sh IMAGE_NAMESPACE=harbor-next
 
 version: '3'
 
