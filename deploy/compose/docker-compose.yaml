@@ -2,8 +2,8 @@ services:
   portal:
     image: ${IMAGE_REPO:-}harbor-portal:${HARBOR_TAG}
     volumes:
-      - ./config/nginx/proxy.conf:/etc/nginx/proxy.d/proxy.conf:ro
-      - ${TLS_CONF:-./config/nginx/tls.conf}:/etc/nginx/proxy.d/tls.conf:ro
+      - ../../config/nginx/proxy.conf:/etc/nginx/proxy.d/proxy.conf:ro
+      - ${TLS_CONF:-../../config/nginx/tls.conf}:/etc/nginx/proxy.d/tls.conf:ro
       - ${TLS_CERT:-./config/certs/tls.crt}:/etc/nginx/ssl/tls.crt:ro
       - ${TLS_KEY:-./config/certs/tls.key}:/etc/nginx/ssl/tls.key:ro
     ports:
@@ -77,7 +77,7 @@ services:
     tmpfs:
       - /tmp:size=256M,mode=1777
     volumes:
-      - ./config/jobservice.yml:/etc/jobservice/config.yml:ro
+      - ../../config/jobservice.yml:/etc/jobservice/config.yml:ro
     environment:
       POSTGRESQL_HOST: postgresql
       POSTGRESQL_PORT: "5432"
@@ -110,8 +110,8 @@ services:
     tmpfs:
       - /tmp:size=256M,mode=1777
     volumes:
-      - ./config/registryctl.yml:/etc/registryctl/config.yml:ro
-      - ./config/registry.yml:/etc/registry/config.yml:ro
+      - ../../config/registryctl.yml:/etc/registryctl/config.yml:ro
+      - ../../config/registry.yml:/etc/registry/config.yml:ro
       - registry-data:/var/lib/registry
     environment:
       PORT: "8080"
@@ -132,7 +132,7 @@ services:
   registry:
     image: ${IMAGE_REPO:-}harbor-registry:${HARBOR_TAG}
     volumes:
-      - ./config/registry.yml:/etc/registry/config.yml:ro
+      - ../../config/registry.yml:/etc/registry/config.yml:ro
       - registry-data:/var/lib/registry
     environment:
       REGISTRY_HTTP_SECRET: ${CORE_SECRET}

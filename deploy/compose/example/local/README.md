@@ -67,7 +67,7 @@ Update `.env`:
 
 ```bash
 EXT_ENDPOINT=https://localhost
-TLS_CONF=./config/nginx/tls.conf
+TLS_CONF=../../config/nginx/tls.conf
 TLS_CERT=./example/local/certs/tls.crt
 TLS_KEY=./example/local/certs/tls.key
 ```

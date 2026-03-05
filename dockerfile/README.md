@@ -46,6 +46,17 @@ docker buildx build --platform linux/amd64 -t harbor-portal:dev -f dockerfile/po
 | RegistryCtl | `/etc/registryctl/config.yml` | Mounted at runtime |
 | Registry | `/etc/registry/config.yml` | Mounted at runtime |
 
+## Portal: SPA-only vs SPA + Reverse Proxy
+
+The portal image serves the Angular SPA on port 8080. Its role differs by deployment:
+
+| Deployment | Portal Role | Reverse Proxy | TLS Termination |
+|------------|------------|---------------|-----------------|
+| **Kubernetes** | SPA only — static files | Ingress controller (external) | Ingress controller |
+| **Compose** | SPA + reverse proxy to Core | nginx inside portal container | nginx inside portal container |
+
+In Compose, proxy and TLS configs are mounted into `/etc/nginx/proxy.d/` at runtime (see `config/nginx/`). The `include /etc/nginx/proxy.d/*.conf;` directive in `nginx.conf` picks them up. When no configs are mounted (or `TLS_CONF=/dev/null`), portal serves only static files — same as in Kubernetes.
+
 ## Docker Hardened Images (DHI)
 
 `portal.dockerfile` uses `dhi.io/nginx` (via our proxy at `8gears.container-registry.com/dhi.io/nginx`) — a CIS-benchmark-compliant, non-root base image rebuilt on a regular cadence with CVE patches.

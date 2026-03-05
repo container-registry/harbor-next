@@ -58,10 +58,17 @@ devenv/
 ├── docker-compose.yml         # All services (infra + backend + trivy)
 ├── air.core.toml              # Air hot-reload config for Core
 ├── air.jobservice.toml        # Air hot-reload config for JobService
-├── jobservice.config.yml      # JobService configuration
-├── registry.config.yml        # Docker Registry config
+├── air.registryctl.toml       # Air hot-reload config for RegistryCtl
 ├── registry.passwd            # Registry HTTP basic auth credentials
+├── token_service_key.pem      # Generated RSA key for token signing
 └── README.md                  # This file
+
+config/                        # Canonical service configs (shared by dev + compose)
+├── jobservice.yml             # JobService configuration
+├── registry.yml               # Docker Registry config
+├── registryctl.yml            # RegistryCtl configuration
+├── nginx/                     # Reverse proxy + TLS (compose only)
+└── portal/nginx.conf          # Baked into portal image at build time
 
 dockerfile/
 └── dev.core.dockerfile        # Dev image with Go, Air, and Delve
