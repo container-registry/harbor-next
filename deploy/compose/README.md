@@ -19,6 +19,7 @@ cp .env.example .env
 # 2. Generate token signing key (must be PKCS#1 / "RSA PRIVATE KEY" format)
 openssl genpkey -algorithm RSA -outform PEM -pkeyopt rsa_keygen_bits:4096 \
   | openssl rsa -traditional -out config/token_service_key.pem
+chmod 644 config/token_service_key.pem
 
 # 3. Start
 docker compose up -d
@@ -64,7 +65,7 @@ Images resolve to `${IMAGE_REPO}harbor-core:${HARBOR_TAG}`, so the value must en
 
 Portal (nginx) serves the Angular UI and reverse-proxies `/v2/`, `/api/`, `/service/`, and `/c/` to Core.
 
-```
+```text
                    :443 (HTTPS)  / :80 (HTTP)
                           │
                    ┌──────▼──────┐

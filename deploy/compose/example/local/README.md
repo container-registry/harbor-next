@@ -29,6 +29,7 @@ cd deploy/compose/example/local
 cp .env.example .env
 openssl genpkey -algorithm RSA -outform PEM -pkeyopt rsa_keygen_bits:4096 \
   | openssl rsa -traditional -out ../../config/token_service_key.pem
+chmod 644 ../../config/token_service_key.pem
 docker compose -f ../../docker-compose.yaml --env-file .env up -d
 ```
 
