@@ -8,7 +8,7 @@ ARG LPROBE_VERSION=MISSING-BUILD-ARG
 # Build Angular application and Swagger UI
 FROM oven/bun:${BUN_VERSION}-alpine AS builder
 # nodejs required: bun hangs on Angular/webpack build inside Docker (oven-sh/bun#15226)
-RUN apk add --no-cache nodejs yq busybox-static
+RUN apk add --no-cache nodejs yq
 WORKDIR /harbor/src/portal
 COPY src/portal/package.json src/portal/bun.lock* ./
 RUN bun install --ignore-scripts
@@ -27,21 +27,11 @@ FROM ghcr.io/fivexl/lprobe:${LPROBE_VERSION} AS lprobe
 
 FROM 8gears.container-registry.com/dhi.io/nginx:${NGINX_VERSION}-debian13
 COPY --from=lprobe /lprobe /lprobe
-COPY --from=builder /bin/busybox.static /tmp/busybox
 COPY --from=builder /harbor/src/portal/dist /usr/share/nginx/html
 COPY --from=builder /harbor/src/portal/swagger.json /usr/share/nginx/html/swagger.json
 COPY --from=builder /harbor/src/portal/app-swagger-ui/dist /usr/share/nginx/html
 COPY config/portal/nginx.conf /etc/nginx/nginx.conf
 WORKDIR /usr/share/nginx/html
-
-# DHI base runs as non-root (65532) — escalate for OpenShift GID 0 permissions
-USER 0
-RUN ["/tmp/busybox", "sh", "-c", "\
-    /tmp/busybox mkdir -p /etc/nginx/proxy.d && \
-    /tmp/busybox chgrp -R 0 /var/cache/nginx /var/log/nginx /etc/nginx/conf.d /etc/nginx/proxy.d /run/nginx && \
-    /tmp/busybox chmod -R g=u /var/cache/nginx /var/log/nginx /etc/nginx/conf.d /etc/nginx/proxy.d /run/nginx && \
-    /tmp/busybox rm /tmp/busybox"]
-USER 65532:0
 
 EXPOSE 8080
 ENTRYPOINT ["nginx", "-g", "daemon off;"]
