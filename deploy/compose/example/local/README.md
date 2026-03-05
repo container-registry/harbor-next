@@ -1,22 +1,22 @@
-# Local Harbor with TLS (mkcert)
+# Local Harbor
 
-Zero-config local deployment with HTTPS using [mkcert](https://github.com/FiloSottile/mkcert) for trusted local certificates.
+Minimal local deployment of Harbor.
 
 ## Prerequisites
 
 - Docker Engine 24+ with Compose v2.24+
-- [mkcert](https://github.com/FiloSottile/mkcert) (`brew install mkcert`)
 - Pre-built Harbor images (`task image:all-images PUSH=false`)
 
 ## Start
 
 ```bash
 cd deploy/compose/example/local
-./setup.sh
-docker compose up -d
+cp .env.example .env
+openssl genpkey -algorithm RSA -out ../../config/token_service_key.pem -pkeyopt rsa_keygen_bits:4096
+docker compose -f ../../docker-compose.yaml --env-file .env up -d
 ```
 
-Open https://localhost and login with `admin` / `Harbor12345`.
+Open http://localhost and login with `admin` / `Harbor12345`.
 
 ## Push / Pull
 
@@ -30,21 +30,27 @@ docker pull localhost/library/alpine:test
 ## Stop
 
 ```bash
-docker compose down        # keep data
-docker compose down -v     # destroy volumes
+docker compose -f ../../docker-compose.yaml --env-file .env down        # keep data
+docker compose -f ../../docker-compose.yaml --env-file .env down -v     # destroy volumes
 ```
 
-## Clean generated files
+## Optional: HTTPS with mkcert
+
+For trusted local TLS, install [mkcert](https://github.com/FiloSottile/mkcert) (`brew install mkcert`) and generate certificates:
 
 ```bash
-./setup.sh clean
+mkcert -install
+mkdir -p certs
+mkcert -cert-file certs/tls.crt -key-file certs/tls.key localhost 127.0.0.1 ::1
 ```
 
-## How it works
+Update `.env`:
+```
+EXT_ENDPOINT=https://localhost
+```
 
-`setup.sh` generates:
-- TLS certificates via mkcert (trusted by your OS)
-- RSA token signing key for Docker token auth
-- `.env` with secrets and `COMPOSE_FILE` pointing to the parent compose + local TLS override
+Start with both compose files — the local overlay adds TLS volumes and the HTTPS port:
 
-The override compose (`docker-compose.yaml`) adds TLS cert/key volumes and the HTTPS port to the portal service. Everything else comes from the parent `deploy/compose/docker-compose.yaml`.
+```bash
+docker compose -f ../../docker-compose.yaml -f docker-compose.yaml --env-file .env up -d
+```

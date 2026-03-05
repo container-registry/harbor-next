@@ -1,6 +1,6 @@
 services:
   portal:
-    image: harbor-portal:${HARBOR_TAG}
+    image: ${IMAGE_REPO:-}harbor-portal:${HARBOR_TAG}
     volumes:
       - ./config/nginx/proxy.conf:/etc/nginx/proxy.d/proxy.conf:ro
       # Uncomment for TLS:
@@ -21,7 +21,7 @@ services:
     restart: unless-stopped
 
   core:
-    image: harbor-core:${HARBOR_TAG}
+    image: ${IMAGE_REPO:-}harbor-core:${HARBOR_TAG}
     volumes:
       - ./config/token_service_key.pem:/etc/core/token_service_key.pem:ro
     environment:
@@ -72,7 +72,7 @@ services:
     restart: unless-stopped
 
   jobservice:
-    image: harbor-jobservice:${HARBOR_TAG}
+    image: ${IMAGE_REPO:-}harbor-jobservice:${HARBOR_TAG}
     volumes:
       - ./config/jobservice.yml:/etc/jobservice/config.yml:ro
     environment:
@@ -103,7 +103,7 @@ services:
     restart: unless-stopped
 
   registryctl:
-    image: harbor-registryctl:${HARBOR_TAG}
+    image: ${IMAGE_REPO:-}harbor-registryctl:${HARBOR_TAG}
     volumes:
       - ./config/registryctl.yml:/etc/registryctl/config.yml:ro
       - ./config/registry.yml:/etc/registry/config.yml:ro
@@ -125,7 +125,7 @@ services:
     restart: unless-stopped
 
   registry:
-    image: harbor-registry:${HARBOR_TAG}
+    image: ${IMAGE_REPO:-}harbor-registry:${HARBOR_TAG}
     volumes:
       - ./config/registry.yml:/etc/registry/config.yml:ro
       - registry-data:/var/lib/registry
@@ -137,7 +137,7 @@ services:
     restart: unless-stopped
 
   trivy-adapter:
-    image: harbor-trivy-adapter:${HARBOR_TAG}
+    image: ${IMAGE_REPO:-}harbor-trivy-adapter:${HARBOR_TAG}
     environment:
       SCANNER_LOG_LEVEL: ${LOG_LEVEL:-info}
       SCANNER_REDIS_URL: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}
@@ -163,7 +163,7 @@ services:
     restart: unless-stopped
 
   exporter:
-    image: harbor-exporter:${HARBOR_TAG}
+    image: ${IMAGE_REPO:-}harbor-exporter:${HARBOR_TAG}
     environment:
       HARBOR_DATABASE_HOST: postgresql
       HARBOR_DATABASE_PORT: "5432"
