@@ -1,0 +1,909 @@
+# ============================================================================
+# HARBOR NEXT HELM CHART - VALUES
+# ============================================================================
+# This chart uses the `toEnvVars` pattern for configuration.
+# Any Harbor config option can be set via component config/secret sections
+# without requiring chart updates.
+# ============================================================================
+
+# ============================================================================
+# 1. GLOBAL SETTINGS
+# ============================================================================
+# -- Credentials to pull images
+# imageCredentials:
+#   registry: xyz.com
+#   username: xxx
+#   password: yyy
+#   email: zzz@xyz.com
+imageCredentials: {}
+
+# -- Global image settings
+image:
+  # -- Image pull policy for all Harbor components
+  pullPolicy: IfNotPresent
+
+# -- List of image pull secrets
+# @default -- []
+imagePullSecrets: []
+
+# -- Override the chart name
+nameOverride: ""
+
+# -- Override the full name
+fullnameOverride: ""
+
+# -- External URL for Harbor (REQUIRED)
+# This is the URL users will use to access Harbor (e.g., https://harbor.example.com)
+# @default -- ""
+externalURL: ""
+
+# -- Log level for all components (debug, info, warning, error, fatal)
+logLevel: info
+
+# -- Harbor admin password (initial setup)
+# @default -- "Harbor12345"
+harborAdminPassword: "Harbor12345"
+
+# -- Secret key for encryption (16 characters)
+# Used for encrypting credentials stored in the database
+# @default -- auto-generated
+secretKey: ""
+
+# The proxy settings for updating trivy vulnerabilities from the Internet and replicating
+# artifacts from/to the registries that cannot be reached directly
+proxy:
+  httpProxy:
+  httpsProxy:
+  noProxy: 127.0.0.1,localhost,.local,.internal
+  components:
+    - core
+    - jobservice
+    - trivy
+
+# ============================================================================
+# 2. INGRESS / GATEWAY
+# ============================================================================
+
+# -- Ingress configuration
+ingress:
+  # tls certificate auto-generated
+  autoGenCert: true
+  # -- Enable ingress
+  enabled: true
+  # -- Ingress class name
+  className: ""
+  # -- Ingress annotations
+  annotations: {}
+    # nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  # -- Harbor core hostname (REQUIRED when ingress enabled)
+  core: ""
+  # -- Additional ingress hosts
+  hosts: []
+    # - host: harbor.example.com
+    #   paths:
+    #     - path: /
+    #       pathType: Prefix
+  # -- Ingress TLS configuration
+  tls: []
+    # - secretName: harbor-tls
+    #   hosts:
+    #     - harbor.example.com
+
+# -- Gateway API configuration (alternative to ingress)
+gateway:
+  # -- Enable Gateway API HTTPRoute
+  enabled: false
+  # -- Gateway parent references
+  parentRefs: []
+    # - name: my-gateway
+    #   namespace: default
+  # -- Hostnames for the HTTPRoute
+  hostnames: []
+    # - harbor.example.com
+
+ipFamily:
+  # ipv6Enabled set to true if ipv6 is enabled in cluster, currently it affected the nginx related component
+  ipv6:
+    enabled: true
+  # ipv4Enabled set to true if ipv4 is enabled in cluster, currently it affected the nginx related component
+  ipv4:
+    enabled: true
+
+# ============================================================================
+# 3. HARBOR COMPONENTS
+# ============================================================================
+# Pattern per component:
+#   config: {} -> ConfigMap (via toEnvVars)
+#   secret: {} -> Secret (via toEnvVars)
+#   extraEnv: [] -> Additional env vars with valueFrom support
+#   K8s settings: image, replicas, resources, etc.
+# ============================================================================
+
+# --- Core ---
+core:
+  # -- Harbor Core application config (converted to env vars in ConfigMap)
+  # Any Harbor Core config can be set here without chart changes
+  # @default -- {}
+  config: {}
+    # Example: CSRF protection, token expiration, etc.
+    # csrf_key: ""
+    # token_expiration: 30
+
+  # -- Sensitive config for Core (converted to env vars in Secret)
+  # @default -- {}
+  secret: {}
+  # -- Use existing secret for Core secret
+  existingSecret: ""
+  # -- Key in existing secret containing the Core secret
+  existingSecretKey: "secret"
+
+  # -- Extra environment variables with valueFrom support
+  # @default -- []
+  extraEnv: []
+    # - name: MY_SECRET
+    #   valueFrom:
+    #     secretKeyRef:
+    #       name: my-secret
+    #       key: value
+
+  # -- Core image settings
+  image:
+    # -- Core image repository
+    repository: 8gears.container-registry.com/8gcr/harbor-core
+    # -- Core image tag (defaults to appVersion)
+    tag: ""
+
+  # -- Number of Core replicas
+  replicas: 1
+
+  # -- Core resource requests and limits
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+  # -- Node selector for Core pods
+  nodeSelector: {}
+
+  # -- Tolerations for Core pods
+  tolerations: []
+
+  # -- Affinity rules for Core pods
+  affinity: {}
+
+  # -- Additional pod annotations for Core
+  podAnnotations: {}
+
+  # -- Additional pod labels for Core
+  podLabels: {}
+
+  # -- Service account settings for Core
+  serviceAccount:
+    # -- Create a service account for Core
+    create: true
+    # -- Service account name (auto-generated if empty)
+    name: ""
+    # -- Service account annotations
+    annotations: {}
+
+  # -- PodDisruptionBudget for Core
+  pdb:
+    # -- Enable PodDisruptionBudget
+    enabled: false
+    # -- Minimum available pods (can be integer or percentage)
+    minAvailable: 1
+    # -- Maximum unavailable pods (alternative to minAvailable)
+    # maxUnavailable: 1
+
+  # -- Security context for Core container
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10000
+    runAsGroup: 10000
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
+
+  # -- Pod security context for Core
+  podSecurityContext:
+    fsGroup: 10000
+
+# --- Registry ---
+registry:
+  # -- If true, the registry returns relative URLs in Location headers
+  relativeurls: false
+  # -- Registry application config (converted to env vars in ConfigMap)
+  # @default -- {}
+  upload_purging:
+    enabled: true
+    age: 168h
+    interval: 24h
+    dryrun: false
+  config: {}
+  credentials:
+    username: "harbor_registry_user"
+    password: ""
+    existingSecret: ""
+    htpasswdString: ""
+  # -- Registry storage configuration
+  storage:
+    disableredirect: false
+    # -- Storage type: filesystem, s3, azure, gcs, oss
+    type: filesystem
+    # -- Filesystem storage settings
+    filesystem:
+      rootdirectory: /storage
+      subPath: ""
+    # -- S3 storage settings
+    s3: {}
+      # region: us-east-1
+      # bucket: my-harbor-bucket
+      # accesskey: ""
+      # secretkey: ""
+      # regionendpoint: ""
+      # encrypt: false
+      # secure: true
+      # v4auth: true
+      # chunksize: 5242880
+      # rootdirectory: ""
+    # -- Azure Blob storage settings
+    azure: {}
+      # accountname: ""
+      # accountkey: ""
+      # container: ""
+      # realm: core.windows.net
+    # -- Google Cloud Storage settings
+    gcs: {}
+      # bucket: ""
+      # keyfile: ""
+      # rootdirectory: ""
+      # chunksize: 5242880
+    # -- Alibaba Cloud OSS settings
+    oss: {}
+      # accesskeyid: ""
+      # accesskeysecret: ""
+      # region: ""
+      # bucket: ""
+      # endpoint: ""
+      # internal: false
+      # encrypt: false
+      # secure: true
+      # chunksize: 10485760
+      # rootdirectory: ""
+
+  # -- Sensitive config for Registry (converted to env vars in Secret)
+  # @default -- {}
+  secret: {}
+
+  # -- Extra environment variables with valueFrom support
+  # @default -- []
+  extraEnv: []
+
+  # -- Registry image settings
+  image:
+    # -- Registry image repository
+    repository: 8gears.container-registry.com/8gcr/harbor-registry
+    # -- Registry image tag (defaults to appVersion)
+    tag: ""
+
+  # -- Registryctl image settings
+  controller:
+    image:
+      # -- Registryctl image repository
+      repository: 8gears.container-registry.com/8gcr/harbor-registryctl
+      # -- Registryctl image tag (defaults to appVersion)
+      tag: ""
+
+  # -- Number of Registry replicas
+  replicas: 1
+
+  # -- Registry persistence settings
+  persistence:
+    # -- Enable persistence for registry
+    enabled: false
+    # -- Storage class for PVC
+    storageClass: ""
+    # -- PVC access modes
+    accessModes:
+      - ReadWriteOnce
+    # -- PVC size
+    size: 10Gi
+    # -- Existing PVC name (disables dynamic provisioning)
+    existingClaim: ""
+    # -- Annotations for PVC
+    annotations: {}
+
+  # -- Registry resource requests and limits
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+  # -- Node selector for Registry pods
+  nodeSelector: {}
+
+  # -- Tolerations for Registry pods
+  tolerations: []
+
+  # -- Affinity rules for Registry pods
+  affinity: {}
+
+  # -- Additional pod annotations for Registry
+  podAnnotations: {}
+
+  # -- Additional pod labels for Registry
+  podLabels: {}
+
+  # -- Service account settings for Registry
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+
+  # -- PodDisruptionBudget for Registry
+  pdb:
+    # -- Enable PodDisruptionBudget
+    enabled: false
+    # -- Minimum available pods (can be integer or percentage)
+    minAvailable: 1
+    # -- Maximum unavailable pods (alternative to minAvailable)
+    # maxUnavailable: 1
+
+  # -- Security context for Registry container
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10000
+    runAsGroup: 10000
+    # readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
+
+  # -- Pod security context for Registry
+  podSecurityContext:
+    fsGroup: 10000
+    fsGroupChangePolicy: OnRootMismatch
+
+# --- Portal ---
+portal:
+  # -- Portal application config (converted to env vars in ConfigMap)
+  # @default -- {}
+  config: {}
+
+  # -- Sensitive config for Portal (converted to env vars in Secret)
+  # @default -- {}
+  secret: {}
+
+  # -- Extra environment variables with valueFrom support
+  # @default -- []
+  extraEnv: []
+
+  # -- Portal image settings
+  image:
+    # -- Portal image repository
+    repository: 8gears.container-registry.com/8gcr/harbor-portal
+    # -- Portal image tag (defaults to appVersion)
+    tag: ""
+
+  # -- Number of Portal replicas
+  replicas: 1
+
+  # -- Portal resource requests and limits
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+  # -- Node selector for Portal pods
+  nodeSelector: {}
+
+  # -- Tolerations for Portal pods
+  tolerations: []
+
+  # -- Affinity rules for Portal pods
+  affinity: {}
+
+  # -- Additional pod annotations for Portal
+  podAnnotations: {}
+
+  # -- Additional pod labels for Portal
+  podLabels: {}
+
+  # -- Service account settings for Portal
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+
+  # -- PodDisruptionBudget for Portal
+  pdb:
+    # -- Enable PodDisruptionBudget
+    enabled: false
+    # -- Minimum available pods (can be integer or percentage)
+    minAvailable: 1
+    # -- Maximum unavailable pods (alternative to minAvailable)
+    # maxUnavailable: 1
+
+  # -- Security context for Portal container
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10000
+    runAsGroup: 10000
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
+
+  # -- Pod security context for Portal
+  podSecurityContext:
+    fsGroup: 10000
+
+# --- Jobservice ---
+jobservice:
+  # -- Jobservice application config (converted to env vars in ConfigMap)
+  # @default -- {}
+  config: {}
+  max_job_workers: 4
+    # job_loggers: file,stdout
+    # logger_sweeper_duration: 14
+
+  # -- Sensitive config for Jobservice (converted to env vars in Secret)
+  # @default -- {}
+  secret: {}
+  # -- Use existing secret for Jobservice secret
+  existingSecret: ""
+  # -- Key in existing secret containing the Jobservice secret
+  existingSecretKey: "JOBSERVICE_SECRET"
+
+  # -- Extra environment variables with valueFrom support
+  # @default -- []
+  extraEnv: []
+
+  # -- Jobservice image settings
+  image:
+    # -- Jobservice image repository
+    repository: 8gears.container-registry.com/8gcr/harbor-jobservice
+    # -- Jobservice image tag (defaults to appVersion)
+    tag: ""
+
+  # -- Number of Jobservice replicas
+  replicas: 1
+
+  # -- Jobservice resource requests and limits
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+  # -- Node selector for Jobservice pods
+  nodeSelector: {}
+
+  # -- Tolerations for Jobservice pods
+  tolerations: []
+
+  # -- Affinity rules for Jobservice pods
+  affinity: {}
+
+  # -- Additional pod annotations for Jobservice
+  podAnnotations: {}
+
+  # -- Additional pod labels for Jobservice
+  podLabels: {}
+
+  # -- Service account settings for Jobservice
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+
+  # -- PodDisruptionBudget for Jobservice
+  pdb:
+    # -- Enable PodDisruptionBudget
+    enabled: false
+    # -- Minimum available pods (can be integer or percentage)
+    minAvailable: 1
+    # -- Maximum unavailable pods (alternative to minAvailable)
+    # maxUnavailable: 1
+
+  # -- Security context for Jobservice container
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10000
+    runAsGroup: 10000
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
+
+  # -- Pod security context for Jobservice
+  podSecurityContext:
+    fsGroup: 10000
+
+  # -- Jobservice persistence settings
+  persistence:
+    # -- Enable persistence for registry
+    enabled: false
+    # -- Storage class for PVC
+    storageClass: ""
+    # -- PVC access modes
+    accessModes:
+      - ReadWriteOnce
+    # -- PVC size
+    size: 1Gi
+    # -- Existing PVC name (disables dynamic provisioning)
+    existingClaim: ""
+    # -- Annotations for PVC
+    annotations: {}
+
+# --- Exporter ---
+exporter:
+  # -- Enable Harbor exporter for Prometheus metrics
+  enabled: true
+
+  # -- Exporter application config (converted to env vars in ConfigMap)
+  # @default -- {}
+  config: {}
+    # cache_time: 23
+    # cache_clean_interval: 14400
+
+  # -- Sensitive config for Exporter (converted to env vars in Secret)
+  # @default -- {}
+  secret: {}
+
+  # -- Extra environment variables with valueFrom support
+  # @default -- []
+  extraEnv: []
+
+  # -- Exporter image settings
+  image:
+    # -- Exporter image repository
+    repository: 8gears.container-registry.com/8gcr/harbor-exporter
+    # -- Exporter image tag (defaults to appVersion)
+    tag: ""
+
+  # -- Number of Exporter replicas
+  replicas: 1
+
+  # -- Exporter resource requests and limits
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+  # -- Node selector for Exporter pods
+  nodeSelector: {}
+
+  # -- Tolerations for Exporter pods
+  tolerations: []
+
+  # -- Affinity rules for Exporter pods
+  affinity: {}
+
+  # -- Additional pod annotations for Exporter
+  podAnnotations: {}
+
+  # -- Additional pod labels for Exporter
+  podLabels: {}
+
+  # -- Service account settings for Exporter
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+
+  # -- PodDisruptionBudget for Exporter
+  pdb:
+    # -- Enable PodDisruptionBudget
+    enabled: false
+    # -- Minimum available pods (can be integer or percentage)
+    minAvailable: 1
+    # -- Maximum unavailable pods (alternative to minAvailable)
+    # maxUnavailable: 1
+
+  # -- Security context for Exporter container
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10000
+    runAsGroup: 10000
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
+
+  # -- Pod security context for Exporter
+  podSecurityContext:
+    fsGroup: 10000
+
+# ============================================================================
+# 4. DEPENDENCIES
+# ============================================================================
+
+# --- Database (EXTERNAL ONLY) ---
+database:
+  # -- Database host (required)
+  host: ""
+  # -- Database port
+  port: 5432
+  # -- Database username
+  username: ""
+  # -- Database password (ignored if existingSecret is set)
+  password: ""
+  # -- Database name
+  database: registry
+  # -- SSL mode for database connection
+  sslmode: disable
+  # -- Maximum idle connections
+  maxIdleConns: 100
+  # -- Maximum open connections
+  maxOpenConns: 900
+  # -- Maximum idle time for connections (0 = no limit)
+  connMaxIdleTime: "0"
+  # -- Maximum lifetime of connections (0 = no limit)
+  connMaxLifetime: "0"
+  # -- Existing secret containing database credentials
+  # Default secret key: POSTGRESQL_PASSWORD
+  existingSecret: ""
+  existingSecretKey: ""
+
+# --- Valkey (Redis-compatible) ---
+valkey:
+  # -- Enable Valkey subchart
+  enabled: true
+  # -- Valkey architecture: standalone or replication
+  architecture: standalone
+  # -- Valkey authentication settings
+  auth:
+    enabled: false
+    password: ""
+  fullnameOverride: "valkey"
+  # -- Valkey persistence configuration
+  dataStorage:
+    enabled: false
+
+  podSecurityContext:
+    fsGroup: 1000
+    runAsUser: 1000
+    runAsGroup: 1000
+
+  securityContext:
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 1000
+
+# --- External Redis (when valkey.enabled=false) ---
+externalRedis:
+  # -- External Redis host
+  host: ""
+  # -- External Redis port
+  port: 6379
+  # -- External Redis password
+  password: ""
+  # -- Sentinel master set name (for Redis Sentinel)
+  sentinelMasterSet: ""
+  # -- Existing secret containing Redis password
+  # Must have key: REDIS_PASSWORD
+  existingSecret: ""
+  # -- TLS options for external Redis
+  tlsOptions:
+    # -- Enable TLS for external Redis connection
+    enable: false
+
+# --- Trivy Scanner ---
+trivy:
+  # -- Enable Trivy scanner
+  enabled: false
+  image:
+    # -- Trivy adapter image repository
+    repository: 8gears.container-registry.com/8gcr/trivy-adapter
+    # -- Trivy adapter image tag (defaults to appVersion)
+    tag: ""
+  # -- Number of Trivy replicas
+  replicas: 1
+  # -- Trivy resource requests and limits
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 1Gi
+  # -- Debug mode for more verbose scanning log
+  debugMode: false
+  dbRepository:
+    - mirror.gcr.io/aquasec/trivy-db
+    - ghcr.io/aquasecurity/trivy-db
+  javaDBRepository:
+    - mirror.gcr.io/aquasec/trivy-java-db
+    - ghcr.io/aquasecurity/trivy-java-db
+  securityCheck: "vuln"
+  # -- Vulnerability types to scan (os,library)
+  vulnType: "os,library"
+  # -- Severity levels to check
+  severity: "UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL"
+  # -- Skip unfixed vulnerabilities
+  ignoreUnfixed: false
+  # -- Skip verifying registry certificate
+  insecure: false
+  # -- GitHub token to download Trivy DB (optional)
+  gitHubToken: ""
+  # -- Skip Trivy DB updates
+  skipUpdate: false
+  # -- Timeout for scanning
+  timeout: "5m0s"
+  # -- Node selector for Trivy pods
+  nodeSelector: {}
+  # -- Tolerations for Trivy pods
+  tolerations: []
+  # -- Affinity rules for Trivy pods
+  affinity: {}
+  # -- Additional pod annotations for Trivy
+  podAnnotations: {}
+  # -- Additional pod labels for Trivy
+  podLabels: {}
+  # -- Security context for Trivy container
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10000
+    runAsGroup: 10000
+  # -- Pod security context for Trivy
+  podSecurityContext:
+    fsGroup: 10000
+
+  # -- Trivy persistence settings - used for cache
+  persistence:
+    # -- Enable persistence for registry
+    enabled: false
+    # -- Storage class for PVC
+    storageClass: ""
+    # -- PVC access modes
+    accessModes:
+      - ReadWriteOnce
+    # -- PVC size
+    size: 5Gi
+    # -- Existing PVC name (disables dynamic provisioning)
+    existingClaim: ""
+    # -- Annotations for PVC
+    annotations: {}
+
+# ============================================================================
+# 5. TLS CONFIGURATION
+# ============================================================================
+
+tls:
+  # -- Enable TLS (set to false if terminating TLS at ingress/load balancer)
+  enabled: false
+  # -- TLS certificate source: auto, secret, or none
+  certSource: none
+  certManager:
+    # -- Enable cert-manager for TLS certificates
+    enabled: false
+    # -- cert-manager issuer reference
+    issuerRef: {}
+      # name: letsencrypt-prod
+      # kind: ClusterIssuer
+    # -- Certificate duration
+    duration: 2160h # 90 days
+    # -- Certificate renewal before expiry
+    renewBefore: 360h # 15 days
+
+  # -- Custom TLS secrets (alternative to cert-manager)
+  customSecrets:
+    # -- TLS secret for core/portal
+    core: ""
+    # -- TLS secret for registry
+    registry: ""
+
+# ============================================================================
+# 6. MONITORING
+# ============================================================================
+
+metrics:
+  # -- Enable metrics endpoints on all components
+  enabled: false
+  # -- Enable Prometheus ServiceMonitor
+  serviceMonitor:
+    # -- Create ServiceMonitor resource
+    enabled: false
+    # -- ServiceMonitor namespace (defaults to release namespace)
+    namespace: ""
+    # -- Additional labels for ServiceMonitor
+    labels: {}
+    # -- Scrape interval
+    interval: 30s
+    # -- Scrape timeout
+    scrapeTimeout: 10s
+    # -- Honor labels
+    honorLabels: true
+
+# ============================================================================
+# 7. ESCAPE HATCHES
+# ============================================================================
+
+# -- Extra static manifests to deploy
+# These are merged with chart labels and deployed as-is
+# @default -- []
+extraManifests: []
+  # - apiVersion: v1
+  #   kind: ConfigMap
+  #   metadata:
+  #     name: my-custom-config
+  #   data:
+  #     key: value
+
+# -- Extra templated manifests to deploy
+# These can use .Values, .Release, and other template functions
+# @default -- []
+extraTemplateManifests: []
+  # - |
+  #     apiVersion: v1
+  #     kind: ConfigMap
+  #     metadata:
+  #       name: {{ .Release.Name }}-custom
+  #     data:
+  #       externalURL: {{ .Values.externalURL }}
+
+
+# ============================================================================
+# 8. Tracing
+# ============================================================================
+
+trace:
+  enabled: false
+  # trace provider: jaeger or otel
+  # jaeger should be 1.26+
+  provider: jaeger
+  # set sample_rate to 1 if you wanna sampling 100% of trace data; set 0.5 if you wanna sampling 50% of trace data, and so forth
+  sample_rate: 1
+  # namespace used to differentiate different harbor services
+  # namespace:
+  # attributes is a key value dict contains user defined attributes used to initialize trace provider
+  # attributes:
+  #   application: harbor
+  jaeger:
+    # jaeger supports two modes:
+    #   collector mode(uncomment endpoint and uncomment username, password if needed)
+    #   agent mode(uncomment agent_host and agent_port)
+    endpoint: http://hostname:14268/api/traces
+    # username:
+    # password:
+    # agent_host: hostname
+    # export trace data by jaeger.thrift in compact mode
+    # agent_port: 6831
+  otel:
+    endpoint: hostname:4318
+    url_path: /v1/traces
+    compression: false
+    insecure: true
+    # timeout is in seconds
+    timeout: 10
+

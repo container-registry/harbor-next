@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ template "harbor.jobservice" . }}-env"
+  labels:
+    {{- include "harbor.componentLabels" (dict "root" . "component" "jobservice") | nindent 4 }}
+data:
+  # Jobservice configuration
+  CORE_URL: {{ include "harbor.core.url" . | quote }}
+  TOKEN_SERVICE_URL: {{ include "harbor.token.service.url" . | quote }}
+  REGISTRY_CREDENTIAL_USERNAME: "{{ .Values.registry.credentials.username }}"
+  REGISTRY_URL: {{ include "harbor.registry.url" . | quote }}
+  REGISTRY_CONTROLLER_URL: {{ include "harbor.registryctl.url" . | quote }}
+
+  JOBSERVICE_WEBHOOK_JOB_MAX_RETRY: {{ include "harbor.jobservice.notification.webhook_job_max_retry" . | quote }}
+  JOBSERVICE_WEBHOOK_JOB_HTTP_CLIENT_TIMEOUT: {{ include "harbor.jobservice.notification.webhook_job_http_client_timeout" . | quote }}
+
+  # Redis configuration
+  _REDIS_URL_CORE: {{ include "harbor.redis.url.core" . | quote }}
+  _REDIS_URL_CACHE_LAYER: {{ include "harbor.redis.url.cache" . | quote }}
+  CACHE_ENABLED: "true"
+  CACHE_EXPIRE_HOURS: "24"
+
+  # Logging
+  LOG_LEVEL: {{ .Values.logLevel | default "info" | quote }}
+
+  {{- if has "jobservice" .Values.proxy.components }}
+  HTTP_PROXY: "{{ .Values.proxy.httpProxy }}"
+  HTTPS_PROXY: "{{ .Values.proxy.httpsProxy }}"
+  NO_PROXY: "{{ template "harbor.noProxy" . }}"
+  {{- end }}
+  {{- if .Values.metrics.enabled}}
+  METRIC_NAMESPACE: harbor
+  METRIC_SUBSYSTEM: jobservice
+  {{- end }}
+  {{- template "harbor.trace.envs.jobservice" . }}
+  # Config via toEnvVars
+  {{- if .Values.jobservice.config }}
+  {{- include "harbor.toEnvVars" (dict "values" .Values.jobservice.config "prefix" "" "isSecret" false) | nindent 2 }}
+  {{- end }}

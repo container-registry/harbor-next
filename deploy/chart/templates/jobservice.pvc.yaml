@@ -1,0 +1,21 @@
+{{- if and .Values.jobservice.persistence.enabled (not .Values.jobservice.persistence.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "harbor.fullname" . }}-jobservice
+  labels:
+    {{- include "harbor.componentLabels" (dict "root" . "component" "jobservice") | nindent 4 }}
+  {{- with .Values.jobservice.persistence.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    {{- toYaml .Values.jobservice.persistence.accessModes | nindent 4 }}
+  {{- if .Values.jobservice.persistence.storageClass }}
+  storageClassName: {{ .Values.jobservice.persistence.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.jobservice.persistence.size | quote }}
+{{- end }}

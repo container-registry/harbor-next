@@ -1,0 +1,18 @@
+{{- if .Values.portal.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "harbor.fullname" . }}-portal
+  labels:
+    {{- include "harbor.componentLabels" (dict "root" . "component" "portal") | nindent 4 }}
+spec:
+  {{- if .Values.portal.pdb.minAvailable }}
+  minAvailable: {{ .Values.portal.pdb.minAvailable }}
+  {{- end }}
+  {{- if .Values.portal.pdb.maxUnavailable }}
+  maxUnavailable: {{ .Values.portal.pdb.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "portal") | nindent 6 }}
+{{- end }}

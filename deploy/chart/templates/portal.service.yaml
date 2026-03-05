@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "harbor.fullname" . }}-portal
+  labels:
+    {{- include "harbor.componentLabels" (dict "root" . "component" "portal") | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: {{ include "harbor.portal.port" . }}
+      targetPort: {{ include "harbor.portal.service.port" . }}
+      protocol: TCP
+  selector:
+    {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "portal") | nindent 4 }}

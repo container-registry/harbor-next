@@ -1,0 +1,150 @@
+suite: ingress tests
+templates:
+  - templates/ingress.yaml
+  - templates/gateway-httproute.yaml
+tests:
+  - it: should create ingress when enabled
+    template: templates/ingress.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      ingress.enabled: true
+      ingress.hosts:
+        - host: harbor.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: spec.rules[0].host
+          value: harbor.example.com
+
+  - it: should not create ingress when disabled
+    template: templates/ingress.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      ingress.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should set ingress class name
+    template: templates/ingress.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      ingress.enabled: true
+      ingress.className: nginx
+      ingress.hosts:
+        - host: harbor.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+    asserts:
+      - equal:
+          path: spec.ingressClassName
+          value: nginx
+
+  - it: should set ingress annotations
+    template: templates/ingress.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      ingress.enabled: true
+      ingress.annotations:
+        kubernetes.io/ingress.class: nginx
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+      ingress.hosts:
+        - host: harbor.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+    asserts:
+      - equal:
+          path: metadata.annotations["kubernetes.io/ingress.class"]
+          value: nginx
+      - equal:
+          path: metadata.annotations["cert-manager.io/cluster-issuer"]
+          value: letsencrypt-prod
+
+  - it: should configure TLS
+    template: templates/ingress.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      ingress.enabled: true
+      ingress.hosts:
+        - host: harbor.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+      ingress.tls:
+        - secretName: harbor-tls
+          hosts:
+            - harbor.example.com
+    asserts:
+      - equal:
+          path: spec.tls[0].secretName
+          value: harbor-tls
+      - equal:
+          path: spec.tls[0].hosts[0]
+          value: harbor.example.com
+
+  - it: should create HTTPRoute when gateway is enabled
+    template: templates/gateway-httproute.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      gateway.enabled: true
+      gateway.hostnames:
+        - harbor.example.com
+      gateway.parentRefs:
+        - name: my-gateway
+          namespace: default
+    asserts:
+      - isKind:
+          of: HTTPRoute
+      - equal:
+          path: spec.hostnames[0]
+          value: harbor.example.com
+      - equal:
+          path: spec.parentRefs[0].name
+          value: my-gateway
+
+  - it: should not create HTTPRoute when gateway is disabled
+    template: templates/gateway-httproute.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      gateway.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should route API paths to core service
+    template: templates/ingress.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      ingress.enabled: true
+      ingress.hosts:
+        - host: harbor.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /api/
+      - matchRegex:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          pattern: .*-core$
+      - equal:
+          path: spec.rules[0].http.paths[5].path
+          value: /
+      - matchRegex:
+          path: spec.rules[0].http.paths[5].backend.service.name
+          pattern: .*-portal$

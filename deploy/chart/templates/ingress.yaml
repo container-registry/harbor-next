@@ -1,0 +1,82 @@
+{{- $root := . -}}
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "harbor.fullname" . }}
+  labels:
+    {{- include "harbor.labels" . | nindent 4 }}
+    app: harbor
+    chart: harbor
+    release: {{ .Release.Name }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className | quote }}
+  {{- end }}
+  {{- if .Values.ingress.tls }}
+  tls:
+    {{- range .Values.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      {{- if eq (include "harbor.autoGenCert" $root) "true" }}
+      secretName: {{ .secretName | default (include "harbor.ingress.secret" $root) }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          # API and Portal routes -> Core
+          - path: /api/
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "harbor.fullname" $ }}-core
+                port:
+                  number: 80
+          - path: /service/
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "harbor.fullname" $ }}-core
+                port:
+                  number: 80
+          - path: /v2/
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "harbor.fullname" $ }}-core
+                port:
+                  number: 80
+          - path: /chartrepo/
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "harbor.fullname" $ }}-core
+                port:
+                  number: 80
+          - path: /c/
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "harbor.fullname" $ }}-core
+                port:
+                  number: 80
+          # Portal (default)
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "harbor.fullname" $ }}-portal
+                port:
+                  number: 80
+    {{- end }}
+{{- end }}

@@ -1,0 +1,90 @@
+suite: exporter component tests
+templates:
+  - templates/exporter.deployment.yaml
+  - templates/exporter.service.yaml
+  - templates/exporter.serviceaccount.yaml
+tests:
+  - it: should create exporter deployment when enabled
+    template: templates/exporter.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      exporter.enabled: true
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-harbor-exporter
+
+  - it: should not create exporter deployment when disabled
+    template: templates/exporter.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      exporter.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should create exporter service when enabled
+    template: templates/exporter.service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      exporter.enabled: true
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: spec.ports[0].port
+          value: 8001
+
+  - it: should not create exporter service when disabled
+    template: templates/exporter.service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      exporter.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should expose metrics port
+    template: templates/exporter.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      exporter.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].name
+          value: metrics
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 8001
+
+  - it: should connect to database
+    template: templates/exporter.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: mydb.example.com
+      database.port: 5433
+      database.username: harbor_user
+      exporter.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_DATABASE_HOST
+            value: "mydb.example.com"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_DATABASE_PORT
+            value: "5433"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_DATABASE_USERNAME
+            value: "harbor_user"

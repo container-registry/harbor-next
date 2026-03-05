@@ -1,0 +1,18 @@
+{{- if .Values.core.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "harbor.fullname" . }}-core
+  labels:
+    {{- include "harbor.componentLabels" (dict "root" . "component" "core") | nindent 4 }}
+spec:
+  {{- if .Values.core.pdb.minAvailable }}
+  minAvailable: {{ .Values.core.pdb.minAvailable }}
+  {{- end }}
+  {{- if .Values.core.pdb.maxUnavailable }}
+  maxUnavailable: {{ .Values.core.pdb.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "core") | nindent 6 }}
+{{- end }}

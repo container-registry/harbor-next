@@ -1,0 +1,71 @@
+suite: extraManifests tests
+templates:
+  - templates/extraManifests.yaml
+tests:
+  - it: should render static extra manifests
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      extraManifests:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: my-custom-config
+          data:
+            key: value
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.name
+          value: my-custom-config
+      - equal:
+          path: data.key
+          value: value
+
+  - it: should add chart labels to extra manifests
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      extraManifests:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: my-custom-config
+          data:
+            key: value
+    asserts:
+      - exists:
+          path: metadata.labels["helm.sh/chart"]
+
+  - it: should render templated extra manifests
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      extraTemplateManifests:
+        - |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: {{ .Release.Name }}-templated
+          data:
+            externalURL: {{ .Values.externalURL }}
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-templated
+      - equal:
+          path: data.externalURL
+          value: https://harbor.example.com
+
+  - it: should render no documents when no extra manifests
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      extraManifests: []
+      extraTemplateManifests: []
+    asserts:
+      - hasDocuments:
+          count: 0

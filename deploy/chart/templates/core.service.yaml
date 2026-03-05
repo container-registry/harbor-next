@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "harbor.fullname" . }}-core
+  labels:
+    {{- include "harbor.componentLabels" (dict "root" . "component" "core") | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http-web
+      port: {{ include "harbor.core.service.port" . }}
+      targetPort: {{ include "harbor.core.port" . }}
+      protocol: TCP
+    - name: {{ include "harbor.metrics.portName" . | quote }}
+      port: {{ include "harbor.metrics.port" . }}
+      targetPort: {{ include "harbor.metrics.port" . }}
+      protocol: TCP
+  selector:
+    {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "core") | nindent 4 }}

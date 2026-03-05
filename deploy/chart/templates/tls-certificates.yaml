@@ -1,0 +1,20 @@
+{{- if .Values.tls.certManager.enabled }}
+{{- $fullname := include "harbor.fullname" . }}
+{{- range .Values.ingress.hosts }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $fullname }}-{{ .host | replace "." "-" }}
+  labels:
+    {{- include "harbor.labels" $ | nindent 4 }}
+spec:
+  secretName: {{ $fullname }}-{{ .host | replace "." "-" }}-tls
+  duration: {{ $.Values.tls.certManager.duration | default "2160h" }}
+  renewBefore: {{ $.Values.tls.certManager.renewBefore | default "360h" }}
+  issuerRef:
+    {{- toYaml $.Values.tls.certManager.issuerRef | nindent 4 }}
+  dnsNames:
+    - {{ .host | quote }}
+{{- end }}
+{{- end }}

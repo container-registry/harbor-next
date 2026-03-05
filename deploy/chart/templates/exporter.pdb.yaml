@@ -1,0 +1,18 @@
+{{- if and .Values.exporter.enabled .Values.exporter.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "harbor.fullname" . }}-exporter
+  labels:
+    {{- include "harbor.componentLabels" (dict "root" . "component" "exporter") | nindent 4 }}
+spec:
+  {{- if .Values.exporter.pdb.minAvailable }}
+  minAvailable: {{ .Values.exporter.pdb.minAvailable }}
+  {{- end }}
+  {{- if .Values.exporter.pdb.maxUnavailable }}
+  maxUnavailable: {{ .Values.exporter.pdb.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "exporter") | nindent 6 }}
+{{- end }}

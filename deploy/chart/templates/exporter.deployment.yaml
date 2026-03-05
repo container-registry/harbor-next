@@ -1,0 +1,125 @@
+{{- if .Values.exporter.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "harbor.fullname" . }}-exporter
+  labels:
+    {{- include "harbor.componentLabels" (dict "root" . "component" "exporter") | nindent 4 }}
+spec:
+  replicas: {{ .Values.exporter.replicas }}
+  selector:
+    matchLabels:
+      {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "exporter") | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.exporter.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "exporter") | nindent 8 }}
+        {{- with .Values.exporter.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- include "harbor.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "harbor.serviceAccountName" (dict "root" . "component" "exporter" "serviceAccount" .Values.exporter.serviceAccount) }}
+      securityContext:
+        {{- toYaml .Values.exporter.podSecurityContext | nindent 8 }}
+      containers:
+        - name: exporter
+          securityContext:
+            {{- toYaml .Values.exporter.securityContext | nindent 12 }}
+          image: {{ include "harbor.image" (dict "imageRoot" .Values.exporter.image "global" .Values.image "chart" .Chart) }}
+          imagePullPolicy: {{ include "harbor.imagePullPolicy" . }}
+          ports:
+            - name: {{ include "harbor.metrics.portName" . | quote }}
+              containerPort: 8001
+              protocol: TCP
+          env:
+            - name: HARBOR_EXPORTER_PORT
+              value: "8001"
+            - name: HARBOR_EXPORTER_METRICS_PATH
+              value: "/metrics"
+            - name: HARBOR_EXPORTER_METRICS_ENABLED
+              value: "true"
+            - name: HARBOR_EXPORTER_MAX_REQUESTS
+              value: "30"
+            - name: HARBOR_EXPORTER_TLS_CERT
+              value: ""
+            - name: HARBOR_EXPORTER_TLS_KEY
+              value: ""
+            - name: HARBOR_SERVICE_SCHEME
+              value: "http"
+            - name: HARBOR_SERVICE_HOST
+              value: {{ include "harbor.fullname" . }}-core
+            - name: HARBOR_SERVICE_PORT
+              value: "80"
+            - name: HARBOR_DATABASE_HOST
+              value: {{ include "harbor.database.host" . | quote }}
+            - name: HARBOR_DATABASE_PORT
+              value: {{ include "harbor.database.port" . | quote }}
+            - name: HARBOR_DATABASE_USERNAME
+              value: {{ include "harbor.database.username" . | quote }}
+            - name: HARBOR_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "harbor.database.secretName" . }}
+                  key: {{ .Values.database.existingSecretKey | default "POSTGRESQL_PASSWORD" }}
+            - name: HARBOR_DATABASE_DBNAME
+              value: {{ include "harbor.database.database" . | quote }}
+            - name: HARBOR_DATABASE_SSLMODE
+              value: {{ include "harbor.database.sslmode" . | quote }}
+            - name: HARBOR_DATABASE_MAX_IDLE_CONNS
+              value: {{ .Values.database.maxIdleConns | default 100 | quote }}
+            - name: HARBOR_DATABASE_MAX_OPEN_CONNS
+              value: {{ .Values.database.maxOpenConns | default 900 | quote }}
+            - name: HARBOR_REDIS_URL
+              value: {{ include "harbor.redis.url.jobservice" . | quote }}
+            - name: HARBOR_REDIS_NAMESPACE
+              value: "harbor_job_service_namespace"
+            - name: HARBOR_REDIS_TIMEOUT
+              value: "3600"
+            {{- if .Values.valkey.auth.enabled }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "harbor.redis.secretName" . }}
+                  key: {{ include "harbor.redis.secretKey" . }}
+            {{- end }}
+            {{- with .Values.exporter.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: {{ include "harbor.metrics.portName" . | quote }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: {{ include "harbor.metrics.portName" . | quote }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.exporter.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.exporter.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.exporter.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.exporter.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

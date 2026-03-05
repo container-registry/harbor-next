@@ -1,0 +1,163 @@
+{{ template "chart.header" . }}
+{{ template "chart.deprecationWarning" . }}
+
+{{ template "chart.badgesSection" . }}
+
+{{ template "chart.description" . }}
+
+## TL;DR
+
+```bash
+helm install my-harbor oci://8gears.container-registry.com/8gcr/chart/harbor-next \
+  --set externalURL=https://harbor.example.com \
+  --set database.host=my-postgres.example.com \
+  --set database.password=secret
+```
+
+## Introduction
+
+This is a modern, production-ready Helm chart for [Harbor Next](https://github.com/container-registry/harbor-next) - the cloud native container registry for Kubernetes.
+
+### Key Features
+
+- **Future-proof configuration**: Uses `toEnvVars` pattern - any Harbor config option works without chart updates
+- **Simplified architecture**: ~20 templates vs 48 in legacy chart
+- **Production-ready**: External database only (use CloudNativePG, AWS RDS, etc.)
+- **Flexible ingress**: Standard Ingress, Gateway API, or custom via `extraManifests`
+- **Optional components**: Valkey (Redis) subchart, Trivy scanner subchart
+
+### What's Different from Legacy Chart
+
+| Legacy Chart | This Chart |
+|-------------|-----------|
+| Built-in PostgreSQL StatefulSet | External database only |
+| Built-in Redis Deployment | Optional Valkey subchart or external |
+| nginx reverse proxy | Direct Ingress/Gateway API |
+| 5 expose types | Ingress, Gateway, or `extraManifests` |
+| ~1,115 lines values.yaml | ~400 lines |
+| 48 template files | ~20 templates |
+
+## Prerequisites
+
+- Kubernetes 1.26+
+- Helm 3.x
+- **External PostgreSQL database** (required)
+- PV provisioner (for registry persistence)
+
+## Installing the Chart
+
+```bash
+helm install my-harbor oci://8gears.container-registry.com/8gcr/chart/harbor-next \
+  --namespace harbor \
+  --create-namespace \
+  --set externalURL=https://harbor.example.com \
+  --set database.host=postgres.example.com \
+  --set database.password=your-password \
+  --set ingress.hosts[0].host=harbor.example.com
+```
+
+## Uninstalling the Chart
+
+```bash
+helm uninstall my-harbor --namespace harbor
+```
+
+{{ template "chart.requirementsSection" . }}
+
+{{ template "chart.valuesSection" . }}
+
+## Configuration Examples
+
+### Minimal Production Setup
+
+```yaml
+externalURL: https://harbor.example.com
+
+database:
+  host: postgres.example.com
+  password: your-db-password
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: harbor.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: harbor-tls
+      hosts:
+        - harbor.example.com
+
+valkey:
+  enabled: true
+```
+
+### S3 Storage Backend
+
+```yaml
+registry:
+  storage:
+    type: s3
+    s3:
+      region: us-east-1
+      bucket: my-harbor-bucket
+      accesskey: AKIAIOSFODNN7EXAMPLE
+      secretkey: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+  persistence:
+    enabled: false
+```
+
+### Gateway API
+
+```yaml
+ingress:
+  enabled: false
+
+gateway:
+  enabled: true
+  parentRefs:
+    - name: my-gateway
+      namespace: default
+  hostnames:
+    - harbor.example.com
+```
+
+### External Redis
+
+```yaml
+valkey:
+  enabled: false
+
+externalRedis:
+  host: redis.example.com
+  port: 6379
+  password: redis-password
+```
+
+### CloudNativePG via extraManifests
+
+```yaml
+extraManifests:
+  - apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    metadata:
+      name: harbor-db
+    spec:
+      instances: 3
+      storage:
+        size: 10Gi
+```
+
+## Upgrading
+
+### From Legacy Harbor Chart
+
+This chart is not a direct upgrade path from the legacy Harbor chart. You should:
+
+1. Backup your Harbor data
+2. Deploy this chart as a new installation
+3. Migrate data using Harbor's replication feature
+
+{{ template "helm-docs.versionFooter" . }}

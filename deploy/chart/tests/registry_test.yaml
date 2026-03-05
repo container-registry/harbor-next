@@ -1,0 +1,156 @@
+suite: registry component tests
+templates:
+  - templates/registry.deployment.yaml
+  - templates/registry.service.yaml
+  - templates/registry.configmap.yaml
+  - templates/registry.secret.yaml
+  - templates/registry.pvc.yaml
+tests:
+  - it: should create registry deployment with default values
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-harbor-registry
+      - equal:
+          path: spec.replicas
+          value: 1
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 2
+
+  - it: should have both registry and registryctl containers
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: registry
+      - equal:
+          path: spec.template.spec.containers[1].name
+          value: registryctl
+
+  - it: should create registry service with correct ports
+    template: templates/registry.service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: spec.ports[0].name
+          value: http
+      - equal:
+          path: spec.ports[0].port
+          value: 5000
+      - equal:
+          path: spec.ports[1].name
+          value: ctl
+      - equal:
+          path: spec.ports[1].port
+          value: 8080
+
+  - it: should create PVC when persistence is enabled with filesystem storage
+    template: templates/registry.pvc.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      registry.storage.type: filesystem
+      registry.persistence.enabled: true
+      registry.persistence.size: 100Gi
+    asserts:
+      - isKind:
+          of: PersistentVolumeClaim
+      - equal:
+          path: spec.resources.requests.storage
+          value: 100Gi
+
+  - it: should not create PVC when using S3 storage
+    template: templates/registry.pvc.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      registry.storage.type: s3
+      registry.persistence.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not create PVC when persistence is disabled
+    template: templates/registry.pvc.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      registry.storage.type: filesystem
+      registry.persistence.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should configure filesystem storage in configmap
+    template: templates/registry.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      registry.storage.type: filesystem
+      registry.storage.filesystem.rootdirectory: /data
+    asserts:
+      - equal:
+          path: data.REGISTRY_STORAGE
+          value: "filesystem"
+      - equal:
+          path: data.REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY
+          value: "/data"
+
+  - it: should configure S3 storage in configmap
+    template: templates/registry.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      registry.storage.type: s3
+      registry.storage.s3.region: us-west-2
+      registry.storage.s3.bucket: my-harbor-bucket
+    asserts:
+      - equal:
+          path: data.REGISTRY_STORAGE
+          value: "s3"
+      - equal:
+          path: data.REGISTRY_STORAGE_S3_REGION
+          value: "us-west-2"
+      - equal:
+          path: data.REGISTRY_STORAGE_S3_BUCKET
+          value: "my-harbor-bucket"
+
+  - it: should use existing PVC when specified
+    template: templates/registry.pvc.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      registry.storage.type: filesystem
+      registry.persistence.enabled: true
+      registry.persistence.existingClaim: my-existing-pvc
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should use existing PVC in deployment
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      registry.storage.type: filesystem
+      registry.persistence.enabled: true
+      registry.persistence.existingClaim: my-existing-pvc
+    asserts:
+      # storage volume is at index 1 (index 0 is tmp emptyDir)
+      - equal:
+          path: spec.template.spec.volumes[1].persistentVolumeClaim.claimName
+          value: my-existing-pvc

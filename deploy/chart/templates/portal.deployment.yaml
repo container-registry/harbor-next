@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "harbor.fullname" . }}-portal
+  labels:
+    {{- include "harbor.componentLabels" (dict "root" . "component" "portal") | nindent 4 }}
+spec:
+  replicas: {{ .Values.portal.replicas }}
+  selector:
+    matchLabels:
+      {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "portal") | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.portal.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "portal") | nindent 8 }}
+        {{- with .Values.portal.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- include "harbor.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "harbor.serviceAccountName" (dict "root" . "component" "portal" "serviceAccount" .Values.portal.serviceAccount) }}
+      securityContext:
+        {{- toYaml .Values.portal.podSecurityContext | nindent 8 }}
+      containers:
+        - name: portal
+          securityContext:
+            {{- toYaml .Values.portal.securityContext | nindent 12 }}
+          image: {{ include "harbor.image" (dict "imageRoot" .Values.portal.image "global" .Values.image "chart" .Chart) }}
+          imagePullPolicy: {{ include "harbor.imagePullPolicy" . }}
+          ports:
+            - name: portal-http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            {{- with .Values.portal.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: portal-http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: portal-http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.portal.resources | nindent 12 }}
+          volumeMounts:
+            - name: portal-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+            - mountPath: /tmp
+              name: tmp
+      volumes:
+        - name: portal-config
+          configMap:
+            name: "{{ template "harbor.portal" . }}"
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.portal.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.portal.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.portal.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

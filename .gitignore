@@ -73,3 +73,6 @@ tmp/
 bin
 .mcp.json
 .claude
+deploy/chart/.task
+deploy/chart/.claude
+deploy/chart/charts/*.tgz

@@ -1,0 +1,179 @@
+{{- if .Values.trivy.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ template "harbor.trivy" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+{{ include "harbor.labels" . | indent 4 }}
+    component: trivy
+    app.kubernetes.io/component: trivy
+spec:
+  replicas: {{ .Values.trivy.replicas }}
+  serviceName: {{  template "harbor.trivy" . }}
+  selector:
+    matchLabels:
+      {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "trivy") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+{{ include "harbor.labels" . | indent 8 }}
+        component: trivy
+        app.kubernetes.io/component: trivy
+{{- if .Values.trivy.podLabels }}
+{{ toYaml .Values.trivy.podLabels | indent 8 }}
+{{- end }}
+      annotations:
+        checksum/secret: {{ include (print $.Template.BasePath "/trivy.secret.yaml") . | sha256sum }} 
+{{- if .Values.trivy.podAnnotations }}
+{{ toYaml .Values.trivy.podAnnotations | indent 8 }}
+{{- end }}
+    spec:
+      {{- include "harbor.imagePullSecrets" . | nindent 6 }}
+      volumes:
+      {{- if .Values.trivy.persistence.enabled }}
+      - name: "data"
+        persistentVolumeClaim:
+          claimName: {{ .Values.trivy.persistence.existingClaim | default "data-" (include "harbor.trivy" .) }}
+      {{- else }}
+      - name: "data"
+        emptyDir: {}
+      {{- end }}
+{{- if .Values.trivy.serviceAccountName }}
+      serviceAccountName: {{ .Values.trivy.serviceAccountName }}
+{{- end }}
+      automountServiceAccountToken: {{ .Values.trivy.automountServiceAccountToken | default false }}
+{{- with .Values.trivy.topologySpreadConstraints}}
+      topologySpreadConstraints:
+{{- range . }}
+      - {{ . | toYaml | indent 8 | trim }}
+        labelSelector:
+          matchLabels:
+{{ include "harbor.matchLabels" $ | indent 12 }}
+            component: trivy
+{{- end }}
+{{- end }}
+      {{- with .Values.trivy.initContainers }}
+      initContainers:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: trivy
+          image: {{ include "harbor.image" (dict "imageRoot" .Values.trivy.image "global" .Values.image "chart" .Chart) }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          securityContext:
+            {{- toYaml .Values.trivy.securityContext | nindent 12 }}
+          env:
+          {{- if has "trivy" .Values.proxy.components }}
+            - name: HTTP_PROXY
+              value: "{{ .Values.proxy.httpProxy }}"
+            - name: HTTPS_PROXY
+              value: "{{ .Values.proxy.httpsProxy }}"
+            - name: NO_PROXY
+              value: "{{ template "harbor.noProxy" . }}"
+          {{- end }}
+            - name: "SCANNER_LOG_LEVEL"
+              value: {{ .Values.logLevel | quote }}
+            - name: "SCANNER_TRIVY_CACHE_DIR"
+              value: "/home/scanner/.cache/trivy"
+            - name: "SCANNER_TRIVY_REPORTS_DIR"
+              value: "/home/scanner/.cache/reports"
+            - name: "SCANNER_TRIVY_DEBUG_MODE"
+              value: {{ .Values.trivy.debugMode | quote }}
+            - name: "SCANNER_TRIVY_VULN_TYPE"
+              value: {{ .Values.trivy.vulnType | quote }}
+            - name: "SCANNER_TRIVY_TIMEOUT"
+              value: {{ .Values.trivy.timeout | quote }}
+            - name: "SCANNER_TRIVY_GITHUB_TOKEN"
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "harbor.trivy" . }}
+                  key: gitHubToken
+            - name: "SCANNER_TRIVY_SEVERITY"
+              value: {{ .Values.trivy.severity | quote }}
+            - name: "SCANNER_TRIVY_IGNORE_UNFIXED"
+              value: {{ .Values.trivy.ignoreUnfixed | default false | quote }}
+            - name: "SCANNER_TRIVY_SKIP_UPDATE"
+              value: {{ .Values.trivy.skipUpdate | default false | quote }}
+            - name: "SCANNER_TRIVY_SKIP_JAVA_DB_UPDATE"
+              value: {{ .Values.trivy.skipJavaDBUpdate | default false | quote }}
+            - name: "SCANNER_TRIVY_DB_REPOSITORY"
+              value: {{ .Values.trivy.dbRepository | join "," | quote }}
+            - name: "SCANNER_TRIVY_JAVA_DB_REPOSITORY"
+              value: {{ .Values.trivy.javaDBRepository | join "," | quote }}
+            - name: "SCANNER_TRIVY_OFFLINE_SCAN"
+              value: {{ .Values.trivy.offlineScan | default false | quote }}
+            - name: "SCANNER_TRIVY_SECURITY_CHECKS"
+              value: {{ .Values.trivy.securityCheck | quote }}
+            - name: "SCANNER_TRIVY_INSECURE"
+              value: {{ .Values.trivy.insecure | default false | quote }}
+            - name: SCANNER_API_SERVER_ADDR
+              value: ":8080"
+            - name: "SCANNER_REDIS_URL"
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "harbor.trivy" . }}
+                  key: redisURL
+            - name: "SCANNER_STORE_REDIS_URL"
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "harbor.trivy" . }}
+                  key: redisURL
+            - name: "SCANNER_JOB_QUEUE_REDIS_URL"
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "harbor.trivy" . }}
+                  key: redisURL
+{{- with .Values.trivy.extraEnvVars }}
+{{- toYaml . | nindent 12 }}
+{{- end }}
+          ports:
+            - name: api-server
+              containerPort: 8080
+          volumeMounts:
+            - name: data
+              mountPath: /home/scanner/.cache
+              readOnly: false
+          livenessProbe:
+            httpGet:
+              scheme: {{ include "harbor.component.scheme" . | upper }}
+              path: /probe/healthy
+              port: api-server
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 10
+          readinessProbe:
+            httpGet:
+              scheme: {{ include "harbor.component.scheme" . | upper }}
+              path: /probe/ready
+              port: api-server
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          resources:
+{{ toYaml .Values.trivy.resources | indent 12 }}
+{{- if and .Values.trivy.persistence.enabled (not .Values.trivy.persistence.existingClaim) }}
+  volumeClaimTemplates:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: data
+      labels:
+        {{- include "harbor.componentLabels" (dict "root" . "component" "trivy") | nindent 8 }}
+      {{- with .Values.trivy.persistence.annotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      accessModes:
+        {{- toYaml .Values.trivy.persistence.accessModes | nindent 8 }}
+      {{- if .Values.trivy.persistence.storageClass }}
+      storageClassName: {{ .Values.trivy.persistence.storageClass | quote }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.trivy.persistence.size | quote }}
+{{- end }}
+{{- end }}

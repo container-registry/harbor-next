@@ -1,0 +1,18 @@
+{{- if .Values.jobservice.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "harbor.fullname" . }}-jobservice
+  labels:
+    {{- include "harbor.componentLabels" (dict "root" . "component" "jobservice") | nindent 4 }}
+spec:
+  {{- if .Values.jobservice.pdb.minAvailable }}
+  minAvailable: {{ .Values.jobservice.pdb.minAvailable }}
+  {{- end }}
+  {{- if .Values.jobservice.pdb.maxUnavailable }}
+  maxUnavailable: {{ .Values.jobservice.pdb.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "jobservice") | nindent 6 }}
+{{- end }}

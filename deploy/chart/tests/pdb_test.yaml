@@ -1,0 +1,132 @@
+suite: PodDisruptionBudget tests
+templates:
+  - templates/core.pdb.yaml
+  - templates/portal.pdb.yaml
+  - templates/registry.pdb.yaml
+  - templates/jobservice.pdb.yaml
+  - templates/exporter.pdb.yaml
+tests:
+  - it: should not create PDBs by default
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should create core PDB when enabled
+    template: templates/core.pdb.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      core.pdb.enabled: true
+      core.pdb.minAvailable: 1
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-harbor-core
+      - equal:
+          path: spec.minAvailable
+          value: 1
+
+  - it: should create portal PDB when enabled
+    template: templates/portal.pdb.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      portal.pdb.enabled: true
+      portal.pdb.minAvailable: 2
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-harbor-portal
+      - equal:
+          path: spec.minAvailable
+          value: 2
+
+  - it: should create registry PDB when enabled
+    template: templates/registry.pdb.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      registry.pdb.enabled: true
+      registry.pdb.minAvailable: 1
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-harbor-registry
+
+  - it: should create jobservice PDB when enabled
+    template: templates/jobservice.pdb.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      jobservice.pdb.enabled: true
+      jobservice.pdb.minAvailable: 1
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-harbor-jobservice
+
+  - it: should create exporter PDB when enabled
+    template: templates/exporter.pdb.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      exporter.enabled: true
+      exporter.pdb.enabled: true
+      exporter.pdb.minAvailable: 1
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-harbor-exporter
+
+  - it: should not create exporter PDB when exporter is disabled
+    template: templates/exporter.pdb.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      exporter.enabled: false
+      exporter.pdb.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should support maxUnavailable instead of minAvailable
+    template: templates/core.pdb.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      core.pdb.enabled: true
+      core.pdb.minAvailable: null
+      core.pdb.maxUnavailable: 1
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+      - equal:
+          path: spec.maxUnavailable
+          value: 1
+      - isNull:
+          path: spec.minAvailable
+
+  - it: should support percentage values for minAvailable
+    template: templates/core.pdb.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      core.pdb.enabled: true
+      core.pdb.minAvailable: "50%"
+    asserts:
+      - equal:
+          path: spec.minAvailable
+          value: "50%"
