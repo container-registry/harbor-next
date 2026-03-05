@@ -313,6 +313,7 @@ tasks:
       - rm -rf src/portal/node_modules
       - rm -f build-errors.log
       - rm -f {{.TOKEN_KEY_FILE}}
+      - rm -f {{.TOKEN_KEY_FILE_LOCAL}}
 
   status:
     desc: Show container status for all services

@@ -15,11 +15,11 @@ job_loggers:
   - name: "FILE"
     level: "INFO"
     settings:
-      base_dir: "tmp"
+      base_dir: "/tmp"
     sweeper:
       duration: 1
       settings:
-        work_dir: "tmp"
+        work_dir: "/tmp"
 
 loggers:
   - name: "STD_OUTPUT"

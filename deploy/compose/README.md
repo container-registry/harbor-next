@@ -19,7 +19,7 @@ cp .env.example .env
 # 2. Generate token signing key (must be PKCS#1 / "RSA PRIVATE KEY" format)
 openssl genpkey -algorithm RSA -outform PEM -pkeyopt rsa_keygen_bits:4096 \
   | openssl rsa -traditional -out config/token_service_key.pem
-chmod 644 config/token_service_key.pem
+chmod 644 config/token_service_key.pem   # container UID 10000 ≠ host UID → needs world-readable
 
 # 3. Start
 docker compose up -d
