@@ -227,7 +227,6 @@ services:
     ports:
       - "${PORT_PORTAL:-4200}:4200"
     environment:
-      OPENAPI_UI: "${OPENAPI_UI:-false}"
       HARBOR_PROXY_TARGET: "http://core:8080"
     depends_on:
       - core

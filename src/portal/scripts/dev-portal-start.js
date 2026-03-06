@@ -1,5 +1,5 @@
 const { rmSync, mkdirSync } = require('node:fs');
-const { spawn, spawnSync } = require('node:child_process');
+const { spawn } = require('node:child_process');
 
 const openApiOutputDir = '/app/src/openapi-ui';
 const angularCli = '/app/node_modules/@angular/cli/bin/ng';
@@ -14,8 +14,8 @@ function cleanOpenApiOutput() {
 }
 
 function buildOpenApiUi() {
-  console.log('OPENAPI_UI=true: building Swagger UI assets into portal');
-  const build = spawnSync('bun', ['run', 'build'], {
+  console.log('Building Swagger UI assets in background...');
+  const child = spawn('bun', ['run', 'build'], {
     cwd: '/swagger-ui',
     env: {
       ...process.env,
@@ -26,9 +26,13 @@ function buildOpenApiUi() {
     stdio: 'inherit',
   });
 
-  if (build.status !== 0) {
-    process.exit(build.status ?? 1);
-  }
+  child.on('exit', code => {
+    if (code !== 0) {
+      console.error(`Swagger UI build failed with exit code ${code}`);
+    } else {
+      console.log('Swagger UI build complete');
+    }
+  });
 }
 
 function startPortal() {
@@ -56,9 +60,5 @@ function startPortal() {
 }
 
 cleanOpenApiOutput();
-
-if (process.env.OPENAPI_UI === 'true') {
-  buildOpenApiUi();
-}
-
+buildOpenApiUi();
 startPortal();

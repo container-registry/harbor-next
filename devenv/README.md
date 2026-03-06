@@ -9,11 +9,8 @@ This directory contains all configuration files needed to run Harbor locally for
 ## Quick Start
 
 ```bash
-# Start full dev environment with Trivy scanner
+# Start full dev environment (includes OpenAPI UI)
 task dev:up
-
-# Also build and expose the OpenAPI / Swagger UI in portal dev mode
-task dev:up OPENAPI_UI=true
 
 # Start infrastructure only (for native development)
 task dev:infra:up
@@ -83,7 +80,6 @@ dockerfile/
 ```bash
 task dev:up                    # Start everything (Core, JobService, Trivy, Portal)
 task dev:up SKIP_TRIVY=true    # Start without Trivy
-task dev:up OPENAPI_UI=true    # Also build OpenAPI UI into the portal dev flow
 task dev:status          # Show running containers
 task dev:logs            # View all container logs
 task dev:clean           # Stop everything and remove volumes
@@ -142,7 +138,7 @@ task test:quick          # Quick validation (fast checks only)
 Code changes are automatically detected and rebuilt:
 - **Go files**: Air watches `src/` and rebuilds (~3 seconds)
 - **Frontend**: Angular HMR (< 1 second once initial compile is complete)
-- **OpenAPI UI**: optional extra build step in portal startup, disabled by default
+- **OpenAPI UI**: Swagger UI assets are built in the background during portal startup
 
 Volume mounts with VirtioFS (Docker Desktop 4.x+) provide fast file system event propagation.
 
