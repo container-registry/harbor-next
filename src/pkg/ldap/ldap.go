@@ -183,7 +183,7 @@ func (s *Session) SearchUser(username string) ([]model.User, error) {
 		u.DN = ldapEntry.DN
 		// Search for nested group memberships (if AdminFilter is set)
 		if s.groupCfg.AdminFilter != "" {
-			nestedFilter, err := createUserSearchFilter(s.groupCfg.AdminFilter, s.basicCfg.UID, username)
+			nestedFilter, err := createAdminSearchFilter(s.groupCfg.AdminFilter, s.basicCfg.UID, username, u.DN)
 			if err != nil {
 				return nil, err
 			}
@@ -325,7 +325,7 @@ func (s *Session) SearchLdapAttribute(baseDN, filter string, attributes []string
 	return result, nil
 }
 
-// createUserSearchFilter - create filter to search for a user with a specified username,
+// createAdminSearchFilter - create filter to search for an admin user with a specified username,
 // and optionally check if the user is a nested member of a group.
 func createAdminSearchFilter(origFilter, ldapUID, username, userDN string) (string, error) {
 	oFilter, err := NewFilterBuilder(origFilter)
