@@ -192,14 +192,10 @@ func (s *Session) SearchUser(username string) ([]model.User, error) {
 				return nil, err
 			}
 
-			// check and give permissions to user under admin DN
-			for _, ldapEntry := range nestedResult.Entries {
-				if ldapEntry.DN != u.DN {
-					continue
-				}
-				// add user to AdminDN
+			// If any entries matched the admin filter, grant admin
+			if len(nestedResult.Entries) > 0 {
 				u.GroupDNList = append(u.GroupDNList, s.groupCfg.AdminDN)
-				log.Debugf("User %s (DN: %s) added to admin group: %s", username, ldapEntry.DN, s.groupCfg.AdminDN)
+				log.Debugf("User %s (DN: %s) added to admin group: %s", username, u.DN, s.groupCfg.AdminDN)
 			}
 		}
 
