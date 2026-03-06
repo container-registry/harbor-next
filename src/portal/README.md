@@ -30,23 +30,16 @@ If `postinstall` scripts were not triggered, then run manually:  `npm run postin
 `proxy.config.mjs` is tracked and reads its targets from environment variables:
 
 - `HARBOR_PROXY_TARGET` defaults to `http://localhost:8080`
-- `OPENAPI_UI=true` builds the OpenAPI UI assets into the portal dev container before `ng serve`
 - `HARBOR_USE_PROXY_AGENT=true` enables `https-proxy-agent`
 - `HARBOR_PROXY_AGENT_SERVER` overrides the corporate proxy agent URL
 
 When using `task dev:up`, the containerized dev stack sets the proxy target automatically.
-OpenAPI UI stays disabled unless you start with `OPENAPI_UI=true`.
+The OpenAPI / Swagger UI is built automatically in the background during portal startup.
 
 ### 4. Start the development server
 
 ```sh
 npm run start
-```
-
-To enable the standalone Swagger UI route in dev:
-
-```sh
-OPENAPI_UI=true task dev:up
 ```
 
 ### 5. Open the application
