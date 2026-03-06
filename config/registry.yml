@@ -1,5 +1,3 @@
-# Docker Registry (Distribution) Configuration - Development Environment
-# All settings hardcoded for local development (localhost)
 version: 0.1
 storage:
   cache:
@@ -7,9 +5,10 @@ storage:
   filesystem:
     rootdirectory: /var/lib/registry
   delete:
-    enabled: false
+    enabled: true
 http:
   addr: :5000
-  secret: placeholder
+  secret: set-via-REGISTRY_HTTP_SECRET-env
+  relativeurls: true
   debug:
     addr: localhost:5001

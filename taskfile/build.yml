@@ -30,6 +30,8 @@ tasks:
       - task: 'binary:jobservice:{{.PLATFORM}}'
       - task: 'binary:registryctl:{{.PLATFORM}}'
       - task: 'binary:exporter:{{.PLATFORM}}'
+      - task: 'binary:registry:{{.PLATFORM}}'
+      - task: 'binary:trivy-adapter:{{.PLATFORM}}'
 
   # --- Internal Go Build ---
 
@@ -128,6 +130,49 @@ tasks:
           PLATFORM: '{{index .MATCH 0}}'
           MAIN_PATH: ./cmd/exporter/main.go
           OUTPUT_NAME: harbor-exporter
+
+  binary:registry:*:
+    desc: "Build Distribution registry binary (cross-compiled from source)"
+    generates:
+      - bin/{{index .MATCH 0}}/registry
+    vars:
+      PLATFORM: '{{index .MATCH 0}}'
+      GOOS: '{{index (splitList "-" (index .MATCH 0)) 0}}'
+      GOARCH: '{{index (splitList "-" (index .MATCH 0)) 1}}'
+    cmds:
+      - cmd: mkdir -p bin/{{.PLATFORM}}
+        silent: true
+      - |
+        DIST_DIR=$(mktemp -d)
+        trap "rm -rf $DIST_DIR" EXIT
+        git clone --branch {{.DISTRIBUTION_VERSION}} --depth 1 {{.DISTRIBUTION_SRC}} "$DIST_DIR"
+        cd "$DIST_DIR"
+        go mod edit -require golang.org/x/net@v0.49.0
+        go mod tidy -e
+        go mod vendor
+        REVISION=$(git rev-parse HEAD)
+        PKG=github.com/distribution/distribution/v3
+        VERSION_STR={{.DISTRIBUTION_VERSION}}
+        LDFLAGS="-X ${PKG}/version.version=${VERSION_STR#v} -X ${PKG}/version.revision=${REVISION} -X ${PKG}/version.mainpkg=${PKG} -s -w"
+        CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath -ldflags "${LDFLAGS}" -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/registry" ./cmd/registry
+
+  binary:trivy-adapter:*:
+    desc: "Build harbor-scanner-trivy binary (cross-compiled from source)"
+    generates:
+      - bin/{{index .MATCH 0}}/scanner-trivy
+    vars:
+      PLATFORM: '{{index .MATCH 0}}'
+      GOOS: '{{index (splitList "-" (index .MATCH 0)) 0}}'
+      GOARCH: '{{index (splitList "-" (index .MATCH 0)) 1}}'
+    cmds:
+      - cmd: mkdir -p bin/{{.PLATFORM}}
+        silent: true
+      - |
+        TRIVY_DIR=$(mktemp -d)
+        trap "rm -rf $TRIVY_DIR" EXIT
+        git clone --branch {{.HARBOR_SCANNER_TRIVY_VERSION}} --depth 1 https://github.com/goharbor/harbor-scanner-trivy.git "$TRIVY_DIR"
+        cd "$TRIVY_DIR"
+        CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/scanner-trivy" cmd/scanner-trivy/main.go
 
   # --- API Generation ---
 

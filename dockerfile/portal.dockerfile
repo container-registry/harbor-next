@@ -25,8 +25,7 @@ RUN cd app-swagger-ui && bun install --ignore-scripts && bun run build
 # RUNTIME
 FROM ghcr.io/fivexl/lprobe:${LPROBE_VERSION} AS lprobe
 
-FROM nginx:${NGINX_VERSION}-alpine
-RUN apk add --no-cache ca-certificates
+FROM 8gears.container-registry.com/dhi.io/nginx:${NGINX_VERSION}-debian13
 COPY --from=lprobe /lprobe /lprobe
 COPY --from=builder /harbor/src/portal/dist /usr/share/nginx/html
 COPY --from=builder /harbor/src/portal/swagger.json /usr/share/nginx/html/swagger.json
@@ -34,11 +33,5 @@ COPY --from=builder /harbor/src/portal/app-swagger-ui/dist /usr/share/nginx/html
 COPY config/portal/nginx.conf /etc/nginx/nginx.conf
 WORKDIR /usr/share/nginx/html
 
-RUN chgrp -R 0 /var/cache/nginx /var/log/nginx /etc/nginx/conf.d && \
-    chmod -R g=u /var/cache/nginx /var/log/nginx /etc/nginx/conf.d
-
 EXPOSE 8080
-EXPOSE 8443
-
-USER nginx
 ENTRYPOINT ["nginx", "-g", "daemon off;"]

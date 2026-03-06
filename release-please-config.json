@@ -1,0 +1,26 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "123fb099df0cc04c99bdb92f01a6da552fafd0fd",
+  "pull-request-header": "This PR prepares the next release based on conventional commits.",
+  "pull-request-title-pattern": "chore: release ${version}",
+  "release-type": "simple",
+  "include-v-in-tag": true,
+  "exclude-paths": [".github", "docs", "tests"],
+  "changelog-sections": [
+    {"type": "feat",     "section": "Features"},
+    {"type": "fix",      "section": "Bug Fixes"},
+    {"type": "perf",     "section": "Performance Improvements"},
+    {"type": "revert",   "section": "Reverts"},
+    {"type": "refactor", "section": "Code Refactoring"},
+    {"type": "docs",     "section": "Documentation"},
+    {"type": "test",     "section": "Tests", "hidden": true},
+    {"type": "chore",    "section": "Miscellaneous", "hidden": true},
+    {"type": "ci",       "section": "CI/CD",          "hidden": true},
+    {"type": "build",    "section": "Build System",   "hidden": true}
+  ],
+  "packages": {
+    ".": {
+      "version-file": "VERSION"
+    }
+  }
+}
