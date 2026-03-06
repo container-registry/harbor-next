@@ -1,0 +1,30 @@
+name: Spell Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**.md'
+      - '**.txt'
+      - '**.yml'
+      - '**.yaml'
+      - '.typos.toml'
+  pull_request:
+    paths:
+      - '**.md'
+      - '**.txt'
+      - '**.yml'
+      - '**.yaml'
+      - '.typos.toml'
+
+permissions:
+  contents: read
+
+jobs:
+  typos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: crate-ci/typos@a8d8e187146634c459c27ade2d3e338569378720 # v1.44.0
+        with:
+          config: .typos.toml
