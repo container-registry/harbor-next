@@ -7,7 +7,7 @@
     "postinstall": "bun scripts/convert-yaml-to-json.js && ng-swagger-gen -i ng-swagger-gen/swagger.json -o ng-swagger-gen && bun scripts/delete-swagger-json.js",
     "start": "bun ./node_modules/@angular/cli/bin/ng serve --host 0.0.0.0",
     "start:prod": "bun ./node_modules/@angular/cli/bin/ng serve --host 0.0.0.0 --configuration production",
-    "start_default_port": "bun ./node_modules/@angular/cli/bin/ng serve --host 0.0.0.0 --port 443 --disable-host-check",
+    "start_default_port": "bun ./node_modules/@angular/cli/bin/ng serve --host 0.0.0.0 --port 443",
     "lint": "ng lint",
     "lint_fix": "ng lint --fix",
     "lint:style": "npx stylelint \"**/*.scss\"",

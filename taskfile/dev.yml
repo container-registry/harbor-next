@@ -3,8 +3,10 @@ version: '3'
 vars:
   # Paths
   COMPOSE_FILE: devenv/docker-compose.yml
-  COMPOSE_RELEASE_FILE: devenv/docker-compose.release.yml
+  COMPOSE_LOCAL_FILE: deploy/compose/docker-compose.yaml
+  COMPOSE_LOCAL_ENV: deploy/compose/example/local/.env.example
   TOKEN_KEY_FILE: devenv/token_service_key.pem
+  TOKEN_KEY_FILE_LOCAL: deploy/compose/config/token_service_key.pem
 
   # Database (only vars used in task commands)
   POSTGRES_USER: postgres
@@ -82,8 +84,8 @@ tasks:
     status:
       - test -f {{.TOKEN_KEY_FILE}}
     cmds:
-      - openssl genpkey -algorithm RSA -out {{.TOKEN_KEY_FILE}} -pkeyopt rsa_keygen_bits:4096
-      - chmod 600 {{.TOKEN_KEY_FILE}}
+      - openssl genpkey -algorithm RSA -outform PEM -pkeyopt rsa_keygen_bits:4096 | openssl rsa -traditional -out {{.TOKEN_KEY_FILE}}
+      - chmod 644 {{.TOKEN_KEY_FILE}}
       - echo "Generated {{.TOKEN_KEY_FILE}}"
 
   # ---------------------------------------------------------------------------
@@ -127,29 +129,6 @@ tasks:
     vars:
       TRIVY_PROFILE: '{{if ne .SKIP_TRIVY "true"}}--profile trivy{{end}}'
     cmd: docker compose -f {{.COMPOSE_FILE}} {{.APP_PROFILES}} {{.TRIVY_PROFILE}} down
-
-  # ---------------------------------------------------------------------------
-  # Release Image Smoke Test
-  # ---------------------------------------------------------------------------
-  up-release:
-    desc: "Start release images for smoke testing (TAG to override VERSION file)"
-    deps: [require-docker, gen:private-key]
-    vars:
-      TAG: '{{.TAG | default .VERSION}}'
-    env:
-      HARBOR_TAG: '{{.TAG}}'
-    cmds:
-      - defer: { task: down-release, vars: { TAG: "{{.TAG}}" } }
-      - task: info
-      - docker compose -f {{.COMPOSE_FILE}} -f {{.COMPOSE_RELEASE_FILE}} {{.APP_PROFILES}} up
-
-  down-release:
-    desc: Stop and remove release smoke test containers
-    vars:
-      TAG: '{{.TAG | default .VERSION}}'
-    env:
-      HARBOR_TAG: '{{.TAG}}'
-    cmd: docker compose -f {{.COMPOSE_FILE}} -f {{.COMPOSE_RELEASE_FILE}} {{.APP_PROFILES}} down
 
   # ---------------------------------------------------------------------------
   # Infrastructure (Docker Compose)
@@ -232,7 +211,7 @@ tasks:
     deps: [frontend:install]
     cmds:
       - task: :build:gen-apis:frontend
-      - exec ./node_modules/.bin/ng serve --host 0.0.0.0 --hmr --disable-host-check
+      - exec ./node_modules/.bin/ng serve --host 0.0.0.0 --hmr
 
   frontend:build:
     desc: Build Portal for production
@@ -279,6 +258,51 @@ tasks:
     cmd: docker compose -f {{.COMPOSE_FILE}} exec postgresql psql -U {{.POSTGRES_USER}} -d {{.POSTGRES_DB}}
 
   # ---------------------------------------------------------------------------
+  # Release Test (deploy/compose)
+  # ---------------------------------------------------------------------------
+  gen:private-key:local:
+    internal: true
+    status: ['test -f {{.TOKEN_KEY_FILE_LOCAL}}']
+    cmds:
+      - mkdir -p $(dirname {{.TOKEN_KEY_FILE_LOCAL}})
+      - openssl genpkey -algorithm RSA -outform PEM -pkeyopt rsa_keygen_bits:4096 | openssl rsa -traditional -out {{.TOKEN_KEY_FILE_LOCAL}}
+      - chmod 644 {{.TOKEN_KEY_FILE_LOCAL}}
+
+  release:up:
+    desc: "Start release images locally (IMAGE_REPO= for remote, empty for local)"
+    deps: [require-docker, gen:private-key:local]
+    vars:
+      TAG: '{{.TAG | default .VERSION}}'
+      REPO: '{{.IMAGE_REPO | default ""}}'
+    env:
+      HARBOR_TAG: '{{.TAG}}'
+      IMAGE_REPO: '{{.REPO}}'
+    cmds:
+      - defer: { task: release:down, vars: { TAG: "{{.TAG}}", IMAGE_REPO: "{{.REPO}}" } }
+      - echo "Release {{.TAG}} {{if .REPO}}({{.REPO}}){{else}}(local){{end}} → http://localhost admin/Harbor12345"
+      - docker compose -f {{.COMPOSE_LOCAL_FILE}} --env-file {{.COMPOSE_LOCAL_ENV}} up
+
+  release:down:
+    desc: Stop release containers
+    vars:
+      TAG: '{{.TAG | default .VERSION}}'
+      REPO: '{{.IMAGE_REPO | default ""}}'
+    env:
+      HARBOR_TAG: '{{.TAG}}'
+      IMAGE_REPO: '{{.REPO}}'
+    cmd: docker compose -f {{.COMPOSE_LOCAL_FILE}} --env-file {{.COMPOSE_LOCAL_ENV}} down
+
+  release:down:clean:
+    desc: Stop release containers and remove all volumes
+    vars:
+      TAG: '{{.TAG | default .VERSION}}'
+      REPO: '{{.IMAGE_REPO | default ""}}'
+    env:
+      HARBOR_TAG: '{{.TAG}}'
+      IMAGE_REPO: '{{.REPO}}'
+    cmd: docker compose -f {{.COMPOSE_LOCAL_FILE}} --env-file {{.COMPOSE_LOCAL_ENV}} down -v
+
+  # ---------------------------------------------------------------------------
   # Utilities
   # ---------------------------------------------------------------------------
   clean:
@@ -290,6 +314,8 @@ tasks:
       - rm -rf src/portal/node_modules
       - rm -f build-errors.log
       - rm -f {{.TOKEN_KEY_FILE}}
+      - rm -f {{.TOKEN_KEY_FILE_LOCAL}}
+      - rmdir $(dirname {{.TOKEN_KEY_FILE_LOCAL}}) 2>/dev/null || true
 
   status:
     desc: Show container status for all services
