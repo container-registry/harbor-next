@@ -29,7 +29,7 @@ import (
 
 // DAO is the data access object interface for CVE allowlist
 type DAO interface {
-	// Set creates or updates the CVE allowlist to DB based on the project ID in the input parm, if the project does not
+	// Set creates or updates the CVE allowlist to DB based on the project ID in the input param, if the project does not
 	// have a CVE allowlist, an empty allowlist will be created.  The project ID should be 0 for system level CVE allowlist
 	Set(ctx context.Context, l models.CVEAllowlist) (int64, error)
 	// QueryByProjectID returns the CVE allowlist of the project based on the project ID in parameter.  The project ID should be 0

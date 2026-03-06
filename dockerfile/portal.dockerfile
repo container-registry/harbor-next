@@ -6,7 +6,7 @@ ARG LPROBE_VERSION=MISSING-BUILD-ARG
 
 #
 # Build Angular application and Swagger UI
-FROM oven/bun:${BUN_VERSION}-alpine AS builder
+FROM --platform=$BUILDPLATFORM oven/bun:${BUN_VERSION}-alpine AS builder
 # nodejs required: bun hangs on Angular/webpack build inside Docker (oven-sh/bun#15226)
 RUN apk add --no-cache nodejs yq
 WORKDIR /harbor/src/portal

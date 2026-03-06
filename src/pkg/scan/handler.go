@@ -29,8 +29,8 @@ import (
 
 var handlerRegistry = map[string]Handler{}
 
-// RegisterScanHanlder register scanner handler
-func RegisterScanHanlder(requestType string, handler Handler) {
+// RegisterScanHandler register scanner handler
+func RegisterScanHandler(requestType string, handler Handler) {
 	handlerRegistry[requestType] = handler
 }
 

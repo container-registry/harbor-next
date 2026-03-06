@@ -54,7 +54,7 @@ func (l *loginResolver) Resolve(ce *commonevent.Metadata, event *event.Event) er
 		Operator:             ce.Username,
 		ResourceType:         rbac.ResourceUser.String(),
 		ResourceName:         ce.Username,
-		OcurrAt:              time.Now(),
+		OccurAt:              time.Now(),
 		Operation:            opLogin,
 		OperationDescription: opLogin,
 		IsSuccessful:         ce.ResponseCode <= http.StatusTemporaryRedirect,

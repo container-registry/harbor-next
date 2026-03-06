@@ -174,7 +174,8 @@
         "DISTRIBUTIONS": {
             "NAME": "배포",
             "INSTANCES": "인스턴스"
-        }
+        },
+        "SUBSCRIPTION": "Subscription"
     },
     "USER": {
         "ADD_ACTION": "새 사용자",
@@ -834,6 +835,8 @@
             "VERIFY_CERT": "LDAP 확인 인증서",
             "LDAP_GROUP_BASE_DN": "LDAP Group Base DN",
             "LDAP_GROUP_BASE_DN_INFO": "LDAP/AD에서 그룹을 조회할 기본 DN입니다. LDAP 그룹 관련 기능을 활성화해야 하는 경우 이 필드를 비워둘 수 없습니다.",
+            "LDAP_GROUP_ADMIN_FILTER": "LDAP Group Admin Filter",
+            "LDAP_GROUP_ADMIN_FILTER_INFO": "The filter for LDAP Admin search.",
             "LDAP_GROUP_FILTER": "LDAP 그룹 필터",
             "LDAP_GROUP_FILTER_INFO": "LDAP/AD 그룹을 검색하기 위한 필터입니다. OpenLDAP의 경우: objectclass=groupOfNames. Active Directory의 경우: objectclass=group. LDAP 그룹 관련 기능이 필요한 경우 이 필드를 비워둘 수 없습니다.",
             "LDAP_GROUP_GID": "LDAP Group GID",
@@ -1364,6 +1367,13 @@
         "ADD_TITLE": "태그 불변성 규칙 추가",
         "ADD_SUBTITLE": "이 프로젝트에 대한 태그 불변성 규칙을 지정합니다. 참고: 모든 태그 불변성 규칙은 먼저 독립적으로 계산된 다음 통합되어 불변성 태그의 최종 세트를 캡처합니다.",
         "IN_REPOSITORIES": "For the repositories",
+        "CONDITION": "불변성 조건",
+        "ACTION_IMMUTABLE": "적용",
+        "RULE_NAME_5": "항상",
+        "RULE_NAME_6": " 지난 {{number}}일 동안 가져온 아티팩트",
+        "RULE_NAME_7": " 지난 {{number}}일 동안 푸시된 아티팩트",
+        "RULE_TEMPLATE_6": "최근 #일 이내에 가져온 아티팩트에 적용",
+        "RULE_TEMPLATE_7": "최근 #일 이내에 푸시된 아티팩트에 적용",
         "REP_SEPARATOR": "쉼표로 구분된 저장소, 저장소* 또는 **를 여러 개 입력하세요.",
         "TAGS": "태그",
         "TAG_SEPARATOR": "여러 개의 쉼표로 구분된 태그(태그* 또는 **)를 입력하세요.",

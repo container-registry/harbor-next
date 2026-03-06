@@ -344,16 +344,16 @@ func (suite *ManagerTestSuite) TestCleanup() {
 		ExtraAttrs: "",
 	}
 
-	mockCleaupCriteria1 := cleanup.Selector{}
-	mockCleaupCriteria1.On("List", mock.Anything).Return([]*model.SystemArtifact{&sa1}, nil).Once()
+	mockCleanupCriteria1 := cleanup.Selector{}
+	mockCleanupCriteria1.On("List", mock.Anything).Return([]*model.SystemArtifact{&sa1}, nil).Once()
 
-	mockCleaupCriteria2 := cleanup.Selector{}
-	mockCleaupCriteria2.On("List", mock.Anything).Return([]*model.SystemArtifact{&sa2}, nil).Once()
+	mockCleanupCriteria2 := cleanup.Selector{}
+	mockCleanupCriteria2.On("List", mock.Anything).Return([]*model.SystemArtifact{&sa2}, nil).Once()
 
 	suite.cleanupCriteria.On("List", mock.Anything).Return([]*model.SystemArtifact{&sa3}, nil).Once()
 
-	suite.mgr.RegisterCleanupCriteria("test_vendor1", "test_type1", &mockCleaupCriteria1)
-	suite.mgr.RegisterCleanupCriteria("test_vendor2", "test_type2", &mockCleaupCriteria2)
+	suite.mgr.RegisterCleanupCriteria("test_vendor1", "test_type1", &mockCleanupCriteria1)
+	suite.mgr.RegisterCleanupCriteria("test_vendor2", "test_type2", &mockCleanupCriteria2)
 
 	suite.dao.On("Delete", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Times(3)
 	suite.regCli.On("DeleteBlob", mock.Anything, mock.Anything).Return(nil).Times(3)
@@ -385,16 +385,16 @@ func (suite *ManagerTestSuite) TestCleanupError() {
 		ExtraAttrs: "",
 	}
 
-	mockCleaupCriteria1 := cleanup.Selector{}
-	mockCleaupCriteria1.On("List", mock.Anything).Return([]*model.SystemArtifact{&sa1}, nil).Once()
+	mockCleanupCriteria1 := cleanup.Selector{}
+	mockCleanupCriteria1.On("List", mock.Anything).Return([]*model.SystemArtifact{&sa1}, nil).Once()
 
-	mockCleaupCriteria2 := cleanup.Selector{}
-	mockCleaupCriteria2.On("List", mock.Anything).Return(nil, errors.New("test error")).Once()
+	mockCleanupCriteria2 := cleanup.Selector{}
+	mockCleanupCriteria2.On("List", mock.Anything).Return(nil, errors.New("test error")).Once()
 
 	suite.cleanupCriteria.On("List", mock.Anything).Return([]*model.SystemArtifact{&sa3}, nil)
 
-	suite.mgr.RegisterCleanupCriteria("test_vendor13000", "test_type13000", &mockCleaupCriteria1)
-	suite.mgr.RegisterCleanupCriteria("test_vendor23000", "test_type23000", &mockCleaupCriteria2)
+	suite.mgr.RegisterCleanupCriteria("test_vendor13000", "test_type13000", &mockCleanupCriteria1)
+	suite.mgr.RegisterCleanupCriteria("test_vendor23000", "test_type23000", &mockCleanupCriteria2)
 
 	suite.dao.On("Delete", mock.Anything, "test_vendor13000", "test_repo13000", "test_digest13000").Return(nil)
 	suite.dao.On("Delete", mock.Anything, "test_vendor33000", "test_repo33000", "test_digest33000").Return(nil)
@@ -428,16 +428,16 @@ func (suite *ManagerTestSuite) TestCleanupErrorDefaultCriteria() {
 		ExtraAttrs: "",
 	}
 
-	mockCleaupCriteria1 := cleanup.Selector{}
-	mockCleaupCriteria1.On("List", mock.Anything).Return([]*model.SystemArtifact{&sa1}, nil).Once()
+	mockCleanupCriteria1 := cleanup.Selector{}
+	mockCleanupCriteria1.On("List", mock.Anything).Return([]*model.SystemArtifact{&sa1}, nil).Once()
 
-	mockCleaupCriteria2 := cleanup.Selector{}
-	mockCleaupCriteria2.On("List", mock.Anything).Return([]*model.SystemArtifact{&sa2}, nil).Once()
+	mockCleanupCriteria2 := cleanup.Selector{}
+	mockCleanupCriteria2.On("List", mock.Anything).Return([]*model.SystemArtifact{&sa2}, nil).Once()
 
 	suite.cleanupCriteria.On("List", mock.Anything).Return(nil, errors.New("test error"))
 
-	suite.mgr.RegisterCleanupCriteria("test_vendor1", "test_type1", &mockCleaupCriteria1)
-	suite.mgr.RegisterCleanupCriteria("test_vendor2", "test_type2", &mockCleaupCriteria2)
+	suite.mgr.RegisterCleanupCriteria("test_vendor1", "test_type1", &mockCleanupCriteria1)
+	suite.mgr.RegisterCleanupCriteria("test_vendor2", "test_type2", &mockCleanupCriteria2)
 
 	suite.dao.On("Delete", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	suite.regCli.On("DeleteBlob", mock.Anything, mock.Anything).Return(nil)
@@ -479,12 +479,12 @@ func (suite *ManagerTestSuite) TestCleanupErrorForVendor() {
 		ExtraAttrs: "",
 	}
 
-	mockCleaupCriteria1 := cleanup.Selector{}
-	mockCleaupCriteria1.On("List", mock.Anything).Return([]*model.SystemArtifact{&sa1, &sa2}, nil).Times(2)
+	mockCleanupCriteria1 := cleanup.Selector{}
+	mockCleanupCriteria1.On("List", mock.Anything).Return([]*model.SystemArtifact{&sa1, &sa2}, nil).Times(2)
 
 	suite.cleanupCriteria.On("List", mock.Anything).Return([]*model.SystemArtifact{&sa3}, nil).Times(2)
 
-	suite.mgr.RegisterCleanupCriteria("test_vendor10000", "test_type10000", &mockCleaupCriteria1)
+	suite.mgr.RegisterCleanupCriteria("test_vendor10000", "test_type10000", &mockCleanupCriteria1)
 
 	suite.dao.On("Delete", mock.Anything, "test_vendor10000", "test_repo10000", "test_digest10000").Return(nil).Once()
 	suite.dao.On("Delete", mock.Anything, "test_vendor10000", "test_repo20000", "test_digest20000").Return(errors.New("test error")).Once()

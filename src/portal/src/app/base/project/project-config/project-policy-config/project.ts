@@ -19,7 +19,7 @@ export class Project {
     creation_time?: Date | string;
     deleted?: number;
     owner_name?: string;
-    togglable?: boolean;
+    toggleable?: boolean;
     update_time?: Date | string;
     current_user_role_id?: number;
     repo_count?: number;

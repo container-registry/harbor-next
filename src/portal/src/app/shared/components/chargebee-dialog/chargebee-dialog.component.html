@@ -1,0 +1,42 @@
+<clr-modal
+    class="chargebee-dialog-modal"
+    [(clrModalOpen)]="opened"
+    [clrModalSize]="size"
+    (clrModalOpenChange)="onModalOpenChange($event)">
+    <h3 class="modal-title">{{ title }}</h3>
+    <div class="modal-body" id="clrModalBody">
+        <h4 class="chargebee-dialog-subtitle" *ngIf="!isSubscribed">Subscribe to upgrade your storage to 100 GiB.</h4>
+        <div class="github-subscription" *ngIf="hasGithubApp && !isSubscribed">
+            Go to the <a href="https://github.com/marketplace/container-registry" target="_blank">Github marketplace</a> to add additional storage.
+        </div>
+        <div class="github-subscription" *ngIf="hasGithubApp && isSubscribed">
+            Go to the <a href="https://github.com/marketplace/container-registry" target="_blank">Github marketplace</a> to manage your subscription.
+        </div>
+        <h4 class="chargebee-dialog-subtitle" *ngIf="isSubscriptionSuccessful">You now have 100 GiB of storage. You can safely close this window.</h4>
+            <div class="plan-selector" *ngIf="!isSubscribed && !hasGithubApp">
+                <clr-select-container>
+                    <label>Subscription Billing Cycle</label>
+                    <select clrSelect [(ngModel)]="selectedPlan" (ngModelChange)="onPlanChange($event)">
+                        <option value="Yearly">{{ formatPrice(currency, 4.2) }}/month, with annual payment of {{ formatPrice(currency, 50) }}.</option>
+                        <option value="Monthly">{{ formatPrice(currency, 5) }}/month, with monthly payment.</option>
+                    </select>
+                </clr-select-container>
+                <p *ngIf="selectedPlan === 'Monthly'">
+		            The annual subscription saves you {{ formatPrice(currency, 10) }}.
+		        </p>
+            </div>
+            <div class="chargebeeFrame" *ngIf="!hasGithubApp">
+                <span class="spinner" *ngIf="!loaded">
+                    Loading...
+                </span>
+                <iframe
+                    id="chargebee"
+                    [src]="sanitizedFrameSrc"
+                    [style.width]="iframeWidth"
+                    [style.height]="iframeHeight"
+                    [style.display]="iframeDisplay"
+                    title="Container Registry Subscription">
+                </iframe>
+            </div>
+    </div>
+</clr-modal>

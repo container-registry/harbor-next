@@ -59,7 +59,7 @@ const mockProjectPolicies: Project[] | any[] = [
         update_time: '2017-11-03T02:37:24Z',
         deleted: 0,
         owner_name: '',
-        togglable: false,
+        toggleable: false,
         current_user_role_id: 0,
         repo_count: 0,
         metadata: {
@@ -74,7 +74,7 @@ const mockProjectPolicies: Project[] | any[] = [
         update_time: '2017-11-03T02:37:24Z',
         deleted: 0,
         owner_name: '',
-        togglable: false,
+        toggleable: false,
         current_user_role_id: 0,
         repo_count: 0,
         metadata: {

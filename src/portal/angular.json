@@ -25,6 +25,8 @@
               "src/images",
               "src/favicon.ico",
               "src/setting.json",
+              "src/setting-container-registry.json",
+              "src/setting-marketplace.json",
               "src/i18n"
             ],
             "styles": [
@@ -121,6 +123,8 @@
               "src/images",
               "src/favicon.ico",
               "src/setting.json",
+              "src/setting-container-registry.json",
+              "src/setting-marketplace.json",
               "src/i18n"
             ]
           }

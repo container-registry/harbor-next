@@ -47,7 +47,7 @@ type RequestConfig struct {
 	// ResourcesWarningPercent value from 0 to 100
 	ResourcesWarningPercent int
 
-	// ResourcesWarning returns event which will be notified when resources usage exceeded the wanring percent
+	// ResourcesWarning returns event which will be notified when resources usage exceeded the warning percent
 	ResourcesWarning func(r *http.Request, reference, referenceID string, message string) event.Metadata
 
 	// ResourcesExceeded returns event which will be notified when resources exceeded the limitation
@@ -64,7 +64,7 @@ func RequestMiddleware(config RequestConfig, skippers ...middleware.Skipper) fun
 		logger := log.G(r.Context()).WithFields(log.Fields{"middleware": "quota", "action": "request", "url": r.URL.Path})
 
 		if config.ReferenceObject == nil || config.Resources == nil {
-			lib_http.SendError(w, fmt.Errorf("invald config the for middleware"))
+			lib_http.SendError(w, fmt.Errorf("invalid config the for middleware"))
 			return
 		}
 
@@ -198,7 +198,7 @@ func RefreshMiddleware(config RefreshConfig, skipers ...middleware.Skipper) func
 		}
 
 		if config.ReferenceObject == nil {
-			return fmt.Errorf("invald config the for middleware")
+			return fmt.Errorf("invalid config the for middleware")
 		}
 
 		logger := log.G(r.Context()).WithFields(log.Fields{"middleware": "quota", "action": "refresh", "url": r.URL.Path})

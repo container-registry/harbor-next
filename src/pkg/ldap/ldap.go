@@ -179,11 +179,47 @@ func (s *Session) SearchUser(username string) ([]model.User, error) {
 			}
 			u.GroupDNList = groupDNList
 		}
+
 		u.DN = ldapEntry.DN
+		// Search for nested group memberships (if AdminFilter is set)
+		if s.groupCfg.AdminFilter != "" {
+			nestedFilter, err := createUserSearchFilter(s.groupCfg.AdminFilter, s.basicCfg.UID, username)
+			if err != nil {
+				return nil, err
+			}
+			nestedResult, err := s.SearchLdap(nestedFilter)
+			if err != nil {
+				return nil, err
+			}
+
+			// check and give permissions to user under admin DN
+			for _, ldapEntry := range nestedResult.Entries {
+				if ldapEntry.DN != u.DN {
+					continue
+				}
+				// add user to AdminDN
+				u.GroupDNList = append(u.GroupDNList, s.groupCfg.AdminDN)
+				log.Debugf("User %s (DN: %s) added to admin group: %s", username, ldapEntry.DN, s.groupCfg.AdminDN)
+			}
+		}
+
 		ldapUsers = append(ldapUsers, u)
 	}
 
 	return ldapUsers, nil
+}
+
+// createSimpleGroupMembershipFilter - Create a simple LDAP filter to check if a user is a member of a group
+func createSimpleGroupMembershipFilter(userDN, groupBaseDN, groupMembershipAttribute, objectClass, nestedGroupFilter string) string {
+	// Combine the filter to include:
+	// 1. Checking if the user is a member of the group (directly or indirectly)
+	// 2. Checking if the user is a member of the nested group (MANAGERS1)
+	return fmt.Sprintf("(&(objectClass=%s)(dn=%s)(%s=%s)(%s))",
+		objectClass,
+		groupBaseDN,
+		groupMembershipAttribute,
+		userDN,
+		nestedGroupFilter)
 }
 
 // Bind with specified DN and password, used in authentication
@@ -252,15 +288,16 @@ func (s *Session) SearchLdapAttribute(baseDN, filter string, attributes []string
 	if err := s.Bind(s.basicCfg.SearchDn, s.basicCfg.SearchPassword); err != nil {
 		return nil, fmt.Errorf("can not bind search dn, error: %v", err)
 	}
+	log.Debugf("baseDN: %v, filter: %v, attributes: %v", baseDN, filter, attributes)
 	filter = normalizeFilter(filter)
 	if len(filter) == 0 {
 		return nil, ErrInvalidFilter
 	}
+	log.Debugf("normalizeFilter: %v", filter)
 	if _, err := goldap.CompileFilter(filter); err != nil {
 		log.Errorf("Wrong filter format, filter:%v", filter)
 		return nil, ErrInvalidFilter
 	}
-	log.Debugf("Search ldap with filter:%v", filter)
 	searchRequest := goldap.NewSearchRequest(
 		baseDN,
 		s.basicCfg.Scope,
@@ -286,6 +323,37 @@ func (s *Session) SearchLdapAttribute(baseDN, filter string, attributes []string
 	}
 
 	return result, nil
+}
+
+// createUserSearchFilter - create filter to search for a user with a specified username,
+// and optionally check if the user is a nested member of a group.
+func createAdminSearchFilter(origFilter, ldapUID, username, userDN string) (string, error) {
+	oFilter, err := NewFilterBuilder(origFilter)
+	if err != nil {
+		return "", err
+	}
+
+	var filterTag string
+	filterTag = goldap.EscapeFilter(username)
+	if len(filterTag) == 0 {
+		filterTag = "*"
+	}
+
+	// Inject nested membership filter if required
+	var uFilterStr string
+	if userDN != "" {
+		uFilterStr = fmt.Sprintf("(member:1.2.840.113556.1.4.1941:=%s)", goldap.EscapeFilter(userDN)) // <-- changed
+	} else {
+		uFilterStr = fmt.Sprintf("(%v=%v)", ldapUID, filterTag) // <-- original behavior retained
+	}
+
+	uFilter, err := NewFilterBuilder(uFilterStr)
+	if err != nil {
+		return "", err
+	}
+
+	filter := oFilter.And(uFilter)
+	return filter.String()
 }
 
 // createUserSearchFilter - create filter to search user with specified username

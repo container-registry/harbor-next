@@ -174,7 +174,8 @@
         "DISTRIBUTIONS": {
             "NAME": "Distribuições",
             "INSTANCES": "Repositórios remotos para distribuição"
-        }
+        },
+        "SUBSCRIPTION": "Subscription"
     },
     "USER": {
         "ADD_ACTION": "Novo Usuário",
@@ -837,6 +838,8 @@
             "VERIFY_CERT": "Verificar certificado LDAP",
             "LDAP_GROUP_BASE_DN": "DN Base de busca de Grupos LDAP",
             "LDAP_GROUP_BASE_DN_INFO": "O DN base de onde buscar grupos no LDAP/AD. This field cannot be empty if you need to enable the LDAP group related feature.",
+            "LDAP_GROUP_ADMIN_FILTER": "LDAP Group Admin Filter",
+            "LDAP_GROUP_ADMIN_FILTER_INFO": "The filter for LDAP Admin search.",
             "LDAP_GROUP_FILTER": "Filtro de Grupo LDAP",
             "LDAP_GROUP_FILTER_INFO": "The filter to search for LDAP/AD groups. For OpenLDAP: objectclass=groupOfNames. For Active Directory: objectclass=group. This field cannot be empty if you need the LDAP group-related feature.",
             "LDAP_GROUP_GID": "GID de Grupo LDAP",
@@ -1373,6 +1376,13 @@
         "ADD_TITLE": "Adicionar regra de imutabilidade das tags",
         "ADD_SUBTITLE": "Informe as regras de imutabilidade para este projeto. Nota: as regras são calculadas de forma independente e, na sequẽncia, unificadas para determinar um conjunto final de tags imutáveis.",
         "IN_REPOSITORIES": "Repositórios",
+        "CONDITION": "Condição de Imutabilidade",
+        "ACTION_IMMUTABLE": "Aplicar",
+        "RULE_NAME_5": "sempre",
+        "RULE_NAME_6": " os artefatos baixados nos últimos {{number}} dias (pulled)",
+        "RULE_NAME_7": " os artefatos recebidos nos últimos {{number}} dias (pushed)",
+        "RULE_TEMPLATE_6": "para artefatos puxados nos últimos # dias",
+        "RULE_TEMPLATE_7": "para artefatos enviados nos últimos # dias",
         "REP_SEPARATOR": "Lista de repositórios: meurepo,repo* or **",
         "TAGS": "Tags",
         "TAG_SEPARATOR": "Lista de tags: minhatag,tag*,or **",

@@ -36,7 +36,7 @@ describe('SearchResultComponent', () => {
         creation_time_str: 'string',
         deleted: 1,
         owner_name: 'string',
-        togglable: true,
+        toggleable: true,
         update_time: Date,
         current_user_role_id: 1,
         repo_count: 1,

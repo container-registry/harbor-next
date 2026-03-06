@@ -174,7 +174,8 @@
         "DISTRIBUTIONS": {
             "NAME": "Distribuciones",
             "INSTANCES": "Instancias"
-        }
+        },
+        "SUBSCRIPTION": "Subscription"
     },
     "USER": {
         "ADD_ACTION": "Nuevo Usuario",
@@ -837,6 +838,8 @@
             "VERIFY_CERT": "LDAP Verificar Cert",
             "LDAP_GROUP_BASE_DN": "LDAP Grupo Base DN",
             "LDAP_GROUP_BASE_DN_INFO": "El DN base desde el cual se buscará un grupo en LDAP/AD. Este campo no puede estar vacío si necesita habilitar la función relacionada con el grupo LDAP.",
+            "LDAP_GROUP_ADMIN_FILTER": "LDAP Group Admin Filter",
+            "LDAP_GROUP_ADMIN_FILTER_INFO": "The filter for LDAP Admin search.",
             "LDAP_GROUP_FILTER": "LDAP Filtro Grupo",
             "LDAP_GROUP_FILTER_INFO": "El filtro para buscar grupos LDAP/AD. Para OpenLDAP: objectclass=groupOfNames. Para Active Directory: objectclass=group. Este campo no puede estar vacío si necesita la función relacionada con el grupo LDAP.",
             "LDAP_GROUP_GID": "LDAP Grupo GID",
@@ -1368,6 +1371,13 @@
         "ADD_TITLE": "Agregar Regla de Inmutabilidad de Tag",
         "ADD_SUBTITLE": "Especificar una regla de inmutabilidad de tag para este proyecto.  Nota: todas las reglas de inmutabilidad de tags son primero independientemente calculadas y luego unidas para capturar el conjunto final de tags inmutables.",
         "IN_REPOSITORIES": "Para los repositorios",
+        "CONDITION": "Condición de inmutabilidad",
+        "ACTION_IMMUTABLE": "aplicar",
+        "RULE_NAME_5": "siempre",
+        "RULE_NAME_6": " los artefactos bajados en los últimos {{number}} días",
+        "RULE_NAME_7": " los artefactos subidos en los últimos {{number}} días",
+        "RULE_TEMPLATE_6": "a los artefactos descargados en los últimos # días",
+        "RULE_TEMPLATE_7": "a los artefactos cargados en los últimos # días",
         "REP_SEPARATOR": "Ingresa múltiples comma para separar repos,repo*,or **",
         "TAGS": "Tags",
         "TAG_SEPARATOR": "Ingresa múltiples comma para separar tags,tag*,or **",

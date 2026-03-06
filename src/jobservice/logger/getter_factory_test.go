@@ -8,28 +8,28 @@ import (
 
 // TestFileGetterFactory
 func TestFileGetterFactory(t *testing.T) {
-	ois := make([]OptionItem, 0)
-	ois = append(ois, OptionItem{"other_key1", 11})
-	ois = append(ois, OptionItem{"base_dir", "/tmp"})
-	ois = append(ois, OptionItem{"other_key2", ""})
+	is := make([]OptionItem, 0)
+	is = append(is, OptionItem{"other_key1", 11})
+	is = append(is, OptionItem{"base_dir", "/tmp"})
+	is = append(is, OptionItem{"other_key2", ""})
 
-	_, err := FileGetterFactory(ois...)
+	_, err := FileGetterFactory(is...)
 	require.Nil(t, err)
 }
 
 // TestFileGetterFactoryErr1
 func TestFileGetterFactoryErr1(t *testing.T) {
-	ois := make([]OptionItem, 0)
-	ois = append(ois, OptionItem{"other_key1", 11})
+	is := make([]OptionItem, 0)
+	is = append(is, OptionItem{"other_key1", 11})
 
-	_, err := FileGetterFactory(ois...)
+	_, err := FileGetterFactory(is...)
 	require.NotNil(t, err)
 }
 
 // TestDBGetterFactory
 func TestDBGetterFactory(t *testing.T) {
-	ois := make([]OptionItem, 0)
+	is := make([]OptionItem, 0)
 
-	_, err := DBGetterFactory(ois...)
+	_, err := DBGetterFactory(is...)
 	require.Nil(t, err)
 }

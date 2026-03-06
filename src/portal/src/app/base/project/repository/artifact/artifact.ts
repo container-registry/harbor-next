@@ -115,6 +115,18 @@ export function hasPullCommand(artifact: Artifact): boolean {
     );
 }
 
+export function getPullCommandForTop(url: string, client: Clients): string {
+    if (url) {
+        if (Object.values(Clients).includes(client)) {
+            if (client == 'custom') {
+                return `${getCustomContainerRuntime()} pull ${url}`;
+            }
+            return `${client} pull ${url}`;
+        }
+    }
+    return null;
+}
+
 export function getPullCommandByDigest(
     artifactType: string,
     url: string,
@@ -226,7 +238,7 @@ export const ArtifactSbomFieldMapper = {
  * Identify the sbomJson contains the two main properties 'spdxVersion' and 'SPDXID'.
  * @param sbomJson SBOM JSON report object.
  * @returns true or false
- * Return true when the sbomJson object contains the attribues 'spdxVersion' and 'SPDXID'.
+ * Return true when the sbomJson object contains the attributes 'spdxVersion' and 'SPDXID'.
  * else return false.
  */
 export function isSpdxSbom(sbomJson?: Object): boolean {

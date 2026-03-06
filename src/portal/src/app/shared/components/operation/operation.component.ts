@@ -56,7 +56,7 @@ export class OperationComponent implements OnInit, OnDestroy {
     private _timeoutInterval;
 
     @HostListener('window:beforeunload', ['$event'])
-    beforeUnloadHander(event) {
+    beforeUnloadHandler(event) {
         if (this.session.getCurrentUser()) {
             // store into localStorage
             // group by user id

@@ -381,11 +381,11 @@ func (_m *mockAdapter) PullBlobChunk(repository string, digest string, blobSize 
 	return r0, r1, r2
 }
 
-// PullManifest provides a mock function with given fields: repository, reference, accepttedMediaTypes
-func (_m *mockAdapter) PullManifest(repository string, reference string, accepttedMediaTypes ...string) (distribution.Manifest, string, error) {
-	_va := make([]interface{}, len(accepttedMediaTypes))
-	for _i := range accepttedMediaTypes {
-		_va[_i] = accepttedMediaTypes[_i]
+// PullManifest provides a mock function with given fields: repository, reference, acceptedMediaTypes
+func (_m *mockAdapter) PullManifest(repository string, reference string, acceptedMediaTypes ...string) (distribution.Manifest, string, error) {
+	_va := make([]interface{}, len(acceptedMediaTypes))
+	for _i := range acceptedMediaTypes {
+		_va[_i] = acceptedMediaTypes[_i]
 	}
 	var _ca []interface{}
 	_ca = append(_ca, repository, reference)
@@ -400,10 +400,10 @@ func (_m *mockAdapter) PullManifest(repository string, reference string, acceptt
 	var r1 string
 	var r2 error
 	if rf, ok := ret.Get(0).(func(string, string, ...string) (distribution.Manifest, string, error)); ok {
-		return rf(repository, reference, accepttedMediaTypes...)
+		return rf(repository, reference, acceptedMediaTypes...)
 	}
 	if rf, ok := ret.Get(0).(func(string, string, ...string) distribution.Manifest); ok {
-		r0 = rf(repository, reference, accepttedMediaTypes...)
+		r0 = rf(repository, reference, acceptedMediaTypes...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(distribution.Manifest)
@@ -411,13 +411,13 @@ func (_m *mockAdapter) PullManifest(repository string, reference string, acceptt
 	}
 
 	if rf, ok := ret.Get(1).(func(string, string, ...string) string); ok {
-		r1 = rf(repository, reference, accepttedMediaTypes...)
+		r1 = rf(repository, reference, acceptedMediaTypes...)
 	} else {
 		r1 = ret.Get(1).(string)
 	}
 
 	if rf, ok := ret.Get(2).(func(string, string, ...string) error); ok {
-		r2 = rf(repository, reference, accepttedMediaTypes...)
+		r2 = rf(repository, reference, acceptedMediaTypes...)
 	} else {
 		r2 = ret.Error(2)
 	}

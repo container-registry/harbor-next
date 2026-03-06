@@ -180,6 +180,12 @@
                     </clr-dropdown>
                 </div>
                 <div class="right-pos">
+                    <app-pull-command
+                        [registryUrl]="registryUrl"
+                        [projectName]="projectName"
+                        [repoName]="repoName"
+                        [isTopModel]="true"
+                        class="mr-1"></app-pull-command>
                     <app-artifact-filter
                         [withDivider]="true"
                         (filterEvent)="filterEvent($event)"
@@ -294,7 +300,7 @@
                                 [clrPosition]="'top-right'"
                                 [clrSize]="'lg'"
                                 *clrIfOpen>
-                                {{ 'REPOSITORY.ARTIFACT_TOOTIP' | translate }}
+                                {{ 'REPOSITORY.ARTIFACT_TOOLTIP' | translate }}
                             </clr-tooltip-content>
                         </clr-tooltip>
                         <app-pull-command

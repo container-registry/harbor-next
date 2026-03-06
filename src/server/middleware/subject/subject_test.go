@@ -38,7 +38,7 @@ func (suite *MiddlewareTestSuite) SetupTest() {
 func (suite *MiddlewareTestSuite) TearDownTest() {
 }
 
-func (suite *MiddlewareTestSuite) prepare(name, digset string, withoutSub ...bool) (distribution.Manifest, distribution.Descriptor, *http.Request) {
+func (suite *MiddlewareTestSuite) prepare(name, digest string, withoutSub ...bool) (distribution.Manifest, distribution.Descriptor, *http.Request) {
 	body := fmt.Sprintf(`
 	{
    "schemaVersion":2,
@@ -62,7 +62,7 @@ func (suite *MiddlewareTestSuite) prepare(name, digset string, withoutSub ...boo
       "mediaType":"application/vnd.oci.image.manifest.v1+json",
       "size":419,
       "digest":"%s"
-   }}`, digset)
+   }}`, digest)
 
 	if len(withoutSub) > 0 && withoutSub[0] {
 		body = fmt.Sprintf(`
@@ -83,7 +83,7 @@ func (suite *MiddlewareTestSuite) prepare(name, digset string, withoutSub ...boo
    ],
    "annotations":{
       "org.example.main.format":"text"
-   }}`, digset)
+   }}`, digest)
 	}
 
 	manifest, descriptor, err := distribution.UnmarshalManifest("application/vnd.oci.image.manifest.v1+json", []byte(body))

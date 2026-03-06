@@ -54,7 +54,7 @@ var (
 	oci_config = `{}`
 
 	// For annotation fashion wasm artifact
-	annnotated_manifest = `{
+	annotated_manifest = `{
    "schemaVersion":2,
    "mediaType":"application/vnd.oci.image.manifest.v1+json",
    "config":{
@@ -75,7 +75,7 @@ var (
       "org.opencontainers.image.base.name":""
    }
 }`
-	annnotated_config = `{
+	annotated_config = `{
    "created":"2022-03-02T09:02:41.01773982Z",
    "architecture":"amd64",
    "os":"linux",
@@ -124,8 +124,8 @@ func (m *WASMProcessorTestSuite) SetupTest() {
 
 func (m *WASMProcessorTestSuite) TestAbstractMetadataForAnnotationFashion() {
 	artifact := &artifact.Artifact{}
-	m.regCli.On("PullBlob", mock.Anything, mock.Anything).Return(int64(0), io.NopCloser(bytes.NewReader([]byte(annnotated_config))), nil)
-	err := m.processor.AbstractMetadata(nil, artifact, []byte(annnotated_manifest))
+	m.regCli.On("PullBlob", mock.Anything, mock.Anything).Return(int64(0), io.NopCloser(bytes.NewReader([]byte(annotated_config))), nil)
+	err := m.processor.AbstractMetadata(nil, artifact, []byte(annotated_manifest))
 	m.Require().Nil(err)
 	m.NotNil(artifact.ExtraAttrs["created"])
 	m.Equal("amd64", artifact.ExtraAttrs["architecture"])
@@ -154,11 +154,11 @@ func (m *WASMProcessorTestSuite) TestAbstractAdditionForAnnotationFashion() {
 	artifact := &artifact.Artifact{}
 
 	manifest := schema2.Manifest{}
-	err = json.Unmarshal([]byte(annnotated_manifest), &manifest)
+	err = json.Unmarshal([]byte(annotated_manifest), &manifest)
 	deserializedManifest, err := schema2.FromStruct(manifest)
 	m.Require().Nil(err)
 	m.regCli.On("PullManifest", mock.Anything, mock.Anything).Return(deserializedManifest, "", nil)
-	m.regCli.On("PullBlob", mock.Anything, mock.Anything).Return(int64(0), io.NopCloser(strings.NewReader(annnotated_config)), nil)
+	m.regCli.On("PullBlob", mock.Anything, mock.Anything).Return(int64(0), io.NopCloser(strings.NewReader(annotated_config)), nil)
 	addition, err := m.processor.AbstractAddition(nil, artifact, AdditionTypeBuildHistory)
 	m.Require().Nil(err)
 	m.Equal("application/json; charset=utf-8", addition.ContentType)

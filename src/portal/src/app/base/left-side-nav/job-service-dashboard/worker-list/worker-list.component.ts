@@ -178,7 +178,7 @@ export class WorkerListComponent implements OnInit, OnDestroy {
             ConfirmationTargets.FREE_SPECIFIED_WORKERS,
             ConfirmationButtons.CONFIRM_CANCEL
         );
-        this.operateDialogService.openComfirmDialog(deletionMessage);
+        this.operateDialogService.openConfirmDialog(deletionMessage);
     }
 
     refreshWorkers() {

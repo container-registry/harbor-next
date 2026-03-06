@@ -95,9 +95,9 @@ func (suite *RdsUtilsTestSuite) TestGetZsetByScore() {
 	require.Nil(suite.T(), err, "nil error should be returned when adding prepared data by ZADD")
 	require.Equal(suite.T(), int64(2), count.(int64), "two items should be added")
 
-	datas, err := GetZsetByScore(suite.conn, key, []int64{0, 2})
+	data, err := GetZsetByScore(suite.conn, key, []int64{0, 2})
 	require.Nil(suite.T(), err, "nil error should be returned when getting data with scores")
-	assert.Equal(suite.T(), 2, len(datas), "expected 2 items but got %d", len(datas))
+	assert.Equal(suite.T(), 2, len(data), "expected 2 items but got %d", len(data))
 }
 
 // TestRdsUtilsTestSuite is suite entry for 'go test'

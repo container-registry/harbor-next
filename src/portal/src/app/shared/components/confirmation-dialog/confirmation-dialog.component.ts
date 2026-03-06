@@ -77,7 +77,7 @@ export class ConfirmationDialogComponent {
 
     cancel(): void {
         if (!this.message) {
-            // Inproper condition
+            // Improper condition
             this.close();
             return;
         }
@@ -99,7 +99,7 @@ export class ConfirmationDialogComponent {
 
     confirm(): void {
         if (!this.message) {
-            // Inproper condition
+            // Improper condition
             this.close();
             return;
         }

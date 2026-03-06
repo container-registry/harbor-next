@@ -63,7 +63,7 @@ type adapter struct {
 	*native.Adapter
 	registry *model.Registry
 	client   *common_http.Client
-	// original http client with no modifer,
+	// original http client with no modifier,
 	// huawei's some api interface with basic authorization,
 	// some with bearer token authorization.
 	oriClient *http.Client

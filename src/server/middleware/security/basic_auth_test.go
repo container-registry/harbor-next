@@ -48,7 +48,7 @@ func TestGetClientIP(t *testing.T) {
 	}{
 		{"nil request", args{nil}, ""},
 		{"no header", args{&http.Request{RemoteAddr: "10.10.10.10"}}, "10.10.10.10"},
-		{"set x forworded for", args{&http.Request{Header: h, RemoteAddr: "10.10.10.10"}}, "1.1.1.1"},
+		{"set x forwarded for", args{&http.Request{Header: h, RemoteAddr: "10.10.10.10"}}, "1.1.1.1"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

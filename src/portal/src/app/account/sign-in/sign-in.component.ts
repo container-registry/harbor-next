@@ -54,7 +54,7 @@ const expireDays = 10;
 export class SignInComponent implements AfterViewChecked, OnInit {
     showPwd: boolean = false;
     redirectUrl: string = '';
-    // Remeber me indicator
+    // Remember me indicator
     rememberMe: boolean = false;
     rememberedName: string = '';
 
@@ -165,7 +165,7 @@ export class SignInComponent implements AfterViewChecked, OnInit {
         }
     }
 
-    remeberMe(): void {
+    saveRememberMe(): void {
         if (this.rememberMe) {
             if (this.rememberedName !== this.signInCredential.principal) {
                 // Set expire time
@@ -195,7 +195,7 @@ export class SignInComponent implements AfterViewChecked, OnInit {
         console.error('An error occurred when signing in:', message);
     }
 
-    // Hande form values changes
+    // Handle form values changes
     formChanged() {
         if (this.currentForm === this.signInForm) {
             return;
@@ -258,8 +258,8 @@ export class SignInComponent implements AfterViewChecked, OnInit {
                 // this.signInStatus = signInStatusNormal;
                 // clear permissions cache
                 this.userPermissionService.clearPermissionCache();
-                // Remeber me
-                this.remeberMe();
+                // Remember me
+                this.saveRememberMe();
 
                 // Redirect to the right router-guard
                 if (

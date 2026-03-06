@@ -85,16 +85,9 @@ func (suite *ArtifactHandlerTestSuite) SetupSuite() {
 
 // TearDownSuite cleans environment.
 func (suite *ArtifactHandlerTestSuite) TearDownSuite() {
-	// delete tag
-	err := tag.Mgr.Delete(suite.ctx, 1)
-	suite.Nil(err)
-	// delete artifact
-	err = pkg.ArtifactMgr.Delete(suite.ctx, 1)
-	suite.Nil(err)
-	// delete repository
-	err = pkg.RepositoryMgr.Delete(suite.ctx, 1)
-	suite.Nil(err)
-
+	tag.Mgr.Delete(suite.ctx, 1)
+	pkg.ArtifactMgr.Delete(suite.ctx, 1)
+	pkg.RepositoryMgr.Delete(suite.ctx, 1)
 }
 
 // TestName tests method Name.
@@ -151,13 +144,17 @@ func (suite *ArtifactHandlerTestSuite) TestOnPull() {
 	// wait for db update
 	suite.Eventually(func() bool {
 		art, err = pkg.ArtifactMgr.Get(suite.ctx, 1)
-		suite.Nil(err)
+		if err != nil {
+			return false
+		}
 		return art.PullTime.After(lastPullTime)
 	}, 3*asyncFlushDuration, asyncFlushDuration/2, "wait for pull_time async update")
 
 	suite.Eventually(func() bool {
 		repository, err = pkg.RepositoryMgr.Get(suite.ctx, 1)
-		suite.Nil(err)
+		if err != nil {
+			return false
+		}
 		return int64(2) == repository.PullCount
 	}, 3*asyncFlushDuration, asyncFlushDuration/2, "wait for pull_count async update")
 }

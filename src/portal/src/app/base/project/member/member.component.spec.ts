@@ -98,7 +98,7 @@ describe('MemberComponent', () => {
         handleError: () => {},
     };
     const mockConfirmationDialogService = {
-        openComfirmDialog: () => {},
+        openConfirmDialog: () => {},
         confirmationConfirm$: of({
             state: 1,
             source: 2,

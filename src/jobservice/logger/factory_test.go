@@ -8,13 +8,13 @@ import (
 
 // TestFileFactory
 func TestFileFactory(t *testing.T) {
-	ois := make([]OptionItem, 0)
-	ois = append(ois, OptionItem{"level", "DEBUG"})
-	ois = append(ois, OptionItem{"base_dir", "/tmp"})
-	ois = append(ois, OptionItem{"filename", "test.out"})
-	ois = append(ois, OptionItem{"depth", 5})
+	is := make([]OptionItem, 0)
+	is = append(is, OptionItem{"level", "DEBUG"})
+	is = append(is, OptionItem{"base_dir", "/tmp"})
+	is = append(is, OptionItem{"filename", "test.out"})
+	is = append(is, OptionItem{"depth", 5})
 
-	ff, err := FileFactory(ois...)
+	ff, err := FileFactory(is...)
 	require.Nil(t, err)
 
 	if closer, ok := ff.(Closer); ok {
@@ -24,52 +24,52 @@ func TestFileFactory(t *testing.T) {
 
 // TestFileFactoryErr1
 func TestFileFactoryErr1(t *testing.T) {
-	ois := make([]OptionItem, 0)
-	ois = append(ois, OptionItem{"level", "DEBUG"})
-	ois = append(ois, OptionItem{"filename", "test.out"})
+	is := make([]OptionItem, 0)
+	is = append(is, OptionItem{"level", "DEBUG"})
+	is = append(is, OptionItem{"filename", "test.out"})
 
-	_, err := FileFactory(ois...)
+	_, err := FileFactory(is...)
 	require.NotNil(t, err)
 }
 
 // TestFileFactoryErr2
 func TestFileFactoryErr2(t *testing.T) {
-	ois := make([]OptionItem, 0)
-	ois = append(ois, OptionItem{"level", "DEBUG"})
-	ois = append(ois, OptionItem{"base_dir", "/tmp"})
+	is := make([]OptionItem, 0)
+	is = append(is, OptionItem{"level", "DEBUG"})
+	is = append(is, OptionItem{"base_dir", "/tmp"})
 
-	_, err := FileFactory(ois...)
+	_, err := FileFactory(is...)
 	require.NotNil(t, err)
 }
 
 // TestStdFactory
 func TestStdFactory(t *testing.T) {
-	ois := make([]OptionItem, 0)
-	ois = append(ois, OptionItem{"level", "DEBUG"})
-	ois = append(ois, OptionItem{"output", "std_out"})
-	ois = append(ois, OptionItem{"depth", 5})
+	is := make([]OptionItem, 0)
+	is = append(is, OptionItem{"level", "DEBUG"})
+	is = append(is, OptionItem{"output", "std_out"})
+	is = append(is, OptionItem{"depth", 5})
 
-	_, err := StdFactory(ois...)
+	_, err := StdFactory(is...)
 	require.Nil(t, err)
 }
 
 // TestDBFactory
 func TestDBFactory(t *testing.T) {
-	ois := make([]OptionItem, 0)
-	ois = append(ois, OptionItem{"level", "DEBUG"})
-	ois = append(ois, OptionItem{"key", "key_db_logger_unit_text"})
-	ois = append(ois, OptionItem{"depth", 5})
+	is := make([]OptionItem, 0)
+	is = append(is, OptionItem{"level", "DEBUG"})
+	is = append(is, OptionItem{"key", "key_db_logger_unit_text"})
+	is = append(is, OptionItem{"depth", 5})
 
-	_, err := DBFactory(ois...)
+	_, err := DBFactory(is...)
 	require.Nil(t, err)
 }
 
 // TestDBFactoryErr1
 func TestDBFactoryErr1(t *testing.T) {
-	ois := make([]OptionItem, 0)
-	ois = append(ois, OptionItem{"level", "DEBUG"})
-	ois = append(ois, OptionItem{"depth", 5})
+	is := make([]OptionItem, 0)
+	is = append(is, OptionItem{"level", "DEBUG"})
+	is = append(is, OptionItem{"depth", 5})
 
-	_, err := DBFactory(ois...)
+	_, err := DBFactory(is...)
 	require.NotNil(t, err)
 }

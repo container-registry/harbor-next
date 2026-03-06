@@ -1,0 +1,39 @@
+// #clrModalBody {
+//     min-height: 500px;
+// }
+
+.chargebee-dialog-modal {
+    min-height: 620px;
+}
+
+.chargebee-dialog-modal ::ng-deep .modal-dialog {
+    top: 10px;
+    position: absolute;
+}
+
+.chargebee-dialog-modal ::ng-deep .modal-body-wrapper {
+    overflow: hidden;
+    max-height: 100vh;
+}
+
+.plan-selector {
+    margin-bottom: 1rem;
+    text-align: left;
+}
+
+.row {
+    flex-grow: 6;
+}
+
+.chargebee-dialog-subtitle {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.chargebeeFrame {
+    min-width: 400px;
+    max-height: 600px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}

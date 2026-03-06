@@ -30,7 +30,7 @@ import (
 	operation "github.com/goharbor/harbor/src/server/v2.0/restapi/operations/project_metadata"
 )
 
-func newProjectMetadaAPI() *projectMetadataAPI {
+func newProjectMetadataAPI() *projectMetadataAPI {
 	return &projectMetadataAPI{
 		ctl:    metadata.Ctl,
 		proCtl: project.Ctl,

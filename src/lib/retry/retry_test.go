@@ -43,7 +43,7 @@ func TestRetry(t *testing.T) {
 	assert.Error(Retry(f1, InitialInterval(time.Second), MaxInterval(time.Second), Timeout(time.Second*5)))
 	// f1 called time     0s - sleep - 1s - sleep - 2s - sleep - 3s - sleep - 4s - sleep - 5s
 	// i after f1 called  1            2            3            4            5            6
-	// the i may be 5 or 6 depend on timeout or default which is seleted by the select statement
+	// the i may be 5 or 6 depend on timeout or default which is selected by the select statement
 	assert.LessOrEqual(i, 6)
 
 	f2 := func() error {

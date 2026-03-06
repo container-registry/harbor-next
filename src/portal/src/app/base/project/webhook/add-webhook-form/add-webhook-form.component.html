@@ -178,9 +178,9 @@
                 <div
                     class="clr-control-container"
                     [class.clr-error]="
-                        enpointURL.errors &&
-                        enpointURL.errors.required &&
-                        (enpointURL.dirty || enpointURL.touched)
+                        endpointURL.errors &&
+                        endpointURL.errors.required &&
+                        (endpointURL.dirty || endpointURL.touched)
                     ">
                     <div class="clr-input-wrapper">
                         <input
@@ -192,7 +192,7 @@
                             [(ngModel)]="webhook.targets[0].address"
                             size="30"
                             name="edit_endpoint_url"
-                            #enpointURL="ngModel"
+                            #endpointURL="ngModel"
                             required
                             [placeholder]="
                                 webhook.targets[0].type === 'http'
@@ -205,9 +205,9 @@
                     </div>
                     <clr-control-error
                         *ngIf="
-                            enpointURL.errors &&
-                            enpointURL.errors.required &&
-                            (enpointURL.dirty || enpointURL.touched)
+                            endpointURL.errors &&
+                            endpointURL.errors.required &&
+                            (endpointURL.dirty || endpointURL.touched)
                         "
                         class="tooltip-content">
                         {{ 'WEBHOOK.URL_IS_REQUIRED' | translate }}

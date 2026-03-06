@@ -31,7 +31,7 @@ type DAO interface {
 	List(ctx context.Context, query *q.Query) ([]*commonmodels.User, error)
 	// Count counts the number of users
 	Count(ctx context.Context, query *q.Query) (int64, error)
-	// Update updates the user record based on the model the parm props are the columns will be updated
+	// Update updates the user record based on the model the param props are the columns will be updated
 	Update(ctx context.Context, user *commonmodels.User, props ...string) error
 	// Delete delete user
 	Delete(ctx context.Context, userID int) error

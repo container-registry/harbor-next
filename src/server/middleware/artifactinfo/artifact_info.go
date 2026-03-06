@@ -83,7 +83,7 @@ func Middleware() func(http.Handler) http.Handler {
 			}
 			if bmr, ok := m[blobMountRepo]; ok {
 				// Fail early for now, though in docker registry an invalid may return 202
-				// it's not clear in OCI spec how to handle invalid from parm
+				// it's not clear in OCI spec how to handle invalid from param
 				bmp, err := projectNameFromRepo(bmr)
 				if err != nil {
 					lib_http.SendError(rw, errors.BadRequestError(err))

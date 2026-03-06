@@ -23,7 +23,7 @@ import { JobserviceService } from '../../../../../../ng-swagger-gen/services/job
 import { MessageHandlerService } from '../../../../shared/services/message-handler.service';
 import { finalize } from 'rxjs/operators';
 import { JobQueue } from '../../../../../../ng-swagger-gen/models/job-queue';
-import { NO, YES } from '../../clearing-job/clearing-job-interfact';
+import { NO, YES } from '../../clearing-job/clearing-job-interface';
 import { PendingJobsActions } from '../job-service-dashboard.interface';
 import { forkJoin, Subscription } from 'rxjs';
 import { ConfirmationDialogService } from '../../../global-confirmation-dialog/confirmation-dialog.service';
@@ -170,7 +170,7 @@ export class PendingListComponent implements OnInit, OnDestroy {
         const jobs: string = this.selectedRows
             .map(item => item.job_type)
             .join(',');
-        this.operateDialogService.openComfirmDialog({
+        this.operateDialogService.openConfirmDialog({
             data: undefined,
             param: jobs,
             title: 'JOB_SERVICE_DASHBOARD.CONFIRM_STOPPING_JOBS',
@@ -184,7 +184,7 @@ export class PendingListComponent implements OnInit, OnDestroy {
         const jobs: string = this.selectedRows
             .map(item => item.job_type)
             .join(',');
-        this.operateDialogService.openComfirmDialog({
+        this.operateDialogService.openConfirmDialog({
             data: undefined,
             param: jobs,
             title: 'JOB_SERVICE_DASHBOARD.CONFIRM_PAUSING_JOBS',
@@ -198,7 +198,7 @@ export class PendingListComponent implements OnInit, OnDestroy {
         const jobs: string = this.selectedRows
             .map(item => item.job_type)
             .join(',');
-        this.operateDialogService.openComfirmDialog({
+        this.operateDialogService.openConfirmDialog({
             data: undefined,
             param: jobs,
             title: 'JOB_SERVICE_DASHBOARD.CONFIRM_RESUMING_JOBS',

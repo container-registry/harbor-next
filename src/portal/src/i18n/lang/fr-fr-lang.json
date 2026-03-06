@@ -174,7 +174,8 @@
         "DISTRIBUTIONS": {
             "NAME": "Distributions",
             "INSTANCES": "Instances"
-        }
+        },
+        "SUBSCRIPTION": "Subscription"
     },
     "USER": {
         "ADD_ACTION": "Nouvel utilisateur",
@@ -836,6 +837,8 @@
             "VERIFY_CERT": "Vérifier le certificat LDAP",
             "LDAP_GROUP_BASE_DN": "DN de base du groupe LDAP",
             "LDAP_GROUP_BASE_DN_INFO": "Le DN de base à partir duquel rechercher un groupe dans l'annuaire LDAP/AD. Ce champ ne peut pas être vide si vous devez activer la fonctionnalité liée aux groupes LDAP.",
+            "LDAP_GROUP_ADMIN_FILTER": "LDAP Group Admin Filter",
+            "LDAP_GROUP_ADMIN_FILTER_INFO": "The filter for LDAP Admin search.",
             "LDAP_GROUP_FILTER": "Filtre de groupe LDAP",
             "LDAP_GROUP_FILTER_INFO": "Filtre de recherche de groupe LDAP/AD. Pour OpenLDAP : objectclass=groupOfNames. Pour Active Directory : objectclass=group. Ce champ ne peut pas être vide si vous avez besoin de la fonctionnalité liée aux groupes LDAP.",
             "LDAP_GROUP_GID": "GID du groupe LDAP",
@@ -1366,6 +1369,13 @@
         "ADD_TITLE": "Ajouter une règle d'immutabilité",
         "ADD_SUBTITLE": "Spécifiez une règle d'immutabilité de tags pour ce projet. Toutes les règles d'immutabilité de tags sont d'abord calculées indépendamment, puis leur union donne le jeu de tags immutables.",
         "IN_REPOSITORIES": "Pour les dépôts",
+        "CONDITION": "Condition d'immutabilité",
+        "ACTION_IMMUTABLE": "appliquer",
+        "RULE_NAME_5": "toujours",
+        "RULE_NAME_6": " les images récupérées dans les {{number}} derniers jours",
+        "RULE_NAME_7": " les images poussées dans les {{number}} derniers jours",
+        "RULE_TEMPLATE_6": "aux artefacts récupérés au cours des # derniers jours",
+        "RULE_TEMPLATE_7": "aux artefacts poussés au cours des # derniers jours",
         "REP_SEPARATOR": "Entrez de multiples repos,repo*,or **, séparés par des virgules",
         "TAGS": "Tags",
         "TAG_SEPARATOR": "Entrez de multiples tags, tag*, or **.",

@@ -148,7 +148,7 @@ export enum QuotaUnit {
 export enum QuotaProgress {
     COUNT_USED = 'COUNT_USED',
     COUNT_HARD = 'COUNT_HARD',
-    STROAGE_USED = 'STORAGE_USED',
+    STORAGE_USED = 'STORAGE_USED',
     STORAGE_HARD = 'STORAGE_HARD',
 }
 

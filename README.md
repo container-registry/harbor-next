@@ -2,7 +2,7 @@
 
 <p align="center"><img alt="Harbor Next" width="256px" src="https://raw.githubusercontent.com/container-registry/harbor-next/refs/heads/main/docs/img/harbor-next-logo.svg"></p>
 
-Harbor is a CNCF graduated open-source container registry to store and manage container images and other OCI artifacts securely with policies, role-based access control, vulnerability scans and signing.
+Harbor is a CNCF graduated open-source container registry to store and manage container images and other OCI artifacts securely with policies, role-based access control, vulnerability scans, and signing.
 
 Harbor is hosted by the [Cloud Native Computing Foundation](https://cncf.io)
 (CNCF).
@@ -20,6 +20,8 @@ We're developing Harbor Next as a [community proposal](https://github.com/goharb
 ## Notable Changes in Harbor Next
 - Contributor/Maintainer ladder automation
 - Continuous delivery
+- Automated release pipeline with multi-arch image builds
+- Cross-compiled Go binaries for faster CI builds
 - Easy Contributor onboarding with out of the box dev environments
 - Multi-architecture artifacts
 - Scratch images with minimal size and attack surface.
@@ -29,7 +31,7 @@ We're developing Harbor Next as a [community proposal](https://github.com/goharb
 - Harbor Satellite Support
 - Versatile Helm Chart
 - Open Compose (install.sh less) supporting Docker & Podman Compose
-- Support for OpenShift,Rancher,k0s 
+- Support for OpenShift, Rancher, k0s
 - Prepending vetted features not yet upstream
 - more...
 
@@ -118,6 +120,17 @@ task -l                  # List all available tasks
 Namespace aliases: `b:` (build), `t:` (test), `img:` (image), `d:` (dev).
 
 See [devenv/README.md](devenv/README.md) for detailed development environment commands.
+
+## Contributing
+
+We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR.
+
+Key rules:
+- PR titles must follow [Conventional Commits](https://www.conventionalcommits.org/) format (`feat:`, `fix:`, `ci:`, etc.)
+- Always merge PRs using **Squash and merge** - never "Create a merge commit"
+- All commits require DCO sign-off (`git commit -s`)
+
+Releases are automated via release-please. A `feat:` or `fix:` squash merge to `main` automatically opens a release PR. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
 
 ## OCI Distribution Conformance Tests
 

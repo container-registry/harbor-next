@@ -117,7 +117,7 @@ func Middleware() func(http.Handler) http.Handler {
 		/*
 			when an images is pushed, it could be
 				1. single image (do nothing)
-				2. an accesory image
+				2. an accessory image
 				3. a subject image
 				4. both as an accessory and a subject image
 			and a subject image or accessory image could be pushed in either order

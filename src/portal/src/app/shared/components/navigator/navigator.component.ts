@@ -211,7 +211,7 @@ export class NavigatorComponent implements OnInit {
         // Call the service to send out the http request
         this.session.signOff().subscribe(
             () => {
-                // Naviagte to the sign in router-guard
+                // Navigate to the sign in router-guard
                 // Appending 'signout' means destroy session cache
                 let signout = true;
                 let redirect_url = this.location.pathname;
@@ -272,7 +272,7 @@ export class NavigatorComponent implements OnInit {
             // Navigate to default page
             this.router.navigate([CommonRoutes.HARBOR_DEFAULT]);
         } else {
-            // Naviagte to signin page
+            // Navigate to signin page
             this.router.navigate([CommonRoutes.HARBOR_ROOT]);
         }
 

@@ -25,7 +25,7 @@ import {
     REFRESH_STATUS_TIME_DIFFERENCE,
     RESOURCE_TYPES,
     RetentionTimeUnit,
-} from '../../clearing-job-interfact';
+} from '../../clearing-job-interface';
 import { clone } from '../../../../../shared/units/utils';
 import { PurgeHistoryComponent } from '../history/purge-history.component';
 import { NgForm } from '@angular/forms';
