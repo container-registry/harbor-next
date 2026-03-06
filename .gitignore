@@ -63,7 +63,13 @@ tests/e2e_setup/robotvars.py
 .task/checksum
 devenv/token_service_key.pem
 devenv/ports.env
+deploy/compose/config/*.pem
+deploy/compose/config/certs/
 .env
 .env.local
+CLAUDE.md
+AGENTS.md
 tmp/
 bin
+.mcp.json
+.claude

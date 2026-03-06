@@ -13,6 +13,6 @@ COPY --from=lprobe /lprobe /lprobe
 ARG TARGETARCH
 COPY bin/linux-${TARGETARCH}/jobservice /jobservice
 WORKDIR /
-EXPOSE 8080
+EXPOSE 8888
 USER harbor
 ENTRYPOINT ["/jobservice", "-c", "/etc/jobservice/config.yml"]

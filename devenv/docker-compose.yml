@@ -28,11 +28,12 @@ services:
     environment:
       OTEL_TRACES_EXPORTER: none
       OTEL_SDK_DISABLED: "true"
+      REGISTRY_STORAGE_DELETE_ENABLED: "false"
     ports:
       - "${PORT_REGISTRY:-50000}:5000"
     volumes:
       - harbor-registry-data:/var/lib/registry
-      - ../devenv/registry.config.yml:/etc/registry/config.yml:ro
+      - ../config/registry.yml:/etc/registry/config.yml:ro
 
   # Core API - starts with: docker compose --profile core up
   core:
@@ -152,7 +153,7 @@ services:
       - go-mod-cache:/go/pkg/mod
       - go-build-cache:/root/.cache/go-build
       - harbor-registry-data:/var/lib/registry
-      - ../devenv/registry.config.yml:/etc/registry/config.yml:ro
+      - ../config/registry.yml:/etc/registry/config.yml:ro
     ports:
       - "${PORT_REGISTRYCTL:-8085}:8080"
       - "127.0.0.1:${PORT_DEBUG_REGISTRYCTL:-2347}:2347"
