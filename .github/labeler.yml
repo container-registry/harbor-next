@@ -1,0 +1,46 @@
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '*.md'
+          - 'docs/**/*'
+
+component/ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**/*'
+          - 'Taskfile.yml'
+          - 'taskfile/**/*'
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/go.mod'
+          - 'src/go.sum'
+          - 'src/portal/package.json'
+          - 'src/portal/bun.lock'
+
+component/core:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/core/**/*'
+
+component/jobservice:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/jobservice/**/*'
+
+component/portal:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/portal/**/*'
+
+component/api:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'api/**/*'
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'tests/**/*'
+          - '**/*_test.go'
