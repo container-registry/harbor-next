@@ -211,16 +211,23 @@ services:
     profiles: [portal]
     volumes:
       - ../src/portal/src:/app/src
-      - ../src/portal/scripts:/app/scripts:ro
       - ../src/portal/angular.json:/app/angular.json:ro
       - ../src/portal/tsconfig.json:/app/tsconfig.json:ro
       - ../src/portal/tsconfig.app.json:/app/tsconfig.app.json:ro
       - ../src/portal/proxy.config.mjs:/app/proxy.config.mjs:ro
       - ../src/portal/ng-swagger-gen:/app/ng-swagger-gen:ro
+      - ../src/portal/app-swagger-ui/package.json:/swagger-ui/package.json:ro
+      - ../src/portal/app-swagger-ui/package-lock.json:/swagger-ui/package-lock.json:ro
+      - ../src/portal/app-swagger-ui/src:/swagger-ui/src
+      - ../src/portal/app-swagger-ui/index.html:/swagger-ui/index.html:ro
+      - ../src/portal/app-swagger-ui/favicon.ico:/swagger-ui/favicon.ico:ro
+      - ../src/portal/app-swagger-ui/webpack.config.js:/swagger-ui/webpack.config.js:ro
       - portal-angular-cache:/app/.angular
+      - portal-openapi-ui:/app/src/openapi-ui
     ports:
       - "${PORT_PORTAL:-4200}:4200"
     environment:
+      OPENAPI_UI: "${OPENAPI_UI:-false}"
       HARBOR_PROXY_TARGET: "http://core:8080"
     depends_on:
       - core
@@ -238,3 +245,5 @@ volumes:
     name: ${PROJECT_PREFIX:-harbor}-go-build-cache
   portal-angular-cache:
     name: ${PROJECT_PREFIX:-harbor}-portal-angular-cache
+  portal-openapi-ui:
+    name: ${PROJECT_PREFIX:-harbor}-portal-openapi-ui

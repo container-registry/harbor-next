@@ -6,6 +6,7 @@
 //configuration. For dev build, the input path is '../../api/v2.0/swagger.yaml'
 let inputFile = '../../api/v2.0/swagger.yaml';
 const outputDir = 'ng-swagger-gen';
+const portalSwaggerFile = 'src/swagger.json';
 
 //convert swagger.yaml to swagger.json
 const yaml = require('js-yaml');
@@ -26,6 +27,7 @@ if (swaggerObj.host) {
 traverseObject(swaggerObj);
 
 fs.writeFileSync(outputDir + '/swagger.json', JSON.stringify(swaggerObj, null, 2));
+fs.writeFileSync(portalSwaggerFile, JSON.stringify(swaggerObj, null, 2));
 
 
 function traverseObject(obj) {
@@ -50,4 +52,3 @@ function traverseObject(obj) {
     }
   }
 }
-

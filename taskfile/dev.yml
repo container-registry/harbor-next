@@ -27,6 +27,7 @@ vars:
   PORT_DEBUG_REGCTL: '{{ add 2347  (mul (atoi .SLOT) 100) }}'
 
   PROJECT_PREFIX: 'harbor-{{.SLOT}}'
+  OPENAPI_UI: '{{.OPENAPI_UI | default "false"}}'
 
   # Docker Compose profile strings (reused across multiple tasks)
   ALL_PROFILES: "--profile portal --profile core --profile jobservice --profile registryctl --profile trivy"
@@ -45,6 +46,7 @@ env:
   PORT_DEBUG_CORE:        '{{.PORT_DEBUG_CORE}}'
   PORT_DEBUG_JOBSERVICE:  '{{.PORT_DEBUG_JOB}}'
   PORT_DEBUG_REGISTRYCTL: '{{.PORT_DEBUG_REGCTL}}'
+  OPENAPI_UI:            '{{.OPENAPI_UI}}'
 
 tasks:
   # ---------------------------------------------------------------------------
@@ -105,6 +107,7 @@ tasks:
       echo "  Registry:     localhost:{{.PORT_REGISTRY}}"
       echo "  RegistryCtl:  localhost:{{.PORT_REGISTRYCTL}}"
       echo "  Trivy:        localhost:{{.PORT_TRIVY}}"
+      echo "  OpenAPI UI:   {{.OPENAPI_UI}}"
       echo "  Prefix:       {{.PROJECT_PREFIX}}"
       echo ""
 
@@ -112,7 +115,7 @@ tasks:
   # Full Development Environment (Containerized)
   # ---------------------------------------------------------------------------
   up:
-    desc: "Start all services with hot reload in foreground (SKIP_TRIVY=true to exclude Trivy)"
+    desc: "Start all services with hot reload in foreground (SKIP_TRIVY=true to exclude Trivy, OPENAPI_UI=true to enable Swagger UI)"
     deps: [require-docker, gen:private-key]
     vars:
       TRIVY_PROFILE: '{{if ne .SKIP_TRIVY "true"}}--profile trivy{{end}}'
@@ -120,7 +123,7 @@ tasks:
       - task: :build:gen-apis
       - task: frontend:install
       - task: :build:gen-apis:frontend
-      - defer: { task: dev:down, vars: { SKIP_TRIVY: "{{.SKIP_TRIVY}}" } }
+      - defer: { task: dev:down, vars: { SKIP_TRIVY: "{{.SKIP_TRIVY}}", OPENAPI_UI: "{{.OPENAPI_UI}}" } }
       - task: info
       - docker compose -f {{.COMPOSE_FILE}} {{.APP_PROFILES}} {{.TRIVY_PROFILE}} up --build
 
@@ -211,7 +214,7 @@ tasks:
     deps: [frontend:install]
     cmds:
       - task: :build:gen-apis:frontend
-      - exec ./node_modules/.bin/ng serve --host 0.0.0.0 --hmr --disable-host-check
+      - exec ./node_modules/.bin/ng serve --host 0.0.0.0 --hmr
 
   frontend:build:
     desc: Build Portal for production
@@ -315,6 +318,7 @@ tasks:
       - rm -f build-errors.log
       - rm -f {{.TOKEN_KEY_FILE}}
       - rm -f {{.TOKEN_KEY_FILE_LOCAL}}
+      - rmdir $(dirname {{.TOKEN_KEY_FILE_LOCAL}}) 2>/dev/null || true
 
   status:
     desc: Show container status for all services

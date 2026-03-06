@@ -25,26 +25,30 @@ npm install
 If `postinstall` scripts were not triggered, then run manually:  `npm run postinstall`
 
 
-### 3. Copy the template proxy file
+### 3. Configure proxy targets
 
-```
-cp proxy.config.mjs.temp proxy.config.mjs
-```
+`proxy.config.mjs` is tracked and reads its targets from environment variables:
 
-### 4. Configure the proxy
+- `HARBOR_PROXY_TARGET` defaults to `http://localhost:8080`
+- `OPENAPI_UI=true` builds the OpenAPI UI assets into the portal dev container before `ng serve`
+- `HARBOR_USE_PROXY_AGENT=true` enables `https-proxy-agent`
+- `HARBOR_PROXY_AGENT_SERVER` overrides the corporate proxy agent URL
 
-Edit `proxy.config.mjs` to specify the Harbor server.
-You can specify the agent if you work behind a corporate proxy.
+When using `task dev:up`, the containerized dev stack sets the proxy target automatically.
+OpenAPI UI stays disabled unless you start with `OPENAPI_UI=true`.
 
-### 5. Start the development server
+### 4. Start the development server
 
-```
+```sh
 npm run start
 ```
 
-### 6. Open the application
+To enable the standalone Swagger UI route in dev:
 
-Open your browser at https://localhost:4200
+```sh
+OPENAPI_UI=true task dev:up
+```
 
+### 5. Open the application
 
-
+Open your browser at http://localhost:4200
