@@ -24,7 +24,7 @@ jobs:
           failed=0
           while IFS= read -r file; do
             while IFS= read -r line; do
-              if echo "$line" | grep -qE '^\s+uses:\s+'; then
+              if echo "$line" | grep -qE '^\s+-?\s*uses:\s+'; then
                 ref=$(echo "$line" | sed 's/.*uses:[[:space:]]*//' | awk '{print $1}')
                 # Skip local actions (starting with ./) and docker:// references
                 if echo "$ref" | grep -qE '^(\.\/|docker://)'; then

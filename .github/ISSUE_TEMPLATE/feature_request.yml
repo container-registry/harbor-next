@@ -8,7 +8,7 @@ body:
       value: |
         Thanks for suggesting a feature!
 
-        **Before submitting**, please search [existing issues](https://github.com/bupd/harbor-next-test-release/issues) to check if it has already been requested.
+        **Before submitting**, please search [existing issues](https://github.com/container-registry/harbor-next/issues) to check if it has already been requested.
 
   - type: textarea
     id: problem
