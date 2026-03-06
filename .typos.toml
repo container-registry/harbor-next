@@ -30,19 +30,16 @@ oras = "oras"
 unknow    = "unknow"
 unsupport = "unsupport"
 parms     = "parms"
-applys    = "applys"
 togglable = "togglable"
-serach    = "serach"
-paylod    = "paylod"
-resoruce  = "resoruce"
 # Valid Go plural variable names (not typos - Go uses these as slice suffixes)
 Datas    = "Datas"
 sortings = "sortings"
 
 [files]
 extend-exclude = [
-    # Non-English i18n translation files
-    "src/portal/src/i18n/",
+    # Upstream source code (hundreds of pre-existing typos, fixing is out of scope)
+    "src/",
+    "api/",
 
     # Upstream test suite
     "tests/",

@@ -25,8 +25,8 @@ vars:
 
   # Multi-arch image build configuration
   # Registry: 8gears.container-registry.com/8gcr/<image>:<version>
-  REGISTRY_ADDRESS: '{{.REGISTRY_ADDRESS | default "8gears.container-registry.com"}}'
-  REGISTRY_PROJECT: '{{.REGISTRY_PROJECT | default "8gcr"}}'
+  REGISTRY_ADDRESS: '{{.REGISTRY_ADDRESS | default .IMAGE_REGISTRY | default "8gears.container-registry.com"}}'
+  REGISTRY_PROJECT: '{{.REGISTRY_PROJECT | default .IMAGE_NAMESPACE | default "8gcr"}}'
   IMAGE_PLATFORMS: '{{.IMAGE_PLATFORMS | default "linux/amd64,linux/arm64"}}'
   IMAGE_BUILDER: "harbor-multiarch"
 
