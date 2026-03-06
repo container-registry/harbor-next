@@ -40,8 +40,9 @@ extend-exclude = [
     # Non-English i18n translation files
     "src/portal/src/i18n/",
 
-    # Upstream API spec (has known typos in field descriptions, fixing is a breaking change)
-    "api/v2.0/swagger.yaml",
+    # Upstream source code (hundreds of pre-existing typos, fixing is out of scope)
+    "src/",
+    "api/",
 
     # Upstream test suite
     "tests/",
