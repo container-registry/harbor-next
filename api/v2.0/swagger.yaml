@@ -1765,7 +1765,7 @@ paths:
         - $ref: '#/parameters/query'
         - $ref: '#/parameters/sort'
         - $ref: '#/parameters/page'
-        - $ref: '#/parameters/pageSize'
+        - $ref: '#/parameters/pageSizeAuditLogExts'
       responses:
         '200':
           description: Success
@@ -6247,6 +6247,15 @@ parameters:
     description: The size of per page
     default: 10
     maximum: 100
+  pageSizeAuditLogExts:
+    name: page_size
+    in: query
+    type: integer
+    format: int64
+    required: false
+    description: The size of per page
+    default: 10
+    maximum: 10000
   requestId:
     name: X-Request-Id
     description: An unique ID for the request
