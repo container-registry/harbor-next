@@ -1,0 +1,28 @@
+pre-commit:
+  parallel: true
+  commands:
+    spellcheck:
+      glob: "*.{md,txt,yml,yaml}"
+      run: typos --config .typos.toml {staged_files}
+
+commit-msg:
+  commands:
+    conventional-commit:
+      run: |
+        msg=$(head -1 {1})
+        pattern="^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?(!)?: .+"
+        if ! echo "$msg" | grep -Eq "$pattern"; then
+          echo "ERROR: Commit message must follow Conventional Commits format"
+          echo "  Format: <type>[optional scope]: <description>"
+          echo "  Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert"
+          echo "  Example: feat: add satellite replication adapter"
+          echo "  Example: fix(jobservice): resolve retry backoff timing"
+          echo "  Got: $msg"
+          exit 1
+        fi
+    dco-signoff:
+      run: |
+        if ! grep -q "^Signed-off-by:" {1}; then
+          echo "ERROR: Missing DCO sign-off. Use 'git commit -s'"
+          exit 1
+        fi
