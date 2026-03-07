@@ -220,12 +220,21 @@ export class SessionService {
             .pipe(
                 map(data => {
                     if (data == null) return null;
-                    const splitData = data.toString().split(",");
+                    if (typeof data === "object") {
+                        return {
+                            projectName: data["project_name"] ?? "",
+                            email: data["email"] ?? "",
+                            subscribed: String(data["subscribed"]).toLowerCase() === "true",
+                            hasGithubApp: String(data["has_github_app"]).toLowerCase() === "true"
+                        };
+                    }
+                    const splitData = String(data).split(",");
+                    if (splitData.length < 4) return null;
                     return {
-                        "projectName": splitData[0],
-                        "email": splitData[1],
-                        "subscribed": splitData[2].toLowerCase() == "true",
-                        "hasGithubApp": splitData[3].toLowerCase() == "true"
+                        projectName: splitData[0],
+                        email: splitData[1],
+                        subscribed: splitData[2].toLowerCase() === "true",
+                        hasGithubApp: splitData[3].toLowerCase() === "true"
                     };
                 }),
                 catchError(error => this.handleError(error)));

@@ -185,8 +185,8 @@ export class HarborShellComponent implements OnInit, OnDestroy {
         );
     }
 
-    // Open about dialog
     openChargebeeDialog(): void {
+        if (!this.deploymentConfig) return;
         this.chargebeeDialog.open(this.deploymentConfig.showSubscriptionCheckoutOption);
     }
 
@@ -203,6 +203,7 @@ export class HarborShellComponent implements OnInit, OnDestroy {
     }
 
     marketplaceLink(): string {
+        if (!this.deploymentConfig) return '';
         if (this.deploymentConfig.showAwsMarketplaceLink) {
             return environment.awsMarketplaceUrl;
         } else {

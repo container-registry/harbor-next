@@ -1,4 +1,4 @@
-import { Component, OnInit, EventEmitter, Output, Renderer2, ElementRef } from "@angular/core";
+import { Component, OnInit, OnDestroy, EventEmitter, Output, Renderer2, ElementRef } from "@angular/core";
 import { DomSanitizer, SafeResourceUrl } from "@angular/platform-browser";
 import { SessionService } from "../../services/session.service";
 import { SkinableConfig } from "../../../services/skinable-config.service";
@@ -16,7 +16,7 @@ const customerPortal = `https://${environment.chargebeeUrl}.chargebeeportal.com`
     templateUrl: "./chargebee-dialog.component.html",
     styleUrls: ["./chargebee-dialog.component.scss"]
 })
-export class ChargebeeDialogComponent implements OnInit {
+export class ChargebeeDialogComponent implements OnInit, OnDestroy {
     opened = false;
     loaded = false;
     size = "full-screen";
@@ -62,6 +62,7 @@ export class ChargebeeDialogComponent implements OnInit {
     }
 
     monitorSubscriptionStatus(): void {
+        if (!this.currentUser) return;
         this.session.getUserSubscriptionStatus(this.currentUser.email).subscribe(data => {
             if (data != null) {
                 this.projectName = data.projectName;
@@ -95,6 +96,7 @@ export class ChargebeeDialogComponent implements OnInit {
         this.sanitizedFrameSrc = this.sanitizer.bypassSecurityTrustResourceUrl(newIframeSrc);
     }
     private startSubscriptionStatusMonitoring(): void {
+        this.stopSubscriptionStatusMonitoring();
         this.subscriptionStatusMonitoring = setInterval(() => {
             this.monitorSubscriptionStatus();
         }, 1000);
@@ -135,6 +137,7 @@ export class ChargebeeDialogComponent implements OnInit {
     }
 
     getCheckoutSrc() {
+        if (!this.userLocation) return customerPortal;
         this.currency = this.userLocation.currency.toUpperCase();
         return checkout
                     .replace("PlanPeriod", this.selectedPlan)
@@ -150,18 +153,26 @@ export class ChargebeeDialogComponent implements OnInit {
         }
     }
 
-    private setupMessageListener(): void {
-        window.addEventListener("message", (event) => {
-            // Verify origin for security
-            if (event.data == "cb.loaded") {
-                this.loaded = true;
-                this.iframeDisplay = iframeDisplayVisible;
-                setTimeout(() => {
-                    this.iframeHeight = defaultIframeHeight;
-                    this.iframeWidth = defaultIframeWidth;
-                }, 500);
+    private messageHandler = (event: MessageEvent) => {
+        const chargebeeOrigin = `https://${environment.chargebeeUrl}.chargebee.com`;
+        const portalOrigin = `https://${environment.chargebeeUrl}.chargebeeportal.com`;
+        if (event.origin !== chargebeeOrigin && event.origin !== portalOrigin) return;
+        if (event.data == "cb.loaded") {
+            this.loaded = true;
+            this.iframeDisplay = iframeDisplayVisible;
+            setTimeout(() => {
+                this.iframeHeight = defaultIframeHeight;
+                this.iframeWidth = defaultIframeWidth;
+            }, 500);
+        }
+    };
 
-            }
-        });
+    private setupMessageListener(): void {
+        window.addEventListener("message", this.messageHandler);
+    }
+
+    ngOnDestroy(): void {
+        window.removeEventListener("message", this.messageHandler);
+        this.stopSubscriptionStatusMonitoring();
     }
 }

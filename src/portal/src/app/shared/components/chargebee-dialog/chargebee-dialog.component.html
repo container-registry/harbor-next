@@ -7,10 +7,10 @@
     <div class="modal-body" id="clrModalBody">
         <h4 class="chargebee-dialog-subtitle" *ngIf="!isSubscribed">Subscribe to upgrade your storage to 100 GiB.</h4>
         <div class="github-subscription" *ngIf="hasGithubApp && !isSubscribed">
-            Go to the <a href="https://github.com/marketplace/container-registry" target="_blank">Github marketplace</a> to add additional storage.
+            Go to the <a href="https://github.com/marketplace/container-registry" target="_blank" rel="noopener noreferrer">Github marketplace</a> to add additional storage.
         </div>
         <div class="github-subscription" *ngIf="hasGithubApp && isSubscribed">
-            Go to the <a href="https://github.com/marketplace/container-registry" target="_blank">Github marketplace</a> to manage your subscription.
+            Go to the <a href="https://github.com/marketplace/container-registry" target="_blank" rel="noopener noreferrer">Github marketplace</a> to manage your subscription.
         </div>
         <h4 class="chargebee-dialog-subtitle" *ngIf="isSubscriptionSuccessful">You now have 100 GiB of storage. You can safely close this window.</h4>
             <div class="plan-selector" *ngIf="!isSubscribed && !hasGithubApp">

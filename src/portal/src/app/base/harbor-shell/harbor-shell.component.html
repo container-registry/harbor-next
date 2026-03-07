@@ -166,13 +166,12 @@
                     *ngIf="showSubscriptionPortalOption()"
                     clrVerticalNavLink
                     routerLinkActive="active"
-                    href="javascript:void(0)"
                     class="nav-link nav-text nav-about-link"
-                    (click)="openChargebeeDialog()">
+                    (click)="openChargebeeDialog(); $event.preventDefault()">
                     <clr-icon
                         shape="store"
-			            clrVerticalNavIcon></clr-icon>
-                        Subscription
+                        clrVerticalNavIcon></clr-icon>
+                        {{ 'SIDE_NAV.SUBSCRIPTION' | translate }}
                 </a>
                 <a
                     *ngIf="showMarketplaceLink()"
@@ -180,11 +179,12 @@
                     routerLinkActive="active"
                     [href]="marketplaceLink()"
                     target="_blank"
+                    rel="noopener noreferrer"
                     class="nav-link nav-text nav-about-link">
                     <clr-icon
                         shape="store"
                         clrVerticalNavIcon></clr-icon>
-                        Subscription
+                        {{ 'SIDE_NAV.SUBSCRIPTION' | translate }}
                 </a>
                 <ng-container *ngFor="let theme of themeArray; let i = index">
                     <ng-container *ngIf="theme.showStyle === styleMode">
