@@ -1,0 +1,46 @@
+name: Lint GitHub Actions
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+
+permissions:
+  contents: read
+
+jobs:
+  pinned-actions:
+    name: Check Pinned Action SHAs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Check all actions are pinned to full SHA
+        run: |
+          failed=0
+          while IFS= read -r file; do
+            while IFS= read -r line; do
+              if echo "$line" | grep -qE '^\s+uses:\s+'; then
+                ref=$(echo "$line" | sed 's/.*uses:[[:space:]]*//' | awk '{print $1}')
+                # Skip local actions (starting with ./) and docker:// references
+                if echo "$ref" | grep -qE '^(\.\/|docker://)'; then
+                  continue
+                fi
+                if ! echo "$ref" | grep -qE '@[a-f0-9]{40}'; then
+                  echo "UNPINNED: $file -> $ref"
+                  failed=1
+                fi
+              fi
+            done < "$file"
+          done < <(find .github/workflows -name '*.yml' -o -name '*.yaml')
+          if [ "$failed" -eq 1 ]; then
+            echo ""
+            echo "All 'uses:' references must be pinned to a full commit SHA."
+            echo "Example: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4"
+            exit 1
+          fi
+          echo "All actions are pinned."

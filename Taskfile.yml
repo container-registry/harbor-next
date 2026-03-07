@@ -25,10 +25,14 @@ vars:
 
   # Multi-arch image build configuration
   # Registry: 8gears.container-registry.com/8gcr/<image>:<version>
-  IMAGE_REGISTRY: '{{.IMAGE_REGISTRY | default "8gears.container-registry.com"}}'
-  IMAGE_NAMESPACE: '{{.IMAGE_NAMESPACE | default "8gcr"}}'
+  REGISTRY_ADDRESS: '{{.REGISTRY_ADDRESS | default "8gears.container-registry.com"}}'
+  REGISTRY_PROJECT: '{{.REGISTRY_PROJECT | default "8gcr"}}'
   IMAGE_PLATFORMS: '{{.IMAGE_PLATFORMS | default "linux/amd64,linux/arm64"}}'
   IMAGE_BUILDER: "harbor-multiarch"
+
+  # Container engine detection: prefer Docker buildx, fallback to Podman
+  CONTAINER_ENGINE:
+    sh: 'docker buildx version 2>&1 | grep -q "github.com/docker/buildx" && echo "docker" || (podman --version >/dev/null 2>&1 && echo "podman" || echo "unknown")'
 
   # CI detection (shared by build.yml and image.yml)
   IS_CI:

@@ -211,7 +211,7 @@ tasks:
     deps: [frontend:install]
     cmds:
       - task: :build:gen-apis:frontend
-      - exec ./node_modules/.bin/ng serve --host 0.0.0.0 --hmr --disable-host-check
+      - exec ./node_modules/.bin/ng serve --host 0.0.0.0 --hmr
 
   frontend:build:
     desc: Build Portal for production
@@ -264,6 +264,7 @@ tasks:
     internal: true
     status: ['test -f {{.TOKEN_KEY_FILE_LOCAL}}']
     cmds:
+      - mkdir -p $(dirname {{.TOKEN_KEY_FILE_LOCAL}})
       - openssl genpkey -algorithm RSA -outform PEM -pkeyopt rsa_keygen_bits:4096 | openssl rsa -traditional -out {{.TOKEN_KEY_FILE_LOCAL}}
       - chmod 644 {{.TOKEN_KEY_FILE_LOCAL}}
 
@@ -314,6 +315,7 @@ tasks:
       - rm -f build-errors.log
       - rm -f {{.TOKEN_KEY_FILE}}
       - rm -f {{.TOKEN_KEY_FILE_LOCAL}}
+      - rmdir $(dirname {{.TOKEN_KEY_FILE_LOCAL}}) 2>/dev/null || true
 
   status:
     desc: Show container status for all services
