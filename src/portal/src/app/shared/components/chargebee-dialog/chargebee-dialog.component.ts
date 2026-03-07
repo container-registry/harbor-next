@@ -1,5 +1,6 @@
 import { Component, OnInit, OnDestroy, EventEmitter, Output, Renderer2, ElementRef } from "@angular/core";
 import { DomSanitizer, SafeResourceUrl } from "@angular/platform-browser";
+import { Subscription } from "rxjs";
 import { SessionService } from "../../services/session.service";
 import { SkinableConfig } from "../../../services/skinable-config.service";
 import { environment } from "../../../../environments/environment";
@@ -10,6 +11,8 @@ const defaultIframeWidth = "400px";
 const defaultIframeHeight = "550px";
 const checkout = `https://${environment.chargebeeUrl}.chargebee.com/hosted_pages/checkout?subscription_items[item_price_id][0]=SubscriptionName-Currency-PlanPeriod&subscription_items[quantity][0]=1&layout=full_page&subscription[cf_Project_Name]=projectName`
 const customerPortal = `https://${environment.chargebeeUrl}.chargebeeportal.com`
+const chargebeeOrigin = `https://${environment.chargebeeUrl}.chargebee.com`;
+const portalOrigin = `https://${environment.chargebeeUrl}.chargebeeportal.com`;
 
 @Component({
     selector: "chargebee-dialog",
@@ -36,6 +39,7 @@ export class ChargebeeDialogComponent implements OnInit, OnDestroy {
     userLocation = null;
     deploymentConfig = null;
     subscriptionStatusMonitoring = null;
+    locationSub: Subscription;
     title = "Container Registry Subscription";
     hasGithubApp = false;
 
@@ -115,7 +119,7 @@ export class ChargebeeDialogComponent implements OnInit, OnDestroy {
             return;
         }
         if (this.userLocation == null) {
-            const location = this.session.getUserLocation().subscribe(data => {
+            this.locationSub = this.session.getUserLocation().subscribe(data => {
                 this.userLocation = data;
             });
         }
@@ -154,8 +158,6 @@ export class ChargebeeDialogComponent implements OnInit, OnDestroy {
     }
 
     private messageHandler = (event: MessageEvent) => {
-        const chargebeeOrigin = `https://${environment.chargebeeUrl}.chargebee.com`;
-        const portalOrigin = `https://${environment.chargebeeUrl}.chargebeeportal.com`;
         if (event.origin !== chargebeeOrigin && event.origin !== portalOrigin) return;
         if (event.data == "cb.loaded") {
             this.loaded = true;
@@ -174,5 +176,8 @@ export class ChargebeeDialogComponent implements OnInit, OnDestroy {
     ngOnDestroy(): void {
         window.removeEventListener("message", this.messageHandler);
         this.stopSubscriptionStatusMonitoring();
+        if (this.locationSub) {
+            this.locationSub.unsubscribe();
+        }
     }
 }
