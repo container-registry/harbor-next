@@ -188,6 +188,11 @@ func (c *controller) UseLocalManifest(ctx context.Context, art lib.ArtifactInfo,
 		return false, nil, err
 	}
 	if !exist || desc == nil {
+		if a != nil { // if not found, use local if it exists, because a exist, otherwise return error
+			log.Debugf("Artifact not found in remote registry but exists in local cache, serving from local: %v:%v", art.Repository, art.Tag)
+			return true, nil, nil
+		}
+
 		dig, err := c.getManifestDigestInLocal(ctx, art)
 		if err != nil {
 			// skip to delete when error, use debug level log to avoid too many logs when the manifest is removed from upstream
