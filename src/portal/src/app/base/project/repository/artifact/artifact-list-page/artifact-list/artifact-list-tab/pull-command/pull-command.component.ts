@@ -86,7 +86,7 @@ export class PullCommandComponent {
                 this.projectName
             }/${this.repoName}`,
             this.getSelectedClient()
-        );
+        ) || '';
     }
 
     getPullCommandForRuntimeByDigest(artifact: Artifact): string {
