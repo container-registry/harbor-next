@@ -47,10 +47,10 @@ export class ProjectsComponent implements OnInit, OnDestroy {
 
     currentFilteredType: number = 0; // all projects
     projectName: string = '';
-    get selecteType(): string {
+    get selectedType(): string {
         return this.currentFilteredType + '';
     }
-    set selecteType(_project: string) {
+    set selectedType(_project: string) {
         this.currentFilteredType = +_project;
         if (window.sessionStorage) {
             window.sessionStorage['projectTypeValue'] = +_project;
@@ -78,7 +78,7 @@ export class ProjectsComponent implements OnInit, OnDestroy {
             window.sessionStorage.removeItem('fromDetails');
         }
         if (this.isSystemAdmin) {
-            this.getConfigration();
+            this.getConfiguration();
         }
         if (!this.searchSub) {
             this.searchSub = this.filterComponent.filterTerms
@@ -140,7 +140,7 @@ export class ProjectsComponent implements OnInit, OnDestroy {
         }
     }
 
-    getConfigration() {
+    getConfiguration() {
         this.configService
             .getConfiguration()
             .subscribe((configurations: Configuration) => {
@@ -167,7 +167,7 @@ export class ProjectsComponent implements OnInit, OnDestroy {
     }
 
     doFilterProjects(): void {
-        this.listProject.doFilterProject(+this.selecteType);
+        this.listProject.doFilterProject(+this.selectedType);
     }
 
     refresh(): void {

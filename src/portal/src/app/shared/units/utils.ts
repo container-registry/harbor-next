@@ -669,11 +669,11 @@ export const GetIntegerAndUnit = (
     }
 };
 
-export const validateLimit = unitContrl => {
+export const validateLimit = unitControl => {
     return (control: AbstractControl) => {
         if (
             // 1024TB
-            getByte(control.value, unitContrl.value) >
+            getByte(control.value, unitControl.value) >
             Math.pow(StorageMultipleConstant, 5)
         ) {
             return {

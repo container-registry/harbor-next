@@ -10,8 +10,8 @@ const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS', 'TRACE'];
 // before rendering, the ui shows a loading style
 fetch('/swagger.json').then(value => value.json()).then(res => {
     res['host'] = window.location.host;
-    const protocal = window.location.protocol;
-    res['schemes'] = [protocal.replace(':', '')];
+    const protocol = window.location.protocol;
+    res['schemes'] = [protocol.replace(':', '')];
     res.info.description = res.info.description + helpInfo;
         // start to render
         SwaggerUI({

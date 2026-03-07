@@ -112,7 +112,7 @@ export class SystemRobotAccountsComponent implements OnInit, OnDestroy {
     ) {}
     ngOnInit() {
         this.getRobotPermissions();
-        this.getCurrenTime();
+        this.getCurrentTime();
         if (!this.searchSub) {
             this.searchSub = this.filterComponent.filterTerms
                 .pipe(
@@ -198,7 +198,7 @@ export class SystemRobotAccountsComponent implements OnInit, OnDestroy {
             });
     }
 
-    getCurrenTime() {
+    getCurrentTime() {
         this.systemInfoService.getSystemInfo().subscribe(res => {
             if (res?.current_time) {
                 this.deltaTime =
@@ -360,7 +360,7 @@ export class SystemRobotAccountsComponent implements OnInit, OnDestroy {
             ConfirmationTargets.ROBOT_ACCOUNT,
             ConfirmationButtons.DELETE_CANCEL
         );
-        this.operateDialogService.openComfirmDialog(deletionMessage);
+        this.operateDialogService.openConfirmDialog(deletionMessage);
     }
 
     disableOrEnable() {
@@ -380,7 +380,7 @@ export class SystemRobotAccountsComponent implements OnInit, OnDestroy {
                 ? ConfirmationButtons.ENABLE_CANCEL
                 : ConfirmationButtons.DISABLE_CANCEL
         );
-        this.operateDialogService.openComfirmDialog(deletionMessage);
+        this.operateDialogService.openConfirmDialog(deletionMessage);
     }
 
     operateRobot() {

@@ -157,7 +157,7 @@ export class ScheduleCardComponent implements OnInit, OnDestroy {
 
     pauseOrResume() {
         if (this.isPaused) {
-            this.operateDialogService.openComfirmDialog({
+            this.operateDialogService.openConfirmDialog({
                 data: undefined,
                 param: null,
                 title: 'JOB_SERVICE_DASHBOARD.CONFIRM_RESUMING_ALL',
@@ -166,7 +166,7 @@ export class ScheduleCardComponent implements OnInit, OnDestroy {
                 buttons: ConfirmationButtons.CONFIRM_CANCEL,
             });
         } else {
-            this.operateDialogService.openComfirmDialog({
+            this.operateDialogService.openConfirmDialog({
                 data: undefined,
                 param: null,
                 title: 'JOB_SERVICE_DASHBOARD.CONFIRM_PAUSING_ALL',

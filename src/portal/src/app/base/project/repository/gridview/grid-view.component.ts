@@ -217,7 +217,7 @@ export class GridViewComponent implements AfterViewInit {
             let top =
                 Math.floor(count / columnsToUse) * (height + marginHeight);
 
-            // trick to show nice apear animation, where the item is already positioned,
+            // trick to show nice appear animation, where the item is already positioned,
             // but it will pop out
             let oldTransform = itemStyle.transform;
             if (!oldTransform || oldTransform === 'none') {

@@ -302,7 +302,7 @@ describe('ImmutableTagComponent', () => {
         fixture.detectChanges();
         await fixture.whenStable();
         let elRepRule: HTMLLIElement = fixture.nativeElement.querySelector(
-            '#tag-selectors-patten0'
+            '#tag-selectors-pattern0'
         );
         expect(elRepRule.textContent).toEqual('rep');
         mockRules[0].tag_selectors[0].pattern = '**';
@@ -316,7 +316,7 @@ describe('ImmutableTagComponent', () => {
         fixture.detectChanges();
         await fixture.whenStable();
         let elRepRule: HTMLLIElement = fixture.nativeElement.querySelector(
-            '#tag-selectors-patten0'
+            '#tag-selectors-pattern0'
         );
         expect(elRepRule.textContent).toEqual('rep');
         mockRules[0].tag_selectors[0].pattern = '**';

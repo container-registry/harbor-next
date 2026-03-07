@@ -24,7 +24,7 @@ import {
     JOB_STATUS,
     REFRESH_STATUS_TIME_DIFFERENCE,
     WORKER_OPTIONS,
-} from '../../clearing-job-interfact';
+} from '../../clearing-job-interface';
 import { clone } from '../../../../../shared/units/utils';
 
 const ONE_MINUTE = 60000;
