@@ -70,6 +70,10 @@ extend-exclude = [
 
     # SQL migration files contain SQL aliases (fo = filter_objects, eto = event_type_objects)
     "make/migrations/",
+
+    # Upstream source code (hundreds of pre-existing typos, fixing is out of scope)
+    "src/",
+    "api/",
 ]
 
 [type.md]

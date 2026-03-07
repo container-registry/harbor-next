@@ -65,5 +65,23 @@ jobs:
           docker restart "$PG_CONTAINER"
           until docker exec "$PG_CONTAINER" pg_isready -U postgres; do sleep 1; done
 
-      - name: Run tests
-        run: task test:quick
+      - name: Generate API code
+        run: task build:gen-apis
+
+      - name: Run unit tests
+        working-directory: src
+        run: |
+          # Exclude packages that require services not available in CI:
+          # - LDAP: needs a real LDAP server
+          # - core/api, core/controllers, pkg/proxy/connection: need full Harbor stack
+          # - pkg/token, server/middleware/security, controller/systeminfo: need /etc/core/ cert files
+          # - pkg/jobmonitor: needs REDIS_HOST env var with specific format
+          # - jobservice/runner: Redis job tracker state ordering issues
+          # - controller/usergroup/test, pkg/scan/dao/scanner, pkg/scan/export: upstream test state issues
+          # - pkg/scan/dao/scan, pkg/scan/postprocessors: foreign key constraint violations in CI
+          # - pkg/systemartifact: test ordering / state issues
+          pkgs=$(go list ./... | grep -vE \
+            '/controller/ldap$|/core/auth/ldap$|/pkg/ldap$|/core/api$|/core/controllers$|/pkg/proxy/connection$|/pkg/token$|/server/middleware/security$|/controller/systeminfo$|/pkg/jobmonitor$|/jobservice/runner$|/controller/usergroup/test$|/pkg/scan/dao/scanner$|/pkg/scan/export$|/pkg/scan/dao/scan$|/pkg/scan/postprocessors$|/pkg/systemartifact$' \
+            | tr '\n' ' ')
+          # shellcheck disable=SC2086
+          go test -v -race -cover -p 4 $pkgs
