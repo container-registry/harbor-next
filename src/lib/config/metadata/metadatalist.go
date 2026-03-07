@@ -137,7 +137,7 @@ var (
 
 		{Name: common.OIDCName, Scope: UserScope, Group: OIDCGroup, ItemType: &StringType{}, Description: `The OIDC provider name`},
 		{Name: common.OIDCEndpoint, Scope: UserScope, Group: OIDCGroup, ItemType: &StringType{}, Description: `The endpoint of the OIDC provider`},
-		{Name: common.OIDCCLientID, Scope: UserScope, Group: OIDCGroup, ItemType: &StringType{}, Description: `The client ID of the OIDC provider`},
+		{Name: common.OIDCClientID, Scope: UserScope, Group: OIDCGroup, ItemType: &StringType{}, Description: `The client ID of the OIDC provider`},
 		{Name: common.OIDCClientSecret, Scope: UserScope, Group: OIDCGroup, ItemType: &PasswordType{}, Description: `The OIDC provider secret`},
 		{Name: common.OIDCGroupsClaim, Scope: UserScope, Group: OIDCGroup, ItemType: &StringType{}, Description: `The attribute claims the group name`},
 		{Name: common.OIDCAdminGroup, Scope: UserScope, Group: OIDCGroup, ItemType: &StringType{}, Description: `The OIDC group which has the harbor admin privileges`},
