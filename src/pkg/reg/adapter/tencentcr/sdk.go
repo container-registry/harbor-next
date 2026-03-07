@@ -185,14 +185,14 @@ func (a *adapter) listReposByNamespace(namespace string) (repos []tcr.TcrReposit
 
 		size := len(resp.Response.RepositoryList)
 		for i, repo := range resp.Response.RepositoryList {
-			log.Debugf("[tencent-tcr.listReposByNamespace.DescribeRepositories] Retrives total=%d page=%d repo(%d/%d)=%s", *resp.Response.TotalCount, page, i, size, *repo.Name)
+			log.Debugf("[tencent-tcr.listReposByNamespace.DescribeRepositories] Retrieves total=%d page=%d repo(%d/%d)=%s", *resp.Response.TotalCount, page, i, size, *repo.Name)
 			repos = append(repos, *repo)
 			repositories = append(repositories, *repo.Name)
 		}
 
 		log.Debugf("[tencent-tcr.listReposByNamespace.DescribeRepositories] total=%d now=%d page=%d,repositories=%v", *resp.Response.TotalCount, len(repos), page, repositories)
 		if len(repos) == int(*resp.Response.TotalCount) {
-			log.Debugf("[tencent-tcr.listReposByNamespace.DescribeRepositories] Retrives all repos.")
+			log.Debugf("[tencent-tcr.listReposByNamespace.DescribeRepositories] Retrieves all repos.")
 			break
 		}
 		page++

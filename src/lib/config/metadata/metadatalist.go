@@ -24,7 +24,7 @@ import (
 type Item struct {
 	// The Scope of this configuration item: eg: SystemScope, UserScope
 	Scope string `json:"scope,omitempty"`
-	// ldapbasic, ldapgroup, uaa settings, used to retieve configure items by group
+	// ldapbasic, ldapgroup, uaa settings, used to retrieve configure items by group
 	Group string `json:"group,omitempty"`
 	// environment key to retrieves this value when initialize, for example: POSTGRESQL_HOST, only used for system settings, for user settings no EnvKey
 	EnvKey string `json:"environment_key,omitempty"`

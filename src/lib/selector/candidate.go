@@ -45,7 +45,7 @@ type Repository struct {
 func (r *Repository) ToJSON() (string, error) {
 	jsonData, err := json.Marshal(r)
 	if err != nil {
-		return "", errors.Wrap(err, "marshal reporitory")
+		return "", errors.Wrap(err, "marshal repository")
 	}
 
 	return string(jsonData), nil

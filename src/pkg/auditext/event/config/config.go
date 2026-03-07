@@ -52,7 +52,7 @@ func (c *resolver) Resolve(ce *commonevent.Metadata, evt *event.Event) error {
 	e.ResourceType = rbac.ResourceConfiguration.String()
 	e.ResourceName = rbac.ResourceConfiguration.String()
 	e.Payload = ext.Redact(ce.RequestPayload, c.SensitiveAttributes)
-	e.OcurrAt = time.Now()
+	e.OccurAt = time.Now()
 	if len(ce.RequestPayload) > payloadSizeLimit {
 		ce.RequestPayload = fmt.Sprintf("%v...", ce.RequestPayload[:payloadSizeLimit])
 	}

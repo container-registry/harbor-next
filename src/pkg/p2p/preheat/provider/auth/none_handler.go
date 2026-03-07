@@ -19,7 +19,7 @@ import (
 	"net/http"
 )
 
-// NoneAuthHandler handles the case of no credentail required.
+// NoneAuthHandler handles the case of no credential required.
 type NoneAuthHandler struct{}
 
 // Mode implements @Handler.Mode

@@ -52,8 +52,8 @@ func loadChart(path string) ([]byte, error) {
 		os.Remove(compressedFileName)
 	}()
 
-	gzipWritter := gzip.NewWriter(chartTar)
-	tarWriter := tar.NewWriter(gzipWritter)
+	gzipWriter := gzip.NewWriter(chartTar)
+	tarWriter := tar.NewWriter(gzipWriter)
 
 	if err = filepath.WalkDir(path, func(fpath string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -76,7 +76,7 @@ func loadChart(path string) ([]byte, error) {
 	}
 	// flush and close writer
 	tarWriter.Close()
-	gzipWritter.Close()
+	gzipWriter.Close()
 	chartTar.Close()
 
 	return os.ReadFile(compressedFileName)

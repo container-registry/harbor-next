@@ -39,7 +39,7 @@ func Middleware() func(http.Handler) http.Handler {
 			r = r.WithContext(ctx)
 		}
 
-		traceID := tracelib.ExractTraceID(r)
+		traceID := tracelib.ExtractTraceID(r)
 		if traceID != "" {
 			ctx := log.WithLogger(r.Context(), log.G(r.Context()).WithFields(log.Fields{"traceID": traceID}))
 			r = r.WithContext(ctx)

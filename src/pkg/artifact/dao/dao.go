@@ -448,14 +448,14 @@ func setLabelQuery(qs beegoorm.QuerySeter, query *q.Query) (beegoorm.QuerySeter,
 	al, ok := labels.(*q.AndList)
 	if !ok {
 		return qs, errors.New(nil).WithCode(errors.BadRequestCode).
-			WithMessage(`the value of "labels" query can only be integer list with intersetion relationship`)
+			WithMessage(`the value of "labels" query can only be integer list with intersection relationship`)
 	}
 	var collections []string
 	for _, value := range al.Values {
 		labelID, ok := value.(int64)
 		if !ok {
 			return qs, errors.New(nil).WithCode(errors.BadRequestCode).
-				WithMessage(`the value of "labels" query can only be integer list with intersetion relationship`)
+				WithMessage(`the value of "labels" query can only be integer list with intersection relationship`)
 		}
 		// param "labelID" is integer, no need to sanitize
 		collections = append(collections, fmt.Sprintf(`SELECT artifact_id FROM label_reference WHERE label_id=%d`, labelID))

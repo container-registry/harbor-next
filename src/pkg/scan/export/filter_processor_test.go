@@ -136,7 +136,7 @@ func (suite *FilterProcessorTestSuite) TestProcessTagFilter() {
 		{Artifact: artpkg.Artifact{Digest: "digest2"}, Tags: []*tag.Tag{tag2}},
 	}
 
-	// filter required repositories haveing the specified tags
+	// filter required repositories having the specified tags
 	{
 		suite.artCtl.On("List", mock.Anything, mock.Anything, mock.Anything).Return(arts, nil).Once()
 
@@ -172,7 +172,7 @@ func (suite *FilterProcessorTestSuite) TestProcessLabelFilter() {
 		suite.Equal("digest2", candidates[1].Digest)
 	}
 
-	// filter required repositories haveing the specified label
+	// filter required repositories having the specified label
 	{
 		candidates, err := suite.filterProcessor.ProcessLabelFilter(context.TODO(), []int64{2}, arts)
 		suite.NoError(err)

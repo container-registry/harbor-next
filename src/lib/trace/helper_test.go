@@ -95,7 +95,7 @@ func TestHarborSpanNameFormatter(t *testing.T) {
 	}
 }
 
-func TestExractTraceID(t *testing.T) {
+func TestExtractTraceID(t *testing.T) {
 	type args struct {
 		headers        map[string]string
 		ctxTraceparent string
@@ -289,7 +289,7 @@ func TestExractTraceID(t *testing.T) {
 				req.Header.Set(h, v)
 			}
 
-			traceID := ExractTraceID(req)
+			traceID := ExtractTraceID(req)
 
 			assert.Equal(t, tt.want, traceID, tt.name)
 		})

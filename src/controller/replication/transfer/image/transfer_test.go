@@ -42,7 +42,7 @@ func (f *fakeRegistry) ManifestExist(repository, reference string) (bool, *distr
 	}
 	return false, &distribution.Descriptor{Digest: digest.Digest("sha256:c6b2b2c507a0944348e0303114d8d93aaaa081732b86451d9bce1f432a537bc7")}, nil
 }
-func (f *fakeRegistry) PullManifest(repository, reference string, accepttedMediaTypes ...string) (distribution.Manifest, string, error) {
+func (f *fakeRegistry) PullManifest(repository, reference string, acceptedMediaTypes ...string) (distribution.Manifest, string, error) {
 	manifest := `{
 		"schemaVersion": 2,
 		"mediaType": "application/vnd.docker.distribution.manifest.v2+json",

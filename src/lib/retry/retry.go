@@ -52,8 +52,8 @@ func Abort(err error) error {
 
 // Options options for the retry functions
 type Options struct {
-	InitialInterval time.Duration                        // the initial interval for retring after failure, default 100 milliseconds
-	MaxInterval     time.Duration                        // the max interval for retring after failure, default 1 second
+	InitialInterval time.Duration                        // the initial interval for retrying after failure, default 100 milliseconds
+	MaxInterval     time.Duration                        // the max interval for retrying after failure, default 1 second
 	Timeout         time.Duration                        // the total time before returning if something is wrong, default 1 minute
 	Callback        func(err error, sleep time.Duration) // the callback function for Retry when the f called failed
 	Backoff         bool

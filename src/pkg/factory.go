@@ -46,7 +46,7 @@ var (
 	ManifestMgr cachedManifest.CachedManager
 )
 
-// init initialize mananger for resources
+// init initialize manager for resources
 func init() {
 	cacheEnabled := config.CacheEnabled()
 	initArtifactMgr(cacheEnabled)

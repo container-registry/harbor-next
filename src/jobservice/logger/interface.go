@@ -16,10 +16,10 @@ package logger
 
 // Interface for logger.
 type Interface interface {
-	// For debuging
+	// For debugging
 	Debug(v ...any)
 
-	// For debuging with format
+	// For debugging with format
 	Debugf(format string, v ...any)
 
 	// For logging info

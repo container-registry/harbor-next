@@ -55,7 +55,7 @@ type Adapter interface {
 type ArtifactRegistry interface {
 	FetchArtifacts(filters []*model.Filter) ([]*model.Resource, error)
 	ManifestExist(repository, reference string) (exist bool, desc *distribution.Descriptor, err error)
-	PullManifest(repository, reference string, accepttedMediaTypes ...string) (manifest distribution.Manifest, digest string, err error)
+	PullManifest(repository, reference string, acceptedMediaTypes ...string) (manifest distribution.Manifest, digest string, err error)
 	PushManifest(repository, reference, mediaType string, payload []byte) (string, error)
 	DeleteManifest(repository, reference string) error // the "reference" can be "tag" or "digest", the function needs to handle both
 	BlobExist(repository, digest string) (exist bool, err error)

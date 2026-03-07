@@ -476,7 +476,7 @@ func filterGroup(groupNames []string, filter string) []string {
 }
 
 // InjectGroupsToUser populates the group to DB and inject the group IDs to user model.
-// The third optional parm is for UT only.
+// The third optional param is for UT only.
 func InjectGroupsToUser(info *UserInfo, user *models.User, f ...populate) {
 	if info == nil || user == nil {
 		log.Warningf("user info or user model is nil, skip the func")

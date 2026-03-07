@@ -183,7 +183,7 @@ func TestProjects(t *testing.T) {
 	assert.Equal(t, 1, len(tags))
 	assert.Equal(t, "mytag", tags[0])
 
-	// List tags for missign image
+	// List tags for missing image
 	_, e = client.getTags("mynamespace/missingimage")
 	require.NotNil(t, e)
 

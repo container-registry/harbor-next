@@ -194,7 +194,7 @@ func (c *Client) getTags(repository string) ([]string, error) {
 	return result, nil
 }
 
-// getNamespaces returns DTR namespaces.  DTR also calles these orgs and accounts depending on where you look
+// getNamespaces returns DTR namespaces.  DTR also calls these orgs and accounts depending on where you look
 func (c *Client) getNamespaces() ([]Account, error) {
 	var accounts []Account
 	var response Accounts

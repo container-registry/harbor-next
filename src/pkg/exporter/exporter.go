@@ -71,7 +71,7 @@ type Exporter struct {
 	collectors map[string]prometheus.Collector
 }
 
-// RegisterCollector register a collector to expoter
+// RegisterCollector register a collector to exporter
 func (e *Exporter) RegisterCollector(collectors ...collector) error {
 	for _, c := range collectors {
 		name := c.GetName()
