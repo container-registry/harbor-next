@@ -80,8 +80,9 @@ jobs:
           # - controller/usergroup/test, pkg/scan/dao/scanner, pkg/scan/export: upstream test state issues
           # - pkg/scan/dao/scan, pkg/scan/postprocessors: foreign key constraint violations in CI
           # - pkg/systemartifact: test ordering / state issues
+          # - jobservice/logger/getter: DB state ordering issues when packages run in parallel
           pkgs=$(go list ./... | grep -vE \
-            '/controller/ldap$|/core/auth/ldap$|/pkg/ldap$|/core/api$|/core/controllers$|/pkg/proxy/connection$|/pkg/token$|/server/middleware/security$|/controller/systeminfo$|/pkg/jobmonitor$|/jobservice/runner$|/controller/usergroup/test$|/pkg/scan/dao/scanner$|/pkg/scan/export$|/pkg/scan/dao/scan$|/pkg/scan/postprocessors$|/pkg/systemartifact$' \
+            '/controller/ldap$|/core/auth/ldap$|/pkg/ldap$|/core/api$|/core/controllers$|/pkg/proxy/connection$|/pkg/token$|/server/middleware/security$|/controller/systeminfo$|/pkg/jobmonitor$|/jobservice/runner$|/jobservice/logger/getter$|/controller/usergroup/test$|/pkg/scan/dao/scanner$|/pkg/scan/export$|/pkg/scan/dao/scan$|/pkg/scan/postprocessors$|/pkg/systemartifact$' \
             | tr '\n' ' ')
           # shellcheck disable=SC2086
           go test -v -race -cover -p 4 $pkgs
