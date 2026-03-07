@@ -18,6 +18,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/goharbor/harbor/src/common/utils"
@@ -97,6 +99,7 @@ func (s *scheduler) Schedule(ctx context.Context, vendorType string, vendorID in
 	if len(vendorType) == 0 {
 		return 0, fmt.Errorf("empty vendor type")
 	}
+	cron = fmt.Sprintf("%d %s", rand.Intn(60), strings.Join(strings.Split(cron, " ")[1:], " "))
 	if _, err := utils.CronParser().Parse(cron); err != nil {
 		return 0, errors.New(nil).WithCode(errors.BadRequestCode).
 			WithMessagef("invalid cron %s: %v", cron, err)
