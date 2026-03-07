@@ -109,7 +109,7 @@ const (
 	HTTPAuthProxyServerCertificate   = "http_authproxy_server_certificate"
 	OIDCName                         = "oidc_name"
 	OIDCEndpoint                     = "oidc_endpoint"
-	OIDCCLientID                     = "oidc_client_id"
+	OIDCClientID                     = "oidc_client_id"
 	OIDCClientSecret                 = "oidc_client_secret"
 	OIDCVerifyCert                   = "oidc_verify_cert"
 	OIDCAdminGroup                   = "oidc_admin_group"

@@ -115,7 +115,7 @@ func TestFormatURL(t *testing.T) {
 			continue
 		}
 		if err != nil || goodURL != u.goodURL {
-			t.Fatalf("Faild on URL: raw=%v, expected:%v, actual:%v", u.rawURL, u.goodURL, goodURL)
+			t.Fatalf("Failed on URL: raw=%v, expected:%v, actual:%v", u.rawURL, u.goodURL, goodURL)
 		}
 	}
 

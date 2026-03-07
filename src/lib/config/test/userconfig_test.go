@@ -254,7 +254,7 @@ func TestOIDCSetting(t *testing.T) {
 		common.OIDCScope:        "openid, profile",
 		common.OIDCGroupsClaim:  "my_group",
 		common.OIDCUserClaim:    "username",
-		common.OIDCCLientID:     "client",
+		common.OIDCClientID:     "client",
 		common.OIDCClientSecret: "secret",
 		common.ExtEndpoint:      "https://harbor.test",
 		common.OIDCLogout:       "false",

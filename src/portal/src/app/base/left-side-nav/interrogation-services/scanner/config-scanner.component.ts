@@ -250,7 +250,7 @@ export class ConfigurationScannerComponent implements OnInit, OnDestroy {
                 ConfirmationTargets.SCANNER,
                 ConfirmationButtons.DELETE_CANCEL
             );
-            this.deletionDialogService.openComfirmDialog(msg);
+            this.deletionDialogService.openConfirmDialog(msg);
         }
     }
     editScanner() {

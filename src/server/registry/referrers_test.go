@@ -167,7 +167,7 @@ func TestReferrersHandlerSavetoCache(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// cache_enabled pull from cahce
+	// cache_enabled pull from cache
 	config.DefaultMgr().Set(context.TODO(), "cache_enabled", true)
 	cacheManagerMock := &testmanifest.CachedManager{}
 	mock.OnAnything(cacheManagerMock, "Get").Return(nil, fmt.Errorf("unable to do stuff: %w", cache.ErrNotFound))

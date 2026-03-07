@@ -92,7 +92,7 @@ type Scan struct {
 type CommonEvent struct {
 	Operator             string
 	ProjectID            int64
-	OcurrAt              time.Time
+	OccurAt              time.Time
 	Operation            string
 	Payload              string
 	SourceIP             string
@@ -106,7 +106,7 @@ type CommonEvent struct {
 func (c *CommonEvent) ResolveToAuditLog() (*model.AuditLogExt, error) {
 	auditLog := &model.AuditLogExt{
 		ProjectID:            c.ProjectID,
-		OpTime:               c.OcurrAt,
+		OpTime:               c.OccurAt,
 		Operation:            c.Operation,
 		Username:             c.Operator,
 		ResourceType:         c.ResourceType,

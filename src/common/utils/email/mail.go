@@ -70,10 +70,10 @@ func Send(addr, identity, username, password string,
 
 // Ping tests the connection and authentication with email server
 // If tls is true, a secure connection is established, or Ping
-// trys to upgrade the insecure connection to a secure one if
+// tries to upgrade the insecure connection to a secure one if
 // email server supports it.
 // Ping doesn't verify the server's certificate and hostname when
-// needed if the parameter insecure is ture
+// needed if the parameter insecure is true
 func Ping(addr, identity, username, password string,
 	timeout int, tls, insecure bool) error {
 	client, err := newClient(addr, identity, username, password,

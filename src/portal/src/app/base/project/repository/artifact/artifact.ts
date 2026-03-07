@@ -226,7 +226,7 @@ export const ArtifactSbomFieldMapper = {
  * Identify the sbomJson contains the two main properties 'spdxVersion' and 'SPDXID'.
  * @param sbomJson SBOM JSON report object.
  * @returns true or false
- * Return true when the sbomJson object contains the attribues 'spdxVersion' and 'SPDXID'.
+ * Return true when the sbomJson object contains the attributes 'spdxVersion' and 'SPDXID'.
  * else return false.
  */
 export function isSpdxSbom(sbomJson?: Object): boolean {

@@ -168,7 +168,7 @@ func OIDCSetting(ctx context.Context) (*cfgModels.OIDCSetting, error) {
 		Endpoint:           mgr.Get(ctx, common.OIDCEndpoint).GetString(),
 		VerifyCert:         mgr.Get(ctx, common.OIDCVerifyCert).GetBool(),
 		AutoOnboard:        mgr.Get(ctx, common.OIDCAutoOnboard).GetBool(),
-		ClientID:           mgr.Get(ctx, common.OIDCCLientID).GetString(),
+		ClientID:           mgr.Get(ctx, common.OIDCClientID).GetString(),
 		ClientSecret:       mgr.Get(ctx, common.OIDCClientSecret).GetString(),
 		GroupsClaim:        mgr.Get(ctx, common.OIDCGroupsClaim).GetString(),
 		GroupFilter:        mgr.Get(ctx, common.OIDCGroupFilter).GetString(),

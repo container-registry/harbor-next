@@ -306,7 +306,7 @@ export class DistributionInstancesComponent implements OnInit, OnDestroy {
             ConfirmationTargets.INSTANCE,
             buttons
         );
-        this.operationDialogService.openComfirmDialog(msg);
+        this.operationDialogService.openConfirmDialog(msg);
     }
 
     operateInstance(data: MultiOperateData) {

@@ -200,7 +200,7 @@ export class ResultSbomComponent implements OnInit, OnDestroy {
             .subscribe(
                 () => {
                     this.onSubmitting = false;
-                    // Forcely change status to queued after successful submitting
+                    // Forcibly change status to queued after successful submitting
                     this.sbomOverview = {
                         scan_status: SBOM_SCAN_STATUS.PENDING,
                     };

@@ -33,14 +33,14 @@ export class GlobalConfirmationDialogComponent implements OnDestroy {
     dialogTitle: string = '';
     dialogContent: string = '';
     message: ConfirmationMessage;
-    annouceSubscription: Subscription;
+    announceSubscription: Subscription;
     buttons: ConfirmationButtons;
     isDelete: boolean = false;
     constructor(
         private confirmationService: ConfirmationDialogService,
         private translate: TranslateService
     ) {
-        this.annouceSubscription =
+        this.announceSubscription =
             confirmationService.confirmationAnnouced$.subscribe(msg => {
                 this.dialogTitle = msg.title;
                 this.dialogContent = msg.message;
@@ -58,8 +58,8 @@ export class GlobalConfirmationDialogComponent implements OnDestroy {
     }
 
     ngOnDestroy(): void {
-        if (this.annouceSubscription) {
-            this.annouceSubscription.unsubscribe();
+        if (this.announceSubscription) {
+            this.announceSubscription.unsubscribe();
         }
     }
 
@@ -87,7 +87,7 @@ export class GlobalConfirmationDialogComponent implements OnDestroy {
 
     cancel(): void {
         if (!this.message) {
-            // Inproper condition
+            // Improper condition
             this.close();
             return;
         }
@@ -109,7 +109,7 @@ export class GlobalConfirmationDialogComponent implements OnDestroy {
 
     confirm(): void {
         if (!this.message) {
-            // Inproper condition
+            // Improper condition
             this.close();
             return;
         }

@@ -45,7 +45,7 @@ func TestOIDCCli(t *testing.T) {
 	assert.Nil(t, ctx)
 
 	// pass
-	username := "oidcModiferTester"
+	username := "oidcModifierTester"
 	password := "oidcSecret"
 	testCtl := &testingUser.Controller{}
 	testCtl.On("GetByName", mock.Anything, username).Return(

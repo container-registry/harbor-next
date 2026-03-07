@@ -111,9 +111,9 @@ func (a *adapter) ManifestExist(repository, reference string) (exist bool, desc 
 	}
 	contentType := resp.Header.Get("Content-Type")
 	contentLen := resp.Header.Get("Content-Length")
-	lenth, _ := strconv.Atoi(contentLen)
+	length, _ := strconv.Atoi(contentLen)
 
-	return exist, &distribution.Descriptor{MediaType: contentType, Size: int64(lenth)}, nil
+	return exist, &distribution.Descriptor{MediaType: contentType, Size: int64(length)}, nil
 }
 
 // DeleteManifest delete the manifest of Huawei SWR
@@ -272,7 +272,7 @@ type hwDescriptor struct {
 	// URLs contains the source URLs of this content.
 	URLs []string `json:"urls,omitempty"`
 
-	// depandence
+	// dependence
 	Dependence string `json:"dependence,omitempty"`
 }
 

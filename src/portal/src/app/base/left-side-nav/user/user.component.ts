@@ -299,7 +299,7 @@ export class UserComponent implements OnDestroy {
             ConfirmationTargets.USER,
             ConfirmationButtons.DELETE_CANCEL
         );
-        this.deletionDialogService.openComfirmDialog(msg);
+        this.deletionDialogService.openConfirmDialog(msg);
     }
 
     delUser(users: User[]): void {

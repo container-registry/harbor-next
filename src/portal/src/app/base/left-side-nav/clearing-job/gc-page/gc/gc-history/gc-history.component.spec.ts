@@ -84,7 +84,7 @@ describe('GcHistoryComponent', () => {
         },
     };
     const fakedConfirmationDialogService = {
-        openComfirmDialog() {},
+        openConfirmDialog() {},
     };
     beforeEach(() => {
         TestBed.configureTestingModule({
@@ -131,7 +131,7 @@ describe('GcHistoryComponent', () => {
     it('stopping GC should work', () => {
         const sy: jasmine.Spy = spyOn(
             fakedConfirmationDialogService,
-            'openComfirmDialog'
+            'openConfirmDialog'
         ).and.returnValue(undefined);
         const stopBtn: HTMLButtonElement =
             fixture.nativeElement.querySelector('#stop-gc');

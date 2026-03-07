@@ -38,6 +38,8 @@ resoruce  = "resoruce"
 # Valid Go plural variable names (not typos - Go uses these as slice suffixes)
 Datas    = "Datas"
 sortings = "sortings"
+# Short variable names used as abbreviations in logger/options code
+ois = "ois"
 
 [files]
 extend-exclude = [

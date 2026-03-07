@@ -137,7 +137,7 @@ export class PendingCardComponent implements OnInit, OnDestroy {
     }
 
     stopAll() {
-        this.operateDialogService.openComfirmDialog({
+        this.operateDialogService.openConfirmDialog({
             data: undefined,
             param: null,
             title: 'JOB_SERVICE_DASHBOARD.CONFIRM_STOP_ALL',

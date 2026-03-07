@@ -293,8 +293,8 @@ func (c *client) ManifestExist(repository, reference string) (bool, *distributio
 	dig := resp.Header.Get("Docker-Content-Digest")
 	contentType := resp.Header.Get("Content-Type")
 	contentLen := resp.Header.Get("Content-Length")
-	lenth, _ := strconv.Atoi(contentLen)
-	return true, &distribution.Descriptor{Digest: digest.Digest(dig), MediaType: contentType, Size: int64(lenth)}, nil
+	length, _ := strconv.Atoi(contentLen)
+	return true, &distribution.Descriptor{Digest: digest.Digest(dig), MediaType: contentType, Size: int64(length)}, nil
 }
 
 func (c *client) PullManifest(repository, reference string, acceptedMediaTypes ...string) (

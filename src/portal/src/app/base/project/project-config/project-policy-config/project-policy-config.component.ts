@@ -190,7 +190,7 @@ export class ProjectPolicyConfigComponent implements OnInit {
             },
             error => this.errorHandler.error(error)
         );
-        // retrive project level policy data
+        // retrieve project level policy data
         this.retrieve();
         this.getPermission();
         this.getSystemAllowlist();

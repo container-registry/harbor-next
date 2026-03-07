@@ -197,7 +197,7 @@ export class ConfigurationAuthComponent implements OnInit {
             }
             this.testingOnGoing = true;
             this.configService.testOIDCServer(settings).subscribe(
-                respone => {
+                response => {
                     this.testingOnGoing = false;
                     this.msgHandler.showSuccess('CONFIG.TEST_OIDC_SUCCESS');
                 },

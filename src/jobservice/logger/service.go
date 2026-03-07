@@ -37,7 +37,7 @@ func Debug(v ...any) {
 	}
 }
 
-// Debugf for debuging with format
+// Debugf for debugging with format
 func Debugf(format string, v ...any) {
 	if jLogger, ok := jobServiceLogger(); ok {
 		jLogger.Debugf(format, v...)

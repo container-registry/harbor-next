@@ -24,7 +24,7 @@ import (
 type Item struct {
 	// The Scope of this configuration item: eg: SystemScope, UserScope
 	Scope string `json:"scope,omitempty"`
-	// ldapbasic, ldapgroup, uaa settings, used to retieve configure items by group
+	// ldapbasic, ldapgroup, uaa settings, used to retrieve configure items by group
 	Group string `json:"group,omitempty"`
 	// environment key to retrieves this value when initialize, for example: POSTGRESQL_HOST, only used for system settings, for user settings no EnvKey
 	EnvKey string `json:"environment_key,omitempty"`
@@ -137,7 +137,7 @@ var (
 
 		{Name: common.OIDCName, Scope: UserScope, Group: OIDCGroup, ItemType: &StringType{}, Description: `The OIDC provider name`},
 		{Name: common.OIDCEndpoint, Scope: UserScope, Group: OIDCGroup, ItemType: &StringType{}, Description: `The endpoint of the OIDC provider`},
-		{Name: common.OIDCCLientID, Scope: UserScope, Group: OIDCGroup, ItemType: &StringType{}, Description: `The client ID of the OIDC provider`},
+		{Name: common.OIDCClientID, Scope: UserScope, Group: OIDCGroup, ItemType: &StringType{}, Description: `The client ID of the OIDC provider`},
 		{Name: common.OIDCClientSecret, Scope: UserScope, Group: OIDCGroup, ItemType: &PasswordType{}, Description: `The OIDC provider secret`},
 		{Name: common.OIDCGroupsClaim, Scope: UserScope, Group: OIDCGroup, ItemType: &StringType{}, Description: `The attribute claims the group name`},
 		{Name: common.OIDCAdminGroup, Scope: UserScope, Group: OIDCGroup, ItemType: &StringType{}, Description: `The OIDC group which has the harbor admin privileges`},

@@ -42,7 +42,7 @@ type ManagerTestSuite struct {
 	manager Manager
 
 	jobID      string
-	numbericID int64
+	numericID int64
 }
 
 // TestManagerTestSuite is entry of executing ManagerTestSuite
@@ -117,7 +117,7 @@ func (suite *ManagerTestSuite) SetupTest() {
 	require.NoError(suite.T(), err, "mock duplicated periodic job policy error")
 
 	score := time.Now().Unix()
-	suite.numbericID = score
+	suite.numericID = score
 	zaddArgs := []any{
 		rds.KeyPeriodicPolicy(suite.namespace),
 		score,
@@ -171,7 +171,7 @@ func (suite *ManagerTestSuite) TestManager() {
 	assert.Equal(suite.T(), 1, count)
 
 	innerConn := suite.pool.Get()
-	p, err := getPeriodicPolicy(suite.numbericID, innerConn, suite.namespace)
+	p, err := getPeriodicPolicy(suite.numericID, innerConn, suite.namespace)
 	assert.NoError(suite.T(), err, "get migrated policy error")
 	assert.NotEmpty(suite.T(), p.ID, "ID of policy")
 	assert.NotEmpty(suite.T(), p.WebHookURL, "Web hook URL of policy")
@@ -195,7 +195,7 @@ func (suite *ManagerTestSuite) TestManager() {
 	assert.Equal(suite.T(), suite.jobID, toString(fields[0]), "check job ID")
 	assert.Equal(suite.T(), job.ScheduledStatus.String(), toString(fields[1]), "check job status")
 	assert.Equal(suite.T(), "http://core:8080/hook", toString(fields[2]), "check web hook URL")
-	assert.Equal(suite.T(), suite.numbericID, toInt(fields[3]), "check numberic ID")
+	assert.Equal(suite.T(), suite.numericID, toInt(fields[3]), "check numeric ID")
 	assert.Nil(suite.T(), fields[4], "'multiple_executions' removed")
 	assert.Nil(suite.T(), fields[5], "'status_hook' removed")
 }

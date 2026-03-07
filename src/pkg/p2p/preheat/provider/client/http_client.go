@@ -82,9 +82,9 @@ func NewHTTPClient(insecure bool) *HTTPClient {
 }
 
 // Get content from the url
-func (hc *HTTPClient) Get(url string, cred *auth.Credential, parmas map[string]string, options map[string]string) ([]byte, error) {
-	bytes, err := hc.get(url, cred, parmas, options)
-	logMsg := fmt.Sprintf("Get %s with params=%v, options=%v", url, parmas, options)
+func (hc *HTTPClient) Get(url string, cred *auth.Credential, params map[string]string, options map[string]string) ([]byte, error) {
+	bytes, err := hc.get(url, cred, params, options)
+	logMsg := fmt.Sprintf("Get %s with params=%v, options=%v", url, params, options)
 	if err != nil {
 		log.Errorf("%s: %s", logMsg, err)
 	} else {
@@ -94,7 +94,7 @@ func (hc *HTTPClient) Get(url string, cred *auth.Credential, parmas map[string]s
 	return bytes, err
 }
 
-func (hc *HTTPClient) get(url string, cred *auth.Credential, parmas map[string]string, options map[string]string) ([]byte, error) {
+func (hc *HTTPClient) get(url string, cred *auth.Credential, params map[string]string, options map[string]string) ([]byte, error) {
 	if len(url) == 0 {
 		return nil, errors.New("empty url")
 	}
@@ -104,9 +104,9 @@ func (hc *HTTPClient) get(url string, cred *auth.Credential, parmas map[string]s
 		return nil, err
 	}
 
-	if len(parmas) > 0 {
+	if len(params) > 0 {
 		l := []string{}
-		for k, p := range parmas {
+		for k, p := range params {
 			l = append(l, fmt.Sprintf("%s=%s", k, p))
 		}
 

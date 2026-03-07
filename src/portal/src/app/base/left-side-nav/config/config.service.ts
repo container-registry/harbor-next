@@ -125,7 +125,7 @@ export class ConfigService {
             changes,
             ConfirmationTargets.CONFIG
         );
-        this.confirmService.openComfirmDialog(msg);
+        this.confirmService.openConfirmDialog(msg);
     }
 
     saveConfiguration(changes: any): Observable<any> {

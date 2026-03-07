@@ -77,7 +77,7 @@ export class InlineAlertComponent {
         this.useAppLevelStyle = false;
     }
 
-    // Show inline sccess info
+    // Show inline success info
     public showInlineSuccess(info: any): void {
         this.displayedText = '';
         if (info && info.message) {

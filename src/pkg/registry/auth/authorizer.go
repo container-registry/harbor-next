@@ -119,7 +119,7 @@ func (a *authorizer) initialize(u *url.URL) error {
 		a.authorizer = basic.NewAuthorizer(a.username, a.password)
 		return nil
 	}
-	return fmt.Errorf("unspported auth scheme: %v", challenges)
+	return fmt.Errorf("unsupported auth scheme: %v", challenges)
 }
 
 // Check whether the request targets to the registry.

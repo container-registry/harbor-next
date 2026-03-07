@@ -9,9 +9,9 @@ Mar 19 12:34:56 172.18.0.1 core[8188]: 2019-03-19T12:34:56Z [ERROR] [utils.go:10
 Mar 19 12:34:58 172.18.0.1 core[8188]: 2019-03-19T12:34:58Z [ERROR] [utils.go:101]: failed to connect to tcp://adminserver:8080, retry after 2 seconds :dial tcp 172.18.0.4:8080: getsockopt: connection refused
 Mar 19 12:35:00 172.18.0.1 core[8188]: 2019-03-19T12:35:00Z [INFO] initializing the project manager based on local database...
 Mar 19 12:35:00 172.18.0.1 core[8188]: 2019-03-19T12:35:00Z [INFO] configurations initialization completed
-Mar 19 12:35:00 172.18.0.1 core[8188]: 2019-03-19T12:35:00Z [INFO] Registering database: type-PostgreSQL host-postgresql port-5432 databse-registry sslmode-"disable"
+Mar 19 12:35:00 172.18.0.1 core[8188]: 2019-03-19T12:35:00Z [INFO] Registering database: type-PostgreSQL host-postgresql port-5432 database-registry sslmode-"disable"
 Mar 19 12:35:00 172.18.0.1 core[8188]: 2019-03-19T12:35:00Z [INFO] Register database completed
-Mar 19 12:35:00 172.18.0.1 core[8188]: 2019-03-19T12:35:00Z [INFO] User id: 1 updated its encypted password successfully.
+Mar 19 12:35:00 172.18.0.1 core[8188]: 2019-03-19T12:35:00Z [INFO] User id: 1 updated its encrypted password successfully.
 Mar 19 12:35:00 172.18.0.1 core[8188]: 2019-03-19T12:35:00Z [INFO] Enable redis cache for chart caching
 Mar 19 12:35:00 172.18.0.1 core[8188]: 2019-03-19T12:35:00Z [INFO] API controller for chart repository server is successfully initialized
 Mar 19 12:35:00 172.18.0.1 core[8188]: 2019-03-19T12:35:00Z [INFO] initialized clair database

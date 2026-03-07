@@ -50,7 +50,7 @@ var _ Operator = &operator{}
 // the specified chart version to get more details
 type operator struct{}
 
-// NewOperator returns an instance of the default chart opertaor
+// NewOperator returns an instance of the default chart operator
 func NewOperator() Operator {
 	return &operator{}
 }

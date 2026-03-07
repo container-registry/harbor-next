@@ -40,7 +40,7 @@ func (l *logoutResolver) Resolve(ce *commonevent.Metadata, event *event.Event) e
 		Operator:             ce.Username,
 		ResourceType:         rbac.ResourceUser.String(),
 		ResourceName:         ce.Username,
-		OcurrAt:              time.Now(),
+		OccurAt:              time.Now(),
 		Operation:            opLogout,
 		OperationDescription: opLogout,
 		IsSuccessful:         true,

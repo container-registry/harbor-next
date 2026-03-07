@@ -63,7 +63,7 @@
                 <clr-dg-row *ngFor="let group of groups" [clrDgItem]="group">
                     <clr-dg-cell>{{ group.group_name }}</clr-dg-cell>
                     <clr-dg-cell>{{
-                        groupToSring(group.group_type) | translate
+                        groupToString(group.group_type) | translate
                     }}</clr-dg-cell>
                     <clr-dg-cell *ngIf="isLdapMode">{{
                         group.ldap_group_dn

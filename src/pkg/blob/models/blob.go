@@ -45,7 +45,7 @@ StatusNone -> StatusDelete : Mark the blob as candidate.
 StatusDelete -> StatusDeleting : Select the blob and call the API to delete asset in the backend storage.
 StatusDeleting -> Trash : Delete success from the backend storage.
 StatusDelete -> StatusNone : Client asks the existence of blob, remove it from the candidate.
-StatusDelete -> StatusDeleteFailed : The storage driver returns fail when to delete the real data from the configurated file system.
+StatusDelete -> StatusDeleteFailed : The storage driver returns fail when to delete the real data from the configured file system.
 StatusDelete -> StatusDelete : Encounter failure in the GC sweep phase. When to rerun the GC job, all of blob candidates are marked as StatusDelete again.
 StatusDeleteFailed -> StatusNone : The delete failed blobs can be pushed again, and back to normal.
 StatusDeleteFailed -> StatusDelete : The delete failed blobs should be in the candidate.

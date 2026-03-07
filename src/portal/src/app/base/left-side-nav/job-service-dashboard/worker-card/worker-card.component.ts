@@ -108,7 +108,7 @@ export class WorkerCardComponent implements OnInit, OnDestroy {
     }
 
     freeAll() {
-        this.operateDialogService.openComfirmDialog({
+        this.operateDialogService.openConfirmDialog({
             data: undefined,
             param: null,
             title: 'JOB_SERVICE_DASHBOARD.CONFIRM_FREE_ALL',
