@@ -174,7 +174,8 @@
         "DISTRIBUTIONS": {
             "NAME": "Distributions",
             "INSTANCES": "Instances"
-        }
+        },
+        "SUBSCRIPTION": "Abonelik"
     },
     "USER": {
         "ADD_ACTION": "Yeni Kullanıcı",

@@ -174,7 +174,8 @@
         "DISTRIBUTIONS": {
             "NAME": "分布式分发",
             "INSTANCES": "实例"
-        }
+        },
+        "SUBSCRIPTION": "订阅"
     },
     "USER": {
         "ADD_ACTION": "创建用户",

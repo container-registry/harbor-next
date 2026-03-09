@@ -14,13 +14,14 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { map, catchError } from 'rxjs/operators';
-import { Observable, throwError as observableThrowError } from 'rxjs';
+import { Observable, throwError as observableThrowError, of } from 'rxjs';
 import { SessionUser, SessionUserBackend } from '../entities/session-user';
 import { SessionViewmodelFactory } from './session.viewmodel.factory';
 import {
     HTTP_FORM_OPTIONS,
     HTTP_GET_OPTIONS,
     HTTP_JSON_OPTIONS,
+    HTTP_SUPABASE_HEADERS,
     CURRENT_BASE_HREF,
 } from '../units/utils';
 import { FlushAll } from '../units/cache-util';
@@ -28,6 +29,7 @@ import { SignInCredential } from '../../account/sign-in/sign-in-credential';
 import { ProjectMemberEntity } from '../../../../ng-swagger-gen/models/project-member-entity';
 import { DeFaultLang } from '../entities/shared.const';
 import { JobServiceDashboardHealthCheckService } from '../../base/left-side-nav/job-service-dashboard/job-service-dashboard-health-check.service';
+import { environment } from 'src/environments/environment';
 
 const signInUrl = '/c/login';
 const currentUserEndpoint = CURRENT_BASE_HREF + '/users/current';
@@ -209,5 +211,55 @@ export class SessionService {
 
     getProjectMembers(): ProjectMemberEntity[] {
         return this.projectMembers;
+    }
+
+    getUserSubscriptionStatus(email: string): Observable<any> {
+        const url = `${environment.supabaseProjectUrl}/rest/v1/rpc/get_c8n_subscription_row`;
+        return this.http
+            .post(url, {"user_email": email}, HTTP_SUPABASE_HEADERS)
+            .pipe(
+                map(data => {
+                    if (data == null) return null;
+                    if (typeof data === "object") {
+                        return {
+                            projectName: data["project_name"] ?? "",
+                            email: data["email"] ?? "",
+                            subscribed: String(data["subscribed"]).toLowerCase() === "true",
+                            hasGithubApp: String(data["has_github_app"]).toLowerCase() === "true"
+                        };
+                    }
+                    const splitData = String(data).split(",");
+                    if (splitData.length < 4) return null;
+                    return {
+                        projectName: splitData[0],
+                        email: splitData[1],
+                        subscribed: splitData[2].toLowerCase() === "true",
+                        hasGithubApp: splitData[3].toLowerCase() === "true"
+                    };
+                }),
+                catchError(error => this.handleError(error)));
+    }
+
+    getUserLocation(): Observable<{locale: string; currency: string;}> {
+        const getUserLocale = (userInfo) => {
+            try {
+                const languages = userInfo.languages.split(',');
+                const language =  languages[0];
+                const detectedCurrency = userInfo.currency.toUpperCase();
+                const supportedCurrency = (detectedCurrency=== "EUR" || detectedCurrency === "CHF") ? detectedCurrency : "USD";
+
+                const locale = language.indexOf('-') !== -1 ? language : language + "-" + userInfo.country
+                return { locale, currency: supportedCurrency };
+            } catch (error) {
+                return { locale: "de-DE", currency: "EUR"};
+            }
+        }
+        const url = 'https://ipapi.co/json';
+        return this.http.get(url).pipe(
+            map(data => {
+                return getUserLocale(data);
+            }),
+            catchError(() => of({ locale: "de-DE", currency: "EUR"}))
+        );
     }
 }

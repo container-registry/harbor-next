@@ -174,7 +174,8 @@
         "DISTRIBUTIONS": {
             "NAME": "P2P-Verteilung",
             "INSTANCES": "Instanzen"
-        }
+        },
+        "SUBSCRIPTION": "Abonnement"
     },
     "USER": {
         "ADD_ACTION": "Neuer Nutzer",
