@@ -42,7 +42,7 @@ func (f *FakeOrmer) InsertWithCtx(ctx context.Context, md any) (int64, error) {
 	return 0, nil
 }
 
-func (f *FakeOrmer) InsertOrUpdateWithCtx(ctx context.Context, md any, colConflitAndArgs ...string) (int64, error) {
+func (f *FakeOrmer) InsertOrUpdateWithCtx(ctx context.Context, md any, colConflictAndArgs ...string) (int64, error) {
 	return 0, nil
 }
 
@@ -131,7 +131,7 @@ func (f *FakeOrmer) Insert(any) (int64, error) {
 }
 
 // InsertOrUpdate ...
-func (f *FakeOrmer) InsertOrUpdate(md any, colConflitAndArgs ...string) (int64, error) {
+func (f *FakeOrmer) InsertOrUpdate(md any, colConflictAndArgs ...string) (int64, error) {
 	return 0, nil
 }
 
@@ -259,11 +259,11 @@ func (f *FakeTxOrmer) InsertWithCtx(ctx context.Context, md any) (int64, error) 
 	return 0, nil
 }
 
-func (f *FakeTxOrmer) InsertOrUpdate(md any, colConflitAndArgs ...string) (int64, error) {
+func (f *FakeTxOrmer) InsertOrUpdate(md any, colConflictAndArgs ...string) (int64, error) {
 	return 0, nil
 }
 
-func (f *FakeTxOrmer) InsertOrUpdateWithCtx(ctx context.Context, md any, colConflitAndArgs ...string) (int64, error) {
+func (f *FakeTxOrmer) InsertOrUpdateWithCtx(ctx context.Context, md any, colConflictAndArgs ...string) (int64, error) {
 	return 0, nil
 }
 

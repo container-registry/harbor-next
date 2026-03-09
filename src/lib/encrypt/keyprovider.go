@@ -45,7 +45,7 @@ func (f *FileKeyProvider) Get(_ map[string]any) (string, error) {
 	return string(b), nil
 }
 
-// PresetKeyProvider returns the preset key disregarding the parm, this is for testing only
+// PresetKeyProvider returns the preset key disregarding the param, this is for testing only
 type PresetKeyProvider struct {
 	Key string
 }

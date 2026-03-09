@@ -78,7 +78,7 @@ func (e *Resolver) Resolve(ce *commonevent.Metadata, event *event.Event) error {
 	evt := &model.CommonEvent{
 		Operator:     ce.Username,
 		ResourceType: e.ResourceType,
-		OcurrAt:      time.Now(),
+		OccurAt:      time.Now(),
 		IsSuccessful: true,
 	}
 	resourceName := ""

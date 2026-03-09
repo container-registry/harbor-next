@@ -20,7 +20,7 @@ import (
 	"github.com/docker/distribution/manifest/schema2"
 	"github.com/stretchr/testify/suite"
 
-	commom_regctl "github.com/goharbor/harbor/src/common/registryctl"
+	common_regctl "github.com/goharbor/harbor/src/common/registryctl"
 	"github.com/goharbor/harbor/src/controller/artifact"
 	"github.com/goharbor/harbor/src/controller/project"
 	"github.com/goharbor/harbor/src/jobservice/job"
@@ -62,7 +62,7 @@ func (suite *gcTestSuite) SetupTest() {
 	suite.originalProjectCtl = project.Ctl
 	project.Ctl = suite.projectCtl
 
-	regCtlInit = func() { commom_regctl.RegistryCtlClient = suite.registryCtlClient }
+	regCtlInit = func() { common_regctl.RegistryCtlClient = suite.registryCtlClient }
 }
 
 func (suite *gcTestSuite) TearDownTest() {

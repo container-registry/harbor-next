@@ -730,16 +730,16 @@ func (c *controllerTestSuite) TestWalk() {
 	}
 }
 
-func (c *controllerTestSuite) TestIsIntoto() {
+func (c *controllerTestSuite) TestIsInto() {
 	blobs := []*models.Blob{
 		{Digest: "sha256:00000", ContentType: "application/vnd.oci.image.manifest.v1+json"},
 		{Digest: "sha256:22222", ContentType: "application/vnd.oci.image.config.v1+json"},
 		{Digest: "sha256:11111", ContentType: "application/vnd.in-toto+json"},
 	}
 	c.blobMgr.On("GetByArt", mock.Anything, mock.Anything).Return(blobs, nil).Once()
-	isIntoto, err := c.ctl.HasUnscannableLayer(context.Background(), "sha256: 77777")
+	isInto, err := c.ctl.HasUnscannableLayer(context.Background(), "sha256: 77777")
 	c.Nil(err)
-	c.True(isIntoto)
+	c.True(isInto)
 
 	blobs2 := []*models.Blob{
 		{Digest: "sha256:00000", ContentType: "application/vnd.oci.image.manifest.v1+json"},
@@ -748,9 +748,9 @@ func (c *controllerTestSuite) TestIsIntoto() {
 	}
 
 	c.blobMgr.On("GetByArt", mock.Anything, mock.Anything).Return(blobs2, nil).Once()
-	isIntoto2, err := c.ctl.HasUnscannableLayer(context.Background(), "sha256: 8888")
+	isInto2, err := c.ctl.HasUnscannableLayer(context.Background(), "sha256: 8888")
 	c.Nil(err)
-	c.False(isIntoto2)
+	c.False(isInto2)
 }
 
 func TestControllerTestSuite(t *testing.T) {

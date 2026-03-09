@@ -60,6 +60,7 @@
         "PULL_BASED": "將資源由遠端儲存庫拉取到本地 Harbor。",
         "DESTINATION_NAMESPACE": "指定目的端命名空間。如果不填，資源會被放到和來源相同的命名空間下。",
         "OVERRIDE": "如果存在具有相同名稱的資源，請指定是否覆蓋目標上的資源。",
+        "SINGLE_ACTIVE_REPLICATION": "指定是否在上一個執行中的任務完成之前跳過執行，以避免相同的複製規則多次並行執行。",
         "EMAIL": "請使用正確的電子郵件地址，例如 name@example.com。",
         "USER_NAME": "不能包含特殊字元且長度不能超過 255 個字元。",
         "FULL_NAME": "全名長度不能超過 20 個字元。",
@@ -87,7 +88,8 @@
         "OIDC_AUTOONBOARD": "跳過使用者初次設定畫面，使其無法變更使用者名稱。使用者名稱將由 ID Token 提供。",
         "OIDC_USER_CLAIM": "ID Token 中用來擷取使用者名稱的宣告名稱。如果未指定，預設為 'name'。",
         "NEW_SECRET": "金鑰長度應為 8-128 個字元，且至少包含 1 個大寫字母、1 個小寫字母和 1 個數字。",
-        "OIDC_LOGOUT": "將使用者從其目前在身分提供者的工作階段中登出。"
+        "OIDC_LOGOUT": "將使用者從其目前在身分提供者的工作階段中登出。",
+        "REPO_TOOLTIP": "在此模式下，使用者無法對映像執行任何操作。"
     },
     "PLACEHOLDER": {
         "CURRENT_PWD": "輸入目前密碼",
@@ -237,9 +239,13 @@
         "QUOTA_UNLIMIT_TIP": "專案所能使用的最大邏輯空間。輸入 '-1' 表示無限制配額。",
         "TYPE": "類型",
         "PROXY_CACHE": "代理快取",
-        "PROXY_CACHE_TOOLTIP": "啟用此選項，可讓此專案作為特定目標 Registry 執行個體的通透快取。Harbor 僅能代理 DockerHub、Docker Registry、Harbor、AWS ECR、Azure ACR、阿里雲 ACR、Quay、Google GCR、GitHub GHCR 及 JFrog Artifactory。",
+        "PROXY_CACHE_TOOLTIP": "啟用此選項，可讓此專案作為特定目標 Registry 執行個體的代理快取。Harbor 僅能代理 DockerHub、Docker Registry、Harbor、Aws ECR、Azure ACR、Alibaba Cloud ACR、Quay、Google GCR、Github GHCR 及 JFrog Artifactory。",
         "ENDPOINT": "端點",
-        "PROXY_CACHE_ENDPOINT": "代理快取端點"
+        "PROXY_CACHE_ENDPOINT": "代理快取端點",
+        "CONNECTION_LIMIT": "上游 Registry 最大連線數",
+        "PROXY_CACHE_MAX_UPSTREAM_CONN_TIP": "此代理快取專案到上游 Registry 的最大連線數，若為 -1 則不限制",
+        "PROXY_CACHE_MAX_UPSTREAM_CONN_INPUT_TIP": "請輸入 -1 或大於 0 的整數。",
+        "NO_PROJECT": "找不到任何專案"
     },
     "PROJECT_DETAIL": {
         "SUMMARY": "摘要",
@@ -267,7 +273,10 @@
         "SCAN": "弱點掃描",
         "AUTOSCAN_TOGGLE": "推送時自動掃描映像檔",
         "AUTOSCAN_POLICY": "當映像檔推送到專案儲存庫時自動掃描。",
-        "SBOM": "SBOM generation"
+        "SBOM": "SBOM generation",
+        "AUTOSBOM_TOGGLE": "推送時自動產生 SBOM",
+        "AUTOSBOM_POLICY": "當映像檔推送到專案儲存庫時自動產生 SBOM。",
+        "CONTENT_TRUST_POLICY": "只允許部署已驗證的映像檔。"
     },
     "MEMBER": {
         "NEW_MEMBER": "新增成員",
@@ -489,6 +498,7 @@
         "RESOURCE_TYPE": "資源類型"
     },
     "REPLICATION": {
+        "REPLICATION_TRIGGER": "觸發器",
         "PUSH_BASED_ONLY": "僅適用於推送模式的複製",
         "YES": "是",
         "SECONDS": "秒",
@@ -716,11 +726,10 @@
         "LABELS": "標籤",
         "ADD_LABEL_TO_IMAGE": "為此映像檔新增標籤",
         "FILTER_BY_LABEL": "依標籤篩選映像檔",
-        "FILTER_ARTIFACT_BY_LABEL": "依標籤篩選 Artifact",
+        "FILTER_ARTIFACT_BY_LABEL": "透過標籤篩選 Artifact",
         "ADD_LABELS": "新增標籤",
         "STOP": "停止",
         "RETAG": "複製",
-        "FILTER_ARTIFACT_BY_LABEL": "透過標籤篩選 Artifact",
         "ACTION": "操作",
         "ADDITIONAL_INFO": "新增資訊",
         "REPO_NAME": "映像檔儲存庫",
@@ -753,6 +762,7 @@
         "SUB_TITLE": "顯示"
     },
     "CONFIG": {
+        "WEBHOOK_NOTIFICATION_ENABLED": "Webhooks 已啟用",
         "SECURITY": "安全性",
         "HISTORY": "歷史記錄",
         "TITLE": "組態設定",
@@ -826,6 +836,8 @@
             "VERIFY_CERT": "LDAP 驗證憑證",
             "LDAP_GROUP_BASE_DN": "LDAP 群組基礎 DN",
             "LDAP_GROUP_BASE_DN_INFO": "在 LDAP/AD 中查詢群組的起始 DN。若要啟用 LDAP 群組相關功能，此欄位不得為空。",
+            "LDAP_GROUP_ADMIN_FILTER": "LDAP 群組管理員篩選器",
+            "LDAP_GROUP_ADMIN_FILTER_INFO": "LDAP 管理員搜尋的篩選器。",
             "LDAP_GROUP_FILTER": "LDAP 群組篩選器",
             "LDAP_GROUP_FILTER_INFO": "搜尋 LDAP/AD 群組的篩選器。OpenLDAP: objectclass=groupOfNames。Active Directory: objectclass=group。若要啟用 LDAP 群組相關功能，此欄位不得為空。",
             "LDAP_GROUP_GID": "LDAP 群組 GID",
@@ -913,8 +925,7 @@
         "COPYRIGHT": "Harbor 是一個開源、受信賴的雲原生 Docker Registry 專案，用於儲存、簽署和以及掃描映像檔內容。它擴展了開源的 Docker Distribution，加入了如安全性、身份認證和用戶管理等功能。Harbor 也支援資源監控和不同實例間的同步。將 Registry 靠近部署和執行環境可以提高傳輸效率。",
         "OPEN_SOURCE_LICENSE": "開源/第三方授權條款"
     },
-    "START_PAGE": {
-    },
+    "START_PAGE": {},
     "TOP_REPO": "熱門儲存庫",
     "STATISTICS": {
         "PRO_ITEM": "專案",
@@ -1307,6 +1318,7 @@
         "RETENTION_RUN": "執行保留",
         "RETENTION_RUN_EXPLAIN": "執行保留原則可能對此專案中的 Artifact 產生不利影響，且受影響的 Artifact 標籤將被刪除。按「取消」並使用「模擬執行」來模擬此原則的效果。否則按「執行」以繼續。",
         "RETention_RUN_ABORTED": "保留執行已中止",
+        "RETENTION_RUN_ABORTED": "保留執行已中止",
         "RETENTION_RUN_ABORTED_EXPLAIN": "此保留執行已中止。已刪除的 Artifact 無法復原。您可以啟動另一個執行以繼續刪除 Artifact。若要模擬執行，您可以使用「模擬執行」。",
         "LOADING": "載入中...",
         "NO_EXECUTION": "找不到任何執行項！",
@@ -1353,10 +1365,17 @@
         "DISABLE": "停用",
         "ENABLE": "啟用",
         "DELETE": "刪除",
-        "ADD_TITLE": "新增標籤不可變性規則",
-        "ADD_SUBTITLE": "為此專案指定標籤不可變性規則。注意：所有標籤不可變性規則將先獨立計算，然後取聯集以得到最終的不可變標籤集合。",
-        "IN_REPOSITORIES": "對於儲存庫",
-        "REP_SEPARATOR": "輸入多個以逗號分隔的儲存庫，例如 repo、repo* 或 **",
+        "ADD_TITLE": "新增標籤不可變更規則",
+        "ADD_SUBTITLE": "為此專案指定標籤不可變更規則。注意：所有標籤不可變更規則都將首先獨立計算，然後合併以得到最終的不可變更標籤集合。",
+        "IN_REPOSITORIES": "套用至儲存庫",
+        "CONDITION": "不可變條件",
+        "ACTION_IMMUTABLE": "套用",
+        "RULE_NAME_5": "永遠",
+        "RULE_NAME_6": "最近{{number}}天被拉取過的映像檔",
+        "RULE_NAME_7": "最近{{number}}天被推送過的映像檔",
+        "RULE_TEMPLATE_6": "套用至過去 # 天內被拉取的構件",
+        "RULE_TEMPLATE_7": "套用至過去 # 天內被推送的構件",
+        "REP_SEPARATOR": "輸入多個逗號分隔的儲存庫，例如 repos,repo* 或 **。",
         "TAGS": "標籤",
         "TAG_SEPARATOR": "輸入多個以逗號分隔的標籤，例如 tag、tag* 或 **。",
         "EDIT_TITLE": "編輯標籤不可變性規則",
@@ -1369,7 +1388,11 @@
         "LOWER_TAGS": "個標籤",
         "NONE": "無",
         "EXISTING_RULE": "既有規則",
-        "ACTION": "操作"
+        "ACTION": "操作",
+        "RULE_NAME_8": " the most recently pushed {{number}} artifacts",
+        "RULE_NAME_9": " the most recently pulled {{number}} artifacts",
+        "RULE_TEMPLATE_8": " to the most recently pushed # artifacts",
+        "RULE_TEMPLATE_9": " to the most recently pulled # artifacts"
     },
     "SCANNER": {
         "DELETION_SUMMARY": "您確定要刪除掃描器 {{param}} 嗎？",
@@ -1876,6 +1899,9 @@
         "DATE_PICKER_DAY_WIDE": "日期",
         "DATE_PICKER_DAY_NARROW": "日",
         "DATE_PICKER_YEAR": "年份",
+        "DATE_PICKER_SELECT_MONTH_TEXT": "選擇月份，目前月份為 {CALENDAR_MONTH}",
+        "DATE_PICKER_SELECT_YEAR_TEXT": "選擇年份，目前年份為 {CALENDAR_YEAR}",
+        "DATE_PICKER_SELECTED_LABEL": "{FULL_DATE} - 已選取",
         "DATAGRID_FOOTER_ROWS_PER_PAGE": "每頁列數",
         "DATAGRID_FOOTER_TOTAL_ITEMS": "總項目數",
         "DATAGRID_FOOTER_SELECTED_ITEMS": "已選項目",

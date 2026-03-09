@@ -174,7 +174,8 @@
         "DISTRIBUTIONS": {
             "NAME": "Distributions",
             "INSTANCES": "Instances"
-        }
+        },
+        "SUBSCRIPTION": "Subscription"
     },
     "USER": {
         "ADD_ACTION": "New User",
@@ -239,9 +240,13 @@
         "QUOTA_UNLIMIT_TIP": "The maximum logical space that can be used by the project. For unlimited quota enter '-1'.",
         "TYPE": "Type",
         "PROXY_CACHE": "Proxy Cache",
-        "PROXY_CACHE_TOOLTIP": "Enable this to allow this project to act as a pull-through cache for a particular target registry instance. Harbor can only act a proxy for DockerHub, Docker Registry, Harbor, Aws ECR, Azure ACR, Alibaba Cloud ACR, Quay, Google GCR, Github GHCR, and JFrog Artifactory registries.",
+        "PROXY_CACHE_TOOLTIP": "Enable this to allow this project to act as a proxy cache for a particular target registry instance. Harbor can only act a proxy for DockerHub, Docker Registry, Harbor, Aws ECR, Azure ACR, Alibaba Cloud ACR, Quay, Google GCR, Github GHCR, and JFrog Artifactory registries.",
         "ENDPOINT": "Endpoint",
-        "PROXY_CACHE_ENDPOINT": "Proxy Cache Endpoint"
+        "PROXY_CACHE_ENDPOINT": "Proxy Cache Endpoint",
+        "CONNECTION_LIMIT": "Max connection to upstream registry",
+        "PROXY_CACHE_MAX_UPSTREAM_CONN_TIP": "The max connection to the upstream registry for this proxy cache project, if -1, then there is no limit",
+        "PROXY_CACHE_MAX_UPSTREAM_CONN_INPUT_TIP": "Please enter -1 or an integer greater than 0. ",
+        "NO_PROJECT": "We couldn't find any projects"
     },
     "PROJECT_DETAIL": {
         "SUMMARY": "Summary",
@@ -269,7 +274,10 @@
         "SCAN": "Vulnerability scanning",
         "AUTOSCAN_TOGGLE": "Automatically scan images on push",
         "AUTOSCAN_POLICY": "Automatically scan images when they are pushed to the project registry.",
-        "SBOM": "SBOM generation"
+        "SBOM": "SBOM generation",
+        "AUTOSBOM_TOGGLE": "Automatically generate SBOM on push",
+        "AUTOSBOM_POLICY": "Automatically generate SBOM when the images are pushed to the project registry.",
+        "CONTENT_TRUST_POLICY": "Allow only verified images to be deployed."
     },
     "MEMBER": {
         "NEW_MEMBER": "New Member",
@@ -491,6 +499,7 @@
         "RESOURCE_TYPE": "Resource Type"
     },
     "REPLICATION": {
+        "REPLICATION_TRIGGER": "Trigger",
         "PUSH_BASED_ONLY": "Only for the push-based replication",
         "YES": "Yes",
         "SECONDS": "Seconds",
@@ -753,6 +762,7 @@
         "SUB_TITLE": "Show"
     },
     "CONFIG": {
+        "WEBHOOK_NOTIFICATION_ENABLED": "Webhooks Enabled",
         "SECURITY": "Security",
         "TITLE": "Configuration",
         "AUTH": "Authentication",
@@ -825,6 +835,8 @@
             "VERIFY_CERT": "LDAP Verify Certificate",
             "LDAP_GROUP_BASE_DN": "LDAP Group Base DN",
             "LDAP_GROUP_BASE_DN_INFO": "The base DN from which to look up a group in LDAP/AD. This field cannot be empty if you need to enable the LDAP group related feature.",
+            "LDAP_GROUP_ADMIN_FILTER": "LDAP Group Admin Filter",
+            "LDAP_GROUP_ADMIN_FILTER_INFO": "The filter for LDAP Admin search.",
             "LDAP_GROUP_FILTER": "LDAP Group Filter",
             "LDAP_GROUP_FILTER_INFO": "The filter to search for LDAP/AD groups. For OpenLDAP: objectclass=groupOfNames. For Active Directory: objectclass=group. This field cannot be empty if you need the LDAP group-related feature.",
             "LDAP_GROUP_GID": "LDAP Group GID",
@@ -1355,6 +1367,17 @@
         "ADD_TITLE": "Add Tag Immutability Rule",
         "ADD_SUBTITLE": "Specify a tag immutability rule for this project.  Note: all tag immutability rules are first independently calculated and then unioned to capture the final set of immutable tags.",
         "IN_REPOSITORIES": "For the repositories",
+        "CONDITION": "Immutability Condition",
+        "ACTION_IMMUTABLE": "apply",
+        "RULE_NAME_5": " always",
+        "RULE_NAME_6": " the artifacts pulled within the last {{number}} days",
+        "RULE_NAME_7": " the artifacts pushed within the last {{number}} days",
+        "RULE_NAME_8": " the most recently pushed {{number}} artifacts",
+        "RULE_NAME_9": " the most recently pulled {{number}} artifacts",
+        "RULE_TEMPLATE_6": " to artifacts pulled within the last # days",
+        "RULE_TEMPLATE_7": " to artifacts pushed within the last # days",
+        "RULE_TEMPLATE_8": " to the most recently pushed # artifacts",
+        "RULE_TEMPLATE_9": " to the most recently pulled # artifacts",
         "REP_SEPARATOR": "Enter multiple comma separated repos,repo*,or **",
         "TAGS": "Tags",
         "TAG_SEPARATOR": "Enter multiple comma separated tags,tag*,or **.",

@@ -26,7 +26,7 @@ const (
 	sizeQuery = "select sum(size) as total_size from system_artifact"
 )
 
-// DAO defines an data access interface for manging the CRUD and read of system
+// DAO defines an data access interface for managing the CRUD and read of system
 // artifact tracking records
 type DAO interface {
 

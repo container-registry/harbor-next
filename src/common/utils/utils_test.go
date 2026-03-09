@@ -156,7 +156,7 @@ func TestGenerateRandomString(t *testing.T) {
 func TestGenerateRandomStringWithLen(t *testing.T) {
 	str := GenerateRandomStringWithLen(16)
 	if len(str) != 16 {
-		t.Errorf("Failed to generate ramdom string with fixed length.")
+		t.Errorf("Failed to generate random string with fixed length.")
 	}
 }
 

@@ -88,7 +88,23 @@
                                         ?.pattern
                                 )
                             }}</span>
-                            <span>,</span>
+                            <span>, </span>
+                            <span>{{
+                                getI18nKey(rule?.action) | translate
+                            }}</span>
+                            <span> </span>
+                            <span>{{
+                                getI18nKey(rule?.template)
+                                    | translate
+                                        : {
+                                              number: (rule?.params || {})[
+                                                  rule?.template
+                                              ]
+                                          }
+                            }}</span>
+                            <span class="color-97">{{
+                                'IMMUTABLE_TAG.WITH' | translate
+                            }}</span>
                             <span>{{
                                 'IMMUTABLE_TAG.LOWER_TAGS' | translate
                             }}</span>
@@ -96,7 +112,7 @@
                                 getI18nKey(rule?.tag_selectors[0]?.decoration)
                                     | translate
                             }}</span>
-                            <span id="{{ 'tag-selectors-patten' + i }}">{{
+                            <span id="{{ 'tag-selectors-pattern' + i }}">{{
                                 formatPattern(rule?.tag_selectors[0]?.pattern)
                             }}</span>
                             <ng-container

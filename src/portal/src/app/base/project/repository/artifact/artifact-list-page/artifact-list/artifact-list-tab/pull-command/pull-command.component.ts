@@ -19,6 +19,7 @@ import {
     Clients,
     getPullCommandByDigest,
     getPullCommandByTag,
+    getPullCommandForTop,
     hasPullCommand,
 } from '../../../../artifact';
 import { getContainerRuntime } from 'src/app/shared/units/shared.utils';
@@ -31,6 +32,8 @@ import { TranslateService } from '@ngx-translate/core';
     styleUrls: ['./pull-command.component.scss'],
 })
 export class PullCommandComponent {
+    @Input()
+    isTopModel: boolean = false; // TopModel is for tab top component,
     @Input()
     isTagMode: boolean = false; // tagMode is for tag list datagrid,
     @Input()
@@ -77,6 +80,15 @@ export class PullCommandComponent {
         return client ? client : Clients.DOCKER;
     }
 
+    getPullCommandForTopModel(): string {
+        return getPullCommandForTop(
+            `${this.registryUrl ? this.registryUrl : location.hostname}/${
+                this.projectName
+            }/${this.repoName}`,
+            this.getSelectedClient()
+        ) || '';
+    }
+
     getPullCommandForRuntimeByDigest(artifact: Artifact): string {
         return getPullCommandByDigest(
             artifact.type,
@@ -100,18 +112,18 @@ export class PullCommandComponent {
     }
 
     getPullCommandForChart(artifact: Artifact): string {
-        if (artifact.tagNumber > 0) {
-            return getPullCommandByTag(
-                artifact.type,
-                `${this.registryUrl ? this.registryUrl : location.hostname}/${
-                    this.projectName
-                }/${this.repoName}`,
-                artifact.tags[0].name,
-                Clients.CHART
-            );
-        } else {
+        // early return if artifact has no tags
+        if (!this.isArtifactTagValid(artifact)) {
             return '';
         }
+        return getPullCommandByTag(
+            artifact.type,
+            `${this.registryUrl ? this.registryUrl : location.hostname}/${
+                this.projectName
+            }/${this.repoName}`,
+            artifact.tags[0].name,
+            Clients.CHART
+        );
     }
 
     // For tagMode
@@ -127,6 +139,10 @@ export class PullCommandComponent {
     }
 
     getPullCommandForRuntimeByTag(artifact: Artifact): string {
+        // early return if artifact has no tags
+        if (!this.isArtifactTagValid(artifact)) {
+            return '';
+        }
         return getPullCommandByTag(
             artifact.type,
             `${this.registryUrl ? this.registryUrl : location.hostname}/${
@@ -138,6 +154,10 @@ export class PullCommandComponent {
     }
 
     getPullCommandForCNABByTag(artifact: Artifact): string {
+        // early return if artifact has no tags
+        if (!this.isArtifactTagValid(artifact)) {
+            return '';
+        }
         return getPullCommandByTag(
             artifact.type,
             `${this.registryUrl ? this.registryUrl : location.hostname}/${
@@ -149,6 +169,10 @@ export class PullCommandComponent {
     }
 
     getPullCommandForChartByTag(artifact: Artifact): string {
+        // early return if artifact has no tags
+        if (!this.isArtifactTagValid(artifact)) {
+            return '';
+        }
         return getPullCommandByTag(
             artifact.type,
             `${this.registryUrl ? this.registryUrl : location.hostname}/${
@@ -156,6 +180,16 @@ export class PullCommandComponent {
             }/${this.repoName}`,
             this.selectedTag,
             Clients.CHART
+        );
+    }
+
+    private isArtifactTagValid(artifact: Artifact): boolean {
+        return (
+            typeof artifact.tagNumber === 'number' &&
+            artifact.tagNumber > 0 &&
+            Array.isArray(artifact.tags) &&
+            artifact.tags.length > 0 &&
+            typeof artifact.tags[0]?.name === 'string'
         );
     }
 

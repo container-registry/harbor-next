@@ -94,7 +94,7 @@ func TestController(t *testing.T) {
 // SetupSuite ...
 func (suite *ControllerTestSuite) SetupSuite() {
 	suite.scanHandler = &scanTest.Handler{}
-	sca.RegisterScanHanlder(v1.ScanTypeVulnerability, suite.scanHandler)
+	sca.RegisterScanHandler(v1.ScanTypeVulnerability, suite.scanHandler)
 	suite.originalArtifactCtl = artifact.Ctl
 	suite.artifactCtl = &artifacttesting.Controller{}
 	artifact.Ctl = suite.artifactCtl
@@ -372,7 +372,7 @@ func (suite *ControllerTestSuite) TestScanControllerScan() {
 		},
 	}
 	{
-		// artifact not provieded
+		// artifact not provided
 		suite.Require().Error(suite.c.Scan(context.TODO(), nil))
 		mock.OnAnything(suite.ar, "HasUnscannableLayer").Return(false, nil).Times(3)
 	}
@@ -442,7 +442,7 @@ func (suite *ControllerTestSuite) TestScanControllerScan() {
 // TestScanControllerStop ...
 func (suite *ControllerTestSuite) TestScanControllerStop() {
 	{
-		// artifact not provieded
+		// artifact not provided
 		suite.Require().Error(suite.c.Stop(context.TODO(), nil, "vulnerability"))
 	}
 

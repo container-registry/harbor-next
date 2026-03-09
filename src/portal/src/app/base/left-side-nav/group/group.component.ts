@@ -233,7 +233,7 @@ export class GroupComponent implements OnInit, OnDestroy {
                 ConfirmationTargets.PROJECT_MEMBER,
                 ConfirmationButtons.DELETE_CANCEL
             );
-            this.operateDialogService.openComfirmDialog(deletionMessage);
+            this.operateDialogService.openConfirmDialog(deletionMessage);
         }
     }
 
@@ -290,7 +290,7 @@ export class GroupComponent implements OnInit, OnDestroy {
         );
     }
 
-    groupToSring(type: number) {
+    groupToString(type: number) {
         if (type === GroupType.LDAP_TYPE) {
             return 'GROUP.LDAP_TYPE';
         } else if (type === GroupType.HTTP_TYPE) {

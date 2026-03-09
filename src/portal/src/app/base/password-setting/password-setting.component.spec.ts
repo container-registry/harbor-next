@@ -92,7 +92,7 @@ describe('PasswordSettingComponent', () => {
             fixture.nativeElement.querySelector('#newPassword-error');
         expect(newPasswordInputError).toBeNull();
     });
-    it('should verify comfirm Password invalid', async () => {
+    it('should verify confirm Password invalid', async () => {
         await fixture.whenStable();
         const newPasswordInput: HTMLInputElement =
             fixture.nativeElement.querySelector('#newPassword');
@@ -110,7 +110,7 @@ describe('PasswordSettingComponent', () => {
             'TOOLTIP.CONFIRM_PWD'
         );
     });
-    it('should verify comfirm Password valid', async () => {
+    it('should verify confirm Password valid', async () => {
         await fixture.whenStable();
         const newPasswordInput: HTMLInputElement =
             fixture.nativeElement.querySelector('#newPassword');

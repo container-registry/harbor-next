@@ -22,7 +22,6 @@ src/portal/dist/
 src/portal/html-report/
 src/portal/node_modules/
 src/portal/app-swagger-ui/node_modules/
-src/portal/app-swagger-ui/webpack.dev.js
 src/portal/typings/
 **/*npm-debug.log.*
 **/*yarn-error.log.*
@@ -33,7 +32,6 @@ src/portal/typings/
 .vscode/
 **/node_modules
 **/ssl/
-**/proxy.config.mjs
 
 src/portal/src/**/*.js
 src/portal/src/**/*.js.map
@@ -60,3 +58,17 @@ src/server/v2.0/restapi/
 harborclient/
 openapi-generator-cli.jar
 tests/e2e_setup/robotvars.py
+.task/checksum
+devenv/token_service_key.pem
+devenv/ports.env
+deploy/compose/config/*.pem
+deploy/compose/config/certs/
+.env
+.env.local
+CLAUDE.md
+AGENTS.md
+tmp/
+bin
+.mcp.json
+.claude
+src/portal/src/swagger.json

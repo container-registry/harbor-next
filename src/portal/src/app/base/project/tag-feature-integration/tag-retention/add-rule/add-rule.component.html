@@ -48,7 +48,7 @@
             <div class="clr-row">
                 <div class="clr-col-4"></div>
                 <div class="clr-col-8 margin-top-5px">
-                    <span class="tootip">{{
+                    <span class="tooltip">{{
                         'TAG_RETENTION.REP_SEPARATOR' | translate
                     }}</span>
                 </div>
@@ -69,7 +69,10 @@
                             class="clr-select w-100">
                             <option class="display-none" value=""></option>
                             <option
-                                *ngFor="let t of metadata?.templates"
+                                *ngFor="
+                                    let t of metadata?.templates
+                                        | callback : filterTemplate
+                                "
                                 value="{{ t?.rule_template }}">
                                 {{ getI18nKey(t?.action) | translate
                                 }}{{ getI18nKey(t?.display_text) | translate }}
@@ -141,7 +144,7 @@
             <div class="clr-row">
                 <div class="clr-col-4"></div>
                 <div class="clr-col-8 margin-top-5px">
-                    <span class="tootip">{{
+                    <span class="tooltip">{{
                         'TAG_RETENTION.TAG_SEPARATOR' | translate
                     }}</span>
                 </div>

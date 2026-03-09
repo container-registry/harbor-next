@@ -114,9 +114,9 @@ func (pm *PolicyMigrator) Migrate() error {
 			if values[5] == nil {
 				logger.Infof("Migrate periodic job stats data is started: %s", pID)
 
-				numbericPolicyID, err := getScoreByID(pID, conn, pm.namespace)
+				numericPolicyID, err := getScoreByID(pID, conn, pm.namespace)
 				if err != nil {
-					logger.Errorf("Get numberic ID of periodic job policy failed with error: %s", err)
+					logger.Errorf("Get numeric ID of periodic job policy failed with error: %s", err)
 					continue
 				}
 
@@ -131,7 +131,7 @@ func (pm *PolicyMigrator) Migrate() error {
 					"status",
 					job.ScheduledStatus.String(), // make sure the status of periodic job is "Scheduled"
 					"numeric_policy_id",
-					numbericPolicyID,
+					numericPolicyID,
 				}
 				// If status hook existing
 				hookURL := toString(values[3])
@@ -158,7 +158,7 @@ func (pm *PolicyMigrator) Migrate() error {
 				// this inner connection will be closed by the calling method
 				innerConn := pm.pool.Get()
 
-				policy, er := getPeriodicPolicy(numbericPolicyID, innerConn, pm.namespace)
+				policy, er := getPeriodicPolicy(numericPolicyID, innerConn, pm.namespace)
 				if er == nil {
 					policy.ID = pID
 					if !utils.IsEmptyStr(hookURL) {
@@ -168,13 +168,13 @@ func (pm *PolicyMigrator) Migrate() error {
 
 					if rawJSON, er := policy.Serialize(); er == nil {
 						// Remove the old one first
-						err = conn.Send("ZREMRANGEBYSCORE", rds.KeyPeriodicPolicy(pm.namespace), numbericPolicyID, numbericPolicyID)
+						err = conn.Send("ZREMRANGEBYSCORE", rds.KeyPeriodicPolicy(pm.namespace), numericPolicyID, numericPolicyID)
 						if err != nil {
 							logger.Errorf("send command ZREMRANGEBYSCORE failed with error: %s", err)
 							continue
 						}
 						// Save back to the rdb
-						err = conn.Send("ZADD", rds.KeyPeriodicPolicy(pm.namespace), numbericPolicyID, rawJSON)
+						err = conn.Send("ZADD", rds.KeyPeriodicPolicy(pm.namespace), numericPolicyID, rawJSON)
 					} else {
 						logger.Errorf("Serialize policy %s failed with error: %s", pID, er)
 					}

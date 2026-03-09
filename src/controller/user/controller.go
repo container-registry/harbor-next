@@ -61,7 +61,7 @@ type Controller interface {
 	GetBySubIss(ctx context.Context, sub, iss string) (*commonmodels.User, error)
 	// Delete ...
 	Delete(ctx context.Context, id int) error
-	// UpdateProfile update the profile based on the ID and data in the model in parm, only a subset of attributes in the model
+	// UpdateProfile update the profile based on the ID and data in the model in param, only a subset of attributes in the model
 	// will be update, see the implementation of manager.
 	UpdateProfile(ctx context.Context, u *commonmodels.User, cols ...string) error
 	// SetCliSecret sets the OIDC CLI secret for a user
@@ -69,7 +69,7 @@ type Controller interface {
 	// UpdateOIDCMeta updates the OIDC metadata of a user, if the cols are not provided, by default the field of token and secret will be updated
 	UpdateOIDCMeta(ctx context.Context, ou *commonmodels.OIDCUser, cols ...string) error
 	// OnboardOIDCUser inserts the record for basic user info and the oidc metadata
-	// if the onboard process is successful the input parm of user model will be populated with user id
+	// if the onboard process is successful the input param of user model will be populated with user id
 	OnboardOIDCUser(ctx context.Context, u *commonmodels.User) error
 	// SearchByName search user by name with fuzzy search
 	SearchByName(ctx context.Context, name string, limitSize int) ([]*commonmodels.User, error)

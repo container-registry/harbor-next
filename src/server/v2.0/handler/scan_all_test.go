@@ -317,7 +317,7 @@ func (suite *ScanAllTestSuite) TestCreateScanAllSchedule() {
 	}
 
 	{
-		// create scan all schedule with ScheduleManual but a previous scan all job aleady exits
+		// create scan all schedule with ScheduleManual but a previous scan all job already exits
 		mock.OnAnything(suite.execMgr, "List").Return([]*task.Execution{suite.execution}, nil).Once()
 
 		body := models.Schedule{Schedule: &models.ScheduleObj{Type: ScheduleManual}}

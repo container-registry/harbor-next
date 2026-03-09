@@ -1,13 +1,38 @@
-Thank you for contributing to Harbor!
+## Summary
 
-# Comprehensive Summary of your change
+<!-- Brief description of what this PR does -->
 
-# Issue being fixed
-Fixes #(issue)
+## Related Issues
 
-Please indicate you've done the following:
-- [ ] Well Written Title and Summary of the PR
-- [ ] Label the PR as needed. "release-note/ignore-for-release, release-note/new-feature, release-note/update, release-note/enhancement, release-note/community, release-note/breaking-change, release-note/docs, release-note/infra, release-note/deprecation"
-- [ ] Accepted the DCO. Commits without the DCO will delay acceptance.
-- [ ] Made sure tests are passing and test coverage is added if needed.
-- [ ] Considered the docs impact and opened a new docs issue or PR with docs changes if needed in [website repository](https://github.com/goharbor/website).
+<!-- Fixes #123 -->
+
+## Type of Change
+
+- [ ] Bug fix (`fix:`)
+- [ ] New feature (`feat:`)
+- [ ] Breaking change (`feat!:` / `fix!:`)
+- [ ] Documentation (`docs:`)
+- [ ] Refactoring (`refactor:`)
+- [ ] CI/CD or build changes (`ci:` / `build:`)
+- [ ] Dependencies update (`chore:`)
+
+## Release Notes
+
+<!--
+Optional. Fill in for user-facing changes (new features, breaking changes, deprecations).
+Leave blank for ci:/chore:/refactor: PRs.
+
+This section is automatically extracted and added to the GitHub Release highlights.
+For breaking changes, also add a BREAKING CHANGE: description to the squash commit footer.
+-->
+
+## Testing
+
+- [ ] Unit tests added/updated
+- [ ] Manual testing performed
+
+## Checklist
+
+- [ ] PR title follows [Conventional Commits](https://www.conventionalcommits.org/) format
+- [ ] Commits are signed off (`git commit -s`)
+- [ ] No new warnings introduced

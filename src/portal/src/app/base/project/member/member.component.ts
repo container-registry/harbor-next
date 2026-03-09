@@ -300,7 +300,7 @@ export class MemberComponent implements OnInit, OnDestroy {
                 ConfirmationTargets.PROJECT_MEMBER,
                 ConfirmationButtons.DELETE_CANCEL
             );
-            this.OperateDialogService.openComfirmDialog(deletionMessage);
+            this.OperateDialogService.openConfirmDialog(deletionMessage);
         }
     }
 
@@ -364,7 +364,7 @@ export class MemberComponent implements OnInit, OnDestroy {
                 );
         };
 
-        // Deleting member then wating for results
+        // Deleting member then waiting for results
         members.forEach(member =>
             memberDeletingObservables.push(deleteMember(member))
         );

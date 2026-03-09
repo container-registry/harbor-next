@@ -1,0 +1,74 @@
+name: Proposal
+description: Propose a significant architectural change or new capability
+title: "[Proposal]: "
+labels: ["proposal", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This template is for significant changes that need design discussion before implementation.
+        For smaller feature requests, use the Feature Request template instead.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: A brief, one-paragraph summary of the proposal
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Why is this change needed? What problems does it solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: design
+    attributes:
+      label: Design / Architecture
+      description: Describe your proposed solution in detail, including component interactions and API changes.
+    validations:
+      required: true
+
+  - type: textarea
+    id: implementation
+    attributes:
+      label: Implementation Plan
+      description: Phases, dependencies, estimated scope, migration path for existing users.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+    validations:
+      required: true
+
+  - type: dropdown
+    id: breaking
+    attributes:
+      label: Breaking Changes
+      options:
+        - "Yes - API breaking changes"
+        - "Yes - Database/schema changes"
+        - "Yes - Configuration changes"
+        - "No breaking changes"
+        - "Unknown / Needs investigation"
+    validations:
+      required: true
+
+  - type: textarea
+    id: security
+    attributes:
+      label: Security Considerations
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched for similar proposals and this is not a duplicate
+          required: true
+        - label: I am willing to help implement this proposal

@@ -50,7 +50,7 @@ const (
 )
 
 func init() {
-	scan.RegisterScanHanlder(v1.ScanTypeSbom, &scanHandler{
+	scan.RegisterScanHandler(v1.ScanTypeSbom, &scanHandler{
 		GenAccessoryFunc:       scan.GenAccessoryArt,
 		SBOMMgrFunc:            func() Manager { return Mgr },
 		TaskMgrFunc:            func() task.Manager { return task.Mgr },

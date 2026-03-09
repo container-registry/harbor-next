@@ -33,7 +33,7 @@ func (a *adapter) FetchArtifacts(_ []*model.Filter) ([]*model.Resource, error) {
 
 	urls := fmt.Sprintf("%s/dockyard/v2/repositories?filter=center::self", a.registry.URL)
 
-	r, err := http.NewRequest("GET", urls, nil)
+	r, err := http.NewRequest(http.MethodGet, urls, nil)
 	if err != nil {
 		return resources, err
 	}
@@ -77,7 +77,7 @@ func (a *adapter) ManifestExist(repository, reference string) (exist bool, desc 
 
 	urls := fmt.Sprintf("%s/v2/%s/manifests/%s", a.registry.URL, repository, reference)
 
-	r, err := http.NewRequest("GET", urls, nil)
+	r, err := http.NewRequest(http.MethodGet, urls, nil)
 	if err != nil {
 		return exist, nil, err
 	}
@@ -111,9 +111,9 @@ func (a *adapter) ManifestExist(repository, reference string) (exist bool, desc 
 	}
 	contentType := resp.Header.Get("Content-Type")
 	contentLen := resp.Header.Get("Content-Length")
-	lenth, _ := strconv.Atoi(contentLen)
+	length, _ := strconv.Atoi(contentLen)
 
-	return exist, &distribution.Descriptor{MediaType: contentType, Size: int64(lenth)}, nil
+	return exist, &distribution.Descriptor{MediaType: contentType, Size: int64(length)}, nil
 }
 
 // DeleteManifest delete the manifest of Huawei SWR
@@ -125,7 +125,7 @@ func (a *adapter) DeleteManifest(repository, reference string) error {
 
 	urls := fmt.Sprintf("%s/v2/%s/manifests/%s", a.registry.URL, repository, reference)
 
-	r, err := http.NewRequest("DELETE", urls, nil)
+	r, err := http.NewRequest(http.MethodDelete, urls, nil)
 	if err != nil {
 		return err
 	}
@@ -204,7 +204,7 @@ type hwRepoQueryResult struct {
 func getJwtToken(a *adapter, repository string) (token jwtToken, err error) {
 	urls := fmt.Sprintf("%s/swr/auth/v2/registry/auth?scope=repository:%s:push,pull", a.registry.URL, repository)
 
-	r, err := http.NewRequest("GET", urls, nil)
+	r, err := http.NewRequest(http.MethodGet, urls, nil)
 	if err != nil {
 		return token, err
 	}
@@ -272,7 +272,7 @@ type hwDescriptor struct {
 	// URLs contains the source URLs of this content.
 	URLs []string `json:"urls,omitempty"`
 
-	// depandence
+	// dependence
 	Dependence string `json:"dependence,omitempty"`
 }
 

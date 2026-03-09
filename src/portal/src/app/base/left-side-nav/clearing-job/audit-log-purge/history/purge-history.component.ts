@@ -33,7 +33,7 @@ import {
     NO,
     REFRESH_STATUS_TIME_DIFFERENCE,
     YES,
-} from '../../clearing-job-interfact';
+} from '../../clearing-job-interface';
 import { ConfirmationMessage } from '../../../../global-confirmation-dialog/confirmation-message';
 import { ConfirmationDialogService } from '../../../../global-confirmation-dialog/confirmation-dialog.service';
 import { ExecHistory } from '../../../../../../../ng-swagger-gen/models/exec-history';
@@ -244,6 +244,6 @@ export class PurgeHistoryComponent implements OnInit, OnDestroy {
             ConfirmationTargets.STOP_AUDIT_LOG_ROTATION,
             ConfirmationButtons.CONFIRM_CANCEL
         );
-        this.confirmationDialogService.openComfirmDialog(StopExecutionsMessage);
+        this.confirmationDialogService.openConfirmDialog(StopExecutionsMessage);
     }
 }

@@ -157,7 +157,7 @@ func (b *BaseController) WriteYamlData(object any) {
 	_, _ = w.Write(yData)
 }
 
-// PopulateUserSession generates a new session ID and fill the user model in parm to the session
+// PopulateUserSession generates a new session ID and fill the user model in param to the session
 func (b *BaseController) PopulateUserSession(u models.User) {
 	err := b.SessionRegenerateID()
 	if err != nil {

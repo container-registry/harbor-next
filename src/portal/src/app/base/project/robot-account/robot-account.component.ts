@@ -113,7 +113,7 @@ export class RobotAccountComponent implements OnInit, OnDestroy {
         private permissionService: PermissionsService
     ) {}
     ngOnInit() {
-        this.getCurrenTime();
+        this.getCurrentTime();
         this.projectId = +this.route.snapshot.parent.parent.params['id'];
         let resolverData = this.route.snapshot.parent.parent.data;
         if (resolverData) {
@@ -200,7 +200,7 @@ export class RobotAccountComponent implements OnInit, OnDestroy {
             });
     }
 
-    getCurrenTime() {
+    getCurrentTime() {
         this.systemInfoService.getSystemInfo().subscribe(res => {
             if (res?.current_time) {
                 this.deltaTime =
@@ -370,7 +370,7 @@ export class RobotAccountComponent implements OnInit, OnDestroy {
             ConfirmationTargets.PROJECT_ROBOT_ACCOUNT,
             ConfirmationButtons.DELETE_CANCEL
         );
-        this.operateDialogService.openComfirmDialog(deletionMessage);
+        this.operateDialogService.openConfirmDialog(deletionMessage);
     }
 
     disableOrEnable() {
@@ -390,7 +390,7 @@ export class RobotAccountComponent implements OnInit, OnDestroy {
                 ? ConfirmationButtons.ENABLE_CANCEL
                 : ConfirmationButtons.DISABLE_CANCEL
         );
-        this.operateDialogService.openComfirmDialog(deletionMessage);
+        this.operateDialogService.openConfirmDialog(deletionMessage);
     }
 
     operateRobot() {

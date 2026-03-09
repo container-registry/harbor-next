@@ -109,7 +109,7 @@ func (d *dao) Create(ctx context.Context, audit *model.AuditLogExt) (int64, erro
 		return 0, err
 	}
 	// the max length of username in database is 255, replace the last
-	// three charaters with "..." if the length is greater than 256
+	// three characters with "..." if the length is greater than 256
 	if len(audit.Username) > 255 {
 		audit.Username = audit.Username[:252] + "..."
 	}

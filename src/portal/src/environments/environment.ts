@@ -19,4 +19,10 @@
 export const environment = {
     production: false,
     buildTimestamp: 0,
+    chargebeeUrl: "container-registry-test",
+    supabaseProjectUrl: "https://zuffjtvdneaetyuhuzdp.supabase.co",
+    supabasePublishableKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlhdCI6MTYyMDMxMTEyMCwiZXhwIjoxOTM1ODg3MTIwfQ.fqZ84TQWlRPlnYH7eS7MDQLLqcB6786Di-9MNO-NRXA",
+    settingJson: "setting.json",
+    awsMarketplaceUrl: "https://console.aws.amazon.com/marketplace",
+    exoscaleMarketplaceUrl: "https://portal.exoscale.com/marketplace/container-registry"
 };

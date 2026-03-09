@@ -30,6 +30,7 @@ import {
 import { AbstractControl } from '@angular/forms';
 import { isValidCron } from 'cron-validator';
 import { ClrDatagridStateInterface } from '@clr/angular';
+import { environment } from 'src/environments/environment';
 
 /**
  * Api levels
@@ -76,6 +77,17 @@ export const HTTP_JSON_OPTIONS: HttpOptionInterface = {
     headers: new HttpHeaders({
         'Content-Type': 'application/json',
         Accept: 'application/json',
+    }),
+    responseType: 'json',
+};
+
+export const HTTP_SUPABASE_HEADERS: HttpOptionInterface = {
+    headers: new HttpHeaders({
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+    "apikey": environment.supabasePublishableKey,
+    "Authorization": `Bearer ${environment.supabasePublishableKey}`,
+    "Range": "0-9"
     }),
     responseType: 'json',
 };
@@ -669,11 +681,11 @@ export const GetIntegerAndUnit = (
     }
 };
 
-export const validateLimit = unitContrl => {
+export const validateLimit = unitControl => {
     return (control: AbstractControl) => {
         if (
             // 1024TB
-            getByte(control.value, unitContrl.value) >
+            getByte(control.value, unitControl.value) >
             Math.pow(StorageMultipleConstant, 5)
         ) {
             return {

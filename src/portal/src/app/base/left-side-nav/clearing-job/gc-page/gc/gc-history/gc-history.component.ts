@@ -36,7 +36,7 @@ import {
     NO,
     REFRESH_STATUS_TIME_DIFFERENCE,
     YES,
-} from '../../../clearing-job-interfact';
+} from '../../../clearing-job-interface';
 import { ConfirmationMessage } from '../../../../../global-confirmation-dialog/confirmation-message';
 import { ConfirmationDialogService } from '../../../../../global-confirmation-dialog/confirmation-dialog.service';
 
@@ -280,7 +280,7 @@ export class GcHistoryComponent implements OnInit, OnDestroy {
             ConfirmationTargets.STOP_GC,
             ConfirmationButtons.CONFIRM_CANCEL
         );
-        this.confirmationDialogService.openComfirmDialog(StopExecutionsMessage);
+        this.confirmationDialogService.openConfirmDialog(StopExecutionsMessage);
     }
 
     shouldShowDetails(status: string): boolean {

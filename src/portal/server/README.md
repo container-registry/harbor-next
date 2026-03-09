@@ -28,39 +28,34 @@ suppose you want to mock a api server for below code:
      npm run mock-api-server
    ```
 
-   4.Edit the file proxy.config.json, and add a proxy object at the top as below:
-   ```json
-[
+   4.Edit the file proxy.config.mjs, and add a proxy object at the top of `HarborProxyConfig` as below:
+   ```js
+const HarborProxyConfig = [
   // redirect requests to the mocked api server
   {
-    "context": [
-      "/api/v2.0/scanners"
-    ],
-    "target": "http://localhost:3000",
-    "secure": false,
-    "changeOrigin": true,
-    "logLevel": "debug"
+    context: ['/api/v2.0/scanners'],
+    target: 'http://localhost:3000',
+    secure: false,
+    changeOrigin: true,
+    logLevel: 'debug',
   },
-  
+
   // redirect requests to the back-end server
   {
-    "context": [
-      "/api",
-      "/c",
-      "/i18n",
-      "/chartrepo",
-      "/LICENSE",
-      "/swagger.json",
-      "/swagger2.json",
-      "/devcenter-api-2.0",
-      "/swagger-ui.bundle.js"
+    context: [
+      '/api',
+      '/service',
+      '/v2',
+      '/chartrepo',
+      '/c',
+      '/LICENSE',
     ],
-    "target": "https://hostname",
-    "secure": false,
-    "changeOrigin": true,
-    "logLevel": "debug"
-  }
-]
+    target: 'https://hostname',
+    secure: false,
+    changeOrigin: true,
+    logLevel: 'debug',
+  },
+];
    ```
 
    5. Run `npm run start`, then all the mocked APIs will be redirected to the mocked server

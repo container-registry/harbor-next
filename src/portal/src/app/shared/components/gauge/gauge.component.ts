@@ -25,7 +25,7 @@ const RESOURCE_COLOR_RED_NORMAL: string = '#EA400D';
 const RESOURCE_COLOR_GREY600: string = '#C7D1D6';
 
 /**
- * Guage to visualize percent usage.
+ * Gage to visualize percent usage.
  */
 @Component({
     selector: 'esxc-gauge',

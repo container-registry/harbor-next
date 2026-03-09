@@ -1,0 +1,61 @@
+version: '3'
+
+# Updates Kroki SVGBob diagram URLs in markdown files.
+#
+# Structure in .md files:
+#   <!--
+#   ```SVGBob
+#   <ascii diagram>
+#   ```
+#   -->
+#   ![alt](https://kroki.io/svgbob/svg/<encoded>)   <- auto-generated
+#
+# If the image link is missing, it will be added automatically.
+
+tasks:
+  default:
+    desc: Update Kroki URLs in all markdown files
+    aliases: [kroki]
+    silent: true
+    vars:
+      MD_FILES:
+        sh: find . -name '*.md' -type f
+    cmds:
+      - for: { var: MD_FILES }
+        cmd: |
+          python3 - "{{.ITEM}}" <<'PYTHON'
+          import sys, re, zlib, base64
+
+          def encode(diagram):
+              return base64.urlsafe_b64encode(zlib.compress(diagram.encode(), 9)).decode()
+
+          file = sys.argv[1]
+          with open(file) as f:
+              content = original = f.read()
+
+          # Pattern: <!-- ... ```SVGBob\n...``` ... -->
+          # Optionally followed by ![...](https://kroki.io/svgbob/svg/...)
+          pattern = r'(<!--\s*```SVGBob\n)(.*?)(```[^>]*-->)(\s*!\[[^\]]*\]\(https://kroki\.io/svgbob/svg/)[A-Za-z0-9_=-]*(\))?'
+
+          def replace_existing(m):
+              diagram = m.group(2)
+              encoded = encode(diagram)
+              return m.group(1) + diagram + m.group(3) + m.group(4) + encoded + (m.group(5) or ')')
+
+          content = re.sub(pattern, replace_existing, content, flags=re.DOTALL)
+
+          # Add missing URLs: <!-- ```SVGBob...``` --> without following image link
+          pattern_missing = r'(<!--\s*```SVGBob\n)(.*?)(```[^>]*-->)(?!\s*!\[)'
+
+          def add_url(m):
+              diagram = m.group(2)
+              encoded = encode(diagram)
+              return m.group(1) + diagram + m.group(3) + f'\n![Diagram](https://kroki.io/svgbob/svg/{encoded})'
+
+          content = re.sub(pattern_missing, add_url, content, flags=re.DOTALL)
+
+          if content != original:
+              with open(file, 'w') as f:
+                  f.write(content)
+              print(f"Updated: {file}")
+          PYTHON

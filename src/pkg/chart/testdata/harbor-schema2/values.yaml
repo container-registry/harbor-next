@@ -467,7 +467,7 @@ cache:
   expireHours: 24
 
 ## set Container Security Context to comply with PSP restricted policy if necessary
-## each of the conatiner will apply the same security context
+## each of the container will apply the same security context
 ## containerSecurityContext:{} is initially an empty yaml that you could edit it on demand, we just filled with a common template for convenience
 containerSecurityContext:
   privileged: false
@@ -602,7 +602,7 @@ core:
   # and reduce the database connections spike and occupies.
   # Using redis will bring up some delay for quota usage updation for display, so only
   # suggest switch provider to redis if you were ran into the db connections spike around
-  # the scenario of high concurrent pushing to same project, no improvment for other scenes.
+  # the scenario of high concurrent pushing to same project, no improvement for other scenes.
   quotaUpdateProvider: db # Or redis
   # Secret is used when core server communicates with other components.
   # If a secret key is not specified, Helm will generate one. Alternatively set existingSecret to use an existing secret

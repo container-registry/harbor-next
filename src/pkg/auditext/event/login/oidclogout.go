@@ -36,7 +36,7 @@ func (o *oidcLogoutResolver) Resolve(ce *commonevent.Metadata, event *event.Even
 		Operator:             ce.Username,
 		ResourceType:         rbac.ResourceUser.String(),
 		ResourceName:         ce.Username,
-		OcurrAt:              time.Now(),
+		OccurAt:              time.Now(),
 		Operation:            opLogout,
 		OperationDescription: opLogout,
 		IsSuccessful:         true,

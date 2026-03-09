@@ -35,5 +35,5 @@ func ServeProm(path string, port int) {
 	mux := http.NewServeMux()
 	mux.Handle(path, promhttp.Handler())
 	log.Infof("Prometheus metric server running on port %v", port)
-	log.Errorf("Promethus metrcis server down with %s", http.ListenAndServe(fmt.Sprintf(":%v", port), mux))
+	log.Errorf("Promethus metrics server down with %s", http.ListenAndServe(fmt.Sprintf(":%v", port), mux))
 }

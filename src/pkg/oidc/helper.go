@@ -476,7 +476,7 @@ func filterGroup(groupNames []string, filter string) []string {
 }
 
 // InjectGroupsToUser populates the group to DB and inject the group IDs to user model.
-// The third optional parm is for UT only.
+// The third optional param is for UT only.
 func InjectGroupsToUser(info *UserInfo, user *models.User, f ...populate) {
 	if info == nil || user == nil {
 		log.Warningf("user info or user model is nil, skip the func")
@@ -516,7 +516,7 @@ func RevokeOIDCRefreshToken(revokeURL, refreshToken, clientID, clientSecret stri
 	data := url.Values{}
 	data.Set("token", refreshToken)
 	data.Set("token_type_hint", "refresh_token")
-	req, err := http.NewRequest("POST", revokeURL, bytes.NewBufferString(data.Encode()))
+	req, err := http.NewRequest(http.MethodPost, revokeURL, bytes.NewBufferString(data.Encode()))
 	if err != nil {
 		return errors.Errorf("failed to create request: %v", err)
 	}

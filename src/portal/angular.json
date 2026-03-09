@@ -22,9 +22,17 @@
             "polyfills": "zone.js",
             "tsConfig": "tsconfig.app.json",
             "assets": [
+              "src/swagger.json",
+              {
+                "glob": "**/*",
+                "input": "src/openapi-ui",
+                "output": "/"
+              },
               "src/images",
               "src/favicon.ico",
               "src/setting.json",
+              "src/setting-container-registry.json",
+              "src/setting-marketplace.json",
               "src/i18n"
             ],
             "styles": [
@@ -85,7 +93,8 @@
           "builder": "@angular-devkit/build-angular:dev-server",
           "options": {
             "browserTarget": "harbor-portal:build",
-            "proxyConfig": "proxy.config.mjs"
+            "proxyConfig": "proxy.config.mjs",
+            "allowedHosts": ["localhost", "127.0.0.1"]
           },
           "configurations": {
             "production": {
@@ -117,9 +126,17 @@
               "node_modules/prismjs/themes/prism-solarizedlight.css"
             ],
             "assets": [
+              "src/swagger.json",
+              {
+                "glob": "**/*",
+                "input": "src/openapi-ui",
+                "output": "/"
+              },
               "src/images",
               "src/favicon.ico",
               "src/setting.json",
+              "src/setting-container-registry.json",
+              "src/setting-marketplace.json",
               "src/i18n"
             ]
           }

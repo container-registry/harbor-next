@@ -55,7 +55,7 @@ export function isSupportedLanguage(x: unknown): x is SupportedLanguage {
 }
 
 /**
- * Hanlde the 401 and 403 code
+ * Handle the 401 and 403 code
  *
  * If handled the 401 or 403, then return true otherwise false
  */
@@ -77,7 +77,7 @@ export const accessErrorHandler = function (
     return false;
 };
 
-// Provide capability of reconstructing the query paramter
+// Provide capability of reconstructing the query parameter
 export const maintainUrlQueryParmas = function (
     uri: string,
     key: string,

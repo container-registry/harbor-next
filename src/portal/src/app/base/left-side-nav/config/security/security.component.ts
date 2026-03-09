@@ -109,7 +109,7 @@ export class SecurityComponent implements OnInit, OnDestroy {
                 null,
                 ConfirmationTargets.CONFIG
             );
-            this.confirmService.openComfirmDialog(msg);
+            this.confirmService.openConfirmDialog(msg);
         } else {
             // Invalid situation, should not come here
             console.error('Nothing changed');

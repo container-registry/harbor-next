@@ -32,31 +32,31 @@ const StatisticsCollectorName = "StatisticsCollector"
 
 var (
 	totalUsage = typedDesc{
-		desc:      newDescWithLables("", "statistics_total_storage_consumption", "Total storage used"),
+		desc:      newDescWithLabels("", "statistics_total_storage_consumption", "Total storage used"),
 		valueType: prometheus.GaugeValue,
 	}
 	totalProjectAmount = typedDesc{
-		desc:      newDescWithLables("", "statistics_total_project_amount", "Total amount of projects"),
+		desc:      newDescWithLabels("", "statistics_total_project_amount", "Total amount of projects"),
 		valueType: prometheus.GaugeValue,
 	}
 	publicProjectAmount = typedDesc{
-		desc:      newDescWithLables("", "statistics_public_project_amount", "Amount of public projects"),
+		desc:      newDescWithLabels("", "statistics_public_project_amount", "Amount of public projects"),
 		valueType: prometheus.GaugeValue,
 	}
 	privateProjectAmount = typedDesc{
-		desc:      newDescWithLables("", "statistics_private_project_amount", "Amount of private projects"),
+		desc:      newDescWithLabels("", "statistics_private_project_amount", "Amount of private projects"),
 		valueType: prometheus.GaugeValue,
 	}
 	totalRepoAmount = typedDesc{
-		desc:      newDescWithLables("", "statistics_total_repo_amount", "Total amount of repositories"),
+		desc:      newDescWithLabels("", "statistics_total_repo_amount", "Total amount of repositories"),
 		valueType: prometheus.GaugeValue,
 	}
 	publicRepoAmount = typedDesc{
-		desc:      newDescWithLables("", "statistics_public_repo_amount", "Amount of public repositories"),
+		desc:      newDescWithLabels("", "statistics_public_repo_amount", "Amount of public repositories"),
 		valueType: prometheus.GaugeValue,
 	}
 	privateRepoAmount = typedDesc{
-		desc:      newDescWithLables("", "statistics_private_repo_amount", "Amount of private repositories"),
+		desc:      newDescWithLabels("", "statistics_private_repo_amount", "Amount of private repositories"),
 		valueType: prometheus.GaugeValue,
 	}
 )

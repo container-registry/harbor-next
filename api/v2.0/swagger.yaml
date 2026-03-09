@@ -1082,19 +1082,19 @@ paths:
         - $ref: '#/parameters/acceptVulnerabilities'
         - name: with_tag
           in: query
-          description: Specify whether the tags are inclued inside the returning artifacts
+          description: Specify whether the tags are included inside the returning artifacts
           type: boolean
           required: false
           default: true
         - name: with_label
           in: query
-          description: Specify whether the labels are inclued inside the returning artifacts
+          description: Specify whether the labels are included inside the returning artifacts
           type: boolean
           required: false
           default: false
         - name: with_scan_overview
           in: query
-          description: Specify whether the scan overview is inclued inside the returning artifacts
+          description: Specify whether the scan overview is included inside the returning artifacts
           type: boolean
           required: false
           default: false
@@ -1113,13 +1113,13 @@ paths:
         # should be in tag level
         - name: with_signature
           in: query
-          description: Specify whether the signature is inclued inside the returning artifacts
+          description: Specify whether the signature is included inside the returning artifacts
           type: boolean
           required: false
           default: false
         - name: with_immutable_status
           in: query
-          description: Specify whether the immutable status is inclued inside the tags of the returning artifacts.
+          description: Specify whether the immutable status is included inside the tags of the returning artifacts.
           type: boolean
           required: false
           default: false
@@ -1276,7 +1276,7 @@ paths:
           description: The JSON object of tag.
           required: true
           schema:
-            $ref: '#/definitions/Tag'
+            $ref: '#/definitions/NewTag'
       responses:
         '201':
           $ref: '#/responses/201'
@@ -1655,7 +1655,7 @@ paths:
           description: Internal server error happened
     put:
       summary: Configure scanner for the specified project
-      description: Set one of the system configured scanner registration as the indepndent scanner of the specified project.
+      description: Set one of the system configured scanner registration as the independent scanner of the specified project.
       tags:
         - project
       operationId: setScannerOfProject
@@ -1765,7 +1765,7 @@ paths:
         - $ref: '#/parameters/query'
         - $ref: '#/parameters/sort'
         - $ref: '#/parameters/page'
-        - $ref: '#/parameters/pageSize'
+        - $ref: '#/parameters/pageSizeAuditLogExts'
       responses:
         '200':
           description: Success
@@ -5314,7 +5314,7 @@ paths:
     post:
       summary: Create a scanner registration
       description: |
-        Creats a new scanner registration with the given data.
+        Creates a new scanner registration with the given data.
       tags:
         - scanner
       operationId: createScanner
@@ -5372,7 +5372,7 @@ paths:
     get:
       summary: Get a scanner registration details
       description: |
-        Retruns the details of the specified scanner registration.
+        Returns the details of the specified scanner registration.
       tags:
         - scanner
       operationId: getScanner
@@ -5380,7 +5380,7 @@ paths:
         - $ref: '#/parameters/requestId'
         - name: registration_id
           in: path
-          description: The scanner registration identifer.
+          description: The scanner registration identifier.
           required: true
           type: string
       responses:
@@ -6220,7 +6220,7 @@ paths:
 parameters:
   query:
     name: q
-    description: Query string to query resources. Supported query patterns are "exact match(k=v)", "fuzzy match(k=~v)", "range(k=[min~max])", "list with union releationship(k={v1 v2 v3})" and "list with intersetion relationship(k=(v1 v2 v3))". The value of range and list can be string(enclosed by " or '), integer or time(in format "2020-04-09 02:36:00"). All of these query patterns should be put in the query string "q=xxx" and splitted by ",". e.g. q=k1=v1,k2=~v2,k3=[min~max]
+    description: Query string to query resources. Supported query patterns are "exact match(k=v)", "fuzzy match(k=~v)", "range(k=[min~max])", "list with union relationship(k={v1 v2 v3})" and "list with intersection relationship(k=(v1 v2 v3))". The value of range and list can be string(enclosed by " or '), integer or time(in format "2020-04-09 02:36:00"). All of these query patterns should be put in the query string "q=xxx" and split by ",". e.g. q=k1=v1,k2=~v2,k3=[min~max]
     in: query
     type: string
     required: false
@@ -6247,6 +6247,15 @@ parameters:
     description: The size of per page
     default: 10
     maximum: 100
+  pageSizeAuditLogExts:
+    name: page_size
+    in: query
+    type: integer
+    format: int64
+    required: false
+    description: The size of per page
+    default: 10
+    maximum: 10000
   requestId:
     name: X-Request-Id
     description: An unique ID for the request
@@ -6696,6 +6705,16 @@ definitions:
         type: boolean
         x-omitempty: false
         description: The immutable status of the tag
+  NewTag:
+    type: object
+    description: The request body for creating a tag
+    required:
+      - name
+    properties:
+      name:
+        type: string
+        x-nullable: false
+        description: The name of the tag
   ExtraAttrs:
     type: object
     additionalProperties:
@@ -7310,8 +7329,9 @@ definitions:
         x-nullable: true
       reuse_sys_cve_allowlist:
         type: string
-        description: 'Whether this project reuse the system level CVE allowlist as the allowlist of its own.  The valid values are "true", "false".
-        If it is set to "true" the actual allowlist associate with this project, if any, will be ignored.'
+        description: |-
+          Whether this project reuse the system level CVE allowlist as the allowlist of its own. The valid values are "true", "false".
+          If it is set to "true" the actual allowlist associate with this project, if any, will be ignored.
         x-nullable: true
       retention_id:
         type: string
@@ -8991,6 +9011,9 @@ definitions:
       ldap_group_search_filter:
         $ref: '#/definitions/StringConfigItem'
         description: The filter to search the ldap group
+      ldap_group_admin_filter:
+        $ref: '#/definitions/StringConfigItem'
+        description: The filter for ldap admin search
       ldap_group_search_scope:
         $ref: '#/definitions/IntegerConfigItem'
         description: The scope to search ldap group. ''0-LDAP_SCOPE_BASE, 1-LDAP_SCOPE_ONELEVEL, 2-LDAP_SCOPE_SUBTREE''
@@ -9186,6 +9209,11 @@ definitions:
       ldap_group_search_filter:
         type: string
         description: The filter to search the ldap group
+        x-omitempty: true
+        x-isnullable: true
+      ldap_group_admin_filter:
+        type: string
+        description: The filter for LDAP Admin search
         x-omitempty: true
         x-isnullable: true
       ldap_group_search_scope:
@@ -9430,7 +9458,7 @@ definitions:
         x-isnullable: true
       disabled_audit_log_event_types:
         type: string
-        description: the list to disable log audit event types. 
+        description: the list to disable log audit event types.
         x-omitempty: true
         x-isnullable: true
   StringConfigItem:
