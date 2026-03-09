@@ -2,6 +2,8 @@ module github.com/goharbor/harbor/src
 
 go 1.25.7
 
+godebug x509negativeserial=1
+
 require (
 	github.com/CloudNativeAI/model-spec v0.0.5
 	github.com/FZambia/sentinel v1.1.0
