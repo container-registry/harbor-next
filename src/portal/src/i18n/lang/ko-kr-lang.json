@@ -835,6 +835,8 @@
             "VERIFY_CERT": "LDAP 확인 인증서",
             "LDAP_GROUP_BASE_DN": "LDAP Group Base DN",
             "LDAP_GROUP_BASE_DN_INFO": "LDAP/AD에서 그룹을 조회할 기본 DN입니다. LDAP 그룹 관련 기능을 활성화해야 하는 경우 이 필드를 비워둘 수 없습니다.",
+            "LDAP_GROUP_ADMIN_FILTER": "LDAP Group Admin Filter",
+            "LDAP_GROUP_ADMIN_FILTER_INFO": "The filter for LDAP Admin search.",
             "LDAP_GROUP_FILTER": "LDAP 그룹 필터",
             "LDAP_GROUP_FILTER_INFO": "LDAP/AD 그룹을 검색하기 위한 필터입니다. OpenLDAP의 경우: objectclass=groupOfNames. Active Directory의 경우: objectclass=group. LDAP 그룹 관련 기능이 필요한 경우 이 필드를 비워둘 수 없습니다.",
             "LDAP_GROUP_GID": "LDAP Group GID",
@@ -922,8 +924,7 @@
         "COPYRIGHT": "프로젝트 'Harbor'는 콘텐츠를 저장, 서명 및 검색하는 신뢰할 수 있는 오픈 소스 클라우드 네이티브 레지스트리 프로젝트입니다. 'Harbor'는 보안, ID, 관리 등 사용자에게 일반적으로 필요한 기능을 추가하여 오픈 소스 Docker 배포를 확장합니다. 'Harbor'는 사용자 관리, 액세스 제어, 활동 모니터링, 인스턴스 간 복제와 같은 고급 기능을 지원합니다. 레지스트리를 빌드 및 실행 환경에 더 가깝게 두면 이미지 전송 효율성도 향상될 수 있습니다.",
         "OPEN_SOURCE_LICENSE": "오픈소스/서드 파티 라이선스"
     },
-    "START_PAGE": {
-    },
+    "START_PAGE": {},
     "TOP_REPO": "인기 저장소",
     "STATISTICS": {
         "PRO_ITEM": "프로젝트",
@@ -1365,6 +1366,13 @@
         "ADD_TITLE": "태그 불변성 규칙 추가",
         "ADD_SUBTITLE": "이 프로젝트에 대한 태그 불변성 규칙을 지정합니다. 참고: 모든 태그 불변성 규칙은 먼저 독립적으로 계산된 다음 통합되어 불변성 태그의 최종 세트를 캡처합니다.",
         "IN_REPOSITORIES": "For the repositories",
+        "CONDITION": "불변성 조건",
+        "ACTION_IMMUTABLE": "적용",
+        "RULE_NAME_5": "항상",
+        "RULE_NAME_6": " 지난 {{number}}일 동안 가져온 아티팩트",
+        "RULE_NAME_7": " 지난 {{number}}일 동안 푸시된 아티팩트",
+        "RULE_TEMPLATE_6": "최근 #일 이내에 가져온 아티팩트에 적용",
+        "RULE_TEMPLATE_7": "최근 #일 이내에 푸시된 아티팩트에 적용",
         "REP_SEPARATOR": "쉼표로 구분된 저장소, 저장소* 또는 **를 여러 개 입력하세요.",
         "TAGS": "태그",
         "TAG_SEPARATOR": "여러 개의 쉼표로 구분된 태그(태그* 또는 **)를 입력하세요.",
@@ -1378,7 +1386,11 @@
         "LOWER_TAGS": " tags",
         "NONE": "없음",
         "EXISTING_RULE": "Existing rule",
-        "ACTION": "ACTION"
+        "ACTION": "ACTION",
+        "RULE_NAME_8": " the most recently pushed {{number}} artifacts",
+        "RULE_NAME_9": " the most recently pulled {{number}} artifacts",
+        "RULE_TEMPLATE_8": " to the most recently pushed # artifacts",
+        "RULE_TEMPLATE_9": " to the most recently pulled # artifacts"
     },
     "SCANNER": {
         "DELETION_SUMMARY": "스캐너 {{param}}을 삭제하시겠습니까?",

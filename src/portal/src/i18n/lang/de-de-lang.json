@@ -835,6 +835,8 @@
             "VERIFY_CERT": "LDAP Zertifikat prüfen. Box deaktivieren, falls der LDAP Server mit selbstsignierten Zertifikaten betrieben wird.",
             "LDAP_GROUP_BASE_DN": "LDAP Gruppen Base DN",
             "LDAP_GROUP_BASE_DN_INFO": "Der Base DN von dem Gruppen im LDAP/AD gesucht werden. Das Feld darf nicht leer sein, sofern eine LDAP Gruppen Funktion eingesetzt wird.",
+            "LDAP_GROUP_ADMIN_FILTER": "LDAP Gruppen-Admin-Filter",
+            "LDAP_GROUP_ADMIN_FILTER_INFO": "Der Filter für die Suche nach LDAP-Administratoren.",
             "LDAP_GROUP_FILTER": "LDAP Gruppen Filter",
             "LDAP_GROUP_FILTER_INFO": "Der Filter für die Suche nach LDAP/AD Gruppen. Für OpenLDAP: objectclass=groupOfNames. Für Active Directory: objectclass=group. Dieses Feld darf nicht leer sein, wenn die Gruppenbezogenen LDAP-Features benötigt werden.",
             "LDAP_GROUP_GID": "LDAP Gruppen GID",
@@ -922,8 +924,7 @@
         "COPYRIGHT": "Project Harbor is an open source trusted cloud native registry project that stores, signs, and scans content. Harbor extends the open source Docker Distribution by adding the functionalities usually required by users such as security, identity and management. Harbor supports advanced features such as user management, access control, activity monitoring, and replication between instances. Having a registry closer to the build and run environment can also improve image transfer efficiency.",
         "OPEN_SOURCE_LICENSE": "Open Source/Third Party License"
     },
-    "START_PAGE": {
-    },
+    "START_PAGE": {},
     "TOP_REPO": "Beliebte Repositories",
     "STATISTICS": {
         "PRO_ITEM": "PROJEKTE",
@@ -1365,6 +1366,13 @@
         "ADD_TITLE": "Tag Immutability Regel hinzufügen",
         "ADD_SUBTITLE": "Definiere eine Tag Immutability Regel für das Projekt. Hinweis: Alle Tag Immutability Regeln werden unabhängig berechnet und dann zusammengeführt um die Immutable Tags zu definieren.",
         "IN_REPOSITORIES": "Für die Repositories",
+        "CONDITION": "Unveränderlichkeitsbedingung",
+        "ACTION_IMMUTABLE": "Anwenden",
+        "RULE_NAME_5": "Immer",
+        "RULE_NAME_6": " die Artefakte, die in den letzten {{ number }} Tagen gepullt wurden",
+        "RULE_NAME_7": " die Artefakte, die in den letzten {{number}} Tagen gepusht wurden",
+        "RULE_TEMPLATE_6": "Für Artefakte, die in den letzten # Tagen gezogen wurden",
+        "RULE_TEMPLATE_7": "Für Artefakte, die in den letzten # Tagen gepusht wurden",
         "REP_SEPARATOR": "Mehrere kommaseparierte Repositories: repos,repo*,oder **",
         "TAGS": "Tags",
         "TAG_SEPARATOR": "Mehrere kommaseparierte Tags: tag*, oder **.",
@@ -1378,7 +1386,11 @@
         "LOWER_TAGS": " Tags",
         "NONE": " keine",
         "EXISTING_RULE": "Existierende Regel",
-        "ACTION": "AKTION"
+        "ACTION": "AKTION",
+        "RULE_NAME_8": " the most recently pushed {{number}} artifacts",
+        "RULE_NAME_9": " the most recently pulled {{number}} artifacts",
+        "RULE_TEMPLATE_8": " to the most recently pushed # artifacts",
+        "RULE_TEMPLATE_9": " to the most recently pulled # artifacts"
     },
     "SCANNER": {
         "DELETION_SUMMARY": "Soll der Scanner {{param}} gelöscht werden?",

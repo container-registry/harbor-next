@@ -231,7 +231,7 @@
         "DELETED_SUCCESS": "Proyecto eliminado satisfactoriamente.",
         "TOGGLED_SUCCESS": "Proyecto alternado satisfactoriamente.",
         "INLINE_HELP_PUBLIC": "Cuando un proyecto se marca como público, todo el mundo tiene permisos de lectura sobre los repositorio de dicho proyecto, y no hace falta hacer \"docker login\" antes de subir imágenes a ellos.",
-        "PROXY_CACHE_BANDWIDTH":"Establezca el ancho de banda de red máximo para extraer imágenes desde el servidor proxy-cache. Para un ancho de banda ilimitado, ingrese -1. ",
+        "PROXY_CACHE_BANDWIDTH": "Establezca el ancho de banda de red máximo para extraer imágenes desde el servidor proxy-cache. Para un ancho de banda ilimitado, ingrese -1. ",
         "BANDWIDTH": "Ancho de banda",
         "SPEED_LIMIT_TIP": "Por favor, introduzca -1 o un número entero mayor que 0. ",
         "OF": "de",
@@ -838,6 +838,8 @@
             "VERIFY_CERT": "LDAP Verificar Cert",
             "LDAP_GROUP_BASE_DN": "LDAP Grupo Base DN",
             "LDAP_GROUP_BASE_DN_INFO": "El DN base desde el cual se buscará un grupo en LDAP/AD. Este campo no puede estar vacío si necesita habilitar la función relacionada con el grupo LDAP.",
+            "LDAP_GROUP_ADMIN_FILTER": "LDAP Group Admin Filter",
+            "LDAP_GROUP_ADMIN_FILTER_INFO": "The filter for LDAP Admin search.",
             "LDAP_GROUP_FILTER": "LDAP Filtro Grupo",
             "LDAP_GROUP_FILTER_INFO": "El filtro para buscar grupos LDAP/AD. Para OpenLDAP: objectclass=groupOfNames. Para Active Directory: objectclass=group. Este campo no puede estar vacío si necesita la función relacionada con el grupo LDAP.",
             "LDAP_GROUP_GID": "LDAP Grupo GID",
@@ -925,8 +927,7 @@
         "COPYRIGHT": "Project Harbor es un proyecto de código abierto de cloud native registry confiable que almacena, firma y escanea contenido. Harbor extiende la distribución Docker de código abierto agregando las funcionalidades que suelen requerir los usuarios, como seguridad, identidad y administración. Harbor admite funciones avanzadas, como administración de usuarios, control de acceso, monitoreo de actividad y replicación entre instancias. Tener un registro más cerca del entorno de compilación y ejecución también puede mejorar la eficiencia de la transferencia de imágenes.",
         "OPEN_SOURCE_LICENSE": "Código Abierto/Licencias de Terceros"
     },
-    "START_PAGE": {
-    },
+    "START_PAGE": {},
     "TOP_REPO": "Repositorios Populares",
     "STATISTICS": {
         "PRO_ITEM": "PROYECTOS",
@@ -1107,7 +1108,6 @@
         "ADD_TAG": "AGREGAR TAG",
         "REMOVE_TAG": "REMOVER TAG",
         "NAME_ALREADY_EXISTS": "Tag ya existe en el repositorio"
-
     },
     "LABEL": {
         "LABEL": "Etiqueta",
@@ -1369,6 +1369,13 @@
         "ADD_TITLE": "Agregar Regla de Inmutabilidad de Tag",
         "ADD_SUBTITLE": "Especificar una regla de inmutabilidad de tag para este proyecto.  Nota: todas las reglas de inmutabilidad de tags son primero independientemente calculadas y luego unidas para capturar el conjunto final de tags inmutables.",
         "IN_REPOSITORIES": "Para los repositorios",
+        "CONDITION": "Condición de inmutabilidad",
+        "ACTION_IMMUTABLE": "aplicar",
+        "RULE_NAME_5": "siempre",
+        "RULE_NAME_6": " los artefactos bajados en los últimos {{number}} días",
+        "RULE_NAME_7": " los artefactos subidos en los últimos {{number}} días",
+        "RULE_TEMPLATE_6": "a los artefactos descargados en los últimos # días",
+        "RULE_TEMPLATE_7": "a los artefactos cargados en los últimos # días",
         "REP_SEPARATOR": "Ingresa múltiples comma para separar repos,repo*,or **",
         "TAGS": "Tags",
         "TAG_SEPARATOR": "Ingresa múltiples comma para separar tags,tag*,or **",
@@ -1382,7 +1389,11 @@
         "LOWER_TAGS": " tags",
         "NONE": " ninguno",
         "EXISTING_RULE": "Regla existente",
-        "ACTION": "ACCION"
+        "ACTION": "ACCION",
+        "RULE_NAME_8": " the most recently pushed {{number}} artifacts",
+        "RULE_NAME_9": " the most recently pulled {{number}} artifacts",
+        "RULE_TEMPLATE_8": " to the most recently pushed # artifacts",
+        "RULE_TEMPLATE_9": " to the most recently pulled # artifacts"
     },
     "SCANNER": {
         "DELETION_SUMMARY": "¿Quieres eliminar el escáner {{param}}?",

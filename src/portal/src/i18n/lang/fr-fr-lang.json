@@ -837,6 +837,8 @@
             "VERIFY_CERT": "Vérifier le certificat LDAP",
             "LDAP_GROUP_BASE_DN": "DN de base du groupe LDAP",
             "LDAP_GROUP_BASE_DN_INFO": "Le DN de base à partir duquel rechercher un groupe dans l'annuaire LDAP/AD. Ce champ ne peut pas être vide si vous devez activer la fonctionnalité liée aux groupes LDAP.",
+            "LDAP_GROUP_ADMIN_FILTER": "Filtre administrateur de groupe LDAP",
+            "LDAP_GROUP_ADMIN_FILTER_INFO": "Le filtre pour la recherche des administrateurs LDAP.",
             "LDAP_GROUP_FILTER": "Filtre de groupe LDAP",
             "LDAP_GROUP_FILTER_INFO": "Filtre de recherche de groupe LDAP/AD. Pour OpenLDAP : objectclass=groupOfNames. Pour Active Directory : objectclass=group. Ce champ ne peut pas être vide si vous avez besoin de la fonctionnalité liée aux groupes LDAP.",
             "LDAP_GROUP_GID": "GID du groupe LDAP",
@@ -924,8 +926,7 @@
         "COPYRIGHT": "Le Project Harbor est un projet de registre cloud native fiable et open source qui stocke, signe et analyse le contenu. Harbor étend la distribution open source Docker en ajoutant les fonctionnalités généralement requises par les utilisateurs telles que la sécurité, l'authentification et la gestion. Harbor prend en charge des fonctionnalités avancées telles que la gestion des utilisateurs, le contrôle d'accès, la surveillance des activités et la réplication entre les instances. Un registre plus proche de l'environnement de build et d'exécution peut également améliorer l'efficacité du transfert d'image.",
         "OPEN_SOURCE_LICENSE": "Licence Open Source / Tierce Partie"
     },
-    "START_PAGE": {
-    },
+    "START_PAGE": {},
     "TOP_REPO": "Dépôts populaires",
     "STATISTICS": {
         "PRO_ITEM": "Projets",
@@ -1367,6 +1368,13 @@
         "ADD_TITLE": "Ajouter une règle d'immutabilité",
         "ADD_SUBTITLE": "Spécifiez une règle d'immutabilité de tags pour ce projet. Toutes les règles d'immutabilité de tags sont d'abord calculées indépendamment, puis leur union donne le jeu de tags immutables.",
         "IN_REPOSITORIES": "Pour les dépôts",
+        "CONDITION": "Condition d'immutabilité",
+        "ACTION_IMMUTABLE": "appliquer",
+        "RULE_NAME_5": "toujours",
+        "RULE_NAME_6": " les images récupérées dans les {{number}} derniers jours",
+        "RULE_NAME_7": " les images poussées dans les {{number}} derniers jours",
+        "RULE_TEMPLATE_6": "aux artefacts récupérés au cours des # derniers jours",
+        "RULE_TEMPLATE_7": "aux artefacts poussés au cours des # derniers jours",
         "REP_SEPARATOR": "Entrez de multiples repos,repo*,or **, séparés par des virgules",
         "TAGS": "Tags",
         "TAG_SEPARATOR": "Entrez de multiples tags, tag*, or **.",
@@ -1380,7 +1388,11 @@
         "LOWER_TAGS": " tags",
         "NONE": " aucun",
         "EXISTING_RULE": "Règle existante",
-        "ACTION": "Action"
+        "ACTION": "Action",
+        "RULE_NAME_8": " the most recently pushed {{number}} artifacts",
+        "RULE_NAME_9": " the most recently pulled {{number}} artifacts",
+        "RULE_TEMPLATE_8": " to the most recently pushed # artifacts",
+        "RULE_TEMPLATE_9": " to the most recently pulled # artifacts"
     },
     "SCANNER": {
         "DELETION_SUMMARY": "Voulez-vous supprimer le scanneur {{param}} ?",

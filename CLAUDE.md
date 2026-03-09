@@ -85,7 +85,8 @@ devenv/               # Docker Compose for local development
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| `build.yml` | PRs to main | Test + compile check |
+| `build.yml` | PRs to main | Compile check |
+| `test.yml` | PRs to main | Unit tests + API lint |
 | `release-please.yml` | Push to main | Release PR automation + image publishing |
 | `pr-title.yml` | PR opened/edited | Enforce conventional commit format |
 | `labeler.yml` | PR opened | Auto-label by component |

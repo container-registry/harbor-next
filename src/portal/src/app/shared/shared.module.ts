@@ -74,6 +74,7 @@ import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { RouterTestingModule } from '@angular/router/testing';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { HarborDatetimePipe } from './pipes/harbor-datetime.pipe';
+import { CallbackPipe } from './pipes/callback.pipe';
 import { RemainingTimeComponent } from './components/remaining-time/remaining-time.component';
 import { LabelSelectorComponent } from './components/label-selector/label-selector.component';
 import { ScrollSectionDirective } from './directives/scroll/scroll-section.directive';
@@ -83,12 +84,12 @@ import { AppLevelAlertsComponent } from './components/app-level-alerts/app-level
 import * as echarts from 'echarts/core';
 import { PieChart } from 'echarts/charts';
 import {
+    DatasetComponent,
+    GridComponent,
+    LegendComponent,
     TitleComponent,
     TooltipComponent,
-    GridComponent,
-    DatasetComponent,
     TransformComponent,
-    LegendComponent,
 } from 'echarts/components';
 import { LabelLayout, UniversalTransition } from 'echarts/features';
 import { CanvasRenderer } from 'echarts/renderers';
@@ -194,6 +195,7 @@ ClarityIcons.add({
         DatePickerComponent,
         ImageNameInputComponent,
         HarborDatetimePipe,
+        CallbackPipe,
         RemainingTimeComponent,
         LabelSelectorComponent,
         AppLevelAlertsComponent,
@@ -239,6 +241,7 @@ ClarityIcons.add({
         DatePickerComponent,
         ImageNameInputComponent,
         HarborDatetimePipe,
+        CallbackPipe,
         RemainingTimeComponent,
         LabelSelectorComponent,
         AppLevelAlertsComponent,

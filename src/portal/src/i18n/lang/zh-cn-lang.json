@@ -837,6 +837,8 @@
             "VERIFY_CERT": "LDAP检查证书",
             "LDAP_GROUP_BASE_DN": "LDAP组基础DN",
             "LDAP_GROUP_BASE_DN_INFO": "LDAP/AD中，用于查找组的基础DN。如果要开启LDAP组功能，则此项必填",
+            "LDAP_GROUP_ADMIN_FILTER": "LDAP组管理员过滤器",
+            "LDAP_GROUP_ADMIN_FILTER_INFO": "用于LDAP管理员搜索的过滤器。",
             "LDAP_GROUP_FILTER": "LDAP组过滤器",
             "LDAP_GROUP_FILTER_INFO": "搜索LDAP组的过滤器. 对于 OpenLDAP，请将值设为: objectclass=groupOfNames. 对于 Active Directory，请将值设为: objectclass=group。如果要开启LDAP组功能，则此项必填",
             "LDAP_GROUP_GID": "LDAP组ID属性",
@@ -924,8 +926,7 @@
         "COPYRIGHT": "Harbor是一个用于存储和分发Docker镜像的企业级Registry服务器，通过添加一些企业必需的功能特性，例如安全、标识和管理等，扩展了开源Docker Distribution。作为一个企业级私有Registry服务器，Harbor提供了更好的性能和安全。提升用户使用Registry构建和运行环境传输镜像的效率。",
         "OPEN_SOURCE_LICENSE": "开源/第三方许可协议"
     },
-    "START_PAGE": {
-    },
+    "START_PAGE": {},
     "TOP_REPO": "受欢迎的镜像仓库",
     "STATISTICS": {
         "PRO_ITEM": "项目",
@@ -1367,6 +1368,13 @@
         "ADD_TITLE": "添加不可变的 Tag 规则",
         "ADD_SUBTITLE": "为此项目指定不可变的 Tag 规则。注意：所有不可变的 Tag 规则都将首先被独立计算，合并后最终获得不可变规则的集合。",
         "IN_REPOSITORIES": "应用到仓库",
+        "CONDITION": "不可变更条件",
+        "ACTION_IMMUTABLE": "应用",
+        "RULE_NAME_5": "永远",
+        "RULE_NAME_6": "最近{{number}}天被拉取过的 artifacts",
+        "RULE_NAME_7": "最近{{number}}天被推送过的 artifacts",
+        "RULE_TEMPLATE_6": "应用至过去 # 天内被拉取的制品",
+        "RULE_TEMPLATE_7": "应用至过去 # 天内被推送的制品",
         "REP_SEPARATOR": "使用逗号分隔 repos,repo* 和 **。",
         "TAGS": "Tags",
         "TAG_SEPARATOR": "使用逗号分割 tags,tag* 和 **。",
@@ -1380,7 +1388,11 @@
         "LOWER_TAGS": " tags",
         "NONE": " 无",
         "EXISTING_RULE": "规则已存在。",
-        "ACTION": "操作"
+        "ACTION": "操作",
+        "RULE_NAME_8": " the most recently pushed {{number}} artifacts",
+        "RULE_NAME_9": " the most recently pulled {{number}} artifacts",
+        "RULE_TEMPLATE_8": " to the most recently pushed # artifacts",
+        "RULE_TEMPLATE_9": " to the most recently pulled # artifacts"
     },
     "SCANNER": {
         "DELETION_SUMMARY": "确定删除扫描器{{param}}？",
