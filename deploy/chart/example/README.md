@@ -9,6 +9,7 @@ This directory contains example values files for deploying Harbor in different e
 | `k3d-local.yaml` | Local development with k3d cluster |
 | `rke2-rancher.yaml` | RKE2/Rancher deployment |
 | [`openshift/`](openshift/) | OpenShift deployment with ttl.sh images and edge-terminated routes |
+| [`aws-eks-irsa/`](aws-eks-irsa/) | AWS EKS with IRSA for S3 storage and RDS IAM Auth (Aurora PostgreSQL) |
 
 ## Usage
 
