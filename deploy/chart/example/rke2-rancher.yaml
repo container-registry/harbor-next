@@ -1,0 +1,101 @@
+# Harbor Helm Chart - RKE2/Rancher Values
+# Usage: helm install harbor . -n harbor -f examples/rke2-rancher.yaml
+
+# External URL for Harbor
+externalURL: "https://rancher-dev-16gb-fsn1-1.container-registry.com"
+
+# Ingress configuration for nginx ingress controller
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-next-upstream-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-next-upstream-tries: "5"
+  core: rancher-dev-16gb-fsn1-1.container-registry.com
+  hosts:
+    - host: rancher-dev-16gb-fsn1-1.container-registry.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: harbor-tls
+      hosts:
+        - rancher-dev-16gb-fsn1-1.container-registry.com
+
+# TLS configuration - auto-generate certs
+tls:
+  enabled: true
+  certSource: auto
+
+# Database configuration - use existing PostgreSQL in my-db namespace
+database:
+  host: postgresql.my-db.svc.cluster.local
+  port: 5432
+  username: postgres
+  password: test1234!
+  database: registry
+  sslmode: disable
+
+# Use internal Valkey (Redis-compatible)
+valkey:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: true
+      size: 1Gi
+
+# Trivy scanner
+trivy:
+  enabled: false
+
+# Metrics
+metrics:
+  enabled: false
+
+# Component configurations
+core:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+jobservice:
+  replicas: 1
+  max_job_workers: 4
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+registry:
+  replicas: 1
+  persistence:
+    enabled: true
+    persistentVolumeClaim:
+      registry:
+        size: 10Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+portal:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+exporter:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi

@@ -1,0 +1,34 @@
+{{- /*
+Consolidated PodDisruptionBudgets for all Harbor components.
+Components are listed in alphabetical order.
+*/ -}}
+{{- $root := . -}}
+{{- $components := list
+  (dict "name" "core"       "values" .Values.core       "needsEnabled" false)
+  (dict "name" "exporter"   "values" .Values.exporter   "needsEnabled" true)
+  (dict "name" "jobservice" "values" .Values.jobservice "needsEnabled" false)
+  (dict "name" "portal"     "values" .Values.portal     "needsEnabled" false)
+  (dict "name" "registry"   "values" .Values.registry   "needsEnabled" false)
+  (dict "name" "trivy"      "values" .Values.trivy      "needsEnabled" true)
+-}}
+{{- range $components }}
+{{- $enabled := ternary (and (index .values "enabled") .values.pdb.enabled) .values.pdb.enabled .needsEnabled }}
+{{- if $enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "harbor.fullname" $root }}-{{ .name }}
+  labels:
+    {{- include "harbor.componentLabels" (dict "root" $root "component" .name) | nindent 4 }}
+spec:
+  {{- if hasKey .values.pdb "maxUnavailable" }}
+  maxUnavailable: {{ .values.pdb.maxUnavailable }}
+  {{- else if hasKey .values.pdb "minAvailable" }}
+  minAvailable: {{ .values.pdb.minAvailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "harbor.componentSelectorLabels" (dict "root" $root "component" .name) | nindent 6 }}
+{{- end }}
+{{- end }}

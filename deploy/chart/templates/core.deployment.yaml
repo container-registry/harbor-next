@@ -1,0 +1,156 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "harbor.fullname" . }}-core
+  labels:
+    {{- include "harbor.componentLabels" (dict "root" . "component" "core") | nindent 4 }}
+spec:
+  replicas: {{ .Values.core.replicas }}
+  revisionHistoryLimit: {{ .Values.core.revisionHistoryLimit | default .Values.global.revisionHistoryLimit }}
+  {{- with .Values.core.deploymentStrategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "core") | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/configmap: {{ include (print $.Template.BasePath "/core.configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/core.secret.yaml") . | sha256sum }}
+        {{- with .Values.core.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "core") | nindent 8 }}
+        {{- with .Values.core.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- include "harbor.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "harbor.serviceAccountName" (dict "root" . "component" "core" "serviceAccount" .Values.core.serviceAccount) }}
+      automountServiceAccountToken: {{ .Values.core.serviceAccount.automountServiceAccountToken | default false }}
+      {{- with (.Values.core.priorityClassName | default .Values.global.priorityClassName) }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.core.podSecurityContext | nindent 8 }}
+      {{- with .Values.core.initContainers }}
+      initContainers:
+        {{- tpl (toYaml .) $ | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: core
+          securityContext:
+            {{- toYaml .Values.core.securityContext | nindent 12 }}
+          image: {{ include "harbor.image" (dict "imageRoot" .Values.core.image "global" .Values.image "chart" .Chart) }}
+          imagePullPolicy: {{ include "harbor.imagePullPolicy" . }}
+          ports:
+            - name: core-http
+              containerPort: 8080
+              protocol: TCP
+            - name: {{ include "harbor.metrics.portName" . | quote }}
+              containerPort: 8001
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "harbor.fullname" . }}-core
+            - secretRef:
+                name: {{ include "harbor.fullname" . }}-core
+          env:
+            {{- if .Values.existingSecretAdminPassword }}
+            - name: HARBOR_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecretAdminPassword }}
+                  key: {{ .Values.existingSecretAdminPasswordKey | default "HARBOR_ADMIN_PASSWORD" }}
+            {{- end }}
+            - name: CORE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.core.existingSecret | default (include "harbor.core" .) }}
+                  key: {{ .Values.core.existingSecretKey | default "secret" }}
+            - name: JOBSERVICE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.jobservice.existingSecret | default (include "harbor.jobservice" .) }}
+                  key: {{ .Values.jobservice.existingSecretKey | default "JOBSERVICE_SECRET" }}
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "harbor.database.secretName" . }}
+                  key: {{ .Values.database.existingSecretKey | default "POSTGRESQL_PASSWORD" }}
+            {{- if .Values.valkey.auth.enabled }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "harbor.redis.secretName" . }}
+                  key: {{ include "harbor.redis.secretKey" . }}
+            {{- end }}
+            {{- with .Values.core.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /api/v2.0/ping
+              port: core-http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/v2.0/ping
+              port: core-http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          {{- if .Values.core.startupProbe.enabled }}
+          startupProbe:
+            httpGet:
+              path: /api/v2.0/ping
+              port: core-http
+            initialDelaySeconds: {{ .Values.core.startupProbe.initialDelaySeconds }}
+            periodSeconds: 10
+            failureThreshold: 12
+          {{- end }}
+          resources:
+            {{- toYaml .Values.core.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/core/app.conf
+              subPath: app.conf
+            - name: secret-key
+              mountPath: /etc/core/key
+              subPath: key
+            - name: token-service-private-key
+              mountPath: /etc/core/private_key.pem
+              subPath: tls.key
+            - name: psc
+              mountPath: /etc/core/token
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "harbor.fullname" . }}-core
+            items:
+              - key: app.conf
+                path: app.conf
+            optional: true
+        - name: secret-key
+          secret:
+            secretName: {{ include "harbor.core" . }}
+            items:
+              - key: secretKey
+                path: key
+        - name: token-service-private-key
+          secret:
+            {{- if .Values.core.tokenSecretName }}
+            secretName: {{ .Values.core.tokenSecretName }}
+            {{- else }}
+            secretName: {{ template "harbor.core" . }}
+            {{- end }}
+        - name: psc
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+      {{- include "harbor.podScheduling" (dict "component" .Values.core "root" $) | nindent 6 }}

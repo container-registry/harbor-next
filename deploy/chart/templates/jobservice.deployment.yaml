@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "harbor.fullname" . }}-jobservice
+  labels:
+    {{- include "harbor.componentLabels" (dict "root" . "component" "jobservice") | nindent 4 }}
+spec:
+  replicas: {{ .Values.jobservice.replicas }}
+  revisionHistoryLimit: {{ .Values.jobservice.revisionHistoryLimit | default .Values.global.revisionHistoryLimit }}
+  {{- with .Values.jobservice.deploymentStrategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "jobservice") | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/configmap: {{ include (print $.Template.BasePath "/jobservice.configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/jobservice.secret.yaml") . | sha256sum }}
+        {{- with .Values.jobservice.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "jobservice") | nindent 8 }}
+        {{- with .Values.jobservice.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- include "harbor.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "harbor.serviceAccountName" (dict "root" . "component" "jobservice" "serviceAccount" .Values.jobservice.serviceAccount) }}
+      automountServiceAccountToken: {{ .Values.jobservice.serviceAccount.automountServiceAccountToken | default false }}
+      {{- with (.Values.jobservice.priorityClassName | default .Values.global.priorityClassName) }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.jobservice.podSecurityContext | nindent 8 }}
+      {{- with .Values.jobservice.initContainers }}
+      initContainers:
+        {{- tpl (toYaml .) $ | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: jobservice
+          securityContext:
+            {{- toYaml .Values.jobservice.securityContext | nindent 12 }}
+          image: {{ include "harbor.image" (dict "imageRoot" .Values.jobservice.image "global" .Values.image "chart" .Chart) }}
+          imagePullPolicy: {{ include "harbor.imagePullPolicy" . }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ template "harbor.jobservice" . }}-env
+            - secretRef:
+                name: {{ include "harbor.fullname" . }}-jobservice
+          env:
+            - name: CORE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.core.existingSecret | default (include "harbor.core" .) }}
+                  key: {{ .Values.core.existingSecretKey | default "secret" }}
+            {{- if .Values.valkey.auth.enabled }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "harbor.redis.secretName" . }}
+                  key: {{ include "harbor.redis.secretKey" . }}
+            {{- end }}
+            {{- with .Values.jobservice.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /api/v1/stats
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/v1/stats
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.jobservice.resources | nindent 12 }}
+          volumeMounts:
+            - name: jobservice-config
+              mountPath: /etc/jobservice/config.yml
+              subPath: config.yml
+            - name: job-logs
+              mountPath: /var/log/jobs
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: jobservice-config
+          configMap:
+            name: "{{ template "harbor.jobservice" . }}"
+        - name: job-logs
+          {{- if and .Values.jobservice.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.jobservice.persistence.existingClaim | default (include "harbor.jobservice" .) }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: tmp
+          emptyDir: {}
+      {{- include "harbor.podScheduling" (dict "component" .Values.jobservice "root" $) | nindent 6 }}

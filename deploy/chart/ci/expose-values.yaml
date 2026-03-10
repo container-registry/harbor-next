@@ -1,0 +1,24 @@
+# Test all expose types render correctly
+externalURL: https://harbor.example.com
+database:
+  host: db.example.com
+harborAdminPassword: Harbor12345
+ingress:
+  enabled: false
+expose:
+  loadBalancer:
+    enabled: true
+    IP: "1.2.3.4"
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: nlb
+trivy:
+  enabled: true
+  serviceAccount:
+    create: true
+  pdb:
+    enabled: true
+cache:
+  enabled: true
+  expireHours: 12
+global:
+  priorityClassName: high-priority

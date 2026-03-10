@@ -1,0 +1,58 @@
+
+Harbor has been installed!
+
+1. Get the Harbor URL:
+{{- if .Values.ingress.enabled }}
+{{- if gt (len .Values.ingress.hosts) 0 }}
+{{- range .Values.ingress.hosts }}
+   Harbor URL: http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+{{- else }}
+   Harbor URL: {{ include "harbor.externalURL" . }}
+{{- end }}
+{{- else if .Values.gateway.enabled }}
+{{- range .Values.gateway.hostnames }}
+   Harbor URL: https://{{ . }}
+{{- end }}
+{{- else }}
+   Harbor is not exposed externally. Use port-forwarding:
+   kubectl port-forward svc/{{ include "harbor.fullname" . }}-portal 8080:80
+   Then access Harbor at: http://localhost:8080
+{{- end }}
+
+2. Login with:
+   Username: admin
+   Password: (your harborAdminPassword value)
+
+3. To push images:
+{{- if .Values.ingress.enabled }}
+{{- if gt (len .Values.ingress.hosts) 0 }}
+{{- range .Values.ingress.hosts }}
+   docker login {{ .host }}
+   docker tag myimage:latest {{ .host }}/library/myimage:latest
+   docker push {{ .host }}/library/myimage:latest
+{{- end }}
+{{- else }}
+   docker login {{ (urlParse .Values.externalURL).host }}
+   docker tag myimage:latest {{ (urlParse .Values.externalURL).host }}/library/myimage:latest
+   docker push {{ (urlParse .Values.externalURL).host }}/library/myimage:latest
+{{- end }}
+{{- end }}
+
+4. Components deployed:
+   - Core: {{ include "harbor.fullname" . }}-core
+   - Registry: {{ include "harbor.fullname" . }}-registry
+   - Portal: {{ include "harbor.fullname" . }}-portal
+   - Jobservice: {{ include "harbor.fullname" . }}-jobservice
+{{- if .Values.exporter.enabled }}
+   - Exporter: {{ include "harbor.fullname" . }}-exporter
+{{- end }}
+{{- if .Values.valkey.enabled }}
+   - Valkey (Redis): {{ include "harbor.fullname" . }}-valkey-master
+{{- end }}{{- if .Values.trivy.enabled }}
+   - Trivy Scanner: {{ include "harbor.fullname" . }}-trivy
+{{- end }}
+
+5. For more information:
+   - Harbor documentation: https://goharbor.io/docs/
+   - Chart source: https://github.com/container-registry/harbor-next

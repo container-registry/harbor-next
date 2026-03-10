@@ -1,0 +1,170 @@
+suite: PodDisruptionBudget tests
+templates:
+  - templates/pdbs.yaml
+tests:
+  - it: should not create PDBs by default
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should create core PDB when enabled
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-harbor-next-core
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.pdb.enabled: true
+      core.pdb.minAvailable: 1
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+      - equal:
+          path: spec.minAvailable
+          value: 1
+
+  - it: should create portal PDB when enabled
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-harbor-next-portal
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      portal.pdb.enabled: true
+      portal.pdb.minAvailable: 2
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+      - equal:
+          path: spec.minAvailable
+          value: 2
+
+  - it: should create registry PDB when enabled
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-harbor-next-registry
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.pdb.enabled: true
+      registry.pdb.minAvailable: 1
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+      - equal:
+          path: spec.minAvailable
+          value: 1
+
+  - it: should create jobservice PDB when enabled
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-harbor-next-jobservice
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      jobservice.pdb.enabled: true
+      jobservice.pdb.minAvailable: 1
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+      - equal:
+          path: spec.minAvailable
+          value: 1
+
+  - it: should create exporter PDB when enabled
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-harbor-next-exporter
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      exporter.enabled: true
+      exporter.pdb.enabled: true
+      exporter.pdb.minAvailable: 1
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+      - equal:
+          path: spec.minAvailable
+          value: 1
+
+  - it: should create trivy PDB when enabled
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-harbor-next-trivy
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trivy.enabled: true
+      trivy.pdb.enabled: true
+      trivy.pdb.minAvailable: 1
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+      - equal:
+          path: spec.minAvailable
+          value: 1
+
+  - it: should not create exporter PDB when exporter is disabled
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      exporter.enabled: false
+      exporter.pdb.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not create trivy PDB when trivy is disabled
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trivy.enabled: false
+      trivy.pdb.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should support maxUnavailable instead of minAvailable
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-harbor-next-core
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.pdb.enabled: true
+      core.pdb.maxUnavailable: 1
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+      - equal:
+          path: spec.maxUnavailable
+          value: 1
+
+  - it: should support percentage values for minAvailable
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-harbor-next-core
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.pdb.enabled: true
+      core.pdb.minAvailable: "50%"
+    asserts:
+      - equal:
+          path: spec.minAvailable
+          value: "50%"

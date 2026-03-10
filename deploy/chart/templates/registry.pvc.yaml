@@ -1,0 +1,24 @@
+{{- if and (eq .Values.registry.storage.type "filesystem") .Values.registry.persistence.enabled (not .Values.registry.persistence.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "harbor.fullname" . }}-registry
+  labels:
+    {{- include "harbor.componentLabels" (dict "root" . "component" "registry") | nindent 4 }}
+  annotations:
+    {{- if eq .Values.registry.persistence.resourcePolicy "keep" }}
+    helm.sh/resource-policy: keep
+    {{- end }}
+    {{- with .Values.registry.persistence.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  accessModes:
+    {{- toYaml .Values.registry.persistence.accessModes | nindent 4 }}
+  {{- if .Values.registry.persistence.storageClass }}
+  storageClassName: {{ .Values.registry.persistence.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.registry.persistence.size | quote }}
+{{- end }}

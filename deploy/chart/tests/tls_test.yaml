@@ -1,0 +1,158 @@
+suite: TLS certificate tests
+templates:
+  - templates/tls-certificates.yaml
+tests:
+  - it: should not create certificates when cert-manager disabled
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      tls.certManager.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should create certificate per ingress host when enabled
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      tls.certManager.enabled: true
+      tls.certManager.issuerRef:
+        name: letsencrypt-prod
+        kind: ClusterIssuer
+      ingress.hosts:
+        - host: harbor.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Certificate
+
+  - it: should set certificate name from host
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      tls.certManager.enabled: true
+      tls.certManager.issuerRef:
+        name: letsencrypt-prod
+        kind: ClusterIssuer
+      ingress.hosts:
+        - host: harbor.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+    asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-harbor-next-harbor-example-com
+
+  - it: should set secretName
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      tls.certManager.enabled: true
+      tls.certManager.issuerRef:
+        name: letsencrypt-prod
+        kind: ClusterIssuer
+      ingress.hosts:
+        - host: harbor.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+    asserts:
+      - equal:
+          path: spec.secretName
+          value: RELEASE-NAME-harbor-next-harbor-example-com-tls
+
+  - it: should set duration and renewBefore
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      tls.certManager.enabled: true
+      tls.certManager.duration: 4320h
+      tls.certManager.renewBefore: 720h
+      tls.certManager.issuerRef:
+        name: letsencrypt-prod
+        kind: ClusterIssuer
+      ingress.hosts:
+        - host: harbor.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+    asserts:
+      - equal:
+          path: spec.duration
+          value: 4320h
+      - equal:
+          path: spec.renewBefore
+          value: 720h
+
+  - it: should set issuerRef
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      tls.certManager.enabled: true
+      tls.certManager.issuerRef:
+        name: letsencrypt-prod
+        kind: ClusterIssuer
+      ingress.hosts:
+        - host: harbor.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+    asserts:
+      - equal:
+          path: spec.issuerRef.name
+          value: letsencrypt-prod
+      - equal:
+          path: spec.issuerRef.kind
+          value: ClusterIssuer
+
+  - it: should set dnsNames
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      tls.certManager.enabled: true
+      tls.certManager.issuerRef:
+        name: letsencrypt-prod
+        kind: ClusterIssuer
+      ingress.hosts:
+        - host: harbor.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+    asserts:
+      - equal:
+          path: spec.dnsNames[0]
+          value: "harbor.example.com"
+
+  - it: should create multiple certificates for multiple hosts
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      tls.certManager.enabled: true
+      tls.certManager.issuerRef:
+        name: letsencrypt-prod
+        kind: ClusterIssuer
+      ingress.hosts:
+        - host: harbor.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+        - host: notary.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+    asserts:
+      - hasDocuments:
+          count: 2

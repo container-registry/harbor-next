@@ -1,0 +1,331 @@
+suite: expose service and route tests
+templates:
+  - templates/expose-service.yaml
+  - templates/expose-route.yaml
+tests:
+  # --- No service by default ---
+  - it: should not create expose service when all disabled
+    template: templates/expose-service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # --- ClusterIP ---
+  - it: should create ClusterIP service when enabled
+    template: templates/expose-service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      expose.clusterIP.enabled: true
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: spec.type
+          value: ClusterIP
+
+  - it: should set ClusterIP http port
+    template: templates/expose-service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      expose.clusterIP.enabled: true
+      expose.clusterIP.ports.http: 8080
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 8080
+
+  - it: should add https port when TLS enabled
+    template: templates/expose-service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      expose.clusterIP.enabled: true
+      tls.enabled: true
+    asserts:
+      - lengthEqual:
+          path: spec.ports
+          count: 2
+      - equal:
+          path: spec.ports[1].name
+          value: https
+
+  - it: should set static ClusterIP
+    template: templates/expose-service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      expose.clusterIP.enabled: true
+      expose.clusterIP.staticClusterIP: 10.0.0.100
+    asserts:
+      - equal:
+          path: spec.clusterIP
+          value: 10.0.0.100
+
+  - it: should set ClusterIP annotations
+    template: templates/expose-service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      expose.clusterIP.enabled: true
+      expose.clusterIP.annotations:
+        my-annotation: my-value
+    asserts:
+      - equal:
+          path: metadata.annotations["my-annotation"]
+          value: my-value
+
+  - it: should set ClusterIP labels
+    template: templates/expose-service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      expose.clusterIP.enabled: true
+      expose.clusterIP.labels:
+        my-label: my-value
+    asserts:
+      - equal:
+          path: metadata.labels["my-label"]
+          value: my-value
+
+  - it: should use custom ClusterIP name
+    template: templates/expose-service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      expose.clusterIP.enabled: true
+      expose.clusterIP.name: my-harbor-svc
+    asserts:
+      - equal:
+          path: metadata.name
+          value: my-harbor-svc
+
+  # --- NodePort ---
+  - it: should create NodePort service when enabled
+    template: templates/expose-service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      expose.nodePort.enabled: true
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: spec.type
+          value: NodePort
+
+  - it: should set NodePort values
+    template: templates/expose-service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      expose.nodePort.enabled: true
+      expose.nodePort.ports.http.port: 80
+      expose.nodePort.ports.http.nodePort: 30080
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 80
+      - equal:
+          path: spec.ports[0].nodePort
+          value: 30080
+
+  - it: should add NodePort https when TLS enabled
+    template: templates/expose-service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      expose.nodePort.enabled: true
+      tls.enabled: true
+      expose.nodePort.ports.https.port: 443
+      expose.nodePort.ports.https.nodePort: 30443
+    asserts:
+      - lengthEqual:
+          path: spec.ports
+          count: 2
+      - equal:
+          path: spec.ports[1].nodePort
+          value: 30443
+
+  # --- LoadBalancer ---
+  - it: should create LoadBalancer service when enabled
+    template: templates/expose-service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      expose.loadBalancer.enabled: true
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: spec.type
+          value: LoadBalancer
+
+  - it: should set loadBalancerIP
+    template: templates/expose-service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      expose.loadBalancer.enabled: true
+      expose.loadBalancer.IP: 1.2.3.4
+    asserts:
+      - equal:
+          path: spec.loadBalancerIP
+          value: 1.2.3.4
+
+  - it: should set loadBalancer sourceRanges
+    template: templates/expose-service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      expose.loadBalancer.enabled: true
+      expose.loadBalancer.sourceRanges:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+    asserts:
+      - equal:
+          path: spec.loadBalancerSourceRanges[0]
+          value: 10.0.0.0/8
+      - equal:
+          path: spec.loadBalancerSourceRanges[1]
+          value: 172.16.0.0/12
+
+  - it: should set loadBalancer annotations
+    template: templates/expose-service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      expose.loadBalancer.enabled: true
+      expose.loadBalancer.annotations:
+        service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    asserts:
+      - equal:
+          path: metadata.annotations["service.beta.kubernetes.io/aws-load-balancer-type"]
+          value: nlb
+
+  # --- OpenShift Route ---
+  - it: should create route when enabled
+    template: templates/expose-route.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      expose.route.enabled: true
+    asserts:
+      - isKind:
+          of: Route
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-harbor-next
+
+  - it: should not create route when disabled
+    template: templates/expose-route.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      expose.route.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should set route host
+    template: templates/expose-route.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      expose.route.enabled: true
+      expose.route.host: harbor.apps.example.com
+    asserts:
+      - equal:
+          path: spec.host
+          value: "harbor.apps.example.com"
+
+  - it: should set route TLS termination
+    template: templates/expose-route.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      expose.route.enabled: true
+      expose.route.tls.termination: passthrough
+    asserts:
+      - equal:
+          path: spec.tls.termination
+          value: passthrough
+
+  - it: should set insecureEdgeTerminationPolicy
+    template: templates/expose-route.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      expose.route.enabled: true
+      expose.route.tls.insecureEdgeTerminationPolicy: Allow
+    asserts:
+      - equal:
+          path: spec.tls.insecureEdgeTerminationPolicy
+          value: Allow
+
+  - it: should route to core service
+    template: templates/expose-route.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      expose.route.enabled: true
+    asserts:
+      - equal:
+          path: spec.to.kind
+          value: Service
+      - equal:
+          path: spec.to.name
+          value: RELEASE-NAME-harbor-next-core
+
+  - it: should set route annotations
+    template: templates/expose-route.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      expose.route.enabled: true
+      expose.route.annotations:
+        haproxy.router.openshift.io/timeout: 600s
+    asserts:
+      - equal:
+          path: metadata.annotations["haproxy.router.openshift.io/timeout"]
+          value: 600s
+
+  - it: should set route labels
+    template: templates/expose-route.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      expose.route.enabled: true
+      expose.route.labels:
+        my-label: my-value
+    asserts:
+      - equal:
+          path: metadata.labels["my-label"]
+          value: my-value

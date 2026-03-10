@@ -1,0 +1,22 @@
+# eksctl ClusterConfig for Harbor Next IRSA demo
+# Usage: eksctl create cluster -f cluster.yaml
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: harbor-next-irsa
+  region: eu-central-1
+  tags:
+    project: harbor-next
+    environment: dev
+
+iam:
+  withOIDC: true
+
+managedNodeGroups:
+  - name: default
+    instanceType: t3.medium
+    desiredCapacity: 1
+    minSize: 1
+    maxSize: 2
+    volumeSize: 30

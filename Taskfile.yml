@@ -54,6 +54,9 @@ includes:
     aliases: [d]
   docs:
     taskfile: ./taskfile/docs.yml
+  helm:
+    taskfile: ./taskfile/helm.yml
+    aliases: [h]
 
 tasks:
   default:
