@@ -15,7 +15,7 @@ helm install my-harbor oci://8gears.container-registry.com/8gcr/chart/harbor-nex
 
 ## Why This Chart?
 
-This chart is a ground-up redesign of the Harbor Helm chart with modern Kubernetes best practices, built for [Harbor Next](https://github.com/container-registry/harbor-next):
+This chart is a ground-up redesign of the Harbor Helm chart with modern Kubernetes best practices, built for [Harbor Next](https://github.com/container-registry/harbor-next) and Harbor.
 
 | Feature | Legacy harbor-helm | This Chart |
 |---------|-------------------|------------|
