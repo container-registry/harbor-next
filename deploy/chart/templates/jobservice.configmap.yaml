@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ template "harbor.jobservice" . }}"
+  labels:
+    {{- include "harbor.labels" . | nindent 4 }}
+data:
+  config.yml: |+
+    #Server listening port
+    protocol: {{ include "harbor.component.scheme" . | quote }}
+    port: {{ include "harbor.jobservice.port" . }}
+    worker_pool:
+      workers: {{ .Values.jobservice.max_job_workers }}
+      backend: "redis"
+      redis_pool:
+        redis_url: {{ include "harbor.redis.url.jobservice" . | quote }}
+        namespace: "harbor_job_service_namespace"
+        idle_timeout_second: 3600
+    job_loggers:
+      {{- if has "file" .Values.jobservice.jobLoggers }}
+      - name: "FILE"
+        level: {{ .Values.logLevel | upper }}
+        settings:
+          base_dir: "/var/log/jobs"
+        sweeper:
+          duration: {{ .Values.jobservice.loggerSweeperDuration | default 14 }} #days
+          settings:
+            work_dir: "/var/log/jobs"
+      {{- end }}
+      {{- if has "database" .Values.jobservice.jobLoggers }}
+      - name: "DB"
+        level: {{ .Values.logLevel | upper }}
+        sweeper:
+          duration: {{ .Values.jobservice.loggerSweeperDuration | default 14 }} #days
+      {{- end }}
+      {{- if has "stdout" .Values.jobservice.jobLoggers }}
+      - name: "STD_OUTPUT"
+        level: {{ .Values.logLevel | upper }}
+      {{- end }}
+    metric:
+      enabled: {{ .Values.metrics.enabled }}
+      path: "{{ include "harbor.metrics.path" . }}"
+      port: {{ include "harbor.metrics.port" . }}
+    #Loggers for the job service
+    loggers:
+      - name: "STD_OUTPUT"
+        level: {{ .Values.logLevel | upper }}
+    reaper:
+      max_update_hours: {{ .Values.jobservice.reaper.max_update_hours | default 24 }}
+      max_dangling_hours: {{ .Values.jobservice.reaper.max_dangling_hours | default 168 }}

@@ -1,0 +1,101 @@
+# Harbor Helm Chart - k3d Local Development Values
+# Usage: helm install harbor . -n harbor -f example/k3d-local.yaml
+
+# External URL for Harbor (use localhost with k3d port mapping)
+externalURL: "https://harbor.localhost"
+
+# Harbor admin password (REQUIRED - change this!)
+harborAdminPassword: "Harbor12345"
+
+# Ingress configuration for k3d (uses Traefik by default)
+ingress:
+  enabled: true
+  className: traefik
+  annotations:
+    # Traefik-specific
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    # Nginx-compatible (also works with Traefik)
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-next-upstream-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-next-upstream-tries: "5"
+  core: harbor.localhost
+  hosts:
+    - host: harbor.localhost
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: harbor-tls
+      hosts:
+        - harbor.localhost
+
+# TLS configuration - auto-generate certs for local dev
+tls:
+  enabled: true
+  certSource: auto
+
+# Database configuration (external postgres required)
+database:
+  host: postgres.harbor.svc.cluster.local
+  port: 5432
+  username: postgres
+  password: harbordbpass
+  database: registry
+  sslmode: disable
+
+# Use internal Valkey (Redis-compatible)
+valkey:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: false
+
+# Trivy scanner - disabled for faster local startup
+trivy:
+  enabled: false
+
+# Metrics - disabled for local dev
+metrics:
+  enabled: false
+
+# Reduced resources for local development
+core:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+jobservice:
+  replicas: 1
+  max_job_workers: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+registry:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+portal:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+exporter:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
