@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "harbor.fullname" . }}-portal
+  labels:
+    {{- include "harbor.componentLabels" (dict "root" . "component" "portal") | nindent 4 }}
+spec:
+  replicas: {{ .Values.portal.replicas }}
+  revisionHistoryLimit: {{ .Values.portal.revisionHistoryLimit | default .Values.global.revisionHistoryLimit }}
+  {{- with .Values.portal.deploymentStrategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "portal") | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.portal.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "portal") | nindent 8 }}
+        {{- with .Values.portal.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- include "harbor.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "harbor.serviceAccountName" (dict "root" . "component" "portal" "serviceAccount" .Values.portal.serviceAccount) }}
+      automountServiceAccountToken: {{ .Values.portal.serviceAccount.automountServiceAccountToken | default false }}
+      {{- with (.Values.portal.priorityClassName | default .Values.global.priorityClassName) }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.portal.podSecurityContext | nindent 8 }}
+      {{- with .Values.portal.initContainers }}
+      initContainers:
+        {{- tpl (toYaml .) $ | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: portal
+          securityContext:
+            {{- toYaml .Values.portal.securityContext | nindent 12 }}
+          image: {{ include "harbor.image" (dict "imageRoot" .Values.portal.image "global" .Values.image "chart" .Chart) }}
+          imagePullPolicy: {{ include "harbor.imagePullPolicy" . }}
+          ports:
+            - name: portal-http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            {{- with .Values.portal.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: portal-http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: portal-http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.portal.resources | nindent 12 }}
+          volumeMounts:
+            - name: portal-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+            - mountPath: /tmp
+              name: tmp
+      volumes:
+        - name: portal-config
+          configMap:
+            name: "{{ template "harbor.portal" . }}"
+        - name: tmp
+          emptyDir: {}
+      {{- include "harbor.podScheduling" (dict "component" .Values.portal "root" $) | nindent 6 }}
