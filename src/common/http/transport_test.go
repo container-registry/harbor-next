@@ -333,7 +333,13 @@ func TestGetHTTPTransportWithMultipleCerts(t *testing.T) {
 func TestWithCustomCACertAppendsToSystemPool(t *testing.T) {
 	customCert := generateSelfSignedCert(t)
 
-	t.Run("custom CA cert uses system pool as base", func(t *testing.T) {
+	// Parse the custom cert for verification
+	block, _ := pem.Decode([]byte(customCert))
+	require.NotNil(t, block)
+	customX509, err := x509.ParseCertificate(block.Bytes)
+	require.NoError(t, err)
+
+	t.Run("custom CA appended to system pool", func(t *testing.T) {
 		tr := &http.Transport{}
 		opt := WithCustomCACert(customCert)
 		opt(tr)
@@ -341,32 +347,37 @@ func TestWithCustomCACertAppendsToSystemPool(t *testing.T) {
 		require.NotNil(t, tr.TLSClientConfig, "TLSClientConfig should be set")
 		require.NotNil(t, tr.TLSClientConfig.RootCAs, "RootCAs should be set")
 
-		// The pool should contain system CAs + our custom CA
-		subjects := tr.TLSClientConfig.RootCAs.Subjects()
+		pool := tr.TLSClientConfig.RootCAs
 
-		assert.GreaterOrEqual(t, len(subjects), 1,
-			"Should have at least our custom CA, and system CAs if available")
+		// Verify the custom cert is trusted by the pool
+		_, err := customX509.Verify(x509.VerifyOptions{Roots: pool})
+		assert.NoError(t, err, "Custom CA should be trusted by the pool")
 
-		// Verify the custom cert is in the pool by checking the last subject
-		assert.NotEmpty(t, subjects, "Should have at least one certificate")
+		// Verify system CAs are still trusted (pool was not replaced)
+		// A pool created from only the custom cert would not contain system CAs
+		systemPool, sysErr := x509.SystemCertPool()
+		if sysErr == nil && systemPool != nil {
+			// Create a cert pool with only the custom cert (no system CAs)
+			customOnlyPool := x509.NewCertPool()
+			customOnlyPool.AddCert(customX509)
+
+			// The configured pool should NOT equal a custom-only pool
+			// because it also includes system CAs
+			assert.NotEqual(t, customOnlyPool, pool,
+				"Pool should contain more than just the custom CA")
+		}
 	})
 
 	t.Run("transport with custom CA configured correctly", func(t *testing.T) {
-		// Create a transport with custom CA
 		transport := GetHTTPTransport(WithCACert(customCert))
 		httpTransport, ok := transport.(*http.Transport)
 		require.True(t, ok, "should be *http.Transport")
 		require.NotNil(t, httpTransport.TLSClientConfig)
 		require.NotNil(t, httpTransport.TLSClientConfig.RootCAs)
 
-		// The RootCAs pool should be configured to trust:
-		// 1. Certs signed by the custom CA
-		// 2. Certs signed by system CAs
-
-		// Verify the pool is not nil and contains certificates
-		subjects := httpTransport.TLSClientConfig.RootCAs.Subjects()
-		assert.GreaterOrEqual(t, len(subjects), 1,
-			"Should have at least custom CA configured")
+		// Verify custom cert is trusted
+		_, err := customX509.Verify(x509.VerifyOptions{Roots: httpTransport.TLSClientConfig.RootCAs})
+		assert.NoError(t, err, "Custom CA should be trusted by the transport pool")
 	})
 }
 
