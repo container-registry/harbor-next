@@ -12,7 +12,6 @@ on:
 permissions: {}
 
 env:
-  GO_VERSION: '1.24.6'
   NODE_VERSION: '18'
   GHCR_REGISTRY: ghcr.io
   GHCR_NAMESPACE: container-registry/harbor-next
@@ -47,23 +46,15 @@ jobs:
 
       - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: src/go.mod
+
+      - uses: arduino/setup-task@24c5e13bce349197642746563945fcdf9355e8f4 # v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate API code
-        run: |
-          mkdir -p "$HOME/.local/bin"
-          curl -sSfL https://github.com/go-swagger/go-swagger/releases/download/v0.31.0/swagger_linux_amd64 -o "$HOME/.local/bin/swagger"
-          chmod +x "$HOME/.local/bin/swagger"
-          mkdir -p src/server/v2.0
-          "$HOME/.local/bin/swagger" generate server \
-            --template-dir=./tools/swagger/templates \
-            --exclude-main \
-            --additional-initialism=CVE \
-            --additional-initialism=GC \
-            --additional-initialism=OIDC \
-            -f ./api/v2.0/swagger.yaml \
-            -A harbor \
-            --target ./src/server/v2.0
+        run: task build:gen-apis
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
@@ -113,14 +104,13 @@ jobs:
           cache-dependency-path: src/portal/package-lock.json
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Install Chromium for Karma tests
         run: |
           npx @puppeteer/browsers install chromium@latest --path $HOME/.cache/puppeteer
           CHROME_PATH=$(find $HOME/.cache/puppeteer -type f -name 'chrome' 2>/dev/null | head -1)
           echo "CHROME_BIN=${CHROME_PATH}" >> $GITHUB_ENV
-          echo "Found Chrome at: ${CHROME_PATH}"
 
       - name: Run tests
         run: npm run test
@@ -135,23 +125,15 @@ jobs:
 
       - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: src/go.mod
+
+      - uses: arduino/setup-task@24c5e13bce349197642746563945fcdf9355e8f4 # v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate API code
-        run: |
-          mkdir -p "$HOME/.local/bin"
-          curl -sSfL https://github.com/go-swagger/go-swagger/releases/download/v0.31.0/swagger_linux_amd64 -o "$HOME/.local/bin/swagger"
-          chmod +x "$HOME/.local/bin/swagger"
-          mkdir -p src/server/v2.0
-          "$HOME/.local/bin/swagger" generate server \
-            --template-dir=./tools/swagger/templates \
-            --exclude-main \
-            --additional-initialism=CVE \
-            --additional-initialism=GC \
-            --additional-initialism=OIDC \
-            -f ./api/v2.0/swagger.yaml \
-            -A harbor \
-            --target ./src/server/v2.0
+        run: task build:gen-apis
 
       - name: Run govulncheck
         working-directory: src
@@ -187,47 +169,27 @@ jobs:
           - registryctl
           - portal
           - registry
-          - nginx
     env:
       BUILDKIT_ADDR: tcp://buildkitd.github-runners.svc:1234
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
 
       - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
-        if: ${{ matrix.service == 'core' || matrix.service == 'jobservice' || matrix.service == 'registryctl' }}
+        if: contains(fromJSON('["core","jobservice","registryctl"]'), matrix.service)
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: src/go.mod
 
-      - name: Install tools
-        if: ${{ matrix.service == 'core' || matrix.service == 'jobservice' || matrix.service == 'registryctl' }}
-        run: |
-          mkdir -p "$HOME/.local/bin"
-          sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b "$HOME/.local/bin"
-          curl -sSfL https://github.com/go-swagger/go-swagger/releases/download/v0.31.0/swagger_linux_amd64 -o "$HOME/.local/bin/swagger"
-          chmod +x "$HOME/.local/bin/swagger"
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Generate API code
-        if: ${{ matrix.service == 'core' || matrix.service == 'jobservice' || matrix.service == 'registryctl' }}
-        run: |
-          mkdir -p src/server/v2.0
-          swagger generate server \
-            --template-dir=./tools/swagger/templates \
-            --exclude-main \
-            --additional-initialism=CVE \
-            --additional-initialism=GC \
-            --additional-initialism=OIDC \
-            -f ./api/v2.0/swagger.yaml \
-            -A harbor \
-            --target ./src/server/v2.0
+      - uses: arduino/setup-task@24c5e13bce349197642746563945fcdf9355e8f4 # v2
+        if: contains(fromJSON('["core","jobservice","registryctl"]'), matrix.service)
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build binaries for both architectures
-        if: ${{ matrix.service == 'core' || matrix.service == 'jobservice' || matrix.service == 'registryctl' }}
-        env:
-          SERVICE: ${{ matrix.service }}
+        if: contains(fromJSON('["core","jobservice","registryctl"]'), matrix.service)
         run: |
-          task build:binary:${SERVICE}:linux-amd64
-          task build:binary:${SERVICE}:linux-arm64
+          task build:binary:${{ matrix.service }}:linux-amd64
+          task build:binary:${{ matrix.service }}:linux-arm64
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
@@ -251,7 +213,7 @@ jobs:
         run: |
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
-            --file "./dockerfiles/${{ matrix.service }}.dockerfile" \
+            --file "./dockerfile/${{ matrix.service }}.dockerfile" \
             --tag "${IMAGE}" \
             --metadata-file metadata.json \
             --push \
@@ -282,7 +244,6 @@ jobs:
           - registryctl
           - portal
           - registry
-          - nginx
     env:
       BUILDKIT_ADDR: tcp://buildkitd.github-runners.svc:1234
     steps:
@@ -344,7 +305,6 @@ jobs:
           - registryctl
           - portal
           - registry
-          - nginx
     steps:
       - name: Install Syft
         uses: anchore/sbom-action/download-syft@a930d0ac434e3182448fe678398ba5713717112a # v0.21.0
@@ -409,7 +369,7 @@ jobs:
           HARBOR_NAMESPACE: ${{ env.HARBOR_NAMESPACE }}
           REPO_NAME: ${{ github.repository }}
         run: |
-          SERVICES=(core jobservice registryctl portal registry nginx)
+          SERVICES=(core jobservice registryctl portal registry)
           {
             echo "<!-- harbor-pr-images -->"
             echo "## Harbor PR Images"
