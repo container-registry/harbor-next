@@ -52,6 +52,12 @@ includes:
   dev:
     taskfile: ./taskfile/dev.yml
     aliases: [d]
+  helm:
+    taskfile: ./taskfile/helm.yml
+    aliases: [h]
+  docs:
+    taskfile: ./taskfile/docs.yml
+    aliases: [doc]
 
 tasks:
   default:

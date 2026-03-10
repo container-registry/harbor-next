@@ -39,4 +39,10 @@ type PostGreSQL struct {
 	MaxOpenConns    int           `json:"max_open_conns"`
 	ConnMaxLifetime time.Duration `json:"conn_max_lifetime"`
 	ConnMaxIdleTime time.Duration `json:"conn_max_idle_time"`
+	// UseIAMAuth enables AWS RDS IAM authentication instead of password-based auth.
+	// When enabled, the Password field is ignored and IAM tokens are generated automatically.
+	UseIAMAuth bool `json:"use_iam_auth"`
+	// AWSRegion is the AWS region where the RDS instance is located.
+	// Required when UseIAMAuth is true.
+	AWSRegion string `json:"aws_region,omitempty"`
 }
