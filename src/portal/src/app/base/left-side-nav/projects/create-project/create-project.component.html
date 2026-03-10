@@ -331,9 +331,7 @@
                 </div>
             </div>
             <clr-checkbox-container
-                [style.visibility]="
-                    isSystemAdmin && enableProxyCache ? 'visible' : 'hidden'
-                ">
+                *ngIf="isSystemAdmin && enableProxyCache">
                 <label class="clr-control-label">
                     {{ 'PROJECT.PROXY_CACHE_LOCAL_ON_NOT_FOUND' | translate }}
                     <clr-tooltip>
