@@ -1,0 +1,234 @@
+name: PR Preview Images
+
+on:
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "CLAUDE.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-preview-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
+  REGISTRY_PROJECT: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
+  PREVIEW_TAG: pr-${{ github.event.pull_request.number }}
+
+jobs:
+  build:
+    name: "${{ matrix.component }} (${{ matrix.platform }})"
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter]
+        platform:
+          - linux/amd64
+          - linux/arm64
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Prepare
+        run: |
+          platform=${{ matrix.platform }}
+          echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Load versions
+        run: grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
+
+      - name: Setup Go
+        if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: src/go.mod
+          cache-dependency-path: src/go.sum
+
+      - name: Install Task
+        if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
+        uses: arduino/setup-task@24c5e13bce349197642746563945fcdf9355e8f4 # v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate API code
+        if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
+        run: task build:gen-apis
+
+      - name: Compile Go binary
+        if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
+        run: task build:binary:${{ matrix.component }}:${{ env.PLATFORM_PAIR }} GIT_COMMIT="${GITHUB_SHA:0:8}"
+
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Log in to registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY_ADDRESS }}
+          username: ${{ vars.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          file: dockerfile/${{ matrix.component }}.dockerfile
+          platforms: ${{ matrix.platform }}
+          build-args: |
+            ALPINE_VERSION=${{ env.ALPINE_VERSION }}
+            LPROBE_VERSION=${{ env.LPROBE_VERSION }}
+            NGINX_VERSION=${{ env.NGINX_VERSION }}
+            BUN_VERSION=${{ env.BUN_VERSION }}
+            GO_VERSION=${{ env.GO_VERSION }}
+            DISTRIBUTION_VERSION=${{ env.DISTRIBUTION_VERSION }}
+            TRIVY_VERSION=${{ env.TRIVY_VERSION }}
+            TRIVY_BASE_IMAGE_VERSION=${{ env.TRIVY_BASE_IMAGE_VERSION }}
+            HARBOR_SCANNER_TRIVY_VERSION=${{ env.HARBOR_SCANNER_TRIVY_VERSION }}
+          tags: ${{ env.REGISTRY_ADDRESS }}/${{ env.REGISTRY_PROJECT }}/harbor-${{ matrix.component }}
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+
+      - name: Export digest
+        run: |
+          mkdir -p "${{ runner.temp }}/digests"
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: preview-digest-${{ matrix.component }}-${{ env.PLATFORM_PAIR }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: "Merge ${{ matrix.component }}"
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
+    needs: [build]
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: preview-digest-${{ matrix.component }}-*
+          merge-multiple: true
+
+      - name: Log in to registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY_ADDRESS }}
+          username: ${{ vars.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Create manifest list and push
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          IMAGE: ${{ env.REGISTRY_ADDRESS }}/${{ env.REGISTRY_PROJECT }}/harbor-${{ matrix.component }}
+        run: |
+          # shellcheck disable=SC2046
+          docker buildx imagetools create \
+            -t "${IMAGE}:${PREVIEW_TAG}" \
+            $(printf "${IMAGE}@sha256:%s " *)
+
+  sign:
+    name: Sign preview images
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
+    needs: [merge]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: src/go.mod
+          cache: false
+
+      - name: Install crane
+        run: go install github.com/google/go-containerregistry/cmd/crane@v0.20.3
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
+
+      - name: Log in to registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY_ADDRESS }}
+          username: ${{ vars.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Sign images by digest
+        env:
+          PATH: ${{ env.PATH }}:${{ runner.temp }}:${{ env.GOPATH }}/bin:${{ env.HOME }}/go/bin
+        run: |
+          for image in core jobservice registryctl exporter portal registry trivy-adapter; do
+            ref="${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-${image}:${PREVIEW_TAG}"
+            digest="$("${HOME}/go/bin/crane" digest "${ref}")"
+            cosign sign --yes "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-${image}@${digest}"
+          done
+
+  pr-comment:
+    name: Comment preview image refs
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
+    needs: [sign]
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Create or update PR comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MARKER: "<!-- harbor-next-pr-preview -->"
+        run: |
+          body=$(cat <<EOF
+          ${MARKER}
+          Preview images for this PR are available in \`${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}\` with tag \`${PREVIEW_TAG}\`.
+
+          - \`${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-core:${PREVIEW_TAG}\`
+          - \`${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-jobservice:${PREVIEW_TAG}\`
+          - \`${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-registryctl:${PREVIEW_TAG}\`
+          - \`${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-exporter:${PREVIEW_TAG}\`
+          - \`${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-portal:${PREVIEW_TAG}\`
+          - \`${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-registry:${PREVIEW_TAG}\`
+          - \`${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-trivy-adapter:${PREVIEW_TAG}\`
+
+          Verify a preview image:
+
+          \`cosign verify ${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-core:${PREVIEW_TAG}\`
+          EOF
+          )
+
+          comment_id=$(
+            gh api "repos/${GITHUB_REPOSITORY}/issues/${{ github.event.pull_request.number }}/comments" \
+              --jq '.[] | select(.body | contains("<!-- harbor-next-pr-preview -->")) | .id' \
+              | head -n 1
+          )
+
+          if [ -n "${comment_id}" ]; then
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" -f body="${body}" >/dev/null
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${{ github.event.pull_request.number }}/comments" -f body="${body}" >/dev/null
+          fi
