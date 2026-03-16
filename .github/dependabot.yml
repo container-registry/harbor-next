@@ -16,7 +16,9 @@
 version: 2
 
 updates:
-  # GitHub Actions (SHA-pinned workflows)
+  # GitHub Actions
+  # All actions are SHA-pinned with version comments.
+  # Dependabot updates both the SHA and the comment tag.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -56,7 +58,9 @@ updates:
       include: "scope"
     open-pull-requests-limit: 10
 
-  # Portal frontend (uses bun.lock, not npm)
+  # Portal (Bun)
+  # src/portal/ uses bun.lock (Bun 1.2+), NOT npm.
+  # Angular and Clarity frameworks are grouped separately for coordinated upgrades.
   - package-ecosystem: "bun"
     directory: "/src/portal"
     schedule:
@@ -81,7 +85,8 @@ updates:
       include: "scope"
     open-pull-requests-limit: 5
 
-  # Swagger UI sub-app (uses package-lock.json)
+  # Swagger UI (npm)
+  # Standalone sub-app with its own package-lock.json.
   - package-ecosystem: "npm"
     directory: "/src/portal/app-swagger-ui"
     schedule:
@@ -101,7 +106,8 @@ updates:
       include: "scope"
     open-pull-requests-limit: 3
 
-  # Docker Compose dev environment
+  # Docker Compose (devenv)
+  # Literal image tags: postgres:16-alpine, valkey/valkey:latest, distribution/distribution:latest
   - package-ecosystem: "docker-compose"
     directory: "/devenv"
     schedule:
