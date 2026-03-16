@@ -867,7 +867,7 @@
         },
         "OIDC": {
             "OIDC_PROVIDER": "OIDC Sağlayıcı Adı",
-            "OIDC_REDIREC_URL": "Lütfen OIDC sağlayıcısındaki Redirect URI’nın girildiğine emin olun",
+            "OIDC_REDIRECT_URL": "Lütfen OIDC sağlayıcısındaki Redirect URI’nın girildiğine emin olun",
             "ENDPOINT": "OIDC Uç Noktası",
             "CLIENT_ID": "OIDC Alıcı ID",
             "CLIENTSECRET": "OIDC Alıcı Şifresi",
@@ -1598,7 +1598,7 @@
         "ONLY_SIGNED": "Only signed images",
         "PREHEAT_ON_PUSH": "Preheat on push",
         "START_TEXT": "No vulnerability severity of",
-        "EDN_TEXT": "and above",
+        "END_TEXT": "and above",
         "LABELS": "Labels",
         "SCHEDULE": "Schedule",
         "TEST_FAILED": "Test failed",

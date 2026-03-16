@@ -867,7 +867,7 @@
         },
         "OIDC": {
             "OIDC_PROVIDER": "OIDC 공급자 이름",
-            "OIDC_REDIREC_URL": "OIDC 공급자의 리디렉션 URI가 다음으로 설정되어 있는지 확인하세요.",
+            "OIDC_REDIRECT_URL": "OIDC 공급자의 리디렉션 URI가 다음으로 설정되어 있는지 확인하세요.",
             "ENDPOINT": "OIDC 엔드포인트",
             "CLIENT_ID": "OIDC 클라이언트 ID",
             "CLIENTSECRET": "OIDC 클라이언트 시크릿",
@@ -1598,7 +1598,7 @@
         "ONLY_SIGNED": "서명된 이미지만",
         "PREHEAT_ON_PUSH": "푸시 시 예열",
         "START_TEXT": "No vulnerability severity of",
-        "EDN_TEXT": "and above",
+        "END_TEXT": "and above",
         "LABELS": "라벨",
         "SCHEDULE": "예약",
         "TEST_FAILED": "테스트 실패",

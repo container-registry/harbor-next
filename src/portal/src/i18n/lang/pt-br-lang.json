@@ -870,7 +870,7 @@
         },
         "OIDC": {
             "OIDC_PROVIDER": "Provedor OIDC",
-            "OIDC_REDIREC_URL": "Confira na configuração do seu provedor que as URLs de Redirecionamento válidas incluem este endereço",
+            "OIDC_REDIRECT_URL": "Confira na configuração do seu provedor que as URLs de Redirecionamento válidas incluem este endereço",
             "ENDPOINT": "Endereço OIDC",
             "CLIENT_ID": "ID do cliente OIDC",
             "CLIENTSECRET": "Segredo do Cliente OIDC",
@@ -1607,7 +1607,7 @@
         "ONLY_SIGNED": "Apenas imagens assinadas",
         "PREHEAT_ON_PUSH": "Pré-análise no envio (push)",
         "START_TEXT": "Nenhuma vulnerabilidade de severeidade",
-        "EDN_TEXT": "ou acima",
+        "END_TEXT": "ou acima",
         "LABELS": "Marcadores",
         "SCHEDULE": "Agendamento",
         "TEST_FAILED": "Falha no teste",
