@@ -338,6 +338,7 @@
                                                     let i = index
                                                 ">
                                                 <app-pull-command
+                                                    *ngIf="i === 0"
                                                     [isTagMode]="true"
                                                     [asLink]="true"
                                                     [artifact]="artifact"
@@ -347,7 +348,7 @@
                                                     [selectedTag]="
                                                         tag.name
                                                     "></app-pull-command>
-                                                <!-- {{ tag.name }} -->
+                                                <span *ngIf="i > 0">{{ tag.name }}</span>
                                                 <!-- Add comma if not last -->
                                                 <span
                                                     *ngIf="
