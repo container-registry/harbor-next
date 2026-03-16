@@ -521,6 +521,23 @@ describe('ArtifactListTabComponent', () => {
 
         expect(result).toBeFalsy();
     });
+    it('Test tagsString returns comma-separated tag names', async () => {
+        fixture = TestBed.createComponent(ArtifactListTabComponent);
+        comp = fixture.componentInstance;
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(comp.tagsString([])).toBeNull();
+        expect(comp.tagsString(null)).toBeNull();
+        expect(comp.tagsString(undefined)).toBeNull();
+        expect(comp.tagsString([{ name: 'latest' }])).toBe('latest');
+        expect(
+            comp.tagsString([
+                { name: 'latest' },
+                { name: 'v1.0.0' },
+                { name: 'stable' },
+            ])
+        ).toBe('latest, v1.0.0, stable');
+    });
     it('Test utils', async () => {
         fixture = TestBed.createComponent(ArtifactListTabComponent);
         comp = fixture.componentInstance;

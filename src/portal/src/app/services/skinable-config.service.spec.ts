@@ -35,6 +35,10 @@ describe('SkinableConfig', () => {
         loginBgImg: '',
         loginTitle: '',
         product: product,
+        showSubscriptionPortalOption: false,
+        showSubscriptionCheckoutOption: false,
+        showExoscaleMarketplaceLink: false,
+        showAwsMarketplaceLink: false,
     };
 
     beforeEach(() => {
