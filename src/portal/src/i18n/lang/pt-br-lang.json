@@ -693,7 +693,7 @@
         "NAME": "Nome",
         "TAGS": "Tags",
         "PLATFORM": "SO/Arquitetura",
-        "ARTIFACT_TOOTIP": "Clique para ver a lista de artefatos OCI",
+        "ARTIFACT_TOOLTIP": "Clique para ver a lista de artefatos OCI",
         "ARTIFACTS_COUNT": "Artefatos",
         "PULL_COUNT": "Pulls",
         "COPY_SUCCESS": "{{ param }} copied to Clipboard",

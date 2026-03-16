@@ -691,7 +691,7 @@
         "NAME": "名称",
         "TAGS": "Tags",
         "PLATFORM": "OS/ARCH",
-        "ARTIFACT_TOOTIP": "点击查看此 OCI 索引的 Artifact 列表",
+        "ARTIFACT_TOOLTIP": "点击查看此 OCI 索引的 Artifact 列表",
         "ARTIFACTS_COUNT": "Artifacts",
         "PULL_COUNT": "下载数",
         "COPY_SUCCESS": "{{ param }} copied to Clipboard",

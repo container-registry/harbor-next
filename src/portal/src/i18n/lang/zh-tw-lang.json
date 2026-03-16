@@ -688,7 +688,7 @@
         "NAME": "名稱",
         "TAGS": "標籤",
         "PLATFORM": "作業系統/架構",
-        "ARTIFACT_TOOTIP": "點選以檢視此 OCI 索引的 Artifact 清單",
+        "ARTIFACT_TOOLTIP": "點選以檢視此 OCI 索引的 Artifact 清單",
         "ARTIFACTS_COUNT": "Artifacts",
         "PULL_COUNT": "拉取次數",
         "COPY_SUCCESS": "{{ param }} 已複製到剪貼簿",

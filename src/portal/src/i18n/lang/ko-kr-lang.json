@@ -689,7 +689,7 @@
         "NAME": "이름",
         "TAGS": "테그",
         "PLATFORM": "OS/ARCH",
-        "ARTIFACT_TOOTIP": "이 OCI 인덱스의 아티팩트 목록을 보려면 클릭하세요.",
+        "ARTIFACT_TOOLTIP": "이 OCI 인덱스의 아티팩트 목록을 보려면 클릭하세요.",
         "ARTIFACTS_COUNT": "아티팩트",
         "PULL_COUNT": "풀(Pull) 수",
         "COPY_SUCCESS": "{{ param }} copied to Clipboard",

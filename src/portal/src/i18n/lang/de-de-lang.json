@@ -689,7 +689,7 @@
         "NAME": "Name",
         "TAGS": "Tags",
         "PLATFORM": "OS/ARCH",
-        "ARTIFACT_TOOTIP": "Klicken um die Artefakt-Liste des OCI index zu sehen",
+        "ARTIFACT_TOOLTIP": "Klicken um die Artefakt-Liste des OCI index zu sehen",
         "ARTIFACTS_COUNT": "Artefakte",
         "PULL_COUNT": "Pulls",
         "COPY_SUCCESS": "{{ param }} copied to Clipboard",
