@@ -53,11 +53,12 @@ All commits require DCO sign-off: `git commit -s`.
 - [ ] Refactoring (`refactor:`)
 - [ ] CI/CD or build changes (`ci:` / `build:`)
 - [ ] Dependencies update (`chore:`)
+- [ ] Tests (`test:`)
 
 ## Release Notes
 <!--
 Optional. Fill in for user-facing changes (new features, breaking changes, deprecations).
-Leave blank for ci:/chore:/refactor: PRs.
+Leave blank for ci:/chore:/refactor:/test: PRs.
 -->
 
 ## Testing
