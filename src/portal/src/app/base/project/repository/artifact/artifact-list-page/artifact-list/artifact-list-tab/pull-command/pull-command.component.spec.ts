@@ -140,6 +140,53 @@ describe('PullCommandComponent', () => {
         expect(modal).toBeTruthy();
     });
 
+    it('should generate pull command using selectedTag in tag mode', () => {
+        component.isTagMode = true;
+        component.registryUrl = 'myregistry.io';
+        component.projectName = 'library';
+        component.repoName = 'nginx';
+        component.selectedTag = 'latest';
+        component.artifact = {
+            type: ArtifactType.IMAGE,
+            tagNumber: 2,
+            digest: 'sha256@digest',
+            tags: [{ name: 'latest' }, { name: 'v1.0.0' }],
+        };
+        fixture.detectChanges();
+
+        const cmd = component.getPullCommandForRuntimeByTag(component.artifact);
+        expect(cmd).toContain('latest');
+        expect(cmd).toContain('myregistry.io/library/nginx');
+        expect(cmd).not.toContain('v1.0.0');
+    });
+
+    it('should return true for hasPullCommandForTag with IMAGE type', () => {
+        component.artifact = {
+            type: ArtifactType.IMAGE,
+            tagNumber: 1,
+            tags: [{ name: 'latest' }],
+        };
+        expect(component.hasPullCommandForTag(component.artifact)).toBeTruthy();
+    });
+
+    it('should return true for hasPullCommandForTag with CNAB type', () => {
+        component.artifact = {
+            type: ArtifactType.CNAB,
+            tagNumber: 1,
+            tags: [{ name: 'latest' }],
+        };
+        expect(component.hasPullCommandForTag(component.artifact)).toBeTruthy();
+    });
+
+    it('should return true for hasPullCommandForTag with CHART type', () => {
+        component.artifact = {
+            type: ArtifactType.CHART,
+            tagNumber: 1,
+            tags: [{ name: 'latest' }],
+        };
+        expect(component.hasPullCommandForTag(component.artifact)).toBeTruthy();
+    });
+
     it('should display when pull command for CNAB is available', async () => {
         // Mock the artifact input with a valid value
         component.artifact = {

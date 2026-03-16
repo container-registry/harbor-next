@@ -207,7 +207,7 @@
                     {{ 'REPOSITORY.PLATFORM' | translate }}
                 </ng-template>
             </clr-dg-column>
-            <clr-dg-column>
+            <clr-dg-column class="tags-column">
                 <ng-template [clrDgHideableColumn]="{ hidden: hiddenArray[2] }">
                     {{ 'REPOSITORY.TAGS' | translate }}
                 </ng-template>
@@ -329,9 +329,10 @@
                                 <div class="center width-p-100">
                                     <span
                                         #tagsSpan
-                                        class="truncated width-p-75"
-                                        >{{ tagsString(artifact?.tags) }}</span
-                                    >
+                                        class="truncated width-p-75">
+                                        {{ tagsString(artifact?.tags) }}
+                                    </span>
+
                                     <span
                                         *ngIf="
                                             artifact?.tags?.length > 1 &&
@@ -339,6 +340,16 @@
                                         "
                                         >({{ artifact?.tagNumber }} )</span
                                     >
+                                    <app-pull-command
+                                        *ngIf="artifact?.tags?.length > 0"
+                                        [isTagMode]="true"
+                                        [artifact]="artifact"
+                                        [registryUrl]="registryUrl"
+                                        [projectName]="projectName"
+                                        [repoName]="repoName"
+                                        [selectedTag]="
+                                            artifact.tags[0].name
+                                        "></app-pull-command>
                                 </div>
                             </div>
                             <clr-tooltip-content
