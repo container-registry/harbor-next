@@ -869,7 +869,7 @@
         },
         "OIDC": {
             "OIDC_PROVIDER": "Fournisseur OIDC",
-            "OIDC_REDIREC_URL": "Vérifiez que la 'Redirect URI' du fournisseur OIDC est configurée",
+            "OIDC_REDIRECT_URL": "Vérifiez que la 'Redirect URI' du fournisseur OIDC est configurée",
             "ENDPOINT": "Endpoint OIDC",
             "CLIENT_ID": "ID client OIDC",
             "CLIENTSECRET": "Client Secret OIDC",
@@ -1599,7 +1599,7 @@
         "ONLY_SIGNED": "Images signées uniquement",
         "PREHEAT_ON_PUSH": "Préchauffage lors du push",
         "START_TEXT": "Pas de vulnérabilité de sévérité",
-        "EDN_TEXT": "et plus",
+        "END_TEXT": "et plus",
         "LABELS": "Labels",
         "SCHEDULE": "Planifier",
         "TEST_FAILED": "Test échoué",
