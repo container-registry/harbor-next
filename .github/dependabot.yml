@@ -108,7 +108,7 @@ updates:
 
   # ── Docker Compose (devenv) ────────────────────────────────────────
   # Literal image tags: postgres:16-alpine, valkey/valkey:latest, distribution/distribution:latest
-  - package-ecosystem: "docker"
+  - package-ecosystem: "docker-compose"
     directory: "/devenv"
     schedule:
       interval: "weekly"
