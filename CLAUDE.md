@@ -36,6 +36,41 @@ gh pr create
 PR title must follow Conventional Commits with lowercase type prefix and capitalized subject: `feat: Add New Feature`, `fix: Resolve Issue`, `docs: Update README`, etc.
 All commits require DCO sign-off: `git commit -s`.
 
+**PR description** must follow this template:
+
+```markdown
+## Summary
+<!-- Brief description of what this PR does -->
+
+## Related Issues
+<!-- Fixes #123 -->
+
+## Type of Change
+- [ ] Bug fix (`fix:`)
+- [ ] New feature (`feat:`)
+- [ ] Breaking change (`feat!:` / `fix!:`)
+- [ ] Documentation (`docs:`)
+- [ ] Refactoring (`refactor:`)
+- [ ] CI/CD or build changes (`ci:` / `build:`)
+- [ ] Dependencies update (`chore:`)
+- [ ] Tests (`test:`)
+
+## Release Notes
+<!--
+Optional. Fill in for user-facing changes (new features, breaking changes, deprecations).
+Leave blank for ci:/chore:/refactor:/test: PRs.
+-->
+
+## Testing
+- [ ] Unit tests added/updated
+- [ ] Manual testing performed
+
+## Checklist
+- [ ] PR title follows Conventional Commits format
+- [ ] Commits are signed off (`git commit -s`)
+- [ ] No new warnings introduced
+```
+
 **Merging PRs:** Always use **Squash and merge**. Never "Create a merge commit" or "Rebase and merge". Non-squash merges create `Merge pull request #N` commits that break release-please's commit parser.
 
 ## Release Process
@@ -110,3 +145,7 @@ Images are pushed to `8gears.container-registry.com/8gcr/` by default.
 Override with `REGISTRY_ADDRESS` and `REGISTRY_PROJECT` vars (e.g., `task image:all-images REGISTRY_ADDRESS=ttl.sh REGISTRY_PROJECT=harbor-next`).
 
 Required secrets for image publishing: `REGISTRY_USERNAME`, `REGISTRY_PASSWORD`.
+
+## AI Commits
+
+Do not add `Co-Authored-By` or any AI attribution trailers to commit messages.
