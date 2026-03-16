@@ -207,7 +207,7 @@
                     {{ 'REPOSITORY.PLATFORM' | translate }}
                 </ng-template>
             </clr-dg-column>
-            <clr-dg-column>
+            <clr-dg-column class="tags-column">
                 <ng-template [clrDgHideableColumn]="{ hidden: hiddenArray[2] }">
                     {{ 'REPOSITORY.TAGS' | translate }}
                 </ng-template>
@@ -330,39 +330,7 @@
                                     <span
                                         #tagsSpan
                                         class="truncated width-p-75">
-                                        <ng-container
-                                            *ngIf="artifact?.tags?.length > 0">
-                                            <ng-container
-                                                *ngFor="
-                                                    let tag of artifact.tags;
-                                                    let i = index
-                                                ">
-                                                <app-pull-command
-                                                    *ngIf="i === 0"
-                                                    [isTagMode]="true"
-                                                    [asLink]="true"
-                                                    [artifact]="artifact"
-                                                    [registryUrl]="registryUrl"
-                                                    [projectName]="projectName"
-                                                    [repoName]="repoName"
-                                                    [selectedTag]="
-                                                        tag.name
-                                                    "></app-pull-command>
-                                                <span *ngIf="i > 0">{{ tag.name }}</span>
-                                                <!-- Add comma if not last -->
-                                                <span
-                                                    *ngIf="
-                                                        i <
-                                                        artifact.tags.length - 1
-                                                    "
-                                                    >,
-                                                </span>
-                                            </ng-container>
-                                        </ng-container>
-
-                                        <ng-template #noTags>
-                                            No tags available
-                                        </ng-template>
+                                        {{ tagsString(artifact?.tags) }}
                                     </span>
 
                                     <span
@@ -372,6 +340,16 @@
                                         "
                                         >({{ artifact?.tagNumber }} )</span
                                     >
+                                    <app-pull-command
+                                        *ngIf="artifact?.tags?.length > 0"
+                                        [isTagMode]="true"
+                                        [artifact]="artifact"
+                                        [registryUrl]="registryUrl"
+                                        [projectName]="projectName"
+                                        [repoName]="repoName"
+                                        [selectedTag]="
+                                            artifact.tags[0].name
+                                        "></app-pull-command>
                                 </div>
                             </div>
                             <clr-tooltip-content

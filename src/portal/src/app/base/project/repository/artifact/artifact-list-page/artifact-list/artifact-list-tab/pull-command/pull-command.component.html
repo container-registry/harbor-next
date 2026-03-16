@@ -48,7 +48,7 @@
     *ngIf="isTagMode && !isTopModel"
     [disabled]="!hasPullCommandForTag(artifact)">
     <hbr-copy-input
-        *ngIf="isImage(artifact) && !asLink"
+        *ngIf="isImage(artifact)"
         [title]="getPullCommandForRuntimeByTag(artifact)"
         [iconMode]="true"
         (onCopySuccess)="onCpSuccess(getPullCommandForRuntimeByTag(artifact))"
@@ -57,39 +57,15 @@
         "></hbr-copy-input>
 
     <hbr-copy-input
-        *ngIf="isImage(artifact) && asLink"
-        [title]="getPullCommandForRuntimeByTag(artifact)"
-        [linkMode]="true"
-        [linkName]="selectedTag"
-        (onCopySuccess)="onCpSuccess(getPullCommandForRuntimeByTag(artifact))"
-        [defaultValue]="
-            getPullCommandForRuntimeByTag(artifact)
-        "></hbr-copy-input>
-
-    <hbr-copy-input
-        *ngIf="isCNAB(artifact) && !asLink"
+        *ngIf="isCNAB(artifact)"
         [title]="getPullCommandForCNABByTag(artifact)"
         [iconMode]="true"
         (onCopySuccess)="onCpSuccess(getPullCommandForCNABByTag(artifact))"
         [defaultValue]="getPullCommandForCNABByTag(artifact)"></hbr-copy-input>
     <hbr-copy-input
-        *ngIf="isCNAB(artifact) && asLink"
-        [title]="getPullCommandForCNABByTag(artifact)"
-        [linkMode]="true"
-        [linkName]="selectedTag"
-        (onCopySuccess)="onCpSuccess(getPullCommandForCNABByTag(artifact))"
-        [defaultValue]="getPullCommandForCNABByTag(artifact)"></hbr-copy-input>
-    <hbr-copy-input
-        *ngIf="isChart(artifact) && !asLink"
+        *ngIf="isChart(artifact)"
         [title]="getPullCommandForChartByTag(artifact)"
         [iconMode]="true"
-        (onCopySuccess)="onCpSuccess(getPullCommandForChartByTag(artifact))"
-        [defaultValue]="getPullCommandForChartByTag(artifact)"></hbr-copy-input>
-    <hbr-copy-input
-        *ngIf="isChart(artifact) && asLink"
-        [title]="getPullCommandForChartByTag(artifact)"
-        [linkMode]="true"
-        [linkName]="selectedTag"
         (onCopySuccess)="onCpSuccess(getPullCommandForChartByTag(artifact))"
         [defaultValue]="getPullCommandForChartByTag(artifact)"></hbr-copy-input>
 </clr-dropdown>

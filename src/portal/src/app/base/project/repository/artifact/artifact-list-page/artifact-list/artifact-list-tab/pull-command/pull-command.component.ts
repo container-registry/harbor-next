@@ -47,8 +47,6 @@ export class PullCommandComponent {
     @Input()
     selectedTag: string;
     @Input()
-    asLink: boolean = false;
-    @Input()
     artifact: Artifact;
     @Input()
     accessoryType: string;
