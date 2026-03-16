@@ -184,8 +184,6 @@ jobs:
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
       - name: Sign images, generate SBOMs, and attest
-        env:
-          PATH: ${{ env.PATH }}:${{ runner.temp }}:${{ env.GOPATH }}/bin:${{ env.HOME }}/go/bin
         run: |
           for image in core jobservice registryctl exporter portal registry trivy-adapter; do
             ref="${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-${image}:${PREVIEW_TAG}"
