@@ -16,6 +16,7 @@
 version: 2
 
 updates:
+  # GitHub Actions (SHA-pinned workflows)
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -35,6 +36,7 @@ updates:
       include: "scope"
     open-pull-requests-limit: 5
 
+  # Go modules
   - package-ecosystem: "gomod"
     directory: "/src"
     schedule:
@@ -54,6 +56,7 @@ updates:
       include: "scope"
     open-pull-requests-limit: 10
 
+  # Portal frontend (uses bun.lock, not npm)
   - package-ecosystem: "bun"
     directory: "/src/portal"
     schedule:
@@ -78,6 +81,7 @@ updates:
       include: "scope"
     open-pull-requests-limit: 5
 
+  # Swagger UI sub-app (uses package-lock.json)
   - package-ecosystem: "npm"
     directory: "/src/portal/app-swagger-ui"
     schedule:
@@ -97,6 +101,7 @@ updates:
       include: "scope"
     open-pull-requests-limit: 3
 
+  # Docker Compose dev environment
   - package-ecosystem: "docker-compose"
     directory: "/devenv"
     schedule:
