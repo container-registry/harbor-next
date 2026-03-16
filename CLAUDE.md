@@ -145,3 +145,7 @@ Images are pushed to `8gears.container-registry.com/8gcr/` by default.
 Override with `REGISTRY_ADDRESS` and `REGISTRY_PROJECT` vars (e.g., `task image:all-images REGISTRY_ADDRESS=ttl.sh REGISTRY_PROJECT=harbor-next`).
 
 Required secrets for image publishing: `REGISTRY_USERNAME`, `REGISTRY_PASSWORD`.
+
+## AI Commits
+
+Do not add `Co-Authored-By` or any AI attribution trailers to commit messages.
