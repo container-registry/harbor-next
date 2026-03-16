@@ -692,7 +692,7 @@
         "NAME": "Nombre",
         "TAGS": "Etiquetas",
         "PLATFORM": "OS/ARCH",
-        "ARTIFACT_TOOTIP": "Haga clic para ver la lista de artefactos de este índice OCI",
+        "ARTIFACT_TOOLTIP": "Haga clic para ver la lista de artefactos de este índice OCI",
         "ARTIFACTS_COUNT": "Artifacts",
         "PULL_COUNT": "Pulls",
         "COPY_SUCCESS": "{{ param }} copied to Clipboard",
@@ -870,7 +870,7 @@
         },
         "OIDC": {
             "OIDC_PROVIDER": "OIDC Proveedor",
-            "OIDC_REDIREC_URL": "Asegúrese de que la URI de redireccionamiento en el proveedor OIDC esté configurada en",
+            "OIDC_REDIRECT_URL": "Asegúrese de que la URI de redireccionamiento en el proveedor OIDC esté configurada en",
             "ENDPOINT": "OIDC Endpoint",
             "CLIENT_ID": "ID de cliente OIDC",
             "CLIENTSECRET": "OIDC Client Secret",
@@ -922,7 +922,8 @@
     "PAGE_NOT_FOUND": {
         "MAIN_TITLE": "Página no encontrada",
         "SUB_TITLE": "Redirigiendo a la página principal en",
-        "UNIT": "segundos..."
+        "UNIT": "segundos...",
+        "REDIRECTING": "Localizando su proyecto..."
     },
     "ABOUT": {
         "VERSION": "Versión",
@@ -1603,7 +1604,7 @@
         "ONLY_SIGNED": "Solo imágenes firmadas",
         "PREHEAT_ON_PUSH": "Preheat en push",
         "START_TEXT": "Sin severidad de vulnerabilidad de",
-        "EDN_TEXT": "y por encima",
+        "END_TEXT": "y por encima",
         "LABELS": "Etiquetas",
         "SCHEDULE": "Programar",
         "TEST_FAILED": "Prueba fallida",

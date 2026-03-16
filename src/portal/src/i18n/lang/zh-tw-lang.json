@@ -174,7 +174,8 @@
         "DISTRIBUTIONS": {
             "NAME": "發佈",
             "INSTANCES": "執行個體"
-        }
+        },
+        "SUBSCRIPTION": "訂閱"
     },
     "USER": {
         "ADD_ACTION": "新增使用者",
@@ -688,7 +689,7 @@
         "NAME": "名稱",
         "TAGS": "標籤",
         "PLATFORM": "作業系統/架構",
-        "ARTIFACT_TOOTIP": "點選以檢視此 OCI 索引的 Artifact 清單",
+        "ARTIFACT_TOOLTIP": "點選以檢視此 OCI 索引的 Artifact 清單",
         "ARTIFACTS_COUNT": "Artifacts",
         "PULL_COUNT": "拉取次數",
         "COPY_SUCCESS": "{{ param }} 已複製到剪貼簿",
@@ -868,7 +869,7 @@
         },
         "OIDC": {
             "OIDC_PROVIDER": "OIDC 提供者名稱",
-            "OIDC_REDIREC_URL": "請確認 OIDC 提供者上的重新導向 URI 已設為",
+            "OIDC_REDIRECT_URL": "請確認 OIDC 提供者上的重新導向 URI 已設為",
             "ENDPOINT": "OIDC 端點",
             "CLIENT_ID": "OIDC 用戶端 ID",
             "CLIENTSECRET": "OIDC 用戶端金鑰",
@@ -918,9 +919,10 @@
         "TEST_OIDC_SUCCESS": "已驗證 OIDC 伺服器的連線。"
     },
     "PAGE_NOT_FOUND": {
-        "MAIN_TITLE": "找不到頁面",
-        "SUB_TITLE": "將在",
-        "UNIT": "秒後重新導向至主頁..."
+        "MAIN_TITLE": "頁面不存在",
+        "SUB_TITLE": "正在重新導向到首頁：",
+        "UNIT": "秒...",
+        "REDIRECTING": "正在查找您的專案..."
     },
     "ABOUT": {
         "VERSION": "版本",
@@ -1599,7 +1601,7 @@
         "ONLY_SIGNED": "僅限已簽署的映像檔",
         "PREHEAT_ON_PUSH": "推送時預熱",
         "START_TEXT": "無弱點嚴重性為",
-        "EDN_TEXT": "及以上",
+        "END_TEXT": "及以上",
         "LABELS": "標籤",
         "SCHEDULE": "排程",
         "TEST_FAILED": "測試失敗",

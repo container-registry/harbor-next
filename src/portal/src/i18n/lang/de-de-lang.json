@@ -689,7 +689,7 @@
         "NAME": "Name",
         "TAGS": "Tags",
         "PLATFORM": "OS/ARCH",
-        "ARTIFACT_TOOTIP": "Klicken um die Artefakt-Liste des OCI index zu sehen",
+        "ARTIFACT_TOOLTIP": "Klicken um die Artefakt-Liste des OCI index zu sehen",
         "ARTIFACTS_COUNT": "Artefakte",
         "PULL_COUNT": "Pulls",
         "COPY_SUCCESS": "{{ param }} copied to Clipboard",
@@ -867,7 +867,7 @@
         },
         "OIDC": {
             "OIDC_PROVIDER": "OIDC Provider Name",
-            "OIDC_REDIREC_URL": "Bitte sicherstellen, dass die Redirect URI des OIDC Providers gesetzt wurde auf",
+            "OIDC_REDIRECT_URL": "Bitte sicherstellen, dass die Redirect URI des OIDC Providers gesetzt wurde auf",
             "ENDPOINT": "OIDC Endpunkt",
             "CLIENT_ID": "OIDC Client ID",
             "CLIENTSECRET": "OIDC Client Secret",
@@ -919,7 +919,8 @@
     "PAGE_NOT_FOUND": {
         "MAIN_TITLE": "Seite nicht gefunden",
         "SUB_TITLE": "Weiterleiten zur Hauptseite in ...",
-        "UNIT": "Sekunden..."
+        "UNIT": "Sekunden...",
+        "REDIRECTING": "Ihr Projekt wird gesucht..."
     },
     "ABOUT": {
         "VERSION": "Version",
@@ -1597,7 +1598,7 @@
         "ONLY_SIGNED": "Nur signierte Images",
         "PREHEAT_ON_PUSH": "Aufwärmen bei Push",
         "START_TEXT": "Keine Schwachstellen mit einem Schweregrad von",
-        "EDN_TEXT": "und höher",
+        "END_TEXT": "und höher",
         "LABELS": "Label",
         "SCHEDULE": "Intervall",
         "TEST_FAILED": "Test fehlgeschlagen",

@@ -691,7 +691,7 @@
         "NAME": "Nom",
         "TAGS": "Tags",
         "PLATFORM": "SE/ARCH",
-        "ARTIFACT_TOOTIP": "Cliquez pour voir la liste des index des artefacts de cet OCI",
+        "ARTIFACT_TOOLTIP": "Cliquez pour voir la liste des index des artefacts de cet OCI",
         "ARTIFACTS_COUNT": "Artefacts",
         "PULL_COUNT": "Pulls",
         "COPY_SUCCESS": "{{ param }} copied to Clipboard",
@@ -869,7 +869,7 @@
         },
         "OIDC": {
             "OIDC_PROVIDER": "Fournisseur OIDC",
-            "OIDC_REDIREC_URL": "Vérifiez que la 'Redirect URI' du fournisseur OIDC est configurée",
+            "OIDC_REDIRECT_URL": "Vérifiez que la 'Redirect URI' du fournisseur OIDC est configurée",
             "ENDPOINT": "Endpoint OIDC",
             "CLIENT_ID": "ID client OIDC",
             "CLIENTSECRET": "Client Secret OIDC",
@@ -921,7 +921,8 @@
     "PAGE_NOT_FOUND": {
         "MAIN_TITLE": "Page introuvable",
         "SUB_TITLE": "Redirection vers la page principale dans",
-        "UNIT": "secondes..."
+        "UNIT": "secondes...",
+        "REDIRECTING": "Recherche de votre projet..."
     },
     "ABOUT": {
         "VERSION": "Version",
@@ -1599,7 +1600,7 @@
         "ONLY_SIGNED": "Images signées uniquement",
         "PREHEAT_ON_PUSH": "Préchauffage lors du push",
         "START_TEXT": "Pas de vulnérabilité de sévérité",
-        "EDN_TEXT": "et plus",
+        "END_TEXT": "et plus",
         "LABELS": "Labels",
         "SCHEDULE": "Planifier",
         "TEST_FAILED": "Test échoué",

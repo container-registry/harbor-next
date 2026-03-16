@@ -689,7 +689,7 @@
         "NAME": "İsim",
         "TAGS": "Etiketler",
         "PLATFORM": "OS/ARCH",
-        "ARTIFACT_TOOTIP": "Click to view this OCI index's artifact list",
+        "ARTIFACT_TOOLTIP": "Click to view this OCI index's artifact list",
         "ARTIFACTS_COUNT": "Artifacts",
         "PULL_COUNT": "İndirmeler",
         "COPY_SUCCESS": "{{ param }} copied to Clipboard",
@@ -867,7 +867,7 @@
         },
         "OIDC": {
             "OIDC_PROVIDER": "OIDC Sağlayıcı Adı",
-            "OIDC_REDIREC_URL": "Lütfen OIDC sağlayıcısındaki Redirect URI’nın girildiğine emin olun",
+            "OIDC_REDIRECT_URL": "Lütfen OIDC sağlayıcısındaki Redirect URI’nın girildiğine emin olun",
             "ENDPOINT": "OIDC Uç Noktası",
             "CLIENT_ID": "OIDC Alıcı ID",
             "CLIENTSECRET": "OIDC Alıcı Şifresi",
@@ -919,7 +919,8 @@
     "PAGE_NOT_FOUND": {
         "MAIN_TITLE": "Sayfa Bulunamadı",
         "SUB_TITLE": "Ana sayfaya yönlendiriliyor",
-        "UNIT": "saniyeler..."
+        "UNIT": "saniyeler...",
+        "REDIRECTING": "Projeniz bulunuyor..."
     },
     "ABOUT": {
         "VERSION": "Versiyon",
@@ -1597,7 +1598,7 @@
         "ONLY_SIGNED": "Only signed images",
         "PREHEAT_ON_PUSH": "Preheat on push",
         "START_TEXT": "No vulnerability severity of",
-        "EDN_TEXT": "and above",
+        "END_TEXT": "and above",
         "LABELS": "Labels",
         "SCHEDULE": "Schedule",
         "TEST_FAILED": "Test failed",
