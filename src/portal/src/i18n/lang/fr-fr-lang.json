@@ -691,7 +691,7 @@
         "NAME": "Nom",
         "TAGS": "Tags",
         "PLATFORM": "SE/ARCH",
-        "ARTIFACT_TOOTIP": "Cliquez pour voir la liste des index des artefacts de cet OCI",
+        "ARTIFACT_TOOLTIP": "Cliquez pour voir la liste des index des artefacts de cet OCI",
         "ARTIFACTS_COUNT": "Artefacts",
         "PULL_COUNT": "Pulls",
         "COPY_SUCCESS": "{{ param }} copied to Clipboard",
@@ -921,7 +921,8 @@
     "PAGE_NOT_FOUND": {
         "MAIN_TITLE": "Page introuvable",
         "SUB_TITLE": "Redirection vers la page principale dans",
-        "UNIT": "secondes..."
+        "UNIT": "secondes...",
+        "REDIRECTING": "Recherche de votre projet..."
     },
     "ABOUT": {
         "VERSION": "Version",

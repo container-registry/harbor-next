@@ -692,7 +692,7 @@
         "NAME": "Nombre",
         "TAGS": "Etiquetas",
         "PLATFORM": "OS/ARCH",
-        "ARTIFACT_TOOTIP": "Haga clic para ver la lista de artefactos de este índice OCI",
+        "ARTIFACT_TOOLTIP": "Haga clic para ver la lista de artefactos de este índice OCI",
         "ARTIFACTS_COUNT": "Artifacts",
         "PULL_COUNT": "Pulls",
         "COPY_SUCCESS": "{{ param }} copied to Clipboard",
@@ -922,7 +922,8 @@
     "PAGE_NOT_FOUND": {
         "MAIN_TITLE": "Página no encontrada",
         "SUB_TITLE": "Redirigiendo a la página principal en",
-        "UNIT": "segundos..."
+        "UNIT": "segundos...",
+        "REDIRECTING": "Localizando su proyecto..."
     },
     "ABOUT": {
         "VERSION": "Versión",

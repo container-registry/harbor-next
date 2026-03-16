@@ -689,7 +689,7 @@
         "NAME": "Name",
         "TAGS": "Tags",
         "PLATFORM": "OS/ARCH",
-        "ARTIFACT_TOOTIP": "Click to view this OCI index's artifact list",
+        "ARTIFACT_TOOLTIP": "Click to view this OCI index's artifact list",
         "ARTIFACTS_COUNT": "Artifacts",
         "PULL_COUNT": "Pulls",
         "COPY_SUCCESS": "{{ param }} copied to Clipboard",
@@ -919,7 +919,8 @@
     "PAGE_NOT_FOUND": {
         "MAIN_TITLE": "Page not found",
         "SUB_TITLE": "Redirecting to main page in",
-        "UNIT": "seconds..."
+        "UNIT": "seconds...",
+        "REDIRECTING": "Locating your project..."
     },
     "ABOUT": {
         "VERSION": "Version",

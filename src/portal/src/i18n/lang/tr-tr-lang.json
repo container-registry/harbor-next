@@ -689,7 +689,7 @@
         "NAME": "İsim",
         "TAGS": "Etiketler",
         "PLATFORM": "OS/ARCH",
-        "ARTIFACT_TOOTIP": "Click to view this OCI index's artifact list",
+        "ARTIFACT_TOOLTIP": "Click to view this OCI index's artifact list",
         "ARTIFACTS_COUNT": "Artifacts",
         "PULL_COUNT": "İndirmeler",
         "COPY_SUCCESS": "{{ param }} copied to Clipboard",
@@ -919,7 +919,8 @@
     "PAGE_NOT_FOUND": {
         "MAIN_TITLE": "Sayfa Bulunamadı",
         "SUB_TITLE": "Ana sayfaya yönlendiriliyor",
-        "UNIT": "saniyeler..."
+        "UNIT": "saniyeler...",
+        "REDIRECTING": "Projeniz bulunuyor..."
     },
     "ABOUT": {
         "VERSION": "Versiyon",
