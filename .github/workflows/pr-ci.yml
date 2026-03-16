@@ -205,7 +205,7 @@ jobs:
     needs: [sign]
     runs-on: ubuntu-latest
     permissions:
-      issues: write
+      pull-requests: write
     steps:
       - name: Create or update PR comment
         env:
