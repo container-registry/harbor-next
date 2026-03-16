@@ -189,7 +189,7 @@ jobs:
         run: |
           for image in core jobservice registryctl exporter portal registry trivy-adapter; do
             ref="${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-${image}:${PREVIEW_TAG}"
-            digest="$("${HOME}/go/bin/crane" digest "${ref}")"
+            digest="$(crane digest "${ref}")"
             image_ref="${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-${image}@${digest}"
 
             cosign sign --yes "${image_ref}"
@@ -226,11 +226,22 @@ jobs:
 
           Verify a preview image:
 
-          \`cosign verify ${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-core:${PREVIEW_TAG}\`
+          \`\`\`
+          cosign verify \\
+            --certificate-identity-regexp="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/pr-ci.yml@.*" \\
+            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \\
+            ${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-core:${PREVIEW_TAG}
+          \`\`\`
 
           Verify SBOM attestation:
 
-          \`cosign verify-attestation --type spdxjson ${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-core:${PREVIEW_TAG}\`
+          \`\`\`
+          cosign verify-attestation \\
+            --certificate-identity-regexp="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/pr-ci.yml@.*" \\
+            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \\
+            --type spdxjson \\
+            ${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-core:${PREVIEW_TAG}
+          \`\`\`
           EOF
           )
 
