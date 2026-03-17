@@ -127,7 +127,7 @@ Leave blank for ci:/chore:/refactor:/docs:/test: PRs.
 - [ ] Manual testing performed
 
 ## Checklist
-- [ ] PR title follows Conventional Commits format
+- [ ] PR title follows [Conventional Commits](https://www.conventionalcommits.org/) format
 - [ ] Commits are signed off (`git commit -s`)
 - [ ] No new warnings introduced
 ```
