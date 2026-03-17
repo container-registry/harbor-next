@@ -68,17 +68,20 @@ DCO sign-off is required on every commit. Use `git commit -s` to add it automati
 
 The PR title becomes the squash commit message on main, so it must also follow Conventional Commits. The `pr-title` CI check enforces this and will block merging if the format is wrong.
 
+The type prefix must be lowercase, and the subject must start with a capital letter:
+
 Good:
 ```
-feat(portal): add repository-level pull command to artifact list tab
-fix: allow negative serial numbers in x509 certificates
-ci: split image builds into parallel matrix jobs
+feat(portal): Add Repository-Level Pull Command to Artifact List Tab
+fix: Allow Negative Serial Numbers in X509 Certificates
+ci: Split Image Builds into Parallel Matrix Jobs
 ```
 
 Bad:
 ```
 Updated the portal
 Fix bug
+feat: add new feature
 Merge pull request #5
 ```
 
@@ -92,7 +95,44 @@ fix(core): ...
 ci(release): ...
 ```
 
-### 5. Breaking Changes
+### 5. PR Description
+
+Use the following template for your PR description:
+
+```markdown
+## Summary
+<!-- Brief description of what this PR does -->
+
+## Related Issues
+<!-- Fixes #123 -->
+
+## Type of Change
+- [ ] Bug fix (`fix:`)
+- [ ] New feature (`feat:`)
+- [ ] Breaking change (`feat!:` / `fix!:`)
+- [ ] Documentation (`docs:`)
+- [ ] Refactoring (`refactor:`)
+- [ ] CI/CD or build changes (`ci:` / `build:`)
+- [ ] Dependencies update (`chore:`)
+- [ ] Tests (`test:`)
+
+## Release Notes
+<!--
+Optional. Fill in for user-facing changes (new features, breaking changes, deprecations).
+Leave blank for ci:/chore:/refactor:/test: PRs.
+-->
+
+## Testing
+- [ ] Unit tests added/updated
+- [ ] Manual testing performed
+
+## Checklist
+- [ ] PR title follows Conventional Commits format
+- [ ] Commits are signed off (`git commit -s`)
+- [ ] No new warnings introduced
+```
+
+### 6. Breaking Changes
 
 For breaking changes, use `!` after the type and add a `BREAKING CHANGE:` footer in the **squash commit body** (the GitHub merge dialog body field, not the PR description body):
 
@@ -205,7 +245,7 @@ Hooks enforce:
 ### Common Task Commands
 
 ```bash
-task                  # Start dev environment
+task dev:up           # Start dev environment with hot reload
 task build            # Build all Go binaries
 task test:quick       # API lint + unit tests (fast)
 task test:unit        # Go unit tests with race detection
