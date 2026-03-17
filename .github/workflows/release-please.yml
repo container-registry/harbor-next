@@ -53,12 +53,11 @@ jobs:
           ref: ${{ needs.release-please.outputs.tag_name }}
 
       - name: Apply enterprise patches
-        if: ${{ vars.PATCHES_REPO != '' }}
         env:
-          PATCHES_TOKEN: ${{ secrets.PATCHES_TOKEN }}
+          PATCHES_TOKEN: ${{ secrets.REPO_READ_TOKEN_8GCR }}
         run: |
           git clone --depth=1 \
-            "https://x-access-token:${PATCHES_TOKEN}@github.com/${{ vars.PATCHES_REPO }}" \
+            "https://x-access-token:${PATCHES_TOKEN}@github.com/container-registry/8gcr" \
             /tmp/patches-repo
           while IFS= read -r patch; do
             patch=$(echo "$patch" | sed 's/#.*//' | xargs)
@@ -211,12 +210,11 @@ jobs:
 
       - name: Collect enterprise patch descriptions
         id: patches
-        if: ${{ vars.PATCHES_REPO != '' }}
         env:
-          PATCHES_TOKEN: ${{ secrets.PATCHES_TOKEN }}
+          PATCHES_TOKEN: ${{ secrets.REPO_READ_TOKEN_8GCR }}
         run: |
           git clone --depth=1 \
-            "https://x-access-token:${PATCHES_TOKEN}@github.com/${{ vars.PATCHES_REPO }}" \
+            "https://x-access-token:${PATCHES_TOKEN}@github.com/container-registry/8gcr" \
             /tmp/patches-repo
           if [ -f /tmp/patches-repo/8gcr-ee/patches/series ]; then
             while IFS= read -r patch; do
