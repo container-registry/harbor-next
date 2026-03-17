@@ -171,7 +171,7 @@ services:
   trivy-adapter:
     build:
       context: ..
-      dockerfile: dockerfile/trivy-adapter.dockerfile
+      dockerfile: dockerfile/dev.trivy-adapter.dockerfile
       args:
         GO_VERSION: ${GO_VERSION}
         HARBOR_SCANNER_TRIVY_VERSION: ${HARBOR_SCANNER_TRIVY_VERSION}
