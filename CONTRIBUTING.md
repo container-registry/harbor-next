@@ -119,7 +119,7 @@ Use the following template for your PR description:
 ## Release Notes
 <!--
 Optional. Fill in for user-facing changes (new features, breaking changes, deprecations).
-Leave blank for ci:/chore:/refactor:/test: PRs.
+Leave blank for ci:/chore:/refactor:/docs:/test: PRs.
 -->
 
 ## Testing
