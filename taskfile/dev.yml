@@ -3,6 +3,7 @@ version: '3'
 vars:
   # Paths
   COMPOSE_FILE: devenv/docker-compose.yml
+  VERSIONS_ENV: versions.env
   COMPOSE_LOCAL_FILE: deploy/compose/docker-compose.yaml
   COMPOSE_LOCAL_ENV: deploy/compose/example/local/.env.example
   TOKEN_KEY_FILE: devenv/token_service_key.pem
@@ -27,6 +28,9 @@ vars:
   PORT_DEBUG_REGCTL: '{{ add 2347  (mul (atoi .SLOT) 100) }}'
 
   PROJECT_PREFIX: 'harbor-{{.SLOT}}'
+
+  # Base docker compose command with env-file for build args (GO_VERSION, BUN_VERSION, etc.)
+  COMPOSE_CMD: 'docker compose -f {{.COMPOSE_FILE}} --env-file {{.VERSIONS_ENV}}'
 
   # Docker Compose profile strings (reused across multiple tasks)
   ALL_PROFILES: "--profile portal --profile core --profile jobservice --profile registryctl --profile trivy"
@@ -122,13 +126,13 @@ tasks:
       - task: :build:gen-apis:frontend
       - defer: { task: dev:down, vars: { SKIP_TRIVY: "{{.SKIP_TRIVY}}" } }
       - task: info
-      - docker compose -f {{.COMPOSE_FILE}} {{.APP_PROFILES}} {{.TRIVY_PROFILE}} up --build
+      - '{{.COMPOSE_CMD}} {{.APP_PROFILES}} {{.TRIVY_PROFILE}} up --build'
 
   down:
     desc: Stop and remove all dev environment containers
     vars:
       TRIVY_PROFILE: '{{if ne .SKIP_TRIVY "true"}}--profile trivy{{end}}'
-    cmd: docker compose -f {{.COMPOSE_FILE}} {{.APP_PROFILES}} {{.TRIVY_PROFILE}} down
+    cmd: '{{.COMPOSE_CMD}} {{.APP_PROFILES}} {{.TRIVY_PROFILE}} down'
 
   # ---------------------------------------------------------------------------
   # Infrastructure (Docker Compose)
@@ -137,24 +141,24 @@ tasks:
     desc: Start PostgreSQL, Redis, and Registry (waits for DB readiness)
     deps: [require-docker]
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} up -d
+      - '{{.COMPOSE_CMD}} up -d'
       - |
         echo "Waiting for PostgreSQL..."
         timeout=60 elapsed=0
-        until docker compose -f {{.COMPOSE_FILE}} exec -T postgresql pg_isready -U postgres > /dev/null 2>&1; do
+        until {{.COMPOSE_CMD}} exec -T postgresql pg_isready -U postgres > /dev/null 2>&1; do
           [ $elapsed -ge $timeout ] && echo "PostgreSQL failed to start" && exit 1
           sleep 2; elapsed=$((elapsed + 2))
         done
       - echo "Infrastructure ready"
-      - docker compose -f {{.COMPOSE_FILE}} ps
+      - '{{.COMPOSE_CMD}} ps'
 
   infra:down:
     desc: Stop PostgreSQL, Redis, and Registry containers
-    cmd: docker compose -f {{.COMPOSE_FILE}} down
+    cmd: '{{.COMPOSE_CMD}} down'
 
   infra:remove:
     desc: Stop all containers and delete all named volumes
-    cmd: docker compose -f {{.COMPOSE_FILE}} {{.ALL_PROFILES}} down -v
+    cmd: '{{.COMPOSE_CMD}} {{.ALL_PROFILES}} down -v'
 
   # ---------------------------------------------------------------------------
   # Backend Services (Containerized)
@@ -164,7 +168,7 @@ tasks:
     deps: [require-docker, gen:private-key]
     cmds:
       - task: :build:gen-apis
-      - docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice --profile registryctl up -d --build
+      - '{{.COMPOSE_CMD}} --profile core --profile jobservice --profile registryctl up -d --build'
       - |
         echo ""
         echo "API: http://localhost:{{.PORT_CORE}}/api/v2.0"
@@ -173,20 +177,20 @@ tasks:
   backend:down:
     desc: Stop and remove Core, JobService, RegistryCtl (keeps infra running)
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} stop core jobservice registryctl
-      - docker compose -f {{.COMPOSE_FILE}} rm -f core jobservice registryctl
+      - '{{.COMPOSE_CMD}} stop core jobservice registryctl'
+      - '{{.COMPOSE_CMD}} rm -f core jobservice registryctl'
 
   backend:logs:
     desc: Tail logs from Core, JobService, and RegistryCtl
-    cmd: docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice --profile registryctl logs -f
+    cmd: '{{.COMPOSE_CMD}} --profile core --profile jobservice --profile registryctl logs -f'
 
   backend:logs:*:
     desc: "Tail logs for a specific backend service (core, jobservice, registryctl)"
-    cmd: docker compose -f {{.COMPOSE_FILE}} logs -f {{index .MATCH 0}}
+    cmd: '{{.COMPOSE_CMD}} logs -f {{index .MATCH 0}}'
 
   backend:restart:
     desc: Restart Core, JobService, and RegistryCtl containers
-    cmd: docker compose -f {{.COMPOSE_FILE}} restart core jobservice registryctl
+    cmd: '{{.COMPOSE_CMD}} restart core jobservice registryctl'
 
   # ---------------------------------------------------------------------------
   # Frontend (Native - alternative to containerized portal)
@@ -248,14 +252,14 @@ tasks:
     desc: Drop database, recreate it, and apply all migrations from scratch
     prompt: "This will delete all data in {{.POSTGRES_DB}}. Continue?"
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} exec -T postgresql dropdb -U {{.POSTGRES_USER}} {{.POSTGRES_DB}} --if-exists
-      - docker compose -f {{.COMPOSE_FILE}} exec -T postgresql createdb -U {{.POSTGRES_USER}} {{.POSTGRES_DB}}
+      - '{{.COMPOSE_CMD}} exec -T postgresql dropdb -U {{.POSTGRES_USER}} {{.POSTGRES_DB}} --if-exists'
+      - '{{.COMPOSE_CMD}} exec -T postgresql createdb -U {{.POSTGRES_USER}} {{.POSTGRES_DB}}'
       - task: db:migrate
       - echo "Database reset complete"
 
   db:shell:
     desc: Open interactive psql session on the dev database
-    cmd: docker compose -f {{.COMPOSE_FILE}} exec postgresql psql -U {{.POSTGRES_USER}} -d {{.POSTGRES_DB}}
+    cmd: '{{.COMPOSE_CMD}} exec postgresql psql -U {{.POSTGRES_USER}} -d {{.POSTGRES_DB}}'
 
   # ---------------------------------------------------------------------------
   # Release Test (deploy/compose)
@@ -308,7 +312,7 @@ tasks:
   clean:
     desc: Remove all containers, volumes, node_modules, and temp files
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} {{.ALL_PROFILES}} down -v
+      - '{{.COMPOSE_CMD}} {{.ALL_PROFILES}} down -v'
       - pkill -f "ng serve" || true
       - rm -rf tmp/
       - rm -rf src/portal/node_modules
@@ -319,8 +323,8 @@ tasks:
 
   status:
     desc: Show container status for all services
-    cmd: docker compose -f {{.COMPOSE_FILE}} {{.ALL_PROFILES}} ps
+    cmd: '{{.COMPOSE_CMD}} {{.ALL_PROFILES}} ps'
 
   logs:
     desc: Tail logs from all containers
-    cmd: docker compose -f {{.COMPOSE_FILE}} {{.ALL_PROFILES}} logs -f
+    cmd: '{{.COMPOSE_CMD}} {{.ALL_PROFILES}} logs -f'
