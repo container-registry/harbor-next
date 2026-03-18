@@ -174,6 +174,7 @@ func (suite *CacheTestSuite) TestPushManifestList() {
 
 	err = suite.mListCache.push(ctx, "library/hello-world", string(originDigest), manList)
 	suite.Require().Nil(err)
+	suite.local.AssertCalled(suite.T(), "UpdatePullTime", ctx, mock.Anything)
 }
 
 func (suite *CacheTestSuite) TestManifestCache_CacheContent() {
