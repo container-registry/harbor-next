@@ -241,6 +241,7 @@ func (c *controller) ensureArtifact(ctx context.Context, repository, digest stri
 	// use orm.WithTransaction here to avoid the issue:
 	// https://www.postgresql.org/message-id/002e01c04da9%24a8f95c20%2425efe6c1%40lasting.ro
 	created := false
+	pendingAccessories := artifact.AccessoryCandidates
 	if err = orm.WithTransaction(func(ctx context.Context) error {
 		id, err := c.artMgr.Create(ctx, artifact)
 		if err != nil {
@@ -248,6 +249,11 @@ func (c *controller) ensureArtifact(ctx context.Context, repository, digest stri
 		}
 		created = true
 		artifact.ID = id
+		for _, candidate := range pendingAccessories {
+			if err := c.accessoryMgr.Ensure(ctx, candidate.SubArtifactDigest, candidate.SubArtifactRepo, candidate.SubArtifactID, candidate.ArtifactID, candidate.Size, candidate.Digest, candidate.Type); err != nil {
+				return err
+			}
+		}
 		return nil
 	})(orm.SetTransactionOpNameToContext(ctx, "tx-ensure-artifact")); err != nil {
 		// got error that isn't conflict error, return directly
