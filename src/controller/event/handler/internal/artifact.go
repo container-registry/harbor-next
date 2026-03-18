@@ -248,9 +248,15 @@ func (a *ArtifactEventHandler) syncFlushPullCount(ctx context.Context, repositor
 func (a *ArtifactEventHandler) asyncFlushPullTime(ctx context.Context) {
 	for {
 		<-time.After(asyncFlushDuration)
-		a.pullTimeLock.Lock()
 
-		for key, time := range a.pullTimeStore {
+		// Snapshot and reset the store under lock, then release before doing DB work.
+		// This avoids blocking new pull events in updatePullTimeInCache during flushes.
+		a.pullTimeLock.Lock()
+		store := a.pullTimeStore
+		a.pullTimeStore = make(map[string]time.Time)
+		a.pullTimeLock.Unlock()
+
+		for key, time := range store {
 			keys := strings.Split(key, ":")
 			artifactID, err := strconv.ParseInt(keys[0], 10, 64)
 			if err != nil {
@@ -265,23 +271,23 @@ func (a *ArtifactEventHandler) asyncFlushPullTime(ctx context.Context) {
 
 			a.syncFlushPullTime(ctx, artifactID, tagName, time)
 		}
-
-		a.pullTimeStore = make(map[string]time.Time)
-		a.pullTimeLock.Unlock()
 	}
 }
 
 func (a *ArtifactEventHandler) asyncFlushPullCount(ctx context.Context) {
 	for {
 		<-time.After(asyncFlushDuration)
+
+		// Snapshot and reset the store under lock, then release before doing DB work.
+		// This avoids blocking new pull events in addPullCountInCache during flushes.
 		a.pullCountLock.Lock()
-
-		for repositoryID, count := range a.pullCountStore {
-			a.syncFlushPullCount(ctx, repositoryID, count)
-		}
-
+		store := a.pullCountStore
 		a.pullCountStore = make(map[int64]uint64)
 		a.pullCountLock.Unlock()
+
+		for repositoryID, count := range store {
+			a.syncFlushPullCount(ctx, repositoryID, count)
+		}
 	}
 }
 
