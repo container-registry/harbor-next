@@ -23,7 +23,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/distribution/manifest/schema2"
 	"github.com/opencontainers/go-digest"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/controller/artifact/processor"
@@ -45,6 +47,7 @@ import (
 	"github.com/goharbor/harbor/src/pkg"
 	"github.com/goharbor/harbor/src/pkg/accessory"
 	accessorymodel "github.com/goharbor/harbor/src/pkg/accessory/model"
+	attestationaccessory "github.com/goharbor/harbor/src/pkg/accessory/model/attestation"
 	"github.com/goharbor/harbor/src/pkg/artifact"
 	"github.com/goharbor/harbor/src/pkg/artifactrash"
 	trashmodel "github.com/goharbor/harbor/src/pkg/artifactrash/model"
@@ -405,7 +408,11 @@ func (c *controller) deleteDeeply(ctx context.Context, id int64, isRoot, isAcces
 	}
 
 	// delete child artifacts if contains any
-	for _, reference := range art.References {
+	childRefs, err := c.artMgr.ListReferences(ctx, q.New(q.KeyWords{"ParentID": art.ID}))
+	if err != nil {
+		return err
+	}
+	for _, reference := range childRefs {
 		// delete reference
 		if err = c.artMgr.DeleteReference(ctx, reference.ID); err != nil &&
 			!errors.IsErr(err, errors.NotFoundCode) {
@@ -725,6 +732,7 @@ func (c *controller) assembleArtifact(ctx context.Context, art *artifact.Artifac
 	artifact := &Artifact{
 		Artifact: *art,
 	}
+	c.filterLegacyBuildKitAttestationReferences(ctx, artifact)
 	// populate addition links
 	c.populateAdditionLinks(ctx, artifact)
 
@@ -795,6 +803,7 @@ func (c *controller) populateAccessories(ctx context.Context, art *Artifact) {
 		return
 	}
 	art.Accessories = accs
+	c.populateLegacyBuildKitAttestationAccessories(ctx, art)
 
 	// Check for inherited Cosign signatures from parent OCI Index
 	hasCosign := false
@@ -830,6 +839,100 @@ func (c *controller) populateAccessories(ctx context.Context, art *Artifact) {
 			}
 		}
 	}
+}
+
+func (c *controller) filterLegacyBuildKitAttestationReferences(ctx context.Context, art *Artifact) {
+	if art == nil || !art.IsImageIndex() || len(art.References) == 0 {
+		return
+	}
+
+	filtered := make([]*artifact.Reference, 0, len(art.References))
+	for _, ref := range art.References {
+		legacy, err := c.isLegacyBuildKitAttestationReference(ctx, ref)
+		if err != nil {
+			log.Errorf("failed to inspect legacy attestation reference %d for artifact %d: %v", ref.ID, art.ID, err)
+			filtered = append(filtered, ref)
+			continue
+		}
+		if !legacy {
+			filtered = append(filtered, ref)
+		}
+	}
+	art.References = filtered
+}
+
+func (c *controller) populateLegacyBuildKitAttestationAccessories(ctx context.Context, art *Artifact) {
+	if art == nil || (art.ManifestMediaType != v1.MediaTypeImageManifest && art.ManifestMediaType != schema2.MediaTypeManifest) {
+		return
+	}
+
+	existing := map[int64]struct{}{}
+	for _, acc := range art.Accessories {
+		existing[acc.GetData().ArtifactID] = struct{}{}
+	}
+
+	parents, err := c.artMgr.ListReferences(ctx, q.New(q.KeyWords{"ChildID": art.ID}))
+	if err != nil {
+		log.Errorf("failed to list parent references of artifact %d: %v", art.ID, err)
+		return
+	}
+
+	for _, parentRef := range parents {
+		parentArt, err := c.artMgr.Get(ctx, parentRef.ParentID)
+		if err != nil || parentArt == nil || !parentArt.IsImageIndex() {
+			continue
+		}
+
+		for _, siblingRef := range parentArt.References {
+			targetDigest := legacyBuildKitAttestationSubjectDigest(siblingRef)
+			if targetDigest != art.Digest {
+				continue
+			}
+			legacy, err := c.isLegacyBuildKitAttestationReference(ctx, siblingRef)
+			if err != nil || !legacy {
+				continue
+			}
+			if _, ok := existing[siblingRef.ChildID]; ok {
+				continue
+			}
+
+			accArt, err := c.artMgr.Get(ctx, siblingRef.ChildID)
+			if err != nil || accArt == nil {
+				continue
+			}
+
+			art.Accessories = append(art.Accessories, attestationaccessory.New(accessorymodel.AccessoryData{
+				ArtifactID:        accArt.ID,
+				SubArtifactID:     art.ID,
+				SubArtifactRepo:   art.RepositoryName,
+				SubArtifactDigest: art.Digest,
+				Size:              accArt.Size,
+				Digest:            accArt.Digest,
+				Type:              accessorymodel.TypeBuildKitAttestation,
+			}))
+			existing[siblingRef.ChildID] = struct{}{}
+		}
+	}
+}
+
+func (c *controller) isLegacyBuildKitAttestationReference(ctx context.Context, ref *artifact.Reference) (bool, error) {
+	if legacyBuildKitAttestationSubjectDigest(ref) == "" {
+		return false, nil
+	}
+	if ref.Platform != nil && (ref.Platform.OS != "unknown" || ref.Platform.Architecture != "unknown") {
+		return false, nil
+	}
+	return c.HasUnscannableLayer(ctx, ref.ChildDigest)
+}
+
+func legacyBuildKitAttestationSubjectDigest(ref *artifact.Reference) string {
+	if ref == nil || ref.Annotations == nil {
+		return ""
+	}
+	if ref.Annotations[buildKitReferenceTypeAnnotation] != buildKitAttestationManifestType {
+		return ""
+	}
+	return ref.Annotations[buildKitReferenceDigestAnnotation]
 }
 
 // HasUnscannableLayer check if it is a in-toto sbom, if it contains any blob with a content_type is application/vnd.in-toto+json, then consider as in-toto sbom
