@@ -164,11 +164,14 @@ func (l *localHelper) UpdatePullTime(ctx context.Context, art lib.ArtifactInfo) 
 	}
 	a, err := l.artifactCtl.GetByReference(ctx, art.Repository, ref, &artifact.Option{WithTag: true})
 	if err != nil {
+		// In proxy-cache scenarios the artifact may not yet be visible or may have
+		// been garbage-collected between the push and this lookup. Treat not-found
+		// as a no-op instead of propagating the error and failing the cache flow.
+		if errors.IsNotFoundErr(err) {
+			log.Warningf("Artifact not found when update pull time, artifact: %v:%v", art.Repository, ref)
+			return nil
+		}
 		return err
-	}
-	if a == nil {
-		log.Warningf("Artifact not found when update pull time, artifact: %v:%v", art.Repository, getReference(art))
-		return nil
 	}
 
 	var tagID int64

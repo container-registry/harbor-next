@@ -172,8 +172,10 @@ func (lh *localHelperTestSuite) TestUpdatePullTime_ArtifactNotFound() {
 	art := lib.ArtifactInfo{Repository: "library/hello-world", Digest: dig}
 	lh.artCtl.On("GetByReference", ctx, art.Repository, dig, &artifact.Option{WithTag: true}).
 		Return(nil, errors.NotFoundError(nil))
+	// Not-found is expected during proxy-cache races and should be treated as a no-op.
 	err := lh.local.UpdatePullTime(ctx, art)
-	lh.Require().NotNil(err)
+	lh.Require().Nil(err)
+	lh.artCtl.AssertNotCalled(lh.T(), "UpdatePullTime")
 }
 
 func (lh *localHelperTestSuite) TestUpdatePullTime_ByDigestNoTag() {
