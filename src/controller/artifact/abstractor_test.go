@@ -321,22 +321,6 @@ var (
     "com.example.key1": "value1"
   }
 }`
-	buildKitAttestationManifest = `{
-  "schemaVersion": 2,
-  "mediaType": "application/vnd.oci.image.manifest.v1+json",
-  "config": {
-    "mediaType": "application/vnd.oci.image.config.v1+json",
-    "size": 167,
-    "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
-  },
-  "layers": [
-    {
-      "mediaType": "application/vnd.in-toto+json",
-      "size": 1234,
-      "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
-    }
-  ]
-}`
 )
 
 type abstractorTestSuite struct {
@@ -513,11 +497,8 @@ func (a *abstractorTestSuite) TestAbstractMetadataOfIndexWithArtifactType() {
 func (a *abstractorTestSuite) TestAbstractMetadataOfIndexWithBuildKitAttestation() {
 	indexManifest, _, err := distribution.UnmarshalManifest(v1.MediaTypeImageIndex, []byte(buildKitAttestationIndex))
 	a.Require().Nil(err)
-	attestationManifest, _, err := distribution.UnmarshalManifest(v1.MediaTypeImageManifest, []byte(buildKitAttestationManifest))
-	a.Require().Nil(err)
 
 	a.regCli.On("PullManifest", mock.Anything, mock.Anything).Return(indexManifest, "", nil).Once()
-	a.regCli.On("PullManifest", mock.Anything, "sha256:70ce0a747f09cd7c09c2d6eaeab69d60adb0398f569296e8c0e844599388ebd6").Return(attestationManifest, "", nil).Once()
 	a.argMgr.On("GetByDigest", mock.Anything, mock.Anything, "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f").Return(&artifact.Artifact{
 		ID:     2,
 		Digest: "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",

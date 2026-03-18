@@ -47,7 +47,6 @@ type abstractor struct {
 }
 
 func (a *abstractor) AbstractMetadata(ctx context.Context, artifact *artifact.Artifact) error {
-	// read manifest content
 	manifest, _, err := a.regCli.PullManifest(artifact.RepositoryName, artifact.Digest)
 	if err != nil {
 		return err
