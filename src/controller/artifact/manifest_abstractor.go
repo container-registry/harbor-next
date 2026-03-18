@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/goharbor/harbor/src/lib/log"
 	pkgartifact "github.com/goharbor/harbor/src/pkg/artifact"
 )
 
@@ -43,7 +42,6 @@ func registerManifestAbstractor(factory manifestAbstractorFactory, mediaTypes ..
 			return fmt.Errorf("manifest abstractor for media type %s already exists", mediaType)
 		}
 		manifestAbstractorFactories[mediaType] = factory
-		log.Infof("manifest abstractor for media type %s registered", mediaType)
 	}
 
 	return nil

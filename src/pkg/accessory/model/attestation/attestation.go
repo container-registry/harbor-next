@@ -24,12 +24,12 @@ type BuildKitAttestation struct {
 	base.Default
 }
 
-// Kind gives the reference type of attestation.
+// Kind returns RefHard — attestations are hard-linked to their subject.
 func (a *BuildKitAttestation) Kind() string {
 	return model.RefHard
 }
 
-// IsHard reports whether the attestation is hard-linked to its subject.
+// IsHard returns true — attestations are hard-linked to their subject.
 func (a *BuildKitAttestation) IsHard() bool {
 	return true
 }
