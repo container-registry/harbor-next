@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   release-please:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
@@ -35,7 +35,7 @@ jobs:
         platform:
           - linux/amd64
           - linux/arm64
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
     env:
@@ -142,7 +142,7 @@ jobs:
     strategy:
       matrix:
         component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter, nginx]
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
     env:
@@ -179,7 +179,7 @@ jobs:
   sign:
     name: Sign and Release
     needs: [release-please, merge]
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: write
       id-token: write

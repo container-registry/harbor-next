@@ -31,7 +31,7 @@ jobs:
         platform:
           - linux/amd64
           - linux/arm64
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
     steps:
@@ -120,7 +120,7 @@ jobs:
       fail-fast: false
       matrix:
         component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter]
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
     steps:
@@ -154,7 +154,7 @@ jobs:
     name: Sign preview images
     if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
     needs: [merge]
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
       id-token: write
@@ -201,7 +201,7 @@ jobs:
     name: Comment preview image refs
     if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
     needs: [sign]
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
       pull-requests: write
     steps:
