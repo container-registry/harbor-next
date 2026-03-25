@@ -268,6 +268,14 @@ helm upgrade \
 
 ## Check Loki works
 
+First, port-forward the Loki service:
+
+```bash
+kubectl port-forward -n monitoring svc/loki 3100:3100
+```
+
+Then, in another terminal, query Loki:
+
 ```bash
 curl -k -G -s "http://localhost:3100/loki/api/v1/query_range" \
   --data-urlencode 'query={namespace="harbor"}' \
