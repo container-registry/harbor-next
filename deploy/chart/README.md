@@ -131,6 +131,7 @@ Built-in `values.schema.json` provides:
 helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-next \
   --namespace harbor \
   --create-namespace \
+  --set harborAdminPassword=your-strong-password \
   --set externalURL=https://harbor.example.com \
   --set database.host=postgres.example.com \
   --set database.password=your-password
