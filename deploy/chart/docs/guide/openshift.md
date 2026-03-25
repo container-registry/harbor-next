@@ -50,12 +50,13 @@ Because OpenShift automatically sets security contexts during deployment, you mu
   ```
 
 ### Set Storage Class
-Configure the `storageClass` to `gp3` (the default on OpenShift) in every persistence section:
+Configure the `storageClass` to the default storage class for your OpenShift cluster in every persistence section:
+
 
 ```yaml
 persistence:
   enabled: true
-  storageClass: "gp3"
+  storageClass: "<your-storage-class>"
 ```
 
 ## Database Deployment
