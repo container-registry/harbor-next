@@ -19,7 +19,7 @@ vars:
 
   GOPATH_BIN:
     sh: echo "${GOBIN:-$(go env GOPATH)/bin}"
-  GOBUILD_FLAGS: "-buildvcs=false"
+  GOBUILD_FLAGS: "-buildvcs=false -trimpath"
   DISTRIBUTION_SRC: "https://github.com/distribution/distribution.git"
   NPM_REGISTRY: "https://registry.npmjs.org/"
 
