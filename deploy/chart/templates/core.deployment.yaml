@@ -57,7 +57,7 @@ spec:
             - configMapRef:
                 name: {{ include "harbor.fullname" . }}-core
             - secretRef:
-                name: name: {{ .Values.core.existingSecret | default (include "harbor.core" .) }}
+                name: {{ .Values.core.existingSecret | default (include "harbor.core" .) }}
           env:
             {{- if .Values.existingSecretAdminPassword }}
             - name: HARBOR_ADMIN_PASSWORD
