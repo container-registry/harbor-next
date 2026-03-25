@@ -7,7 +7,7 @@ A modern, production-ready Helm chart for [Harbor Next](https://github.com/conta
 ## TL;DR
 
 ```bash
-helm install my-harbor oci://8gears.container-registry.com/8gcr/chart/harbor-next \
+helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-next \
   --set externalURL=https://harbor.example.com \
   --set database.host=my-postgres.example.com \
   --set database.password=secret
@@ -128,7 +128,7 @@ Built-in `values.schema.json` provides:
 ### Basic Installation
 
 ```bash
-helm install my-harbor oci://8gears.container-registry.com/8gcr/chart/harbor-next \
+helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-next \
   --namespace harbor \
   --create-namespace \
   --set externalURL=https://harbor.example.com \
@@ -139,7 +139,7 @@ helm install my-harbor oci://8gears.container-registry.com/8gcr/chart/harbor-nex
 ### With Values File
 
 ```bash
-helm install my-harbor oci://8gears.container-registry.com/8gcr/chart/harbor-next \
+helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-next \
   --namespace harbor \
   --create-namespace \
   -f values-production.yaml
