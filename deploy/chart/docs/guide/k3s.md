@@ -23,6 +23,7 @@ Pull the Harbor Helm chart from the OCI registry.
 
    ```bash
    tar xzvf harbor-*.tgz
+   cd harbor-next
    ```
 
 ## Add Database Manifest
