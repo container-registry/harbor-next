@@ -1,4 +1,4 @@
-# Deploy Harbor on Nutanix Cloud Platform
+# Deploy Harbor on Nutanix Kubernetes Platform
 
 ## Deploy a Local CNPG System
 
