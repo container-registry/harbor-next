@@ -105,7 +105,27 @@ database:
   database: registry
 ```
 
-The hostname chosen for our local deployment is the default, `harbor.example.com`. To override our DNS resolver, we set a mapping to localhost in `/etc/hosts`:
+We set also `externalURL` and `harborAdminPassword`:
+
+```yaml
+externalURL: "https://harbor.example.com"
+harborAdminPassword: "strong-password"
+```
+
+Finally we configure the ingress:
+
+```yaml
+ingress:
+  core: harbor.example.com
+  hosts:
+    - host: harbor.example.com
+  tls:
+    - secretName: harbor-tls
+      hosts:
+        - harbor.example.com
+```
+
+The hostname chosen for our local deployment is `harbor.example.com`. To override our DNS resolver, we set a mapping to localhost in `/etc/hosts`:
 
 ```
 127.0.0.1 harbor.example.com
