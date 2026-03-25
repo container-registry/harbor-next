@@ -10,7 +10,7 @@ A modern, production-ready Helm chart for [Harbor Next](https://github.com/conta
 helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-next \
   --set externalURL=https://harbor.example.com \
   --set database.host=my-postgres.example.com \
-  --set database.password=secret
+  --set database.existingSecret=my-harbor-db
 ```
 
 ## Why This Chart?
