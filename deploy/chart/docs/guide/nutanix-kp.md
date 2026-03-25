@@ -44,7 +44,7 @@ alloy:
 
         rule {
           source_labels = ["__meta_kubernetes_namespace"]
-          regex         = "harbor|test-1-alex"
+          regex         = "harbor"
           action        = "keep"
         }
 
