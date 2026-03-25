@@ -14,6 +14,9 @@ Components are listed in alphabetical order.
 {{- range $components }}
 {{- $enabled := ternary (and (index .values "enabled") .values.pdb.enabled) .values.pdb.enabled .needsEnabled }}
 {{- if $enabled }}
+{{- if and (not (hasKey .values.pdb "maxUnavailable")) (not (hasKey .values.pdb "minAvailable")) }}
+{{- fail (printf "%s.pdb requires either minAvailable or maxUnavailable when enabled" .name) }}
+{{- end }}
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
