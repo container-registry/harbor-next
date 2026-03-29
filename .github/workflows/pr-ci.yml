@@ -60,7 +60,7 @@ jobs:
         if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
         uses: arduino/setup-task@24c5e13bce349197642746563945fcdf9355e8f4 # v2
         with:
-          version: 3.x
+          version: 3.49.1
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate API code
