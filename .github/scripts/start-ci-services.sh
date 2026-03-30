@@ -2,10 +2,10 @@
 
 set -euo pipefail
 
-if ! command -v pg_ctlcluster >/dev/null 2>&1 || ! command -v redis-server >/dev/null 2>&1; then
+if ! command -v pg_ctlcluster >/dev/null 2>&1 || ! command -v redis-server >/dev/null 2>&1 || ! command -v gcc >/dev/null 2>&1; then
   export DEBIAN_FRONTEND=noninteractive
   sudo apt-get update
-  sudo apt-get install -y --no-install-recommends postgresql redis-server
+  sudo apt-get install -y --no-install-recommends build-essential postgresql redis-server
 fi
 
 pg_version="$(find /etc/postgresql -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -V | tail -n1)"
