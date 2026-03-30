@@ -12,30 +12,7 @@ permissions:
 jobs:
   test:
     name: Unit Tests
-    runs-on: ubuntu-latest  # requires Docker daemon for services — switch to vars.RUNNER after DinD sidecar is deployed
-    services:
-      postgresql:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: root123
-          POSTGRES_DB: registry
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository || contains(fromJSON('["OWNER","MEMBER"]'), github.event.pull_request.author_association)) && vars.RUNNER || 'ubuntu-latest' }}
     env:
       POSTGRESQL_HOST: localhost
       POSTGRESQL_USR: postgres
@@ -58,12 +35,8 @@ jobs:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Increase postgres max_connections
-        run: |
-          PG_CONTAINER=$(docker ps -q --filter "ancestor=postgres:16-alpine")
-          docker exec "$PG_CONTAINER" psql -U postgres -c "ALTER SYSTEM SET max_connections = 300;"
-          docker restart "$PG_CONTAINER"
-          until docker exec "$PG_CONTAINER" pg_isready -U postgres; do sleep 1; done
+      - name: Start PostgreSQL and Redis
+        run: ./.github/scripts/start-ci-services.sh
 
       - name: Generate API code
         run: task build:gen-apis
