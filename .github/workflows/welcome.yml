@@ -14,10 +14,9 @@ jobs:
   welcome:
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     steps:
-      - uses: actions/first-interaction@fb2402657b4a28582200150d0a145671d0e50597 # v1
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          issue-message: |
+      - uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          ISSUE_MESSAGE: |
             Thanks for opening your first issue!
 
             A maintainer will review this soon. In the meantime:
@@ -25,8 +24,7 @@ jobs:
             - Search [existing issues](https://github.com/${{ github.repository }}/issues) for similar reports
 
             If this is a question rather than a bug, consider opening a [Discussion](https://github.com/${{ github.repository }}/discussions) instead.
-
-          pr-message: |
+          PR_MESSAGE: |
             Thanks for your first pull request!
 
             A maintainer will review this soon. Please ensure:
@@ -35,3 +33,26 @@ jobs:
             - [ ] PR title follows [Conventional Commits](https://www.conventionalcommits.org/)
 
             Check our [Contributing Guide](https://github.com/${{ github.repository }}/blob/main/CONTRIBUTING.md) for details.
+        with:
+          script: |
+            const isPullRequest = context.eventName === "pull_request_target";
+            const issueNumber = isPullRequest ? context.payload.pull_request.number : context.payload.issue.number;
+            const author = isPullRequest ? context.payload.pull_request.user.login : context.payload.issue.user.login;
+            const type = isPullRequest ? "pr" : "issue";
+
+            const { data } = await github.rest.search.issuesAndPullRequests({
+              q: `repo:${context.repo.owner}/${context.repo.repo} author:${author} type:${type}`,
+              per_page: 2,
+            });
+
+            if (data.total_count !== 1) {
+              core.info(`${author} is not a first-time ${type} author`);
+              return;
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: isPullRequest ? process.env.PR_MESSAGE : process.env.ISSUE_MESSAGE,
+            });
