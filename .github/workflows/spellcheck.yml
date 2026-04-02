@@ -22,9 +22,24 @@ permissions:
 
 jobs:
   typos:
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository || contains(fromJSON('["OWNER","MEMBER"]'), github.event.pull_request.author_association)) && vars.RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: crate-ci/typos@a8d8e187146634c459c27ade2d3e338569378720 # v1.44.0
-        with:
-          config: .typos.toml
+
+      - name: Run typos
+        env:
+          TYPOS_VERSION: "1.44.0"
+        run: |
+          case "$(uname -m)" in
+            x86_64|amd64) target="x86_64-unknown-linux-musl" ;;
+            aarch64|arm64) target="aarch64-unknown-linux-musl" ;;
+            *)
+              echo "Unsupported architecture: $(uname -m)"
+              exit 1
+              ;;
+          esac
+
+          install_dir="$(mktemp -d)"
+          curl -fsSL "https://github.com/crate-ci/typos/releases/download/v${TYPOS_VERSION}/typos-v${TYPOS_VERSION}-${target}.tar.gz" -o /tmp/typos.tar.gz
+          tar -xzf /tmp/typos.tar.gz -C "$install_dir" --strip-components=1 --no-same-owner --no-same-permissions ./typos
+          "$install_dir/typos" --config .typos.toml
