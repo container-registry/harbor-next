@@ -12,30 +12,7 @@ permissions:
 jobs:
   test:
     name: Unit Tests
-    runs-on: ubuntu-latest  # requires Docker daemon for services — switch to vars.RUNNER after DinD sidecar is deployed
-    services:
-      postgresql:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: root123
-          POSTGRES_DB: registry
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository || contains(fromJSON('["OWNER","MEMBER"]'), github.event.pull_request.author_association)) && vars.RUNNER || 'ubuntu-latest' }}
     env:
       POSTGRESQL_HOST: localhost
       POSTGRESQL_USR: postgres
@@ -45,6 +22,7 @@ jobs:
       POSTGRES_MIGRATION_SCRIPTS_PATH: ${{ github.workspace }}/make/migrations/postgresql
       UTTEST: "true"
       JOB_SERVICE_POOL_REDIS_URL: "redis://localhost:6379"
+      CGO_ENABLED: "1"
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -58,12 +36,8 @@ jobs:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Increase postgres max_connections
-        run: |
-          PG_CONTAINER=$(docker ps -q --filter "ancestor=postgres:16-alpine")
-          docker exec "$PG_CONTAINER" psql -U postgres -c "ALTER SYSTEM SET max_connections = 300;"
-          docker restart "$PG_CONTAINER"
-          until docker exec "$PG_CONTAINER" pg_isready -U postgres; do sleep 1; done
+      - name: Start PostgreSQL and Redis
+        run: ./.github/scripts/start-ci-services.sh
 
       - name: Generate API code
         run: task build:gen-apis
@@ -76,13 +50,15 @@ jobs:
           # - core/api, core/controllers, pkg/proxy/connection: need full Harbor stack
           # - pkg/token, server/middleware/security, controller/systeminfo: need /etc/core/ cert files
           # - pkg/jobmonitor: needs REDIS_HOST env var with specific format
+          # - common/utils/email: reaches external SMTP endpoints
           # - jobservice/runner: Redis job tracker state ordering issues
           # - controller/usergroup/test, pkg/scan/dao/scanner, pkg/scan/export: upstream test state issues
           # - pkg/scan/dao/scan, pkg/scan/postprocessors: foreign key constraint violations in CI
           # - pkg/systemartifact: test ordering / state issues
           # - jobservice/logger/getter: DB state ordering issues when packages run in parallel
           pkgs=$(go list ./... | grep -vE \
-            '/controller/ldap$|/core/auth/ldap$|/pkg/ldap$|/core/api$|/core/controllers$|/pkg/proxy/connection$|/pkg/token$|/server/middleware/security$|/controller/systeminfo$|/pkg/jobmonitor$|/jobservice/runner$|/jobservice/logger/getter$|/controller/usergroup/test$|/pkg/scan/dao/scanner$|/pkg/scan/export$|/pkg/scan/dao/scan$|/pkg/scan/postprocessors$|/pkg/systemartifact$' \
+            '/controller/ldap$|/core/auth/ldap$|/pkg/ldap$|/core/api$|/core/controllers$|/pkg/proxy/connection$|/pkg/token$|/server/middleware/security$|/controller/systeminfo$|/pkg/jobmonitor$|/common/utils/email$|/jobservice/runner$|/jobservice/logger/getter$|/controller/usergroup/test$|/pkg/scan/dao/scanner$|/pkg/scan/export$|/pkg/scan/dao/scan$|/pkg/scan/postprocessors$|/pkg/systemartifact$' \
             | tr '\n' ' ')
+          # Run packages serially because many DAO suites share the same test database.
           # shellcheck disable=SC2086
-          go test -v -race -cover -p 4 $pkgs
+          go test -v -race -cover -p 1 -parallel 1 $pkgs
