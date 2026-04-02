@@ -41,6 +41,8 @@ func registerManifestAbstractor(factory manifestAbstractorFactory, mediaTypes ..
 		if _, ok := manifestAbstractorFactories[mediaType]; ok {
 			return fmt.Errorf("manifest abstractor for media type %s already exists", mediaType)
 		}
+	}
+	for _, mediaType := range mediaTypes {
 		manifestAbstractorFactories[mediaType] = factory
 	}
 

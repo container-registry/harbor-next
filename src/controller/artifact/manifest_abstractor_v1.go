@@ -59,7 +59,7 @@ func (m *manifestV1Abstractor) AbstractMetadata(ctx context.Context, art *pkgart
 }
 
 func init() {
-	mediaTypes := []string{"", "application/json", schema1.MediaTypeSignedManifest}
+	mediaTypes := []string{"", "application/json", schema1.MediaTypeSignedManifest, schema1.MediaTypeManifest}
 	if err := registerManifestAbstractor(func(a *abstractor) manifestAbstractor {
 		return &manifestV1Abstractor{blobMgr: a.blobMgr}
 	}, mediaTypes...); err != nil {

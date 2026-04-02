@@ -498,19 +498,20 @@ func (a *abstractorTestSuite) TestAbstractMetadataOfIndexWithBuildKitAttestation
 	indexManifest, _, err := distribution.UnmarshalManifest(v1.MediaTypeImageIndex, []byte(buildKitAttestationIndex))
 	a.Require().Nil(err)
 
-	a.regCli.On("PullManifest", mock.Anything, mock.Anything).Return(indexManifest, "", nil).Once()
-	a.argMgr.On("GetByDigest", mock.Anything, mock.Anything, "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f").Return(&artifact.Artifact{
+	const repo = "library/test"
+	a.regCli.On("PullManifest", repo, mock.Anything).Return(indexManifest, "", nil).Once()
+	a.argMgr.On("GetByDigest", mock.Anything, repo, "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f").Return(&artifact.Artifact{
 		ID:     2,
 		Digest: "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
 		Size:   10,
 	}, nil).Twice()
-	a.argMgr.On("GetByDigest", mock.Anything, mock.Anything, "sha256:70ce0a747f09cd7c09c2d6eaeab69d60adb0398f569296e8c0e844599388ebd6").Return(&artifact.Artifact{
+	a.argMgr.On("GetByDigest", mock.Anything, repo, "sha256:70ce0a747f09cd7c09c2d6eaeab69d60adb0398f569296e8c0e844599388ebd6").Return(&artifact.Artifact{
 		ID:     3,
 		Digest: "sha256:70ce0a747f09cd7c09c2d6eaeab69d60adb0398f569296e8c0e844599388ebd6",
 		Size:   3,
 	}, nil).Once()
 
-	artifact := &artifact.Artifact{ID: 1}
+	artifact := &artifact.Artifact{ID: 1, RepositoryName: repo}
 	err = a.abstractor.AbstractMetadata(context.TODO(), artifact)
 	a.Require().Nil(err)
 	a.Equal(v1.MediaTypeImageIndex, artifact.ManifestMediaType)
