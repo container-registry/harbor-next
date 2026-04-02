@@ -58,7 +58,7 @@ jobs:
 
       - name: Install Task
         if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
-        uses: arduino/setup-task@24c5e13bce349197642746563945fcdf9355e8f4 # v2
+        uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
         with:
           version: 3.49.1
           repo-token: ${{ secrets.GITHUB_TOKEN }}
@@ -191,7 +191,7 @@ jobs:
         uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
 
       - name: Install syft
-        uses: anchore/sbom-action/download-syft@57aae528053a48a3f6235f2d9461b05fbcb7366d # v0.23.1
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
 
       - name: Log in to registry
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
