@@ -1,0 +1,86 @@
+template: matryer
+template-data:
+  stub-impl: true
+  with-resets: true
+  skip-ensure: true
+packages:
+  github.com/goharbor/harbor/src/pkg/artifact:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/artifact
+          pkgname: artifact
+          filename: manager.go
+          structname: Manager
+  github.com/goharbor/harbor/src/pkg/repository:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/repository
+          pkgname: repository
+          filename: manager.go
+          structname: Manager
+  github.com/goharbor/harbor/src/pkg/artifactrash:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/artifactrash
+          pkgname: artifactrash
+          filename: manager.go
+          structname: Manager
+  github.com/goharbor/harbor/src/pkg/blob:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/blob
+          pkgname: blob
+          filename: manager.go
+          structname: Manager
+  github.com/goharbor/harbor/src/controller/tag:
+    interfaces:
+      Controller:
+        config:
+          dir: testing/moq/controller/tag
+          pkgname: tag
+          filename: controller.go
+          structname: FakeController
+  github.com/goharbor/harbor/src/pkg/label:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/label
+          pkgname: label
+          filename: manager.go
+          structname: Manager
+  github.com/goharbor/harbor/src/pkg/immutable/match:
+    interfaces:
+      ImmutableTagMatcher:
+        config:
+          dir: testing/moq/pkg/immutable
+          pkgname: immutable
+          filename: matcher.go
+          structname: FakeMatcher
+  github.com/goharbor/harbor/src/pkg/registry:
+    interfaces:
+      Client:
+        config:
+          dir: testing/moq/pkg/registry
+          pkgname: registry
+          filename: client.go
+          structname: Client
+  github.com/goharbor/harbor/src/pkg/accessory:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/accessory
+          pkgname: accessory
+          filename: manager.go
+          structname: Manager
+  github.com/goharbor/harbor/src/controller/project:
+    interfaces:
+      Controller:
+        config:
+          dir: testing/moq/controller/project
+          pkgname: project
+          filename: controller.go
+          structname: Controller
