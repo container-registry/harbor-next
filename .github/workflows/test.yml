@@ -31,6 +31,9 @@ jobs:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Ensure C toolchain for race detector
+        run: command -v gcc >/dev/null || sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc
+
       - name: Generate API code
         run: task build:gen-apis
 
@@ -52,7 +55,7 @@ jobs:
           POSTGRES_PASSWORD: root123
           POSTGRES_DB: registry
         ports:
-          - 5432:5432
+          - 5432/tcp
         options: >-
           --health-cmd pg_isready
           --health-interval 5s
@@ -61,7 +64,7 @@ jobs:
       redis:
         image: redis:7-alpine
         ports:
-          - 6379:6379
+          - 6379/tcp
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 5s
@@ -70,12 +73,12 @@ jobs:
     env:
       POSTGRESQL_HOST: localhost
       POSTGRESQL_USR: postgres
-      POSTGRESQL_PORT: "5432"
+      POSTGRESQL_PORT: ${{ job.services.postgres.ports[5432] }}
       POSTGRESQL_PWD: root123
       POSTGRESQL_DATABASE: registry
       POSTGRES_MIGRATION_SCRIPTS_PATH: ${{ github.workspace }}/make/migrations/postgresql
       UTTEST: "true"
-      JOB_SERVICE_POOL_REDIS_URL: "redis://localhost:6379"
+      JOB_SERVICE_POOL_REDIS_URL: "redis://localhost:${{ job.services.redis.ports[6379] }}"
       CGO_ENABLED: "1"
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -89,6 +92,9 @@ jobs:
         with:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Ensure C toolchain for race detector
+        run: command -v gcc >/dev/null || sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc
 
       - name: Generate API code
         run: task build:gen-apis

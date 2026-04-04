@@ -205,6 +205,9 @@ tasks:
           elif [ -f coverage-db.out ]; then
             mv coverage-db.out coverage.out
           fi
+          if [ -f coverage.out ]; then
+            go tool cover -html=coverage.out -o coverage.html
+          fi
 
   quick:
     desc: "Run API lint and unit tests only (fast validation)"
