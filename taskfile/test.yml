@@ -83,6 +83,24 @@ tasks:
       - go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
       - go tool cover -html=coverage.out -o coverage.html
 
+  unit:pure:
+    desc: "Run pure unit tests (no DB/Redis needed) with full parallelism"
+    deps: [build:gen-apis]
+    dir: src
+    cmd: |
+      pkgs=$(../.github/scripts/list-test-packages.sh pure | tr '\n' ' ')
+      # shellcheck disable=SC2086
+      go test -race -timeout=15m {{.COVER_FLAGS}} {{.TEST_FLAGS}} $pkgs
+
+  unit:db:
+    desc: "Run DB-dependent unit tests serially (needs PostgreSQL + Redis)"
+    deps: [build:gen-apis]
+    dir: src
+    cmd: |
+      pkgs=$(../.github/scripts/list-test-packages.sh db | tr '\n' ' ')
+      # shellcheck disable=SC2086
+      go test -race -timeout=15m -p 1 -parallel 1 {{.COVER_FLAGS}} {{.TEST_FLAGS}} $pkgs
+
   unit:watch:
     desc: "Re-run Go unit tests on file changes (requires watchexec)"
     preconditions:
@@ -159,12 +177,40 @@ tasks:
       - task: unit
 
   ci:
-    desc: "Run full CI pipeline with reports (lint, vuln scan, unit tests)"
+    desc: "Run full CI pipeline with reports (lint, vuln scan, split unit tests)"
+    deps:
+      - _ci-checks
+      - _ci-tests
+
+  _ci-checks:
+    internal: true
+    deps:
+      - lint:api
+      - lint:report
+      - vuln-report
+
+  _ci-tests:
+    internal: true
+    deps: [build:gen-apis]
     cmds:
-      - task: lint:api
-      - task: lint:report
-      - task: vuln-report
-      - task: unit:coverage
+      - task: unit:pure
+        vars:
+          COVER_FLAGS: "-coverprofile=coverage-pure.out -covermode=atomic"
+          TEST_FLAGS: "-count=1"
+      - task: unit:db
+        vars:
+          COVER_FLAGS: "-coverprofile=coverage-db.out -covermode=atomic"
+          TEST_FLAGS: "-count=1"
+      - cmd: |
+          cd src
+          if [ -f coverage-pure.out ] && [ -f coverage-db.out ]; then
+            { head -1 coverage-pure.out; tail -n +2 coverage-pure.out; tail -n +2 coverage-db.out; } > coverage.out
+            rm -f coverage-pure.out coverage-db.out
+          elif [ -f coverage-pure.out ]; then
+            mv coverage-pure.out coverage.out
+          elif [ -f coverage-db.out ]; then
+            mv coverage-db.out coverage.out
+          fi
 
   quick:
     desc: "Run API lint and unit tests only (fast validation)"
@@ -181,4 +227,4 @@ tasks:
     cmds:
       - rm -f golangci-lint.report
       - rm -f govulncheck.sarif
-      - rm -f src/coverage.out src/coverage.html
+      - rm -f src/coverage.out src/coverage-pure.out src/coverage-db.out src/coverage.html
