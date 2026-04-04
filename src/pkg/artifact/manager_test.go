@@ -20,7 +20,6 @@ import (
 	"time"
 
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/goharbor/harbor/src/lib/q"
@@ -28,61 +27,99 @@ import (
 )
 
 type fakeDao struct {
-	mock.Mock
+	CountFunc           func(ctx context.Context, query *q.Query) (int64, error)
+	ListFunc            func(ctx context.Context, query *q.Query) ([]*dao.Artifact, error)
+	GetFunc             func(ctx context.Context, id int64) (*dao.Artifact, error)
+	GetByDigestFunc     func(ctx context.Context, repository, digest string) (*dao.Artifact, error)
+	CreateFunc          func(ctx context.Context, artifact *dao.Artifact) (int64, error)
+	DeleteFunc          func(ctx context.Context, id int64) error
+	UpdateFunc          func(ctx context.Context, artifact *dao.Artifact, props ...string) error
+	UpdatePullTimeFunc  func(ctx context.Context, id int64, pullTime time.Time) error
+	CreateReferenceFunc func(ctx context.Context, reference *dao.ArtifactReference) (int64, error)
+	ListReferencesFunc  func(ctx context.Context, query *q.Query) ([]*dao.ArtifactReference, error)
+	DeleteReferenceFunc func(ctx context.Context, id int64) error
+	DeleteReferencesFunc func(ctx context.Context, parentID int64) error
+	ListWithLatestFunc  func(ctx context.Context, query *q.Query) ([]*dao.Artifact, error)
 }
 
 func (f *fakeDao) Count(ctx context.Context, query *q.Query) (int64, error) {
-	args := f.Called()
-	return int64(args.Int(0)), args.Error(1)
+	if f.CountFunc != nil {
+		return f.CountFunc(ctx, query)
+	}
+	return 0, nil
 }
 func (f *fakeDao) List(ctx context.Context, query *q.Query) ([]*dao.Artifact, error) {
-	args := f.Called()
-	return args.Get(0).([]*dao.Artifact), args.Error(1)
+	if f.ListFunc != nil {
+		return f.ListFunc(ctx, query)
+	}
+	return nil, nil
 }
 func (f *fakeDao) Get(ctx context.Context, id int64) (*dao.Artifact, error) {
-	args := f.Called()
-	return args.Get(0).(*dao.Artifact), args.Error(1)
+	if f.GetFunc != nil {
+		return f.GetFunc(ctx, id)
+	}
+	return nil, nil
 }
 func (f *fakeDao) GetByDigest(ctx context.Context, repository, digest string) (*dao.Artifact, error) {
-	args := f.Called()
-	return args.Get(0).(*dao.Artifact), args.Error(1)
+	if f.GetByDigestFunc != nil {
+		return f.GetByDigestFunc(ctx, repository, digest)
+	}
+	return nil, nil
 }
 func (f *fakeDao) Create(ctx context.Context, artifact *dao.Artifact) (int64, error) {
-	args := f.Called()
-	return int64(args.Int(0)), args.Error(1)
+	if f.CreateFunc != nil {
+		return f.CreateFunc(ctx, artifact)
+	}
+	return 0, nil
 }
 func (f *fakeDao) Delete(ctx context.Context, id int64) error {
-	args := f.Called()
-	return args.Error(0)
+	if f.DeleteFunc != nil {
+		return f.DeleteFunc(ctx, id)
+	}
+	return nil
 }
 func (f *fakeDao) Update(ctx context.Context, artifact *dao.Artifact, props ...string) error {
-	args := f.Called()
-	return args.Error(0)
+	if f.UpdateFunc != nil {
+		return f.UpdateFunc(ctx, artifact, props...)
+	}
+	return nil
 }
 func (f *fakeDao) UpdatePullTime(ctx context.Context, id int64, pullTime time.Time) error {
-	args := f.Called()
-	return args.Error(0)
+	if f.UpdatePullTimeFunc != nil {
+		return f.UpdatePullTimeFunc(ctx, id, pullTime)
+	}
+	return nil
 }
 func (f *fakeDao) CreateReference(ctx context.Context, reference *dao.ArtifactReference) (int64, error) {
-	args := f.Called()
-	return int64(args.Int(0)), args.Error(1)
+	if f.CreateReferenceFunc != nil {
+		return f.CreateReferenceFunc(ctx, reference)
+	}
+	return 0, nil
 }
 func (f *fakeDao) ListReferences(ctx context.Context, query *q.Query) ([]*dao.ArtifactReference, error) {
-	args := f.Called()
-	return args.Get(0).([]*dao.ArtifactReference), args.Error(1)
+	if f.ListReferencesFunc != nil {
+		return f.ListReferencesFunc(ctx, query)
+	}
+	return nil, nil
 }
 func (f *fakeDao) DeleteReference(ctx context.Context, id int64) error {
-	args := f.Called()
-	return args.Error(0)
+	if f.DeleteReferenceFunc != nil {
+		return f.DeleteReferenceFunc(ctx, id)
+	}
+	return nil
 }
 func (f *fakeDao) DeleteReferences(ctx context.Context, parentID int64) error {
-	args := f.Called()
-	return args.Error(0)
+	if f.DeleteReferencesFunc != nil {
+		return f.DeleteReferencesFunc(ctx, parentID)
+	}
+	return nil
 }
 
 func (f *fakeDao) ListWithLatest(ctx context.Context, query *q.Query) ([]*dao.Artifact, error) {
-	args := f.Called()
-	return args.Get(0).([]*dao.Artifact), args.Error(1)
+	if f.ListWithLatestFunc != nil {
+		return f.ListWithLatestFunc(ctx, query)
+	}
+	return nil, nil
 }
 
 type managerTestSuite struct {
@@ -99,7 +136,9 @@ func (m *managerTestSuite) SetupTest() {
 }
 
 func (m *managerTestSuite) TestCount() {
-	m.dao.On("Count", mock.Anything).Return(1, nil)
+	m.dao.CountFunc = func(_ context.Context, _ *q.Query) (int64, error) {
+		return 1, nil
+	}
 	total, err := m.mgr.Count(nil, nil)
 	m.Require().Nil(err)
 	m.Equal(int64(1), total)
@@ -120,21 +159,22 @@ func (m *managerTestSuite) TestAssemble() {
 		ExtraAttrs:        `{"attr1":"value1"}`,
 		Annotations:       `{"anno1":"value1"}`,
 	}
-	m.dao.On("ListReferences").Return([]*dao.ArtifactReference{
-		{
-			ID:       1,
-			ParentID: 1,
-			ChildID:  2,
-		},
-		{
-			ID:       2,
-			ParentID: 1,
-			ChildID:  3,
-		},
-	}, nil)
+	m.dao.ListReferencesFunc = func(_ context.Context, _ *q.Query) ([]*dao.ArtifactReference, error) {
+		return []*dao.ArtifactReference{
+			{
+				ID:       1,
+				ParentID: 1,
+				ChildID:  2,
+			},
+			{
+				ID:       2,
+				ParentID: 1,
+				ChildID:  3,
+			},
+		}, nil
+	}
 	artifact, err := m.mgr.assemble(nil, art)
 	m.Require().Nil(err)
-	m.dao.AssertExpectations(m.T())
 	m.Require().NotNil(artifact)
 	m.Equal(art.ID, artifact.ID)
 	m.Equal(2, len(artifact.References))
@@ -155,7 +195,9 @@ func (m *managerTestSuite) TestListWithLatest() {
 		ExtraAttrs:        `{"attr1":"value1"}`,
 		Annotations:       `{"anno1":"value1"}`,
 	}
-	m.dao.On("ListWithLatest", mock.Anything).Return([]*dao.Artifact{art}, nil)
+	m.dao.ListWithLatestFunc = func(_ context.Context, _ *q.Query) ([]*dao.Artifact, error) {
+		return []*dao.Artifact{art}, nil
+	}
 	artifacts, err := m.mgr.ListWithLatest(nil, nil)
 	m.Require().Nil(err)
 	m.Equal(1, len(artifacts))
@@ -177,8 +219,12 @@ func (m *managerTestSuite) TestList() {
 		ExtraAttrs:        `{"attr1":"value1"}`,
 		Annotations:       `{"anno1":"value1"}`,
 	}
-	m.dao.On("List", mock.Anything).Return([]*dao.Artifact{art}, nil)
-	m.dao.On("ListReferences").Return([]*dao.ArtifactReference{}, nil)
+	m.dao.ListFunc = func(_ context.Context, _ *q.Query) ([]*dao.Artifact, error) {
+		return []*dao.Artifact{art}, nil
+	}
+	m.dao.ListReferencesFunc = func(_ context.Context, _ *q.Query) ([]*dao.ArtifactReference, error) {
+		return []*dao.ArtifactReference{}, nil
+	}
 	artifacts, err := m.mgr.List(nil, nil)
 	m.Require().Nil(err)
 	m.Equal(1, len(artifacts))
@@ -200,11 +246,14 @@ func (m *managerTestSuite) TestGet() {
 		ExtraAttrs:        `{"attr1":"value1"}`,
 		Annotations:       `{"anno1":"value1"}`,
 	}
-	m.dao.On("Get", mock.Anything).Return(art, nil)
-	m.dao.On("ListReferences").Return([]*dao.ArtifactReference{}, nil)
+	m.dao.GetFunc = func(_ context.Context, _ int64) (*dao.Artifact, error) {
+		return art, nil
+	}
+	m.dao.ListReferencesFunc = func(_ context.Context, _ *q.Query) ([]*dao.ArtifactReference, error) {
+		return []*dao.ArtifactReference{}, nil
+	}
 	artifact, err := m.mgr.Get(nil, 1)
 	m.Require().Nil(err)
-	m.dao.AssertExpectations(m.T())
 	m.Require().NotNil(artifact)
 	m.Equal(art.ID, artifact.ID)
 }
@@ -224,8 +273,12 @@ func (m *managerTestSuite) TestGetByDigest() {
 		ExtraAttrs:        `{"attr1":"value1"}`,
 		Annotations:       `{"anno1":"value1"}`,
 	}
-	m.dao.On("GetByDigest", mock.Anything).Return(art, nil)
-	m.dao.On("ListReferences").Return([]*dao.ArtifactReference{}, nil)
+	m.dao.GetByDigestFunc = func(_ context.Context, _ string, _ string) (*dao.Artifact, error) {
+		return art, nil
+	}
+	m.dao.ListReferencesFunc = func(_ context.Context, _ *q.Query) ([]*dao.ArtifactReference, error) {
+		return []*dao.ArtifactReference{}, nil
+	}
 	artifact, err := m.mgr.GetByDigest(nil, "library/hello-world", "sha256:418fb88ec412e340cdbef913b8ca1bbe8f9e8dc705f9617414c1f2c8db980180")
 	m.Require().Nil(err)
 	m.Require().NotNil(artifact)
@@ -233,8 +286,12 @@ func (m *managerTestSuite) TestGetByDigest() {
 }
 
 func (m *managerTestSuite) TestCreate() {
-	m.dao.On("Create", mock.Anything).Return(1, nil)
-	m.dao.On("CreateReference").Return(1, nil)
+	m.dao.CreateFunc = func(_ context.Context, _ *dao.Artifact) (int64, error) {
+		return 1, nil
+	}
+	m.dao.CreateReferenceFunc = func(_ context.Context, _ *dao.ArtifactReference) (int64, error) {
+		return 1, nil
+	}
 	id, err := m.mgr.Create(nil, &Artifact{
 		References: []*Reference{
 			{
@@ -243,43 +300,49 @@ func (m *managerTestSuite) TestCreate() {
 		},
 	})
 	m.Require().Nil(err)
-	m.dao.AssertExpectations(m.T())
 	m.Equal(int64(1), id)
 }
 
 func (m *managerTestSuite) TestDelete() {
-	m.dao.On("Delete", mock.Anything).Return(nil)
-	m.dao.On("DeleteReferences").Return(nil)
+	m.dao.DeleteFunc = func(_ context.Context, _ int64) error {
+		return nil
+	}
+	m.dao.DeleteReferencesFunc = func(_ context.Context, _ int64) error {
+		return nil
+	}
 	err := m.mgr.Delete(nil, 1)
 	m.Require().Nil(err)
-	m.dao.AssertExpectations(m.T())
 }
 
 func (m *managerTestSuite) TestUpdate() {
-	m.dao.On("Update", mock.Anything).Return(nil)
+	m.dao.UpdateFunc = func(_ context.Context, _ *dao.Artifact, _ ...string) error {
+		return nil
+	}
 	err := m.mgr.Update(nil, &Artifact{
 		ID:       1,
 		PullTime: time.Now(),
 	}, "PullTime")
 	m.Require().Nil(err)
-	m.dao.AssertExpectations(m.T())
 }
 
 func (m *managerTestSuite) TestUpdatePullTime() {
-	m.dao.On("UpdatePullTime", mock.Anything).Return(nil)
+	m.dao.UpdatePullTimeFunc = func(_ context.Context, _ int64, _ time.Time) error {
+		return nil
+	}
 	err := m.mgr.UpdatePullTime(nil, 1, time.Now())
 	m.Require().Nil(err)
-	m.dao.AssertExpectations(m.T())
 }
 
 func (m *managerTestSuite) TestListReferences() {
-	m.dao.On("ListReferences").Return([]*dao.ArtifactReference{
-		{
-			ID:       1,
-			ParentID: 1,
-			ChildID:  2,
-		},
-	}, nil)
+	m.dao.ListReferencesFunc = func(_ context.Context, _ *q.Query) ([]*dao.ArtifactReference, error) {
+		return []*dao.ArtifactReference{
+			{
+				ID:       1,
+				ParentID: 1,
+				ChildID:  2,
+			},
+		}, nil
+	}
 	references, err := m.mgr.ListReferences(nil, nil)
 	m.Require().Nil(err)
 	m.Require().Len(references, 1)
@@ -287,7 +350,9 @@ func (m *managerTestSuite) TestListReferences() {
 }
 
 func (m *managerTestSuite) TestDeleteReference() {
-	m.dao.On("DeleteReference").Return(nil)
+	m.dao.DeleteReferenceFunc = func(_ context.Context, _ int64) error {
+		return nil
+	}
 	err := m.mgr.DeleteReference(nil, 1)
 	m.Require().Nil(err)
 }

@@ -13,9 +13,10 @@ import (
 	"time"
 
 	beegoorm "github.com/beego/beego/v2/client/orm"
-	"github.com/goharbor/harbor/src/lib/errors"
-	testifymock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/goharbor/harbor/src/lib/errors"
 
 	commonmodels "github.com/goharbor/harbor/src/common/models"
 	"github.com/goharbor/harbor/src/pkg/scan/export"
@@ -23,20 +24,20 @@ import (
 	"github.com/goharbor/harbor/src/server/v2.0/models"
 	"github.com/goharbor/harbor/src/server/v2.0/restapi"
 	operation "github.com/goharbor/harbor/src/server/v2.0/restapi/operations/scan_data_export"
-	"github.com/goharbor/harbor/src/testing/controller/project"
-	"github.com/goharbor/harbor/src/testing/controller/scandataexport"
-	"github.com/goharbor/harbor/src/testing/mock"
-	systemartifacttesting "github.com/goharbor/harbor/src/testing/pkg/systemartifact"
-	"github.com/goharbor/harbor/src/testing/pkg/user"
+	projectctl "github.com/goharbor/harbor/src/testing/moq/controller/project"
+	scandataexportctl "github.com/goharbor/harbor/src/testing/moq/controller/scandataexport"
+	systemartifactmodel "github.com/goharbor/harbor/src/pkg/systemartifact/model"
+	systemartifacttesting "github.com/goharbor/harbor/src/testing/moq/pkg/systemartifact"
+	usertesting "github.com/goharbor/harbor/src/testing/moq/pkg/user"
 	htesting "github.com/goharbor/harbor/src/testing/server/v2.0/handler"
 )
 
 type ScanExportTestSuite struct {
 	htesting.Suite
-	scanExportCtl  *scandataexport.Controller
-	proCtl         *project.Controller
+	scanExportCtl  *scandataexportctl.Controller
+	proCtl         *projectctl.Controller
 	sysArtifactMgr *systemartifacttesting.Manager
-	userMgr        *user.Manager
+	userMgr        *usertesting.Manager
 }
 
 func (suite *ScanExportTestSuite) SetupSuite() {
@@ -45,10 +46,13 @@ func (suite *ScanExportTestSuite) SetupSuite() {
 
 func (suite *ScanExportTestSuite) SetupTest() {
 
-	suite.scanExportCtl = &scandataexport.Controller{}
-	suite.proCtl = &project.Controller{}
+	suite.scanExportCtl = &scandataexportctl.Controller{}
+	suite.proCtl = &projectctl.Controller{}
 	suite.sysArtifactMgr = &systemartifacttesting.Manager{}
-	suite.userMgr = &user.Manager{}
+	suite.userMgr = &usertesting.Manager{}
+	suite.proCtl.ExistsFunc = func(_ context.Context, _ any) (bool, error) {
+		return true, nil
+	}
 	suite.Config = &restapi.Config{
 		ScanDataExportAPI: &scanDataExportAPI{
 			scanDataExportCtl: suite.scanExportCtl,
@@ -57,7 +61,6 @@ func (suite *ScanExportTestSuite) SetupTest() {
 			userMgr:           suite.userMgr,
 		},
 	}
-	mock.OnAnything(suite.proCtl, "Exists").Return(true, nil)
 	suite.Suite.SetupSuite()
 }
 
@@ -147,8 +150,11 @@ func (suite *ScanExportTestSuite) TestValidateScanExportParams() {
 	suite.NoError(err)
 
 	// none exist project should return error
-	api.proCtl = &project.Controller{}
-	mock.OnAnything(api.proCtl, "Exists").Return(false, nil)
+	notExistProCtl := &projectctl.Controller{}
+	notExistProCtl.ExistsFunc = func(_ context.Context, _ any) (bool, error) {
+		return false, nil
+	}
+	api.proCtl = notExistProCtl
 	criteria = models.ScanDataExportRequest{
 		CVEIds:       "CVE-123,CVE-456",
 		Labels:       []int64{100},
@@ -165,7 +171,12 @@ func (suite *ScanExportTestSuite) TestExportScanData() {
 	suite.Security.On("GetUsername").Return("test-user")
 	suite.Security.On("Can", mock.Anything, mock.Anything, mock.Anything).Return(true).Once()
 	usr := commonmodels.User{UserID: 1000, Username: "test-user"}
-	suite.userMgr.On("GetByName", mock.Anything, "test-user").Return(&usr, nil).Once()
+	suite.userMgr.GetByNameFunc = func(_ context.Context, username string) (*commonmodels.User, error) {
+		if username == "test-user" {
+			return &usr, nil
+		}
+		return nil, nil
+	}
 	// user authenticated and correct headers sent
 	{
 		suite.Security.On("IsAuthenticated").Return(true).Once()
@@ -185,8 +196,13 @@ func (suite *ScanExportTestSuite) TestExportScanData() {
 		headers := make(map[string]string)
 		headers["X-Scan-Data-Type"] = v1.MimeTypeGenericVulnerabilityReport
 
-		// data, err := json.Marshal(criteria)
-		mock.OnAnything(suite.scanExportCtl, "Start").Return(int64(100), nil).Once()
+		suite.scanExportCtl.StartFunc = func(_ context.Context, req export.Request) (int64, error) {
+			suite.Equal("test-user", req.UserName)
+			suite.Equal("test-job", req.JobName)
+			suite.Equal("{test-tag1,test-tag2}", req.Tags)
+			suite.Equal(1000, req.UserID)
+			return int64(100), nil
+		}
 		res, err := suite.DoReq(http.MethodPost, url, buffer, headers)
 		suite.Equal(200, res.StatusCode)
 
@@ -195,11 +211,7 @@ func (suite *ScanExportTestSuite) TestExportScanData() {
 		json.NewDecoder(res.Body).Decode(&respData)
 		suite.Equal(int64(100), int64(respData["id"].(float64)))
 
-		// validate job name and user name set in the request for job execution
-		jobRequestMatcher := testifymock.MatchedBy(func(req export.Request) bool {
-			return req.UserName == "test-user" && req.JobName == "test-job" && req.Tags == "{test-tag1,test-tag2}" && req.UserID == 1000
-		})
-		suite.scanExportCtl.AssertCalled(suite.T(), "Start", mock.Anything, jobRequestMatcher)
+		suite.NotEmpty(suite.scanExportCtl.StartCalls())
 	}
 
 	// user authenticated but incorrect/unsupported header sent across
@@ -222,7 +234,6 @@ func (suite *ScanExportTestSuite) TestExportScanData() {
 		headers := make(map[string]string)
 		headers["X-Scan-Data-Type"] = "test"
 
-		mock.OnAnything(suite.scanExportCtl, "Start").Return(int64(100), nil).Once()
 		res, err := suite.DoReq(http.MethodPost, url, buffer, headers)
 		suite.Equal(400, res.StatusCode)
 		suite.Equal(nil, err)
@@ -248,7 +259,6 @@ func (suite *ScanExportTestSuite) TestExportScanData() {
 		headers := make(map[string]string)
 		headers["X-Scan-Data-Type"] = v1.MimeTypeGenericVulnerabilityReport
 
-		mock.OnAnything(suite.scanExportCtl, "Start").Return(int64(100), nil).Once()
 		res, err := suite.DoReq(http.MethodPost, url, buffer, headers)
 		suite.Equal(400, res.StatusCode)
 		suite.Equal(nil, err)
@@ -259,7 +269,9 @@ func (suite *ScanExportTestSuite) TestExportScanData() {
 func (suite *ScanExportTestSuite) TestExportScanDataGetUserIdError() {
 	suite.Security.On("GetUsername").Return("test-user")
 	suite.Security.On("Can", mock.Anything, mock.Anything, mock.Anything).Return(true).Once()
-	suite.userMgr.On("GetByName", mock.Anything, "test-user").Return(nil, errors.New("test error")).Once()
+	suite.userMgr.GetByNameFunc = func(_ context.Context, _ string) (*commonmodels.User, error) {
+		return nil, errors.New("test error")
+	}
 	// user authenticated and correct headers sent
 	{
 		suite.Security.On("IsAuthenticated").Return(true).Once()
@@ -279,20 +291,23 @@ func (suite *ScanExportTestSuite) TestExportScanDataGetUserIdError() {
 		headers := make(map[string]string)
 		headers["X-Scan-Data-Type"] = v1.MimeTypeGenericVulnerabilityReport
 
-		// data, err := json.Marshal(criteria)
-		mock.OnAnything(suite.scanExportCtl, "Start").Return(int64(100), nil).Once()
+		suite.scanExportCtl.StartFunc = func(_ context.Context, _ export.Request) (int64, error) {
+			return int64(100), nil
+		}
 		res, err := suite.DoReq(http.MethodPost, url, buffer, headers)
 		suite.Equal(http.StatusInternalServerError, res.StatusCode)
 		suite.Equal(nil, err)
 
-		suite.scanExportCtl.AssertNotCalled(suite.T(), "Start")
+		suite.Empty(suite.scanExportCtl.StartCalls())
 	}
 }
 
 func (suite *ScanExportTestSuite) TestExportScanDataGetUserIdNotFound() {
 	suite.Security.On("GetUsername").Return("test-user")
 	suite.Security.On("Can", mock.Anything, mock.Anything, mock.Anything).Return(true).Once()
-	suite.userMgr.On("GetByName", mock.Anything, "test-user").Return(nil, nil).Once()
+	suite.userMgr.GetByNameFunc = func(_ context.Context, _ string) (*commonmodels.User, error) {
+		return nil, nil
+	}
 	// user authenticated and correct headers sent
 	{
 		suite.Security.On("IsAuthenticated").Return(true).Once()
@@ -312,13 +327,14 @@ func (suite *ScanExportTestSuite) TestExportScanDataGetUserIdNotFound() {
 		headers := make(map[string]string)
 		headers["X-Scan-Data-Type"] = v1.MimeTypeGenericVulnerabilityReport
 
-		// data, err := json.Marshal(criteria)
-		mock.OnAnything(suite.scanExportCtl, "Start").Return(int64(100), nil).Once()
+		suite.scanExportCtl.StartFunc = func(_ context.Context, _ export.Request) (int64, error) {
+			return int64(100), nil
+		}
 		res, err := suite.DoReq(http.MethodPost, url, buffer, headers)
 		suite.Equal(http.StatusForbidden, res.StatusCode)
 		suite.Equal(nil, err)
 
-		suite.scanExportCtl.AssertNotCalled(suite.T(), "Start")
+		suite.Empty(suite.scanExportCtl.StartCalls())
 	}
 }
 
@@ -342,7 +358,6 @@ func (suite *ScanExportTestSuite) TestExportScanDataNoPrivileges() {
 	headers := make(map[string]string)
 	headers["X-Scan-Data-Type"] = v1.MimeTypeGenericVulnerabilityReport
 
-	mock.OnAnything(suite.scanExportCtl, "Start").Return(int64(100), nil).Once()
 	res, err := suite.DoReq(http.MethodPost, url, buffer, headers)
 	suite.Equal(http.StatusForbidden, res.StatusCode)
 	suite.NoError(err)
@@ -371,7 +386,15 @@ func (suite *ScanExportTestSuite) TestGetScanDataExportExecution() {
 		JobName:          "test-job",
 		FilePresent:      false,
 	}
-	mock.OnAnything(suite.scanExportCtl, "GetExecution").Return(execution, nil).Once()
+	callCount := 0
+	suite.scanExportCtl.GetExecutionFunc = func(_ context.Context, _ int64) (*export.Execution, error) {
+		callCount++
+		if callCount == 1 {
+			return execution, nil
+		}
+		execution.StatusMessage = customizeStatusMessage
+		return execution, nil
+	}
 	res, err := suite.DoReq(http.MethodGet, url, nil)
 	suite.Equal(200, res.StatusCode)
 	suite.Equal(nil, err)
@@ -382,8 +405,6 @@ func (suite *ScanExportTestSuite) TestGetScanDataExportExecution() {
 	suite.Equal(defaultStatusMessage, respData.StatusText)
 
 	// test customize status message
-	execution.StatusMessage = customizeStatusMessage
-	mock.OnAnything(suite.scanExportCtl, "GetExecution").Return(execution, nil).Once()
 	res, err = suite.DoReq(http.MethodGet, url, nil)
 	suite.Equal(200, res.StatusCode)
 	suite.Equal(nil, err)
@@ -413,7 +434,9 @@ func (suite *ScanExportTestSuite) TestGetScanDataExportExecutionUserNotOwnerOfEx
 		JobName:          "test-job",
 		FilePresent:      false,
 	}
-	mock.OnAnything(suite.scanExportCtl, "GetExecution").Return(execution, nil).Once()
+	suite.scanExportCtl.GetExecutionFunc = func(_ context.Context, _ int64) (*export.Execution, error) {
+		return execution, nil
+	}
 	res, err := suite.DoReq(http.MethodGet, url, nil)
 	suite.Equal(http.StatusForbidden, res.StatusCode)
 	suite.Equal(nil, err)
@@ -439,16 +462,25 @@ func (suite *ScanExportTestSuite) TestDownloadScanData() {
 		UserName:         "test-user",
 		FilePresent:      true,
 	}
-	mock.OnAnything(suite.scanExportCtl, "GetExecution").Return(execution, nil)
-	mock.OnAnything(suite.scanExportCtl, "DeleteExecution").Return(nil)
+	suite.scanExportCtl.GetExecutionFunc = func(_ context.Context, _ int64) (*export.Execution, error) {
+		return execution, nil
+	}
+	suite.scanExportCtl.DeleteExecutionFunc = func(_ context.Context, _ int64) error {
+		return nil
+	}
 
 	// all BLOB related operations succeed
-	mock.OnAnything(suite.sysArtifactMgr, "Create").Return(int64(1), nil)
+	suite.sysArtifactMgr.CreateFunc = func(_ context.Context, _ *systemartifactmodel.SystemArtifact, _ io.Reader) (int64, error) {
+		return int64(1), nil
+	}
 
 	sampleData := "test,hello,world"
-	data := io.NopCloser(strings.NewReader(sampleData))
-	mock.OnAnything(suite.sysArtifactMgr, "Read").Return(data, nil)
-	mock.OnAnything(suite.sysArtifactMgr, "Delete").Return(nil)
+	suite.sysArtifactMgr.ReadFunc = func(_ context.Context, _ string, _ string, _ string) (io.ReadCloser, error) {
+		return io.NopCloser(strings.NewReader(sampleData)), nil
+	}
+	suite.sysArtifactMgr.DeleteFunc = func(_ context.Context, _ string, _ string, _ string) error {
+		return nil
+	}
 
 	res, err := suite.DoReq(http.MethodGet, url, nil)
 	suite.Equal(200, res.StatusCode)
@@ -481,16 +513,12 @@ func (suite *ScanExportTestSuite) TestDownloadScanDataUserNotOwnerofExport() {
 		UserName:         "test-user",
 		FilePresent:      true,
 	}
-	mock.OnAnything(suite.scanExportCtl, "GetExecution").Return(execution, nil)
-	mock.OnAnything(suite.scanExportCtl, "DeleteExecution").Return(nil)
-
-	// all BLOB related operations succeed
-	mock.OnAnything(suite.sysArtifactMgr, "Create").Return(int64(1), nil)
-
-	sampleData := "test,hello,world"
-	data := io.NopCloser(strings.NewReader(sampleData))
-	mock.OnAnything(suite.sysArtifactMgr, "Read").Return(data, nil)
-	mock.OnAnything(suite.sysArtifactMgr, "Delete").Return(nil)
+	suite.scanExportCtl.GetExecutionFunc = func(_ context.Context, _ int64) (*export.Execution, error) {
+		return execution, nil
+	}
+	suite.scanExportCtl.DeleteExecutionFunc = func(_ context.Context, _ int64) error {
+		return nil
+	}
 
 	res, err := suite.DoReq(http.MethodGet, url, nil)
 	suite.Equal(http.StatusForbidden, res.StatusCode)
@@ -517,16 +545,9 @@ func (suite *ScanExportTestSuite) TestDownloadScanDataNoCsvFilePresent() {
 		UserName:         "test-user1",
 		FilePresent:      false,
 	}
-	mock.OnAnything(suite.scanExportCtl, "GetExecution").Return(execution, nil)
-	mock.OnAnything(suite.scanExportCtl, "DeleteExecution").Return(nil)
-
-	// all BLOB related operations succeed
-	mock.OnAnything(suite.sysArtifactMgr, "Create").Return(int64(1), nil)
-
-	sampleData := "test,hello,world"
-	data := io.NopCloser(strings.NewReader(sampleData))
-	mock.OnAnything(suite.sysArtifactMgr, "Read").Return(data, nil)
-	mock.OnAnything(suite.sysArtifactMgr, "Delete").Return(nil)
+	suite.scanExportCtl.GetExecutionFunc = func(_ context.Context, _ int64) (*export.Execution, error) {
+		return execution, nil
+	}
 
 	res, err := suite.DoReq(http.MethodGet, url, nil)
 	suite.Equal(http.StatusNotFound, res.StatusCode)
@@ -539,16 +560,9 @@ func (suite *ScanExportTestSuite) TestDownloadScanDataExecutionNotPresent() {
 	suite.Security.On("Can", mock.Anything, mock.Anything, mock.Anything).Return(true).Times(1)
 	url := "/export/cve/download/100"
 
-	mock.OnAnything(suite.scanExportCtl, "GetExecution").Return(nil, beegoorm.ErrNoRows)
-	mock.OnAnything(suite.scanExportCtl, "DeleteExecution").Return(nil)
-
-	// all BLOB related operations succeed
-	mock.OnAnything(suite.sysArtifactMgr, "Create").Return(int64(1), nil)
-
-	sampleData := "test,hello,world"
-	data := io.NopCloser(strings.NewReader(sampleData))
-	mock.OnAnything(suite.sysArtifactMgr, "Read").Return(data, nil)
-	mock.OnAnything(suite.sysArtifactMgr, "Delete").Return(nil)
+	suite.scanExportCtl.GetExecutionFunc = func(_ context.Context, _ int64) (*export.Execution, error) {
+		return nil, beegoorm.ErrNoRows
+	}
 
 	res, err := suite.DoReq(http.MethodGet, url, nil)
 	suite.Equal(http.StatusNotFound, res.StatusCode)
@@ -561,16 +575,9 @@ func (suite *ScanExportTestSuite) TestDownloadScanDataExecutionError() {
 	suite.Security.On("Can", mock.Anything, mock.Anything, mock.Anything).Return(true).Times(1)
 	url := "/export/cve/download/100"
 
-	mock.OnAnything(suite.scanExportCtl, "GetExecution").Return(nil, errors.New("test error"))
-	mock.OnAnything(suite.scanExportCtl, "DeleteExecution").Return(nil)
-
-	// all BLOB related operations succeed
-	mock.OnAnything(suite.sysArtifactMgr, "Create").Return(int64(1), nil)
-
-	sampleData := "test,hello,world"
-	data := io.NopCloser(strings.NewReader(sampleData))
-	mock.OnAnything(suite.sysArtifactMgr, "Read").Return(data, nil)
-	mock.OnAnything(suite.sysArtifactMgr, "Delete").Return(nil)
+	suite.scanExportCtl.GetExecutionFunc = func(_ context.Context, _ int64) (*export.Execution, error) {
+		return nil, errors.New("test error")
+	}
 
 	res, err := suite.DoReq(http.MethodGet, url, nil)
 	suite.Equal(http.StatusInternalServerError, res.StatusCode)
@@ -603,7 +610,15 @@ func (suite *ScanExportTestSuite) TestGetScanDataExportExecutionList() {
 		UserName:         "test-user",
 	}
 	fmt.Println("URL string : ", url.String())
-	mock.OnAnything(suite.scanExportCtl, "ListExecutions").Return([]*export.Execution{execution}, nil).Once()
+	listCallCount := 0
+	suite.scanExportCtl.ListExecutionsFunc = func(_ context.Context, _ string) ([]*export.Execution, error) {
+		listCallCount++
+		if listCallCount == 1 {
+			return []*export.Execution{execution}, nil
+		}
+		execution.StatusMessage = customizeStatusMessage
+		return []*export.Execution{execution}, nil
+	}
 	res, err := suite.DoReq(http.MethodGet, url.String(), nil)
 	suite.Equal(200, res.StatusCode)
 	suite.Equal(nil, err)
@@ -613,8 +628,6 @@ func (suite *ScanExportTestSuite) TestGetScanDataExportExecutionList() {
 	suite.Equal(int64(100), respData.Items[0].ID)
 	suite.Equal(defaultStatusMessage, respData.Items[0].StatusText)
 	// test customize status message
-	execution.StatusMessage = customizeStatusMessage
-	mock.OnAnything(suite.scanExportCtl, "ListExecutions").Return([]*export.Execution{execution}, nil).Once()
 	res, err = suite.DoReq(http.MethodGet, url.String(), nil)
 	suite.Equal(200, res.StatusCode)
 	suite.Equal(nil, err)
@@ -650,7 +663,9 @@ func (suite *ScanExportTestSuite) TestGetScanDataExportExecutionListFilterNotOwn
 	}
 
 	fmt.Println("URL string : ", url.String())
-	mock.OnAnything(suite.scanExportCtl, "ListExecutions").Return([]*export.Execution{executionOwned}, nil).Once()
+	suite.scanExportCtl.ListExecutionsFunc = func(_ context.Context, _ string) ([]*export.Execution, error) {
+		return []*export.Execution{executionOwned}, nil
+	}
 	res, err := suite.DoReq(http.MethodGet, url.String(), nil)
 	suite.Equal(200, res.StatusCode)
 	suite.Equal(nil, err)

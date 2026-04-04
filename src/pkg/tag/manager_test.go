@@ -19,7 +19,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/goharbor/harbor/src/lib/q"
@@ -27,36 +26,35 @@ import (
 )
 
 type fakeDao struct {
-	mock.Mock
+	CountFunc           func(ctx context.Context, query *q.Query) (int64, error)
+	ListFunc            func(ctx context.Context, query *q.Query) ([]*tag.Tag, error)
+	GetFunc             func(ctx context.Context, id int64) (*tag.Tag, error)
+	CreateFunc          func(ctx context.Context, t *tag.Tag) (int64, error)
+	UpdateFunc          func(ctx context.Context, t *tag.Tag, props ...string) error
+	DeleteFunc          func(ctx context.Context, id int64) error
+	DeleteOfArtifactFunc func(ctx context.Context, artifactID int64) error
 }
 
 func (f *fakeDao) Count(ctx context.Context, query *q.Query) (int64, error) {
-	args := f.Called()
-	return int64(args.Int(0)), args.Error(1)
+	return f.CountFunc(ctx, query)
 }
 func (f *fakeDao) List(ctx context.Context, query *q.Query) ([]*tag.Tag, error) {
-	args := f.Called()
-	return args.Get(0).([]*tag.Tag), args.Error(1)
+	return f.ListFunc(ctx, query)
 }
 func (f *fakeDao) Get(ctx context.Context, id int64) (*tag.Tag, error) {
-	args := f.Called()
-	return args.Get(0).(*tag.Tag), args.Error(1)
+	return f.GetFunc(ctx, id)
 }
-func (f *fakeDao) Create(ctx context.Context, tag *tag.Tag) (int64, error) {
-	args := f.Called()
-	return int64(args.Int(0)), args.Error(1)
+func (f *fakeDao) Create(ctx context.Context, t *tag.Tag) (int64, error) {
+	return f.CreateFunc(ctx, t)
 }
-func (f *fakeDao) Update(ctx context.Context, tag *tag.Tag, props ...string) error {
-	args := f.Called()
-	return args.Error(0)
+func (f *fakeDao) Update(ctx context.Context, t *tag.Tag, props ...string) error {
+	return f.UpdateFunc(ctx, t, props...)
 }
 func (f *fakeDao) Delete(ctx context.Context, id int64) error {
-	args := f.Called()
-	return args.Error(0)
+	return f.DeleteFunc(ctx, id)
 }
 func (f *fakeDao) DeleteOfArtifact(ctx context.Context, artifactID int64) error {
-	args := f.Called()
-	return args.Error(0)
+	return f.DeleteOfArtifactFunc(ctx, artifactID)
 }
 
 type managerTestSuite struct {
@@ -73,7 +71,9 @@ func (m *managerTestSuite) SetupTest() {
 }
 
 func (m *managerTestSuite) TestCount() {
-	m.dao.On("Count", mock.Anything).Return(1, nil)
+	m.dao.CountFunc = func(_ context.Context, _ *q.Query) (int64, error) {
+		return int64(1), nil
+	}
 	total, err := m.mgr.Count(nil, nil)
 	m.Require().Nil(err)
 	m.Equal(int64(1), total)
@@ -88,7 +88,9 @@ func (m *managerTestSuite) TestList() {
 		PushTime:     time.Now(),
 		PullTime:     time.Now(),
 	}
-	m.dao.On("List", mock.Anything).Return([]*tag.Tag{tg}, nil)
+	m.dao.ListFunc = func(_ context.Context, _ *q.Query) ([]*tag.Tag, error) {
+		return []*tag.Tag{tg}, nil
+	}
 	tags, err := m.mgr.List(nil, nil)
 	m.Require().Nil(err)
 	m.Equal(1, len(tags))
@@ -96,35 +98,41 @@ func (m *managerTestSuite) TestList() {
 }
 
 func (m *managerTestSuite) TestGet() {
-	m.dao.On("Get", mock.Anything).Return(&tag.Tag{}, nil)
+	m.dao.GetFunc = func(_ context.Context, _ int64) (*tag.Tag, error) {
+		return &tag.Tag{}, nil
+	}
 	_, err := m.mgr.Get(nil, 1)
 	m.Require().Nil(err)
-	m.dao.AssertExpectations(m.T())
 }
 
 func (m *managerTestSuite) TestCreate() {
-	m.dao.On("Create", mock.Anything).Return(1, nil)
+	m.dao.CreateFunc = func(_ context.Context, _ *tag.Tag) (int64, error) {
+		return int64(1), nil
+	}
 	_, err := m.mgr.Create(nil, nil)
 	m.Require().Nil(err)
-	m.dao.AssertExpectations(m.T())
 }
 
 func (m *managerTestSuite) TestUpdate() {
-	m.dao.On("Update", mock.Anything).Return(nil)
+	m.dao.UpdateFunc = func(_ context.Context, _ *tag.Tag, _ ...string) error {
+		return nil
+	}
 	err := m.mgr.Update(nil, nil)
 	m.Require().Nil(err)
-	m.dao.AssertExpectations(m.T())
 }
 
 func (m *managerTestSuite) TestDelete() {
-	m.dao.On("Delete", mock.Anything).Return(nil)
+	m.dao.DeleteFunc = func(_ context.Context, _ int64) error {
+		return nil
+	}
 	err := m.mgr.Delete(nil, 1)
 	m.Require().Nil(err)
-	m.dao.AssertExpectations(m.T())
 }
 
 func (m *managerTestSuite) TestDeleteOfArtifact() {
-	m.dao.On("DeleteOfArtifact", mock.Anything).Return(nil)
+	m.dao.DeleteOfArtifactFunc = func(_ context.Context, _ int64) error {
+		return nil
+	}
 	err := m.mgr.DeleteOfArtifact(nil, 1)
 	m.Require().Nil(err)
 }

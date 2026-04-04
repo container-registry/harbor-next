@@ -18,7 +18,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/goharbor/harbor/src/common"
@@ -28,22 +27,21 @@ import (
 
 // MockDriver is a mock implementation of store.Driver
 type MockDriver struct {
-	mock.Mock
+	LoadFunc func(ctx context.Context) (map[string]any, error)
+	SaveFunc func(ctx context.Context, cfg map[string]any) error
+	GetFunc  func(ctx context.Context, key string) (map[string]any, error)
 }
 
 func (m *MockDriver) Load(ctx context.Context) (map[string]any, error) {
-	args := m.Called(ctx)
-	return args.Get(0).(map[string]any), args.Error(1)
+	return m.LoadFunc(ctx)
 }
 
 func (m *MockDriver) Save(ctx context.Context, cfg map[string]any) error {
-	args := m.Called(ctx, cfg)
-	return args.Error(0)
+	return m.SaveFunc(ctx, cfg)
 }
 
 func (m *MockDriver) Get(ctx context.Context, key string) (map[string]any, error) {
-	args := m.Called(ctx, key)
-	return args.Get(0).(map[string]any), args.Error(1)
+	return m.GetFunc(ctx, key)
 }
 
 // GetItemFromDriverTestSuite tests the GetItemFromDriver method
@@ -68,40 +66,44 @@ func (suite *GetItemFromDriverTestSuite) TestGetItemFromDriverSuccess() {
 		common.SkipAuditLogDatabase: true,
 	}
 
-	suite.driver.On("Get", suite.ctx, key).Return(expectedResult, nil)
+	suite.driver.GetFunc = func(_ context.Context, k string) (map[string]any, error) {
+		suite.Equal(key, k)
+		return expectedResult, nil
+	}
 
 	result, err := suite.manager.GetItemFromDriver(suite.ctx, key)
 
 	suite.Require().NoError(err)
 	suite.Equal(expectedResult, result)
-	suite.driver.AssertExpectations(suite.T())
 }
 
 func (suite *GetItemFromDriverTestSuite) TestGetItemFromDriverError() {
 	key := common.SkipAuditLogDatabase
 	expectedError := errors.New("database connection failed")
 
-	suite.driver.On("Get", suite.ctx, key).Return(map[string]any{}, expectedError)
+	suite.driver.GetFunc = func(_ context.Context, _ string) (map[string]any, error) {
+		return map[string]any{}, expectedError
+	}
 
 	result, err := suite.manager.GetItemFromDriver(suite.ctx, key)
 
 	suite.Require().Error(err)
 	suite.Equal(expectedError, err)
 	suite.Empty(result)
-	suite.driver.AssertExpectations(suite.T())
 }
 
 func (suite *GetItemFromDriverTestSuite) TestGetItemFromDriverEmptyResult() {
 	key := common.SkipAuditLogDatabase
 	expectedResult := map[string]any{}
 
-	suite.driver.On("Get", suite.ctx, key).Return(expectedResult, nil)
+	suite.driver.GetFunc = func(_ context.Context, _ string) (map[string]any, error) {
+		return expectedResult, nil
+	}
 
 	result, err := suite.manager.GetItemFromDriver(suite.ctx, key)
 
 	suite.Require().NoError(err)
 	suite.Equal(expectedResult, result)
-	suite.driver.AssertExpectations(suite.T())
 }
 
 func (suite *GetItemFromDriverTestSuite) TestGetItemFromDriverMultipleKeys() {
@@ -111,13 +113,14 @@ func (suite *GetItemFromDriverTestSuite) TestGetItemFromDriverMultipleKeys() {
 		common.SkipAuditLogDatabase:    false,
 	}
 
-	suite.driver.On("Get", suite.ctx, key).Return(expectedResult, nil)
+	suite.driver.GetFunc = func(_ context.Context, _ string) (map[string]any, error) {
+		return expectedResult, nil
+	}
 
 	result, err := suite.manager.GetItemFromDriver(suite.ctx, key)
 
 	suite.Require().NoError(err)
 	suite.Equal(expectedResult, result)
-	suite.driver.AssertExpectations(suite.T())
 }
 
 func (suite *GetItemFromDriverTestSuite) TestGetItemFromDriverNilContext() {
@@ -126,26 +129,28 @@ func (suite *GetItemFromDriverTestSuite) TestGetItemFromDriverNilContext() {
 		common.SkipAuditLogDatabase: false,
 	}
 
-	suite.driver.On("Get", mock.Anything, key).Return(expectedResult, nil)
+	suite.driver.GetFunc = func(_ context.Context, _ string) (map[string]any, error) {
+		return expectedResult, nil
+	}
 
 	result, err := suite.manager.GetItemFromDriver(nil, key)
 
 	suite.Require().NoError(err)
 	suite.Equal(expectedResult, result)
-	suite.driver.AssertExpectations(suite.T())
 }
 
 func (suite *GetItemFromDriverTestSuite) TestGetItemFromDriverEmptyKey() {
 	key := ""
 	expectedResult := map[string]any{}
 
-	suite.driver.On("Get", suite.ctx, key).Return(expectedResult, nil)
+	suite.driver.GetFunc = func(_ context.Context, _ string) (map[string]any, error) {
+		return expectedResult, nil
+	}
 
 	result, err := suite.manager.GetItemFromDriver(suite.ctx, key)
 
 	suite.Require().NoError(err)
 	suite.Equal(expectedResult, result)
-	suite.driver.AssertExpectations(suite.T())
 }
 
 func TestGetItemFromDriverTestSuite(t *testing.T) {

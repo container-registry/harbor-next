@@ -28,7 +28,7 @@ import (
 	"github.com/goharbor/harbor/src/pkg/scan/dao/scanner"
 	v1 "github.com/goharbor/harbor/src/pkg/scan/rest/v1"
 	mocktesting "github.com/goharbor/harbor/src/testing/mock"
-	metadatatesting "github.com/goharbor/harbor/src/testing/pkg/project/metadata"
+	metadatatesting "github.com/goharbor/harbor/src/testing/moq/pkg/project/metadata"
 	v1testing "github.com/goharbor/harbor/src/testing/pkg/scan/rest/v1"
 	scannertesting "github.com/goharbor/harbor/src/testing/pkg/scan/scanner"
 )
@@ -191,15 +191,26 @@ func (suite *ControllerTestSuite) TestSetRegistrationByProject() {
 	var pid, pid2 int64 = 1, 2
 
 	// not set before
-	suite.mMeta.On("Get", mock.Anything, pid, proScannerMetaKey).Return(m, nil)
-	suite.mMeta.On("Add", mock.Anything, pid, mm).Return(nil)
+	suite.mMeta.GetFunc = func(_ context.Context, projectID int64, meta ...string) (map[string]string, error) {
+		if projectID == pid {
+			return m, nil
+		}
+		if projectID == pid2 {
+			return mm, nil
+		}
+		return nil, nil
+	}
+	suite.mMeta.AddFunc = func(_ context.Context, _ int64, _ map[string]string) error {
+		return nil
+	}
 
 	err := suite.c.SetRegistrationByProject(context.TODO(), pid, "uuid")
 	require.NoError(suite.T(), err)
 
 	// Set before
-	suite.mMeta.On("Get", mock.Anything, pid2, proScannerMetaKey).Return(mm, nil)
-	suite.mMeta.On("Update", mock.Anything, pid2, mmm).Return(nil)
+	suite.mMeta.UpdateFunc = func(_ context.Context, _ int64, _ map[string]string) error {
+		return nil
+	}
 
 	err = suite.c.SetRegistrationByProject(context.TODO(), pid2, "uuid2")
 	require.NoError(suite.T(), err)
@@ -214,7 +225,12 @@ func (suite *ControllerTestSuite) TestGetRegistrationByProject() {
 	var pid int64 = 1
 	suite.sample.UUID = "uuid"
 
-	suite.mMeta.On("Get", mock.Anything, pid, proScannerMetaKey).Return(m, nil)
+	suite.mMeta.GetFunc = func(_ context.Context, projectID int64, meta ...string) (map[string]string, error) {
+		if projectID == pid {
+			return m, nil
+		}
+		return nil, nil
+	}
 	suite.mMgr.On("Get", mock.Anything, "uuid").Return(suite.sample, nil)
 
 	r, err := suite.c.GetRegistrationByProject(context.TODO(), pid)
@@ -222,7 +238,9 @@ func (suite *ControllerTestSuite) TestGetRegistrationByProject() {
 	require.Equal(suite.T(), "forUT", r.Name)
 
 	// Not configured at project level, return system default
-	suite.mMeta.On("Get", mock.Anything, pid, proScannerMetaKey).Return(nil, nil)
+	suite.mMeta.GetFunc = func(_ context.Context, _ int64, _ ...string) (map[string]string, error) {
+		return nil, nil
+	}
 	suite.mMgr.On("GetDefault", mock.Anything).Return(suite.sample, nil)
 
 	r, err = suite.c.GetRegistrationByProject(context.TODO(), pid)
@@ -240,7 +258,12 @@ func (suite *ControllerTestSuite) TestGetRegistrationByProjectWhenPingError() {
 	var pid int64 = 1
 	suite.sample.UUID = "uuid"
 
-	suite.mMeta.On("Get", mock.Anything, pid, proScannerMetaKey).Return(m, nil)
+	suite.mMeta.GetFunc = func(_ context.Context, projectID int64, meta ...string) (map[string]string, error) {
+		if projectID == pid {
+			return m, nil
+		}
+		return nil, nil
+	}
 	suite.mMgr.On("Get", mock.Anything, "uuid").Return(suite.sample, nil)
 
 	// Ping error

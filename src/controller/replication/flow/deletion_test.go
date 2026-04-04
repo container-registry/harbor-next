@@ -24,7 +24,8 @@ import (
 	repctlmodel "github.com/goharbor/harbor/src/controller/replication/model"
 	"github.com/goharbor/harbor/src/pkg/reg/adapter"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
-	"github.com/goharbor/harbor/src/testing/pkg/task"
+	taskpkg "github.com/goharbor/harbor/src/pkg/task"
+	mocktask "github.com/goharbor/harbor/src/testing/moq/pkg/task"
 )
 
 type deletionFlowTestSuite struct {
@@ -44,8 +45,10 @@ func (d *deletionFlowTestSuite) TestRun() {
 		},
 	}, nil)
 
-	taskMgr := &task.Manager{}
-	taskMgr.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(int64(1), nil)
+	taskMgr := &mocktask.Manager{}
+	taskMgr.CreateFunc = func(_ context.Context, _ int64, _ *taskpkg.Job, _ ...map[string]any) (int64, error) {
+		return int64(1), nil
+	}
 
 	policy := &repctlmodel.Policy{
 		SrcRegistry: &model.Registry{

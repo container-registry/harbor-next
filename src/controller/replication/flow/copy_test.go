@@ -22,7 +22,8 @@ import (
 	"github.com/goharbor/harbor/src/pkg/reg/adapter"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
 	"github.com/goharbor/harbor/src/pkg/task"
-	testingTask "github.com/goharbor/harbor/src/testing/pkg/task"
+	taskpkg "github.com/goharbor/harbor/src/pkg/task"
+	mocktask "github.com/goharbor/harbor/src/testing/moq/pkg/task"
 )
 
 type copyFlowTestSuite struct {
@@ -55,13 +56,18 @@ func (c *copyFlowTestSuite) TestRun() {
 	}, nil)
 	adp.On("PrepareForPush", mock.Anything).Return(nil)
 
-	execMgr := &testingTask.ExecutionManager{}
-	execMgr.On("Get", mock.Anything, mock.Anything).Return(&task.Execution{
-		Status: job.RunningStatus.String(),
-	}, nil)
+	execMgr := &mocktask.ExecutionManager{}
+	execMgr.GetFunc = func(_ context.Context, _ int64) (*task.Execution, error) {
+		return &task.Execution{
+			Status: job.RunningStatus.String(),
+		}, nil
+	}
 
-	taskMgr := &testingTask.Manager{}
-	taskMgr.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(int64(1), nil).Once()
+	taskMgr := &mocktask.Manager{}
+	taskMgr.CreateFunc = func(_ context.Context, _ int64, _ *taskpkg.Job, _ ...map[string]any) (int64, error) {
+		return int64(1), nil
+	}
+
 	policy := &repctlmodel.Policy{
 		SrcRegistry: &model.Registry{
 			Type: "TEST_FOR_COPY_FLOW",

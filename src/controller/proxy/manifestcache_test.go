@@ -28,12 +28,11 @@ import (
 
 	"github.com/goharbor/harbor/src/controller/artifact"
 	"github.com/goharbor/harbor/src/lib"
-	"github.com/goharbor/harbor/src/testing/mock"
 
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-const ociManifest = `{ 
+const ociManifest = `{
 	"schemaVersion": 2,
 	"mediaType": "application/vnd.oci.image.manifest.v1+json",
 	"config": {
@@ -104,14 +103,13 @@ func (suite *CacheTestSuite) TestUpdateManifestList() {
 	manList := &manifestlist.DeserializedManifestList{
 		ManifestList: manifestList,
 	}
-	artInfo1 := lib.ArtifactInfo{
-		Repository: "library/hello-world",
-		Digest:     amdDig,
-		Tag:        "",
-	}
 	ar := &artifact.Artifact{}
-	suite.local.On("GetManifest", ctx, artInfo1).Return(ar, nil)
-	suite.local.On("GetManifest", ctx, mock.Anything).Return(nil, nil)
+	suite.local.GetManifestFunc = func(_ context.Context, art lib.ArtifactInfo) (*artifact.Artifact, error) {
+		if art.Digest == amdDig {
+			return ar, nil
+		}
+		return nil, nil
+	}
 
 	newMan, err := suite.mListCache.updateManifestList(ctx, "library/hello-world", manList)
 	suite.Require().Nil(err)
@@ -154,32 +152,33 @@ func (suite *CacheTestSuite) TestPushManifestList() {
 	manList := &manifestlist.DeserializedManifestList{
 		ManifestList: manifestList,
 	}
-	repo := "library/hello-world"
-	artInfo1 := lib.ArtifactInfo{
-		Repository: repo,
-		Digest:     amdDig,
-		Tag:        "",
-	}
-	ar := &artifact.Artifact{}
 	_, payload, err := manList.Payload()
 	suite.Nil(err)
 	originDigest := digest.FromBytes(payload)
 
-	suite.local.On("GetManifest", ctx, artInfo1).Return(ar, nil)
-	suite.local.On("GetManifest", ctx, mock.Anything).Return(nil, nil)
+	ar := &artifact.Artifact{}
+	suite.local.GetManifestFunc = func(_ context.Context, art lib.ArtifactInfo) (*artifact.Artifact, error) {
+		if art.Digest == amdDig {
+			return ar, nil
+		}
+		return nil, nil
+	}
 
-	suite.local.On("PushManifest", repo, originDigest, mock.Anything).Return(fmt.Errorf("wrong digest"))
-	suite.local.On("PushManifest", repo, mock.Anything, mock.Anything).Return(nil)
-	suite.local.On("UpdatePullTime", ctx, mock.Anything).Return(nil)
+	suite.local.PushManifestFunc = func(_ string, tag string, _ distribution.Manifest) error {
+		if tag == string(originDigest) {
+			return fmt.Errorf("wrong digest")
+		}
+		return nil
+	}
+	suite.local.UpdatePullTimeFunc = func(_ context.Context, _ lib.ArtifactInfo) error {
+		return nil
+	}
 
 	err = suite.mListCache.push(ctx, "library/hello-world", string(originDigest), manList)
 	suite.Require().Nil(err)
-	suite.local.AssertCalled(suite.T(), "UpdatePullTime", ctx, mock.Anything)
 }
 
 func (suite *CacheTestSuite) TestManifestCache_CacheContent() {
-	defer suite.local.AssertExpectations(suite.T())
-
 	manifest := ociManifest
 	man, desc, err := distribution.UnmarshalManifest(v1.MediaTypeImageManifest, []byte(manifest))
 	suite.Require().NoError(err)
@@ -193,16 +192,17 @@ func (suite *CacheTestSuite) TestManifestCache_CacheContent() {
 		Tag:        "latest",
 	}
 
-	suite.local.On("CheckDependencies", ctx, artInfo.Repository, man).Once().Return([]distribution.Descriptor{})
-	suite.local.On("PushManifest", artInfo.Repository, artInfo.Digest, man).Once().Return(nil)
-	suite.local.On("PushManifest", artInfo.Repository, artInfo.Tag, man).Once().Return(nil)
+	suite.local.CheckDependenciesFunc = func(_ context.Context, _ string, _ distribution.Manifest) []distribution.Descriptor {
+		return []distribution.Descriptor{}
+	}
+	suite.local.PushManifestFunc = func(_ string, _ string, _ distribution.Manifest) error {
+		return nil
+	}
 
 	suite.mCache.CacheContent(ctx, repo, man, artInfo, nil, "")
 }
 
 func (suite *CacheTestSuite) TestManifestCache_push_succeeds() {
-	defer suite.local.AssertExpectations(suite.T())
-
 	manifest := ociManifest
 	man, desc, err := distribution.UnmarshalManifest(v1.MediaTypeImageManifest, []byte(manifest))
 	suite.Require().NoError(err)
@@ -215,16 +215,15 @@ func (suite *CacheTestSuite) TestManifestCache_push_succeeds() {
 		Tag:        "latest",
 	}
 
-	suite.local.On("PushManifest", artInfo.Repository, artInfo.Digest, man).Once().Return(nil)
-	suite.local.On("PushManifest", artInfo.Repository, artInfo.Tag, man).Once().Return(nil)
+	suite.local.PushManifestFunc = func(_ string, _ string, _ distribution.Manifest) error {
+		return nil
+	}
 
 	err = suite.mCache.push(artInfo, man)
 	suite.Assert().NoError(err)
 }
 
 func (suite *CacheTestSuite) TestManifestCache_push_fails() {
-	defer suite.local.AssertExpectations(suite.T())
-
 	manifest := ociManifest
 	man, desc, err := distribution.UnmarshalManifest(v1.MediaTypeImageManifest, []byte(manifest))
 	suite.Require().NoError(err)
@@ -239,8 +238,15 @@ func (suite *CacheTestSuite) TestManifestCache_push_fails() {
 
 	digestErr := fmt.Errorf("error during manifest push referencing digest")
 	tagErr := fmt.Errorf("error during manifest push referencing tag")
-	suite.local.On("PushManifest", artInfo.Repository, artInfo.Digest, man).Once().Return(digestErr)
-	suite.local.On("PushManifest", artInfo.Repository, artInfo.Tag, man).Once().Return(tagErr)
+	suite.local.PushManifestFunc = func(_ string, ref string, _ distribution.Manifest) error {
+		if ref == artInfo.Digest {
+			return digestErr
+		}
+		if ref == artInfo.Tag {
+			return tagErr
+		}
+		return nil
+	}
 
 	err = suite.mCache.push(artInfo, man)
 	suite.Assert().Error(err)

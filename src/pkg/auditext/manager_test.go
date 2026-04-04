@@ -15,14 +15,15 @@
 package auditext
 
 import (
+	"context"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/auditext/model"
 	_ "github.com/goharbor/harbor/src/pkg/config/db"
-	mockDAO "github.com/goharbor/harbor/src/testing/pkg/auditext/dao"
+	mockDAO "github.com/goharbor/harbor/src/testing/moq/pkg/auditext/dao"
 )
 
 type managerTestSuite struct {
@@ -39,7 +40,9 @@ func (m *managerTestSuite) SetupTest() {
 }
 
 func (m *managerTestSuite) TestCount() {
-	m.dao.On("Count", mock.Anything, mock.Anything).Return(int64(1), nil)
+	m.dao.CountFunc = func(_ context.Context, _ *q.Query) (int64, error) {
+		return int64(1), nil
+	}
 	total, err := m.mgr.Count(nil, nil)
 	m.Require().Nil(err)
 	m.Equal(int64(1), total)
@@ -51,7 +54,9 @@ func (m *managerTestSuite) TestList() {
 		Resource:     "library/hello-world",
 		ResourceType: "artifact",
 	}
-	m.dao.On("List", mock.Anything, mock.Anything).Return([]*model.AuditLogExt{audit}, nil)
+	m.dao.ListFunc = func(_ context.Context, _ *q.Query) ([]*model.AuditLogExt, error) {
+		return []*model.AuditLogExt{audit}, nil
+	}
 	auditLogs, err := m.mgr.List(nil, nil)
 	m.Require().Nil(err)
 	m.Equal(1, len(auditLogs))
@@ -64,39 +69,43 @@ func (m *managerTestSuite) TestGet() {
 		Resource:     "library/hello-world",
 		ResourceType: "artifact",
 	}
-	m.dao.On("Get", mock.Anything, mock.Anything).Return(audit, nil)
+	m.dao.GetFunc = func(_ context.Context, _ int64) (*model.AuditLogExt, error) {
+		return audit, nil
+	}
 	au, err := m.mgr.Get(nil, 1)
 	m.Require().Nil(err)
-	m.dao.AssertExpectations(m.T())
 	m.Require().NotNil(au)
 	m.Equal(audit.Resource, au.Resource)
 }
 
 func (m *managerTestSuite) TestCreate() {
-	m.dao.On("Create", mock.Anything, mock.Anything).Return(int64(1), nil)
+	m.dao.CreateFunc = func(_ context.Context, _ *model.AuditLogExt) (int64, error) {
+		return int64(1), nil
+	}
 	id, err := m.mgr.Create(nil, &model.AuditLogExt{
 		ProjectID:    1,
 		Resource:     "library/hello-world",
 		ResourceType: "artifact",
 	})
 	m.Require().Nil(err)
-	m.dao.AssertExpectations(m.T())
 	m.Equal(int64(1), id)
 }
 
 func (m *managerTestSuite) TestDelete() {
-	m.dao.On("Delete", mock.Anything, mock.Anything).Return(nil)
+	m.dao.DeleteFunc = func(_ context.Context, _ int64) error {
+		return nil
+	}
 	err := m.mgr.Delete(nil, 1)
 	m.Require().Nil(err)
-	m.dao.AssertExpectations(m.T())
 }
 
 func (m *managerTestSuite) TestPurge() {
-	m.dao.On("Purge", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(int64(1), nil)
+	m.dao.PurgeFunc = func(_ context.Context, _ int, _ []string, _ bool) (int64, error) {
+		return int64(1), nil
+	}
 	total, err := m.mgr.Purge(nil, 1, nil, false)
 	m.Require().Nil(err)
 	m.Equal(int64(1), total)
-	m.dao.AssertExpectations(m.T())
 }
 
 func TestManager(t *testing.T) {

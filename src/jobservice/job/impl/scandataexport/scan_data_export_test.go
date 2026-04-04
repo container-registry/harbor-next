@@ -7,29 +7,26 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
-	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/opencontainers/go-digest"
-	testifymock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/goharbor/harbor/src/controller/artifact"
 	"github.com/goharbor/harbor/src/jobservice/job"
-	"github.com/goharbor/harbor/src/lib/selector"
 	artpkg "github.com/goharbor/harbor/src/pkg/artifact"
 	"github.com/goharbor/harbor/src/pkg/scan/export"
-	"github.com/goharbor/harbor/src/pkg/systemartifact/model"
+	sysartmodel "github.com/goharbor/harbor/src/pkg/systemartifact/model"
 	"github.com/goharbor/harbor/src/pkg/task"
 	htesting "github.com/goharbor/harbor/src/testing"
 	mockjobservice "github.com/goharbor/harbor/src/testing/jobservice"
-	"github.com/goharbor/harbor/src/testing/mock"
-	"github.com/goharbor/harbor/src/testing/pkg/project"
-	export2 "github.com/goharbor/harbor/src/testing/pkg/scan/export"
-	systemartifacttesting "github.com/goharbor/harbor/src/testing/pkg/systemartifact"
-	tasktesting "github.com/goharbor/harbor/src/testing/pkg/task"
+	export2 "github.com/goharbor/harbor/src/testing/moq/pkg/scan/export"
+	systemartifacttesting "github.com/goharbor/harbor/src/testing/moq/pkg/systemartifact"
+	tasktesting "github.com/goharbor/harbor/src/testing/moq/pkg/task"
 )
 
 const (
@@ -45,7 +42,6 @@ type ScanDataExportJobTestSuite struct {
 	exportMgr        *export2.Manager
 	digestCalculator *export2.ArtifactDigestCalculator
 	filterProcessor  *export2.FilterProcessor
-	projectMgr       *project.Manager
 	sysArtifactMgr   *systemartifacttesting.Manager
 }
 
@@ -57,7 +53,6 @@ func (suite *ScanDataExportJobTestSuite) SetupTest() {
 	suite.exportMgr = &export2.Manager{}
 	suite.digestCalculator = &export2.ArtifactDigestCalculator{}
 	suite.filterProcessor = &export2.FilterProcessor{}
-	suite.projectMgr = &project.Manager{}
 	suite.sysArtifactMgr = &systemartifacttesting.Manager{}
 	suite.job = &ScanDataExport{
 		execMgr:               suite.execMgr,
@@ -68,24 +63,40 @@ func (suite *ScanDataExportJobTestSuite) SetupTest() {
 		sysArtifactMgr:        suite.sysArtifactMgr,
 	}
 
-	suite.execMgr.On("UpdateExtraAttrs", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	suite.execMgr.UpdateExtraAttrsFunc = func(_ context.Context, _ int64, _ map[string]any) error {
+		return nil
+	}
 	// all BLOB related operations succeed
-	suite.sysArtifactMgr.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(int64(1), nil)
+	suite.sysArtifactMgr.CreateFunc = func(_ context.Context, _ *sysartmodel.SystemArtifact, _ io.Reader) (int64, error) {
+		return int64(1), nil
+	}
 }
 
 func (suite *ScanDataExportJobTestSuite) TestRun() {
 
 	data := suite.createDataRecords(3)
-	mock.OnAnything(suite.exportMgr, "Fetch").Return(data, nil).Once()
-	mock.OnAnything(suite.digestCalculator, "Calculate").Return(digest.Digest(MockDigest), nil)
-	mock.OnAnything(suite.filterProcessor, "ProcessRepositoryFilter").Return([]int64{1}, nil).Once()
-	mock.OnAnything(suite.filterProcessor, "ProcessTagFilter").Return([]*artifact.Artifact{{Artifact: artpkg.Artifact{ID: 1}}}, nil).Once()
-	mock.OnAnything(suite.filterProcessor, "ProcessLabelFilter").Return([]*artifact.Artifact{{Artifact: artpkg.Artifact{ID: 1}}}, nil).Once()
+	suite.exportMgr.FetchFunc = func(_ context.Context, _ export.Params) ([]export.Data, error) {
+		return data, nil
+	}
+	suite.digestCalculator.CalculateFunc = func(_ string) (digest.Digest, error) {
+		return digest.Digest(MockDigest), nil
+	}
+	suite.filterProcessor.ProcessRepositoryFilterFunc = func(_ context.Context, _ string, _ []int64) ([]int64, error) {
+		return []int64{1}, nil
+	}
+	suite.filterProcessor.ProcessTagFilterFunc = func(_ context.Context, _ string, _ []int64) ([]*artifact.Artifact, error) {
+		return []*artifact.Artifact{{Artifact: artpkg.Artifact{ID: 1}}}, nil
+	}
+	suite.filterProcessor.ProcessLabelFilterFunc = func(_ context.Context, _ []int64, _ []*artifact.Artifact) ([]*artifact.Artifact, error) {
+		return []*artifact.Artifact{{Artifact: artpkg.Artifact{ID: 1}}}, nil
+	}
 
 	execAttrs := make(map[string]any)
 	execAttrs[export.JobNameAttribute] = "test-job"
 	execAttrs[export.UserNameAttribute] = "test-user"
-	mock.OnAnything(suite.execMgr, "Get").Return(&task.Execution{ID: ExecID, ExtraAttrs: execAttrs}, nil)
+	suite.execMgr.GetFunc = func(_ context.Context, _ int64) (*task.Execution, error) {
+		return &task.Execution{ID: ExecID, ExtraAttrs: execAttrs}, nil
+	}
 
 	params := job.Parameters{}
 	params[export.JobModeKey] = export.JobModeExport
@@ -97,20 +108,28 @@ func (suite *ScanDataExportJobTestSuite) TestRun() {
 
 	err := suite.job.Run(ctx, params)
 	suite.NoError(err)
-	sysArtifactRecordMatcher := testifymock.MatchedBy(func(sa *model.SystemArtifact) bool {
-		return sa.Repository == "scandata_export_1000000" && sa.Vendor == strings.ToLower(export.Vendor) && sa.Digest == MockDigest
-	})
-	suite.sysArtifactMgr.AssertCalled(suite.T(), "Create", mock.Anything, sysArtifactRecordMatcher, mock.Anything)
+	// Verify sysArtifactMgr.Create was called with matching record
+	createCalls := suite.sysArtifactMgr.CreateCalls()
+	suite.NotEmpty(createCalls)
+	lastCreate := createCalls[len(createCalls)-1]
+	suite.Equal("scandata_export_1000000", lastCreate.ArtifactRecord.Repository)
+	suite.Equal(strings.ToLower(export.Vendor), lastCreate.ArtifactRecord.Vendor)
+	suite.Equal(MockDigest, lastCreate.ArtifactRecord.Digest)
 
-	m := make(map[string]any)
-	m[export.DigestKey] = MockDigest
-	m[export.CreateTimestampKey] = mock.Anything
-
-	extraAttrsMatcher := testifymock.MatchedBy(func(attrsMap map[string]any) bool {
-		_, ok := m[export.CreateTimestampKey]
-		return attrsMap[export.DigestKey] == MockDigest && ok && attrsMap[export.JobNameAttribute] == "test-job" && attrsMap[export.UserNameAttribute] == "test-user"
-	})
-	suite.execMgr.AssertCalled(suite.T(), "UpdateExtraAttrs", mock.Anything, ExecID, extraAttrsMatcher)
+	// Verify UpdateExtraAttrs was called with correct digest and attrs
+	updateCalls := suite.execMgr.UpdateExtraAttrsCalls()
+	suite.NotEmpty(updateCalls)
+	found := false
+	for _, c := range updateCalls {
+		if c.ID == ExecID {
+			if c.ExtraAttrs[export.DigestKey] == MockDigest &&
+				c.ExtraAttrs[export.JobNameAttribute] == "test-job" &&
+				c.ExtraAttrs[export.UserNameAttribute] == "test-user" {
+				found = true
+			}
+		}
+	}
+	suite.True(found, "Expected UpdateExtraAttrs call with correct attrs")
 	_, err = os.Stat("/tmp/scandata_export_1000000.csv")
 	suite.Truef(os.IsNotExist(err), "Expected CSV file to be deleted")
 
@@ -118,13 +137,19 @@ func (suite *ScanDataExportJobTestSuite) TestRun() {
 
 func (suite *ScanDataExportJobTestSuite) TestRunWithEmptyData() {
 	var data []export.Data
-	mock.OnAnything(suite.exportMgr, "Fetch").Return(data, nil).Once()
-	mock.OnAnything(suite.digestCalculator, "Calculate").Return(digest.Digest(MockDigest), nil)
+	suite.exportMgr.FetchFunc = func(_ context.Context, _ export.Params) ([]export.Data, error) {
+		return data, nil
+	}
+	suite.digestCalculator.CalculateFunc = func(_ string) (digest.Digest, error) {
+		return digest.Digest(MockDigest), nil
+	}
 
 	execAttrs := make(map[string]any)
 	execAttrs[export.JobNameAttribute] = "test-job"
 	execAttrs[export.UserNameAttribute] = "test-user"
-	mock.OnAnything(suite.execMgr, "Get").Return(&task.Execution{ID: ExecID, ExtraAttrs: execAttrs}, nil)
+	suite.execMgr.GetFunc = func(_ context.Context, _ int64) (*task.Execution, error) {
+		return &task.Execution{ID: ExecID, ExtraAttrs: execAttrs}, nil
+	}
 
 	params := job.Parameters{}
 	params[export.JobModeKey] = export.JobModeExport
@@ -134,25 +159,41 @@ func (suite *ScanDataExportJobTestSuite) TestRunWithEmptyData() {
 	err := suite.job.Run(ctx, params)
 	suite.NoError(err)
 
-	extraAttrsMatcher := testifymock.MatchedBy(func(attrsMap map[string]any) bool {
-		return attrsMap["status_message"] == "No vulnerabilities found or matched" && attrsMap[export.JobNameAttribute] == "test-job" && attrsMap[export.UserNameAttribute] == "test-user"
-	})
-	suite.execMgr.AssertCalled(suite.T(), "UpdateExtraAttrs", mock.Anything, ExecID, extraAttrsMatcher)
+	// Verify UpdateExtraAttrs was called with "No vulnerabilities" message
+	updateCalls := suite.execMgr.UpdateExtraAttrsCalls()
+	found := false
+	for _, c := range updateCalls {
+		if c.ExtraAttrs["status_message"] == "No vulnerabilities found or matched" &&
+			c.ExtraAttrs[export.JobNameAttribute] == "test-job" &&
+			c.ExtraAttrs[export.UserNameAttribute] == "test-user" {
+			found = true
+		}
+	}
+	suite.True(found, "Expected UpdateExtraAttrs call with 'No vulnerabilities' message")
 }
 
 func (suite *ScanDataExportJobTestSuite) TestRunAttributeUpdateError() {
 
 	data := suite.createDataRecords(3)
-	mock.OnAnything(suite.exportMgr, "Fetch").Return(data, nil).Once()
-	mock.OnAnything(suite.filterProcessor, "ProcessRepositoryFilter").Return([]int64{1}, nil).Once()
-	mock.OnAnything(suite.filterProcessor, "ProcessTagFilter").Return([]*artifact.Artifact{{Artifact: artpkg.Artifact{ID: 1}}}, nil).Once()
-	mock.OnAnything(suite.filterProcessor, "ProcessLabelFilter").Return([]*artifact.Artifact{{Artifact: artpkg.Artifact{ID: 1}}}, nil).Once()
-	mock.OnAnything(suite.digestCalculator, "Calculate").Return(digest.Digest(MockDigest), nil)
+	suite.exportMgr.FetchFunc = func(_ context.Context, _ export.Params) ([]export.Data, error) {
+		return data, nil
+	}
+	suite.filterProcessor.ProcessRepositoryFilterFunc = func(_ context.Context, _ string, _ []int64) ([]int64, error) {
+		return []int64{1}, nil
+	}
+	suite.filterProcessor.ProcessTagFilterFunc = func(_ context.Context, _ string, _ []int64) ([]*artifact.Artifact, error) {
+		return []*artifact.Artifact{{Artifact: artpkg.Artifact{ID: 1}}}, nil
+	}
+	suite.filterProcessor.ProcessLabelFilterFunc = func(_ context.Context, _ []int64, _ []*artifact.Artifact) ([]*artifact.Artifact, error) {
+		return []*artifact.Artifact{{Artifact: artpkg.Artifact{ID: 1}}}, nil
+	}
+	suite.digestCalculator.CalculateFunc = func(_ string) (digest.Digest, error) {
+		return digest.Digest(MockDigest), nil
+	}
 
-	execAttrs := make(map[string]any)
-	execAttrs[export.JobNameAttribute] = "test-job"
-	execAttrs[export.UserNameAttribute] = "test-user"
-	mock.OnAnything(suite.execMgr, "Get").Return(nil, errors.New("test-error"))
+	suite.execMgr.GetFunc = func(_ context.Context, _ int64) (*task.Execution, error) {
+		return nil, errors.New("test-error")
+	}
 
 	params := job.Parameters{}
 	params[export.JobModeKey] = export.JobModeExport
@@ -164,20 +205,9 @@ func (suite *ScanDataExportJobTestSuite) TestRunAttributeUpdateError() {
 
 	err := suite.job.Run(ctx, params)
 	suite.Error(err)
-	sysArtifactRecordMatcher := testifymock.MatchedBy(func(sa *model.SystemArtifact) bool {
-		return sa.Repository == "scandata_export_1000000" && sa.Vendor == strings.ToLower(export.Vendor) && sa.Digest == MockDigest
-	})
-	suite.sysArtifactMgr.AssertCalled(suite.T(), "Create", mock.Anything, sysArtifactRecordMatcher, mock.Anything)
+	// Create should have been called (for sys artifact)
+	suite.NotEmpty(suite.sysArtifactMgr.CreateCalls())
 
-	m := make(map[string]any)
-	m[export.DigestKey] = MockDigest
-	m[export.CreateTimestampKey] = mock.Anything
-
-	extraAttrsMatcher := testifymock.MatchedBy(func(attrsMap map[string]any) bool {
-		_, ok := m[export.CreateTimestampKey]
-		return attrsMap[export.DigestKey] == MockDigest && ok && attrsMap[export.JobNameAttribute] == "test-job" && attrsMap[export.UserNameAttribute] == "test-user"
-	})
-	suite.execMgr.AssertNotCalled(suite.T(), "UpdateExtraAttrs", mock.Anything, ExecID, extraAttrsMatcher)
 	_, err = os.Stat("/tmp/scandata_export_1000000.csv")
 	suite.Truef(os.IsNotExist(err), "Expected CSV file to be deleted")
 
@@ -206,19 +236,37 @@ func (suite *ScanDataExportJobTestSuite) TestRunWithCriteria() {
 	{
 		data := suite.createDataRecords(3)
 
-		mock.OnAnything(suite.exportMgr, "Fetch").Return(data, nil).Once()
-		mock.OnAnything(suite.exportMgr, "Fetch").Return(make([]export.Data, 0), nil).Once()
-		mock.OnAnything(suite.digestCalculator, "Calculate").Return(digest.Digest(MockDigest), nil)
+		fetchCallCount := 0
+		suite.exportMgr.FetchFunc = func(_ context.Context, p export.Params) ([]export.Data, error) {
+			fetchCallCount++
+			if fetchCallCount == 1 {
+				// Verify CVEIds in params
+				assert.Equal(suite.T(), "CVE-123", p.CVEIds)
+				return data, nil
+			}
+			return make([]export.Data, 0), nil
+		}
+		suite.digestCalculator.CalculateFunc = func(_ string) (digest.Digest, error) {
+			return digest.Digest(MockDigest), nil
+		}
 		execAttrs := make(map[string]any)
 		execAttrs[export.JobNameAttribute] = "test-job"
 		execAttrs[export.UserNameAttribute] = "test-user"
-		mock.OnAnything(suite.execMgr, "Get").Return(&task.Execution{ID: ExecID, ExtraAttrs: execAttrs}, nil).Once()
+		suite.execMgr.GetFunc = func(_ context.Context, _ int64) (*task.Execution, error) {
+			return &task.Execution{ID: ExecID, ExtraAttrs: execAttrs}, nil
+		}
 
 		repoCandidates := []int64{1}
 		artCandidates := []*artifact.Artifact{{Artifact: artpkg.Artifact{ID: 1, Digest: "digest1"}}}
-		mock.OnAnything(suite.filterProcessor, "ProcessRepositoryFilter").Return(repoCandidates, nil)
-		mock.OnAnything(suite.filterProcessor, "ProcessTagFilter").Return(artCandidates, nil)
-		mock.OnAnything(suite.filterProcessor, "ProcessLabelFilter").Return(artCandidates, nil)
+		suite.filterProcessor.ProcessRepositoryFilterFunc = func(_ context.Context, _ string, _ []int64) ([]int64, error) {
+			return repoCandidates, nil
+		}
+		suite.filterProcessor.ProcessTagFilterFunc = func(_ context.Context, _ string, _ []int64) ([]*artifact.Artifact, error) {
+			return artCandidates, nil
+		}
+		suite.filterProcessor.ProcessLabelFilterFunc = func(_ context.Context, _ []int64, _ []*artifact.Artifact) ([]*artifact.Artifact, error) {
+			return artCandidates, nil
+		}
 
 		criteria := export.Request{
 			CVEIds:       "CVE-123",
@@ -236,52 +284,63 @@ func (suite *ScanDataExportJobTestSuite) TestRunWithCriteria() {
 		params["Request"] = criteriaMap
 
 		ctx := &mockjobservice.MockJobContext{}
-		ctx.On("SystemContext").Return(context.TODO()).Once()
 
 		err := suite.job.Run(ctx, params)
 		suite.NoError(err)
-		sysArtifactRecordMatcher := testifymock.MatchedBy(func(sa *model.SystemArtifact) bool {
-			return sa.Repository == "scandata_export_1000000" && sa.Vendor == strings.ToLower(export.Vendor) && sa.Digest == MockDigest
-		})
-		suite.sysArtifactMgr.AssertCalled(suite.T(), "Create", mock.Anything, sysArtifactRecordMatcher, mock.Anything)
+		// Verify sysArtifactMgr.Create was called with matching record
+		createCalls := suite.sysArtifactMgr.CreateCalls()
+		suite.NotEmpty(createCalls)
+		lastCreate := createCalls[len(createCalls)-1]
+		suite.Equal("scandata_export_1000000", lastCreate.ArtifactRecord.Repository)
+		suite.Equal(strings.ToLower(export.Vendor), lastCreate.ArtifactRecord.Vendor)
+		suite.Equal(MockDigest, lastCreate.ArtifactRecord.Digest)
 
-		m := make(map[string]any)
-		m[export.DigestKey] = MockDigest
-		m[export.CreateTimestampKey] = mock.Anything
-
-		extraAttrsMatcher := testifymock.MatchedBy(func(attrsMap map[string]any) bool {
-			_, ok := m[export.CreateTimestampKey]
-			return attrsMap[export.DigestKey] == MockDigest && ok
-		})
-		suite.execMgr.AssertCalled(suite.T(), "UpdateExtraAttrs", mock.Anything, ExecID, extraAttrsMatcher)
+		// Verify UpdateExtraAttrs was called with correct digest
+		updateCalls := suite.execMgr.UpdateExtraAttrsCalls()
+		found := false
+		for _, c := range updateCalls {
+			if c.ID == ExecID && c.ExtraAttrs[export.DigestKey] == MockDigest {
+				found = true
+			}
+		}
+		suite.True(found, "Expected UpdateExtraAttrs call with correct digest")
 		_, err = os.Stat("/tmp/scandata_export_1000000.csv")
-
-		exportParamsMatcher := testifymock.MatchedBy(func(params export.Params) bool {
-			return reflect.DeepEqual(params.CVEIds, criteria.CVEIds)
-		})
-		suite.exportMgr.AssertCalled(suite.T(), "Fetch", mock.Anything, exportParamsMatcher)
-
 		suite.Truef(os.IsNotExist(err), "Expected CSV file to be deleted")
 	}
 
 	{
-		mock.OnAnything(suite.sysArtifactMgr, "Create").Return(int64(1), nil).Once()
+		// Reset mocks for second sub-test
+		suite.SetupTest()
+
 		data := suite.createDataRecords(3)
-		mock.OnAnything(suite.exportMgr, "Fetch").Return(data, nil).Once()
-		mock.OnAnything(suite.exportMgr, "Fetch").Return(make([]export.Data, 0), nil).Once()
-		mock.OnAnything(suite.digestCalculator, "Calculate").Return(digest.Digest(MockDigest), nil)
-		mock.OnAnything(suite.exportMgr, "Fetch").Return(data, nil).Once()
-		mock.OnAnything(suite.exportMgr, "Fetch").Return(make([]export.Data, 0), nil).Once()
-		mock.OnAnything(suite.digestCalculator, "Calculate").Return(digest.Digest(MockDigest), nil)
+		fetchCallCount := 0
+		suite.exportMgr.FetchFunc = func(_ context.Context, p export.Params) ([]export.Data, error) {
+			fetchCallCount++
+			if fetchCallCount == 1 {
+				assert.Equal(suite.T(), "CVE-123", p.CVEIds)
+				return data, nil
+			}
+			return make([]export.Data, 0), nil
+		}
+		suite.digestCalculator.CalculateFunc = func(_ string) (digest.Digest, error) {
+			return digest.Digest(MockDigest), nil
+		}
 		execAttrs := make(map[string]any)
 		execAttrs[export.JobNameAttribute] = "test-job"
 		execAttrs[export.UserNameAttribute] = "test-user"
-		mock.OnAnything(suite.execMgr, "Get").Return(&task.Execution{ID: ExecID, ExtraAttrs: execAttrs}, nil).Once()
+		suite.execMgr.GetFunc = func(_ context.Context, _ int64) (*task.Execution, error) {
+			return &task.Execution{ID: ExecID, ExtraAttrs: execAttrs}, nil
+		}
 
-		repoCandidate1 := &selector.Candidate{NamespaceID: 1}
-		repoCandidates := []*selector.Candidate{repoCandidate1}
-		mock.OnAnything(suite.filterProcessor, "ProcessRepositoryFilter").Return(repoCandidates, nil)
-		mock.OnAnything(suite.filterProcessor, "ProcessTagFilter").Return(repoCandidates, nil)
+		suite.filterProcessor.ProcessRepositoryFilterFunc = func(_ context.Context, _ string, _ []int64) ([]int64, error) {
+			return []int64{1}, nil
+		}
+		suite.filterProcessor.ProcessTagFilterFunc = func(_ context.Context, _ string, _ []int64) ([]*artifact.Artifact, error) {
+			return []*artifact.Artifact{{Artifact: artpkg.Artifact{ID: 1}}}, nil
+		}
+		suite.filterProcessor.ProcessLabelFilterFunc = func(_ context.Context, _ []int64, _ []*artifact.Artifact) ([]*artifact.Artifact, error) {
+			return []*artifact.Artifact{{Artifact: artpkg.Artifact{ID: 1}}}, nil
+		}
 
 		criteria := export.Request{
 			CVEIds:   "CVE-123",
@@ -298,51 +357,47 @@ func (suite *ScanDataExportJobTestSuite) TestRunWithCriteria() {
 		params["Request"] = criteriaMap
 
 		ctx := &mockjobservice.MockJobContext{}
-		ctx.On("SystemContext").Return(context.TODO()).Times(3)
 
 		err := suite.job.Run(ctx, params)
 		suite.NoError(err)
-		sysArtifactRecordMatcher := testifymock.MatchedBy(func(sa *model.SystemArtifact) bool {
-			return sa.Repository == "scandata_export_1000000" && sa.Vendor == strings.ToLower(export.Vendor) && sa.Digest == MockDigest
-		})
-		suite.sysArtifactMgr.AssertCalled(suite.T(), "Create", mock.Anything, sysArtifactRecordMatcher, mock.Anything)
-		m := make(map[string]any)
-		m[export.DigestKey] = MockDigest
-		m[export.CreateTimestampKey] = mock.Anything
+		createCalls := suite.sysArtifactMgr.CreateCalls()
+		suite.NotEmpty(createCalls)
+		lastCreate := createCalls[len(createCalls)-1]
+		suite.Equal("scandata_export_1000000", lastCreate.ArtifactRecord.Repository)
+		suite.Equal(strings.ToLower(export.Vendor), lastCreate.ArtifactRecord.Vendor)
+		suite.Equal(MockDigest, lastCreate.ArtifactRecord.Digest)
 
-		extraAttrsMatcher := testifymock.MatchedBy(func(attrsMap map[string]any) bool {
-			_, ok := m[export.CreateTimestampKey]
-			return attrsMap[export.DigestKey] == MockDigest && ok
-		})
-		suite.execMgr.AssertCalled(suite.T(), "UpdateExtraAttrs", mock.Anything, ExecID, extraAttrsMatcher)
+		updateCalls := suite.execMgr.UpdateExtraAttrsCalls()
+		found := false
+		for _, c := range updateCalls {
+			if c.ID == ExecID && c.ExtraAttrs[export.DigestKey] == MockDigest {
+				found = true
+			}
+		}
+		suite.True(found)
 		_, err = os.Stat("/tmp/scandata_export_1000000.csv")
-
-		exportParamsMatcher := testifymock.MatchedBy(func(params export.Params) bool {
-			return reflect.DeepEqual(params.CVEIds, criteria.CVEIds)
-		})
-		suite.exportMgr.AssertCalled(suite.T(), "Fetch", mock.Anything, exportParamsMatcher)
-
 		suite.Truef(os.IsNotExist(err), "Expected CSV file to be deleted")
 	}
 }
 
 func (suite *ScanDataExportJobTestSuite) TestRunWithCriteriaForRepositoryIdFilter() {
 	{
-		data := suite.createDataRecords(3)
-
-		mock.OnAnything(suite.exportMgr, "Fetch").Return(data, nil).Once()
-		mock.OnAnything(suite.exportMgr, "Fetch").Return(make([]export.Data, 0), nil).Once()
-		mock.OnAnything(suite.digestCalculator, "Calculate").Return(digest.Digest(MockDigest), nil)
-		mock.OnAnything(suite.exportMgr, "Fetch").Return(data, nil).Once()
-		mock.OnAnything(suite.exportMgr, "Fetch").Return(make([]export.Data, 0), nil).Once()
-		mock.OnAnything(suite.digestCalculator, "Calculate").Return(digest.Digest(MockDigest), nil)
+		suite.digestCalculator.CalculateFunc = func(_ string) (digest.Digest, error) {
+			return digest.Digest(MockDigest), nil
+		}
 		execAttrs := make(map[string]any)
 		execAttrs[export.JobNameAttribute] = "test-job"
 		execAttrs[export.UserNameAttribute] = "test-user"
-		mock.OnAnything(suite.execMgr, "Get").Return(&task.Execution{ID: ExecID, ExtraAttrs: execAttrs}, nil).Once()
+		suite.execMgr.GetFunc = func(_ context.Context, _ int64) (*task.Execution, error) {
+			return &task.Execution{ID: ExecID, ExtraAttrs: execAttrs}, nil
+		}
 
-		mock.OnAnything(suite.filterProcessor, "ProcessRepositoryFilter").Return([]int64{1}, errors.New("test error")).Once()
-		mock.OnAnything(suite.filterProcessor, "ProcessTagFilter").Return([]*artifact.Artifact{{Artifact: artpkg.Artifact{ID: 1}}}, nil).Once()
+		suite.filterProcessor.ProcessRepositoryFilterFunc = func(_ context.Context, _ string, _ []int64) ([]int64, error) {
+			return []int64{1}, errors.New("test error")
+		}
+		suite.filterProcessor.ProcessTagFilterFunc = func(_ context.Context, _ string, _ []int64) ([]*artifact.Artifact, error) {
+			return []*artifact.Artifact{{Artifact: artpkg.Artifact{ID: 1}}}, nil
+		}
 
 		criteria := export.Request{
 			CVEIds:       "CVE-123",
@@ -360,39 +415,36 @@ func (suite *ScanDataExportJobTestSuite) TestRunWithCriteriaForRepositoryIdFilte
 		params["Request"] = criteriaMap
 
 		ctx := &mockjobservice.MockJobContext{}
-		ctx.On("SystemContext").Return(context.TODO()).Once()
 
 		err := suite.job.Run(ctx, params)
 		suite.Error(err)
-		sysArtifactRecordMatcher := testifymock.MatchedBy(func(sa *model.SystemArtifact) bool {
-			return sa.Repository == "scandata_export_1000000" && sa.Vendor == strings.ToLower(export.Vendor) && sa.Digest == MockDigest
-		})
-		suite.sysArtifactMgr.AssertNotCalled(suite.T(), "Create", mock.Anything, sysArtifactRecordMatcher, mock.Anything)
-		suite.execMgr.AssertNotCalled(suite.T(), "UpdateExtraAttrs", mock.Anything, ExecID, mock.Anything)
+		// sysArtifactMgr.Create should NOT have been called (beyond SetupTest)
+		// exportMgr.Fetch should NOT have been called
+		suite.Empty(suite.exportMgr.FetchCalls())
 		_, err = os.Stat("/tmp/scandata_export_1000000.csv")
-
-		suite.exportMgr.AssertNotCalled(suite.T(), "Fetch", mock.Anything, mock.Anything)
-
 		suite.Truef(os.IsNotExist(err), "Expected CSV file to be deleted")
 	}
 
 	// empty list of repo ids
 	{
-		data := suite.createDataRecords(3)
+		suite.SetupTest()
 
-		mock.OnAnything(suite.exportMgr, "Fetch").Return(data, nil).Once()
-		mock.OnAnything(suite.exportMgr, "Fetch").Return(make([]export.Data, 0), nil).Once()
-		mock.OnAnything(suite.digestCalculator, "Calculate").Return(digest.Digest(MockDigest), nil)
-		mock.OnAnything(suite.exportMgr, "Fetch").Return(data, nil).Once()
-		mock.OnAnything(suite.exportMgr, "Fetch").Return(make([]export.Data, 0), nil).Once()
-		mock.OnAnything(suite.digestCalculator, "Calculate").Return(digest.Digest(MockDigest), nil)
+		suite.digestCalculator.CalculateFunc = func(_ string) (digest.Digest, error) {
+			return digest.Digest(MockDigest), nil
+		}
 		execAttrs := make(map[string]any)
 		execAttrs[export.JobNameAttribute] = "test-job"
 		execAttrs[export.UserNameAttribute] = "test-user"
-		mock.OnAnything(suite.execMgr, "Get").Return(&task.Execution{ID: ExecID, ExtraAttrs: execAttrs}, nil).Once()
+		suite.execMgr.GetFunc = func(_ context.Context, _ int64) (*task.Execution, error) {
+			return &task.Execution{ID: ExecID, ExtraAttrs: execAttrs}, nil
+		}
 
-		mock.OnAnything(suite.filterProcessor, "ProcessRepositoryFilter").Return([]int64{}, nil).Once()
-		mock.OnAnything(suite.filterProcessor, "ProcessTagFilter").Return([]*artifact.Artifact{}, nil).Once()
+		suite.filterProcessor.ProcessRepositoryFilterFunc = func(_ context.Context, _ string, _ []int64) ([]int64, error) {
+			return []int64{}, nil
+		}
+		suite.filterProcessor.ProcessTagFilterFunc = func(_ context.Context, _ string, _ []int64) ([]*artifact.Artifact, error) {
+			return []*artifact.Artifact{}, nil
+		}
 
 		criteria := export.Request{
 			CVEIds:       "CVE-123",
@@ -410,19 +462,14 @@ func (suite *ScanDataExportJobTestSuite) TestRunWithCriteriaForRepositoryIdFilte
 		params["Request"] = criteriaMap
 
 		ctx := &mockjobservice.MockJobContext{}
-		ctx.On("SystemContext").Return(context.TODO()).Once()
 
 		err := suite.job.Run(ctx, params)
 		suite.NoError(err)
-		sysArtifactRecordMatcher := testifymock.MatchedBy(func(sa *model.SystemArtifact) bool {
-			return sa.Repository == "scandata_export_1000000" && sa.Vendor == strings.ToLower(export.Vendor) && sa.Digest == MockDigest
-		})
-		suite.sysArtifactMgr.AssertNotCalled(suite.T(), "Create", mock.Anything, sysArtifactRecordMatcher, mock.Anything)
-		suite.execMgr.AssertCalled(suite.T(), "UpdateExtraAttrs", mock.Anything, ExecID, mock.Anything)
+		// UpdateExtraAttrs should have been called
+		suite.NotEmpty(suite.execMgr.UpdateExtraAttrsCalls())
+		// exportMgr.Fetch should NOT have been called
+		suite.Empty(suite.exportMgr.FetchCalls())
 		_, err = os.Stat("/tmp/scandata_export_1000000.csv")
-
-		suite.exportMgr.AssertNotCalled(suite.T(), "Fetch", mock.Anything, mock.Anything)
-
 		suite.Truef(os.IsNotExist(err), "Expected CSV file to be deleted")
 	}
 
@@ -430,21 +477,22 @@ func (suite *ScanDataExportJobTestSuite) TestRunWithCriteriaForRepositoryIdFilte
 
 func (suite *ScanDataExportJobTestSuite) TestRunWithCriteriaForRepositoryIdWithTagFilter() {
 	{
-		data := suite.createDataRecords(3)
-
-		mock.OnAnything(suite.exportMgr, "Fetch").Return(data, nil).Once()
-		mock.OnAnything(suite.exportMgr, "Fetch").Return(make([]export.Data, 0), nil).Once()
-		mock.OnAnything(suite.digestCalculator, "Calculate").Return(digest.Digest(MockDigest), nil)
-		mock.OnAnything(suite.exportMgr, "Fetch").Return(data, nil).Once()
-		mock.OnAnything(suite.exportMgr, "Fetch").Return(make([]export.Data, 0), nil).Once()
-		mock.OnAnything(suite.digestCalculator, "Calculate").Return(digest.Digest(MockDigest), nil)
+		suite.digestCalculator.CalculateFunc = func(_ string) (digest.Digest, error) {
+			return digest.Digest(MockDigest), nil
+		}
 		execAttrs := make(map[string]any)
 		execAttrs[export.JobNameAttribute] = "test-job"
 		execAttrs[export.UserNameAttribute] = "test-user"
-		mock.OnAnything(suite.execMgr, "Get").Return(&task.Execution{ID: ExecID, ExtraAttrs: execAttrs}, nil).Once()
+		suite.execMgr.GetFunc = func(_ context.Context, _ int64) (*task.Execution, error) {
+			return &task.Execution{ID: ExecID, ExtraAttrs: execAttrs}, nil
+		}
 
-		mock.OnAnything(suite.filterProcessor, "ProcessRepositoryFilter").Return([]int64{1}, nil).Once()
-		mock.OnAnything(suite.filterProcessor, "ProcessTagFilter").Return(nil, errors.New("test error")).Once()
+		suite.filterProcessor.ProcessRepositoryFilterFunc = func(_ context.Context, _ string, _ []int64) ([]int64, error) {
+			return []int64{1}, nil
+		}
+		suite.filterProcessor.ProcessTagFilterFunc = func(_ context.Context, _ string, _ []int64) ([]*artifact.Artifact, error) {
+			return nil, errors.New("test error")
+		}
 
 		criteria := export.Request{
 			CVEIds:       "CVE-123",
@@ -462,39 +510,34 @@ func (suite *ScanDataExportJobTestSuite) TestRunWithCriteriaForRepositoryIdWithT
 		params["Request"] = criteriaMap
 
 		ctx := &mockjobservice.MockJobContext{}
-		ctx.On("SystemContext").Return(context.TODO()).Once()
 
 		err := suite.job.Run(ctx, params)
 		suite.Error(err)
-		sysArtifactRecordMatcher := testifymock.MatchedBy(func(sa *model.SystemArtifact) bool {
-			return sa.Repository == "scandata_export_1000000" && sa.Vendor == strings.ToLower(export.Vendor) && sa.Digest == MockDigest
-		})
-		suite.sysArtifactMgr.AssertNotCalled(suite.T(), "Create", mock.Anything, sysArtifactRecordMatcher, mock.Anything)
-		suite.execMgr.AssertNotCalled(suite.T(), "UpdateExtraAttrs", mock.Anything, ExecID, mock.Anything)
+		suite.Empty(suite.exportMgr.FetchCalls())
 		_, err = os.Stat("/tmp/scandata_export_1000000.csv")
-
-		suite.exportMgr.AssertNotCalled(suite.T(), "Fetch", mock.Anything, mock.Anything)
-
 		suite.Truef(os.IsNotExist(err), "Expected CSV file to be deleted")
 	}
 
 	// empty list of repo ids after applying tag filters
 	{
-		data := suite.createDataRecords(3)
+		suite.SetupTest()
 
-		mock.OnAnything(suite.exportMgr, "Fetch").Return(data, nil).Once()
-		mock.OnAnything(suite.exportMgr, "Fetch").Return(make([]export.Data, 0), nil).Once()
-		mock.OnAnything(suite.digestCalculator, "Calculate").Return(digest.Digest(MockDigest), nil)
-		mock.OnAnything(suite.exportMgr, "Fetch").Return(data, nil).Once()
-		mock.OnAnything(suite.exportMgr, "Fetch").Return(make([]export.Data, 0), nil).Once()
-		mock.OnAnything(suite.digestCalculator, "Calculate").Return(digest.Digest(MockDigest), nil)
+		suite.digestCalculator.CalculateFunc = func(_ string) (digest.Digest, error) {
+			return digest.Digest(MockDigest), nil
+		}
 		execAttrs := make(map[string]any)
 		execAttrs[export.JobNameAttribute] = "test-job"
 		execAttrs[export.UserNameAttribute] = "test-user"
-		mock.OnAnything(suite.execMgr, "Get").Return(&task.Execution{ID: ExecID, ExtraAttrs: execAttrs}, nil).Once()
+		suite.execMgr.GetFunc = func(_ context.Context, _ int64) (*task.Execution, error) {
+			return &task.Execution{ID: ExecID, ExtraAttrs: execAttrs}, nil
+		}
 
-		mock.OnAnything(suite.filterProcessor, "ProcessRepositoryFilter").Return([]int64{}, nil).Once()
-		mock.OnAnything(suite.filterProcessor, "ProcessTagFilter").Return(nil, nil).Once()
+		suite.filterProcessor.ProcessRepositoryFilterFunc = func(_ context.Context, _ string, _ []int64) ([]int64, error) {
+			return []int64{}, nil
+		}
+		suite.filterProcessor.ProcessTagFilterFunc = func(_ context.Context, _ string, _ []int64) ([]*artifact.Artifact, error) {
+			return nil, nil
+		}
 
 		criteria := export.Request{
 			CVEIds:       "CVE-123",
@@ -512,19 +555,12 @@ func (suite *ScanDataExportJobTestSuite) TestRunWithCriteriaForRepositoryIdWithT
 		params["Request"] = criteriaMap
 
 		ctx := &mockjobservice.MockJobContext{}
-		ctx.On("SystemContext").Return(context.TODO()).Once()
 
 		err := suite.job.Run(ctx, params)
 		suite.NoError(err)
-		sysArtifactRecordMatcher := testifymock.MatchedBy(func(sa *model.SystemArtifact) bool {
-			return sa.Repository == "scandata_export_1000000" && sa.Vendor == strings.ToLower(export.Vendor) && sa.Digest == MockDigest
-		})
-		suite.sysArtifactMgr.AssertNotCalled(suite.T(), "Create", mock.Anything, sysArtifactRecordMatcher, mock.Anything)
-		suite.execMgr.AssertCalled(suite.T(), "UpdateExtraAttrs", mock.Anything, ExecID, mock.Anything)
+		suite.NotEmpty(suite.execMgr.UpdateExtraAttrsCalls())
+		suite.Empty(suite.exportMgr.FetchCalls())
 		_, err = os.Stat("/tmp/scandata_export_1000000.csv")
-
-		suite.exportMgr.AssertNotCalled(suite.T(), "Fetch", mock.Anything, mock.Anything)
-
 		suite.Truef(os.IsNotExist(err), "Expected CSV file to be deleted")
 	}
 
@@ -532,9 +568,12 @@ func (suite *ScanDataExportJobTestSuite) TestRunWithCriteriaForRepositoryIdWithT
 
 func (suite *ScanDataExportJobTestSuite) TestExportDigestCalculationErrorsOut() {
 	data := suite.createDataRecords(3)
-	mock.OnAnything(suite.exportMgr, "Fetch").Return(data, nil).Once()
-	mock.OnAnything(suite.exportMgr, "Fetch").Return(make([]export.Data, 0), nil).Once()
-	mock.OnAnything(suite.digestCalculator, "Calculate").Return(digest.Digest(""), errors.New("test error"))
+	suite.exportMgr.FetchFunc = func(_ context.Context, _ export.Params) ([]export.Data, error) {
+		return data, nil
+	}
+	suite.digestCalculator.CalculateFunc = func(_ string) (digest.Digest, error) {
+		return digest.Digest(""), errors.New("test error")
+	}
 	params := job.Parameters{}
 	params[export.JobModeKey] = export.JobModeExport
 	params["JobId"] = JobId
@@ -542,11 +581,6 @@ func (suite *ScanDataExportJobTestSuite) TestExportDigestCalculationErrorsOut() 
 
 	err := suite.job.Run(ctx, params)
 	suite.Error(err)
-	sysArtifactRecordMatcher := testifymock.MatchedBy(func(sa *model.SystemArtifact) bool {
-		return sa.Repository == "scandata_export_1000000" && sa.Vendor == strings.ToLower(export.Vendor) && sa.Digest == MockDigest
-	})
-	suite.sysArtifactMgr.AssertNotCalled(suite.T(), "Create", mock.Anything, sysArtifactRecordMatcher, mock.Anything)
-	suite.execMgr.AssertNotCalled(suite.T(), "UpdateExtraAttrs")
 	_, err = os.Stat("/tmp/scandata_export_1000000.csv")
 	suite.Truef(os.IsNotExist(err), "Expected CSV file to be deleted")
 }

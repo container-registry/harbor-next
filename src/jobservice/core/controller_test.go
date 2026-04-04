@@ -17,7 +17,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -60,13 +59,26 @@ func (suite *ControllerTestSuite) SetupSuite() {
 func (suite *ControllerTestSuite) SetupTest() {
 	suite.worker = &fakeWorker{}
 
-	suite.worker.On("IsKnownJob", job.SampleJob).Return((*sample.Job)(nil), true)
-	suite.worker.On("IsKnownJob", "fake").Return(nil, false)
-	suite.worker.On("ValidateJobParameters", (*sample.Job)(nil), suite.params).Return(nil)
+	suite.worker.IsKnownJobFunc = func(name string) (any, bool) {
+		if name == job.SampleJob {
+			return (*sample.Job)(nil), true
+		}
+		return nil, false
+	}
+	suite.worker.ValidateJobParametersFunc = func(_ any, _ job.Parameters) error {
+		return nil
+	}
 
 	fakeMgr := &fakeManager{}
-	fakeMgr.On("SaveJob", suite.res).Return(nil)
-	fakeMgr.On("GetJob", suite.jobID).Return(suite.res, nil)
+	fakeMgr.SaveJobFunc = func(_ *job.Stats) error {
+		return nil
+	}
+	fakeMgr.GetJobFunc = func(jobID string) (*job.Stats, error) {
+		if jobID == suite.jobID {
+			return suite.res, nil
+		}
+		return nil, nil
+	}
 
 	suite.manager = fakeMgr
 
@@ -81,7 +93,9 @@ func TestControllerTestSuite(t *testing.T) {
 func (suite *ControllerTestSuite) TestLaunchGenericJob() {
 	req := createJobReq("Generic")
 
-	suite.worker.On("Enqueue", job.SampleJob, suite.params, true, req.Job.StatusHook).Return(suite.res, nil)
+	suite.worker.EnqueueFunc = func(jobName string, params job.Parameters, isUnique bool, webHook string) (*job.Stats, error) {
+		return suite.res, nil
+	}
 
 	res, err := suite.ctl.LaunchJob(req)
 	require.Nil(suite.T(), err, "launch job: nil error expected but got %s", err)
@@ -92,7 +106,9 @@ func (suite *ControllerTestSuite) TestLaunchGenericJob() {
 func (suite *ControllerTestSuite) TestLaunchScheduledJob() {
 	req := createJobReq("Scheduled")
 
-	suite.worker.On("Schedule", job.SampleJob, suite.params, uint64(100), true, req.Job.StatusHook).Return(suite.res, nil)
+	suite.worker.ScheduleFunc = func(jobName string, params job.Parameters, runAfterSeconds uint64, isUnique bool, webHook string) (*job.Stats, error) {
+		return suite.res, nil
+	}
 
 	res, err := suite.ctl.LaunchJob(req)
 	require.Nil(suite.T(), err, "launch scheduled job: nil error expected but got %s", err)
@@ -103,7 +119,9 @@ func (suite *ControllerTestSuite) TestLaunchScheduledJob() {
 func (suite *ControllerTestSuite) TestLaunchPeriodicJob() {
 	req := createJobReq("Periodic")
 
-	suite.worker.On("PeriodicallyEnqueue", job.SampleJob, suite.params, "5 * * * * *", true, req.Job.StatusHook).Return(suite.res, nil)
+	suite.worker.PeriodicallyEnqueueFunc = func(jobName string, params job.Parameters, cronSetting string, isUnique bool, webHook string) (*job.Stats, error) {
+		return suite.res, nil
+	}
 
 	res, err := suite.ctl.LaunchJob(req)
 	require.Nil(suite.T(), err, "launch periodic job: nil error expected but got %s", err)
@@ -119,8 +137,12 @@ func (suite *ControllerTestSuite) TestGetJobStats() {
 
 // TestJobActions ...
 func (suite *ControllerTestSuite) TestJobActions() {
-	suite.worker.On("StopJob", suite.jobID).Return(nil)
-	suite.worker.On("RetryJob", suite.jobID).Return(nil)
+	suite.worker.StopJobFunc = func(_ string) error {
+		return nil
+	}
+	suite.worker.RetryJobFunc = func(_ string) error {
+		return nil
+	}
 
 	err := suite.ctl.StopJob(suite.jobID)
 	err = suite.ctl.RetryJob(suite.jobID)
@@ -130,13 +152,15 @@ func (suite *ControllerTestSuite) TestJobActions() {
 
 // TestCheckStatus ...
 func (suite *ControllerTestSuite) TestCheckStatus() {
-	suite.worker.On("Stats").Return(&worker.Stats{
-		Pools: []*worker.StatsData{
-			{
-				Status: "running",
+	suite.worker.StatsFunc = func() (*worker.Stats, error) {
+		return &worker.Stats{
+			Pools: []*worker.StatsData{
+				{
+					Status: "running",
+				},
 			},
-		},
-	}, nil)
+		}, nil
+	}
 
 	st, err := suite.ctl.CheckStatus()
 	require.Nil(suite.T(), err, "check worker status: nil error expected but got %s", err)
@@ -179,9 +203,18 @@ func (suite *ControllerTestSuite) TestGetScheduledJobs() {
 	}
 
 	fakeMgr := &fakeManager{}
-	fakeMgr.On("SaveJob", suite.res).Return(nil)
-	fakeMgr.On("GetJob", suite.jobID).Return(suite.res, nil)
-	fakeMgr.On("GetScheduledJobs", q).Return([]*job.Stats{suite.res}, int64(1), nil)
+	fakeMgr.SaveJobFunc = func(_ *job.Stats) error {
+		return nil
+	}
+	fakeMgr.GetJobFunc = func(jobID string) (*job.Stats, error) {
+		if jobID == suite.jobID {
+			return suite.res, nil
+		}
+		return nil, nil
+	}
+	fakeMgr.GetScheduledJobsFunc = func(_ *query.Parameter) ([]*job.Stats, int64, error) {
+		return []*job.Stats{suite.res}, int64(1), nil
+	}
 	suite.manager = fakeMgr
 
 	_, total, err := suite.ctl.GetJobs(q)
@@ -198,9 +231,18 @@ func (suite *ControllerTestSuite) TestGetPeriodicExecutions() {
 	}
 
 	fakeMgr := &fakeManager{}
-	fakeMgr.On("SaveJob", suite.res).Return(nil)
-	fakeMgr.On("GetJob", suite.jobID).Return(suite.res, nil)
-	fakeMgr.On("GetPeriodicExecution", "1000", q).Return([]*job.Stats{suite.res}, int64(1), nil)
+	fakeMgr.SaveJobFunc = func(_ *job.Stats) error {
+		return nil
+	}
+	fakeMgr.GetJobFunc = func(jobID string) (*job.Stats, error) {
+		if jobID == suite.jobID {
+			return suite.res, nil
+		}
+		return nil, nil
+	}
+	fakeMgr.GetPeriodicExecutionFunc = func(_ string, _ *query.Parameter) ([]*job.Stats, int64, error) {
+		return []*job.Stats{suite.res}, int64(1), nil
+	}
 	suite.manager = fakeMgr
 
 	_, total, err := suite.ctl.GetPeriodicExecutions("1000", q)
@@ -294,120 +336,136 @@ func (suite *ControllerTestSuite) SaveJob(j *job.Stats) error {
 
 // fake worker
 type fakeWorker struct {
-	mock.Mock
+	StartFunc                func() error
+	GetPoolIDFunc            func() string
+	RegisterJobsFunc         func(jobs map[string]any) error
+	EnqueueFunc              func(jobName string, params job.Parameters, isUnique bool, webHook string) (*job.Stats, error)
+	ScheduleFunc             func(jobName string, params job.Parameters, runAfterSeconds uint64, isUnique bool, webHook string) (*job.Stats, error)
+	PeriodicallyEnqueueFunc  func(jobName string, params job.Parameters, cronSetting string, isUnique bool, webHook string) (*job.Stats, error)
+	StatsFunc                func() (*worker.Stats, error)
+	IsKnownJobFunc           func(name string) (any, bool)
+	ValidateJobParametersFunc func(jobType any, params job.Parameters) error
+	StopJobFunc              func(jobID string) error
+	RetryJobFunc             func(jobID string) error
 }
 
 func (f *fakeWorker) Start() error {
-	return f.Called().Error(0)
+	if f.StartFunc != nil {
+		return f.StartFunc()
+	}
+	return nil
 }
 
 func (f *fakeWorker) GetPoolID() string {
-	return f.Called().String()
+	if f.GetPoolIDFunc != nil {
+		return f.GetPoolIDFunc()
+	}
+	return ""
 }
 
 func (f *fakeWorker) RegisterJobs(jobs map[string]any) error {
-	return f.Called(jobs).Error(0)
+	if f.RegisterJobsFunc != nil {
+		return f.RegisterJobsFunc(jobs)
+	}
+	return nil
 }
 
 func (f *fakeWorker) Enqueue(jobName string, params job.Parameters, isUnique bool, webHook string) (*job.Stats, error) {
-	args := f.Called(jobName, params, isUnique, webHook)
-	if args.Error(1) != nil {
-		return nil, args.Error(1)
+	if f.EnqueueFunc != nil {
+		return f.EnqueueFunc(jobName, params, isUnique, webHook)
 	}
-
-	return args.Get(0).(*job.Stats), nil
+	return nil, nil
 }
 
 func (f *fakeWorker) Schedule(jobName string, params job.Parameters, runAfterSeconds uint64, isUnique bool, webHook string) (*job.Stats, error) {
-	args := f.Called(jobName, params, runAfterSeconds, isUnique, webHook)
-	if args.Error(1) != nil {
-		return nil, args.Error(1)
+	if f.ScheduleFunc != nil {
+		return f.ScheduleFunc(jobName, params, runAfterSeconds, isUnique, webHook)
 	}
-
-	return args.Get(0).(*job.Stats), nil
+	return nil, nil
 }
 
 func (f *fakeWorker) PeriodicallyEnqueue(jobName string, params job.Parameters, cronSetting string, isUnique bool, webHook string) (*job.Stats, error) {
-	args := f.Called(jobName, params, cronSetting, isUnique, webHook)
-	if args.Error(1) != nil {
-		return nil, args.Error(1)
+	if f.PeriodicallyEnqueueFunc != nil {
+		return f.PeriodicallyEnqueueFunc(jobName, params, cronSetting, isUnique, webHook)
 	}
-
-	return args.Get(0).(*job.Stats), nil
+	return nil, nil
 }
 
 func (f *fakeWorker) Stats() (*worker.Stats, error) {
-	args := f.Called()
-	if args.Error(1) != nil {
-		return nil, args.Error(1)
+	if f.StatsFunc != nil {
+		return f.StatsFunc()
 	}
-
-	return args.Get(0).(*worker.Stats), nil
+	return nil, nil
 }
 
 func (f *fakeWorker) IsKnownJob(name string) (any, bool) {
-	args := f.Called(name)
-	if !args.Bool(1) {
-		return nil, args.Bool(1)
+	if f.IsKnownJobFunc != nil {
+		return f.IsKnownJobFunc(name)
 	}
-
-	return args.Get(0), args.Bool(1)
+	return nil, false
 }
 
 func (f *fakeWorker) ValidateJobParameters(jobType any, params job.Parameters) error {
-	return f.Called(jobType, params).Error(0)
+	if f.ValidateJobParametersFunc != nil {
+		return f.ValidateJobParametersFunc(jobType, params)
+	}
+	return nil
 }
 
 func (f *fakeWorker) StopJob(jobID string) error {
-	return f.Called(jobID).Error(0)
+	if f.StopJobFunc != nil {
+		return f.StopJobFunc(jobID)
+	}
+	return nil
 }
 
 func (f *fakeWorker) RetryJob(jobID string) error {
-	return f.Called(jobID).Error(0)
+	if f.RetryJobFunc != nil {
+		return f.RetryJobFunc(jobID)
+	}
+	return nil
 }
 
 // fake manager
 type fakeManager struct {
-	mock.Mock
+	GetJobsFunc              func(q *query.Parameter) ([]*job.Stats, int64, error)
+	GetPeriodicExecutionFunc func(pID string, q *query.Parameter) ([]*job.Stats, int64, error)
+	GetScheduledJobsFunc     func(q *query.Parameter) ([]*job.Stats, int64, error)
+	GetJobFunc               func(jobID string) (*job.Stats, error)
+	SaveJobFunc              func(j *job.Stats) error
 }
 
 func (fm *fakeManager) GetJobs(q *query.Parameter) ([]*job.Stats, int64, error) {
-	args := fm.Called(q)
-	if args.Error(2) != nil {
-		return nil, 0, args.Error(2)
+	if fm.GetJobsFunc != nil {
+		return fm.GetJobsFunc(q)
 	}
-
-	return args.Get(0).([]*job.Stats), args.Get(1).(int64), nil
+	return nil, 0, nil
 }
 
 func (fm *fakeManager) GetPeriodicExecution(pID string, q *query.Parameter) ([]*job.Stats, int64, error) {
-	args := fm.Called(pID, q)
-	if args.Error(2) != nil {
-		return nil, 0, args.Error(2)
+	if fm.GetPeriodicExecutionFunc != nil {
+		return fm.GetPeriodicExecutionFunc(pID, q)
 	}
-
-	return args.Get(0).([]*job.Stats), args.Get(1).(int64), nil
+	return nil, 0, nil
 }
 
 func (fm *fakeManager) GetScheduledJobs(q *query.Parameter) ([]*job.Stats, int64, error) {
-	args := fm.Called(q)
-	if args.Error(2) != nil {
-		return nil, 0, args.Error(2)
+	if fm.GetScheduledJobsFunc != nil {
+		return fm.GetScheduledJobsFunc(q)
 	}
-
-	return args.Get(0).([]*job.Stats), args.Get(1).(int64), nil
+	return nil, 0, nil
 }
 
 func (fm *fakeManager) GetJob(jobID string) (*job.Stats, error) {
-	args := fm.Called(jobID)
-	if args.Error(1) != nil {
-		return nil, args.Error(1)
+	if fm.GetJobFunc != nil {
+		return fm.GetJobFunc(jobID)
 	}
-
-	return args.Get(0).(*job.Stats), nil
+	return nil, nil
 }
 
 func (fm *fakeManager) SaveJob(j *job.Stats) error {
-	args := fm.Called(j)
-	return args.Error(0)
+	if fm.SaveJobFunc != nil {
+		return fm.SaveJobFunc(j)
+	}
+	return nil
 }

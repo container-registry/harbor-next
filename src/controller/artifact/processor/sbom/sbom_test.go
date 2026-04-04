@@ -23,13 +23,12 @@ import (
 
 	"github.com/docker/distribution"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/goharbor/harbor/src/controller/artifact/processor/base"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/pkg/artifact"
-	"github.com/goharbor/harbor/src/testing/pkg/registry"
+	"github.com/goharbor/harbor/src/testing/moq/pkg/registry"
 )
 
 type SBOMProcessorTestSuite struct {
@@ -70,8 +69,12 @@ func (suite *SBOMProcessorTestSuite) TestAbstractAdditionNormal() {
 	blobReader := io.NopCloser(reader)
 	mani, _, err := distribution.UnmarshalManifest(v1.MediaTypeImageManifest, []byte(manContent))
 	suite.Require().NoError(err)
-	suite.regCli.On("PullManifest", mock.Anything, mock.Anything).Return(mani, "sha256:123", nil).Once()
-	suite.regCli.On("PullBlob", mock.Anything, mock.Anything).Return(int64(123), blobReader, nil).Once()
+	suite.regCli.PullManifestFunc = func(_ string, _ string, _ ...string) (distribution.Manifest, string, error) {
+		return mani, "sha256:123", nil
+	}
+	suite.regCli.PullBlobFunc = func(_ string, _ string) (int64, io.ReadCloser, error) {
+		return int64(123), blobReader, nil
+	}
 	addition, err := suite.processor.AbstractAddition(context.Background(), &artifact.Artifact{RepositoryName: "repo", Digest: "digest"}, "sbom")
 	suite.Nil(err)
 	suite.Equal(sbomContent, string(addition.Content))
@@ -105,7 +108,9 @@ func (suite *SBOMProcessorTestSuite) TestAbstractAdditionMultiLayer() {
 }`
 	mani, _, err := distribution.UnmarshalManifest(v1.MediaTypeImageManifest, []byte(manContent))
 	suite.Require().NoError(err)
-	suite.regCli.On("PullManifest", mock.Anything, mock.Anything).Return(mani, "sha256:123", nil).Once()
+	suite.regCli.PullManifestFunc = func(_ string, _ string, _ ...string) (distribution.Manifest, string, error) {
+		return mani, "sha256:123", nil
+	}
 	_, err = suite.processor.AbstractAddition(context.Background(), &artifact.Artifact{RepositoryName: "repo", Digest: "digest"}, "sbom")
 	suite.NotNil(err)
 }
@@ -128,8 +133,12 @@ func (suite *SBOMProcessorTestSuite) TestAbstractAdditionPullBlobError() {
 }`
 	mani, _, err := distribution.UnmarshalManifest(v1.MediaTypeImageManifest, []byte(manContent))
 	suite.Require().NoError(err)
-	suite.regCli.On("PullManifest", mock.Anything, mock.Anything).Return(mani, "sha256:123", nil).Once()
-	suite.regCli.On("PullBlob", mock.Anything, mock.Anything).Return(int64(123), nil, errors.NotFoundError(fmt.Errorf("not found"))).Once()
+	suite.regCli.PullManifestFunc = func(_ string, _ string, _ ...string) (distribution.Manifest, string, error) {
+		return mani, "sha256:123", nil
+	}
+	suite.regCli.PullBlobFunc = func(_ string, _ string) (int64, io.ReadCloser, error) {
+		return int64(123), nil, errors.NotFoundError(fmt.Errorf("not found"))
+	}
 	addition, err := suite.processor.AbstractAddition(context.Background(), &artifact.Artifact{RepositoryName: "repo", Digest: "digest"}, "sbom")
 	suite.NotNil(err)
 	suite.Nil(addition)
@@ -145,13 +154,17 @@ func (suite *SBOMProcessorTestSuite) TestAbstractAdditionNoSBOMLayer() {
 }`
 	mani, _, err := distribution.UnmarshalManifest(v1.MediaTypeImageManifest, []byte(manContent))
 	suite.Require().NoError(err)
-	suite.regCli.On("PullManifest", mock.Anything, mock.Anything).Return(mani, "sha256:123", nil).Once()
+	suite.regCli.PullManifestFunc = func(_ string, _ string, _ ...string) (distribution.Manifest, string, error) {
+		return mani, "sha256:123", nil
+	}
 	_, err = suite.processor.AbstractAddition(context.Background(), &artifact.Artifact{RepositoryName: "repo", Digest: "digest"}, "sbom")
 	suite.NotNil(err)
 }
 
 func (suite *SBOMProcessorTestSuite) TestAbstractAdditionPullManifestError() {
-	suite.regCli.On("PullManifest", mock.Anything, mock.Anything).Return(nil, "sha256:123", errors.NotFoundError(fmt.Errorf("not found"))).Once()
+	suite.regCli.PullManifestFunc = func(_ string, _ string, _ ...string) (distribution.Manifest, string, error) {
+		return nil, "sha256:123", errors.NotFoundError(fmt.Errorf("not found"))
+	}
 	_, err := suite.processor.AbstractAddition(context.Background(), &artifact.Artifact{RepositoryName: "repo", Digest: "digest"}, "sbom")
 	suite.NotNil(err)
 

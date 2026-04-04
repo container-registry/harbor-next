@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -102,19 +101,25 @@ func (suite *APIHandlerTestSuite) TestLaunchJobFailed() {
 	bytes, _ := json.Marshal(req)
 
 	fc1 := &fakeController{}
-	fc1.On("LaunchJob", req).Return(nil, errs.BadRequestError(req.Job.Name))
+	fc1.LaunchJobFunc = func(r *job.Request) (*job.Stats, error) {
+		return nil, errs.BadRequestError(r.Job.Name)
+	}
 	suite.controller = fc1
 	_, code := suite.postReq(fmt.Sprintf("%s/%s", suite.APIAddr, "jobs"), bytes)
 	assert.Equal(suite.T(), 400, code, "expect 400 bad request but got %d", code)
 
 	fc2 := &fakeController{}
-	fc2.On("LaunchJob", req).Return(nil, errs.ConflictError(req.Job.Name))
+	fc2.LaunchJobFunc = func(r *job.Request) (*job.Stats, error) {
+		return nil, errs.ConflictError(r.Job.Name)
+	}
 	suite.controller = fc2
 	_, code = suite.postReq(fmt.Sprintf("%s/%s", suite.APIAddr, "jobs"), bytes)
 	assert.Equal(suite.T(), 409, code, "expect 409 conflict but got %d", code)
 
 	fc3 := &fakeController{}
-	fc3.On("LaunchJob", req).Return(nil, errs.LaunchJobError(errors.New("testing launch job")))
+	fc3.LaunchJobFunc = func(_ *job.Request) (*job.Stats, error) {
+		return nil, errs.LaunchJobError(errors.New("testing launch job"))
+	}
 	suite.controller = fc3
 	_, code = suite.postReq(fmt.Sprintf("%s/%s", suite.APIAddr, "jobs"), bytes)
 	assert.Equal(suite.T(), 500, code, "expect 500 internal server error but got %d", code)
@@ -126,7 +131,9 @@ func (suite *APIHandlerTestSuite) TestLaunchJobSucceed() {
 	bytes, _ := json.Marshal(req)
 
 	fc := &fakeController{}
-	fc.On("LaunchJob", req).Return(createJobStats("sample", "Generic", ""), nil)
+	fc.LaunchJobFunc = func(_ *job.Request) (*job.Stats, error) {
+		return createJobStats("sample", "Generic", ""), nil
+	}
 	suite.controller = fc
 
 	_, code := suite.postReq(fmt.Sprintf("%s/%s", suite.APIAddr, "jobs"), bytes)
@@ -136,7 +143,9 @@ func (suite *APIHandlerTestSuite) TestLaunchJobSucceed() {
 // TestGetJobFailed ...
 func (suite *APIHandlerTestSuite) TestGetJobFailed() {
 	fc := &fakeController{}
-	fc.On("GetJob", "fake_job_ID").Return(nil, errs.NoObjectFoundError("fake_job_ID"))
+	fc.GetJobFunc = func(jobID string) (*job.Stats, error) {
+		return nil, errs.NoObjectFoundError(jobID)
+	}
 	suite.controller = fc
 
 	_, code := suite.getReq(fmt.Sprintf("%s/%s", suite.APIAddr, "jobs/fake_job_ID"))
@@ -146,7 +155,9 @@ func (suite *APIHandlerTestSuite) TestGetJobFailed() {
 // TestGetJobSucceed ...
 func (suite *APIHandlerTestSuite) TestGetJobSucceed() {
 	fc := &fakeController{}
-	fc.On("GetJob", "fake_job_ID").Return(createJobStats("sample", "Generic", ""), nil)
+	fc.GetJobFunc = func(_ string) (*job.Stats, error) {
+		return createJobStats("sample", "Generic", ""), nil
+	}
 	suite.controller = fc
 
 	res, code := suite.getReq(fmt.Sprintf("%s/%s", suite.APIAddr, "jobs/fake_job_ID"))
@@ -164,7 +175,9 @@ func (suite *APIHandlerTestSuite) TestJobActionFailed() {
 	assert.Equal(suite.T(), 501, code, "expected 501 not implemented but got %d", code)
 
 	fc1 := &fakeController{}
-	fc1.On("StopJob", "fake_job_ID_not").Return(errs.NoObjectFoundError("fake_job_ID_not"))
+	fc1.StopJobFunc = func(_ string) error {
+		return errs.NoObjectFoundError("fake_job_ID_not")
+	}
 	suite.controller = fc1
 	actionReq = createJobActionReq("stop")
 	data, _ = json.Marshal(actionReq)
@@ -172,13 +185,17 @@ func (suite *APIHandlerTestSuite) TestJobActionFailed() {
 	assert.Equal(suite.T(), 404, code, "expected 404 not found but got %d", code)
 
 	fc2 := &fakeController{}
-	fc2.On("StopJob", "fake_job_ID").Return(errs.BadRequestError("fake_job_ID"))
+	fc2.StopJobFunc = func(_ string) error {
+		return errs.BadRequestError("fake_job_ID")
+	}
 	suite.controller = fc2
 	_, code = suite.postReq(fmt.Sprintf("%s/%s", suite.APIAddr, "jobs/fake_job_ID"), data)
 	assert.Equal(suite.T(), 400, code, "expected 400 bad request but got %d", code)
 
 	fc3 := &fakeController{}
-	fc3.On("StopJob", "fake_job_ID").Return(errs.StopJobError(errors.New("testing error")))
+	fc3.StopJobFunc = func(_ string) error {
+		return errs.StopJobError(errors.New("testing error"))
+	}
 	suite.controller = fc3
 	_, code = suite.postReq(fmt.Sprintf("%s/%s", suite.APIAddr, "jobs/fake_job_ID"), data)
 	assert.Equal(suite.T(), 500, code, "expected 500 internal server but got %d", code)
@@ -187,7 +204,9 @@ func (suite *APIHandlerTestSuite) TestJobActionFailed() {
 // TestJobActionSucceed ...
 func (suite *APIHandlerTestSuite) TestJobActionSucceed() {
 	fc := &fakeController{}
-	fc.On("StopJob", "fake_job_ID_not").Return(nil)
+	fc.StopJobFunc = func(_ string) error {
+		return nil
+	}
 	suite.controller = fc
 	actionReq := createJobActionReq("stop")
 	data, _ := json.Marshal(actionReq)
@@ -205,7 +224,9 @@ func (suite *APIHandlerTestSuite) TestCheckStatus() {
 		},
 	}
 	fc := &fakeController{}
-	fc.On("CheckStatus").Return(statsRes, nil)
+	fc.CheckStatusFunc = func() (*worker.Stats, error) {
+		return statsRes, nil
+	}
 	suite.controller = fc
 
 	bytes, code := suite.getReq(fmt.Sprintf("%s/%s", suite.APIAddr, "stats"))
@@ -223,7 +244,9 @@ func (suite *APIHandlerTestSuite) TestCheckStatus() {
 // TestGetJobLogInvalidID ...
 func (suite *APIHandlerTestSuite) TestGetJobLogInvalidID() {
 	fc := &fakeController{}
-	fc.On("GetJobLogData", "fake_job_ID_not").Return(nil, errs.NoObjectFoundError("fake_job_ID_not"))
+	fc.GetJobLogDataFunc = func(jobID string) ([]byte, error) {
+		return nil, errs.NoObjectFoundError(jobID)
+	}
 	suite.controller = fc
 
 	_, code := suite.getReq(fmt.Sprintf("%s/%s", suite.APIAddr, "jobs/fake_job_ID_not/log"))
@@ -233,7 +256,9 @@ func (suite *APIHandlerTestSuite) TestGetJobLogInvalidID() {
 // TestGetJobLog ...
 func (suite *APIHandlerTestSuite) TestGetJobLog() {
 	fc := &fakeController{}
-	fc.On("GetJobLogData", "fake_job_ID").Return([]byte("hello log"), nil)
+	fc.GetJobLogDataFunc = func(_ string) ([]byte, error) {
+		return []byte("hello log"), nil
+	}
 	suite.controller = fc
 
 	resData, code := suite.getReq(fmt.Sprintf("%s/%s", suite.APIAddr, "jobs/fake_job_ID/log"))
@@ -250,8 +275,12 @@ func (suite *APIHandlerTestSuite) TestGetPeriodicExecutionsWithoutQuery() {
 	}
 
 	fc := &fakeController{}
-	fc.On("GetPeriodicExecutions", "fake_job_ID", q).
-		Return([]*job.Stats{createJobStats("sample", "Generic", "")}, int64(1), nil)
+	fc.GetPeriodicExecutionsFunc = func(periodicJobID string, qp *query.Parameter) ([]*job.Stats, int64, error) {
+		if periodicJobID == "fake_job_ID" && qp.PageNumber == q.PageNumber && qp.PageSize == q.PageSize {
+			return []*job.Stats{createJobStats("sample", "Generic", "")}, int64(1), nil
+		}
+		return nil, 0, nil
+	}
 	suite.controller = fc
 
 	_, code := suite.getReq(fmt.Sprintf("%s/%s", suite.APIAddr, "jobs/fake_job_ID/executions"))
@@ -260,17 +289,13 @@ func (suite *APIHandlerTestSuite) TestGetPeriodicExecutionsWithoutQuery() {
 
 // TestGetPeriodicExecutionsWithQuery ...
 func (suite *APIHandlerTestSuite) TestGetPeriodicExecutionsWithQuery() {
-	extras := make(query.ExtraParameters)
-	extras.Set(query.ExtraParamKeyNonStoppedOnly, true)
-	q := &query.Parameter{
-		PageNumber: 2,
-		PageSize:   50,
-		Extras:     extras,
-	}
-
 	fc := &fakeController{}
-	fc.On("GetPeriodicExecutions", "fake_job_ID", q).
-		Return([]*job.Stats{createJobStats("sample", "Generic", "")}, int64(1), nil)
+	fc.GetPeriodicExecutionsFunc = func(periodicJobID string, qp *query.Parameter) ([]*job.Stats, int64, error) {
+		if periodicJobID == "fake_job_ID" && qp.PageNumber == 2 && qp.PageSize == 50 {
+			return []*job.Stats{createJobStats("sample", "Generic", "")}, int64(1), nil
+		}
+		return nil, 0, nil
+	}
 	suite.controller = fc
 
 	_, code := suite.getReq(fmt.Sprintf("%s/%s", suite.APIAddr, "jobs/fake_job_ID/executions?page_number=2&page_size=50&non_dead_only=true"))
@@ -279,24 +304,25 @@ func (suite *APIHandlerTestSuite) TestGetPeriodicExecutionsWithQuery() {
 
 // TestGetJobs ...
 func (suite *APIHandlerTestSuite) TestGetJobs() {
-	q := &query.Parameter{
-		PageNumber: 2,
-		PageSize:   50,
-		Extras:     make(query.ExtraParameters),
-	}
-
 	fc := &fakeController{}
-	fc.On("GetJobs", q).
-		Return([]*job.Stats{createJobStats("sample", job.KindGeneric, "")}, int64(1), nil)
+	fc.GetJobsFunc = func(qp *query.Parameter) ([]*job.Stats, int64, error) {
+		if qp.PageNumber == 2 && qp.PageSize == 50 {
+			return []*job.Stats{createJobStats("sample", job.KindGeneric, "")}, int64(1), nil
+		}
+		return nil, 0, nil
+	}
 	suite.controller = fc
 
 	_, code := suite.getReq(fmt.Sprintf("%s/%s", suite.APIAddr, "jobs?page_number=2&page_size=50"))
 	assert.Equal(suite.T(), 200, code, "expected 200 ok but got %d", code)
 
-	q.Extras.Set(query.ExtraParamKeyKind, job.KindScheduled)
 	fc = &fakeController{}
-	fc.On("GetJobs", q).
-		Return([]*job.Stats{createJobStats("sample", job.KindScheduled, "")}, int64(1), nil)
+	fc.GetJobsFunc = func(qp *query.Parameter) ([]*job.Stats, int64, error) {
+		if qp.PageNumber == 2 && qp.PageSize == 50 {
+			return []*job.Stats{createJobStats("sample", job.KindScheduled, "")}, int64(1), nil
+		}
+		return nil, 0, nil
+	}
 	suite.controller = fc
 
 	_, code = suite.getReq(fmt.Sprintf("%s/%s", suite.APIAddr, "jobs?page_number=2&page_size=50&kind=Scheduled"))
@@ -412,71 +438,70 @@ func (suite *APIHandlerTestSuite) GetJobs(query *query.Parameter) ([]*job.Stats,
 }
 
 type fakeController struct {
-	mock.Mock
+	LaunchJobFunc             func(req *job.Request) (*job.Stats, error)
+	GetJobFunc                func(jobID string) (*job.Stats, error)
+	StopJobFunc               func(jobID string) error
+	RetryJobFunc              func(jobID string) error
+	CheckStatusFunc           func() (*worker.Stats, error)
+	GetJobLogDataFunc         func(jobID string) ([]byte, error)
+	GetPeriodicExecutionsFunc func(periodicJobID string, query *query.Parameter) ([]*job.Stats, int64, error)
+	GetJobsFunc               func(query *query.Parameter) ([]*job.Stats, int64, error)
 }
 
 func (fc *fakeController) LaunchJob(req *job.Request) (*job.Stats, error) {
-	args := fc.Called(req)
-	if args.Error(1) != nil {
-		return nil, args.Error(1)
+	if fc.LaunchJobFunc != nil {
+		return fc.LaunchJobFunc(req)
 	}
-
-	return args.Get(0).(*job.Stats), nil
+	return nil, nil
 }
 
 func (fc *fakeController) GetJob(jobID string) (*job.Stats, error) {
-	args := fc.Called(jobID)
-	if args.Error(1) != nil {
-		return nil, args.Error(1)
+	if fc.GetJobFunc != nil {
+		return fc.GetJobFunc(jobID)
 	}
-
-	return args.Get(0).(*job.Stats), nil
+	return nil, nil
 }
 
 func (fc *fakeController) StopJob(jobID string) error {
-	args := fc.Called(jobID)
-	return args.Error(0)
+	if fc.StopJobFunc != nil {
+		return fc.StopJobFunc(jobID)
+	}
+	return nil
 }
 
 func (fc *fakeController) RetryJob(jobID string) error {
-	args := fc.Called(jobID)
-	return args.Error(0)
+	if fc.RetryJobFunc != nil {
+		return fc.RetryJobFunc(jobID)
+	}
+	return nil
 }
 
 func (fc *fakeController) CheckStatus() (*worker.Stats, error) {
-	args := fc.Called()
-	if args.Error(1) != nil {
-		return nil, args.Error(1)
+	if fc.CheckStatusFunc != nil {
+		return fc.CheckStatusFunc()
 	}
-
-	return args.Get(0).(*worker.Stats), nil
+	return nil, nil
 }
 
 func (fc *fakeController) GetJobLogData(jobID string) ([]byte, error) {
-	args := fc.Called(jobID)
-	if args.Error(1) != nil {
-		return nil, args.Error(1)
+	if fc.GetJobLogDataFunc != nil {
+		return fc.GetJobLogDataFunc(jobID)
 	}
-
-	return args.Get(0).([]byte), nil
+	return nil, nil
 }
 
 func (fc *fakeController) GetPeriodicExecutions(periodicJobID string, query *query.Parameter) ([]*job.Stats, int64, error) {
-	args := fc.Called(periodicJobID, query)
-	if args.Error(2) != nil {
-		return nil, args.Get(1).(int64), args.Error(2)
+	if fc.GetPeriodicExecutionsFunc != nil {
+		return fc.GetPeriodicExecutionsFunc(periodicJobID, query)
 	}
-
-	return args.Get(0).([]*job.Stats), args.Get(1).(int64), nil
+	return nil, 0, nil
 }
 
 func (fc *fakeController) GetJobs(query *query.Parameter) ([]*job.Stats, int64, error) {
-	args := fc.Called(query)
-	if args.Error(2) != nil {
-		return nil, args.Get(1).(int64), args.Error(2)
+	if fc.GetJobsFunc != nil {
+		return fc.GetJobsFunc(query)
 	}
-
-	return args.Get(0).([]*job.Stats), args.Get(1).(int64), nil
+	return nil, 0, nil
 }
 
 func createJobStats(name, kind, cron string) *job.Stats {

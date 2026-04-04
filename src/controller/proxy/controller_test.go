@@ -21,7 +21,6 @@ import (
 
 	"github.com/docker/distribution"
 	"github.com/opencontainers/go-digest"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/goharbor/harbor/src/controller/artifact"
@@ -30,60 +29,88 @@ import (
 	_ "github.com/goharbor/harbor/src/lib/cache"
 	"github.com/goharbor/harbor/src/lib/errors"
 	proModels "github.com/goharbor/harbor/src/pkg/project/models"
-	testproxy "github.com/goharbor/harbor/src/testing/controller/proxy"
+	testproxy "github.com/goharbor/harbor/src/testing/moq/controller/proxy"
 )
 
 type localInterfaceMock struct {
-	mock.Mock
+	SendPullEventFunc     func(ctx context.Context, repo, tag string)
+	GetManifestFunc       func(ctx context.Context, art lib.ArtifactInfo) (*artifact.Artifact, error)
+	SameArtifactFunc      func(ctx context.Context, repo, tag, dig string) (bool, error)
+	BlobExistFunc         func(ctx context.Context, art lib.ArtifactInfo) (bool, error)
+	PushBlobFunc          func(localRepo string, desc distribution.Descriptor, bReader io.ReadCloser) error
+	PushManifestFunc      func(repo string, tag string, manifest distribution.Manifest) error
+	PushManifestListFunc  func(ctx context.Context, repo string, tag string, man distribution.Manifest) error
+	CheckDependenciesFunc func(ctx context.Context, repo string, man distribution.Manifest) []distribution.Descriptor
+	DeleteManifestFunc    func(repo, ref string)
+	UpdatePullTimeFunc    func(ctx context.Context, art lib.ArtifactInfo) error
 }
 
 func (l *localInterfaceMock) SendPullEvent(ctx context.Context, repo, tag string) {
-	panic("implement me")
+	if l.SendPullEventFunc != nil {
+		l.SendPullEventFunc(ctx, repo, tag)
+	}
 }
 
 func (l *localInterfaceMock) GetManifest(ctx context.Context, art lib.ArtifactInfo) (*artifact.Artifact, error) {
-	args := l.Called(ctx, art)
-
-	var a *artifact.Artifact
-	if args.Get(0) != nil {
-		a = args.Get(0).(*artifact.Artifact)
+	if l.GetManifestFunc != nil {
+		return l.GetManifestFunc(ctx, art)
 	}
-	return a, args.Error(1)
+	return nil, nil
 }
 
 func (l *localInterfaceMock) SameArtifact(ctx context.Context, repo, tag, dig string) (bool, error) {
-	panic("implement me")
+	if l.SameArtifactFunc != nil {
+		return l.SameArtifactFunc(ctx, repo, tag, dig)
+	}
+	return false, nil
 }
 
 func (l *localInterfaceMock) BlobExist(ctx context.Context, art lib.ArtifactInfo) (bool, error) {
-	args := l.Called(ctx, art)
-	return args.Bool(0), args.Error(1)
+	if l.BlobExistFunc != nil {
+		return l.BlobExistFunc(ctx, art)
+	}
+	return false, nil
 }
 
 func (l *localInterfaceMock) PushBlob(localRepo string, desc distribution.Descriptor, bReader io.ReadCloser) error {
-	panic("implement me")
+	if l.PushBlobFunc != nil {
+		return l.PushBlobFunc(localRepo, desc, bReader)
+	}
+	return nil
 }
 
 func (l *localInterfaceMock) PushManifest(repo string, tag string, manifest distribution.Manifest) error {
-	args := l.Called(repo, tag, manifest)
-	return args.Error(0)
+	if l.PushManifestFunc != nil {
+		return l.PushManifestFunc(repo, tag, manifest)
+	}
+	return nil
 }
 
 func (l *localInterfaceMock) PushManifestList(ctx context.Context, repo string, tag string, man distribution.Manifest) error {
-	panic("implement me")
+	if l.PushManifestListFunc != nil {
+		return l.PushManifestListFunc(ctx, repo, tag, man)
+	}
+	return nil
 }
 
 func (l *localInterfaceMock) CheckDependencies(ctx context.Context, repo string, man distribution.Manifest) []distribution.Descriptor {
-	args := l.Called(ctx, repo, man)
-	return args.Get(0).([]distribution.Descriptor)
+	if l.CheckDependenciesFunc != nil {
+		return l.CheckDependenciesFunc(ctx, repo, man)
+	}
+	return nil
 }
 
 func (l *localInterfaceMock) DeleteManifest(repo, ref string) {
+	if l.DeleteManifestFunc != nil {
+		l.DeleteManifestFunc(repo, ref)
+	}
 }
 
 func (l *localInterfaceMock) UpdatePullTime(ctx context.Context, art lib.ArtifactInfo) error {
-	args := l.Called(ctx, art)
-	return args.Error(0)
+	if l.UpdatePullTimeFunc != nil {
+		return l.UpdatePullTimeFunc(ctx, art)
+	}
+	return nil
 }
 
 type proxyControllerTestSuite struct {
@@ -109,7 +136,9 @@ func (p *proxyControllerTestSuite) TestUseLocalManifest_True() {
 	ctx := context.Background()
 	dig := "sha256:1a9ec845ee94c202b2d5da74a24f0ed2058318bfa9879fa541efaecba272e86b"
 	art := lib.ArtifactInfo{Repository: "library/hello-world", Digest: dig}
-	p.local.On("GetManifest", mock.Anything, mock.Anything).Return(&artifact.Artifact{}, nil)
+	p.local.GetManifestFunc = func(_ context.Context, _ lib.ArtifactInfo) (*artifact.Artifact, error) {
+		return &artifact.Artifact{}, nil
+	}
 
 	result, _, err := p.ctr.UseLocalManifest(ctx, art, p.remote, p.proj)
 	p.Assert().Nil(err)
@@ -121,8 +150,12 @@ func (p *proxyControllerTestSuite) TestUseLocalManifest_False() {
 	dig := "sha256:1a9ec845ee94c202b2d5da74a24f0ed2058318bfa9879fa541efaecba272e86b"
 	desc := &distribution.Descriptor{Digest: digest.Digest(dig)}
 	art := lib.ArtifactInfo{Repository: "library/hello-world", Digest: dig}
-	p.remote.On("ManifestExist", mock.Anything, mock.Anything).Return(true, desc, nil)
-	p.local.On("GetManifest", mock.Anything, mock.Anything).Return(nil, nil)
+	p.remote.ManifestExistFunc = func(_ string, _ string) (bool, *distribution.Descriptor, error) {
+		return true, desc, nil
+	}
+	p.local.GetManifestFunc = func(_ context.Context, _ lib.ArtifactInfo) (*artifact.Artifact, error) {
+		return nil, nil
+	}
 	result, _, err := p.ctr.UseLocalManifest(ctx, art, p.remote, p.proj)
 	p.Assert().Nil(err)
 	p.Assert().False(result)
@@ -133,8 +166,12 @@ func (p *proxyControllerTestSuite) TestUseLocalManifest_429() {
 	dig := "sha256:1a9ec845ee94c202b2d5da74a24f0ed2058318bfa9879fa541efaecba272e86b"
 	desc := &distribution.Descriptor{Digest: digest.Digest(dig)}
 	art := lib.ArtifactInfo{Repository: "library/hello-world", Digest: dig}
-	p.remote.On("ManifestExist", mock.Anything, mock.Anything).Return(false, desc, errors.New("too many requests").WithCode(errors.RateLimitCode))
-	p.local.On("GetManifest", mock.Anything, mock.Anything).Return(nil, nil)
+	p.remote.ManifestExistFunc = func(_ string, _ string) (bool, *distribution.Descriptor, error) {
+		return false, desc, errors.New("too many requests").WithCode(errors.RateLimitCode)
+	}
+	p.local.GetManifestFunc = func(_ context.Context, _ lib.ArtifactInfo) (*artifact.Artifact, error) {
+		return nil, nil
+	}
 	_, _, err := p.ctr.UseLocalManifest(ctx, art, p.remote, p.proj)
 	p.Assert().NotNil(err)
 	errors.IsRateLimitError(err)
@@ -145,8 +182,12 @@ func (p *proxyControllerTestSuite) TestUseLocalManifest_429ToLocal() {
 	dig := "sha256:1a9ec845ee94c202b2d5da74a24f0ed2058318bfa9879fa541efaecba272e86b"
 	desc := &distribution.Descriptor{Digest: digest.Digest(dig)}
 	art := lib.ArtifactInfo{Repository: "library/hello-world", Digest: dig}
-	p.remote.On("ManifestExist", mock.Anything, mock.Anything).Return(false, desc, errors.New("too many requests").WithCode(errors.RateLimitCode))
-	p.local.On("GetManifest", mock.Anything, mock.Anything).Return(&artifact.Artifact{}, nil)
+	p.remote.ManifestExistFunc = func(_ string, _ string) (bool, *distribution.Descriptor, error) {
+		return false, desc, errors.New("too many requests").WithCode(errors.RateLimitCode)
+	}
+	p.local.GetManifestFunc = func(_ context.Context, _ lib.ArtifactInfo) (*artifact.Artifact, error) {
+		return &artifact.Artifact{}, nil
+	}
 	result, _, err := p.ctr.UseLocalManifest(ctx, art, p.remote, p.proj)
 	p.Assert().Nil(err)
 	p.Assert().True(result)
@@ -161,8 +202,12 @@ func (p *proxyControllerTestSuite) TestUseLocalManifestWithTag_True() {
 		RegistryID: 1,
 		Metadata:   map[string]string{proModels.ProMetaProxyCacheLocalOnNotFound: "true"},
 	}
-	p.local.On("GetManifest", mock.Anything, mock.Anything).Return(&artifact.Artifact{}, nil)
-	p.remote.On("ManifestExist", mock.Anything, mock.Anything).Return(false, desc, nil)
+	p.local.GetManifestFunc = func(_ context.Context, _ lib.ArtifactInfo) (*artifact.Artifact, error) {
+		return &artifact.Artifact{}, nil
+	}
+	p.remote.ManifestExistFunc = func(_ string, _ string) (bool, *distribution.Descriptor, error) {
+		return false, desc, nil
+	}
 	result, _, err := p.ctr.UseLocalManifest(ctx, art, p.remote, proj)
 	p.Assert().Nil(err)
 	p.Assert().True(result)
@@ -177,8 +222,12 @@ func (p *proxyControllerTestSuite) TestUseLocalManifestWithTag_NotFoundWhenOptio
 		RegistryID: 1,
 		Metadata:   map[string]string{},
 	}
-	p.local.On("GetManifest", mock.Anything, mock.Anything).Return(&artifact.Artifact{}, nil)
-	p.remote.On("ManifestExist", mock.Anything, mock.Anything).Return(false, desc, nil)
+	p.local.GetManifestFunc = func(_ context.Context, _ lib.ArtifactInfo) (*artifact.Artifact, error) {
+		return &artifact.Artifact{}, nil
+	}
+	p.remote.ManifestExistFunc = func(_ string, _ string) (bool, *distribution.Descriptor, error) {
+		return false, desc, nil
+	}
 	result, _, err := p.ctr.UseLocalManifest(ctx, art, p.remote, proj)
 	p.Assert().NotNil(err)
 	p.Assert().False(result)
@@ -188,7 +237,9 @@ func (p *proxyControllerTestSuite) TestUseLocalBlob_True() {
 	ctx := context.Background()
 	dig := "sha256:1a9ec845ee94c202b2d5da74a24f0ed2058318bfa9879fa541efaecba272e86b"
 	art := lib.ArtifactInfo{Repository: "library/hello-world", Digest: dig}
-	p.local.On("BlobExist", mock.Anything, mock.Anything).Return(true, nil)
+	p.local.BlobExistFunc = func(_ context.Context, _ lib.ArtifactInfo) (bool, error) {
+		return true, nil
+	}
 	result := p.ctr.UseLocalBlob(ctx, art)
 	p.Assert().True(result)
 }
@@ -197,7 +248,9 @@ func (p *proxyControllerTestSuite) TestUseLocalBlob_False() {
 	ctx := context.Background()
 	dig := "sha256:1a9ec845ee94c202b2d5da74a24f0ed2058318bfa9879fa541efaecba272e86b"
 	art := lib.ArtifactInfo{Repository: "library/hello-world", Digest: dig}
-	p.local.On("BlobExist", mock.Anything, mock.Anything).Return(false, nil)
+	p.local.BlobExistFunc = func(_ context.Context, _ lib.ArtifactInfo) (bool, error) {
+		return false, nil
+	}
 	result := p.ctr.UseLocalBlob(ctx, art)
 	p.Assert().False(result)
 }

@@ -49,7 +49,9 @@ func (suite *sweepJobTestSuite) TestRun() {
 	// test stop case
 	j := &SweepJob{mgr: suite.sweepMgr}
 	suite.jobCtx.On("OPCommand").Return(job.StopCommand, true).Once()
-	suite.sweepMgr.On("FixDanglingStateExecution", context.TODO()).Return(nil)
+	suite.sweepMgr.FixDanglingStateExecutionFunc = func(_ context.Context) error {
+		return nil
+	}
 	err := j.Run(suite.jobCtx, params)
 	suite.NoError(err, "stop job should not return error")
 
@@ -64,11 +66,18 @@ func (suite *sweepJobTestSuite) TestRun() {
 	ctx := context.TODO()
 	suite.jobCtx.On("OPCommand").Return(job.NilCommand, true)
 	suite.jobCtx.On("SystemContext").Return(ctx, nil)
-	suite.sweepMgr.On("ListCandidates", ctx, "WEBHOOK", int64(10)).Return([]int64{1}, nil)
-	suite.sweepMgr.On("ListCandidates", ctx, "REPLICATION", int64(20)).Return([]int64{2}, nil)
-	suite.sweepMgr.On("Clean", ctx, []int64{1}).Return(nil)
-	suite.sweepMgr.On("Clean", ctx, []int64{2}).Return(nil)
-	suite.sweepMgr.On("FixDanglingStateExecution", ctx).Return(nil)
+	suite.sweepMgr.ListCandidatesFunc = func(_ context.Context, vendorType string, retainCnt int64) ([]int64, error) {
+		if vendorType == "WEBHOOK" && retainCnt == 10 {
+			return []int64{1}, nil
+		}
+		if vendorType == "REPLICATION" && retainCnt == 20 {
+			return []int64{2}, nil
+		}
+		return nil, nil
+	}
+	suite.sweepMgr.CleanFunc = func(_ context.Context, _ []int64) error {
+		return nil
+	}
 	err = j.Run(suite.jobCtx, params)
 	suite.NoError(err)
 }

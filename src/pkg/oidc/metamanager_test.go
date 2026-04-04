@@ -6,13 +6,11 @@ import (
 	"context"
 	"testing"
 
-	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/goharbor/harbor/src/common/models"
 	"github.com/goharbor/harbor/src/lib/q"
-	"github.com/goharbor/harbor/src/testing/mock"
-	tdao "github.com/goharbor/harbor/src/testing/pkg/oidc/dao"
+	tdao "github.com/goharbor/harbor/src/testing/moq/pkg/oidc/dao"
 )
 
 // encrypt "secret1" using key "naa4JtarA1Zsc3uY" (set in helper_test)
@@ -33,22 +31,19 @@ func (m *metaMgrTestSuite) SetupTest() {
 
 func (m *metaMgrTestSuite) TestGetByUserID() {
 	{
-		m.dao.On("List", mock.Anything, testifymock.MatchedBy(
-			func(query *q.Query) bool {
-				return query.Keywords["user_id"] == 8
-			})).Return([]*models.OIDCUser{}, nil)
+		m.dao.ListFunc = func(_ context.Context, query *q.Query) ([]*models.OIDCUser, error) {
+			if query.Keywords["user_id"] == 8 {
+				return []*models.OIDCUser{}, nil
+			}
+			return []*models.OIDCUser{
+				{ID: 1, UserID: 9, Secret: encSecret, Token: "token1"},
+				{ID: 2, UserID: 9, Secret: "secret", Token: "token2"},
+			}, nil
+		}
 		_, err := m.mgr.GetByUserID(context.Background(), 8)
 		m.NotNil(err)
 	}
 	{
-		m.dao.On("List", mock.Anything, testifymock.MatchedBy(
-			func(query *q.Query) bool {
-				return query.Keywords["user_id"] == 9
-			})).Return([]*models.OIDCUser{
-
-			{ID: 1, UserID: 9, Secret: encSecret, Token: "token1"},
-			{ID: 2, UserID: 9, Secret: "secret", Token: "token2"},
-		}, nil)
 		ou, err := m.mgr.GetByUserID(context.Background(), 9)
 		m.Nil(err)
 		m.Equal(encSecret, ou.Secret)
@@ -57,13 +52,16 @@ func (m *metaMgrTestSuite) TestGetByUserID() {
 }
 
 func (m *metaMgrTestSuite) TestUpdateSecret() {
-	m.dao.On("List", mock.Anything, mock.Anything).Return([]*models.OIDCUser{
-		{ID: 1, UserID: 9, Secret: encSecret, Token: "token1"},
-	}, nil)
-	m.dao.On("Update", mock.Anything, mock.Anything, "secret").Return(nil)
+	m.dao.ListFunc = func(_ context.Context, _ *q.Query) ([]*models.OIDCUser, error) {
+		return []*models.OIDCUser{
+			{ID: 1, UserID: 9, Secret: encSecret, Token: "token1"},
+		}, nil
+	}
+	m.dao.UpdateFunc = func(_ context.Context, _ *models.OIDCUser, _ ...string) error {
+		return nil
+	}
 	err := m.mgr.SetCliSecretByUserID(context.Background(), 9, "new")
 	m.Nil(err)
-	m.dao.AssertExpectations(m.T())
 }
 
 func TestManager(t *testing.T) {

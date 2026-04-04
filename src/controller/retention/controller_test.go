@@ -22,7 +22,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/goharbor/harbor/src/common/dao"
@@ -36,9 +35,9 @@ import (
 	"github.com/goharbor/harbor/src/pkg/retention/policy/rule"
 	"github.com/goharbor/harbor/src/pkg/scheduler"
 	"github.com/goharbor/harbor/src/pkg/task"
-	"github.com/goharbor/harbor/src/testing/pkg/project"
-	"github.com/goharbor/harbor/src/testing/pkg/repository"
-	testingTask "github.com/goharbor/harbor/src/testing/pkg/task"
+	"github.com/goharbor/harbor/src/testing/moq/pkg/project"
+	"github.com/goharbor/harbor/src/testing/moq/pkg/repository"
+	testingTask "github.com/goharbor/harbor/src/testing/moq/pkg/task"
 )
 
 type ControllerTestSuite struct {
@@ -70,32 +69,46 @@ func (s *ControllerTestSuite) TestPolicy() {
 	execMgr := &testingTask.ExecutionManager{}
 	taskMgr := &testingTask.Manager{}
 	retentionMgr := retention.NewManager()
-	execMgr.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(int64(1), nil)
-	execMgr.On("Delete", mock.Anything, mock.Anything).Return(nil)
-	execMgr.On("Get", mock.Anything, mock.Anything).Return(&task.Execution{
-		ID:     1,
-		Status: job.RunningStatus.String(),
-		ExtraAttrs: map[string]any{
-			"dry_run": true,
-		},
-	}, nil)
-	execMgr.On("List", mock.Anything, mock.Anything).Return([]*task.Execution{{
-		ID:     1,
-		Status: job.RunningStatus.String(),
-		ExtraAttrs: map[string]any{
-			"dry_run": true,
-		},
-	}}, nil)
-	taskMgr.On("List", mock.Anything, mock.Anything).Return([]*task.Task{{
-		ID:     1,
-		Status: job.RunningStatus.String(),
-		ExtraAttrs: map[string]any{
-			"total":    1,
-			"retained": 1,
-		},
-	}}, nil)
-	taskMgr.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(int64(1), nil)
-	taskMgr.On("Stop", mock.Anything, mock.Anything).Return(nil)
+	execMgr.CreateFunc = func(_ context.Context, _ string, _ int64, _ string, _ ...map[string]any) (int64, error) {
+		return int64(1), nil
+	}
+	execMgr.DeleteFunc = func(_ context.Context, _ int64) error {
+		return nil
+	}
+	execMgr.GetFunc = func(_ context.Context, _ int64) (*task.Execution, error) {
+		return &task.Execution{
+			ID:     1,
+			Status: job.RunningStatus.String(),
+			ExtraAttrs: map[string]any{
+				"dry_run": true,
+			},
+		}, nil
+	}
+	execMgr.ListFunc = func(_ context.Context, _ *q.Query) ([]*task.Execution, error) {
+		return []*task.Execution{{
+			ID:     1,
+			Status: job.RunningStatus.String(),
+			ExtraAttrs: map[string]any{
+				"dry_run": true,
+			},
+		}}, nil
+	}
+	taskMgr.ListFunc = func(_ context.Context, _ *q.Query) ([]*task.Task, error) {
+		return []*task.Task{{
+			ID:     1,
+			Status: job.RunningStatus.String(),
+			ExtraAttrs: map[string]any{
+				"total":    1,
+				"retained": 1,
+			},
+		}}, nil
+	}
+	taskMgr.CreateFunc = func(_ context.Context, _ int64, _ *task.Job, _ ...map[string]any) (int64, error) {
+		return int64(1), nil
+	}
+	taskMgr.StopFunc = func(_ context.Context, _ int64) error {
+		return nil
+	}
 
 	c := defaultController{
 		manager:        retentionMgr,
@@ -206,32 +219,46 @@ func (s *ControllerTestSuite) TestExecution() {
 	execMgr := &testingTask.ExecutionManager{}
 	taskMgr := &testingTask.Manager{}
 	retentionMgr := retention.NewManager()
-	execMgr.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(int64(1), nil)
-	execMgr.On("Get", mock.Anything, mock.Anything).Return(&task.Execution{
-		ID:     1,
-		Status: job.RunningStatus.String(),
-		ExtraAttrs: map[string]any{
-			"dry_run": true,
-		},
-	}, nil)
-	execMgr.On("MarkDone", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-	execMgr.On("List", mock.Anything, mock.Anything).Return([]*task.Execution{{
-		ID:     1,
-		Status: job.RunningStatus.String(),
-		ExtraAttrs: map[string]any{
-			"dry_run": true,
-		},
-	}}, nil)
-	taskMgr.On("List", mock.Anything, mock.Anything).Return([]*task.Task{{
-		ID:     1,
-		Status: job.RunningStatus.String(),
-		ExtraAttrs: map[string]any{
-			"total":    1,
-			"retained": 1,
-		},
-	}}, nil)
-	taskMgr.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(int64(1), nil)
-	taskMgr.On("Stop", mock.Anything, mock.Anything).Return(nil)
+	execMgr.CreateFunc = func(_ context.Context, _ string, _ int64, _ string, _ ...map[string]any) (int64, error) {
+		return int64(1), nil
+	}
+	execMgr.GetFunc = func(_ context.Context, _ int64) (*task.Execution, error) {
+		return &task.Execution{
+			ID:     1,
+			Status: job.RunningStatus.String(),
+			ExtraAttrs: map[string]any{
+				"dry_run": true,
+			},
+		}, nil
+	}
+	execMgr.MarkDoneFunc = func(_ context.Context, _ int64, _ string) error {
+		return nil
+	}
+	execMgr.ListFunc = func(_ context.Context, _ *q.Query) ([]*task.Execution, error) {
+		return []*task.Execution{{
+			ID:     1,
+			Status: job.RunningStatus.String(),
+			ExtraAttrs: map[string]any{
+				"dry_run": true,
+			},
+		}}, nil
+	}
+	taskMgr.ListFunc = func(_ context.Context, _ *q.Query) ([]*task.Task, error) {
+		return []*task.Task{{
+			ID:     1,
+			Status: job.RunningStatus.String(),
+			ExtraAttrs: map[string]any{
+				"total":    1,
+				"retained": 1,
+			},
+		}}, nil
+	}
+	taskMgr.CreateFunc = func(_ context.Context, _ int64, _ *task.Job, _ ...map[string]any) (int64, error) {
+		return int64(1), nil
+	}
+	taskMgr.StopFunc = func(_ context.Context, _ int64) error {
+		return nil
+	}
 
 	m := defaultController{
 		manager:        retentionMgr,

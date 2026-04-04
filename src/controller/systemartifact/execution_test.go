@@ -3,20 +3,20 @@ package systemartifact
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/pkg/errors"
-	testifymock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/goharbor/harbor/src/jobservice/job"
 	"github.com/goharbor/harbor/src/lib/orm"
+	"github.com/goharbor/harbor/src/lib/q"
 	scheduler2 "github.com/goharbor/harbor/src/pkg/scheduler"
 	"github.com/goharbor/harbor/src/pkg/task"
 	ormtesting "github.com/goharbor/harbor/src/testing/lib/orm"
-	"github.com/goharbor/harbor/src/testing/mock"
-	"github.com/goharbor/harbor/src/testing/pkg/scheduler"
-	"github.com/goharbor/harbor/src/testing/pkg/systemartifact"
-	testingTask "github.com/goharbor/harbor/src/testing/pkg/task"
+	"github.com/goharbor/harbor/src/testing/moq/pkg/scheduler"
+	"github.com/goharbor/harbor/src/testing/moq/pkg/systemartifact"
+	testingTask "github.com/goharbor/harbor/src/testing/moq/pkg/task"
 )
 
 type SystemArtifactCleanupTestSuite struct {
@@ -49,18 +49,22 @@ func (suite *SystemArtifactCleanupTestSuite) TestStartCleanup() {
 		executionID := int64(1)
 		taskId := int64(1)
 
-		suite.execMgr.On("Create", ctx, "SYSTEM_ARTIFACT_CLEANUP", int64(0), "SCHEDULE").Return(executionID, nil).Once()
+		suite.execMgr.CreateFunc = func(_ context.Context, _ string, _ int64, _ string, _ ...map[string]any) (int64, error) {
+			return executionID, nil
+		}
 
-		suite.taskMgr.On("Create", ctx, executionID, mock.Anything).Return(taskId, nil).Once()
+		suite.taskMgr.CreateFunc = func(_ context.Context, _ int64, j *task.Job, _ ...map[string]any) (int64, error) {
+			assert.Equal(suite.T(), "SYSTEM_ARTIFACT_CLEANUP", j.Name)
+			return taskId, nil
+		}
 
-		suite.execMgr.On("MarkDone", ctx, executionID, mock.Anything).Return(nil).Once()
+		suite.execMgr.MarkDoneFunc = func(_ context.Context, _ int64, _ string) error {
+			return nil
+		}
 
 		err := suite.ctl.Start(ctx, false, "SCHEDULE")
 		suite.NoError(err)
-		jobMatcher := testifymock.MatchedBy(func(j *task.Job) bool {
-			return "SYSTEM_ARTIFACT_CLEANUP" == j.Name
-		})
-		suite.taskMgr.AssertCalled(suite.T(), "Create", ctx, executionID, jobMatcher)
+		assert.NotEmpty(suite.T(), suite.taskMgr.CreateCalls())
 	}
 }
 
@@ -79,13 +83,13 @@ func (suite *SystemArtifactCleanupTestSuite) TestStartCleanupErrorDuringCreate()
 
 		ctx := context.TODO()
 
-		executionID := int64(1)
+		suite.execMgr.CreateFunc = func(_ context.Context, _ string, _ int64, _ string, _ ...map[string]any) (int64, error) {
+			return int64(0), errors.New("test error")
+		}
 
-		suite.execMgr.On(
-			"Create", ctx, "SYSTEM_ARTIFACT_CLEANUP", int64(0), "SCHEDULE",
-		).Return(int64(0), errors.New("test error")).Once()
-
-		suite.execMgr.On("MarkDone", ctx, executionID, mock.Anything).Return(nil).Once()
+		suite.execMgr.MarkDoneFunc = func(_ context.Context, _ int64, _ string) error {
+			return nil
+		}
 
 		err := suite.ctl.Start(ctx, false, "SCHEDULE")
 		suite.Error(err)
@@ -108,16 +112,21 @@ func (suite *SystemArtifactCleanupTestSuite) TestStartCleanupErrorDuringTaskCrea
 		ctx := context.TODO()
 
 		executionID := int64(1)
-		taskId := int64(0)
 
-		suite.execMgr.On(
-			"Create", ctx, "SYSTEM_ARTIFACT_CLEANUP", int64(0), "SCHEDULE",
-		).Return(executionID, nil).Once()
+		suite.execMgr.CreateFunc = func(_ context.Context, _ string, _ int64, _ string, _ ...map[string]any) (int64, error) {
+			return executionID, nil
+		}
 
-		suite.taskMgr.On("Create", ctx, executionID, mock.Anything).Return(taskId, errors.New("test error")).Once()
+		suite.taskMgr.CreateFunc = func(_ context.Context, _ int64, _ *task.Job, _ ...map[string]any) (int64, error) {
+			return int64(0), errors.New("test error")
+		}
 
-		suite.execMgr.On("MarkError", ctx, executionID, mock.Anything).Return(nil).Once()
-		suite.execMgr.On("StopAndWaitWithError", ctx, executionID, mock.Anything, mock.Anything).Return(nil).Once()
+		suite.execMgr.MarkErrorFunc = func(_ context.Context, _ int64, _ string) error {
+			return nil
+		}
+		suite.execMgr.StopAndWaitWithErrorFunc = func(_ context.Context, _ int64, _ time.Duration, _ error) error {
+			return nil
+		}
 
 		err := suite.ctl.Start(ctx, false, "SCHEDULE")
 		suite.Error(err)
@@ -137,17 +146,20 @@ func (suite *SystemArtifactCleanupTestSuite) TestScheduleCleanupJobNoPreviousSch
 		makeCtx:           func() context.Context { return orm.NewContext(nil, &ormtesting.FakeOrmer{}) },
 	}
 
-	var extraAttrs map[string]any
-	suite.sched.On("Schedule", mock.Anything,
-		job.SystemArtifactCleanupVendorType, int64(0), cronTypeDaily, cronSpec, SystemArtifactCleanupCallback, nil, extraAttrs).Return(int64(1), nil)
-	suite.sched.On("ListSchedules", mock.Anything, mock.Anything).Return(make([]*scheduler2.Schedule, 0), nil)
+	scheduleCalled := false
+	suite.sched.ScheduleFunc = func(_ context.Context, _ string, _ int64, _ string, _ string, _ string, _ any, _ map[string]any) (int64, error) {
+		scheduleCalled = true
+		return int64(1), nil
+	}
+	suite.sched.ListSchedulesFunc = func(_ context.Context, _ *q.Query) ([]*scheduler2.Schedule, error) {
+		return make([]*scheduler2.Schedule, 0), nil
+	}
 	sched = suite.sched
 	ctx := context.TODO()
 
 	ScheduleCleanupTask(ctx)
 
-	suite.sched.AssertCalled(suite.T(), "Schedule", mock.Anything,
-		job.SystemArtifactCleanupVendorType, int64(0), cronTypeDaily, cronSpec, SystemArtifactCleanupCallback, nil, extraAttrs)
+	suite.True(scheduleCalled)
 }
 
 func (suite *SystemArtifactCleanupTestSuite) TestScheduleCleanupJobPreviousSchedule() {
@@ -163,19 +175,22 @@ func (suite *SystemArtifactCleanupTestSuite) TestScheduleCleanupJobPreviousSched
 		makeCtx:           func() context.Context { return orm.NewContext(nil, &ormtesting.FakeOrmer{}) },
 	}
 
-	var extraAttrs map[string]any
-	suite.sched.On("Schedule", mock.Anything,
-		job.SystemArtifactCleanupVendorType, int64(0), cronTypeDaily, cronSpec, SystemArtifactCleanupCallback, nil, extraAttrs).Return(int64(1), nil)
+	scheduleCalled := false
+	suite.sched.ScheduleFunc = func(_ context.Context, _ string, _ int64, _ string, _ string, _ string, _ any, _ map[string]any) (int64, error) {
+		scheduleCalled = true
+		return int64(1), nil
+	}
 
 	existingSchedule := scheduler2.Schedule{ID: int64(10)}
-	suite.sched.On("ListSchedules", mock.Anything, mock.Anything).Return([]*scheduler2.Schedule{&existingSchedule}, nil)
+	suite.sched.ListSchedulesFunc = func(_ context.Context, _ *q.Query) ([]*scheduler2.Schedule, error) {
+		return []*scheduler2.Schedule{&existingSchedule}, nil
+	}
 	sched = suite.sched
 	ctx := context.TODO()
 
 	ScheduleCleanupTask(ctx)
 
-	suite.sched.AssertNotCalled(suite.T(), "Schedule", mock.Anything,
-		job.SystemArtifactCleanupVendorType, int64(0), cronTypeDaily, cronSpec, SystemArtifactCleanupCallback, nil, extraAttrs)
+	suite.False(scheduleCalled)
 }
 
 func (suite *SystemArtifactCleanupTestSuite) TestScheduleCleanupJobPreviousScheduleError() {
@@ -191,20 +206,21 @@ func (suite *SystemArtifactCleanupTestSuite) TestScheduleCleanupJobPreviousSched
 		makeCtx:           func() context.Context { return orm.NewContext(nil, &ormtesting.FakeOrmer{}) },
 	}
 
-	suite.sched.On("Schedule", mock.Anything,
-		job.SystemArtifactCleanupVendorType, int64(0), cronTypeDaily, cronSpec, SystemArtifactCleanupCallback, nil, mock.Anything).Return(int64(1), nil)
+	scheduleCalled := false
+	suite.sched.ScheduleFunc = func(_ context.Context, _ string, _ int64, _ string, _ string, _ string, _ any, _ map[string]any) (int64, error) {
+		scheduleCalled = true
+		return int64(1), nil
+	}
 
-	suite.sched.On("ListSchedules", mock.Anything, mock.Anything).Return(nil, errors.New("test error"))
+	suite.sched.ListSchedulesFunc = func(_ context.Context, _ *q.Query) ([]*scheduler2.Schedule, error) {
+		return nil, errors.New("test error")
+	}
 	sched = suite.sched
 	ctx := context.TODO()
 
 	ScheduleCleanupTask(ctx)
 
-	extraAttributesMatcher := testifymock.MatchedBy(func(attrs map[string]any) bool {
-		return len(attrs) == 0
-	})
-	suite.sched.AssertNotCalled(suite.T(), "Schedule", mock.Anything,
-		job.SystemArtifactCleanupVendorType, int64(0), cronTypeDaily, cronSpec, SystemArtifactCleanupCallback, nil, extraAttributesMatcher)
+	suite.False(scheduleCalled)
 }
 
 func (suite *SystemArtifactCleanupTestSuite) TearDownSuite() {

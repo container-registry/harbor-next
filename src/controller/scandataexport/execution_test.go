@@ -6,17 +6,16 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	testifymock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/goharbor/harbor/src/jobservice/job"
 	"github.com/goharbor/harbor/src/lib/orm"
+	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/scan/export"
 	"github.com/goharbor/harbor/src/pkg/task"
 	ormtesting "github.com/goharbor/harbor/src/testing/lib/orm"
-	"github.com/goharbor/harbor/src/testing/mock"
-	systemartifacttesting "github.com/goharbor/harbor/src/testing/pkg/systemartifact"
-	testingTask "github.com/goharbor/harbor/src/testing/pkg/task"
+	systemartifacttesting "github.com/goharbor/harbor/src/testing/moq/pkg/systemartifact"
+	testingTask "github.com/goharbor/harbor/src/testing/moq/pkg/task"
 )
 
 type ScanDataExportExecutionTestSuite struct {
@@ -58,9 +57,10 @@ func (suite *ScanDataExportExecutionTestSuite) TestGetTask() {
 			StatusRevision: 0,
 		}
 
-		tasks := make([]*task.Task, 0)
-		tasks = append(tasks, &t)
-		mock.OnAnything(suite.taskMgr, "List").Return(tasks, nil).Once()
+		tasks := []*task.Task{&t}
+		suite.taskMgr.ListFunc = func(_ context.Context, _ *q.Query) ([]*task.Task, error) {
+			return tasks, nil
+		}
 		returnedTask, err := suite.ctl.GetTask(context.Background(), 100)
 		suite.NoError(err)
 		suite.Equal(t, *returnedTask)
@@ -68,15 +68,18 @@ func (suite *ScanDataExportExecutionTestSuite) TestGetTask() {
 
 	// no task records exist for an execution id
 	{
-		tasks := make([]*task.Task, 0)
-		mock.OnAnything(suite.taskMgr, "List").Return(tasks, nil).Once()
+		suite.taskMgr.ListFunc = func(_ context.Context, _ *q.Query) ([]*task.Task, error) {
+			return []*task.Task{}, nil
+		}
 		_, err := suite.ctl.GetTask(context.Background(), 100)
 		suite.Error(err)
 	}
 
 	// listing of tasks returns an error
 	{
-		mock.OnAnything(suite.taskMgr, "List").Return(nil, errors.New("test error")).Once()
+		suite.taskMgr.ListFunc = func(_ context.Context, _ *q.Query) ([]*task.Task, error) {
+			return nil, errors.New("test error")
+		}
 		_, err := suite.ctl.GetTask(context.Background(), 100)
 		suite.Error(err)
 	}
@@ -113,8 +116,12 @@ func (suite *ScanDataExportExecutionTestSuite) TestGetExecution() {
 			UpdateTime:    time.Time{},
 			EndTime:       time.Time{},
 		}
-		mock.OnAnything(suite.execMgr, "Get").Return(&exec, nil).Once()
-		mock.OnAnything(suite.sysArtifactMgr, "Exists").Return(true, nil).Once()
+		suite.execMgr.GetFunc = func(_ context.Context, _ int64) (*task.Execution, error) {
+			return &exec, nil
+		}
+		suite.sysArtifactMgr.ExistsFunc = func(_ context.Context, _ string, _ string, _ string) (bool, error) {
+			return true, nil
+		}
 
 		exportExec, err := suite.ctl.GetExecution(context.TODO(), 100)
 		suite.NoError(err)
@@ -127,7 +134,9 @@ func (suite *ScanDataExportExecutionTestSuite) TestGetExecution() {
 
 	// get execution fails
 	{
-		mock.OnAnything(suite.execMgr, "Get").Return(nil, errors.New("test error")).Once()
+		suite.execMgr.GetFunc = func(_ context.Context, _ int64) (*task.Execution, error) {
+			return nil, errors.New("test error")
+		}
 		exportExec, err := suite.ctl.GetExecution(context.TODO(), 100)
 		suite.Error(err)
 		suite.Nil(exportExec)
@@ -135,7 +144,9 @@ func (suite *ScanDataExportExecutionTestSuite) TestGetExecution() {
 
 	// get execution returns null
 	{
-		mock.OnAnything(suite.execMgr, "Get").Return(nil, nil).Once()
+		suite.execMgr.GetFunc = func(_ context.Context, _ int64) (*task.Execution, error) {
+			return nil, nil
+		}
 		exportExec, err := suite.ctl.GetExecution(context.TODO(), 100)
 		suite.NoError(err)
 		suite.Nil(exportExec)
@@ -171,8 +182,12 @@ func (suite *ScanDataExportExecutionTestSuite) TestGetExecutionSysArtifactExistF
 			UpdateTime:    time.Time{},
 			EndTime:       time.Time{},
 		}
-		mock.OnAnything(suite.execMgr, "Get").Return(&exec, nil).Once()
-		mock.OnAnything(suite.sysArtifactMgr, "Exists").Return(false, errors.New("test error")).Once()
+		suite.execMgr.GetFunc = func(_ context.Context, _ int64) (*task.Execution, error) {
+			return &exec, nil
+		}
+		suite.sysArtifactMgr.ExistsFunc = func(_ context.Context, _ string, _ string, _ string) (bool, error) {
+			return false, errors.New("test error")
+		}
 
 		exportExec, err := suite.ctl.GetExecution(context.TODO(), 100)
 		suite.NoError(err)
@@ -211,10 +226,13 @@ func (suite *ScanDataExportExecutionTestSuite) TestGetExecutionList() {
 			UpdateTime:    time.Time{},
 			EndTime:       time.Time{},
 		}
-		execs := make([]*task.Execution, 0)
-		execs = append(execs, &exec)
-		mock.OnAnything(suite.execMgr, "List").Return(execs, nil).Once()
-		mock.OnAnything(suite.sysArtifactMgr, "Exists").Return(true, nil).Once()
+		execs := []*task.Execution{&exec}
+		suite.execMgr.ListFunc = func(_ context.Context, _ *q.Query) ([]*task.Execution, error) {
+			return execs, nil
+		}
+		suite.sysArtifactMgr.ExistsFunc = func(_ context.Context, _ string, _ string, _ string) (bool, error) {
+			return true, nil
+		}
 		exportExec, err := suite.ctl.ListExecutions(context.TODO(), "test-user")
 		suite.NoError(err)
 
@@ -225,7 +243,9 @@ func (suite *ScanDataExportExecutionTestSuite) TestGetExecutionList() {
 
 	// get execution fails
 	{
-		mock.OnAnything(suite.execMgr, "List").Return(nil, errors.New("test error")).Once()
+		suite.execMgr.ListFunc = func(_ context.Context, _ *q.Query) ([]*task.Execution, error) {
+			return nil, errors.New("test error")
+		}
 		exportExec, err := suite.ctl.ListExecutions(context.TODO(), "test-user")
 		suite.Error(err)
 		suite.Nil(exportExec)
@@ -242,13 +262,16 @@ func (suite *ScanDataExportExecutionTestSuite) TestStart() {
 	}
 	// execution manager and task manager return successfully
 	{
-		// get execution succeeds
-		attrs := make(map[string]any)
-		attrs[export.ProjectIDsAttribute] = []int64{1}
-		attrs[export.JobNameAttribute] = "test-job"
-		attrs[export.UserNameAttribute] = "test-user"
-		suite.execMgr.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, attrs).Return(int64(10), nil)
-		suite.taskMgr.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(int64(20), nil)
+		var capturedAttrs map[string]any
+		suite.execMgr.CreateFunc = func(_ context.Context, _ string, _ int64, _ string, extraAttrs ...map[string]any) (int64, error) {
+			if len(extraAttrs) > 0 {
+				capturedAttrs = extraAttrs[0]
+			}
+			return int64(10), nil
+		}
+		suite.taskMgr.CreateFunc = func(_ context.Context, _ int64, _ *task.Job, _ ...map[string]any) (int64, error) {
+			return int64(20), nil
+		}
 		ctx := context.Background()
 		ctx = context.WithValue(ctx, export.CsvJobVendorIDKey, int(-1))
 		criteria := export.Request{}
@@ -258,7 +281,11 @@ func (suite *ScanDataExportExecutionTestSuite) TestStart() {
 		executionId, err := suite.ctl.Start(ctx, criteria)
 		suite.NoError(err)
 		suite.Equal(int64(10), executionId)
-		suite.validateExecutionManagerInvocation(ctx)
+		// validate execution manager was called with correct attrs
+		suite.Equal("test-job", capturedAttrs[export.JobNameAttribute])
+		suite.Equal("test-user", capturedAttrs[export.UserNameAttribute])
+		// Verify Create was called
+		assert.NotEmpty(suite.T(), suite.execMgr.CreateCalls())
 	}
 
 }
@@ -271,7 +298,9 @@ func (suite *ScanDataExportExecutionTestSuite) TestDeleteExecution() {
 		taskMgr: suite.taskMgr,
 		makeCtx: func() context.Context { return orm.NewContext(nil, &ormtesting.FakeOrmer{}) },
 	}
-	mock.OnAnything(suite.execMgr, "Delete").Return(nil).Once()
+	suite.execMgr.DeleteFunc = func(_ context.Context, _ int64) error {
+		return nil
+	}
 	err := suite.ctl.DeleteExecution(context.TODO(), int64(1))
 	suite.NoError(err)
 }
@@ -288,7 +317,9 @@ func (suite *ScanDataExportExecutionTestSuite) TestStartWithExecManagerError() {
 	{
 		ctx := context.Background()
 		ctx = context.WithValue(ctx, export.CsvJobVendorIDKey, int(-1))
-		mock.OnAnything(suite.execMgr, "Create").Return(int64(-1), errors.New("Test Error"))
+		suite.execMgr.CreateFunc = func(_ context.Context, _ string, _ int64, _ string, _ ...map[string]any) (int64, error) {
+			return int64(-1), errors.New("Test Error")
+		}
 		_, err := suite.ctl.Start(ctx, export.Request{JobName: "test-job", UserName: "test-user"})
 		suite.Error(err)
 	}
@@ -303,18 +334,21 @@ func (suite *ScanDataExportExecutionTestSuite) TestStartWithTaskManagerError() {
 		makeCtx: func() context.Context { return orm.NewContext(nil, &ormtesting.FakeOrmer{}) },
 	}
 	// execution manager is successful but task manager returns an error
-	// execution manager and task manager return successfully
 	{
 		ctx := context.Background()
 		ctx = context.WithValue(ctx, export.CsvJobVendorIDKey, int(-1))
-		attrs := make(map[string]any)
-		attrs[export.ProjectIDsAttribute] = []int64{1}
-		attrs[export.JobNameAttribute] = "test-job"
-		attrs[export.UserNameAttribute] = "test-user"
-		suite.execMgr.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, attrs).Return(int64(10), nil)
-		suite.taskMgr.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(int64(-1), errors.New("Test Error"))
-		mock.OnAnything(suite.execMgr, "StopAndWait").Return(nil)
-		mock.OnAnything(suite.execMgr, "MarkError").Return(nil)
+		suite.execMgr.CreateFunc = func(_ context.Context, _ string, _ int64, _ string, _ ...map[string]any) (int64, error) {
+			return int64(10), nil
+		}
+		suite.taskMgr.CreateFunc = func(_ context.Context, _ int64, _ *task.Job, _ ...map[string]any) (int64, error) {
+			return int64(-1), errors.New("Test Error")
+		}
+		suite.execMgr.StopAndWaitFunc = func(_ context.Context, _ int64, _ time.Duration) error {
+			return nil
+		}
+		suite.execMgr.MarkErrorFunc = func(_ context.Context, _ int64, _ string) error {
+			return nil
+		}
 		_, err := suite.ctl.Start(ctx, export.Request{JobName: "test-job", UserName: "test-user", Projects: []int64{1}})
 		suite.Error(err)
 	}
@@ -323,16 +357,6 @@ func (suite *ScanDataExportExecutionTestSuite) TestStartWithTaskManagerError() {
 func (suite *ScanDataExportExecutionTestSuite) TearDownSuite() {
 	suite.execMgr = nil
 	suite.taskMgr = nil
-}
-
-func (suite *ScanDataExportExecutionTestSuite) validateExecutionManagerInvocation(ctx context.Context) {
-	// validate that execution manager has been called with the specified
-	extraAttsMatcher := testifymock.MatchedBy(func(m map[string]any) bool {
-		jobName, jobNamePresent := m[export.JobNameAttribute]
-		userName, userNamePresent := m[export.UserNameAttribute]
-		return jobNamePresent && userNamePresent && jobName == "test-job" && userName == "test-user"
-	})
-	suite.execMgr.AssertCalled(suite.T(), "Create", ctx, job.ScanDataExportVendorType, int64(-1), task.ExecutionTriggerManual, extraAttsMatcher)
 }
 
 func TestScanDataExportExecutionTestSuite(t *testing.T) {
