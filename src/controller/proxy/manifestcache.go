@@ -126,14 +126,15 @@ func (m *ManifestListCache) updateManifestList(ctx context.Context, repo string,
 }
 
 func (m *ManifestListCache) push(ctx context.Context, repo, reference string, man distribution.Manifest) error {
-	// For manifest list, it might include some different manifest
-	// it will wait and check for 30 mins, if all depend manifests are ready then push it
-	// if time exceed, then push a updated manifest list which contains existing manifest
+	// Wait for child manifests to arrive in local storage, then push the manifest list.
+	// Uses exponential backoff and respects context cancellation.
+	ctx, cancel := context.WithTimeout(ctx, manifestListPushTimeout)
+	defer cancel()
+
 	var newMan distribution.Manifest
 	var err error
-	for range maxManifestListWait {
-		log.Debugf("waiting for the manifest ready, repo %v, tag:%v", repo, reference)
-		time.Sleep(sleepIntervalSec * time.Second)
+	wait := initialRetryInterval
+	for {
 		newMan, err = m.updateManifestList(ctx, repo, man)
 		if err != nil {
 			return err
@@ -141,6 +142,15 @@ func (m *ManifestListCache) push(ctx context.Context, repo, reference string, ma
 		if len(newMan.References()) == len(man.References()) {
 			break
 		}
+		log.Debugf("waiting for manifests to be ready, repo %v, tag:%v, retry in %v", repo, reference, wait)
+		select {
+		case <-ctx.Done():
+			log.Debugf("timeout waiting for manifests, proceeding with %d/%d refs", len(newMan.References()), len(man.References()))
+		case <-time.After(wait):
+			wait = min(wait*2, maxRetryInterval)
+			continue
+		}
+		break
 	}
 	if len(newMan.References()) == 0 {
 		return libErrors.New("manifest list doesn't contain any pushed manifest")
@@ -192,14 +202,25 @@ type ManifestCache struct {
 
 // CacheContent ...
 func (m *ManifestCache) CacheContent(ctx context.Context, remoteRepo string, man distribution.Manifest, art lib.ArtifactInfo, r RemoteInterface, _ string) {
+	ctx, cancel := context.WithTimeout(ctx, manifestPushTimeout)
+	defer cancel()
+
 	var waitBlobs []distribution.Descriptor
-	for n := range maxManifestWait {
-		time.Sleep(sleepIntervalSec * time.Second)
+	wait := initialRetryInterval
+	for {
 		waitBlobs = m.local.CheckDependencies(ctx, art.Repository, man)
 		if len(waitBlobs) == 0 {
 			break
 		}
-		log.Debugf("Current n=%v artifact: %v:%v", n, art.Repository, art.Tag)
+		log.Debugf("waiting for blob dependencies, artifact: %v:%v, remaining: %d, retry in %v", art.Repository, art.Tag, len(waitBlobs), wait)
+		select {
+		case <-ctx.Done():
+			log.Debugf("timeout waiting for blob dependencies for %v:%v", art.Repository, art.Tag)
+		case <-time.After(wait):
+			wait = min(wait*2, maxRetryInterval)
+			continue
+		}
+		break
 	}
 	if len(waitBlobs) > 0 {
 		// docker client will skip to pull layers exist in local

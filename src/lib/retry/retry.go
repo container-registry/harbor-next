@@ -19,6 +19,7 @@ import (
 	"math/rand"
 	"time"
 
+	bclock "github.com/benbjohnson/clock"
 	"github.com/jpillora/backoff"
 
 	"github.com/goharbor/harbor/src/lib/errors"
@@ -57,6 +58,7 @@ type Options struct {
 	Timeout         time.Duration                        // the total time before returning if something is wrong, default 1 minute
 	Callback        func(err error, sleep time.Duration) // the callback function for Retry when the f called failed
 	Backoff         bool
+	Clock           bclock.Clock // clock source for time operations; defaults to real time
 }
 
 // Option ...
@@ -97,6 +99,14 @@ func Backoff(backoff bool) Option {
 	}
 }
 
+// WithClock sets the clock source. Use clock.NewMock() in tests to
+// eliminate real sleeps and make retry behavior deterministic.
+func WithClock(c bclock.Clock) Option {
+	return func(opts *Options) {
+		opts.Clock = c
+	}
+}
+
 // Retry retry until f run successfully or timeout
 //
 // NOTE: This function will use exponential backoff and jitter for retrying, see
@@ -122,6 +132,11 @@ func Retry(f func() error, options ...Option) error {
 		opts.Timeout = time.Minute
 	}
 
+	clk := opts.Clock
+	if clk == nil {
+		clk = bclock.New()
+	}
+
 	var b *backoff.Backoff
 
 	if opts.Backoff {
@@ -135,7 +150,7 @@ func Retry(f func() error, options ...Option) error {
 
 	var err error
 
-	timeout := time.After(opts.Timeout)
+	timeout := clk.After(opts.Timeout)
 	for {
 		select {
 		case <-timeout:
@@ -160,7 +175,7 @@ func Retry(f func() error, options ...Option) error {
 				opts.Callback(err, sleep)
 			}
 
-			time.Sleep(sleep)
+			clk.Sleep(sleep)
 		}
 	}
 }

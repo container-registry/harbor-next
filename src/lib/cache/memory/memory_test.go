@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/goharbor/harbor/src/lib/cache"
@@ -28,11 +29,16 @@ import (
 type CacheTestSuite struct {
 	suite.Suite
 	cache cache.Cache
+	clock *clock.Mock
 	ctx   context.Context
 }
 
 func (suite *CacheTestSuite) SetupSuite() {
-	suite.cache, _ = cache.New("memory", cache.Expiration(time.Second*5))
+	suite.clock = clock.NewMock()
+	suite.cache, _ = cache.New("memory",
+		cache.Expiration(5*time.Second),
+		cache.WithClock(suite.clock),
+	)
 	suite.ctx = context.TODO()
 }
 
@@ -46,10 +52,10 @@ func (suite *CacheTestSuite) TestContains() {
 	suite.cache.Delete(suite.ctx, key)
 	suite.False(suite.cache.Contains(suite.ctx, key))
 
-	suite.cache.Save(suite.ctx, key, "value", time.Second*5)
+	suite.cache.Save(suite.ctx, key, "value", 5*time.Second)
 	suite.True(suite.cache.Contains(suite.ctx, key))
 
-	time.Sleep(time.Second * 8)
+	suite.clock.Add(6 * time.Second) // advance past TTL
 	suite.False(suite.cache.Contains(suite.ctx, key))
 }
 
@@ -88,7 +94,7 @@ func (suite *CacheTestSuite) TestSave() {
 		suite.cache.Fetch(suite.ctx, key, &value)
 		suite.Equal("hello, save", value)
 
-		time.Sleep(time.Second * 8)
+		suite.clock.Add(6 * time.Second) // advance past default 5s TTL
 
 		value = ""
 		suite.Error(suite.cache.Fetch(suite.ctx, key, &value))
@@ -98,7 +104,7 @@ func (suite *CacheTestSuite) TestSave() {
 	{
 		suite.cache.Save(suite.ctx, key, "hello, save", time.Second)
 
-		time.Sleep(time.Second * 2)
+		suite.clock.Add(2 * time.Second) // advance past 1s TTL
 
 		var value string
 		suite.Error(suite.cache.Fetch(suite.ctx, key, &value))

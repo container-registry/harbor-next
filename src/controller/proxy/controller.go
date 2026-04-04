@@ -39,10 +39,15 @@ import (
 )
 
 const (
-	// wait more time than manifest (maxManifestWait) because manifest list depends on manifest ready
-	maxManifestListWait = 20
-	maxManifestWait     = 10
-	sleepIntervalSec    = 20
+	// Timeouts for waiting on manifest dependencies to be pushed to local storage.
+	// ManifestList depends on child manifests, so it gets a longer timeout.
+	manifestListPushTimeout = 10 * time.Minute
+	manifestPushTimeout     = 5 * time.Minute
+
+	// Exponential backoff parameters for dependency polling.
+	initialRetryInterval = 1 * time.Second
+	maxRetryInterval     = 30 * time.Second
+
 	// keep manifest list in cache for one week
 	manifestListCacheInterval = 7 * 24 * 60 * 60 * time.Second
 )
