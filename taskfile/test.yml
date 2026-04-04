@@ -87,19 +87,13 @@ tasks:
     desc: "Run pure unit tests (no DB/Redis needed) with full parallelism"
     deps: [build:gen-apis]
     dir: src
-    cmd: |
-      pkgs=$(../.github/scripts/list-test-packages.sh pure | tr '\n' ' ')
-      # shellcheck disable=SC2086
-      go test -race -timeout=15m {{.COVER_FLAGS}} {{.TEST_FLAGS}} $pkgs
+    cmd: go test -race -timeout=15m {{.COVER_FLAGS}} {{.TEST_FLAGS}} ./...
 
   unit:db:
     desc: "Run DB-dependent unit tests serially (needs PostgreSQL + Redis)"
     deps: [build:gen-apis]
     dir: src
-    cmd: |
-      pkgs=$(../.github/scripts/list-test-packages.sh db | tr '\n' ' ')
-      # shellcheck disable=SC2086
-      go test -race -timeout=15m -p 1 -parallel 1 {{.COVER_FLAGS}} {{.TEST_FLAGS}} $pkgs
+    cmd: go test -race -timeout=15m -tags db -p 1 -parallel 1 {{.COVER_FLAGS}} {{.TEST_FLAGS}} ./...
 
   unit:watch:
     desc: "Re-run Go unit tests on file changes (requires watchexec)"
