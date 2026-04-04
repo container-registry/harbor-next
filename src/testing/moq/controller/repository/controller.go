@@ -2,92 +2,94 @@
 // github.com/vektra/mockery
 // template: matryer
 
-package tag
+package repository
 
 import (
 	"context"
 	"sync"
 
-	"github.com/goharbor/harbor/src/controller/tag"
 	"github.com/goharbor/harbor/src/lib/q"
+	"github.com/goharbor/harbor/src/pkg/repository/model"
 )
 
-// Controller is a mock implementation of tag.Controller.
+// Controller is a mock implementation of repository.Controller.
 //
 //	func TestSomethingThatUsesController(t *testing.T) {
 //
-//		// make and configure a mocked tag.Controller
+//		// make and configure a mocked repository.Controller
 //		mockedController := &Controller{
+//			AddPullCountFunc: func(ctx context.Context, id int64, count uint64) error {
+//				panic("mock out the AddPullCount method")
+//			},
 //			CountFunc: func(ctx context.Context, query *q.Query) (int64, error) {
 //				panic("mock out the Count method")
-//			},
-//			CreateFunc: func(ctx context.Context, tag1 *tag.Tag) (int64, error) {
-//				panic("mock out the Create method")
 //			},
 //			DeleteFunc: func(ctx context.Context, id int64) error {
 //				panic("mock out the Delete method")
 //			},
-//			DeleteTagsFunc: func(ctx context.Context, ids []int64) error {
-//				panic("mock out the DeleteTags method")
-//			},
-//			EnsureFunc: func(ctx context.Context, repositoryID int64, artifactID int64, name string) (int64, error) {
+//			EnsureFunc: func(ctx context.Context, name string) (bool, int64, error) {
 //				panic("mock out the Ensure method")
 //			},
-//			GetFunc: func(ctx context.Context, id int64, option *tag.Option) (*tag.Tag, error) {
+//			GetFunc: func(ctx context.Context, id int64) (*model.RepoRecord, error) {
 //				panic("mock out the Get method")
 //			},
-//			ListFunc: func(ctx context.Context, query *q.Query, option *tag.Option) ([]*tag.Tag, error) {
+//			GetByNameFunc: func(ctx context.Context, name string) (*model.RepoRecord, error) {
+//				panic("mock out the GetByName method")
+//			},
+//			ListFunc: func(ctx context.Context, query *q.Query) ([]*model.RepoRecord, error) {
 //				panic("mock out the List method")
 //			},
-//			UpdateFunc: func(ctx context.Context, tag1 *tag.Tag, props ...string) error {
+//			UpdateFunc: func(ctx context.Context, repository *model.RepoRecord, properties ...string) error {
 //				panic("mock out the Update method")
 //			},
 //		}
 //
-//		// use mockedController in code that requires tag.Controller
+//		// use mockedController in code that requires repository.Controller
 //		// and then make assertions.
 //
 //	}
 type Controller struct {
+	// AddPullCountFunc mocks the AddPullCount method.
+	AddPullCountFunc func(ctx context.Context, id int64, count uint64) error
+
 	// CountFunc mocks the Count method.
 	CountFunc func(ctx context.Context, query *q.Query) (int64, error)
-
-	// CreateFunc mocks the Create method.
-	CreateFunc func(ctx context.Context, tag1 *tag.Tag) (int64, error)
 
 	// DeleteFunc mocks the Delete method.
 	DeleteFunc func(ctx context.Context, id int64) error
 
-	// DeleteTagsFunc mocks the DeleteTags method.
-	DeleteTagsFunc func(ctx context.Context, ids []int64) error
-
 	// EnsureFunc mocks the Ensure method.
-	EnsureFunc func(ctx context.Context, repositoryID int64, artifactID int64, name string) (int64, error)
+	EnsureFunc func(ctx context.Context, name string) (bool, int64, error)
 
 	// GetFunc mocks the Get method.
-	GetFunc func(ctx context.Context, id int64, option *tag.Option) (*tag.Tag, error)
+	GetFunc func(ctx context.Context, id int64) (*model.RepoRecord, error)
+
+	// GetByNameFunc mocks the GetByName method.
+	GetByNameFunc func(ctx context.Context, name string) (*model.RepoRecord, error)
 
 	// ListFunc mocks the List method.
-	ListFunc func(ctx context.Context, query *q.Query, option *tag.Option) ([]*tag.Tag, error)
+	ListFunc func(ctx context.Context, query *q.Query) ([]*model.RepoRecord, error)
 
 	// UpdateFunc mocks the Update method.
-	UpdateFunc func(ctx context.Context, tag1 *tag.Tag, props ...string) error
+	UpdateFunc func(ctx context.Context, repository *model.RepoRecord, properties ...string) error
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AddPullCount holds details about calls to the AddPullCount method.
+		AddPullCount []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ID is the id argument value.
+			ID int64
+			// Count is the count argument value.
+			Count uint64
+		}
 		// Count holds details about calls to the Count method.
 		Count []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// Query is the query argument value.
 			Query *q.Query
-		}
-		// Create holds details about calls to the Create method.
-		Create []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Tag1 is the tag1 argument value.
-			Tag1 *tag.Tag
 		}
 		// Delete holds details about calls to the Delete method.
 		Delete []struct {
@@ -96,21 +98,10 @@ type Controller struct {
 			// ID is the id argument value.
 			ID int64
 		}
-		// DeleteTags holds details about calls to the DeleteTags method.
-		DeleteTags []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Ids is the ids argument value.
-			Ids []int64
-		}
 		// Ensure holds details about calls to the Ensure method.
 		Ensure []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// RepositoryID is the repositoryID argument value.
-			RepositoryID int64
-			// ArtifactID is the artifactID argument value.
-			ArtifactID int64
 			// Name is the name argument value.
 			Name string
 		}
@@ -120,8 +111,13 @@ type Controller struct {
 			Ctx context.Context
 			// ID is the id argument value.
 			ID int64
-			// Option is the option argument value.
-			Option *tag.Option
+		}
+		// GetByName holds details about calls to the GetByName method.
+		GetByName []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
 		}
 		// List holds details about calls to the List method.
 		List []struct {
@@ -129,27 +125,75 @@ type Controller struct {
 			Ctx context.Context
 			// Query is the query argument value.
 			Query *q.Query
-			// Option is the option argument value.
-			Option *tag.Option
 		}
 		// Update holds details about calls to the Update method.
 		Update []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// Tag1 is the tag1 argument value.
-			Tag1 *tag.Tag
-			// Props is the props argument value.
-			Props []string
+			// Repository is the repository argument value.
+			Repository *model.RepoRecord
+			// Properties is the properties argument value.
+			Properties []string
 		}
 	}
-	lockCount      sync.RWMutex
-	lockCreate     sync.RWMutex
-	lockDelete     sync.RWMutex
-	lockDeleteTags sync.RWMutex
-	lockEnsure     sync.RWMutex
-	lockGet        sync.RWMutex
-	lockList       sync.RWMutex
-	lockUpdate     sync.RWMutex
+	lockAddPullCount sync.RWMutex
+	lockCount        sync.RWMutex
+	lockDelete       sync.RWMutex
+	lockEnsure       sync.RWMutex
+	lockGet          sync.RWMutex
+	lockGetByName    sync.RWMutex
+	lockList         sync.RWMutex
+	lockUpdate       sync.RWMutex
+}
+
+// AddPullCount calls AddPullCountFunc.
+func (mock *Controller) AddPullCount(ctx context.Context, id int64, count uint64) error {
+	callInfo := struct {
+		Ctx   context.Context
+		ID    int64
+		Count uint64
+	}{
+		Ctx:   ctx,
+		ID:    id,
+		Count: count,
+	}
+	mock.lockAddPullCount.Lock()
+	mock.calls.AddPullCount = append(mock.calls.AddPullCount, callInfo)
+	mock.lockAddPullCount.Unlock()
+	if mock.AddPullCountFunc == nil {
+		var (
+			err error
+		)
+		return err
+	}
+	return mock.AddPullCountFunc(ctx, id, count)
+}
+
+// AddPullCountCalls gets all the calls that were made to AddPullCount.
+// Check the length with:
+//
+//	len(mockedController.AddPullCountCalls())
+func (mock *Controller) AddPullCountCalls() []struct {
+	Ctx   context.Context
+	ID    int64
+	Count uint64
+} {
+	var calls []struct {
+		Ctx   context.Context
+		ID    int64
+		Count uint64
+	}
+	mock.lockAddPullCount.RLock()
+	calls = mock.calls.AddPullCount
+	mock.lockAddPullCount.RUnlock()
+	return calls
+}
+
+// ResetAddPullCountCalls reset all the calls that were made to AddPullCount.
+func (mock *Controller) ResetAddPullCountCalls() {
+	mock.lockAddPullCount.Lock()
+	mock.calls.AddPullCount = nil
+	mock.lockAddPullCount.Unlock()
 }
 
 // Count calls CountFunc.
@@ -199,53 +243,6 @@ func (mock *Controller) ResetCountCalls() {
 	mock.lockCount.Unlock()
 }
 
-// Create calls CreateFunc.
-func (mock *Controller) Create(ctx context.Context, tag1 *tag.Tag) (int64, error) {
-	callInfo := struct {
-		Ctx  context.Context
-		Tag1 *tag.Tag
-	}{
-		Ctx:  ctx,
-		Tag1: tag1,
-	}
-	mock.lockCreate.Lock()
-	mock.calls.Create = append(mock.calls.Create, callInfo)
-	mock.lockCreate.Unlock()
-	if mock.CreateFunc == nil {
-		var (
-			id  int64
-			err error
-		)
-		return id, err
-	}
-	return mock.CreateFunc(ctx, tag1)
-}
-
-// CreateCalls gets all the calls that were made to Create.
-// Check the length with:
-//
-//	len(mockedController.CreateCalls())
-func (mock *Controller) CreateCalls() []struct {
-	Ctx  context.Context
-	Tag1 *tag.Tag
-} {
-	var calls []struct {
-		Ctx  context.Context
-		Tag1 *tag.Tag
-	}
-	mock.lockCreate.RLock()
-	calls = mock.calls.Create
-	mock.lockCreate.RUnlock()
-	return calls
-}
-
-// ResetCreateCalls reset all the calls that were made to Create.
-func (mock *Controller) ResetCreateCalls() {
-	mock.lockCreate.Lock()
-	mock.calls.Create = nil
-	mock.lockCreate.Unlock()
-}
-
 // Delete calls DeleteFunc.
 func (mock *Controller) Delete(ctx context.Context, id int64) error {
 	callInfo := struct {
@@ -292,76 +289,27 @@ func (mock *Controller) ResetDeleteCalls() {
 	mock.lockDelete.Unlock()
 }
 
-// DeleteTags calls DeleteTagsFunc.
-func (mock *Controller) DeleteTags(ctx context.Context, ids []int64) error {
-	callInfo := struct {
-		Ctx context.Context
-		Ids []int64
-	}{
-		Ctx: ctx,
-		Ids: ids,
-	}
-	mock.lockDeleteTags.Lock()
-	mock.calls.DeleteTags = append(mock.calls.DeleteTags, callInfo)
-	mock.lockDeleteTags.Unlock()
-	if mock.DeleteTagsFunc == nil {
-		var (
-			err error
-		)
-		return err
-	}
-	return mock.DeleteTagsFunc(ctx, ids)
-}
-
-// DeleteTagsCalls gets all the calls that were made to DeleteTags.
-// Check the length with:
-//
-//	len(mockedController.DeleteTagsCalls())
-func (mock *Controller) DeleteTagsCalls() []struct {
-	Ctx context.Context
-	Ids []int64
-} {
-	var calls []struct {
-		Ctx context.Context
-		Ids []int64
-	}
-	mock.lockDeleteTags.RLock()
-	calls = mock.calls.DeleteTags
-	mock.lockDeleteTags.RUnlock()
-	return calls
-}
-
-// ResetDeleteTagsCalls reset all the calls that were made to DeleteTags.
-func (mock *Controller) ResetDeleteTagsCalls() {
-	mock.lockDeleteTags.Lock()
-	mock.calls.DeleteTags = nil
-	mock.lockDeleteTags.Unlock()
-}
-
 // Ensure calls EnsureFunc.
-func (mock *Controller) Ensure(ctx context.Context, repositoryID int64, artifactID int64, name string) (int64, error) {
+func (mock *Controller) Ensure(ctx context.Context, name string) (bool, int64, error) {
 	callInfo := struct {
-		Ctx          context.Context
-		RepositoryID int64
-		ArtifactID   int64
-		Name         string
+		Ctx  context.Context
+		Name string
 	}{
-		Ctx:          ctx,
-		RepositoryID: repositoryID,
-		ArtifactID:   artifactID,
-		Name:         name,
+		Ctx:  ctx,
+		Name: name,
 	}
 	mock.lockEnsure.Lock()
 	mock.calls.Ensure = append(mock.calls.Ensure, callInfo)
 	mock.lockEnsure.Unlock()
 	if mock.EnsureFunc == nil {
 		var (
-			n   int64
-			err error
+			created bool
+			id      int64
+			err     error
 		)
-		return n, err
+		return created, id, err
 	}
-	return mock.EnsureFunc(ctx, repositoryID, artifactID, name)
+	return mock.EnsureFunc(ctx, name)
 }
 
 // EnsureCalls gets all the calls that were made to Ensure.
@@ -369,16 +317,12 @@ func (mock *Controller) Ensure(ctx context.Context, repositoryID int64, artifact
 //
 //	len(mockedController.EnsureCalls())
 func (mock *Controller) EnsureCalls() []struct {
-	Ctx          context.Context
-	RepositoryID int64
-	ArtifactID   int64
-	Name         string
+	Ctx  context.Context
+	Name string
 } {
 	var calls []struct {
-		Ctx          context.Context
-		RepositoryID int64
-		ArtifactID   int64
-		Name         string
+		Ctx  context.Context
+		Name string
 	}
 	mock.lockEnsure.RLock()
 	calls = mock.calls.Ensure
@@ -394,27 +338,25 @@ func (mock *Controller) ResetEnsureCalls() {
 }
 
 // Get calls GetFunc.
-func (mock *Controller) Get(ctx context.Context, id int64, option *tag.Option) (*tag.Tag, error) {
+func (mock *Controller) Get(ctx context.Context, id int64) (*model.RepoRecord, error) {
 	callInfo := struct {
-		Ctx    context.Context
-		ID     int64
-		Option *tag.Option
+		Ctx context.Context
+		ID  int64
 	}{
-		Ctx:    ctx,
-		ID:     id,
-		Option: option,
+		Ctx: ctx,
+		ID:  id,
 	}
 	mock.lockGet.Lock()
 	mock.calls.Get = append(mock.calls.Get, callInfo)
 	mock.lockGet.Unlock()
 	if mock.GetFunc == nil {
 		var (
-			tag1 *tag.Tag
-			err  error
+			repository *model.RepoRecord
+			err        error
 		)
-		return tag1, err
+		return repository, err
 	}
-	return mock.GetFunc(ctx, id, option)
+	return mock.GetFunc(ctx, id)
 }
 
 // GetCalls gets all the calls that were made to Get.
@@ -422,14 +364,12 @@ func (mock *Controller) Get(ctx context.Context, id int64, option *tag.Option) (
 //
 //	len(mockedController.GetCalls())
 func (mock *Controller) GetCalls() []struct {
-	Ctx    context.Context
-	ID     int64
-	Option *tag.Option
+	Ctx context.Context
+	ID  int64
 } {
 	var calls []struct {
-		Ctx    context.Context
-		ID     int64
-		Option *tag.Option
+		Ctx context.Context
+		ID  int64
 	}
 	mock.lockGet.RLock()
 	calls = mock.calls.Get
@@ -444,28 +384,73 @@ func (mock *Controller) ResetGetCalls() {
 	mock.lockGet.Unlock()
 }
 
-// List calls ListFunc.
-func (mock *Controller) List(ctx context.Context, query *q.Query, option *tag.Option) ([]*tag.Tag, error) {
+// GetByName calls GetByNameFunc.
+func (mock *Controller) GetByName(ctx context.Context, name string) (*model.RepoRecord, error) {
 	callInfo := struct {
-		Ctx    context.Context
-		Query  *q.Query
-		Option *tag.Option
+		Ctx  context.Context
+		Name string
 	}{
-		Ctx:    ctx,
-		Query:  query,
-		Option: option,
+		Ctx:  ctx,
+		Name: name,
+	}
+	mock.lockGetByName.Lock()
+	mock.calls.GetByName = append(mock.calls.GetByName, callInfo)
+	mock.lockGetByName.Unlock()
+	if mock.GetByNameFunc == nil {
+		var (
+			repository *model.RepoRecord
+			err        error
+		)
+		return repository, err
+	}
+	return mock.GetByNameFunc(ctx, name)
+}
+
+// GetByNameCalls gets all the calls that were made to GetByName.
+// Check the length with:
+//
+//	len(mockedController.GetByNameCalls())
+func (mock *Controller) GetByNameCalls() []struct {
+	Ctx  context.Context
+	Name string
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Name string
+	}
+	mock.lockGetByName.RLock()
+	calls = mock.calls.GetByName
+	mock.lockGetByName.RUnlock()
+	return calls
+}
+
+// ResetGetByNameCalls reset all the calls that were made to GetByName.
+func (mock *Controller) ResetGetByNameCalls() {
+	mock.lockGetByName.Lock()
+	mock.calls.GetByName = nil
+	mock.lockGetByName.Unlock()
+}
+
+// List calls ListFunc.
+func (mock *Controller) List(ctx context.Context, query *q.Query) ([]*model.RepoRecord, error) {
+	callInfo := struct {
+		Ctx   context.Context
+		Query *q.Query
+	}{
+		Ctx:   ctx,
+		Query: query,
 	}
 	mock.lockList.Lock()
 	mock.calls.List = append(mock.calls.List, callInfo)
 	mock.lockList.Unlock()
 	if mock.ListFunc == nil {
 		var (
-			tags []*tag.Tag
-			err  error
+			repositories []*model.RepoRecord
+			err          error
 		)
-		return tags, err
+		return repositories, err
 	}
-	return mock.ListFunc(ctx, query, option)
+	return mock.ListFunc(ctx, query)
 }
 
 // ListCalls gets all the calls that were made to List.
@@ -473,14 +458,12 @@ func (mock *Controller) List(ctx context.Context, query *q.Query, option *tag.Op
 //
 //	len(mockedController.ListCalls())
 func (mock *Controller) ListCalls() []struct {
-	Ctx    context.Context
-	Query  *q.Query
-	Option *tag.Option
+	Ctx   context.Context
+	Query *q.Query
 } {
 	var calls []struct {
-		Ctx    context.Context
-		Query  *q.Query
-		Option *tag.Option
+		Ctx   context.Context
+		Query *q.Query
 	}
 	mock.lockList.RLock()
 	calls = mock.calls.List
@@ -496,15 +479,15 @@ func (mock *Controller) ResetListCalls() {
 }
 
 // Update calls UpdateFunc.
-func (mock *Controller) Update(ctx context.Context, tag1 *tag.Tag, props ...string) error {
+func (mock *Controller) Update(ctx context.Context, repository *model.RepoRecord, properties ...string) error {
 	callInfo := struct {
-		Ctx   context.Context
-		Tag1  *tag.Tag
-		Props []string
+		Ctx        context.Context
+		Repository *model.RepoRecord
+		Properties []string
 	}{
-		Ctx:   ctx,
-		Tag1:  tag1,
-		Props: props,
+		Ctx:        ctx,
+		Repository: repository,
+		Properties: properties,
 	}
 	mock.lockUpdate.Lock()
 	mock.calls.Update = append(mock.calls.Update, callInfo)
@@ -515,7 +498,7 @@ func (mock *Controller) Update(ctx context.Context, tag1 *tag.Tag, props ...stri
 		)
 		return err
 	}
-	return mock.UpdateFunc(ctx, tag1, props...)
+	return mock.UpdateFunc(ctx, repository, properties...)
 }
 
 // UpdateCalls gets all the calls that were made to Update.
@@ -523,14 +506,14 @@ func (mock *Controller) Update(ctx context.Context, tag1 *tag.Tag, props ...stri
 //
 //	len(mockedController.UpdateCalls())
 func (mock *Controller) UpdateCalls() []struct {
-	Ctx   context.Context
-	Tag1  *tag.Tag
-	Props []string
+	Ctx        context.Context
+	Repository *model.RepoRecord
+	Properties []string
 } {
 	var calls []struct {
-		Ctx   context.Context
-		Tag1  *tag.Tag
-		Props []string
+		Ctx        context.Context
+		Repository *model.RepoRecord
+		Properties []string
 	}
 	mock.lockUpdate.RLock()
 	calls = mock.calls.Update
@@ -547,21 +530,17 @@ func (mock *Controller) ResetUpdateCalls() {
 
 // ResetCalls reset all the calls that were made to all mocked methods.
 func (mock *Controller) ResetCalls() {
+	mock.lockAddPullCount.Lock()
+	mock.calls.AddPullCount = nil
+	mock.lockAddPullCount.Unlock()
+
 	mock.lockCount.Lock()
 	mock.calls.Count = nil
 	mock.lockCount.Unlock()
 
-	mock.lockCreate.Lock()
-	mock.calls.Create = nil
-	mock.lockCreate.Unlock()
-
 	mock.lockDelete.Lock()
 	mock.calls.Delete = nil
 	mock.lockDelete.Unlock()
-
-	mock.lockDeleteTags.Lock()
-	mock.calls.DeleteTags = nil
-	mock.lockDeleteTags.Unlock()
 
 	mock.lockEnsure.Lock()
 	mock.calls.Ensure = nil
@@ -570,6 +549,10 @@ func (mock *Controller) ResetCalls() {
 	mock.lockGet.Lock()
 	mock.calls.Get = nil
 	mock.lockGet.Unlock()
+
+	mock.lockGetByName.Lock()
+	mock.calls.GetByName = nil
+	mock.lockGetByName.Unlock()
 
 	mock.lockList.Lock()
 	mock.calls.List = nil

@@ -8,16 +8,16 @@ import (
 	"context"
 	"sync"
 
-	"github.com/goharbor/harbor/src/controller/tag"
 	"github.com/goharbor/harbor/src/lib/q"
+	"github.com/goharbor/harbor/src/pkg/tag/model/tag"
 )
 
-// Controller is a mock implementation of tag.Controller.
+// Manager is a mock implementation of tag.Manager.
 //
-//	func TestSomethingThatUsesController(t *testing.T) {
+//	func TestSomethingThatUsesManager(t *testing.T) {
 //
-//		// make and configure a mocked tag.Controller
-//		mockedController := &Controller{
+//		// make and configure a mocked tag.Manager
+//		mockedManager := &Manager{
 //			CountFunc: func(ctx context.Context, query *q.Query) (int64, error) {
 //				panic("mock out the Count method")
 //			},
@@ -27,16 +27,13 @@ import (
 //			DeleteFunc: func(ctx context.Context, id int64) error {
 //				panic("mock out the Delete method")
 //			},
-//			DeleteTagsFunc: func(ctx context.Context, ids []int64) error {
-//				panic("mock out the DeleteTags method")
+//			DeleteOfArtifactFunc: func(ctx context.Context, artifactID int64) error {
+//				panic("mock out the DeleteOfArtifact method")
 //			},
-//			EnsureFunc: func(ctx context.Context, repositoryID int64, artifactID int64, name string) (int64, error) {
-//				panic("mock out the Ensure method")
-//			},
-//			GetFunc: func(ctx context.Context, id int64, option *tag.Option) (*tag.Tag, error) {
+//			GetFunc: func(ctx context.Context, id int64) (*tag.Tag, error) {
 //				panic("mock out the Get method")
 //			},
-//			ListFunc: func(ctx context.Context, query *q.Query, option *tag.Option) ([]*tag.Tag, error) {
+//			ListFunc: func(ctx context.Context, query *q.Query) ([]*tag.Tag, error) {
 //				panic("mock out the List method")
 //			},
 //			UpdateFunc: func(ctx context.Context, tag1 *tag.Tag, props ...string) error {
@@ -44,11 +41,11 @@ import (
 //			},
 //		}
 //
-//		// use mockedController in code that requires tag.Controller
+//		// use mockedManager in code that requires tag.Manager
 //		// and then make assertions.
 //
 //	}
-type Controller struct {
+type Manager struct {
 	// CountFunc mocks the Count method.
 	CountFunc func(ctx context.Context, query *q.Query) (int64, error)
 
@@ -58,17 +55,14 @@ type Controller struct {
 	// DeleteFunc mocks the Delete method.
 	DeleteFunc func(ctx context.Context, id int64) error
 
-	// DeleteTagsFunc mocks the DeleteTags method.
-	DeleteTagsFunc func(ctx context.Context, ids []int64) error
-
-	// EnsureFunc mocks the Ensure method.
-	EnsureFunc func(ctx context.Context, repositoryID int64, artifactID int64, name string) (int64, error)
+	// DeleteOfArtifactFunc mocks the DeleteOfArtifact method.
+	DeleteOfArtifactFunc func(ctx context.Context, artifactID int64) error
 
 	// GetFunc mocks the Get method.
-	GetFunc func(ctx context.Context, id int64, option *tag.Option) (*tag.Tag, error)
+	GetFunc func(ctx context.Context, id int64) (*tag.Tag, error)
 
 	// ListFunc mocks the List method.
-	ListFunc func(ctx context.Context, query *q.Query, option *tag.Option) ([]*tag.Tag, error)
+	ListFunc func(ctx context.Context, query *q.Query) ([]*tag.Tag, error)
 
 	// UpdateFunc mocks the Update method.
 	UpdateFunc func(ctx context.Context, tag1 *tag.Tag, props ...string) error
@@ -96,23 +90,12 @@ type Controller struct {
 			// ID is the id argument value.
 			ID int64
 		}
-		// DeleteTags holds details about calls to the DeleteTags method.
-		DeleteTags []struct {
+		// DeleteOfArtifact holds details about calls to the DeleteOfArtifact method.
+		DeleteOfArtifact []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// Ids is the ids argument value.
-			Ids []int64
-		}
-		// Ensure holds details about calls to the Ensure method.
-		Ensure []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// RepositoryID is the repositoryID argument value.
-			RepositoryID int64
 			// ArtifactID is the artifactID argument value.
 			ArtifactID int64
-			// Name is the name argument value.
-			Name string
 		}
 		// Get holds details about calls to the Get method.
 		Get []struct {
@@ -120,8 +103,6 @@ type Controller struct {
 			Ctx context.Context
 			// ID is the id argument value.
 			ID int64
-			// Option is the option argument value.
-			Option *tag.Option
 		}
 		// List holds details about calls to the List method.
 		List []struct {
@@ -129,8 +110,6 @@ type Controller struct {
 			Ctx context.Context
 			// Query is the query argument value.
 			Query *q.Query
-			// Option is the option argument value.
-			Option *tag.Option
 		}
 		// Update holds details about calls to the Update method.
 		Update []struct {
@@ -142,18 +121,17 @@ type Controller struct {
 			Props []string
 		}
 	}
-	lockCount      sync.RWMutex
-	lockCreate     sync.RWMutex
-	lockDelete     sync.RWMutex
-	lockDeleteTags sync.RWMutex
-	lockEnsure     sync.RWMutex
-	lockGet        sync.RWMutex
-	lockList       sync.RWMutex
-	lockUpdate     sync.RWMutex
+	lockCount            sync.RWMutex
+	lockCreate           sync.RWMutex
+	lockDelete           sync.RWMutex
+	lockDeleteOfArtifact sync.RWMutex
+	lockGet              sync.RWMutex
+	lockList             sync.RWMutex
+	lockUpdate           sync.RWMutex
 }
 
 // Count calls CountFunc.
-func (mock *Controller) Count(ctx context.Context, query *q.Query) (int64, error) {
+func (mock *Manager) Count(ctx context.Context, query *q.Query) (int64, error) {
 	callInfo := struct {
 		Ctx   context.Context
 		Query *q.Query
@@ -177,8 +155,8 @@ func (mock *Controller) Count(ctx context.Context, query *q.Query) (int64, error
 // CountCalls gets all the calls that were made to Count.
 // Check the length with:
 //
-//	len(mockedController.CountCalls())
-func (mock *Controller) CountCalls() []struct {
+//	len(mockedManager.CountCalls())
+func (mock *Manager) CountCalls() []struct {
 	Ctx   context.Context
 	Query *q.Query
 } {
@@ -193,14 +171,14 @@ func (mock *Controller) CountCalls() []struct {
 }
 
 // ResetCountCalls reset all the calls that were made to Count.
-func (mock *Controller) ResetCountCalls() {
+func (mock *Manager) ResetCountCalls() {
 	mock.lockCount.Lock()
 	mock.calls.Count = nil
 	mock.lockCount.Unlock()
 }
 
 // Create calls CreateFunc.
-func (mock *Controller) Create(ctx context.Context, tag1 *tag.Tag) (int64, error) {
+func (mock *Manager) Create(ctx context.Context, tag1 *tag.Tag) (int64, error) {
 	callInfo := struct {
 		Ctx  context.Context
 		Tag1 *tag.Tag
@@ -224,8 +202,8 @@ func (mock *Controller) Create(ctx context.Context, tag1 *tag.Tag) (int64, error
 // CreateCalls gets all the calls that were made to Create.
 // Check the length with:
 //
-//	len(mockedController.CreateCalls())
-func (mock *Controller) CreateCalls() []struct {
+//	len(mockedManager.CreateCalls())
+func (mock *Manager) CreateCalls() []struct {
 	Ctx  context.Context
 	Tag1 *tag.Tag
 } {
@@ -240,14 +218,14 @@ func (mock *Controller) CreateCalls() []struct {
 }
 
 // ResetCreateCalls reset all the calls that were made to Create.
-func (mock *Controller) ResetCreateCalls() {
+func (mock *Manager) ResetCreateCalls() {
 	mock.lockCreate.Lock()
 	mock.calls.Create = nil
 	mock.lockCreate.Unlock()
 }
 
 // Delete calls DeleteFunc.
-func (mock *Controller) Delete(ctx context.Context, id int64) error {
+func (mock *Manager) Delete(ctx context.Context, id int64) error {
 	callInfo := struct {
 		Ctx context.Context
 		ID  int64
@@ -270,8 +248,8 @@ func (mock *Controller) Delete(ctx context.Context, id int64) error {
 // DeleteCalls gets all the calls that were made to Delete.
 // Check the length with:
 //
-//	len(mockedController.DeleteCalls())
-func (mock *Controller) DeleteCalls() []struct {
+//	len(mockedManager.DeleteCalls())
+func (mock *Manager) DeleteCalls() []struct {
 	Ctx context.Context
 	ID  int64
 } {
@@ -286,123 +264,66 @@ func (mock *Controller) DeleteCalls() []struct {
 }
 
 // ResetDeleteCalls reset all the calls that were made to Delete.
-func (mock *Controller) ResetDeleteCalls() {
+func (mock *Manager) ResetDeleteCalls() {
 	mock.lockDelete.Lock()
 	mock.calls.Delete = nil
 	mock.lockDelete.Unlock()
 }
 
-// DeleteTags calls DeleteTagsFunc.
-func (mock *Controller) DeleteTags(ctx context.Context, ids []int64) error {
+// DeleteOfArtifact calls DeleteOfArtifactFunc.
+func (mock *Manager) DeleteOfArtifact(ctx context.Context, artifactID int64) error {
 	callInfo := struct {
-		Ctx context.Context
-		Ids []int64
+		Ctx        context.Context
+		ArtifactID int64
 	}{
-		Ctx: ctx,
-		Ids: ids,
+		Ctx:        ctx,
+		ArtifactID: artifactID,
 	}
-	mock.lockDeleteTags.Lock()
-	mock.calls.DeleteTags = append(mock.calls.DeleteTags, callInfo)
-	mock.lockDeleteTags.Unlock()
-	if mock.DeleteTagsFunc == nil {
+	mock.lockDeleteOfArtifact.Lock()
+	mock.calls.DeleteOfArtifact = append(mock.calls.DeleteOfArtifact, callInfo)
+	mock.lockDeleteOfArtifact.Unlock()
+	if mock.DeleteOfArtifactFunc == nil {
 		var (
 			err error
 		)
 		return err
 	}
-	return mock.DeleteTagsFunc(ctx, ids)
+	return mock.DeleteOfArtifactFunc(ctx, artifactID)
 }
 
-// DeleteTagsCalls gets all the calls that were made to DeleteTags.
+// DeleteOfArtifactCalls gets all the calls that were made to DeleteOfArtifact.
 // Check the length with:
 //
-//	len(mockedController.DeleteTagsCalls())
-func (mock *Controller) DeleteTagsCalls() []struct {
-	Ctx context.Context
-	Ids []int64
+//	len(mockedManager.DeleteOfArtifactCalls())
+func (mock *Manager) DeleteOfArtifactCalls() []struct {
+	Ctx        context.Context
+	ArtifactID int64
 } {
 	var calls []struct {
-		Ctx context.Context
-		Ids []int64
+		Ctx        context.Context
+		ArtifactID int64
 	}
-	mock.lockDeleteTags.RLock()
-	calls = mock.calls.DeleteTags
-	mock.lockDeleteTags.RUnlock()
+	mock.lockDeleteOfArtifact.RLock()
+	calls = mock.calls.DeleteOfArtifact
+	mock.lockDeleteOfArtifact.RUnlock()
 	return calls
 }
 
-// ResetDeleteTagsCalls reset all the calls that were made to DeleteTags.
-func (mock *Controller) ResetDeleteTagsCalls() {
-	mock.lockDeleteTags.Lock()
-	mock.calls.DeleteTags = nil
-	mock.lockDeleteTags.Unlock()
-}
-
-// Ensure calls EnsureFunc.
-func (mock *Controller) Ensure(ctx context.Context, repositoryID int64, artifactID int64, name string) (int64, error) {
-	callInfo := struct {
-		Ctx          context.Context
-		RepositoryID int64
-		ArtifactID   int64
-		Name         string
-	}{
-		Ctx:          ctx,
-		RepositoryID: repositoryID,
-		ArtifactID:   artifactID,
-		Name:         name,
-	}
-	mock.lockEnsure.Lock()
-	mock.calls.Ensure = append(mock.calls.Ensure, callInfo)
-	mock.lockEnsure.Unlock()
-	if mock.EnsureFunc == nil {
-		var (
-			n   int64
-			err error
-		)
-		return n, err
-	}
-	return mock.EnsureFunc(ctx, repositoryID, artifactID, name)
-}
-
-// EnsureCalls gets all the calls that were made to Ensure.
-// Check the length with:
-//
-//	len(mockedController.EnsureCalls())
-func (mock *Controller) EnsureCalls() []struct {
-	Ctx          context.Context
-	RepositoryID int64
-	ArtifactID   int64
-	Name         string
-} {
-	var calls []struct {
-		Ctx          context.Context
-		RepositoryID int64
-		ArtifactID   int64
-		Name         string
-	}
-	mock.lockEnsure.RLock()
-	calls = mock.calls.Ensure
-	mock.lockEnsure.RUnlock()
-	return calls
-}
-
-// ResetEnsureCalls reset all the calls that were made to Ensure.
-func (mock *Controller) ResetEnsureCalls() {
-	mock.lockEnsure.Lock()
-	mock.calls.Ensure = nil
-	mock.lockEnsure.Unlock()
+// ResetDeleteOfArtifactCalls reset all the calls that were made to DeleteOfArtifact.
+func (mock *Manager) ResetDeleteOfArtifactCalls() {
+	mock.lockDeleteOfArtifact.Lock()
+	mock.calls.DeleteOfArtifact = nil
+	mock.lockDeleteOfArtifact.Unlock()
 }
 
 // Get calls GetFunc.
-func (mock *Controller) Get(ctx context.Context, id int64, option *tag.Option) (*tag.Tag, error) {
+func (mock *Manager) Get(ctx context.Context, id int64) (*tag.Tag, error) {
 	callInfo := struct {
-		Ctx    context.Context
-		ID     int64
-		Option *tag.Option
+		Ctx context.Context
+		ID  int64
 	}{
-		Ctx:    ctx,
-		ID:     id,
-		Option: option,
+		Ctx: ctx,
+		ID:  id,
 	}
 	mock.lockGet.Lock()
 	mock.calls.Get = append(mock.calls.Get, callInfo)
@@ -414,22 +335,20 @@ func (mock *Controller) Get(ctx context.Context, id int64, option *tag.Option) (
 		)
 		return tag1, err
 	}
-	return mock.GetFunc(ctx, id, option)
+	return mock.GetFunc(ctx, id)
 }
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
 //
-//	len(mockedController.GetCalls())
-func (mock *Controller) GetCalls() []struct {
-	Ctx    context.Context
-	ID     int64
-	Option *tag.Option
+//	len(mockedManager.GetCalls())
+func (mock *Manager) GetCalls() []struct {
+	Ctx context.Context
+	ID  int64
 } {
 	var calls []struct {
-		Ctx    context.Context
-		ID     int64
-		Option *tag.Option
+		Ctx context.Context
+		ID  int64
 	}
 	mock.lockGet.RLock()
 	calls = mock.calls.Get
@@ -438,22 +357,20 @@ func (mock *Controller) GetCalls() []struct {
 }
 
 // ResetGetCalls reset all the calls that were made to Get.
-func (mock *Controller) ResetGetCalls() {
+func (mock *Manager) ResetGetCalls() {
 	mock.lockGet.Lock()
 	mock.calls.Get = nil
 	mock.lockGet.Unlock()
 }
 
 // List calls ListFunc.
-func (mock *Controller) List(ctx context.Context, query *q.Query, option *tag.Option) ([]*tag.Tag, error) {
+func (mock *Manager) List(ctx context.Context, query *q.Query) ([]*tag.Tag, error) {
 	callInfo := struct {
-		Ctx    context.Context
-		Query  *q.Query
-		Option *tag.Option
+		Ctx   context.Context
+		Query *q.Query
 	}{
-		Ctx:    ctx,
-		Query:  query,
-		Option: option,
+		Ctx:   ctx,
+		Query: query,
 	}
 	mock.lockList.Lock()
 	mock.calls.List = append(mock.calls.List, callInfo)
@@ -465,22 +382,20 @@ func (mock *Controller) List(ctx context.Context, query *q.Query, option *tag.Op
 		)
 		return tags, err
 	}
-	return mock.ListFunc(ctx, query, option)
+	return mock.ListFunc(ctx, query)
 }
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
 //
-//	len(mockedController.ListCalls())
-func (mock *Controller) ListCalls() []struct {
-	Ctx    context.Context
-	Query  *q.Query
-	Option *tag.Option
+//	len(mockedManager.ListCalls())
+func (mock *Manager) ListCalls() []struct {
+	Ctx   context.Context
+	Query *q.Query
 } {
 	var calls []struct {
-		Ctx    context.Context
-		Query  *q.Query
-		Option *tag.Option
+		Ctx   context.Context
+		Query *q.Query
 	}
 	mock.lockList.RLock()
 	calls = mock.calls.List
@@ -489,14 +404,14 @@ func (mock *Controller) ListCalls() []struct {
 }
 
 // ResetListCalls reset all the calls that were made to List.
-func (mock *Controller) ResetListCalls() {
+func (mock *Manager) ResetListCalls() {
 	mock.lockList.Lock()
 	mock.calls.List = nil
 	mock.lockList.Unlock()
 }
 
 // Update calls UpdateFunc.
-func (mock *Controller) Update(ctx context.Context, tag1 *tag.Tag, props ...string) error {
+func (mock *Manager) Update(ctx context.Context, tag1 *tag.Tag, props ...string) error {
 	callInfo := struct {
 		Ctx   context.Context
 		Tag1  *tag.Tag
@@ -521,8 +436,8 @@ func (mock *Controller) Update(ctx context.Context, tag1 *tag.Tag, props ...stri
 // UpdateCalls gets all the calls that were made to Update.
 // Check the length with:
 //
-//	len(mockedController.UpdateCalls())
-func (mock *Controller) UpdateCalls() []struct {
+//	len(mockedManager.UpdateCalls())
+func (mock *Manager) UpdateCalls() []struct {
 	Ctx   context.Context
 	Tag1  *tag.Tag
 	Props []string
@@ -539,14 +454,14 @@ func (mock *Controller) UpdateCalls() []struct {
 }
 
 // ResetUpdateCalls reset all the calls that were made to Update.
-func (mock *Controller) ResetUpdateCalls() {
+func (mock *Manager) ResetUpdateCalls() {
 	mock.lockUpdate.Lock()
 	mock.calls.Update = nil
 	mock.lockUpdate.Unlock()
 }
 
 // ResetCalls reset all the calls that were made to all mocked methods.
-func (mock *Controller) ResetCalls() {
+func (mock *Manager) ResetCalls() {
 	mock.lockCount.Lock()
 	mock.calls.Count = nil
 	mock.lockCount.Unlock()
@@ -559,13 +474,9 @@ func (mock *Controller) ResetCalls() {
 	mock.calls.Delete = nil
 	mock.lockDelete.Unlock()
 
-	mock.lockDeleteTags.Lock()
-	mock.calls.DeleteTags = nil
-	mock.lockDeleteTags.Unlock()
-
-	mock.lockEnsure.Lock()
-	mock.calls.Ensure = nil
-	mock.lockEnsure.Unlock()
+	mock.lockDeleteOfArtifact.Lock()
+	mock.calls.DeleteOfArtifact = nil
+	mock.lockDeleteOfArtifact.Unlock()
 
 	mock.lockGet.Lock()
 	mock.calls.Get = nil

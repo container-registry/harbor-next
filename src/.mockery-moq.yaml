@@ -1,86 +1,488 @@
 template: matryer
+filename: '{{.InterfaceName | snakecase}}.go'
+structname: '{{.InterfaceName}}'
 template-data:
   stub-impl: true
   with-resets: true
   skip-ensure: true
 packages:
-  github.com/goharbor/harbor/src/pkg/artifact:
+  github.com/docker/distribution:
     interfaces:
-      Manager:
+      Manifest:
         config:
-          dir: testing/moq/pkg/artifact
-          pkgname: artifact
-          filename: manager.go
-          structname: Manager
-  github.com/goharbor/harbor/src/pkg/repository:
+          dir: testing/moq/pkg/distribution
+  github.com/goharbor/harbor/src/common/security:
     interfaces:
-      Manager:
+      Context:
         config:
-          dir: testing/moq/pkg/repository
-          pkgname: repository
-          filename: manager.go
-          structname: Manager
-  github.com/goharbor/harbor/src/pkg/artifactrash:
-    interfaces:
-      Manager:
-        config:
-          dir: testing/moq/pkg/artifactrash
-          pkgname: artifactrash
-          filename: manager.go
-          structname: Manager
-  github.com/goharbor/harbor/src/pkg/blob:
-    interfaces:
-      Manager:
-        config:
-          dir: testing/moq/pkg/blob
-          pkgname: blob
-          filename: manager.go
-          structname: Manager
-  github.com/goharbor/harbor/src/controller/tag:
+          dir: testing/moq/common/security
+  github.com/goharbor/harbor/src/controller/artifact:
     interfaces:
       Controller:
         config:
-          dir: testing/moq/controller/tag
-          pkgname: tag
-          filename: controller.go
-          structname: FakeController
-  github.com/goharbor/harbor/src/pkg/label:
+          dir: testing/moq/controller/artifact
+  github.com/goharbor/harbor/src/controller/artifact/annotation:
     interfaces:
-      Manager:
+      Parser:
         config:
-          dir: testing/moq/pkg/label
-          pkgname: label
-          filename: manager.go
-          structname: Manager
-  github.com/goharbor/harbor/src/pkg/immutable/match:
+          dir: testing/moq/pkg/parser
+          pkgname: parser
+  github.com/goharbor/harbor/src/controller/artifact/processor:
     interfaces:
-      ImmutableTagMatcher:
+      Processor:
         config:
-          dir: testing/moq/pkg/immutable
-          pkgname: immutable
-          filename: matcher.go
-          structname: FakeMatcher
-  github.com/goharbor/harbor/src/pkg/registry:
+          dir: testing/moq/pkg/processor
+  github.com/goharbor/harbor/src/controller/blob:
     interfaces:
-      Client:
+      Controller:
         config:
-          dir: testing/moq/pkg/registry
-          pkgname: registry
-          filename: client.go
-          structname: Client
-  github.com/goharbor/harbor/src/pkg/accessory:
+          dir: testing/moq/controller/blob
+  github.com/goharbor/harbor/src/controller/config:
     interfaces:
-      Manager:
+      Controller:
         config:
-          dir: testing/moq/pkg/accessory
-          pkgname: accessory
-          filename: manager.go
-          structname: Manager
+          dir: testing/moq/controller/config
+  github.com/goharbor/harbor/src/controller/jobservice:
+    interfaces:
+      SchedulerController:
+        config:
+          dir: testing/moq/controller/jobservice
   github.com/goharbor/harbor/src/controller/project:
     interfaces:
       Controller:
         config:
           dir: testing/moq/controller/project
-          pkgname: project
-          filename: controller.go
-          structname: Controller
+  github.com/goharbor/harbor/src/controller/proxy:
+    interfaces:
+      RemoteInterface:
+        config:
+          dir: testing/moq/controller/proxy
+  github.com/goharbor/harbor/src/controller/purge:
+    interfaces:
+      Controller:
+        config:
+          dir: testing/moq/controller/purge
+  github.com/goharbor/harbor/src/controller/quota:
+    interfaces:
+      Controller:
+        config:
+          dir: testing/moq/controller/quota
+  github.com/goharbor/harbor/src/controller/replication:
+    interfaces:
+      Controller:
+        config:
+          dir: testing/moq/controller/replication
+  github.com/goharbor/harbor/src/controller/repository:
+    interfaces:
+      Controller:
+        config:
+          dir: testing/moq/controller/repository
+  github.com/goharbor/harbor/src/controller/retention:
+    interfaces:
+      Controller:
+        config:
+          dir: testing/moq/controller/retention
+  github.com/goharbor/harbor/src/controller/robot:
+    interfaces:
+      Controller:
+        config:
+          dir: testing/moq/controller/robot
+  github.com/goharbor/harbor/src/controller/scan:
+    interfaces:
+      Checker:
+        config:
+          dir: testing/moq/controller/scan
+      Controller:
+        config:
+          dir: testing/moq/controller/scan
+  github.com/goharbor/harbor/src/controller/scandataexport:
+    interfaces:
+      Controller:
+        config:
+          dir: testing/moq/controller/scandataexport
+  github.com/goharbor/harbor/src/controller/scanner:
+    interfaces:
+      Controller:
+        config:
+          dir: testing/moq/controller/scanner
+  github.com/goharbor/harbor/src/controller/securityhub:
+    interfaces:
+      Controller:
+        config:
+          dir: testing/moq/controller/securityhub
+  github.com/goharbor/harbor/src/controller/systemartifact:
+    interfaces:
+      Controller:
+        config:
+          dir: testing/moq/controller/systemartifact
+  github.com/goharbor/harbor/src/controller/task:
+    interfaces:
+      Controller:
+        config:
+          dir: testing/moq/controller/task
+      ExecutionController:
+        config:
+          dir: testing/moq/controller/task
+  github.com/goharbor/harbor/src/controller/user:
+    interfaces:
+      Controller:
+        config:
+          dir: testing/moq/controller/user
+  github.com/goharbor/harbor/src/controller/webhook:
+    interfaces:
+      Controller:
+        config:
+          dir: testing/moq/controller/webhook
+  github.com/goharbor/harbor/src/lib/cache:
+    interfaces:
+      Cache:
+        config:
+          dir: testing/moq/lib/cache
+      Iterator:
+        config:
+          dir: testing/moq/lib/cache
+  github.com/goharbor/harbor/src/lib/config:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/lib/config
+  github.com/goharbor/harbor/src/lib/orm:
+    interfaces:
+      Creator:
+        config:
+          dir: testing/moq/lib/orm
+  github.com/goharbor/harbor/src/pkg/accessory:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/accessory
+  github.com/goharbor/harbor/src/pkg/accessory/dao:
+    interfaces:
+      DAO:
+        config:
+          dir: testing/moq/pkg/accessory/dao
+  github.com/goharbor/harbor/src/pkg/accessory/model:
+    interfaces:
+      Accessory:
+        config:
+          dir: testing/moq/pkg/accessory/model
+  github.com/goharbor/harbor/src/pkg/allowlist:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/allowlist
+  github.com/goharbor/harbor/src/pkg/allowlist/dao:
+    interfaces:
+      DAO:
+        config:
+          dir: testing/moq/pkg/allowlist/dao
+  github.com/goharbor/harbor/src/pkg/artifact:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/artifact
+  github.com/goharbor/harbor/src/pkg/artifactrash:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/artifactrash
+  github.com/goharbor/harbor/src/pkg/audit:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/audit
+  github.com/goharbor/harbor/src/pkg/audit/dao:
+    interfaces:
+      DAO:
+        config:
+          dir: testing/moq/pkg/audit/dao
+  github.com/goharbor/harbor/src/pkg/auditext:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/auditext
+  github.com/goharbor/harbor/src/pkg/auditext/dao:
+    interfaces:
+      DAO:
+        config:
+          dir: testing/moq/pkg/auditext/dao
+  github.com/goharbor/harbor/src/pkg/blob:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/blob
+  github.com/goharbor/harbor/src/pkg/cached/manifest/redis:
+    interfaces:
+      CachedManager:
+        config:
+          dir: testing/moq/pkg/cached/manifest/redis
+  github.com/goharbor/harbor/src/pkg/chart:
+    interfaces:
+      Operator:
+        config:
+          dir: testing/moq/pkg/chart
+  github.com/goharbor/harbor/src/pkg/immutable/dao:
+    interfaces:
+      DAO:
+        config:
+          dir: testing/moq/pkg/immutable/dao
+  github.com/goharbor/harbor/src/pkg/immutable/match:
+    interfaces:
+      ImmutableTagMatcher:
+        config:
+          dir: testing/moq/pkg/immutable
+          structname: FakeMatcher
+          pkgname: immutable
+  github.com/goharbor/harbor/src/pkg/joblog:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/joblog
+  github.com/goharbor/harbor/src/pkg/joblog/dao:
+    interfaces:
+      DAO:
+        config:
+          dir: testing/moq/pkg/joblog/dao
+  github.com/goharbor/harbor/src/pkg/label:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/label
+  github.com/goharbor/harbor/src/pkg/label/dao:
+    interfaces:
+      DAO:
+        config:
+          dir: testing/moq/pkg/label/dao
+  github.com/goharbor/harbor/src/pkg/ldap:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/ldap
+  github.com/goharbor/harbor/src/pkg/member:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/member
+  github.com/goharbor/harbor/src/pkg/notification/policy:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/notification/policy
+  github.com/goharbor/harbor/src/pkg/notification/policy/dao:
+    interfaces:
+      DAO:
+        config:
+          dir: testing/moq/pkg/notification/policy/dao
+  github.com/goharbor/harbor/src/pkg/oidc:
+    interfaces:
+      MetaManager:
+        config:
+          dir: testing/moq/pkg/oidc
+  github.com/goharbor/harbor/src/pkg/oidc/dao:
+    interfaces:
+      MetaDAO:
+        config:
+          dir: testing/moq/pkg/oidc/dao
+  github.com/goharbor/harbor/src/pkg/p2p/preheat/instance:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/p2p/preheat/instance
+  github.com/goharbor/harbor/src/pkg/p2p/preheat/policy:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/p2p/preheat/policy
+  github.com/goharbor/harbor/src/pkg/project:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/project
+  github.com/goharbor/harbor/src/pkg/project/metadata:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/project/metadata
+  github.com/goharbor/harbor/src/pkg/queuestatus:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/queuestatus
+  github.com/goharbor/harbor/src/pkg/quota:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/quota
+  github.com/goharbor/harbor/src/pkg/quota/driver:
+    interfaces:
+      Driver:
+        config:
+          dir: testing/moq/pkg/quota/driver
+  github.com/goharbor/harbor/src/pkg/rbac:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/rbac
+  github.com/goharbor/harbor/src/pkg/rbac/dao:
+    interfaces:
+      DAO:
+        config:
+          dir: testing/moq/pkg/rbac/dao
+  github.com/goharbor/harbor/src/pkg/reg:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/reg
+  github.com/goharbor/harbor/src/pkg/reg/adapter:
+    interfaces:
+      Adapter:
+        config:
+          dir: testing/moq/pkg/reg/adapter
+  github.com/goharbor/harbor/src/pkg/reg/dao:
+    interfaces:
+      DAO:
+        config:
+          dir: testing/moq/pkg/reg/dao
+  github.com/goharbor/harbor/src/pkg/registry:
+    interfaces:
+      Client:
+        config:
+          dir: testing/moq/pkg/registry
+  github.com/goharbor/harbor/src/pkg/replication:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/replication
+  github.com/goharbor/harbor/src/pkg/replication/dao:
+    interfaces:
+      DAO:
+        config:
+          dir: testing/moq/pkg/replication/dao
+  github.com/goharbor/harbor/src/pkg/repository:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/repository
+  github.com/goharbor/harbor/src/pkg/repository/dao:
+    interfaces:
+      DAO:
+        config:
+          dir: testing/moq/pkg/repository/dao
+  github.com/goharbor/harbor/src/pkg/robot:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/robot
+  github.com/goharbor/harbor/src/pkg/robot/dao:
+    interfaces:
+      DAO:
+        config:
+          dir: testing/moq/pkg/robot/dao
+  github.com/goharbor/harbor/src/pkg/scan:
+    interfaces:
+      Handler:
+        config:
+          dir: testing/moq/pkg/scan
+  github.com/goharbor/harbor/src/pkg/scan/export:
+    interfaces:
+      ArtifactDigestCalculator:
+        config:
+          dir: testing/moq/pkg/scan/export
+      FilterProcessor:
+        config:
+          dir: testing/moq/pkg/scan/export
+      Manager:
+        config:
+          dir: testing/moq/pkg/scan/export
+  github.com/goharbor/harbor/src/pkg/scan/postprocessors:
+    interfaces:
+      NativeScanReportConverter:
+        config:
+          dir: testing/moq/pkg/scan/postprocessors
+  github.com/goharbor/harbor/src/pkg/scan/report:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/scan/report
+  github.com/goharbor/harbor/src/pkg/scan/sbom:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/scan/sbom
+  github.com/goharbor/harbor/src/pkg/scheduler:
+    interfaces:
+      Scheduler:
+        config:
+          dir: testing/moq/pkg/scheduler
+  github.com/goharbor/harbor/src/pkg/securityhub:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/securityhub
+  github.com/goharbor/harbor/src/pkg/systemartifact:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/systemartifact
+      Selector:
+        config:
+          dir: testing/moq/pkg/systemartifact/cleanup
+          pkgname: cleanup
+  github.com/goharbor/harbor/src/pkg/systemartifact/dao:
+    interfaces:
+      DAO:
+        config:
+          dir: testing/moq/pkg/systemartifact/dao
+  github.com/goharbor/harbor/src/pkg/tag:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/tag
+  github.com/goharbor/harbor/src/pkg/task:
+    interfaces:
+      ExecutionManager:
+        config:
+          dir: testing/moq/pkg/task
+      Manager:
+        config:
+          dir: testing/moq/pkg/task
+  github.com/goharbor/harbor/src/pkg/user:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/user
+  github.com/goharbor/harbor/src/pkg/user/dao:
+    interfaces:
+      DAO:
+        config:
+          dir: testing/moq/pkg/user/dao
+  github.com/goharbor/harbor/src/pkg/usergroup:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/moq/pkg/usergroup
+  github.com/goharbor/harbor/src/registryctl/client:
+    interfaces:
+      Client:
+        config:
+          dir: testing/moq/registryctl
+          pkgname: registryctl
+  github.com/goharbor/harbor/src/controller/tag:
+    interfaces:
+      Controller:
+        config:
+          dir: testing/moq/controller/tag
+  github.com/goharbor/harbor/src/controller/p2p/preheat:
+    interfaces:
+      Enforcer:
+        config:
+          dir: testing/moq/controller/p2p/preheat
+  github.com/goharbor/harbor/src/pkg/jobmonitor:
+    config:
+      dir: testing/moq/pkg/jobmonitor
+    interfaces:
+      JobServiceMonitorClient:
+      PoolManager:
+      QueueManager:
+      RedisClient:
+      WorkerManager:

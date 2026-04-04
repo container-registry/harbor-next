@@ -73,7 +73,7 @@ type controllerTestSuite struct {
 	artMgr       *arttesting.Manager
 	artrashMgr   *artrashtesting.Manager
 	blobMgr      *blobtesting.Manager
-	tagCtl       *tagtesting.FakeController
+	tagCtl       *tagtesting.Controller
 	labelMgr     *labeltesting.Manager
 	abstractor   *fakeAbstractor
 	immutableMtr *immutabletesting.FakeMatcher
@@ -87,7 +87,7 @@ func (c *controllerTestSuite) SetupTest() {
 	c.artMgr = &arttesting.Manager{}
 	c.artrashMgr = &artrashtesting.Manager{}
 	c.blobMgr = &blobtesting.Manager{}
-	c.tagCtl = &tagtesting.FakeController{}
+	c.tagCtl = &tagtesting.Controller{}
 	c.labelMgr = &labeltesting.Manager{}
 	c.abstractor = &fakeAbstractor{}
 	c.immutableMtr = &immutabletesting.FakeMatcher{}
