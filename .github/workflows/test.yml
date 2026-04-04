@@ -36,10 +36,7 @@ jobs:
 
       - name: Run pure unit tests
         working-directory: src
-        run: |
-          pkgs=$(../.github/scripts/list-test-packages.sh pure | tr '\n' ' ')
-          # shellcheck disable=SC2086
-          go test -race -count=1 -timeout=15m -cover $pkgs
+        run: go test -race -count=1 -timeout=15m -cover ./...
 
   # --------------------------------------------------------------------------
   # DB-dependent unit tests — need PostgreSQL + Redis, run serially
@@ -98,7 +95,4 @@ jobs:
 
       - name: Run DB unit tests
         working-directory: src
-        run: |
-          pkgs=$(../.github/scripts/list-test-packages.sh db | tr '\n' ' ')
-          # shellcheck disable=SC2086
-          go test -race -count=1 -timeout=15m -cover -p 1 -parallel 1 $pkgs
+        run: go test -race -count=1 -timeout=15m -tags db -cover -p 1 -parallel 1 ./...
