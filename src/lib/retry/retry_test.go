@@ -74,7 +74,7 @@ func TestRetry(t *testing.T) {
 
 	err := Retry(func() error {
 		return fmt.Errorf("always failed")
-	})
+	}, Timeout(3*time.Second))
 
 	assert.Error(err)
 	assert.Equal("retry timeout: always failed", err.Error())

@@ -32,7 +32,7 @@ type CacheTestSuite struct {
 }
 
 func (suite *CacheTestSuite) SetupSuite() {
-	suite.cache, _ = cache.New("redis", cache.Expiration(time.Second*5))
+	suite.cache, _ = cache.New("redis", cache.Expiration(time.Second))
 	suite.ctx = context.TODO()
 }
 
@@ -46,10 +46,10 @@ func (suite *CacheTestSuite) TestContains() {
 	suite.cache.Delete(suite.ctx, key)
 	suite.False(suite.cache.Contains(suite.ctx, key))
 
-	suite.cache.Save(suite.ctx, key, "value", time.Second*5)
+	suite.cache.Save(suite.ctx, key, "value", time.Second)
 	suite.True(suite.cache.Contains(suite.ctx, key))
 
-	time.Sleep(time.Second * 8)
+	time.Sleep(time.Second * 2)
 	suite.False(suite.cache.Contains(suite.ctx, key))
 }
 
@@ -88,7 +88,7 @@ func (suite *CacheTestSuite) TestSave() {
 		suite.cache.Fetch(suite.ctx, key, &value)
 		suite.Equal("hello, save", value)
 
-		time.Sleep(time.Second * 8)
+		time.Sleep(time.Second * 2)
 
 		value = ""
 		suite.Error(suite.cache.Fetch(suite.ctx, key, &value))

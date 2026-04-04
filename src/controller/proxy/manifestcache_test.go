@@ -60,6 +60,11 @@ type CacheTestSuite struct {
 }
 
 func (suite *CacheTestSuite) SetupSuite() {
+	// Use short intervals so tests don't sleep for minutes
+	sleepIntervalSec = 0
+	maxManifestListWait = 2
+	maxManifestWait = 2
+
 	suite.local = localInterfaceMock{}
 	suite.mListCache = &ManifestListCache{local: &suite.local}
 	suite.mCache = &ManifestCache{local: &suite.local}

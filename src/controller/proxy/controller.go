@@ -38,11 +38,16 @@ import (
 	model_tag "github.com/goharbor/harbor/src/pkg/tag/model/tag"
 )
 
-const (
+// Retry parameters for waiting on manifest dependencies.
+// Variables (not constants) so tests can shorten the intervals.
+var (
 	// wait more time than manifest (maxManifestWait) because manifest list depends on manifest ready
 	maxManifestListWait = 20
 	maxManifestWait     = 10
 	sleepIntervalSec    = 20
+)
+
+const (
 	// keep manifest list in cache for one week
 	manifestListCacheInterval = 7 * 24 * 60 * 60 * time.Second
 )
