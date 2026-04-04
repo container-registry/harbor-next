@@ -21,16 +21,24 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
-
+	proCtl "github.com/goharbor/harbor/src/controller/project"
 	proModels "github.com/goharbor/harbor/src/pkg/project/models"
-	"github.com/goharbor/harbor/src/testing/controller/project"
+	"github.com/goharbor/harbor/src/testing/moq/controller/project"
 )
 
 func Test_projectReferenceObject(t *testing.T) {
-	ctl := &project.Controller{}
-	ctl.On("GetByName", mock.AnythingOfType("context.todoCtx"), "library").Return(&proModels.Project{ProjectID: 1}, nil)
-	ctl.On("GetByName", mock.AnythingOfType("context.todoCtx"), "demo").Return(nil, fmt.Errorf("not found"))
+	ctl := &project.Controller{
+		GetByNameFunc: func(_ context.Context, projectName string, _ ...proCtl.Option) (*proModels.Project, error) {
+			switch projectName {
+			case "library":
+				return &proModels.Project{ProjectID: 1}, nil
+			case "demo":
+				return nil, fmt.Errorf("not found")
+			default:
+				return nil, fmt.Errorf("unknown project: %s", projectName)
+			}
+		},
+	}
 
 	originalProjectController := projectController
 	defer func() {

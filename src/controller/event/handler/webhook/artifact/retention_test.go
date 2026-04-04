@@ -3,12 +3,12 @@
 package artifact
 
 import (
+	"context"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/goharbor/harbor/src/common/dao"
@@ -20,8 +20,8 @@ import (
 	"github.com/goharbor/harbor/src/pkg/notification"
 	policy_model "github.com/goharbor/harbor/src/pkg/notification/policy/model"
 	ret "github.com/goharbor/harbor/src/pkg/retention"
-	retentiontesting "github.com/goharbor/harbor/src/testing/controller/retention"
-	testingnotification "github.com/goharbor/harbor/src/testing/pkg/notification/policy"
+	retentiontesting "github.com/goharbor/harbor/src/testing/moq/controller/retention"
+	testingnotification "github.com/goharbor/harbor/src/testing/moq/pkg/notification/policy"
 )
 
 func TestRetentionHandler_Handle(t *testing.T) {
@@ -35,32 +35,40 @@ func TestRetentionHandler_Handle(t *testing.T) {
 		notification.PolicyMgr = policyMgr
 		retention.Ctl = oldretentionCtl
 	}()
-	policyMgrMock := &testingnotification.Manager{}
-	notification.PolicyMgr = policyMgrMock
-	retentionCtl := &retentiontesting.Controller{}
-	retention.Ctl = retentionCtl
-	retentionCtl.On("GetRetentionExecTask", mock.Anything, mock.Anything).
-		Return(&ret.Task{
-			ID:          1,
-			ExecutionID: 1,
-			Status:      "Success",
-			StartTime:   time.Now(),
-			EndTime:     time.Now(),
-		}, nil)
-	retentionCtl.On("GetRetentionExec", mock.Anything, mock.Anything).Return(&ret.Execution{
-		ID:        1,
-		PolicyID:  1,
-		Status:    "Success",
-		Trigger:   "Manual",
-		DryRun:    true,
-		StartTime: time.Now(),
-		EndTime:   time.Now(),
-	}, nil)
-	policyMgrMock.On("GetRelatedPolices", mock.Anything, mock.Anything, mock.Anything).Return([]*policy_model.Policy{
-		{
-			ID: 0,
+	retentionCtl := &retentiontesting.Controller{
+		GetRetentionExecTaskFunc: func(_ context.Context, _ int64) (*ret.Task, error) {
+			return &ret.Task{
+				ID:          1,
+				ExecutionID: 1,
+				Status:      "Success",
+				StartTime:   time.Now(),
+				EndTime:     time.Now(),
+			}, nil
 		},
-	}, nil)
+		GetRetentionExecFunc: func(_ context.Context, _ int64) (*ret.Execution, error) {
+			return &ret.Execution{
+				ID:        1,
+				PolicyID:  1,
+				Status:    "Success",
+				Trigger:   "Manual",
+				DryRun:    true,
+				StartTime: time.Now(),
+				EndTime:   time.Now(),
+			}, nil
+		},
+	}
+	retention.Ctl = retentionCtl
+	policyMgrMock := &testingnotification.Manager{
+		GetRelatedPolicesFunc: func(_ context.Context, _ int64, _ string) ([]*policy_model.Policy, error) {
+			return []*policy_model.Policy{
+				{
+					ID: 0,
+				},
+			}, nil
+		},
+	}
+	notification.PolicyMgr = policyMgrMock
+
 
 	type args struct {
 		data any

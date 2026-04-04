@@ -18,14 +18,13 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/goharbor/harbor/src/lib/q"
 	accessorymodel "github.com/goharbor/harbor/src/pkg/accessory/model"
 	"github.com/goharbor/harbor/src/pkg/artifact"
-	accessorytesting "github.com/goharbor/harbor/src/testing/pkg/accessory"
-	artifacttesting "github.com/goharbor/harbor/src/testing/pkg/artifact"
+	accessorytesting "github.com/goharbor/harbor/src/testing/moq/pkg/accessory"
+	artifacttesting "github.com/goharbor/harbor/src/testing/moq/pkg/artifact"
 )
 
 type IteratorTestSuite struct {
@@ -55,22 +54,29 @@ func (suite *IteratorTestSuite) TeardownSuite() {
 }
 
 func (suite *IteratorTestSuite) TestIterator() {
-	suite.accMgr.On("List", mock.Anything, mock.Anything).Return([]accessorymodel.Accessory{}, nil)
-	q1 := &q.Query{PageNumber: 1, PageSize: 5, Keywords: map[string]any{}}
-	suite.artMgr.On("List", mock.Anything, q1).Return([]*artifact.Artifact{
-		{ID: 1},
-		{ID: 2},
-		{ID: 3},
-		{ID: 4},
-		{ID: 5},
-	}, nil)
-
-	q2 := &q.Query{PageNumber: 2, PageSize: 5, Keywords: map[string]any{}}
-	suite.artMgr.On("List", mock.Anything, q2).Return([]*artifact.Artifact{
-		{ID: 6},
-		{ID: 7},
-		{ID: 8},
-	}, nil)
+	suite.accMgr.ListFunc = func(_ context.Context, _ *q.Query) ([]accessorymodel.Accessory, error) {
+		return []accessorymodel.Accessory{}, nil
+	}
+	suite.artMgr.ListFunc = func(_ context.Context, query *q.Query) ([]*artifact.Artifact, error) {
+		switch query.PageNumber {
+		case 1:
+			return []*artifact.Artifact{
+				{ID: 1},
+				{ID: 2},
+				{ID: 3},
+				{ID: 4},
+				{ID: 5},
+			}, nil
+		case 2:
+			return []*artifact.Artifact{
+				{ID: 6},
+				{ID: 7},
+				{ID: 8},
+			}, nil
+		default:
+			return nil, nil
+		}
+	}
 
 	var artifacts []*Artifact
 	for art := range Iterator(context.TODO(), 5, nil, nil) {

@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/gomodule/redigo/redis"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/goharbor/harbor/src/jobservice/common/list"
@@ -147,7 +146,9 @@ func (suite *ReaperTestSuite) TestSyncOutdatedStats() {
 		list.New())
 	err := mt.Load()
 	suite.NoError(err, "track job stats")
-	suite.ctl.On("Track", suite.jid).Return(mt, nil)
+	suite.ctl.TrackFunc = func(jobID string) (job.Tracker, error) {
+		return mt, nil
+	}
 
 	err = suite.r.syncOutdatedStats()
 	suite.NoError(err, "sync outdated stats")
@@ -215,29 +216,28 @@ func mockJobStats(conn redis.Conn, ns string, jid string) error {
 }
 
 type mockLcmCtl struct {
-	mock.Mock
+	ServeFunc func() error
+	NewFunc   func(stats *job.Stats) (job.Tracker, error)
+	TrackFunc func(jobID string) (job.Tracker, error)
 }
 
 func (m *mockLcmCtl) Serve() error {
+	if m.ServeFunc != nil {
+		return m.ServeFunc()
+	}
 	return nil
 }
 
-// New tracker from the new provided stats
 func (m *mockLcmCtl) New(stats *job.Stats) (job.Tracker, error) {
-	args := m.Called(stats)
-	if args.Get(0) != nil {
-		return args.Get(0).(job.Tracker), nil
+	if m.NewFunc != nil {
+		return m.NewFunc(stats)
 	}
-
-	return nil, args.Error(1)
+	return nil, nil
 }
 
-// Track the life cycle of the specified existing job
 func (m *mockLcmCtl) Track(jobID string) (job.Tracker, error) {
-	args := m.Called(jobID)
-	if args.Get(0) != nil {
-		return args.Get(0).(job.Tracker), nil
+	if m.TrackFunc != nil {
+		return m.TrackFunc(jobID)
 	}
-
-	return nil, args.Error(1)
+	return nil, nil
 }

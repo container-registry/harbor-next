@@ -15,13 +15,13 @@
 package purge
 
 import (
+	"context"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/goharbor/harbor/src/pkg/task"
-	testingTask "github.com/goharbor/harbor/src/testing/pkg/task"
+	testingTask "github.com/goharbor/harbor/src/testing/moq/pkg/task"
 )
 
 type PurgeControllerTestSuite struct {
@@ -41,8 +41,12 @@ func (p *PurgeControllerTestSuite) SetupSuite() {
 }
 
 func (p *PurgeControllerTestSuite) TestStart() {
-	p.exeMgr.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(int64(1), nil)
-	p.taskMgr.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(int64(1), nil)
+	p.exeMgr.CreateFunc = func(_ context.Context, _ string, _ int64, _ string, _ ...map[string]any) (int64, error) {
+		return 1, nil
+	}
+	p.taskMgr.CreateFunc = func(_ context.Context, _ int64, _ *task.Job, _ ...map[string]any) (int64, error) {
+		return 1, nil
+	}
 	policy := JobPolicy{}
 	id, err := p.Ctl.Start(nil, policy, task.ExecutionTriggerManual)
 	p.Nil(err)

@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/gomodule/redigo/redis"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -110,8 +109,11 @@ func (suite *HookAgentTestSuite) prepareData() {
 
 // TestEventSending ...
 func (suite *HookAgentTestSuite) TestEventSending() {
-	mc := &mockClient{}
-	mc.On("SendEvent", suite.event).Return(nil)
+	mc := &mockClient{
+		SendEventFunc: func(_ *Event) error {
+			return nil
+		},
+	}
 	suite.agent.client = mc
 
 	err := suite.agent.Trigger(suite.event)
@@ -123,8 +125,11 @@ func (suite *HookAgentTestSuite) TestEventSending() {
 
 // TestEventSending ...
 func (suite *HookAgentTestSuite) TestEventSendingError() {
-	mc := &mockClient{}
-	mc.On("SendEvent", suite.event).Return(errors.New("internal server error: for testing"))
+	mc := &mockClient{
+		SendEventFunc: func(_ *Event) error {
+			return errors.New("internal server error: for testing")
+		},
+	}
 	suite.agent.client = mc
 
 	err := suite.agent.Trigger(suite.event)
@@ -141,10 +146,12 @@ func (suite *HookAgentTestSuite) checkStatus() {
 }
 
 type mockClient struct {
-	mock.Mock
+	SendEventFunc func(evt *Event) error
 }
 
 func (mc *mockClient) SendEvent(evt *Event) error {
-	args := mc.Called(evt)
-	return args.Error(0)
+	if mc.SendEventFunc != nil {
+		return mc.SendEventFunc(evt)
+	}
+	return nil
 }

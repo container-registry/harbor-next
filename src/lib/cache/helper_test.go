@@ -22,8 +22,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
-
-	"github.com/goharbor/harbor/src/testing/mock"
 )
 
 type Foobar struct {
@@ -41,9 +39,11 @@ func (suite *FetchOrSaveTestSuite) SetupSuite() {
 }
 
 func (suite *FetchOrSaveTestSuite) TestFetchInternalError() {
-	c := &mockCache{}
-
-	mock.OnAnything(c, "Fetch").Return(fmt.Errorf("oops"))
+	c := &mockCache{
+		FetchFunc: func(_ context.Context, _ string, _ any) error {
+			return fmt.Errorf("oops")
+		},
+	}
 
 	var str string
 	err := FetchOrSave(suite.ctx, c, "key", &str, func() (any, error) {
@@ -54,9 +54,11 @@ func (suite *FetchOrSaveTestSuite) TestFetchInternalError() {
 }
 
 func (suite *FetchOrSaveTestSuite) TestBuildError() {
-	c := &mockCache{}
-
-	mock.OnAnything(c, "Fetch").Return(ErrNotFound)
+	c := &mockCache{
+		FetchFunc: func(_ context.Context, _ string, _ any) error {
+			return ErrNotFound
+		},
+	}
 
 	var str string
 	err := FetchOrSave(suite.ctx, c, "key", &str, func() (any, error) {
@@ -67,10 +69,14 @@ func (suite *FetchOrSaveTestSuite) TestBuildError() {
 }
 
 func (suite *FetchOrSaveTestSuite) TestSaveError() {
-	c := &mockCache{}
-
-	mock.OnAnything(c, "Fetch").Return(ErrNotFound)
-	mock.OnAnything(c, "Save").Return(fmt.Errorf("oops"))
+	c := &mockCache{
+		FetchFunc: func(_ context.Context, _ string, _ any) error {
+			return ErrNotFound
+		},
+		SaveFunc: func(_ context.Context, _ string, _ any, _ ...time.Duration) error {
+			return fmt.Errorf("oops")
+		},
+	}
 
 	var str string
 	err := FetchOrSave(suite.ctx, c, "key", &str, func() (any, error) {
@@ -86,20 +92,20 @@ func (suite *FetchOrSaveTestSuite) TestSaveCalledOnlyOneTime() {
 
 	var data sync.Map
 
-	mock.OnAnything(c, "Fetch").Return(func(ctx context.Context, key string, value any) error {
+	c.FetchFunc = func(_ context.Context, key string, _ any) error {
 		_, ok := data.Load(key)
 		if ok {
 			return nil
 		}
 
 		return ErrNotFound
-	})
+	}
 
-	mock.OnAnything(c, "Save").Return(func(ctx context.Context, key string, value any, exp ...time.Duration) error {
+	c.SaveFunc = func(_ context.Context, key string, value any, _ ...time.Duration) error {
 		data.Store(key, value)
 
 		return nil
-	})
+	}
 
 	var wg sync.WaitGroup
 
@@ -118,7 +124,7 @@ func (suite *FetchOrSaveTestSuite) TestSaveCalledOnlyOneTime() {
 
 	wg.Wait()
 
-	c.AssertNumberOfCalls(suite.T(), "Save", 1)
+	suite.Equal(int64(1), c.saveCalls.Load())
 }
 
 func TestFetchOrSaveTestSuite(t *testing.T) {

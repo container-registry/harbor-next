@@ -18,11 +18,8 @@ import (
 	"context"
 	"testing"
 
-	testifymock "github.com/stretchr/testify/mock"
-
 	"github.com/goharbor/harbor/src/common/models"
-	"github.com/goharbor/harbor/src/testing/mock"
-	testinguserpkg "github.com/goharbor/harbor/src/testing/pkg/user"
+	testinguserpkg "github.com/goharbor/harbor/src/testing/moq/pkg/user"
 )
 
 func TestSearchUser(t *testing.T) {
@@ -33,15 +30,17 @@ func TestSearchUser(t *testing.T) {
 		Realname: "Existing user",
 	}
 
-	mockUserMgr := &testinguserpkg.Manager{}
+	mockUserMgr := &testinguserpkg.Manager{
+		GetByNameFunc: func(_ context.Context, username string) (*models.User, error) {
+			if username == "existuser" {
+				return user, nil
+			}
+			return nil, nil
+		},
+	}
 	auth := &Auth{
 		userMgr: mockUserMgr,
 	}
-
-	mockUserMgr.On("GetByName", mock.Anything, testifymock.MatchedBy(
-		func(name string) bool {
-			return name == "existuser"
-		})).Return(user, nil)
 
 	newUser, err := auth.SearchUser(context.TODO(), "existuser")
 	if err != nil {

@@ -20,7 +20,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	common_dao "github.com/goharbor/harbor/src/common/dao"
@@ -34,32 +33,46 @@ import (
 )
 
 type MockAuditLogManager struct {
-	mock.Mock
+	CountFunc  func(ctx context.Context, query *q.Query) (int64, error)
+	CreateFunc func(ctx context.Context, audit *model.AuditLog) (int64, error)
+	DeleteFunc func(ctx context.Context, id int64) error
+	GetFunc    func(ctx context.Context, id int64) (*model.AuditLog, error)
+	ListFunc   func(ctx context.Context, query *q.Query) ([]*model.AuditLog, error)
 }
 
-func (m *MockAuditLogManager) Count(ctx context.Context, query *q.Query) (total int64, err error) {
-	args := m.Called()
-	return int64(args.Int(0)), args.Error(1)
+func (m *MockAuditLogManager) Count(ctx context.Context, query *q.Query) (int64, error) {
+	if m.CountFunc != nil {
+		return m.CountFunc(ctx, query)
+	}
+	return 0, nil
 }
 
-func (m *MockAuditLogManager) Create(ctx context.Context, audit *model.AuditLog) (id int64, err error) {
-	args := m.Called()
-	return int64(args.Int(0)), args.Error(1)
+func (m *MockAuditLogManager) Create(ctx context.Context, audit *model.AuditLog) (int64, error) {
+	if m.CreateFunc != nil {
+		return m.CreateFunc(ctx, audit)
+	}
+	return 0, nil
 }
 
-func (m *MockAuditLogManager) Delete(ctx context.Context, id int64) (err error) {
-	args := m.Called()
-	return args.Error(0)
+func (m *MockAuditLogManager) Delete(ctx context.Context, id int64) error {
+	if m.DeleteFunc != nil {
+		return m.DeleteFunc(ctx, id)
+	}
+	return nil
 }
 
-func (m *MockAuditLogManager) Get(ctx context.Context, id int64) (audit *model.AuditLog, err error) {
-	args := m.Called()
-	return args.Get(0).(*model.AuditLog), args.Error(1)
+func (m *MockAuditLogManager) Get(ctx context.Context, id int64) (*model.AuditLog, error) {
+	if m.GetFunc != nil {
+		return m.GetFunc(ctx, id)
+	}
+	return nil, nil
 }
 
-func (m *MockAuditLogManager) List(ctx context.Context, query *q.Query) (audits []*model.AuditLog, err error) {
-	args := m.Called()
-	return args.Get(0).([]*model.AuditLog), args.Error(1)
+func (m *MockAuditLogManager) List(ctx context.Context, query *q.Query) ([]*model.AuditLog, error) {
+	if m.ListFunc != nil {
+		return m.ListFunc(ctx, query)
+	}
+	return nil, nil
 }
 
 type AuditLogHandlerTestSuite struct {
@@ -76,8 +89,12 @@ func (suite *AuditLogHandlerTestSuite) SetupSuite() {
 
 func (suite *AuditLogHandlerTestSuite) TestSubscribeTagEvent() {
 
-	suite.logMgr.On("Create", mock.Anything).Return(1, nil)
-	suite.logMgr.On("Count", mock.Anything).Return(1, nil)
+	suite.logMgr.CreateFunc = func(_ context.Context, _ *model.AuditLog) (int64, error) {
+		return 1, nil
+	}
+	suite.logMgr.CountFunc = func(_ context.Context, _ *q.Query) (int64, error) {
+		return 1, nil
+	}
 
 	// sample code to use the event framework.
 

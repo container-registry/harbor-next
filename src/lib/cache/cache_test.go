@@ -18,8 +18,9 @@ import (
 	"fmt"
 	"testing"
 
+	"context"
+
 	"github.com/goharbor/harbor/src/lib/retry"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -61,8 +62,11 @@ func (suite *CacheTestSuite) TestInitialize() {
 
 	{
 		Register("cache", func(opts Options) (Cache, error) {
-			c := &mockCache{}
-			c.On("Ping", mock.Anything).Return(retry.Abort(fmt.Errorf("oops")))
+			c := &mockCache{
+				PingFunc: func(_ context.Context) error {
+					return retry.Abort(fmt.Errorf("oops"))
+				},
+			}
 
 			return c, nil
 		})
@@ -74,8 +78,11 @@ func (suite *CacheTestSuite) TestInitialize() {
 
 	{
 		Register("cache", func(opts Options) (Cache, error) {
-			c := &mockCache{}
-			c.On("Ping", mock.Anything).Return(nil)
+			c := &mockCache{
+				PingFunc: func(_ context.Context) error {
+					return nil
+				},
+			}
 
 			return c, nil
 		})
