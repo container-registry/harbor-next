@@ -64,6 +64,14 @@ func (f *fakeAbstractor) AbstractMetadata(ctx context.Context, artifact *artifac
 	return args.Error(0)
 }
 
+type stubAbstractor struct {
+	fn func(context.Context, *artifact.Artifact) error
+}
+
+func (s stubAbstractor) AbstractMetadata(ctx context.Context, art *artifact.Artifact) error {
+	return s.fn(ctx, art)
+}
+
 type controllerTestSuite struct {
 	suite.Suite
 	ctl          *controller
@@ -258,6 +266,43 @@ func (c *controllerTestSuite) TestEnsureArtifact() {
 	c.Require().Error(err, errors.NotFoundError(nil))
 	c.False(created)
 	c.Require().Nil(art)
+
+	// reset the mock
+	c.SetupTest()
+
+	// the artifact doesn't exist and includes a pending BuildKit accessory candidate
+	c.repoMgr.On("GetByName", mock.Anything, mock.Anything).Return(&repomodel.RepoRecord{
+		ProjectID: 1,
+	}, nil)
+	c.artMgr.On("GetByDigest", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.NotFoundError(nil))
+	c.artMgr.On("Create", mock.Anything, mock.Anything).Return(int64(1), nil)
+	c.accMgr.On("Ensure", mock.Anything,
+		"sha256:cad250bb95ea402adf4f687cc7d6747ecf0de875e6d6117f74437893964903df",
+		"library/hello-world",
+		int64(2),
+		int64(3),
+		int64(4),
+		"sha256:44401ce7f2bf39029d0d56f095374b7f344e1986c8b4970ef4f4fdb98e3f7220",
+		accessorymodel.TypeBuildKitAttestation,
+	).Return(nil).Once()
+	c.ctl.abstractor = stubAbstractor{
+		fn: func(_ context.Context, art *artifact.Artifact) error {
+			art.AccessoryCandidates = []*artifact.AccessoryCandidate{{
+				ArtifactID:        3,
+				SubArtifactID:     2,
+				SubArtifactRepo:   "library/hello-world",
+				SubArtifactDigest: "sha256:cad250bb95ea402adf4f687cc7d6747ecf0de875e6d6117f74437893964903df",
+				Digest:            "sha256:44401ce7f2bf39029d0d56f095374b7f344e1986c8b4970ef4f4fdb98e3f7220",
+				Size:              4,
+				Type:              accessorymodel.TypeBuildKitAttestation,
+			}}
+			return nil
+		},
+	}
+	created, art, err = c.ctl.ensureArtifact(orm.NewContext(nil, &ormtesting.FakeOrmer{}), "library/hello-world", digest)
+	c.Require().Nil(err)
+	c.True(created)
+	c.Equal(int64(1), art.ID)
 }
 
 func (c *controllerTestSuite) TestEnsure() {

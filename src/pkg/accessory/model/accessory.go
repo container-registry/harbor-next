@@ -79,6 +79,9 @@ const (
 
 	// TypeHarborSBOM identifies sbom.harbor
 	TypeHarborSBOM = "sbom.harbor"
+
+	// TypeBuildKitAttestation identifies attestation.buildkit
+	TypeBuildKitAttestation = "attestation.buildkit"
 )
 
 // AccessoryData ...

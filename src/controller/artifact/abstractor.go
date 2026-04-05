@@ -177,6 +177,16 @@ func (a *abstractor) abstractIndexMetadata(ctx context.Context, art *artifact.Ar
 	art.Size += int64(len(content))
 	// populate the referenced artifacts
 	for _, mani := range index.Manifests {
+		candidate, err := a.toBuildKitAttestationCandidate(ctx, art.RepositoryName, mani, index.Manifests)
+		if err != nil {
+			return err
+		}
+		if candidate != nil {
+			art.Size += candidate.Size
+			art.AccessoryCandidates = append(art.AccessoryCandidates, candidate)
+			continue
+		}
+
 		digest := mani.Digest.String()
 		// make sure the child artifact exist
 		ar, err := a.artMgr.GetByDigest(ctx, art.RepositoryName, digest)
