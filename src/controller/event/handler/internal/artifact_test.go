@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build db
+
 package internal
 
 import (
@@ -114,15 +116,16 @@ func (suite *ArtifactHandlerTestSuite) TestDefaultAsyncFlushDuration() {
 
 // TestOnPush tests handle push events.
 func (suite *ArtifactHandlerTestSuite) TestOnPush() {
-	err := suite.handler.onPush(context.TODO(), &event.ArtifactEvent{Artifact: &artifact.Artifact{}})
+	err := suite.handler.onPush(suite.ctx, &event.ArtifactEvent{Artifact: &artifact.Artifact{ProjectID: 1}})
 	suite.Nil(err, "onPush should return nil")
 }
 
 // TestOnPull tests handler pull events.
 func (suite *ArtifactHandlerTestSuite) TestOnPull() {
+	handler := &ArtifactEventHandler{}
 	// test sync mode
 	asyncFlushDuration = 0
-	err := suite.handler.onPull(suite.ctx, &event.ArtifactEvent{Artifact: &artifact.Artifact{ID: 1, RepositoryID: 1}, Tags: []string{"latest"}})
+	err := handler.onPull(suite.ctx, &event.ArtifactEvent{Artifact: &artifact.Artifact{ID: 1, RepositoryID: 1}, Tags: []string{"latest"}})
 	suite.Nil(err, "onPull should return nil")
 	// sync mode should update db immediately
 	// pull_time
@@ -137,7 +140,7 @@ func (suite *ArtifactHandlerTestSuite) TestOnPull() {
 
 	// test async mode
 	asyncFlushDuration = 200 * time.Millisecond
-	err = suite.handler.onPull(suite.ctx, &event.ArtifactEvent{Artifact: &artifact.Artifact{ID: 1, RepositoryID: 1}, Tags: []string{"latest"}})
+	err = handler.onPull(suite.ctx, &event.ArtifactEvent{Artifact: &artifact.Artifact{ID: 1, RepositoryID: 1}, Tags: []string{"latest"}})
 	suite.Nil(err, "onPull should return nil")
 	// async mode should not update db immediately
 	// pull_time
@@ -219,4 +222,31 @@ func Test_parseProjectName(t *testing.T) {
 			}
 		})
 	}
+}
+
+func (suite *ArtifactHandlerTestSuite) TestUpdateParentArtifactPullTime() {
+	// Setup mock artifact manager
+	suite.artMgr.On("ListReferences", mock.Anything, mock.Anything).Return([]*artifact.Reference{
+		{
+			ID:       1,
+			ParentID: 100,
+			ChildID:  200,
+		},
+		{
+			ID:       2,
+			ParentID: 100,
+			ChildID:  200,
+		},
+	}, nil)
+
+	suite.artMgr.On("UpdatePullTime", mock.Anything, int64(100), mock.Anything).Return(nil)
+
+	handler := &ArtifactEventHandler{artMgr: suite.artMgr}
+	pullTime := time.Now()
+
+	// Test updating parent pull time
+	handler.updateParentArtifactPullTime(suite.ctx, 200, pullTime)
+
+	// UpdatePullTime should only be called once
+	suite.artMgr.AssertNumberOfCalls(suite.T(), "UpdatePullTime", 1)
 }

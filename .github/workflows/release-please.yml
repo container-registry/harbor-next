@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   release-please:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
@@ -35,7 +35,7 @@ jobs:
         platform:
           - linux/amd64
           - linux/arm64
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
     env:
@@ -47,18 +47,20 @@ jobs:
         run: |
           platform=${{ matrix.platform }}
           echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
+          if [ -n "$BUILDX_HOST" ]; then
+            echo "BUILDX_HOST=$BUILDX_HOST" >> "$GITHUB_ENV"
+          fi
 
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: ${{ needs.release-please.outputs.tag_name }}
 
       - name: Apply enterprise patches
-        if: ${{ vars.PATCHES_REPO != '' }}
         env:
-          PATCHES_TOKEN: ${{ secrets.PATCHES_TOKEN }}
+          PATCHES_TOKEN: ${{ secrets.REPO_READ_TOKEN_8GCR }}
         run: |
           git clone --depth=1 \
-            "https://x-access-token:${PATCHES_TOKEN}@github.com/${{ vars.PATCHES_REPO }}" \
+            "https://x-access-token:${PATCHES_TOKEN}@github.com/container-registry/8gcr" \
             /tmp/patches-repo
           while IFS= read -r patch; do
             patch=$(echo "$patch" | sed 's/#.*//' | xargs)
@@ -79,7 +81,7 @@ jobs:
 
       - name: Install Task
         if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
-        uses: arduino/setup-task@24c5e13bce349197642746563945fcdf9355e8f4 # v2
+        uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
         with:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
@@ -93,8 +95,12 @@ jobs:
         run: task build:binary:${{ matrix.component }}:${{ env.PLATFORM_PAIR }} GIT_COMMIT="${GITHUB_SHA:0:8}"
 
       - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+        if: env.BUILDX_HOST == ''
 
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+        with:
+          driver: ${{ env.BUILDX_HOST && 'remote' || '' }}
+          endpoint: ${{ env.BUILDX_HOST }}
 
       - name: Log in to registry
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
@@ -143,7 +149,7 @@ jobs:
     strategy:
       matrix:
         component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter, nginx]
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
     env:
@@ -151,6 +157,12 @@ jobs:
       REGISTRY_PROJECT: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
       VERSION: ${{ needs.release-please.outputs.version }}
     steps:
+      - name: Prepare BuildKit
+        run: |
+          if [ -n "$BUILDX_HOST" ]; then
+            echo "BUILDX_HOST=$BUILDX_HOST" >> "$GITHUB_ENV"
+          fi
+
       - name: Download digests
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
@@ -166,6 +178,9 @@ jobs:
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+        with:
+          driver: ${{ env.BUILDX_HOST && 'remote' || '' }}
+          endpoint: ${{ env.BUILDX_HOST }}
 
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests
@@ -180,7 +195,7 @@ jobs:
   sign:
     name: Sign and Release
     needs: [release-please, merge]
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: write
       id-token: write
@@ -211,12 +226,11 @@ jobs:
 
       - name: Collect enterprise patch descriptions
         id: patches
-        if: ${{ vars.PATCHES_REPO != '' }}
         env:
-          PATCHES_TOKEN: ${{ secrets.PATCHES_TOKEN }}
+          PATCHES_TOKEN: ${{ secrets.REPO_READ_TOKEN_8GCR }}
         run: |
           git clone --depth=1 \
-            "https://x-access-token:${PATCHES_TOKEN}@github.com/${{ vars.PATCHES_REPO }}" \
+            "https://x-access-token:${PATCHES_TOKEN}@github.com/container-registry/8gcr" \
             /tmp/patches-repo
           if [ -f /tmp/patches-repo/8gcr-ee/patches/series ]; then
             while IFS= read -r patch; do
