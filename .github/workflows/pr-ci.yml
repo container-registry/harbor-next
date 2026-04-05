@@ -220,54 +220,76 @@ jobs:
     needs: [sign]
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
+      issues: write
       pull-requests: write
     steps:
       - name: Create or update PR comment
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MARKER: "<!-- harbor-next-pr-preview -->"
-        run: |
-          body=$(cat <<EOF
-          ${MARKER}
-          Preview images for this PR are available in \`${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}\` with tag \`${PREVIEW_TAG}\`.
+        with:
+          script: |
+            const marker = process.env.MARKER;
+            const registryAddress = process.env.REGISTRY_ADDRESS;
+            const registryProject = process.env.REGISTRY_PROJECT;
+            const previewTag = process.env.PREVIEW_TAG;
+            const repository = process.env.GITHUB_REPOSITORY;
+            const issueNumber = context.payload.pull_request.number;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
 
-          - \`${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-core:${PREVIEW_TAG}\`
-          - \`${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-jobservice:${PREVIEW_TAG}\`
-          - \`${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-registryctl:${PREVIEW_TAG}\`
-          - \`${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-exporter:${PREVIEW_TAG}\`
-          - \`${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-portal:${PREVIEW_TAG}\`
-          - \`${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-registry:${PREVIEW_TAG}\`
-          - \`${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-trivy-adapter:${PREVIEW_TAG}\`
+            const body = `${marker}
+            Preview images for this PR are available in \`${registryAddress}/${registryProject}\` with tag \`${previewTag}\`.
 
-          Verify a preview image:
+            - \`${registryAddress}/${registryProject}/harbor-core:${previewTag}\`
+            - \`${registryAddress}/${registryProject}/harbor-jobservice:${previewTag}\`
+            - \`${registryAddress}/${registryProject}/harbor-registryctl:${previewTag}\`
+            - \`${registryAddress}/${registryProject}/harbor-exporter:${previewTag}\`
+            - \`${registryAddress}/${registryProject}/harbor-portal:${previewTag}\`
+            - \`${registryAddress}/${registryProject}/harbor-registry:${previewTag}\`
+            - \`${registryAddress}/${registryProject}/harbor-trivy-adapter:${previewTag}\`
 
-          \`\`\`
-          cosign verify \\
-            --certificate-identity-regexp="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/pr-ci.yml@.*" \\
-            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \\
-            ${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-core:${PREVIEW_TAG}
-          \`\`\`
+            Verify a preview image:
 
-          Verify SBOM attestation:
+            \`\`\`
+            cosign verify \\
+              --certificate-identity-regexp="https://github.com/${repository}/.github/workflows/pr-ci.yml@.*" \\
+              --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \\
+              ${registryAddress}/${registryProject}/harbor-core:${previewTag}
+            \`\`\`
 
-          \`\`\`
-          cosign verify-attestation \\
-            --certificate-identity-regexp="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/pr-ci.yml@.*" \\
-            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \\
-            --type spdxjson \\
-            ${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-core:${PREVIEW_TAG}
-          \`\`\`
-          EOF
-          )
+            Verify SBOM attestation:
 
-          comment_id=$(
-            gh api "repos/${GITHUB_REPOSITORY}/issues/${{ github.event.pull_request.number }}/comments" \
-              --jq '.[] | select(.body | contains("<!-- harbor-next-pr-preview -->")) | .id' \
-              | head -n 1
-          )
+            \`\`\`
+            cosign verify-attestation \\
+              --certificate-identity-regexp="https://github.com/${repository}/.github/workflows/pr-ci.yml@.*" \\
+              --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \\
+              --type spdxjson \\
+              ${registryAddress}/${registryProject}/harbor-core:${previewTag}
+            \`\`\``;
 
-          if [ -n "${comment_id}" ]; then
-            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" -f body="${body}" >/dev/null
-          else
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${{ github.event.pull_request.number }}/comments" -f body="${body}" >/dev/null
-          fi
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: issueNumber,
+              per_page: 100,
+            });
+
+            const existingComment = comments.find(comment => comment.body?.includes(marker));
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existingComment.id,
+                body,
+              });
+              return;
+            }
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: issueNumber,
+              body,
+            });
