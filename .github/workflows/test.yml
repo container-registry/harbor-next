@@ -10,43 +10,16 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: Unit Tests
-    runs-on: ubuntu-latest  # requires Docker daemon for services — switch to vars.RUNNER after DinD sidecar is deployed
-    services:
-      postgresql:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: root123
-          POSTGRES_DB: registry
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+  # --------------------------------------------------------------------------
+  # Pure unit tests — no external services, full parallelism
+  # --------------------------------------------------------------------------
+  test-unit:
+    name: Unit Tests (pure)
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository || contains(fromJSON('["OWNER","MEMBER"]'), github.event.pull_request.author_association)) && vars.RUNNER || 'ubuntu-latest' }}
     env:
-      POSTGRESQL_HOST: localhost
-      POSTGRESQL_USR: postgres
-      POSTGRESQL_PORT: "5432"
-      POSTGRESQL_PWD: root123
-      POSTGRESQL_DATABASE: registry
-      POSTGRES_MIGRATION_SCRIPTS_PATH: ${{ github.workspace }}/make/migrations/postgresql
-      UTTEST: "true"
-      JOB_SERVICE_POOL_REDIS_URL: "redis://localhost:6379"
+      CGO_ENABLED: "1"
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
@@ -58,31 +31,74 @@ jobs:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Increase postgres max_connections
-        run: |
-          PG_CONTAINER=$(docker ps -q --filter "ancestor=postgres:16-alpine")
-          docker exec "$PG_CONTAINER" psql -U postgres -c "ALTER SYSTEM SET max_connections = 300;"
-          docker restart "$PG_CONTAINER"
-          until docker exec "$PG_CONTAINER" pg_isready -U postgres; do sleep 1; done
+      - name: Ensure C toolchain for race detector
+        run: command -v gcc >/dev/null || sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc
 
       - name: Generate API code
         run: task build:gen-apis
 
-      - name: Run unit tests
+      - name: Run pure unit tests
         working-directory: src
-        run: |
-          # Exclude packages that require services not available in CI:
-          # - LDAP: needs a real LDAP server
-          # - core/api, core/controllers, pkg/proxy/connection: need full Harbor stack
-          # - pkg/token, server/middleware/security, controller/systeminfo: need /etc/core/ cert files
-          # - pkg/jobmonitor: needs REDIS_HOST env var with specific format
-          # - jobservice/runner: Redis job tracker state ordering issues
-          # - controller/usergroup/test, pkg/scan/dao/scanner, pkg/scan/export: upstream test state issues
-          # - pkg/scan/dao/scan, pkg/scan/postprocessors: foreign key constraint violations in CI
-          # - pkg/systemartifact: test ordering / state issues
-          # - jobservice/logger/getter: DB state ordering issues when packages run in parallel
-          pkgs=$(go list ./... | grep -vE \
-            '/controller/ldap$|/core/auth/ldap$|/pkg/ldap$|/core/api$|/core/controllers$|/pkg/proxy/connection$|/pkg/token$|/server/middleware/security$|/controller/systeminfo$|/pkg/jobmonitor$|/jobservice/runner$|/jobservice/logger/getter$|/controller/usergroup/test$|/pkg/scan/dao/scanner$|/pkg/scan/export$|/pkg/scan/dao/scan$|/pkg/scan/postprocessors$|/pkg/systemartifact$' \
-            | tr '\n' ' ')
-          # shellcheck disable=SC2086
-          go test -v -race -cover -p 4 $pkgs
+        run: go test -race -count=1 -timeout=15m -cover ./...
+
+  # --------------------------------------------------------------------------
+  # DB-dependent unit tests — need PostgreSQL + Redis, run serially
+  # --------------------------------------------------------------------------
+  test-db:
+    name: Unit Tests (DB)
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository || contains(fromJSON('["OWNER","MEMBER"]'), github.event.pull_request.author_association)) && vars.RUNNER || 'ubuntu-latest' }}
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: root123
+          POSTGRES_DB: registry
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379/tcp
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      POSTGRESQL_HOST: localhost
+      POSTGRESQL_USR: postgres
+      POSTGRESQL_PORT: ${{ job.services.postgres.ports[5432] }}
+      POSTGRESQL_PWD: root123
+      POSTGRESQL_DATABASE: registry
+      POSTGRES_MIGRATION_SCRIPTS_PATH: ${{ github.workspace }}/make/migrations/postgresql
+      UTTEST: "true"
+      JOB_SERVICE_POOL_REDIS_URL: "redis://localhost:${{ job.services.redis.ports[6379] }}"
+      CGO_ENABLED: "1"
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: src/go.mod
+          cache-dependency-path: src/go.sum
+
+      - uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Ensure C toolchain for race detector
+        run: command -v gcc >/dev/null || sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc
+
+      - name: Generate API code
+        run: task build:gen-apis
+
+      - name: Run DB unit tests
+        working-directory: src
+        run: go test -race -count=1 -timeout=15m -tags db -cover -p 1 -parallel 1 ./...
