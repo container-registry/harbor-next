@@ -88,7 +88,6 @@ export const multipleFilter: Array<{
 ];
 
 export enum AccessoryType {
-    ATTESTATION = 'attestation.buildkit',
     COSIGN = 'signature.cosign',
     NOTATION = 'signature.notation',
     NYDUS = 'accelerator.nydus',

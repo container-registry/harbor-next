@@ -289,38 +289,7 @@ var (
    "annotations": {
      "com.example.key1": "value1"
    }
-	  }`
-	buildKitAttestationIndex = `{
-  "schemaVersion": 2,
-  "mediaType": "application/vnd.oci.image.index.v1+json",
-  "manifests": [
-    {
-      "mediaType": "application/vnd.oci.image.manifest.v1+json",
-      "size": 7143,
-      "digest": "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
-      "platform": {
-        "architecture": "amd64",
-        "os": "linux"
-      }
-    },
-    {
-      "mediaType": "application/vnd.oci.image.manifest.v1+json",
-      "size": 1024,
-      "digest": "sha256:70ce0a747f09cd7c09c2d6eaeab69d60adb0398f569296e8c0e844599388ebd6",
-      "annotations": {
-        "vnd.docker.reference.digest": "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
-        "vnd.docker.reference.type": "attestation-manifest"
-      },
-      "platform": {
-        "architecture": "unknown",
-        "os": "unknown"
-      }
-    }
-  ],
-  "annotations": {
-    "com.example.key1": "value1"
-  }
-}`
+ }`
 )
 
 type abstractorTestSuite struct {
@@ -465,7 +434,7 @@ func (a *abstractorTestSuite) TestAbstractMetadataOfIndex() {
 	a.Assert().Equal(v1.MediaTypeImageIndex, artifact.ManifestMediaType)
 	a.Assert().Equal(v1.MediaTypeImageIndex, artifact.MediaType)
 	a.Assert().Equal("", artifact.ArtifactType)
-	a.Assert().Equal(int64(len([]byte(index))+20), artifact.Size)
+	a.Assert().Equal(int64(668), artifact.Size)
 	a.Require().Len(artifact.Annotations, 1)
 	a.Assert().Equal("value1", artifact.Annotations["com.example.key1"])
 	a.Len(artifact.References, 2)
@@ -488,41 +457,10 @@ func (a *abstractorTestSuite) TestAbstractMetadataOfIndexWithArtifactType() {
 	a.Assert().Equal(v1.MediaTypeImageIndex, artifact.ManifestMediaType)
 	a.Assert().Equal(v1.MediaTypeImageIndex, artifact.MediaType)
 	a.Assert().Equal("application/vnd.food.stand", artifact.ArtifactType)
-	a.Assert().Equal(int64(len([]byte(indexWithArtifactType))+20), artifact.Size)
+	a.Assert().Equal(int64(801), artifact.Size)
 	a.Require().Len(artifact.Annotations, 1)
 	a.Assert().Equal("value1", artifact.Annotations["com.example.key1"])
 	a.Len(artifact.References, 2)
-}
-
-func (a *abstractorTestSuite) TestAbstractMetadataOfIndexWithBuildKitAttestation() {
-	indexManifest, _, err := distribution.UnmarshalManifest(v1.MediaTypeImageIndex, []byte(buildKitAttestationIndex))
-	a.Require().Nil(err)
-
-	const repo = "library/test"
-	a.regCli.On("PullManifest", repo, mock.Anything).Return(indexManifest, "", nil).Once()
-	a.argMgr.On("GetByDigest", mock.Anything, repo, "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f").Return(&artifact.Artifact{
-		ID:     2,
-		Digest: "sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f",
-		Size:   10,
-	}, nil).Twice()
-	a.argMgr.On("GetByDigest", mock.Anything, repo, "sha256:70ce0a747f09cd7c09c2d6eaeab69d60adb0398f569296e8c0e844599388ebd6").Return(&artifact.Artifact{
-		ID:     3,
-		Digest: "sha256:70ce0a747f09cd7c09c2d6eaeab69d60adb0398f569296e8c0e844599388ebd6",
-		Size:   3,
-	}, nil).Once()
-
-	artifact := &artifact.Artifact{ID: 1, RepositoryName: repo}
-	err = a.abstractor.AbstractMetadata(context.TODO(), artifact)
-	a.Require().Nil(err)
-	a.Equal(v1.MediaTypeImageIndex, artifact.ManifestMediaType)
-	a.Equal(v1.MediaTypeImageIndex, artifact.MediaType)
-	a.Equal(int64(len([]byte(buildKitAttestationIndex))+13), artifact.Size)
-	a.Len(artifact.References, 1)
-	a.Len(artifact.AccessoryCandidates, 1)
-	a.Equal(int64(3), artifact.AccessoryCandidates[0].ArtifactID)
-	a.Equal(int64(2), artifact.AccessoryCandidates[0].SubArtifactID)
-	a.Equal("sha256:e692418e4cbaf90ca69d05a66403747baa33ee08806650b51fab815ad7fc331f", artifact.AccessoryCandidates[0].SubArtifactDigest)
-	a.Equal("attestation.buildkit", artifact.AccessoryCandidates[0].Type)
 }
 
 type unknownManifest struct{}
