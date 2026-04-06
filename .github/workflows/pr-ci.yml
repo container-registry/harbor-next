@@ -275,7 +275,10 @@ jobs:
               per_page: 100,
             });
 
-            const existingComment = comments.find(comment => comment.body?.includes(marker));
+            const existingComment = comments.find(comment =>
+              comment.user?.login === 'github-actions[bot]' &&
+              comment.body?.startsWith(marker)
+            );
 
             if (existingComment) {
               await github.rest.issues.updateComment({

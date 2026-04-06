@@ -35,6 +35,7 @@ const (
 	buildKitReferenceDigestAnnotation = "vnd.docker.reference.digest"
 	buildKitAttestationManifestType   = "attestation-manifest"
 	inTotoLayerMediaType              = "application/vnd.in-toto+json"
+	maxBuildKitStatementBytes   int64 = 4 << 20 // 4 MiB
 )
 
 type buildKitStatement struct {
@@ -111,9 +112,15 @@ func (a *abstractor) loadBuildKitAttestationSubjects(ctx context.Context, reposi
 		}
 		defer blob.Close()
 
-		payload, err := io.ReadAll(blob)
+		if layer.Size > 0 && layer.Size > maxBuildKitStatementBytes {
+			return nil, fmt.Errorf("in-toto payload too large: %d", layer.Size)
+		}
+		payload, err := io.ReadAll(io.LimitReader(blob, maxBuildKitStatementBytes+1))
 		if err != nil {
 			return nil, err
+		}
+		if int64(len(payload)) > maxBuildKitStatementBytes {
+			return nil, fmt.Errorf("in-toto payload exceeds %d bytes", maxBuildKitStatementBytes)
 		}
 
 		statement := &buildKitStatement{}

@@ -303,6 +303,7 @@ func (c *controllerTestSuite) TestEnsureArtifact() {
 	c.Require().Nil(err)
 	c.True(created)
 	c.Equal(int64(1), art.ID)
+	c.accMgr.AssertExpectations(c.T())
 }
 
 func (c *controllerTestSuite) TestEnsure() {

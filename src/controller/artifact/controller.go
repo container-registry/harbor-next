@@ -247,13 +247,13 @@ func (c *controller) ensureArtifact(ctx context.Context, repository, digest stri
 		if err != nil {
 			return err
 		}
-		created = true
 		artifact.ID = id
 		for _, candidate := range pendingAccessories {
 			if err := c.accessoryMgr.Ensure(ctx, candidate.SubArtifactDigest, candidate.SubArtifactRepo, candidate.SubArtifactID, candidate.ArtifactID, candidate.Size, candidate.Digest, candidate.Type); err != nil {
 				return err
 			}
 		}
+		created = true
 		return nil
 	})(orm.SetTransactionOpNameToContext(ctx, "tx-ensure-artifact")); err != nil {
 		// got error that isn't conflict error, return directly
