@@ -53,8 +53,7 @@ func (a *abstractor) toBuildKitAttestationCandidate(ctx context.Context, reposit
 
 	subjects, err := a.loadBuildKitAttestationSubjects(ctx, repository, descriptor.Digest.String())
 	if err != nil {
-		log.G(ctx).Debugf("skip BuildKit attestation candidate for %s@%s: %v", repository, descriptor.Digest.String(), err)
-		return nil, nil
+		log.G(ctx).Debugf("could not load BuildKit attestation subjects for %s@%s, falling back to annotation-based resolution: %v", repository, descriptor.Digest.String(), err)
 	}
 
 	targetDigest := resolveBuildKitAttestationSubject(descriptor, siblings, subjects)
