@@ -7,7 +7,7 @@ tmp_dir = "tmp"
 
 [build]
   # Build with debug flags for Delve (-N disables optimizations, -l disables inlining)
-  cmd = "cd src && CGO_ENABLED=0 GOMODCACHE=/tmp/gomodcache /usr/local/go/bin/go build -gcflags=all='-N -l' -trimpath -o ../tmp/core ./core/main.go"
+  cmd = "cd src && CGO_ENABLED=0 GOMODCACHE=/go/pkg/mod /usr/local/go/bin/go build -gcflags=all='-N -l' -trimpath -o ../tmp/core ./core/main.go"
 
   bin = "tmp/core"
   args_bin = []

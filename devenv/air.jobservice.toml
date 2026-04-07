@@ -7,7 +7,7 @@ tmp_dir = "tmp"
 
 [build]
   # Build command - includes debug flags for Delve compatibility
-  cmd = "cd src && CGO_ENABLED=0 GOMODCACHE=/tmp/gomodcache /usr/local/go/bin/go build -gcflags=all='-N -l' -o ../tmp/jobservice ./jobservice/main.go"
+  cmd = "cd src && CGO_ENABLED=0 GOMODCACHE=/go/pkg/mod /usr/local/go/bin/go build -gcflags=all='-N -l' -o ../tmp/jobservice ./jobservice/main.go"
 
   # Binary output path (used by full_bin)
   bin = "tmp/jobservice"
