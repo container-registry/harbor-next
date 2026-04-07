@@ -57,7 +57,7 @@
         "karma": "6.4.2",
         "karma-chrome-launcher": "~3.1.0",
         "karma-coverage": "^2.2.1",
-        "karma-jasmine": "~4.0.1",
+        "karma-jasmine": "~5.1.0",
         "karma-jasmine-html-reporter": "^1.7.0",
         "ng-swagger-gen": "^1.8.1",
         "prettier": "^2.8.8",
@@ -1564,7 +1564,7 @@
 
     "karma-coverage": ["karma-coverage@2.2.1", "", { "dependencies": { "istanbul-lib-coverage": "^3.2.0", "istanbul-lib-instrument": "^5.1.0", "istanbul-lib-report": "^3.0.0", "istanbul-lib-source-maps": "^4.0.1", "istanbul-reports": "^3.0.5", "minimatch": "^3.0.4" } }, "sha512-yj7hbequkQP2qOSb20GuNSIyE//PgJWHwC2IydLE6XRtsnaflv+/OSGNssPjobYUlhVVagy99TQpqUt3vAUG7A=="],
 
-    "karma-jasmine": ["karma-jasmine@4.0.2", "", { "dependencies": { "jasmine-core": "^3.6.0" }, "peerDependencies": { "karma": "*" } }, "sha512-ggi84RMNQffSDmWSyyt4zxzh2CQGwsxvYYsprgyR1j8ikzIduEdOlcLvXjZGwXG/0j41KUXOWsUCBfbEHPWP9g=="],
+    "karma-jasmine": ["karma-jasmine@5.1.0", "", { "dependencies": { "jasmine-core": "^4.1.0" }, "peerDependencies": { "karma": "^6.0.0" } }, "sha512-i/zQLFrfEpRyQoJF9fsCdTMOF5c2dK7C7OmsuKg2D0YSsuZSfQDiLuaiktbuio6F2wiCsZSnSnieIQ0ant/uzQ=="],
 
     "karma-jasmine-html-reporter": ["karma-jasmine-html-reporter@1.7.0", "", { "peerDependencies": { "jasmine-core": ">=3.8", "karma": ">=0.9", "karma-jasmine": ">=1.1" } }, "sha512-pzum1TL7j90DTE86eFt48/s12hqwQuiD+e5aXx2Dc9wDEn2LfGq6RoAxEZZjFiN0RDSCOnosEKRZWxbQ+iMpQQ=="],
 
@@ -2603,8 +2603,6 @@
     "json-schema-ref-parser/js-yaml": ["js-yaml@3.14.1", "", { "dependencies": { "argparse": "^1.0.7", "esprima": "^4.0.0" }, "bin": "bin/js-yaml.js" }, "sha512-okMH7OXXJ7YrN9Ok3/SXrnu4iX9yOk+25nqX4imS2npuvTYDmo/QEZoqwZkYaIDk3jVvBOTOIEgEhaLOynBS9g=="],
 
     "karma/yargs": ["yargs@16.2.0", "", { "dependencies": { "cliui": "^7.0.2", "escalade": "^3.1.1", "get-caller-file": "^2.0.5", "require-directory": "^2.1.1", "string-width": "^4.2.0", "y18n": "^5.0.5", "yargs-parser": "^20.2.2" } }, "sha512-D1mvvtDG0L5ft/jGWkLpG1+m0eQxOfaBvTNELraWj22wSVUMWxZUvYgJYcKh6jGGIkJFhH4IZPQhR4TKpc8mBw=="],
-
-    "karma-jasmine/jasmine-core": ["jasmine-core@3.99.1", "", {}, "sha512-Hu1dmuoGcZ7AfyynN3LsfruwMbxMALMka+YtZeGoLuDEySVmVAPaonkNoBRIw/ectu8b9tVQCJNgp4a4knp+tg=="],
 
     "katex/commander": ["commander@8.3.0", "", {}, "sha512-OkTL9umf+He2DZkUq8f8J9of7yL6RJKI24dVITBmNfZBmri9zYZQrKkuXiKhyfPSu8tUhnVBB1iKXevvnlR4Ww=="],
 
