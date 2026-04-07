@@ -19,26 +19,26 @@ import (
 	"github.com/goharbor/harbor/src/pkg/accessory/model/base"
 )
 
-// BuildKitAttestation models BuildKit provenance and SBOM attachments.
-type BuildKitAttestation struct {
+// Attestation models OCI attestation accessories.
+type Attestation struct {
 	base.Default
 }
 
 // Kind gives the reference type of attestation.
-func (a *BuildKitAttestation) Kind() string {
+func (a *Attestation) Kind() string {
 	return model.RefHard
 }
 
 // IsHard reports whether the attestation is hard-linked to its subject.
-func (a *BuildKitAttestation) IsHard() bool {
+func (a *Attestation) IsHard() bool {
 	return true
 }
 
-// New returns a BuildKit attestation accessory.
+// New returns an attestation accessory.
 func New(data model.AccessoryData) model.Accessory {
-	return &BuildKitAttestation{Default: base.Default{Data: data}}
+	return &Attestation{Default: base.Default{Data: data}}
 }
 
 func init() {
-	model.Register(model.TypeBuildKitAttestation, New)
+	model.Register(model.TypeInTotoAttestation, New)
 }

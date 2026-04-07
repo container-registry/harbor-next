@@ -31,11 +31,11 @@ import (
 )
 
 const (
-	buildKitReferenceTypeAnnotation   = "vnd.docker.reference.type"
-	buildKitReferenceDigestAnnotation = "vnd.docker.reference.digest"
-	buildKitAttestationManifestType   = "attestation-manifest"
-	inTotoLayerMediaType              = "application/vnd.in-toto+json"
-	maxBuildKitStatementBytes   int64 = 4 << 20 // 4 MiB
+	buildKitReferenceTypeAnnotation         = "vnd.docker.reference.type"
+	buildKitReferenceDigestAnnotation       = "vnd.docker.reference.digest"
+	buildKitAttestationManifestType         = "attestation-manifest"
+	inTotoLayerMediaType                    = "application/vnd.in-toto+json"
+	maxBuildKitStatementBytes         int64 = 4 << 20 // 4 MiB
 )
 
 type buildKitStatement struct {
@@ -78,7 +78,7 @@ func (a *abstractor) toBuildKitAttestationCandidate(ctx context.Context, reposit
 		SubArtifactDigest: targetDigest,
 		Digest:            accessoryArt.Digest,
 		Size:              accessoryArt.Size,
-		Type:              accessorymodel.TypeBuildKitAttestation,
+		Type:              accessorymodel.TypeInTotoAttestation,
 	}, nil
 }
 
@@ -105,7 +105,6 @@ func (a *abstractor) loadBuildKitAttestationSubjects(ctx context.Context, reposi
 		if layer.MediaType != inTotoLayerMediaType {
 			continue
 		}
-
 		_, blob, err := a.regCli.PullBlob(repository, layer.Digest.String())
 		if err != nil {
 			return nil, err

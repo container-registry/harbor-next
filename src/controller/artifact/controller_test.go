@@ -270,7 +270,7 @@ func (c *controllerTestSuite) TestEnsureArtifact() {
 	// reset the mock
 	c.SetupTest()
 
-	// the artifact doesn't exist and includes a pending BuildKit accessory candidate
+	// the artifact doesn't exist and includes a pending attestation accessory candidate
 	c.repoMgr.On("GetByName", mock.Anything, mock.Anything).Return(&repomodel.RepoRecord{
 		ProjectID: 1,
 	}, nil)
@@ -283,7 +283,7 @@ func (c *controllerTestSuite) TestEnsureArtifact() {
 		int64(3),
 		int64(4),
 		"sha256:44401ce7f2bf39029d0d56f095374b7f344e1986c8b4970ef4f4fdb98e3f7220",
-		accessorymodel.TypeBuildKitAttestation,
+		accessorymodel.TypeInTotoAttestation,
 	).Return(nil).Once()
 	c.ctl.abstractor = stubAbstractor{
 		fn: func(_ context.Context, art *artifact.Artifact) error {
@@ -294,7 +294,7 @@ func (c *controllerTestSuite) TestEnsureArtifact() {
 				SubArtifactDigest: "sha256:cad250bb95ea402adf4f687cc7d6747ecf0de875e6d6117f74437893964903df",
 				Digest:            "sha256:44401ce7f2bf39029d0d56f095374b7f344e1986c8b4970ef4f4fdb98e3f7220",
 				Size:              4,
-				Type:              accessorymodel.TypeBuildKitAttestation,
+				Type:              accessorymodel.TypeInTotoAttestation,
 			}}
 			return nil
 		},

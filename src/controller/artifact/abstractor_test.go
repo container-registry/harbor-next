@@ -591,7 +591,7 @@ func (a *abstractorTestSuite) TestAbstractMetadataOfIndexWithBuildKitAttestation
 	a.Equal(int64(3), artifact.AccessoryCandidates[0].ArtifactID)
 	a.Equal(int64(2), artifact.AccessoryCandidates[0].SubArtifactID)
 	a.Equal("sha256:cad250bb95ea402adf4f687cc7d6747ecf0de875e6d6117f74437893964903df", artifact.AccessoryCandidates[0].SubArtifactDigest)
-	a.Equal("attestation.buildkit", artifact.AccessoryCandidates[0].Type)
+	a.Equal("attestation.intoto", artifact.AccessoryCandidates[0].Type)
 }
 
 // TestAbstractMetadataOfIndexWithBuildKitAttestationAnnotationOnly verifies
@@ -624,7 +624,7 @@ func (a *abstractorTestSuite) TestAbstractMetadataOfIndexWithBuildKitAttestation
 	a.Equal(int64(3), artifact.AccessoryCandidates[0].ArtifactID)
 	a.Equal(int64(2), artifact.AccessoryCandidates[0].SubArtifactID)
 	a.Equal("sha256:cad250bb95ea402adf4f687cc7d6747ecf0de875e6d6117f74437893964903df", artifact.AccessoryCandidates[0].SubArtifactDigest)
-	a.Equal("attestation.buildkit", artifact.AccessoryCandidates[0].Type)
+	a.Equal("attestation.intoto", artifact.AccessoryCandidates[0].Type)
 }
 
 type unknownManifest struct{}

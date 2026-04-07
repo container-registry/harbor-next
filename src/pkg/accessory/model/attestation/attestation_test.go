@@ -3,6 +3,7 @@ package attestation
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/goharbor/harbor/src/pkg/accessory/model"
@@ -19,7 +20,7 @@ type AttestationTestSuite struct {
 func (suite *AttestationTestSuite) SetupSuite() {
 	suite.digest = suite.DigestString()
 	suite.subDigest = suite.DigestString()
-	suite.accessory, _ = model.New(model.TypeBuildKitAttestation, model.AccessoryData{
+	suite.accessory, _ = model.New(model.TypeInTotoAttestation, model.AccessoryData{
 		ArtifactID:        1,
 		SubArtifactDigest: suite.subDigest,
 		Size:              1234,
@@ -36,7 +37,7 @@ func (suite *AttestationTestSuite) TestGetDigest() {
 }
 
 func (suite *AttestationTestSuite) TestGetType() {
-	suite.Equal(model.TypeBuildKitAttestation, suite.accessory.GetData().Type)
+	suite.Equal(model.TypeInTotoAttestation, suite.accessory.GetData().Type)
 }
 
 func (suite *AttestationTestSuite) TestKind() {
@@ -54,4 +55,10 @@ func (suite *AttestationTestSuite) TestDisplay() {
 
 func TestAttestationTestSuite(t *testing.T) {
 	suite.Run(t, new(AttestationTestSuite))
+}
+
+func TestInTotoTypeRegistered(t *testing.T) {
+	acc, err := model.New(model.TypeInTotoAttestation, model.AccessoryData{})
+	require.NoError(t, err)
+	require.Equal(t, model.TypeInTotoAttestation, acc.GetData().Type)
 }

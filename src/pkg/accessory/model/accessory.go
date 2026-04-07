@@ -80,8 +80,9 @@ const (
 	// TypeHarborSBOM identifies sbom.harbor
 	TypeHarborSBOM = "sbom.harbor"
 
-	// TypeBuildKitAttestation identifies attestation.buildkit
-	TypeBuildKitAttestation = "attestation.buildkit"
+	// TypeInTotoAttestation identifies an attestation that carries an
+	// application/vnd.in-toto+json payload.
+	TypeInTotoAttestation = "attestation.intoto"
 )
 
 // AccessoryData ...

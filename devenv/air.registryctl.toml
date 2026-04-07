@@ -7,14 +7,14 @@ tmp_dir = "tmp"
 
 [build]
   # Build with debug flags for Delve (-N disables optimizations, -l disables inlining)
-  cmd = "cd src && CGO_ENABLED=0 go build -gcflags=all='-N -l' -trimpath -o ../tmp/registryctl ./registryctl/main.go"
+  cmd = "cd src && CGO_ENABLED=0 GOMODCACHE=/tmp/gomodcache /usr/local/go/bin/go build -gcflags=all='-N -l' -trimpath -o ../tmp/registryctl ./registryctl/main.go"
 
   bin = "tmp/registryctl"
   args_bin = ["-c", "config/registryctl.yml"]
 
   # Delve debugger on port 2347, starts immediately (--continue)
   # Attach anytime with: dlv connect localhost:2347
-  full_bin = "dlv exec ./tmp/registryctl --listen=0.0.0.0:2347 --headless=true --api-version=2 --accept-multiclient --continue --"
+  full_bin = "/go/bin/dlv exec ./tmp/registryctl --listen=0.0.0.0:2347 --headless=true --api-version=2 --accept-multiclient --continue --"
 
   # Watch src directory for Go files only
   include_dir = ["src"]
