@@ -45,8 +45,7 @@
 
 <clr-dropdown
     class="mr-1"
-    *ngIf="isTagMode && !isTopModel"
-    [disabled]="!hasPullCommandForTag(artifact)">
+    *ngIf="isTagMode && !isTopModel && hasPullCommandForTag(artifact)">
     <hbr-copy-input
         *ngIf="isImage(artifact)"
         [title]="getPullCommandForRuntimeByTag(artifact)"
