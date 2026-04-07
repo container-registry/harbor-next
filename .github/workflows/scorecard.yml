@@ -13,7 +13,8 @@ permissions: read-all
 jobs:
   analysis:
     name: Scorecard Analysis
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    # Scorecard result publishing requires a single GitHub-hosted Ubuntu runner.
+    runs-on: ubuntu-latest
     permissions:
       security-events: write
       id-token: write
