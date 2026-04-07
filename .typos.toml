@@ -26,6 +26,8 @@ jobservice   = "jobservice"
 # Container/OCI terminology
 oci  = "oci"
 oras = "oras"
+# in-toto normalized label segment
+intoto = "intoto"
 # Public API field names - fixing would be a breaking API change
 unknow    = "unknow"
 unsupport = "unsupport"

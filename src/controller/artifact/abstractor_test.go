@@ -16,6 +16,9 @@ package artifact
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"strings"
 	"testing"
 
 	"github.com/docker/distribution"
@@ -290,6 +293,95 @@ var (
      "com.example.key1": "value1"
    }
  }`
+	buildKitAttestationIndex = `{
+  "schemaVersion": 2,
+  "mediaType": "application/vnd.oci.image.index.v1+json",
+  "manifests": [
+    {
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "size": 7143,
+      "digest": "sha256:cad250bb95ea402adf4f687cc7d6747ecf0de875e6d6117f74437893964903df",
+      "platform": {
+        "architecture": "amd64",
+        "os": "linux"
+      }
+    },
+    {
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "size": 1024,
+      "digest": "sha256:44401ce7f2bf39029d0d56f095374b7f344e1986c8b4970ef4f4fdb98e3f7220",
+      "annotations": {
+        "vnd.docker.reference.digest": "sha256:480b518ed0138eacf2d070de80cb8eb019fb0b3565e2598ed654a541c31061a0",
+        "vnd.docker.reference.type": "attestation-manifest"
+      },
+      "platform": {
+        "architecture": "unknown",
+        "os": "unknown"
+      }
+    }
+  ],
+  "annotations": {
+    "com.example.key1": "value1"
+  }
+}`
+	buildKitAttestationManifest = `{
+  "schemaVersion": 2,
+  "mediaType": "application/vnd.oci.image.manifest.v1+json",
+  "config": {
+    "mediaType": "application/vnd.oci.image.config.v1+json",
+    "size": 167,
+    "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "layers": [
+    {
+      "mediaType": "application/vnd.in-toto+json",
+      "size": 2156,
+      "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ]
+}`
+	buildKitAttestationStatement = `{
+  "_type": "https://in-toto.io/Statement/v0.1",
+  "subject": [
+    {
+      "name": "amd64",
+      "digest": {
+        "sha256": "480b518ed0138eacf2d070de80cb8eb019fb0b3565e2598ed654a541c31061a0"
+      }
+    }
+  ],
+  "predicateType": "https://slsa.dev/provenance/v1"
+}`
+	// Index where the attestation annotation digest points directly at the
+	// platform child so resolution works without in-toto subject loading.
+	buildKitAttestationIndexAnnotationOnly = `{
+  "schemaVersion": 2,
+  "mediaType": "application/vnd.oci.image.index.v1+json",
+  "manifests": [
+    {
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "size": 7143,
+      "digest": "sha256:cad250bb95ea402adf4f687cc7d6747ecf0de875e6d6117f74437893964903df",
+      "platform": {
+        "architecture": "amd64",
+        "os": "linux"
+      }
+    },
+    {
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "size": 1024,
+      "digest": "sha256:44401ce7f2bf39029d0d56f095374b7f344e1986c8b4970ef4f4fdb98e3f7220",
+      "annotations": {
+        "vnd.docker.reference.digest": "sha256:cad250bb95ea402adf4f687cc7d6747ecf0de875e6d6117f74437893964903df",
+        "vnd.docker.reference.type": "attestation-manifest"
+      },
+      "platform": {
+        "architecture": "unknown",
+        "os": "unknown"
+      }
+    }
+  ]
+}`
 )
 
 type abstractorTestSuite struct {
@@ -461,6 +553,78 @@ func (a *abstractorTestSuite) TestAbstractMetadataOfIndexWithArtifactType() {
 	a.Require().Len(artifact.Annotations, 1)
 	a.Assert().Equal("value1", artifact.Annotations["com.example.key1"])
 	a.Len(artifact.References, 2)
+}
+
+func (a *abstractorTestSuite) TestAbstractMetadataOfIndexWithBuildKitAttestation() {
+	indexManifest, _, err := distribution.UnmarshalManifest(v1.MediaTypeImageIndex, []byte(buildKitAttestationIndex))
+	a.Require().Nil(err)
+	attestationManifest, _, err := distribution.UnmarshalManifest(v1.MediaTypeImageManifest, []byte(buildKitAttestationManifest))
+	a.Require().Nil(err)
+
+	const repo = "library/test"
+	a.regCli.On("PullManifest", repo, mock.Anything).Return(indexManifest, "", nil).Once()
+	a.regCli.On("PullManifest", repo, "sha256:44401ce7f2bf39029d0d56f095374b7f344e1986c8b4970ef4f4fdb98e3f7220").Return(attestationManifest, "", nil).Once()
+	a.regCli.On("PullBlob", repo, "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb").Return(
+		int64(len(buildKitAttestationStatement)),
+		io.NopCloser(strings.NewReader(buildKitAttestationStatement)),
+		nil,
+	).Once()
+	a.argMgr.On("GetByDigest", mock.Anything, repo, "sha256:cad250bb95ea402adf4f687cc7d6747ecf0de875e6d6117f74437893964903df").Return(&artifact.Artifact{
+		ID:     2,
+		Digest: "sha256:cad250bb95ea402adf4f687cc7d6747ecf0de875e6d6117f74437893964903df",
+		Size:   10,
+	}, nil).Twice()
+	a.argMgr.On("GetByDigest", mock.Anything, repo, "sha256:44401ce7f2bf39029d0d56f095374b7f344e1986c8b4970ef4f4fdb98e3f7220").Return(&artifact.Artifact{
+		ID:     3,
+		Digest: "sha256:44401ce7f2bf39029d0d56f095374b7f344e1986c8b4970ef4f4fdb98e3f7220",
+		Size:   3,
+	}, nil).Once()
+
+	artifact := &artifact.Artifact{ID: 1, RepositoryName: repo}
+	err = a.abstractor.AbstractMetadata(context.TODO(), artifact)
+	a.Require().Nil(err)
+	a.Equal(v1.MediaTypeImageIndex, artifact.ManifestMediaType)
+	a.Equal(v1.MediaTypeImageIndex, artifact.MediaType)
+	a.Equal(int64(len([]byte(buildKitAttestationIndex))+13), artifact.Size)
+	a.Len(artifact.References, 1)
+	a.Len(artifact.AccessoryCandidates, 1)
+	a.Equal(int64(3), artifact.AccessoryCandidates[0].ArtifactID)
+	a.Equal(int64(2), artifact.AccessoryCandidates[0].SubArtifactID)
+	a.Equal("sha256:cad250bb95ea402adf4f687cc7d6747ecf0de875e6d6117f74437893964903df", artifact.AccessoryCandidates[0].SubArtifactDigest)
+	a.Equal("attestation.intoto", artifact.AccessoryCandidates[0].Type)
+}
+
+// TestAbstractMetadataOfIndexWithBuildKitAttestationAnnotationOnly verifies
+// that annotation-based subject resolution works when in-toto subject loading
+// fails (e.g. no in-toto layer in the attestation manifest).
+func (a *abstractorTestSuite) TestAbstractMetadataOfIndexWithBuildKitAttestationAnnotationOnly() {
+	indexManifest, _, err := distribution.UnmarshalManifest(v1.MediaTypeImageIndex, []byte(buildKitAttestationIndexAnnotationOnly))
+	a.Require().Nil(err)
+
+	const repo = "library/test"
+	a.regCli.On("PullManifest", repo, mock.Anything).Return(indexManifest, "", nil).Once()
+	// PullManifest for the attestation returns an error to simulate loading failure
+	a.regCli.On("PullManifest", repo, "sha256:44401ce7f2bf39029d0d56f095374b7f344e1986c8b4970ef4f4fdb98e3f7220").Return(nil, "", fmt.Errorf("no in-toto payload")).Once()
+	a.argMgr.On("GetByDigest", mock.Anything, repo, "sha256:cad250bb95ea402adf4f687cc7d6747ecf0de875e6d6117f74437893964903df").Return(&artifact.Artifact{
+		ID:     2,
+		Digest: "sha256:cad250bb95ea402adf4f687cc7d6747ecf0de875e6d6117f74437893964903df",
+		Size:   10,
+	}, nil).Twice()
+	a.argMgr.On("GetByDigest", mock.Anything, repo, "sha256:44401ce7f2bf39029d0d56f095374b7f344e1986c8b4970ef4f4fdb98e3f7220").Return(&artifact.Artifact{
+		ID:     3,
+		Digest: "sha256:44401ce7f2bf39029d0d56f095374b7f344e1986c8b4970ef4f4fdb98e3f7220",
+		Size:   3,
+	}, nil).Once()
+
+	artifact := &artifact.Artifact{ID: 1, RepositoryName: repo}
+	err = a.abstractor.AbstractMetadata(context.TODO(), artifact)
+	a.Require().Nil(err)
+	a.Len(artifact.References, 1)
+	a.Len(artifact.AccessoryCandidates, 1)
+	a.Equal(int64(3), artifact.AccessoryCandidates[0].ArtifactID)
+	a.Equal(int64(2), artifact.AccessoryCandidates[0].SubArtifactID)
+	a.Equal("sha256:cad250bb95ea402adf4f687cc7d6747ecf0de875e6d6117f74437893964903df", artifact.AccessoryCandidates[0].SubArtifactDigest)
+	a.Equal("attestation.intoto", artifact.AccessoryCandidates[0].Type)
 }
 
 type unknownManifest struct{}
