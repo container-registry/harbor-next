@@ -12,7 +12,7 @@
     "lint_fix": "ng lint --fix",
     "lint:style": "npx stylelint \"**/*.scss\"",
     "lint_fix:style": "npx stylelint \"**/*.scss\" --fix",
-    "test": "bun ./node_modules/@angular/cli/bin/ng test --code-coverage",
+    "test": "node ./node_modules/@angular/cli/bin/ng test --code-coverage",
     "test:watch": "ng test --code-coverage --watch",
     "test:debug": "ng test --code-coverage --source-map false",
     "test:chrome": "ng test --code-coverage --browsers Chrome",
