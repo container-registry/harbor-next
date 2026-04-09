@@ -188,7 +188,7 @@ jobs:
         run: go install github.com/google/go-containerregistry/cmd/crane@v0.20.3
 
       - name: Install envsubst
-        run: command -v envsubst || sudo apt-get install -y gettext-base
+        run: command -v envsubst || (sudo apt-get update && sudo apt-get install -y gettext-base)
 
       - name: Install cosign
         uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
