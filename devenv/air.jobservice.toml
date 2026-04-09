@@ -7,7 +7,7 @@ tmp_dir = "tmp"
 
 [build]
   # Build command - includes debug flags for Delve compatibility
-  cmd = "cd src && CGO_ENABLED=0 go build -gcflags=all='-N -l' -o ../tmp/jobservice ./jobservice/main.go"
+  cmd = "cd src && CGO_ENABLED=0 GOMODCACHE=/go/pkg/mod /usr/local/go/bin/go build -gcflags=all='-N -l' -o ../tmp/jobservice ./jobservice/main.go"
 
   # Binary output path (used by full_bin)
   bin = "tmp/jobservice"
@@ -17,7 +17,7 @@ tmp_dir = "tmp"
 
   # Run via Delve debugger - allows attaching debugger at any time
   # Port 2346 for Jobservice (Core uses 2345), --continue starts immediately without waiting for debugger
-  full_bin = "dlv exec ./tmp/jobservice --listen=0.0.0.0:2346 --headless=true --api-version=2 --accept-multiclient --continue -- -c config/jobservice.yml"
+  full_bin = "/go/bin/dlv exec ./tmp/jobservice --listen=0.0.0.0:2346 --headless=true --api-version=2 --accept-multiclient --continue -- -c config/jobservice.yml"
 
   # Watch these directories
   include_dir = ["src"]

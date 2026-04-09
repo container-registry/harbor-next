@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -388,20 +389,21 @@ func (a *artifactAPI) ListAccessories(ctx context.Context, params operation.List
 		return a.SendError(ctx, err)
 	}
 
-	// If no direct signature found, check for Cosign signatures inherited from a parent OCI index.
-	if len(accs) == 0 {
-		// Use strings.Contains because the UI sends a list of types (e.g. type={signature.cosign ...})
-		if strings.Contains(lib.StringValue(params.Q), "signature.cosign") {
+	// If no direct Cosign signature found, check for inherited ones from a parent OCI index.
+	hasCosign := slices.ContainsFunc(accs, func(acc accessorymodel.Accessory) bool {
+		return acc.GetData().Type == accessorymodel.TypeCosignSignature
+	})
+	if !hasCosign {
+		if strings.Contains(lib.StringValue(params.Q), accessorymodel.TypeCosignSignature) {
 			artWithAccs, err := a.artCtl.Get(ctx, art.ID, &artifact.Option{WithAccessory: true})
 			if err != nil {
 				log.Warningf("failed to get artifact %d with accessories for inheritance check: %v", art.ID, err)
 			} else if artWithAccs != nil {
-				// Combine direct and inherited accessories
 				allAccs := append(artWithAccs.Accessories, artWithAccs.InheritedAccessories...)
 				for _, acc := range allAccs {
 					if acc.GetData().Type == accessorymodel.TypeCosignSignature {
 						accs = append(accs, acc)
-						total = 1
+						total++
 						break
 					}
 				}
