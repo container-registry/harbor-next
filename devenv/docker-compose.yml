@@ -5,7 +5,7 @@
 
 services:
   postgresql:
-    image: postgres:18-alpine
+    image: docker.io/library/postgres:18-alpine
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: root123
@@ -83,6 +83,8 @@ services:
       JOBSERVICE_URL: http://jobservice:8888
       CORE_SECRET: devenv-secret-do-not-use-in-production
       JOBSERVICE_SECRET: devenv-secret-do-not-use-in-production
+      # Portal (dev server on port 4200, not Nginx on 8080)
+      PORTAL_URL: http://portal:4200
       # Trivy scanner
       TRIVY_ADAPTER_URL: http://trivy-adapter:8080
       WITH_TRIVY: "true"
