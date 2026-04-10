@@ -88,34 +88,85 @@ type controllerTestSuite struct {
 	proCtl       *projecttesting.Controller
 }
 
+// SetupTest resets all mock fields and creates a bare controller.
+// Each test must call the setupXxx helpers for the mocks it needs,
+// keeping the total mock.Mock instance count (and race-detector
+// overhead) proportional to actual usage instead of O(mocks×tests).
 func (c *controllerTestSuite) SetupTest() {
+	c.repoMgr = nil
+	c.artMgr = nil
+	c.artrashMgr = nil
+	c.blobMgr = nil
+	c.tagCtl = nil
+	c.labelMgr = nil
+	c.abstractor = nil
+	c.immutableMtr = nil
+	c.regCli = nil
+	c.accMgr = nil
+	c.proCtl = nil
+	c.ctl = &controller{}
+}
+
+func (c *controllerTestSuite) setupRepoMgr() {
 	c.repoMgr = &repotesting.Manager{}
+	c.ctl.repoMgr = c.repoMgr
+}
+
+func (c *controllerTestSuite) setupArtMgr() {
 	c.artMgr = &arttesting.Manager{}
+	c.ctl.artMgr = c.artMgr
+}
+
+func (c *controllerTestSuite) setupArtrashMgr() {
 	c.artrashMgr = &artrashtesting.Manager{}
+	c.ctl.artrashMgr = c.artrashMgr
+}
+
+func (c *controllerTestSuite) setupBlobMgr() {
 	c.blobMgr = &blob.Manager{}
+	c.ctl.blobMgr = c.blobMgr
+}
+
+func (c *controllerTestSuite) setupTagCtl() {
 	c.tagCtl = &tagtesting.FakeController{}
+	c.ctl.tagCtl = c.tagCtl
+}
+
+func (c *controllerTestSuite) setupLabelMgr() {
 	c.labelMgr = &label.Manager{}
+	c.ctl.labelMgr = c.labelMgr
+}
+
+func (c *controllerTestSuite) setupAbstractor() {
 	c.abstractor = &fakeAbstractor{}
+	c.ctl.abstractor = c.abstractor
+}
+
+func (c *controllerTestSuite) setupImmutableMtr() {
 	c.immutableMtr = &immutable.FakeMatcher{}
-	c.accMgr = &accessorytesting.Manager{}
+	c.ctl.immutableMtr = c.immutableMtr
+}
+
+func (c *controllerTestSuite) setupRegCli() {
 	c.regCli = &registry.Client{}
+	c.ctl.regCli = c.regCli
+}
+
+func (c *controllerTestSuite) setupAccMgr() {
+	c.accMgr = &accessorytesting.Manager{}
+	c.ctl.accessoryMgr = c.accMgr
+}
+
+func (c *controllerTestSuite) setupProCtl() {
 	c.proCtl = &projecttesting.Controller{}
-	c.ctl = &controller{
-		repoMgr:      c.repoMgr,
-		artMgr:       c.artMgr,
-		artrashMgr:   c.artrashMgr,
-		blobMgr:      c.blobMgr,
-		tagCtl:       c.tagCtl,
-		labelMgr:     c.labelMgr,
-		abstractor:   c.abstractor,
-		immutableMtr: c.immutableMtr,
-		regCli:       c.regCli,
-		accessoryMgr: c.accMgr,
-		proCtl:       c.proCtl,
-	}
+	c.ctl.proCtl = c.proCtl
 }
 
 func (c *controllerTestSuite) TestAssembleArtifact() {
+	c.setupTagCtl()
+	c.setupLabelMgr()
+	c.setupAccMgr()
+
 	art := &artifact.Artifact{
 		ID:             1,
 		Digest:         "sha256:123",
@@ -229,6 +280,7 @@ func (c *controllerTestSuite) TestEnsureArtifact() {
 	digest := "sha256:418fb88ec412e340cdbef913b8ca1bbe8f9e8dc705f9617414c1f2c8db980180"
 
 	// the artifact already exists
+	c.setupArtMgr()
 	c.artMgr.On("GetByDigest", mock.Anything, mock.Anything, mock.Anything).Return(&artifact.Artifact{
 		ID: 1,
 	}, nil)
@@ -239,6 +291,9 @@ func (c *controllerTestSuite) TestEnsureArtifact() {
 
 	// reset the mock
 	c.SetupTest()
+	c.setupRepoMgr()
+	c.setupArtMgr()
+	c.setupAbstractor()
 
 	// the artifact doesn't exist
 	c.repoMgr.On("GetByName", mock.Anything, mock.Anything).Return(&repomodel.RepoRecord{
@@ -254,6 +309,9 @@ func (c *controllerTestSuite) TestEnsureArtifact() {
 
 	// reset the mock
 	c.SetupTest()
+	c.setupRepoMgr()
+	c.setupArtMgr()
+	c.setupAbstractor()
 
 	// the artifact doesn't exist and get a conflict error on creating the artifact and fail to get again
 	c.repoMgr.On("GetByName", mock.Anything, mock.Anything).Return(&repomodel.RepoRecord{
@@ -307,6 +365,13 @@ func (c *controllerTestSuite) TestEnsureArtifact() {
 }
 
 func (c *controllerTestSuite) TestEnsure() {
+	c.setupRepoMgr()
+	c.setupArtMgr()
+	c.setupAbstractor()
+	c.setupTagCtl()
+	c.setupAccMgr()
+	c.setupProCtl()
+
 	digest := "sha256:418fb88ec412e340cdbef913b8ca1bbe8f9e8dc705f9617414c1f2c8db980180"
 
 	// both the artifact and the tag don't exist
@@ -331,6 +396,7 @@ func (c *controllerTestSuite) TestEnsure() {
 }
 
 func (c *controllerTestSuite) TestCount() {
+	c.setupArtMgr()
 	c.artMgr.On("Count", mock.Anything, mock.Anything).Return(int64(1), nil)
 	total, err := c.ctl.Count(nil, nil)
 	c.Require().Nil(err)
@@ -338,6 +404,11 @@ func (c *controllerTestSuite) TestCount() {
 }
 
 func (c *controllerTestSuite) TestList() {
+	c.setupArtMgr()
+	c.setupTagCtl()
+	c.setupRepoMgr()
+	c.setupAccMgr()
+
 	query := &q.Query{}
 	option := &Option{
 		WithTag:       true,
@@ -377,6 +448,11 @@ func (c *controllerTestSuite) TestList() {
 }
 
 func (c *controllerTestSuite) TestListWithLatest() {
+	c.setupArtMgr()
+	c.setupTagCtl()
+	c.setupRepoMgr()
+	c.setupAccMgr()
+
 	query := &q.Query{}
 	option := &Option{
 		WithTag:       true,
@@ -416,6 +492,8 @@ func (c *controllerTestSuite) TestListWithLatest() {
 }
 
 func (c *controllerTestSuite) TestGet() {
+	c.setupArtMgr()
+	c.setupRepoMgr()
 	c.artMgr.On("Get", mock.Anything, mock.Anything, mock.Anything).Return(&artifact.Artifact{
 		ID:           1,
 		RepositoryID: 1,
@@ -428,6 +506,9 @@ func (c *controllerTestSuite) TestGet() {
 }
 
 func (c *controllerTestSuite) TestGetByDigest() {
+	c.setupRepoMgr()
+	c.setupArtMgr()
+
 	// not found
 	c.repoMgr.On("GetByName", mock.Anything, mock.Anything).Return(&repomodel.RepoRecord{
 		RepositoryID: 1,
@@ -440,6 +521,8 @@ func (c *controllerTestSuite) TestGetByDigest() {
 
 	// reset the mock
 	c.SetupTest()
+	c.setupRepoMgr()
+	c.setupArtMgr()
 
 	// success
 	c.repoMgr.On("GetByName", mock.Anything, mock.Anything).Return(&repomodel.RepoRecord{
@@ -458,6 +541,9 @@ func (c *controllerTestSuite) TestGetByDigest() {
 }
 
 func (c *controllerTestSuite) TestGetByTag() {
+	c.setupRepoMgr()
+	c.setupTagCtl()
+
 	// not found
 	c.repoMgr.On("GetByName", mock.Anything, mock.Anything).Return(&repomodel.RepoRecord{
 		RepositoryID: 1,
@@ -469,6 +555,9 @@ func (c *controllerTestSuite) TestGetByTag() {
 
 	// reset the mock
 	c.SetupTest()
+	c.setupRepoMgr()
+	c.setupTagCtl()
+	c.setupArtMgr()
 
 	// success
 	c.repoMgr.On("GetByName", mock.Anything, mock.Anything).Return(&repomodel.RepoRecord{
@@ -495,6 +584,9 @@ func (c *controllerTestSuite) TestGetByTag() {
 }
 
 func (c *controllerTestSuite) TestGetByReference() {
+	c.setupRepoMgr()
+	c.setupArtMgr()
+
 	// reference is digest
 	c.repoMgr.On("GetByName", mock.Anything, mock.Anything).Return(&repomodel.RepoRecord{
 		RepositoryID: 1,
@@ -512,6 +604,9 @@ func (c *controllerTestSuite) TestGetByReference() {
 
 	// reset the mock
 	c.SetupTest()
+	c.setupRepoMgr()
+	c.setupTagCtl()
+	c.setupArtMgr()
 
 	// reference is tag
 	c.repoMgr.On("GetByName", mock.Anything, mock.Anything).Return(&repomodel.RepoRecord{
@@ -539,6 +634,9 @@ func (c *controllerTestSuite) TestGetByReference() {
 
 func (c *controllerTestSuite) TestDeleteDeeply() {
 	// root artifact and doesn't exist
+	c.setupArtMgr()
+	c.setupAccMgr()
+	c.setupLabelMgr()
 	c.artMgr.On("Get", mock.Anything, mock.Anything).Return(nil, errors.NotFoundError(nil))
 	c.accMgr.On("List", mock.Anything, mock.Anything).Return([]accessorymodel.Accessory{}, nil)
 	c.labelMgr.On("ListByArtifact", mock.Anything, mock.Anything).Return([]*model.Label{}, nil)
@@ -548,6 +646,9 @@ func (c *controllerTestSuite) TestDeleteDeeply() {
 
 	// reset the mock
 	c.SetupTest()
+	c.setupArtMgr()
+	c.setupAccMgr()
+	c.setupLabelMgr()
 
 	// child artifact and doesn't exist
 	c.artMgr.On("Get", mock.Anything, mock.Anything).Return(nil, errors.NotFoundError(nil))
@@ -558,6 +659,12 @@ func (c *controllerTestSuite) TestDeleteDeeply() {
 
 	// reset the mock
 	c.SetupTest()
+	c.setupArtMgr()
+	c.setupTagCtl()
+	c.setupRepoMgr()
+	c.setupArtrashMgr()
+	c.setupAccMgr()
+	c.setupLabelMgr()
 
 	// child artifact and contains tags
 	c.artMgr.On("Get", mock.Anything, mock.Anything).Return(&artifact.Artifact{ID: 1}, nil)
@@ -579,6 +686,11 @@ func (c *controllerTestSuite) TestDeleteDeeply() {
 
 	// reset the mock
 	c.SetupTest()
+	c.setupArtMgr()
+	c.setupTagCtl()
+	c.setupRepoMgr()
+	c.setupAccMgr()
+	c.setupLabelMgr()
 
 	// root artifact is referenced by other artifacts
 	c.artMgr.On("Get", mock.Anything, mock.Anything).Return(&artifact.Artifact{ID: 1}, nil)
@@ -596,6 +708,11 @@ func (c *controllerTestSuite) TestDeleteDeeply() {
 
 	// reset the mock
 	c.SetupTest()
+	c.setupArtMgr()
+	c.setupTagCtl()
+	c.setupRepoMgr()
+	c.setupAccMgr()
+	c.setupLabelMgr()
 
 	// child artifact contains no tag but referenced by other artifacts
 	c.artMgr.On("Get", mock.Anything, mock.Anything).Return(&artifact.Artifact{ID: 1}, nil)
@@ -613,6 +730,13 @@ func (c *controllerTestSuite) TestDeleteDeeply() {
 
 	// reset the mock
 	c.SetupTest()
+	c.setupArtMgr()
+	c.setupTagCtl()
+	c.setupLabelMgr()
+	c.setupAccMgr()
+	c.setupBlobMgr()
+	c.setupRepoMgr()
+	c.setupArtrashMgr()
 
 	// accessory contains tag
 	c.artMgr.On("Get", mock.Anything, mock.Anything).Return(&artifact.Artifact{ID: 1}, nil)
@@ -640,6 +764,14 @@ func (c *controllerTestSuite) TestDeleteDeeply() {
 }
 
 func (c *controllerTestSuite) TestCopy() {
+	c.setupArtMgr()
+	c.setupProCtl()
+	c.setupRepoMgr()
+	c.setupTagCtl()
+	c.setupAccMgr()
+	c.setupAbstractor()
+	c.setupRegCli()
+
 	c.artMgr.On("Get", mock.Anything, mock.Anything).Return(&artifact.Artifact{
 		ID:     1,
 		Digest: "sha256:418fb88ec412e340cdbef913b8ca1bbe8f9e8dc705f9617414c1f2c8db980180",
@@ -685,6 +817,9 @@ func (c *controllerTestSuite) TestCopy() {
 }
 
 func (c *controllerTestSuite) TestUpdatePullTime() {
+	c.setupTagCtl()
+	c.setupArtMgr()
+
 	// artifact ID and tag ID matches
 	c.tagCtl.On("Get").Return(&tag.Tag{
 		Tag: model_tag.Tag{
@@ -701,6 +836,8 @@ func (c *controllerTestSuite) TestUpdatePullTime() {
 
 	// reset the mock
 	c.SetupTest()
+	c.setupTagCtl()
+	c.setupArtMgr()
 
 	// artifact ID and tag ID doesn't match
 	c.tagCtl.On("Get").Return(&tag.Tag{
@@ -716,6 +853,8 @@ func (c *controllerTestSuite) TestUpdatePullTime() {
 
 	// if no tag, should not update tag
 	c.SetupTest()
+	c.setupTagCtl()
+	c.setupArtMgr()
 	c.tagCtl.On("Update").Return(nil)
 	c.artMgr.On("UpdatePullTime", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	err = c.ctl.UpdatePullTime(nil, 1, 0, time.Now())
@@ -726,24 +865,30 @@ func (c *controllerTestSuite) TestUpdatePullTime() {
 }
 
 func (c *controllerTestSuite) TestGetAddition() {
+	c.setupArtMgr()
 	c.artMgr.On("Get", mock.Anything, mock.Anything).Return(&artifact.Artifact{}, nil)
 	_, err := c.ctl.GetAddition(nil, 1, "addition")
 	c.Require().NotNil(err)
 }
 
 func (c *controllerTestSuite) TestAddTo() {
+	c.setupLabelMgr()
 	c.labelMgr.On("AddTo", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	err := c.ctl.AddLabel(context.Background(), 1, 1)
 	c.Require().Nil(err)
 }
 
 func (c *controllerTestSuite) TestRemoveFrom() {
+	c.setupLabelMgr()
 	c.labelMgr.On("RemoveFrom", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	err := c.ctl.RemoveLabel(nil, 1, 1)
 	c.Require().Nil(err)
 }
 
 func (c *controllerTestSuite) TestWalk() {
+	c.setupArtMgr()
+	c.setupAccMgr()
+
 	c.artMgr.On("List", mock.Anything, mock.Anything).Return([]*artifact.Artifact{
 		{Digest: "d1", ManifestMediaType: v1.MediaTypeImageManifest},
 		{Digest: "d2", ManifestMediaType: v1.MediaTypeImageManifest},
@@ -781,6 +926,8 @@ func (c *controllerTestSuite) TestWalk() {
 }
 
 func (c *controllerTestSuite) TestIsInto() {
+	c.setupBlobMgr()
+
 	blobs := []*models.Blob{
 		{Digest: "sha256:00000", ContentType: "application/vnd.oci.image.manifest.v1+json"},
 		{Digest: "sha256:22222", ContentType: "application/vnd.oci.image.config.v1+json"},
