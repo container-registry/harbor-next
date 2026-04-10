@@ -11,6 +11,10 @@ COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=certs /etc/passwd /etc/group /etc/
 COPY --from=lprobe /lprobe /lprobe
 ARG TARGETARCH
+ARG harbor_version=dev
+ARG git_commit=unknown
+LABEL org.opencontainers.image.version=${harbor_version}
+LABEL org.opencontainers.image.revision=${git_commit}
 COPY bin/linux-${TARGETARCH}/harbor-exporter /harbor-exporter
 WORKDIR /
 EXPOSE 8080

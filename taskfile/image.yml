@@ -132,6 +132,7 @@ tasks:
         vars:
           IMAGE_NAME: 'harbor-{{.SERVICE}}'
           DOCKERFILE: '{{.SERVICE}}.dockerfile'
+          BUILD_ARGS: '{{.BUILD_ARGS | default ""}}'
 
   # --- Go Services (require pre-built binaries) ---
 
@@ -162,6 +163,7 @@ tasks:
       - task: _binary-image
         vars:
           SERVICE: exporter
+          BUILD_ARGS: '--build-arg harbor_version={{.VERSION}} --build-arg git_commit={{.GIT_COMMIT}}'
 
   # --- Standalone Images ---
 
