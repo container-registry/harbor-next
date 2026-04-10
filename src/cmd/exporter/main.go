@@ -17,10 +17,11 @@ package main
 import (
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
-	_ "github.com/jackc/pgx/v4/stdlib" // registry pgx driver
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
 
@@ -36,7 +37,6 @@ func main() {
 	// Start pprof server
 	lib.StartPprof()
 
-	viper.AutomaticEnv()
 	viper.SetEnvPrefix("harbor")
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
@@ -50,7 +50,6 @@ func main() {
 			Password:        viper.GetString("database.password"),
 			Database:        viper.GetString("database.dbname"),
 			SSLMode:         viper.GetString("database.sslmode"),
-			MaxIdleConns:    viper.GetInt("database.max_idle_conns"),
 			MaxOpenConns:    viper.GetInt("database.max_open_conns"),
 			ConnMaxLifetime: getConnMaxLifetime(viper.GetString("database.conn_max_lifetime")),
 			ConnMaxIdleTime: getConnMaxIdleTime(viper.GetString("database.conn_max_idle_time")),
@@ -99,10 +98,25 @@ func main() {
 		exporterOpt.CacheCleanInterval,
 	)
 	prometheus.MustRegister(harborExporter)
-	if err := harborExporter.ListenAndServe(); err != nil {
-		log.Errorf("Error starting Harbor exporter %s", err)
-		os.Exit(1)
+
+	errCh := make(chan error, 1)
+	go func() {
+		if err := harborExporter.ListenAndServe(); err != nil {
+			errCh <- err
+		}
+	}()
+
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case s := <-sig:
+		log.Infof("Received signal %s, shutting down...", s)
+	case err := <-errCh:
+		log.Errorf("Harbor exporter failed: %v", err)
 	}
+
+	dao.ClosePool()
 }
 
 func getConnMaxLifetime(duration string) time.Duration {

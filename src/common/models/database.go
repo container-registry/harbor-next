@@ -34,9 +34,13 @@ type PostGreSQL struct {
 	Username        string        `json:"username"`
 	Password        string        `json:"password,omitempty"`
 	Database        string        `json:"database"`
-	SSLMode         string        `json:"sslmode"`
-	MaxIdleConns    int           `json:"max_idle_conns"`
-	MaxOpenConns    int           `json:"max_open_conns"`
+	SSLMode      string `json:"sslmode"`
+	MaxOpenConns int    `json:"max_open_conns"`
 	ConnMaxLifetime time.Duration `json:"conn_max_lifetime"`
 	ConnMaxIdleTime time.Duration `json:"conn_max_idle_time"`
+	// Pool settings for pgxpool
+	HealthCheckPeriod time.Duration `json:"health_check_period"`
+	ConnectTimeout    time.Duration `json:"connect_timeout"`
+	MinConns          int32         `json:"min_conns"`
+	URL string `json:"url"`
 }

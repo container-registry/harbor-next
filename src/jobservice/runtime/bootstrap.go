@@ -21,6 +21,7 @@ import (
 	"os/signal"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -28,6 +29,7 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 
+	"github.com/goharbor/harbor/src/common/dao"
 	"github.com/goharbor/harbor/src/jobservice/api"
 	"github.com/goharbor/harbor/src/jobservice/common/utils"
 	"github.com/goharbor/harbor/src/jobservice/config"
@@ -230,7 +232,7 @@ func (bs *Bootstrap) LoadAndRun(ctx context.Context, cancel context.CancelFunc) 
 	// Listen to the system signals
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
-	terminated := false
+	var terminated atomic.Bool
 	go func(errChan chan error) {
 		defer func() {
 			// Gracefully shutdown
@@ -238,13 +240,15 @@ func (bs *Bootstrap) LoadAndRun(ctx context.Context, cancel context.CancelFunc) 
 			if er := apiServer.Stop(); er != nil {
 				logger.Error(er)
 			}
+			// Drain pgxpool connections
+			dao.ClosePool()
 			// Notify others who're listening to the system context
 			cancel()
 		}()
 
 		select {
 		case <-sig:
-			terminated = true
+			terminated.Store(true)
 			return
 		case err = <-errChan:
 			logger.Errorf("Received error from error chan: %s", err)
@@ -257,7 +261,7 @@ func (bs *Bootstrap) LoadAndRun(ctx context.Context, cancel context.CancelFunc) 
 	logger.Infof("API server is serving at %d with [%s] mode at node [%s]", cfg.Port, cfg.Protocol, node)
 	metric.JobserviceInfo.WithLabelValues(node.(string), workerPoolID, fmt.Sprint(cfg.PoolConfig.WorkerCount)).Set(1)
 	if er := apiServer.Start(); er != nil {
-		if !terminated {
+		if !terminated.Load() {
 			// Tell the listening goroutine
 			rootContext.ErrorChan <- er
 		}
