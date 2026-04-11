@@ -44,7 +44,10 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Ensure C toolchain for race detector
-        run: command -v gcc >/dev/null || sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc
+        run: |
+          if ! echo '#include <stdlib.h>' | gcc -E -x c - >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc libc6-dev
+          fi
 
       - name: Generate API code
         run: task build:gen-apis
@@ -102,7 +105,10 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Ensure C toolchain for race detector
-        run: command -v gcc >/dev/null || sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc
+        run: |
+          if ! echo '#include <stdlib.h>' | gcc -E -x c - >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc libc6-dev
+          fi
 
       - name: Generate API code
         run: task build:gen-apis
