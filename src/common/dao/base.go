@@ -15,14 +15,17 @@
 package dao
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"strconv"
+	"os"
 	"sync"
+	"sync/atomic"
 
 	"github.com/beego/beego/v2/client/orm"
 
 	"github.com/goharbor/harbor/src/common/models"
+	"github.com/goharbor/harbor/src/lib/dbpool"
 	"github.com/goharbor/harbor/src/lib/log"
 	proModels "github.com/goharbor/harbor/src/pkg/project/models"
 	userModels "github.com/goharbor/harbor/src/pkg/user/models"
@@ -64,6 +67,11 @@ func InitDatabase(database *models.Database) error {
 		return err
 	}
 
+	if os.Getenv("POSTGRESQL_MAX_IDLE_CONNS") != "" {
+		log.Warningf("POSTGRESQL_MAX_IDLE_CONNS is deprecated and ignored. " +
+			"Use POSTGRESQL_MIN_CONNS (default: 2) to set the minimum number of idle connections kept in the pool.")
+	}
+
 	log.Infof("Registering database: %s", db.String())
 	if err := db.Register(); err != nil {
 		return err
@@ -76,22 +84,39 @@ func InitDatabase(database *models.Database) error {
 func getDatabase(database *models.Database) (db Database, err error) {
 	switch database.Type {
 	case "", "postgresql":
-		db = NewPGSQL(
-			database.PostGreSQL.Host,
-			strconv.Itoa(database.PostGreSQL.Port),
-			database.PostGreSQL.Username,
-			database.PostGreSQL.Password,
-			database.PostGreSQL.Database,
-			database.PostGreSQL.SSLMode,
-			database.PostGreSQL.MaxIdleConns,
-			database.PostGreSQL.MaxOpenConns,
-			database.PostGreSQL.ConnMaxLifetime,
-			database.PostGreSQL.ConnMaxIdleTime,
-		)
+		db = NewPGSQL(database.PostGreSQL)
 	default:
 		err = fmt.Errorf("invalid database: %s", database.Type)
 	}
 	return
+}
+
+// activePool holds the pool created during Register() for shutdown access.
+var activePool atomic.Pointer[dbpool.Pool]
+
+func setActivePool(p *dbpool.Pool) {
+	activePool.Store(p)
+}
+
+func GetPool() *dbpool.Pool {
+	return activePool.Load()
+}
+
+func ClosePool() {
+	if p := activePool.Swap(nil); p != nil {
+		log.Info("Closing database pool...")
+		p.Close()
+	}
+}
+
+// SelfTest runs the pool's error-detection self-test. Must be called after
+// migrations have run (it queries the properties table).
+func SelfTest() error {
+	p := activePool.Load()
+	if p == nil {
+		return fmt.Errorf("database pool not initialized")
+	}
+	return p.SelfTest(context.Background())
 }
 
 var globalOrm orm.Ormer

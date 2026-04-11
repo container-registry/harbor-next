@@ -67,12 +67,11 @@ func PrepareTestForPostgresSQL() {
 			Username:     dbUser,
 			Password:     dbPassword,
 			Database:     dbDatabase,
-			MaxIdleConns: 50,
 			MaxOpenConns: 100,
 		},
 	}
 
-	log.Infof("POSTGRES_HOST: %s, POSTGRES_USR: %s, POSTGRES_PORT: %d, POSTGRES_PWD: %s\n", dbHost, dbUser, dbPort, dbPassword)
+	log.Infof("POSTGRES_HOST: %s, POSTGRES_USR: %s, POSTGRES_PORT: %d\n", dbHost, dbUser, dbPort)
 	o = initDatabaseForTest(database)
 }
 

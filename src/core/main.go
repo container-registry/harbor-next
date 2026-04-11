@@ -59,7 +59,6 @@ import (
 	"github.com/goharbor/harbor/src/lib/retry"
 	tracelib "github.com/goharbor/harbor/src/lib/trace"
 	"github.com/goharbor/harbor/src/migration"
-	_ "github.com/goharbor/harbor/src/pkg/accessory/model/attestation"
 	_ "github.com/goharbor/harbor/src/pkg/accessory/model/base"
 	_ "github.com/goharbor/harbor/src/pkg/accessory/model/cosign"
 	_ "github.com/goharbor/harbor/src/pkg/accessory/model/notation"
@@ -219,6 +218,11 @@ func main() {
 		log.Info("The database has been migrated successfully")
 	}
 
+	if err := dao.SelfTest(); err != nil {
+		log.Fatalf("database self-test failed: %v", err)
+	}
+	log.Info("database self-test passed")
+
 	ctx = orm.Clone(ctx)
 	if err := config.Load(ctx); err != nil {
 		log.Fatalf("failed to load config: %v", err)
@@ -251,7 +255,7 @@ func main() {
 
 	closing := make(chan struct{})
 	done := make(chan struct{})
-	go gracefulShutdown(closing, done, shutdownTracerProvider)
+	go gracefulShutdown(closing, done, shutdownTracerProvider, dao.ClosePool)
 	// Start health checker for registries
 	go registry.Ctl.StartRegularHealthCheck(orm.Context(), closing, done)
 	// Init audit log
