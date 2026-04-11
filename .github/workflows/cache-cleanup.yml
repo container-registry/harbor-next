@@ -16,26 +16,30 @@ jobs:
     steps:
       - name: Trim Go build cache (files not accessed in 7 days)
         run: |
-          if [ -n "$GOCACHE" ] && [ -d "$GOCACHE" ]; then
-            echo "Build cache before: $(du -sh "$GOCACHE" | cut -f1)"
-            find "$GOCACHE" -type f -atime +7 -delete 2>/dev/null || true
-            find "$GOCACHE" -type d -empty -delete 2>/dev/null || true
-            echo "Build cache after: $(du -sh "$GOCACHE" | cut -f1)"
-          else
+          if [ -z "$GOCACHE" ] || [ ! -d "$GOCACHE" ]; then
             echo "No GOCACHE directory found at '${GOCACHE:-<unset>}'"
+            exit 0
           fi
+          case "$GOCACHE" in /home/*|/opt/ci-cache/*) ;; *)
+            echo "ERROR: GOCACHE='$GOCACHE' not under /home or /opt/ci-cache, skipping"; exit 0 ;; esac
+          echo "Build cache before: $(du -sh "$GOCACHE" | cut -f1)"
+          find "$GOCACHE" -type f -atime +7 -delete 2>/dev/null || true
+          find "$GOCACHE" -type d -empty -delete 2>/dev/null || true
+          echo "Build cache after: $(du -sh "$GOCACHE" | cut -f1)"
 
       - name: Check module cache size
         run: |
-          if [ -n "$GOMODCACHE" ] && [ -d "$GOMODCACHE" ]; then
-            size_mb=$(du -sm "$GOMODCACHE" | cut -f1)
-            echo "Module cache: ${size_mb}MB"
-            if [ "$size_mb" -gt 2048 ]; then
-              echo "Exceeds 2GB threshold, clearing..."
-              chmod -R u+w "$GOMODCACHE" && rm -rf "$GOMODCACHE"
-            fi
-          else
+          if [ -z "$GOMODCACHE" ] || [ ! -d "$GOMODCACHE" ]; then
             echo "No GOMODCACHE directory found at '${GOMODCACHE:-<unset>}'"
+            exit 0
+          fi
+          case "$GOMODCACHE" in /home/*|/opt/ci-cache/*) ;; *)
+            echo "ERROR: GOMODCACHE='$GOMODCACHE' not under /home or /opt/ci-cache, skipping"; exit 0 ;; esac
+          size_mb=$(du -sm "$GOMODCACHE" | cut -f1)
+          echo "Module cache: ${size_mb}MB"
+          if [ "$size_mb" -gt 2048 ]; then
+            echo "Exceeds 2GB threshold, clearing..."
+            chmod -R u+w "$GOMODCACHE" && rm -rf "$GOMODCACHE"
           fi
 
       - name: Report tool cache size
