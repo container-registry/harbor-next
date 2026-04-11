@@ -59,31 +59,7 @@ jobs:
   test-db:
     name: Unit Tests (DB)
     runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository || contains(fromJSON('["OWNER","MEMBER"]'), github.event.pull_request.author_association)) && vars.RUNNER || 'ubuntu-latest' }}
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: root123
-          POSTGRES_DB: registry
-        ports:
-          - 5432/tcp
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379/tcp
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
     env:
-      POSTGRESQL_HOST: localhost
       POSTGRESQL_USR: postgres
       POSTGRESQL_PWD: root123
       POSTGRESQL_DATABASE: registry
@@ -92,6 +68,28 @@ jobs:
       CGO_ENABLED: "1"
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Start test services
+        run: |
+          PREFIX="test-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "SVC_PREFIX=${PREFIX}" >> "$GITHUB_ENV"
+          docker run -d --name "${PREFIX}-postgres" \
+            -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=root123 -e POSTGRES_DB=registry \
+            -p 5432:5432 postgres:16-alpine
+          docker run -d --name "${PREFIX}-redis" \
+            -p 6379:6379 redis:7-alpine
+          # Resolve service host: shared DinD uses its service FQDN, local Docker uses localhost
+          if [ -n "$DOCKER_HOST" ] && echo "$DOCKER_HOST" | grep -qv localhost; then
+            SVC_HOST=$(echo "$DOCKER_HOST" | sed 's|tcp://||;s|:.*||')
+          else
+            SVC_HOST=localhost
+          fi
+          echo "SVC_HOST=${SVC_HOST}" >> "$GITHUB_ENV"
+          echo "POSTGRESQL_HOST=${SVC_HOST}" >> "$GITHUB_ENV"
+          echo "POSTGRESQL_PORT=5432" >> "$GITHUB_ENV"
+          echo "JOB_SERVICE_POOL_REDIS_URL=redis://${SVC_HOST}:6379" >> "$GITHUB_ENV"
+          # Wait for postgres
+          until docker exec "${PREFIX}-postgres" pg_isready -U postgres; do sleep 1; done
 
       - uses: ./.github/actions/setup-go-cached
         with:
@@ -106,14 +104,14 @@ jobs:
       - name: Ensure C toolchain for race detector
         run: command -v gcc >/dev/null || sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc
 
-      - name: Export service ports
-        run: |
-          echo "POSTGRESQL_PORT=${{ job.services.postgres.ports['5432'] }}" >> "$GITHUB_ENV"
-          echo "JOB_SERVICE_POOL_REDIS_URL=redis://localhost:${{ job.services.redis.ports['6379'] }}" >> "$GITHUB_ENV"
-
       - name: Generate API code
         run: task build:gen-apis
 
       - name: Run DB unit tests
         working-directory: src
         run: go test -race -count=1 -timeout=15m -tags db -cover -p 1 -parallel 1 ./...
+
+      - name: Stop test services
+        if: always()
+        run: |
+          docker rm -f "${SVC_PREFIX}-postgres" "${SVC_PREFIX}-redis" 2>/dev/null || true
