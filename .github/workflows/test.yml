@@ -76,23 +76,26 @@ jobs:
         run: |
           PREFIX="test-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           echo "SVC_PREFIX=${PREFIX}" >> "$GITHUB_ENV"
+          # Use random host ports to avoid collisions on shared Docker daemon
           docker run -d --name "${PREFIX}-postgres" \
             -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=root123 -e POSTGRES_DB=registry \
-            -p 5432:5432 postgres:16-alpine
+            -p 0:5432 postgres:16-alpine
           docker run -d --name "${PREFIX}-redis" \
-            -p 6379:6379 redis:7-alpine
+            -p 0:6379 redis:7-alpine
           # Resolve service host: shared DinD uses its service FQDN, local Docker uses localhost
           if [ -n "$DOCKER_HOST" ] && echo "$DOCKER_HOST" | grep -qv localhost; then
             SVC_HOST=$(echo "$DOCKER_HOST" | sed 's|tcp://||;s|:.*||')
           else
             SVC_HOST=localhost
           fi
+          PG_PORT=$(docker port "${PREFIX}-postgres" 5432 | head -1 | cut -d: -f2)
+          REDIS_PORT=$(docker port "${PREFIX}-redis" 6379 | head -1 | cut -d: -f2)
           echo "SVC_HOST=${SVC_HOST}" >> "$GITHUB_ENV"
           echo "POSTGRESQL_HOST=${SVC_HOST}" >> "$GITHUB_ENV"
-          echo "POSTGRESQL_PORT=5432" >> "$GITHUB_ENV"
-          echo "JOB_SERVICE_POOL_REDIS_URL=redis://${SVC_HOST}:6379" >> "$GITHUB_ENV"
-          # Wait for postgres
-          until docker exec "${PREFIX}-postgres" pg_isready -U postgres; do sleep 1; done
+          echo "POSTGRESQL_PORT=${PG_PORT}" >> "$GITHUB_ENV"
+          echo "JOB_SERVICE_POOL_REDIS_URL=redis://${SVC_HOST}:${REDIS_PORT}" >> "$GITHUB_ENV"
+          # Wait for postgres (timeout after 30s)
+          timeout 30 bash -c "until docker exec ${PREFIX}-postgres pg_isready -U postgres; do sleep 1; done"
 
       - uses: ./.github/actions/setup-go-cached
         with:
