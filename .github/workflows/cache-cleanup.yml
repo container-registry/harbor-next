@@ -23,7 +23,7 @@ jobs:
           case "$GOCACHE" in /home/*|/opt/ci-cache/*) ;; *)
             echo "ERROR: GOCACHE='$GOCACHE' not under /home or /opt/ci-cache, skipping"; exit 0 ;; esac
           echo "Build cache before: $(du -sh "$GOCACHE" | cut -f1)"
-          find "$GOCACHE" -type f -atime +7 -delete 2>/dev/null || true
+          find "$GOCACHE" -type f -mtime +7 -delete 2>/dev/null || true
           find "$GOCACHE" -type d -empty -delete 2>/dev/null || true
           echo "Build cache after: $(du -sh "$GOCACHE" | cut -f1)"
 
