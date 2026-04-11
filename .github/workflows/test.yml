@@ -73,12 +73,10 @@ jobs:
     env:
       POSTGRESQL_HOST: localhost
       POSTGRESQL_USR: postgres
-      POSTGRESQL_PORT: ${{ job.services.postgres.ports[5432] }}
       POSTGRESQL_PWD: root123
       POSTGRESQL_DATABASE: registry
       POSTGRES_MIGRATION_SCRIPTS_PATH: ${{ github.workspace }}/make/migrations/postgresql
       UTTEST: "true"
-      JOB_SERVICE_POOL_REDIS_URL: "redis://localhost:${{ job.services.redis.ports[6379] }}"
       CGO_ENABLED: "1"
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -95,6 +93,11 @@ jobs:
 
       - name: Ensure C toolchain for race detector
         run: command -v gcc >/dev/null || sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc
+
+      - name: Export service ports
+        run: |
+          echo "POSTGRESQL_PORT=${{ job.services.postgres.ports['5432'] }}" >> "$GITHUB_ENV"
+          echo "JOB_SERVICE_POOL_REDIS_URL=redis://localhost:${{ job.services.redis.ports['6379'] }}" >> "$GITHUB_ENV"
 
       - name: Generate API code
         run: task build:gen-apis
