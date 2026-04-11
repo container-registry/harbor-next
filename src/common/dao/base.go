@@ -98,12 +98,10 @@ func setActivePool(p *dbpool.Pool) {
 	activePool.Store(p)
 }
 
-// GetPool returns the active database pool, or nil if not yet initialized.
 func GetPool() *dbpool.Pool {
 	return activePool.Load()
 }
 
-// ClosePool closes the active database pool if initialized.
 func ClosePool() {
 	if p := activePool.Swap(nil); p != nil {
 		log.Info("Closing database pool...")

@@ -16,18 +16,15 @@ package models
 
 import "time"
 
-// Database ...
 type Database struct {
 	Type       string      `json:"type"`
 	PostGreSQL *PostGreSQL `json:"postgresql,omitempty"`
 }
 
-// SQLite ...
 type SQLite struct {
 	File string `json:"file"`
 }
 
-// PostGreSQL ...
 type PostGreSQL struct {
 	Host              string        `json:"host"`
 	Port              int           `json:"port"`

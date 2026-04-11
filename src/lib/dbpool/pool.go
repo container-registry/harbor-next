@@ -32,21 +32,15 @@ import (
 	"github.com/goharbor/harbor/src/lib/log"
 )
 
+// Defaults are chosen for backward compatibility with the pre-pgxpool Harbor
+// configuration. PostgreSQL server's own max_connections defaults to 100;
+// the metadata default for MaxOpenConns is 100 to match.
 const (
-	// DefaultMinConns is the default minimum number of idle connections.
-	DefaultMinConns = 2
-
-	// DefaultMaxConnIdleTime is the default max idle time for a connection.
+	DefaultMinConns        = 2
 	DefaultMaxConnIdleTime = 10 * time.Minute
-
-	// DefaultHealthCheckPeriod is the default health check interval.
 	DefaultHealthCheckPeriod = 1 * time.Minute
-
-	// DefaultConnectTimeout is the default connection timeout.
-	DefaultConnectTimeout = 10 * time.Second
-
-	// healthyTimeout is the timeout for Healthy() ping.
-	healthyTimeout = 5 * time.Second
+	DefaultConnectTimeout    = 10 * time.Second
+	healthyTimeout           = 5 * time.Second
 )
 
 // Pool wraps a pgxpool.Pool and the bridged *sql.DB for Beego ORM compatibility.
@@ -59,7 +53,6 @@ type Pool struct {
 // Use this extension point for tracers, metrics, or other pgxpool customizations.
 type Option func(*pgxpool.Config)
 
-// New creates a new Pool from Harbor's PostgreSQL config.
 func New(ctx context.Context, cfg *models.PostGreSQL, opts ...Option) (*Pool, error) {
 	connStr := BuildDSN(cfg)
 
@@ -68,10 +61,8 @@ func New(ctx context.Context, cfg *models.PostGreSQL, opts ...Option) (*Pool, er
 		return nil, fmt.Errorf("dbpool: parse config: %w", err)
 	}
 
-	// Map Harbor config to pgxpool config.
 	applyPoolConfig(poolCfg, cfg)
 
-	// Apply caller-provided options (e.g., tracers, metrics).
 	for _, opt := range opts {
 		opt(poolCfg)
 	}
@@ -81,15 +72,17 @@ func New(ctx context.Context, cfg *models.PostGreSQL, opts ...Option) (*Pool, er
 		return nil, fmt.Errorf("dbpool: create pool: %w", err)
 	}
 
-	// Bridge pgxpool to *sql.DB. Do NOT set any pool params on db --
-	// pgxpool owns the lifecycle. stdlib.OpenDBFromPool sets MaxIdleConns=0.
+	// Do NOT set any pool params on db — pgxpool owns the connection lifecycle,
+	// not database/sql. stdlib.OpenDBFromPool intentionally sets MaxIdleConns=0
+	// on the sql.DB wrapper so that sql.DB never tries to manage connections itself.
 	db := stdlib.OpenDBFromPool(pool)
 
 	return &Pool{pool: pool, db: db}, nil
 }
 
-// BuildDSN constructs a PostgreSQL connection string from config.
-// Exported for testing.
+// BuildDSN returns cfg.URL if set (for cloud-managed databases like RDS IAM auth
+// where the DSN contains tokens or parameters that don't map to individual fields),
+// otherwise constructs a libpq key-value connection string from config fields.
 func BuildDSN(cfg *models.PostGreSQL) string {
 	if cfg.URL != "" {
 		return cfg.URL
@@ -102,8 +95,6 @@ func BuildDSN(cfg *models.PostGreSQL) string {
 		cfg.Host, cfg.Port, cfg.Username, escaped, cfg.Database, cfg.SSLMode)
 }
 
-// applyPoolConfig maps Harbor config values to pgxpool.Config fields.
-// Exported as a function (not method) for testability.
 func applyPoolConfig(poolCfg *pgxpool.Config, cfg *models.PostGreSQL) {
 	// 0 means "not set" — leave pgxpool's default: max(4, runtime.NumCPU()).
 	if cfg.MaxOpenConns > 0 {
@@ -144,7 +135,7 @@ func applyPoolConfig(poolCfg *pgxpool.Config, cfg *models.PostGreSQL) {
 }
 
 // RegisterWithOrm registers the bridged *sql.DB with Beego ORM.
-// Do NOT use orm.RegisterDataBase -- it opens its own sql.DB and fights pgxpool.
+// Do NOT use orm.RegisterDataBase — it opens its own sql.DB and fights pgxpool.
 func (p *Pool) RegisterWithOrm(alias ...string) error {
 	if err := orm.RegisterDriver("pgx", orm.DRPostgres); err != nil {
 		if !strings.Contains(err.Error(), "already registered") {
@@ -161,7 +152,6 @@ func (p *Pool) RegisterWithOrm(alias ...string) error {
 		return fmt.Errorf("dbpool: AddAliasWthDB(%q): %w", aliasName, err)
 	}
 
-	// Verify the registration succeeded.
 	got, err := orm.GetDB(aliasName)
 	if err != nil {
 		return fmt.Errorf("dbpool: verify GetDB(%q): %w", aliasName, err)
@@ -173,11 +163,11 @@ func (p *Pool) RegisterWithOrm(alias ...string) error {
 	return nil
 }
 
-// SelfTest verifies that pgconn error codes are correctly detected.
-// This catches the case where someone imports pgx/v4 pgconn instead of v5,
-// which would silently break error detection.
+// SelfTest verifies that pgconn error codes are correctly detected through the
+// sql.DB bridge. This catches the case where someone imports pgx/v4's pgconn
+// instead of v5, which would silently break error classification (IsDuplicateKeyError
+// and friends in lib/orm/error.go would never match).
 func (p *Pool) SelfTest(ctx context.Context) error {
-	// Insert a sentinel row (idempotent).
 	_, err := p.db.ExecContext(ctx,
 		"INSERT INTO properties (k, v) VALUES ('__dbpool_selftest', '') ON CONFLICT (k) DO NOTHING")
 	if err != nil {
@@ -187,7 +177,6 @@ func (p *Pool) SelfTest(ctx context.Context) error {
 		_, _ = p.db.ExecContext(ctx, "DELETE FROM properties WHERE k = '__dbpool_selftest'")
 	}()
 
-	// Attempt a deliberate duplicate (no ON CONFLICT) to trigger unique violation.
 	_, err = p.db.ExecContext(ctx,
 		"INSERT INTO properties (k, v) VALUES ('__dbpool_selftest', 'x')")
 	if err == nil {
@@ -205,17 +194,9 @@ func (p *Pool) SelfTest(ctx context.Context) error {
 	return nil
 }
 
-// DB returns the bridged *sql.DB.
-func (p *Pool) DB() *sql.DB {
-	return p.db
-}
+func (p *Pool) DB() *sql.DB       { return p.db }
+func (p *Pool) PgxPool() *pgxpool.Pool { return p.pool }
 
-// PgxPool returns the underlying pgxpool.Pool for direct pgx access.
-func (p *Pool) PgxPool() *pgxpool.Pool {
-	return p.pool
-}
-
-// Close drains the pool and closes the bridged sql.DB.
 func (p *Pool) Close() {
 	p.pool.Close()
 	if err := p.db.Close(); err != nil {
@@ -223,7 +204,6 @@ func (p *Pool) Close() {
 	}
 }
 
-// Healthy returns true if the pool can reach the database.
 func (p *Pool) Healthy() bool {
 	ctx, cancel := context.WithTimeout(context.Background(), healthyTimeout)
 	defer cancel()

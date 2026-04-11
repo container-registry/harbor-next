@@ -21,7 +21,10 @@ import (
 	"github.com/goharbor/harbor/src/lib/errors"
 )
 
-// PostgreSQL error codes used for error classification.
+// Standard PostgreSQL SQLSTATE codes. Must match the Code field on
+// pgx/v5's pgconn.PgError — if someone swaps to pgx/v4's pgconn,
+// errors.As will never match and these checks silently stop working.
+// SelfTest in lib/dbpool catches this at startup.
 const (
 	pgUniqueViolation     = "23505"
 	pgForeignKeyViolation = "23503"

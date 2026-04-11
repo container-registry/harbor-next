@@ -39,18 +39,15 @@ type pgsql struct {
 	pool *dbpool.Pool
 }
 
-// Name returns the name of PostgreSQL
 func (p *pgsql) Name() string {
 	return "PostgreSQL"
 }
 
-// String ...
 func (p *pgsql) String() string {
 	return fmt.Sprintf("type-%s host-%s port-%d database-%s sslmode-%q",
 		p.Name(), p.cfg.Host, p.cfg.Port, p.cfg.Database, p.cfg.SSLMode)
 }
 
-// NewPGSQL returns an instance of postgres
 func NewPGSQL(cfg *models.PostGreSQL) Database {
 	if len(cfg.SSLMode) == 0 {
 		cfg.SSLMode = "disable"
@@ -58,7 +55,8 @@ func NewPGSQL(cfg *models.PostGreSQL) Database {
 	return &pgsql{cfg: cfg}
 }
 
-// Register registers pgSQL to orm with the info wrapped by the instance.
+// Register creates a pgxpool, bridges it to Beego ORM, and stores the pool
+// in activePool for shutdown access (see ClosePool).
 func (p *pgsql) Register(alias ...string) error {
 	// When URL is set, Host/Port may not match the actual target — skip preflight.
 	if p.cfg.URL == "" {
@@ -106,7 +104,9 @@ func (p *pgsql) UpgradeSchema() error {
 	return nil
 }
 
-// NewMigrator creates a migrator base on the information
+// NewMigrator creates a golang-migrate instance. The scheme is "pgx5" because
+// golang-migrate's pgx/v5 driver registers under that name (not "pgx", which
+// is the v4 driver).
 func NewMigrator(database *models.PostGreSQL) (*migrate.Migrate, error) {
 	dbURL := url.URL{
 		Scheme:   "pgx5",
