@@ -45,9 +45,8 @@ jobs:
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: ~/.cache/go-build
-          key: go-build-${{ runner.os }}-build-${{ hashFiles('src/go.sum') }}-${{ github.sha }}
+          key: go-build-${{ runner.os }}-build-${{ hashFiles('src/go.sum') }}
           restore-keys: |
-            go-build-${{ runner.os }}-build-${{ hashFiles('src/go.sum') }}-
             go-build-${{ runner.os }}-
 
       - uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
