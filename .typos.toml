@@ -28,6 +28,10 @@ oci  = "oci"
 oras = "oras"
 # in-toto normalized label segment
 intoto = "intoto"
+# Upstream beego ORM function name (typo is in beego, not our code)
+Wth = "Wth"
+# Intentional SQL typo in integration tests (testing error handling)
+SELCT = "SELCT"
 # Public API field names - fixing would be a breaking API change
 unknow    = "unknow"
 unsupport = "unsupport"
