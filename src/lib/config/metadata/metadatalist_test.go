@@ -23,9 +23,9 @@ import (
 	"github.com/goharbor/harbor/src/common"
 )
 
-// TestDatabaseConfigDefaults pins the default values for all PostgreSQL config
-// knobs. If someone changes a default, this test breaks — forcing an explicit
-// decision rather than a silent behavior change.
+// TestDatabaseConfigDefaults pins the default values for PostgreSQL pool and
+// connection config knobs. If someone changes a default, this test breaks —
+// forcing an explicit decision rather than a silent behavior change.
 func TestDatabaseConfigDefaults(t *testing.T) {
 	expected := map[string]string{
 		common.PostGreSQLMaxOpenConns:      "100",
