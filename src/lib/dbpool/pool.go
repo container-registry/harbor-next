@@ -33,10 +33,6 @@ import (
 )
 
 const (
-	// DefaultMaxConns is the default maximum number of connections per service.
-	// Per user decision: "Max pool size: 25 connections per service (configurable)".
-	DefaultMaxConns = 25
-
 	// DefaultMinConns is the default minimum number of idle connections.
 	DefaultMinConns = 2
 
@@ -109,10 +105,9 @@ func BuildDSN(cfg *models.PostGreSQL) string {
 // applyPoolConfig maps Harbor config values to pgxpool.Config fields.
 // Exported as a function (not method) for testability.
 func applyPoolConfig(poolCfg *pgxpool.Config, cfg *models.PostGreSQL) {
+	// 0 means "not set" — leave pgxpool's default: max(4, runtime.NumCPU()).
 	if cfg.MaxOpenConns > 0 {
 		poolCfg.MaxConns = int32(cfg.MaxOpenConns)
-	} else {
-		poolCfg.MaxConns = DefaultMaxConns
 	}
 
 	if cfg.MinConns > 0 {

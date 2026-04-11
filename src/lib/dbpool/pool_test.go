@@ -98,17 +98,18 @@ func TestApplyPoolConfig_ZeroFallbacks(t *testing.T) {
 	poolCfg, err := pgxpool.ParseConfig(dsn)
 	require.NoError(t, err)
 
+	pgxDefault := poolCfg.MaxConns // pgxpool sets max(4, NumCPU) during ParseConfig
+
 	applyPoolConfig(poolCfg, cfg)
 
-	// MaxOpenConns=0 must fall back to 25, not pgxpool's default of 4.
-	assert.Equal(t, int32(DefaultMaxConns), poolCfg.MaxConns, "zero MaxOpenConns should default to 25")
+	assert.Equal(t, pgxDefault, poolCfg.MaxConns, "zero MaxOpenConns should keep pgxpool default")
 	assert.Equal(t, int32(DefaultMinConns), poolCfg.MinConns)
 	assert.Equal(t, DefaultMaxConnIdleTime, poolCfg.MaxConnIdleTime)
 	assert.Equal(t, DefaultHealthCheckPeriod, poolCfg.HealthCheckPeriod)
 	assert.Equal(t, DefaultConnectTimeout, poolCfg.ConnConfig.ConnectTimeout)
 }
 
-func TestApplyPoolConfig_MaxConns25NotPgxDefault4(t *testing.T) {
+func TestApplyPoolConfig_ZeroMaxConnsKeepsPgxDefault(t *testing.T) {
 	cfg := &models.PostGreSQL{
 		Host:         "localhost",
 		Port:         5432,
@@ -116,15 +117,16 @@ func TestApplyPoolConfig_MaxConns25NotPgxDefault4(t *testing.T) {
 		Password:     "test",
 		Database:     "test",
 		SSLMode:      "disable",
-		MaxOpenConns: 0, // explicitly zero
+		MaxOpenConns: 0,
 	}
 
 	dsn := BuildDSN(cfg)
 	poolCfg, err := pgxpool.ParseConfig(dsn)
 	require.NoError(t, err)
 
+	pgxDefault := poolCfg.MaxConns // max(4, NumCPU)
+
 	applyPoolConfig(poolCfg, cfg)
 
-	// This is the key assertion: pgxpool defaults to 4, but we must use 25.
-	assert.Equal(t, int32(25), poolCfg.MaxConns, "must be 25 per user decision, not pgxpool default of 4")
+	assert.Equal(t, pgxDefault, poolCfg.MaxConns, "zero MaxOpenConns must not override pgxpool default")
 }
