@@ -109,7 +109,8 @@ func BuildDSN(cfg *models.PostGreSQL) string {
 // applyPoolConfig maps Harbor config values to pgxpool.Config fields.
 // Exported as a function (not method) for testability.
 func applyPoolConfig(poolCfg *pgxpool.Config, cfg *models.PostGreSQL) {
-	// MaxConns: belt-and-suspenders -- metadata default is 25, but guard against zero.
+	// MaxConns: 0 means "not set" (old Harbor default was unlimited via database/sql,
+	// but pgxpool requires a concrete limit). Fall back to DefaultMaxConns (25).
 	if cfg.MaxOpenConns > 0 {
 		poolCfg.MaxConns = int32(cfg.MaxOpenConns)
 	} else {
