@@ -46,7 +46,9 @@ func testCfg() *models.PostGreSQL {
 	host := envOr("POSTGRESQL_HOST", "localhost")
 	port := 5432
 	if p := os.Getenv("POSTGRESQL_PORT"); p != "" {
-		port, _ = strconv.Atoi(p)
+		if v, err := strconv.Atoi(p); err == nil {
+			port = v
+		}
 	}
 	user := envOr("POSTGRESQL_USR", envOr("POSTGRESQL_USERNAME", "postgres"))
 	pwd := envOr("POSTGRESQL_PWD", envOr("POSTGRESQL_PASSWORD", "root123"))
@@ -482,12 +484,17 @@ func TestPool_SimpleProtocolParameterizedQuery(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestPool_RecoveryAfterConnectionKill(t *testing.T) {
+	const appName = "dbpool_recovery_test"
+
 	cfg := testCfg()
 	cfg.MaxOpenConns = 2
 	cfg.MinConns = 1
 	cfg.HealthCheckPeriod = 500 * time.Millisecond
 
-	p := mustPool(t, cfg)
+	setAppName := func(c *pgxpool.Config) {
+		c.ConnConfig.RuntimeParams["application_name"] = appName
+	}
+	p := mustPool(t, cfg, setAppName)
 	ctx := context.Background()
 
 	// Verify pool works
@@ -495,13 +502,13 @@ func TestPool_RecoveryAfterConnectionKill(t *testing.T) {
 	err := p.DB().QueryRowContext(ctx, "SELECT 1").Scan(&n)
 	require.NoError(t, err)
 
-	// Kill all backend connections from this pool by terminating backends
+	// Kill only this pool's backend connections
 	_, err = p.DB().ExecContext(ctx, `
 		SELECT pg_terminate_backend(pid)
 		FROM pg_stat_activity
 		WHERE pid <> pg_backend_pid()
 		  AND datname = current_database()
-		  AND application_name = ''`)
+		  AND application_name = $1`, appName)
 	// The terminate might kill our own connection too, so ignore errors
 	_ = err
 
