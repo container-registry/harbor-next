@@ -20,7 +20,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"os"
 	"strconv"
 	"sync"
@@ -106,9 +105,7 @@ func TestPool_ConnectAndQuery(t *testing.T) {
 
 func TestPool_URLOverridesFields(t *testing.T) {
 	cfg := testCfg()
-	url := fmt.Sprintf("host=%s port=%d user=%s password='%s' dbname=%s sslmode=%s",
-		cfg.Host, cfg.Port, cfg.Username, cfg.Password, cfg.Database, cfg.SSLMode)
-	cfg.URL = url
+	cfg.URL = BuildDSN(cfg) // capture a known-good DSN
 	cfg.Host = "should-be-ignored"
 	cfg.Port = 9999
 
