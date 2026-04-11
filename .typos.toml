@@ -1,5 +1,9 @@
 # Configuration for typos spell checker
 # https://github.com/crate-ci/typos
+#
+# Scope: markdown files (full content) and YAML files (comments only).
+# Go comments are checked by misspell via golangci-lint (src/.golangci.yaml).
+# The workflow extracts YAML comment lines into temp files before running typos.
 
 [default]
 extend-ignore-identifiers-re = [
@@ -8,62 +12,31 @@ extend-ignore-identifiers-re = [
 ]
 
 [default.extend-words]
-# Common Go short variable names flagged as false positives
-pn  = "pn"
-ba  = "ba"
-ot  = "ot"
-lik = "lik"
-fo  = "fo"
-ure = "ure"
-# Harbor-specific identifiers
-cfg          = "cfg"
-ctx          = "ctx"
-req          = "req"
-resp         = "resp"
-impl         = "impl"
+# Harbor service names (appear in docs and comments)
 registryctl  = "registryctl"
 jobservice   = "jobservice"
 # Container/OCI terminology
 oci  = "oci"
 oras = "oras"
-# in-toto normalized label segment
 intoto = "intoto"
-# Upstream beego ORM function name (typo is in beego, not our code)
-Wth = "Wth"
-# Intentional SQL typo in integration tests (testing error handling)
-SELCT = "SELCT"
-# Public API field names - fixing would be a breaking API change
-unknow    = "unknow"
-unsupport = "unsupport"
-parms     = "parms"
-applys    = "applys"
-togglable = "togglable"
-serach    = "serach"
-paylod    = "paylod"
-resoruce  = "resoruce"
-# Valid Go plural variable names (not typos - Go uses these as slice suffixes)
-Datas    = "Datas"
-sortings = "sortings"
-# Short variable names used as abbreviations in logger/options code
-ois = "ois"
+# Common Go abbreviations referenced in docs
+cfg  = "cfg"
+ctx  = "ctx"
 
 [files]
 extend-exclude = [
     # Non-English i18n translation files
     "src/portal/src/i18n/",
 
-    # Upstream test suite
-    "tests/",
-
     # Upstream files with company names, non-English brands
     "ADOPTERS.md",
     "CONTRIBUTORS.md",
 
-    # Lock files and dependency hashes
-    "go.sum",
-    "src/go.mod",
-    "bun.lock",
-    "package-lock.json",
+    # Upstream test suite (robot framework, testcase filenames have typos)
+    "tests/",
+
+    # Claude Code agent/plan files (auto-generated, not shipped)
+    ".claude/",
 
     # Build and vendor artifacts
     "vendor/",
@@ -71,13 +44,11 @@ extend-exclude = [
     "dist/",
     "bin/",
 
-    # Keys and certs
-    "*.pem",
-    "*.crt",
-    "*.key",
+    # Patch files contain git diff metadata and i18n translations
+    "8gcr-ee/patches/",
 
-    # SQL migration files contain SQL aliases (fo = filter_objects, eto = event_type_objects)
-    "make/migrations/",
+    # OpenAPI spec — field names are API contracts, can't be fixed
+    "api/v2.0/swagger.yaml",
 ]
 
 [type.md]

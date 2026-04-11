@@ -5,14 +5,12 @@ on:
     branches: [main]
     paths:
       - '**.md'
-      - '**.txt'
       - '**.yml'
       - '**.yaml'
       - '.typos.toml'
   pull_request:
     paths:
       - '**.md'
-      - '**.txt'
       - '**.yml'
       - '**.yaml'
       - '.typos.toml'
@@ -41,5 +39,22 @@ jobs:
 
           install_dir="$(mktemp -d)"
           curl -fsSL "https://github.com/crate-ci/typos/releases/download/v${TYPOS_VERSION}/typos-v${TYPOS_VERSION}-${target}.tar.gz" -o /tmp/typos.tar.gz
-          tar -xzf /tmp/typos.tar.gz -C "$install_dir" --strip-components=1 --no-same-owner --no-same-permissions ./typos
-          "$install_dir/typos" --config .typos.toml
+          tar -xzf /tmp/typos.tar.gz -C "$install_dir" --strip-components=1 --no-same-owner --no-same-permissions
+          typos="$install_dir/typos"
+
+          # 1) Check markdown files directly
+          find . -type f -name '*.md' -not -path './.git/*' \
+            | "$typos" --config .typos.toml --file-list - --force-exclude
+
+          # 2) Check only comments in YAML files.
+          #    Extract comment lines preserving line numbers (non-comment lines
+          #    become empty so typos reports correct positions).
+          comment_dir="$(mktemp -d)"
+          find . -type f \( -name '*.yml' -o -name '*.yaml' \) \
+            -not -path './.git/*' | while IFS= read -r f; do
+            dest="$comment_dir/$f"
+            mkdir -p "$(dirname "$dest")"
+            awk '/^[[:space:]]*#/ { sub(/^[[:space:]]*#[[:space:]]?/, ""); print; next } { print "" }' "$f" > "$dest"
+          done
+          find "$comment_dir" -type f \( -name '*.yml' -o -name '*.yaml' \) \
+            | "$typos" --config .typos.toml --file-list - --force-exclude
