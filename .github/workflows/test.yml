@@ -94,8 +94,9 @@ jobs:
           echo "POSTGRESQL_HOST=${SVC_HOST}" >> "$GITHUB_ENV"
           echo "POSTGRESQL_PORT=${PG_PORT}" >> "$GITHUB_ENV"
           echo "JOB_SERVICE_POOL_REDIS_URL=redis://${SVC_HOST}:${REDIS_PORT}" >> "$GITHUB_ENV"
-          # Wait for postgres (timeout after 30s)
+          # Wait for services (timeout after 30s each)
           timeout 30 bash -c "until docker exec ${PREFIX}-postgres pg_isready -U postgres; do sleep 1; done"
+          timeout 10 bash -c "until docker exec ${PREFIX}-redis redis-cli ping | grep -q PONG; do sleep 1; done"
 
       - uses: ./.github/actions/setup-go-cached
         with:

@@ -14,7 +14,7 @@ jobs:
     name: Trim host caches
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     steps:
-      - name: Trim Go build cache (files not accessed in 7 days)
+      - name: Trim Go build cache (files not modified in 7 days)
         run: |
           if [ -z "$GOCACHE" ] || [ ! -d "$GOCACHE" ]; then
             echo "No GOCACHE directory found at '${GOCACHE:-<unset>}'"
@@ -39,7 +39,7 @@ jobs:
           echo "Module cache: ${size_mb}MB"
           if [ "$size_mb" -gt 2048 ]; then
             echo "Exceeds 2GB threshold, clearing..."
-            chmod -R u+w "$GOMODCACHE" && rm -rf "$GOMODCACHE"
+            chmod -R u+w "$GOMODCACHE" && rm -rf "${GOMODCACHE:?}"/* 2>/dev/null || true
           fi
 
       - name: Report tool cache size
