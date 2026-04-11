@@ -242,8 +242,6 @@ func (bs *Bootstrap) LoadAndRun(ctx context.Context, cancel context.CancelFunc) 
 			}
 			// Notify others who're listening to the system context
 			cancel()
-			// Drain pgxpool connections after workers have stopped
-			dao.ClosePool()
 		}()
 
 		select {
@@ -272,6 +270,8 @@ func (bs *Bootstrap) LoadAndRun(ctx context.Context, cancel context.CancelFunc) 
 
 	// Wait everyone exits.
 	rootContext.WG.Wait()
+
+	dao.ClosePool()
 
 	return
 }
