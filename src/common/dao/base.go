@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"sync/atomic"
 
@@ -64,6 +65,11 @@ func InitDatabase(database *models.Database) error {
 	db, err := getDatabase(database)
 	if err != nil {
 		return err
+	}
+
+	if os.Getenv("POSTGRESQL_MAX_IDLE_CONNS") != "" {
+		log.Warningf("POSTGRESQL_MAX_IDLE_CONNS is deprecated and ignored. " +
+			"Use POSTGRESQL_MIN_CONNS (default: 2) to set the minimum number of idle connections kept in the pool.")
 	}
 
 	log.Infof("Registering database: %s", db.String())
