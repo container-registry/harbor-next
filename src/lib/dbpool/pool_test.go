@@ -130,3 +130,99 @@ func TestApplyPoolConfig_ZeroMaxConnsKeepsPgxDefault(t *testing.T) {
 
 	assert.Equal(t, pgxDefault, poolCfg.MaxConns, "zero MaxOpenConns must not override pgxpool default")
 }
+
+func TestBuildDSN_FieldOrdering(t *testing.T) {
+	cfg := &models.PostGreSQL{
+		Host: "h", Port: 5432, Username: "u", Password: "p", Database: "d", SSLMode: "disable",
+	}
+	dsn := BuildDSN(cfg)
+	// Pin the exact format. If the order changes, libpq-compatible clients may break.
+	assert.Equal(t, "host=h port=5432 user=u password='p' dbname=d sslmode=disable timezone=UTC", dsn)
+}
+
+func TestBuildDSN_URLTakesPrecedence(t *testing.T) {
+	cfg := &models.PostGreSQL{
+		Host:     "should-be-ignored",
+		Port:     9999,
+		Username: "ignored",
+		Password: "ignored",
+		Database: "ignored",
+		SSLMode:  "ignored",
+		URL:      "host=real port=5432 user=real dbname=real sslmode=disable",
+	}
+	dsn := BuildDSN(cfg)
+	assert.Equal(t, cfg.URL, dsn, "URL field must override all other fields")
+	assert.NotContains(t, dsn, "ignored")
+}
+
+func TestApplyPoolConfig_SimpleProtocolAlwaysSet(t *testing.T) {
+	// If someone removes the SimpleProtocol line, Beego ORM breaks silently
+	// with prepared statement cache errors under concurrent use.
+	cfg := &models.PostGreSQL{
+		Host: "h", Port: 5432, Username: "u", Password: "p", Database: "d", SSLMode: "disable",
+	}
+	poolCfg, err := pgxpool.ParseConfig(BuildDSN(cfg))
+	require.NoError(t, err)
+
+	applyPoolConfig(poolCfg, cfg)
+
+	assert.Equal(t, pgx.QueryExecModeSimpleProtocol, poolCfg.ConnConfig.DefaultQueryExecMode,
+		"SimpleProtocol must always be set — Beego ORM relies on it")
+}
+
+func TestApplyPoolConfig_NegativeValuesIgnored(t *testing.T) {
+	cfg := &models.PostGreSQL{
+		Host:              "h",
+		Port:              5432,
+		Username:          "u",
+		Password:          "p",
+		Database:          "d",
+		SSLMode:           "disable",
+		MaxOpenConns:      -1,
+		MinConns:          -5,
+		ConnMaxLifetime:   -1 * time.Minute,
+		ConnMaxIdleTime:   -1 * time.Minute,
+		HealthCheckPeriod: -1 * time.Minute,
+		ConnectTimeout:    -1 * time.Second,
+	}
+	poolCfg, err := pgxpool.ParseConfig(BuildDSN(cfg))
+	require.NoError(t, err)
+
+	pgxDefaultMax := poolCfg.MaxConns
+
+	applyPoolConfig(poolCfg, cfg)
+
+	// Negative MaxOpenConns (-1 < 0) should not override pgxpool default
+	assert.Equal(t, pgxDefaultMax, poolCfg.MaxConns, "negative MaxOpenConns must not set MaxConns")
+	// Negative MinConns should fall back to default
+	assert.Equal(t, int32(DefaultMinConns), poolCfg.MinConns, "negative MinConns must fall back to default")
+	// Negative durations should fall back to defaults
+	assert.Equal(t, DefaultMaxConnIdleTime, poolCfg.MaxConnIdleTime)
+	assert.Equal(t, DefaultHealthCheckPeriod, poolCfg.HealthCheckPeriod)
+	assert.Equal(t, DefaultConnectTimeout, poolCfg.ConnConfig.ConnectTimeout)
+}
+
+func TestBuildDSN_PasswordWithSpecialChars(t *testing.T) {
+	tests := []struct {
+		name     string
+		password string
+		want     string
+	}{
+		{"single quote", "it's", `password='it\'s'`},
+		{"backslash", `pass\word`, `password='pass\\word'`},
+		{"both", `it\'s`, `password='it\\\'s'`},
+		{"spaces", "p a s s", `password='p a s s'`},
+		{"empty", "", `password=''`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &models.PostGreSQL{
+				Host: "h", Port: 5432, Username: "u",
+				Password: tt.password, Database: "d", SSLMode: "disable",
+			}
+			dsn := BuildDSN(cfg)
+			assert.Contains(t, dsn, tt.want)
+		})
+	}
+}
