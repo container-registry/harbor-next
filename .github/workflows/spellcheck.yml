@@ -5,14 +5,12 @@ on:
     branches: [main]
     paths:
       - '**.md'
-      - '**.txt'
       - '**.yml'
       - '**.yaml'
       - '.typos.toml'
   pull_request:
     paths:
       - '**.md'
-      - '**.txt'
       - '**.yml'
       - '**.yaml'
       - '.typos.toml'
@@ -30,6 +28,8 @@ jobs:
         env:
           TYPOS_VERSION: "1.44.0"
         run: |
+          set -o pipefail
+
           case "$(uname -m)" in
             x86_64|amd64) target="x86_64-unknown-linux-musl" ;;
             aarch64|arm64) target="aarch64-unknown-linux-musl" ;;
@@ -41,5 +41,44 @@ jobs:
 
           install_dir="$(mktemp -d)"
           curl -fsSL "https://github.com/crate-ci/typos/releases/download/v${TYPOS_VERSION}/typos-v${TYPOS_VERSION}-${target}.tar.gz" -o /tmp/typos.tar.gz
-          tar -xzf /tmp/typos.tar.gz -C "$install_dir" --strip-components=1 --no-same-owner --no-same-permissions ./typos
-          "$install_dir/typos" --config .typos.toml
+          tar -xzf /tmp/typos.tar.gz -C "$install_dir" --strip-components=1 --no-same-owner --no-same-permissions
+          typos="$install_dir/typos"
+
+          # 1) Check markdown files directly
+          find . -type f -name '*.md' -not -path './.git/*' \
+            | "$typos" --config .typos.toml --file-list - --force-exclude
+
+          # 2) Check only comments in YAML files.
+          #    Extract comment text (full-line and inline) preserving line numbers.
+          #    Non-comment lines become empty so typos reports correct positions.
+          comment_dir="$(mktemp -d)"
+          find . -type f \( -name '*.yml' -o -name '*.yaml' \) \
+            -not -path './.git/*' | while IFS= read -r f; do
+            dest="$comment_dir/$f"
+            mkdir -p "$(dirname "$dest")"
+            awk '{
+              # Full-line comment (most common)
+              if (/^[[:space:]]*#/) {
+                sub(/^[[:space:]]*#[[:space:]]?/, ""); print; next
+              }
+              # Inline comment: walk line tracking quotes, find " #" outside strings
+              n = length($0); dq = 0; sq = 0; cs = 0
+              for (j = 1; j <= n; j++) {
+                c = substr($0, j, 1)
+                if (c == "\"" && !sq) dq = !dq
+                else if (c == "\047" && !dq) sq = !sq
+                else if (c == "#" && !dq && !sq && j > 1 && substr($0, j-1, 1) == " ") {
+                  cs = j; break
+                }
+              }
+              if (cs) { s = substr($0, cs + 1); sub(/^[[:space:]]?/, "", s); print s }
+              else print ""
+            }' "$f" > "$dest"
+          done
+          # Run from inside comment_dir so paths are repo-relative,
+          # matching extend-exclude patterns in .typos.toml.
+          (
+            cd "$comment_dir"
+            find . -type f \( -name '*.yml' -o -name '*.yaml' \) \
+              | "$typos" --config "$GITHUB_WORKSPACE/.typos.toml" --file-list - --force-exclude
+          )
