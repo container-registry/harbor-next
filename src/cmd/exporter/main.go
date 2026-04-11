@@ -109,14 +109,17 @@ func main() {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
+	exitCode := 0
 	select {
 	case s := <-sig:
 		log.Infof("Received signal %s, shutting down...", s)
 	case err := <-errCh:
 		log.Errorf("Harbor exporter failed: %v", err)
+		exitCode = 1
 	}
 
 	dao.ClosePool()
+	os.Exit(exitCode)
 }
 
 func getConnMaxLifetime(duration string) time.Duration {

@@ -60,7 +60,7 @@ func NewPGSQL(cfg *models.PostGreSQL) Database {
 
 // Register registers pgSQL to orm with the info wrapped by the instance.
 func (p *pgsql) Register(alias ...string) error {
-	if err := utils.TestTCPConn(fmt.Sprintf("%s:%d", p.cfg.Host, p.cfg.Port), 60, 2); err != nil {
+	if err := utils.TestTCPConn(net.JoinHostPort(p.cfg.Host, strconv.Itoa(p.cfg.Port)), 60, 2); err != nil {
 		return err
 	}
 

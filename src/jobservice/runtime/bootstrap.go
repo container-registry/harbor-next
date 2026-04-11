@@ -240,10 +240,10 @@ func (bs *Bootstrap) LoadAndRun(ctx context.Context, cancel context.CancelFunc) 
 			if er := apiServer.Stop(); er != nil {
 				logger.Error(er)
 			}
-			// Drain pgxpool connections
-			dao.ClosePool()
 			// Notify others who're listening to the system context
 			cancel()
+			// Drain pgxpool connections after workers have stopped
+			dao.ClosePool()
 		}()
 
 		select {

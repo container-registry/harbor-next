@@ -146,10 +146,9 @@ func applyPoolConfig(poolCfg *pgxpool.Config, cfg *models.PostGreSQL) {
 // RegisterWithOrm registers the bridged *sql.DB with Beego ORM.
 // Do NOT use orm.RegisterDataBase -- it opens its own sql.DB and fights pgxpool.
 func (p *Pool) RegisterWithOrm(alias ...string) error {
-	// RegisterDriver is idempotent in practice, but may return "already registered".
 	if err := orm.RegisterDriver("pgx", orm.DRPostgres); err != nil {
 		if !strings.Contains(err.Error(), "already registered") {
-			log.Warningf("dbpool: RegisterDriver returned: %v (ignored)", err)
+			return fmt.Errorf("dbpool: RegisterDriver(%q): %w", "pgx", err)
 		}
 	}
 

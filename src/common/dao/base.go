@@ -105,7 +105,7 @@ func GetPool() *dbpool.Pool {
 
 // ClosePool closes the active database pool if initialized.
 func ClosePool() {
-	if p := GetPool(); p != nil {
+	if p := activePool.Swap(nil); p != nil {
 		log.Info("Closing database pool...")
 		p.Close()
 	}
