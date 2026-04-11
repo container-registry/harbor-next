@@ -1,0 +1,57 @@
+name: Cache Cleanup
+
+on:
+  schedule:
+    - cron: '0 4 * * 0' # Weekly, Sunday 4am UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  cleanup-host:
+    name: Trim host caches
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    steps:
+      - name: Trim Go build cache (files not accessed in 7 days)
+        run: |
+          if [ -n "$GOCACHE" ] && [ -d "$GOCACHE" ]; then
+            echo "Build cache before: $(du -sh "$GOCACHE" | cut -f1)"
+            find "$GOCACHE" -type f -atime +7 -delete 2>/dev/null || true
+            find "$GOCACHE" -type d -empty -delete 2>/dev/null || true
+            echo "Build cache after: $(du -sh "$GOCACHE" | cut -f1)"
+          else
+            echo "No GOCACHE directory found at '${GOCACHE:-<unset>}'"
+          fi
+
+      - name: Check module cache size
+        run: |
+          if [ -n "$GOMODCACHE" ] && [ -d "$GOMODCACHE" ]; then
+            size_mb=$(du -sm "$GOMODCACHE" | cut -f1)
+            echo "Module cache: ${size_mb}MB"
+            if [ "$size_mb" -gt 2048 ]; then
+              echo "Exceeds 2GB threshold, clearing..."
+              chmod -R u+w "$GOMODCACHE" && rm -rf "$GOMODCACHE"
+            fi
+          else
+            echo "No GOMODCACHE directory found at '${GOMODCACHE:-<unset>}'"
+          fi
+
+      - name: Report tool cache size
+        run: |
+          if [ -d "/opt/hostedtoolcache" ]; then
+            echo "Tool cache: $(du -sh /opt/hostedtoolcache | cut -f1)"
+          fi
+
+  cleanup-github-cache:
+    name: Purge stale GitHub Actions caches
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete cache entries older than 7 days
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh cache list -R "${{ github.repository }}" --limit 100 --json id,lastAccessedAt \
+            --jq '[.[] | select(.lastAccessedAt < (now - 604800 | todate)) | .id] | .[]' \
+          | xargs -I{} gh cache delete {} -R "${{ github.repository }}" 2>/dev/null || true
