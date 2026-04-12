@@ -65,7 +65,7 @@
         "stylelint": "^14.16.1",
         "stylelint-config-prettier": "^9.0.5",
         "stylelint-config-prettier-scss": "^0.0.1",
-        "stylelint-config-standard": "^29.0.0",
+        "stylelint-config-standard": "^40.0.0",
         "stylelint-config-standard-scss": "^6.1.0",
         "typescript": "~5.0.4",
       },
@@ -2170,11 +2170,11 @@
 
     "stylelint-config-prettier-scss": ["stylelint-config-prettier-scss@0.0.1", "", { "dependencies": { "stylelint-config-prettier": ">=9.0.3" }, "peerDependencies": { "stylelint": ">=11.0.0" }, "bin": { "stylelint-config-prettier-scss": "bin/check.js", "stylelint-config-prettier-scss-check": "bin/check.js" } }, "sha512-lBAYG9xYOh2LeWEPC/64xeUxwOTnQ8nDyBijQoWoJb10/bMGrUwnokpt8jegGck2Vbtxh6XGwH63z5qBcVHreQ=="],
 
-    "stylelint-config-recommended": ["stylelint-config-recommended@9.0.0", "", { "peerDependencies": { "stylelint": "^14.10.0" } }, "sha512-9YQSrJq4NvvRuTbzDsWX3rrFOzOlYBmZP+o513BJN/yfEmGSr0AxdvrWs0P/ilSpVV/wisamAHu5XSk8Rcf4CQ=="],
+    "stylelint-config-recommended": ["stylelint-config-recommended@18.0.0", "", { "peerDependencies": { "stylelint": "^17.0.0" } }, "sha512-mxgT2XY6YZ3HWWe3Di8umG6aBmWmHTblTgu/f10rqFXnyWxjKWwNdjSWkgkwCtxIKnqjSJzvFmPT5yabVIRxZg=="],
 
     "stylelint-config-recommended-scss": ["stylelint-config-recommended-scss@8.0.0", "", { "dependencies": { "postcss-scss": "^4.0.2", "stylelint-config-recommended": "^9.0.0", "stylelint-scss": "^4.0.0" }, "peerDependencies": { "postcss": "^8.3.3", "stylelint": "^14.10.0" } }, "sha512-BxjxEzRaZoQb7Iinc3p92GS6zRdRAkIuEu2ZFLTxJK2e1AIcCb5B5MXY9KOXdGTnYFZ+KKx6R4Fv9zU6CtMYPQ=="],
 
-    "stylelint-config-standard": ["stylelint-config-standard@29.0.0", "", { "dependencies": { "stylelint-config-recommended": "^9.0.0" }, "peerDependencies": { "stylelint": "^14.14.0" } }, "sha512-uy8tZLbfq6ZrXy4JKu3W+7lYLgRQBxYTUUB88vPgQ+ZzAxdrvcaSUW9hOMNLYBnwH+9Kkj19M2DHdZ4gKwI7tg=="],
+    "stylelint-config-standard": ["stylelint-config-standard@40.0.0", "", { "dependencies": { "stylelint-config-recommended": "^18.0.0" }, "peerDependencies": { "stylelint": "^17.0.0" } }, "sha512-EznGJxOUhtWck2r6dJpbgAdPATIzvpLdK9+i5qPd4Lx70es66TkBPljSg4wN3Qnc6c4h2n+WbUrUynQ3fanjHw=="],
 
     "stylelint-config-standard-scss": ["stylelint-config-standard-scss@6.1.0", "", { "dependencies": { "stylelint-config-recommended-scss": "^8.0.0", "stylelint-config-standard": "^29.0.0" }, "peerDependencies": { "postcss": "^8.3.3", "stylelint": "^14.14.0" } }, "sha512-iZ2B5kQT2G3rUzx+437cEpdcnFOQkwnwqXuY8Z0QUwIHQVE8mnYChGAquyKFUKZRZ0pRnrciARlPaR1RBtPb0Q=="],
 
@@ -2724,6 +2724,10 @@
 
     "streamroller/fs-extra": ["fs-extra@8.1.0", "", { "dependencies": { "graceful-fs": "^4.2.0", "jsonfile": "^4.0.0", "universalify": "^0.1.0" } }, "sha512-yhlQgA6mnOJUKOsRUFsgJdQCvkKhcz8tlZG5HBQfReYZy46OwLcY+Zia0mtdHsOo9y/hP+CxMN0TU9QxoOtG4g=="],
 
+    "stylelint-config-recommended-scss/stylelint-config-recommended": ["stylelint-config-recommended@9.0.0", "", { "peerDependencies": { "stylelint": "^14.10.0" } }, "sha512-9YQSrJq4NvvRuTbzDsWX3rrFOzOlYBmZP+o513BJN/yfEmGSr0AxdvrWs0P/ilSpVV/wisamAHu5XSk8Rcf4CQ=="],
+
+    "stylelint-config-standard-scss/stylelint-config-standard": ["stylelint-config-standard@29.0.0", "", { "dependencies": { "stylelint-config-recommended": "^9.0.0" }, "peerDependencies": { "stylelint": "^14.14.0" } }, "sha512-uy8tZLbfq6ZrXy4JKu3W+7lYLgRQBxYTUUB88vPgQ+ZzAxdrvcaSUW9hOMNLYBnwH+9Kkj19M2DHdZ4gKwI7tg=="],
+
     "supports-hyperlinks/supports-color": ["supports-color@7.2.0", "", { "dependencies": { "has-flag": "^4.0.0" } }, "sha512-qpCAvRl9stuOHveKsn7HncJRvv501qIacKzQlO/+Lwxc9+0q2wLyv4Dfvt80/DPn2pqOBsJdDiogXGR9+OvwRw=="],
 
     "table/ajv": ["ajv@8.12.0", "", { "dependencies": { "fast-deep-equal": "^3.1.1", "json-schema-traverse": "^1.0.0", "require-from-string": "^2.0.2", "uri-js": "^4.2.2" } }, "sha512-sRu1kpcO9yLtYxBKvqfTeh9KzZEwO3STyX1HT+4CaDzC6HpTGYhIhPIzj9XuKU7KYDwnaeh5hcOwjy1QuJzBPA=="],
@@ -2889,6 +2893,8 @@
     "streamroller/fs-extra/jsonfile": ["jsonfile@4.0.0", "", { "optionalDependencies": { "graceful-fs": "^4.1.6" } }, "sha512-m6F1R3z8jjlf2imQHS2Qez5sjKWQzbuuhuJ/FKYFRZvPE3PuHcSMVZzfsLhGVOkfd20obL5SWEBew5ShlquNxg=="],
 
     "streamroller/fs-extra/universalify": ["universalify@0.1.2", "", {}, "sha512-rBJeI5CXAlmy1pV+617WB9J63U6XcazHHF2f2dbJix4XzpUF0RS3Zbj0FGIOCAva5P/d/GBOYaACQ1w+0azUkg=="],
+
+    "stylelint-config-standard-scss/stylelint-config-standard/stylelint-config-recommended": ["stylelint-config-recommended@9.0.0", "", { "peerDependencies": { "stylelint": "^14.10.0" } }, "sha512-9YQSrJq4NvvRuTbzDsWX3rrFOzOlYBmZP+o513BJN/yfEmGSr0AxdvrWs0P/ilSpVV/wisamAHu5XSk8Rcf4CQ=="],
 
     "table/ajv/json-schema-traverse": ["json-schema-traverse@1.0.0", "", {}, "sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug=="],
 
