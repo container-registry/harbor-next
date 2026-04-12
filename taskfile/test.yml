@@ -74,11 +74,15 @@ tasks:
   unit:
     desc: "Run Go unit tests with race detection"
     dir: src
+    env:
+      UTTEST: "true"
     cmd: go test -v -race -cover ./...
 
   unit:coverage:
     desc: "Run Go unit tests and generate HTML coverage report"
     dir: src
+    env:
+      UTTEST: "true"
     cmds:
       - go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
       - go tool cover -html=coverage.out -o coverage.html
@@ -87,12 +91,16 @@ tasks:
     desc: "Run pure unit tests (no DB/Redis needed) with full parallelism"
     deps: [build:gen-apis]
     dir: src
+    env:
+      UTTEST: "true"
     cmd: go test -race -timeout=15m {{.COVER_FLAGS}} {{.TEST_FLAGS}} ./...
 
   unit:db:
     desc: "Run DB-dependent unit tests serially (needs PostgreSQL + Redis)"
     deps: [build:gen-apis]
     dir: src
+    env:
+      UTTEST: "true"
     cmd: go test -race -timeout=15m -tags db -p 1 -parallel 1 {{.COVER_FLAGS}} {{.TEST_FLAGS}} ./...
 
   unit:watch:
@@ -101,6 +109,8 @@ tasks:
       - sh: command -v watchexec
         msg: "watchexec not found. Install: brew install watchexec"
     dir: src
+    env:
+      UTTEST: "true"
     cmd: watchexec -e go -r -- go test -v ./...
 
   # ============================================================================
