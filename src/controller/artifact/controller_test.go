@@ -327,6 +327,10 @@ func (c *controllerTestSuite) TestEnsureArtifact() {
 
 	// reset the mock
 	c.SetupTest()
+	c.setupRepoMgr()
+	c.setupArtMgr()
+	c.setupAccMgr()
+	c.setupAbstractor()
 
 	// the artifact doesn't exist and includes a pending attestation accessory candidate
 	c.repoMgr.On("GetByName", mock.Anything, mock.Anything).Return(&repomodel.RepoRecord{
