@@ -38,8 +38,5 @@ jobs:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Generate API code
-        run: task build:gen-apis
-
       - name: Build binaries (linux/amd64)
         run: PLATFORMS=linux/amd64 task build
