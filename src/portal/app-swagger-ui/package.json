@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "css-loader": "^6.11.0",
-    "style-loader": "^3.3.4",
+    "style-loader": "^4.0.0",
     "swagger-ui": "5.32.1"
   },
   "devDependencies": {
