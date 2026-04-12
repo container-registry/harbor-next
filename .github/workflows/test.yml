@@ -54,7 +54,10 @@ jobs:
 
       - name: Run pure unit tests
         working-directory: src
-        run: go test -race -count=1 -timeout=15m -cover ./...
+        # -p 2 limits concurrent package compile+test to 2 to keep peak
+        # memory under the runner's limit. -race adds significant memory
+        # overhead and Harbor's full package set OOMs at higher parallelism.
+        run: go test -race -count=1 -timeout=20m -cover -p 2 ./...
 
   # --------------------------------------------------------------------------
   # DB-dependent unit tests — need PostgreSQL + Redis, run serially
