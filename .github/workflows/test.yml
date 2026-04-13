@@ -89,6 +89,14 @@ jobs:
           echo "POSTGRESQL_HOST=${SVC_HOST}" >> "$GITHUB_ENV"
           echo "POSTGRESQL_PORT=${PG_PORT}" >> "$GITHUB_ENV"
           echo "JOB_SERVICE_POOL_REDIS_URL=redis://${SVC_HOST}:${REDIS_PORT}" >> "$GITHUB_ENV"
+          # Harbor's libredis.GetRegistryClient / GetHarborClient read these
+          # env vars. controller/blob, jobservice/*, pkg/task/dao all need
+          # them. Without these the tests fail with net.OpError "dial tcp".
+          echo "_REDIS_URL_REG=redis://${SVC_HOST}:${REDIS_PORT}/1" >> "$GITHUB_ENV"
+          echo "_REDIS_URL_CORE=redis://${SVC_HOST}:${REDIS_PORT}/0" >> "$GITHUB_ENV"
+          echo "_REDIS_URL_HARBOR=redis://${SVC_HOST}:${REDIS_PORT}/0" >> "$GITHUB_ENV"
+          echo "REDIS_HOST=${SVC_HOST}" >> "$GITHUB_ENV"
+          echo "REDIS_PORT=${REDIS_PORT}" >> "$GITHUB_ENV"
           # Wait for services (timeout after 30s each)
           timeout 30 bash -c "until docker exec ${PREFIX}-postgres pg_isready -U postgres; do sleep 1; done"
           timeout 10 bash -c "until docker exec ${PREFIX}-redis redis-cli ping | grep -q PONG; do sleep 1; done"
