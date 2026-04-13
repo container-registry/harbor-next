@@ -145,7 +145,7 @@
         "PREFERENCES": "Preferences",
         "CHANGE_PWD": "Alterar senha",
         "ABOUT": "Informativo",
-        "LOGIN": "Log In",
+        "LOGIN": "Entrar",
         "LOGOUT": "Sair"
     },
     "GLOBAL_SEARCH": {
@@ -499,7 +499,8 @@
         "OF": "de",
         "NOT_FOUND": "Não encontramos nenhum registro!",
         "RESOURCE": "Recurso",
-        "RESOURCE_TYPE": "Tipo de Recurso"
+        "RESOURCE_TYPE": "Tipo de Recurso",
+        "DOWNLOAD": "Baixar"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Gatilho",

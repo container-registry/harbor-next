@@ -212,14 +212,16 @@ export class NavigatorComponent implements OnInit {
             queryParams: { redirect_url: state.url },
         };
 
+        const config = this.appConfigService.getConfig();
         // if primary auth mode enabled, skip the first step
         if (
-            this.appConfigService.getConfig().auth_mode ==
-                CONFIG_AUTH_MODE.OIDC_AUTH &&
-            this.appConfigService.getConfig().primary_auth_mode
+            config &&
+            config.auth_mode === CONFIG_AUTH_MODE.OIDC_AUTH &&
+            config.primary_auth_mode
         ) {
             window.location.href =
-                '/c/oidc/login?redirect_url=' + encodeURI(state.url);
+                '/c/oidc/login?redirect_url=' +
+                encodeURIComponent(state.url);
             return;
         }
 

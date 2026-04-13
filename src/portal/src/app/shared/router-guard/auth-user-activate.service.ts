@@ -67,23 +67,25 @@ export class AuthCheckGuard {
                             let navigatorExtra: NavigationExtras = {
                                 queryParams: { redirect_url: state.url },
                             };
+                            const config =
+                                this.appConfigService.getConfig();
                             // if primary auth mode enabled, skip the first step
                             if (
-                                this.appConfigService.getConfig().auth_mode ==
+                                config &&
+                                config.auth_mode ===
                                     CONFIG_AUTH_MODE.OIDC_AUTH &&
-                                this.appConfigService.getConfig()
-                                    .primary_auth_mode
+                                config.primary_auth_mode
                             ) {
-                                // window.location.href =
-                                    // '/c/oidc/login?redirect_url=' +
-                                    // encodeURI(state.url);
-                                return observer.next(true);
+                                window.location.href =
+                                    '/c/oidc/login?redirect_url=' +
+                                    encodeURIComponent(state.url);
+                                return observer.next(false);
                             }
-                            // this.router.navigate(
-                            //     [CommonRoutes.EMBEDDED_SIGN_IN],
-                            //     navigatorExtra
-                            // );
-                            return observer.next(true);
+                            this.router.navigate(
+                                [CommonRoutes.EMBEDDED_SIGN_IN],
+                                navigatorExtra
+                            );
+                            return observer.next(false);
                         } else {
                             return observer.next(true);
                         }

@@ -145,7 +145,7 @@
         "PREFERENCES": "Preferences",
         "CHANGE_PWD": "修改密码",
         "ABOUT": "关于",
-        "LOGIN": "Log In",
+        "LOGIN": "登录",
         "LOGOUT": "退出"
     },
     "GLOBAL_SEARCH": {
@@ -499,7 +499,8 @@
         "OF": "共计",
         "NOT_FOUND": "未发现任何日志!",
         "RESOURCE": "资源",
-        "RESOURCE_TYPE": "资源类型"
+        "RESOURCE_TYPE": "资源类型",
+        "DOWNLOAD": "下载"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "触发器",

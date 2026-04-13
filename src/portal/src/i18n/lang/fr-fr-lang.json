@@ -145,7 +145,7 @@
         "PREFERENCES": "Preferences",
         "CHANGE_PWD": "Modifier le mot de passe",
         "ABOUT": "À propos",
-        "LOGIN": "Log In",
+        "LOGIN": "Se connecter",
         "LOGOUT": "Se déconnecter"
     },
     "GLOBAL_SEARCH": {
@@ -501,7 +501,8 @@
         "OF": "sur",
         "NOT_FOUND": "Nous n'avons trouvé aucun log !",
         "RESOURCE": "Ressource",
-        "RESOURCE_TYPE": "Type de ressource"
+        "RESOURCE_TYPE": "Type de ressource",
+        "DOWNLOAD": "Télécharger"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Déclencheur",
