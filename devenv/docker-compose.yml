@@ -12,6 +12,12 @@ services:
       POSTGRES_DB: registry
     ports:
       - "${PORT_POSTGRES:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+      start_period: 5s
     volumes:
       - harbor-postgres-data:/var/lib/postgresql/data
       - ../make/migrations:/migrations
@@ -20,6 +26,12 @@ services:
     image: valkey/valkey:latest
     ports:
       - "${PORT_REDIS:-6379}:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli ping | grep -q PONG"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+      start_period: 2s
     volumes:
       - harbor-redis-data:/data
 
@@ -93,9 +105,12 @@ services:
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr
     command: air -c devenv/air.core.toml
     depends_on:
-      - postgresql
-      - redis
-      - registry
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      registry:
+        condition: service_started
 
 
   # JobService - starts with: docker compose --profile jobservice up
