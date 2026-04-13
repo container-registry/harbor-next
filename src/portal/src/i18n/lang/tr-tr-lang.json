@@ -145,7 +145,7 @@
         "PREFERENCES": "Preferences",
         "CHANGE_PWD": "Şifreyi Değiştir",
         "ABOUT": "Hakkında",
-        "LOGIN": "Log In",
+        "LOGIN": "Giriş Yap",
         "LOGOUT": "Çıkış"
     },
     "GLOBAL_SEARCH": {
@@ -499,7 +499,8 @@
         "OF": "of",
         "NOT_FOUND": "We couldn't find any logs!",
         "RESOURCE": "Resource",
-        "RESOURCE_TYPE": "Resource Type"
+        "RESOURCE_TYPE": "Resource Type",
+        "DOWNLOAD": "İndir"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Tetikleyici",

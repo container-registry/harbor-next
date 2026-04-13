@@ -110,13 +110,13 @@
         </clr-dropdown>
         <a
             href="javascript:void(0)"
-            id="aboutMenu"
+            id="loginMenu"
             class="nav-link nav-text"
             (click)="logIn()"
             *ngIf="!isSessionValid"
             >{{ 'ACCOUNT_SETTINGS.LOGIN' | translate }}</a
         >
-        <div class="nav-divider"></div>
+        <div class="nav-divider" *ngIf="!isSessionValid"></div>
         <a
             href="javascript:void(0)"
             id="aboutMenu"

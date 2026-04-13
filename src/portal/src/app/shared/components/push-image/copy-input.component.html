@@ -23,14 +23,15 @@
             </textarea>
         </span>
         <span *ngIf="linkMode">
-            <a
-                href="javascript:void(0)"
+            <button
+                type="button"
+                class="btn btn-link"
                 [class.is-success]="isCopied"
                 [class.is-error]="hasCopyError"
                 [ngxClipboard]="inputTarget1"
                 (cbOnSuccess)="onSuccess($event)"
                 (cbOnError)="onError($event)">
-                {{ linkName }}</a
+                {{ linkName }}</button
             >
         </span>
         <span *ngIf="!linkMode">

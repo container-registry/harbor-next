@@ -145,7 +145,7 @@
         "PREFERENCES": "Preferences",
         "CHANGE_PWD": "비밀번호 변경",
         "ABOUT": "About",
-        "LOGIN": "Log In",
+        "LOGIN": "로그인",
         "LOGOUT": "로그아웃"
     },
     "GLOBAL_SEARCH": {
@@ -499,7 +499,8 @@
         "OF": "of",
         "NOT_FOUND": "로그를 찾을 수 없습니다!",
         "RESOURCE": "리소스",
-        "RESOURCE_TYPE": "리소스 종류"
+        "RESOURCE_TYPE": "리소스 종류",
+        "DOWNLOAD": "다운로드"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "트리거",

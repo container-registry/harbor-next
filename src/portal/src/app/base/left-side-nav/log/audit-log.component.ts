@@ -129,19 +129,27 @@ export class AuditLogComponent {
                 page: page,
                 pageSize: pageSize,
             };
+            if (this.currentTerm && this.currentTerm !== '') {
+                params.q = encodeURIComponent(
+                    `${this.defaultFilter}=~${this.currentTerm}`
+                );
+            }
             this.logService.listAuditLogExtsResponse(params).subscribe(
                 response => {
-                    const logs = response.body as AuditLogExt[];
-                    allLogs.push(...logs);
+                    const logs = (response.body || []) as AuditLogExt[];
+                    if (logs.length > 0) {
+                        allLogs.push(...logs);
+                    }
 
-                    const totalCount = parseInt(
-                        response.headers.get('x-total-count') || '0',
-                        10
-                    );
+                    const totalCountHeader =
+                        response.headers.get('x-total-count');
+                    const totalCount = totalCountHeader
+                        ? parseInt(totalCountHeader, 10)
+                        : Infinity;
                     const hasMore =
                         logs.length === pageSize &&
                         allLogs.length < maxLogs &&
-                        allLogs.length < totalCount;
+                        allLogs.length < (isNaN(totalCount) ? Infinity : totalCount);
 
                     if (hasMore) {
                         fetchPage(page + 1);

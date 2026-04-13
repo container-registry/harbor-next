@@ -145,7 +145,7 @@
         "PREFERENCES": "偏好設定",
         "CHANGE_PWD": "變更密碼",
         "ABOUT": "關於",
-        "LOGIN": "Log In",
+        "LOGIN": "登入",
         "LOGOUT": "登出"
     },
     "GLOBAL_SEARCH": {
@@ -499,7 +499,8 @@
         "OF": "中的",
         "NOT_FOUND": "找不到任何日誌！",
         "RESOURCE": "資源",
-        "RESOURCE_TYPE": "資源類型"
+        "RESOURCE_TYPE": "資源類型",
+        "DOWNLOAD": "下載"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "觸發器",

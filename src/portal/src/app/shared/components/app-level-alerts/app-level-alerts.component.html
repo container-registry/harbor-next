@@ -20,21 +20,6 @@
             <span class="alert-text">{{ 'REPO_READ_ONLY' | translate }}</span>
         </clr-alert-item>
     </clr-alert>
-    <!-- <clr-alert -->
-    <!--     *ngIf="showLogin" -->
-    <!--     [clrAlertType]="message?.type" -->
-    <!--     [clrAlertAppLevel]="true"> -->
-    <!--     <clr-alert-item> -->
-    <!--         <span class="alert-text">{{ message?.message | translate }}</span> -->
-    <!--         <div class="alert-actions"> -->
-    <!--             <button -->
-    <!--                 class="btn alert-action no-underline" -->
-    <!--                 (click)="signIn()"> -->
-    <!--                 {{ 'BUTTON.LOG_IN' | translate }} -->
-    <!--             </button> -->
-    <!--         </div> -->
-    <!--     </clr-alert-item> -->
-    <!-- </clr-alert> -->
     <clr-alert
         (clrAlertClosedChange)="closeHealthWarning()"
         *ngIf="
