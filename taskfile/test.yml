@@ -9,6 +9,13 @@ includes:
     dir: ..
     internal: true
 
+vars:
+  # Single source of truth for the unit:pure / unit:db package exclusion
+  # filter. See the comment block above `unit:pure` for per-package rationale.
+  # To run every package, pass PKG_EXCLUDE='^$' on the command line — that
+  # regex matches only empty lines, so `grep -vE '^$'` keeps everything.
+  DEFAULT_PKG_EXCLUDE: '/controller/ldap$|/core/auth/ldap$|/pkg/ldap$|/core/api$|/core/controllers$|/pkg/proxy/connection$|/pkg/token$|/server/middleware/security$|/server/middleware/blob$|/controller/systeminfo$|/pkg/jobmonitor$|/common/utils/email$|/jobservice/runner$|/jobservice/logger/getter$|/jobservice/job/impl/gc$|/core/session$|/lib/cache/redis$|/controller/usergroup/test$|/pkg/scan/dao/scanner$|/pkg/scan/export$|/pkg/scan/dao/scan$|/pkg/scan/postprocessors$|/pkg/systemartifact$|/pkg/accessory/model/attestation$'
+
 tasks:
   # ============================================================================
   # Linting Tasks
@@ -108,8 +115,12 @@ tasks:
   #     upstream test-ordering / FK-constraint issues
   #   - /pkg/accessory/model/attestation: imports src/testing which has
   #     //go:build db; doesn't compile without -tags db
-  # Override in dev with `task test:unit:pure PKG_EXCLUDE=` to run everything.
-  # Keep this list in sync with any upstream fixes.
+  #
+  # The filter is defined once as DEFAULT_PKG_EXCLUDE at the top of this file.
+  # To run every package in dev, pass a sentinel regex that matches nothing:
+  #     task test:unit:pure PKG_EXCLUDE='^$'
+  # (Passing an empty string does NOT work — slim-sprig `default` treats it as
+  # unset, and `grep -vE ''` would drop every line anyway.)
   # ----------------------------------------------------------------------------
   unit:pure:
     desc: "Run pure unit tests (no DB/Redis needed) with full parallelism"
@@ -118,7 +129,7 @@ tasks:
     env:
       UTTEST: "true"
     vars:
-      PKG_EXCLUDE: '{{.PKG_EXCLUDE | default "/controller/ldap$|/core/auth/ldap$|/pkg/ldap$|/core/api$|/core/controllers$|/pkg/proxy/connection$|/pkg/token$|/server/middleware/security$|/server/middleware/blob$|/controller/systeminfo$|/pkg/jobmonitor$|/common/utils/email$|/jobservice/runner$|/jobservice/logger/getter$|/jobservice/job/impl/gc$|/core/session$|/lib/cache/redis$|/controller/usergroup/test$|/pkg/scan/dao/scanner$|/pkg/scan/export$|/pkg/scan/dao/scan$|/pkg/scan/postprocessors$|/pkg/systemartifact$|/pkg/accessory/model/attestation$"}}'
+      PKG_EXCLUDE: '{{.PKG_EXCLUDE | default .DEFAULT_PKG_EXCLUDE}}'
     cmd: |
       pkgs=$(go list ./... | grep -vE '{{.PKG_EXCLUDE}}' | tr '\n' ' ')
       # shellcheck disable=SC2086
@@ -131,7 +142,7 @@ tasks:
     env:
       UTTEST: "true"
     vars:
-      PKG_EXCLUDE: '{{.PKG_EXCLUDE | default "/controller/ldap$|/core/auth/ldap$|/pkg/ldap$|/core/api$|/core/controllers$|/pkg/proxy/connection$|/pkg/token$|/server/middleware/security$|/server/middleware/blob$|/controller/systeminfo$|/pkg/jobmonitor$|/common/utils/email$|/jobservice/runner$|/jobservice/logger/getter$|/jobservice/job/impl/gc$|/core/session$|/lib/cache/redis$|/controller/usergroup/test$|/pkg/scan/dao/scanner$|/pkg/scan/export$|/pkg/scan/dao/scan$|/pkg/scan/postprocessors$|/pkg/systemartifact$|/pkg/accessory/model/attestation$"}}'
+      PKG_EXCLUDE: '{{.PKG_EXCLUDE | default .DEFAULT_PKG_EXCLUDE}}'
     cmd: |
       pkgs=$(go list -tags db ./... | grep -vE '{{.PKG_EXCLUDE}}' | tr '\n' ' ')
       # shellcheck disable=SC2086
