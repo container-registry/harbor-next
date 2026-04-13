@@ -175,8 +175,7 @@
         "DISTRIBUTIONS": {
             "NAME": "배포",
             "INSTANCES": "인스턴스"
-        },
-        "SUBSCRIPTION": "구독"
+        }
     },
     "USER": {
         "ADD_ACTION": "새 사용자",

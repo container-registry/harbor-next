@@ -175,8 +175,7 @@
         "DISTRIBUTIONS": {
             "NAME": "Distribuições",
             "INSTANCES": "Repositórios remotos para distribuição"
-        },
-        "SUBSCRIPTION": "Assinatura"
+        }
     },
     "USER": {
         "ADD_ACTION": "Novo Usuário",
