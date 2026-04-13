@@ -6,8 +6,8 @@ testdata_dir = "testdata"
 tmp_dir = "tmp"
 
 [build]
-  # Build command - includes debug flags for Delve compatibility
-  cmd = "cd src && CGO_ENABLED=0 GOMODCACHE=/go/pkg/mod /usr/local/go/bin/go build -gcflags=all='-N -l' -o ../tmp/jobservice ./jobservice/main.go"
+  # Fast build by default. Set DEBUG=true to enable Delve step-through debugging.
+  cmd = "cd src && CGO_ENABLED=0 GOMODCACHE=/go/pkg/mod /usr/local/go/bin/go build ${DEBUG:+-gcflags=all='-N -l'} -trimpath -o ../tmp/jobservice ./jobservice/main.go"
 
   # Binary output path (used by full_bin)
   bin = "tmp/jobservice"
@@ -60,7 +60,7 @@ tmp_dir = "tmp"
   follow_symlink = false
 
   # Delay before restarting (ms)
-  delay = 1000
+  delay = 500
 
   # Stop on build error
   stop_on_error = true
