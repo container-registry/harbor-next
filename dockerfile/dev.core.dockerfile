@@ -7,16 +7,12 @@ FROM golang:${GO_VERSION}-alpine
 ARG AIR_VERSION
 ARG DELVE_VERSION
 
-# Install git (required for go mod download) and other tools
+# Install git (required by go modules)
 RUN apk add --no-cache git
 
 # Install development tools
 RUN go install github.com/air-verse/air@${AIR_VERSION} && \
     go install github.com/go-delve/delve/cmd/dlv@${DELVE_VERSION}
-
-# Pre-download Go modules (seeds go-mod-cache volume on first create)
-COPY src/go.mod src/go.sum /tmp/harbor-deps/
-RUN cd /tmp/harbor-deps && go mod download && rm -rf /tmp/harbor-deps
 
 WORKDIR /app
 
