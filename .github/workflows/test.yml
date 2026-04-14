@@ -30,6 +30,7 @@ jobs:
     runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository || contains(fromJSON('["OWNER","MEMBER"]'), github.event.pull_request.author_association)) && vars.RUNNER || 'ubuntu-latest' }}
     env:
       CGO_ENABLED: "1"
+      RACE_FLAGS: ${{ github.event_name == 'push' && '-race' || '' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -44,13 +45,14 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Ensure C toolchain for race detector
+        if: env.RACE_FLAGS != ''
         run: |
           if ! echo '#include <stdlib.h>' | gcc -E -x c - >/dev/null 2>&1; then
             sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc libc6-dev
           fi
 
       - name: Run pure unit tests
-        run: task test:unit:pure COVER_FLAGS=-cover TEST_FLAGS=-count=1
+        run: task test:unit:pure RACE_FLAGS="${RACE_FLAGS}" TEST_FLAGS=-count=1
 
   # --------------------------------------------------------------------------
   # DB-dependent unit tests — need PostgreSQL + Redis, run serially
@@ -64,6 +66,7 @@ jobs:
       POSTGRESQL_DATABASE: registry
       POSTGRES_MIGRATION_SCRIPTS_PATH: ${{ github.workspace }}/make/migrations/postgresql
       CGO_ENABLED: "1"
+      RACE_FLAGS: ${{ github.event_name == 'push' && '-race' || '' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -129,13 +132,14 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Ensure C toolchain for race detector
+        if: env.RACE_FLAGS != ''
         run: |
           if ! echo '#include <stdlib.h>' | gcc -E -x c - >/dev/null 2>&1; then
             sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc libc6-dev
           fi
 
       - name: Run DB unit tests
-        run: task test:unit:db COVER_FLAGS=-cover TEST_FLAGS=-count=1
+        run: task test:unit:db RACE_FLAGS="${RACE_FLAGS}" TEST_FLAGS=-count=1
 
       - name: Stop test services
         if: always()

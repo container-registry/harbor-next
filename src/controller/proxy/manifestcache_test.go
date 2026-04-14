@@ -58,15 +58,27 @@ type CacheTestSuite struct {
 	mCache     *ManifestCache
 	mListCache *ManifestListCache
 	local      localInterfaceMock
+	oldListWait int
+	oldWait     int
+	oldSleepSec int
 }
 
 func (suite *CacheTestSuite) SetupSuite() {
 	suite.local = localInterfaceMock{}
 	suite.mListCache = &ManifestListCache{local: &suite.local}
 	suite.mCache = &ManifestCache{local: &suite.local}
+	suite.oldListWait = maxManifestListWait
+	suite.oldWait = maxManifestWait
+	suite.oldSleepSec = sleepIntervalSec
+	maxManifestListWait = 1
+	maxManifestWait = 1
+	sleepIntervalSec = 0
 }
 
 func (suite *CacheTestSuite) TearDownSuite() {
+	maxManifestListWait = suite.oldListWait
+	maxManifestWait = suite.oldWait
+	sleepIntervalSec = suite.oldSleepSec
 }
 func (suite *CacheTestSuite) TestUpdateManifestList() {
 	ctx := context.Background()
