@@ -12,10 +12,10 @@ includes:
 vars:
   # Packages we still exclude from CI by default because they need external
   # services or a full Harbor stack we do not provision in unit-test jobs.
-  DEFAULT_DB_EXCLUDE: '/controller/ldap$|/core/auth/ldap$|/pkg/ldap$|/core/api$|/core/controllers$|/server/middleware/security$|/controller/systeminfo$|/common/utils/email$|/jobservice/runner$|/jobservice/logger/getter$|/controller/usergroup/test$|/pkg/scan/dao/scan$|/pkg/scan/postprocessors$|/pkg/systemartifact$'
+  DEFAULT_DB_EXCLUDE: '/controller/ldap$|/core/auth/ldap$|/pkg/ldap$|/core/api$|/core/controllers$|/server/middleware/security$|/controller/systeminfo$|/common/utils/email$|/jobservice/runner$|/jobservice/logger/getter$|/jobservice/logger/backend$|/jobservice/logger/sweeper$|/controller/usergroup/test$|/pkg/exporter$|/pkg/scan/dao/scan$|/pkg/scan/postprocessors$|/pkg/systemartifact$'
   # Packages excluded from the pure lane because they require Redis/Postgres
   # setup or have db-tagged tests that should only run in the DB lane.
-  DEFAULT_PURE_EXCLUDE: '/controller/ldap$|/core/auth/ldap$|/pkg/ldap$|/core/api$|/core/controllers$|/server/middleware/security$|/controller/systeminfo$|/common/utils/email$|/jobservice/runner$|/jobservice/logger/getter$|/controller/usergroup/test$|/pkg/scan/dao/scan$|/pkg/scan/postprocessors$|/pkg/systemartifact$|/core/session$|/jobservice/job/impl/gc$|/lib/cache/redis$|/pkg/jobmonitor$|/pkg/proxy/connection$|/pkg/scan/dao/scanner$|/pkg/scan/export$|/server/middleware/blob$'
+  DEFAULT_PURE_EXCLUDE: '/controller/ldap$|/core/auth/ldap$|/pkg/ldap$|/core/api$|/core/controllers$|/server/middleware/security$|/controller/systeminfo$|/common/utils/email$|/jobservice/runner$|/jobservice/logger/getter$|/jobservice/logger/backend$|/jobservice/logger/sweeper$|/controller/usergroup/test$|/pkg/exporter$|/pkg/scan/dao/scan$|/pkg/scan/postprocessors$|/pkg/systemartifact$|/core/session$|/jobservice/job/impl/gc$|/lib/cache/redis$|/pkg/jobmonitor$|/pkg/proxy/connection$|/pkg/scan/dao/scanner$|/pkg/scan/export$|/server/middleware/blob$'
   # These packages need Redis/Postgres-backed test setup but do not use
   # //go:build db test files, so we add them explicitly to the DB lane.
   DEFAULT_DB_EXTRA_PACKAGES: 'github.com/goharbor/harbor/src/core/session github.com/goharbor/harbor/src/jobservice/job/impl/gc github.com/goharbor/harbor/src/lib/cache/redis github.com/goharbor/harbor/src/pkg/jobmonitor github.com/goharbor/harbor/src/pkg/proxy/connection'
