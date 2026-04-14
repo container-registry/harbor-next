@@ -8071,6 +8071,11 @@ definitions:
         x-nullable: true
         x-omitempty: true
         description: The OIDC provider name, empty if current auth is not OIDC_auth or OIDC provider is not configured.
+      unauthenticated_landing_page:
+        type: string
+        x-nullable: true
+        x-omitempty: true
+        description: 'The page unauthenticated users see before logging in. Valid values are "login" and "public_projects".'
   AuthproxySetting:
     type: object
     properties:
@@ -8996,6 +9001,9 @@ definitions:
       primary_auth_mode:
         $ref: '#/definitions/BoolConfigItem'
         description: The flag to indicate whether the current auth mode should consider as a primary one.
+      unauthenticated_landing_page:
+        $ref: '#/definitions/StringConfigItem'
+        description: 'The page unauthenticated users see before logging in. Valid values are "login" and "public_projects".'
       ldap_base_dn:
         $ref: '#/definitions/StringConfigItem'
         description: The Base DN for LDAP binding.
@@ -9184,6 +9192,11 @@ definitions:
         x-nullable: true
         x-omitempty: true
         description: The flag to indicate whether the current auth mode should consider as a primary one.
+      unauthenticated_landing_page:
+        type: string
+        description: 'The page unauthenticated users see before logging in. Valid values are "login" and "public_projects".'
+        x-omitempty: true
+        x-isnullable: true
       ldap_base_dn:
         type: string
         description: The Base DN for LDAP binding.

@@ -241,6 +241,7 @@ export class ConfigurationAuthComponent implements OnInit {
                 prop === 'project_creattion_restriction' ||
                 prop === 'primary_auth_mode' ||
                 prop === 'self_registration' ||
+                prop === 'unauthenticated_landing_page' ||
                 prop.startsWith('http_')
             ) {
                 changes[prop] = allChanges[prop];

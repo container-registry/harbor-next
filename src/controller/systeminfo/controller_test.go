@@ -34,6 +34,7 @@ func (s *sysInfoCtlTestSuite) SetupTest() {
 		common.ReadOnly:                    false,
 		common.NotificationEnable:          false,
 		common.BannerMessage:               "{\"closable\":false,\"message\":\"Just for test\",\"type\":\" error\"}",
+		common.UnauthenticatedLandingPage:  common.LandingPageLogin,
 	}
 
 	config.InitWithSettings(conf)
@@ -58,17 +59,19 @@ func (s *sysInfoCtlTestSuite) TestGetInfo() {
 		{
 			withProtected: false,
 			expect: Data{
-				AuthMode:         "db_auth",
-				SelfRegistration: true,
-				BannerMessage:    "{\"closable\":false,\"message\":\"Just for test\",\"type\":\" error\"}",
+				AuthMode:                   "db_auth",
+				SelfRegistration:           true,
+				BannerMessage:              "{\"closable\":false,\"message\":\"Just for test\",\"type\":\" error\"}",
+				UnauthenticatedLandingPage: common.LandingPageLogin,
 			},
 		},
 		{
 			withProtected: true,
 			expect: Data{
-				AuthMode:         "db_auth",
-				SelfRegistration: true,
-				BannerMessage:    "{\"closable\":false,\"message\":\"Just for test\",\"type\":\" error\"}",
+				AuthMode:                   "db_auth",
+				SelfRegistration:           true,
+				BannerMessage:              "{\"closable\":false,\"message\":\"Just for test\",\"type\":\" error\"}",
+				UnauthenticatedLandingPage: common.LandingPageLogin,
 				Protected: &protectedData{
 					RegistryURL:             "test.goharbor.io",
 					ExtURL:                  "https://test.goharbor.io",

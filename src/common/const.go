@@ -235,6 +235,11 @@ const (
 	// Customized banner message
 	BannerMessage = "banner_message"
 
+	// UnauthenticatedLandingPage controls which page unauthenticated users see
+	UnauthenticatedLandingPage = "unauthenticated_landing_page"
+	LandingPageLogin           = "login"
+	LandingPagePublicProjects  = "public_projects"
+
 	// UIMaxLengthLimitedOfNumber is the max length that UI limited for type number
 	UIMaxLengthLimitedOfNumber = 10
 	// ExecutionStatusRefreshIntervalSeconds is the interval seconds for refreshing execution status
