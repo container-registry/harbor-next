@@ -71,27 +71,52 @@ jobs:
         run: |
           PREFIX="test-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           echo "SVC_PREFIX=${PREFIX}" >> "$GITHUB_ENV"
-          # Use random host ports to avoid collisions on shared Docker daemon
+
+          # Redis runs on the runner pod itself at localhost:6379.
+          # Rationale: several tests hardcode `redis://localhost:6379`:
+          #   - src/pkg/task/dao/execution_test.go:50 (cache.Initialize)
+          #   - src/jobservice/config/config_test.go:98 (asserts literal)
+          #   - src/jobservice/tests/utils.go:39 (hardcodes testingRedisPort=6379)
+          # Running Redis on the runner pod's localhost makes all of them
+          # work without touching upstream source. Also avoids cross-PR
+          # port-6379 collisions that would happen if we published through
+          # the shared DinD daemon.
+          command -v redis-server >/dev/null 2>&1 || \
+            sudo apt-get update -qq && sudo apt-get install -y -qq redis-server
+          # Start Redis as a daemon. --daemonize forks and returns; --bind
+          # 0.0.0.0 is fine on an ephemeral runner pod.
+          redis-server --daemonize yes --port 6379 --bind 0.0.0.0 --save "" --appendonly no
+          timeout 10 bash -c 'until redis-cli -h localhost -p 6379 ping 2>/dev/null | grep -q PONG; do sleep 0.5; done'
+
+          # Postgres stays in DinD with a random host port because no test
+          # hardcodes localhost for postgres; they all respect POSTGRESQL_HOST.
           docker run -d --name "${PREFIX}-postgres" \
             -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=root123 -e POSTGRES_DB=registry \
             -p 0:5432 postgres:16-alpine
-          docker run -d --name "${PREFIX}-redis" \
-            -p 0:6379 redis:7-alpine
-          # Resolve service host: shared DinD uses its service FQDN, local Docker uses localhost
+          # Resolve postgres host: shared DinD uses its service FQDN, local Docker uses localhost
           if [ -n "$DOCKER_HOST" ] && echo "$DOCKER_HOST" | grep -qv localhost; then
-            SVC_HOST=$(echo "$DOCKER_HOST" | sed 's|tcp://||;s|:.*||')
+            PG_HOST=$(echo "$DOCKER_HOST" | sed 's|tcp://||;s|:.*||')
           else
-            SVC_HOST=localhost
+            PG_HOST=localhost
           fi
           PG_PORT=$(docker port "${PREFIX}-postgres" 5432 | head -1 | cut -d: -f2)
-          REDIS_PORT=$(docker port "${PREFIX}-redis" 6379 | head -1 | cut -d: -f2)
-          echo "SVC_HOST=${SVC_HOST}" >> "$GITHUB_ENV"
-          echo "POSTGRESQL_HOST=${SVC_HOST}" >> "$GITHUB_ENV"
+
+          echo "POSTGRESQL_HOST=${PG_HOST}" >> "$GITHUB_ENV"
           echo "POSTGRESQL_PORT=${PG_PORT}" >> "$GITHUB_ENV"
-          echo "JOB_SERVICE_POOL_REDIS_URL=redis://${SVC_HOST}:${REDIS_PORT}" >> "$GITHUB_ENV"
-          # Wait for services (timeout after 30s each)
+          # All Redis URLs point at localhost:6379 (runner-pod-local Redis).
+          # JOB_SERVICE_POOL_REDIS_URL is read by jobservice/config's env
+          # override path and must equal "redis://localhost:6379" exactly
+          # to satisfy TestDefaultConfig's literal assertion against the
+          # yaml default.
+          echo "JOB_SERVICE_POOL_REDIS_URL=redis://localhost:6379" >> "$GITHUB_ENV"
+          echo "_REDIS_URL_REG=redis://localhost:6379/1" >> "$GITHUB_ENV"
+          echo "_REDIS_URL_CORE=redis://localhost:6379/0" >> "$GITHUB_ENV"
+          echo "_REDIS_URL_HARBOR=redis://localhost:6379/0" >> "$GITHUB_ENV"
+          echo "REDIS_HOST=localhost" >> "$GITHUB_ENV"
+          echo "REDIS_PORT=6379" >> "$GITHUB_ENV"
+
+          # Wait for postgres
           timeout 30 bash -c "until docker exec ${PREFIX}-postgres pg_isready -U postgres; do sleep 1; done"
-          timeout 10 bash -c "until docker exec ${PREFIX}-redis redis-cli ping | grep -q PONG; do sleep 1; done"
 
       - uses: ./.github/actions/setup-go-cached
         with:
@@ -115,4 +140,5 @@ jobs:
       - name: Stop test services
         if: always()
         run: |
-          docker rm -f "${SVC_PREFIX}-postgres" "${SVC_PREFIX}-redis" 2>/dev/null || true
+          redis-cli -h localhost -p 6379 shutdown nosave 2>/dev/null || true
+          docker rm -f "${SVC_PREFIX}-postgres" 2>/dev/null || true
