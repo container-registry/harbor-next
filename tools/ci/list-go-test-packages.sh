@@ -15,11 +15,20 @@ case "${mode}" in
       | awk -v re="${exclude_regex}" '$0 !~ re'
     ;;
   db-tagged)
-    mapfile -t pkg_dirs < <(
-      rg -l '^//go:build db$' . --glob '**/*_test.go' \
-        | sed 's#^\./##; s#/[^/]*$##' \
-        | sort -u
-    )
+    if command -v rg >/dev/null 2>&1; then
+      mapfile -t pkg_dirs < <(
+        rg -l '^//go:build db$' . --glob '**/*_test.go' \
+          | sed 's#^\./##; s#/[^/]*$##' \
+          | sort -u
+      )
+    else
+      mapfile -t pkg_dirs < <(
+        find . -type f -name '*_test.go' -print0 \
+          | xargs -0 grep -l '^//go:build db$' \
+          | sed 's#^\./##; s#/[^/]*$##' \
+          | sort -u
+      )
+    fi
 
     if [ "${#pkg_dirs[@]}" -eq 0 ]; then
       exit 0
