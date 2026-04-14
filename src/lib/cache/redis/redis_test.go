@@ -27,9 +27,9 @@ import (
 
 const (
 	defaultExpiration    = 200 * time.Millisecond
-	defaultWaitForExpiry = 400 * time.Millisecond
+	defaultWaitForExpiry = 2 * defaultExpiration
 	customExpiration     = 100 * time.Millisecond
-	customWaitForExpiry  = 200 * time.Millisecond
+	customWaitForExpiry  = 2 * customExpiration
 )
 
 type CacheTestSuite struct {
@@ -39,7 +39,9 @@ type CacheTestSuite struct {
 }
 
 func (suite *CacheTestSuite) SetupSuite() {
-	suite.cache, _ = cache.New("redis", cache.Expiration(defaultExpiration))
+	c, err := cache.New("redis", cache.Expiration(defaultExpiration))
+	suite.Require().NoError(err)
+	suite.cache = c
 	suite.ctx = context.TODO()
 }
 

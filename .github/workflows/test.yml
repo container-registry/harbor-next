@@ -95,7 +95,7 @@ jobs:
           # port-6379 collisions that would happen if we published through
           # the shared DinD daemon.
           command -v redis-server >/dev/null 2>&1 || \
-            sudo apt-get update -qq && sudo apt-get install -y -qq redis-server
+            { sudo apt-get update -qq && sudo apt-get install -y -qq redis-server; }
           # Start Redis as a daemon. --daemonize forks and returns; --bind
           # 0.0.0.0 is fine on an ephemeral runner pod.
           redis-server --daemonize yes --port 6379 --bind 0.0.0.0 --save "" --appendonly no

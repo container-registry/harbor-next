@@ -19,12 +19,14 @@ type AttestationTestSuite struct {
 func (suite *AttestationTestSuite) SetupSuite() {
 	suite.digest = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
 	suite.subDigest = "sha256:2222222222222222222222222222222222222222222222222222222222222222"
-	suite.accessory, _ = model.New(model.TypeInTotoAttestation, model.AccessoryData{
+	acc, err := model.New(model.TypeInTotoAttestation, model.AccessoryData{
 		ArtifactID:        1,
 		SubArtifactDigest: suite.subDigest,
 		Size:              1234,
 		Digest:            suite.digest,
 	})
+	suite.Require().NoError(err)
+	suite.accessory = acc
 }
 
 func (suite *AttestationTestSuite) TestGetArtID() {
