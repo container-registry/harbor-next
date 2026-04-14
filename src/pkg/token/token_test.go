@@ -2,6 +2,7 @@ package token
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -14,6 +15,9 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	if err := os.Setenv("TOKEN_PRIVATE_KEY_PATH", filepath.Clean("../../../tests/private_key.pem")); err != nil {
+		os.Exit(1)
+	}
 	config.Init()
 
 	result := m.Run()

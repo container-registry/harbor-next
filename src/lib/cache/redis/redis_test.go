@@ -25,6 +25,13 @@ import (
 	"github.com/goharbor/harbor/src/lib/cache"
 )
 
+const (
+	defaultExpiration    = 200 * time.Millisecond
+	defaultWaitForExpiry = 400 * time.Millisecond
+	customExpiration     = 100 * time.Millisecond
+	customWaitForExpiry  = 200 * time.Millisecond
+)
+
 type CacheTestSuite struct {
 	suite.Suite
 	cache cache.Cache
@@ -32,7 +39,7 @@ type CacheTestSuite struct {
 }
 
 func (suite *CacheTestSuite) SetupSuite() {
-	suite.cache, _ = cache.New("redis", cache.Expiration(time.Second*5))
+	suite.cache, _ = cache.New("redis", cache.Expiration(defaultExpiration))
 	suite.ctx = context.TODO()
 }
 
@@ -46,10 +53,10 @@ func (suite *CacheTestSuite) TestContains() {
 	suite.cache.Delete(suite.ctx, key)
 	suite.False(suite.cache.Contains(suite.ctx, key))
 
-	suite.cache.Save(suite.ctx, key, "value", time.Second*5)
+	suite.cache.Save(suite.ctx, key, "value", defaultExpiration)
 	suite.True(suite.cache.Contains(suite.ctx, key))
 
-	time.Sleep(time.Second * 8)
+	time.Sleep(defaultWaitForExpiry)
 	suite.False(suite.cache.Contains(suite.ctx, key))
 }
 
@@ -88,7 +95,7 @@ func (suite *CacheTestSuite) TestSave() {
 		suite.cache.Fetch(suite.ctx, key, &value)
 		suite.Equal("hello, save", value)
 
-		time.Sleep(time.Second * 8)
+		time.Sleep(defaultWaitForExpiry)
 
 		value = ""
 		suite.Error(suite.cache.Fetch(suite.ctx, key, &value))
@@ -96,9 +103,9 @@ func (suite *CacheTestSuite) TestSave() {
 	}
 
 	{
-		suite.cache.Save(suite.ctx, key, "hello, save", time.Second)
+		suite.cache.Save(suite.ctx, key, "hello, save", customExpiration)
 
-		time.Sleep(time.Second * 2)
+		time.Sleep(customWaitForExpiry)
 
 		var value string
 		suite.Error(suite.cache.Fetch(suite.ctx, key, &value))
