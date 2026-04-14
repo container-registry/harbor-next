@@ -198,10 +198,12 @@ func (p *Pool) DB() *sql.DB       { return p.db }
 func (p *Pool) PgxPool() *pgxpool.Pool { return p.pool }
 
 func (p *Pool) Close() {
-	p.pool.Close()
+	// Close sql.DB first — it borrows connections from the pool via Acquire(),
+	// so release its references before draining the underlying pool.
 	if err := p.db.Close(); err != nil {
 		log.Warningf("dbpool: close sql.DB: %v", err)
 	}
+	p.pool.Close()
 }
 
 func (p *Pool) Healthy() bool {
