@@ -6,8 +6,9 @@ testdata_dir = "src/testdata"
 tmp_dir = "tmp"
 
 [build]
-  # Build with debug flags for Delve (-N disables optimizations, -l disables inlining)
-  cmd = "cd src && CGO_ENABLED=0 GOMODCACHE=/go/pkg/mod /usr/local/go/bin/go build -gcflags=all='-N -l' -trimpath -o ../tmp/core ./core/main.go"
+  # Fast build by default. Set DEBUG=true to enable Delve step-through debugging:
+  #   docker compose exec core env DEBUG=true air -c devenv/air.core.toml
+  cmd = "cd src && CGO_ENABLED=0 GOMODCACHE=/go/pkg/mod /usr/local/go/bin/go build ${DEBUG:+-gcflags=all='-N -l'} -trimpath -o ../tmp/core ./core/main.go"
 
   bin = "tmp/core"
   args_bin = []

@@ -145,6 +145,7 @@
         "PREFERENCES": "Preferences",
         "CHANGE_PWD": "Alterar senha",
         "ABOUT": "Informativo",
+        "LOGIN": "Entrar",
         "LOGOUT": "Sair"
     },
     "GLOBAL_SEARCH": {
@@ -174,8 +175,7 @@
         "DISTRIBUTIONS": {
             "NAME": "Distribuições",
             "INSTANCES": "Repositórios remotos para distribuição"
-        },
-        "SUBSCRIPTION": "Assinatura"
+        }
     },
     "USER": {
         "ADD_ACTION": "Novo Usuário",
@@ -498,7 +498,8 @@
         "OF": "de",
         "NOT_FOUND": "Não encontramos nenhum registro!",
         "RESOURCE": "Recurso",
-        "RESOURCE_TYPE": "Tipo de Recurso"
+        "RESOURCE_TYPE": "Tipo de Recurso",
+        "DOWNLOAD": "Baixar"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Gatilho",

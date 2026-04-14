@@ -27,5 +27,8 @@ doc/
 docs/
 *.md
 
+# Tests (not needed in images)
+tests/
+
 # Config templates
 make/common/config/

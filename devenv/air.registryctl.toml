@@ -6,8 +6,8 @@ testdata_dir = "src/testdata"
 tmp_dir = "tmp"
 
 [build]
-  # Build with debug flags for Delve (-N disables optimizations, -l disables inlining)
-  cmd = "cd src && CGO_ENABLED=0 GOMODCACHE=/go/pkg/mod /usr/local/go/bin/go build -gcflags=all='-N -l' -trimpath -o ../tmp/registryctl ./registryctl/main.go"
+  # Fast build by default. Set DEBUG=true to enable Delve step-through debugging.
+  cmd = "cd src && CGO_ENABLED=0 GOMODCACHE=/go/pkg/mod /usr/local/go/bin/go build ${DEBUG:+-gcflags=all='-N -l'} -trimpath -o ../tmp/registryctl ./registryctl/main.go"
 
   bin = "tmp/registryctl"
   args_bin = ["-c", "config/registryctl.yml"]

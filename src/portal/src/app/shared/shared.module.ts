@@ -31,7 +31,6 @@ import { NavigatorComponent } from './components/navigator/navigator.component';
 import { SearchResultComponent } from './components/global-search/search-result.component';
 import { GlobalSearchComponent } from './components/global-search/global-search.component';
 import { AboutDialogComponent } from './components/about-dialog/about-dialog.component';
-import { ChargebeeDialogComponent } from './components/chargebee-dialog/chargebee-dialog.component';
 import {
     LabelDefaultService,
     LabelService,
@@ -176,7 +175,6 @@ ClarityIcons.add({
         SearchResultComponent,
         GlobalSearchComponent,
         AboutDialogComponent,
-        ChargebeeDialogComponent,
         FilterComponent,
         GaugeComponent,
         ConfirmationDialogComponent,
@@ -222,7 +220,6 @@ ClarityIcons.add({
         SearchResultComponent,
         GlobalSearchComponent,
         AboutDialogComponent,
-        ChargebeeDialogComponent,
         FilterComponent,
         GaugeComponent,
         ConfirmationDialogComponent,

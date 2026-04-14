@@ -7,7 +7,7 @@ FROM golang:${GO_VERSION}-alpine
 ARG AIR_VERSION
 ARG DELVE_VERSION
 
-# Install git (required for go mod download) and other tools
+# Install git (required by go modules)
 RUN apk add --no-cache git
 
 # Install development tools

@@ -145,6 +145,7 @@
         "PREFERENCES": "Preferences",
         "CHANGE_PWD": "Cambiar contraseña",
         "ABOUT": "Acerca de",
+        "LOGIN": "Iniciar sesión",
         "LOGOUT": "Cerrar sesión"
     },
     "GLOBAL_SEARCH": {
@@ -174,8 +175,7 @@
         "DISTRIBUTIONS": {
             "NAME": "Distribuciones",
             "INSTANCES": "Instancias"
-        },
-        "SUBSCRIPTION": "Suscripción"
+        }
     },
     "USER": {
         "ADD_ACTION": "Nuevo Usuario",
@@ -499,7 +499,8 @@
         "OF": "of",
         "NOT_FOUND": "No pudimos encontrar ningún registro!",
         "RESOURCE": "Recursos",
-        "RESOURCE_TYPE": "Tipo de Recurso"
+        "RESOURCE_TYPE": "Tipo de Recurso",
+        "DOWNLOAD": "Descargar"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Disparador",
