@@ -56,7 +56,6 @@ func main() {
 			HealthCheckPeriod: viper.GetDuration("database.health_check_period"),
 			ConnectTimeout:    viper.GetDuration("database.connect_timeout"),
 			MinConns:          int32(viper.GetInt("database.min_conns")),
-			URL:               viper.GetString("database.url"),
 		},
 	}
 	if err := dao.InitDatabase(dbCfg); err != nil {
