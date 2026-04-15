@@ -18,7 +18,8 @@ runs:
         go-version-file: ${{ inputs.go-version-file }}
         cache: false
 
-    # GitHub-hosted only: restore module cache from GitHub's cache storage
+    # GitHub-hosted only: restore module cache from GitHub's cache storage.
+    # Self-hosted runners use persistent host-mounted $GOMODCACHE instead.
     - name: Restore Go module cache
       if: runner.environment != 'self-hosted'
       uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
@@ -27,7 +28,8 @@ runs:
         key: go-mod-${{ runner.os }}-${{ hashFiles(inputs.go-sum-path) }}
         restore-keys: go-mod-${{ runner.os }}-
 
-    # GitHub-hosted only: restore build cache from GitHub's cache storage
+    # GitHub-hosted only: restore build cache from GitHub's cache storage.
+    # Self-hosted runners use persistent host-mounted $GOCACHE instead.
     - name: Restore Go build cache
       if: runner.environment != 'self-hosted'
       uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3

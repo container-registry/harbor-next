@@ -186,6 +186,7 @@ tasks:
   gen-apis:
     desc: "Generate Go server code from swagger.yaml"
     run: once
+    method: checksum
     deps: [require-swagger]
     sources:
       - api/v2.0/swagger.yaml
