@@ -87,6 +87,36 @@ tasks:
       - sh: docker info > /dev/null 2>&1
         msg: "Docker daemon is not running. Please start Docker first."
 
+  require-ports:
+    internal: true
+    run: once
+    silent: true
+    cmds:
+      - |
+        failed=0
+        for pair in \
+          "{{.PORT_POSTGRES}}:PostgreSQL" \
+          "{{.PORT_REDIS}}:Redis" \
+          "{{.PORT_CORE}}:Core" \
+          "{{.PORT_PORTAL}}:Portal" \
+          "{{.PORT_REGISTRY}}:Registry" \
+          "{{.PORT_REGISTRYCTL}}:RegistryCtl" \
+          "{{.PORT_TRIVY}}:Trivy"; do
+          port="${pair%%:*}"
+          name="${pair##*:}"
+          if ss -tlnH "sport = :$port" 2>/dev/null | grep -q .; then
+            pid=$(ss -tlnpH "sport = :$port" 2>/dev/null | sed -n 's/.*pid=\([0-9]*\).*/\1/p' | head -1)
+            echo "ERROR: Port $port ($name) is already in use${pid:+ by PID $pid}"
+            failed=1
+          fi
+        done
+        if [ "$failed" -eq 1 ]; then
+          echo ""
+          echo "Free the ports above, or use a different slot:  task dev:up SLOT=1"
+          echo "SLOT=1 offsets all ports by +100 (PostgreSQL→{{add .PORT_POSTGRES 100}}, Redis→{{add .PORT_REDIS 100}}, …)"
+          exit 1
+        fi
+
   gen:private-key:
     desc: Generate RSA 4096 key for token signing (skipped if exists)
     status:
@@ -141,7 +171,7 @@ tasks:
 
   up:
     desc: "Start all services with hot reload in foreground (SKIP_TRIVY=true to exclude Trivy)"
-    deps: [require-docker, gen:private-key]
+    deps: [require-docker, require-ports, gen:private-key]
     vars:
       TRIVY_PROFILE: '{{if ne .SKIP_TRIVY "true"}}--profile trivy{{end}}'
     cmds:
@@ -161,7 +191,7 @@ tasks:
   # ---------------------------------------------------------------------------
   infra:up:
     desc: Start PostgreSQL, Redis, and Registry (waits for DB readiness)
-    deps: [require-docker]
+    deps: [require-docker, require-ports]
     cmds:
       - '{{.COMPOSE_CMD}} up -d'
       - |
@@ -187,7 +217,7 @@ tasks:
   # ---------------------------------------------------------------------------
   backend:up:
     desc: Build and start Core, JobService, RegistryCtl with hot reload
-    deps: [require-docker, gen:private-key]
+    deps: [require-docker, require-ports, gen:private-key]
     cmds:
       - task: :build:gen-apis
       - '{{.COMPOSE_CMD}} --profile core --profile jobservice --profile registryctl up -d --build'
