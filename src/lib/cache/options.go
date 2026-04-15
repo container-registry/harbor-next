@@ -16,6 +16,8 @@ package cache
 
 import (
 	"time"
+
+	"github.com/benbjohnson/clock"
 )
 
 // Option function to set the options of the cache
@@ -27,6 +29,7 @@ type Options struct {
 	Codec      Codec         // the codec for the cache
 	Expiration time.Duration // the default expiration for the cache
 	Prefix     string        // the prefix for all the keys in the cache
+	Clock      clock.Clock   // clock source for time operations; nil means real time
 }
 
 // Key returns the real cache key
@@ -62,5 +65,13 @@ func Expiration(d time.Duration) Option {
 func Prefix(prefix string) Option {
 	return func(o *Options) {
 		o.Prefix = prefix
+	}
+}
+
+// WithClock sets the clock source. Use clock.NewMock() in tests to
+// make TTL expiration deterministic without real sleeps.
+func WithClock(c clock.Clock) Option {
+	return func(o *Options) {
+		o.Clock = c
 	}
 }

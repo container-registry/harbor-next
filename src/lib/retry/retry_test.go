@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/benbjohnson/clock"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,62 +33,127 @@ func TestAbort(t *testing.T) {
 	assert.Equal("retry abort, error: failed to call func", e2.Error())
 }
 
+// advanceUntilDone starts a goroutine that advances the mock clock in
+// small increments until the done channel is closed. This unblocks any
+// Sleep or After calls inside Retry without requiring real wall time.
+func advanceUntilDone(mock *clock.Mock, step time.Duration, done <-chan struct{}) {
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			default:
+				mock.Add(step)
+				// yield to let Retry process the tick
+				time.Sleep(time.Millisecond)
+			}
+		}
+	}()
+}
+
 func TestRetry(t *testing.T) {
 	assert := assert.New(t)
 
-	i := 0
-	f1 := func() error {
-		i++
-		return fmt.Errorf("failed")
-	}
-	assert.Error(Retry(f1, InitialInterval(time.Second), MaxInterval(time.Second), Timeout(time.Second*5)))
-	// f1 called time     0s - sleep - 1s - sleep - 2s - sleep - 3s - sleep - 4s - sleep - 5s
-	// i after f1 called  1            2            3            4            5            6
-	// the i may be 5 or 6 depend on timeout or default which is selected by the select statement
-	assert.LessOrEqual(i, 6)
-
-	f2 := func() error {
-		return nil
-	}
-	assert.Nil(Retry(f2))
-
-	i = 0
-	f3 := func() error {
-		defer func() {
+	// Test 1: always-failing function hits timeout
+	{
+		i := 0
+		f := func() error {
 			i++
-		}()
-
-		if i < 2 {
 			return fmt.Errorf("failed")
 		}
-		return nil
+		mock := clock.NewMock()
+		done := make(chan struct{})
+		advanceUntilDone(mock, time.Second, done)
+
+		assert.Error(Retry(f,
+			InitialInterval(time.Second),
+			MaxInterval(time.Second),
+			Timeout(5*time.Second),
+			WithClock(mock),
+		))
+		close(done)
+		assert.GreaterOrEqual(i, 2)
 	}
-	assert.Nil(Retry(f3))
 
-	Retry(
-		f1,
-		Timeout(time.Second*5),
-		Callback(func(err error, sleep time.Duration) {
-			fmt.Printf("failed to exec f1 retry after %s : %v\n", sleep, err)
-		}),
-	)
+	// Test 2: immediately succeeding function
+	{
+		f := func() error { return nil }
+		assert.Nil(Retry(f, WithClock(clock.NewMock())))
+	}
 
-	err := Retry(func() error {
-		return fmt.Errorf("always failed")
-	})
-
-	assert.Error(err)
-	assert.Equal("retry timeout: always failed", err.Error())
-
-	i = 0
-	f4 := func() error {
-		if i == 3 {
-			return Abort(fmt.Errorf("abort"))
+	// Test 3: function succeeds after a few retries
+	{
+		i := 0
+		f := func() error {
+			defer func() { i++ }()
+			if i < 2 {
+				return fmt.Errorf("failed")
+			}
+			return nil
 		}
+		mock := clock.NewMock()
+		done := make(chan struct{})
+		advanceUntilDone(mock, 100*time.Millisecond, done)
 
-		i++
-		return fmt.Errorf("error")
+		assert.Nil(Retry(f, WithClock(mock)))
+		close(done)
 	}
-	assert.Error(Retry(f4, InitialInterval(time.Second), MaxInterval(time.Second), Timeout(time.Second*5)))
-	assert.LessOrEqual(i, 3)
+
+	// Test 4: callback is invoked on each failure
+	{
+		var cbCount int
+		f := func() error { return fmt.Errorf("failed") }
+		mock := clock.NewMock()
+		done := make(chan struct{})
+		advanceUntilDone(mock, time.Second, done)
+
+		Retry(f,
+			Timeout(5*time.Second),
+			WithClock(mock),
+			Callback(func(err error, sleep time.Duration) {
+				cbCount++
+			}),
+		)
+		close(done)
+		assert.Greater(cbCount, 0)
+	}
+
+	// Test 5: always-failing produces correct error message
+	{
+		mock := clock.NewMock()
+		done := make(chan struct{})
+		advanceUntilDone(mock, time.Second, done)
+
+		err := Retry(func() error {
+			return fmt.Errorf("always failed")
+		}, Timeout(time.Minute), WithClock(mock))
+		close(done)
+
+		assert.Error(err)
+		assert.Equal("retry timeout: always failed", err.Error())
+	}
+
+	// Test 6: abort stops retrying immediately
+	{
+		i := 0
+		f := func() error {
+			if i == 3 {
+				return Abort(fmt.Errorf("abort"))
+			}
+			i++
+			return fmt.Errorf("error")
+		}
+		mock := clock.NewMock()
+		done := make(chan struct{})
+		advanceUntilDone(mock, time.Second, done)
+
+		assert.Error(Retry(f,
+			InitialInterval(time.Second),
+			MaxInterval(time.Second),
+			Timeout(5*time.Second),
+			WithClock(mock),
+		))
+		close(done)
+		assert.Equal(3, i)
+	}
 }

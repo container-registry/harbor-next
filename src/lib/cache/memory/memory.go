@@ -22,6 +22,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/benbjohnson/clock"
+
 	"github.com/goharbor/harbor/src/lib/cache"
 	"github.com/goharbor/harbor/src/lib/log"
 )
@@ -31,16 +33,17 @@ type entry struct {
 	expiratedAt int64
 }
 
-func (e *entry) isExpirated() bool {
-	return e.expiratedAt < time.Now().UnixNano()
-}
-
 var _ cache.Cache = (*Cache)(nil)
 
 // Cache memory cache
 type Cache struct {
 	opts    *cache.Options
+	clock   clock.Clock
 	storage sync.Map
+}
+
+func (c *Cache) isExpired(e *entry) bool {
+	return e.expiratedAt < c.clock.Now().UnixNano()
 }
 
 // Contains returns true if key exists
@@ -50,7 +53,7 @@ func (c *Cache) Contains(ctx context.Context, key string) bool {
 		return false
 	}
 
-	if e.(*entry).isExpirated() {
+	if c.isExpired(e.(*entry)) {
 		err := c.Delete(ctx, c.opts.Key(key))
 		log.Errorf("failed to delete cache in Contains() method when it's expired, error: %v", err)
 		return false
@@ -73,7 +76,7 @@ func (c *Cache) Fetch(ctx context.Context, key string, value any) error {
 	}
 
 	e := v.(*entry)
-	if e.isExpirated() {
+	if c.isExpired(e) {
 		err := c.Delete(ctx, c.opts.Key(key))
 		if err != nil {
 			log.Errorf("failed to delete cache in Fetch() method when it's expired, error: %v", err)
@@ -101,10 +104,11 @@ func (c *Cache) Save(_ context.Context, key string, value any, expiration ...tim
 	}
 
 	var expiratedAt int64
+	now := c.clock.Now()
 	if len(expiration) > 0 {
-		expiratedAt = time.Now().Add(expiration[0]).UnixNano()
+		expiratedAt = now.Add(expiration[0]).UnixNano()
 	} else if c.opts.Expiration > 0 {
-		expiratedAt = time.Now().Add(c.opts.Expiration).UnixNano()
+		expiratedAt = now.Add(c.opts.Expiration).UnixNano()
 	} else {
 		expiratedAt = math.MaxInt64
 	}
@@ -127,7 +131,7 @@ func (c *Cache) Scan(_ context.Context, match string) (cache.Iterator, error) {
 		}
 
 		if matched {
-			if v.(*entry).isExpirated() {
+			if c.isExpired(v.(*entry)) {
 				c.storage.Delete(k)
 			} else {
 				keys = append(keys, strings.TrimPrefix(k.(string), c.opts.Prefix))
@@ -170,7 +174,11 @@ func (i *ScanIterator) Val() string {
 
 // New returns memory cache
 func New(opts cache.Options) (cache.Cache, error) {
-	return &Cache{opts: &opts}, nil
+	clk := opts.Clock
+	if clk == nil {
+		clk = clock.New()
+	}
+	return &Cache{opts: &opts, clock: clk}, nil
 }
 
 func init() {

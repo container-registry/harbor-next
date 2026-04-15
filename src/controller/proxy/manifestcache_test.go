@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/manifest"
@@ -119,7 +120,10 @@ func (suite *CacheTestSuite) TestUpdateManifestList() {
 }
 
 func (suite *CacheTestSuite) TestPushManifestList() {
-	ctx := context.Background()
+	// Use a short timeout — push() polls with backoff and stops when ctx expires
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
 	amdDig := "sha256:1a9ec845ee94c202b2d5da74a24f0ed2058318bfa9879fa541efaecba272e86b"
 	armDig := "sha256:92c7f9c92844bbbb5d0a101b22f7c2a7949e40f8ea90c8b3bc396879d95e899a"
 	manifestList := manifestlist.ManifestList{
@@ -155,26 +159,23 @@ func (suite *CacheTestSuite) TestPushManifestList() {
 		ManifestList: manifestList,
 	}
 	repo := "library/hello-world"
-	artInfo1 := lib.ArtifactInfo{
-		Repository: repo,
-		Digest:     amdDig,
-		Tag:        "",
-	}
 	ar := &artifact.Artifact{}
 	_, payload, err := manList.Payload()
 	suite.Nil(err)
 	originDigest := digest.FromBytes(payload)
 
-	suite.local.On("GetManifest", ctx, artInfo1).Return(ar, nil)
-	suite.local.On("GetManifest", ctx, mock.Anything).Return(nil, nil)
+	artInfo1 := lib.ArtifactInfo{Repository: "library/hello-world", Digest: amdDig}
+	// Use mock.Anything for ctx since push() wraps it with its own timeout
+	suite.local.On("GetManifest", mock.Anything, artInfo1).Return(ar, nil)
+	suite.local.On("GetManifest", mock.Anything, mock.Anything).Return(nil, nil)
 
 	suite.local.On("PushManifest", repo, originDigest, mock.Anything).Return(fmt.Errorf("wrong digest"))
 	suite.local.On("PushManifest", repo, mock.Anything, mock.Anything).Return(nil)
-	suite.local.On("UpdatePullTime", ctx, mock.Anything).Return(nil)
+	suite.local.On("UpdatePullTime", mock.Anything, mock.Anything).Return(nil)
 
 	err = suite.mListCache.push(ctx, "library/hello-world", string(originDigest), manList)
 	suite.Require().Nil(err)
-	suite.local.AssertCalled(suite.T(), "UpdatePullTime", ctx, mock.Anything)
+	suite.local.AssertCalled(suite.T(), "UpdatePullTime", mock.Anything, mock.Anything)
 }
 
 func (suite *CacheTestSuite) TestManifestCache_CacheContent() {
@@ -193,7 +194,8 @@ func (suite *CacheTestSuite) TestManifestCache_CacheContent() {
 		Tag:        "latest",
 	}
 
-	suite.local.On("CheckDependencies", ctx, artInfo.Repository, man).Once().Return([]distribution.Descriptor{})
+	// Use mock.Anything for ctx since CacheContent wraps it with its own timeout
+	suite.local.On("CheckDependencies", mock.Anything, artInfo.Repository, man).Once().Return([]distribution.Descriptor{})
 	suite.local.On("PushManifest", artInfo.Repository, artInfo.Digest, man).Once().Return(nil)
 	suite.local.On("PushManifest", artInfo.Repository, artInfo.Tag, man).Once().Return(nil)
 
