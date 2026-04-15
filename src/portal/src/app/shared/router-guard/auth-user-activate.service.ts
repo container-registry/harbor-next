@@ -24,7 +24,7 @@ import { MessageHandlerService } from '../services/message-handler.service';
 import { SearchTriggerService } from '../components/global-search/search-trigger.service';
 import { Observable } from 'rxjs';
 import { UN_LOGGED_PARAM, YES } from '../../account/sign-in/sign-in.service';
-import { CommonRoutes, CONFIG_AUTH_MODE } from '../entities/shared.const';
+import { CommonRoutes, CONFIG_AUTH_MODE, LANDING_PAGE } from '../entities/shared.const';
 
 @Injectable({
     providedIn: 'root',
@@ -64,9 +64,6 @@ export class AuthCheckGuard {
                         if (
                             !state.url.startsWith(CommonRoutes.EMBEDDED_SIGN_IN)
                         ) {
-                            let navigatorExtra: NavigationExtras = {
-                                queryParams: { redirect_url: state.url },
-                            };
                             const config =
                                 this.appConfigService.getConfig();
                             // if primary auth mode enabled, skip the first step
@@ -81,6 +78,27 @@ export class AuthCheckGuard {
                                     encodeURIComponent(state.url);
                                 return observer.next(false);
                             }
+                            if (
+                                config &&
+                                config.unauthenticated_landing_page ===
+                                    LANDING_PAGE.PUBLIC_PROJECTS &&
+                                !state.url.startsWith(
+                                    CommonRoutes.HARBOR_DEFAULT
+                                )
+                            ) {
+                                this.router.navigate(
+                                    [CommonRoutes.HARBOR_DEFAULT],
+                                    {
+                                        queryParams: {
+                                            [UN_LOGGED_PARAM]: YES,
+                                        },
+                                    }
+                                );
+                                return observer.next(false);
+                            }
+                            let navigatorExtra: NavigationExtras = {
+                                queryParams: { redirect_url: state.url },
+                            };
                             this.router.navigate(
                                 [CommonRoutes.EMBEDDED_SIGN_IN],
                                 navigatorExtra

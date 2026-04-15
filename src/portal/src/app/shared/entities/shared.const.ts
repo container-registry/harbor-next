@@ -87,6 +87,11 @@ export const ListMode = {
     FULL: 'full',
 };
 
+export const LANDING_PAGE = {
+    LOGIN: 'login',
+    PUBLIC_PROJECTS: 'public_projects',
+};
+
 export const CommonRoutes = {
     SIGN_IN: '/sign-in',
     EMBEDDED_SIGN_IN: '/account/sign-in',

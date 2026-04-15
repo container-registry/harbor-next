@@ -72,6 +72,8 @@ var (
 
 		{Name: common.PrimaryAuthMode, Scope: UserScope, Group: BasicGroup, EnvKey: "PRIMARY_AUTH_MODE", DefaultValue: "false", ItemType: &BoolType{}, Description: `Use current auth mode as a primary one`},
 
+		{Name: common.UnauthenticatedLandingPage, Scope: UserScope, Group: BasicGroup, EnvKey: "UNAUTHENTICATED_LANDING_PAGE", DefaultValue: common.LandingPageLogin, ItemType: &LandingPageType{}, Editable: true, Description: `The default landing page for unauthenticated users. Valid values are "login" and "public_projects".`},
+
 		{Name: common.TrivyAdapterURL, Scope: SystemScope, Group: TrivyGroup, EnvKey: "TRIVY_ADAPTER_URL", DefaultValue: "http://trivy-adapter:8080", ItemType: &StringType{}, Editable: false},
 
 		{Name: common.CoreURL, Scope: SystemScope, Group: BasicGroup, EnvKey: "CORE_URL", DefaultValue: "http://core:8080", ItemType: &StringType{}, Editable: false},
