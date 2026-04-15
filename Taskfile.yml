@@ -69,6 +69,23 @@ tasks:
     cmds:
       - task: test:all
 
+  lint:
+    desc: "Run API lint, Go lint, and dependency vulnerability checks"
+    cmds:
+      - task: test:lint:api
+      - task: test:lint
+      - task: test:vuln-check
+
+  lint:api:
+    desc: "Run API lint"
+    cmds:
+      - task: test:lint:api
+
+  vuln-check:
+    desc: "Run Go dependency vulnerability checks"
+    cmds:
+      - task: test:vuln-check
+
   images:
     desc: "Build all container images (PUSH=false for local, PLATFORMS=linux/arm64 for single arch)"
     cmds:

@@ -108,8 +108,9 @@ task setup               # Install development tools (air, dlv, govulncheck)
 task build               # Build all binaries (alias: task b:all-binaries)
 task images              # Build all Docker images
 task test                # Run all tests (alias: task t:all)
-task test:lint           # Run linters
-task test:unit           # Run unit tests only
+task lint                # Run API lint, Go lint, and vuln-check
+task test:unit:pure      # Run pure unit tests only
+task test:unit:db        # Run DB-backed unit tests only
 task clean               # Clean build artifacts
 task info                # Show build info and tool versions
 task -l                  # List all available tasks

@@ -133,7 +133,7 @@ func (m *ManifestListCache) push(ctx context.Context, repo, reference string, ma
 	var err error
 	for range maxManifestListWait {
 		log.Debugf("waiting for the manifest ready, repo %v, tag:%v", repo, reference)
-		time.Sleep(sleepIntervalSec * time.Second)
+		time.Sleep(time.Duration(sleepIntervalSec) * time.Second)
 		newMan, err = m.updateManifestList(ctx, repo, man)
 		if err != nil {
 			return err
@@ -194,7 +194,7 @@ type ManifestCache struct {
 func (m *ManifestCache) CacheContent(ctx context.Context, remoteRepo string, man distribution.Manifest, art lib.ArtifactInfo, r RemoteInterface, _ string) {
 	var waitBlobs []distribution.Descriptor
 	for n := range maxManifestWait {
-		time.Sleep(sleepIntervalSec * time.Second)
+		time.Sleep(time.Duration(sleepIntervalSec) * time.Second)
 		waitBlobs = m.local.CheckDependencies(ctx, art.Repository, man)
 		if len(waitBlobs) == 0 {
 			break

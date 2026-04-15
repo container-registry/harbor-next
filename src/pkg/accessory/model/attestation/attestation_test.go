@@ -7,19 +7,18 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/goharbor/harbor/src/pkg/accessory/model"
-	htesting "github.com/goharbor/harbor/src/testing"
 )
 
 type AttestationTestSuite struct {
-	htesting.Suite
+	suite.Suite
 	accessory model.Accessory
 	digest    string
 	subDigest string
 }
 
 func (suite *AttestationTestSuite) SetupSuite() {
-	suite.digest = suite.DigestString()
-	suite.subDigest = suite.DigestString()
+	suite.digest = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+	suite.subDigest = "sha256:2222222222222222222222222222222222222222222222222222222222222222"
 	suite.accessory, _ = model.New(model.TypeInTotoAttestation, model.AccessoryData{
 		ArtifactID:        1,
 		SubArtifactDigest: suite.subDigest,
