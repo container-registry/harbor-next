@@ -139,7 +139,7 @@ jobs:
           fi
 
       - name: Download digests
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: ${{ runner.temp }}/digests
           pattern: preview-digest-${{ matrix.component }}-*
@@ -237,7 +237,7 @@ jobs:
           fi
 
       - name: Create or update PR comment
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           MARKER: "<!-- harbor-next-pr-preview -->"
         with:
