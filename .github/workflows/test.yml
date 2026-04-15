@@ -82,7 +82,7 @@ jobs:
 
       - name: Start test services
         run: |
-          PREFIX="test-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          PREFIX="test-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${{ matrix.shard_index }}"
           echo "SVC_PREFIX=${PREFIX}" >> "$GITHUB_ENV"
 
           # Redis runs on the runner pod itself at localhost:6379.
