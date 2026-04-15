@@ -61,9 +61,38 @@ import (
 
 var (
 	// Ctl is a global artifact controller instance
-	Ctl                 = NewController()
-	skippedContentTypes = map[string]struct{}{
-		"application/vnd.in-toto+json": {},
+	Ctl = NewController()
+	// scannableContentTypes defines the allowlist of content types that Trivy can scan.
+	// Content types NOT in this list are skipped to avoid scanner failures on
+	// signature/attestation blobs (cosign, in-toto, sigstore, DSSE) which are
+	// small JSON payloads that cannot be extracted as tar archives.
+	scannableContentTypes = map[string]struct{}{
+		// Docker/OCI image manifests
+		"application/vnd.oci.image.manifest.v1+json":                {},
+		"application/vnd.docker.distribution.manifest.v2+json":      {},
+		"application/vnd.docker.distribution.manifest.v1+json":      {},
+		"application/vnd.docker.distribution.manifest.v1+prettyjws": {},
+		// Docker/OCI image indexes (multi-arch)
+		"application/vnd.oci.image.index.v1+json":                   {},
+		"application/vnd.docker.distribution.manifest.list.v2+json": {},
+		// Docker/OCI image layers
+		"application/vnd.docker.image.rootfs.diff.tar.gzip":                {},
+		"application/vnd.docker.image.rootfs.diff.tar":                     {},
+		"application/vnd.docker.image.rootfs.foreign.diff.tar.gzip":        {},
+		"application/vnd.oci.image.layer.v1.tar":                           {},
+		"application/vnd.oci.image.layer.v1.tar+gzip":                      {},
+		"application/vnd.oci.image.layer.v1.tar+zstd":                      {},
+		"application/vnd.oci.image.layer.nondistributable.v1.tar":          {},
+		"application/vnd.oci.image.layer.nondistributable.v1.tar+gzip":     {},
+		"application/vnd.oci.image.layer.nondistributable.v1.tar+zstd":     {},
+		// Docker/OCI image configs
+		"application/vnd.oci.image.config.v1+json":       {},
+		"application/vnd.docker.container.image.v1+json": {},
+		// Helm charts
+		"application/vnd.cncf.helm.config.v1+json":            {},
+		"application/vnd.cncf.helm.chart.content.v1.tar+gzip": {},
+		// SBOMs
+		"application/vnd.cyclonedx+json": {},
 	}
 )
 
@@ -832,7 +861,10 @@ func (c *controller) populateAccessories(ctx context.Context, art *Artifact) {
 	}
 }
 
-// HasUnscannableLayer check if it is a in-toto sbom, if it contains any blob with a content_type is application/vnd.in-toto+json, then consider as in-toto sbom
+// HasUnscannableLayer checks if the artifact contains any layer/blob that cannot be scanned.
+// Uses an allowlist approach: only known scannable content types (tar archives, configs, helm charts)
+// are allowed. Signature/attestation blobs (cosign, in-toto, sigstore, DSSE) are automatically
+// skipped because they are small JSON payloads that Trivy cannot extract as tar archives.
 func (c *controller) HasUnscannableLayer(ctx context.Context, dgst string) (bool, error) {
 	if len(dgst) == 0 {
 		return false, nil
@@ -842,8 +874,8 @@ func (c *controller) HasUnscannableLayer(ctx context.Context, dgst string) (bool
 		return false, err
 	}
 	for _, b := range blobs {
-		if _, exist := skippedContentTypes[b.ContentType]; exist {
-			log.Debugf("the artifact with digest %v is unscannable, because it contains content type: %v", dgst, b.ContentType)
+		if _, scannable := scannableContentTypes[b.ContentType]; !scannable {
+			log.Debugf("artifact %v is unscannable: content type %v not in allowlist", dgst, b.ContentType)
 			return true, nil
 		}
 	}
