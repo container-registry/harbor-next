@@ -170,7 +170,7 @@ tasks:
       - |
         TRIVY_DIR=$(mktemp -d)
         trap "rm -rf $TRIVY_DIR" EXIT
-        git clone --branch {{.HARBOR_SCANNER_TRIVY_VERSION}} --depth 1 https://github.com/goharbor/harbor-scanner-trivy.git "$TRIVY_DIR"
+        git clone --branch {{.HARBOR_SCANNER_TRIVY_VERSION}} --depth 1 https://github.com/container-registry/harbor-scanner-trivy.git "$TRIVY_DIR"
         cd "$TRIVY_DIR"
         CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/scanner-trivy" cmd/scanner-trivy/main.go
 
