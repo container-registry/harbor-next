@@ -12,7 +12,7 @@ FROM golang:${GO_VERSION}-alpine AS builder
 ARG HARBOR_SCANNER_TRIVY_VERSION
 RUN apk add --no-cache git
 RUN git clone --branch ${HARBOR_SCANNER_TRIVY_VERSION} --depth 1 \
-      https://github.com/goharbor/harbor-scanner-trivy.git /src
+      https://github.com/container-registry/harbor-scanner-trivy.git /src
 WORKDIR /src
 RUN CGO_ENABLED=0 go build -o /scanner-trivy cmd/scanner-trivy/main.go
 
