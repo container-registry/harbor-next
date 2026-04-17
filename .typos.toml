@@ -1,4 +1,5 @@
 # Configuration for typos spell checker
+
 # https://github.com/crate-ci/typos
 #
 # Scope: markdown files (full content) and YAML files (comments only).
