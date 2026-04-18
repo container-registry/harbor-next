@@ -56,7 +56,7 @@ All scripts accept these overrides:
 | `DB_CLUSTER_ID` | `harbor-next-aurora` | Aurora cluster identifier |
 | `DB_MASTER_PASSWORD` | (random) | Aurora master password |
 | `CHART_VERSION` | `3.0.0` | Helm chart version |
-| `CHART_REF` | `oci://8gears.container-registry.com/harbor-next/chart/harbor` | Chart OCI reference |
+| `CHART_REF` | `oci://8gears.container-registry.com/8gcr/charts/harbor-next` | Chart OCI reference |
 | `KUBECONFIG_PATH` | `~/.kube/<CLUSTER_NAME>.yaml` | Kubeconfig file path |
 
 ## Quick Start
@@ -146,7 +146,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO harbor_iam_u
 ### 7. Deploy Harbor
 
 ```bash
-helm install harbor-next oci://8gears.container-registry.com/harbor-next/chart/harbor \
+helm install harbor-next oci://8gears.container-registry.com/8gcr/charts/harbor-next \
   --version 3.0.0 -n harbor --create-namespace \
   -f values-aws-irsa.yaml \
   --set database.host=<AURORA_ENDPOINT> \

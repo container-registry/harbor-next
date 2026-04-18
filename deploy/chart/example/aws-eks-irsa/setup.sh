@@ -30,7 +30,7 @@ IAM_POLICY_NAME="${IAM_POLICY_NAME:-harbor-next-irsa}"
 IAM_ROLE_NAME="${IAM_ROLE_NAME:-harbor-next-irsa}"
 
 CHART_VERSION="${CHART_VERSION:-3.0.0}"
-CHART_REF="${CHART_REF:-oci://8gears.container-registry.com/harbor-next/chart/harbor}"
+CHART_REF="${CHART_REF:-oci://8gears.container-registry.com/8gcr/charts/harbor-next}"
 
 KUBECONFIG_PATH="${KUBECONFIG_PATH:-${HOME}/.kube/${CLUSTER_NAME}.yaml}"
 export KUBECONFIG="${KUBECONFIG_PATH}"

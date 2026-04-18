@@ -7,7 +7,7 @@
 #   - IRSA role with S3 + rds-db:connect permissions
 #
 # Usage:
-#   helm install harbor-next oci://8gears.container-registry.com/harbor-next/chart/harbor \
+#   helm install harbor-next oci://8gears.container-registry.com/8gcr/charts/harbor-next \
 #     --version 3.0.0 -n harbor --create-namespace \
 #     -f values-aws-irsa.yaml \
 #     --set database.host=<AURORA_ENDPOINT> \
