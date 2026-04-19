@@ -7,7 +7,7 @@
     "start": "webpack serve --config webpack.config.js --mode development"
   },
   "dependencies": {
-    "css-loader": "^6.11.0",
+    "css-loader": "^7.1.4",
     "style-loader": "^3.3.4",
     "swagger-ui": "5.32.1"
   },
