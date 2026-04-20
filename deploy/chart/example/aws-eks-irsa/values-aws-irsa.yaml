@@ -18,6 +18,8 @@
 
 # Access via kubectl port-forward svc/harbor-next-core 8443:443 -n harbor
 externalURL: "https://localhost:8443"
+# Demo password. For production, use `existingSecretAdminPassword` with a
+# Secret from AWS Secrets Manager, external-secrets, or SOPS.
 harborAdminPassword: "Harbor12345"
 
 # --- Exposure: ClusterIP only (port-forward access) ---

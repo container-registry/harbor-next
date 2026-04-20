@@ -11,7 +11,7 @@ Check if internal TLS is enabled
   {{- printf "http" -}}
 {{- end }}
 
-{{- define "harbor.middlware.enabled" -}}
+{{- define "harbor.middleware.enabled" -}}
 {{- false }}
 {{- end }}
 
