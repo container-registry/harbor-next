@@ -34,28 +34,13 @@ Deploy Harbor Next on AWS EKS using IAM Roles for Service Accounts (IRSA) for ze
 
 ## Prerequisites
 
-- AWS CLI v2, configured for account `163500494166` (or your target account)
+- AWS CLI v2, configured for your target AWS account
 - `eksctl` >= 0.170
 - `helm` >= 3.14
 - `kubectl`
 - `docker` (for push/pull verification)
-- Harbor Next images with RDS IAM Auth support (from `aws-iam-auth` branch)
-
-### IAM Auth Commits
-
-The RDS IAM Auth code is on the `aws-iam-auth` branch. Cherry-pick these commits onto your build branch before building images:
-
-```bash
-git cherry-pick 702be52951  # feat: add support for AWS IAM auth
-git cherry-pick 31f5ead5f1  # fix: add the metadata entries for the new config keys
-git cherry-pick fce902463f  # fix: JobService database authentication with IAM
-```
-
-Then build images:
-
-```bash
-task images PLATFORMS=linux/amd64
-```
+- Harbor Next `v2.15.0` or later — RDS IAM Auth is built in.
+  Public images: `8gears.container-registry.com/8gcr/harbor-{core,jobservice,registry,portal}:v2.15.0`
 
 ## Environment Variables
 
@@ -220,7 +205,7 @@ kubectl exec -n harbor <registry-pod> -- env | grep AWS  # should show AWS_WEB_I
 
 ### "password authentication failed" for harbor_iam_user
 
-The IAM auth code (`HARBOR_DATABASE_IAM_AUTH=true`) is required. Ensure images are built from the `aws-iam-auth` branch or have the cherry-picked commits.
+IAM auth is activated by `POSTGRESQL_USE_IAM_AUTH=true` + `POSTGRESQL_AWS_REGION=<region>`, set via `core.config` / `jobservice.config` in `values-aws-irsa.yaml`. Confirm they reach the pod with `kubectl exec <core-pod> -n harbor -- env | grep POSTGRESQL_USE_IAM_AUTH`. Use public images tagged `v2.15.0` or later — earlier images do not include the IAM code.
 
 ### automountServiceAccountToken
 

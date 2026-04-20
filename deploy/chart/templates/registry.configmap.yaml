@@ -165,7 +165,7 @@ data:
       schema1:
         enabled: true
 
-    {{- if (include "harbor.middlware.enabled" .) }}
+    {{- if (include "harbor.middleware.enabled" .) }}
     {{- $middleware := .Values.registry.middleware }}
     {{- $middlewareType := $middleware.type }}
     {{- if eq $middlewareType "cloudFront" }}
