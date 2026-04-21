@@ -112,7 +112,7 @@ jobs:
           endpoint: ${{ env.BUILDX_HOST }}
 
       - name: Log in to registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         with:
           registry: ${{ env.REGISTRY_ADDRESS }}
           username: ${{ vars.REGISTRY_USERNAME }}
@@ -180,7 +180,7 @@ jobs:
           merge-multiple: true
 
       - name: Log in to registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         with:
           registry: ${{ env.REGISTRY_ADDRESS }}
           username: ${{ vars.REGISTRY_USERNAME }}
@@ -223,7 +223,7 @@ jobs:
         uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
 
       - name: Log in to registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         with:
           registry: ${{ env.REGISTRY_ADDRESS }}
           username: ${{ vars.REGISTRY_USERNAME }}
