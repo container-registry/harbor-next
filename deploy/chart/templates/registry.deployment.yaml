@@ -1,0 +1,195 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "harbor.registry.name" . }}
+  labels:
+    {{- include "harbor.componentLabels" (dict "root" . "component" "registry") | nindent 4 }}
+spec:
+  replicas: {{ .Values.registry.replicas }}
+  revisionHistoryLimit: {{ .Values.registry.revisionHistoryLimit | default .Values.global.revisionHistoryLimit }}
+  {{- with .Values.registry.deploymentStrategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "registry") | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/configmap: {{ include (print $.Template.BasePath "/registry.configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/registry.secret.yaml") . | sha256sum }}
+        checksum/registryctl-configmap: {{ include (print $.Template.BasePath "/registryctl.configmap.yaml") . | sha256sum }}
+        checksum/registryctl-secret: {{ include (print $.Template.BasePath "/registryctl.secret.yaml") . | sha256sum }}
+        {{- with .Values.registry.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "registry") | nindent 8 }}
+        {{- with .Values.registry.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- include "harbor.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "harbor.serviceAccountName" (dict "root" . "component" "registry" "serviceAccount" .Values.registry.serviceAccount) }}
+      automountServiceAccountToken: {{ .Values.registry.serviceAccount.automountServiceAccountToken | default false }}
+      {{- with (.Values.registry.priorityClassName | default .Values.global.priorityClassName) }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.registry.podSecurityContext | nindent 8 }}
+      {{- with .Values.registry.initContainers }}
+      initContainers:
+        {{- tpl (toYaml .) $ | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: registry
+          securityContext:
+            {{- toYaml .Values.registry.securityContext | nindent 12 }}
+          image: {{ include "harbor.image" (dict "imageRoot" .Values.registry.image "global" .Values.image "chart" .Chart) }}
+          imagePullPolicy: {{ include "harbor.imagePullPolicy" . }}
+          ports:
+            - name: http
+              containerPort: 5000
+              protocol: TCP
+            - name: metrics
+              containerPort: 5001
+              protocol: TCP
+          envFrom:
+            - secretRef:
+                name: {{ include "harbor.registry.name" . }}
+          {{- with .Values.registry.extraEnv }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.registry.resources | nindent 12 }}
+          volumeMounts:
+            - name: storage
+              mountPath: {{ .Values.registry.storage.filesystem.rootdirectory | default "/storage" }}
+            {{- if and (eq .Values.registry.storage.type "gcs") .Values.registry.storage.gcs.keyfile }}
+            - name: gcs-key
+              mountPath: /etc/registry/gcs
+              readOnly: true
+            {{- end }}
+            - mountPath: /etc/registry/passwd
+              name: registry-htpasswd
+              subPath: passwd
+            - mountPath: /etc/registry/config.yml
+              name: registry-config
+              subPath: config.yml
+            - name: tmp
+              mountPath: /tmp
+        - name: registryctl
+          securityContext:
+            {{- toYaml .Values.registry.securityContext | nindent 12 }}
+          image: {{ include "harbor.image" (dict "imageRoot" .Values.registry.controller.image "global" .Values.image "chart" .Chart) }}
+          imagePullPolicy: {{ include "harbor.imagePullPolicy" . }}
+          ports:
+            - name: ctl
+              containerPort: 8080
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "harbor.registry.name" . }}
+            - secretRef:
+                name: {{ include "harbor.registry.name" . }}
+            - configMapRef:
+                name: {{ include "harbor.fullname" . }}-registryctl
+            - secretRef:
+                name: {{ include "harbor.fullname" . }}-registryctl
+          env:
+            {{- if .Values.registry.existingSecret }}
+            - name: REGISTRY_HTTP_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.registry.existingSecret }}
+                  key: {{ .Values.registry.existingSecretKey }}
+            {{- end }}
+            - name: CORE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default (include "harbor.core" .) .Values.core.existingSecret }}
+                  key: secret
+            - name: JOBSERVICE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default (include "harbor.jobservice" .) .Values.jobservice.existingSecret }}
+                  {{- if .Values.jobservice.existingSecret }}
+                  key: {{ .Values.jobservice.existingSecretKey }}
+                  {{- else }}
+                  key: JOBSERVICE_SECRET
+                  {{- end }}
+            {{- if has "registry" .Values.proxy.components }}
+            - name: HTTP_PROXY
+              value: "{{ .Values.proxy.httpProxy }}"
+            - name: HTTPS_PROXY
+              value: "{{ .Values.proxy.httpsProxy }}"
+            - name: NO_PROXY
+              value: "{{ template "harbor.noProxy" . }}"
+            {{- end }}
+            {{- with .Values.registry.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.registry.resources | nindent 12 }}
+          volumeMounts:
+            - name: storage
+              mountPath: {{ .Values.registry.storage.filesystem.rootdirectory | default "/storage" }}
+            - name: registry-config
+              mountPath: /etc/registry/config.yml
+              subPath: config.yml
+            - name: registry-config
+              mountPath: /etc/registryctl/config.yml
+              subPath: ctl-config.yml
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: registry-htpasswd
+          secret:
+            items:
+              - key: REGISTRY_HTPASSWD
+                path: passwd
+            secretName: {{ include "harbor.registry.name" . }}-htpasswd
+        - configMap:
+            name: {{ include "harbor.registry.name" . }}
+          name: registry-config
+        - name: storage
+          {{- if and .Values.registry.persistence.enabled (eq .Values.registry.storage.type "filesystem") }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.registry.persistence.existingClaim | default (include "harbor.registry" .) }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- if and (eq .Values.registry.storage.type "gcs") .Values.registry.storage.gcs.keyfile }}
+        - name: gcs-key
+          secret:
+            secretName: {{ include "harbor.fullname" . }}-registry-gcs
+        {{- end }}
+      {{- include "harbor.podScheduling" (dict "component" .Values.registry "root" $) | nindent 6 }}
