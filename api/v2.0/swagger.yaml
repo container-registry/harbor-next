@@ -7546,6 +7546,10 @@ definitions:
         type: string
         description: 'Matching mode for proxy_cache_filter_pattern: "doublestar" (default, glob-style with ** support) or "regex". Only has value when the current project is a proxy cache project.'
         x-nullable: true
+      proxy_referrer_api:
+        type: string
+        description: 'Whether the proxy cache project should handle API referrer requests. The valid values are "true", "false".'
+        x-nullable: true
   ProjectSummary:
     type: object
     properties:

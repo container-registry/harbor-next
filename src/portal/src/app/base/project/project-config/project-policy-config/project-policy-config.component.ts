@@ -61,6 +61,7 @@ export class ProjectPolicy {
     ProxySpeedKb?: number | null;
     MaxUpstreamConn?: number | null;
     ProxyCacheLocalOnNotFound?: boolean;
+    ProxyReferrerAPI?: boolean;
     ProxyCacheFilterPattern?: string | null;
     ProxyCacheFilterKind?: string | null;
 
@@ -77,6 +78,7 @@ export class ProjectPolicy {
         this.ProxySpeedKb = -1;
         this.MaxUpstreamConn = -1;
         this.ProxyCacheLocalOnNotFound = false;
+        this.ProxyReferrerAPI = false;
         this.ProxyCacheFilterPattern = null;
         this.ProxyCacheFilterKind = 'doublestar';
     }
@@ -102,6 +104,8 @@ export class ProjectPolicy {
             : -1;
         this.ProxyCacheLocalOnNotFound =
             pro.metadata.proxy_cache_local_on_not_found === 'true';
+        this.ProxyReferrerAPI =
+            pro.metadata.proxy_referrer_api === 'true' ? true : false;
         this.ProxyCacheFilterPattern =
             pro.metadata.proxy_cache_filter_pattern || null;
         this.ProxyCacheFilterKind =

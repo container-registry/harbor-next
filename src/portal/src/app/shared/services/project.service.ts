@@ -174,6 +174,9 @@ export class ProjectDefaultService extends ProjectService {
                     : '-1',
             proxy_cache_local_on_not_found:
                 projectPolicy.ProxyCacheLocalOnNotFound ? 'true' : 'false',
+            proxy_referrer_api: projectPolicy.ProxyReferrerAPI
+                ? 'true'
+                : 'false',
         };
         if (
             projectPolicy.ProxyCacheFilterPattern !== undefined &&

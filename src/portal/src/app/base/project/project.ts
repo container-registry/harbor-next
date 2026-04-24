@@ -38,6 +38,7 @@ export class Project {
         bandwidth: number;
         max_upstream_conn: number;
         proxy_cache_local_on_not_found?: string | boolean;
+        proxy_referrer_api?: string | boolean;
         proxy_cache_filter_pattern?: string;
         proxy_cache_filter_kind?: string;
     };
@@ -45,6 +46,7 @@ export class Project {
         this.metadata = <any>{};
         this.metadata.public = false;
         this.metadata.max_upstream_conn = -1;
+        this.metadata.proxy_referrer_api = false;
         this.metadata.proxy_cache_filter_pattern = '';
         this.metadata.proxy_cache_filter_kind =
             REPOSITORY_FILTER_KIND_DOUBLESTAR;
