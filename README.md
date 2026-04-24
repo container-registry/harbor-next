@@ -1,5 +1,6 @@
 # Harbor Next
 
+
 <p align="center"><img alt="Harbor Next" width="256px" src="https://raw.githubusercontent.com/container-registry/harbor-next/refs/heads/main/docs/img/harbor-next-logo.svg"></p>
 
 Harbor is a CNCF graduated open-source container registry to store and manage container images and other OCI artifacts securely with policies, role-based access control, vulnerability scans and signing.
