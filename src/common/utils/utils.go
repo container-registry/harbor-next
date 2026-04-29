@@ -312,7 +312,9 @@ func ValidateCronString(cron string) error {
 	return nil
 }
 
-// IsLocalPath checks if path is local, includes the empty path
+// IsLocalPath checks if path is local, includes the empty path.
+// It rejects paths starting with // or /\ because browsers normalize backslash
+// to forward-slash, turning /\example.com into //example.com (an external redirect).
 func IsLocalPath(path string) bool {
-	return len(path) == 0 || (strings.HasPrefix(path, "/") && !strings.HasPrefix(path, "//"))
+	return len(path) == 0 || (strings.HasPrefix(path, "/") && !strings.HasPrefix(path, "//") && !strings.HasPrefix(path, `/\`))
 }
