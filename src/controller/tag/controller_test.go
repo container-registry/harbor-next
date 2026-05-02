@@ -50,6 +50,7 @@ func (c *controllerTestSuite) SetupTest() {
 	c.ctl = &controller{
 		tagMgr:       c.tagMgr,
 		artMgr:       c.artMgr,
+		repoMgr:      c.repoMgr,
 		immutableMtr: c.immutableMtr,
 	}
 }
@@ -88,6 +89,8 @@ func (c *controllerTestSuite) TestEnsureTag() {
 	c.artMgr.On("Get", mock.Anything, mock.Anything).Return(&pkg_artifact.Artifact{
 		ID: 1,
 	}, nil)
+	mock.OnAnything(c.artMgr, "Update").Return(nil)
+	c.repoMgr.On("Touch", mock.Anything, mock.Anything).Return(nil)
 	mock.OnAnything(c.immutableMtr, "Match").Return(false, nil)
 	_, err = c.ctl.Ensure(orm.NewContext(nil, &ormtesting.FakeOrmer{}), 1, 1, "latest")
 	c.Require().Nil(err)
@@ -102,6 +105,8 @@ func (c *controllerTestSuite) TestEnsureTag() {
 	c.artMgr.On("Get", mock.Anything, mock.Anything).Return(&pkg_artifact.Artifact{
 		ID: 1,
 	}, nil)
+	mock.OnAnything(c.artMgr, "Update").Return(nil)
+	c.repoMgr.On("Touch", mock.Anything, mock.Anything).Return(nil)
 	mock.OnAnything(c.immutableMtr, "Match").Return(false, nil)
 	_, err = c.ctl.Ensure(orm.NewContext(nil, &ormtesting.FakeOrmer{}), 1, 1, "latest")
 	c.Require().Nil(err)
@@ -150,6 +155,8 @@ func (c *controllerTestSuite) TestDelete() {
 	c.artMgr.On("Get", mock.Anything, mock.Anything).Return(&pkg_artifact.Artifact{
 		ID: 1,
 	}, nil)
+	mock.OnAnything(c.artMgr, "Update").Return(nil)
+	c.repoMgr.On("Touch", mock.Anything, mock.Anything).Return(nil)
 	mock.OnAnything(c.immutableMtr, "Match").Return(false, nil)
 	c.tagMgr.On("Delete", mock.Anything, mock.Anything).Return(nil)
 	err := c.ctl.Delete(nil, 1)
@@ -190,6 +197,8 @@ func (c *controllerTestSuite) TestDeleteTags() {
 	c.artMgr.On("Get", mock.Anything, mock.Anything).Return(&pkg_artifact.Artifact{
 		ID: 1,
 	}, nil)
+	mock.OnAnything(c.artMgr, "Update").Return(nil)
+	c.repoMgr.On("Touch", mock.Anything, mock.Anything).Return(nil)
 	mock.OnAnything(c.immutableMtr, "Match").Return(false, nil)
 	c.tagMgr.On("Delete", mock.Anything, mock.Anything).Return(nil)
 	ids := []int64{1, 2, 3, 4}

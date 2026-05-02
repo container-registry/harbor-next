@@ -24,10 +24,12 @@ import (
 	"github.com/goharbor/harbor/src/lib/orm"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/lib/selector"
+	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/pkg"
 	"github.com/goharbor/harbor/src/pkg/artifact"
 	"github.com/goharbor/harbor/src/pkg/immutable/match"
 	"github.com/goharbor/harbor/src/pkg/immutable/match/rule"
+	"github.com/goharbor/harbor/src/pkg/repository"
 	"github.com/goharbor/harbor/src/pkg/tag"
 	model_tag "github.com/goharbor/harbor/src/pkg/tag/model/tag"
 )
@@ -63,6 +65,7 @@ func NewController() Controller {
 	return &controller{
 		tagMgr:       tag.Mgr,
 		artMgr:       pkg.ArtifactMgr,
+		repoMgr:      pkg.RepositoryMgr,
 		immutableMtr: rule.NewRuleMatcher(),
 	}
 }
@@ -70,6 +73,7 @@ func NewController() Controller {
 type controller struct {
 	tagMgr       tag.Manager
 	artMgr       artifact.Manager
+	repoMgr      repository.Manager
 	immutableMtr match.ImmutableTagMatcher
 }
 
@@ -103,7 +107,11 @@ func (c *controller) Ensure(ctx context.Context, repositoryID, artifactID int64,
 		// update it to point to the provided artifact
 		tag.ArtifactID = artifactID
 		tag.PushTime = time.Now()
-		return tag.ID, c.Update(ctx, tag, "ArtifactID", "PushTime")
+		if err := c.Update(ctx, tag, "ArtifactID", "PushTime"); err != nil {
+			return 0, err
+		}
+		c.touchParents(ctx, repositoryID, artifactID)
+		return tag.ID, nil
 	}
 
 	// the tag doesn't exist under the repository, create it
@@ -121,8 +129,25 @@ func (c *controller) Ensure(ctx context.Context, repositoryID, artifactID int64,
 	})(orm.SetTransactionOpNameToContext(ctx, "tx-tag-ensure")); err != nil && !errors.IsConflictErr(err) {
 		return 0, err
 	}
+	c.touchParents(ctx, repositoryID, artifactID)
 
 	return tagID, nil
+}
+
+// touchParents bumps update_time on the parent repository and artifact so
+// "last modified" timestamps reflect tag push/delete events. Errors are logged
+// only — the tag operation has already succeeded.
+func (c *controller) touchParents(ctx context.Context, repositoryID, artifactID int64) {
+	if c.repoMgr != nil {
+		if err := c.repoMgr.Touch(ctx, repositoryID); err != nil {
+			log.G(ctx).Warningf("failed to touch repository %d update_time: %v", repositoryID, err)
+		}
+	}
+	if c.artMgr != nil && artifactID > 0 {
+		if err := c.artMgr.Update(ctx, &artifact.Artifact{ID: artifactID}, "UpdateTime"); err != nil {
+			log.G(ctx).Warningf("failed to touch artifact %d update_time: %v", artifactID, err)
+		}
+	}
 }
 
 // Count ...
@@ -191,7 +216,11 @@ func (c *controller) Delete(ctx context.Context, id int64) (err error) {
 		return errors.New(nil).WithCode(errors.PreconditionCode).
 			WithMessagef("the tag %s configured as immutable, cannot be deleted", tag.Name)
 	}
-	return c.tagMgr.Delete(ctx, id)
+	if err := c.tagMgr.Delete(ctx, id); err != nil {
+		return err
+	}
+	c.touchParents(ctx, tag.RepositoryID, tag.ArtifactID)
+	return nil
 }
 
 // DeleteTags ...
