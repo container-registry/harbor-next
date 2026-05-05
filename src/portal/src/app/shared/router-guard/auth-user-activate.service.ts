@@ -81,11 +81,23 @@ export class AuthCheckGuard {
                             if (
                                 config &&
                                 config.unauthenticated_landing_page ===
-                                    LANDING_PAGE.PUBLIC_PROJECTS &&
-                                !state.url.startsWith(
-                                    CommonRoutes.HARBOR_DEFAULT
-                                )
+                                    LANDING_PAGE.PUBLIC_PROJECTS
                             ) {
+                                if (
+                                    state.url.startsWith(
+                                        CommonRoutes.HARBOR_DEFAULT
+                                    )
+                                ) {
+                                    const urlTree = this.router.parseUrl(
+                                        state.url
+                                    );
+                                    urlTree.queryParams = {
+                                        ...urlTree.queryParams,
+                                        [UN_LOGGED_PARAM]: YES,
+                                    };
+                                    this.router.navigateByUrl(urlTree);
+                                    return observer.next(false);
+                                }
                                 this.router.navigate(
                                     [CommonRoutes.HARBOR_DEFAULT],
                                     {
