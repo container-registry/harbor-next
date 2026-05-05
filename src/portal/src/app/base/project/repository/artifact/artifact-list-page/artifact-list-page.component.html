@@ -1,8 +1,8 @@
 <div>
     <div class="breadcrumb">
-        <span class="back-icon"><</span>
+        <span class="back-icon">&lt;</span>
         <a (click)="goProBack()">{{ 'SIDE_NAV.PROJECTS' | translate }}</a>
-        <span class="back-icon"><</span>
+        <span class="back-icon">&lt;</span>
         <a (click)="watchGoBackEvt(projectId)">{{ projectName }}</a>
         <span *ngIf="depth"
             >&lt;<a (click)="backInitRepo()">{{ repoName }}</a></span
