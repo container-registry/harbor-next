@@ -52,10 +52,11 @@ describe('MemberGuard', () => {
         expect(guard).toBeTruthy();
     }));
 
-    it('should open public project route without retrieving user session', inject(
+    it('should retrieve user session before opening public project route', inject(
         [MemberGuard],
         (guard: MemberGuard) => {
             sessionService.getCurrentUser.and.returnValue(null);
+            sessionService.retrieveUser.and.returnValue(of({} as any));
             projectService.getProjectFromCache.and.returnValue(
                 of({ project_id: 1, name: 'library' } as any)
             );
@@ -72,7 +73,39 @@ describe('MemberGuard', () => {
 
             result.subscribe(canActivate => {
                 expect(canActivate).toBeTrue();
-                expect(sessionService.retrieveUser).not.toHaveBeenCalled();
+                expect(sessionService.retrieveUser).toHaveBeenCalled();
+                expect(projectService.getProjectFromCache).toHaveBeenCalledWith(
+                    1
+                );
+                expect(router.navigate).not.toHaveBeenCalled();
+            });
+        }
+    ));
+
+    it('should fall back to public project route when user retrieval fails with public marker', inject(
+        [MemberGuard],
+        (guard: MemberGuard) => {
+            sessionService.getCurrentUser.and.returnValue(null);
+            sessionService.retrieveUser.and.returnValue(
+                throwError(() => ({ status: 401 }))
+            );
+            projectService.getProjectFromCache.and.returnValue(
+                of({ project_id: 1, name: 'library' } as any)
+            );
+
+            const result = guard.canActivate(
+                {
+                    params: { id: 1 },
+                    queryParams: { [UN_LOGGED_PARAM]: YES },
+                } as any,
+                {
+                    url: `/harbor/projects/1/repositories?${UN_LOGGED_PARAM}=${YES}`,
+                } as any
+            ) as Observable<boolean>;
+
+            result.subscribe(canActivate => {
+                expect(canActivate).toBeTrue();
+                expect(sessionService.retrieveUser).toHaveBeenCalled();
                 expect(projectService.getProjectFromCache).toHaveBeenCalledWith(
                     1
                 );

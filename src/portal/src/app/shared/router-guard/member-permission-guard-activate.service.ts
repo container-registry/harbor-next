@@ -26,6 +26,7 @@ import {
 } from '../services';
 import { CommonRoutes } from '../entities/shared.const';
 import { UN_LOGGED_PARAM, YES } from '../../account/sign-in/sign-in.service';
+import { SessionService } from '../services/session.service';
 
 @Injectable({
     providedIn: 'root',
@@ -34,7 +35,8 @@ export class MemberPermissionGuard {
     constructor(
         private router: Router,
         private errorHandler: ErrorHandler,
-        private userPermission: UserPermissionService
+        private userPermission: UserPermissionService,
+        private sessionService: SessionService
     ) {}
 
     canActivate(
@@ -43,7 +45,10 @@ export class MemberPermissionGuard {
     ): Observable<boolean> | boolean {
         const projectId = route.parent.params['id'];
         const permission = route.data.permissionParam as UserPrivilegeServeItem;
-        if (route.queryParams[UN_LOGGED_PARAM] === YES) {
+        if (
+            route.queryParams[UN_LOGGED_PARAM] === YES &&
+            this.sessionService.getCurrentUser() === null
+        ) {
             if (this.isPublicProjectPermission(permission)) {
                 return true;
             }

@@ -18,6 +18,7 @@ import { Observable, of, throwError } from 'rxjs';
 import { UN_LOGGED_PARAM, YES } from '../../account/sign-in/sign-in.service';
 import { CommonRoutes } from '../entities/shared.const';
 import { UserPermissionService, USERSTATICPERMISSION } from '../services';
+import { SessionService } from '../services/session.service';
 import { ErrorHandler } from '../units/error-handler';
 import { MemberPermissionGuard } from './member-permission-guard-activate.service';
 
@@ -26,6 +27,7 @@ describe('MemberPermissionGuardActivateServiceGuard', () => {
     let router: Router;
     let errorHandler: jasmine.SpyObj<ErrorHandler>;
     let userPermissionService: jasmine.SpyObj<UserPermissionService>;
+    let sessionService: jasmine.SpyObj<SessionService>;
 
     const repositoryListPermission = {
         resource: USERSTATICPERMISSION.REPOSITORY.KEY,
@@ -41,6 +43,10 @@ describe('MemberPermissionGuardActivateServiceGuard', () => {
         userPermissionService = jasmine.createSpyObj('UserPermissionService', [
             'getPermission',
         ]);
+        sessionService = jasmine.createSpyObj('SessionService', [
+            'getCurrentUser',
+        ]);
+        sessionService.getCurrentUser.and.returnValue(null);
         TestBed.configureTestingModule({
             imports: [RouterTestingModule],
             providers: [
@@ -52,6 +58,10 @@ describe('MemberPermissionGuardActivateServiceGuard', () => {
                 {
                     provide: UserPermissionService,
                     useValue: userPermissionService,
+                },
+                {
+                    provide: SessionService,
+                    useValue: sessionService,
                 },
             ],
         });
@@ -107,6 +117,27 @@ describe('MemberPermissionGuardActivateServiceGuard', () => {
             [CommonRoutes.HARBOR_DEFAULT],
             { queryParams: { [UN_LOGGED_PARAM]: YES } }
         );
+    });
+
+    it('should check backend permissions for signed-in routes even with public marker', done => {
+        sessionService.getCurrentUser.and.returnValue({} as any);
+        userPermissionService.getPermission.and.returnValue(of(true));
+
+        const result = guard.canActivate(
+            createRoute(memberListPermission, { [UN_LOGGED_PARAM]: YES }),
+            {} as any
+        ) as Observable<boolean>;
+
+        result.subscribe(canActivate => {
+            expect(canActivate).toBeTrue();
+            expect(userPermissionService.getPermission).toHaveBeenCalledWith(
+                1,
+                USERSTATICPERMISSION.MEMBER.KEY,
+                USERSTATICPERMISSION.MEMBER.VALUE.LIST
+            );
+            expect(router.navigate).not.toHaveBeenCalled();
+            done();
+        });
     });
 
     it('should redirect when backend permission check fails', done => {

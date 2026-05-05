@@ -19,7 +19,7 @@ import {
 } from '@angular/router';
 import { SessionService } from '../services/session.service';
 import { Observable, of } from 'rxjs';
-import { map, catchError } from 'rxjs/operators';
+import { map, catchError, switchMap } from 'rxjs/operators';
 import { ProjectService } from '../services';
 import { CommonRoutes } from '../entities/shared.const';
 import { HttpStatusCode } from '@angular/common/http';
@@ -48,17 +48,20 @@ export class MemberGuard {
             return this.hasProjectPerm(state.url, projectId, route);
         }
 
-        if (route.queryParams[UN_LOGGED_PARAM] === YES) {
-            return this.hasProjectPerm(state.url, projectId, route);
-        }
-
         return this.sessionService.retrieveUser().pipe(
-            () => {
-                return this.hasProjectPerm(state.url, projectId, route);
-            },
-            catchError(err => {
+            map(() => true),
+            catchError(() => {
+                if (route.queryParams[UN_LOGGED_PARAM] === YES) {
+                    return of(true);
+                }
                 this.router.navigate([CommonRoutes.HARBOR_DEFAULT]);
                 return of(false);
+            }),
+            switchMap(canCheckProject => {
+                if (!canCheckProject) {
+                    return of(false);
+                }
+                return this.hasProjectPerm(state.url, projectId, route);
             })
         );
     }
@@ -82,9 +85,12 @@ export class MemberGuard {
             }),
             catchError(err => {
                 // User session timed out, then redirect to sign-in page
+                const isAnonymousPublicRoute =
+                    route.queryParams[UN_LOGGED_PARAM] === YES &&
+                    this.sessionService.getCurrentUser() === null;
                 if (
                     err.status === HttpStatusCode.Unauthorized &&
-                    route.queryParams[UN_LOGGED_PARAM] !== YES
+                    !isAnonymousPublicRoute
                 ) {
                     this.sessionService.clear(); // because of SignInGuard, must clear user session before navigating to sign-in page
                     this.router.navigate([CommonRoutes.EMBEDDED_SIGN_IN], {
