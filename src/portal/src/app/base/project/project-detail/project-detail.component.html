@@ -138,6 +138,7 @@
                     id="{{ 'project-' + tab.linkName }}"
                     clrTabLink
                     routerLink="{{ tab.linkName }}"
+                    [queryParams]="getQueryParams()"
                     routerLinkActive="active"
                     type="button">
                     <a class="nav-link">{{ tab.showTabName | translate }}</a>

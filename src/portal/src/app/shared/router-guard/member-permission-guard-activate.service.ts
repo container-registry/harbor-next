@@ -19,8 +19,13 @@ import {
 } from '@angular/router';
 import { Observable } from 'rxjs';
 import { ErrorHandler } from '../units/error-handler';
-import { UserPermissionService, UserPrivilegeServeItem } from '../services';
+import {
+    UserPermissionService,
+    UserPrivilegeServeItem,
+    USERSTATICPERMISSION,
+} from '../services';
 import { CommonRoutes } from '../entities/shared.const';
+import { UN_LOGGED_PARAM, YES } from '../../account/sign-in/sign-in.service';
 
 @Injectable({
     providedIn: 'root',
@@ -38,6 +43,15 @@ export class MemberPermissionGuard {
     ): Observable<boolean> | boolean {
         const projectId = route.parent.params['id'];
         const permission = route.data.permissionParam as UserPrivilegeServeItem;
+        if (route.queryParams[UN_LOGGED_PARAM] === YES) {
+            if (this.isPublicProjectPermission(permission)) {
+                return true;
+            }
+            this.router.navigate([CommonRoutes.HARBOR_DEFAULT], {
+                queryParams: { [UN_LOGGED_PARAM]: YES },
+            });
+            return false;
+        }
         return this.checkPermission(projectId, permission);
     }
 
@@ -72,5 +86,18 @@ export class MemberPermissionGuard {
                     },
                 });
         });
+    }
+
+    private isPublicProjectPermission(
+        permission: UserPrivilegeServeItem
+    ): boolean {
+        return (
+            (permission.resource === USERSTATICPERMISSION.PROJECT.KEY &&
+                permission.action ===
+                    USERSTATICPERMISSION.PROJECT.VALUE.READ) ||
+            (permission.resource === USERSTATICPERMISSION.REPOSITORY.KEY &&
+                permission.action ===
+                    USERSTATICPERMISSION.REPOSITORY.VALUE.LIST)
+        );
     }
 }

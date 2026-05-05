@@ -61,6 +61,7 @@
             <a
                 href="javascript:void(0)"
                 [routerLink]="getLink(p.project_id)"
+                [queryParams]="getQueryParams()"
                 (click)="clickLink(p.project_id)"
                 >{{ p.name }}</a
             >

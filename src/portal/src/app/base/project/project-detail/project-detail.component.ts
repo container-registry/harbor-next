@@ -49,6 +49,7 @@ import {
     HarborEvent,
 } from '../../../services/event-service/event.service';
 import { RouteConfigId } from '../../../route-reuse-strategy/harbor-route-reuse-strategy';
+import { UN_LOGGED_PARAM, YES } from '../../../account/sign-in/sign-in.service';
 
 @Component({
     selector: 'project-detail',
@@ -220,6 +221,12 @@ export class ProjectDetailComponent
         }
     }
     getPermissionsList(projectId: number): void {
+        if (this.isPublicAndNotLogged) {
+            this.hasProjectReadPermission = true;
+            this.hasRepositoryListPermission = true;
+            return;
+        }
+
         let permissionsList: Array<Observable<boolean>> = [];
         permissionsList.push(
             this.userPermissionService.getPermission(
@@ -364,6 +371,20 @@ export class ProjectDetailComponent
 
     public get isSessionValid(): boolean {
         return this.sessionService.getCurrentUser() != null;
+    }
+
+    public get isPublicAndNotLogged(): boolean {
+        return (
+            !this.isSessionValid &&
+            this.route.snapshot.queryParams[UN_LOGGED_PARAM] === YES
+        );
+    }
+
+    getQueryParams() {
+        if (!this.isPublicAndNotLogged) {
+            return null;
+        }
+        return { [UN_LOGGED_PARAM]: YES };
     }
 
     backToProject(): void {

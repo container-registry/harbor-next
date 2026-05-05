@@ -48,6 +48,10 @@ export class MemberGuard {
             return this.hasProjectPerm(state.url, projectId, route);
         }
 
+        if (route.queryParams[UN_LOGGED_PARAM] === YES) {
+            return this.hasProjectPerm(state.url, projectId, route);
+        }
+
         return this.sessionService.retrieveUser().pipe(
             () => {
                 return this.hasProjectPerm(state.url, projectId, route);

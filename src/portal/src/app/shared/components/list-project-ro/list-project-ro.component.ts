@@ -13,6 +13,8 @@
 // limitations under the License.
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 import { Project } from '../../../../../ng-swagger-gen/models/project';
+import { UN_LOGGED_PARAM, YES } from '../../../account/sign-in/sign-in.service';
+import { SessionService } from '../../services/session.service';
 
 @Component({
     selector: 'list-project-ro',
@@ -22,9 +24,16 @@ import { Project } from '../../../../../ng-swagger-gen/models/project';
 export class ListProjectROComponent {
     @Input() projects: Project[];
 
-    constructor() {}
+    constructor(private sessionService: SessionService) {}
 
     getLink(proId: number) {
         return `/harbor/projects/${proId}/repositories`;
+    }
+
+    getQueryParams() {
+        if (this.sessionService.getCurrentUser()) {
+            return null;
+        }
+        return { [UN_LOGGED_PARAM]: YES };
     }
 }
