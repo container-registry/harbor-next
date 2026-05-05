@@ -78,7 +78,7 @@ dockerfile/
 
 ### Full Environment
 ```bash
-task dev:up                    # Start everything (Core, JobService, Trivy, Portal)
+task dev:up                    # Start backend containers and native Portal
 task dev:up SKIP_TRIVY=true    # Start without Trivy
 task dev:status          # Show running containers
 task dev:logs            # View all container logs

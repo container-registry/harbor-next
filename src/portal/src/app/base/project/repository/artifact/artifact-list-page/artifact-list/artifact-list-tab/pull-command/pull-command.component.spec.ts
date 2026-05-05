@@ -160,6 +160,24 @@ describe('PullCommandComponent', () => {
         expect(cmd).not.toContain('v1.0.0');
     });
 
+    it('should generate tag mode pull command when artifact tag list is loaded separately', () => {
+        component.isTagMode = true;
+        component.registryUrl = 'myregistry.io';
+        component.projectName = 'library';
+        component.repoName = 'registry';
+        component.selectedTag = 'latest';
+        component.artifact = {
+            type: ArtifactType.IMAGE,
+            digest: 'sha256@digest',
+            tags: undefined,
+        };
+        fixture.detectChanges();
+
+        const cmd = component.getPullCommandForRuntimeByTag(component.artifact);
+        expect(cmd).toContain('latest');
+        expect(cmd).toContain('myregistry.io/library/registry');
+    });
+
     it('should return true for hasPullCommandForTag with IMAGE type', () => {
         component.artifact = {
             type: ArtifactType.IMAGE,

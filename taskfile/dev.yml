@@ -35,6 +35,7 @@ vars:
   # Docker Compose profile strings (reused across multiple tasks)
   ALL_PROFILES: "--profile portal --profile core --profile jobservice --profile registryctl --profile trivy"
   APP_PROFILES: "--profile portal --profile core --profile jobservice --profile registryctl"
+  BACKEND_PROFILES: "--profile core --profile jobservice --profile registryctl"
 
 env:
   COMPOSE_PROJECT_NAME:   '{{.PROJECT_PREFIX}}'
@@ -147,7 +148,7 @@ tasks:
       echo ""
 
   # ---------------------------------------------------------------------------
-  # Full Development Environment (Containerized)
+  # Full Development Environment (backend containers + native Portal)
   # ---------------------------------------------------------------------------
   _codegen:
     internal: true
@@ -170,21 +171,40 @@ tasks:
       - task: :build:gen-apis:frontend
 
   up:
-    desc: "Start all services with hot reload in foreground (SKIP_TRIVY=true to exclude Trivy)"
+    desc: "Start backend containers and native Portal with hot reload (SKIP_TRIVY=true to exclude Trivy)"
     deps: [require-docker, require-ports, gen:private-key]
     vars:
       TRIVY_PROFILE: '{{if ne .SKIP_TRIVY "true"}}--profile trivy{{end}}'
     cmds:
-      - defer: { task: dev:down, vars: { SKIP_TRIVY: "{{.SKIP_TRIVY}}" } }
+      - defer: { task: down, vars: { SKIP_TRIVY: "{{.SKIP_TRIVY}}" } }
       - task: _codegen
       - task: info
-      - '{{.COMPOSE_CMD}} {{.APP_PROFILES}} {{.TRIVY_PROFILE}} up --build'
+      - '{{.COMPOSE_CMD}} {{.BACKEND_PROFILES}} {{.TRIVY_PROFILE}} up -d --build'
+      - task: _wait-core
+      - task: _frontend-serve
 
   down:
     desc: Stop and remove all dev environment containers
     vars:
       TRIVY_PROFILE: '{{if ne .SKIP_TRIVY "true"}}--profile trivy{{end}}'
-    cmd: '{{.COMPOSE_CMD}} {{.APP_PROFILES}} {{.TRIVY_PROFILE}} down'
+    cmds:
+      - task: _frontend-stop
+      - '{{.COMPOSE_CMD}} {{.BACKEND_PROFILES}} {{.TRIVY_PROFILE}} down'
+
+  _frontend-stop:
+    internal: true
+    silent: true
+    cmds:
+      - |
+        pid=$(ss -tlnpH "sport = :{{.PORT_PORTAL}}" 2>/dev/null | sed -n 's/.*pid=\([0-9]*\).*/\1/p' | head -1)
+        args=$(ps -p "$pid" -o args= 2>/dev/null || true)
+        cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null || true)
+        expected="./node_modules/@angular/cli/bin/ng serve --host 0.0.0.0 --port {{.PORT_PORTAL}} --hmr"
+        case "$args" in
+          *"$expected"*)
+            [ "$cwd" = "$PWD/src/portal" ] && kill "$pid"
+            ;;
+        esac
 
   # ---------------------------------------------------------------------------
   # Infrastructure (Docker Compose)
@@ -244,6 +264,24 @@ tasks:
     desc: Restart Core, JobService, and RegistryCtl containers
     cmd: '{{.COMPOSE_CMD}} restart core jobservice registryctl'
 
+  _wait-core:
+    internal: true
+    silent: true
+    cmds:
+      - |
+        echo "Waiting for Core at http://localhost:{{.PORT_CORE}}..."
+        timeout=120
+        elapsed=0
+        until curl -fsS "http://localhost:{{.PORT_CORE}}/api/v2.0/ping" >/dev/null 2>&1; do
+          if [ "$elapsed" -ge "$timeout" ]; then
+            echo "Core did not become ready within ${timeout}s"
+            exit 1
+          fi
+          sleep 2
+          elapsed=$((elapsed + 2))
+        done
+        echo "Core ready"
+
   # ---------------------------------------------------------------------------
   # Frontend (Native - alternative to containerized portal)
   # ---------------------------------------------------------------------------
@@ -263,11 +301,17 @@ tasks:
   frontend:native:
     desc: Serve Portal with ng serve on host (alternative to containerized portal)
     silent: true
-    dir: src/portal
     deps: [frontend:install]
     cmds:
       - task: :build:gen-apis:frontend
-      - exec ./node_modules/.bin/ng serve --host 0.0.0.0 --hmr
+      - task: _frontend-serve
+
+  _frontend-serve:
+    internal: true
+    dir: src/portal
+    env:
+      HARBOR_PROXY_TARGET: 'http://localhost:{{.PORT_CORE}}'
+    cmd: exec node --max_old_space_size=2048 ./node_modules/@angular/cli/bin/ng serve --host 0.0.0.0 --port {{.PORT_PORTAL}} --hmr
 
   frontend:build:
     desc: Build Portal for production
@@ -365,7 +409,7 @@ tasks:
     desc: Remove all containers, volumes, node_modules, and temp files
     cmds:
       - '{{.COMPOSE_CMD}} {{.ALL_PROFILES}} down -v'
-      - pkill -f "ng serve" || true
+      - task: _frontend-stop
       - rm -rf tmp/
       - rm -rf src/portal/node_modules
       - rm -f build-errors.log

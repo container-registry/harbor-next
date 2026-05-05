@@ -65,6 +65,7 @@ describe('AuthCheckGuard', () => {
         guard = TestBed.inject(AuthCheckGuard);
         router = TestBed.inject(Router);
         spyOn(router, 'navigate');
+        spyOn(router, 'navigateByUrl');
     });
 
     it('should be created', () => {
@@ -124,7 +125,7 @@ describe('AuthCheckGuard', () => {
             });
         });
 
-        it('should fall back to sign-in when already on /harbor/projects to prevent redirect loop', (done) => {
+        it('should allow public projects route when already on /harbor/projects', (done) => {
             appConfigService.getConfig.and.returnValue(createAppConfig({
                 unauthenticated_landing_page: LANDING_PAGE.PUBLIC_PROJECTS,
             }));
@@ -135,12 +136,40 @@ describe('AuthCheckGuard', () => {
             const result = guard.canActivate(route, state);
             (result as Observable<boolean>).subscribe(canActivate => {
                 expect(canActivate).toBeFalse();
-                expect(router.navigate).toHaveBeenCalledWith(
-                    [CommonRoutes.EMBEDDED_SIGN_IN],
-                    jasmine.objectContaining({
-                        queryParams: { redirect_url: CommonRoutes.HARBOR_DEFAULT },
-                    })
+                const urlTree = (router.navigateByUrl as jasmine.Spy).calls
+                    .mostRecent()
+                    .args[0];
+                expect(router.serializeUrl(urlTree)).toBe(
+                    `${CommonRoutes.HARBOR_DEFAULT}?${UN_LOGGED_PARAM}=${YES}`
                 );
+                expect(router.navigate).not.toHaveBeenCalled();
+                done();
+            });
+        });
+
+        it('should preserve public project repository route for unauthenticated access', (done) => {
+            appConfigService.getConfig.and.returnValue(createAppConfig({
+                unauthenticated_landing_page: LANDING_PAGE.PUBLIC_PROJECTS,
+            }));
+
+            const route = createRouteSnapshot();
+            const state = createStateSnapshot(
+                '/harbor/projects/123/repositories/library%2Fnginx/artifacts-tab'
+            );
+
+            const result = guard.canActivate(route, state);
+            (result as Observable<boolean>).subscribe(canActivate => {
+                expect(canActivate).toBeFalse();
+                const urlTree = (router.navigateByUrl as jasmine.Spy).calls
+                    .mostRecent()
+                    .args[0];
+                const expectedUrl =
+                    '/harbor/projects/123/repositories/library%2Fnginx/artifacts-tab' +
+                    '?publicAndNotLogged=yes';
+                expect(router.serializeUrl(urlTree)).toBe(
+                    expectedUrl
+                );
+                expect(router.navigate).not.toHaveBeenCalled();
                 done();
             });
         });

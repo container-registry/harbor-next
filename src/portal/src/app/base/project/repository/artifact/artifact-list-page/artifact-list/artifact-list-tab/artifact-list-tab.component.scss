@@ -203,6 +203,24 @@
   width: 75%;
 }
 
+.tag-cell-content {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.tag-cell-text {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
+.tag-copy-command {
+  flex: 0 0 auto;
+  margin-left: 4px;
+}
+
 .action-bar {
   display: flex;
   align-items: center;

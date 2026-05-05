@@ -101,7 +101,10 @@
                 }}</clr-dg-placeholder>
                 <clr-dg-row *ngFor="let r of repositories" [clrDgItem]="r">
                     <clr-dg-cell>
-                        <a href="javascript:void(0)" [routerLink]="getLink(r)">
+                        <a
+                            href="javascript:void(0)"
+                            [routerLink]="getLink(r)"
+                            [queryParams]="getQueryParams()">
                             <span *ngIf="withAdmiral" class="list-img"
                                 ><img [src]="getImgLink(r)" /></span
                             >{{ r.name }}</a
@@ -151,7 +154,10 @@
         [withAdmiral]="withAdmiral"
         (loadNextPageEvent)="loadNextPage()">
         <ng-template let-item="item">
-            <a class="card clickable" [routerLink]="getLink(item)">
+            <a
+                class="card clickable"
+                [routerLink]="getLink(item)"
+                [queryParams]="getQueryParams()">
                 <div class="card-header">
                     <div
                         [ngClass]="{
