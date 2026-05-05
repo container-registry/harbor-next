@@ -5,7 +5,7 @@
 
 services:
   postgresql:
-    image: docker.io/library/postgres:18-alpine
+    image: ${REGISTRY_ADDRESS:-docker.io}/${REGISTRY_PROJECT:-library}/postgres:18-alpine
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: root123

@@ -197,9 +197,14 @@ tasks:
     cmds:
       - |
         pid=$(ss -tlnpH "sport = :{{.PORT_PORTAL}}" 2>/dev/null | sed -n 's/.*pid=\([0-9]*\).*/\1/p' | head -1)
-        if [ -n "$pid" ] && ps -p "$pid" -o args= | grep -q "ng serve"; then
-          kill "$pid"
-        fi
+        args=$(ps -p "$pid" -o args= 2>/dev/null || true)
+        cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null || true)
+        expected="./node_modules/@angular/cli/bin/ng serve --host 0.0.0.0 --port {{.PORT_PORTAL}} --hmr"
+        case "$args" in
+          *"$expected"*)
+            [ "$cwd" = "$PWD/src/portal" ] && kill "$pid"
+            ;;
+        esac
 
   # ---------------------------------------------------------------------------
   # Infrastructure (Docker Compose)
@@ -404,7 +409,7 @@ tasks:
     desc: Remove all containers, volumes, node_modules, and temp files
     cmds:
       - '{{.COMPOSE_CMD}} {{.ALL_PROFILES}} down -v'
-      - pkill -f "ng serve" || true
+      - task: _frontend-stop
       - rm -rf tmp/
       - rm -rf src/portal/node_modules
       - rm -f build-errors.log
