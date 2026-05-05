@@ -391,6 +391,12 @@ export class ProjectDetailComponent
         if (window.sessionStorage) {
             window.sessionStorage.setItem('fromDetails', 'true');
         }
+        if (this.isPublicAndNotLogged) {
+            this.router.navigate(['/harbor', 'projects'], {
+                queryParams: { [UN_LOGGED_PARAM]: YES },
+            });
+            return;
+        }
         this.router.navigate(['/harbor', 'projects']);
     }
     isDefaultTab(tab, index) {
