@@ -6,6 +6,96 @@ This changelog mirrors [GitHub Releases](https://github.com/container-registry/h
 
 ---
 
+## [2.15.0](https://github.com/container-registry/harbor-next/compare/v2.14.0...v2.15.0) (2026-05-06)
+
+
+### Features
+
+* Add CI/CD Pipelines, Release Automation, and Developer Tooling ([#45](https://github.com/container-registry/harbor-next/issues/45)) ([aed9379](https://github.com/container-registry/harbor-next/commit/aed9379016157fd40cfb20e3daf3653d92d29d45))
+* Add Conditional Immutability Rules Compatible with Retention Policy ([#33](https://github.com/container-registry/harbor-next/issues/33)) ([ab409ac](https://github.com/container-registry/harbor-next/commit/ab409ac568fa5c5bb9e58e8ded6e56ff680cdada))
+* Add configurable landing page for unauthenticated users ([#152](https://github.com/container-registry/harbor-next/issues/152)) ([67fb2d6](https://github.com/container-registry/harbor-next/commit/67fb2d6470fdec28bb0785cc9a39559f1f47374a))
+* Add LDAP Admin Filter ([#34](https://github.com/container-registry/harbor-next/issues/34)) ([7a919e9](https://github.com/container-registry/harbor-next/commit/7a919e9bbe4df98cbb760c3fa88a7649e5a30d4e))
+* Add Subscription Menu With Chargebee Integration ([#40](https://github.com/container-registry/harbor-next/issues/40)) ([850da22](https://github.com/container-registry/harbor-next/commit/850da2265c5ad2323ed160e1a274ffc7229e822a))
+* Audit Log Max Page Size up to 10000 ([#37](https://github.com/container-registry/harbor-next/issues/37)) ([21862b1](https://github.com/container-registry/harbor-next/commit/21862b1de9281d6e850877dd24692431d260834b))
+* **compose:** production compose, images, devenv overhaul with DHI base images, non-root containers, production compose ([bcc27db](https://github.com/container-registry/harbor-next/commit/bcc27db46878dc191207022eeed4aa5b01f815bb))
+* **db:** Upgrade to pgx/v5 and pgxpool for connection pooling ([#118](https://github.com/container-registry/harbor-next/issues/118)) ([612a3c5](https://github.com/container-registry/harbor-next/commit/612a3c5f7d989352585d9563ebfb7a11202068c3))
+* **docs:** Add documentation generation tasks for helm-docs and SVGBob diagrams ([79abc5e](https://github.com/container-registry/harbor-next/commit/79abc5e536a306e4c83c3bde5bc0543a231c9fc7))
+* **portal:** Add Copy Pull Command Button on Tags ([#61](https://github.com/container-registry/harbor-next/issues/61)) ([73ec73b](https://github.com/container-registry/harbor-next/commit/73ec73b32596b06e7bbbd86fb5431846a323279b))
+* **portal:** Add copy pull command to tag links ([e3fb9d3](https://github.com/container-registry/harbor-next/commit/e3fb9d3a170de632aaed0a5e9010f9439195a8da))
+* **portal:** add download button to export audit logs ([b536ad1](https://github.com/container-registry/harbor-next/commit/b536ad16a002b5f414fc5d8de62f66d42e21cbd0))
+* **portal:** Add Repository-Level Pull Command to Artifact List Tab ([#32](https://github.com/container-registry/harbor-next/issues/32)) ([c3b9cf9](https://github.com/container-registry/harbor-next/commit/c3b9cf9933d8b11671c3a78968ba5ce65bb22928))
+* **portal:** always build OpenAPI UI in background ([7c27b9f](https://github.com/container-registry/harbor-next/commit/7c27b9f263c10149b9ba24e9d3b8507dd0822ed0))
+* Randomise Seconds When Scheduling Jobs ([#35](https://github.com/container-registry/harbor-next/issues/35)) ([e88647f](https://github.com/container-registry/harbor-next/commit/e88647f1b223df4d72bb45d03ae58b211e5b671f))
+* **ui:** Redirect Pull URLs to Project Repository Page ([#63](https://github.com/container-registry/harbor-next/issues/63)) ([3cfd879](https://github.com/container-registry/harbor-next/commit/3cfd879eb194275e392a0e027823e3fd01c64d82))
+* unauthenticated access to ui ([704dcd4](https://github.com/container-registry/harbor-next/commit/704dcd4b026a5545645140f04aa63f52119975e2))
+
+
+### Bug Fixes
+
+* [upstream] Add missing AWS ECR regions ([0d50d99](https://github.com/container-registry/harbor-next/commit/0d50d99255dac7b0a288098c8d5df0e59d929bdc))
+* [upstream] Add User-Agent header to all registry requests ([e7d0be5](https://github.com/container-registry/harbor-next/commit/e7d0be59d897a34bbfcc72acf53e9a0fcc765334))
+* [upstream] Append Custom CAs to System CA Pool ([d8d52f9](https://github.com/container-registry/harbor-next/commit/d8d52f9e3ca87d66c50d6060b655956a965389cb))
+* [upstream] Bump Trivy to v0.69.2 Following Supply Chain Incident ([c17e06c](https://github.com/container-registry/harbor-next/commit/c17e06c5f0066af34435fc15aa08d33d9792877a))
+* [upstream] Check Error First Before Other Checks ([2abc8da](https://github.com/container-registry/harbor-next/commit/2abc8da923ed0ca6569a690fa0f7ccf3ef4a4ec2))
+* [upstream] Format version span indentation in about dialog ([74ce587](https://github.com/container-registry/harbor-next/commit/74ce5879b3e80d62f41a8f3ef6f7db8ebf63677f))
+* [upstream] Proxy Cache Serve Local on Remote Not Found ([4d1c757](https://github.com/container-registry/harbor-next/commit/4d1c757238c657ca069ff795820875cc8c2ca6c4))
+* [upstream] Remove Payload From Config Audit Log ([b4a0a2c](https://github.com/container-registry/harbor-next/commit/b4a0a2cf53f039129dddb7afa7cfee9075b3605b))
+* [upstream] Swagger Replication Rule Invalid JSON ([6d0f605](https://github.com/container-registry/harbor-next/commit/6d0f605dbe346269222459bac75eaea67dc085de))
+* [upstream] Update parent and child artifact pull times ([0fc0ec7](https://github.com/container-registry/harbor-next/commit/0fc0ec7b04ab0456ea551269dcaa2d7518770c2a))
+* [upstream] Update Verify Remote Cert Tooltip for Registry Endpoints ([8f997c2](https://github.com/container-registry/harbor-next/commit/8f997c27c86c92c7e39729ea5684dc4d07adb14d))
+* [upstream] Wrong Operation Response Name for UpdateRepository ([e4e3a48](https://github.com/container-registry/harbor-next/commit/e4e3a48a46e5534b01583c0deffcf71fc2b80d0d))
+* add -trimpath to go build flags to prevent local path leaks ([31351a2](https://github.com/container-registry/harbor-next/commit/31351a27c6bd81c28483df3fd9fc706b12ed5e15))
+* Address PR [#119](https://github.com/container-registry/harbor-next/issues/119) review feedback ([d683f71](https://github.com/container-registry/harbor-next/commit/d683f717228a0c50f7ba6fcbbfd0c939c75e572b))
+* Allow Negative Serial Numbers in x509 Certificates ([#36](https://github.com/container-registry/harbor-next/issues/36)) ([b3c99cb](https://github.com/container-registry/harbor-next/commit/b3c99cb35ad4f9b2f9bc6db701e78ed55d85c7b9))
+* Avoid holding pull time lock during async DB flushes ([d19d080](https://github.com/container-registry/harbor-next/commit/d19d080e03273e854614ab50e2d6bce4c4f16504))
+* Classify BuildKit attestations as accessories ([#85](https://github.com/container-registry/harbor-next/issues/85)) ([01d2fc3](https://github.com/container-registry/harbor-next/commit/01d2fc3dcd205e4963cda00772009d2189de6ae3))
+* Clean up unused portal UI components and configuration ([966baee](https://github.com/container-registry/harbor-next/commit/966baeeb485769cbfb17fb28667b0a88e745af42))
+* **db:** Remove redundant sql.DB Close in dbpool.Pool.Close() ([#150](https://github.com/container-registry/harbor-next/issues/150)) ([6b0e929](https://github.com/container-registry/harbor-next/commit/6b0e929eaeb75972fb2f3c7897fbef7560281717))
+* **deps:** Bump go-jose/go-jose/v4 to v4.1.4 for CVE-2026-34986 ([dce1151](https://github.com/container-registry/harbor-next/commit/dce1151ecd27501cb0da67117bf1397abb8e43ba))
+* **deps:** Bump go.opentelemetry.io/otel/sdk to v1.43.0 for PATH hijack CVE ([45b8d5f](https://github.com/container-registry/harbor-next/commit/45b8d5feb20f9602dbcdf5513a4259f13c99372c))
+* **devenv:** registryctl crashes on startup , missing config file argument ([#28](https://github.com/container-registry/harbor-next/issues/28)) ([7e10546](https://github.com/container-registry/harbor-next/commit/7e105464c5ae6d36b5ef3716c12170a065649bcc))
+* **dev:** Fix Dev Environment Docker Compose and Trivy Adapter Setup ([#83](https://github.com/container-registry/harbor-next/issues/83)) ([6bbe1e9](https://github.com/container-registry/harbor-next/commit/6bbe1e9b4854e817d02af495b463725e60da1407))
+* **exporter:** Bake Harbor version into exporter image at build time ([22b73ff](https://github.com/container-registry/harbor-next/commit/22b73ff28fa0139c3f538bfb7e55acabce88dd4d))
+* **exporter:** Remove redundant database URL field from exporter config ([#148](https://github.com/container-registry/harbor-next/issues/148)) ([00b151e](https://github.com/container-registry/harbor-next/commit/00b151e7b78e693a30ec578cfeb66695018387d0))
+* Handle proxy-cache races in UpdatePullTime and correct artForPullTime construction ([1d9cc7e](https://github.com/container-registry/harbor-next/commit/1d9cc7ecdbcf8bfe6e98147f0b49c2de0b26142e))
+* Honor unauthenticated project redirects ([#187](https://github.com/container-registry/harbor-next/issues/187)) ([362039c](https://github.com/container-registry/harbor-next/commit/362039c048f89ce7f91a0b3b1a23f26af89c2f9c))
+* **image:** Use pre-built binaries in registry and trivy-adapter dockerfiles, fix --load/--push output ([c7fd1bb](https://github.com/container-registry/harbor-next/commit/c7fd1bb9090e7a92ba88728ed12ecc9aae720e99))
+* implement cosign signature inheritance for OCI index children  ([#27](https://github.com/container-registry/harbor-next/issues/27)) ([c6f9e37](https://github.com/container-registry/harbor-next/commit/c6f9e37f3062875c16cac38d30d1831f4de1e8a1))
+* Improve CA Pool Test Assertion and Use Typed NotFoundError in Purge API ([#55](https://github.com/container-registry/harbor-next/issues/55)) ([f499a3c](https://github.com/container-registry/harbor-next/commit/f499a3c012689836c62e8c08faed438bfeb59c67))
+* **portal:** [upstream] UI Statistics Display Are Not Aligned ([78dc662](https://github.com/container-registry/harbor-next/commit/78dc66293eb72127d7f4e8650d4a730e3f7507e9))
+* **portal:** Fix i18n Key Typos and Add Missing zh-TW Translation ([#64](https://github.com/container-registry/harbor-next/issues/64)) ([7759d0c](https://github.com/container-registry/harbor-next/commit/7759d0cb83fc7bba316c7d47bda630470e327343))
+* **portal:** Fix Proxy Cache Checkbox Visibility, Guard, and i18n Keys ([#54](https://github.com/container-registry/harbor-next/issues/54)) ([d2034f0](https://github.com/container-registry/harbor-next/commit/d2034f04fc86db8c07ab1f6c040dd0468b6ad612))
+* **portal:** stabilize test runner ([3b23e05](https://github.com/container-registry/harbor-next/commit/3b23e0547b3acfaad8890abf7847cf1126e51dfb))
+* Proxy Cache Fallback Local - Even When Remote Does Not Exist ([#38](https://github.com/container-registry/harbor-next/issues/38)) ([0fe897d](https://github.com/container-registry/harbor-next/commit/0fe897d11d20d1250cd69249c32efe2bd110e317))
+* **proxy:** [upstream] Preserve URL path prefix during registry auth discovery ([cf4f538](https://github.com/container-registry/harbor-next/commit/cf4f538c3a7768b5f02bb849c17dd036edf7c2ae))
+* **proxy:** [upstream] Serve local artifact on remote not found in proxy cache ([e9877f1](https://github.com/container-registry/harbor-next/commit/e9877f149488df4c1abe5b9544605d9db32ef9fa))
+* Re-add missing in-toto attestation accessory model import ([#149](https://github.com/container-registry/harbor-next/issues/149)) ([a508b0a](https://github.com/container-registry/harbor-next/commit/a508b0ab5284f2525266976f3cef38fe89c84083))
+* remove unauthorised banner ([704dcd4](https://github.com/container-registry/harbor-next/commit/704dcd4b026a5545645140f04aa63f52119975e2))
+* Replace scannable content type skiplist with allowlist and add scan timeout ([#151](https://github.com/container-registry/harbor-next/issues/151)) ([29a0245](https://github.com/container-registry/harbor-next/commit/29a0245804e999c374e0cfc33068e881abec8f75))
+* **security:** [upstream] Reject Bearer Tokens Issued Before Project Creation ([4efbb56](https://github.com/container-registry/harbor-next/commit/4efbb5657b761254ab53c3c3162307db4653ed94))
+* **security:** reject bearer tokens issued before project creation ([#31](https://github.com/container-registry/harbor-next/issues/31)) ([a7a7ce1](https://github.com/container-registry/harbor-next/commit/a7a7ce1f5baced521975244c1630943d5ae18650))
+* **session:** [upstream] Use Correct Maxlifetime in SessionRegenerate ([f8b5f82](https://github.com/container-registry/harbor-next/commit/f8b5f82813aee2bd77f8a4f059bf95b8f53b0d45))
+* Set Release-Please Manifest to 2.14.0 for Correct 2.15.0 First Release ([#51](https://github.com/container-registry/harbor-next/issues/51)) ([0afa522](https://github.com/container-registry/harbor-next/commit/0afa522aea335e2228296e622f9356778919ac8d))
+* Use fully qualified PostgreSQL image name for Podman compatibility ([c300e3f](https://github.com/container-registry/harbor-next/commit/c300e3fa6fbeaa5d22729bc1e7b324fcf1360839))
+
+
+### Performance Improvements
+
+* **ci:** speed up unit test pipeline ([#147](https://github.com/container-registry/harbor-next/issues/147)) ([5c8c40b](https://github.com/container-registry/harbor-next/commit/5c8c40b42f13bd3c8a30f2432045c38959ed16e5))
+
+
+### Code Refactoring
+
+* [upstream] Omit Unnecessary Reassignment ([1f412ed](https://github.com/container-registry/harbor-next/commit/1f412edd055ba613aff2cf66f95d804e19e0e393))
+* **portal:** portal openapi refactor ([#48](https://github.com/container-registry/harbor-next/issues/48)) ([7532146](https://github.com/container-registry/harbor-next/commit/75321463141974ae4d5165f0e9963bda68c40a7d))
+
+
+### Documentation
+
+* Add PR Description Template to CLAUDE.md ([#62](https://github.com/container-registry/harbor-next/issues/62)) ([ce9bffe](https://github.com/container-registry/harbor-next/commit/ce9bffe22fd936d04bea10dda79e234b8ecd9365))
+* Simplify CLAUDE.md ([#159](https://github.com/container-registry/harbor-next/issues/159)) ([d19f8d3](https://github.com/container-registry/harbor-next/commit/d19f8d3fae4fe134a204f65c765db8352bddb805))
+* Update CONTRIBUTING.md with PR Description Template and Title Format ([#81](https://github.com/container-registry/harbor-next/issues/81)) ([53cc0fa](https://github.com/container-registry/harbor-next/commit/53cc0fa18dd002ba76d2940f7668acd9ad26399a))
+
 ## v2.14.x
 
 ### v2.14.2 (2026-01-15)
