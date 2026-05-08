@@ -4,3 +4,6 @@ contact_links:
   - name: GitHub Discussions
     url: https://github.com/container-registry/harbor-next/discussions
     about: Ask questions and discuss with the community
+  - name: Security Vulnerability
+    url: https://github.com/container-registry/harbor-next/security/advisories/new
+    about: Report Security Vulnerabilities privately
