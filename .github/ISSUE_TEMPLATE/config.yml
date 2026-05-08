@@ -6,4 +6,4 @@ contact_links:
     about: Ask questions and discuss with the community
   - name: Security Vulnerability
     url: https://github.com/container-registry/harbor-next/security/advisories/new
-    about: Report security vulnerabilities privately
+    about: Report Security Vulnerabilities privately
