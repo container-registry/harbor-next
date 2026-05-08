@@ -196,13 +196,32 @@ tasks:
     silent: true
     cmds:
       - |
-        pid=$(ss -tlnpH "sport = :{{.PORT_PORTAL}}" 2>/dev/null | sed -n 's/.*pid=\([0-9]*\).*/\1/p' | head -1)
-        args=$(ps -p "$pid" -o args= 2>/dev/null || true)
-        cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null || true)
         expected="./node_modules/@angular/cli/bin/ng serve --host 0.0.0.0 --port {{.PORT_PORTAL}} --hmr"
+        pid=""
+
+        if command -v lsof >/dev/null 2>&1; then
+          pid=$(lsof -nP -tiTCP:{{.PORT_PORTAL}} -sTCP:LISTEN 2>/dev/null | head -1)
+        fi
+        if [ -z "$pid" ] && command -v ss >/dev/null 2>&1; then
+          pid=$(ss -tlnpH "sport = :{{.PORT_PORTAL}}" 2>/dev/null | sed -n 's/.*pid=\([0-9]*\).*/\1/p' | head -1)
+        fi
+
+        if [ -z "$pid" ]; then
+          exit 0
+        fi
+
+        args=$(ps -p "$pid" -o command= 2>/dev/null || ps -p "$pid" -o args= 2>/dev/null || true)
+        cwd=""
+        if [ -e "/proc/$pid/cwd" ]; then
+          cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null || true)
+        elif command -v lsof >/dev/null 2>&1; then
+          cwd=$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -1)
+        fi
         case "$args" in
           *"$expected"*)
-            [ "$cwd" = "$PWD/src/portal" ] && kill "$pid"
+            if [ -z "$cwd" ] || [ "$cwd" = "$PWD/src/portal" ]; then
+              kill "$pid"
+            fi
             ;;
         esac
 
