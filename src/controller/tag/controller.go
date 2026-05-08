@@ -21,10 +21,10 @@ import (
 
 	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/lib/errors"
+	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/orm"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/lib/selector"
-	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/pkg"
 	"github.com/goharbor/harbor/src/pkg/artifact"
 	"github.com/goharbor/harbor/src/pkg/immutable/match"
@@ -105,12 +105,13 @@ func (c *controller) Ensure(ctx context.Context, repositoryID, artifactID int64,
 		}
 		// the tag exists under the repository, but it is attached to other artifact
 		// update it to point to the provided artifact
+		oldArtifactID := tag.ArtifactID
 		tag.ArtifactID = artifactID
 		tag.PushTime = time.Now()
 		if err := c.Update(ctx, tag, "ArtifactID", "PushTime"); err != nil {
 			return 0, err
 		}
-		c.touchParents(ctx, repositoryID, artifactID)
+		c.touchParents(ctx, repositoryID, oldArtifactID, artifactID)
 		return tag.ID, nil
 	}
 
@@ -136,15 +137,26 @@ func (c *controller) Ensure(ctx context.Context, repositoryID, artifactID int64,
 
 // touchParents bumps update_time on the parent repository and artifact so
 // "last modified" timestamps reflect tag push/delete events. Errors are logged
-// only — the tag operation has already succeeded.
-func (c *controller) touchParents(ctx context.Context, repositoryID, artifactID int64) {
+// only; the tag operation has already succeeded.
+func (c *controller) touchParents(ctx context.Context, repositoryID int64, artifactIDs ...int64) {
 	if c.repoMgr != nil {
 		if err := c.repoMgr.Touch(ctx, repositoryID); err != nil {
 			log.G(ctx).Warningf("failed to touch repository %d update_time: %v", repositoryID, err)
 		}
 	}
-	if c.artMgr != nil && artifactID > 0 {
-		if err := c.artMgr.Update(ctx, &artifact.Artifact{ID: artifactID}, "UpdateTime"); err != nil {
+	if c.artMgr == nil {
+		return
+	}
+	touched := map[int64]struct{}{}
+	for _, artifactID := range artifactIDs {
+		if artifactID <= 0 {
+			continue
+		}
+		if _, ok := touched[artifactID]; ok {
+			continue
+		}
+		touched[artifactID] = struct{}{}
+		if err := c.artMgr.Touch(ctx, artifactID); err != nil {
 			log.G(ctx).Warningf("failed to touch artifact %d update_time: %v", artifactID, err)
 		}
 	}
