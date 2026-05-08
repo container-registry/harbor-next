@@ -156,9 +156,7 @@ A third party security audit was performed by Cure53 in October 2019. You can se
 
 ### Reporting security vulnerabilities
 
-If you've found a security related issue, a vulnerability, or a potential vulnerability in Harbor please let the [Harbor Security Team](mailto:cncf-harbor-security@lists.cncf.io) know with the details of the vulnerability. We'll send a confirmation
-email to acknowledge your report, and we'll send an additional email when we've identified the issue
-positively or negatively.
+If you've found a security related issue, a vulnerability, or a potential vulnerability in Harbor Next, please report it privately through [GitHub Security Advisories](https://github.com/container-registry/harbor-next/security/advisories/new). Maintainers will acknowledge your report and coordinate investigation, remediation, and disclosure through the private advisory.
 
 For further details please see our complete [security release process](SECURITY.md).
 
