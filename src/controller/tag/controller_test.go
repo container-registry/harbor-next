@@ -112,6 +112,16 @@ func (c *controllerTestSuite) TestEnsureTag() {
 	c.tagMgr.AssertExpectations(c.T())
 	c.artMgr.AssertExpectations(c.T())
 	c.repoMgr.AssertExpectations(c.T())
+
+	// reset the mock
+	c.SetupTest()
+
+	// a concurrent create conflict means this request did not change tag state
+	c.tagMgr.On("List", mock.Anything, mock.Anything).Return([]*tag.Tag{}, nil)
+	c.tagMgr.On("Create", mock.Anything, mock.Anything).Return(int64(0), errors.ConflictError(nil))
+	_, err = c.ctl.Ensure(orm.NewContext(nil, &ormtesting.FakeOrmer{}), 1, 1, "latest")
+	c.Require().Nil(err)
+	c.tagMgr.AssertExpectations(c.T())
 }
 
 func (c *controllerTestSuite) TestCount() {

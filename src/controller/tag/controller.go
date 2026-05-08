@@ -127,7 +127,10 @@ func (c *controller) Ensure(ctx context.Context, repositoryID, artifactID int64,
 		tag.PushTime = time.Now()
 		tagID, err = c.Create(ctx, tag)
 		return err
-	})(orm.SetTransactionOpNameToContext(ctx, "tx-tag-ensure")); err != nil && !errors.IsConflictErr(err) {
+	})(orm.SetTransactionOpNameToContext(ctx, "tx-tag-ensure")); err != nil {
+		if errors.IsConflictErr(err) {
+			return tagID, nil
+		}
 		return 0, err
 	}
 	c.touchParents(ctx, repositoryID, artifactID)
