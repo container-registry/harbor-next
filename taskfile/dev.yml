@@ -200,7 +200,7 @@ tasks:
         pid=""
 
         if command -v lsof >/dev/null 2>&1; then
-          pid=$(lsof -nP -tiTCP:{{.PORT_PORTAL}} -sTCP:LISTEN 2>/dev/null | head -1)
+          pid=$(lsof -nP -t -iTCP:{{.PORT_PORTAL}} -sTCP:LISTEN 2>/dev/null | head -1)
         fi
         if [ -z "$pid" ] && command -v ss >/dev/null 2>&1; then
           pid=$(ss -tlnpH "sport = :{{.PORT_PORTAL}}" 2>/dev/null | sed -n 's/.*pid=\([0-9]*\).*/\1/p' | head -1)
