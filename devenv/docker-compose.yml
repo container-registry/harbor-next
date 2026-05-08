@@ -19,7 +19,7 @@ services:
       retries: 15
       start_period: 5s
     volumes:
-      - harbor-postgres-18-data:/var/lib/postgresql
+      - harbor-postgres-18-data:/var/lib/postgresql/data
       - ../make/migrations:/migrations
 
   redis:
