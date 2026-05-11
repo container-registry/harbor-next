@@ -120,6 +120,7 @@ tasks:
 
   gen:private-key:
     desc: Generate RSA 4096 key for token signing (skipped if exists)
+    deps: [require-docker]
     status:
       - test -f {{.TOKEN_KEY_FILE}}
     cmds:
