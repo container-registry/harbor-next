@@ -14,5 +14,6 @@ ARG TARGETARCH
 COPY bin/linux-${TARGETARCH}/jobservice /jobservice
 WORKDIR /
 EXPOSE 8888
+HEALTHCHECK --interval=10s --timeout=5s --retries=5 CMD ["/lprobe", "-port", "8888", "-endpoint", "/api/v1/stats"]
 USER harbor
 ENTRYPOINT ["/jobservice", "-c", "/etc/jobservice/config.yml"]

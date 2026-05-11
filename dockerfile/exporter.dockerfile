@@ -18,5 +18,6 @@ LABEL org.opencontainers.image.revision=${git_commit}
 COPY bin/linux-${TARGETARCH}/harbor-exporter /harbor-exporter
 WORKDIR /
 EXPOSE 8080
+HEALTHCHECK --interval=10s --timeout=5s --retries=5 CMD ["/lprobe", "-port", "8080", "-endpoint", "/metrics"]
 USER harbor
 ENTRYPOINT ["/harbor-exporter"]
