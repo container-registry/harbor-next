@@ -15,4 +15,6 @@ RUN bun install --ignore-scripts
 
 WORKDIR /app
 COPY src/portal/scripts/dev-portal-start.js /app/scripts/dev-portal-start.js
+HEALTHCHECK --interval=10s --timeout=5s --retries=5 CMD wget -q -O /dev/null http://127.0.0.1:4200 || exit 1
+USER bun
 CMD ["bun", "/app/scripts/dev-portal-start.js"]

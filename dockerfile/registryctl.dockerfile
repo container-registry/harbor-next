@@ -14,5 +14,6 @@ ARG TARGETARCH
 COPY bin/linux-${TARGETARCH}/registryctl /registryctl
 WORKDIR /
 EXPOSE 8080
+HEALTHCHECK --interval=10s --timeout=5s --retries=5 CMD ["/lprobe", "-port", "8080", "-endpoint", "/api/health"]
 USER harbor
 ENTRYPOINT ["/registryctl", "-c", "/etc/registryctl/config.yml"]
