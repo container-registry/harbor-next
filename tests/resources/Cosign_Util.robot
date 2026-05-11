@@ -20,11 +20,11 @@ Library  Process
 *** Keywords ***
 Cosign Generate Key Pair
     Remove Files  cosign.key  cosign.pub
-    Wait Unitl Command Success  cosign generate-key-pair
+    Wait Unitl Command Success  env COSIGN_PASSWORD=Harbor12345 cosign generate-key-pair
 
 Cosign Sign
     [Arguments]  ${artifact}
-    Wait Unitl Command Success  cosign sign -y --allow-insecure-registry --key cosign.key ${artifact}
+    Wait Unitl Command Success  env COSIGN_PASSWORD=Harbor12345 cosign sign -y --allow-insecure-registry --key cosign.key ${artifact}
 
 Cosign Verify
     [Arguments]  ${artifact}  ${signed}
