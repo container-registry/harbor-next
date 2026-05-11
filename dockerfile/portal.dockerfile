@@ -18,7 +18,8 @@ RUN bun run postinstall && \
     bun run generate-build-timestamp && \
     node --max_old_space_size=2048 node_modules/@angular/cli/bin/ng build --configuration production
 COPY LICENSE ./dist/LICENSE
-RUN cd app-swagger-ui && bun install --ignore-scripts && bun run build
+WORKDIR /harbor/src/portal/app-swagger-ui
+RUN bun install --ignore-scripts && bun run build
 
 #
 # RUNTIME
