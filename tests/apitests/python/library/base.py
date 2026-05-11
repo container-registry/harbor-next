@@ -147,12 +147,11 @@ def run_command_with_popen(command):
         proc.stdout.close()
         return output
 
-def run_command(command, expected_error_message = None, env = None):
+def run_command(command, expected_error_message = None):
     try:
         output = subprocess.check_output(command,
-                                          stderr=subprocess.STDOUT,
-                                          universal_newlines=True,
-                                          env=env)
+                                         stderr=subprocess.STDOUT,
+                                         universal_newlines=True)
     except subprocess.CalledProcessError as e:
         if expected_error_message is not None:
             if str(e.output).lower().find(expected_error_message.lower()) < 0:
