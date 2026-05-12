@@ -47,9 +47,9 @@ tests:
             - path: /
               pathType: Prefix
     asserts:
-      - equal:
+      - matchRegex:
           path: metadata.name
-          value: RELEASE-NAME-harbor-next-harbor-example-com
+          pattern: "^RELEASE-NAME-harbor-ne-harbor-example-com-[0-9a-f]{8}$"
 
   - it: should set secretName
     set:
@@ -66,9 +66,9 @@ tests:
             - path: /
               pathType: Prefix
     asserts:
-      - equal:
+      - matchRegex:
           path: spec.secretName
-          value: RELEASE-NAME-harbor-next-harbor-example-com-tls
+          pattern: "^RELEASE-NAME-harbor-ne-harbor-example-com-[0-9a-f]{8}-tls$"
 
   - it: should set duration and renewBefore
     set:
