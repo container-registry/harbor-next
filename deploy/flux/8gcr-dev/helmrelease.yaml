@@ -1,0 +1,114 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: harbor
+  namespace: 8gcr-dev-main
+spec:
+  interval: 10m
+  releaseName: harbor
+  chartRef:
+    kind: OCIRepository
+    name: harbor-next-chart
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+    cleanupOnFail: true
+  values:
+    externalURL: https://8gcr.container-registry.dev
+    logLevel: info
+
+    # Admin password is provisioned out-of-band by k8s/apps as a SOPS-encrypted Secret.
+    existingSecretAdminPassword: harbor-admin
+    existingSecretAdminPasswordKey: HARBOR_ADMIN_PASSWORD
+
+    expose:
+      clusterIP: { enabled: false }
+      nodePort: { enabled: false }
+      loadBalancer: { enabled: false }
+      route: { enabled: false }
+
+    ingress:
+      enabled: true
+      className: nginx
+      autoGenCert: false
+      core: 8gcr.container-registry.dev
+      hosts:
+        - host: 8gcr.container-registry.dev
+      tls:
+        - secretName: harbor-tls
+          hosts:
+            - 8gcr.container-registry.dev
+      annotations:
+        nginx.ingress.kubernetes.io/proxy-body-size: "0"
+        nginx.ingress.kubernetes.io/ssl-redirect: "true"
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+
+    # ---- Database (external; provisioned by k8s/apps) ----
+    database:
+      host: postgres.8gcr-dev-main.svc.cluster.local
+      port: 5432
+      username: harbor
+      database: registry
+      sslmode: disable
+      existingSecret: harbor-database
+      existingSecretKey: POSTGRESQL_PASSWORD
+
+    # ---- Valkey (in-chart, default standalone) ----
+    valkey:
+      enabled: true
+      architecture: standalone
+      auth:
+        enabled: false
+
+    # ---- Component image pins (continuous deploy: 8gcr-dev/main-latest) ----
+    core:
+      image:
+        repository: 8gears.container-registry.com/8gcr-dev/harbor-core
+        tag: main-latest
+      replicas: 1
+
+    jobservice:
+      image:
+        repository: 8gears.container-registry.com/8gcr-dev/harbor-jobservice
+        tag: main-latest
+      replicas: 1
+      persistence:
+        enabled: true
+        size: 10Gi
+
+    registry:
+      image:
+        repository: 8gears.container-registry.com/8gcr-dev/harbor-registry
+        tag: main-latest
+      controller:
+        image:
+          repository: 8gears.container-registry.com/8gcr-dev/harbor-registryctl
+          tag: main-latest
+      replicas: 1
+      persistence:
+        enabled: true
+        size: 100Gi
+
+    portal:
+      image:
+        repository: 8gears.container-registry.com/8gcr-dev/harbor-portal
+        tag: main-latest
+      replicas: 1
+
+    exporter:
+      enabled: true
+      image:
+        repository: 8gears.container-registry.com/8gcr-dev/harbor-exporter
+        tag: main-latest
+      replicas: 1
+
+    trivy:
+      enabled: true
+      image:
+        repository: 8gears.container-registry.com/8gcr-dev/harbor-trivy-adapter
+        tag: main-latest
+      replicas: 1

@@ -1,0 +1,12 @@
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: OCIRepository
+metadata:
+  name: harbor-next-chart
+  namespace: 8gcr-dev-main
+spec:
+  interval: 5m
+  url: oci://8gears.container-registry.com/8gcr-dev/chart/harbor-next
+  ref:
+    tag: main-latest
+  secretRef:
+    name: harbor-oci-pull
