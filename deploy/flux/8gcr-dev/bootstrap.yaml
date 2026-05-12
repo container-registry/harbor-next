@@ -1,0 +1,53 @@
+# One-time bootstrap for the 8gcr-dev Harbor deployment on hz-hopper.
+#
+# Apply once per cluster:
+#   kubectl apply -f https://raw.githubusercontent.com/container-registry/harbor-next/main/deploy/flux/8gcr-dev/bootstrap.yaml
+#
+# This creates the OCIRepository + Kustomization in flux-system that fetches
+# the deploy bundle at oci://8gears.container-registry.com/8gcr-dev/deploy:latest
+# and reconciles every resource in it (including SOPS-encrypted secrets).
+#
+# Re-applying is a no-op. After this single step, all subsequent changes flow
+# through chart-publish.yml → OCI artifact → Flux reconcile.
+#
+# Prerequisites on the cluster:
+#   - FluxCD v2 with source-controller, kustomize-controller, helm-controller
+#   - Secret/sops-age in flux-system (holds the age private key matching
+#     age18jfefmcak9zk6jrh7j59ap0rg3zxg577suvmlyrgm3sn0l28zq4slcu94r)
+#   - CloudNativePG operator in cnpg-system (provisions Postgres via extraManifests)
+#   - cert-manager + letsencrypt-prod ClusterIssuer
+#   - nginx IngressClass
+#   - DNS A record 8gcr.container-registry.dev pointing at the cluster ingress
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: harbor-8gcr-dev
+  namespace: flux-system
+spec:
+  interval: 5m
+  url: oci://8gears.container-registry.com/8gcr-dev/deploy
+  ref:
+    tag: latest
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: harbor-8gcr-dev
+  namespace: flux-system
+spec:
+  interval: 5m
+  timeout: 10m
+  prune: true
+  wait: true
+  sourceRef:
+    kind: OCIRepository
+    name: harbor-8gcr-dev
+  path: ./
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  dependsOn:
+    - name: infrastructure-cert-manager
+    - name: infrastructure-ingress-nginx
