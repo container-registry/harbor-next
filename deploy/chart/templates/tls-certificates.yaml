@@ -5,12 +5,12 @@
 {{- $ingressHosts = list (dict "host" (include "harbor.ingress.primaryHost" .)) -}}
 {{- end -}}
 {{- range $ingressHosts }}
-{{- $hostSlug := include "harbor.dnsSafeName" (.host | replace "*." "wildcard-") -}}
-{{- $hostHash := sha256sum .host | trunc 8 -}}
-{{- /* Layout: <fullname (≤22)>-<hostSlug (≤27)>-<hash (8)> = ≤59, leaving room for "-tls" suffix in secretName under the 63-char DNS-1123 label limit. */ -}}
-{{- $certName := printf "%s-%s" ($fullname | trunc 22 | trimSuffix "-") ($hostSlug | trunc 27 | trimSuffix "-") | trimSuffix "-" -}}
-{{- $certName = printf "%s-%s" $certName $hostHash -}}
-{{- $secretName := printf "%s-tls" $certName -}}
+{{- $hostSlug := include "harbor.dnsSafeName" (.host | replace "*." "wildcard-") }}
+{{- $hostHash := sha256sum .host | trunc 8 }}
+{{- /* Layout: <fullname (≤22)>-<hostSlug (≤27)>-<hash (8)> = ≤59, leaving room for "-tls" suffix in secretName under the 63-char DNS-1123 label limit. */}}
+{{- $certName := printf "%s-%s" ($fullname | trunc 22 | trimSuffix "-") ($hostSlug | trunc 27 | trimSuffix "-") | trimSuffix "-" }}
+{{- $certName = printf "%s-%s" $certName $hostHash }}
+{{- $secretName := printf "%s-tls" $certName }}
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
