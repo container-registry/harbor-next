@@ -15,7 +15,7 @@ metadata:
 spec:
   accessModes:
     {{- toYaml .Values.registry.persistence.accessModes | nindent 4 }}
-  {{- if .Values.registry.persistence.storageClass }}
+  {{- if hasKey .Values.registry.persistence "storageClass" }}
   storageClassName: {{ .Values.registry.persistence.storageClass | quote }}
   {{- end }}
   resources:

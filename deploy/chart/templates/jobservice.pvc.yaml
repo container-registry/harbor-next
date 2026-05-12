@@ -15,7 +15,7 @@ metadata:
 spec:
   accessModes:
     {{- toYaml .Values.jobservice.persistence.accessModes | nindent 4 }}
-  {{- if .Values.jobservice.persistence.storageClass }}
+  {{- if hasKey .Values.jobservice.persistence "storageClass" }}
   storageClassName: {{ .Values.jobservice.persistence.storageClass | quote }}
   {{- end }}
   resources:
