@@ -21,7 +21,7 @@ spec:
     externalURL: https://8gcr.container-registry.dev
     logLevel: info
 
-    # Admin password is provisioned out-of-band by k8s/apps as a SOPS-encrypted Secret.
+    # Admin password provisioned by secrets.sops.yaml in this bundle.
     existingSecretAdminPassword: harbor-admin
     existingSecretAdminPasswordKey: HARBOR_ADMIN_PASSWORD
 

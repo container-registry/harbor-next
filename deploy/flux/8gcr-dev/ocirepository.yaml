@@ -8,5 +8,4 @@ spec:
   url: oci://8gears.container-registry.com/8gcr-dev/chart/harbor-next
   ref:
     tag: latest
-  secretRef:
-    name: harbor-oci-pull
+  # 8gcr-dev is a public Harbor project — anonymous pulls work, no secretRef.
