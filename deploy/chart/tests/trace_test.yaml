@@ -1,0 +1,44 @@
+suite: trace helper tests
+templates:
+  - templates/registryctl.configmap.yaml
+tests:
+  # Regression guard for 9979736de. Sprig `default 1` clobbers `0`
+  # because Sprig treats 0 as empty. The helper now uses a hasKey
+  # check so an explicit `trace.sample_rate: 0` (sample nothing,
+  # useful in load tests or staging) renders as "0".
+  - it: should preserve explicit trace.sample_rate=0
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trace.enabled: true
+      trace.sample_rate: 0
+    asserts:
+      - equal:
+          path: data.TRACE_SAMPLE_RATE
+          value: "0"
+
+  - it: should preserve fractional trace.sample_rate
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trace.enabled: true
+      trace.sample_rate: 0.25
+    asserts:
+      - equal:
+          path: data.TRACE_SAMPLE_RATE
+          value: "0.25"
+
+  - it: should fall back to 1 when trace.sample_rate is unset
+    # Values.yaml default is 1; this guards against accidental removal
+    # of the helper fallback that would render "<no value>" or "".
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trace.enabled: true
+    asserts:
+      - equal:
+          path: data.TRACE_SAMPLE_RATE
+          value: "1"
