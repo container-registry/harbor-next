@@ -159,4 +159,11 @@ Since RKE2 comes with an Nginx ingress deployed by default, we can access the po
 https://harbor.example.com
 ```
 
-The default credentials are `admin` and `Harbor12345`.
+Log in with username `admin` and the password you set in `harborAdminPassword`
+above (`strong-password` in this example — change it to a real strong password
+before deploying anywhere reachable from outside your cluster).
+
+> **⚠️ Security:** If you skip `harborAdminPassword`, Harbor falls back to the
+> well-known default `Harbor12345`. That default is publicly documented and must
+> never be used on a non-throwaway environment. Rotate the password from the
+> Harbor UI (User Profile → Change Password) immediately after first login.
