@@ -1,8 +1,10 @@
 suite: ServiceMonitor tests
 templates:
   - templates/servicemonitor.yaml
+  - templates/validate-values.yaml
 tests:
   - it: should not create ServiceMonitor when disabled
+    template: templates/servicemonitor.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
@@ -13,10 +15,12 @@ tests:
           count: 0
 
   - it: should create ServiceMonitor when enabled
+    template: templates/servicemonitor.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
+      metrics.enabled: true
       metrics.serviceMonitor.enabled: true
     asserts:
       - isKind:
@@ -26,10 +30,12 @@ tests:
           value: RELEASE-NAME-harbor-next
 
   - it: should set custom namespace
+    template: templates/servicemonitor.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
+      metrics.enabled: true
       metrics.serviceMonitor.enabled: true
       metrics.serviceMonitor.namespace: monitoring
     asserts:
@@ -38,10 +44,12 @@ tests:
           value: monitoring
 
   - it: should set custom labels
+    template: templates/servicemonitor.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
+      metrics.enabled: true
       metrics.serviceMonitor.enabled: true
       metrics.serviceMonitor.labels:
         release: prometheus
@@ -51,10 +59,12 @@ tests:
           value: prometheus
 
   - it: should set custom interval
+    template: templates/servicemonitor.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
+      metrics.enabled: true
       metrics.serviceMonitor.enabled: true
       metrics.serviceMonitor.interval: 60s
     asserts:
@@ -63,10 +73,12 @@ tests:
           value: 60s
 
   - it: should set custom scrapeTimeout
+    template: templates/servicemonitor.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
+      metrics.enabled: true
       metrics.serviceMonitor.enabled: true
       metrics.serviceMonitor.scrapeTimeout: 30s
     asserts:
@@ -75,10 +87,12 @@ tests:
           value: 30s
 
   - it: should default honorLabels to true
+    template: templates/servicemonitor.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
+      metrics.enabled: true
       metrics.serviceMonitor.enabled: true
     asserts:
       - equal:
@@ -86,10 +100,12 @@ tests:
           value: true
 
   - it: should set metrics path
+    template: templates/servicemonitor.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
+      metrics.enabled: true
       metrics.serviceMonitor.enabled: true
     asserts:
       - equal:
@@ -97,12 +113,29 @@ tests:
           value: /metrics
 
   - it: should match release namespace in namespaceSelector
+    template: templates/servicemonitor.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
+      metrics.enabled: true
       metrics.serviceMonitor.enabled: true
     asserts:
       - equal:
           path: spec.namespaceSelector.matchNames[0]
           value: NAMESPACE
+
+  # Regression guard for 9160ed527 (Fix #21). Enabling the ServiceMonitor
+  # without enabling /metrics scraping creates an orphan ServiceMonitor
+  # that scrapes nothing — Prometheus silently gets no Harbor metrics.
+  - it: should fail when serviceMonitor enabled without metrics.enabled
+    template: templates/validate-values.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      metrics.enabled: false
+      metrics.serviceMonitor.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "metrics.serviceMonitor.enabled requires metrics.enabled=true. Without metrics enabled, Harbor pods do not expose the /metrics endpoint the ServiceMonitor would scrape."
