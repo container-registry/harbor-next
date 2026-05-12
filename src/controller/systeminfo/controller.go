@@ -43,13 +43,14 @@ var Ctl = NewController()
 
 // Data wraps common systeminfo data
 type Data struct {
-	AuthMode          string
-	PrimaryAuthMode   bool
-	SelfRegistration  bool
-	BannerMessage     string
-	AuthProxySettings *models.HTTPAuthProxy
-	Protected         *protectedData
-	OIDCProviderName  string
+	AuthMode                   string
+	PrimaryAuthMode            bool
+	SelfRegistration           bool
+	BannerMessage              string
+	UnauthenticatedLandingPage string
+	AuthProxySettings          *models.HTTPAuthProxy
+	Protected                  *protectedData
+	OIDCProviderName           string
 }
 
 type protectedData struct {
@@ -99,11 +100,12 @@ func (c *controller) GetInfo(ctx context.Context, opt Options) (*Data, error) {
 		return nil, err
 	}
 	res := &Data{
-		AuthMode:         utils.SafeCastString(cfg[common.AUTHMode]),
-		PrimaryAuthMode:  utils.SafeCastBool(cfg[common.PrimaryAuthMode]),
-		SelfRegistration: utils.SafeCastBool(cfg[common.SelfRegistration]),
-		BannerMessage:    utils.SafeCastString(mgr.Get(ctx, common.BannerMessage).GetString()),
-		OIDCProviderName: OIDCProviderName(cfg),
+		AuthMode:                   utils.SafeCastString(cfg[common.AUTHMode]),
+		PrimaryAuthMode:            utils.SafeCastBool(cfg[common.PrimaryAuthMode]),
+		SelfRegistration:           utils.SafeCastBool(cfg[common.SelfRegistration]),
+		BannerMessage:              utils.SafeCastString(mgr.Get(ctx, common.BannerMessage).GetString()),
+		UnauthenticatedLandingPage: utils.SafeCastString(cfg[common.UnauthenticatedLandingPage]),
+		OIDCProviderName:           OIDCProviderName(cfg),
 	}
 	if res.AuthMode == common.HTTPAuth {
 		if s, err := config.HTTPAuthProxySetting(ctx); err == nil {

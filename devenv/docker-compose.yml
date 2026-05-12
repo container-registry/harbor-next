@@ -5,21 +5,33 @@
 
 services:
   postgresql:
-    image: postgres:16-alpine
+    image: ${REGISTRY_ADDRESS:-docker.io}/${REGISTRY_PROJECT:-library}/postgres:18-alpine
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: root123
       POSTGRES_DB: registry
     ports:
       - "${PORT_POSTGRES:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+      start_period: 5s
     volumes:
-      - harbor-postgres-data:/var/lib/postgresql/data
+      - harbor-postgres-18-data:/var/lib/postgresql
       - ../make/migrations:/migrations
 
   redis:
     image: valkey/valkey:latest
     ports:
       - "${PORT_REDIS:-6379}:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli ping | grep -q PONG"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+      start_period: 2s
     volumes:
       - harbor-redis-data:/data
 
@@ -37,6 +49,7 @@ services:
 
   # Core API - starts with: docker compose --profile core up
   core:
+    image: harbor-dev-go
     build:
       context: ..
       dockerfile: dockerfile/dev.core.dockerfile
@@ -44,11 +57,13 @@ services:
         GO_VERSION: ${GO_VERSION}
         AIR_VERSION: ${AIR_VERSION}
         DELVE_VERSION: ${DELVE_VERSION}
+        DEV_UID: ${DEV_UID:-1000}
+        DEV_GID: ${DEV_GID:-1000}
     profiles: [core]
     volumes:
       - ..:/app
-      - go-mod-cache:/go/pkg/mod
-      - go-build-cache:/root/.cache/go-build
+      - ${HOST_GOMODCACHE:?}:/go/pkg/mod
+      - ${HOST_GOCACHE:?}:/home/harbor/.cache/go-build
       # Mount views directly to where beego expects them (avoids symlink leaking to host)
       - ../src/core/views:/app/views:ro
     ports:
@@ -83,33 +98,34 @@ services:
       JOBSERVICE_URL: http://jobservice:8888
       CORE_SECRET: devenv-secret-do-not-use-in-production
       JOBSERVICE_SECRET: devenv-secret-do-not-use-in-production
+      # Portal (dev server on port 4200, not Nginx on 8080)
+      PORTAL_URL: http://portal:4200
       # Trivy scanner
       TRIVY_ADAPTER_URL: http://trivy-adapter:8080
       WITH_TRIVY: "true"
+      HEALTHCHECK_PORT: "8080"
+      HEALTHCHECK_ENDPOINT: /api/v2.0/ping
       # Proxy cache and replication
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr
     command: air -c devenv/air.core.toml
     depends_on:
-      - postgresql
-      - redis
-      - registry
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      registry:
+        condition: service_started
 
 
   # JobService - starts with: docker compose --profile jobservice up
   jobservice:
-    build:
-      context: ..
-      dockerfile: dockerfile/dev.core.dockerfile
-      args:
-        GO_VERSION: ${GO_VERSION}
-        AIR_VERSION: ${AIR_VERSION}
-        DELVE_VERSION: ${DELVE_VERSION}
+    image: harbor-dev-go
     profiles: [jobservice]
     volumes:
       - ..:/app
-      - go-mod-cache:/go/pkg/mod
-      - go-build-cache:/root/.cache/go-build
+      - ${HOST_GOMODCACHE:?}:/go/pkg/mod
+      - ${HOST_GOCACHE:?}:/home/harbor/.cache/go-build
     # ports:
     #   - "8888:8888"  # JobService API (uncomment if needed)
     #   - "127.0.0.1:2346:2346"  # Debug port (uncomment if needed)
@@ -134,24 +150,20 @@ services:
       REGISTRY_CREDENTIAL_PASSWORD: ""
       TOKEN_SERVICE_URL: http://core:8080/service/token
       LOG_LEVEL: debug
+      HEALTHCHECK_PORT: "8888"
+      HEALTHCHECK_ENDPOINT: /api/v1/stats
     command: air -c devenv/air.jobservice.toml
     depends_on:
       - core
 
   # RegistryCtl - starts with: docker compose --profile registryctl up
   registryctl:
-    build:
-      context: ..
-      dockerfile: dockerfile/dev.core.dockerfile
-      args:
-        GO_VERSION: ${GO_VERSION}
-        AIR_VERSION: ${AIR_VERSION}
-        DELVE_VERSION: ${DELVE_VERSION}
+    image: harbor-dev-go
     profiles: [registryctl]
     volumes:
       - ..:/app
-      - go-mod-cache:/go/pkg/mod
-      - go-build-cache:/root/.cache/go-build
+      - ${HOST_GOMODCACHE:?}:/go/pkg/mod
+      - ${HOST_GOCACHE:?}:/home/harbor/.cache/go-build
       - harbor-registry-data:/var/lib/registry
       - ../config/registry.yml:/etc/registry/config.yml:ro
     ports:
@@ -163,6 +175,8 @@ services:
       REGISTRY_CONFIG: /etc/registry/config.yml
       CORE_SECRET: devenv-secret-do-not-use-in-production
       JOBSERVICE_SECRET: devenv-secret-do-not-use-in-production
+      HEALTHCHECK_PORT: "8080"
+      HEALTHCHECK_ENDPOINT: /api/health
     command: air -c devenv/air.registryctl.toml
     depends_on:
       - registry
@@ -171,7 +185,7 @@ services:
   trivy-adapter:
     build:
       context: ..
-      dockerfile: dockerfile/trivy-adapter.dockerfile
+      dockerfile: dockerfile/dev.trivy-adapter.dockerfile
       args:
         GO_VERSION: ${GO_VERSION}
         HARBOR_SCANNER_TRIVY_VERSION: ${HARBOR_SCANNER_TRIVY_VERSION}
@@ -203,6 +217,7 @@ services:
 
   # Portal (Angular UI) - starts with: docker compose --profile portal up
   portal:
+    image: harbor-dev-portal
     build:
       context: ..
       dockerfile: dockerfile/dev.portal.dockerfile
@@ -222,7 +237,7 @@ services:
       - ../src/portal/app-swagger-ui/index.html:/swagger-ui/index.html:ro
       - ../src/portal/app-swagger-ui/favicon.ico:/swagger-ui/favicon.ico:ro
       - ../src/portal/app-swagger-ui/webpack.config.js:/swagger-ui/webpack.config.js:ro
-      - portal-angular-cache:/app/.angular
+      - ../src/portal/.angular:/app/.angular
       - portal-openapi-ui:/app/src/openapi-ui
     ports:
       - "${PORT_PORTAL:-4200}:4200"
@@ -232,17 +247,11 @@ services:
       - core
 
 volumes:
-  harbor-postgres-data:
-    name: ${PROJECT_PREFIX:-harbor}-postgres-data
+  harbor-postgres-18-data:
+    name: ${PROJECT_PREFIX:-harbor}-postgres-18-data
   harbor-redis-data:
     name: ${PROJECT_PREFIX:-harbor}-redis-data
   harbor-registry-data:
     name: ${PROJECT_PREFIX:-harbor}-registry-data
-  go-mod-cache:
-    name: ${PROJECT_PREFIX:-harbor}-go-mod-cache
-  go-build-cache:
-    name: ${PROJECT_PREFIX:-harbor}-go-build-cache
-  portal-angular-cache:
-    name: ${PROJECT_PREFIX:-harbor}-portal-angular-cache
   portal-openapi-ui:
     name: ${PROJECT_PREFIX:-harbor}-portal-openapi-ui

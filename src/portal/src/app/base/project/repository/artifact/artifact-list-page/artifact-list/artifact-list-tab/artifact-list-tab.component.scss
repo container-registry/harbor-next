@@ -18,7 +18,7 @@
 .truncated {
   width: 100px;
   line-height: 20px;
-  height: 20px;
+  height: 25px;
   display: flex;
   align-items: center;
   overflow: hidden;
@@ -158,6 +158,10 @@
   width: 6rem !important;
 }
 
+.tags-column {
+  width: 14rem !important;
+}
+
 .co-signed-column {
   width: 7rem !important;
 }
@@ -197,6 +201,24 @@
 
 .width-p-75 {
   width: 75%;
+}
+
+.tag-cell-content {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.tag-cell-text {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
+.tag-copy-command {
+  flex: 0 0 auto;
+  margin-left: 4px;
 }
 
 .action-bar {

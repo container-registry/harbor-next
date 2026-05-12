@@ -206,6 +206,37 @@ func (a *ArtifactEventHandler) syncFlushPullTime(ctx context.Context, artifactID
 	if err := artifact.Ctl.UpdatePullTime(ctx, artifactID, tagID, time); err != nil {
 		log.Warningf("failed to update pull time for artifact %d, %v", artifactID, err)
 	}
+
+	a.updateParentArtifactPullTime(ctx, artifactID, time)
+}
+
+// update the pull time of parent artifacts that reference this artifact
+func (a *ArtifactEventHandler) updateParentArtifactPullTime(ctx context.Context, childArtifactID int64, pullTime time.Time) {
+	artMgr := pkg.ArtifactMgr
+	// for UT mock
+	if a.artMgr != nil {
+		artMgr = a.artMgr
+	}
+	references, err := artMgr.ListReferences(ctx, q.New(q.KeyWords{"ChildID": childArtifactID}))
+	if err != nil {
+		log.Warningf("failed to list parent references for artifact %d when updating pull time: %v", childArtifactID, err)
+		return
+	}
+
+	// deduplicate parent IDs and update pull time
+	seen := make(map[int64]bool, len(references))
+	for _, ref := range references {
+		if seen[ref.ParentID] {
+			continue
+		}
+		seen[ref.ParentID] = true
+
+		if err := artMgr.UpdatePullTime(ctx, ref.ParentID, pullTime); err != nil {
+			log.Warningf("failed to update pull time for parent artifact %d: %v", ref.ParentID, err)
+		} else {
+			log.Debugf("updated pull time for parent artifact %d (child: %d)", ref.ParentID, childArtifactID)
+		}
+	}
 }
 
 func (a *ArtifactEventHandler) syncFlushPullCount(ctx context.Context, repositoryID int64, count uint64) {
@@ -217,9 +248,15 @@ func (a *ArtifactEventHandler) syncFlushPullCount(ctx context.Context, repositor
 func (a *ArtifactEventHandler) asyncFlushPullTime(ctx context.Context) {
 	for {
 		<-time.After(asyncFlushDuration)
-		a.pullTimeLock.Lock()
 
-		for key, time := range a.pullTimeStore {
+		// Snapshot and reset the store under lock, then release before doing DB work.
+		// This avoids blocking new pull events in updatePullTimeInCache during flushes.
+		a.pullTimeLock.Lock()
+		store := a.pullTimeStore
+		a.pullTimeStore = make(map[string]time.Time)
+		a.pullTimeLock.Unlock()
+
+		for key, time := range store {
 			keys := strings.Split(key, ":")
 			artifactID, err := strconv.ParseInt(keys[0], 10, 64)
 			if err != nil {
@@ -234,23 +271,23 @@ func (a *ArtifactEventHandler) asyncFlushPullTime(ctx context.Context) {
 
 			a.syncFlushPullTime(ctx, artifactID, tagName, time)
 		}
-
-		a.pullTimeStore = make(map[string]time.Time)
-		a.pullTimeLock.Unlock()
 	}
 }
 
 func (a *ArtifactEventHandler) asyncFlushPullCount(ctx context.Context) {
 	for {
 		<-time.After(asyncFlushDuration)
+
+		// Snapshot and reset the store under lock, then release before doing DB work.
+		// This avoids blocking new pull events in addPullCountInCache during flushes.
 		a.pullCountLock.Lock()
-
-		for repositoryID, count := range a.pullCountStore {
-			a.syncFlushPullCount(ctx, repositoryID, count)
-		}
-
+		store := a.pullCountStore
 		a.pullCountStore = make(map[int64]uint64)
 		a.pullCountLock.Unlock()
+
+		for repositoryID, count := range store {
+			a.syncFlushPullCount(ctx, repositoryID, count)
+		}
 	}
 }
 

@@ -1,11 +1,9 @@
 .wrapper-back {
     position: absolute;
     top: 50%;
-    height: 240px;
-    margin-top: -120px;
-    text-align: center;
     left: 50%;
-    margin-left: -300px;
+    transform: translate(-50%, -50%);
+    text-align: center;
 }
 
 .status-code {

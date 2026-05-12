@@ -16,27 +16,27 @@ package models
 
 import "time"
 
-// Database ...
 type Database struct {
 	Type       string      `json:"type"`
 	PostGreSQL *PostGreSQL `json:"postgresql,omitempty"`
 }
 
-// SQLite ...
 type SQLite struct {
 	File string `json:"file"`
 }
 
-// PostGreSQL ...
 type PostGreSQL struct {
-	Host            string        `json:"host"`
-	Port            int           `json:"port"`
-	Username        string        `json:"username"`
-	Password        string        `json:"password,omitempty"`
-	Database        string        `json:"database"`
-	SSLMode         string        `json:"sslmode"`
-	MaxIdleConns    int           `json:"max_idle_conns"`
-	MaxOpenConns    int           `json:"max_open_conns"`
-	ConnMaxLifetime time.Duration `json:"conn_max_lifetime"`
-	ConnMaxIdleTime time.Duration `json:"conn_max_idle_time"`
+	Host              string        `json:"host"`
+	Port              int           `json:"port"`
+	Username          string        `json:"username"`
+	Password          string        `json:"password,omitempty"`
+	Database          string        `json:"database"`
+	SSLMode           string        `json:"sslmode"`
+	MaxOpenConns      int           `json:"max_open_conns"`
+	ConnMaxLifetime   time.Duration `json:"conn_max_lifetime"`
+	ConnMaxIdleTime   time.Duration `json:"conn_max_idle_time"`
+	HealthCheckPeriod time.Duration `json:"health_check_period"`
+	ConnectTimeout    time.Duration `json:"connect_timeout"`
+	MinConns          int32         `json:"min_conns"`
+	URL               string        `json:"url"`
 }

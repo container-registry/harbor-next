@@ -19,7 +19,7 @@ vars:
 
   GOPATH_BIN:
     sh: echo "${GOBIN:-$(go env GOPATH)/bin}"
-  GOBUILD_FLAGS: "-buildvcs=false"
+  GOBUILD_FLAGS: "-buildvcs=false -trimpath"
   DISTRIBUTION_SRC: "https://github.com/distribution/distribution.git"
   NPM_REGISTRY: "https://registry.npmjs.org/"
 
@@ -71,6 +71,23 @@ tasks:
     desc: "Run all tests"
     cmds:
       - task: test:all
+
+  lint:
+    desc: "Run API lint, Go lint, and dependency vulnerability checks"
+    cmds:
+      - task: test:lint:api
+      - task: test:lint
+      - task: test:vuln-check
+
+  lint:api:
+    desc: "Run API lint"
+    cmds:
+      - task: test:lint:api
+
+  vuln-check:
+    desc: "Run Go dependency vulnerability checks"
+    cmds:
+      - task: test:vuln-check
 
   images:
     desc: "Build all container images (PUSH=false for local, PLATFORMS=linux/arm64 for single arch)"

@@ -58,15 +58,27 @@ type CacheTestSuite struct {
 	mCache     *ManifestCache
 	mListCache *ManifestListCache
 	local      localInterfaceMock
+	oldListWait int
+	oldWait     int
+	oldSleepSec int
 }
 
 func (suite *CacheTestSuite) SetupSuite() {
 	suite.local = localInterfaceMock{}
 	suite.mListCache = &ManifestListCache{local: &suite.local}
 	suite.mCache = &ManifestCache{local: &suite.local}
+	suite.oldListWait = maxManifestListWait
+	suite.oldWait = maxManifestWait
+	suite.oldSleepSec = sleepIntervalSec
+	maxManifestListWait = 1
+	maxManifestWait = 1
+	sleepIntervalSec = 0
 }
 
 func (suite *CacheTestSuite) TearDownSuite() {
+	maxManifestListWait = suite.oldListWait
+	maxManifestWait = suite.oldWait
+	sleepIntervalSec = suite.oldSleepSec
 }
 func (suite *CacheTestSuite) TestUpdateManifestList() {
 	ctx := context.Background()
@@ -170,9 +182,11 @@ func (suite *CacheTestSuite) TestPushManifestList() {
 
 	suite.local.On("PushManifest", repo, originDigest, mock.Anything).Return(fmt.Errorf("wrong digest"))
 	suite.local.On("PushManifest", repo, mock.Anything, mock.Anything).Return(nil)
+	suite.local.On("UpdatePullTime", ctx, mock.Anything).Return(nil)
 
 	err = suite.mListCache.push(ctx, "library/hello-world", string(originDigest), manList)
 	suite.Require().Nil(err)
+	suite.local.AssertCalled(suite.T(), "UpdatePullTime", ctx, mock.Anything)
 }
 
 func (suite *CacheTestSuite) TestManifestCache_CacheContent() {

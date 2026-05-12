@@ -28,7 +28,7 @@ export class SkinableConfig {
 
     public getCustomFile(): Observable<any> {
         return this.http
-            .get(`${environment.settingJson}?buildTimeStamp=${environment?.buildTimestamp}`)
+            .get(`setting.json?buildTimeStamp=${environment?.buildTimestamp}`)
             .pipe(
                 map(
                     response => (this.customSkinData = response as CustomStyle)

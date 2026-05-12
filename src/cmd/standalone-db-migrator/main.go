@@ -45,7 +45,6 @@ func main() {
 			Password:     getAttr("POSTGRESQL_PASSWORD"),
 			Database:     getAttr("POSTGRESQL_DATABASE"),
 			SSLMode:      getAttr("POSTGRESQL_SSLMODE"),
-			MaxIdleConns: 5,
 			MaxOpenConns: 5,
 		},
 	}

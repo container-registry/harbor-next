@@ -1,0 +1,39 @@
+name: 'Setup Go with Smart Caching'
+description: 'Uses persistent host cache on self-hosted, actions/cache on GitHub-hosted.'
+
+inputs:
+  go-version-file:
+    description: 'Path to go.mod for version detection'
+    required: true
+  go-sum-path:
+    description: 'Path to go.sum for cache key hashing'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Go toolchain
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+      with:
+        go-version-file: ${{ inputs.go-version-file }}
+        cache: false
+
+    # GitHub-hosted only: restore module cache from GitHub's cache storage
+    - name: Restore Go module cache
+      if: runner.environment != 'self-hosted'
+      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      with:
+        path: ~/go/pkg/mod
+        key: go-mod-${{ runner.os }}-${{ hashFiles(inputs.go-sum-path) }}
+        restore-keys: go-mod-${{ runner.os }}-
+
+    # GitHub-hosted only: restore build cache from GitHub's cache storage
+    - name: Restore Go build cache
+      if: runner.environment != 'self-hosted'
+      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      with:
+        path: ~/.cache/go-build
+        key: go-build-${{ runner.os }}-${{ hashFiles(inputs.go-sum-path) }}-${{ github.sha }}
+        restore-keys: |
+          go-build-${{ runner.os }}-${{ hashFiles(inputs.go-sum-path) }}-
+          go-build-${{ runner.os }}-

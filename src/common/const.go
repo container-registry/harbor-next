@@ -59,11 +59,14 @@ const (
 	PostGreSQLPassword               = "postgresql_password"
 	PostGreSQLDatabase               = "postgresql_database"
 	PostGreSQLSSLMode                = "postgresql_sslmode"
-	PostGreSQLMaxIdleConns           = "postgresql_max_idle_conns"
 	PostGreSQLMaxOpenConns           = "postgresql_max_open_conns"
 	PostGreSQLConnMaxLifetime        = "postgresql_conn_max_lifetime"
 	PostGreSQLConnMaxIdleTime        = "postgresql_conn_max_idle_time"
-	SelfRegistration                 = "self_registration"
+	PostGreSQLHealthCheckPeriod      = "postgresql_health_check_period"
+	PostGreSQLConnectTimeout         = "postgresql_connect_timeout"
+	PostGreSQLMinConns               = "postgresql_min_conns"
+	PostGreSQLURL    = "postgresql_url"
+	SelfRegistration = "self_registration"
 	CoreURL                          = "core_url"
 	CoreLocalURL                     = "core_local_url"
 	JobServiceURL                    = "jobservice_url"
@@ -232,6 +235,11 @@ const (
 	// Customized banner message
 	BannerMessage = "banner_message"
 
+	// UnauthenticatedLandingPage controls which page unauthenticated users see
+	UnauthenticatedLandingPage = "unauthenticated_landing_page"
+	LandingPageLogin           = "login"
+	LandingPagePublicProjects  = "public_projects"
+
 	// UIMaxLengthLimitedOfNumber is the max length that UI limited for type number
 	UIMaxLengthLimitedOfNumber = 10
 	// ExecutionStatusRefreshIntervalSeconds is the interval seconds for refreshing execution status
@@ -256,4 +264,10 @@ const (
 
 	// The replication adapter whitelist
 	ReplicationAdapterWhiteList = "REPLICATION_ADAPTER_WHITELIST"
+
+	// UserAgentHeaderName is the HTTP header key for user agent.
+	UserAgentHeaderName = "User-Agent"
+
+	// UserAgent is the default user-agent header for registry client requests
+	UserAgent = "harbor-registry-client"
 )

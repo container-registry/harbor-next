@@ -16,9 +16,18 @@ package orm
 
 import (
 	"github.com/beego/beego/v2/client/orm"
-	"github.com/jackc/pgconn"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/goharbor/harbor/src/lib/errors"
+)
+
+// Standard PostgreSQL SQLSTATE codes. Must match the Code field on
+// pgx/v5's pgconn.PgError — if someone swaps to pgx/v4's pgconn,
+// errors.As will never match and these checks silently stop working.
+// SelfTest in lib/dbpool catches this at startup.
+const (
+	pgUniqueViolation     = "23505"
+	pgForeignKeyViolation = "23503"
 )
 
 var (
@@ -87,7 +96,7 @@ func AsForeignKeyError(err error, messageFormat string, args ...any) *errors.Err
 // IsDuplicateKeyError check the duplicate key error
 func IsDuplicateKeyError(err error) bool {
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+	if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
 		return true
 	}
 
@@ -96,7 +105,7 @@ func IsDuplicateKeyError(err error) bool {
 
 func isViolatingForeignKeyConstraintError(err error) bool {
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+	if errors.As(err, &pgErr) && pgErr.Code == pgForeignKeyViolation {
 		return true
 	}
 

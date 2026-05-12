@@ -15,15 +15,13 @@
 - [ ] Refactoring (`refactor:`)
 - [ ] CI/CD or build changes (`ci:` / `build:`)
 - [ ] Dependencies update (`chore:`)
+- [ ] Tests (`test:`)
 
 ## Release Notes
 
 <!--
 Optional. Fill in for user-facing changes (new features, breaking changes, deprecations).
-Leave blank for ci:/chore:/refactor: PRs.
-
-This section is automatically extracted and added to the GitHub Release highlights.
-For breaking changes, also add a BREAKING CHANGE: description to the squash commit footer.
+Leave blank for ci:/chore:/refactor:/docs:/test: PRs.
 -->
 
 ## Testing

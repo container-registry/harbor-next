@@ -55,6 +55,7 @@ export class Configuration {
     [key: string]: any | any[];
     auth_mode: StringValueItem;
     primary_auth_mode: BoolValueItem;
+    unauthenticated_landing_page: StringValueItem;
     project_creation_restriction: StringValueItem;
     self_registration: BoolValueItem;
     ldap_base_dn: StringValueItem;
@@ -122,6 +123,7 @@ export class Configuration {
     public constructor() {
         this.auth_mode = new StringValueItem('db_auth', true);
         this.primary_auth_mode = new BoolValueItem(false, true);
+        this.unauthenticated_landing_page = new StringValueItem('login', true);
         this.project_creation_restriction = new StringValueItem(
             'everyone',
             true

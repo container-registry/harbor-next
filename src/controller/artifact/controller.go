@@ -61,9 +61,38 @@ import (
 
 var (
 	// Ctl is a global artifact controller instance
-	Ctl                 = NewController()
-	skippedContentTypes = map[string]struct{}{
-		"application/vnd.in-toto+json": {},
+	Ctl = NewController()
+	// scannableContentTypes defines the allowlist of content types that Trivy can scan.
+	// Content types NOT in this list are skipped to avoid scanner failures on
+	// signature/attestation blobs (cosign, in-toto, sigstore, DSSE) which are
+	// small JSON payloads that cannot be extracted as tar archives.
+	scannableContentTypes = map[string]struct{}{
+		// Docker/OCI image manifests
+		"application/vnd.oci.image.manifest.v1+json":                {},
+		"application/vnd.docker.distribution.manifest.v2+json":      {},
+		"application/vnd.docker.distribution.manifest.v1+json":      {},
+		"application/vnd.docker.distribution.manifest.v1+prettyjws": {},
+		// Docker/OCI image indexes (multi-arch)
+		"application/vnd.oci.image.index.v1+json":                   {},
+		"application/vnd.docker.distribution.manifest.list.v2+json": {},
+		// Docker/OCI image layers
+		"application/vnd.docker.image.rootfs.diff.tar.gzip":                {},
+		"application/vnd.docker.image.rootfs.diff.tar":                     {},
+		"application/vnd.docker.image.rootfs.foreign.diff.tar.gzip":        {},
+		"application/vnd.oci.image.layer.v1.tar":                           {},
+		"application/vnd.oci.image.layer.v1.tar+gzip":                      {},
+		"application/vnd.oci.image.layer.v1.tar+zstd":                      {},
+		"application/vnd.oci.image.layer.nondistributable.v1.tar":          {},
+		"application/vnd.oci.image.layer.nondistributable.v1.tar+gzip":     {},
+		"application/vnd.oci.image.layer.nondistributable.v1.tar+zstd":     {},
+		// Docker/OCI image configs
+		"application/vnd.oci.image.config.v1+json":       {},
+		"application/vnd.docker.container.image.v1+json": {},
+		// Helm charts
+		"application/vnd.cncf.helm.config.v1+json":            {},
+		"application/vnd.cncf.helm.chart.content.v1.tar+gzip": {},
+		// SBOMs
+		"application/vnd.cyclonedx+json": {},
 	}
 )
 
@@ -241,13 +270,19 @@ func (c *controller) ensureArtifact(ctx context.Context, repository, digest stri
 	// use orm.WithTransaction here to avoid the issue:
 	// https://www.postgresql.org/message-id/002e01c04da9%24a8f95c20%2425efe6c1%40lasting.ro
 	created := false
+	pendingAccessories := artifact.AccessoryCandidates
 	if err = orm.WithTransaction(func(ctx context.Context) error {
 		id, err := c.artMgr.Create(ctx, artifact)
 		if err != nil {
 			return err
 		}
-		created = true
 		artifact.ID = id
+		for _, candidate := range pendingAccessories {
+			if err := c.accessoryMgr.Ensure(ctx, candidate.SubArtifactDigest, candidate.SubArtifactRepo, candidate.SubArtifactID, candidate.ArtifactID, candidate.Size, candidate.Digest, candidate.Type); err != nil {
+				return err
+			}
+		}
+		created = true
 		return nil
 	})(orm.SetTransactionOpNameToContext(ctx, "tx-ensure-artifact")); err != nil {
 		// got error that isn't conflict error, return directly
@@ -789,9 +824,47 @@ func (c *controller) populateAccessories(ctx context.Context, art *Artifact) {
 		return
 	}
 	art.Accessories = accs
+
+	// Check for inherited Cosign signatures from parent OCI Index
+	hasCosign := false
+	for _, acc := range accs {
+		if acc.GetData().Type == accessorymodel.TypeCosignSignature {
+			hasCosign = true
+			break
+		}
+	}
+
+	// If the child is not signed, look up its parents to see if they are signed
+	if !hasCosign {
+		parents, err := c.artMgr.ListReferences(ctx, &q.Query{
+			Keywords: map[string]any{"ChildID": art.ID},
+		})
+		if err != nil {
+			log.Errorf("failed to list parent references of artifact %d: %v", art.ID, err)
+			return
+		}
+		if len(parents) == 0 {
+			return
+		}
+		for _, p := range parents {
+			parentAccs, err := c.accessoryMgr.List(ctx, q.New(q.KeyWords{"SubjectArtifactID": p.ParentID}))
+			if err != nil {
+				continue
+			}
+			for _, pAcc := range parentAccs {
+				if pAcc.GetData().Type == accessorymodel.TypeCosignSignature {
+					art.InheritedAccessories = append(art.InheritedAccessories, pAcc)
+					return
+				}
+			}
+		}
+	}
 }
 
-// HasUnscannableLayer check if it is a in-toto sbom, if it contains any blob with a content_type is application/vnd.in-toto+json, then consider as in-toto sbom
+// HasUnscannableLayer checks if the artifact contains any layer/blob that cannot be scanned.
+// Uses an allowlist approach: only known scannable content types (tar archives, configs, helm charts)
+// are allowed. Signature/attestation blobs (cosign, in-toto, sigstore, DSSE) are automatically
+// skipped because they are small JSON payloads that Trivy cannot extract as tar archives.
 func (c *controller) HasUnscannableLayer(ctx context.Context, dgst string) (bool, error) {
 	if len(dgst) == 0 {
 		return false, nil
@@ -801,8 +874,8 @@ func (c *controller) HasUnscannableLayer(ctx context.Context, dgst string) (bool
 		return false, err
 	}
 	for _, b := range blobs {
-		if _, exist := skippedContentTypes[b.ContentType]; exist {
-			log.Debugf("the artifact with digest %v is unscannable, because it contains content type: %v", dgst, b.ContentType)
+		if _, scannable := scannableContentTypes[b.ContentType]; !scannable {
+			log.Debugf("artifact %v is unscannable: content type %v not in allowlist", dgst, b.ContentType)
 			return true, nil
 		}
 	}

@@ -3,6 +3,7 @@ version: '3'
 vars:
   # Paths
   COMPOSE_FILE: devenv/docker-compose.yml
+  VERSIONS_ENV: versions.env
   COMPOSE_LOCAL_FILE: deploy/compose/docker-compose.yaml
   COMPOSE_LOCAL_ENV: deploy/compose/example/local/.env.example
   TOKEN_KEY_FILE: devenv/token_service_key.pem
@@ -28,13 +29,21 @@ vars:
 
   PROJECT_PREFIX: 'harbor-{{.SLOT}}'
 
+  # Base docker compose command with env-file for build args (GO_VERSION, BUN_VERSION, etc.)
+  COMPOSE_CMD: 'docker compose -f {{.COMPOSE_FILE}} --env-file {{.VERSIONS_ENV}}'
+
   # Docker Compose profile strings (reused across multiple tasks)
   ALL_PROFILES: "--profile portal --profile core --profile jobservice --profile registryctl --profile trivy"
   APP_PROFILES: "--profile portal --profile core --profile jobservice --profile registryctl"
+  BACKEND_PROFILES: "--profile core --profile jobservice --profile registryctl"
 
 env:
   COMPOSE_PROJECT_NAME:   '{{.PROJECT_PREFIX}}'
   PROJECT_PREFIX:         '{{.PROJECT_PREFIX}}'
+  HOST_GOMODCACHE:
+    sh: go env GOMODCACHE
+  HOST_GOCACHE:
+    sh: go env GOCACHE
   PORT_CORE:              '{{.PORT_CORE}}'
   PORT_PORTAL:            '{{.PORT_PORTAL}}'
   PORT_POSTGRES:          '{{.PORT_POSTGRES}}'
@@ -79,6 +88,36 @@ tasks:
       - sh: docker info > /dev/null 2>&1
         msg: "Docker daemon is not running. Please start Docker first."
 
+  require-ports:
+    internal: true
+    run: once
+    silent: true
+    cmds:
+      - |
+        failed=0
+        for pair in \
+          "{{.PORT_POSTGRES}}:PostgreSQL" \
+          "{{.PORT_REDIS}}:Redis" \
+          "{{.PORT_CORE}}:Core" \
+          "{{.PORT_PORTAL}}:Portal" \
+          "{{.PORT_REGISTRY}}:Registry" \
+          "{{.PORT_REGISTRYCTL}}:RegistryCtl" \
+          "{{.PORT_TRIVY}}:Trivy"; do
+          port="${pair%%:*}"
+          name="${pair##*:}"
+          if ss -tlnH "sport = :$port" 2>/dev/null | grep -q .; then
+            pid=$(ss -tlnpH "sport = :$port" 2>/dev/null | sed -n 's/.*pid=\([0-9]*\).*/\1/p' | head -1)
+            echo "ERROR: Port $port ($name) is already in use${pid:+ by PID $pid}"
+            failed=1
+          fi
+        done
+        if [ "$failed" -eq 1 ]; then
+          echo ""
+          echo "Free the ports above, or use a different slot:  task dev:up SLOT=1"
+          echo "SLOT=1 offsets all ports by +100 (PostgreSQL→{{add .PORT_POSTGRES 100}}, Redis→{{add .PORT_REDIS 100}}, …)"
+          exit 1
+        fi
+
   gen:private-key:
     desc: Generate RSA 4096 key for token signing (skipped if exists)
     status:
@@ -109,62 +148,119 @@ tasks:
       echo ""
 
   # ---------------------------------------------------------------------------
-  # Full Development Environment (Containerized)
+  # Full Development Environment (backend containers + native Portal)
   # ---------------------------------------------------------------------------
+  _codegen:
+    internal: true
+    deps:
+      - :build:gen-apis
+      - _frontend-codegen
+      - _warm-caches
+
+  _warm-caches:
+    internal: true
+    cmds:
+      - mkdir -p src/portal/.angular
+      - cmd: cd src && go mod download
+        silent: true
+
+  _frontend-codegen:
+    internal: true
+    cmds:
+      - task: frontend:install
+      - task: :build:gen-apis:frontend
+
   up:
-    desc: "Start all services with hot reload in foreground (SKIP_TRIVY=true to exclude Trivy)"
-    deps: [require-docker, gen:private-key]
+    desc: "Start backend containers and native Portal with hot reload (SKIP_TRIVY=true to exclude Trivy)"
+    deps: [require-docker, require-ports, gen:private-key]
     vars:
       TRIVY_PROFILE: '{{if ne .SKIP_TRIVY "true"}}--profile trivy{{end}}'
     cmds:
-      - task: :build:gen-apis
-      - task: frontend:install
-      - task: :build:gen-apis:frontend
-      - defer: { task: dev:down, vars: { SKIP_TRIVY: "{{.SKIP_TRIVY}}" } }
+      - defer: { task: down, vars: { SKIP_TRIVY: "{{.SKIP_TRIVY}}" } }
+      - task: _codegen
       - task: info
-      - docker compose -f {{.COMPOSE_FILE}} {{.APP_PROFILES}} {{.TRIVY_PROFILE}} up --build
+      - '{{.COMPOSE_CMD}} {{.BACKEND_PROFILES}} {{.TRIVY_PROFILE}} up -d --build'
+      - task: _wait-core
+      - task: _frontend-serve
 
   down:
     desc: Stop and remove all dev environment containers
     vars:
       TRIVY_PROFILE: '{{if ne .SKIP_TRIVY "true"}}--profile trivy{{end}}'
-    cmd: docker compose -f {{.COMPOSE_FILE}} {{.APP_PROFILES}} {{.TRIVY_PROFILE}} down
+    cmds:
+      - task: _frontend-stop
+      - '{{.COMPOSE_CMD}} {{.BACKEND_PROFILES}} {{.TRIVY_PROFILE}} down'
+
+  _frontend-stop:
+    internal: true
+    silent: true
+    cmds:
+      - |
+        expected="./node_modules/@angular/cli/bin/ng serve --host 0.0.0.0 --port {{.PORT_PORTAL}} --hmr"
+        pid=""
+
+        if command -v lsof >/dev/null 2>&1; then
+          pid=$(lsof -nP -t -iTCP:{{.PORT_PORTAL}} -sTCP:LISTEN 2>/dev/null | head -1 || true)
+        fi
+        if [ -z "$pid" ] && command -v ss >/dev/null 2>&1; then
+          pid=$(ss -tlnpH "sport = :{{.PORT_PORTAL}}" 2>/dev/null | sed -n 's/.*pid=\([0-9]*\).*/\1/p' | head -1 || true)
+        fi
+
+        if [ -z "$pid" ]; then
+          exit 0
+        fi
+
+        args=$(ps -p "$pid" -o command= 2>/dev/null || ps -p "$pid" -o args= 2>/dev/null || true)
+        cwd=""
+        if [ -e "/proc/$pid/cwd" ]; then
+          cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null || true)
+        elif command -v lsof >/dev/null 2>&1; then
+          cwd=$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -1)
+        fi
+        case "$args" in
+          *"$expected"*)
+            if [ -z "$cwd" ] || [ "$cwd" = "$PWD/src/portal" ]; then
+              kill "$pid" 2>/dev/null || true
+            fi
+            ;;
+        esac
+        exit 0
 
   # ---------------------------------------------------------------------------
   # Infrastructure (Docker Compose)
   # ---------------------------------------------------------------------------
   infra:up:
     desc: Start PostgreSQL, Redis, and Registry (waits for DB readiness)
-    deps: [require-docker]
+    deps: [require-docker, require-ports]
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} up -d
+      - '{{.COMPOSE_CMD}} up -d'
       - |
         echo "Waiting for PostgreSQL..."
         timeout=60 elapsed=0
-        until docker compose -f {{.COMPOSE_FILE}} exec -T postgresql pg_isready -U postgres > /dev/null 2>&1; do
+        until {{.COMPOSE_CMD}} exec -T postgresql pg_isready -U postgres > /dev/null 2>&1; do
           [ $elapsed -ge $timeout ] && echo "PostgreSQL failed to start" && exit 1
           sleep 2; elapsed=$((elapsed + 2))
         done
       - echo "Infrastructure ready"
-      - docker compose -f {{.COMPOSE_FILE}} ps
+      - '{{.COMPOSE_CMD}} ps'
 
   infra:down:
     desc: Stop PostgreSQL, Redis, and Registry containers
-    cmd: docker compose -f {{.COMPOSE_FILE}} down
+    cmd: '{{.COMPOSE_CMD}} down'
 
   infra:remove:
     desc: Stop all containers and delete all named volumes
-    cmd: docker compose -f {{.COMPOSE_FILE}} {{.ALL_PROFILES}} down -v
+    cmd: '{{.COMPOSE_CMD}} {{.ALL_PROFILES}} down -v'
 
   # ---------------------------------------------------------------------------
   # Backend Services (Containerized)
   # ---------------------------------------------------------------------------
   backend:up:
     desc: Build and start Core, JobService, RegistryCtl with hot reload
-    deps: [require-docker, gen:private-key]
+    deps: [require-docker, require-ports, gen:private-key]
     cmds:
       - task: :build:gen-apis
-      - docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice --profile registryctl up -d --build
+      - '{{.COMPOSE_CMD}} --profile core --profile jobservice --profile registryctl up -d --build'
       - |
         echo ""
         echo "API: http://localhost:{{.PORT_CORE}}/api/v2.0"
@@ -173,20 +269,38 @@ tasks:
   backend:down:
     desc: Stop and remove Core, JobService, RegistryCtl (keeps infra running)
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} stop core jobservice registryctl
-      - docker compose -f {{.COMPOSE_FILE}} rm -f core jobservice registryctl
+      - '{{.COMPOSE_CMD}} stop core jobservice registryctl'
+      - '{{.COMPOSE_CMD}} rm -f core jobservice registryctl'
 
   backend:logs:
     desc: Tail logs from Core, JobService, and RegistryCtl
-    cmd: docker compose -f {{.COMPOSE_FILE}} --profile core --profile jobservice --profile registryctl logs -f
+    cmd: '{{.COMPOSE_CMD}} --profile core --profile jobservice --profile registryctl logs -f'
 
   backend:logs:*:
     desc: "Tail logs for a specific backend service (core, jobservice, registryctl)"
-    cmd: docker compose -f {{.COMPOSE_FILE}} logs -f {{index .MATCH 0}}
+    cmd: '{{.COMPOSE_CMD}} logs -f {{index .MATCH 0}}'
 
   backend:restart:
     desc: Restart Core, JobService, and RegistryCtl containers
-    cmd: docker compose -f {{.COMPOSE_FILE}} restart core jobservice registryctl
+    cmd: '{{.COMPOSE_CMD}} restart core jobservice registryctl'
+
+  _wait-core:
+    internal: true
+    silent: true
+    cmds:
+      - |
+        echo "Waiting for Core at http://localhost:{{.PORT_CORE}}..."
+        timeout=120
+        elapsed=0
+        until curl -fsS "http://localhost:{{.PORT_CORE}}/api/v2.0/ping" >/dev/null 2>&1; do
+          if [ "$elapsed" -ge "$timeout" ]; then
+            echo "Core did not become ready within ${timeout}s"
+            exit 1
+          fi
+          sleep 2
+          elapsed=$((elapsed + 2))
+        done
+        echo "Core ready"
 
   # ---------------------------------------------------------------------------
   # Frontend (Native - alternative to containerized portal)
@@ -207,11 +321,17 @@ tasks:
   frontend:native:
     desc: Serve Portal with ng serve on host (alternative to containerized portal)
     silent: true
-    dir: src/portal
     deps: [frontend:install]
     cmds:
       - task: :build:gen-apis:frontend
-      - exec ./node_modules/.bin/ng serve --host 0.0.0.0 --hmr
+      - task: _frontend-serve
+
+  _frontend-serve:
+    internal: true
+    dir: src/portal
+    env:
+      HARBOR_PROXY_TARGET: 'http://localhost:{{.PORT_CORE}}'
+    cmd: exec node --max_old_space_size=2048 ./node_modules/@angular/cli/bin/ng serve --host 0.0.0.0 --port {{.PORT_PORTAL}} --hmr
 
   frontend:build:
     desc: Build Portal for production
@@ -248,14 +368,14 @@ tasks:
     desc: Drop database, recreate it, and apply all migrations from scratch
     prompt: "This will delete all data in {{.POSTGRES_DB}}. Continue?"
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} exec -T postgresql dropdb -U {{.POSTGRES_USER}} {{.POSTGRES_DB}} --if-exists
-      - docker compose -f {{.COMPOSE_FILE}} exec -T postgresql createdb -U {{.POSTGRES_USER}} {{.POSTGRES_DB}}
+      - '{{.COMPOSE_CMD}} exec -T postgresql dropdb -U {{.POSTGRES_USER}} {{.POSTGRES_DB}} --if-exists'
+      - '{{.COMPOSE_CMD}} exec -T postgresql createdb -U {{.POSTGRES_USER}} {{.POSTGRES_DB}}'
       - task: db:migrate
       - echo "Database reset complete"
 
   db:shell:
     desc: Open interactive psql session on the dev database
-    cmd: docker compose -f {{.COMPOSE_FILE}} exec postgresql psql -U {{.POSTGRES_USER}} -d {{.POSTGRES_DB}}
+    cmd: '{{.COMPOSE_CMD}} exec postgresql psql -U {{.POSTGRES_USER}} -d {{.POSTGRES_DB}}'
 
   # ---------------------------------------------------------------------------
   # Release Test (deploy/compose)
@@ -308,8 +428,8 @@ tasks:
   clean:
     desc: Remove all containers, volumes, node_modules, and temp files
     cmds:
-      - docker compose -f {{.COMPOSE_FILE}} {{.ALL_PROFILES}} down -v
-      - pkill -f "ng serve" || true
+      - '{{.COMPOSE_CMD}} {{.ALL_PROFILES}} down -v'
+      - task: _frontend-stop
       - rm -rf tmp/
       - rm -rf src/portal/node_modules
       - rm -f build-errors.log
@@ -319,8 +439,8 @@ tasks:
 
   status:
     desc: Show container status for all services
-    cmd: docker compose -f {{.COMPOSE_FILE}} {{.ALL_PROFILES}} ps
+    cmd: '{{.COMPOSE_CMD}} {{.ALL_PROFILES}} ps'
 
   logs:
     desc: Tail logs from all containers
-    cmd: docker compose -f {{.COMPOSE_FILE}} {{.ALL_PROFILES}} logs -f
+    cmd: '{{.COMPOSE_CMD}} {{.ALL_PROFILES}} logs -f'

@@ -86,6 +86,21 @@ func (t *ProjectCreationRestrictionType) validate(str string) error {
 	return nil
 }
 
+// LandingPageType validates the unauthenticated landing page setting
+type LandingPageType struct {
+	StringType
+}
+
+func (t *LandingPageType) validate(str string) error {
+	if !(str == common.LandingPageLogin || str == common.LandingPagePublicProjects) {
+		return fmt.Errorf("invalid %s, should be %s or %s",
+			common.UnauthenticatedLandingPage,
+			common.LandingPageLogin,
+			common.LandingPagePublicProjects)
+	}
+	return nil
+}
+
 // IntType ..
 type IntType struct {
 }

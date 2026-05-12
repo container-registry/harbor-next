@@ -26,6 +26,7 @@ VOLUME /var/lib/registry
 
 EXPOSE 5000
 EXPOSE 5443
+HEALTHCHECK --interval=5s --timeout=3s --retries=5 CMD ["/lprobe", "-port", "5001", "-endpoint", "/debug/health"]
 
 USER harbor
 ENTRYPOINT ["/usr/bin/registry_DO_NOT_USE_GC", "serve", "/etc/registry/config.yml"]

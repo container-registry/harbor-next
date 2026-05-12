@@ -145,6 +145,7 @@
         "PREFERENCES": "Preferences",
         "CHANGE_PWD": "Şifreyi Değiştir",
         "ABOUT": "Hakkında",
+        "LOGIN": "Giriş Yap",
         "LOGOUT": "Çıkış"
     },
     "GLOBAL_SEARCH": {
@@ -174,8 +175,7 @@
         "DISTRIBUTIONS": {
             "NAME": "Distributions",
             "INSTANCES": "Instances"
-        },
-        "SUBSCRIPTION": "Abonelik"
+        }
     },
     "USER": {
         "ADD_ACTION": "Yeni Kullanıcı",
@@ -498,7 +498,8 @@
         "OF": "of",
         "NOT_FOUND": "We couldn't find any logs!",
         "RESOURCE": "Resource",
-        "RESOURCE_TYPE": "Resource Type"
+        "RESOURCE_TYPE": "Resource Type",
+        "DOWNLOAD": "İndir"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Tetikleyici",
@@ -689,7 +690,7 @@
         "NAME": "İsim",
         "TAGS": "Etiketler",
         "PLATFORM": "OS/ARCH",
-        "ARTIFACT_TOOTIP": "Click to view this OCI index's artifact list",
+        "ARTIFACT_TOOLTIP": "Click to view this OCI index's artifact list",
         "ARTIFACTS_COUNT": "Artifacts",
         "PULL_COUNT": "İndirmeler",
         "COPY_SUCCESS": "{{ param }} copied to Clipboard",
@@ -783,6 +784,9 @@
         "TOKEN_EXPIRATION": "Token Sonu (Dakika)",
         "SESSION_TIMEOUT": "Session Timeout (Minutes)",
         "SESSION_TIMEOUT_INFO": "Set the session timeout for Harbor UI. The default is 60 minutes.",
+        "UNAUTH_LANDING_PAGE": "Kimliği doğrulanmamış kullanıcılar için açılış sayfası",
+        "UNAUTH_LANDING_PAGE_LOGIN": "Giriş sayfası",
+        "UNAUTH_LANDING_PAGE_PUBLIC_PROJECTS": "Genel projeler sayfası",
         "AUTH_MODE": "Yetkilendirme Modu",
         "PRIMARY_AUTH_MODE": "Primary Auth Mode",
         "PRO_CREATION_RESTRICTION": "Proje oluşturma",
@@ -806,6 +810,7 @@
             "SELF_REGISTRATION_ENABLE": "Kaydolmayı etkinleştir.",
             "SELF_REGISTRATION_DISABLE": "Kaydolmayı devre dışı bırak.",
             "VERIFY_REMOTE_CERT": "İmaj çoğaltmanın uzak bir kayıt defteri için sertifikayı doğrulaması gerekip gerekmediğini belirleyin. Uzak kayıt defteri uç noktası sertifikası doğrulamasını atlamak istediğinizde bu kutuyu işaretini kaldırın.",
+            "UNAUTH_LANDING_PAGE": "Kimliği doğrulanmamış kullanıcıların giriş yapmadan önce göreceği varsayılan sayfayı seçin.",
             "AUTH_MODE": "Varsayılan olarak kimlik doğrulama modu veritabanıdır, yani kimlik bilgileri yerel bir veritabanında saklanır. Bir LDAP sunucusunda bir kullanıcının kimlik bilgilerini doğrulamak istiyorsanız, LDAP olarak ayarlayın.",
             "PRIMARY_AUTH_MODE": "This auth mode becomes the default way for users to login. The login screen where the user selects to login via the identity provider or via local DB will automatically redirect the user to this identity provider. Login via DB is possible when visiting the url '/account/sign-in' explicitly.",
             "LDAP_SEARCH_DN": "LDAP / AD sunucusunu arama iznine sahip bir kullanıcının DN'si. LDAP / AD sunucunuz anonim aramayı desteklemiyorsa, bu DN ve ldap_search_pwd'yi yapılandırmanız gerekir.",
@@ -867,7 +872,7 @@
         },
         "OIDC": {
             "OIDC_PROVIDER": "OIDC Sağlayıcı Adı",
-            "OIDC_REDIREC_URL": "Lütfen OIDC sağlayıcısındaki Redirect URI’nın girildiğine emin olun",
+            "OIDC_REDIRECT_URL": "Lütfen OIDC sağlayıcısındaki Redirect URI’nın girildiğine emin olun",
             "ENDPOINT": "OIDC Uç Noktası",
             "CLIENT_ID": "OIDC Alıcı ID",
             "CLIENTSECRET": "OIDC Alıcı Şifresi",
@@ -919,7 +924,8 @@
     "PAGE_NOT_FOUND": {
         "MAIN_TITLE": "Sayfa Bulunamadı",
         "SUB_TITLE": "Ana sayfaya yönlendiriliyor",
-        "UNIT": "saniyeler..."
+        "UNIT": "saniyeler...",
+        "REDIRECTING": "Projeniz bulunuyor..."
     },
     "ABOUT": {
         "VERSION": "Versiyon",
@@ -1597,7 +1603,7 @@
         "ONLY_SIGNED": "Only signed images",
         "PREHEAT_ON_PUSH": "Preheat on push",
         "START_TEXT": "No vulnerability severity of",
-        "EDN_TEXT": "and above",
+        "END_TEXT": "and above",
         "LABELS": "Labels",
         "SCHEDULE": "Schedule",
         "TEST_FAILED": "Test failed",

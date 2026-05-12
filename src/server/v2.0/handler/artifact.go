@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -41,6 +42,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/accessory"
+	accessorymodel "github.com/goharbor/harbor/src/pkg/accessory/model"
 	"github.com/goharbor/harbor/src/pkg/label"
 	"github.com/goharbor/harbor/src/pkg/notification"
 	"github.com/goharbor/harbor/src/pkg/scan/report"
@@ -370,13 +372,14 @@ func (a *artifactAPI) ListAccessories(ctx context.Context, params operation.List
 		return a.SendError(ctx, err)
 	}
 
-	artifact, err := a.artCtl.GetByReference(ctx, fmt.Sprintf("%s/%s", params.ProjectName, params.RepositoryName), params.Reference, nil)
+	// RENAMED from 'artifact' to 'art' to avoid shadowing the 'artifact' package
+	art, err := a.artCtl.GetByReference(ctx, fmt.Sprintf("%s/%s", params.ProjectName, params.RepositoryName), params.Reference, nil)
 	if err != nil {
 		return a.SendError(ctx, err)
 	}
-	query.Keywords["SubjectArtifactID"] = artifact.ID
+	query.Keywords["SubjectArtifactID"] = art.ID
 
-	// list accessories according to the query
+	// 1. Get the direct accessories
 	total, err := a.accMgr.Count(ctx, query)
 	if err != nil {
 		return a.SendError(ctx, err)
@@ -384,6 +387,28 @@ func (a *artifactAPI) ListAccessories(ctx context.Context, params operation.List
 	accs, err := a.accMgr.List(ctx, query)
 	if err != nil {
 		return a.SendError(ctx, err)
+	}
+
+	// If no direct Cosign signature found, check for inherited ones from a parent OCI index.
+	hasCosign := slices.ContainsFunc(accs, func(acc accessorymodel.Accessory) bool {
+		return acc.GetData().Type == accessorymodel.TypeCosignSignature
+	})
+	if !hasCosign {
+		if strings.Contains(lib.StringValue(params.Q), accessorymodel.TypeCosignSignature) {
+			artWithAccs, err := a.artCtl.Get(ctx, art.ID, &artifact.Option{WithAccessory: true})
+			if err != nil {
+				log.Warningf("failed to get artifact %d with accessories for inheritance check: %v", art.ID, err)
+			} else if artWithAccs != nil {
+				allAccs := append(artWithAccs.Accessories, artWithAccs.InheritedAccessories...)
+				for _, acc := range allAccs {
+					if acc.GetData().Type == accessorymodel.TypeCosignSignature {
+						accs = append(accs, acc)
+						total++
+						break
+					}
+				}
+			}
+		}
 	}
 
 	var res []*models.Accessory

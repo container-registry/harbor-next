@@ -1,0 +1,124 @@
+# Dependabot configuration
+# Docs: https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference
+#
+# Coverage:
+#   - GitHub Actions (SHA-pinned in .github/workflows/)
+#   - Go modules (src/go.mod)
+#   - Bun/Angular frontend (src/portal/bun.lock)
+#   - npm Swagger UI (src/portal/app-swagger-ui/package-lock.json)
+#   - Docker Compose images (devenv/docker-compose.yml)
+#
+# NOT covered (requires Renovate or custom automation):
+#   - versions.env (16 pinned tool/base-image versions used via Taskfile dotenv)
+#   - Dockerfile FROM lines using ARG variables (e.g., FROM alpine:${ALPINE_VERSION})
+#   - CI service container images in .github/workflows/test.yml
+
+version: 2
+
+updates:
+  # GitHub Actions
+  # All actions are SHA-pinned with version comments.
+  # Dependabot updates both the SHA and the comment tag.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "02:00"
+      timezone: "Asia/Kolkata"
+    groups:
+      actions-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    open-pull-requests-limit: 5
+
+  # Go modules
+  - package-ecosystem: "gomod"
+    directory: "/src"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "02:15"
+      timezone: "Asia/Kolkata"
+    groups:
+      go-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    labels:
+      - "dependencies"
+      - "go"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    open-pull-requests-limit: 10
+
+  # Portal (Bun)
+  # src/portal/ uses bun.lock (Bun 1.2+), NOT npm.
+  # Angular and Clarity frameworks are grouped separately for coordinated upgrades.
+  - package-ecosystem: "bun"
+    directory: "/src/portal"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "02:30"
+      timezone: "Asia/Kolkata"
+    groups:
+      angular:
+        patterns: ["@angular/*", "@angular-*"]
+      clarity:
+        patterns: ["@cds/*", "@clr/*"]
+      frontend-minor-patch:
+        patterns: ["*"]
+        exclude-patterns: ["@angular/*", "@angular-*", "@cds/*", "@clr/*"]
+        update-types: ["minor", "patch"]
+    labels:
+      - "dependencies"
+      - "frontend"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    open-pull-requests-limit: 5
+
+  # Swagger UI (npm)
+  # Standalone sub-app with its own package-lock.json.
+  - package-ecosystem: "npm"
+    directory: "/src/portal/app-swagger-ui"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "02:45"
+      timezone: "Asia/Kolkata"
+    groups:
+      swagger-all:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    labels:
+      - "dependencies"
+      - "frontend"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    open-pull-requests-limit: 3
+
+  # Docker Compose (devenv)
+  # Literal image tags: postgres:16-alpine, valkey/valkey:latest, distribution/distribution:latest
+  - package-ecosystem: "docker-compose"
+    directory: "/devenv"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "Asia/Kolkata"
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    open-pull-requests-limit: 5

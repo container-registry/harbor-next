@@ -199,7 +199,7 @@ services:
     restart: unless-stopped
 
   postgresql:
-    image: postgres:${POSTGRES_VERSION:-16}-alpine
+    image: docker.io/library/postgres:${POSTGRES_VERSION:-16}-alpine
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD}

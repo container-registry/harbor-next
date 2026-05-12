@@ -145,6 +145,7 @@
         "PREFERENCES": "Preferences",
         "CHANGE_PWD": "Alterar senha",
         "ABOUT": "Informativo",
+        "LOGIN": "Entrar",
         "LOGOUT": "Sair"
     },
     "GLOBAL_SEARCH": {
@@ -174,8 +175,7 @@
         "DISTRIBUTIONS": {
             "NAME": "Distribuições",
             "INSTANCES": "Repositórios remotos para distribuição"
-        },
-        "SUBSCRIPTION": "Assinatura"
+        }
     },
     "USER": {
         "ADD_ACTION": "Novo Usuário",
@@ -498,7 +498,8 @@
         "OF": "de",
         "NOT_FOUND": "Não encontramos nenhum registro!",
         "RESOURCE": "Recurso",
-        "RESOURCE_TYPE": "Tipo de Recurso"
+        "RESOURCE_TYPE": "Tipo de Recurso",
+        "DOWNLOAD": "Baixar"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Gatilho",
@@ -693,7 +694,7 @@
         "NAME": "Nome",
         "TAGS": "Tags",
         "PLATFORM": "SO/Arquitetura",
-        "ARTIFACT_TOOTIP": "Clique para ver a lista de artefatos OCI",
+        "ARTIFACT_TOOLTIP": "Clique para ver a lista de artefatos OCI",
         "ARTIFACTS_COUNT": "Artefatos",
         "PULL_COUNT": "Pulls",
         "COPY_SUCCESS": "{{ param }} copied to Clipboard",
@@ -786,6 +787,9 @@
         "TOKEN_EXPIRATION": "Expiração do Token (Minutos)",
         "SESSION_TIMEOUT": "Session Timeout (Minutes)",
         "SESSION_TIMEOUT_INFO": "Set the session timeout for Harbor UI. The default is 60 minutes.",
+        "UNAUTH_LANDING_PAGE": "Página inicial para usuários não autenticados",
+        "UNAUTH_LANDING_PAGE_LOGIN": "Página de login",
+        "UNAUTH_LANDING_PAGE_PUBLIC_PROJECTS": "Página de projetos públicos",
         "AUTH_MODE": "Modo de autenticação",
         "PRIMARY_AUTH_MODE": "Primary Auth Mode",
         "PRO_CREATION_RESTRICTION": "Criação de Projeto",
@@ -809,6 +813,7 @@
             "SELF_REGISTRATION_ENABLE": "Habilitar cadastro de usuários.",
             "SELF_REGISTRATION_DISABLE": "Desabilitar cadastro de usuários.",
             "VERIFY_REMOTE_CERT": "Determine se a replicação de imagens deve verificar o certificado para um registro remoto. Desmarque esta caixa ao ignorar a verificação do certificado de endpoint do registro remoto.",
+            "UNAUTH_LANDING_PAGE": "Escolha a página padrão exibida para usuários não autenticados antes do login.",
             "AUTH_MODE": "Por padrão, o modo de autenticação é via banco de dados, ex. As credenciais são armazenadas em um Banco de Dados local. Altere para LDAP se você deseja verificar as credenciais de um usuário utilizando um servidor LDAP.",
             "PRIMARY_AUTH_MODE": "This auth mode becomes the default way for users to login. The login screen where the user selects to login via the identity provider or via local DB will automatically redirect the user to this identity provider. Login via DB is possible when visiting the url '/account/sign-in' explicitly.",
             "LDAP_SEARCH_DN": "A DN de um usuário que possui permissão para buscar no servidor LDAP/AD. Se o seu servidor LDAP/AD não suportar buscas anônimas, você deve configurar esse DN e ldap_search_pwd.",
@@ -870,7 +875,7 @@
         },
         "OIDC": {
             "OIDC_PROVIDER": "Provedor OIDC",
-            "OIDC_REDIREC_URL": "Confira na configuração do seu provedor que as URLs de Redirecionamento válidas incluem este endereço",
+            "OIDC_REDIRECT_URL": "Confira na configuração do seu provedor que as URLs de Redirecionamento válidas incluem este endereço",
             "ENDPOINT": "Endereço OIDC",
             "CLIENT_ID": "ID do cliente OIDC",
             "CLIENTSECRET": "Segredo do Cliente OIDC",
@@ -922,7 +927,8 @@
     "PAGE_NOT_FOUND": {
         "MAIN_TITLE": "Página não encontrada",
         "SUB_TITLE": "Redirecionando para a página principal em",
-        "UNIT": "segundos..."
+        "UNIT": "segundos...",
+        "REDIRECTING": "Localizando seu projeto..."
     },
     "ABOUT": {
         "VERSION": "Versão",
@@ -1606,7 +1612,7 @@
         "ONLY_SIGNED": "Apenas imagens assinadas",
         "PREHEAT_ON_PUSH": "Pré-análise no envio (push)",
         "START_TEXT": "Nenhuma vulnerabilidade de severeidade",
-        "EDN_TEXT": "ou acima",
+        "END_TEXT": "ou acima",
         "LABELS": "Marcadores",
         "SCHEDULE": "Agendamento",
         "TEST_FAILED": "Falha no teste",

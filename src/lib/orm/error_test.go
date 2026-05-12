@@ -18,7 +18,7 @@ import (
 	"testing"
 
 	"github.com/beego/beego/v2/client/orm"
-	"github.com/jackc/pgconn"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -59,6 +59,47 @@ func TestIsConflictError(t *testing.T) {
 	require.NotNil(t, err)
 	assert.Equal(t, errors.ConflictCode, err.Code)
 	assert.Equal(t, message, err.Message)
+}
+
+// TestIsDuplicateKeyError_Classification pins the error code classification.
+// If someone changes the pgconn import from v5 to v4, or changes the error code,
+// this test breaks.
+func TestIsDuplicateKeyError_Classification(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"unique violation 23505", &pgconn.PgError{Code: "23505"}, true},
+		{"FK violation 23503 is not duplicate", &pgconn.PgError{Code: "23503"}, false},
+		{"syntax error is not duplicate", &pgconn.PgError{Code: "42601"}, false},
+		{"generic error", errors.New("generic"), false},
+		{"nil error", nil, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, IsDuplicateKeyError(tt.err))
+		})
+	}
+}
+
+// TestIsViolatingForeignKeyConstraintError_Classification pins FK error detection.
+func TestIsViolatingForeignKeyConstraintError_Classification(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"FK violation 23503", &pgconn.PgError{Code: "23503"}, true},
+		{"unique violation 23505 is not FK", &pgconn.PgError{Code: "23505"}, false},
+		{"generic error", errors.New("generic"), false},
+		{"nil error", nil, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, isViolatingForeignKeyConstraintError(tt.err))
+		})
+	}
 }
 
 func TestIsForeignKeyError(t *testing.T) {

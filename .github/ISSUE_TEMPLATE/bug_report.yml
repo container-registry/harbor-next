@@ -8,7 +8,7 @@ body:
       value: |
         Thanks for taking the time to fill out this bug report!
 
-        **Before submitting**, please search [existing issues](https://github.com/bupd/harbor-next-test-release/issues) to avoid duplicates.
+        **Before submitting**, please search [existing issues](https://github.com/container-registry/harbor-next/issues) to avoid duplicates.
 
   - type: textarea
     id: description

@@ -145,6 +145,7 @@
         "PREFERENCES": "Preferences",
         "CHANGE_PWD": "Change Password",
         "ABOUT": "About",
+        "LOGIN": "Log In",
         "LOGOUT": "Log Out"
     },
     "GLOBAL_SEARCH": {
@@ -174,8 +175,7 @@
         "DISTRIBUTIONS": {
             "NAME": "Distributions",
             "INSTANCES": "Instances"
-        },
-        "SUBSCRIPTION": "Subscription"
+        }
     },
     "USER": {
         "ADD_ACTION": "New User",
@@ -498,7 +498,8 @@
         "OF": "of",
         "NOT_FOUND": "We couldn't find any logs!",
         "RESOURCE": "Resource",
-        "RESOURCE_TYPE": "Resource Type"
+        "RESOURCE_TYPE": "Resource Type",
+        "DOWNLOAD": "Download"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Trigger",
@@ -689,7 +690,7 @@
         "NAME": "Name",
         "TAGS": "Tags",
         "PLATFORM": "OS/ARCH",
-        "ARTIFACT_TOOTIP": "Click to view this OCI index's artifact list",
+        "ARTIFACT_TOOLTIP": "Click to view this OCI index's artifact list",
         "ARTIFACTS_COUNT": "Artifacts",
         "PULL_COUNT": "Pulls",
         "COPY_SUCCESS": "{{ param }} copied to Clipboard",
@@ -783,6 +784,9 @@
         "TOKEN_EXPIRATION": "Token Expiration (Minutes)",
         "SESSION_TIMEOUT": "Session Timeout (Minutes)",
         "SESSION_TIMEOUT_INFO": "Set the session timeout for Harbor UI. The default is 60 minutes.",
+        "UNAUTH_LANDING_PAGE": "Unauthenticated Users Landing Page",
+        "UNAUTH_LANDING_PAGE_LOGIN": "Log In Page",
+        "UNAUTH_LANDING_PAGE_PUBLIC_PROJECTS": "Public Projects Page",
         "AUTH_MODE": "Auth Mode",
         "PRIMARY_AUTH_MODE": "Primary Auth Mode",
         "PRO_CREATION_RESTRICTION": "Project Creation",
@@ -806,6 +810,7 @@
             "SELF_REGISTRATION_ENABLE": "Enable sign up.",
             "SELF_REGISTRATION_DISABLE": "Deactivate sign up.",
             "VERIFY_REMOTE_CERT": "Determine whether image replication should verify the certificate for a remote registry. Uncheck this box to skip verifying the remote registry endpoint certificate.",
+            "UNAUTH_LANDING_PAGE": "Choose the default page unauthenticated users see before logging in.",
             "AUTH_MODE": "By default the authentication mode is database, i.e. the credentials are stored in a local database. Set it to LDAP if you want to verify a user's credential against an LDAP server.",
             "PRIMARY_AUTH_MODE": "This auth mode becomes the default way for users to login. The login screen where the user selects to login via the identity provider or via local DB will automatically redirect the user to this identity provider. Login via DB is possible when visiting the url '/account/sign-in' explicitly.",
             "LDAP_SEARCH_DN": "A user's DN who has the permission to search the LDAP/AD server. If your LDAP/AD server does not support anonymous search, you should configure this DN and ldap_search_pwd.",
@@ -867,7 +872,7 @@
         },
         "OIDC": {
             "OIDC_PROVIDER": "OIDC Provider Name",
-            "OIDC_REDIREC_URL": "Please make sure the Redirect URI on the OIDC provider is set to",
+            "OIDC_REDIRECT_URL": "Please make sure the Redirect URI on the OIDC provider is set to",
             "ENDPOINT": "OIDC Endpoint",
             "CLIENT_ID": "OIDC Client ID",
             "CLIENTSECRET": "OIDC Client Secret",
@@ -919,7 +924,8 @@
     "PAGE_NOT_FOUND": {
         "MAIN_TITLE": "Page not found",
         "SUB_TITLE": "Redirecting to main page in",
-        "UNIT": "seconds..."
+        "UNIT": "seconds...",
+        "REDIRECTING": "Locating your project..."
     },
     "ABOUT": {
         "VERSION": "Version",
@@ -1598,7 +1604,7 @@
         "ONLY_SIGNED": "Only signed images",
         "PREHEAT_ON_PUSH": "Preheat on push",
         "START_TEXT": "No vulnerability severity of",
-        "EDN_TEXT": "and above",
+        "END_TEXT": "and above",
         "LABELS": "Labels",
         "SCHEDULE": "Schedule",
         "TEST_FAILED": "Test failed",

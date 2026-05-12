@@ -30,22 +30,35 @@ import (
 // underlying concrete detail and provides an unified artifact view
 // for all users.
 type Artifact struct {
-	ID                int64             `json:"id"`
-	Type              string            `json:"type"`                // image, chart or other OCI compatible
-	MediaType         string            `json:"media_type"`          // the media type of artifact. Mostly, it's the value of `manifest.config.mediatype`
-	ManifestMediaType string            `json:"manifest_media_type"` // the media type of manifest/index
-	ArtifactType      string            `json:"artifact_type"`       // the artifactType of manifest/index
-	ProjectID         int64             `json:"project_id"`
-	RepositoryID      int64             `json:"repository_id"`
-	RepositoryName    string            `json:"repository_name"`
-	Digest            string            `json:"digest"`
-	Size              int64             `json:"size"`
-	Icon              string            `json:"icon"`
-	PushTime          time.Time         `json:"push_time"`
-	PullTime          time.Time         `json:"pull_time"`
-	ExtraAttrs        map[string]any    `json:"extra_attrs"` // only contains the simple attributes specific for the different artifact type, most of them should come from the config layer
-	Annotations       map[string]string `json:"annotations"`
-	References        []*Reference      `json:"references"` // child artifacts referenced by the parent artifact if the artifact is an index
+	ID                  int64                 `json:"id"`
+	Type                string                `json:"type"`                // image, chart or other OCI compatible
+	MediaType           string                `json:"media_type"`          // the media type of artifact. Mostly, it's the value of `manifest.config.mediatype`
+	ManifestMediaType   string                `json:"manifest_media_type"` // the media type of manifest/index
+	ArtifactType        string                `json:"artifact_type"`       // the artifactType of manifest/index
+	ProjectID           int64                 `json:"project_id"`
+	RepositoryID        int64                 `json:"repository_id"`
+	RepositoryName      string                `json:"repository_name"`
+	Digest              string                `json:"digest"`
+	Size                int64                 `json:"size"`
+	Icon                string                `json:"icon"`
+	PushTime            time.Time             `json:"push_time"`
+	PullTime            time.Time             `json:"pull_time"`
+	ExtraAttrs          map[string]any        `json:"extra_attrs"` // only contains the simple attributes specific for the different artifact type, most of them should come from the config layer
+	Annotations         map[string]string     `json:"annotations"`
+	References          []*Reference          `json:"references"` // child artifacts referenced by the parent artifact if the artifact is an index
+	AccessoryCandidates []*AccessoryCandidate `json:"-"`
+}
+
+// AccessoryCandidate records an accessory relationship that should be persisted
+// alongside the artifact ingestion flow.
+type AccessoryCandidate struct {
+	ArtifactID        int64
+	SubArtifactID     int64
+	SubArtifactRepo   string
+	SubArtifactDigest string
+	Digest            string
+	Size              int64
+	Type              string
 }
 
 // ResolveArtifactType returns the artifact type of the artifact, prefer ArtifactType, use MediaType if ArtifactType is empty.

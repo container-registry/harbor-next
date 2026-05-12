@@ -28,7 +28,6 @@ import { PasswordSettingComponent } from '../password-setting/password-setting.c
 import { NavigatorComponent } from '../../shared/components/navigator/navigator.component';
 import { SessionService } from '../../shared/services/session.service';
 import { AboutDialogComponent } from '../../shared/components/about-dialog/about-dialog.component';
-import { ChargebeeDialogComponent } from '../../shared/components/chargebee-dialog/chargebee-dialog.component';
 import { SearchTriggerService } from '../../shared/components/global-search/search-trigger.service';
 import {
     CommonRoutes,
@@ -39,13 +38,10 @@ import { clone } from '../../shared/units/utils';
 import { ThemeService } from '../../services/theme.service';
 import { AccountSettingsModalComponent } from '../account-settings/account-settings-modal.component';
 import { PreferenceSettingsComponent } from '../preference-settings/preference-settings.component';
-import { SkinableConfig } from '../../services/skinable-config.service';
-import { CustomStyle } from '../../services/theme';
 import {
     EventService,
     HarborEvent,
 } from '../../services/event-service/event.service';
-import { environment } from '../../../environments/environment';
 
 const HAS_STYLE_MODE: string = 'styleModeLocal';
 
@@ -70,9 +66,6 @@ export class HarborShellComponent implements OnInit, OnDestroy {
     @ViewChild(AboutDialogComponent)
     aboutDialog: AboutDialogComponent;
 
-    @ViewChild(ChargebeeDialogComponent)
-    chargebeeDialog: ChargebeeDialogComponent;
-
     // To indicator whwther or not the search results page is displayed
     // We need to use this property to do some overriding work
     isSearchResultsOpened: boolean = false;
@@ -83,7 +76,6 @@ export class HarborShellComponent implements OnInit, OnDestroy {
     styleMode = this.themeArray[0].showStyle;
     @ViewChild('scrollDiv') scrollDiv: ElementRef;
     scrollToPositionSub: Subscription;
-    deploymentConfig: CustomStyle;
     constructor(
         private route: ActivatedRoute,
         private router: Router,
@@ -92,8 +84,7 @@ export class HarborShellComponent implements OnInit, OnDestroy {
         private appConfigService: AppConfigService,
         public theme: ThemeService,
         private event: EventService,
-        private cd: ChangeDetectorRef,
-        private skinableConfig: SkinableConfig,
+        private cd: ChangeDetectorRef
     ) {}
 
     ngOnInit() {
@@ -125,7 +116,6 @@ export class HarborShellComponent implements OnInit, OnDestroy {
         if (localStorage) {
             this.styleMode = localStorage.getItem(HAS_STYLE_MODE);
         }
-        this.deploymentConfig = this.skinableConfig.getSkinConfig();
     }
     isDBAuth(): boolean {
         if (this.appConfigService?.configurations?.auth_mode) {
@@ -185,31 +175,6 @@ export class HarborShellComponent implements OnInit, OnDestroy {
         );
     }
 
-    openChargebeeDialog(): void {
-        if (!this.deploymentConfig) return;
-        this.chargebeeDialog.open(this.deploymentConfig.showSubscriptionCheckoutOption);
-    }
-
-    showSubscriptionPortalOption(): boolean {
-        return this.deploymentConfig && this.deploymentConfig.showSubscriptionPortalOption;
-    }
-
-    showExoscaleMarketplaceLink(): boolean {
-        return this.deploymentConfig && this.deploymentConfig.showExoscaleMarketplaceLink;
-    }
-
-    showMarketplaceLink(): boolean {
-        return this.deploymentConfig && (this.deploymentConfig.showAwsMarketplaceLink || this.deploymentConfig.showExoscaleMarketplaceLink);
-    }
-
-    marketplaceLink(): string {
-        if (!this.deploymentConfig) return '';
-        if (this.deploymentConfig.showAwsMarketplaceLink) {
-            return environment.awsMarketplaceUrl;
-        } else {
-            return environment.exoscaleMarketplaceUrl;
-        }
-    }
     // Open modal dialog
     openModal(event: ModalEvent): void {
         switch (event.modalName) {

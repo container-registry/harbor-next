@@ -1,3 +1,5 @@
+//go:build db
+
 package policy
 
 import (

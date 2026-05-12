@@ -482,7 +482,12 @@ func (bc *basicController) startScanAll(ctx context.Context, executionID int64) 
 			return bc.Scan(ctx, artifact, WithExecutionID(executionID))
 		}
 
-		if err := orm.WithTransaction(scan)(orm.SetTransactionOpNameToContext(bc.makeCtx(), "tx-start-scanall")); err != nil {
+		// Add timeout to prevent DB connections from being held indefinitely if scanner hangs.
+		scanCtx, scanCancel := context.WithTimeout(bc.makeCtx(), 3*time.Minute)
+		err := orm.WithTransaction(scan)(orm.SetTransactionOpNameToContext(scanCtx, "tx-start-scanall"))
+		scanCancel()
+
+		if err != nil {
 			// Just logged
 			log.Errorf("failed to scan artifact %s, error %v", artifact, err)
 

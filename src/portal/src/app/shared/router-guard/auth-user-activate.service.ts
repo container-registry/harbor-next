@@ -24,7 +24,7 @@ import { MessageHandlerService } from '../services/message-handler.service';
 import { SearchTriggerService } from '../components/global-search/search-trigger.service';
 import { Observable } from 'rxjs';
 import { UN_LOGGED_PARAM, YES } from '../../account/sign-in/sign-in.service';
-import { CommonRoutes, CONFIG_AUTH_MODE } from '../entities/shared.const';
+import { CommonRoutes, CONFIG_AUTH_MODE, LANDING_PAGE } from '../entities/shared.const';
 
 @Injectable({
     providedIn: 'root',
@@ -64,21 +64,53 @@ export class AuthCheckGuard {
                         if (
                             !state.url.startsWith(CommonRoutes.EMBEDDED_SIGN_IN)
                         ) {
-                            let navigatorExtra: NavigationExtras = {
-                                queryParams: { redirect_url: state.url },
-                            };
+                            const config =
+                                this.appConfigService.getConfig();
                             // if primary auth mode enabled, skip the first step
                             if (
-                                this.appConfigService.getConfig().auth_mode ==
+                                config &&
+                                config.auth_mode ===
                                     CONFIG_AUTH_MODE.OIDC_AUTH &&
-                                this.appConfigService.getConfig()
-                                    .primary_auth_mode
+                                config.primary_auth_mode
                             ) {
                                 window.location.href =
                                     '/c/oidc/login?redirect_url=' +
-                                    encodeURI(state.url);
+                                    encodeURIComponent(state.url);
                                 return observer.next(false);
                             }
+                            if (
+                                config &&
+                                config.unauthenticated_landing_page ===
+                                    LANDING_PAGE.PUBLIC_PROJECTS
+                            ) {
+                                if (
+                                    state.url.startsWith(
+                                        CommonRoutes.HARBOR_DEFAULT
+                                    )
+                                ) {
+                                    const urlTree = this.router.parseUrl(
+                                        state.url
+                                    );
+                                    urlTree.queryParams = {
+                                        ...urlTree.queryParams,
+                                        [UN_LOGGED_PARAM]: YES,
+                                    };
+                                    this.router.navigateByUrl(urlTree);
+                                    return observer.next(false);
+                                }
+                                this.router.navigate(
+                                    [CommonRoutes.HARBOR_DEFAULT],
+                                    {
+                                        queryParams: {
+                                            [UN_LOGGED_PARAM]: YES,
+                                        },
+                                    }
+                                );
+                                return observer.next(false);
+                            }
+                            let navigatorExtra: NavigationExtras = {
+                                queryParams: { redirect_url: state.url },
+                            };
                             this.router.navigate(
                                 [CommonRoutes.EMBEDDED_SIGN_IN],
                                 navigatorExtra

@@ -39,15 +39,15 @@ import (
 )
 
 const (
-	// wait more time than manifest (maxManifestWait) because manifest list depends on manifest ready
-	maxManifestListWait = 20
-	maxManifestWait     = 10
-	sleepIntervalSec    = 20
 	// keep manifest list in cache for one week
 	manifestListCacheInterval = 7 * 24 * 60 * 60 * time.Second
 )
 
 var (
+	// wait more time than manifest (maxManifestWait) because manifest list depends on manifest ready
+	maxManifestListWait = 20
+	maxManifestWait     = 10
+	sleepIntervalSec    = 20
 	// Ctl is a global proxy controller instance
 	ctl  Controller
 	once sync.Once

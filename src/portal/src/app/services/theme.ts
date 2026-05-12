@@ -37,11 +37,7 @@ export interface CustomStyle {
         name: string;
         logo: string;
         introduction: string;
-    },
-    showSubscriptionPortalOption: boolean;
-    showSubscriptionCheckoutOption: boolean;
-    showExoscaleMarketplaceLink: boolean;
-    showAwsMarketplaceLink: boolean;
+    };
 }
 
 export const THEME_ARRAY: ThemeInterface[] = [

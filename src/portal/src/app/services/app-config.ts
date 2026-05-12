@@ -32,6 +32,7 @@ export class AppConfig {
     banner_message: string;
     current_time: string;
     oidc_provider_name: string;
+    unauthenticated_landing_page: string;
 
     constructor() {
         // Set default value
@@ -54,5 +55,6 @@ export class AppConfig {
         this.show_popular_repo = false;
         this.banner_message = '';
         this.oidc_provider_name = '';
+        this.unauthenticated_landing_page = 'login';
     }
 }

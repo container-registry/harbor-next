@@ -3,86 +3,156 @@ name: Test
 on:
   pull_request:
     branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "CLAUDE.md"
   push:
     branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "CLAUDE.md"
 
 permissions:
   contents: read
 
-jobs:
-  test:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    services:
-      postgresql:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: root123
-          POSTGRES_DB: registry
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    env:
-      POSTGRESQL_HOST: localhost
-      POSTGRESQL_USR: postgres
-      POSTGRESQL_PORT: "5432"
-      POSTGRESQL_PWD: root123
-      POSTGRESQL_DATABASE: registry
-      POSTGRES_MIGRATION_SCRIPTS_PATH: ${{ github.workspace }}/make/migrations/postgresql
-      UTTEST: "true"
-      JOB_SERVICE_POOL_REDIS_URL: "redis://localhost:6379"
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+concurrency:
+  group: test-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+jobs:
+  # --------------------------------------------------------------------------
+  # Pure unit tests — no external services, full parallelism
+  # --------------------------------------------------------------------------
+  test-unit:
+    name: Unit Tests (pure)
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository || contains(fromJSON('["OWNER","MEMBER"]'), github.event.pull_request.author_association)) && vars.RUNNER || 'ubuntu-latest' }}
+    env:
+      CGO_ENABLED: "1"
+      RACE_FLAGS: -race
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: ./.github/actions/setup-go-cached
         with:
           go-version-file: src/go.mod
-          cache-dependency-path: src/go.sum
+          go-sum-path: src/go.sum
 
-      - uses: arduino/setup-task@24c5e13bce349197642746563945fcdf9355e8f4 # v2
+      - uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
         with:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Increase postgres max_connections
+      - name: Ensure C toolchain for race detector
+        if: env.RACE_FLAGS != ''
         run: |
-          PG_CONTAINER=$(docker ps -q --filter "ancestor=postgres:16-alpine")
-          docker exec "$PG_CONTAINER" psql -U postgres -c "ALTER SYSTEM SET max_connections = 300;"
-          docker restart "$PG_CONTAINER"
-          until docker exec "$PG_CONTAINER" pg_isready -U postgres; do sleep 1; done
+          if ! echo '#include <stdlib.h>' | gcc -E -x c - >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc libc6-dev
+          fi
 
-      - name: Generate API code
-        run: task build:gen-apis
+      - name: Run pure unit tests
+        run: task test:unit:pure RACE_FLAGS="${RACE_FLAGS}" TEST_FLAGS=-count=1
 
-      - name: Run unit tests
-        working-directory: src
+  # --------------------------------------------------------------------------
+  # DB-dependent unit tests — need PostgreSQL + Redis, run serially
+  # --------------------------------------------------------------------------
+  test-db:
+    name: Unit Tests (DB ${{ matrix.shard_name }})
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository || contains(fromJSON('["OWNER","MEMBER"]'), github.event.pull_request.author_association)) && vars.RUNNER || 'ubuntu-latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard_index: 0
+            shard_total: 2
+            shard_name: 1/2
+          - shard_index: 1
+            shard_total: 2
+            shard_name: 2/2
+    env:
+      POSTGRESQL_USR: postgres
+      POSTGRESQL_PWD: root123
+      POSTGRESQL_DATABASE: registry
+      POSTGRES_MIGRATION_SCRIPTS_PATH: ${{ github.workspace }}/make/migrations/postgresql
+      CGO_ENABLED: "1"
+      RACE_FLAGS: -race
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Start test services
         run: |
-          # Exclude packages that require services not available in CI:
-          # - LDAP: needs a real LDAP server
-          # - core/api, core/controllers, pkg/proxy/connection: need full Harbor stack
-          # - pkg/token, server/middleware/security, controller/systeminfo: need /etc/core/ cert files
-          # - pkg/jobmonitor: needs REDIS_HOST env var with specific format
-          # - jobservice/runner: Redis job tracker state ordering issues
-          # - controller/usergroup/test, pkg/scan/dao/scanner, pkg/scan/export: upstream test state issues
-          # - pkg/scan/dao/scan, pkg/scan/postprocessors: foreign key constraint violations in CI
-          # - pkg/systemartifact: test ordering / state issues
-          # - jobservice/logger/getter: DB state ordering issues when packages run in parallel
-          pkgs=$(go list ./... | grep -vE \
-            '/controller/ldap$|/core/auth/ldap$|/pkg/ldap$|/core/api$|/core/controllers$|/pkg/proxy/connection$|/pkg/token$|/server/middleware/security$|/controller/systeminfo$|/pkg/jobmonitor$|/jobservice/runner$|/jobservice/logger/getter$|/controller/usergroup/test$|/pkg/scan/dao/scanner$|/pkg/scan/export$|/pkg/scan/dao/scan$|/pkg/scan/postprocessors$|/pkg/systemartifact$' \
-            | tr '\n' ' ')
-          # shellcheck disable=SC2086
-          go test -v -race -cover -p 4 $pkgs
+          PREFIX="test-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${{ matrix.shard_index }}"
+          echo "SVC_PREFIX=${PREFIX}" >> "$GITHUB_ENV"
+
+          # Redis runs on the runner pod itself at localhost:6379.
+          # Rationale: several tests hardcode `redis://localhost:6379`:
+          #   - src/pkg/task/dao/execution_test.go:50 (cache.Initialize)
+          #   - src/jobservice/config/config_test.go:98 (asserts literal)
+          #   - src/jobservice/tests/utils.go:39 (hardcodes testingRedisPort=6379)
+          # Running Redis on the runner pod's localhost makes all of them
+          # work without touching upstream source. Also avoids cross-PR
+          # port-6379 collisions that would happen if we published through
+          # the shared DinD daemon.
+          command -v redis-server >/dev/null 2>&1 || \
+            sudo apt-get update -qq && sudo apt-get install -y -qq redis-server
+          # Start Redis as a daemon. --daemonize forks and returns; --bind
+          # 0.0.0.0 is fine on an ephemeral runner pod.
+          redis-server --daemonize yes --port 6379 --bind 0.0.0.0 --save "" --appendonly no
+          timeout 10 bash -c 'until redis-cli -h localhost -p 6379 ping 2>/dev/null | grep -q PONG; do sleep 0.5; done'
+
+          # Postgres stays in DinD with a random host port because no test
+          # hardcodes localhost for postgres; they all respect POSTGRESQL_HOST.
+          docker run -d --name "${PREFIX}-postgres" \
+            -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=root123 -e POSTGRES_DB=registry \
+            -p 0:5432 postgres:16-alpine
+          # Resolve postgres host: shared DinD uses its service FQDN, local Docker uses localhost
+          if [ -n "$DOCKER_HOST" ] && echo "$DOCKER_HOST" | grep -qv localhost; then
+            PG_HOST=$(echo "$DOCKER_HOST" | sed 's|tcp://||;s|:.*||')
+          else
+            PG_HOST=localhost
+          fi
+          PG_PORT=$(docker port "${PREFIX}-postgres" 5432 | head -1 | cut -d: -f2)
+
+          echo "POSTGRESQL_HOST=${PG_HOST}" >> "$GITHUB_ENV"
+          echo "POSTGRESQL_PORT=${PG_PORT}" >> "$GITHUB_ENV"
+          # All Redis URLs point at localhost:6379 (runner-pod-local Redis).
+          # JOB_SERVICE_POOL_REDIS_URL is read by jobservice/config's env
+          # override path and must equal "redis://localhost:6379" exactly
+          # to satisfy TestDefaultConfig's literal assertion against the
+          # yaml default.
+          echo "JOB_SERVICE_POOL_REDIS_URL=redis://localhost:6379" >> "$GITHUB_ENV"
+          echo "_REDIS_URL_REG=redis://localhost:6379/1" >> "$GITHUB_ENV"
+          echo "_REDIS_URL_CORE=redis://localhost:6379/0" >> "$GITHUB_ENV"
+          echo "_REDIS_URL_HARBOR=redis://localhost:6379/0" >> "$GITHUB_ENV"
+          echo "REDIS_HOST=localhost" >> "$GITHUB_ENV"
+          echo "REDIS_PORT=6379" >> "$GITHUB_ENV"
+
+          # Wait for postgres
+          timeout 30 bash -c "until docker exec ${PREFIX}-postgres pg_isready -U postgres; do sleep 1; done"
+
+      - uses: ./.github/actions/setup-go-cached
+        with:
+          go-version-file: src/go.mod
+          go-sum-path: src/go.sum
+
+      - uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Ensure C toolchain for race detector
+        if: env.RACE_FLAGS != ''
+        run: |
+          if ! echo '#include <stdlib.h>' | gcc -E -x c - >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc libc6-dev
+          fi
+
+      - name: Run DB unit tests
+        run: task test:unit:db RACE_FLAGS="${RACE_FLAGS}" TEST_FLAGS=-count=1 SHARD_INDEX=${{ matrix.shard_index }} SHARD_TOTAL=${{ matrix.shard_total }}
+
+      - name: Stop test services
+        if: always()
+        run: |
+          redis-cli -h localhost -p 6379 shutdown nosave 2>/dev/null || true
+          docker rm -f "${SVC_PREFIX}-postgres" 2>/dev/null || true

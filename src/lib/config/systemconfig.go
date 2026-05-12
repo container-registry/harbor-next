@@ -256,16 +256,19 @@ func Database() (*models.Database, error) {
 	database := &models.Database{}
 	database.Type = DefaultMgr().Get(backgroundCtx, common.DatabaseType).GetString()
 	postgresql := &models.PostGreSQL{
-		Host:            DefaultMgr().Get(backgroundCtx, common.PostGreSQLHOST).GetString(),
-		Port:            DefaultMgr().Get(backgroundCtx, common.PostGreSQLPort).GetInt(),
-		Username:        DefaultMgr().Get(backgroundCtx, common.PostGreSQLUsername).GetString(),
-		Password:        DefaultMgr().Get(backgroundCtx, common.PostGreSQLPassword).GetPassword(),
-		Database:        DefaultMgr().Get(backgroundCtx, common.PostGreSQLDatabase).GetString(),
-		SSLMode:         DefaultMgr().Get(backgroundCtx, common.PostGreSQLSSLMode).GetString(),
-		MaxIdleConns:    DefaultMgr().Get(backgroundCtx, common.PostGreSQLMaxIdleConns).GetInt(),
-		MaxOpenConns:    DefaultMgr().Get(backgroundCtx, common.PostGreSQLMaxOpenConns).GetInt(),
-		ConnMaxLifetime: DefaultMgr().Get(backgroundCtx, common.PostGreSQLConnMaxLifetime).GetDuration(),
-		ConnMaxIdleTime: DefaultMgr().Get(backgroundCtx, common.PostGreSQLConnMaxIdleTime).GetDuration(),
+		Host:              DefaultMgr().Get(backgroundCtx, common.PostGreSQLHOST).GetString(),
+		Port:              DefaultMgr().Get(backgroundCtx, common.PostGreSQLPort).GetInt(),
+		Username:          DefaultMgr().Get(backgroundCtx, common.PostGreSQLUsername).GetString(),
+		Password:          DefaultMgr().Get(backgroundCtx, common.PostGreSQLPassword).GetPassword(),
+		Database:          DefaultMgr().Get(backgroundCtx, common.PostGreSQLDatabase).GetString(),
+		SSLMode:           DefaultMgr().Get(backgroundCtx, common.PostGreSQLSSLMode).GetString(),
+		MaxOpenConns:      DefaultMgr().Get(backgroundCtx, common.PostGreSQLMaxOpenConns).GetInt(),
+		ConnMaxLifetime:   DefaultMgr().Get(backgroundCtx, common.PostGreSQLConnMaxLifetime).GetDuration(),
+		ConnMaxIdleTime:   DefaultMgr().Get(backgroundCtx, common.PostGreSQLConnMaxIdleTime).GetDuration(),
+		HealthCheckPeriod: DefaultMgr().Get(backgroundCtx, common.PostGreSQLHealthCheckPeriod).GetDuration(),
+		ConnectTimeout:    DefaultMgr().Get(backgroundCtx, common.PostGreSQLConnectTimeout).GetDuration(),
+		MinConns:          int32(DefaultMgr().Get(backgroundCtx, common.PostGreSQLMinConns).GetInt()),
+		URL: DefaultMgr().Get(backgroundCtx, common.PostGreSQLURL).GetString(),
 	}
 	database.PostGreSQL = postgresql
 

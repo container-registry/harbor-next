@@ -47,6 +47,8 @@ export class PullCommandComponent {
     @Input()
     selectedTag: string;
     @Input()
+    asLink: boolean = false;
+    @Input()
     artifact: Artifact;
     @Input()
     accessoryType: string;
@@ -139,8 +141,7 @@ export class PullCommandComponent {
     }
 
     getPullCommandForRuntimeByTag(artifact: Artifact): string {
-        // early return if artifact has no tags
-        if (!this.isArtifactTagValid(artifact)) {
+        if (!this.isSelectedTagValid()) {
             return '';
         }
         return getPullCommandByTag(
@@ -154,8 +155,7 @@ export class PullCommandComponent {
     }
 
     getPullCommandForCNABByTag(artifact: Artifact): string {
-        // early return if artifact has no tags
-        if (!this.isArtifactTagValid(artifact)) {
+        if (!this.isSelectedTagValid()) {
             return '';
         }
         return getPullCommandByTag(
@@ -169,8 +169,7 @@ export class PullCommandComponent {
     }
 
     getPullCommandForChartByTag(artifact: Artifact): string {
-        // early return if artifact has no tags
-        if (!this.isArtifactTagValid(artifact)) {
+        if (!this.isSelectedTagValid()) {
             return '';
         }
         return getPullCommandByTag(
@@ -191,6 +190,10 @@ export class PullCommandComponent {
             artifact.tags.length > 0 &&
             typeof artifact.tags[0]?.name === 'string'
         );
+    }
+
+    private isSelectedTagValid(): boolean {
+        return typeof this.selectedTag === 'string' && this.selectedTag !== '';
     }
 
     onCpSuccess(copied: string): void {
