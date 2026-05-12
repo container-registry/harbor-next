@@ -64,17 +64,21 @@ spec:
       auth:
         enabled: false
 
-    # ---- Component image pins (continuous deploy: 8gcr-dev/main-latest) ----
+    # ---- Component image pins (continuous deploy via existing 8gcr-dev/:latest) ----
+    # The :latest tag in 8gcr-dev/ is maintained by an out-of-band buildah pipeline
+    # (not the harbor-next GitHub workflows). HelmRelease's 5-min OCIRepository
+    # interval picks up new chart digests; component images update via the
+    # imagePullPolicy + the moving :latest tag.
     core:
       image:
         repository: 8gears.container-registry.com/8gcr-dev/harbor-core
-        tag: main-latest
+        tag: latest
       replicas: 1
 
     jobservice:
       image:
         repository: 8gears.container-registry.com/8gcr-dev/harbor-jobservice
-        tag: main-latest
+        tag: latest
       replicas: 1
       persistence:
         enabled: true
@@ -83,11 +87,11 @@ spec:
     registry:
       image:
         repository: 8gears.container-registry.com/8gcr-dev/harbor-registry
-        tag: main-latest
+        tag: latest
       controller:
         image:
           repository: 8gears.container-registry.com/8gcr-dev/harbor-registryctl
-          tag: main-latest
+          tag: latest
       replicas: 1
       persistence:
         enabled: true
@@ -96,19 +100,19 @@ spec:
     portal:
       image:
         repository: 8gears.container-registry.com/8gcr-dev/harbor-portal
-        tag: main-latest
+        tag: latest
       replicas: 1
 
     exporter:
       enabled: true
       image:
         repository: 8gears.container-registry.com/8gcr-dev/harbor-exporter
-        tag: main-latest
+        tag: latest
       replicas: 1
 
     trivy:
       enabled: true
       image:
         repository: 8gears.container-registry.com/8gcr-dev/harbor-trivy-adapter
-        tag: main-latest
+        tag: latest
       replicas: 1

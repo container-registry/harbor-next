@@ -7,6 +7,6 @@ spec:
   interval: 5m
   url: oci://8gears.container-registry.com/8gcr-dev/chart/harbor-next
   ref:
-    tag: main-latest
+    tag: latest
   secretRef:
     name: harbor-oci-pull

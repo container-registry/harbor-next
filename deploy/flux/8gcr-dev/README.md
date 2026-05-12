@@ -9,19 +9,17 @@ A flat directory of Flux v2 manifests:
 | File | Purpose |
 |------|---------|
 | `namespace.yaml` | Namespace `8gcr-dev-main` (deployment-specific; the cluster runs multiple Harbor instances). |
-| `ocirepository.yaml` | Pulls the Harbor Next chart from `oci://8gears.container-registry.com/8gcr-dev/chart/harbor-next:main-latest` every 5 minutes. |
-| `helmrelease.yaml` | Renders the chart into the `8gcr-dev-main` namespace with the dev-environment values (image tags pinned to `8gears.container-registry.com/8gcr-dev/harbor-*:main-latest`). |
+| `ocirepository.yaml` | Pulls the Harbor Next chart from `oci://8gears.container-registry.com/8gcr-dev/chart/harbor-next:latest` every 5 minutes. |
+| `helmrelease.yaml` | Renders the chart into the `8gcr-dev-main` namespace with the dev-environment values (image tags pinned to `8gears.container-registry.com/8gcr-dev/harbor-*:latest`). |
 | `kustomization.yaml` | Plain Kustomize index, lets the Flux Kustomization controller reconcile this directory. |
 
 ## How it gets to the cluster
 
-1. **Build & publish** — `.github/workflows/chart-publish.yml`, on every push to `main`:
-   - Packages `deploy/chart/` and pushes to `oci://8gears.container-registry.com/8gcr-dev/chart/harbor-next:<version>` (also moves the `main-latest` tag).
-   - Bundles this directory and pushes it to `oci://8gears.container-registry.com/8gcr-dev/deploy:<version>` via `flux push artifact` (also moves `main-latest`).
-2. **Build & publish images** — `.github/workflows/images-dev.yml`, on every push to `main`:
-   - Builds all Harbor component images (core, jobservice, registry, registryctl, portal, exporter, trivy-adapter) for `linux/amd64` and `linux/arm64`.
-   - Pushes to `8gears.container-registry.com/8gcr-dev/harbor-<component>:main-<sha7>` and `:main-latest`.
-3. **Reconcile** — a Flux `OCIRepository` + `Kustomization` defined in [`container-registry/k8s/apps`](https://github.com/container-registry/k8s/apps) (component `harbor_8gcr_dev.py`) on hz-hopper points at `oci://8gears.container-registry.com/8gcr-dev/deploy:main-latest` and applies this directory.
+1. **Chart + bundle publish** — `.github/workflows/chart-publish.yml`, on every push to `main`:
+   - Packages `deploy/chart/` and pushes to `oci://8gears.container-registry.com/8gcr-dev/chart/harbor-next:<version>` (also moves the `latest` tag).
+   - Bundles this directory and pushes it to `oci://8gears.container-registry.com/8gcr-dev/deploy:<version>` via `flux push artifact` (also moves `latest`).
+2. **Component images** — maintained out-of-band by an existing buildah pipeline that publishes to `8gears.container-registry.com/8gcr-dev/harbor-<component>:latest`. This bundle does not build images; it consumes the existing `:latest` tags.
+3. **Reconcile** — a Flux `OCIRepository` + `Kustomization` defined in [`container-registry/k8s/apps`](https://github.com/container-registry/k8s/apps) (component `harbor_8gcr_dev.py`) on hz-hopper points at `oci://8gears.container-registry.com/8gcr-dev/deploy:latest` and applies this directory.
 
 ## Cluster prerequisites (provisioned via `k8s/apps`)
 
@@ -39,7 +37,7 @@ DNS: `8gcr.container-registry.dev` A/AAAA records point at the hz-hopper ingress
 
 | Trigger | Registry project | Tag | Consumer |
 |---------|------------------|-----|----------|
-| push to `main` | `8gcr-dev` | `main-latest`, `main-<sha7>` | this bundle (8gcr-dev environment) |
+| push to `main` (chart + bundle) | `8gcr-dev` | `latest`, `<base>-main.<sha7>` | this bundle (8gcr-dev environment) |
 | release-please tag | `8gcr` | `<semver>` | future production overlays (pin to semver) |
 
 ## Local validation

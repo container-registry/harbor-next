@@ -79,13 +79,13 @@ jobs:
           helm push "dist/harbor-next-${VERSION}.tgz" \
             "oci://${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/chart"
 
-      - name: Move main-latest tag on chart
+      - name: Move latest tag on chart
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           oras tag \
             "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/chart/harbor-next:${VERSION}" \
-            main-latest
+            latest
 
       - name: Push Flux deploy bundle
         env:
@@ -97,13 +97,13 @@ jobs:
             --source="${{ github.server_url }}/${{ github.repository }}" \
             --revision="${GITHUB_REF_NAME}@sha1:${GITHUB_SHA}"
 
-      - name: Move main-latest tag on deploy bundle
+      - name: Move latest tag on deploy bundle
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           oras tag \
             "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/deploy:${VERSION}" \
-            main-latest
+            latest
 
   publish-release:
     name: Publish release
