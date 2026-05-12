@@ -568,7 +568,7 @@ Kubernetes: `>=1.28.0-0`
 | global | object | `{"priorityClassName":"","revisionHistoryLimit":3}` | Global defaults inherited by all components |
 | global.priorityClassName | string | `""` | Priority class name for all component pods |
 | global.revisionHistoryLimit | int | `3` | Number of old ReplicaSets to retain (K8s default is 10) |
-| harborAdminPassword | string | "Harbor12345" | Harbor admin password (initial setup) |
+| harborAdminPassword | string | `""` | Harbor admin password (initial setup). **REQUIRED** unless `existingSecretAdminPassword` is set. Do not use the legacy default `Harbor12345` — it is publicly known. For production reference a pre-created Secret via `existingSecretAdminPassword` rather than passing the value here. Rotate from the Harbor UI after first login. |
 | image | object | `{"pullPolicy":"IfNotPresent"}` | Global image settings |
 | image.pullPolicy | string | `"IfNotPresent"` | Image pull policy for all Harbor components |
 | imageCredentials | object | `{}` | Credentials to pull images imageCredentials:   registry: xyz.com   username: xxx   password: yyy   email: zzz@xyz.com |

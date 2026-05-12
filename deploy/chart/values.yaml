@@ -48,8 +48,12 @@ externalURL: ""
 # -- Log level for all components (debug, info, warning, error, fatal)
 logLevel: info
 
-# -- Harbor admin password (initial setup)
-# @default -- "Harbor12345"
+# -- Harbor admin password (initial setup).
+# **REQUIRED** unless `existingSecretAdminPassword` is set.
+# Do not use the legacy default `Harbor12345` — it is publicly known.
+# For production reference a pre-created Secret via
+# `existingSecretAdminPassword` rather than passing the value here.
+# Rotate from the Harbor UI after first login.
 harborAdminPassword: ""
 
 # -- Secret key for encryption (16 characters)
