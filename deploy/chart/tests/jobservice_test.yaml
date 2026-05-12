@@ -1,4 +1,9 @@
 suite: jobservice component tests
+# All tests assert chart-computed output for known inputs. Pure Helm
+# pass-through tests (replicas, podAnnotations, nodeSelector, etc.)
+# were removed — they only proved `--set` works, not that the chart
+# does anything with the value. Full-render regression coverage for
+# jobservice lives in snapshots_test.yaml.
 templates:
   - templates/jobservice.deployment.yaml
   - templates/jobservice.service.yaml
@@ -7,7 +12,8 @@ templates:
   - templates/jobservice.secret.yaml
   - templates/jobservice.pvc.yaml
 tests:
-  - it: should create jobservice deployment
+  # Pins fullname helper: deployment name = <release>-<chart>-jobservice
+  - it: should compute jobservice deployment name from fullname helper
     template: templates/jobservice.deployment.yaml
     set:
       externalURL: https://harbor.example.com
@@ -19,23 +25,9 @@ tests:
       - equal:
           path: metadata.name
           value: RELEASE-NAME-harbor-next-jobservice
-      - equal:
-          path: spec.replicas
-          value: 1
 
-  - it: should use custom replica count
-    template: templates/jobservice.deployment.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      jobservice.replicas: 3
-    asserts:
-      - equal:
-          path: spec.replicas
-          value: 3
-
-  - it: should set correct image
+  # Pins image concat: <repository>:<tag>
+  - it: should concat image repository and tag
     template: templates/jobservice.deployment.yaml
     set:
       externalURL: https://harbor.example.com
@@ -48,7 +40,8 @@ tests:
           path: spec.template.spec.containers[0].image
           value: goharbor/harbor-jobservice:2.10.0
 
-  - it: should expose container port 8080
+  # Pins hardcoded chart container port (not user-settable)
+  - it: should expose hardcoded container port 8080
     template: templates/jobservice.deployment.yaml
     set:
       externalURL: https://harbor.example.com
@@ -59,7 +52,8 @@ tests:
           path: spec.template.spec.containers[0].ports[0].containerPort
           value: 8080
 
-  - it: should reference CORE_SECRET from secret
+  # Pins CORE_SECRET valueFrom routing to core secret name + 'secret' key from helpers
+  - it: should wire CORE_SECRET env to core Secret via secretKeyRef
     template: templates/jobservice.deployment.yaml
     set:
       externalURL: https://harbor.example.com
@@ -75,7 +69,8 @@ tests:
                 name: RELEASE-NAME-harbor-next-core
                 key: secret
 
-  - it: should create jobservice service
+  # Pins service fullname + chart-hardcoded port 80
+  - it: should compute service name from fullname and expose port 80
     template: templates/jobservice.service.yaml
     set:
       externalURL: https://harbor.example.com
@@ -91,7 +86,8 @@ tests:
           path: spec.ports[0].port
           value: 80
 
-  - it: should configure default workers count in configmap
+  # Pins default workers value (4) rendered in config.yml when user does not override
+  - it: should render default workers count in config.yml
     template: templates/jobservice.configmap.yaml
     set:
       externalURL: https://harbor.example.com
@@ -104,7 +100,8 @@ tests:
           path: data["config.yml"]
           pattern: "workers: 4"
 
-  - it: should configure custom workers count
+  # Pins max_job_workers -> config.yml workers field mapping
+  - it: should render custom workers count in config.yml
     template: templates/jobservice.configmap.yaml
     set:
       externalURL: https://harbor.example.com
@@ -116,7 +113,8 @@ tests:
           path: data["config.yml"]
           pattern: "workers: 10"
 
-  - it: should configure file job logger
+  # Pins jobLoggers: file -> name: "FILE" rendering in config.yml
+  - it: should render FILE logger block when file logger configured
     template: templates/jobservice.configmap.yaml
     set:
       externalURL: https://harbor.example.com
@@ -129,7 +127,8 @@ tests:
           path: data["config.yml"]
           pattern: 'name: "FILE"'
 
-  - it: should configure database job logger
+  # Pins jobLoggers: database -> name: "DB" rendering in config.yml
+  - it: should render DB logger block when database logger configured
     template: templates/jobservice.configmap.yaml
     set:
       externalURL: https://harbor.example.com
@@ -142,7 +141,8 @@ tests:
           path: data["config.yml"]
           pattern: 'name: "DB"'
 
-  - it: should configure stdout job logger
+  # Pins jobLoggers: stdout -> name: "STD_OUTPUT" rendering in config.yml
+  - it: should render STD_OUTPUT logger block when stdout logger configured
     template: templates/jobservice.configmap.yaml
     set:
       externalURL: https://harbor.example.com
@@ -155,7 +155,8 @@ tests:
           path: data["config.yml"]
           pattern: 'name: "STD_OUTPUT"'
 
-  - it: should configure reaper settings
+  # Pins reaper settings rendered into config.yml
+  - it: should render reaper max_update_hours and max_dangling_hours in config.yml
     template: templates/jobservice.configmap.yaml
     set:
       externalURL: https://harbor.example.com
@@ -171,7 +172,8 @@ tests:
           path: data["config.yml"]
           pattern: "max_dangling_hours: 336"
 
-  - it: should set webhook notification settings in configmap-env
+  # Pins webhook int -> string coercion for env configmap (ConfigMap data must be strings)
+  - it: should coerce webhook int values to strings in configmap-env
     template: templates/jobservice.configmap-env.yaml
     set:
       externalURL: https://harbor.example.com
@@ -189,20 +191,8 @@ tests:
           path: data.JOBSERVICE_WEBHOOK_JOB_HTTP_CLIENT_TIMEOUT
           value: "10"
 
-  - it: should create jobservice secret
-    template: templates/jobservice.secret.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-    asserts:
-      - isKind:
-          of: Secret
-      - equal:
-          path: metadata.name
-          value: RELEASE-NAME-harbor-next-jobservice
-
-  - it: should create PVC when persistence enabled
+  # Pins PVC gating: rendered when persistence.enabled=true, size flows to storage request
+  - it: should render PVC with requested storage when persistence enabled
     template: templates/jobservice.pvc.yaml
     set:
       externalURL: https://harbor.example.com
@@ -217,7 +207,8 @@ tests:
           path: spec.resources.requests.storage
           value: 10Gi
 
-  - it: should not create PVC when persistence disabled
+  # Pins PVC gating: not rendered when persistence disabled (doc count 0)
+  - it: should not render PVC when persistence disabled
     template: templates/jobservice.pvc.yaml
     set:
       externalURL: https://harbor.example.com
@@ -228,7 +219,8 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: should not create PVC when existingClaim set
+  # Pins PVC gating: not rendered when existingClaim set (chart skips PVC creation)
+  - it: should not render PVC when existingClaim set
     template: templates/jobservice.pvc.yaml
     set:
       externalURL: https://harbor.example.com
@@ -240,7 +232,8 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: should use emptyDir when persistence disabled
+  # Pins volume selection: emptyDir variant when persistence disabled
+  - it: should mount emptyDir for job-logs when persistence disabled
     template: templates/jobservice.deployment.yaml
     set:
       externalURL: https://harbor.example.com
@@ -254,7 +247,8 @@ tests:
       - isNotNull:
           path: spec.template.spec.volumes[1].emptyDir
 
-  - it: should use PVC when persistence enabled
+  # Pins volume selection: PVC variant with claimName computed from fullname helper
+  - it: should mount PVC with chart-computed claimName when persistence enabled
     template: templates/jobservice.deployment.yaml
     set:
       externalURL: https://harbor.example.com
@@ -269,7 +263,8 @@ tests:
           path: spec.template.spec.volumes[1].persistentVolumeClaim.claimName
           value: RELEASE-NAME-harbor-next-jobservice
 
-  - it: should use existingClaim in deployment
+  # Pins volume selection: existingClaim overrides chart-computed claimName
+  - it: should mount existingClaim verbatim when set
     template: templates/jobservice.deployment.yaml
     set:
       externalURL: https://harbor.example.com
@@ -281,140 +276,3 @@ tests:
       - equal:
           path: spec.template.spec.volumes[1].persistentVolumeClaim.claimName
           value: my-existing-pvc
-
-  - it: should include checksum annotations
-    template: templates/jobservice.deployment.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-    asserts:
-      - exists:
-          path: spec.template.metadata.annotations["checksum/configmap"]
-      - exists:
-          path: spec.template.metadata.annotations["checksum/secret"]
-
-  - it: should apply pod annotations
-    template: templates/jobservice.deployment.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      jobservice.podAnnotations:
-        prometheus.io/scrape: "true"
-    asserts:
-      - equal:
-          path: spec.template.metadata.annotations["prometheus.io/scrape"]
-          value: "true"
-
-  - it: should apply pod labels
-    template: templates/jobservice.deployment.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      jobservice.podLabels:
-        custom-label: custom-value
-    asserts:
-      - equal:
-          path: spec.template.metadata.labels["custom-label"]
-          value: custom-value
-
-  - it: should apply node selector
-    template: templates/jobservice.deployment.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      jobservice.nodeSelector:
-        disktype: ssd
-    asserts:
-      - equal:
-          path: spec.template.spec.nodeSelector.disktype
-          value: ssd
-
-  - it: should apply tolerations
-    template: templates/jobservice.deployment.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      jobservice.tolerations:
-        - key: "node-role.kubernetes.io/control-plane"
-          operator: "Exists"
-          effect: "NoSchedule"
-    asserts:
-      - equal:
-          path: spec.template.spec.tolerations[0].key
-          value: node-role.kubernetes.io/control-plane
-
-  - it: should apply container securityContext
-    template: templates/jobservice.deployment.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      jobservice.securityContext:
-        runAsNonRoot: true
-        runAsUser: 10000
-    asserts:
-      - equal:
-          path: spec.template.spec.containers[0].securityContext.runAsNonRoot
-          value: true
-
-  - it: should apply podSecurityContext
-    template: templates/jobservice.deployment.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      jobservice.podSecurityContext:
-        fsGroup: 10000
-    asserts:
-      - equal:
-          path: spec.template.spec.securityContext.fsGroup
-          value: 10000
-
-  - it: should apply deploymentStrategy
-    template: templates/jobservice.deployment.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      jobservice.deploymentStrategy:
-        type: Recreate
-    asserts:
-      - equal:
-          path: spec.strategy.type
-          value: Recreate
-
-  - it: should add initContainers
-    template: templates/jobservice.deployment.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      jobservice.initContainers:
-        - name: init
-          image: busybox
-          command: ["sh", "-c", "echo init"]
-    asserts:
-      - equal:
-          path: spec.template.spec.initContainers[0].name
-          value: init
-
-  - it: should add extraEnv
-    template: templates/jobservice.deployment.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      jobservice.extraEnv:
-        - name: CUSTOM_VAR
-          value: custom-value
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: CUSTOM_VAR
-            value: custom-value
