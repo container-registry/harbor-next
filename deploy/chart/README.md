@@ -136,16 +136,19 @@ Built-in `values.schema.json` provides:
 ### Basic Installation
 
 ```bash
-# Pre-create the DB credential Secret so the password never appears on the CLI
+# Pre-create the DB credential and admin Secrets so passwords never appear on the CLI
 kubectl create namespace harbor
 kubectl -n harbor create secret generic my-harbor-db \
-  --from-literal=POSTGRESQL_PASSWORD='your-strong-password'
+  --from-literal=POSTGRESQL_PASSWORD='your-strong-db-password'
+kubectl -n harbor create secret generic my-harbor-admin \
+  --from-literal=HARBOR_ADMIN_PASSWORD='your-strong-admin-password'
 
 helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-next \
   --namespace harbor \
   --set externalURL=https://harbor.example.com \
   --set database.host=postgres.example.com \
-  --set database.existingSecret=my-harbor-db
+  --set database.existingSecret=my-harbor-db \
+  --set existingSecretAdminPassword=my-harbor-admin
 ```
 
 ### With Values File
