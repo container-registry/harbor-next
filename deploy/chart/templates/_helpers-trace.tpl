@@ -9,7 +9,9 @@ Trace helpers
          field renders as the literal string `<no value>` inside quotes,
          which then becomes runtime config and confuses Harbor. */ -}}
   TRACE_ENABLED: "{{ .Values.trace.enabled }}"
-  TRACE_SAMPLE_RATE: "{{ .Values.trace.sample_rate | default 1 }}"
+  {{- /* Use hasKey so an explicit `sample_rate: 0` (sample nothing) is preserved
+         instead of being clobbered by sprig `default` (which treats 0 as empty). */}}
+  TRACE_SAMPLE_RATE: "{{ if hasKey .Values.trace "sample_rate" }}{{ .Values.trace.sample_rate }}{{ else }}1{{ end }}"
   {{- with .Values.trace.namespace }}
   TRACE_NAMESPACE: "{{ . }}"
   {{- end }}
