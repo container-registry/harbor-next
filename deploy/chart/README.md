@@ -176,11 +176,14 @@ Each Harbor component (core, portal, registry, jobservice, exporter) supports:
 
 | Key | Description |
 |-----|-------------|
-| `<component>.replicas` | Number of replicas |
+| `<component>.replicas` | Number of replicas (ignored when `autoscaling.enabled=true`) |
+| `<component>.autoscaling` | `enabled`/`minReplicas`/`maxReplicas`/CPU+memory targets — see [HPA section](#hpa--autoscaling) |
 | `<component>.resources` | CPU/memory requests and limits |
 | `<component>.config` | Application config (becomes ConfigMap env vars) |
 | `<component>.secret` | Sensitive config (becomes Secret env vars) |
 | `<component>.extraEnv` | Additional env vars with `valueFrom` support |
+| `<component>.lifecycle` | Container `preStop`/`postStart` hook spec — see [Lifecycle hooks](#lifecycle-hooks-prestop-drain) |
+| `<component>.hostAliases` | `/etc/hosts` entries (list of `{ip, hostnames}`) for private DNS targets |
 | `<component>.pdb.enabled` | Enable PodDisruptionBudget |
 | `<component>.pdb.minAvailable` | Minimum available pods during disruption |
 | `<component>.affinity` | Pod affinity rules |
@@ -208,7 +211,9 @@ The [`example/`](example/) directory contains ready-to-use values files for comm
 |------|-------------|
 | [`k3d-local.yaml`](example/k3d-local.yaml) | Local development with k3d cluster |
 | [`rke2-rancher.yaml`](example/rke2-rancher.yaml) | RKE2/Rancher deployment |
+| [`private-ca.yaml`](example/private-ca.yaml) | Private-CA / mTLS: PG with `verify-full` + Redis over TLS + shared CA for S3/OIDC |
 | [`openshift/`](example/openshift/) | OpenShift deployment with edge-terminated routes |
+| [`aws-eks-irsa/`](example/aws-eks-irsa/) | AWS EKS with IRSA for S3 storage and RDS IAM Auth |
 
 ```bash
 helm install harbor . -n harbor --create-namespace -f example/k3d-local.yaml
@@ -227,12 +232,18 @@ database:
   password: your-db-password
   sslmode: require
 
-# HA: Multiple replicas with PDB
+# HA: PDB + autoscaling. `replicas:` is ignored once autoscaling kicks
+# in — the HPA owns the count and the Deployment template OMITS the
+# field so helm upgrade does not fight the HPA on every roll-out.
 core:
-  replicas: 2
   pdb:
     enabled: true
     minAvailable: 1
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
   resources:
     requests:
       cpu: 200m
@@ -241,16 +252,24 @@ core:
       memory: 1Gi
 
 portal:
-  replicas: 2
   pdb:
     enabled: true
     minAvailable: 1
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
 
 registry:
-  replicas: 2
   pdb:
     enabled: true
     minAvailable: 1
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
 
 # Ingress with TLS
 ingress:
@@ -283,15 +302,24 @@ registry:
     s3:
       region: us-east-1
       bucket: my-harbor-bucket
-      accesskey: AKIAIOSFODNN7EXAMPLE
-      secretkey: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+      # Credentials — either inline (dev) or via Secret (prod)
+      # accesskey: AKIAIOSFODNN7EXAMPLE
+      # secretkey: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+      existingSecret: my-s3-creds            # Secret with keys below
+      existingSecretAccessKeyKey: REGISTRY_STORAGE_S3_ACCESSKEY
+      existingSecretSecretKeyKey: REGISTRY_STORAGE_S3_SECRETKEY
       # Optional settings
       regionendpoint: https://s3.us-east-1.amazonaws.com
       encrypt: true
       secure: true
+      # forcepathstyle: true                 # MinIO / Ceph RGW / SeaweedFS
   persistence:
     enabled: false  # Disable PVC when using S3
 ```
+
+When `existingSecret` is set the chart strips the credential keys from the generated `*-registry` Secret and sources them via `valueFrom.secretKeyRef` on both the registry container and the registryctl sidecar (registryctl runs garbage collection and needs the same creds). Same pattern works for `azure.existingSecret` and `oss.existingSecret`.
+
+For MinIO, Ceph RGW, or SeaweedFS, set `forcepathstyle: true` — those backends only accept path-style addressing, while the libS3 default is virtual-host style.
 
 ### Azure Blob Storage
 
@@ -365,6 +393,94 @@ tls:
     duration: 2160h    # 90 days
     renewBefore: 360h  # 15 days
 ```
+
+### HPA / Autoscaling
+
+Per-component HPAs target the matching Deployment (or the trivy StatefulSet) and the controller template OMITS `replicas:` whenever `autoscaling.enabled=true` — otherwise each `helm upgrade` would reset the count and fight the HPA. Available on `core`, `jobservice`, `registry`, `portal`, and `trivy`.
+
+```yaml
+core:
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80   # optional
+    # Raw HPAv2 pass-through:
+    # metrics: []     # external / object / pods metrics
+    # behavior: {}    # scaleUp/scaleDown stabilization windows
+```
+
+The chart fails fast at `helm install` / `helm template` time if `maxReplicas` is missing or `minReplicas > maxReplicas`.
+
+### Lifecycle hooks (preStop drain)
+
+Behind AWS NLB, GCP load balancers, or any setup with eventually-consistent LB deregistration, in-flight requests during a rolling upgrade hit a SIGTERM'd pod and surface as `504 Gateway Timeout` or `EOF`. A `preStop` sleep gives the LB time to deregister before the container exits:
+
+```yaml
+core:
+  lifecycle:
+    preStop:
+      exec:
+        command: ["/bin/sh", "-c", "sleep 15"]
+
+registry:           # applied to both registry + registryctl containers
+  lifecycle:
+    preStop:
+      exec:
+        command: ["/bin/sh", "-c", "sleep 30"]
+```
+
+Available on every component. `httpGet` and `tcpSocket` hook handlers are accepted too.
+
+### External Redis with a private CA
+
+For managed Redis hosting (self-hosted with cert-manager, some on-prem managed offerings) where the server cert is signed by a private CA, set `externalRedis.tlsOptions.existingCaSecret` to a Secret holding the CA bundle. The chart mounts that Secret on every Harbor component and sets `SSL_CERT_DIR` so Go's `crypto/x509` reads from the mount **in addition to** the default system trust bundle.
+
+```yaml
+valkey:
+  enabled: false
+
+externalRedis:
+  host: redis.private.example.com
+  port: 6379
+  password: redis-password
+  tlsOptions:
+    enable: true
+    existingCaSecret: my-redis-ca            # Secret with `ca.crt` key
+    existingCaSecretKey: ca.crt              # default, override if needed
+```
+
+Because the mount affects the system trust pool, the **same Secret also covers private CAs used for S3 endpoints, OIDC providers, LDAP**, etc. — not just Redis. The plumbing is skipped automatically when `valkey.enabled=true` (in-cluster Redis uses cluster-internal trust, no custom CA involved).
+
+### PostgreSQL TLS / mTLS
+
+For managed PostgreSQL that requires `verify-full` sslmode (RDS-with-custom-CA, GCP CloudSQL, on-prem with internal PKI), point `database.existingTlsSecret` at a Secret containing the cert files. The chart mounts it read-only at `/etc/harbor/db-tls` and auto-constructs `POSTGRESQL_URL` env on core and jobservice (Harbor's runtime DB pool returns `cfg.URL` verbatim when set).
+
+```yaml
+database:
+  host: pg.example.com
+  username: harbor
+  database: registry
+  sslmode: verify-full
+  existingSecret: my-harbor-db               # POSTGRESQL_PASSWORD
+  existingTlsSecret: my-pg-tls               # ca.crt (+ tls.crt + tls.key for mTLS)
+  clientCertEnabled: false                   # set true for client-cert auth
+```
+
+Expected keys in `existingTlsSecret` follow cert-manager convention:
+
+| Key | When |
+|-----|------|
+| `ca.crt` | Always (server-cert verification) |
+| `tls.crt` | When `clientCertEnabled: true` |
+| `tls.key` | When `clientCertEnabled: true` |
+
+**Caveats:**
+- **Exporter** does not yet plumb `POSTGRESQL_URL` through its viper config, so its DB connection ignores the URL env. Works fine for `sslmode=verify-ca` with a publicly-trusted CA; for mTLS the exporter will fail until a backend-side patch lands.
+- **Schema migrations** use Harbor's `NewMigrator`, which builds its own DSN from individual fields and ignores `cfg.URL`. Servers that **require** client certificates will reject the migrator. Use `sslmode=verify-ca` (CA-only verification) or coordinate the initial migration via an external trusted client until the migrator honors `URL`.
+
+A combined example covering DB TLS + private Redis CA + cert-manager-managed ingress lives at [`example/private-ca.yaml`](example/private-ca.yaml).
 
 ### Custom Configuration via `toEnvVars`
 
