@@ -6,4 +6,4 @@ metadata:
 {{ include "harbor.labels" . | indent 4 }}
 data:
   _PLACEHOLDER: "true"
-  {{- include "harbor.trace.envs.registryctl" . | nindent 2 }}
+  {{- template "harbor.trace.envs.registryctl" . }}
