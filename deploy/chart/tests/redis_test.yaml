@@ -51,3 +51,65 @@ tests:
               secretKeyRef:
                 name: my-cache-auth
                 key: default-password
+
+  # Regression guards for 3773fd7a7 (Fix #2). harbor.redis.url used to
+  # hardcode `redis://` and only inject `:$(REDIS_PASSWORD)@` when
+  # valkey.auth.enabled was true. External Redis with TLS, sentinel, or
+  # password-only auth all produced broken plain-redis URLs.
+  - it: should render rediss:// for external Redis with TLS
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      valkey.enabled: false
+      externalRedis.host: redis.ext
+      externalRedis.password: secretpw
+      externalRedis.tlsOptions.enable: true
+    asserts:
+      - equal:
+          path: data._REDIS_URL_CORE
+          value: "rediss://:$(REDIS_PASSWORD)@redis.ext:6379/0?idle_timeout_seconds=30"
+
+  - it: should render rediss+sentinel:// with masterSet for sentinel mode
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      valkey.enabled: false
+      externalRedis.host: sentinel.ext
+      externalRedis.password: secretpw
+      externalRedis.sentinelMasterSet: master
+      externalRedis.tlsOptions.enable: true
+    asserts:
+      - equal:
+          path: data._REDIS_URL_CORE
+          value: "rediss+sentinel://:$(REDIS_PASSWORD)@sentinel.ext:6379/master/0?idle_timeout_seconds=30"
+
+  - it: should include $(REDIS_PASSWORD) for external Redis with password but no TLS
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      valkey.enabled: false
+      externalRedis.host: redis.ext
+      externalRedis.password: secretpw
+    asserts:
+      - equal:
+          path: data._REDIS_URL_CORE
+          value: "redis://:$(REDIS_PASSWORD)@redis.ext:6379/0?idle_timeout_seconds=30"
+
+  - it: should omit credentials when external Redis has no auth
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      valkey.enabled: false
+      externalRedis.host: redis.ext
+    asserts:
+      - equal:
+          path: data._REDIS_URL_CORE
+          value: "redis://redis.ext:6379/0?idle_timeout_seconds=30"
