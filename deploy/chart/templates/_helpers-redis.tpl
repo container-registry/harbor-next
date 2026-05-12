@@ -38,7 +38,7 @@ Return the Redis password secret name
 */}}
 {{- define "harbor.redis.secretName" -}}
 {{- if .Values.valkey.enabled }}
-{{- .Release.Name }}-valkey
+{{- printf "%s-auth" (.Values.valkey.fullnameOverride | default (printf "%s-valkey" .Release.Name)) }}
 {{- else if .Values.externalRedis.existingSecret }}
 {{- .Values.externalRedis.existingSecret }}
 {{- else }}
@@ -47,11 +47,16 @@ Return the Redis password secret name
 {{- end }}
 
 {{/*
-Return the Redis password key in the secret
+Return the Redis password key in the secret.
+For valkey: `default-password` (matches valkey subchart's ACL `default` user key).
+For external Redis with existingSecret: user-supplied `externalRedis.existingSecretKey`.
+Otherwise: `REDIS_PASSWORD` (the generated external-redis Secret).
 */}}
 {{- define "harbor.redis.secretKey" -}}
-{{- if .Values.valkey.auth.enabled -}}
-valkey-password
+{{- if .Values.valkey.enabled -}}
+default-password
+{{- else if .Values.externalRedis.existingSecret -}}
+{{- .Values.externalRedis.existingSecretKey | default "REDIS_PASSWORD" -}}
 {{- else -}}
 REDIS_PASSWORD
 {{- end -}}
