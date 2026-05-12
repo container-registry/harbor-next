@@ -64,7 +64,7 @@ jobs:
           owner: container-registry
           repositories: 8gcr
 
-      - name: Apply enterprise patches
+      - name: Apply commercial patches
         env:
           PATCHES_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
@@ -245,7 +245,7 @@ jobs:
           owner: container-registry
           repositories: 8gcr
 
-      - name: Collect enterprise patch descriptions
+      - name: Collect commercial patch descriptions
         id: patches
         env:
           PATCHES_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -306,9 +306,9 @@ jobs:
               printf '%s\n\n' "${HIGHLIGHTS}"
             fi
             if [ -f applied-patches.txt ] && [ -s applied-patches.txt ]; then
-              echo "## Enterprise Features"
+              echo "## Commercial Features"
               echo ""
-              echo "This release includes the following enterprise enhancements:"
+              echo "This release includes the following commercial enhancements:"
               cat applied-patches.txt
               echo ""
             fi
