@@ -71,6 +71,18 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.core.existingSecret | default (include "harbor.core" .) }}
                   key: {{ .Values.core.existingSecretKey | default "secret" }}
+            {{- /* SECRET_KEY: if existingSecretSecretKey is set, pull from there;
+                  else it lives in the generated core Secret under `SECRET_KEY`. */}}
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  {{- if .Values.existingSecretSecretKey }}
+                  name: {{ .Values.existingSecretSecretKey }}
+                  key: {{ .Values.existingSecretSecretKeyKey | default "secretKey" }}
+                  {{- else }}
+                  name: {{ include "harbor.core" . }}
+                  key: SECRET_KEY
+                  {{- end }}
             - name: JOBSERVICE_SECRET
               valueFrom:
                 secretKeyRef:
@@ -138,10 +150,22 @@ spec:
             optional: true
         - name: secret-key
           secret:
-            secretName: {{ .Values.core.existingSecret | default (include "harbor.core" .) }}
+            {{- if .Values.existingSecretSecretKey }}
+            secretName: {{ .Values.existingSecretSecretKey }}
             items:
-              - key: {{ if .Values.core.existingSecret }}{{ .Values.core.existingSecretKey | default "secret" }}{{ else }}secretKey{{ end }}
+              - key: {{ .Values.existingSecretSecretKeyKey | default "secretKey" }}
                 path: key
+            {{- else if .Values.core.existingSecret }}
+            secretName: {{ .Values.core.existingSecret }}
+            items:
+              - key: {{ .Values.core.existingSecretKey | default "secret" }}
+                path: key
+            {{- else }}
+            secretName: {{ include "harbor.core" . }}
+            items:
+              - key: secretKey
+                path: key
+            {{- end }}
         - name: token-service-private-key
           secret:
             {{- if .Values.core.tokenSecretName }}

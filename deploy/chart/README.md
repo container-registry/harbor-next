@@ -488,7 +488,8 @@ Kubernetes: `>=1.28.0-0`
 | database.username | string | `""` | Database username |
 | existingSecretAdminPassword | string | `""` | Existing secret containing the admin password (overrides harborAdminPassword) |
 | existingSecretAdminPasswordKey | string | `"HARBOR_ADMIN_PASSWORD"` | Key in the existing secret for admin password |
-| existingSecretSecretKey | string | `""` | Existing secret containing the encryption key (overrides secretKey) |
+| existingSecretSecretKey | string | `""` | Existing secret containing the encryption key (overrides secretKey). The secret must hold the 16-char key under `SECRET_KEY` and `secretKey` (or override the key name via `existingSecretSecretKeyKey`). |
+| existingSecretSecretKeyKey | string | `"secretKey"` | Key in `existingSecretSecretKey` that holds the encryption key. Used both for the `SECRET_KEY` env on core and the `secret-key` volume mount (which Harbor reads as `/etc/core/key`). |
 | exporter.affinity | object | `{}` | Affinity rules for Exporter pods |
 | exporter.config | object | {} | Exporter application config (converted to env vars in ConfigMap) |
 | exporter.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
