@@ -667,6 +667,8 @@ Kubernetes: `>=1.28.0-0`
 | registry.credentials.password | string | `""` |  |
 | registry.credentials.username | string | `"harbor_registry_user"` |  |
 | registry.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
+| registry.existingSecret | string | `""` | Existing Secret that supplies `REGISTRY_HTTP_SECRET`. When set, the generated registry Secret omits `REGISTRY_HTTP_SECRET` and the deployment reads it from this Secret via env. Other registry-storage keys (S3, Azure, OSS) still come from the generated Secret. |
+| registry.existingSecretKey | string | `"REGISTRY_HTTP_SECRET"` | Key in `registry.existingSecret` that holds REGISTRY_HTTP_SECRET. |
 | registry.extraEnv | list | [] | Extra environment variables with valueFrom support |
 | registry.image | object | `{"repository":"8gears.container-registry.com/8gcr/harbor-registry","tag":""}` | Registry image settings |
 | registry.image.repository | string | `"8gears.container-registry.com/8gcr/harbor-registry"` | Registry image repository |

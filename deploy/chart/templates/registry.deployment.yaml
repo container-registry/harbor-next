@@ -116,7 +116,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.registry.existingSecret }}
-                  key: {{ .Values.registry.existingSecretKey }}
+                  key: {{ .Values.registry.existingSecretKey | default "REGISTRY_HTTP_SECRET" }}
             {{- end }}
             - name: CORE_SECRET
               valueFrom:
