@@ -403,6 +403,13 @@ registry:
     interval: 24h
     dryrun: false
   config: {}
+  # -- Existing Secret that supplies `REGISTRY_HTTP_SECRET`. When set,
+  # the generated registry Secret omits `REGISTRY_HTTP_SECRET` and the
+  # deployment reads it from this Secret via env. Other registry-storage
+  # keys (S3, Azure, OSS) still come from the generated Secret.
+  existingSecret: ""
+  # -- Key in `registry.existingSecret` that holds REGISTRY_HTTP_SECRET.
+  existingSecretKey: "REGISTRY_HTTP_SECRET"
   credentials:
     username: "harbor_registry_user"
     password: ""
