@@ -1,0 +1,53 @@
+suite: redis / valkey wiring tests
+templates:
+  - templates/core.deployment.yaml
+  - templates/core.configmap.yaml
+  - templates/core.secret.yaml
+tests:
+  # Regression guard for ab6bab46b (Fix #1). The valkey 0.9.3 subchart
+  # names its auth Secret `<valkey.fullname>-auth` and stores passwords
+  # under `<aclUser>-password` keys. The harbor.redis.secretName /
+  # secretKey helpers used to return `<release>-valkey` and
+  # `valkey-password` — neither matched what the subchart created.
+  # Pods with valkey.auth.enabled=true could not find their Redis
+  # password and crash-looped.
+  - it: should reference the valkey-auth Secret with the default-password key
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      valkey.enabled: true
+      valkey.auth.enabled: true
+      valkey.auth.aclUsers.default.password: pw
+      valkey.auth.aclUsers.default.permissions: "~* &* +@all"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: valkey-auth
+                key: default-password
+
+  - it: should honor valkey.fullnameOverride in the secret name
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      valkey.enabled: true
+      valkey.fullnameOverride: my-cache
+      valkey.auth.enabled: true
+      valkey.auth.aclUsers.default.password: pw
+      valkey.auth.aclUsers.default.permissions: "~* &* +@all"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: my-cache-auth
+                key: default-password
