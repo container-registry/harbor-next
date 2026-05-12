@@ -167,7 +167,7 @@ func (a adapter) PrepareForPush(resources []*model.Resource) error {
 	}
 
 	// Create a POST request
-	req, err := http.NewRequest("POST", destinationURL, bytes.NewBuffer(data))
+	req, err := http.NewRequest(http.MethodPost, destinationURL, bytes.NewBuffer(data))
 	if err != nil {
 		return fmt.Errorf("error creating request: %v", err)
 	}

@@ -129,7 +129,9 @@ describe('MemberGuard', () => {
 
             result.subscribe(canActivate => {
                 expect(canActivate).toBeFalse();
-                expect(projectService.getProjectFromCache).not.toHaveBeenCalled();
+                expect(
+                    projectService.getProjectFromCache
+                ).not.toHaveBeenCalled();
                 expect(router.navigate).toHaveBeenCalledWith([
                     CommonRoutes.HARBOR_DEFAULT,
                 ]);

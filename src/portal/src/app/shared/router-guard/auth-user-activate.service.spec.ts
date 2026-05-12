@@ -12,7 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 import { TestBed } from '@angular/core/testing';
-import { Router, ActivatedRouteSnapshot, RouterStateSnapshot } from '@angular/router';
+import {
+    Router,
+    ActivatedRouteSnapshot,
+    RouterStateSnapshot,
+} from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
 import { SessionService } from '../services/session.service';
 import { AppConfigService } from '../../services/app-config.service';
@@ -32,7 +36,9 @@ describe('AuthCheckGuard', () => {
     let messageHandlerService: jasmine.SpyObj<MessageHandlerService>;
     let searchTriggerService: jasmine.SpyObj<SearchTriggerService>;
 
-    function createRouteSnapshot(queryParams: any = {}): ActivatedRouteSnapshot {
+    function createRouteSnapshot(
+        queryParams: any = {}
+    ): ActivatedRouteSnapshot {
         return { queryParams } as ActivatedRouteSnapshot;
     }
 
@@ -46,10 +52,19 @@ describe('AuthCheckGuard', () => {
     }
 
     beforeEach(() => {
-        sessionService = jasmine.createSpyObj('SessionService', ['getCurrentUser', 'retrieveUser']);
-        appConfigService = jasmine.createSpyObj('AppConfigService', ['getConfig']);
-        messageHandlerService = jasmine.createSpyObj('MessageHandlerService', ['clear']);
-        searchTriggerService = jasmine.createSpyObj('SearchTriggerService', ['closeSearch']);
+        sessionService = jasmine.createSpyObj('SessionService', [
+            'getCurrentUser',
+            'retrieveUser',
+        ]);
+        appConfigService = jasmine.createSpyObj('AppConfigService', [
+            'getConfig',
+        ]);
+        messageHandlerService = jasmine.createSpyObj('MessageHandlerService', [
+            'clear',
+        ]);
+        searchTriggerService = jasmine.createSpyObj('SearchTriggerService', [
+            'closeSearch',
+        ]);
 
         TestBed.configureTestingModule({
             imports: [RouterTestingModule],
@@ -57,8 +72,14 @@ describe('AuthCheckGuard', () => {
                 AuthCheckGuard,
                 { provide: SessionService, useValue: sessionService },
                 { provide: AppConfigService, useValue: appConfigService },
-                { provide: MessageHandlerService, useValue: messageHandlerService },
-                { provide: SearchTriggerService, useValue: searchTriggerService },
+                {
+                    provide: MessageHandlerService,
+                    useValue: messageHandlerService,
+                },
+                {
+                    provide: SearchTriggerService,
+                    useValue: searchTriggerService,
+                },
             ],
         });
 
@@ -75,17 +96,21 @@ describe('AuthCheckGuard', () => {
     describe('unauthenticated user routing', () => {
         beforeEach(() => {
             sessionService.getCurrentUser.and.returnValue(null);
-            sessionService.retrieveUser.and.returnValue(throwError(() => new Error('not authenticated')));
+            sessionService.retrieveUser.and.returnValue(
+                throwError(() => new Error('not authenticated'))
+            );
         });
 
         [
             { name: 'landing_page = login', landingPage: LANDING_PAGE.LOGIN },
             { name: 'landing_page is empty', landingPage: '' },
         ].forEach(({ name, landingPage }) => {
-            it(`should redirect to sign-in page when ${name}`, (done) => {
-                appConfigService.getConfig.and.returnValue(createAppConfig({
-                    unauthenticated_landing_page: landingPage,
-                }));
+            it(`should redirect to sign-in page when ${name}`, done => {
+                appConfigService.getConfig.and.returnValue(
+                    createAppConfig({
+                        unauthenticated_landing_page: landingPage,
+                    })
+                );
 
                 const route = createRouteSnapshot();
                 const state = createStateSnapshot(CommonRoutes.HARBOR_DEFAULT);
@@ -96,7 +121,9 @@ describe('AuthCheckGuard', () => {
                     expect(router.navigate).toHaveBeenCalledWith(
                         [CommonRoutes.EMBEDDED_SIGN_IN],
                         jasmine.objectContaining({
-                            queryParams: { redirect_url: CommonRoutes.HARBOR_DEFAULT },
+                            queryParams: {
+                                redirect_url: CommonRoutes.HARBOR_DEFAULT,
+                            },
                         })
                     );
                     done();
@@ -104,10 +131,12 @@ describe('AuthCheckGuard', () => {
             });
         });
 
-        it('should redirect to public projects page when landing_page = public_projects', (done) => {
-            appConfigService.getConfig.and.returnValue(createAppConfig({
-                unauthenticated_landing_page: LANDING_PAGE.PUBLIC_PROJECTS,
-            }));
+        it('should redirect to public projects page when landing_page = public_projects', done => {
+            appConfigService.getConfig.and.returnValue(
+                createAppConfig({
+                    unauthenticated_landing_page: LANDING_PAGE.PUBLIC_PROJECTS,
+                })
+            );
 
             const route = createRouteSnapshot();
             const state = createStateSnapshot('/harbor/users');
@@ -125,10 +154,12 @@ describe('AuthCheckGuard', () => {
             });
         });
 
-        it('should allow public projects route when already on /harbor/projects', (done) => {
-            appConfigService.getConfig.and.returnValue(createAppConfig({
-                unauthenticated_landing_page: LANDING_PAGE.PUBLIC_PROJECTS,
-            }));
+        it('should allow public projects route when already on /harbor/projects', done => {
+            appConfigService.getConfig.and.returnValue(
+                createAppConfig({
+                    unauthenticated_landing_page: LANDING_PAGE.PUBLIC_PROJECTS,
+                })
+            );
 
             const route = createRouteSnapshot();
             const state = createStateSnapshot(CommonRoutes.HARBOR_DEFAULT);
@@ -136,9 +167,9 @@ describe('AuthCheckGuard', () => {
             const result = guard.canActivate(route, state);
             (result as Observable<boolean>).subscribe(canActivate => {
                 expect(canActivate).toBeFalse();
-                const urlTree = (router.navigateByUrl as jasmine.Spy).calls
-                    .mostRecent()
-                    .args[0];
+                const urlTree = (
+                    router.navigateByUrl as jasmine.Spy
+                ).calls.mostRecent().args[0];
                 expect(router.serializeUrl(urlTree)).toBe(
                     `${CommonRoutes.HARBOR_DEFAULT}?${UN_LOGGED_PARAM}=${YES}`
                 );
@@ -147,10 +178,12 @@ describe('AuthCheckGuard', () => {
             });
         });
 
-        it('should preserve public project repository route for unauthenticated access', (done) => {
-            appConfigService.getConfig.and.returnValue(createAppConfig({
-                unauthenticated_landing_page: LANDING_PAGE.PUBLIC_PROJECTS,
-            }));
+        it('should preserve public project repository route for unauthenticated access', done => {
+            appConfigService.getConfig.and.returnValue(
+                createAppConfig({
+                    unauthenticated_landing_page: LANDING_PAGE.PUBLIC_PROJECTS,
+                })
+            );
 
             const route = createRouteSnapshot();
             const state = createStateSnapshot(
@@ -160,21 +193,19 @@ describe('AuthCheckGuard', () => {
             const result = guard.canActivate(route, state);
             (result as Observable<boolean>).subscribe(canActivate => {
                 expect(canActivate).toBeFalse();
-                const urlTree = (router.navigateByUrl as jasmine.Spy).calls
-                    .mostRecent()
-                    .args[0];
+                const urlTree = (
+                    router.navigateByUrl as jasmine.Spy
+                ).calls.mostRecent().args[0];
                 const expectedUrl =
                     '/harbor/projects/123/repositories/library%2Fnginx/artifacts-tab' +
                     '?publicAndNotLogged=yes';
-                expect(router.serializeUrl(urlTree)).toBe(
-                    expectedUrl
-                );
+                expect(router.serializeUrl(urlTree)).toBe(expectedUrl);
                 expect(router.navigate).not.toHaveBeenCalled();
                 done();
             });
         });
 
-        it('should allow access when publicAndNotLogged=yes query param is set', (done) => {
+        it('should allow access when publicAndNotLogged=yes query param is set', done => {
             const route = createRouteSnapshot({ [UN_LOGGED_PARAM]: YES });
             const state = createStateSnapshot(CommonRoutes.HARBOR_DEFAULT);
 
