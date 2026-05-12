@@ -146,6 +146,17 @@ tar xzvf harbor-*.tgz
 
 Enable monitoring with Prometheus by setting the `metrics` section in your values file:
 
+> **Note:** the `prometheus.kommander.d2iq.io/select: "true"` label below
+> is specific to **D2iQ Kommander** (the multi-cluster control plane
+> bundled with some NKP installs). On vanilla Nutanix Kubernetes
+> Platform — or any cluster running a stock kube-prometheus-stack /
+> Prometheus Operator install — replace it with the label your
+> Prometheus' `serviceMonitorSelector` actually matches (typically
+> `release: <prometheus-release-name>` or `prometheus: kube-prometheus`).
+> Run `kubectl get prometheus -A -o yaml` and look at
+> `spec.serviceMonitorSelector.matchLabels` to find the right value for
+> your cluster.
+
 ```yaml
 metrics:
   enabled: true
@@ -153,6 +164,7 @@ metrics:
     enabled: true
     namespace: ""
     labels:
+      # Replace with your Prometheus' serviceMonitorSelector match (see note above).
       prometheus.kommander.d2iq.io/select: "true"
     interval: 30s
     scrapeTimeout: 10s
