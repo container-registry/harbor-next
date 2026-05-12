@@ -1,0 +1,141 @@
+# Tests for fields rendered by the shared `harbor.podScheduling` helper.
+# Each component re-uses the helper, so verifying it works on one
+# component (core) covers all six. The "renders on all components" test
+# protects against any future component skipping the helper include.
+suite: pod scheduling helper tests
+templates:
+  - templates/core.deployment.yaml
+  - templates/core.configmap.yaml
+  - templates/core.secret.yaml
+  - templates/jobservice.deployment.yaml
+  - templates/jobservice.configmap.yaml
+  - templates/jobservice.configmap-env.yaml
+  - templates/jobservice.secret.yaml
+  - templates/portal.deployment.yaml
+  - templates/portal.configmap.yaml
+  - templates/registry.deployment.yaml
+  - templates/registry.configmap.yaml
+  - templates/registry.secret.yaml
+  - templates/registryctl.configmap.yaml
+  - templates/registryctl.secret.yaml
+  - templates/exporter.deployment.yaml
+  - templates/trivy.statefulset.yaml
+  - templates/trivy.secret.yaml
+tests:
+  # Regression guard for hostAliases support. The PodSpec.hostAliases
+  # field is what backs the in-cluster /etc/hosts override — without it
+  # users can't reach private DNS (service mesh hosts, internal CAs,
+  # legacy LDAP/SMTP). Tracks upstream goharbor/harbor-helm#2221.
+  - it: should render hostAliases on the core PodSpec
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.hostAliases:
+        - ip: "10.0.0.10"
+          hostnames:
+            - "ldap.internal"
+            - "smtp.internal"
+        - ip: "10.0.0.20"
+          hostnames:
+            - "ca.internal"
+    asserts:
+      - equal:
+          path: spec.template.spec.hostAliases
+          value:
+            - ip: "10.0.0.10"
+              hostnames:
+                - "ldap.internal"
+                - "smtp.internal"
+            - ip: "10.0.0.20"
+              hostnames:
+                - "ca.internal"
+
+  # Pins the helper's `with` gate: when no hostAliases are set, the key
+  # is absent entirely (not emitted as an empty `hostAliases: []`, which
+  # K8s would still accept but bloats the manifest).
+  - it: should omit hostAliases when unset
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - notExists:
+          path: spec.template.spec.hostAliases
+
+  # Per-component coverage: trivy uses a StatefulSet, the others
+  # Deployments. The helper has to land in both PodSpecs equally.
+  - it: should render hostAliases on the trivy StatefulSet
+    template: templates/trivy.statefulset.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trivy.enabled: true
+      trivy.hostAliases:
+        - ip: "10.0.0.30"
+          hostnames:
+            - "scanner.internal"
+    asserts:
+      - equal:
+          path: spec.template.spec.hostAliases[0].ip
+          value: "10.0.0.30"
+
+  - it: should render hostAliases on jobservice
+    template: templates/jobservice.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      jobservice.hostAliases:
+        - ip: "10.0.0.40"
+          hostnames: ["worker.internal"]
+    asserts:
+      - equal:
+          path: spec.template.spec.hostAliases[0].ip
+          value: "10.0.0.40"
+
+  - it: should render hostAliases on portal
+    template: templates/portal.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      portal.hostAliases:
+        - ip: "10.0.0.50"
+          hostnames: ["portal-extra.internal"]
+    asserts:
+      - equal:
+          path: spec.template.spec.hostAliases[0].ip
+          value: "10.0.0.50"
+
+  - it: should render hostAliases on registry
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.hostAliases:
+        - ip: "10.0.0.60"
+          hostnames: ["registry-storage.internal"]
+    asserts:
+      - equal:
+          path: spec.template.spec.hostAliases[0].ip
+          value: "10.0.0.60"
+
+  - it: should render hostAliases on exporter
+    template: templates/exporter.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      metrics.enabled: true
+      exporter.hostAliases:
+        - ip: "10.0.0.70"
+          hostnames: ["metrics-target.internal"]
+    asserts:
+      - equal:
+          path: spec.template.spec.hostAliases[0].ip
+          value: "10.0.0.70"

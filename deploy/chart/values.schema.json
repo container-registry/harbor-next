@@ -877,6 +877,20 @@
         "tolerations": {
           "type": "array"
         },
+        "hostAliases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "ip": { "type": "string" },
+              "hostnames": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            },
+            "required": ["ip", "hostnames"]
+          }
+        },
         "affinity": {
           "type": "object"
         },

@@ -164,6 +164,10 @@ affinity:
 tolerations:
   {{- toYaml . | nindent 2 }}
 {{- end }}
+{{- with .component.hostAliases }}
+hostAliases:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
 {{- end }}
 
 {{/*

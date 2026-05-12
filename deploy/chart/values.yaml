@@ -306,6 +306,16 @@ core:
   initContainers: []
   # -- Topology spread constraints for pod scheduling
   topologySpreadConstraints: []
+  # -- Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for
+  # private DNS that does not exist in cluster DNS — service-mesh sidecars,
+  # legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the
+  # Kubernetes PodSpec: a list of `{ip, hostnames}` entries.
+  # @default -- []
+  hostAliases: []
+    # - ip: "10.0.0.10"
+    #   hostnames:
+    #     - "ldap.internal"
+    #     - "smtp.internal"
   # -- Deployment strategy (empty = K8s default RollingUpdate)
   # @default -- {}
   deploymentStrategy: {}
@@ -476,6 +486,16 @@ registry:
   initContainers: []
   # -- Topology spread constraints for pod scheduling
   topologySpreadConstraints: []
+  # -- Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for
+  # private DNS that does not exist in cluster DNS — service-mesh sidecars,
+  # legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the
+  # Kubernetes PodSpec: a list of `{ip, hostnames}` entries.
+  # @default -- []
+  hostAliases: []
+    # - ip: "10.0.0.10"
+    #   hostnames:
+    #     - "ldap.internal"
+    #     - "smtp.internal"
   # -- Deployment strategy (empty = K8s default RollingUpdate)
   # @default -- {}
   deploymentStrategy: {}
@@ -597,6 +617,16 @@ portal:
   initContainers: []
   # -- Topology spread constraints for pod scheduling
   topologySpreadConstraints: []
+  # -- Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for
+  # private DNS that does not exist in cluster DNS — service-mesh sidecars,
+  # legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the
+  # Kubernetes PodSpec: a list of `{ip, hostnames}` entries.
+  # @default -- []
+  hostAliases: []
+    # - ip: "10.0.0.10"
+    #   hostnames:
+    #     - "ldap.internal"
+    #     - "smtp.internal"
   # -- Deployment strategy (empty = K8s default RollingUpdate)
   # @default -- {}
   deploymentStrategy: {}
@@ -712,6 +742,16 @@ jobservice:
   initContainers: []
   # -- Topology spread constraints for pod scheduling
   topologySpreadConstraints: []
+  # -- Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for
+  # private DNS that does not exist in cluster DNS — service-mesh sidecars,
+  # legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the
+  # Kubernetes PodSpec: a list of `{ip, hostnames}` entries.
+  # @default -- []
+  hostAliases: []
+    # - ip: "10.0.0.10"
+    #   hostnames:
+    #     - "ldap.internal"
+    #     - "smtp.internal"
   # -- Deployment strategy (empty = K8s default RollingUpdate)
   # @default -- {}
   deploymentStrategy: {}
@@ -829,6 +869,16 @@ exporter:
   initContainers: []
   # -- Topology spread constraints for pod scheduling
   topologySpreadConstraints: []
+  # -- Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for
+  # private DNS that does not exist in cluster DNS — service-mesh sidecars,
+  # legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the
+  # Kubernetes PodSpec: a list of `{ip, hostnames}` entries.
+  # @default -- []
+  hostAliases: []
+    # - ip: "10.0.0.10"
+    #   hostnames:
+    #     - "ldap.internal"
+    #     - "smtp.internal"
   # -- Deployment strategy (empty = K8s default RollingUpdate)
   # @default -- {}
   deploymentStrategy: {}
@@ -1035,6 +1085,16 @@ trivy:
   initContainers: []
   # -- Topology spread constraints for pod scheduling
   topologySpreadConstraints: []
+  # -- Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for
+  # private DNS that does not exist in cluster DNS — service-mesh sidecars,
+  # legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the
+  # Kubernetes PodSpec: a list of `{ip, hostnames}` entries.
+  # @default -- []
+  hostAliases: []
+    # - ip: "10.0.0.10"
+    #   hostnames:
+    #     - "ldap.internal"
+    #     - "smtp.internal"
 
   # -- Service account settings for Trivy
   serviceAccount:

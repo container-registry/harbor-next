@@ -449,6 +449,7 @@ Kubernetes: `>=1.28.0-0`
 | core.gdpr | object | `{"auditLogsCompliant":false,"deleteUser":false}` | GDPR settings |
 | core.gdpr.auditLogsCompliant | bool | `false` | Enable audit logs GDPR compliance |
 | core.gdpr.deleteUser | bool | `false` | Enable user deletion for GDPR compliance |
+| core.hostAliases | list | [] | Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for private DNS that does not exist in cluster DNS — service-mesh sidecars, legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the Kubernetes PodSpec: a list of `{ip, hostnames}` entries. |
 | core.image | object | `{"repository":"8gears.container-registry.com/8gcr/harbor-core","tag":""}` | Core image settings |
 | core.image.repository | string | `"8gears.container-registry.com/8gcr/harbor-core"` | Core image repository |
 | core.image.tag | string | `""` | Core image tag (defaults to appVersion) |
@@ -498,6 +499,7 @@ Kubernetes: `>=1.28.0-0`
 | exporter.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
 | exporter.enabled | bool | `true` | Enable Harbor exporter for Prometheus metrics |
 | exporter.extraEnv | list | [] | Extra environment variables with valueFrom support |
+| exporter.hostAliases | list | [] | Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for private DNS that does not exist in cluster DNS — service-mesh sidecars, legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the Kubernetes PodSpec: a list of `{ip, hostnames}` entries. |
 | exporter.image | object | `{"repository":"8gears.container-registry.com/8gcr/harbor-exporter","tag":""}` | Exporter image settings |
 | exporter.image.repository | string | `"8gears.container-registry.com/8gcr/harbor-exporter"` | Exporter image repository |
 | exporter.image.tag | string | `""` | Exporter image tag (defaults to appVersion) |
@@ -591,6 +593,7 @@ Kubernetes: `>=1.28.0-0`
 | jobservice.existingSecret | string | `""` | Use existing secret for Jobservice secret |
 | jobservice.existingSecretKey | string | `"JOBSERVICE_SECRET"` | Key in existing secret containing the Jobservice secret |
 | jobservice.extraEnv | list | [] | Extra environment variables with valueFrom support |
+| jobservice.hostAliases | list | [] | Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for private DNS that does not exist in cluster DNS — service-mesh sidecars, legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the Kubernetes PodSpec: a list of `{ip, hostnames}` entries. |
 | jobservice.image | object | `{"repository":"8gears.container-registry.com/8gcr/harbor-jobservice","tag":""}` | Jobservice image settings |
 | jobservice.image.repository | string | `"8gears.container-registry.com/8gcr/harbor-jobservice"` | Jobservice image repository |
 | jobservice.image.tag | string | `""` | Jobservice image tag (defaults to appVersion) |
@@ -635,6 +638,7 @@ Kubernetes: `>=1.28.0-0`
 | portal.config | object | {} | Portal application config (converted to env vars in ConfigMap) |
 | portal.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
 | portal.extraEnv | list | [] | Extra environment variables with valueFrom support |
+| portal.hostAliases | list | [] | Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for private DNS that does not exist in cluster DNS — service-mesh sidecars, legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the Kubernetes PodSpec: a list of `{ip, hostnames}` entries. |
 | portal.image | object | `{"repository":"8gears.container-registry.com/8gcr/harbor-portal","tag":""}` | Portal image settings |
 | portal.image.repository | string | `"8gears.container-registry.com/8gcr/harbor-portal"` | Portal image repository |
 | portal.image.tag | string | `""` | Portal image tag (defaults to appVersion) |
@@ -673,6 +677,7 @@ Kubernetes: `>=1.28.0-0`
 | registry.existingSecret | string | `""` | Existing Secret that supplies `REGISTRY_HTTP_SECRET`. When set, the generated registry Secret omits `REGISTRY_HTTP_SECRET` and the deployment reads it from this Secret via env. Other registry-storage keys (S3, Azure, OSS) still come from the generated Secret. |
 | registry.existingSecretKey | string | `"REGISTRY_HTTP_SECRET"` | Key in `registry.existingSecret` that holds REGISTRY_HTTP_SECRET. |
 | registry.extraEnv | list | [] | Extra environment variables with valueFrom support |
+| registry.hostAliases | list | [] | Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for private DNS that does not exist in cluster DNS — service-mesh sidecars, legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the Kubernetes PodSpec: a list of `{ip, hostnames}` entries. |
 | registry.image | object | `{"repository":"8gears.container-registry.com/8gcr/harbor-registry","tag":""}` | Registry image settings |
 | registry.image.repository | string | `"8gears.container-registry.com/8gcr/harbor-registry"` | Registry image repository |
 | registry.image.tag | string | `""` | Registry image tag (defaults to appVersion) |
@@ -732,6 +737,7 @@ Kubernetes: `>=1.28.0-0`
 | trivy.debugMode | bool | `false` | Debug mode for more verbose scanning log |
 | trivy.enabled | bool | `false` | Enable Trivy scanner |
 | trivy.gitHubToken | string | `""` | GitHub token to download Trivy DB (optional) |
+| trivy.hostAliases | list | [] | Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for private DNS that does not exist in cluster DNS — service-mesh sidecars, legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the Kubernetes PodSpec: a list of `{ip, hostnames}` entries. |
 | trivy.ignoreUnfixed | bool | `false` | Skip unfixed vulnerabilities |
 | trivy.image.repository | string | `"8gears.container-registry.com/8gcr/trivy-adapter"` | Trivy adapter image repository |
 | trivy.image.tag | string | `""` | Trivy adapter image tag (defaults to appVersion) |
