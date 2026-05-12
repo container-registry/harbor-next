@@ -66,8 +66,14 @@ existingSecretAdminPassword: ""
 # -- Key in the existing secret for admin password
 existingSecretAdminPasswordKey: HARBOR_ADMIN_PASSWORD
 
-# -- Existing secret containing the encryption key (overrides secretKey)
+# -- Existing secret containing the encryption key (overrides secretKey).
+# The secret must hold the 16-char key under `SECRET_KEY` and `secretKey`
+# (or override the key name via `existingSecretSecretKeyKey`).
 existingSecretSecretKey: ""
+# -- Key in `existingSecretSecretKey` that holds the encryption key.
+# Used both for the `SECRET_KEY` env on core and the `secret-key`
+# volume mount (which Harbor reads as `/etc/core/key`).
+existingSecretSecretKeyKey: "secretKey"
 
 # -- Cache configuration (Redis-based caching for manifests)
 cache:
