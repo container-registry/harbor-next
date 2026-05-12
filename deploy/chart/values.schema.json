@@ -372,7 +372,10 @@
                 "keyid": { "type": "string" },
                 "multipartcopychunksize": { "type": "integer" },
                 "multipartcopymaxconcurrency": { "type": "integer" },
-                "multipartcopythresholdsize": { "type": "integer" }
+                "multipartcopythresholdsize": { "type": "integer" },
+                "existingSecret": { "type": "string" },
+                "existingSecretAccessKeyKey": { "type": "string" },
+                "existingSecretSecretKeyKey": { "type": "string" }
               }
             },
             "azure": {
@@ -381,7 +384,9 @@
                 "accountname": { "type": "string" },
                 "accountkey": { "type": "string" },
                 "container": { "type": "string" },
-                "realm": { "type": "string" }
+                "realm": { "type": "string" },
+                "existingSecret": { "type": "string" },
+                "existingSecretKey": { "type": "string" }
               }
             },
             "gcs": {
@@ -405,7 +410,9 @@
                 "encrypt": { "type": "boolean" },
                 "secure": { "type": "boolean" },
                 "chunksize": { "type": "integer" },
-                "rootdirectory": { "type": "string" }
+                "rootdirectory": { "type": "string" },
+                "existingSecret": { "type": "string" },
+                "existingSecretKey": { "type": "string" }
               }
             }
           }

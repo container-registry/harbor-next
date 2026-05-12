@@ -58,7 +58,10 @@ spec:
           envFrom:
             - secretRef:
                 name: {{ include "harbor.registry.name" . }}
-          {{- if or .Values.registry.existingSecret .Values.registry.extraEnv }}
+          {{- $s3Ext := and (eq .Values.registry.storage.type "s3") .Values.registry.storage.s3.existingSecret -}}
+          {{- $azureExt := and (eq .Values.registry.storage.type "azure") .Values.registry.storage.azure.existingSecret -}}
+          {{- $ossExt := and (eq .Values.registry.storage.type "oss") .Values.registry.storage.oss.existingSecret -}}
+          {{- if or .Values.registry.existingSecret .Values.registry.extraEnv $s3Ext $azureExt $ossExt }}
           env:
             {{- if .Values.registry.existingSecret }}
             - name: REGISTRY_HTTP_SECRET
@@ -66,6 +69,32 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.registry.existingSecret }}
                   key: {{ .Values.registry.existingSecretKey | default "REGISTRY_HTTP_SECRET" }}
+            {{- end }}
+            {{- if $s3Ext }}
+            - name: REGISTRY_STORAGE_S3_ACCESSKEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.registry.storage.s3.existingSecret }}
+                  key: {{ .Values.registry.storage.s3.existingSecretAccessKeyKey | default "REGISTRY_STORAGE_S3_ACCESSKEY" }}
+            - name: REGISTRY_STORAGE_S3_SECRETKEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.registry.storage.s3.existingSecret }}
+                  key: {{ .Values.registry.storage.s3.existingSecretSecretKeyKey | default "REGISTRY_STORAGE_S3_SECRETKEY" }}
+            {{- end }}
+            {{- if $azureExt }}
+            - name: REGISTRY_STORAGE_AZURE_ACCOUNTKEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.registry.storage.azure.existingSecret }}
+                  key: {{ .Values.registry.storage.azure.existingSecretKey | default "REGISTRY_STORAGE_AZURE_ACCOUNTKEY" }}
+            {{- end }}
+            {{- if $ossExt }}
+            - name: REGISTRY_STORAGE_OSS_ACCESSKEYSECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.registry.storage.oss.existingSecret }}
+                  key: {{ .Values.registry.storage.oss.existingSecretKey | default "REGISTRY_STORAGE_OSS_ACCESSKEYSECRET" }}
             {{- end }}
             {{- with .Values.registry.extraEnv }}
             {{- toYaml . | nindent 12 }}
@@ -130,6 +159,36 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.registry.existingSecret }}
                   key: {{ .Values.registry.existingSecretKey | default "REGISTRY_HTTP_SECRET" }}
+            {{- end }}
+            {{- /* Per-backend storage credentials when sourced from a BYO Secret —
+                   registryctl runs admin ops (GC) that need the same creds.
+                   When `<backend>.existingSecret` is set the generated registry
+                   Secret strips these keys, so we must inject them here too. */}}
+            {{- if $s3Ext }}
+            - name: REGISTRY_STORAGE_S3_ACCESSKEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.registry.storage.s3.existingSecret }}
+                  key: {{ .Values.registry.storage.s3.existingSecretAccessKeyKey | default "REGISTRY_STORAGE_S3_ACCESSKEY" }}
+            - name: REGISTRY_STORAGE_S3_SECRETKEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.registry.storage.s3.existingSecret }}
+                  key: {{ .Values.registry.storage.s3.existingSecretSecretKeyKey | default "REGISTRY_STORAGE_S3_SECRETKEY" }}
+            {{- end }}
+            {{- if $azureExt }}
+            - name: REGISTRY_STORAGE_AZURE_ACCOUNTKEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.registry.storage.azure.existingSecret }}
+                  key: {{ .Values.registry.storage.azure.existingSecretKey | default "REGISTRY_STORAGE_AZURE_ACCOUNTKEY" }}
+            {{- end }}
+            {{- if $ossExt }}
+            - name: REGISTRY_STORAGE_OSS_ACCESSKEYSECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.registry.storage.oss.existingSecret }}
+                  key: {{ .Values.registry.storage.oss.existingSecretKey | default "REGISTRY_STORAGE_OSS_ACCESSKEYSECRET" }}
             {{- end }}
             - name: CORE_SECRET
               valueFrom:

@@ -447,11 +447,19 @@ registry:
     # -- S3 storage settings. Set `forcepathstyle: true` for MinIO / Ceph
     # RGW / SeaweedFS — virtual-host style is the libS3 default and most
     # non-AWS S3-compatible backends only accept path-style addressing.
+    #
+    # For External-Secrets-Operator / Vault / SealedSecrets workflows set
+    # `existingSecret: my-creds` instead of inline `accesskey`/`secretkey`;
+    # the chart then pulls credentials from that Secret via env, and the
+    # generated `*-registry` Secret stops emitting those keys.
     s3: {}
       # region: us-east-1
       # bucket: my-harbor-bucket
       # accesskey: ""
       # secretkey: ""
+      # existingSecret: ""
+      # existingSecretAccessKeyKey: REGISTRY_STORAGE_S3_ACCESSKEY
+      # existingSecretSecretKeyKey: REGISTRY_STORAGE_S3_SECRETKEY
       # regionendpoint: ""
       # forcepathstyle: false
       # encrypt: false
@@ -459,10 +467,13 @@ registry:
       # v4auth: true
       # chunksize: 5242880
       # rootdirectory: ""
-    # -- Azure Blob storage settings
+    # -- Azure Blob storage settings. `existingSecret` works the same as
+    # for s3 — set it to source `accountkey` from a BYO Secret.
     azure: {}
       # accountname: ""
       # accountkey: ""
+      # existingSecret: ""
+      # existingSecretKey: REGISTRY_STORAGE_AZURE_ACCOUNTKEY
       # container: ""
       # realm: core.windows.net
     # -- Google Cloud Storage settings
@@ -471,10 +482,13 @@ registry:
       # keyfile: ""
       # rootdirectory: ""
       # chunksize: 5242880
-    # -- Alibaba Cloud OSS settings
+    # -- Alibaba Cloud OSS settings. `existingSecret` works the same as
+    # for s3 — set it to source `accesskeysecret` from a BYO Secret.
     oss: {}
       # accesskeyid: ""
       # accesskeysecret: ""
+      # existingSecret: ""
+      # existingSecretKey: REGISTRY_STORAGE_OSS_ACCESSKEYSECRET
       # region: ""
       # bucket: ""
       # endpoint: ""
