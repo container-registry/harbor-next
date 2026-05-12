@@ -246,15 +246,27 @@ Secret Key helpers
 */}}
 
 {{/*
-Return the secret key for encryption
+Return the secret key for encryption.
+
+Resolution order:
+  1. Explicit `.Values.secretKey` if set.
+  2. The `SECRET_KEY` value persisted in the existing core Secret on
+     upgrade (looked up at template time), so upgrades reuse the
+     original key.
+  3. A fresh 16-char alphanumeric on first install. Random, not
+     derivable from release name.
 */}}
 {{- define "harbor.secretKey" -}}
 {{- if .Values.secretKey }}
 {{- .Values.secretKey }}
 {{- else }}
-{{- /* Generate a deterministic key based on release name */ -}}
-{{- $key := printf "%s-harbor-secret-key" .Release.Name | sha256sum | trunc 16 }}
-{{- $key }}
+{{- $existing := (lookup "v1" "Secret" .Release.Namespace (include "harbor.core" .)) | default dict }}
+{{- $existingKey := index ($existing.data | default dict) "SECRET_KEY" }}
+{{- if $existingKey }}
+{{- $existingKey | b64dec }}
+{{- else }}
+{{- randAlphaNum 16 }}
+{{- end }}
 {{- end }}
 {{- end }}
 
