@@ -168,3 +168,27 @@ tests:
       - equal:
           path: spec.minAvailable
           value: "50%"
+
+  # Regression guard for 45bd59360 — PDB requires exactly one of
+  # minAvailable / maxUnavailable (Kubernetes API rule).
+  - it: should fail when neither minAvailable nor maxUnavailable is set
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.pdb.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "core.pdb requires either minAvailable or maxUnavailable when enabled"
+
+  - it: should fail when both minAvailable and maxUnavailable are set
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.pdb.enabled: true
+      core.pdb.minAvailable: 1
+      core.pdb.maxUnavailable: 1
+    asserts:
+      - failedTemplate:
+          errorMessage: "core.pdb cannot set both minAvailable and maxUnavailable (Kubernetes requires them to be mutually exclusive)"
