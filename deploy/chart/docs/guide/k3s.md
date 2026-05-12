@@ -26,11 +26,17 @@ Pull the Harbor Helm chart from the OCI registry.
    cd harbor-next
    ```
 
-## Add Database Manifest
+## Prepare a Values File
 
-Use `extraManifests` to deploy the PostgreSQL database within the same namespace.
+Save the following as `values-k3s.yaml` in the extracted chart directory.
+The three blocks below stack into a single file — `extraManifests` deploys
+the database alongside Harbor, `database` wires Harbor to it via an
+existing secret, and `ingress` exposes Harbor through Traefik.
 
 ```yaml
+# values-k3s.yaml
+
+# 1. Database manifest deployed in the same namespace as Harbor
 extraManifests:
   - apiVersion: postgresql.cnpg.io/v1
     kind: Cluster
@@ -44,26 +50,16 @@ extraManifests:
         initdb:
           database: registry
           owner: harbor
-```
 
-## Configure Harbor Database Settings
-
-Update the Harbor configuration to use the external database and the password stored in the secret.
-
-```yaml
+# 2. Harbor → database wiring (CNPG creates `harbor-db-app` Secret)
 database:
   host: "harbor-db-rw"
   port: 5432
   username: "harbor"
   existingSecret: "harbor-db-app"
   existingSecretKey: "password"
-```
 
-## Configure Traefik Ingress
-
-Enable and configure the ingress using Traefik.
-
-```yaml
+# 3. Traefik ingress with auto-generated TLS
 ingress:
   enabled: true
   className: "traefik"
@@ -74,11 +70,18 @@ ingress:
 
 ## Deploy Harbor
 
-Install or upgrade Harbor in the default namespace.
+Install or upgrade Harbor in the default namespace using the values file
+prepared above. `database.host` is already in the file, so we only set
+the deploy-time values on the command line.
+
+> **⚠️ Security:** Change `harborAdminPassword` below — `Harbor12345` is
+> the publicly-documented default and must not be used outside throwaway
+> environments. Better: create a Secret and reference it via
+> `existingSecretAdminPassword` instead of `--set`.
 
 ```bash
 helm upgrade --install test-1 . \
+  -f values-k3s.yaml \
   --set externalURL=https://harbor.localhost \
-  --set database.host=harbor-db-rw \
-  --set harborAdminPassword=Harbor12345
+  --set harborAdminPassword='change-me-strong-password'
 ```
