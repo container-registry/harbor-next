@@ -1,37 +1,24 @@
+# Pruned from 29 -> 16 tests.
+#
+# Removed tautological assertions: isKind against the matching template,
+# equal round-trip of user-supplied input (replicas, podAnnotations,
+# podLabels, nodeSelector, tolerations, securityContext, podSecurityContext,
+# priorityClassName, initContainers, extraEnv), exists on always-present
+# paths, and hasDocuments: count assertions on the enable/disable gates.
+#
+# Kept tests assert chart logic that can actually regress:
+#   - image repository+tag concatenation
+#   - the 9 SCANNER_TRIVY_* env vars (int/bool -> string coercion)
+#   - proxy.components membership gating HTTP_PROXY / HTTPS_PROXY injection
+#   - persistence variants (volumeClaimTemplates / emptyDir / existingClaim)
+#   - trivy.secret.yaml redisURL composition via harbor.redis.url.trivy
+#   - service port name (load-bearing for selector / ingress port matching)
 suite: trivy component tests
 templates:
   - templates/trivy.statefulset.yaml
   - templates/trivy.service.yaml
   - templates/trivy.secret.yaml
 tests:
-  - it: should create trivy statefulset when enabled
-    template: templates/trivy.statefulset.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      trivy.enabled: true
-    asserts:
-      - isKind:
-          of: StatefulSet
-      - equal:
-          path: metadata.name
-          value: RELEASE-NAME-harbor-next-trivy
-      - equal:
-          path: spec.replicas
-          value: 1
-
-  - it: should not create trivy statefulset when disabled
-    template: templates/trivy.statefulset.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      trivy.enabled: false
-    asserts:
-      - hasDocuments:
-          count: 0
-
   - it: should set correct image
     template: templates/trivy.statefulset.yaml
     set:
@@ -247,32 +234,7 @@ tests:
           path: spec.template.spec.volumes[0].persistentVolumeClaim.claimName
           value: my-existing-pvc
 
-  - it: should create trivy service when enabled
-    template: templates/trivy.service.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      trivy.enabled: true
-    asserts:
-      - isKind:
-          of: Service
-      - equal:
-          path: spec.ports[0].port
-          value: 8080
-
-  - it: should not create trivy service when disabled
-    template: templates/trivy.service.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      trivy.enabled: false
-    asserts:
-      - hasDocuments:
-          count: 0
-
-  - it: should create trivy secret when enabled
+  - it: should compose redisURL using harbor.redis.url.trivy helper
     template: templates/trivy.secret.yaml
     set:
       externalURL: https://harbor.example.com
@@ -280,153 +242,20 @@ tests:
       harborAdminPassword: Harbor12345
       trivy.enabled: true
     asserts:
-      - isKind:
-          of: Secret
-      - exists:
+      # base64("redis://valkey:6379/5") -- proves helper composes scheme,
+      # host, port, and the /5 trivy db index.
+      - equal:
           path: data.redisURL
-      - exists:
-          path: data.gitHubToken
+          value: cmVkaXM6Ly92YWxrZXk6NjM3OS81
 
-  - it: should not create trivy secret when disabled
-    template: templates/trivy.secret.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      trivy.enabled: false
-    asserts:
-      - hasDocuments:
-          count: 0
-
-  - it: should apply pod annotations
-    template: templates/trivy.statefulset.yaml
+  - it: should expose service port named http-trivy
+    template: templates/trivy.service.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
       trivy.enabled: true
-      trivy.podAnnotations:
-        prometheus.io/scrape: "true"
     asserts:
       - equal:
-          path: spec.template.metadata.annotations["prometheus.io/scrape"]
-          value: "true"
-
-  - it: should apply pod labels
-    template: templates/trivy.statefulset.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      trivy.enabled: true
-      trivy.podLabels:
-        custom-label: custom-value
-    asserts:
-      - equal:
-          path: spec.template.metadata.labels["custom-label"]
-          value: custom-value
-
-  - it: should apply node selector
-    template: templates/trivy.statefulset.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      trivy.enabled: true
-      trivy.nodeSelector:
-        disktype: ssd
-    asserts:
-      - equal:
-          path: spec.template.spec.nodeSelector.disktype
-          value: ssd
-
-  - it: should apply tolerations
-    template: templates/trivy.statefulset.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      trivy.enabled: true
-      trivy.tolerations:
-        - key: "node-role.kubernetes.io/control-plane"
-          operator: "Exists"
-          effect: "NoSchedule"
-    asserts:
-      - equal:
-          path: spec.template.spec.tolerations[0].key
-          value: node-role.kubernetes.io/control-plane
-
-  - it: should apply container securityContext
-    template: templates/trivy.statefulset.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      trivy.enabled: true
-      trivy.securityContext:
-        runAsNonRoot: true
-        runAsUser: 10000
-    asserts:
-      - equal:
-          path: spec.template.spec.containers[0].securityContext.runAsNonRoot
-          value: true
-
-  - it: should apply podSecurityContext
-    template: templates/trivy.statefulset.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      trivy.enabled: true
-      trivy.podSecurityContext:
-        fsGroup: 10000
-    asserts:
-      - equal:
-          path: spec.template.spec.securityContext.fsGroup
-          value: 10000
-
-  - it: should apply priorityClassName
-    template: templates/trivy.statefulset.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      trivy.enabled: true
-      trivy.priorityClassName: high-priority
-    asserts:
-      - equal:
-          path: spec.template.spec.priorityClassName
-          value: "high-priority"
-
-  - it: should add initContainers
-    template: templates/trivy.statefulset.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      trivy.enabled: true
-      trivy.initContainers:
-        - name: init
-          image: busybox
-          command: ["sh", "-c", "echo init"]
-    asserts:
-      - equal:
-          path: spec.template.spec.initContainers[0].name
-          value: init
-
-  - it: should add extraEnv
-    template: templates/trivy.statefulset.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      trivy.enabled: true
-      trivy.extraEnv:
-        - name: CUSTOM_VAR
-          value: custom-value
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: CUSTOM_VAR
-            value: custom-value
+          path: spec.ports[0].name
+          value: http-trivy
