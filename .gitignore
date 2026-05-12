@@ -59,6 +59,8 @@ harborclient/
 openapi-generator-cli.jar
 tests/e2e_setup/robotvars.py
 .task/checksum
+.task/
+deploy/chart/charts/
 devenv/token_service_key.pem
 devenv/ports.env
 deploy/compose/config/*.pem
