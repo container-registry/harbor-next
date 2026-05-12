@@ -83,12 +83,14 @@ export class PullCommandComponent {
     }
 
     getPullCommandForTopModel(): string {
-        return getPullCommandForTop(
-            `${this.registryUrl ? this.registryUrl : location.hostname}/${
-                this.projectName
-            }/${this.repoName}`,
-            this.getSelectedClient()
-        ) || '';
+        return (
+            getPullCommandForTop(
+                `${this.registryUrl ? this.registryUrl : location.hostname}/${
+                    this.projectName
+                }/${this.repoName}`,
+                this.getSelectedClient()
+            ) || ''
+        );
     }
 
     getPullCommandForRuntimeByDigest(artifact: Artifact): string {

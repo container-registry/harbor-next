@@ -82,7 +82,7 @@ func (a *abstractor) toBuildKitAttestationCandidate(ctx context.Context, reposit
 	}, nil
 }
 
-func (a *abstractor) loadBuildKitAttestationSubjects(ctx context.Context, repository, digestRef string) ([]buildKitSubject, error) {
+func (a *abstractor) loadBuildKitAttestationSubjects(_ context.Context, repository, digestRef string) ([]buildKitSubject, error) {
 	manifest, _, err := a.regCli.PullManifest(repository, digestRef)
 	if err != nil {
 		return nil, err

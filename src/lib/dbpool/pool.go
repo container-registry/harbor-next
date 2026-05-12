@@ -36,8 +36,8 @@ import (
 // configuration. PostgreSQL server's own max_connections defaults to 100;
 // the metadata default for MaxOpenConns is 100 to match.
 const (
-	DefaultMinConns        = 2
-	DefaultMaxConnIdleTime = 10 * time.Minute
+	DefaultMinConns          = 2
+	DefaultMaxConnIdleTime   = 10 * time.Minute
 	DefaultHealthCheckPeriod = 1 * time.Minute
 	DefaultConnectTimeout    = 10 * time.Second
 	healthyTimeout           = 5 * time.Second
@@ -194,7 +194,7 @@ func (p *Pool) SelfTest(ctx context.Context) error {
 	return nil
 }
 
-func (p *Pool) DB() *sql.DB       { return p.db }
+func (p *Pool) DB() *sql.DB            { return p.db }
 func (p *Pool) PgxPool() *pgxpool.Pool { return p.pool }
 
 func (p *Pool) Close() {
