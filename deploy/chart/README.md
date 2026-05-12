@@ -451,9 +451,8 @@ Kubernetes: `>=1.28.0-0`
 | core.image.tag | string | `""` | Core image tag (defaults to appVersion) |
 | core.initContainers | list | `[]` | Init containers (run before main containers) |
 | core.nodeSelector | object | `{}` | Node selector for Core pods |
-| core.pdb | object | `{"enabled":false,"minAvailable":1}` | PodDisruptionBudget for Core |
-| core.pdb.enabled | bool | `false` | Enable PodDisruptionBudget |
-| core.pdb.minAvailable | int | `1` | Minimum available pods (can be integer or percentage) |
+| core.pdb | object | `{"enabled":false}` | PodDisruptionBudget for Core |
+| core.pdb.enabled | bool | `false` | Enable PodDisruptionBudget. When true, exactly one of `minAvailable` or `maxUnavailable` must be set (Kubernetes rejects PDBs with both fields). |
 | core.podAnnotations | object | `{}` | Additional pod annotations for Core |
 | core.podLabels | object | `{}` | Additional pod labels for Core |
 | core.podSecurityContext | object | `{"fsGroup":10000}` | Pod security context for Core |
@@ -500,9 +499,8 @@ Kubernetes: `>=1.28.0-0`
 | exporter.image.tag | string | `""` | Exporter image tag (defaults to appVersion) |
 | exporter.initContainers | list | `[]` | Init containers (run before main containers) |
 | exporter.nodeSelector | object | `{}` | Node selector for Exporter pods |
-| exporter.pdb | object | `{"enabled":false,"minAvailable":1}` | PodDisruptionBudget for Exporter |
-| exporter.pdb.enabled | bool | `false` | Enable PodDisruptionBudget |
-| exporter.pdb.minAvailable | int | `1` | Minimum available pods (can be integer or percentage) |
+| exporter.pdb | object | `{"enabled":false}` | PodDisruptionBudget for Exporter |
+| exporter.pdb.enabled | bool | `false` | Enable PodDisruptionBudget. When true, exactly one of `minAvailable` or `maxUnavailable` must be set (Kubernetes rejects PDBs with both fields). |
 | exporter.podAnnotations | object | `{}` | Additional pod annotations for Exporter |
 | exporter.podLabels | object | `{}` | Additional pod labels for Exporter |
 | exporter.podSecurityContext | object | `{"fsGroup":10000}` | Pod security context for Exporter |
@@ -598,9 +596,8 @@ Kubernetes: `>=1.28.0-0`
 | jobservice.max_job_workers | int | `4` |  |
 | jobservice.nodeSelector | object | `{}` | Node selector for Jobservice pods |
 | jobservice.notification | object | `{"webhook_job_http_client_timeout":3,"webhook_job_max_retry":3}` | Notification settings |
-| jobservice.pdb | object | `{"enabled":false,"minAvailable":1}` | PodDisruptionBudget for Jobservice |
-| jobservice.pdb.enabled | bool | `false` | Enable PodDisruptionBudget |
-| jobservice.pdb.minAvailable | int | `1` | Minimum available pods (can be integer or percentage) |
+| jobservice.pdb | object | `{"enabled":false}` | PodDisruptionBudget for Jobservice |
+| jobservice.pdb.enabled | bool | `false` | Enable PodDisruptionBudget. When true, exactly one of `minAvailable` or `maxUnavailable` must be set (Kubernetes rejects PDBs with both fields). |
 | jobservice.persistence | object | `{"accessModes":["ReadWriteOnce"],"annotations":{},"enabled":false,"existingClaim":"","resourcePolicy":"keep","size":"1Gi"}` | Jobservice persistence settings |
 | jobservice.persistence.accessModes | list | `["ReadWriteOnce"]` | PVC access modes |
 | jobservice.persistence.annotations | object | `{}` | Annotations for PVC |
@@ -639,9 +636,8 @@ Kubernetes: `>=1.28.0-0`
 | portal.image.tag | string | `""` | Portal image tag (defaults to appVersion) |
 | portal.initContainers | list | `[]` | Init containers (run before main containers) |
 | portal.nodeSelector | object | `{}` | Node selector for Portal pods |
-| portal.pdb | object | `{"enabled":false,"minAvailable":1}` | PodDisruptionBudget for Portal |
-| portal.pdb.enabled | bool | `false` | Enable PodDisruptionBudget |
-| portal.pdb.minAvailable | int | `1` | Minimum available pods (can be integer or percentage) |
+| portal.pdb | object | `{"enabled":false}` | PodDisruptionBudget for Portal |
+| portal.pdb.enabled | bool | `false` | Enable PodDisruptionBudget. When true, exactly one of `minAvailable` or `maxUnavailable` must be set (Kubernetes rejects PDBs with both fields). |
 | portal.podAnnotations | object | `{}` | Additional pod annotations for Portal |
 | portal.podLabels | object | `{}` | Additional pod labels for Portal |
 | portal.podSecurityContext | object | `{"fsGroup":10000}` | Pod security context for Portal |
@@ -676,9 +672,8 @@ Kubernetes: `>=1.28.0-0`
 | registry.image.tag | string | `""` | Registry image tag (defaults to appVersion) |
 | registry.initContainers | list | `[]` | Init containers (run before main containers) |
 | registry.nodeSelector | object | `{}` | Node selector for Registry pods |
-| registry.pdb | object | `{"enabled":false,"minAvailable":1}` | PodDisruptionBudget for Registry |
-| registry.pdb.enabled | bool | `false` | Enable PodDisruptionBudget |
-| registry.pdb.minAvailable | int | `1` | Minimum available pods (can be integer or percentage) |
+| registry.pdb | object | `{"enabled":false}` | PodDisruptionBudget for Registry |
+| registry.pdb.enabled | bool | `false` | Enable PodDisruptionBudget. When true, exactly one of `minAvailable` or `maxUnavailable` must be set (Kubernetes rejects PDBs with both fields). |
 | registry.persistence | object | `{"accessModes":["ReadWriteOnce"],"annotations":{},"enabled":false,"existingClaim":"","resourcePolicy":"keep","size":"10Gi"}` | Registry persistence settings |
 | registry.persistence.accessModes | list | `["ReadWriteOnce"]` | PVC access modes |
 | registry.persistence.annotations | object | `{}` | Annotations for PVC |
@@ -740,9 +735,8 @@ Kubernetes: `>=1.28.0-0`
 | trivy.javaDBRepository[1] | string | `"ghcr.io/aquasecurity/trivy-java-db"` |  |
 | trivy.nodeSelector | object | `{}` | Node selector for Trivy pods |
 | trivy.offlineScan | bool | `false` | Enable offline scan mode |
-| trivy.pdb | object | `{"enabled":false,"minAvailable":1}` | PodDisruptionBudget for Trivy |
-| trivy.pdb.enabled | bool | `false` | Enable PodDisruptionBudget |
-| trivy.pdb.minAvailable | int | `1` | Minimum available pods |
+| trivy.pdb | object | `{"enabled":false}` | PodDisruptionBudget for Trivy |
+| trivy.pdb.enabled | bool | `false` | Enable PodDisruptionBudget. When true, exactly one of `minAvailable` or `maxUnavailable` must be set (Kubernetes rejects PDBs with both fields). |
 | trivy.persistence | object | `{"accessModes":["ReadWriteOnce"],"annotations":{},"enabled":false,"existingClaim":"","size":"5Gi"}` | Trivy persistence settings - used for cache |
 | trivy.persistence.accessModes | list | `["ReadWriteOnce"]` | PVC access modes |
 | trivy.persistence.annotations | object | `{}` | Annotations for PVC |
