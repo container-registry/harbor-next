@@ -32,8 +32,13 @@ jobs:
           BASE_VERSION=$(awk '/^version:/ {print $2}' deploy/chart/Chart.yaml)
           SHORT_SHA="${GITHUB_SHA:0:7}"
           VERSION="${BASE_VERSION}-main.${SHORT_SHA}"
+          # Floating tag MUST be SemVer-parseable: helm-controller v1.3+
+          # rejects plain "latest" via "failed parsing artifact revision".
+          # "<base>-dev" satisfies SemVer (pre-release identifier "dev").
+          FLOATING_TAG="${BASE_VERSION}-dev"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Publishing dev version: ${VERSION}"
+          echo "floating_tag=${FLOATING_TAG}" >> "$GITHUB_OUTPUT"
+          echo "Publishing dev version: ${VERSION} (also tagged ${FLOATING_TAG})"
 
       - name: Setup Helm
         uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
@@ -62,30 +67,38 @@ jobs:
       - name: Update chart dependencies
         run: helm dependency update deploy/chart
 
-      - name: Package chart
+      - name: Package chart at floating version
+        # Chart.yaml.version must equal the OCI tag the OCIRepository points at
+        # (helm-controller v1.3+ enforces revision == chart.metadata.version).
+        # Package with the floating SemVer ("<base>-dev") so the OCI tag and
+        # Chart.yaml agree.
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          FLOATING_TAG: ${{ steps.version.outputs.floating_tag }}
         run: |
           mkdir -p dist
           helm package deploy/chart \
             --destination dist \
-            --version "${VERSION}" \
-            --app-version "${VERSION}"
+            --version "${FLOATING_TAG}" \
+            --app-version "${FLOATING_TAG}"
 
-      - name: Push chart
+      - name: Push chart at floating tag
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          FLOATING_TAG: ${{ steps.version.outputs.floating_tag }}
         run: |
-          helm push "dist/harbor-next-${VERSION}.tgz" \
+          helm push "dist/harbor-next-${FLOATING_TAG}.tgz" \
             "oci://${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/chart"
 
-      - name: Move latest tag on chart
+      - name: Add immutable per-commit tag on chart
+        # The per-push tag (3.0.0-main.<sha7>) is a stable audit-trail
+        # reference. The OCIRepository tracks the floating tag; this immutable
+        # tag lets us roll back / pin to a specific commit when needed.
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          FLOATING_TAG: ${{ steps.version.outputs.floating_tag }}
         run: |
           oras tag \
-            "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/chart/harbor-next:${VERSION}" \
-            latest
+            "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/chart/harbor-next:${FLOATING_TAG}" \
+            "${VERSION}"
 
       - name: Push Flux deploy bundle
         env:
@@ -98,6 +111,9 @@ jobs:
             --revision="${GITHUB_REF_NAME}@sha1:${GITHUB_SHA}"
 
       - name: Move latest tag on deploy bundle
+        # Bundle artifacts are consumed by Flux's kustomize-controller, which
+        # does NOT impose a SemVer constraint on the revision (unlike
+        # helm-controller). Plain "latest" is fine here.
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
