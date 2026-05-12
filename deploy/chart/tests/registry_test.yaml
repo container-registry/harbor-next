@@ -141,6 +141,58 @@ tests:
           path: data["config.yml"]
           pattern: "bucket: my-harbor-bucket"
 
+  # MinIO / Ceph RGW / SeaweedFS support: the upstream chart's stale
+  # PRs #2248 and #2300 both tried to add this. The docker/distribution
+  # registry reads forcepathstyle from config.yml; without it most
+  # non-AWS S3 backends 403 or 404 on bucket operations.
+  - it: should emit forcepathstyle when explicitly set
+    template: templates/registry.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.storage.type: s3
+      registry.storage.s3.region: us-east-1
+      registry.storage.s3.bucket: harbor
+      registry.storage.s3.forcepathstyle: true
+    asserts:
+      - matchRegex:
+          path: data["config.yml"]
+          pattern: "forcepathstyle: true"
+
+  # Boolean false must still render (registry default is true). Without
+  # `hasKey`, a literal `false` would skip the line and silently fall
+  # back to libS3 default.
+  - it: should emit forcepathstyle when set to false
+    template: templates/registry.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.storage.type: s3
+      registry.storage.s3.region: us-east-1
+      registry.storage.s3.bucket: harbor
+      registry.storage.s3.forcepathstyle: false
+    asserts:
+      - matchRegex:
+          path: data["config.yml"]
+          pattern: "forcepathstyle: false"
+
+  # Gating: omitting the key keeps config.yml clean for AWS S3 users.
+  - it: should omit forcepathstyle line when not set
+    template: templates/registry.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.storage.type: s3
+      registry.storage.s3.region: us-east-1
+      registry.storage.s3.bucket: harbor
+    asserts:
+      - notMatchRegex:
+          path: data["config.yml"]
+          pattern: "forcepathstyle"
+
   # Pins the gating: setting persistence.existingClaim must suppress the
   # generated PVC (else the chart would create a PVC AND the deployment
   # would reference an unrelated one).

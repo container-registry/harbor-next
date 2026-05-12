@@ -52,6 +52,9 @@ data:
         {{- if $storage.s3.regionendpoint }}
         regionendpoint: {{ $storage.s3.regionendpoint }}
         {{- end }}
+        {{- if hasKey $storage.s3 "forcepathstyle" }}
+        forcepathstyle: {{ $storage.s3.forcepathstyle }}
+        {{- end }}
         {{- if $storage.s3.encrypt }}
         encrypt: {{ $storage.s3.encrypt }}
         {{- end }}

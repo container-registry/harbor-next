@@ -702,7 +702,7 @@ Kubernetes: `>=1.28.0-0`
 | registry.storage.filesystem | object | `{"rootdirectory":"/storage","subPath":""}` | Filesystem storage settings |
 | registry.storage.gcs | object | `{}` | Google Cloud Storage settings |
 | registry.storage.oss | object | `{}` | Alibaba Cloud OSS settings |
-| registry.storage.s3 | object | `{}` | S3 storage settings |
+| registry.storage.s3 | object | `{}` | S3 storage settings. Set `forcepathstyle: true` for MinIO / Ceph RGW / SeaweedFS — virtual-host style is the libS3 default and most non-AWS S3-compatible backends only accept path-style addressing. |
 | registry.storage.type | string | `"filesystem"` | Storage type: filesystem, s3, azure, gcs, oss |
 | registry.tolerations | list | `[]` | Tolerations for Registry pods |
 | registry.topologySpreadConstraints | list | `[]` | Topology spread constraints for pod scheduling |

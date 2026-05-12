@@ -361,11 +361,18 @@
                 "accesskey": { "type": "string" },
                 "secretkey": { "type": "string" },
                 "regionendpoint": { "type": "string" },
+                "forcepathstyle": { "type": "boolean" },
                 "encrypt": { "type": "boolean" },
                 "secure": { "type": "boolean" },
+                "skipverify": { "type": "boolean" },
                 "v4auth": { "type": "boolean" },
                 "chunksize": { "type": "integer" },
-                "rootdirectory": { "type": "string" }
+                "rootdirectory": { "type": "string" },
+                "storageclass": { "type": "string" },
+                "keyid": { "type": "string" },
+                "multipartcopychunksize": { "type": "integer" },
+                "multipartcopymaxconcurrency": { "type": "integer" },
+                "multipartcopythresholdsize": { "type": "integer" }
               }
             },
             "azure": {

@@ -424,13 +424,16 @@ registry:
     filesystem:
       rootdirectory: /storage
       subPath: ""
-    # -- S3 storage settings
+    # -- S3 storage settings. Set `forcepathstyle: true` for MinIO / Ceph
+    # RGW / SeaweedFS — virtual-host style is the libS3 default and most
+    # non-AWS S3-compatible backends only accept path-style addressing.
     s3: {}
       # region: us-east-1
       # bucket: my-harbor-bucket
       # accesskey: ""
       # secretkey: ""
       # regionendpoint: ""
+      # forcepathstyle: false
       # encrypt: false
       # secure: true
       # v4auth: true
