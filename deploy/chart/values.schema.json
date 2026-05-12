@@ -100,6 +100,10 @@
       "type": "string",
       "description": "Existing secret containing the encryption key"
     },
+    "existingSecretSecretKeyKey": {
+      "type": "string",
+      "description": "Key in existingSecretSecretKey that holds the encryption key (defaults to secretKey). Used for both SECRET_KEY env and the secret-key volume mount."
+    },
     "secretKey": {
       "type": "string",
       "description": "Secret key for encryption (16 characters)",
@@ -325,6 +329,14 @@
         { "$ref": "#/$defs/harborComponent" }
       ],
       "properties": {
+        "existingSecret": {
+          "type": "string",
+          "description": "Existing Secret supplying REGISTRY_HTTP_SECRET. When set, the generated registry Secret omits this key and both the registry container and registryctl sidecar source it from here via env."
+        },
+        "existingSecretKey": {
+          "type": "string",
+          "description": "Key in registry.existingSecret that holds REGISTRY_HTTP_SECRET (defaults to REGISTRY_HTTP_SECRET)."
+        },
         "storage": {
           "type": "object",
           "properties": {
@@ -525,7 +537,12 @@
           "type": "string"
         },
         "existingSecret": {
-          "type": "string"
+          "type": "string",
+          "description": "Existing Secret containing the Redis password"
+        },
+        "existingSecretKey": {
+          "type": "string",
+          "description": "Key in externalRedis.existingSecret that holds the Redis password (defaults to REDIS_PASSWORD)"
         }
       }
     },
