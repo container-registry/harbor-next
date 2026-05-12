@@ -115,7 +115,7 @@ tasks:
       - helm-docs --chart-search-root={{.CHART_DIR}} --dry-run > /tmp/helm-docs-expected.md
       - defer: rm -f /tmp/helm-docs-expected.md /tmp/helm-docs-actual.md
       - grep -v 'kroki\.io/svgbob' {{.CHART_DIR}}/README.md > /tmp/helm-docs-actual.md
-      - diff -q /tmp/helm-docs-expected.md /tmp/helm-docs-actual.md || (echo "README.md is out of date. Run{{":"}} task docs" && exit 1)
+      - diff -q /tmp/helm-docs-expected.md /tmp/helm-docs-actual.md || (echo "README.md is out of date. Run{{":"}} cd deploy/chart && task docs" && exit 1)
 
   # ============================================================================
   # Aggregate Tasks
