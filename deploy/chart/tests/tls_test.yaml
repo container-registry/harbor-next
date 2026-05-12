@@ -156,3 +156,81 @@ tests:
     asserts:
       - hasDocuments:
           count: 2
+
+  # Regression guard for 212a44486 / 9a59ac102 (Fix #3). Wildcard hosts
+  # like *.example.com used to become *-example-com — an invalid DNS-1123
+  # label that cert-manager rejected. The chart now slugs `*.` to
+  # `wildcard-` and appends a sha256(fullname+host) suffix so multiple
+  # releases or wildcard variants stay distinct.
+  - it: should sanitize wildcard hosts in Certificate name
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      tls.certManager.enabled: true
+      tls.certManager.issuerRef:
+        name: letsencrypt-prod
+        kind: ClusterIssuer
+      ingress.hosts:
+        - host: "*.example.com"
+          paths:
+            - path: /
+              pathType: Prefix
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: "^RELEASE-NAME-harbor-ne-wildcard-example-com-[0-9a-f]{8}$"
+      - matchRegex:
+          path: spec.secretName
+          pattern: "^RELEASE-NAME-harbor-ne-wildcard-example-com-[0-9a-f]{8}-tls$"
+      # dnsNames keeps the original wildcard — the cert covers *.example.com
+      - equal:
+          path: spec.dnsNames[0]
+          value: "*.example.com"
+
+  - it: should keep Certificate name under 63 chars for long FQDNs
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      tls.certManager.enabled: true
+      tls.certManager.issuerRef:
+        name: letsencrypt-prod
+        kind: ClusterIssuer
+      ingress.hosts:
+        - host: "harbor.really-long-subdomain-for-overflow-testing.example.com"
+          paths:
+            - path: /
+              pathType: Prefix
+    asserts:
+      # metadata.name max 63 chars per DNS-1123 label
+      - matchRegex:
+          path: metadata.name
+          pattern: "^.{1,63}$"
+      - matchRegex:
+          path: spec.secretName
+          pattern: "^.{1,63}$"
+
+  - it: should produce distinct Certificate names for releases sharing a 22-char prefix
+    # Same chart, same host, two different releases that share the same
+    # truncated 22-char fullname prefix. 9a59ac102 added $fullname to the
+    # hash input so each release gets a unique cert/secret name.
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      tls.certManager.enabled: true
+      tls.certManager.issuerRef:
+        name: letsencrypt-prod
+        kind: ClusterIssuer
+      ingress.hosts:
+        - host: harbor.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+    release:
+      name: harbor-prod-team-alpha-cluster-east
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: "^harbor-prod-team-alpha-harbor-example-com-[0-9a-f]{8}$"
