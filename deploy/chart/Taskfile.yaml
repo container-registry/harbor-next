@@ -38,38 +38,41 @@ tasks:
   # Documentation
   # ============================================================================
 
+  _require-helm-docs:
+    internal: true
+    preconditions:
+      - sh: command -v helm-docs
+        msg: |
+          helm-docs not found. Install:
+            macOS:  brew install norwoodj/tap/helm-docs
+            Linux:  go install github.com/norwoodj/helm-docs/cmd/helm-docs@latest
+          (or download a release binary from https://github.com/norwoodj/helm-docs/releases)
+
   docs:
-    desc: Generate README and JSON Schema from values.yaml
-    deps: [docs:readme, docs:schema]
+    desc: Generate README from values.yaml + README.md.gotmpl using helm-docs
+    deps: [docs:readme]
 
   docs:readme:
-    desc: Generate README from values.yaml using helm-docs
+    desc: Generate README.md (values.schema.json is hand-maintained — edit it directly)
+    deps: [_require-helm-docs]
     cmds:
-      - helm-docs --chart-search-root={{.CHART_DIR}}
+      # --chart-to-generate {{.CHART_DIR}} isolates this chart so helm-docs
+      # doesn't also process the extracted valkey subchart in ./charts/.
+      - helm-docs --chart-search-root={{.CHART_DIR}} --chart-to-generate={{.CHART_DIR}}
     sources:
       - values.yaml
       - README.md.gotmpl
     generates:
       - README.md
 
-  docs:schema:
-    desc: Generate JSON Schema from values.yaml
-    cmds:
-      - helm schema -input {{.CHART_DIR}}/values.yaml -output {{.CHART_DIR}}/values.schema.json
-    sources:
-      - values.yaml
-    generates:
-      - values.schema.json
-
   docs:verify:
-    desc: Verify docs are up-to-date (for CI)
+    desc: Verify README.md is up-to-date with helm-docs output
+    deps: [_require-helm-docs]
     cmds:
-      - helm-docs --chart-search-root={{.CHART_DIR}} --dry-run > /tmp/helm-docs-expected.md
-      - defer: rm -f /tmp/helm-docs-expected.md /tmp/helm-docs-actual.md /tmp/values.schema.json
+      - helm-docs --chart-search-root={{.CHART_DIR}} --chart-to-generate={{.CHART_DIR}} --dry-run > /tmp/helm-docs-expected.md
+      - defer: rm -f /tmp/helm-docs-expected.md /tmp/helm-docs-actual.md
       - grep -v 'kroki\.io/svgbob' {{.CHART_DIR}}/README.md > /tmp/helm-docs-actual.md
       - diff /tmp/helm-docs-actual.md /tmp/helm-docs-expected.md || (echo "README.md is out of date. Run{{":"}} task docs" && exit 1)
-      - helm schema -input {{.CHART_DIR}}/values.yaml -output /tmp/values.schema.json
-      - diff {{.CHART_DIR}}/values.schema.json /tmp/values.schema.json || (echo "Schema out of date. Run{{":"}} task docs" && exit 1)
 
   # ============================================================================
   # Dependencies

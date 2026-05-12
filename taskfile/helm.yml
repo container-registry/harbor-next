@@ -111,8 +111,16 @@ tasks:
 
   helm-docs:
     desc: "Check that chart README is up-to-date with helm-docs"
+    preconditions:
+      - sh: command -v helm-docs
+        msg: |
+          helm-docs not found. Install:
+            macOS:  brew install norwoodj/tap/helm-docs
+            Linux:  go install github.com/norwoodj/helm-docs/cmd/helm-docs@latest
     cmds:
-      - helm-docs --chart-search-root={{.CHART_DIR}} --dry-run > /tmp/helm-docs-expected.md
+      # --chart-to-generate isolates the harbor-next chart so helm-docs
+      # doesn't also process the extracted valkey subchart in charts/.
+      - helm-docs --chart-search-root={{.CHART_DIR}} --chart-to-generate={{.CHART_DIR}} --dry-run > /tmp/helm-docs-expected.md
       - defer: rm -f /tmp/helm-docs-expected.md /tmp/helm-docs-actual.md
       - grep -v 'kroki\.io/svgbob' {{.CHART_DIR}}/README.md > /tmp/helm-docs-actual.md
       - diff -q /tmp/helm-docs-expected.md /tmp/helm-docs-actual.md || (echo "README.md is out of date. Run{{":"}} cd deploy/chart && task docs" && exit 1)
