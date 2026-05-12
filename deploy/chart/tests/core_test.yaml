@@ -182,3 +182,134 @@ tests:
       - equal:
           path: spec.template.spec.containers[0].resources.limits.memory
           value: 1Gi
+
+  # ============================================================================
+  # SECRET_KEY env + secret-key volume resolution
+  # Regression guards for d631d09aa (Fix #4) and ba7cfeeac (Fix #18).
+  # The encryption key has three sourcing paths:
+  #   (a) generated `*-core` Secret, key `SECRET_KEY` / `secretKey` (default)
+  #   (b) `core.existingSecret` + `core.existingSecretKey` (BYO core secret)
+  #   (c) `existingSecretSecretKey` + `existingSecretSecretKeyKey` (BYO key Secret)
+  # Path (c) used to strip SECRET_KEY/secretKey from the generated Secret
+  # without redirecting the env or volume — pods crash-looped looking
+  # for a key that didn't exist. All three must now resolve to a Secret
+  # + key that actually contains the value.
+  # ============================================================================
+
+  - it: should mount SECRET_KEY from generated Secret by default
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: RELEASE-NAME-harbor-next-core
+                key: SECRET_KEY
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: secret-key
+            secret:
+              secretName: RELEASE-NAME-harbor-next-core
+              items:
+                - key: secretKey
+                  path: key
+
+  - it: should mount SECRET_KEY from core.existingSecret with custom key
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.existingSecret: my-core
+      core.existingSecretKey: customCoreKey
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: CORE_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: my-core
+                key: customCoreKey
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: secret-key
+            secret:
+              secretName: my-core
+              items:
+                - key: customCoreKey
+                  path: key
+
+  - it: should mount SECRET_KEY from existingSecretSecretKey with custom key
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      existingSecretSecretKey: my-enc
+      existingSecretSecretKeyKey: customEncKey
+    asserts:
+      # SECRET_KEY env routes to the BYO encryption Secret, not the core Secret
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: my-enc
+                key: customEncKey
+      # Volume mount targets the same BYO Secret + key
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: secret-key
+            secret:
+              secretName: my-enc
+              items:
+                - key: customEncKey
+                  path: key
+
+  - it: should strip SECRET_KEY/secretKey from generated Secret when existingSecretSecretKey is set
+    template: templates/core.secret.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      existingSecretSecretKey: my-enc
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-harbor-next-core
+    asserts:
+      - notExists:
+          path: data.SECRET_KEY
+      - notExists:
+          path: data.secretKey
+
+  - it: should render matching SECRET_KEY and secretKey in the generated Secret
+    # 89e59a324 (Fix #8) pre-computes the key once so both data fields
+    # hold the same value. Two `include` calls would otherwise return
+    # different randAlphaNum results.
+    template: templates/core.secret.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      secretKey: "sixteenkeychars1"  # schema requires exactly 16 chars
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-harbor-next-core
+    asserts:
+      - equal:
+          path: data.SECRET_KEY
+          value: "c2l4dGVlbmtleWNoYXJzMQ=="  # base64('sixteenkeychars1')
+      - equal:
+          path: data.secretKey
+          value: "c2l4dGVlbmtleWNoYXJzMQ=="
