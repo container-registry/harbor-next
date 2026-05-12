@@ -934,8 +934,9 @@ externalRedis:
   # -- Sentinel master set name (for Redis Sentinel)
   sentinelMasterSet: ""
   # -- Existing secret containing Redis password
-  # Must have key: REDIS_PASSWORD
   existingSecret: ""
+  # -- Key in the existing secret that holds the Redis password
+  existingSecretKey: "REDIS_PASSWORD"
   # -- TLS options for external Redis
   tlsOptions:
     # -- Enable TLS for external Redis connection
