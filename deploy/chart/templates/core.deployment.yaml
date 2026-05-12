@@ -93,6 +93,7 @@ spec:
                 secretKeyRef:
                   name: {{ include "harbor.database.secretName" . }}
                   key: {{ .Values.database.existingSecretKey | default "POSTGRESQL_PASSWORD" }}
+            {{- include "harbor.database.tlsEnv" . | nindent 12 }}
             {{- $extAuth := and (not .Values.valkey.enabled) (or .Values.externalRedis.existingSecret .Values.externalRedis.password) -}}
             {{- if or .Values.valkey.auth.enabled $extAuth }}
             - name: REDIS_PASSWORD
@@ -146,6 +147,7 @@ spec:
               mountPath: /etc/core/token
             - name: tmp
               mountPath: /tmp
+            {{- include "harbor.database.tlsVolumeMount" . | nindent 12 }}
             {{- include "harbor.extraCA.volumeMount" . | nindent 12 }}
       volumes:
         - name: config
@@ -184,5 +186,6 @@ spec:
           emptyDir: {}
         - name: tmp
           emptyDir: {}
+        {{- include "harbor.database.tlsVolume" . | nindent 8 }}
         {{- include "harbor.extraCA.volume" . | nindent 8 }}
       {{- include "harbor.podScheduling" (dict "component" .Values.core "root" $) | nindent 6 }}

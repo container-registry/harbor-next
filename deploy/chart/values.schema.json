@@ -498,6 +498,21 @@
         },
         "existingSecretKey": {
           "type": "string"
+        },
+        "existingTlsSecret": {
+          "type": "string",
+          "description": "Secret with ca.crt (+ tls.crt + tls.key for mTLS) for PostgreSQL TLS"
+        },
+        "clientCertEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include sslcert/sslkey in the auto-built POSTGRESQL_URL"
+        },
+        "connMaxIdleTime": {
+          "type": "string"
+        },
+        "connMaxLifetime": {
+          "type": "string"
         }
       }
     },

@@ -69,6 +69,14 @@ spec:
                   name: {{ include "harbor.redis.secretName" . }}
                   key: {{ include "harbor.redis.secretKey" . }}
             {{- end }}
+            {{- if eq (include "harbor.database.tlsEnabled" .) "true" }}
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "harbor.database.secretName" . }}
+                  key: {{ .Values.database.existingSecretKey | default "POSTGRESQL_PASSWORD" }}
+            {{- include "harbor.database.tlsEnv" . | nindent 12 }}
+            {{- end }}
             {{- include "harbor.extraCA.env" . | nindent 12 }}
             {{- with .Values.jobservice.extraEnv }}
             {{- toYaml . | nindent 12 }}
@@ -99,6 +107,7 @@ spec:
               mountPath: /var/log/jobs
             - name: tmp
               mountPath: /tmp
+            {{- include "harbor.database.tlsVolumeMount" . | nindent 12 }}
             {{- include "harbor.extraCA.volumeMount" . | nindent 12 }}
       volumes:
         - name: jobservice-config
@@ -113,5 +122,6 @@ spec:
           {{- end }}
         - name: tmp
           emptyDir: {}
+        {{- include "harbor.database.tlsVolume" . | nindent 8 }}
         {{- include "harbor.extraCA.volume" . | nindent 8 }}
       {{- include "harbor.podScheduling" (dict "component" .Values.jobservice "root" $) | nindent 6 }}
