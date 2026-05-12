@@ -144,7 +144,7 @@ Component name helpers (used by noProxy and other cross-component references)
 {{- end -}}
 
 {{- define "harbor.ingress.secret" -}}
-{{- printf "harbor-tls" -}}
+{{- printf "%s-ingress-tls" (include "harbor.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
 {{- define "harbor.ingress.primaryHost" -}}
