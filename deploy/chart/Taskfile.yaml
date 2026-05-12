@@ -64,9 +64,12 @@ tasks:
   docs:verify:
     desc: Verify docs are up-to-date (for CI)
     cmds:
-      - helm-docs --chart-search-root={{.CHART_DIR}} --dry-run
+      - helm-docs --chart-search-root={{.CHART_DIR}} --dry-run > /tmp/helm-docs-expected.md
+      - defer: rm -f /tmp/helm-docs-expected.md /tmp/helm-docs-actual.md /tmp/values.schema.json
+      - grep -v 'kroki\.io/svgbob' {{.CHART_DIR}}/README.md > /tmp/helm-docs-actual.md
+      - diff /tmp/helm-docs-actual.md /tmp/helm-docs-expected.md || (echo "README.md is out of date. Run{{":"}} task docs" && exit 1)
       - helm schema -input {{.CHART_DIR}}/values.yaml -output /tmp/values.schema.json
-      - diff {{.CHART_DIR}}/values.schema.json /tmp/values.schema.json || (echo "Schema out of date. Run 'task docs'" && exit 1)
+      - diff {{.CHART_DIR}}/values.schema.json /tmp/values.schema.json || (echo "Schema out of date. Run{{":"}} task docs" && exit 1)
 
   # ============================================================================
   # Dependencies
