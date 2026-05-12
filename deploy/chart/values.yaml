@@ -480,8 +480,9 @@ registry:
     enabled: false
     # -- Resource policy: "keep" prevents PVC deletion on helm uninstall
     resourcePolicy: "keep"
-    # -- Storage class for PVC
-    storageClass: ""
+    # -- Storage class for PVC. Omit to use the cluster default StorageClass;
+    # set to "" to opt out of any StorageClass (binds only to PVs with no class).
+    # storageClass: gp3
     # -- PVC access modes
     accessModes:
       - ReadWriteOnce
@@ -756,8 +757,9 @@ jobservice:
     enabled: false
     # -- Resource policy: "keep" prevents PVC deletion on helm uninstall
     resourcePolicy: "keep"
-    # -- Storage class for PVC
-    storageClass: ""
+    # -- Storage class for PVC. Omit to use the cluster default StorageClass;
+    # set to "" to opt out of any StorageClass (binds only to PVs with no class).
+    # storageClass: gp3
     # -- PVC access modes
     accessModes:
       - ReadWriteOnce
@@ -1032,8 +1034,9 @@ trivy:
   persistence:
     # -- Enable persistence for registry
     enabled: false
-    # -- Storage class for PVC
-    storageClass: ""
+    # -- Storage class for PVC. Omit to use the cluster default StorageClass;
+    # set to "" to opt out of any StorageClass (binds only to PVs with no class).
+    # storageClass: gp3
     # -- PVC access modes
     accessModes:
       - ReadWriteOnce

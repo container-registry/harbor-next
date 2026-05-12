@@ -159,7 +159,7 @@ spec:
     spec:
       accessModes:
         {{- toYaml .Values.trivy.persistence.accessModes | nindent 8 }}
-      {{- if .Values.trivy.persistence.storageClass }}
+      {{- if hasKey .Values.trivy.persistence "storageClass" }}
       storageClassName: {{ .Values.trivy.persistence.storageClass | quote }}
       {{- end }}
       resources:
