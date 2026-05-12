@@ -1,7 +1,14 @@
+# All tests assert chart-computed output for known inputs or fail-fast
+# guards. Pure Helm pass-through tests were removed — they only proved
+# `--set` works, not that the chart does anything with the value.
+# Full-render regression coverage lives in snapshots_test.yaml.
 suite: PodDisruptionBudget tests
 templates:
   - templates/pdbs.yaml
 tests:
+  # Pins the default gating: pdbs.yaml renders 0 documents when every
+  # component PDB is disabled. Guards against an accidental
+  # `default: enabled: true` regression in values.yaml.
   - it: should not create PDBs by default
     set:
       externalURL: https://harbor.example.com
@@ -11,110 +18,8 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: should create core PDB when enabled
-    documentSelector:
-      path: metadata.name
-      value: RELEASE-NAME-harbor-next-core
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      core.pdb.enabled: true
-      core.pdb.minAvailable: 1
-    asserts:
-      - isKind:
-          of: PodDisruptionBudget
-      - equal:
-          path: spec.minAvailable
-          value: 1
-
-  - it: should create portal PDB when enabled
-    documentSelector:
-      path: metadata.name
-      value: RELEASE-NAME-harbor-next-portal
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      portal.pdb.enabled: true
-      portal.pdb.minAvailable: 2
-    asserts:
-      - isKind:
-          of: PodDisruptionBudget
-      - equal:
-          path: spec.minAvailable
-          value: 2
-
-  - it: should create registry PDB when enabled
-    documentSelector:
-      path: metadata.name
-      value: RELEASE-NAME-harbor-next-registry
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      registry.pdb.enabled: true
-      registry.pdb.minAvailable: 1
-    asserts:
-      - isKind:
-          of: PodDisruptionBudget
-      - equal:
-          path: spec.minAvailable
-          value: 1
-
-  - it: should create jobservice PDB when enabled
-    documentSelector:
-      path: metadata.name
-      value: RELEASE-NAME-harbor-next-jobservice
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      jobservice.pdb.enabled: true
-      jobservice.pdb.minAvailable: 1
-    asserts:
-      - isKind:
-          of: PodDisruptionBudget
-      - equal:
-          path: spec.minAvailable
-          value: 1
-
-  - it: should create exporter PDB when enabled
-    documentSelector:
-      path: metadata.name
-      value: RELEASE-NAME-harbor-next-exporter
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      exporter.enabled: true
-      exporter.pdb.enabled: true
-      exporter.pdb.minAvailable: 1
-    asserts:
-      - isKind:
-          of: PodDisruptionBudget
-      - equal:
-          path: spec.minAvailable
-          value: 1
-
-  - it: should create trivy PDB when enabled
-    documentSelector:
-      path: metadata.name
-      value: RELEASE-NAME-harbor-next-trivy
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      trivy.enabled: true
-      trivy.pdb.enabled: true
-      trivy.pdb.minAvailable: 1
-    asserts:
-      - isKind:
-          of: PodDisruptionBudget
-      - equal:
-          path: spec.minAvailable
-          value: 1
-
+  # Pins the cross-component gating: exporter.pdb.enabled=true is a
+  # no-op when exporter.enabled=false (no Deployment → no PDB target).
   - it: should not create exporter PDB when exporter is disabled
     set:
       externalURL: https://harbor.example.com
@@ -126,6 +31,8 @@ tests:
       - hasDocuments:
           count: 0
 
+  # Pins the cross-component gating: trivy.pdb.enabled=true is a no-op
+  # when trivy.enabled=false.
   - it: should not create trivy PDB when trivy is disabled
     set:
       externalURL: https://harbor.example.com
@@ -137,6 +44,9 @@ tests:
       - hasDocuments:
           count: 0
 
+  # Pins the documentSelector-based per-component PDB name plus the
+  # maxUnavailable branch of the mutually-exclusive minAvailable /
+  # maxUnavailable conditional in the PDB spec.
   - it: should support maxUnavailable instead of minAvailable
     documentSelector:
       path: metadata.name
@@ -154,6 +64,9 @@ tests:
           path: spec.maxUnavailable
           value: 1
 
+  # Pins that minAvailable accepts a percentage string (e.g. "50%"), not
+  # just an integer — the chart must preserve the quoted form so
+  # Kubernetes interprets it as a percentage and not an int.
   - it: should support percentage values for minAvailable
     documentSelector:
       path: metadata.name

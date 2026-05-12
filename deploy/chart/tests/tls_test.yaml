@@ -1,7 +1,15 @@
+# All tests assert chart-computed output for known inputs or fail-fast
+# guards. Pure Helm pass-through tests were removed — they only proved
+# `--set` works, not that the chart does anything with the value.
+# Full-render regression coverage lives in snapshots_test.yaml.
 suite: TLS certificate tests
 templates:
   - templates/tls-certificates.yaml
 tests:
+  # Pins the top-level conditional: tls-certificates.yaml renders 0
+  # documents when tls.certManager.enabled=false. Acts as a guard
+  # against accidentally flipping the default to true (would create
+  # Certificate resources in clusters without cert-manager installed).
   - it: should not create certificates when cert-manager disabled
     set:
       externalURL: https://harbor.example.com
@@ -12,26 +20,10 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: should create certificate per ingress host when enabled
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      tls.certManager.enabled: true
-      tls.certManager.issuerRef:
-        name: letsencrypt-prod
-        kind: ClusterIssuer
-      ingress.hosts:
-        - host: harbor.example.com
-          paths:
-            - path: /
-              pathType: Prefix
-    asserts:
-      - hasDocuments:
-          count: 1
-      - isKind:
-          of: Certificate
-
+  # Pins the chart-computed Certificate name: `<truncated-fullname>-
+  # <slug-of-host>-<8-hex-of-sha256>`. The chart slugs the host (dots
+  # to dashes) and appends a hash to keep multi-host / multi-release
+  # names unique.
   - it: should set certificate name from host
     set:
       externalURL: https://harbor.example.com
@@ -51,6 +43,9 @@ tests:
           path: metadata.name
           pattern: "^RELEASE-NAME-harbor-ne-harbor-example-com-[0-9a-f]{8}$"
 
+  # Pins the chart-computed secretName: same shape as metadata.name
+  # plus a `-tls` suffix, so the Ingress/HTTPRoute can reference the
+  # Secret cert-manager will populate.
   - it: should set secretName
     set:
       externalURL: https://harbor.example.com
@@ -70,6 +65,9 @@ tests:
           path: spec.secretName
           pattern: "^RELEASE-NAME-harbor-ne-harbor-example-com-[0-9a-f]{8}-tls$"
 
+  # Pins the conditional emission of spec.duration and spec.renewBefore
+  # — these keys are only rendered when set in values, and cert-manager
+  # rejects empty strings here.
   - it: should set duration and renewBefore
     set:
       externalURL: https://harbor.example.com
@@ -94,6 +92,9 @@ tests:
           path: spec.renewBefore
           value: 720h
 
+  # Pins the issuerRef structure (name + kind) — cert-manager treats
+  # missing kind as Issuer (namespaced), so dropping kind here would
+  # silently break ClusterIssuer references.
   - it: should set issuerRef
     set:
       externalURL: https://harbor.example.com
@@ -116,6 +117,9 @@ tests:
           path: spec.issuerRef.kind
           value: ClusterIssuer
 
+  # Pins that dnsNames carries the original ingress host verbatim (no
+  # slug, no truncation) — cert-manager needs the real DNS name to
+  # request the cert.
   - it: should set dnsNames
     set:
       externalURL: https://harbor.example.com
@@ -135,6 +139,9 @@ tests:
           path: spec.dnsNames[0]
           value: "harbor.example.com"
 
+  # Pins the per-host range loop: N ingress.hosts entries must render
+  # N Certificate documents (one per host, each with its own name +
+  # secretName).
   - it: should create multiple certificates for multiple hosts
     set:
       externalURL: https://harbor.example.com
