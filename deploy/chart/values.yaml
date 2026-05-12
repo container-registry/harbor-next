@@ -1093,10 +1093,23 @@ externalRedis:
   existingSecret: ""
   # -- Key in the existing secret that holds the Redis password
   existingSecretKey: "REDIS_PASSWORD"
-  # -- TLS options for external Redis
+  # -- TLS options for external Redis. For managed Redis with a private
+  # CA (self-hosted Redis, some on-prem managed offerings, custom certs
+  # via cert-manager), set `existingCaSecret` to a Secret holding the
+  # CA bundle. The chart mounts it on every Harbor component at
+  # `/etc/harbor/extra-ca` and sets `SSL_CERT_DIR` so Go's TLS adds it
+  # to the system trust pool — so the same Secret also covers private
+  # CAs used for S3 endpoints, OIDC, etc. Tracks upstream
+  # goharbor/harbor-helm#549.
   tlsOptions:
     # -- Enable TLS for external Redis connection
     enable: false
+    # -- Name of an existing Secret containing the CA bundle. Leave
+    # empty to use only the cluster's default trust store.
+    existingCaSecret: ""
+    # -- Key inside `existingCaSecret` that holds the PEM-encoded CA
+    # bundle. Default `ca.crt` is the convention cert-manager uses.
+    existingCaSecretKey: "ca.crt"
 
 # --- Trivy Scanner ---
 trivy:

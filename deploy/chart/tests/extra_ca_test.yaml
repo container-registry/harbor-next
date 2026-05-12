@@ -1,0 +1,190 @@
+# Regression guards for the externalRedis.tlsOptions.existingCaSecret
+# feature. Tracks upstream goharbor/harbor-helm#549. When the value is
+# set, every Harbor component that talks to Redis (and, incidentally,
+# to S3 / OIDC / other TLS endpoints) gets:
+#   1. A Secret volume mounted at /etc/harbor/extra-ca
+#   2. A volumeMount on the container pointing to that path
+#   3. SSL_CERT_DIR env so Go's crypto/x509 reads CAs from that dir
+#      ON TOP of the default system trust bundle baked into the image.
+#
+# When unset, none of those three should appear — anywhere.
+suite: extra CA bundle (externalRedis.tlsOptions.existingCaSecret)
+templates:
+  - templates/core.deployment.yaml
+  - templates/core.configmap.yaml
+  - templates/core.secret.yaml
+  - templates/jobservice.deployment.yaml
+  - templates/jobservice.configmap.yaml
+  - templates/jobservice.configmap-env.yaml
+  - templates/jobservice.secret.yaml
+  - templates/registry.deployment.yaml
+  - templates/registry.configmap.yaml
+  - templates/registry.secret.yaml
+  - templates/registryctl.configmap.yaml
+  - templates/registryctl.secret.yaml
+  - templates/exporter.deployment.yaml
+  - templates/trivy.statefulset.yaml
+  - templates/trivy.secret.yaml
+set:
+  externalURL: https://harbor.example.com
+  database.host: postgres.example.com
+  harborAdminPassword: Harbor12345
+  valkey.enabled: false
+  externalRedis.host: redis.example.com
+  externalRedis.tlsOptions.enable: true
+  externalRedis.tlsOptions.existingCaSecret: my-redis-ca
+  trivy.enabled: true
+  metrics.enabled: true
+tests:
+  - it: should mount + env SSL_CERT_DIR on core
+    template: templates/core.deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SSL_CERT_DIR
+            value: "/etc/ssl/certs:/etc/harbor/extra-ca"
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: extra-ca
+            mountPath: /etc/harbor/extra-ca
+            readOnly: true
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: extra-ca
+            secret:
+              secretName: my-redis-ca
+              items:
+                - key: ca.crt
+                  path: ca.crt
+
+  - it: should mount + env SSL_CERT_DIR on jobservice
+    template: templates/jobservice.deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SSL_CERT_DIR
+            value: "/etc/ssl/certs:/etc/harbor/extra-ca"
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: extra-ca
+            mountPath: /etc/harbor/extra-ca
+            readOnly: true
+
+  # Registry has two containers; both need the mount + env.
+  - it: should mount + env on both registry containers
+    template: templates/registry.deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SSL_CERT_DIR
+            value: "/etc/ssl/certs:/etc/harbor/extra-ca"
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: SSL_CERT_DIR
+            value: "/etc/ssl/certs:/etc/harbor/extra-ca"
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: extra-ca
+            mountPath: /etc/harbor/extra-ca
+            readOnly: true
+      - contains:
+          path: spec.template.spec.containers[1].volumeMounts
+          content:
+            name: extra-ca
+            mountPath: /etc/harbor/extra-ca
+            readOnly: true
+
+  - it: should mount + env on exporter
+    template: templates/exporter.deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SSL_CERT_DIR
+            value: "/etc/ssl/certs:/etc/harbor/extra-ca"
+
+  - it: should mount + env on trivy
+    template: templates/trivy.statefulset.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SSL_CERT_DIR
+            value: "/etc/ssl/certs:/etc/harbor/extra-ca"
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: extra-ca
+            mountPath: /etc/harbor/extra-ca
+            readOnly: true
+
+  # Custom key name resolves correctly.
+  - it: should honor a custom existingCaSecretKey
+    template: templates/core.deployment.yaml
+    set:
+      externalRedis.tlsOptions.existingCaSecretKey: "custom-ca-key.pem"
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: extra-ca
+            secret:
+              secretName: my-redis-ca
+              items:
+                - key: custom-ca-key.pem
+                  path: ca.crt
+
+  # Valkey is the in-cluster Redis. The CA mount is for EXTERNAL TLS
+  # endpoints — the helper must skip when valkey is enabled because
+  # the in-cluster Service uses cluster-internal trust, no custom CA
+  # involved. Tests `not .Values.valkey.enabled` branch.
+  - it: should NOT mount when valkey is enabled (in-cluster Redis)
+    template: templates/core.deployment.yaml
+    set:
+      valkey.enabled: true
+      externalRedis.host: ""
+      # Even with a CA value set, in-cluster valkey path skips it.
+      externalRedis.tlsOptions.existingCaSecret: my-redis-ca
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SSL_CERT_DIR
+          any: true
+      - notContains:
+          path: spec.template.spec.volumes
+          content:
+            name: extra-ca
+          any: true
+
+  # Default case: the env / volume / mount must NOT appear when no CA
+  # is set. Guards against the helper accidentally leaking SSL_CERT_DIR
+  # into every Harbor install.
+  - it: should NOT mount or set env when existingCaSecret is unset
+    template: templates/core.deployment.yaml
+    set:
+      externalRedis.tlsOptions.existingCaSecret: ""
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SSL_CERT_DIR
+          any: true
+      - notContains:
+          path: spec.template.spec.volumes
+          content:
+            name: extra-ca
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: extra-ca
+          any: true

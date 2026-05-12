@@ -101,6 +101,7 @@ spec:
                   name: {{ include "harbor.redis.secretName" . }}
                   key: {{ include "harbor.redis.secretKey" . }}
             {{- end }}
+            {{- include "harbor.extraCA.env" . | nindent 12 }}
             {{- with .Values.core.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -145,6 +146,7 @@ spec:
               mountPath: /etc/core/token
             - name: tmp
               mountPath: /tmp
+            {{- include "harbor.extraCA.volumeMount" . | nindent 12 }}
       volumes:
         - name: config
           configMap:
@@ -182,4 +184,5 @@ spec:
           emptyDir: {}
         - name: tmp
           emptyDir: {}
+        {{- include "harbor.extraCA.volume" . | nindent 8 }}
       {{- include "harbor.podScheduling" (dict "component" .Values.core "root" $) | nindent 6 }}

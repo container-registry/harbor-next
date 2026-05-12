@@ -100,6 +100,7 @@ spec:
                   name: {{ include "harbor.redis.secretName" . }}
                   key: {{ include "harbor.redis.secretKey" . }}
             {{- end }}
+            {{- include "harbor.extraCA.env" . | nindent 12 }}
             {{- with .Values.exporter.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -124,8 +125,10 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            {{- include "harbor.extraCA.volumeMount" . | nindent 12 }}
       volumes:
         - name: tmp
           emptyDir: {}
+        {{- include "harbor.extraCA.volume" . | nindent 8 }}
       {{- include "harbor.podScheduling" (dict "component" .Values.exporter "root" $) | nindent 6 }}
 {{- end }}

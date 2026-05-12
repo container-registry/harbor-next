@@ -104,6 +104,7 @@ spec:
                 secretKeyRef:
                   name: {{ include "harbor.fullname" . }}-trivy
                   key: redisURL
+            {{- include "harbor.extraCA.env" . | nindent 12 }}
             {{- with .Values.trivy.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -114,6 +115,7 @@ spec:
             - name: data
               mountPath: /home/scanner/.cache
               readOnly: false
+            {{- include "harbor.extraCA.volumeMount" . | nindent 12 }}
           livenessProbe:
             httpGet:
               scheme: {{ include "harbor.component.scheme" . | upper }}
@@ -147,6 +149,7 @@ spec:
       - name: "data"
         emptyDir: {}
       {{- end }}
+      {{- include "harbor.extraCA.volume" . | nindent 6 }}
       {{- include "harbor.podScheduling" (dict "component" .Values.trivy "root" $) | nindent 6 }}
 {{- if and .Values.trivy.persistence.enabled (not .Values.trivy.persistence.existingClaim) }}
   volumeClaimTemplates:

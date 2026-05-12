@@ -61,7 +61,8 @@ spec:
           {{- $s3Ext := and (eq .Values.registry.storage.type "s3") .Values.registry.storage.s3.existingSecret -}}
           {{- $azureExt := and (eq .Values.registry.storage.type "azure") .Values.registry.storage.azure.existingSecret -}}
           {{- $ossExt := and (eq .Values.registry.storage.type "oss") .Values.registry.storage.oss.existingSecret -}}
-          {{- if or .Values.registry.existingSecret .Values.registry.extraEnv $s3Ext $azureExt $ossExt }}
+          {{- $caExt := eq (include "harbor.redis.caBundleEnabled" .) "true" -}}
+          {{- if or .Values.registry.existingSecret .Values.registry.extraEnv $s3Ext $azureExt $ossExt $caExt }}
           env:
             {{- if .Values.registry.existingSecret }}
             - name: REGISTRY_HTTP_SECRET
@@ -70,6 +71,7 @@ spec:
                   name: {{ .Values.registry.existingSecret }}
                   key: {{ .Values.registry.existingSecretKey | default "REGISTRY_HTTP_SECRET" }}
             {{- end }}
+            {{- include "harbor.extraCA.env" . | nindent 12 }}
             {{- if $s3Ext }}
             - name: REGISTRY_STORAGE_S3_ACCESSKEY
               valueFrom:
@@ -134,6 +136,7 @@ spec:
               subPath: config.yml
             - name: tmp
               mountPath: /tmp
+            {{- include "harbor.extraCA.volumeMount" . | nindent 12 }}
         - name: registryctl
           securityContext:
             {{- toYaml .Values.registry.securityContext | nindent 12 }}
@@ -160,6 +163,7 @@ spec:
                   name: {{ .Values.registry.existingSecret }}
                   key: {{ .Values.registry.existingSecretKey | default "REGISTRY_HTTP_SECRET" }}
             {{- end }}
+            {{- include "harbor.extraCA.env" . | nindent 12 }}
             {{- /* Per-backend storage credentials when sourced from a BYO Secret —
                    registryctl runs admin ops (GC) that need the same creds.
                    When `<backend>.existingSecret` is set the generated registry
@@ -244,6 +248,7 @@ spec:
               subPath: ctl-config.yml
             - name: tmp
               mountPath: /tmp
+            {{- include "harbor.extraCA.volumeMount" . | nindent 12 }}
       volumes:
         - name: tmp
           emptyDir: {}
@@ -268,4 +273,5 @@ spec:
           secret:
             secretName: {{ include "harbor.fullname" . }}-registry-gcs
         {{- end }}
+        {{- include "harbor.extraCA.volume" . | nindent 8 }}
       {{- include "harbor.podScheduling" (dict "component" .Values.registry "root" $) | nindent 6 }}

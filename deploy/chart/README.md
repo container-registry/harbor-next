@@ -560,8 +560,10 @@ Kubernetes: `>=1.28.0-0`
 | externalRedis.password | string | `""` | External Redis password |
 | externalRedis.port | int | `6379` | External Redis port |
 | externalRedis.sentinelMasterSet | string | `""` | Sentinel master set name (for Redis Sentinel) |
-| externalRedis.tlsOptions | object | `{"enable":false}` | TLS options for external Redis |
+| externalRedis.tlsOptions | object | `{"enable":false,"existingCaSecret":"","existingCaSecretKey":"ca.crt"}` | TLS options for external Redis. For managed Redis with a private CA (self-hosted Redis, some on-prem managed offerings, custom certs via cert-manager), set `existingCaSecret` to a Secret holding the CA bundle. The chart mounts it on every Harbor component at `/etc/harbor/extra-ca` and sets `SSL_CERT_DIR` so Go's TLS adds it to the system trust pool — so the same Secret also covers private CAs used for S3 endpoints, OIDC, etc. Tracks upstream goharbor/harbor-helm#549. |
 | externalRedis.tlsOptions.enable | bool | `false` | Enable TLS for external Redis connection |
+| externalRedis.tlsOptions.existingCaSecret | string | `""` | Name of an existing Secret containing the CA bundle. Leave empty to use only the cluster's default trust store. |
+| externalRedis.tlsOptions.existingCaSecretKey | string | `"ca.crt"` | Key inside `existingCaSecret` that holds the PEM-encoded CA bundle. Default `ca.crt` is the convention cert-manager uses. |
 | externalRedis.username | string | `""` | External Redis username |
 | externalURL | string | "" | External URL for Harbor (REQUIRED) This is the URL users will use to access Harbor (e.g., https://harbor.example.com) |
 | extraManifests | list | [] | Extra static manifests to deploy These are merged with chart labels and deployed as-is |

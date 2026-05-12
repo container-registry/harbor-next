@@ -557,6 +557,27 @@
         "existingSecretKey": {
           "type": "string",
           "description": "Key in externalRedis.existingSecret that holds the Redis password (defaults to REDIS_PASSWORD)"
+        },
+        "username": {
+          "type": "string"
+        },
+        "tlsOptions": {
+          "type": "object",
+          "properties": {
+            "enable": {
+              "type": "boolean",
+              "default": false
+            },
+            "existingCaSecret": {
+              "type": "string",
+              "description": "Secret holding a CA bundle that all Harbor components should trust (Redis, S3, OIDC, etc.). Mounted at /etc/harbor/extra-ca."
+            },
+            "existingCaSecretKey": {
+              "type": "string",
+              "default": "ca.crt",
+              "description": "Key inside existingCaSecret that holds the PEM-encoded CA bundle"
+            }
+          }
         }
       }
     },

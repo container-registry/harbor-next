@@ -142,3 +142,62 @@ Return the Redis URL for Harbor core
 {{- define "harbor.redis.enableTLS" -}}
   {{- ternary "true" "false" (and (not .Values.valkey.enabled) (and .Values.externalRedis .Values.externalRedis.tlsOptions .Values.externalRedis.tlsOptions.enable)) }}
 {{- end -}}
+
+{{/*
+Whether the user supplied a custom CA bundle for external Redis (and,
+incidentally, any other private-CA endpoint Harbor talks to over TLS —
+S3, OIDC, LDAP). When true the chart mounts that Secret at
+/etc/harbor/extra-ca/ on every component that opens a TLS connection
+and sets SSL_CERT_DIR so Go's crypto/x509 also reads from that dir on
+top of the default system bundle.
+*/}}
+{{- define "harbor.redis.caBundleEnabled" -}}
+{{- $hasCA := false -}}
+{{- if and .Values.externalRedis .Values.externalRedis.tlsOptions -}}
+  {{- if ne (.Values.externalRedis.tlsOptions.existingCaSecret | toString) "" -}}
+    {{- $hasCA = true -}}
+  {{- end -}}
+{{- end -}}
+{{- if and (not .Values.valkey.enabled) $hasCA -}}true{{- end -}}
+{{- end -}}
+
+{{/*
+Volume block — the Secret with the user-supplied CA bundle. Key
+defaults to `ca.crt` so it Just Works for cert-manager Secrets, but
+overridable via `externalRedis.tlsOptions.existingCaSecretKey`.
+*/}}
+{{- define "harbor.extraCA.volume" -}}
+{{- if eq (include "harbor.redis.caBundleEnabled" .) "true" }}
+- name: extra-ca
+  secret:
+    secretName: {{ .Values.externalRedis.tlsOptions.existingCaSecret }}
+    items:
+      - key: {{ .Values.externalRedis.tlsOptions.existingCaSecretKey | default "ca.crt" }}
+        path: ca.crt
+{{- end }}
+{{- end }}
+
+{{/*
+VolumeMount block — mounted read-only at /etc/harbor/extra-ca.
+*/}}
+{{- define "harbor.extraCA.volumeMount" -}}
+{{- if eq (include "harbor.redis.caBundleEnabled" .) "true" }}
+- name: extra-ca
+  mountPath: /etc/harbor/extra-ca
+  readOnly: true
+{{- end }}
+{{- end }}
+
+{{/*
+SSL_CERT_DIR env — Go's crypto/x509 reads CAs from ALL paths in this
+colon-separated list, supplementing (not replacing) the default system
+bundle (`/etc/ssl/certs/ca-certificates.crt`) that the scratch-based
+Harbor image already copies in. Order does not affect trust; any cert
+in any listed dir is trusted.
+*/}}
+{{- define "harbor.extraCA.env" -}}
+{{- if eq (include "harbor.redis.caBundleEnabled" .) "true" }}
+- name: SSL_CERT_DIR
+  value: "/etc/ssl/certs:/etc/harbor/extra-ca"
+{{- end }}
+{{- end }}
