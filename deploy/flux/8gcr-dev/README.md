@@ -8,7 +8,7 @@ A flat directory of Flux v2 manifests:
 
 | File | Purpose |
 |------|---------|
-| `namespace.yaml` | Namespace `8gcr-dev-main` (deployment-specific; the cluster runs multiple Harbor instances). |
+| `namespace.yaml` | Namespace `8gcr-dev-main`. |
 | `ocirepository.yaml` | Pulls the Harbor Next chart from `oci://8gears.container-registry.com/8gcr-dev/chart/harbor-next:latest` every 5 minutes. |
 | `helmrelease.yaml` | Renders the chart into the `8gcr-dev-main` namespace with the dev-environment values (image tags pinned to `8gears.container-registry.com/8gcr-dev/harbor-*:latest`). |
 | `kustomization.yaml` | Plain Kustomize index, lets the Flux Kustomization controller reconcile this directory. |

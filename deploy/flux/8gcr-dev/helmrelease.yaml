@@ -82,7 +82,7 @@ spec:
       replicas: 1
       persistence:
         enabled: true
-        size: 10Gi
+        size: 1Gi
 
     registry:
       image:
@@ -95,7 +95,7 @@ spec:
       replicas: 1
       persistence:
         enabled: true
-        size: 100Gi
+        size: 10Gi
 
     portal:
       image:
