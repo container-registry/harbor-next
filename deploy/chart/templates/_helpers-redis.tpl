@@ -63,16 +63,26 @@ REDIS_PASSWORD
 {{- end }}
 
 {{/*
-Return the Base Redis URL for Harbor components
+Return the Base Redis URL for Harbor components.
+Honors `harbor.redis.scheme` (redis/rediss/redis+sentinel/rediss+sentinel) and
+includes `$(REDIS_PASSWORD)` whenever auth is required:
+  - valkey.auth.enabled
+  - externalRedis.existingSecret (key supplies a password)
+  - externalRedis.password is non-empty
 */}}
 {{- define "harbor.redis.url" -}}
   {{- $root := . -}}
+  {{- $scheme := include "harbor.redis.scheme" $root -}}
   {{- $host := include "harbor.redis.host" $root -}}
   {{- $port := include "harbor.redis.port" $root -}}
-  {{- if .Values.valkey.auth.enabled -}}
-    {{- printf "redis://:$(REDIS_PASSWORD)@%s:%s" $host $port -}}
+  {{- $masterSet := include "harbor.redis.masterSet" $root -}}
+  {{- $extAuth := and (not .Values.valkey.enabled) (or (ne (.Values.externalRedis.existingSecret | toString) "") (ne (.Values.externalRedis.password | toString) "")) -}}
+  {{- $needPw := or (eq (.Values.valkey.auth.enabled | toString) "true") $extAuth -}}
+  {{- $creds := ternary ":$(REDIS_PASSWORD)@" "" (eq ($needPw | toString) "true") -}}
+  {{- if $masterSet -}}
+    {{- printf "%s://%s%s:%s/%s" $scheme $creds $host $port $masterSet -}}
   {{- else -}}
-    {{- printf "redis://%s:%s" $host $port -}}
+    {{- printf "%s://%s%s:%s" $scheme $creds $host $port -}}
   {{- end -}}
 {{- end }}
 
