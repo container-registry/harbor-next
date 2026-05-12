@@ -30,12 +30,14 @@ tls:
   enabled: true
   certSource: auto
 
-# Database configuration - use existing PostgreSQL in my-db namespace
+# Database configuration - use existing PostgreSQL in my-db namespace.
+# Prefer `database.existingSecret` for production; the inline password
+# below is a placeholder for the example only.
 database:
   host: postgresql.my-db.svc.cluster.local
   port: 5432
   username: postgres
-  password: test1234!
+  password: "CHANGE_ME"  # REQUIRED: set a strong password or use existingSecret
   database: registry
   sslmode: disable
 
