@@ -4,7 +4,7 @@ kind: Service
 metadata:
   name: "{{ template "harbor.trivy" . }}"
   labels:
-{{ include "harbor.labels" . | indent 4 }}
+    {{- include "harbor.componentLabels" (dict "root" . "component" "trivy") | nindent 4 }}
 spec:
   ports:
     - name: http-trivy
