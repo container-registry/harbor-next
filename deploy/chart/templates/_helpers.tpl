@@ -318,6 +318,17 @@ Validate required values
 {{- if and .Values.metrics.serviceMonitor.enabled (not .Values.metrics.enabled) }}
 {{- fail "metrics.serviceMonitor.enabled requires metrics.enabled=true. Without metrics enabled, Harbor pods do not expose the /metrics endpoint the ServiceMonitor would scrape." }}
 {{- end }}
+{{- /* HPA min/max sanity — fail fast at template time rather than letting K8s reject. */}}
+{{- range $name, $cfg := dict "core" .Values.core "registry" .Values.registry "jobservice" .Values.jobservice "portal" .Values.portal "trivy" .Values.trivy }}
+{{- if and $cfg.autoscaling $cfg.autoscaling.enabled }}
+{{- if not $cfg.autoscaling.maxReplicas }}
+{{- fail (printf "%s.autoscaling.enabled=true requires %s.autoscaling.maxReplicas to be set." $name $name) }}
+{{- end }}
+{{- if gt (int ($cfg.autoscaling.minReplicas | default 1)) (int $cfg.autoscaling.maxReplicas) }}
+{{- fail (printf "%s.autoscaling.minReplicas (%v) must be <= %s.autoscaling.maxReplicas (%v)." $name $cfg.autoscaling.minReplicas $name $cfg.autoscaling.maxReplicas) }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- end }}
 
 

@@ -6,7 +6,9 @@ metadata:
   labels:
     {{- include "harbor.componentLabels" (dict "root" . "component" "trivy") | nindent 4 }}
 spec:
+  {{- if not (and .Values.trivy.autoscaling .Values.trivy.autoscaling.enabled) }}
   replicas: {{ .Values.trivy.replicas }}
+  {{- end }}
   revisionHistoryLimit: {{ .Values.trivy.revisionHistoryLimit | default .Values.global.revisionHistoryLimit }}
   serviceName: {{ include "harbor.fullname" . }}-trivy
   selector:

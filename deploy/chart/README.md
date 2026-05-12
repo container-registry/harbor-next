@@ -438,6 +438,7 @@ Kubernetes: `>=1.28.0-0`
 | cache.expireHours | int | `24` | Cache expiration in hours |
 | core.affinity | object | `{}` | Affinity rules for Core pods |
 | core.artifactPullAsyncFlushDuration | string | `""` | Artifact pull async flush duration |
+| core.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler configuration. When enabled the chart OMITS the static `replicas:` field on the Deployment so HPA owns the replica count. `maxReplicas` is REQUIRED. Tracks upstream goharbor/harbor-helm#1068. |
 | core.config | object | {} | Harbor Core application config (converted to env vars in ConfigMap) Any Harbor Core config can be set here without chart changes |
 | core.configureUserSettings | string | `""` | Initial user settings JSON applied on first boot |
 | core.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
@@ -462,7 +463,7 @@ Kubernetes: `>=1.28.0-0`
 | core.podLabels | object | `{}` | Additional pod labels for Core |
 | core.podSecurityContext | object | `{"fsGroup":10000}` | Pod security context for Core |
 | core.quotaUpdateProvider | string | `"db"` | Quota update provider (db or redis) |
-| core.replicas | int | `1` | Number of Core replicas |
+| core.replicas | int | `1` | Number of Core replicas (ignored when autoscaling.enabled=true) |
 | core.resources | object | `{"limits":{"memory":"512Mi"},"requests":{"cpu":"100m","memory":"256Mi"}}` | Core resource requests and limits |
 | core.secret | object | {} | Sensitive config for Core (converted to env vars in Secret) |
 | core.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsGroup":10000,"runAsNonRoot":true,"runAsUser":10000,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for Core container |
@@ -594,6 +595,7 @@ Kubernetes: `>=1.28.0-0`
 | ipFamily.ipv4.enabled | bool | `true` |  |
 | ipFamily.ipv6.enabled | bool | `true` |  |
 | jobservice.affinity | object | `{}` | Affinity rules for Jobservice pods |
+| jobservice.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler. See `core.autoscaling` for full docs. |
 | jobservice.config | object | {} | Jobservice application config (converted to env vars in ConfigMap) |
 | jobservice.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
 | jobservice.existingSecret | string | `""` | Use existing secret for Jobservice secret |
@@ -623,7 +625,7 @@ Kubernetes: `>=1.28.0-0`
 | jobservice.podLabels | object | `{}` | Additional pod labels for Jobservice |
 | jobservice.podSecurityContext | object | `{"fsGroup":10000}` | Pod security context for Jobservice |
 | jobservice.reaper | object | `{"max_dangling_hours":168,"max_update_hours":24}` | Reaper settings |
-| jobservice.replicas | int | `1` | Number of Jobservice replicas |
+| jobservice.replicas | int | `1` | Number of Jobservice replicas (ignored when autoscaling.enabled=true) |
 | jobservice.resources | object | `{"limits":{"memory":"512Mi"},"requests":{"cpu":"100m","memory":"256Mi"}}` | Jobservice resource requests and limits |
 | jobservice.secret | object | {} | Sensitive config for Jobservice (converted to env vars in Secret) |
 | jobservice.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsGroup":10000,"runAsNonRoot":true,"runAsUser":10000,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for Jobservice container |
@@ -642,6 +644,7 @@ Kubernetes: `>=1.28.0-0`
 | metrics.serviceMonitor.scrapeTimeout | string | `"10s"` | Scrape timeout |
 | nameOverride | string | `""` | Override the chart name |
 | portal.affinity | object | `{}` | Affinity rules for Portal pods |
+| portal.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler. See `core.autoscaling` for full docs. |
 | portal.config | object | {} | Portal application config (converted to env vars in ConfigMap) |
 | portal.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
 | portal.extraEnv | list | [] | Extra environment variables with valueFrom support |
@@ -657,7 +660,7 @@ Kubernetes: `>=1.28.0-0`
 | portal.podAnnotations | object | `{}` | Additional pod annotations for Portal |
 | portal.podLabels | object | `{}` | Additional pod labels for Portal |
 | portal.podSecurityContext | object | `{"fsGroup":10000}` | Pod security context for Portal |
-| portal.replicas | int | `1` | Number of Portal replicas |
+| portal.replicas | int | `1` | Number of Portal replicas (ignored when autoscaling.enabled=true) |
 | portal.resources | object | `{"limits":{"memory":"256Mi"},"requests":{"cpu":"100m","memory":"128Mi"}}` | Portal resource requests and limits |
 | portal.secret | object | {} | Sensitive config for Portal (converted to env vars in Secret) |
 | portal.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsGroup":10000,"runAsNonRoot":true,"runAsUser":10000,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for Portal container |
@@ -673,6 +676,7 @@ Kubernetes: `>=1.28.0-0`
 | proxy.httpsProxy | string | `nil` |  |
 | proxy.noProxy | string | `"127.0.0.1,localhost,.local,.internal"` |  |
 | registry.affinity | object | `{}` | Affinity rules for Registry pods |
+| registry.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler. See `core.autoscaling` for full docs. |
 | registry.config | object | `{}` |  |
 | registry.controller | object | `{"image":{"repository":"8gears.container-registry.com/8gcr/harbor-registryctl","tag":""}}` | Registryctl image settings |
 | registry.controller.image.repository | string | `"8gears.container-registry.com/8gcr/harbor-registryctl"` | Registryctl image repository |
@@ -705,7 +709,7 @@ Kubernetes: `>=1.28.0-0`
 | registry.podLabels | object | `{}` | Additional pod labels for Registry |
 | registry.podSecurityContext | object | `{"fsGroup":10000,"fsGroupChangePolicy":"OnRootMismatch"}` | Pod security context for Registry |
 | registry.relativeurls | bool | `false` | If true, the registry returns relative URLs in Location headers |
-| registry.replicas | int | `1` | Number of Registry replicas |
+| registry.replicas | int | `1` | Number of Registry replicas (ignored when autoscaling.enabled=true) |
 | registry.resources | object | `{"limits":{"memory":"512Mi"},"requests":{"cpu":"100m","memory":"256Mi"}}` | Registry resource requests and limits |
 | registry.secret | object | {} | Sensitive config for Registry (converted to env vars in Secret) |
 | registry.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsGroup":10000,"runAsNonRoot":true,"runAsUser":10000,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for Registry container |
@@ -741,6 +745,7 @@ Kubernetes: `>=1.28.0-0`
 | trace.provider | string | `"jaeger"` |  |
 | trace.sample_rate | int | `1` |  |
 | trivy.affinity | object | `{}` | Affinity rules for Trivy pods |
+| trivy.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler for the Trivy StatefulSet. See `core.autoscaling` for full docs. |
 | trivy.dbRepository[0] | string | `"mirror.gcr.io/aquasec/trivy-db"` |  |
 | trivy.dbRepository[1] | string | `"ghcr.io/aquasecurity/trivy-db"` |  |
 | trivy.debugMode | bool | `false` | Debug mode for more verbose scanning log |
@@ -768,7 +773,7 @@ Kubernetes: `>=1.28.0-0`
 | trivy.podAnnotations | object | `{}` | Additional pod annotations for Trivy |
 | trivy.podLabels | object | `{}` | Additional pod labels for Trivy |
 | trivy.podSecurityContext | object | `{"fsGroup":10000}` | Pod security context for Trivy |
-| trivy.replicas | int | `1` | Number of Trivy replicas |
+| trivy.replicas | int | `1` | Number of Trivy replicas (ignored when autoscaling.enabled=true) |
 | trivy.resources | object | `{"limits":{"cpu":1,"memory":"1Gi"},"requests":{"cpu":"200m","memory":"512Mi"}}` | Trivy resource requests and limits |
 | trivy.securityCheck | string | `"vuln"` |  |
 | trivy.securityContext | object | `{"runAsGroup":10000,"runAsNonRoot":true,"runAsUser":10000}` | Security context for Trivy container |

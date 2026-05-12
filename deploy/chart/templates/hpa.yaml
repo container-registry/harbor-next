@@ -1,0 +1,71 @@
+{{/*
+HorizontalPodAutoscaler resources — one per component that opts in via
+`<component>.autoscaling.enabled: true`. Tracks upstream
+goharbor/harbor-helm#1068 — production users needed CPU/memory-driven
+scaling for core / registry / trivy. Upstream never landed it.
+
+When a component has autoscaling enabled, the corresponding Deployment /
+StatefulSet template must NOT set `replicas:` — otherwise every helm
+upgrade would reset the count and fight the HPA. That conditional lives
+in each controller template.
+
+Generated names follow the `<fullname>-<component>` pattern so they line
+up with the Deployment / StatefulSet they target.
+
+The chart uses apiVersion `autoscaling/v2`, GA since Kubernetes 1.23.
+The Chart.yaml minimum kubeVersion (`>=1.28.0-0`) covers it.
+*/}}
+{{- $components := list
+  (dict "name" "core" "kind" "Deployment" "values" .Values.core)
+  (dict "name" "jobservice" "kind" "Deployment" "values" .Values.jobservice)
+  (dict "name" "registry" "kind" "Deployment" "values" .Values.registry)
+  (dict "name" "portal" "kind" "Deployment" "values" .Values.portal)
+  (dict "name" "trivy" "kind" "StatefulSet" "values" .Values.trivy)
+-}}
+{{- range $c := $components }}
+{{- $vals := $c.values }}
+{{- if and $vals.autoscaling $vals.autoscaling.enabled }}
+{{- /* Skip trivy HPA when trivy itself is disabled — otherwise the HPA
+       targets a controller that doesn't exist. */}}
+{{- if not (and (eq $c.name "trivy") (not $.Values.trivy.enabled)) }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "harbor.fullname" $ }}-{{ $c.name }}
+  labels:
+    {{- include "harbor.componentLabels" (dict "root" $ "component" $c.name) | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: {{ $c.kind }}
+    name: {{ include "harbor.fullname" $ }}-{{ $c.name }}
+  minReplicas: {{ $vals.autoscaling.minReplicas | default 1 }}
+  maxReplicas: {{ required (printf "%s.autoscaling.maxReplicas is required when autoscaling is enabled" $c.name) $vals.autoscaling.maxReplicas }}
+  metrics:
+    {{- if $vals.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $vals.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if $vals.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ $vals.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+    {{- with $vals.autoscaling.metrics }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with $vals.autoscaling.behavior }}
+  behavior:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

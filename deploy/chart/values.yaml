@@ -344,8 +344,22 @@ core:
     # -- Core image tag (defaults to appVersion)
     tag: ""
 
-  # -- Number of Core replicas
+  # -- Number of Core replicas (ignored when autoscaling.enabled=true)
   replicas: 1
+
+  # -- HorizontalPodAutoscaler configuration. When enabled the chart
+  # OMITS the static `replicas:` field on the Deployment so HPA owns
+  # the replica count. `maxReplicas` is REQUIRED. Tracks upstream
+  # goharbor/harbor-helm#1068.
+  # @default -- See [values.yaml](values.yaml)
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    # maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
+    # metrics: []   # raw HPAv2 metric specs (external / object / pods)
+    # behavior: {}  # scaleUp / scaleDown stabilization windows
 
   # -- Core resource requests and limits
   resources:
@@ -549,8 +563,19 @@ registry:
       # -- Registryctl image tag (defaults to appVersion)
       tag: ""
 
-  # -- Number of Registry replicas
+  # -- Number of Registry replicas (ignored when autoscaling.enabled=true)
   replicas: 1
+
+  # -- HorizontalPodAutoscaler. See `core.autoscaling` for full docs.
+  # @default -- See [values.yaml](values.yaml)
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    # maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
+    # metrics: []
+    # behavior: {}
 
   # -- Registry persistence settings
   persistence:
@@ -685,8 +710,19 @@ portal:
     # -- Portal image tag (defaults to appVersion)
     tag: ""
 
-  # -- Number of Portal replicas
+  # -- Number of Portal replicas (ignored when autoscaling.enabled=true)
   replicas: 1
+
+  # -- HorizontalPodAutoscaler. See `core.autoscaling` for full docs.
+  # @default -- See [values.yaml](values.yaml)
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    # maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
+    # metrics: []
+    # behavior: {}
 
   # -- Portal resource requests and limits
   resources:
@@ -817,8 +853,19 @@ jobservice:
     # -- Jobservice image tag (defaults to appVersion)
     tag: ""
 
-  # -- Number of Jobservice replicas
+  # -- Number of Jobservice replicas (ignored when autoscaling.enabled=true)
   replicas: 1
+
+  # -- HorizontalPodAutoscaler. See `core.autoscaling` for full docs.
+  # @default -- See [values.yaml](values.yaml)
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    # maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
+    # metrics: []
+    # behavior: {}
 
   # -- Jobservice resource requests and limits
   resources:
@@ -1148,8 +1195,21 @@ trivy:
     repository: 8gears.container-registry.com/8gcr/trivy-adapter
     # -- Trivy adapter image tag (defaults to appVersion)
     tag: ""
-  # -- Number of Trivy replicas
+  # -- Number of Trivy replicas (ignored when autoscaling.enabled=true)
   replicas: 1
+
+  # -- HorizontalPodAutoscaler for the Trivy StatefulSet. See
+  # `core.autoscaling` for full docs.
+  # @default -- See [values.yaml](values.yaml)
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    # maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
+    # metrics: []
+    # behavior: {}
+
   # -- Trivy resource requests and limits
   resources:
     requests:

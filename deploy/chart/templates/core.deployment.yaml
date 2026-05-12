@@ -5,7 +5,9 @@ metadata:
   labels:
     {{- include "harbor.componentLabels" (dict "root" . "component" "core") | nindent 4 }}
 spec:
+  {{- if not (and .Values.core.autoscaling .Values.core.autoscaling.enabled) }}
   replicas: {{ .Values.core.replicas }}
+  {{- end }}
   revisionHistoryLimit: {{ .Values.core.revisionHistoryLimit | default .Values.global.revisionHistoryLimit }}
   {{- with .Values.core.deploymentStrategy }}
   strategy:

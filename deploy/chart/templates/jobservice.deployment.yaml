@@ -5,7 +5,9 @@ metadata:
   labels:
     {{- include "harbor.componentLabels" (dict "root" . "component" "jobservice") | nindent 4 }}
 spec:
+  {{- if not (and .Values.jobservice.autoscaling .Values.jobservice.autoscaling.enabled) }}
   replicas: {{ .Values.jobservice.replicas }}
+  {{- end }}
   revisionHistoryLimit: {{ .Values.jobservice.revisionHistoryLimit | default .Values.global.revisionHistoryLimit }}
   {{- with .Values.jobservice.deploymentStrategy }}
   strategy:

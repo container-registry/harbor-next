@@ -5,7 +5,9 @@ metadata:
   labels:
     {{- include "harbor.componentLabels" (dict "root" . "component" "registry") | nindent 4 }}
 spec:
+  {{- if not (and .Values.registry.autoscaling .Values.registry.autoscaling.enabled) }}
   replicas: {{ .Values.registry.replicas }}
+  {{- end }}
   revisionHistoryLimit: {{ .Values.registry.revisionHistoryLimit | default .Values.global.revisionHistoryLimit }}
   {{- with .Values.registry.deploymentStrategy }}
   strategy:

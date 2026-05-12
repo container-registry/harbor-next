@@ -941,6 +941,18 @@
             "preStop": { "type": "object" }
           }
         },
+        "autoscaling": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "minReplicas": { "type": "integer", "minimum": 1 },
+            "maxReplicas": { "type": "integer", "minimum": 1 },
+            "targetCPUUtilizationPercentage": { "type": "integer", "minimum": 1, "maximum": 100 },
+            "targetMemoryUtilizationPercentage": { "type": "integer", "minimum": 1, "maximum": 100 },
+            "metrics": { "type": "array" },
+            "behavior": { "type": "object" }
+          }
+        },
         "affinity": {
           "type": "object"
         },

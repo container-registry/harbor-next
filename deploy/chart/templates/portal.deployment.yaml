@@ -5,7 +5,9 @@ metadata:
   labels:
     {{- include "harbor.componentLabels" (dict "root" . "component" "portal") | nindent 4 }}
 spec:
+  {{- if not (and .Values.portal.autoscaling .Values.portal.autoscaling.enabled) }}
   replicas: {{ .Values.portal.replicas }}
+  {{- end }}
   revisionHistoryLimit: {{ .Values.portal.revisionHistoryLimit | default .Values.global.revisionHistoryLimit }}
   {{- with .Values.portal.deploymentStrategy }}
   strategy:
