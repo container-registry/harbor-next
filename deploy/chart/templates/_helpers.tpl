@@ -311,6 +311,9 @@ Validate required values
 {{- if gt $enabledExposeMethods 1 }}
 {{- fail "Only one expose method can be enabled at a time (ingress, gateway, expose.clusterIP, expose.nodePort, expose.loadBalancer, expose.route)." }}
 {{- end }}
+{{- if and .Values.metrics.serviceMonitor.enabled (not .Values.metrics.enabled) }}
+{{- fail "metrics.serviceMonitor.enabled requires metrics.enabled=true. Without metrics enabled, Harbor pods do not expose the /metrics endpoint the ServiceMonitor would scrape." }}
+{{- end }}
 {{- end }}
 
 
