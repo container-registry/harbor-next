@@ -31,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter, nginx]
+        component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter]
         platform:
           - linux/amd64
           - linux/arm64
@@ -157,7 +157,7 @@ jobs:
     needs: [release-please, build]
     strategy:
       matrix:
-        component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter, nginx]
+        component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter]
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
@@ -231,7 +231,7 @@ jobs:
 
       - name: Sign images
         run: |
-          for image in core jobservice registryctl exporter portal registry trivy-adapter nginx; do
+          for image in core jobservice registryctl exporter portal registry trivy-adapter; do
             cosign sign --yes \
               "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-${image}:${VERSION}"
           done
@@ -269,7 +269,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           REGISTRY="${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}"
-          IMAGES="core jobservice registryctl exporter portal registry trivy-adapter nginx"
+          IMAGES="core jobservice registryctl exporter portal registry trivy-adapter"
 
           HIGHLIGHTS=""
           PREV_TAG=$(gh release list --limit 20 --json tagName \
