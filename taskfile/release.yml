@@ -1,0 +1,256 @@
+# Release artifact tasks.
+#
+# GitHub-specific release orchestration stays in .github/workflows. This file
+# owns the composable artifact pipeline: enterprise patches, multi-arch image
+# builds, manifest tags, cosign signatures, SBOMs, and attestations.
+
+version: '3'
+
+includes:
+  build:
+    taskfile: ./build.yml
+    dir: ..
+    internal: true
+
+vars:
+  RELEASE_COMPONENTS: '{{.RELEASE_COMPONENTS | default "core,jobservice,registryctl,exporter,portal,registry,trivy-adapter,nginx"}}'
+  RELEASE_GO_COMPONENTS: '{{.RELEASE_GO_COMPONENTS | default "core,jobservice,registryctl,exporter,registry,trivy-adapter"}}'
+  RELEASE_PLATFORMS: '{{.RELEASE_PLATFORMS | default .IMAGE_PLATFORMS}}'
+  RELEASE_WORK_DIR: '{{.RELEASE_WORK_DIR | default "tmp/release"}}'
+  RELEASE_DIGESTS_DIR: '{{.RELEASE_WORK_DIR}}/digests'
+  RELEASE_PATCHES_REPO: '{{.RELEASE_WORK_DIR}}/patches-repo'
+  RELEASE_SBOM_DIR: '{{.RELEASE_WORK_DIR}}/sboms'
+  RELEASE_BUILDER: '{{.RELEASE_BUILDER | default "harbor-release"}}'
+  PATCHES_OWNER: '{{.PATCHES_OWNER | default "container-registry"}}'
+  PATCHES_REPO: '{{.PATCHES_REPO | default "8gcr"}}'
+  PATCHES_PATH: '{{.PATCHES_PATH | default "8gcr-ee/patches"}}'
+
+tasks:
+  run:
+    desc: "Build, push, sign, and attest release images"
+    requires:
+      vars: [VERSION]
+    cmds:
+      - task: check-tools
+      - task: patches:apply
+      - task: docker:login
+      - task: buildx:setup
+      - task: build:gen-apis
+      - task: build-images
+        vars:
+          VERSION: '{{.VERSION}}'
+          GIT_COMMIT: '{{.GIT_COMMIT}}'
+      - task: merge-images
+        vars:
+          VERSION: '{{.VERSION}}'
+      - task: sign-images
+        vars:
+          VERSION: '{{.VERSION}}'
+      - task: attest-sboms
+        vars:
+          VERSION: '{{.VERSION}}'
+
+  check-tools:
+    internal: true
+    cmds:
+      - command -v git >/dev/null
+      - command -v docker >/dev/null
+      - command -v go >/dev/null
+      - command -v node >/dev/null
+
+  patches:clone:
+    internal: true
+    cmds:
+      - |
+        set -eu
+        if [ -z "${PATCHES_TOKEN:-}" ]; then
+          echo "PATCHES_TOKEN is required to clone {{.PATCHES_OWNER}}/{{.PATCHES_REPO}}" >&2
+          exit 1
+        fi
+        rm -rf "{{.RELEASE_PATCHES_REPO}}"
+        mkdir -p "{{.RELEASE_WORK_DIR}}"
+        git clone --depth=1 \
+          "https://x-access-token:${PATCHES_TOKEN}@github.com/{{.PATCHES_OWNER}}/{{.PATCHES_REPO}}" \
+          "{{.RELEASE_PATCHES_REPO}}"
+
+  patches:apply:
+    desc: "Apply enterprise patches from the private patches repository"
+    deps: [patches:clone]
+    cmds:
+      - |
+        set -eu
+        series="{{.RELEASE_PATCHES_REPO}}/{{.PATCHES_PATH}}/series"
+        if [ ! -f "$series" ]; then
+          echo "No enterprise patch series found at $series"
+          exit 0
+        fi
+        while IFS= read -r line; do
+          patch="${line%%#*}"
+          patch="$(printf '%s' "$patch" | xargs)"
+          [ -z "$patch" ] && continue
+          git apply --binary "{{.RELEASE_PATCHES_REPO}}/{{.PATCHES_PATH}}/$patch"
+        done < "$series"
+
+  docker:login:
+    desc: "Log in to the release container registry"
+    cmds:
+      - |
+        set -eu
+        if [ -z "${REGISTRY_USERNAME:-}" ] || [ -z "${REGISTRY_PASSWORD:-}" ]; then
+          echo "REGISTRY_USERNAME and REGISTRY_PASSWORD are required" >&2
+          exit 1
+        fi
+        printf '%s' "$REGISTRY_PASSWORD" | docker login {{.REGISTRY_ADDRESS}} --username "$REGISTRY_USERNAME" --password-stdin
+
+  buildx:setup:
+    desc: "Prepare the Docker Buildx builder for release builds"
+    cmds:
+      - |
+        set -eu
+        if docker buildx inspect {{.RELEASE_BUILDER}} >/dev/null 2>&1; then
+          docker buildx use {{.RELEASE_BUILDER}}
+        elif [ -n "${BUILDX_HOST:-}" ]; then
+          docker buildx create --name {{.RELEASE_BUILDER}} --driver remote "$BUILDX_HOST" --use
+        else
+          docker buildx create --name {{.RELEASE_BUILDER}} --driver docker-container --use
+        fi
+        docker buildx inspect --bootstrap
+
+  build-images:
+    desc: "Build and push per-platform release images by digest"
+    requires:
+      vars: [VERSION, GIT_COMMIT]
+    cmds:
+      - |
+        set -eu
+        rm -rf "{{.RELEASE_DIGESTS_DIR}}"
+        mkdir -p "{{.RELEASE_DIGESTS_DIR}}"
+        for component in $(printf '%s' "{{.RELEASE_COMPONENTS}}" | tr ',' ' '); do
+          for platform in $(printf '%s' "{{.RELEASE_PLATFORMS}}" | tr ',' ' '); do
+            task release:build-image COMPONENT="$component" PLATFORM="$platform" VERSION="{{.VERSION}}" GIT_COMMIT="{{.GIT_COMMIT}}"
+          done
+        done
+
+  build-image:
+    internal: true
+    requires:
+      vars: [COMPONENT, PLATFORM, VERSION, GIT_COMMIT]
+    cmds:
+      - |
+        set -eu
+        component="{{.COMPONENT}}"
+        platform="{{.PLATFORM}}"
+        platform_pair="$(printf '%s' "$platform" | tr '/' '-')"
+        dockerfile="dockerfile/${component}.dockerfile"
+        metadata_file="{{.RELEASE_WORK_DIR}}/metadata-${component}-${platform_pair}.json"
+        if [ ! -f "$dockerfile" ]; then
+          echo "$dockerfile is required for release component $component" >&2
+          exit 1
+        fi
+
+        case ",{{.RELEASE_GO_COMPONENTS}}," in
+          *,"$component",*) task --force "build:binary:${component}:${platform_pair}" VERSION="{{.VERSION}}" GIT_COMMIT="{{.GIT_COMMIT}}" ;;
+        esac
+
+        image="{{.REGISTRY_ADDRESS}}/{{.REGISTRY_PROJECT}}/harbor-${component}"
+        docker buildx build \
+          --builder {{.RELEASE_BUILDER}} \
+          --platform "$platform" \
+          --build-arg ALPINE_VERSION={{.ALPINE_VERSION}} \
+          --build-arg LPROBE_VERSION={{.LPROBE_VERSION}} \
+          --build-arg NGINX_VERSION={{.NGINX_VERSION}} \
+          --build-arg BUN_VERSION={{.BUN_VERSION}} \
+          --build-arg GO_VERSION={{.GO_VERSION}} \
+          --build-arg DISTRIBUTION_VERSION={{.DISTRIBUTION_VERSION}} \
+          --build-arg TRIVY_VERSION={{.TRIVY_VERSION}} \
+          --build-arg TRIVY_BASE_IMAGE_VERSION={{.TRIVY_BASE_IMAGE_VERSION}} \
+          --build-arg HARBOR_SCANNER_TRIVY_VERSION={{.HARBOR_SCANNER_TRIVY_VERSION}} \
+          --tag "$image" \
+          --file "$dockerfile" \
+          --output type=image,push-by-digest=true,name-canonical=true,push=true \
+          --metadata-file "$metadata_file" \
+          .
+        digest="$(node -e 'const fs=require("fs"); const m=JSON.parse(fs.readFileSync(process.argv[1], "utf8")); console.log(m["containerimage.digest"] || "")' "$metadata_file")"
+        if [ -z "$digest" ] || [ "${digest#sha256:}" = "$digest" ]; then
+          echo "docker buildx did not write a sha256 digest for $component $platform" >&2
+          exit 1
+        fi
+        mkdir -p "{{.RELEASE_DIGESTS_DIR}}/${component}"
+        : > "{{.RELEASE_DIGESTS_DIR}}/${component}/${digest#sha256:}"
+
+  merge-images:
+    desc: "Create and push multi-arch release manifest lists"
+    requires:
+      vars: [VERSION]
+    cmds:
+      - |
+        set -eu
+        for component in $(printf '%s' "{{.RELEASE_COMPONENTS}}" | tr ',' ' '); do
+          task release:merge-image COMPONENT="$component" VERSION="{{.VERSION}}"
+        done
+
+  merge-image:
+    internal: true
+    requires:
+      vars: [COMPONENT, VERSION]
+    cmds:
+      - |
+        set -eu
+        component="{{.COMPONENT}}"
+        digest_dir="{{.RELEASE_DIGESTS_DIR}}/${component}"
+        image="{{.REGISTRY_ADDRESS}}/{{.REGISTRY_PROJECT}}/harbor-${component}"
+        set -- "$digest_dir"/*
+        if [ ! -e "$1" ]; then
+          echo "No digests found for $component in $digest_dir" >&2
+          exit 1
+        fi
+        refs=""
+        for digest_file in "$digest_dir"/*; do
+          refs="$refs ${image}@sha256:$(basename "$digest_file")"
+        done
+        # refs is intentionally split into separate imagetools arguments.
+        docker buildx imagetools create -t "${image}:{{.VERSION}}" $refs
+
+  install-cosign:
+    internal: true
+    cmds:
+      - go install github.com/sigstore/cosign/v2/cmd/cosign@{{.COSIGN_VERSION}}
+
+  install-syft:
+    internal: true
+    cmds:
+      - go install github.com/anchore/syft/cmd/syft@{{.SYFT_VERSION}}
+
+  sign-images:
+    desc: "Sign release images with cosign"
+    deps: [install-cosign]
+    requires:
+      vars: [VERSION]
+    cmds:
+      - |
+        set -eu
+        for component in $(printf '%s' "{{.RELEASE_COMPONENTS}}" | tr ',' ' '); do
+          {{.GOPATH_BIN}}/cosign sign --yes \
+            "{{.REGISTRY_ADDRESS}}/{{.REGISTRY_PROJECT}}/harbor-${component}:{{.VERSION}}"
+        done
+
+  attest-sboms:
+    desc: "Generate SPDX SBOMs and publish cosign attestations"
+    deps: [install-cosign, install-syft]
+    requires:
+      vars: [VERSION]
+    cmds:
+      - |
+        set -eu
+        mkdir -p "{{.RELEASE_SBOM_DIR}}"
+        for component in $(printf '%s' "{{.RELEASE_COMPONENTS}}" | tr ',' ' '); do
+          ref="{{.REGISTRY_ADDRESS}}/{{.REGISTRY_PROJECT}}/harbor-${component}:{{.VERSION}}"
+          sbom="{{.RELEASE_SBOM_DIR}}/sbom-${component}.spdx.json"
+          {{.GOPATH_BIN}}/syft "$ref" -o spdx-json > "$sbom"
+          {{.GOPATH_BIN}}/cosign attest --yes --predicate "$sbom" --type spdxjson "$ref"
+        done
+
+  clean:
+    desc: "Remove release task working files"
+    cmds:
+      - rm -rf {{.RELEASE_WORK_DIR}}

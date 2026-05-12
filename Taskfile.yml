@@ -52,6 +52,9 @@ includes:
   dev:
     taskfile: ./taskfile/dev.yml
     aliases: [d]
+  release:
+    taskfile: ./taskfile/release.yml
+    aliases: [r]
 
 tasks:
   default:
@@ -90,6 +93,11 @@ tasks:
     desc: "Build all container images (PUSH=false for local, PLATFORMS=linux/arm64 for single arch)"
     cmds:
       - task: image:all-images
+
+  release:
+    desc: "Build, push, sign, and attest release artifacts"
+    cmds:
+      - task: release:run
 
   clean:
     desc: "Remove all build artifacts, images, test output, and dev environment"
