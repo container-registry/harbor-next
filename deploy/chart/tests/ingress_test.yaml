@@ -2,6 +2,7 @@ suite: ingress tests
 templates:
   - templates/ingress.yaml
   - templates/gateway-httproute.yaml
+  - templates/ingress.secret.yaml
 tests:
   - it: should create ingress when enabled
     template: templates/ingress.yaml
@@ -156,3 +157,83 @@ tests:
       - matchRegex:
           path: spec.rules[0].http.paths[5].backend.service.name
           pattern: .*-portal$
+
+  # Regression guard for fdbd99f5b (Fix #7). With autoGenCert=true and
+  # multiple ingress.hosts entries, the chart must emit ONE tls Secret
+  # whose cert SAN covers every host (the helper passes the full host
+  # list to genSignedCert). If anyone "splits" this into one cert per
+  # host, the document count breaks this test.
+  - it: should render a single autoGen TLS Secret covering all hosts
+    template: templates/ingress.secret.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      ingress.enabled: true
+      ingress.autoGenCert: true
+      ingress.hosts:
+        - host: harbor.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+        - host: notary.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+      ingress.tls:
+        - hosts:
+            - harbor.example.com
+            - notary.example.com
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Secret
+      - equal:
+          path: type
+          value: kubernetes.io/tls
+      - exists:
+          path: data["tls.crt"]
+      - exists:
+          path: data["tls.key"]
+      - exists:
+          path: data["ca.crt"]
+
+  # Release-scoped Secret name regression guard for 1ef7e3877 (Fix #5).
+  # Used to be hardcoded "harbor-tls"; two releases in the same namespace
+  # would collide. Helper now returns `<fullname>-ingress-tls`.
+  - it: should give the autoGen TLS Secret a release-scoped name
+    template: templates/ingress.secret.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      ingress.enabled: true
+      ingress.autoGenCert: true
+      ingress.hosts:
+        - host: harbor.example.com
+      ingress.tls:
+        - hosts:
+            - harbor.example.com
+    asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-harbor-next-ingress-tls
+
+  - it: should not render the autoGen Secret when autoGenCert is false
+    template: templates/ingress.secret.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      ingress.enabled: true
+      ingress.autoGenCert: false
+      ingress.hosts:
+        - host: harbor.example.com
+      ingress.tls:
+        - hosts:
+            - harbor.example.com
+          secretName: external-tls
+    asserts:
+      - hasDocuments:
+          count: 0
