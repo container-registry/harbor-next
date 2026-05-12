@@ -8,11 +8,20 @@
 ## TL;DR
 
 ```bash
+# Provide DB credentials via a Secret instead of --set (process list + shell history leak)
+kubectl create secret generic my-harbor-db \
+  --from-literal=POSTGRESQL_PASSWORD='your-strong-password'
+
 helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-next \
   --set externalURL=https://harbor.example.com \
   --set database.host=my-postgres.example.com \
-  --set database.password=secret
+  --set database.existingSecret=my-harbor-db
 ```
+
+> **⚠️ Security:** Harbor's default admin credentials (`admin` / `Harbor12345`) are
+> publicly known. Set a strong password via `harborAdminPassword` (or, better, a
+> Kubernetes Secret referenced by `existingSecretAdminPassword`) and rotate it after
+> the first login.
 
 ## Why This Chart?
 
@@ -128,12 +137,16 @@ Built-in `values.schema.json` provides:
 ### Basic Installation
 
 ```bash
+# Pre-create the DB credential Secret so the password never appears on the CLI
+kubectl create namespace harbor
+kubectl -n harbor create secret generic my-harbor-db \
+  --from-literal=POSTGRESQL_PASSWORD='your-strong-password'
+
 helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-next \
   --namespace harbor \
-  --create-namespace \
   --set externalURL=https://harbor.example.com \
   --set database.host=postgres.example.com \
-  --set database.password=your-password
+  --set database.existingSecret=my-harbor-db
 ```
 
 ### With Values File

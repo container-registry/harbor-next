@@ -1,21 +1,30 @@
-# Harbor Next
+# harbor-next
 
-![Version: 3.0.0](https://img.shields.io/badge/Version-3.0.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: v2.14.1](https://img.shields.io/badge/AppVersion-v2.14.1-informational?style=flat-square)
+![Version: 3.0.0](https://img.shields.io/badge/Version-3.0.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: v2.15.0](https://img.shields.io/badge/AppVersion-v2.15.0-informational?style=flat-square)
 
 A modern, production-ready Helm chart for [Harbor Next](https://github.com/container-registry/harbor-next) - the cloud native container registry for Kubernetes.
 
 ## TL;DR
 
 ```bash
+# Provide DB credentials via a Secret instead of --set (process list + shell history leak)
+kubectl create secret generic my-harbor-db \
+  --from-literal=POSTGRESQL_PASSWORD='your-strong-password'
+
 helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-next \
   --set externalURL=https://harbor.example.com \
   --set database.host=my-postgres.example.com \
   --set database.existingSecret=my-harbor-db
 ```
 
+> **⚠️ Security:** Harbor's default admin credentials (`admin` / `Harbor12345`) are
+> publicly known. Set a strong password via `harborAdminPassword` (or, better, a
+> Kubernetes Secret referenced by `existingSecretAdminPassword`) and rotate it after
+> the first login.
+
 ## Why This Chart?
 
-This chart is a ground-up redesign of the Harbor Helm chart with modern Kubernetes best practices, built for [Harbor Next](https://github.com/container-registry/harbor-next) and Harbor.
+This chart is a ground-up redesign of the Harbor Helm chart with modern Kubernetes best practices, built for [Harbor Next](https://github.com/container-registry/harbor-next):
 
 | Feature | Legacy harbor-helm | This Chart |
 |---------|-------------------|------------|
@@ -114,7 +123,6 @@ Built-in `values.schema.json` provides:
    └────────────────┘
 ```
 -->
-![Diagram](https://kroki.io/svgbob/svg/eNp7NKXn0ZSG4YImcD2a0qSABSh55qUXpRYXK-gruCeWpJYnVio4BngqKeAAQFOAJk0ZRiEzg0uBAAD5GZlHebrYQ4X4RHLRtD3Y3Y1bnItEj0wgw_Nk6YE4DJRSA_KLShJzFOB8JJZzflEqjP9oegu6KdN2gdUFpaZnFpcUVSJiEKJdSSPUU1MJm8FKGsCkD5ZCk1HS8MxNTE8tBsrBjSI-D8yAG4VVzxqq6SEmJRORwtGk8MTeFsKxT9B8LIkUTQybblITIukJF7utTQpe-UnFqUVlmcmpsPAEk64VBcAEm1qEFMq4TAAmp5DE4mxQakIyQUnDN7WkKDMZmsjwmEBaKiI9peJNDU00KSu3EKdsDcUlPK4ykcJykfR6AamkC0vMyU6txAheCCe4JL8IWPQooJViShpBqSmZSEkIoUlJIyDMWT_YWF8PKktueUWiNvSQRk0JpIct9kqhuATYXAkO9EEEhGsFMNvlAauKRw1TFIpSC0szi1JTNJW4SHc-zBMATXrWZQ==)
 
 ## Prerequisites
 
@@ -128,13 +136,16 @@ Built-in `values.schema.json` provides:
 ### Basic Installation
 
 ```bash
+# Pre-create the DB credential Secret so the password never appears on the CLI
+kubectl create namespace harbor
+kubectl -n harbor create secret generic my-harbor-db \
+  --from-literal=POSTGRESQL_PASSWORD='your-strong-password'
+
 helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-next \
   --namespace harbor \
-  --create-namespace \
-  --set harborAdminPassword=your-strong-password \
   --set externalURL=https://harbor.example.com \
   --set database.host=postgres.example.com \
-  --set database.password=your-password
+  --set database.existingSecret=my-harbor-db
 ```
 
 ### With Values File
@@ -537,7 +548,8 @@ Kubernetes: `>=1.28.0-0`
 | expose.route.labels | object | `{}` | Route labels |
 | expose.route.tls.insecureEdgeTerminationPolicy | string | `"Redirect"` | Insecure edge termination policy: Allow, Disable, Redirect |
 | expose.route.tls.termination | string | `"edge"` | TLS termination type: edge, passthrough, or reencrypt |
-| externalRedis.existingSecret | string | `""` | Existing secret containing Redis password Must have key: REDIS_PASSWORD |
+| externalRedis.existingSecret | string | `""` | Existing secret containing Redis password |
+| externalRedis.existingSecretKey | string | `"REDIS_PASSWORD"` | Key in the existing secret that holds the Redis password |
 | externalRedis.host | string | `""` | External Redis host |
 | externalRedis.password | string | `""` | External Redis password |
 | externalRedis.port | int | `6379` | External Redis port |
@@ -589,14 +601,13 @@ Kubernetes: `>=1.28.0-0`
 | jobservice.pdb | object | `{"enabled":false,"minAvailable":1}` | PodDisruptionBudget for Jobservice |
 | jobservice.pdb.enabled | bool | `false` | Enable PodDisruptionBudget |
 | jobservice.pdb.minAvailable | int | `1` | Minimum available pods (can be integer or percentage) |
-| jobservice.persistence | object | `{"accessModes":["ReadWriteOnce"],"annotations":{},"enabled":false,"existingClaim":"","resourcePolicy":"keep","size":"1Gi","storageClass":""}` | Jobservice persistence settings |
+| jobservice.persistence | object | `{"accessModes":["ReadWriteOnce"],"annotations":{},"enabled":false,"existingClaim":"","resourcePolicy":"keep","size":"1Gi"}` | Jobservice persistence settings |
 | jobservice.persistence.accessModes | list | `["ReadWriteOnce"]` | PVC access modes |
 | jobservice.persistence.annotations | object | `{}` | Annotations for PVC |
 | jobservice.persistence.enabled | bool | `false` | Enable persistence for jobservice |
 | jobservice.persistence.existingClaim | string | `""` | Existing PVC name (disables dynamic provisioning) |
 | jobservice.persistence.resourcePolicy | string | `"keep"` | Resource policy: "keep" prevents PVC deletion on helm uninstall |
 | jobservice.persistence.size | string | `"1Gi"` | PVC size |
-| jobservice.persistence.storageClass | string | `""` | Storage class for PVC |
 | jobservice.podAnnotations | object | `{}` | Additional pod annotations for Jobservice |
 | jobservice.podLabels | object | `{}` | Additional pod labels for Jobservice |
 | jobservice.podSecurityContext | object | `{"fsGroup":10000}` | Pod security context for Jobservice |
@@ -668,14 +679,13 @@ Kubernetes: `>=1.28.0-0`
 | registry.pdb | object | `{"enabled":false,"minAvailable":1}` | PodDisruptionBudget for Registry |
 | registry.pdb.enabled | bool | `false` | Enable PodDisruptionBudget |
 | registry.pdb.minAvailable | int | `1` | Minimum available pods (can be integer or percentage) |
-| registry.persistence | object | `{"accessModes":["ReadWriteOnce"],"annotations":{},"enabled":false,"existingClaim":"","resourcePolicy":"keep","size":"10Gi","storageClass":""}` | Registry persistence settings |
+| registry.persistence | object | `{"accessModes":["ReadWriteOnce"],"annotations":{},"enabled":false,"existingClaim":"","resourcePolicy":"keep","size":"10Gi"}` | Registry persistence settings |
 | registry.persistence.accessModes | list | `["ReadWriteOnce"]` | PVC access modes |
 | registry.persistence.annotations | object | `{}` | Annotations for PVC |
 | registry.persistence.enabled | bool | `false` | Enable persistence for registry |
 | registry.persistence.existingClaim | string | `""` | Existing PVC name (disables dynamic provisioning) |
 | registry.persistence.resourcePolicy | string | `"keep"` | Resource policy: "keep" prevents PVC deletion on helm uninstall |
 | registry.persistence.size | string | `"10Gi"` | PVC size |
-| registry.persistence.storageClass | string | `""` | Storage class for PVC |
 | registry.podAnnotations | object | `{}` | Additional pod annotations for Registry |
 | registry.podLabels | object | `{}` | Additional pod labels for Registry |
 | registry.podSecurityContext | object | `{"fsGroup":10000,"fsGroupChangePolicy":"OnRootMismatch"}` | Pod security context for Registry |
@@ -733,13 +743,12 @@ Kubernetes: `>=1.28.0-0`
 | trivy.pdb | object | `{"enabled":false,"minAvailable":1}` | PodDisruptionBudget for Trivy |
 | trivy.pdb.enabled | bool | `false` | Enable PodDisruptionBudget |
 | trivy.pdb.minAvailable | int | `1` | Minimum available pods |
-| trivy.persistence | object | `{"accessModes":["ReadWriteOnce"],"annotations":{},"enabled":false,"existingClaim":"","size":"5Gi","storageClass":""}` | Trivy persistence settings - used for cache |
+| trivy.persistence | object | `{"accessModes":["ReadWriteOnce"],"annotations":{},"enabled":false,"existingClaim":"","size":"5Gi"}` | Trivy persistence settings - used for cache |
 | trivy.persistence.accessModes | list | `["ReadWriteOnce"]` | PVC access modes |
 | trivy.persistence.annotations | object | `{}` | Annotations for PVC |
 | trivy.persistence.enabled | bool | `false` | Enable persistence for registry |
 | trivy.persistence.existingClaim | string | `""` | Existing PVC name (disables dynamic provisioning) |
 | trivy.persistence.size | string | `"5Gi"` | PVC size |
-| trivy.persistence.storageClass | string | `""` | Storage class for PVC |
 | trivy.podAnnotations | object | `{}` | Additional pod annotations for Trivy |
 | trivy.podLabels | object | `{}` | Additional pod labels for Trivy |
 | trivy.podSecurityContext | object | `{"fsGroup":10000}` | Pod security context for Trivy |
