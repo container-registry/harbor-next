@@ -58,9 +58,18 @@ spec:
           envFrom:
             - secretRef:
                 name: {{ include "harbor.registry.name" . }}
-          {{- with .Values.registry.extraEnv }}
+          {{- if or .Values.registry.existingSecret .Values.registry.extraEnv }}
           env:
+            {{- if .Values.registry.existingSecret }}
+            - name: REGISTRY_HTTP_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.registry.existingSecret }}
+                  key: {{ .Values.registry.existingSecretKey | default "REGISTRY_HTTP_SECRET" }}
+            {{- end }}
+            {{- with .Values.registry.extraEnv }}
             {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- end }}
           livenessProbe:
             httpGet:
