@@ -140,7 +140,7 @@ spec:
           secret:
             secretName: {{ .Values.core.existingSecret | default (include "harbor.core" .) }}
             items:
-              - key: secretKey
+              - key: {{ if .Values.core.existingSecret }}{{ .Values.core.existingSecretKey | default "secret" }}{{ else }}secretKey{{ end }}
                 path: key
         - name: token-service-private-key
           secret:
