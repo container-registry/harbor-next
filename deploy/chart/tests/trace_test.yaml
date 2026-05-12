@@ -42,3 +42,52 @@ tests:
       - equal:
           path: data.TRACE_SAMPLE_RATE
           value: "1"
+
+  # Regression guard for c50cf9f27 (Fix #17). registryctl.configmap.yaml
+  # used `nindent 2` on a helper that already emits 2-space-indented
+  # keys, double-indenting them to 4 spaces — invalid YAML. helm install
+  # failed with `did not find expected key` whenever trace.enabled=true.
+  #
+  # If the regression returns, helm-unittest fails to render the
+  # ConfigMap at all and these asserts cannot resolve their paths.
+  - it: should render valid YAML with trace.enabled=true (P0 install-breaker guard)
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trace.enabled: true
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: data._PLACEHOLDER
+          value: "true"
+      # TRACE_* keys must be siblings of _PLACEHOLDER under `data:`,
+      # not nested below _PLACEHOLDER (which is what the bug produced).
+      - equal:
+          path: data.TRACE_ENABLED
+          value: "true"
+      - equal:
+          path: data.TRACE_SERVICE_NAME
+          value: "harbor-registryctl"
+
+  - it: should not emit "<no value>" when optional trace fields are absent
+    # Regression guard for 50d34a593 (Fix #22). Helm renders unset
+    # template vars as the literal `<no value>` inside quotes; the
+    # helper now wraps optional fields in `{{- with }}` so missing
+    # values omit the key entirely.
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trace.enabled: true
+    asserts:
+      - notMatchRegex:
+          path: data.TRACE_ENABLED
+          pattern: "<no value>"
+      - notMatchRegex:
+          path: data.TRACE_SAMPLE_RATE
+          pattern: "<no value>"
+      - notMatchRegex:
+          path: data.TRACE_JAEGER_ENDPOINT
+          pattern: "<no value>"
