@@ -78,15 +78,14 @@ sops --age "$AGE_PUB" --encrypted-regex '^(data|stringData)$' \
   -e plaintext-secrets.yaml > deploy/flux/8gcr-dev/secrets.sops.yaml
 ```
 
-The three `Secret` resources in the file:
+The two `Secret` resources in the file:
 
-| Name | Type | Keys | Used by |
+| Name | Type | Keys | Consumers |
 |---|---|---|---|
 | `harbor-admin` | `Opaque` | `HARBOR_ADMIN_PASSWORD` | Harbor Core (`existingSecretAdminPassword`). |
-| `harbor-database` | `Opaque` | `POSTGRESQL_PASSWORD` | Harbor Core/Jobservice runtime DB client (`database.existingSecret`). |
-| `harbor-db-password` | `kubernetes.io/basic-auth` | `username` (`harbor`), `password` | CNPG bootstrap (`spec.bootstrap.initdb.secret.name`). |
+| `harbor-db-password` | `kubernetes.io/basic-auth` | `username` (`harbor`), `password` | (1) CNPG bootstrap — `Cluster.spec.bootstrap.initdb.secret.name`; (2) Harbor's chart — `database.existingSecret` + `existingSecretKey: password`. Same Secret, both consumers. |
 
-`harbor-database/POSTGRESQL_PASSWORD` and `harbor-db-password/password` MUST hold the same value — CNPG initdb seeds Postgres with one, the chart connects with the other.
+One DB Secret, one source of truth: rotating `harbor-db-password.password` updates both CNPG-initdb (on a fresh Cluster) and Harbor's runtime client in one place. No risk of the runtime password drifting away from what was seeded into Postgres.
 
 ## Release vs dev
 

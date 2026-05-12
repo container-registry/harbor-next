@@ -47,15 +47,20 @@ spec:
         nginx.ingress.kubernetes.io/ssl-redirect: "true"
         cert-manager.io/cluster-issuer: letsencrypt-prod
 
-    # ---- Database (external; provisioned by k8s/apps) ----
+    # ---- Database ----
+    # Both CNPG bootstrap (extraManifests below) and Harbor's runtime DB client
+    # read the SAME Secret/harbor-db-password. CNPG requires basic-auth type
+    # (keys: username, password); Harbor's chart reads .password via
+    # existingSecretKey. One secret, one source of truth — no drift between
+    # bootstrap and runtime.
     database:
-      host: postgres.8gcr-dev-main.svc.cluster.local
+      host: harbor-db-rw.8gcr-dev-main.svc.cluster.local
       port: 5432
       username: harbor
       database: registry
       sslmode: disable
-      existingSecret: harbor-database
-      existingSecretKey: POSTGRESQL_PASSWORD
+      existingSecret: harbor-db-password
+      existingSecretKey: password
 
     # ---- Valkey (in-chart, default standalone) ----
     valkey:
@@ -82,6 +87,7 @@ spec:
       replicas: 1
       persistence:
         enabled: true
+        storageClass: local-path
         size: 1Gi
 
     registry:
@@ -95,6 +101,7 @@ spec:
       replicas: 1
       persistence:
         enabled: true
+        storageClass: local-path
         size: 10Gi
 
     portal:
