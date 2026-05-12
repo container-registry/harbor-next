@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# bootstrap.yaml is intentionally NOT listed here — it's the one-time
+# kubectl-apply entry point that creates the Flux Kustomization which
+# reconciles this directory. Reconciling it from inside would be circular.
+resources:
+  - namespace.yaml
+  - secrets.sops.yaml
+  - ocirepository.yaml
+  - helmrelease.yaml

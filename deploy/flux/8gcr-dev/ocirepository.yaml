@@ -1,0 +1,15 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: harbor-next-chart
+  namespace: 8gcr-dev-main
+spec:
+  interval: 5m
+  url: oci://8gears.container-registry.com/8gcr-dev/chart/harbor-next
+  ref:
+    # Floating semver-shaped tag (helm-controller v1.3+ requires the
+    # OCIRepository revision to be parseable as SemVer). The chart-publish
+    # workflow rewrites this tag on every push to main; the underlying
+    # versioned tags (3.0.0-main.<sha7>) stay immutable for traceability.
+    tag: 3.0.0-dev
+  # 8gcr-dev is a public Harbor project — anonymous pulls work, no secretRef.
