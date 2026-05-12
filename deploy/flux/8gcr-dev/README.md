@@ -26,10 +26,12 @@ A flat directory of Flux v2 manifests:
 In namespace `8gcr-dev-main`:
 
 - `Secret/harbor-admin` — admin password (key `HARBOR_ADMIN_PASSWORD`).
-- `Secret/harbor-database` — PostgreSQL password (key `POSTGRESQL_PASSWORD`).
+- `Secret/harbor-database` — PostgreSQL password Harbor reads at runtime (key `POSTGRESQL_PASSWORD`).
+- `Secret/harbor-db-password` — CNPG bootstrap secret (keys `username`, `password`, `type=kubernetes.io/basic-auth`). Must hold the same password as `harbor-database/POSTGRESQL_PASSWORD`.
 - `Secret/harbor-oci-pull` — `dockerconfigjson` to pull the chart and component images from `8gears.container-registry.com`.
 - `Certificate/harbor-tls` — issued by `letsencrypt-prod` ClusterIssuer for `8gcr.container-registry.dev`.
-- A reachable PostgreSQL at `postgres.8gcr-dev-main.svc.cluster.local:5432` with a `registry` database owned by user `harbor` (chart does not embed Postgres).
+
+PostgreSQL itself is provisioned in-cluster via [CloudNativePG](https://cloudnative-pg.io): the chart renders a `Cluster.postgresql.cnpg.io/v1` resource through its `extraManifests` escape hatch (see `helmrelease.yaml`). The CNPG operator (already installed on hz-hopper in `cnpg-system`) reconciles it into a Postgres pod and creates the `harbor-db-rw` Service that the chart's `database.host` value references.
 
 DNS: `8gcr.container-registry.dev` A/AAAA records point at the hz-hopper ingress LoadBalancer.
 

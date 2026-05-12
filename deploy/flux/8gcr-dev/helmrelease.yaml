@@ -116,3 +116,23 @@ spec:
         repository: 8gears.container-registry.com/8gcr-dev/harbor-trivy-adapter
         tag: latest
       replicas: 1
+
+    # ---- CNPG Postgres provisioned via the chart's extraManifests escape hatch ----
+    # The harbor-db-password Secret it references is provisioned out-of-band
+    # (SOPS-encrypted in k8s/apps); must contain keys: username, password.
+    extraManifests:
+      - apiVersion: postgresql.cnpg.io/v1
+        kind: Cluster
+        metadata:
+          name: harbor-db
+        spec:
+          imageName: ghcr.io/cloudnative-pg/postgresql:17
+          instances: 1
+          storage:
+            size: 5Gi
+          bootstrap:
+            initdb:
+              database: registry
+              owner: harbor
+              secret:
+                name: harbor-db-password
