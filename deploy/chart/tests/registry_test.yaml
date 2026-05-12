@@ -164,3 +164,93 @@ tests:
       - equal:
           path: spec.template.spec.volumes[3].persistentVolumeClaim.claimName
           value: my-existing-pvc
+
+  # ============================================================================
+  # registry.existingSecret wiring
+  # Regression guards for facffbd3c (Fix #19) and 4fd719d7a.
+  #
+  # When `registry.existingSecret` is set, the generated `*-registry`
+  # Secret stops emitting REGISTRY_HTTP_SECRET. Two consumers must
+  # source it from the BYO Secret instead:
+  #   - the registry container (was missed in facffbd3c → fixed in
+  #     4fd719d7a — only had envFrom on the generated Secret)
+  #   - the registryctl sidecar (had an explicit env from facffbd3c)
+  # `existingSecretKey` defaults to REGISTRY_HTTP_SECRET so an unset
+  # key value can't render `secretKeyRef.key: ""`.
+  # ============================================================================
+
+  - it: should strip REGISTRY_HTTP_SECRET from generated Secret when existingSecret is set
+    template: templates/registry.secret.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.existingSecret: my-reg
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-harbor-next-registry
+    asserts:
+      - notExists:
+          path: data.REGISTRY_HTTP_SECRET
+
+  - it: should inject REGISTRY_HTTP_SECRET into the registry container from existingSecret
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.existingSecret: my-reg
+    asserts:
+      # registry container is containers[0]
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REGISTRY_HTTP_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: my-reg
+                key: REGISTRY_HTTP_SECRET
+
+  - it: should inject REGISTRY_HTTP_SECRET into the registryctl sidecar from existingSecret
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.existingSecret: my-reg
+    asserts:
+      # registryctl sidecar is containers[1]
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: REGISTRY_HTTP_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: my-reg
+                key: REGISTRY_HTTP_SECRET
+
+  - it: should honor a custom existingSecretKey in both containers
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.existingSecret: my-reg
+      registry.existingSecretKey: customRegKey
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REGISTRY_HTTP_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: my-reg
+                key: customRegKey
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: REGISTRY_HTTP_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: my-reg
+                key: customRegKey
