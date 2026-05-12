@@ -1,3 +1,7 @@
+# All tests assert chart-computed output for known inputs or fail-fast
+# guards. Pure Helm pass-through tests were removed — they only proved
+# `--set` works, not that the chart does anything with the value.
+# Full-render regression coverage lives in snapshots_test.yaml.
 suite: registry component tests
 templates:
   - templates/registry.deployment.yaml
@@ -8,32 +12,19 @@ templates:
   - templates/registryctl.configmap.yaml
   - templates/registryctl.secret.yaml
 tests:
-  - it: should create registry deployment with default values
+  # Pins the two-container layout (registry + registryctl sidecar) and
+  # the container ordering that the REGISTRY_HTTP_SECRET tests below
+  # depend on (containers[0]=registry, containers[1]=registryctl).
+  - it: should have both registry and registryctl containers in order
     template: templates/registry.deployment.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
     asserts:
-      - isKind:
-          of: Deployment
-      - equal:
-          path: metadata.name
-          value: RELEASE-NAME-harbor-next-registry
-      - equal:
-          path: spec.replicas
-          value: 1
       - lengthEqual:
           path: spec.template.spec.containers
           count: 2
-
-  - it: should have both registry and registryctl containers
-    template: templates/registry.deployment.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-    asserts:
       - equal:
           path: spec.template.spec.containers[0].name
           value: registry
@@ -41,6 +32,9 @@ tests:
           path: spec.template.spec.containers[1].name
           value: registryctl
 
+  # Pins the hardcoded registry (5000) and registryctl (8080) ports and
+  # their port names — both names are consumed by Service selectors and
+  # the ingress/HTTPRoute backend.service.port.name references.
   - it: should create registry service with correct ports
     template: templates/registry.service.yaml
     set:
@@ -48,8 +42,6 @@ tests:
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
     asserts:
-      - isKind:
-          of: Service
       - equal:
           path: spec.ports[0].name
           value: http-registry
@@ -63,6 +55,9 @@ tests:
           path: spec.ports[1].port
           value: 8080
 
+  # Pins the PVC-gating conditional: a PVC is rendered only when
+  # storage.type=filesystem AND persistence.enabled=true AND no
+  # existingClaim is set. Also pins size pass-through.
   - it: should create PVC when persistence is enabled with filesystem storage
     template: templates/registry.pvc.yaml
     set:
@@ -79,6 +74,8 @@ tests:
           path: spec.resources.requests.storage
           value: 100Gi
 
+  # Pins the conditional: S3 storage suppresses the registry PVC even
+  # when persistence.enabled=true (S3 is the source of truth, not PV).
   - it: should not create PVC when using S3 storage
     template: templates/registry.pvc.yaml
     set:
@@ -91,6 +88,8 @@ tests:
       - hasDocuments:
           count: 0
 
+  # Pins the gating: persistence.enabled=false suppresses the PVC even
+  # for filesystem storage type.
   - it: should not create PVC when persistence is disabled
     template: templates/registry.pvc.yaml
     set:
@@ -103,6 +102,9 @@ tests:
       - hasDocuments:
           count: 0
 
+  # Pins the conditional rendering of the filesystem storage block in
+  # config.yml (only present when storage.type=filesystem) plus the
+  # rootdirectory pass-through into the YAML body.
   - it: should configure filesystem storage in configmap
     template: templates/registry.configmap.yaml
     set:
@@ -112,8 +114,6 @@ tests:
       registry.storage.type: filesystem
       registry.storage.filesystem.rootdirectory: /data
     asserts:
-      - isKind:
-          of: ConfigMap
       - matchRegex:
           path: data["config.yml"]
           pattern: "filesystem:"
@@ -121,6 +121,9 @@ tests:
           path: data["config.yml"]
           pattern: "rootdirectory: /data"
 
+  # Pins the conditional rendering of the S3 storage block in config.yml
+  # — region and bucket flow from values into the YAML body, not just
+  # into top-level keys.
   - it: should configure S3 storage in configmap
     template: templates/registry.configmap.yaml
     set:
@@ -138,7 +141,10 @@ tests:
           path: data["config.yml"]
           pattern: "bucket: my-harbor-bucket"
 
-  - it: should use existing PVC when specified
+  # Pins the gating: setting persistence.existingClaim must suppress the
+  # generated PVC (else the chart would create a PVC AND the deployment
+  # would reference an unrelated one).
+  - it: should not render generated PVC when existingClaim is set
     template: templates/registry.pvc.yaml
     set:
       externalURL: https://harbor.example.com
@@ -151,7 +157,9 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: should use existing PVC in deployment
+  # Pins the cross-template wiring: when existingClaim is set, the
+  # deployment's storage volume must reference that claim verbatim.
+  - it: should wire existingClaim into the deployment volume
     template: templates/registry.deployment.yaml
     set:
       externalURL: https://harbor.example.com

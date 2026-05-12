@@ -1,28 +1,16 @@
+# All tests assert chart-computed output for known inputs or fail-fast
+# guards. Pure Helm pass-through tests were removed — they only proved
+# `--set` works, not that the chart does anything with the value.
+# Full-render regression coverage lives in snapshots_test.yaml.
 suite: ingress tests
 templates:
   - templates/ingress.yaml
   - templates/gateway-httproute.yaml
   - templates/ingress.secret.yaml
 tests:
-  - it: should create ingress when enabled
-    template: templates/ingress.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      ingress.enabled: true
-      ingress.hosts:
-        - host: harbor.example.com
-          paths:
-            - path: /
-              pathType: Prefix
-    asserts:
-      - isKind:
-          of: Ingress
-      - equal:
-          path: spec.rules[0].host
-          value: harbor.example.com
-
+  # Pins the top-level conditional: ingress.yaml renders 0 documents
+  # when ingress.enabled=false. Without this gate, Harbor would emit an
+  # Ingress in environments using Gateway API instead.
   - it: should not create ingress when disabled
     template: templates/ingress.yaml
     set:
@@ -34,47 +22,10 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: should set ingress class name
-    template: templates/ingress.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      ingress.enabled: true
-      ingress.className: nginx
-      ingress.hosts:
-        - host: harbor.example.com
-          paths:
-            - path: /
-              pathType: Prefix
-    asserts:
-      - equal:
-          path: spec.ingressClassName
-          value: nginx
-
-  - it: should set ingress annotations
-    template: templates/ingress.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      ingress.enabled: true
-      ingress.annotations:
-        kubernetes.io/ingress.class: nginx
-        cert-manager.io/cluster-issuer: letsencrypt-prod
-      ingress.hosts:
-        - host: harbor.example.com
-          paths:
-            - path: /
-              pathType: Prefix
-    asserts:
-      - equal:
-          path: metadata.annotations["kubernetes.io/ingress.class"]
-          value: nginx
-      - equal:
-          path: metadata.annotations["cert-manager.io/cluster-issuer"]
-          value: letsencrypt-prod
-
+  # Pins the ingress.tls templating loop: each entry in ingress.tls
+  # becomes one spec.tls[] item with secretName and hosts preserved.
+  # Borderline pass-through, but proves the range loop indexes
+  # correctly (would break silently on a `range` typo).
   - it: should configure TLS
     template: templates/ingress.yaml
     set:
@@ -99,6 +50,10 @@ tests:
           path: spec.tls[0].hosts[0]
           value: harbor.example.com
 
+  # Pins the HTTPRoute parentRefs/hostnames wiring under the
+  # gateway.enabled conditional. Gateway API output differs structurally
+  # from Ingress — name/namespace under parentRefs[0], hostnames at top
+  # level — so this guards against template-restructure regressions.
   - it: should create HTTPRoute when gateway is enabled
     template: templates/gateway-httproute.yaml
     set:
@@ -112,8 +67,6 @@ tests:
         - name: my-gateway
           namespace: default
     asserts:
-      - isKind:
-          of: HTTPRoute
       - equal:
           path: spec.hostnames[0]
           value: harbor.example.com
@@ -121,6 +74,9 @@ tests:
           path: spec.parentRefs[0].name
           value: my-gateway
 
+  # Pins the top-level conditional: gateway-httproute.yaml renders 0
+  # documents when gateway.enabled=false (the default), preventing
+  # accidental dual-stack Ingress+HTTPRoute emission.
   - it: should not create HTTPRoute when gateway is disabled
     template: templates/gateway-httproute.yaml
     set:
@@ -132,6 +88,10 @@ tests:
       - hasDocuments:
           count: 0
 
+  # Pins the chart-computed ingress path-routing table: for a single
+  # ingress.hosts[0] entry the chart emits 6 paths, with /api/ routed
+  # to the core Service and / routed to the portal Service. Anyone
+  # reordering or merging paths in ingress.yaml breaks this immediately.
   - it: should route API paths to core service
     template: templates/ingress.yaml
     set:
