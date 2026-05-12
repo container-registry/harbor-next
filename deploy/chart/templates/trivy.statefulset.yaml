@@ -134,6 +134,10 @@ spec:
             failureThreshold: 3
           resources:
             {{- toYaml .Values.trivy.resources | nindent 12 }}
+          {{- with .Values.trivy.lifecycle }}
+          lifecycle:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       volumes:
       {{- if and .Values.trivy.persistence.enabled .Values.trivy.persistence.existingClaim }}
       - name: "data"

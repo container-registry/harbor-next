@@ -66,6 +66,10 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.portal.resources | nindent 12 }}
+          {{- with .Values.portal.lifecycle }}
+          lifecycle:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           volumeMounts:
             - name: portal-config
               mountPath: /etc/nginx/nginx.conf

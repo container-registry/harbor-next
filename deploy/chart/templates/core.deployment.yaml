@@ -127,6 +127,10 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.core.resources | nindent 12 }}
+          {{- with .Values.core.lifecycle }}
+          lifecycle:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           volumeMounts:
             - name: config
               mountPath: /etc/core/app.conf

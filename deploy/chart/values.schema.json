@@ -891,6 +891,13 @@
             "required": ["ip", "hostnames"]
           }
         },
+        "lifecycle": {
+          "type": "object",
+          "properties": {
+            "postStart": { "type": "object" },
+            "preStop": { "type": "object" }
+          }
+        },
         "affinity": {
           "type": "object"
         },

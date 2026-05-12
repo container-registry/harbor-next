@@ -85,6 +85,10 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.registry.resources | nindent 12 }}
+          {{- with .Values.registry.lifecycle }}
+          lifecycle:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           volumeMounts:
             - name: storage
               mountPath: {{ .Values.registry.storage.filesystem.rootdirectory | default "/storage" }}
@@ -166,6 +170,10 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.registry.resources | nindent 12 }}
+          {{- with .Values.registry.lifecycle }}
+          lifecycle:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           volumeMounts:
             - name: storage
               mountPath: {{ .Values.registry.storage.filesystem.rootdirectory | default "/storage" }}

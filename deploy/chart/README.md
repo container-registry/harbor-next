@@ -454,6 +454,7 @@ Kubernetes: `>=1.28.0-0`
 | core.image.repository | string | `"8gears.container-registry.com/8gcr/harbor-core"` | Core image repository |
 | core.image.tag | string | `""` | Core image tag (defaults to appVersion) |
 | core.initContainers | list | `[]` | Init containers (run before main containers) |
+| core.lifecycle | object | {} | Container `lifecycle` hook spec (preStop / postStart). Common use: preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`, `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all closed without merge, the gap was never closed there. |
 | core.nodeSelector | object | `{}` | Node selector for Core pods |
 | core.pdb | object | `{"enabled":false}` | PodDisruptionBudget for Core |
 | core.pdb.enabled | bool | `false` | Enable PodDisruptionBudget. When true, exactly one of `minAvailable` or `maxUnavailable` must be set (Kubernetes rejects PDBs with both fields). |
@@ -504,6 +505,7 @@ Kubernetes: `>=1.28.0-0`
 | exporter.image.repository | string | `"8gears.container-registry.com/8gcr/harbor-exporter"` | Exporter image repository |
 | exporter.image.tag | string | `""` | Exporter image tag (defaults to appVersion) |
 | exporter.initContainers | list | `[]` | Init containers (run before main containers) |
+| exporter.lifecycle | object | {} | Container `lifecycle` hook spec (preStop / postStart). Common use: preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`, `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all closed without merge, the gap was never closed there. |
 | exporter.nodeSelector | object | `{}` | Node selector for Exporter pods |
 | exporter.pdb | object | `{"enabled":false}` | PodDisruptionBudget for Exporter |
 | exporter.pdb.enabled | bool | `false` | Enable PodDisruptionBudget. When true, exactly one of `minAvailable` or `maxUnavailable` must be set (Kubernetes rejects PDBs with both fields). |
@@ -599,6 +601,7 @@ Kubernetes: `>=1.28.0-0`
 | jobservice.image.tag | string | `""` | Jobservice image tag (defaults to appVersion) |
 | jobservice.initContainers | list | `[]` | Init containers (run before main containers) |
 | jobservice.jobLoggers | list | `["file"]` | Job loggers: file, database, or stdout |
+| jobservice.lifecycle | object | {} | Container `lifecycle` hook spec (preStop / postStart). Common use: preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`, `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all closed without merge, the gap was never closed there. |
 | jobservice.loggerSweeperDuration | int | `14` | Logger sweeper duration in days (ignored if logger is stdout) |
 | jobservice.max_job_workers | int | `4` |  |
 | jobservice.nodeSelector | object | `{}` | Node selector for Jobservice pods |
@@ -643,6 +646,7 @@ Kubernetes: `>=1.28.0-0`
 | portal.image.repository | string | `"8gears.container-registry.com/8gcr/harbor-portal"` | Portal image repository |
 | portal.image.tag | string | `""` | Portal image tag (defaults to appVersion) |
 | portal.initContainers | list | `[]` | Init containers (run before main containers) |
+| portal.lifecycle | object | {} | Container `lifecycle` hook spec (preStop / postStart). Common use: preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`, `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all closed without merge, the gap was never closed there. |
 | portal.nodeSelector | object | `{}` | Node selector for Portal pods |
 | portal.pdb | object | `{"enabled":false}` | PodDisruptionBudget for Portal |
 | portal.pdb.enabled | bool | `false` | Enable PodDisruptionBudget. When true, exactly one of `minAvailable` or `maxUnavailable` must be set (Kubernetes rejects PDBs with both fields). |
@@ -682,6 +686,7 @@ Kubernetes: `>=1.28.0-0`
 | registry.image.repository | string | `"8gears.container-registry.com/8gcr/harbor-registry"` | Registry image repository |
 | registry.image.tag | string | `""` | Registry image tag (defaults to appVersion) |
 | registry.initContainers | list | `[]` | Init containers (run before main containers) |
+| registry.lifecycle | object | {} | Container `lifecycle` hook spec (preStop / postStart). Common use: preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`, `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all closed without merge, the gap was never closed there. |
 | registry.nodeSelector | object | `{}` | Node selector for Registry pods |
 | registry.pdb | object | `{"enabled":false}` | PodDisruptionBudget for Registry |
 | registry.pdb.enabled | bool | `false` | Enable PodDisruptionBudget. When true, exactly one of `minAvailable` or `maxUnavailable` must be set (Kubernetes rejects PDBs with both fields). |
@@ -745,6 +750,7 @@ Kubernetes: `>=1.28.0-0`
 | trivy.insecure | bool | `false` | Skip verifying registry certificate |
 | trivy.javaDBRepository[0] | string | `"mirror.gcr.io/aquasec/trivy-java-db"` |  |
 | trivy.javaDBRepository[1] | string | `"ghcr.io/aquasecurity/trivy-java-db"` |  |
+| trivy.lifecycle | object | {} | Container `lifecycle` hook spec (preStop / postStart). Common use: preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`, `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all closed without merge, the gap was never closed there. |
 | trivy.nodeSelector | object | `{}` | Node selector for Trivy pods |
 | trivy.offlineScan | bool | `false` | Enable offline scan mode |
 | trivy.pdb | object | `{"enabled":false}` | PodDisruptionBudget for Trivy |

@@ -86,6 +86,10 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.jobservice.resources | nindent 12 }}
+          {{- with .Values.jobservice.lifecycle }}
+          lifecycle:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           volumeMounts:
             - name: jobservice-config
               mountPath: /etc/jobservice/config.yml

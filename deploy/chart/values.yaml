@@ -316,6 +316,16 @@ core:
     #   hostnames:
     #     - "ldap.internal"
     #     - "smtp.internal"
+  # -- Container `lifecycle` hook spec (preStop / postStart). Common use:
+  # preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding
+  # 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`,
+  # `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all
+  # closed without merge, the gap was never closed there.
+  # @default -- {}
+  lifecycle: {}
+    # preStop:
+    #   exec:
+    #     command: ["/bin/sh", "-c", "sleep 15"]
   # -- Deployment strategy (empty = K8s default RollingUpdate)
   # @default -- {}
   deploymentStrategy: {}
@@ -496,6 +506,16 @@ registry:
     #   hostnames:
     #     - "ldap.internal"
     #     - "smtp.internal"
+  # -- Container `lifecycle` hook spec (preStop / postStart). Common use:
+  # preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding
+  # 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`,
+  # `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all
+  # closed without merge, the gap was never closed there.
+  # @default -- {}
+  lifecycle: {}
+    # preStop:
+    #   exec:
+    #     command: ["/bin/sh", "-c", "sleep 15"]
   # -- Deployment strategy (empty = K8s default RollingUpdate)
   # @default -- {}
   deploymentStrategy: {}
@@ -627,6 +647,16 @@ portal:
     #   hostnames:
     #     - "ldap.internal"
     #     - "smtp.internal"
+  # -- Container `lifecycle` hook spec (preStop / postStart). Common use:
+  # preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding
+  # 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`,
+  # `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all
+  # closed without merge, the gap was never closed there.
+  # @default -- {}
+  lifecycle: {}
+    # preStop:
+    #   exec:
+    #     command: ["/bin/sh", "-c", "sleep 15"]
   # -- Deployment strategy (empty = K8s default RollingUpdate)
   # @default -- {}
   deploymentStrategy: {}
@@ -752,6 +782,16 @@ jobservice:
     #   hostnames:
     #     - "ldap.internal"
     #     - "smtp.internal"
+  # -- Container `lifecycle` hook spec (preStop / postStart). Common use:
+  # preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding
+  # 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`,
+  # `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all
+  # closed without merge, the gap was never closed there.
+  # @default -- {}
+  lifecycle: {}
+    # preStop:
+    #   exec:
+    #     command: ["/bin/sh", "-c", "sleep 15"]
   # -- Deployment strategy (empty = K8s default RollingUpdate)
   # @default -- {}
   deploymentStrategy: {}
@@ -879,6 +919,16 @@ exporter:
     #   hostnames:
     #     - "ldap.internal"
     #     - "smtp.internal"
+  # -- Container `lifecycle` hook spec (preStop / postStart). Common use:
+  # preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding
+  # 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`,
+  # `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all
+  # closed without merge, the gap was never closed there.
+  # @default -- {}
+  lifecycle: {}
+    # preStop:
+    #   exec:
+    #     command: ["/bin/sh", "-c", "sleep 15"]
   # -- Deployment strategy (empty = K8s default RollingUpdate)
   # @default -- {}
   deploymentStrategy: {}
@@ -1095,6 +1145,16 @@ trivy:
     #   hostnames:
     #     - "ldap.internal"
     #     - "smtp.internal"
+  # -- Container `lifecycle` hook spec (preStop / postStart). Common use:
+  # preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding
+  # 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`,
+  # `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all
+  # closed without merge, the gap was never closed there.
+  # @default -- {}
+  lifecycle: {}
+    # preStop:
+    #   exec:
+    #     command: ["/bin/sh", "-c", "sleep 15"]
 
   # -- Service account settings for Trivy
   serviceAccount:

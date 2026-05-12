@@ -139,3 +139,87 @@ tests:
       - equal:
           path: spec.template.spec.hostAliases[0].ip
           value: "10.0.0.70"
+
+  # ============================================================================
+  # lifecycle hooks (preStop / postStart) — per-container, not per-PodSpec.
+  # Tracks upstream goharbor/harbor-helm #1722/#1739/#2156/#2157 (all stalled).
+  # Common use: preStop sleep for LB drain on rolling upgrades.
+  # ============================================================================
+
+  - it: should render lifecycle on core container
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.lifecycle:
+        preStop:
+          exec:
+            command: ["/bin/sh", "-c", "sleep 15"]
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].lifecycle.preStop.exec.command
+          value: ["/bin/sh", "-c", "sleep 15"]
+
+  - it: should omit lifecycle when unset on core
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].lifecycle
+
+  # Registry deployment has two containers (registry + registryctl). The
+  # same lifecycle value applies to BOTH — LB drain affects either pod
+  # the Service fronts. Splitting per container would require two new
+  # values, which adds surface area without a real use case.
+  - it: should render lifecycle on both registry containers
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.lifecycle:
+        preStop:
+          exec:
+            command: ["/bin/sh", "-c", "sleep 30"]
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].lifecycle.preStop.exec.command
+          value: ["/bin/sh", "-c", "sleep 30"]
+      - equal:
+          path: spec.template.spec.containers[1].lifecycle.preStop.exec.command
+          value: ["/bin/sh", "-c", "sleep 30"]
+
+  - it: should render lifecycle on trivy StatefulSet container
+    template: templates/trivy.statefulset.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trivy.enabled: true
+      trivy.lifecycle:
+        postStart:
+          exec:
+            command: ["/bin/true"]
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].lifecycle.postStart.exec.command
+          value: ["/bin/true"]
+
+  - it: should render lifecycle on jobservice / portal / exporter
+    template: templates/jobservice.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      jobservice.lifecycle:
+        preStop:
+          exec:
+            command: ["/bin/sh", "-c", "sleep 10"]
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].lifecycle.preStop.exec.command
+          value: ["/bin/sh", "-c", "sleep 10"]
