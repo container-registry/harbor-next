@@ -93,7 +93,8 @@ spec:
                 secretKeyRef:
                   name: {{ include "harbor.database.secretName" . }}
                   key: {{ .Values.database.existingSecretKey | default "POSTGRESQL_PASSWORD" }}
-            {{- if .Values.valkey.auth.enabled }}
+            {{- $extAuth := and (not .Values.valkey.enabled) (or .Values.externalRedis.existingSecret .Values.externalRedis.password) -}}
+            {{- if or .Values.valkey.auth.enabled $extAuth }}
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:

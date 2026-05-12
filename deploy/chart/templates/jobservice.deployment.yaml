@@ -61,7 +61,8 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.core.existingSecret | default (include "harbor.core" .) }}
                   key: {{ .Values.core.existingSecretKey | default "secret" }}
-            {{- if .Values.valkey.auth.enabled }}
+            {{- $extAuth := and (not .Values.valkey.enabled) (or .Values.externalRedis.existingSecret .Values.externalRedis.password) -}}
+            {{- if or .Values.valkey.auth.enabled $extAuth }}
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
