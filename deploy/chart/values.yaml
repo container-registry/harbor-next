@@ -357,11 +357,15 @@ core:
 
   # -- PodDisruptionBudget for Core
   pdb:
-    # -- Enable PodDisruptionBudget
+    # -- Enable PodDisruptionBudget. When true, exactly one of
+    # `minAvailable` or `maxUnavailable` must be set (Kubernetes
+    # rejects PDBs with both fields).
     enabled: false
-    # -- Minimum available pods (can be integer or percentage)
-    minAvailable: 1
-    # -- Maximum unavailable pods (alternative to minAvailable)
+    # -- Minimum available pods (integer or percentage). Mutually
+    # exclusive with maxUnavailable.
+    # minAvailable: 1
+    # -- Maximum unavailable pods (integer or percentage). Mutually
+    # exclusive with minAvailable.
     # maxUnavailable: 1
 
   # -- Security context for Core container
@@ -530,11 +534,15 @@ registry:
 
   # -- PodDisruptionBudget for Registry
   pdb:
-    # -- Enable PodDisruptionBudget
+    # -- Enable PodDisruptionBudget. When true, exactly one of
+    # `minAvailable` or `maxUnavailable` must be set (Kubernetes
+    # rejects PDBs with both fields).
     enabled: false
-    # -- Minimum available pods (can be integer or percentage)
-    minAvailable: 1
-    # -- Maximum unavailable pods (alternative to minAvailable)
+    # -- Minimum available pods (integer or percentage). Mutually
+    # exclusive with maxUnavailable.
+    # minAvailable: 1
+    # -- Maximum unavailable pods (integer or percentage). Mutually
+    # exclusive with minAvailable.
     # maxUnavailable: 1
 
   # -- Security context for Registry container
@@ -623,11 +631,15 @@ portal:
 
   # -- PodDisruptionBudget for Portal
   pdb:
-    # -- Enable PodDisruptionBudget
+    # -- Enable PodDisruptionBudget. When true, exactly one of
+    # `minAvailable` or `maxUnavailable` must be set (Kubernetes
+    # rejects PDBs with both fields).
     enabled: false
-    # -- Minimum available pods (can be integer or percentage)
-    minAvailable: 1
-    # -- Maximum unavailable pods (alternative to minAvailable)
+    # -- Minimum available pods (integer or percentage). Mutually
+    # exclusive with maxUnavailable.
+    # minAvailable: 1
+    # -- Maximum unavailable pods (integer or percentage). Mutually
+    # exclusive with minAvailable.
     # maxUnavailable: 1
 
   # -- Security context for Portal container
@@ -731,11 +743,15 @@ jobservice:
 
   # -- PodDisruptionBudget for Jobservice
   pdb:
-    # -- Enable PodDisruptionBudget
+    # -- Enable PodDisruptionBudget. When true, exactly one of
+    # `minAvailable` or `maxUnavailable` must be set (Kubernetes
+    # rejects PDBs with both fields).
     enabled: false
-    # -- Minimum available pods (can be integer or percentage)
-    minAvailable: 1
-    # -- Maximum unavailable pods (alternative to minAvailable)
+    # -- Minimum available pods (integer or percentage). Mutually
+    # exclusive with maxUnavailable.
+    # minAvailable: 1
+    # -- Maximum unavailable pods (integer or percentage). Mutually
+    # exclusive with minAvailable.
     # maxUnavailable: 1
 
   # -- Security context for Jobservice container
@@ -844,11 +860,15 @@ exporter:
 
   # -- PodDisruptionBudget for Exporter
   pdb:
-    # -- Enable PodDisruptionBudget
+    # -- Enable PodDisruptionBudget. When true, exactly one of
+    # `minAvailable` or `maxUnavailable` must be set (Kubernetes
+    # rejects PDBs with both fields).
     enabled: false
-    # -- Minimum available pods (can be integer or percentage)
-    minAvailable: 1
-    # -- Maximum unavailable pods (alternative to minAvailable)
+    # -- Minimum available pods (integer or percentage). Mutually
+    # exclusive with maxUnavailable.
+    # minAvailable: 1
+    # -- Maximum unavailable pods (integer or percentage). Mutually
+    # exclusive with minAvailable.
     # maxUnavailable: 1
 
   # -- Security context for Exporter container
@@ -1010,10 +1030,16 @@ trivy:
 
   # -- PodDisruptionBudget for Trivy
   pdb:
-    # -- Enable PodDisruptionBudget
+    # -- Enable PodDisruptionBudget. When true, exactly one of
+    # `minAvailable` or `maxUnavailable` must be set (Kubernetes
+    # rejects PDBs with both fields).
     enabled: false
-    # -- Minimum available pods
-    minAvailable: 1
+    # -- Minimum available pods (integer or percentage). Mutually
+    # exclusive with maxUnavailable.
+    # minAvailable: 1
+    # -- Maximum unavailable pods (integer or percentage). Mutually
+    # exclusive with minAvailable.
+    # maxUnavailable: 1
 
   # -- Node selector for Trivy pods
   nodeSelector: {}
