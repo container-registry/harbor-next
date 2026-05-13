@@ -276,6 +276,18 @@ jobs:
         run: |
           REGISTRY="${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}"
           IMAGES="core jobservice registryctl exporter portal registry trivy-adapter"
+          GENERATED_NOTES="$(mktemp)"
+          RELEASE_BODY="$(mktemp)"
+          FORMATTED_BODY="$(mktemp)"
+
+          gh api "repos/${{ github.repository }}/releases/generate-notes" \
+            -f "tag_name=${TAG_NAME}" \
+            --jq .body > "${GENERATED_NOTES}"
+          gh release view "${TAG_NAME}" --json body -q .body > "${RELEASE_BODY}"
+          node .github/scripts/format-release-notes.mjs \
+            "${RELEASE_BODY}" \
+            "${GENERATED_NOTES}" \
+            "${FORMATTED_BODY}"
 
           HIGHLIGHTS=""
           PREV_TAG=$(gh release list --limit 20 --json tagName \
@@ -338,5 +350,5 @@ jobs:
             echo ""
             echo "---"
             echo ""
-            gh release view "${TAG_NAME}" --json body -q .body
+            cat "${FORMATTED_BODY}"
           } | gh release edit "${TAG_NAME}" --notes-file -
