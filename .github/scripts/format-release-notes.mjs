@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const [releaseBodyPath, generatedNotesPath, outputPath] = process.argv.slice(2);
@@ -9,6 +10,8 @@ if (!releaseBodyPath || !generatedNotesPath || !outputPath) {
 const releaseBody = readFileSync(releaseBodyPath, 'utf8');
 const generatedNotes = readFileSync(generatedNotesPath, 'utf8');
 const authorsByPr = new Map();
+const upstreamMetadataByCommit = new Map();
+const upstreamAuthors = new Set();
 
 for (const match of generatedNotes.matchAll(/by (@[^\s]+) in https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/(\d+)/g)) {
   authorsByPr.set(match[2], match[1]);
@@ -46,6 +49,101 @@ function formatEntry(line) {
   return entry;
 }
 
+function commitShaFromEntry(entry) {
+  return entry.match(/https:\/\/github\.com\/[^/]+\/[^/]+\/commit\/([0-9a-f]{7,40})/i)?.[1];
+}
+
+function commitMessage(sha) {
+  try {
+    return execFileSync('git', ['show', '-s', '--format=%B', sha], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+  } catch {
+    return '';
+  }
+}
+
+function normalizeUpstreamPr(value) {
+  if (!value) {
+    return undefined;
+  }
+
+  return value.match(/(?:goharbor\/harbor#|github\.com\/goharbor\/harbor\/pull\/|#)(\d+)/)?.[1]
+    ?? value.match(/^(\d+)$/)?.[1];
+}
+
+function normalizeAuthor(value) {
+  return value?.trim().match(/^@[A-Za-z0-9-]+(?:\[bot\])?/)?.[0];
+}
+
+function parseUpstreamMetadata(message) {
+  const pr = normalizeUpstreamPr(message.match(/^Upstream-PR:\s*(.+)$/im)?.[1]);
+  const author = normalizeAuthor(message.match(/^Upstream-Author:\s*(.+)$/im)?.[1]);
+
+  if (!pr && !author) {
+    return undefined;
+  }
+
+  return {pr, author};
+}
+
+function metadataForCommit(sha) {
+  if (!sha) {
+    return undefined;
+  }
+
+  if (!upstreamMetadataByCommit.has(sha)) {
+    upstreamMetadataByCommit.set(sha, parseUpstreamMetadata(commitMessage(sha)) ?? null);
+  }
+
+  return upstreamMetadataByCommit.get(sha) ?? undefined;
+}
+
+function parseInlineUpstreamMetadata(entry) {
+  const inline = entry.match(/\((?:upstream\s+)?(?:PR\s+)?((?:goharbor\/harbor#|https:\/\/github\.com\/goharbor\/harbor\/pull\/)\d+)\s+by\s+(@[A-Za-z0-9-]+(?:\[bot\])?)\)/i);
+  if (!inline) {
+    return undefined;
+  }
+
+  return {
+    pr: normalizeUpstreamPr(inline[1]),
+    author: normalizeAuthor(inline[2]),
+  };
+}
+
+function upstreamPrLink(pr) {
+  return `[goharbor/harbor#${pr}](https://github.com/goharbor/harbor/pull/${pr})`;
+}
+
+function formatUpstreamEntry(entry, sha) {
+  const metadata = metadataForCommit(sha) ?? parseInlineUpstreamMetadata(entry);
+  let formatted = entry
+    .replace(/\s*\[upstream\]\s*/i, ' ')
+    .replace(/\s+\((?:upstream\s+)?(?:PR\s+)?(?:goharbor\/harbor#|https:\/\/github\.com\/goharbor\/harbor\/pull\/)\d+\s+by\s+@[A-Za-z0-9-]+(?:\[bot\])?\)/i, '')
+    .replace(/\s{2,}/g, ' ');
+
+  if (!metadata?.pr && !metadata?.author) {
+    return formatted;
+  }
+
+  if (metadata.author) {
+    upstreamAuthors.add(metadata.author);
+  }
+
+  const details = [
+    metadata.author ? `by ${metadata.author}` : undefined,
+    metadata.pr ? `in ${upstreamPrLink(metadata.pr)}` : undefined,
+  ].filter(Boolean).join(' ');
+
+  const commitSuffix = formatted.match(/\s+\(\[[0-9a-f]+\]\(https:\/\/github\.com\/[^)]+\/commit\/[0-9a-f]+\)\)$/i);
+  if (!commitSuffix) {
+    return `${formatted} ${details}`;
+  }
+
+  return `${formatted.slice(0, commitSuffix.index)} ${details}${commitSuffix[0]}`;
+}
+
 for (const line of releaseBody.split('\n')) {
   if (line.startsWith('## ')) {
     continue;
@@ -61,8 +159,12 @@ for (const line of releaseBody.split('\n')) {
   }
 
   if (line.startsWith('* ') || line.startsWith('- ')) {
-    const entry = formatEntry(line);
-    const targetSection = entry.toLowerCase().includes('[upstream]') ? 'Upstream' : currentSection;
+    let entry = formatEntry(line);
+    const targetSection = entry.toLowerCase().includes('[upstream]') || currentSection === 'Upstream' ? 'Upstream' : currentSection;
+
+    if (targetSection === 'Upstream') {
+      entry = formatUpstreamEntry(entry, commitShaFromEntry(entry));
+    }
 
     if (targetSection) {
       sections.get(targetSection)?.push(entry);
@@ -95,7 +197,7 @@ if (newContributors) {
   output.push('', newContributors.replace('## New Contributors', '### New Contributors').replace(/^\*/gm, '-'));
 }
 
-const authors = [...new Set(authorsByPr.values())].sort((a, b) => a.localeCompare(b, undefined, {sensitivity: 'base'}));
+const authors = [...new Set([...authorsByPr.values(), ...upstreamAuthors])].sort((a, b) => a.localeCompare(b, undefined, {sensitivity: 'base'}));
 if (authors.length > 0) {
   output.push('', '### Contributors', '');
 
