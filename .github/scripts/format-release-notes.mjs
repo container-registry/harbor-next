@@ -11,7 +11,6 @@ const releaseBody = readFileSync(releaseBodyPath, 'utf8');
 const generatedNotes = readFileSync(generatedNotesPath, 'utf8');
 const authorsByPr = new Map();
 const upstreamMetadataByCommit = new Map();
-const upstreamAuthors = new Set();
 
 for (const match of generatedNotes.matchAll(/by (@[^\s]+) in https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/(\d+)/g)) {
   authorsByPr.set(match[2], match[1]);
@@ -141,10 +140,6 @@ function formatUpstreamEntry(entry, sha) {
     return formatted;
   }
 
-  if (metadata.author) {
-    upstreamAuthors.add(metadata.author);
-  }
-
   const details = [
     metadata.author ? `by ${metadata.author}` : undefined,
     metadata.pr ? `in ${upstreamPrLink(metadata.pr)}` : undefined,
@@ -238,28 +233,6 @@ if (trailing.length > 0) {
 const newContributors = generatedNotes.match(/## New Contributors[\s\S]*?(?=\n\n\*\*Full Changelog\*\*|$)/)?.[0];
 if (newContributors) {
   output.push('', newContributors.replace('## New Contributors', '### New Contributors').replace(/^\*/gm, '-'));
-}
-
-const authors = [...new Set([...authorsByPr.values(), ...upstreamAuthors])].sort((a, b) => a.localeCompare(b, undefined, {sensitivity: 'base'}));
-if (authors.length > 0) {
-  output.push('', '### Contributors', '');
-
-  for (const author of authors) {
-    const name = author.slice(1);
-    const isBot = name.endsWith('[bot]');
-    const baseName = isBot ? name.slice(0, -5) : name;
-    const profile = isBot ? `https://github.com/apps/${baseName}` : `https://github.com/${name}`;
-    output.push(`- [![${author}](https://github.com/${baseName}.png?size=64)](${profile})`);
-  }
-
-  const names = authors.map(author => author.slice(1));
-  const namesLine = names.length === 1
-    ? names[0]
-    : names.length === 2
-      ? `${names[0]} and ${names[1]}`
-      : `${names.slice(0, -1).join(', ')}, and ${names.at(-1)}`;
-
-  output.push('', namesLine);
 }
 
 writeFileSync(outputPath, `${output.join('\n').trim()}\n`);
