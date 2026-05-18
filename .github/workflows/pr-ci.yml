@@ -17,7 +17,7 @@ concurrency:
 
 env:
   REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
-  PR_PROJECT_NAME: ${{ vars.PR_PROJECT_NAME }}
+  PR_REGISTRY_PROJECT: ${{ vars.PR_REGISTRY_PROJECT }}
   PREVIEW_TAG: pr-${{ github.event.pull_request.number }}
 
 jobs:
@@ -103,7 +103,7 @@ jobs:
             TRIVY_VERSION=${{ env.TRIVY_VERSION }}
             TRIVY_BASE_IMAGE_VERSION=${{ env.TRIVY_BASE_IMAGE_VERSION }}
             HARBOR_SCANNER_TRIVY_VERSION=${{ env.HARBOR_SCANNER_TRIVY_VERSION }}
-          tags: ${{ env.REGISTRY_ADDRESS }}/${{ env.PR_PROJECT_NAME }}/harbor-${{ matrix.component }}
+          tags: ${{ env.REGISTRY_ADDRESS }}/${{ env.PR_REGISTRY_PROJECT }}/harbor-${{ matrix.component }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
@@ -160,7 +160,7 @@ jobs:
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests
         env:
-          IMAGE: ${{ env.REGISTRY_ADDRESS }}/${{ env.PR_PROJECT_NAME }}/harbor-${{ matrix.component }}
+          IMAGE: ${{ env.REGISTRY_ADDRESS }}/${{ env.PR_REGISTRY_PROJECT }}/harbor-${{ matrix.component }}
         run: |
           # shellcheck disable=SC2046
           docker buildx imagetools create \
@@ -206,9 +206,9 @@ jobs:
       - name: Sign images, generate SBOMs, and attest
         run: |
           for image in core jobservice registryctl exporter portal registry trivy-adapter; do
-            ref="${REGISTRY_ADDRESS}/${PR_PROJECT_NAME}/harbor-${image}:${PREVIEW_TAG}"
+            ref="${REGISTRY_ADDRESS}/${PR_REGISTRY_PROJECT}/harbor-${image}:${PREVIEW_TAG}"
             digest="$(crane digest "${ref}")"
-            image_ref="${REGISTRY_ADDRESS}/${PR_PROJECT_NAME}/harbor-${image}@${digest}"
+            image_ref="${REGISTRY_ADDRESS}/${PR_REGISTRY_PROJECT}/harbor-${image}@${digest}"
 
             cosign sign --yes "${image_ref}"
 
@@ -244,7 +244,7 @@ jobs:
           script: |
             const marker = process.env.MARKER;
             const registryAddress = process.env.REGISTRY_ADDRESS;
-            const registryProject = process.env.PR_PROJECT_NAME;
+            const registryProject = process.env.PR_REGISTRY_PROJECT;
             const previewTag = process.env.PREVIEW_TAG;
             const repository = process.env.GITHUB_REPOSITORY;
             const issueNumber = context.payload.pull_request.number;
