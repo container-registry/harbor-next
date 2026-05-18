@@ -216,6 +216,8 @@ jobs:
       TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
 
       - name: Install envsubst
         run: command -v envsubst || (sudo apt-get update && sudo apt-get install -y gettext-base)
@@ -263,8 +265,7 @@ jobs:
             while IFS= read -r patch; do
               patch=$(echo "$patch" | sed 's/#.*//' | xargs)
               [ -z "$patch" ] && continue
-              desc=$(head -1 "/tmp/patches-repo/8gcr-ee/patches/$patch" | sed 's/^Subject: //')
-              echo "- ${desc}" >> applied-patches.txt
+              node .github/scripts/format-commercial-patch.mjs "/tmp/patches-repo/8gcr-ee/patches/$patch" >> applied-patches.txt
             done < /tmp/patches-repo/8gcr-ee/patches/series
             echo "has_patches=true" >> "$GITHUB_OUTPUT"
           fi
@@ -276,6 +277,18 @@ jobs:
         run: |
           REGISTRY="${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}"
           IMAGES="core jobservice registryctl exporter portal registry trivy-adapter"
+          GENERATED_NOTES="$(mktemp)"
+          RELEASE_BODY="$(mktemp)"
+          FORMATTED_BODY="$(mktemp)"
+
+          gh api "repos/${{ github.repository }}/releases/generate-notes" \
+            -f "tag_name=${TAG_NAME}" \
+            --jq .body > "${GENERATED_NOTES}"
+          gh release view "${TAG_NAME}" --json body -q .body > "${RELEASE_BODY}"
+          node .github/scripts/format-release-notes.mjs \
+            "${RELEASE_BODY}" \
+            "${GENERATED_NOTES}" \
+            "${FORMATTED_BODY}"
 
           HIGHLIGHTS=""
           PREV_TAG=$(gh release list --limit 20 --json tagName \
@@ -308,15 +321,15 @@ jobs:
           fi
 
           {
-            if [ -n "${HIGHLIGHTS}" ]; then
-              printf '%s\n\n' "${HIGHLIGHTS}"
-            fi
             if [ -f applied-patches.txt ] && [ -s applied-patches.txt ]; then
               echo "## Commercial Features"
               echo ""
               echo "This release includes the following commercial enhancements:"
               cat applied-patches.txt
               echo ""
+            fi
+            if [ -n "${HIGHLIGHTS}" ]; then
+              printf '%s\n\n' "${HIGHLIGHTS}"
             fi
             echo "## Container Images"
             echo ""
@@ -338,5 +351,5 @@ jobs:
             echo ""
             echo "---"
             echo ""
-            gh release view "${TAG_NAME}" --json body -q .body
+            cat "${FORMATTED_BODY}"
           } | gh release edit "${TAG_NAME}" --notes-file -
