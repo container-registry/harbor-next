@@ -213,7 +213,7 @@ Use `upstream:` for cherry-picked changes from `goharbor/harbor` so release-plea
 
 Add the upstream PR and author to the commit body so the release notes can show the original attribution instead of the sync bot:
 
-```
+```text
 upstream(proxy): Preserve URL path prefix during registry auth discovery
 
 Upstream-PR: goharbor/harbor#12345

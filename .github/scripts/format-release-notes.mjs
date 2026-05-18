@@ -101,6 +101,14 @@ function metadataForCommit(sha) {
 }
 
 function parseInlineUpstreamMetadata(entry) {
+  const formatted = entry.match(/\sby\s+(@[A-Za-z0-9-]+(?:\[bot\])?)\s+in\s+(?:\[goharbor\/harbor#(\d+)\]\(https:\/\/github\.com\/goharbor\/harbor\/pull\/\2\)|https:\/\/github\.com\/goharbor\/harbor\/pull\/(\d+))/i);
+  if (formatted) {
+    return {
+      pr: formatted[2] ?? formatted[3],
+      author: normalizeAuthor(formatted[1]),
+    };
+  }
+
   const inline = entry.match(/\((?:upstream\s+)?(?:PR\s+)?((?:goharbor\/harbor#|https:\/\/github\.com\/goharbor\/harbor\/pull\/)\d+)\s+by\s+(@[A-Za-z0-9-]+(?:\[bot\])?)\)/i);
   if (!inline) {
     return undefined;
@@ -117,9 +125,15 @@ function upstreamPrLink(pr) {
 }
 
 function formatUpstreamEntry(entry, sha) {
-  const metadata = metadataForCommit(sha) ?? parseInlineUpstreamMetadata(entry);
+  const commitMetadata = metadataForCommit(sha);
+  const inlineMetadata = parseInlineUpstreamMetadata(entry);
+  const metadata = {
+    pr: commitMetadata?.pr ?? inlineMetadata?.pr,
+    author: commitMetadata?.author ?? inlineMetadata?.author,
+  };
   let formatted = entry
     .replace(/\s*\[upstream\]\s*/i, ' ')
+    .replace(/\sby\s+@[A-Za-z0-9-]+(?:\[bot\])?\s+in\s+(?:\[goharbor\/harbor#\d+\]\(https:\/\/github\.com\/goharbor\/harbor\/pull\/\d+\)|https:\/\/github\.com\/goharbor\/harbor\/pull\/\d+)/i, '')
     .replace(/\s+\((?:upstream\s+)?(?:PR\s+)?(?:goharbor\/harbor#|https:\/\/github\.com\/goharbor\/harbor\/pull\/)\d+\s+by\s+@[A-Za-z0-9-]+(?:\[bot\])?\)/i, '')
     .replace(/\s{2,}/g, ' ');
 
@@ -144,7 +158,26 @@ function formatUpstreamEntry(entry, sha) {
   return `${formatted.slice(0, commitSuffix.index)} ${details}${commitSuffix[0]}`;
 }
 
-for (const line of releaseBody.split('\n')) {
+function releaseNotesLines(body) {
+  const lines = body.split('\n');
+  const start = lines.findIndex(line => line.trim() === '## What\'s Changed');
+  if (start === -1) {
+    return lines;
+  }
+
+  const block = [];
+  for (const line of lines.slice(start + 1)) {
+    if (line.startsWith('## ')) {
+      break;
+    }
+
+    block.push(line);
+  }
+
+  return block;
+}
+
+for (const line of releaseNotesLines(releaseBody)) {
   if (line.startsWith('## ')) {
     continue;
   }
@@ -178,10 +211,20 @@ for (const line of releaseBody.split('\n')) {
 }
 
 const output = ['## What\'s Changed'];
+const emittedSections = new Set();
 
 for (const section of sectionOrder) {
   const entries = sections.get(section) ?? [];
   if (entries.length === 0) {
+    continue;
+  }
+
+  output.push('', `### ${section}`, '', ...entries);
+  emittedSections.add(section);
+}
+
+for (const [section, entries] of sections) {
+  if (emittedSections.has(section) || entries.length === 0) {
     continue;
   }
 
