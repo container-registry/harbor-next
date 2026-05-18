@@ -115,7 +115,10 @@ export function hasPullCommand(artifact: Artifact): boolean {
     );
 }
 
-export function getPullCommandForTop(url: string, client: Clients): string | null {
+export function getPullCommandForTop(
+    url: string,
+    client: Clients
+): string | null {
     if (url) {
         if (Object.values(Clients).includes(client)) {
             if (client == 'custom') {

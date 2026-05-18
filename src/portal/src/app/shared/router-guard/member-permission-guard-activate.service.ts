@@ -19,8 +19,14 @@ import {
 } from '@angular/router';
 import { Observable } from 'rxjs';
 import { ErrorHandler } from '../units/error-handler';
-import { UserPermissionService, UserPrivilegeServeItem } from '../services';
+import {
+    UserPermissionService,
+    UserPrivilegeServeItem,
+    USERSTATICPERMISSION,
+} from '../services';
 import { CommonRoutes } from '../entities/shared.const';
+import { UN_LOGGED_PARAM, YES } from '../../account/sign-in/sign-in.service';
+import { SessionService } from '../services/session.service';
 
 @Injectable({
     providedIn: 'root',
@@ -29,7 +35,8 @@ export class MemberPermissionGuard {
     constructor(
         private router: Router,
         private errorHandler: ErrorHandler,
-        private userPermission: UserPermissionService
+        private userPermission: UserPermissionService,
+        private sessionService: SessionService
     ) {}
 
     canActivate(
@@ -38,6 +45,18 @@ export class MemberPermissionGuard {
     ): Observable<boolean> | boolean {
         const projectId = route.parent.params['id'];
         const permission = route.data.permissionParam as UserPrivilegeServeItem;
+        if (
+            route.queryParams[UN_LOGGED_PARAM] === YES &&
+            this.sessionService.getCurrentUser() === null
+        ) {
+            if (this.isPublicProjectPermission(permission)) {
+                return true;
+            }
+            this.router.navigate([CommonRoutes.HARBOR_DEFAULT], {
+                queryParams: { [UN_LOGGED_PARAM]: YES },
+            });
+            return false;
+        }
         return this.checkPermission(projectId, permission);
     }
 
@@ -72,5 +91,18 @@ export class MemberPermissionGuard {
                     },
                 });
         });
+    }
+
+    private isPublicProjectPermission(
+        permission: UserPrivilegeServeItem
+    ): boolean {
+        return (
+            (permission.resource === USERSTATICPERMISSION.PROJECT.KEY &&
+                permission.action ===
+                    USERSTATICPERMISSION.PROJECT.VALUE.READ) ||
+            (permission.resource === USERSTATICPERMISSION.REPOSITORY.KEY &&
+                permission.action ===
+                    USERSTATICPERMISSION.REPOSITORY.VALUE.LIST)
+        );
     }
 }

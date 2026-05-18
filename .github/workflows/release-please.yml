@@ -17,7 +17,7 @@ jobs:
       tag_name: ${{ steps.release.outputs.tag_name }}
       version: ${{ steps.release.outputs.version }}
     steps:
-      - uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4.4.0
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -31,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter, nginx]
+        component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter]
         platform:
           - linux/amd64
           - linux/arm64
@@ -57,14 +57,14 @@ jobs:
 
       - name: Generate GitHub App token
         id: app-token
-        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ vars.SYNC_APP_ID }}
           private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
           owner: container-registry
           repositories: 8gcr
 
-      - name: Apply enterprise patches
+      - name: Apply commercial patches
         env:
           PATCHES_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
@@ -157,7 +157,7 @@ jobs:
     needs: [release-please, build]
     strategy:
       matrix:
-        component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter, nginx]
+        component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter]
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
@@ -165,6 +165,7 @@ jobs:
       REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
       REGISTRY_PROJECT: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
       VERSION: ${{ needs.release-please.outputs.version }}
+      TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
     steps:
       - name: Prepare BuildKit
         run: |
@@ -198,7 +199,7 @@ jobs:
         run: |
           # shellcheck disable=SC2046
           docker buildx imagetools create \
-            -t "${IMAGE}:${VERSION}" \
+            -t "${IMAGE}:${TAG_NAME}" \
             $(printf "${IMAGE}@sha256:%s " *)
 
   sign:
@@ -215,12 +216,19 @@ jobs:
       TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
 
       - name: Install envsubst
         run: command -v envsubst || (sudo apt-get update && sudo apt-get install -y gettext-base)
 
+      - name: Install gh CLI
+        uses: actions4gh/setup-gh@44a12005484c53be5bf51bebe8c985b4be8ba8de # v1.0.2
+        with:
+          gh-version: latest
+
       - name: Install cosign
-        uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Log in to registry
         uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
@@ -231,21 +239,21 @@ jobs:
 
       - name: Sign images
         run: |
-          for image in core jobservice registryctl exporter portal registry trivy-adapter nginx; do
+          for image in core jobservice registryctl exporter portal registry trivy-adapter; do
             cosign sign --yes \
-              "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-${image}:${VERSION}"
+              "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-${image}:${TAG_NAME}"
           done
 
       - name: Generate GitHub App token
         id: app-token
-        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ vars.SYNC_APP_ID }}
           private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
           owner: container-registry
           repositories: 8gcr
 
-      - name: Collect enterprise patch descriptions
+      - name: Collect commercial patch descriptions
         id: patches
         env:
           PATCHES_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -257,8 +265,7 @@ jobs:
             while IFS= read -r patch; do
               patch=$(echo "$patch" | sed 's/#.*//' | xargs)
               [ -z "$patch" ] && continue
-              desc=$(head -1 "/tmp/patches-repo/8gcr-ee/patches/$patch" | sed 's/^Subject: //')
-              echo "- ${desc}" >> applied-patches.txt
+              node .github/scripts/format-commercial-patch.mjs "/tmp/patches-repo/8gcr-ee/patches/$patch" >> applied-patches.txt
             done < /tmp/patches-repo/8gcr-ee/patches/series
             echo "has_patches=true" >> "$GITHUB_OUTPUT"
           fi
@@ -269,7 +276,19 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           REGISTRY="${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}"
-          IMAGES="core jobservice registryctl exporter portal registry trivy-adapter nginx"
+          IMAGES="core jobservice registryctl exporter portal registry trivy-adapter"
+          GENERATED_NOTES="$(mktemp)"
+          RELEASE_BODY="$(mktemp)"
+          FORMATTED_BODY="$(mktemp)"
+
+          gh api "repos/${{ github.repository }}/releases/generate-notes" \
+            -f "tag_name=${TAG_NAME}" \
+            --jq .body > "${GENERATED_NOTES}"
+          gh release view "${TAG_NAME}" --json body -q .body > "${RELEASE_BODY}"
+          node .github/scripts/format-release-notes.mjs \
+            "${RELEASE_BODY}" \
+            "${GENERATED_NOTES}" \
+            "${FORMATTED_BODY}"
 
           HIGHLIGHTS=""
           PREV_TAG=$(gh release list --limit 20 --json tagName \
@@ -302,15 +321,15 @@ jobs:
           fi
 
           {
-            if [ -n "${HIGHLIGHTS}" ]; then
-              printf '%s\n\n' "${HIGHLIGHTS}"
-            fi
             if [ -f applied-patches.txt ] && [ -s applied-patches.txt ]; then
-              echo "## Enterprise Features"
+              echo "## Commercial Features"
               echo ""
-              echo "This release includes the following enterprise enhancements:"
+              echo "This release includes the following commercial enhancements:"
               cat applied-patches.txt
               echo ""
+            fi
+            if [ -n "${HIGHLIGHTS}" ]; then
+              printf '%s\n\n' "${HIGHLIGHTS}"
             fi
             echo "## Container Images"
             echo ""
@@ -319,7 +338,7 @@ jobs:
             echo "| Image | Reference |"
             echo "|-------|-----------|"
             for image in $IMAGES; do
-              echo "| \`harbor-${image}\` | \`${REGISTRY}/harbor-${image}:${VERSION}\` |"
+              echo "| \`harbor-${image}\` | \`${REGISTRY}/harbor-${image}:${TAG_NAME}\` |"
             done
             echo ""
             echo "**Verify an image signature:**"
@@ -327,10 +346,10 @@ jobs:
             echo "cosign verify \\"
             echo "  --certificate-identity \"https://github.com/${{ github.repository }}/.github/workflows/release-please.yml@refs/heads/main\" \\"
             echo "  --certificate-oidc-issuer \"https://token.actions.githubusercontent.com\" \\"
-            echo "  ${REGISTRY}/harbor-core:${VERSION}"
+            echo "  ${REGISTRY}/harbor-core:${TAG_NAME}"
             echo "\`\`\`"
             echo ""
             echo "---"
             echo ""
-            gh release view "${TAG_NAME}" --json body -q .body
+            cat "${FORMATTED_BODY}"
           } | gh release edit "${TAG_NAME}" --notes-file -

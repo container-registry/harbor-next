@@ -120,6 +120,45 @@ Namespace aliases: `b:` (build), `t:` (test), `img:` (image), `d:` (dev).
 
 See [devenv/README.md](devenv/README.md) for detailed development environment commands.
 
+### Release Note Commit Formats
+
+Use `upstream:` commits for cherry-picked changes from `goharbor/harbor`. Keep the subject conventional, then add the upstream PR and original author as trailers in the commit body:
+
+```text
+upstream(proxy): Preserve URL path prefix during registry auth discovery
+
+Upstream-PR: goharbor/harbor#12345
+Upstream-Author: @original-author
+Signed-off-by: Your Name <your@email.com>
+```
+
+This renders in release notes as an `Upstream` entry with the original upstream PR link and author.
+
+Commercial patch commits can use a simple subject instead of a conventional commit. The patch `Subject:` becomes the release-note title, and the patch body before `---` becomes the description:
+
+```text
+Subject: [PATCH] Branding customization
+
+Allows operators to configure product branding for the portal without rebuilding
+the Harbor Next image.
+
+Supports custom names, logos, and landing page copy from deployment
+configuration.
+---
+```
+
+This renders as:
+
+```markdown
+- **Branding customization**
+
+  Allows operators to configure product branding for the portal without rebuilding
+  the Harbor Next image.
+
+  Supports custom names, logos, and landing page copy from deployment
+  configuration.
+```
+
 ## OCI Distribution Conformance Tests
 
 Check the OCI distribution conformance tests [report](https://storage.googleapis.com/harbor-conformance-test/report.html) of Harbor.
@@ -156,9 +195,7 @@ A third party security audit was performed by Cure53 in October 2019. You can se
 
 ### Reporting security vulnerabilities
 
-If you've found a security related issue, a vulnerability, or a potential vulnerability in Harbor please let the [Harbor Security Team](mailto:cncf-harbor-security@lists.cncf.io) know with the details of the vulnerability. We'll send a confirmation
-email to acknowledge your report, and we'll send an additional email when we've identified the issue
-positively or negatively.
+If you've found a security related issue, a vulnerability, or a potential vulnerability in Harbor Next, please report it privately through [GitHub Security Advisories](https://github.com/container-registry/harbor-next/security/advisories/new). Maintainers will acknowledge your report and coordinate investigation, remediation, and disclosure through the private advisory.
 
 For further details please see our complete [security release process](SECURITY.md).
 

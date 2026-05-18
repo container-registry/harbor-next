@@ -60,6 +60,10 @@ import { ConfirmationDialogService } from '../../../global-confirmation-dialog/c
 import { errorHandler } from '../../../../shared/units/shared.utils';
 import { ConfirmationMessage } from '../../../global-confirmation-dialog/confirmation-message';
 import { ExportCveComponent } from './export-cve/export-cve.component';
+import {
+    UN_LOGGED_PARAM,
+    YES,
+} from '../../../../account/sign-in/sign-in.service';
 
 const MAX_PROJECTS_NUM: number = 1;
 const INTERVAL: number = 30000;
@@ -167,6 +171,13 @@ export class ListProjectComponent implements OnDestroy {
     }
     getLink(proId: number) {
         return `/harbor/projects/${proId}/repositories`;
+    }
+
+    getQueryParams() {
+        if (this.session.getCurrentUser()) {
+            return null;
+        }
+        return { [UN_LOGGED_PARAM]: YES };
     }
 
     clrLoad(state: ClrDatagridStateInterface) {

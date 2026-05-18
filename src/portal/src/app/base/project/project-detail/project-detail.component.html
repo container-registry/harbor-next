@@ -1,15 +1,17 @@
-<span class="back-icon"><</span>
-<a *ngIf="hasSignedIn" (click)="backToProject()" class="backStyle">{{
-    'PROJECT_DETAIL.PROJECTS' | translate
-}}</a>
+<ng-container *ngIf="hasSignedIn || isPublicAndNotLogged">
+    <span class="back-icon">&lt;</span>
+    <a (click)="backToProject()" class="backStyle">{{
+        'PROJECT_DETAIL.PROJECTS' | translate
+    }}</a>
+</ng-container>
 <ng-container *ngIf="hasSignedIn && isWebhookTaskListPage()">
-    <span class="back-icon"><</span>
+    <span class="back-icon">&lt;</span>
     <a (click)="backToWebhook()" class="backStyle">{{
         'PROJECT_DETAIL.WEBHOOKS' | translate
     }}</a>
 </ng-container>
 <ng-container *ngIf="hasSignedIn && isP2pPreheatTaskListPage()">
-    <span class="back-icon"><</span>
+    <span class="back-icon">&lt;</span>
     <a (click)="backToP2pPreheat()" class="backStyle">{{
         'P2P_PROVIDER.P2P_PROVIDER' | translate
     }}</a>
@@ -138,6 +140,7 @@
                     id="{{ 'project-' + tab.linkName }}"
                     clrTabLink
                     routerLink="{{ tab.linkName }}"
+                    [queryParams]="getQueryParams()"
                     routerLinkActive="active"
                     type="button">
                     <a class="nav-link">{{ tab.showTabName | translate }}</a>

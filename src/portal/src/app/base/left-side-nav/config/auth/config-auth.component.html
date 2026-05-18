@@ -1,6 +1,8 @@
 <form #authConfigFrom="ngForm" class="clr-form clr-form-horizontal">
     <div class="clr-form-control">
-        <label for="unauthLandingPage" class="clr-control-label">
+        <label
+            for="unauthLandingPage"
+            class="clr-control-label unauth-landing-page-label">
             {{ 'CONFIG.UNAUTH_LANDING_PAGE' | translate }}
             <clr-tooltip>
                 <clr-icon
@@ -11,7 +13,9 @@
                     clrPosition="top-right"
                     clrSize="lg"
                     *clrIfOpen>
-                    <span>{{ 'CONFIG.TOOLTIP.UNAUTH_LANDING_PAGE' | translate }}</span>
+                    <span>{{
+                        'CONFIG.TOOLTIP.UNAUTH_LANDING_PAGE' | translate
+                    }}</span>
                 </clr-tooltip-content>
             </clr-tooltip></label
         >
@@ -21,13 +25,20 @@
                     class="clr-select"
                     id="unauthLandingPage"
                     name="unauthLandingPage"
-                    [disabled]="disabled(currentConfig.unauthenticated_landing_page)"
-                    [(ngModel)]="currentConfig.unauthenticated_landing_page.value">
+                    [disabled]="
+                        disabled(currentConfig.unauthenticated_landing_page)
+                    "
+                    [(ngModel)]="
+                        currentConfig.unauthenticated_landing_page.value
+                    ">
                     <option value="login">
                         {{ 'CONFIG.UNAUTH_LANDING_PAGE_LOGIN' | translate }}
                     </option>
                     <option value="public_projects">
-                        {{ 'CONFIG.UNAUTH_LANDING_PAGE_PUBLIC_PROJECTS' | translate }}
+                        {{
+                            'CONFIG.UNAUTH_LANDING_PAGE_PUBLIC_PROJECTS'
+                                | translate
+                        }}
                     </option>
                 </select>
             </div>

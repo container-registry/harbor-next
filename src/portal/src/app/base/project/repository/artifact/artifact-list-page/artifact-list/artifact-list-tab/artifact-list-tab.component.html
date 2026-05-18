@@ -326,10 +326,10 @@
                     <div *ngIf="artifact.tags" class="truncated width-p-100">
                         <clr-tooltip class="width-p-100">
                             <div clrTooltipTrigger class="center">
-                                <div class="center width-p-100">
+                                <div class="tag-cell-content">
                                     <span
                                         #tagsSpan
-                                        class="truncated width-p-75">
+                                        class="truncated tag-cell-text">
                                         {{ tagsString(artifact?.tags) }}
                                     </span>
 
@@ -342,6 +342,7 @@
                                     >
                                     <app-pull-command
                                         *ngIf="artifact?.tags?.length > 0"
+                                        class="tag-copy-command"
                                         [isTagMode]="true"
                                         [artifact]="artifact"
                                         [registryUrl]="registryUrl"
