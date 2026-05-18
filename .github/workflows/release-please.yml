@@ -265,8 +265,7 @@ jobs:
             while IFS= read -r patch; do
               patch=$(echo "$patch" | sed 's/#.*//' | xargs)
               [ -z "$patch" ] && continue
-              desc=$(head -1 "/tmp/patches-repo/8gcr-ee/patches/$patch" | sed 's/^Subject: //')
-              echo "- ${desc}" >> applied-patches.txt
+              node .github/scripts/format-commercial-patch.mjs "/tmp/patches-repo/8gcr-ee/patches/$patch" >> applied-patches.txt
             done < /tmp/patches-repo/8gcr-ee/patches/series
             echo "has_patches=true" >> "$GITHUB_OUTPUT"
           fi
