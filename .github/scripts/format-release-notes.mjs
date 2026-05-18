@@ -159,7 +159,7 @@ function formatUpstreamEntry(entry, sha) {
 }
 
 function releaseNotesLines(body) {
-  const lines = body.split('\n');
+  const lines = body.split(/\r?\n/);
   const start = lines.findIndex(line => line.trim() === '## What\'s Changed');
   if (start === -1) {
     return lines;
