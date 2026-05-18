@@ -322,15 +322,15 @@ jobs:
           fi
 
           {
-            if [ -n "${HIGHLIGHTS}" ]; then
-              printf '%s\n\n' "${HIGHLIGHTS}"
-            fi
             if [ -f applied-patches.txt ] && [ -s applied-patches.txt ]; then
               echo "## Commercial Features"
               echo ""
               echo "This release includes the following commercial enhancements:"
               cat applied-patches.txt
               echo ""
+            fi
+            if [ -n "${HIGHLIGHTS}" ]; then
+              printf '%s\n\n' "${HIGHLIGHTS}"
             fi
             echo "## Container Images"
             echo ""

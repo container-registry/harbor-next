@@ -22,7 +22,7 @@ const sectionNames = new Map([
   ['Code Refactoring', 'Updates'],
   ['Documentation', 'Updates'],
 ]);
-const sectionOrder = ['Features', 'Fixes', 'Updates', 'Upstream', 'Reverts'];
+const sectionOrder = ['Commercial Features', 'Features', 'Fixes', 'Updates', 'Upstream', 'Reverts'];
 const sections = new Map(sectionOrder.map(section => [section, []]));
 const trailing = [];
 let currentSection = '';
@@ -198,6 +198,11 @@ for (const line of releaseNotesLines(releaseBody)) {
       sections.get(targetSection)?.push(entry);
       continue;
     }
+  }
+
+  if (currentSection === 'Commercial Features' && line.trim()) {
+    sections.get(currentSection)?.push(line);
+    continue;
   }
 
   if (sawSection && line.trim()) {
