@@ -33,8 +33,8 @@ If `postinstall` scripts were not triggered, then run manually:  `npm run postin
 - `HARBOR_USE_PROXY_AGENT=true` enables `https-proxy-agent`
 - `HARBOR_PROXY_AGENT_SERVER` overrides the corporate proxy agent URL
 
-When using `task dev:up`, the containerized dev stack sets the proxy target automatically.
-The OpenAPI / Swagger UI is built automatically in the background during portal startup.
+When using `task dev:up`, the Taskfile sets the proxy target automatically.
+The TypeScript API client is regenerated before portal startup.
 
 ### 4. Start the development server
 

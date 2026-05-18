@@ -54,6 +54,7 @@ Common types:
 |------|------------|----------------|
 | `feat` | New user-facing feature | Minor version bump |
 | `fix` | Bug fix | Patch version bump |
+| `upstream` | Cherry-picked upstream Harbor change | Patch version bump |
 | `feat!` / `fix!` | Breaking change | Major version bump |
 | `refactor` | Code change, no behaviour change | No release |
 | `docs` | Documentation only | No release |
@@ -92,6 +93,7 @@ Use a scope in parentheses to indicate the component:
 ```
 feat(portal): ...
 fix(core): ...
+upstream(proxy): ...
 ci(release): ...
 ```
 
@@ -113,6 +115,7 @@ Use the following template for your PR description:
 - [ ] Documentation (`docs:`)
 - [ ] Refactoring (`refactor:`)
 - [ ] CI/CD or build changes (`ci:` / `build:`)
+- [ ] Upstream Harbor cherry-pick (`upstream:`)
 - [ ] Dependencies update (`chore:`)
 - [ ] Tests (`test:`)
 
@@ -173,7 +176,7 @@ Releases are fully automated via [release-please](https://github.com/googleapis/
 
 ### The Flow
 
-1. A `feat:` or `fix:` PR is squash-merged to main
+1. A `feat:`, `fix:`, or `upstream:` PR is squash-merged to main
 2. Release-please scans commits since the last release
 3. It opens a `chore: release X.Y.Z` PR that updates `VERSION` and `CHANGELOG.md`
 4. Maintainer reviews and merges the release PR (squash merge)
@@ -185,6 +188,7 @@ Releases are fully automated via [release-please](https://github.com/googleapis/
 | Commit type | Version bump | Example |
 |-------------|-------------|---------|
 | `fix:` | Patch | `2.16.0` -> `2.16.1` |
+| `upstream:` | Patch | `2.16.0` -> `2.16.1` |
 | `feat:` | Minor | `2.16.0` -> `2.17.0` |
 | `feat!:` / `BREAKING CHANGE:` | Major | `2.16.0` -> `3.0.0` |
 | `ci:` / `chore:` / `docs:` / `test:` / `build:` | No release | - |
@@ -201,7 +205,23 @@ A `feat:` PR that only changes `.github/` files (e.g. a CI workflow improvement)
 
 ### CHANGELOG.md
 
-The changelog is generated automatically from squash commit messages. `ci:`, `chore:`, `test:`, and `build:` commits are hidden from the changelog. Only `feat:`, `fix:`, `perf:`, `revert:`, `refactor:`, and `docs:` appear.
+The changelog is generated automatically from squash commit messages. `ci:`, `chore:`, `test:`, and `build:` commits are hidden from the changelog. Only `feat:`, `fix:`, `upstream:`, `perf:`, `revert:`, `refactor:`, and `docs:` appear.
+
+### Upstream Cherry-Picks
+
+Use `upstream:` for cherry-picked changes from `goharbor/harbor` so release-please puts them in the `Upstream` release notes section.
+
+Add the upstream PR and author to the commit body so the release notes can show the original attribution instead of the sync bot:
+
+```text
+upstream(proxy): Preserve URL path prefix during registry auth discovery
+
+Upstream-PR: goharbor/harbor#12345
+Upstream-Author: @original-author
+Signed-off-by: Your Name <your@email.com>
+```
+
+The GitHub release note will render that entry as `by @original-author in goharbor/harbor#12345`.
 
 ---
 

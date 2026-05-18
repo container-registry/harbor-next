@@ -17,5 +17,6 @@ COPY icons /icons
 COPY src/core/views /views
 WORKDIR /
 EXPOSE 8080
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=5 CMD ["/lprobe", "-port", "8080", "-endpoint", "/api/v2.0/ping"]
 USER harbor
 ENTRYPOINT ["/core"]

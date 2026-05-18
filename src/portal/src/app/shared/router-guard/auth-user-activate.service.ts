@@ -24,7 +24,11 @@ import { MessageHandlerService } from '../services/message-handler.service';
 import { SearchTriggerService } from '../components/global-search/search-trigger.service';
 import { Observable } from 'rxjs';
 import { UN_LOGGED_PARAM, YES } from '../../account/sign-in/sign-in.service';
-import { CommonRoutes, CONFIG_AUTH_MODE, LANDING_PAGE } from '../entities/shared.const';
+import {
+    CommonRoutes,
+    CONFIG_AUTH_MODE,
+    LANDING_PAGE,
+} from '../entities/shared.const';
 
 @Injectable({
     providedIn: 'root',
@@ -64,8 +68,7 @@ export class AuthCheckGuard {
                         if (
                             !state.url.startsWith(CommonRoutes.EMBEDDED_SIGN_IN)
                         ) {
-                            const config =
-                                this.appConfigService.getConfig();
+                            const config = this.appConfigService.getConfig();
                             // if primary auth mode enabled, skip the first step
                             if (
                                 config &&
@@ -81,11 +84,23 @@ export class AuthCheckGuard {
                             if (
                                 config &&
                                 config.unauthenticated_landing_page ===
-                                    LANDING_PAGE.PUBLIC_PROJECTS &&
-                                !state.url.startsWith(
-                                    CommonRoutes.HARBOR_DEFAULT
-                                )
+                                    LANDING_PAGE.PUBLIC_PROJECTS
                             ) {
+                                if (
+                                    state.url.startsWith(
+                                        CommonRoutes.HARBOR_DEFAULT
+                                    )
+                                ) {
+                                    const urlTree = this.router.parseUrl(
+                                        state.url
+                                    );
+                                    urlTree.queryParams = {
+                                        ...urlTree.queryParams,
+                                        [UN_LOGGED_PARAM]: YES,
+                                    };
+                                    this.router.navigateByUrl(urlTree);
+                                    return observer.next(false);
+                                }
                                 this.router.navigate(
                                     [CommonRoutes.HARBOR_DEFAULT],
                                     {

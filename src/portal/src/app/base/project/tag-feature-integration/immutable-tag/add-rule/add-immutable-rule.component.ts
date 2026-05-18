@@ -269,9 +269,7 @@ export class AddImmutableRuleComponent {
         if (this.rule.template !== rule.template) {
             return false;
         }
-        return (
-            JSON.stringify(this.rule.params) === JSON.stringify(rule.params)
-        );
+        return JSON.stringify(this.rule.params) === JSON.stringify(rule.params);
     }
 
     getI18nKey(str: string) {

@@ -132,7 +132,10 @@
                     clrCheckbox
                     [(ngModel)]="projectPolicy.ProxyCacheLocalOnNotFound"
                     name="proxy-cache-local-on-not-found"
-                    [disabled]="!hasChangeConfigRole || !allowUpdateProxyCacheConfiguration" />
+                    [disabled]="
+                        !hasChangeConfigRole ||
+                        !allowUpdateProxyCacheConfiguration
+                    " />
                 <label for="proxy-cache-local-on-not-found-input">
                     {{ 'PROJECT.PROXY_CACHE_LOCAL_ON_NOT_FOUND' | translate }}
                 </label>

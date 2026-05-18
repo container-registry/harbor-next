@@ -84,6 +84,7 @@ import {
     EventService,
     HarborEvent,
 } from '../../../services/event-service/event.service';
+import { UN_LOGGED_PARAM, YES } from '../../../account/sign-in/sign-in.service';
 
 @Component({
     selector: 'hbr-repository-gridview',
@@ -173,6 +174,13 @@ export class RepositoryGridviewComponent
             'repositories',
             repoEvt.name.substr(this.projectName.length + 1),
         ];
+    }
+
+    getQueryParams() {
+        if (this.session.getCurrentUser()) {
+            return null;
+        }
+        return { [UN_LOGGED_PARAM]: YES };
     }
 
     ngOnChanges(changes: SimpleChanges): void {
@@ -572,6 +580,15 @@ export class RepositoryGridviewComponent
     }
 
     getHelmChartVersionPermission(projectId: number): void {
+        if (
+            !this.hasSignedIn &&
+            this.route.snapshot.queryParams[UN_LOGGED_PARAM] === YES
+        ) {
+            this.hasCreateRepositoryPermission = false;
+            this.hasDeleteRepositoryPermission = false;
+            return;
+        }
+
         let hasCreateRepositoryPermission =
             this.userPermissionService.getPermission(
                 this.projectId,

@@ -18,7 +18,8 @@ RUN bun run postinstall && \
     bun run generate-build-timestamp && \
     node --max_old_space_size=2048 node_modules/@angular/cli/bin/ng build --configuration production
 COPY LICENSE ./dist/LICENSE
-RUN cd app-swagger-ui && bun install --ignore-scripts && bun run build
+WORKDIR /harbor/src/portal/app-swagger-ui
+RUN bun install --ignore-scripts && bun run build
 
 #
 # RUNTIME
@@ -32,4 +33,6 @@ COPY config/portal/nginx.conf /etc/nginx/nginx.conf
 WORKDIR /usr/share/nginx/html
 
 EXPOSE 8080
+HEALTHCHECK --interval=10s --timeout=5s --retries=3 CMD ["/lprobe", "-port", "8080"]
+USER nginx
 ENTRYPOINT ["nginx", "-g", "daemon off;"]
