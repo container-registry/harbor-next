@@ -9,22 +9,26 @@ if (!patchPath) {
 const lines = readFileSync(patchPath, 'utf8').split(/\r?\n/);
 const subjectIndex = lines.findIndex(line => line.startsWith('Subject: '));
 
-if (subjectIndex === -1) {
+if (subjectIndex === -1 && !lines[0]?.trim()) {
   process.exit(0);
 }
 
-const subject = lines[subjectIndex]
+const subjectLine = subjectIndex === -1 ? lines[0] : lines[subjectIndex];
+const subject = subjectLine
   .replace(/^Subject: /, '')
   .replace(/^\[PATCH[^\]]*\]\s*/, '')
   .trim();
 
-let bodyStart = lines.findIndex((line, index) => index > subjectIndex && line === '');
+const headerIndex = subjectIndex === -1 ? 0 : subjectIndex;
+let bodyStart = lines.findIndex((line, index) => index > headerIndex && line === '');
 if (bodyStart === -1) {
-  bodyStart = subjectIndex;
+  bodyStart = headerIndex;
 }
 
 const bodyEnd = lines.findIndex((line, index) => index > bodyStart && line === '---');
-const bodyLines = lines.slice(bodyStart + 1, bodyEnd === -1 ? lines.length : bodyEnd);
+const bodyLines = lines
+  .slice(bodyStart + 1, bodyEnd === -1 ? lines.length : bodyEnd)
+  .filter(line => !line.startsWith('From: ') && !/^[A-Za-z-]+-by: /i.test(line));
 
 while (bodyLines.length > 0 && bodyLines[0].trim() === '') {
   bodyLines.shift();

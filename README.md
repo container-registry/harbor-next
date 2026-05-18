@@ -134,10 +134,10 @@ Signed-off-by: Your Name <your@email.com>
 
 This renders in release notes as an `Upstream` entry with the original upstream PR link and author.
 
-Commercial patch commits can use a simple subject instead of a conventional commit. The patch `Subject:` becomes the release-note title, and the patch body before `---` becomes the description:
+Commercial patch commits can use a simple subject instead of a conventional commit. The first line of the exported patch becomes the release-note title, and the patch body before `---` becomes the description:
 
 ```text
-Subject: [PATCH] Branding customization
+Branding customization
 
 Allows operators to configure product branding for the portal without rebuilding
 the Harbor Next image.
