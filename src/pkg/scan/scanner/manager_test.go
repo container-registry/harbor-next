@@ -17,6 +17,8 @@
 package scanner
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -49,6 +51,10 @@ func TestBasicManager(t *testing.T) {
 
 // SetupSuite prepares env for test suite
 func (suite *BasicManagerTestSuite) SetupSuite() {
+	keyPath := filepath.Join(suite.T().TempDir(), "key")
+	require.NoError(suite.T(), os.WriteFile(keyPath, []byte("naa4JtarA1Zsc3uY"), 0600))
+	suite.T().Setenv("KEY_PATH", keyPath)
+
 	suite.Suite.SetupSuite()
 
 	suite.mgr = New()
