@@ -120,6 +120,45 @@ Namespace aliases: `b:` (build), `t:` (test), `img:` (image), `d:` (dev).
 
 See [devenv/README.md](devenv/README.md) for detailed development environment commands.
 
+### Release Note Commit Formats
+
+Use `upstream:` commits for cherry-picked changes from `goharbor/harbor`. Keep the subject conventional, then add the upstream PR and original author as trailers in the commit body:
+
+```text
+upstream(proxy): Preserve URL path prefix during registry auth discovery
+
+Upstream-PR: goharbor/harbor#12345
+Upstream-Author: @original-author
+Signed-off-by: Your Name <your@email.com>
+```
+
+This renders in release notes as an `Upstream` entry with the original upstream PR link and author.
+
+Commercial patch commits can use a simple subject instead of a conventional commit. The patch `Subject:` becomes the release-note title, and the patch body before `---` becomes the description:
+
+```text
+Subject: [PATCH] Branding customization
+
+Allows operators to configure product branding for the portal without rebuilding
+the Harbor Next image.
+
+Supports custom names, logos, and landing page copy from deployment
+configuration.
+---
+```
+
+This renders as:
+
+```markdown
+- **Branding customization**
+
+  Allows operators to configure product branding for the portal without rebuilding
+  the Harbor Next image.
+
+  Supports custom names, logos, and landing page copy from deployment
+  configuration.
+```
+
 ## OCI Distribution Conformance Tests
 
 Check the OCI distribution conformance tests [report](https://storage.googleapis.com/harbor-conformance-test/report.html) of Harbor.
