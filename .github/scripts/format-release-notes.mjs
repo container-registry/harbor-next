@@ -124,14 +124,11 @@ function upstreamPrLink(pr) {
 }
 
 function formatUpstreamTitle(entry) {
-  const title = entry
+  return entry
     .replace(/^[-*]\s*/, '')
     .replace(/\s*\[upstream\]\s*/i, ' ')
-    .replace(/^\s*(?:feat|fix|perf|refactor|docs|test|chore|ci|build)(?:\([^)]+\))?!?:\s*/i, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
-
-  return title.charAt(0).toUpperCase() + title.slice(1);
 }
 
 function formatUpstreamEntry(entry, sha) {
