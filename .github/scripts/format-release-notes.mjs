@@ -144,7 +144,7 @@ function formatUpstreamEntry(entry, sha) {
     .replace(/\s{2,}/g, ' ');
   const commitSuffix = formatted.match(/\s+\(\[[0-9a-f]+\]\(https:\/\/github\.com\/[^)]+\/commit\/[0-9a-f]+\)\)$/i);
   const title = formatUpstreamTitle(commitSuffix ? formatted.slice(0, commitSuffix.index) : formatted);
-  formatted = `- [upstream] ${title}`;
+  formatted = `- ${title}`;
 
   if (!metadata?.pr && !metadata?.author) {
     return `${formatted}${commitSuffix?.[0] ?? ''}`;
