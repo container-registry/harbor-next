@@ -123,6 +123,14 @@ function upstreamPrLink(pr) {
   return `[goharbor/harbor#${pr}](https://github.com/goharbor/harbor/pull/${pr})`;
 }
 
+function formatUpstreamTitle(entry) {
+  return entry
+    .replace(/^[-*]\s*/, '')
+    .replace(/\s*\[upstream\]\s*/i, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 function formatUpstreamEntry(entry, sha) {
   const commitMetadata = metadataForCommit(sha);
   const inlineMetadata = parseInlineUpstreamMetadata(entry);
@@ -131,13 +139,15 @@ function formatUpstreamEntry(entry, sha) {
     author: commitMetadata?.author ?? inlineMetadata?.author,
   };
   let formatted = entry
-    .replace(/\s*\[upstream\]\s*/i, ' ')
     .replace(/\sby\s+@[A-Za-z0-9-]+(?:\[bot\])?\s+in\s+(?:\[goharbor\/harbor#\d+\]\(https:\/\/github\.com\/goharbor\/harbor\/pull\/\d+\)|https:\/\/github\.com\/goharbor\/harbor\/pull\/\d+)/i, '')
     .replace(/\s+\((?:upstream\s+)?(?:PR\s+)?(?:goharbor\/harbor#|https:\/\/github\.com\/goharbor\/harbor\/pull\/)\d+\s+by\s+@[A-Za-z0-9-]+(?:\[bot\])?\)/i, '')
     .replace(/\s{2,}/g, ' ');
+  const commitSuffix = formatted.match(/\s+\(\[[0-9a-f]+\]\(https:\/\/github\.com\/[^)]+\/commit\/[0-9a-f]+\)\)$/i);
+  const title = formatUpstreamTitle(commitSuffix ? formatted.slice(0, commitSuffix.index) : formatted);
+  formatted = `- ${title}`;
 
   if (!metadata?.pr && !metadata?.author) {
-    return formatted;
+    return `${formatted}${commitSuffix?.[0] ?? ''}`;
   }
 
   const details = [
@@ -145,12 +155,11 @@ function formatUpstreamEntry(entry, sha) {
     metadata.pr ? `in ${upstreamPrLink(metadata.pr)}` : undefined,
   ].filter(Boolean).join(' ');
 
-  const commitSuffix = formatted.match(/\s+\(\[[0-9a-f]+\]\(https:\/\/github\.com\/[^)]+\/commit\/[0-9a-f]+\)\)$/i);
   if (!commitSuffix) {
     return `${formatted} ${details}`;
   }
 
-  return `${formatted.slice(0, commitSuffix.index)} ${details}${commitSuffix[0]}`;
+  return `${formatted} ${details}${commitSuffix[0]}`;
 }
 
 function releaseNotesLines(body) {
