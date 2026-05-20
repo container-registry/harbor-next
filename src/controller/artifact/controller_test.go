@@ -785,6 +785,7 @@ func (c *controllerTestSuite) TestCopy() {
 		RepositoryID: 1,
 		Name:         "library/hello-world",
 	}, nil)
+	c.repoMgr.On("Touch", mock.Anything, mock.Anything).Return(nil)
 	c.artMgr.On("Count", mock.Anything, mock.Anything).Return(int64(0), nil)
 	c.artMgr.On("GetByDigest", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.NotFoundError(nil))
 	c.tagCtl.On("List").Return([]*tag.Tag{

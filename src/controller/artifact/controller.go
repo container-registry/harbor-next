@@ -297,7 +297,23 @@ func (c *controller) ensureArtifact(ctx context.Context, repository, digest stri
 		}
 	}
 
+	if created {
+		c.touchRepo(ctx, repo.RepositoryID)
+	}
+
 	return created, artifact, nil
+}
+
+// touchRepo bumps update_time on the parent repository so the "last modified"
+// timestamp reflects artifact create/delete/label events. Errors are logged
+// only; the caller's operation has already succeeded.
+func (c *controller) touchRepo(ctx context.Context, repositoryID int64) {
+	if c.repoMgr == nil || repositoryID <= 0 {
+		return
+	}
+	if err := c.repoMgr.Touch(ctx, repositoryID); err != nil {
+		log.G(ctx).Warningf("failed to touch repository %d update_time: %v", repositoryID, err)
+	}
 }
 
 func (c *controller) Count(ctx context.Context, query *q.Query) (int64, error) {
@@ -473,6 +489,9 @@ func (c *controller) deleteDeeply(ctx context.Context, id int64, isRoot, isAcces
 			return nil
 		}
 		return err
+	}
+	if isRoot {
+		c.touchRepo(ctx, art.RepositoryID)
 	}
 
 	blobs, err := c.blobMgr.List(ctx, q.New(q.KeyWords{"artifactDigest": art.Digest}))
@@ -672,12 +691,27 @@ func (c *controller) AddLabel(ctx context.Context, artifactID int64, labelID int
 			}
 		}
 	}()
-	err = c.labelMgr.AddTo(ctx, labelID, artifactID)
+	if err = c.labelMgr.AddTo(ctx, labelID, artifactID); err != nil {
+		return
+	}
+	if c.artMgr != nil {
+		if art, gerr := c.artMgr.Get(ctx, artifactID); gerr == nil {
+			c.touchRepo(ctx, art.RepositoryID)
+		}
+	}
 	return
 }
 
 func (c *controller) RemoveLabel(ctx context.Context, artifactID int64, labelID int64) error {
-	return c.labelMgr.RemoveFrom(ctx, labelID, artifactID)
+	if err := c.labelMgr.RemoveFrom(ctx, labelID, artifactID); err != nil {
+		return err
+	}
+	if c.artMgr != nil {
+		if art, err := c.artMgr.Get(ctx, artifactID); err == nil {
+			c.touchRepo(ctx, art.RepositoryID)
+		}
+	}
+	return nil
 }
 
 func (c *controller) Walk(ctx context.Context, root *Artifact, walkFn func(*Artifact) error, option *Option) error {
