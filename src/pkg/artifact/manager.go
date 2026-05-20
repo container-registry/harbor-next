@@ -42,8 +42,6 @@ type Manager interface {
 	Delete(ctx context.Context, id int64) (err error)
 	// Update the artifact. Only the properties specified by "props" will be updated if it is set
 	Update(ctx context.Context, artifact *Artifact, props ...string) (err error)
-	// Touch bumps the artifact's update_time to now.
-	Touch(ctx context.Context, id int64) error
 	// UpdatePullTime updates artifact pull time by ID.
 	UpdatePullTime(ctx context.Context, id int64, pullTime time.Time) (err error)
 	// ListReferences according to the query
@@ -127,10 +125,6 @@ func (m *manager) Delete(ctx context.Context, id int64) error {
 
 func (m *manager) Update(ctx context.Context, artifact *Artifact, props ...string) (err error) {
 	return m.dao.Update(ctx, artifact.To(), props...)
-}
-
-func (m *manager) Touch(ctx context.Context, id int64) error {
-	return m.dao.Touch(ctx, id)
 }
 
 func (m *manager) UpdatePullTime(ctx context.Context, id int64, pullTime time.Time) (err error) {
