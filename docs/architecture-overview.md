@@ -61,7 +61,7 @@ It is a set of cooperating services behind a single gateway. The **Core** servic
 │            "Filesystem, S3, GCS, Azure Blob (inmemory for tests)"            │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
-Structure for auto-update: run `task` in docs/ directory.
+Structure for auto-update: run `task docs:svgbob` from the repo root.
 The diagram must be inside a HTML comment, wrapped in ```SVGBob fences.
 The Kroki image link must follow immediately after the closing. If missing one will be created.
 -->
