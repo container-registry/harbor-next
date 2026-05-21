@@ -33,7 +33,7 @@ We're developing Harbor Next as a [community proposal](https://github.com/goharb
 - Versatile Helm Chart
 - Open Compose (install.sh less) supporting Docker & Podman Compose
 - Support for OpenShift, Rancher, k3s, Nutanix (NKP)
-- Prepending vetted features not yet upstream
+- Prepending vetted features not yet upstream — see the [release notes](https://github.com/container-registry/harbor-next/releases)
 - See [ROADMAP.md](/ROADMAP.md) for more...
 
 ## Harbor Features
