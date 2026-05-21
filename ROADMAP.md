@@ -1,6 +1,6 @@
 # Harbor Next Roadmap
 
-A high level roadmap to give users and idea where the next generation **Harbor** is heading towards.
+A high level roadmap to give users an idea where the next generation **Harbor** is heading towards.
 
 Harbor next is focusing on 3 areas
 
