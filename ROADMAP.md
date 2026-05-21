@@ -45,6 +45,6 @@ Legend: ✅ Delivered · 🚧 In progress · 🗓️ Planned · 💲 Commercial 
 - 🗓 **Pluggable Scanner Spec V1.3** — Generic image analysis & chaining beyond SBOM and vulnerabilites.
 - 🗓 **Extension Points** — Users can to extend Harbor at various points.
 - 🗓 **New Portal** — Node/Angular less portal with simple HTML MPA.
-- 🗓 **Drop Redis** — With an architectual redising Redis is not needed for caching.
+- 🗓 **Drop Redis** — With an architectural redesign Redis is not needed for caching.
 - 🗓 **3-tier Stack** — One Application/Container & Database stack.
 
