@@ -1,0 +1,137 @@
+# Harbor Next — AWS EKS with IRSA (S3 + RDS IAM Auth)
+#
+# Prerequisites:
+#   - EKS cluster with OIDC provider (see cluster.yaml)
+#   - S3 bucket for registry storage
+#   - Aurora PostgreSQL with IAM authentication enabled
+#   - IRSA role with S3 + rds-db:connect permissions
+#
+# Usage:
+#   helm install harbor-next oci://8gears.container-registry.com/8gcr/charts/harbor-next \
+#     --version 3.0.0 -n harbor --create-namespace \
+#     -f values-aws-irsa.yaml \
+#     --set database.host=<AURORA_ENDPOINT> \
+#     --set registry.storage.s3.bucket=<BUCKET_NAME> \
+#     --set core.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=<ROLE_ARN> \
+#     --set jobservice.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=<ROLE_ARN> \
+#     --set registry.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=<ROLE_ARN>
+
+# Access via kubectl port-forward svc/harbor-next-core 8443:443 -n harbor
+externalURL: "https://localhost:8443"
+# Demo password. For production, use `existingSecretAdminPassword` with a
+# Secret from AWS Secrets Manager, external-secrets, or SOPS.
+harborAdminPassword: "Harbor12345"
+
+# --- Exposure: ClusterIP only (port-forward access) ---
+expose:
+  clusterIP:
+    enabled: true
+
+# Ingress disabled — access via port-forward
+ingress:
+  enabled: false
+
+# Auto-generated self-signed TLS
+tls:
+  enabled: true
+  certSource: auto
+
+# --- External Database: Aurora PostgreSQL with RDS IAM Auth ---
+database:
+  host: ""       # set via --set database.host=<AURORA_ENDPOINT>
+  port: 5432
+  username: harbor_iam_user
+  password: "placeholder"  # ignored when IAM auth is active
+  database: registry
+  sslmode: require
+  # Cap connection lifetime below RDS IAM token expiry (15 min)
+  connMaxLifetime: "840s"
+
+# --- Valkey (in-cluster) ---
+valkey:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: false
+
+# --- Trivy: disabled for this example ---
+trivy:
+  enabled: false
+
+# --- Exporter / Metrics: disabled ---
+exporter:
+  enabled: false
+metrics:
+  enabled: false
+
+# --- Core ---
+core:
+  replicas: 1
+  # IAM auth env vars (picked up by core's BeforeConnect hook)
+  config:
+    POSTGRESQL_USE_IAM_AUTH: "true"
+    POSTGRESQL_AWS_REGION: "eu-central-1"
+  serviceAccount:
+    create: true
+    annotations: {}
+    # eks.amazonaws.com/role-arn: <ROLE_ARN>  — set via --set
+    automountServiceAccountToken: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+# --- Job Service ---
+jobservice:
+  replicas: 1
+  max_job_workers: 2
+  config:
+    POSTGRESQL_USE_IAM_AUTH: "true"
+    POSTGRESQL_AWS_REGION: "eu-central-1"
+  serviceAccount:
+    create: true
+    annotations: {}
+    # eks.amazonaws.com/role-arn: <ROLE_ARN>  — set via --set
+    automountServiceAccountToken: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+# --- Registry: S3 storage via IRSA ---
+registry:
+  replicas: 1
+  config: {}
+  storage:
+    type: s3
+    s3:
+      region: eu-central-1
+      bucket: ""  # set via --set registry.storage.s3.bucket=<BUCKET_NAME>
+      # No accesskey/secretkey — IRSA provides credentials via
+      # AWS SDK default credential chain (projected service account token).
+  serviceAccount:
+    create: true
+    annotations: {}
+    # eks.amazonaws.com/role-arn: <ROLE_ARN>  — set via --set
+    automountServiceAccountToken: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+# --- Portal ---
+portal:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi

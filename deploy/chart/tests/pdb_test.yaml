@@ -1,0 +1,107 @@
+# All tests assert chart-computed output for known inputs or fail-fast
+# guards. Pure Helm pass-through tests were removed — they only proved
+# `--set` works, not that the chart does anything with the value.
+# Full-render regression coverage lives in snapshots_test.yaml.
+suite: PodDisruptionBudget tests
+templates:
+  - templates/pdbs.yaml
+tests:
+  # Pins the default gating: pdbs.yaml renders 0 documents when every
+  # component PDB is disabled. Guards against an accidental
+  # `default: enabled: true` regression in values.yaml.
+  - it: should not create PDBs by default
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Pins the cross-component gating: exporter.pdb.enabled=true is a
+  # no-op when exporter.enabled=false (no Deployment → no PDB target).
+  - it: should not create exporter PDB when exporter is disabled
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      exporter.enabled: false
+      exporter.pdb.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Pins the cross-component gating: trivy.pdb.enabled=true is a no-op
+  # when trivy.enabled=false.
+  - it: should not create trivy PDB when trivy is disabled
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trivy.enabled: false
+      trivy.pdb.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Pins the documentSelector-based per-component PDB name plus the
+  # maxUnavailable branch of the mutually-exclusive minAvailable /
+  # maxUnavailable conditional in the PDB spec.
+  - it: should support maxUnavailable instead of minAvailable
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-harbor-next-core
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.pdb.enabled: true
+      core.pdb.maxUnavailable: 1
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+      - equal:
+          path: spec.maxUnavailable
+          value: 1
+
+  # Pins that minAvailable accepts a percentage string (e.g. "50%"), not
+  # just an integer — the chart must preserve the quoted form so
+  # Kubernetes interprets it as a percentage and not an int.
+  - it: should support percentage values for minAvailable
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-harbor-next-core
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.pdb.enabled: true
+      core.pdb.minAvailable: "50%"
+    asserts:
+      - equal:
+          path: spec.minAvailable
+          value: "50%"
+
+  # Regression guard for 45bd59360 — PDB requires exactly one of
+  # minAvailable / maxUnavailable (Kubernetes API rule).
+  - it: should fail when neither minAvailable nor maxUnavailable is set
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.pdb.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "core.pdb requires either minAvailable or maxUnavailable when enabled"
+
+  - it: should fail when both minAvailable and maxUnavailable are set
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.pdb.enabled: true
+      core.pdb.minAvailable: 1
+      core.pdb.maxUnavailable: 1
+    asserts:
+      - failedTemplate:
+          errorMessage: "core.pdb cannot set both minAvailable and maxUnavailable (Kubernetes requires them to be mutually exclusive)"

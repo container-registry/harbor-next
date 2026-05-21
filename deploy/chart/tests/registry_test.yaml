@@ -1,0 +1,264 @@
+# All tests assert chart-computed output for known inputs or fail-fast
+# guards. Pure Helm pass-through tests were removed — they only proved
+# `--set` works, not that the chart does anything with the value.
+# Full-render regression coverage lives in snapshots_test.yaml.
+suite: registry component tests
+templates:
+  - templates/registry.deployment.yaml
+  - templates/registry.service.yaml
+  - templates/registry.configmap.yaml
+  - templates/registry.secret.yaml
+  - templates/registry.pvc.yaml
+  - templates/registryctl.configmap.yaml
+  - templates/registryctl.secret.yaml
+tests:
+  # Pins the two-container layout (registry + registryctl sidecar) and
+  # the container ordering that the REGISTRY_HTTP_SECRET tests below
+  # depend on (containers[0]=registry, containers[1]=registryctl).
+  - it: should have both registry and registryctl containers in order
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 2
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: registry
+      - equal:
+          path: spec.template.spec.containers[1].name
+          value: registryctl
+
+  # Pins the hardcoded registry (5000) and registryctl (8080) ports and
+  # their port names — both names are consumed by Service selectors and
+  # the ingress/HTTPRoute backend.service.port.name references.
+  - it: should create registry service with correct ports
+    template: templates/registry.service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - equal:
+          path: spec.ports[0].name
+          value: http-registry
+      - equal:
+          path: spec.ports[0].port
+          value: 5000
+      - equal:
+          path: spec.ports[1].name
+          value: http-controller
+      - equal:
+          path: spec.ports[1].port
+          value: 8080
+
+  # Pins the PVC-gating conditional: a PVC is rendered only when
+  # storage.type=filesystem AND persistence.enabled=true AND no
+  # existingClaim is set. Also pins size pass-through.
+  - it: should create PVC when persistence is enabled with filesystem storage
+    template: templates/registry.pvc.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.storage.type: filesystem
+      registry.persistence.enabled: true
+      registry.persistence.size: 100Gi
+    asserts:
+      - isKind:
+          of: PersistentVolumeClaim
+      - equal:
+          path: spec.resources.requests.storage
+          value: 100Gi
+
+  # Pins the conditional: S3 storage suppresses the registry PVC even
+  # when persistence.enabled=true (S3 is the source of truth, not PV).
+  - it: should not create PVC when using S3 storage
+    template: templates/registry.pvc.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.storage.type: s3
+      registry.persistence.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Pins the gating: persistence.enabled=false suppresses the PVC even
+  # for filesystem storage type.
+  - it: should not create PVC when persistence is disabled
+    template: templates/registry.pvc.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.storage.type: filesystem
+      registry.persistence.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Pins the conditional rendering of the filesystem storage block in
+  # config.yml (only present when storage.type=filesystem) plus the
+  # rootdirectory pass-through into the YAML body.
+  - it: should configure filesystem storage in configmap
+    template: templates/registry.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.storage.type: filesystem
+      registry.storage.filesystem.rootdirectory: /data
+    asserts:
+      - matchRegex:
+          path: data["config.yml"]
+          pattern: "filesystem:"
+      - matchRegex:
+          path: data["config.yml"]
+          pattern: "rootdirectory: /data"
+
+  # Pins the conditional rendering of the S3 storage block in config.yml
+  # — region and bucket flow from values into the YAML body, not just
+  # into top-level keys.
+  - it: should configure S3 storage in configmap
+    template: templates/registry.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.storage.type: s3
+      registry.storage.s3.region: us-west-2
+      registry.storage.s3.bucket: my-harbor-bucket
+    asserts:
+      - matchRegex:
+          path: data["config.yml"]
+          pattern: "region: us-west-2"
+      - matchRegex:
+          path: data["config.yml"]
+          pattern: "bucket: my-harbor-bucket"
+
+  # Pins the gating: setting persistence.existingClaim must suppress the
+  # generated PVC (else the chart would create a PVC AND the deployment
+  # would reference an unrelated one).
+  - it: should not render generated PVC when existingClaim is set
+    template: templates/registry.pvc.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.storage.type: filesystem
+      registry.persistence.enabled: true
+      registry.persistence.existingClaim: my-existing-pvc
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Pins the cross-template wiring: when existingClaim is set, the
+  # deployment's storage volume must reference that claim verbatim.
+  - it: should wire existingClaim into the deployment volume
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.storage.type: filesystem
+      registry.persistence.enabled: true
+      registry.persistence.existingClaim: my-existing-pvc
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[3].persistentVolumeClaim.claimName
+          value: my-existing-pvc
+
+  # ============================================================================
+  # registry.existingSecret wiring
+  # Regression guards for facffbd3c (Fix #19) and 4fd719d7a.
+  #
+  # When `registry.existingSecret` is set, the generated `*-registry`
+  # Secret stops emitting REGISTRY_HTTP_SECRET. Two consumers must
+  # source it from the BYO Secret instead:
+  #   - the registry container (was missed in facffbd3c → fixed in
+  #     4fd719d7a — only had envFrom on the generated Secret)
+  #   - the registryctl sidecar (had an explicit env from facffbd3c)
+  # `existingSecretKey` defaults to REGISTRY_HTTP_SECRET so an unset
+  # key value can't render `secretKeyRef.key: ""`.
+  # ============================================================================
+
+  - it: should strip REGISTRY_HTTP_SECRET from generated Secret when existingSecret is set
+    template: templates/registry.secret.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.existingSecret: my-reg
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-harbor-next-registry
+    asserts:
+      - notExists:
+          path: data.REGISTRY_HTTP_SECRET
+
+  - it: should inject REGISTRY_HTTP_SECRET into the registry container from existingSecret
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.existingSecret: my-reg
+    asserts:
+      # registry container is containers[0]
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REGISTRY_HTTP_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: my-reg
+                key: REGISTRY_HTTP_SECRET
+
+  - it: should inject REGISTRY_HTTP_SECRET into the registryctl sidecar from existingSecret
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.existingSecret: my-reg
+    asserts:
+      # registryctl sidecar is containers[1]
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: REGISTRY_HTTP_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: my-reg
+                key: REGISTRY_HTTP_SECRET
+
+  - it: should honor a custom existingSecretKey in both containers
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.existingSecret: my-reg
+      registry.existingSecretKey: customRegKey
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REGISTRY_HTTP_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: my-reg
+                key: customRegKey
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: REGISTRY_HTTP_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: my-reg
+                key: customRegKey

@@ -1,0 +1,62 @@
+# All tests assert chart-computed output for known inputs. Pure Helm
+# pass-through tests (replicas, podAnnotations, nodeSelector, etc.)
+# were removed — they only proved `--set` works, not that the chart
+# does anything with the value. Full-render regression coverage for
+# the exporter component lives in snapshots_test.yaml.
+suite: exporter component tests
+templates:
+  - templates/exporter.deployment.yaml
+  - templates/exporter.service.yaml
+  - templates/serviceaccounts.yaml
+tests:
+  # Pins: exporter Deployment is gated by .Values.exporter.enabled (default-off, off-by-flag).
+  - it: should not render exporter Deployment when disabled
+    template: templates/exporter.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      exporter.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Pins: exporter Service is gated by the same .Values.exporter.enabled flag.
+  - it: should not render exporter Service when disabled
+    template: templates/exporter.service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      exporter.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Pins: chart writes HARBOR_DATABASE_HOST/PORT/USERNAME env entries from
+  # the shared .Values.database.* block (not exporter-local config).
+  - it: should wire database env from .Values.database
+    template: templates/exporter.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: mydb.example.com
+      harborAdminPassword: Harbor12345
+      database.port: 5433
+      database.username: harbor_user
+      exporter.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_DATABASE_HOST
+            value: "mydb.example.com"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_DATABASE_PORT
+            value: "5433"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_DATABASE_USERNAME
+            value: "harbor_user"

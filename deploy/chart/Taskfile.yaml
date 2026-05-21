@@ -1,0 +1,170 @@
+version: '3'
+
+vars:
+  CHART_DIR: '.'
+  CHART_NAME: harbor-next
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  # ============================================================================
+  # Development
+  # ============================================================================
+
+  lint:
+    desc: Lint the Helm chart
+    cmds:
+      - helm lint {{.CHART_DIR}} --set externalURL=https://harbor.example.com --set database.host=postgres.example.com --set harborAdminPassword=changeme123
+
+  template:
+    desc: Render templates locally
+    cmds:
+      - helm template test {{.CHART_DIR}} --set externalURL=https://harbor.example.com --set database.host=postgres.example.com --set harborAdminPassword=changeme123
+
+  template:debug:
+    desc: Render templates with debug output
+    cmds:
+      - helm template test {{.CHART_DIR}} --debug --set externalURL=https://harbor.example.com --set database.host=postgres.example.com --set harborAdminPassword=changeme123
+
+  validate:
+    desc: Validate rendered templates against Kubernetes API
+    cmds:
+      - helm template test {{.CHART_DIR}} --set externalURL=https://harbor.example.com --set database.host=postgres.example.com --set harborAdminPassword=changeme123 | kubectl apply --dry-run=client -f -
+
+  # ============================================================================
+  # Documentation
+  # ============================================================================
+
+  _require-helm-docs:
+    internal: true
+    preconditions:
+      - sh: command -v helm-docs
+        msg: |
+          helm-docs not found. Install:
+            macOS:  brew install norwoodj/tap/helm-docs
+            Linux:  go install github.com/norwoodj/helm-docs/cmd/helm-docs@latest
+          (or download a release binary from https://github.com/norwoodj/helm-docs/releases)
+
+  docs:
+    desc: Generate README from values.yaml + README.md.gotmpl using helm-docs
+    deps: [docs:readme]
+
+  docs:readme:
+    desc: Generate README.md (values.schema.json is hand-maintained — edit it directly)
+    deps: [_require-helm-docs]
+    cmds:
+      # --chart-to-generate {{.CHART_DIR}} isolates this chart so helm-docs
+      # doesn't also process the extracted valkey subchart in ./charts/.
+      - helm-docs --chart-search-root={{.CHART_DIR}} --chart-to-generate={{.CHART_DIR}}
+    sources:
+      - values.yaml
+      - README.md.gotmpl
+    generates:
+      - README.md
+
+  docs:verify:
+    desc: Verify README.md is up-to-date with helm-docs output
+    deps: [_require-helm-docs]
+    cmds:
+      - helm-docs --chart-search-root={{.CHART_DIR}} --chart-to-generate={{.CHART_DIR}} --dry-run > /tmp/helm-docs-expected.md
+      - defer: rm -f /tmp/helm-docs-expected.md /tmp/helm-docs-actual.md
+      - grep -v 'kroki\.io/svgbob' {{.CHART_DIR}}/README.md > /tmp/helm-docs-actual.md
+      - diff /tmp/helm-docs-actual.md /tmp/helm-docs-expected.md || (echo "README.md is out of date. Run{{":"}} task docs" && exit 1)
+
+  # ============================================================================
+  # Dependencies
+  # ============================================================================
+
+  deps:
+    desc: Update chart dependencies
+    cmds:
+      - helm dependency update {{.CHART_DIR}}
+
+  deps:build:
+    desc: Build chart dependencies
+    cmds:
+      - helm dependency build {{.CHART_DIR}}
+
+  # ============================================================================
+  # Testing
+  # ============================================================================
+
+  test:
+    desc: Run all tests
+    deps: [lint]
+    cmds:
+      - task: test:unit
+
+  test:unit:
+    desc: Run unit tests
+    cmds:
+      - helm unittest {{.CHART_DIR}}
+
+  test:unit:update:
+    desc: Run unit tests and update snapshots
+    cmds:
+      - helm unittest {{.CHART_DIR}} --update-snapshot
+
+  # ============================================================================
+  # Packaging
+  # ============================================================================
+
+  package:
+    desc: Package the chart
+    deps: [lint, docs]
+    cmds:
+      - helm package {{.CHART_DIR}}
+
+  # ============================================================================
+  # Installation
+  # ============================================================================
+
+  install:
+    desc: Install chart to current cluster (requires values file)
+    requires:
+      vars: [VALUES_FILE]
+    cmds:
+      - helm install {{.CHART_NAME}} {{.CHART_DIR}} -f {{.VALUES_FILE}}
+
+  install:dry-run:
+    desc: Dry-run install to current cluster
+    requires:
+      vars: [VALUES_FILE]
+    cmds:
+      - helm install {{.CHART_NAME}} {{.CHART_DIR}} -f {{.VALUES_FILE}} --dry-run
+
+  upgrade:
+    desc: Upgrade chart in current cluster
+    requires:
+      vars: [VALUES_FILE]
+    cmds:
+      - helm upgrade {{.CHART_NAME}} {{.CHART_DIR}} -f {{.VALUES_FILE}}
+
+  uninstall:
+    desc: Uninstall chart from current cluster
+    cmds:
+      - helm uninstall {{.CHART_NAME}}
+
+  # ============================================================================
+  # CI/CD
+  # ============================================================================
+
+  ci:
+    desc: Run CI pipeline (lint, test, docs:verify)
+    cmds:
+      - task: lint
+      - task: test:unit
+      - task: docs:verify
+
+  # ============================================================================
+  # Cleanup
+  # ============================================================================
+
+  clean:
+    desc: Clean generated files
+    cmds:
+      - rm -f {{.CHART_DIR}}/*.tgz
+      - rm -rf {{.CHART_DIR}}/charts/*.tgz

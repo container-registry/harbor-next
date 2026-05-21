@@ -1,0 +1,199 @@
+# All tests assert chart-computed output for known inputs or fail-fast
+# guards. Pure Helm pass-through tests were removed — they only proved
+# `--set` works, not that the chart does anything with the value.
+# Full-render regression coverage lives in snapshots_test.yaml.
+suite: ingress tests
+templates:
+  - templates/ingress.yaml
+  - templates/gateway-httproute.yaml
+  - templates/ingress.secret.yaml
+tests:
+  # Pins the top-level conditional: ingress.yaml renders 0 documents
+  # when ingress.enabled=false. Without this gate, Harbor would emit an
+  # Ingress in environments using Gateway API instead.
+  - it: should not create ingress when disabled
+    template: templates/ingress.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      ingress.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Pins the ingress.tls templating loop: each entry in ingress.tls
+  # becomes one spec.tls[] item with secretName and hosts preserved.
+  # Borderline pass-through, but proves the range loop indexes
+  # correctly (would break silently on a `range` typo).
+  - it: should configure TLS
+    template: templates/ingress.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      ingress.enabled: true
+      ingress.hosts:
+        - host: harbor.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+      ingress.tls:
+        - secretName: harbor-tls
+          hosts:
+            - harbor.example.com
+    asserts:
+      - equal:
+          path: spec.tls[0].secretName
+          value: harbor-tls
+      - equal:
+          path: spec.tls[0].hosts[0]
+          value: harbor.example.com
+
+  # Pins the HTTPRoute parentRefs/hostnames wiring under the
+  # gateway.enabled conditional. Gateway API output differs structurally
+  # from Ingress — name/namespace under parentRefs[0], hostnames at top
+  # level — so this guards against template-restructure regressions.
+  - it: should create HTTPRoute when gateway is enabled
+    template: templates/gateway-httproute.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      gateway.enabled: true
+      gateway.hostnames:
+        - harbor.example.com
+      gateway.parentRefs:
+        - name: my-gateway
+          namespace: default
+    asserts:
+      - equal:
+          path: spec.hostnames[0]
+          value: harbor.example.com
+      - equal:
+          path: spec.parentRefs[0].name
+          value: my-gateway
+
+  # Pins the top-level conditional: gateway-httproute.yaml renders 0
+  # documents when gateway.enabled=false (the default), preventing
+  # accidental dual-stack Ingress+HTTPRoute emission.
+  - it: should not create HTTPRoute when gateway is disabled
+    template: templates/gateway-httproute.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      gateway.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Pins the chart-computed ingress path-routing table: for a single
+  # ingress.hosts[0] entry the chart emits 6 paths, with /api/ routed
+  # to the core Service and / routed to the portal Service. Anyone
+  # reordering or merging paths in ingress.yaml breaks this immediately.
+  - it: should route API paths to core service
+    template: templates/ingress.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      ingress.enabled: true
+      ingress.hosts:
+        - host: harbor.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /api/
+      - matchRegex:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          pattern: .*-core$
+      - equal:
+          path: spec.rules[0].http.paths[5].path
+          value: /
+      - matchRegex:
+          path: spec.rules[0].http.paths[5].backend.service.name
+          pattern: .*-portal$
+
+  # Regression guard for fdbd99f5b (Fix #7). With autoGenCert=true and
+  # multiple ingress.hosts entries, the chart must emit ONE tls Secret
+  # whose cert SAN covers every host (the helper passes the full host
+  # list to genSignedCert). If anyone "splits" this into one cert per
+  # host, the document count breaks this test.
+  - it: should render a single autoGen TLS Secret covering all hosts
+    template: templates/ingress.secret.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      ingress.enabled: true
+      ingress.autoGenCert: true
+      ingress.hosts:
+        - host: harbor.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+        - host: notary.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+      ingress.tls:
+        - hosts:
+            - harbor.example.com
+            - notary.example.com
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Secret
+      - equal:
+          path: type
+          value: kubernetes.io/tls
+      - exists:
+          path: data["tls.crt"]
+      - exists:
+          path: data["tls.key"]
+      - exists:
+          path: data["ca.crt"]
+
+  # Release-scoped Secret name regression guard for 1ef7e3877 (Fix #5).
+  # Used to be hardcoded "harbor-tls"; two releases in the same namespace
+  # would collide. Helper now returns `<fullname>-ingress-tls`.
+  - it: should give the autoGen TLS Secret a release-scoped name
+    template: templates/ingress.secret.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      ingress.enabled: true
+      ingress.autoGenCert: true
+      ingress.hosts:
+        - host: harbor.example.com
+      ingress.tls:
+        - hosts:
+            - harbor.example.com
+    asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-harbor-next-ingress-tls
+
+  - it: should not render the autoGen Secret when autoGenCert is false
+    template: templates/ingress.secret.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      ingress.enabled: true
+      ingress.autoGenCert: false
+      ingress.hosts:
+        - host: harbor.example.com
+      ingress.tls:
+        - hosts:
+            - harbor.example.com
+          secretName: external-tls
+    asserts:
+      - hasDocuments:
+          count: 0

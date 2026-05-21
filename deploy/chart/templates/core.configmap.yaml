@@ -1,0 +1,89 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "harbor.fullname" . }}-core
+  labels:
+    {{- include "harbor.componentLabels" (dict "root" . "component" "core") | nindent 4 }}
+data:
+  app.conf: |+
+    appname = Harbor
+    runmode = prod
+    enablegzip = true
+
+    [prod]
+    httpport = {{ include "harbor.core.port" . }}
+  PORT: {{ include "harbor.core.port" . | quote }}
+  DATABASE_TYPE: "postgresql"
+  # Harbor Core configuration
+  EXT_ENDPOINT: {{ include "harbor.externalURL" . | quote }}
+  CORE_URL: {{ include "harbor.core.url" . | quote }}
+  PORTAL_URL: {{ include "harbor.portal.url" . | quote }}
+  REGISTRY_URL: {{ include "harbor.registry.url" . | quote }}
+  JOBSERVICE_URL: {{ include "harbor.jobservice.url" . | quote }}
+  TOKEN_SERVICE_URL: {{ include "harbor.token.service.url" . }}
+  CORE_LOCAL_URL: "http://127.0.0.1:{{ include "harbor.core.port" . }}"
+  WITH_TRIVY: {{ include "harbor.trivy.enabled" . | quote }}
+  TRIVY_ADAPTER_URL: {{ include "harbor.trivy.url" . | quote }}
+  REGISTRY_STORAGE_PROVIDER_NAME: "{{ .Values.registry.storage.type }}"
+  CONFIG_PATH: "/etc/core/app.conf"
+  REGISTRY_CONTROLLER_URL: {{ include "harbor.registryctl.url" . }}
+  REGISTRY_CREDENTIAL_USERNAME: "{{ .Values.registry.credentials.username }}"
+  {{- if has "core" .Values.proxy.components }}
+  HTTP_PROXY: "{{ .Values.proxy.httpProxy }}"
+  HTTPS_PROXY: "{{ .Values.proxy.httpsProxy }}"
+  NO_PROXY: {{ include "harbor.noProxy" . }}
+  {{- end }}
+  PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: "docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory"
+  REPLICATION_ADAPTER_WHITELIST: "ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite"
+  {{- if .Values.metrics.enabled}}
+  METRIC_ENABLE: "true"
+  METRIC_PATH: {{ include "harbor.metrics.path" . | quote }}
+  METRIC_PORT: {{ include "harbor.metrics.port" . | quote }}
+  METRIC_NAMESPACE: harbor
+  METRIC_SUBSYSTEM: core
+  {{- end }}
+
+  # Database configuration
+  POSTGRESQL_HOST: {{ include "harbor.database.host" . | quote }}
+  POSTGRESQL_PORT: {{ include "harbor.database.port" . | quote }}
+  POSTGRESQL_DATABASE: {{ include "harbor.database.database" . | quote }}
+  POSTGRESQL_USERNAME: {{ include "harbor.database.username" . | quote }}
+  POSTGRESQL_SSLMODE: {{ include "harbor.database.sslmode" . | quote }}
+  POSTGRESQL_MAX_IDLE_CONNS: {{ .Values.database.maxIdleConns | default 100 | quote }}
+  POSTGRESQL_MAX_OPEN_CONNS: {{ .Values.database.maxOpenConns | default 900 | quote }}
+  POSTGRESQL_CONN_MAX_IDLE_TIME: {{ .Values.database.connMaxIdleTime | quote }}
+  POSTGRESQL_CONN_MAX_LIFETIME: {{ .Values.database.connMaxLifetime | quote }}
+  # Redis configuration
+  CHART_CACHE_DRIVER: "redis"
+  _REDIS_URL_CORE: {{ include "harbor.redis.url.core" . | quote }}
+  _REDIS_URL_REG: {{ include "harbor.redis.url.registry" . | quote }}
+  _REDIS_URL_HARBOR: {{ include "harbor.redis.url.harbor" . | quote }}
+  _REDIS_URL_CACHE_LAYER: {{ include "harbor.redis.url.cache" . | quote }}
+  # Logging
+  LOG_LEVEL: {{ .Values.logLevel | default "info" | quote }}
+
+  # Cache configuration
+  CACHE_ENABLED: {{ .Values.cache.enabled | quote }}
+  {{- if .Values.cache.enabled }}
+  CACHE_EXPIRE_HOURS: {{ .Values.cache.expireHours | quote }}
+  {{- end }}
+
+  # Core-specific settings
+  {{- if .Values.core.configureUserSettings }}
+  CONFIG_OVERWRITE_JSON: {{ .Values.core.configureUserSettings | quote }}
+  {{- end }}
+  {{- if .Values.core.quotaUpdateProvider }}
+  QUOTA_UPDATE_PROVIDER: {{ .Values.core.quotaUpdateProvider | quote }}
+  {{- end }}
+  {{- if .Values.core.artifactPullAsyncFlushDuration }}
+  ARTIFACT_PULL_ASYNC_FLUSH_DURATION: {{ .Values.core.artifactPullAsyncFlushDuration | quote }}
+  {{- end }}
+  {{- if .Values.core.gdpr }}
+  GDPR_DELETE_USER: {{ .Values.core.gdpr.deleteUser | quote }}
+  GDPR_AUDIT_LOGS: {{ .Values.core.gdpr.auditLogsCompliant | quote }}
+  {{- end }}
+
+  # Config via toEnvVars
+  {{- if .Values.core.config }}
+  {{- include "harbor.toEnvVars" (dict "values" .Values.core.config "prefix" "" "isSecret" false) | nindent 2 }}
+  {{- end }}

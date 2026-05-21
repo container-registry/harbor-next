@@ -1,0 +1,32 @@
+{{/*
+OpenShift Route — creates a Route pointing to the core service.
+*/}}
+{{- if .Values.expose.route.enabled }}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ include "harbor.fullname" . }}
+  labels:
+    {{- include "harbor.labels" . | nindent 4 }}
+    {{- with .Values.expose.route.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.expose.route.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.expose.route.host }}
+  host: {{ . | quote }}
+  {{- end }}
+  port:
+    targetPort: http-web
+  to:
+    kind: Service
+    name: {{ include "harbor.fullname" . }}-core
+    weight: 100
+  tls:
+    termination: {{ .Values.expose.route.tls.termination | default "edge" }}
+    insecureEdgeTerminationPolicy: {{ .Values.expose.route.tls.insecureEdgeTerminationPolicy | default "Redirect" }}
+  wildcardPolicy: None
+{{- end }}
