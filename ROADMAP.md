@@ -5,7 +5,7 @@ A high level roadmap to give users an idea where the next generation **Harbor** 
 Harbor next is focusing on 3 areas
 
 - Ease of development, deployment and operation with minimum resource utilization (compute and dependencies)
-- Extensibility for user self exension of Harbor
+- Extensibility for user self extension of Harbor
 - Vendor neutral community
 
 
