@@ -29,33 +29,33 @@ All services run in containers:
 
 <!--
 ```SVGBob
-┌─ "Host" ─────────────┐┌────────────────────────────────────────────────┐
-│ ┌────────┐           ││                "Docker Network"                │
-│ │"Portal"│           ││                                                │
-│ │":4200" │           ││  ┌────────┐    ┌──────────────┐   ┌─────────┐  │
-│ └───┬────┘           ││  │ "Core" │<---│ "JobService" │<--│ "Trivy" │  │
-│     │                ││  │ ":8080"│    │   ":8888"    │   │ ":8081" │  │
-│     └────────────────┼┼->│        │    └──────┬───────┘   └─────────┘  │
-└──────────────────────┘│  └───┬────┘           │                        │
-                        │      │                │                        │
-                        │      └───────┬────────┘                        │
-                        │              ▼                                 │
+┌──────────────────────┐┌────────────────────────────────────────────────┐
+│        "Host"        ││                "Docker Network"                │
+│                      ││                                                │
+│ ┌────────┐           ││  ┌────────┐    ┌──────────────┐   ┌─────────┐  │
+│ │"Portal"│───────────┼┼->│ "Core" │<---│ "JobService" │<--│ "Trivy" │  │
+│ │":4200" │           ││  │":8080" │    │   ":8888"    │   │ ":8081" │  │
+│ └────────┘           ││  └───┬────┘    └──────┬───────┘   └─────────┘  │
+└──────────────────────┘│      │                │                        │
+                        │      └────────┬───────┘                        │
+                        │               ▼                                │
                         │    ┌─────────────────────┐                     │
                         │    │    "PostgreSQL"     │                     │
-                        │    │      ":5432"        │                     │
+                        │    │       ":5432"       │                     │
                         │    └─────────────────────┘                     │
                         │    ┌─────────────────────┐                     │
-                        │    │      "Redis"        │                     │
-                        │    │      ":6379"        │                     │
+                        │    │       "Redis"       │                     │
+                        │    │       ":6379"       │                     │
                         │    └─────────────────────┘                     │
                         │    ┌─────────────────────┐  ┌──────────────┐   │
                         │    │     "Registry"      │<-│"RegistryCtl" │   │
                         │    │      ":50000"       │  │   ":8085"    │   │
                         │    └─────────────────────┘  └──────────────┘   │
+                        │                                                │
                         └────────────────────────────────────────────────┘
 ```
 -->
-![Diagram](https://kroki.io/svgbob/svg/eNp7NKXn0ZQGBSWP_OISJQUgkzg04RFY3yBDE7geTWlSwOu0CQoIAFQMUo8GlFzyk7NTixT8UkvK84uyldDlgVqg1jQpBeQXlSTmKKGagt1YQgDZWCsTIwMDUGxgM5aw90iMmwlEaJmA7MApSBJrUNXNwOrgJgUl5_yiVLCPbHR1dcEiXvlJwalFZZnJcHGwcEhRZlkl1O8wK6GmYQkyhAVWFgYWBrCYgFBAMSBQQgjAFRpitWAK6SluDxDp2iG5De4ArIatwWHMDCLsnwFz7hRqZJUZUP8TH5f4Ei4eOQU8sUehkbgCYg3eQKTASrjAtD1E5WcCBlKjDJ1AvuVgCliEFZekF6UGB_oo4Y0W4o0EZTxTE2MjJUIxTZSRlKf2GUM5foCBGZSakllMncCEx4-ZsbnlaPzAKjYyqkuiAxsYfemZxSVFlUpwaRtQTQcXdy7JUULUT6TkMQMDUCsBSRpe7RlYmKJWe3SKRxKNmUHQcVMGXyNzBgDjUNI3)
+![Diagram](https://kroki.io/svgbob/svg/eNp7NKXn0ZQGitGER9Qxh7poAtejKU0KUKDkkV9cogTjASWQ5OBqXPKTs1OLFPxSS8rzi7KV0OWBWriwaMNnJCEAMxJvAE7AYg1hDSTGyQQitExAdnCTUkB-UUlijhLYSQTN3wNEunYgrUrO-UWpSiATbHR1dcEiXvlJwalFZZnJcHGwcEhRZlklWATVYisTIwMDqDiWkAEqsDCwQCiAUEBBIFBCCICtAKk0xLBiCm5_zMBqJbKGNVg04DByDR5L8LoCogbi4CnUyCwz4IGJJRXjSdggJ-CRgzHwuHENEQFNupUIkWl7iMmEBAykRgE3gXzLwRQwvxWXpBelBgf6KOGNFuKNBGcLUxNjIyUCMU2UkZQnxBlDOX5AgRmUmpJZTJXARMSPmbG55Wj8QGsfMuo0ogMbGHvpmcUlRZVKcGkbUEUEF3cuyVFCVB5ExyEwixkYgCosJGl4nWRgYYpaJ9EpHkk0ZgbJBa8CZcXulMHXoJwBAKUXzkM=)
 
 ## Directory Structure
 
