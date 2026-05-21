@@ -144,7 +144,7 @@ services:
     restart: unless-stopped
 
   trivy-adapter:
-    image: ${IMAGE_REPO:-}harbor-trivy-adapter:${HARBOR_TAG}
+    image: ${IMAGE_REPO:-}trivy-adapter:${HARBOR_TAG}
     environment:
       SCANNER_LOG_LEVEL: ${LOG_LEVEL:-info}
       SCANNER_REDIS_URL: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}/5
