@@ -27,29 +27,35 @@ All services run in containers:
 - **Redis/Valkey** - Cache/queue (port 6379)
 - **Distribution** - Docker Registry (port 50000)
 
+<!--
 ```SVGBob
-                    ┌────────────────────────────────────────┐
-                    │            Docker Network              │
-                    │                                        │
-┌──────────┐        │  ┌──────┐  ┌───────────┐  ┌───────┐    │
-│  Portal  │◄───────┼─►│ Core │◄─│ JobService│◄─│ Trivy │    │
-│ :4200    │        │  │:8080 │  │   :8888   │  │ :8081 │    │
-└──────────┘        │  └──┬───┘  └─────┬─────┘  └───────┘    │
-   (native)         │     │            │                     │
-                    │  ┌──▼────────────▼──┐                  │
-                    │  │    PostgreSQL    │                  │
-                    │  │      :5432       │                  │
-                    │  └──────────────────┘                  │
-                    │  ┌──────────────────┐                  │
-                    │  │      Redis       │                  │
-                    │  │      :6379       │                  │
-                    │  └──────────────────┘                  │
-                    │  ┌──────────────────┐                  │
-                    │  │    Registry      │                  │
-                    │  │     :50000       │                  │
-                    │  └──────────────────┘                  │
-                    └────────────────────────────────────────┘
+┌──────────────────────┐┌────────────────────────────────────────────────┐
+│        "Host"        ││                "Docker Network"                │
+│                      ││                                                │
+│      ┌────────┐      ││  ┌────────┐    ┌──────────────┐   ┌─────────┐  │
+│      │"Portal"│──────┼┼->│ "Core" │<---│ "JobService" │<--│ "Trivy" │  │
+│      │":4200" │      ││  │":8080" │    │   ":8888"    │   │ ":8081" │  │
+│      └────────┘      ││  └───┬────┘    └──────┬───────┘   └─────────┘  │
+│                      ││      │                │                        │
+└──────────────────────┘│      └────────┬───────┘                        │
+                        │               ▼                                │
+                        │    ┌─────────────────────┐                     │
+                        │    │    "PostgreSQL"     │                     │
+                        │    │       ":5432"       │                     │
+                        │    └─────────────────────┘                     │
+                        │    ┌─────────────────────┐                     │
+                        │    │       "Redis"       │                     │
+                        │    │       ":6379"       │                     │
+                        │    └─────────────────────┘                     │
+                        │    ┌─────────────────────┐  ┌──────────────┐   │
+                        │    │     "Registry"      │<-│"RegistryCtl" │   │
+                        │    │      ":50000"       │  │   ":8085"    │   │
+                        │    └─────────────────────┘  └──────────────┘   │
+                        │                                                │
+                        └────────────────────────────────────────────────┘
 ```
+-->
+![Diagram](https://kroki.io/svgbob/svg/eNp7NKXn0ZQGitGER9Qxh7poAtejKU0KUKDkkV9cogTjASWQ5OBqXPKTs1OLFPxSS8rzi7KV0OWBWriwaMNnJCGAYiTeUJyAag1htSTGyQQitEzAcHCTUkB-UUlijhLYXZg69gCRrh1Ig5JzflGqEkiLja6uLljEKz8pOLWoLDMZLg4WDinKLKsEi2CxzsrEyMAAKokaHkA5CwMLhByEAgoCgRJCAGwFSKUhdium4Pb-DHQrkdWuwaIWh2lr8JiP1wEQNUQnQyyK8CRRiLFTqJHzZhAXnmvwhzN2J-KRQxeZtoeY7EfAQGoUbRPItxxMATNZcUl6UWpwoI8S3mgk3khw1jA1MTZSIpAyiDKS8lQzYyjHDygwg1JTMoupEpiI-DEzNrccjR9ovUNGbUZ0YANjLz2zuKSoUgkubQOqjODiziU5SogKhOg4BGYxAwNQfYUkDa-XDCxMUeslOsUjicbMILngVaCs2J0y-JqSMwBBj8jF)
 
 ## Directory Structure
 

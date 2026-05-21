@@ -232,6 +232,33 @@ Signed-off-by: Your Name <your@email.com>
 
 The GitHub release note will render that entry as `by @original-author in goharbor/harbor#12345`.
 
+### Commercial Patch Commits
+
+Commercial patches can use a simple subject instead of a conventional commit. The patch `Subject:` becomes the release-note title, and the patch body before `---` becomes the description:
+
+```text
+Subject: [PATCH] Branding customization
+
+Allows operators to configure product branding for the portal without rebuilding
+the Harbor Next image.
+
+Supports custom names, logos, and landing page copy from deployment
+configuration.
+---
+```
+
+This renders in the release notes as:
+
+```markdown
+- **Branding customization**
+
+  Allows operators to configure product branding for the portal without rebuilding
+  the Harbor Next image.
+
+  Supports custom names, logos, and landing page copy from deployment
+  configuration.
+```
+
 ---
 
 ## Adding Release Notes to Your PR
