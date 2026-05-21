@@ -32,12 +32,12 @@ All services run in containers:
 ┌──────────────────────┐┌────────────────────────────────────────────────┐
 │        "Host"        ││                "Docker Network"                │
 │                      ││                                                │
-│ ┌────────┐           ││  ┌────────┐    ┌──────────────┐   ┌─────────┐  │
-│ │"Portal"│───────────┼┼->│ "Core" │<---│ "JobService" │<--│ "Trivy" │  │
-│ │":4200" │           ││  │":8080" │    │   ":8888"    │   │ ":8081" │  │
-│ └────────┘           ││  └───┬────┘    └──────┬───────┘   └─────────┘  │
-└──────────────────────┘│      │                │                        │
-                        │      └────────┬───────┘                        │
+│      ┌────────┐      ││  ┌────────┐    ┌──────────────┐   ┌─────────┐  │
+│      │"Portal"│──────┼┼->│ "Core" │<---│ "JobService" │<--│ "Trivy" │  │
+│      │":4200" │      ││  │":8080" │    │   ":8888"    │   │ ":8081" │  │
+│      └────────┘      ││  └───┬────┘    └──────┬───────┘   └─────────┘  │
+│                      ││      │                │                        │
+└──────────────────────┘│      └────────┬───────┘                        │
                         │               ▼                                │
                         │    ┌─────────────────────┐                     │
                         │    │    "PostgreSQL"     │                     │
@@ -55,7 +55,7 @@ All services run in containers:
                         └────────────────────────────────────────────────┘
 ```
 -->
-![Diagram](https://kroki.io/svgbob/svg/eNp7NKXn0ZQGitGER9Qxh7poAtejKU0KUKDkkV9cogTjASWQ5OBqXPKTs1OLFPxSS8rzi7KV0OWBWriwaMNnJCEAMxJvAE7AYg1hDSTGyQQitExAdnCTUkB-UUlijhLYSQTN3wNEunYgrUrO-UWpSiATbHR1dcEiXvlJwalFZZnJcHGwcEhRZlklWATVYisTIwMDqDiWkAEqsDCwQCiAUEBBIFBCCICtAKk0xLBiCm5_zMBqJbKGNVg04DByDR5L8LoCogbi4CnUyCwz4IGJJRXjSdggJ-CRgzHwuHENEQFNupUIkWl7iMmEBAykRgE3gXzLwRQwvxWXpBelBgf6KOGNFuKNBGcLUxNjIyUCMU2UkZQnxBlDOX5AgRmUmpJZTJXARMSPmbG55Wj8QGsfMuo0ogMbGHvpmcUlRZVKcGkbUEUEF3cuyVFCVB5ExyEwixkYgCosJGl4nWRgYYpaJ9EpHkk0ZgbJBa8CZcXulMHXoJwBAKUXzkM=)
+![Diagram](https://kroki.io/svgbob/svg/eNp7NKXn0ZQGitGER9Qxh7poAtejKU0KUKDkkV9cogTjASWQ5OBqXPKTs1OLFPxSS8rzi7KV0OWBWriwaMNnJCGAYiTeUJyAag1htSTGyQQitEzAcHCTUkB-UUlijhLYXZg69gCRrh1Ig5JzflGqEkiLja6uLljEKz8pOLWoLDMZLg4WDinKLKsEi2CxzsrEyMAAKokaHkA5CwMLhByEAgoCgRJCAGwFSKUhdium4Pb-DHQrkdWuwaIWh2lr8JiP1wEQNUQnQyyK8CRRiLFTqJHzZhAXnmvwhzN2J-KRQxeZtoeY7EfAQGoUbRPItxxMATNZcUl6UWpwoI8S3mgk3khw1jA1MTZSIpAyiDKS8lQzYyjHDygwg1JTMoupEpiI-DEzNrccjR9ovUNGbUZ0YANjLz2zuKSoUgkubQOqjODiziU5SogKhOg4BGYxAwNQfYUkDa-XDCxMUeslOsUjicbMILngVaCs2J0y-JqSMwBBj8jF)
 
 ## Directory Structure
 
