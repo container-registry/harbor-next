@@ -11,7 +11,7 @@ If you are an organization that wants to help shape the evolution of Harbor,
 
 ## What is Harbor Next
 
-Harbor Next is a community-driven evolution of Harbor, designed to accelerate innovation and lower the barrier of entry for contributors.
+Harbor Next is a community-driven evolution of Harbor, designed to accelerate innovation and lower the barrier to entry for contributors.
 It serves as the foundation for [8gcr](https://container-registry.com/8gcr) (8gears Container Registry), used across enterprises, government agencies, and cloud providers.
 
 We're developing Harbor Next as a [community proposal](https://github.com/goharbor/community/pull/272) with the goal of advancing Harbor and the container registry ecosystem.
