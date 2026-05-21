@@ -22,7 +22,7 @@ Legend: ✅ Delivered · 🚧 In progress · 🗓️ Planned · 💲 Commercial 
 - ✅ **DEV Env** — Easy contributor onboarding with out of the box local dev environments.
 - ✅ **K8s Distributions Support** — Tested support for OpenShift, Rancher, k0s
 - ✅ **Built-in connection pooling** — database driver upgraded to pgx/v5 including connection pooling.
-- ✅ **Public landing page** — Allow unauthenticated users to browse publicly availibe repositories.
+- ✅ **Public landing page** — Allow unauthenticated users to browse publicly available repositories.
 - ✅ **Compose File** — install.sh less and non-root compose file for Docker and Podman.
 - ✅ **Docker Distribution** — Use of Docker Distribution V3.
 - ✅ **Harbor Satellite** —  Support for Harbor satellite image replication to EDGE.
