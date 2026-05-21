@@ -15,7 +15,7 @@ Legend: ✅ Delivered · 🚧 In progress · 🗓️ Planned · 💲 Commercial 
 
 ## Delivered in v2.15
 
-- ✅ **CI/CD Pipeline** — Continous delivery readiness for reliable, extensible workflows localy and in pipelines.
+- ✅ **CI/CD Pipeline** — Continuous delivery readiness for reliable, extensible workflows locally and in pipelines.
 - ✅ **PR Builds** — Each PR gets a set of images for users to grab, verify and use.
 - ✅ **Multi-architecture builds** — Build binaires and images for different architecutures starting with ARM64 and AMD64
 - ✅ **Scratch Images** — Scratch images with minimal size and attack surface.
