@@ -1,0 +1,107 @@
+name: Backport
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  backport:
+    if: >-
+      ${{
+        github.event.issue.pull_request &&
+        startsWith(github.event.comment.body, '/backport ') &&
+        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
+      }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      PR_NUMBER: ${{ github.event.issue.number }}
+      COMMENT_BODY: ${{ github.event.comment.body }}
+    steps:
+      - name: Resolve backport target
+        id: target
+        run: |
+          target=$(printf '%s' "${COMMENT_BODY}" | tr -d '\r' | awk 'NR == 1 {print $2}')
+          if [[ ! "${target}" =~ ^v[0-9]+\.[0-9]+$ ]]; then
+            gh pr comment "${PR_NUMBER}" --body "Invalid backport target: \`${target}\`. Use \`/backport vX.Y\`."
+            exit 1
+          fi
+
+          branch="release-${target#v}"
+          if ! gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${branch}" >/dev/null 2>&1; then
+            gh pr comment "${PR_NUMBER}" --body "Backport target branch \`${branch}\` does not exist."
+            exit 1
+          fi
+
+          echo "branch=${branch}" >> "${GITHUB_OUTPUT}"
+
+      - name: Load source PR
+        id: source
+        run: |
+          merged=$(gh pr view "${PR_NUMBER}" --json merged --jq .merged)
+          if [ "${merged}" != "true" ]; then
+            gh pr comment "${PR_NUMBER}" --body "Cannot backport because this PR has not been merged."
+            exit 1
+          fi
+
+          title=$(gh pr view "${PR_NUMBER}" --json title --jq .title)
+          url=$(gh pr view "${PR_NUMBER}" --json url --jq .url)
+          sha=$(gh pr view "${PR_NUMBER}" --json mergeCommit --jq .mergeCommit.oid)
+
+          echo "title=${title}" >> "${GITHUB_OUTPUT}"
+          echo "url=${url}" >> "${GITHUB_OUTPUT}"
+          echo "sha=${sha}" >> "${GITHUB_OUTPUT}"
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ steps.target.outputs.branch }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Cherry-pick and open PR
+        env:
+          TARGET_BRANCH: ${{ steps.target.outputs.branch }}
+          SOURCE_TITLE: ${{ steps.source.outputs.title }}
+          SOURCE_URL: ${{ steps.source.outputs.url }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          gh auth setup-git
+          git fetch origin
+
+          backport_branch="backport/pr-${PR_NUMBER}-to-${TARGET_BRANCH}"
+          if git ls-remote --exit-code --heads origin "${backport_branch}" >/dev/null 2>&1; then
+            backport_branch="${backport_branch}-${GITHUB_RUN_ID}"
+          fi
+          git switch -c "${backport_branch}"
+
+          if ! git cherry-pick -x "${SOURCE_SHA}"; then
+            git cherry-pick --abort || true
+            gh pr comment "${PR_NUMBER}" --body "Backport to \`${TARGET_BRANCH}\` has conflicts. Please cherry-pick \`${SOURCE_SHA}\` manually."
+            exit 1
+          fi
+
+          if git diff --quiet "origin/${TARGET_BRANCH}" HEAD; then
+            gh pr comment "${PR_NUMBER}" --body "No backport PR opened for \`${TARGET_BRANCH}\`; the cherry-pick produced no changes."
+            exit 0
+          fi
+
+          git push origin "${backport_branch}"
+          printf -v body 'Backports %s to `%s`.\n\nCherry-picked commit: %s' \
+            "${SOURCE_URL}" \
+            "${TARGET_BRANCH}" \
+            "${SOURCE_SHA}"
+          pr_url=$(gh pr create \
+            --base "${TARGET_BRANCH}" \
+            --head "${backport_branch}" \
+            --title "${SOURCE_TITLE}" \
+            --body "${body}")
+
+          gh pr comment "${PR_NUMBER}" --body "Opened backport PR for \`${TARGET_BRANCH}\`: ${pr_url}"
