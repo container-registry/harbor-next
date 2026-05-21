@@ -17,7 +17,7 @@ Legend: ✅ Delivered · 🚧 In progress · 🗓️ Planned · 💲 Commercial 
 
 - ✅ **CI/CD Pipeline** — Continuous delivery readiness for reliable, extensible workflows locally and in pipelines.
 - ✅ **PR Builds** — Each PR gets a set of images for users to grab, verify and use.
-- ✅ **Multi-architecture builds** — Build binaires and images for different architecutures starting with ARM64 and AMD64
+- ✅ **Multi-architecture builds** — Build binaries and images for different architectures starting with ARM64 and AMD64
 - ✅ **Scratch Images** — Scratch images with minimal size and attack surface.
 - ✅ **DEV Env** — Easy contributor onboarding with out of the box local dev environments.
 - ✅ **K8s Distributions Support** — Tested support for OpenShift, Rancher, k0s
