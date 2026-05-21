@@ -65,43 +65,56 @@ Images resolve to `${IMAGE_REPO}harbor-core:${HARBOR_TAG}`, so the value must en
 
 Portal (nginx) serves the Angular UI and reverse-proxies `/v2/`, `/api/`, `/service/`, and `/c/` to Core.
 
-```text
-                   :443 (HTTPS)  / :80 (HTTP)
-                          │
-                   ┌──────▼──────┐
-                   │   Portal    │  nginx — static UI + reverse proxy
-                   │  (nginx)    │  /v2/*, /api/*, /service/*, /c/* → core
-                   └──────┬──────┘
-                          │ :8080
-                   ┌──────▼──────┐
-                   │    Core     │  API gateway, auth, business logic
-                   │             │
-                   └──┬────┬───┬─┘
-                      │    │   │
-         ┌────────────┘    │   └───────────┐
-         │ :8888           │ :5000         │ :8080
-  ┌──────▼──────┐   ┌──────▼─────┐  ┌──────▼───────┐
-  │ JobService  │   │  Registry  │  │ RegistryCtl  │
-  │             │   │ (distrib.) │  │ (storage ops)│
-  └─────────────┘   └─────┬──────┘  └──────┬───────┘
-                          └─────────┬──────┘
-                             ┌──────▼──────┐
-                             │ registry-   │  Docker volume
-                             │ data        │  /var/lib/registry
-                             └─────────────┘
+<!--
+```SVGBob
+                          ":443 (HTTPS)  /  :80 (HTTP)"
+                                      │
+                                      ▼
+                              ┌────────────────┐
+                              │    "Portal"    │
+                              │    "(nginx)"   │
+                              └───────┬────────┘
+                                      │
+                                      ▼
+                              ┌────────────────┐
+                              │     "Core"     │
+                              │    ":8080"     │
+                              └──┬─────┬─────┬─┘
+                  ┌──────────────┘     │     └──────────────┐
+                  ▼                    ▼                    ▼
+          ┌───────────────┐   ┌───────────────┐   ┌────────────────┐
+          │ "JobService"  │   │  "Registry"   │   │ "RegistryCtl"  │
+          │    ":8888"    │   │    ":5000"    │   │    ":8080"     │
+          └───────────────┘   └───────┬───────┘   └───────┬────────┘
+                                      └───────────┬───────┘
+                                                  │
+                                                  ▼
+                                          ┌────────────────┐
+                                          │"registry-data" │
+                                          │   "(volume)"   │
+                                          └────────────────┘
 
-  ┌─────────────┐   ┌─────────────┐
-  │ Trivy       │   │  Exporter   │  Prometheus /metrics
-  │ Adapter     │   │             │
-  └─────────────┘   └─────────────┘
+          ┌───────────────┐   ┌───────────────┐
+          │    "Trivy"    │   │  "Exporter"   │
+          │   "Adapter"   │   │               │
+          └───────────────┘   └───────────────┘
 
-  ── Infrastructure (shared by Core, JobService, Trivy, Exporter) ──
-
-  ┌──────────────┐  ┌─────────────┐
-  │ PostgreSQL   │  │   Redis     │  Valkey
-  │        :5432 │  │       :6379 │
-  └──────────────┘  └─────────────┘
+          ┌───────────────┐   ┌───────────────┐
+          │ "PostgreSQL"  │   │    "Redis"    │
+          │    ":5432"    │   │    ":6379"    │
+          └───────────────┘   └───────────────┘
 ```
+-->
+![Diagram](https://kroki.io/svgbob/svg/eNpTUMAFlKxMTIwVNDxCQgKCNRUU9BUUrCwMIHxNJS4FosCjKU3Eqpy2h4uQWT2PpjSQiCYQNLQJ7NeA_KKSxBwl4twM06SRl56ZV6GpRKSmKTjcuAa382cMs3BWUHLOL0pVUiAtnIHpzsKAeE1TcAcsLhFs4UxiOMxA8Sfu2CY6-IAxhSMCCccr6XE4gY660DwMCjMlr_yk4NSissxkUOqAhCKYVApKTc8sLimqVFJAFocLO5fkKKEnC0S6AQIlBRSNYHFTAwMDbOK40hmJsQlNDaTn-Bm0LyeI8cgaCm0hr2QirZSieYmF5gmlImiC001JLElUItFfkBSmpFGWn1Oam0pkjUF6xGHE10AUCVgyYkhRZlkleoZTcq0oANa6qUVKCtgzsJJjSmIBQh6pdMWVvKidTwd1wALbLMUl6UWpwYE-SuglWVBqSmaxkoICzpLR1MTYCFsJaGZsbqk0gAELAEZlQZE=)
+
+- **Portal (nginx)** — serves the static Angular UI and reverse-proxies `/v2/*`, `/api/*`, `/service/*`, and `/c/*` to Core.
+- **Core** (`:8080`) — API gateway, authentication, and business logic.
+- **JobService** (`:8888`) — asynchronous jobs (scan, replication, GC, retention).
+- **Registry** (`:5000`) — `docker/distribution`; blob/manifest storage.
+- **RegistryCtl** (`:8080`) — direct storage operations (used by GC).
+- **registry-data** — Docker volume mounted at `/var/lib/registry`, shared by Registry and RegistryCtl.
+- **Trivy Adapter** — vulnerability scanner. **Exporter** — Prometheus `/metrics`.
+- **Infrastructure** — PostgreSQL (`:5432`) and Redis/Valkey (`:6379`) are shared by Core, JobService, Trivy, and Exporter.
 
 ## Verify Push/Pull
 
