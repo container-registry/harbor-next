@@ -48,14 +48,14 @@ All services run in containers:
                            │    │      "Redis"        │                     │
                            │    │      ":6379"        │                     │
                            │    └─────────────────────┘                     │
-                           │    ┌─────────────────────┐                     │
-                           │    │     "Registry"      │                     │
-                           │    │      ":50000"       │                     │
-                           │    └─────────────────────┘                     │
+                           │    ┌─────────────────────┐  ┌──────────────┐   │
+                           │    │     "Registry"      │<-│"RegistryCtl" │   │
+                           │    │      ":50000"       │  │   ":8085"    │   │
+                           │    └─────────────────────┘  └──────────────┘   │
                            └────────────────────────────────────────────────┘
 ```
 -->
-![Diagram](https://kroki.io/svgbob/svg/eNpTUFB4NKXn0ZQGItAEBTggWg890QQusMuaFJQC8otKEnOUoFwkVyNxIEDJJT85O7VIwS-1pDy_KFsJXR6oBW6qlYmRgYGSAhGmEgLIpmrkJZZklqVqKmExFW8wTyAjIiYQoWUCkvumYMiuwaZlBoa7gR5zzi9KBXvKRldXFyzilZ8UnFpUlpkMFwcLhxRlllUqwXVy4Q1ZhPlWFgYWBkpQNRAKKAYESFEEV2iI3fwpZCW0Pbp2SE6DuwCrYWtwmDGDCPtnoLlXAVdoTMFt4QwFolIqMfbgMIIqpuIKiDV4Q4cyW-EC0_YQm2MJmEmNYnECRfaDKWD5V1ySXpQaHOijhDeKSDIVlL1MTYyNlAhFPLGmTqE4rGYM_bgChmpQakpmMdVCFR5XZsbmlqNxRdW4AkZVemZxSVGlEpXjytTAANq0GMpxNWXwtQlnAACIi0nx)
+![Diagram](https://kroki.io/svgbob/svg/eNpTUFB4NKXn0ZQGItAEBTggWg890QQusMuaFJQC8otKEnOUoFwkVyNxIEDJJT85O7VIwS-1pDy_KFsJXR6oBW6qlYmRgYGSAhGmEgLIpmrkJZZklqVqKmExFW8wTyAjIiYQoWUCkvumYMiuwaZlBoa7gR5zzi9KBXvKRldXFyzilZ8UnFpUlpkMFwcLhxRlllUqwXVy4Q1ZhPlWFgYWBkpQNRAKKAYESFEEV2iI3fwpZCW0Pbp2SE6DuwCrYWtwmDGDCPtnoLlXAVdoTMFt4QwFolIqMfbgMIIqpuIKiDV4Q4cyW-EC0_YQm2MJmEmNYnECRfaDKWD5V1ySXpQaHOijhDeKSDIVlL1MTYyNlAhFPLGmTqE4rGYM_bgChmpQakpmMdVCFR5XZsbmlqNxhVqtkVFZkhLqwKhMzywuKapUgkvbgOo4uLhzSY4SomoiMe8ZGECbH8jVoAKkfjNFrfToF6ckGjODGPdNGXxtyxkAXOGQFQ==)
 
 ## Directory Structure
 
