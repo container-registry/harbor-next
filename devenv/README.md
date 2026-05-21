@@ -29,12 +29,12 @@ All services run in containers:
 
 <!--
 ```SVGBob
-   ┌────────────┐          ┌────────────────────────────────────────────────┐
-   │ "Portal"   │          │                "Docker Network"                │
-   │ ":4200"    │          │                                                │
-   │ "(native)" │          │  ┌────────┐    ┌──────────────┐   ┌─────────┐  │
-   └─────┬──────┘          │  │ "Core" │<---│ "JobService" │<--│ "Trivy" │  │
-         │                 │  │ ":8080"│    │   ":8888"    │   │ ":8081" │  │
+   ┌─ "Host" ───┐          ┌────────────────────────────────────────────────┐
+   │ ┌────────┐ │          │                "Docker Network"                │
+   │ │"Portal"│ │          │                                                │
+   │ │":4200" │ │          │  ┌────────┐    ┌──────────────┐   ┌─────────┐  │
+   │ └───┬────┘ │          │  │ "Core" │<---│ "JobService" │<--│ "Trivy" │  │
+   └─────┼──────┘          │  │ ":8080"│    │   ":8888"    │   │ ":8081" │  │
          └─────────────────┼->│        │    └──────┬───────┘   └─────────┘  │
                            │  └───┬────┘           │                        │
                            │      │                │                        │
@@ -55,7 +55,7 @@ All services run in containers:
                            └────────────────────────────────────────────────┘
 ```
 -->
-![Diagram](https://kroki.io/svgbob/svg/eNpTUFB4NKXn0ZQGItAEBTggWg890QQusMuaFJQC8otKEnOUoFwkVyNxIEDJJT85O7VIwS-1pDy_KFsJXR6oBW6qlYmRgYGSAhGmEgLIpmrkJZZklqVqKmExFW8wTyAjIiYQoWUCkvumYMiuwaZlBoa7gR5zzi9KBXvKRldXFyzilZ8UnFpUlpkMFwcLhxRlllUqwXVy4Q1ZhPlWFgYWBkpQNRAKKAYESFEEV2iI3fwpZCW0Pbp2SE6DuwCrYWtwmDGDCPtnoLlXAVdoTMFt4QwFolIqMfbgMIIqpuIKiDV4Q4cyW-EC0_YQm2MJmEmNYnECRfaDKWD5V1ySXpQaHOijhDeKSDIVlL1MTYyNlAhFPLGmTqE4rGYM_bgChmpQakpmMdVCFR5XZsbmlqNxhVqtkVFZkhLqwKhMzywuKapUgkvbgOo4uLhzSY4SomoiMe8ZGECbH8jVoAKkfjNFrfToF6ckGjODGPdNGXxtyxkAXOGQFQ==)
+![Diagram](https://kroki.io/svgbob/svg/eNpTUFB4NKXn0ZQGBSWP_OISJSCvAYYmKMABRM0gQxO4wC5rwu-6CWAlSD5B4kCAkkt-cnZqkYJfakl5flG2Ero8UAvCpialgPyiksQcJSgXr8mEAJrJViZGBgZKCthNJuBJ0iNpAhFaJqC5cQqS3BpUpTOwurlJQck5vygV7CkbXV1dsIhXflJwalFZZjJcHCwcUpRZVqkE1wmxdQqGm_Zgc-gMbDZbWRhYGChBnQWhgGJAoIQQgCs0RLUZZtYUspLmHl07pNCAuwCrYWtwmDGDCPtnoLkXaxJTIBRxRKVhYuzBYQRVTMUVEGvwhg5ltsIFpu0hNi8TMJMaBekEiuwHU8BCrLgkvSg1ONBHCW8UkWQqKHuZmhgbKRGKeGJNnUJxWM0Y-nEFDNWg1JTMYqqFKjyuzIzNLUfjCrWyI6MKJSXUgVGZnllcUlSpBJe2AdV-cHHnkhwlRNVEYt4zMAC1H9CqQQVI_WaKWunRL05JNGYGMe6bMvhaozMAA7qvHw==)
 
 ## Directory Structure
 
