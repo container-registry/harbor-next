@@ -128,10 +128,6 @@ See [devenv/README.md](devenv/README.md) for detailed development environment co
 
 Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the PR workflow, commit conventions (Conventional Commits + DCO sign-off), squash-merge rules, and how releases work. New contributors can get a dev environment running with `task` (see [Development](#development)).
 
-## OCI Distribution Conformance Tests
-
-Check the OCI distribution conformance tests [report](https://storage.googleapis.com/harbor-conformance-test/report.html) of Harbor.
-
 ## Compatibility
 
 The [compatibility list](https://goharbor.io/docs/edge/install-config/harbor-compatibility-list/) document provides compatibility information for the Harbor components.
