@@ -23,6 +23,11 @@ jobs:
       PR_NUMBER: ${{ github.event.pull_request.number }}
       PR_TITLE: ${{ github.event.pull_request.title }}
     steps:
+      - name: Install gh CLI
+        uses: actions4gh/setup-gh@44a12005484c53be5bf51bebe8c985b4be8ba8de # v1.0.2
+        with:
+          gh-version: latest
+
       - name: Comment with backport commands
         run: |
           case "${PR_TITLE}" in
