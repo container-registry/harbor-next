@@ -1,0 +1,50 @@
+name: Backport Suggestion
+
+on:
+  pull_request_target:
+    types: [closed]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  suggest:
+    if: >-
+      ${{
+        github.event.pull_request.merged == true &&
+        github.event.pull_request.base.ref == 'main'
+      }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      PR_TITLE: ${{ github.event.pull_request.title }}
+    steps:
+      - name: Install gh CLI
+        uses: actions4gh/setup-gh@44a12005484c53be5bf51bebe8c985b4be8ba8de # v1.0.2
+        with:
+          gh-version: latest
+
+      - name: Comment with backport commands
+        run: |
+          case "${PR_TITLE}" in
+            fix:*|upstream:*|perf:*|revert:*) ;;
+            *) exit 0 ;;
+          esac
+
+          branches=$(gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/heads/release-" \
+            --jq '.[].ref | sub("refs/heads/"; "")' | sort -Vr)
+          if [ -z "${branches}" ]; then
+            exit 0
+          fi
+
+          body=$'This change may need patch-release backports. Comment with one of these commands to open a cherry-pick PR:\n\n'
+          while IFS= read -r branch; do
+            [ -z "${branch}" ] && continue
+            body="${body}\`/backport v${branch#release-}\`"$'\n'
+          done <<< "${branches}"
+
+          gh pr comment "${PR_NUMBER}" --body "${body}"

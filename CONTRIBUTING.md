@@ -164,24 +164,34 @@ Why this matters: non-squash merges create `Merge pull request #N` commits on ma
 5. Ensure the `Signed-off-by:` line is present in the body
 6. Click "Confirm squash and merge"
 
-### What Lands on Main
+### What Lands on Release Branches
 
-After squash merging, exactly one commit lands on main with the message from the PR title. This is the commit release-please reads.
+After squash merging, exactly one commit lands on `main` or a `release-X.Y` maintenance branch with the message from the PR title. This is the commit release-please reads.
 
 ---
 
 ## How Releases Work
 
 Releases are fully automated via [release-please](https://github.com/googleapis/release-please).
+Maintainers should use [RELEASE.md](RELEASE.md) as the release and backport runbook.
 
 ### The Flow
 
-1. A `feat:`, `fix:`, or `upstream:` PR is squash-merged to main
+1. A `feat:`, `fix:`, or `upstream:` PR is squash-merged to `main`
 2. Release-please scans commits since the last release
 3. It opens a `chore: release X.Y.Z` PR that updates `VERSION` and `CHANGELOG.md`
 4. Maintainer reviews and merges the release PR (squash merge)
 5. GitHub Release is created automatically
 6. Docker images are built, signed, and pushed
+7. If the release is a new minor `.0` release, a `release-X.Y` maintenance branch is created automatically from the release tag
+
+### Maintenance Branches
+
+Patch releases are cut from `release-X.Y` branches, for example `release-2.15` produces `v2.15.1`, `v2.15.2`, and later patch releases.
+
+Maintenance branches use release-please with patch-only versioning. Even if a backported commit is titled `feat:`, the maintenance branch still produces a patch release.
+
+For eligible merged PRs on `main`, a maintainer can comment `/backport vX.Y` on the merged PR to cherry-pick the merge commit and open a backport PR against `release-X.Y`.
 
 ### Version Bump Rules
 
