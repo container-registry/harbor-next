@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - "release-*"
 
 permissions:
   contents: write
@@ -16,13 +17,50 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
       version: ${{ steps.release.outputs.version }}
+      major: ${{ steps.release.outputs.major }}
+      minor: ${{ steps.release.outputs.minor }}
+      patch: ${{ steps.release.outputs.patch }}
     steps:
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          config-file: release-please-config.json
+          target-branch: ${{ github.ref_name }}
+          config-file: ${{ github.ref_name == 'main' && 'release-please-config.json' || 'release-please-config-maintenance.json' }}
           manifest-file: .release-please-manifest.json
+
+  create-maintenance-branch:
+    name: Create Maintenance Branch
+    needs: [release-please]
+    if: >-
+      ${{
+        github.ref_name == 'main' &&
+        needs.release-please.outputs.release_created == 'true' &&
+        needs.release-please.outputs.patch == '0'
+      }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    permissions:
+      contents: write
+    env:
+      TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+      MAJOR: ${{ needs.release-please.outputs.major }}
+      MINOR: ${{ needs.release-please.outputs.minor }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Create branch for patch releases
+        run: |
+          branch="release-${MAJOR}.${MINOR}"
+          if git ls-remote --exit-code --heads origin "${branch}" >/dev/null 2>&1; then
+            echo "${branch} already exists"
+            exit 0
+          fi
+
+          git fetch --depth=1 origin "refs/tags/${TAG_NAME}:refs/tags/${TAG_NAME}"
+          sha=$(git rev-list -n 1 "${TAG_NAME}")
+          git push origin "${sha}:refs/heads/${branch}"
 
   build:
     name: "${{ matrix.component }} (${{ matrix.platform }})"
@@ -172,6 +210,7 @@ jobs:
       REGISTRY_PROJECT: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
       VERSION: ${{ needs.release-please.outputs.version }}
       TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+      RELEASE_BRANCH: ${{ github.ref_name }}
     steps:
       - name: Prepare BuildKit
         id: prepare
@@ -226,6 +265,7 @@ jobs:
       REGISTRY_PROJECT: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
       VERSION: ${{ needs.release-please.outputs.version }}
       TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+      RELEASE_BRANCH: ${{ github.ref_name }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -308,14 +348,17 @@ jobs:
             "${FORMATTED_BODY}"
 
           HIGHLIGHTS=""
-          PREV_TAG=$(gh release list --limit 20 --json tagName \
-            --jq "[.[] | .tagName | select(. != \"${TAG_NAME}\")] | .[0]")
+          git fetch --tags --force
+          PREV_TAG=$(git tag --merged HEAD --sort=-creatordate \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+            | grep -v "^${TAG_NAME}$" \
+            | head -n 1 || true)
           if [ -n "${PREV_TAG}" ]; then
             SINCE=$(gh release view "${PREV_TAG}" --json createdAt -q '.createdAt')
             SINCE_DATE="${SINCE%T*}"
             HIGHLIGHTS=$(gh pr list \
               --state merged \
-              --base main \
+              --base "${RELEASE_BRANCH}" \
               --search "merged:>=${SINCE_DATE}" \
               --json number,title,url,body \
               --limit 100 \
@@ -365,7 +408,7 @@ jobs:
             echo "**Verify an image signature:**"
             echo "\`\`\`sh"
             echo "cosign verify \\"
-            echo "  --certificate-identity \"https://github.com/${{ github.repository }}/.github/workflows/release-please.yml@refs/heads/main\" \\"
+            echo "  --certificate-identity \"https://github.com/${{ github.repository }}/.github/workflows/release-please.yml@refs/heads/${RELEASE_BRANCH}\" \\"
             echo "  --certificate-oidc-issuer \"https://token.actions.githubusercontent.com\" \\"
             echo "  ${REGISTRY}/harbor-core:${TAG_NAME}"
             echo "\`\`\`"
