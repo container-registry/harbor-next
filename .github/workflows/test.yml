@@ -128,8 +128,12 @@ jobs:
           echo "REDIS_HOST=localhost" >> "$GITHUB_ENV"
           echo "REDIS_PORT=6379" >> "$GITHUB_ENV"
 
-          # Wait for postgres
-          timeout 30 bash -c "until docker exec ${PREFIX}-postgres pg_isready -U postgres; do sleep 1; done"
+          # Wait for postgres; slow shared runners can take longer to initialize it.
+          if ! timeout 120 bash -c "until docker exec ${PREFIX}-postgres pg_isready -U postgres; do sleep 1; done"; then
+            docker ps -a --filter "name=${PREFIX}-postgres"
+            docker logs "${PREFIX}-postgres" || true
+            exit 1
+          fi
 
       - uses: ./.github/actions/setup-go-cached
         with:
