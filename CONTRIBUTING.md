@@ -173,6 +173,7 @@ After squash merging, exactly one commit lands on `main` or a `release-X.Y` main
 ## How Releases Work
 
 Releases are fully automated via [release-please](https://github.com/googleapis/release-please).
+Maintainers should use [RELEASE.md](RELEASE.md) as the release and backport runbook.
 
 ### The Flow
 
