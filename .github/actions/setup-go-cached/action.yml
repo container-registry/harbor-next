@@ -18,6 +18,29 @@ runs:
         go-version-file: ${{ inputs.go-version-file }}
         cache: false
 
+    - name: Check Go toolchain
+      id: check-go
+      shell: bash
+      run: |
+        if command -v go >/dev/null 2>&1; then
+          go version
+          echo "missing=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        echo "missing=true" >> "$GITHUB_OUTPUT"
+
+    - name: Retry Go toolchain setup
+      if: steps.check-go.outputs.missing == 'true'
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+      with:
+        go-version-file: ${{ inputs.go-version-file }}
+        cache: false
+
+    - name: Verify Go toolchain
+      shell: bash
+      run: go version
+
     # GitHub-hosted only: restore module cache from GitHub's cache storage
     - name: Restore Go module cache
       if: runner.environment != 'self-hosted'
