@@ -141,9 +141,6 @@ func (c *controller) Ensure(ctx context.Context, repositoryID, artifactID int64,
 // timestamp reflects tag push/delete events. Errors are logged only; the tag
 // operation has already succeeded.
 func (c *controller) touchRepo(ctx context.Context, repositoryID int64) {
-	if c.repoMgr == nil {
-		return
-	}
 	if err := c.repoMgr.Touch(ctx, repositoryID); err != nil {
 		log.G(ctx).Warningf("failed to touch repository %d update_time: %v", repositoryID, err)
 	}

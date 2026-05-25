@@ -308,9 +308,6 @@ func (c *controller) ensureArtifact(ctx context.Context, repository, digest stri
 // timestamp reflects artifact create/delete/label events. Errors are logged
 // only; the caller's operation has already succeeded.
 func (c *controller) touchRepo(ctx context.Context, repositoryID int64) {
-	if c.repoMgr == nil || repositoryID <= 0 {
-		return
-	}
 	if err := c.repoMgr.Touch(ctx, repositoryID); err != nil {
 		log.G(ctx).Warningf("failed to touch repository %d update_time: %v", repositoryID, err)
 	}
@@ -694,11 +691,12 @@ func (c *controller) AddLabel(ctx context.Context, artifactID int64, labelID int
 	if err = c.labelMgr.AddTo(ctx, labelID, artifactID); err != nil {
 		return
 	}
-	if c.artMgr != nil {
-		if art, gerr := c.artMgr.Get(ctx, artifactID); gerr == nil {
-			c.touchRepo(ctx, art.RepositoryID)
-		}
+	art, gerr := c.artMgr.Get(ctx, artifactID)
+	if gerr != nil {
+		log.G(ctx).Errorf("failed to get artifact %d after adding label %d: %v", artifactID, labelID, gerr)
+		return
 	}
+	c.touchRepo(ctx, art.RepositoryID)
 	return
 }
 
@@ -706,11 +704,12 @@ func (c *controller) RemoveLabel(ctx context.Context, artifactID int64, labelID 
 	if err := c.labelMgr.RemoveFrom(ctx, labelID, artifactID); err != nil {
 		return err
 	}
-	if c.artMgr != nil {
-		if art, err := c.artMgr.Get(ctx, artifactID); err == nil {
-			c.touchRepo(ctx, art.RepositoryID)
-		}
+	art, err := c.artMgr.Get(ctx, artifactID)
+	if err != nil {
+		log.G(ctx).Errorf("failed to get artifact %d after removing label %d: %v", artifactID, labelID, err)
+		return nil
 	}
+	c.touchRepo(ctx, art.RepositoryID)
 	return nil
 }
 
