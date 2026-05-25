@@ -88,6 +88,12 @@ jobs:
           git switch -c "${backport_branch}"
 
           if ! git cherry-pick -x "${SOURCE_SHA}"; then
+            if git diff --quiet && git diff --cached --quiet; then
+              git cherry-pick --skip || true
+              gh pr comment "${PR_NUMBER}" --body "No backport PR opened for \`${TARGET_BRANCH}\`; the cherry-pick produced no changes."
+              exit 0
+            fi
+
             git cherry-pick --abort || true
             gh pr comment "${PR_NUMBER}" --body "Backport to \`${TARGET_BRANCH}\` has conflicts. Please cherry-pick \`${SOURCE_SHA}\` manually."
             exit 1

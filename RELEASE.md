@@ -26,7 +26,7 @@ flowchart LR
 
   upstream -->|selected fixes as upstream: commits| harborMain
   harborMain -->|release-please PR merged| harborTag
-  harborTag -->|new vX.Y.0 creates| harborRelease
+  harborTag -->|new v2.Y.0 creates| harborRelease
   harborMain -->|/backport vX.Y| harborRelease
   harborRelease -->|maintenance release-please PR merged| harborTag
   harborMain -->|upstream-sync dispatch| gcrMain
@@ -92,8 +92,8 @@ sequenceDiagram
   Actions->>Registry: Build and push release images
   Actions->>Cosign: Sign release images
   Actions->>GitHub: Rewrite GitHub Release notes
-  alt main release and patch == 0
-    Actions->>GitHub: Create release-X.Y branch from vX.Y.0
+  alt main release
+    Actions->>GitHub: Create release-2.Y branch from v2.Y.0
   end
 ```
 
@@ -101,10 +101,10 @@ sequenceDiagram
 
 | Branch | Config | Release behavior |
 |--------|--------|------------------|
-| `main` | `release-please-config.json` | Normal semver bumps |
+| `main` | `release-please-config.json` | Minor releases only |
 | `release-X.Y` | `release-please-config-maintenance.json` | Patch-only releases |
 
-`main` releases can create major, minor, or patch versions. A new `.0` release from `main` automatically creates `release-X.Y` from the release tag.
+`main` uses `versioning: always-bump-minor`. It must not create `v3` releases. A release from `main` creates the next `v2.Y.0` version and automatically creates `release-2.Y` from the release tag.
 
 `release-X.Y` uses `versioning: always-bump-patch`. Any release-worthy commit on a maintenance branch produces the next patch version.
 
@@ -112,12 +112,12 @@ sequenceDiagram
 
 | Commit type | `main` bump | `release-X.Y` bump | Notes section |
 |-------------|-------------|--------------------|---------------|
-| `fix:` | Patch | Patch | Bug Fixes |
-| `upstream:` | Patch | Patch | Upstream |
-| `perf:` | Patch | Patch | Performance Improvements |
+| `fix:` | Minor | Patch | Bug Fixes |
+| `upstream:` | Minor | Patch | Upstream |
+| `perf:` | Minor | Patch | Performance Improvements |
 | `feat:` | Minor | Patch | Features |
-| `feat!:` or `BREAKING CHANGE:` | Major | Patch | Breaking changes |
-| `revert:` | Patch when reverting releasable change | Patch when reverting releasable change | Reverts |
+| `feat!:` or `BREAKING CHANGE:` | Minor | Patch | Breaking changes |
+| `revert:` | Minor when releasable | Patch when releasable | Reverts |
 | `ci:`, `chore:`, `build:`, `test:` | No release | No release | Hidden |
 
 Release-please ignores changes that only touch:
@@ -134,13 +134,13 @@ Use `ci:` for workflow-only changes.
 2. Release-please opens or updates `chore: release X.Y.Z`.
 3. Review `VERSION`, `.release-please-manifest.json`, and `CHANGELOG.md`.
 4. Squash-merge the release PR.
-5. Release-please creates the `vX.Y.Z` tag and GitHub Release.
+5. Release-please creates the `v2.Y.0` tag and GitHub Release.
 6. The release workflow checks out the Harbor Next release source.
 7. The workflow applies 8gcr patches at release runtime.
 8. The workflow builds and pushes multi-arch images.
 9. The workflow signs images with cosign.
 10. The workflow rewrites the GitHub Release notes.
-11. If the version is `vX.Y.0`, the workflow creates `release-X.Y`.
+11. The workflow creates `release-2.Y` for the new minor line.
 
 ## Maintenance Release Flow
 
@@ -174,6 +174,7 @@ Rules:
 - The workflow cherry-picks the source merge commit with `git cherry-pick -x`.
 - The workflow opens a PR against `release-X.Y`.
 - If the cherry-pick conflicts, the workflow comments on the source PR and stops.
+- If the cherry-pick is empty or already applied, the workflow comments on the source PR and stops without opening a PR.
 
 The suggestion workflow comments with backport commands for merged `main` PRs whose unscoped titles start with `fix:`, `upstream:`, `perf:`, or `revert:`. Scoped titles like `fix(core): ...` do not currently get automatic suggestion comments, but `/backport vX.Y` still works manually.
 

@@ -52,10 +52,10 @@ Common types:
 
 | Type | When to use | Release effect |
 |------|------------|----------------|
-| `feat` | New user-facing feature | Minor version bump |
-| `fix` | Bug fix | Patch version bump |
-| `upstream` | Cherry-picked upstream Harbor change | Patch version bump |
-| `feat!` / `fix!` | Breaking change | Major version bump |
+| `feat` | New user-facing feature | Minor on `main`, patch on `release-X.Y` |
+| `fix` | Bug fix | Minor on `main`, patch on `release-X.Y` |
+| `upstream` | Cherry-picked upstream Harbor change | Minor on `main`, patch on `release-X.Y` |
+| `feat!` / `fix!` | Breaking change | Minor on `main`, patch on `release-X.Y` |
 | `refactor` | Code change, no behaviour change | No release |
 | `docs` | Documentation only | No release |
 | `ci` | CI/CD pipeline changes | No release |
@@ -197,10 +197,11 @@ For eligible merged PRs on `main`, a maintainer can comment `/backport vX.Y` on 
 
 | Commit type | Version bump | Example |
 |-------------|-------------|---------|
-| `fix:` | Patch | `2.16.0` -> `2.16.1` |
-| `upstream:` | Patch | `2.16.0` -> `2.16.1` |
+| `fix:` on `main` | Minor | `2.16.0` -> `2.17.0` |
+| `upstream:` on `main` | Minor | `2.16.0` -> `2.17.0` |
 | `feat:` | Minor | `2.16.0` -> `2.17.0` |
-| `feat!:` / `BREAKING CHANGE:` | Major | `2.16.0` -> `3.0.0` |
+| `feat!:` / `BREAKING CHANGE:` | Minor | `2.16.0` -> `2.17.0` |
+| Any release-worthy commit on `release-X.Y` | Patch | `2.16.0` -> `2.16.1` |
 | `ci:` / `chore:` / `docs:` / `test:` / `build:` | No release | - |
 
 ### What Triggers a Release PR
