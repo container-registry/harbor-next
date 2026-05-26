@@ -132,7 +132,6 @@ func (c *controller) Ensure(ctx context.Context, repositoryID, artifactID int64,
 		}
 		return 0, err
 	}
-	c.touchRepo(ctx, repositoryID)
 
 	return tagID, nil
 }
@@ -185,7 +184,12 @@ func (c *controller) Create(ctx context.Context, tag *Tag) (id int64, err error)
 	if !isValidTag(tag.Name) {
 		return 0, errors.BadRequestError(errors.Errorf("invalid tag name: %s", tag.Name))
 	}
-	return c.tagMgr.Create(ctx, &(tag.Tag))
+	id, err = c.tagMgr.Create(ctx, &(tag.Tag))
+	if err != nil {
+		return 0, err
+	}
+	c.touchRepo(ctx, tag.RepositoryID)
+	return id, nil
 }
 
 func isValidTag(name string) bool {

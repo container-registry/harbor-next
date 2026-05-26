@@ -153,6 +153,15 @@ func (c *controllerTestSuite) TestGet() {
 	c.Equal(false, tag.Immutable)
 }
 
+func (c *controllerTestSuite) TestCreate() {
+	c.tagMgr.On("Create", mock.Anything, mock.Anything).Return(int64(1), nil)
+	c.repoMgr.On("Touch", mock.Anything, int64(1)).Return(nil).Once()
+	id, err := c.ctl.Create(nil, &Tag{Tag: tag.Tag{RepositoryID: 1, Name: "v1"}})
+	c.Require().Nil(err)
+	c.Equal(int64(1), id)
+	c.repoMgr.AssertExpectations(c.T())
+}
+
 func (c *controllerTestSuite) TestDelete() {
 	c.tagMgr.On("Get", mock.Anything, mock.Anything).Return(&tag.Tag{
 		RepositoryID: 1,

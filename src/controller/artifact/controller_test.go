@@ -885,23 +885,15 @@ func (c *controllerTestSuite) TestGetAddition() {
 
 func (c *controllerTestSuite) TestAddTo() {
 	c.setupLabelMgr()
-	c.setupArtMgr()
-	c.setupRepoMgr()
 	c.labelMgr.On("AddTo", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	c.artMgr.On("Get", mock.Anything, mock.Anything).Return(&artifact.Artifact{ID: 1, RepositoryID: 1}, nil)
-	c.repoMgr.On("Touch", mock.Anything, int64(1)).Return(nil)
 	err := c.ctl.AddLabel(context.Background(), 1, 1)
 	c.Require().Nil(err)
 }
 
 func (c *controllerTestSuite) TestRemoveFrom() {
 	c.setupLabelMgr()
-	c.setupArtMgr()
-	c.setupRepoMgr()
 	c.labelMgr.On("RemoveFrom", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	c.artMgr.On("Get", mock.Anything, mock.Anything).Return(&artifact.Artifact{ID: 1, RepositoryID: 1}, nil)
-	c.repoMgr.On("Touch", mock.Anything, int64(1)).Return(nil)
-	err := c.ctl.RemoveLabel(context.Background(), 1, 1)
+	err := c.ctl.RemoveLabel(nil, 1, 1)
 	c.Require().Nil(err)
 }
 
