@@ -52,6 +52,8 @@ includes:
   dev:
     taskfile: ./taskfile/dev.yml
     aliases: [d]
+  docs:
+    taskfile: ./taskfile/docs.yml
 
 tasks:
   default:

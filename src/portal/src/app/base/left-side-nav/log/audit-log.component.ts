@@ -149,7 +149,8 @@ export class AuditLogComponent {
                     const hasMore =
                         logs.length === pageSize &&
                         allLogs.length < maxLogs &&
-                        allLogs.length < (isNaN(totalCount) ? Infinity : totalCount);
+                        allLogs.length <
+                            (isNaN(totalCount) ? Infinity : totalCount);
 
                     if (hasMore) {
                         fetchPage(page + 1);

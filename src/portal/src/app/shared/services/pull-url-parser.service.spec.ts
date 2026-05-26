@@ -39,7 +39,9 @@ describe('PullUrlParserService', () => {
         });
 
         it('should parse project/repo@digest format', () => {
-            const result = service.parsePullUrl('/myproject/alpine@sha256:abc123');
+            const result = service.parsePullUrl(
+                '/myproject/alpine@sha256:abc123'
+            );
             expect(result).toEqual({
                 projectName: 'myproject',
                 repoName: 'alpine',

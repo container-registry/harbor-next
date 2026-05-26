@@ -36,6 +36,7 @@ WORKDIR /
 
 EXPOSE 8080
 EXPOSE 8443
+HEALTHCHECK --interval=10s --timeout=5s --retries=5 CMD ["/lprobe", "-port", "8080", "-endpoint", "/probe/ready"]
 
 USER scanner
 ENTRYPOINT ["/home/scanner/bin/scanner-trivy"]

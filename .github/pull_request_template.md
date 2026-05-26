@@ -14,6 +14,7 @@
 - [ ] Documentation (`docs:`)
 - [ ] Refactoring (`refactor:`)
 - [ ] CI/CD or build changes (`ci:` / `build:`)
+- [ ] Upstream Harbor cherry-pick (`upstream:`)
 - [ ] Dependencies update (`chore:`)
 - [ ] Tests (`test:`)
 

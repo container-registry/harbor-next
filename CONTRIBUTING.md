@@ -54,6 +54,7 @@ Common types:
 |------|------------|----------------|
 | `feat` | New user-facing feature | Minor version bump |
 | `fix` | Bug fix | Patch version bump |
+| `upstream` | Cherry-picked upstream Harbor change | Patch version bump |
 | `feat!` / `fix!` | Breaking change | Major version bump |
 | `refactor` | Code change, no behaviour change | No release |
 | `docs` | Documentation only | No release |
@@ -92,6 +93,7 @@ Use a scope in parentheses to indicate the component:
 ```
 feat(portal): ...
 fix(core): ...
+upstream(proxy): ...
 ci(release): ...
 ```
 
@@ -113,6 +115,7 @@ Use the following template for your PR description:
 - [ ] Documentation (`docs:`)
 - [ ] Refactoring (`refactor:`)
 - [ ] CI/CD or build changes (`ci:` / `build:`)
+- [ ] Upstream Harbor cherry-pick (`upstream:`)
 - [ ] Dependencies update (`chore:`)
 - [ ] Tests (`test:`)
 
@@ -161,30 +164,41 @@ Why this matters: non-squash merges create `Merge pull request #N` commits on ma
 5. Ensure the `Signed-off-by:` line is present in the body
 6. Click "Confirm squash and merge"
 
-### What Lands on Main
+### What Lands on Release Branches
 
-After squash merging, exactly one commit lands on main with the message from the PR title. This is the commit release-please reads.
+After squash merging, exactly one commit lands on `main` or a `release-X.Y` maintenance branch with the message from the PR title. This is the commit release-please reads.
 
 ---
 
 ## How Releases Work
 
 Releases are fully automated via [release-please](https://github.com/googleapis/release-please).
+Maintainers should use [RELEASE.md](RELEASE.md) as the release and backport runbook.
 
 ### The Flow
 
-1. A `feat:` or `fix:` PR is squash-merged to main
+1. A `feat:`, `fix:`, or `upstream:` PR is squash-merged to `main`
 2. Release-please scans commits since the last release
 3. It opens a `chore: release X.Y.Z` PR that updates `VERSION` and `CHANGELOG.md`
 4. Maintainer reviews and merges the release PR (squash merge)
 5. GitHub Release is created automatically
 6. Docker images are built, signed, and pushed
+7. If the release is a new minor `.0` release, a `release-X.Y` maintenance branch is created automatically from the release tag
+
+### Maintenance Branches
+
+Patch releases are cut from `release-X.Y` branches, for example `release-2.15` produces `v2.15.1`, `v2.15.2`, and later patch releases.
+
+Maintenance branches use release-please with patch-only versioning. Even if a backported commit is titled `feat:`, the maintenance branch still produces a patch release.
+
+For eligible merged PRs on `main`, a maintainer can comment `/backport vX.Y` on the merged PR to cherry-pick the merge commit and open a backport PR against `release-X.Y`.
 
 ### Version Bump Rules
 
 | Commit type | Version bump | Example |
 |-------------|-------------|---------|
 | `fix:` | Patch | `2.16.0` -> `2.16.1` |
+| `upstream:` | Patch | `2.16.0` -> `2.16.1` |
 | `feat:` | Minor | `2.16.0` -> `2.17.0` |
 | `feat!:` / `BREAKING CHANGE:` | Major | `2.16.0` -> `3.0.0` |
 | `ci:` / `chore:` / `docs:` / `test:` / `build:` | No release | - |
@@ -201,7 +215,50 @@ A `feat:` PR that only changes `.github/` files (e.g. a CI workflow improvement)
 
 ### CHANGELOG.md
 
-The changelog is generated automatically from squash commit messages. `ci:`, `chore:`, `test:`, and `build:` commits are hidden from the changelog. Only `feat:`, `fix:`, `perf:`, `revert:`, `refactor:`, and `docs:` appear.
+The changelog is generated automatically from squash commit messages. `ci:`, `chore:`, `test:`, and `build:` commits are hidden from the changelog. Only `feat:`, `fix:`, `upstream:`, `perf:`, `revert:`, `refactor:`, and `docs:` appear.
+
+### Upstream Cherry-Picks
+
+Use `upstream:` for cherry-picked changes from `goharbor/harbor` so release-please puts them in the `Upstream` release notes section.
+
+Add the upstream PR and author to the commit body so the release notes can show the original attribution instead of the sync bot:
+
+```text
+upstream(proxy): Preserve URL path prefix during registry auth discovery
+
+Upstream-PR: goharbor/harbor#12345
+Upstream-Author: @original-author
+Signed-off-by: Your Name <your@email.com>
+```
+
+The GitHub release note will render that entry as `by @original-author in goharbor/harbor#12345`.
+
+### Commercial Patch Commits
+
+Commercial patches can use a simple subject instead of a conventional commit. The patch `Subject:` becomes the release-note title, and the patch body before `---` becomes the description:
+
+```text
+Subject: [PATCH] Branding customization
+
+Allows operators to configure product branding for the portal without rebuilding
+the Harbor Next image.
+
+Supports custom names, logos, and landing page copy from deployment
+configuration.
+---
+```
+
+This renders in the release notes as:
+
+```markdown
+- **Branding customization**
+
+  Allows operators to configure product branding for the portal without rebuilding
+  the Harbor Next image.
+
+  Supports custom names, logos, and landing page copy from deployment
+  configuration.
+```
 
 ---
 

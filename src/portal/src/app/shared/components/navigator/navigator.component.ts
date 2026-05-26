@@ -220,8 +220,7 @@ export class NavigatorComponent implements OnInit {
             config.primary_auth_mode
         ) {
             window.location.href =
-                '/c/oidc/login?redirect_url=' +
-                encodeURIComponent(state.url);
+                '/c/oidc/login?redirect_url=' + encodeURIComponent(state.url);
             return;
         }
 

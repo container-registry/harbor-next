@@ -1,9 +1,9 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-  "bootstrap-sha": "123fb099df0cc04c99bdb92f01a6da552fafd0fd",
-  "pull-request-header": "This PR prepares the next release based on conventional commits.",
+  "pull-request-header": "This PR prepares the next patch release for this maintenance branch based on conventional commits.",
   "pull-request-title-pattern": "chore: release ${version}",
   "release-type": "simple",
+  "versioning": "always-bump-patch",
   "include-v-in-tag": true,
   "exclude-paths": [".github", "docs", "tests"],
   "changelog-sections": [
