@@ -297,8 +297,10 @@ func (c *controllerTestSuite) TestEnsureArtifact() {
 
 	// the artifact doesn't exist
 	c.repoMgr.On("GetByName", mock.Anything, mock.Anything).Return(&repomodel.RepoRecord{
-		ProjectID: 1,
+		RepositoryID: 1,
+		ProjectID:    1,
 	}, nil)
+	c.repoMgr.On("Touch", mock.Anything, int64(1)).Return(nil)
 	c.artMgr.On("GetByDigest", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.NotFoundError(nil))
 	c.artMgr.On("Create", mock.Anything, mock.Anything).Return(int64(1), nil)
 	c.abstractor.On("AbstractMetadata").Return(nil)
@@ -334,8 +336,10 @@ func (c *controllerTestSuite) TestEnsureArtifact() {
 
 	// the artifact doesn't exist and includes a pending attestation accessory candidate
 	c.repoMgr.On("GetByName", mock.Anything, mock.Anything).Return(&repomodel.RepoRecord{
-		ProjectID: 1,
+		RepositoryID: 1,
+		ProjectID:    1,
 	}, nil)
+	c.repoMgr.On("Touch", mock.Anything, int64(1)).Return(nil)
 	c.artMgr.On("GetByDigest", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.NotFoundError(nil))
 	c.artMgr.On("Create", mock.Anything, mock.Anything).Return(int64(1), nil)
 	c.accMgr.On("Ensure", mock.Anything,
@@ -380,8 +384,10 @@ func (c *controllerTestSuite) TestEnsure() {
 
 	// both the artifact and the tag don't exist
 	c.repoMgr.On("GetByName", mock.Anything, mock.Anything).Return(&repomodel.RepoRecord{
-		ProjectID: 1,
+		RepositoryID: 1,
+		ProjectID:    1,
 	}, nil)
+	c.repoMgr.On("Touch", mock.Anything, int64(1)).Return(nil)
 	c.artMgr.On("GetByDigest", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.NotFoundError(nil))
 	c.artMgr.On("Create", mock.Anything, mock.Anything).Return(int64(1), nil)
 	c.abstractor.On("AbstractMetadata").Return(nil)
@@ -743,7 +749,7 @@ func (c *controllerTestSuite) TestDeleteDeeply() {
 	c.setupArtrashMgr()
 
 	// accessory contains tag
-	c.artMgr.On("Get", mock.Anything, mock.Anything).Return(&artifact.Artifact{ID: 1}, nil)
+	c.artMgr.On("Get", mock.Anything, mock.Anything).Return(&artifact.Artifact{ID: 1, RepositoryID: 1}, nil)
 	c.artMgr.On("Delete", mock.Anything, mock.Anything).Return(nil)
 	c.tagCtl.On("List").Return([]*tag.Tag{
 		{
@@ -760,6 +766,7 @@ func (c *controllerTestSuite) TestDeleteDeeply() {
 	c.blobMgr.On("List", mock.Anything, mock.Anything).Return(nil, nil)
 	c.blobMgr.On("CleanupAssociationsForProject", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	c.repoMgr.On("Get", mock.Anything, mock.Anything).Return(&repomodel.RepoRecord{}, nil)
+	c.repoMgr.On("Touch", mock.Anything, int64(1)).Return(nil)
 	c.artrashMgr.On("Create", mock.Anything, mock.Anything).Return(int64(0), nil)
 	c.labelMgr.On("ListByArtifact", mock.Anything, mock.Anything).Return([]*model.Label{}, nil)
 	err = c.ctl.deleteDeeply(orm.NewContext(nil, &ormtesting.FakeOrmer{}), 1, true, true)
@@ -785,6 +792,7 @@ func (c *controllerTestSuite) TestCopy() {
 		RepositoryID: 1,
 		Name:         "library/hello-world",
 	}, nil)
+	c.repoMgr.On("Touch", mock.Anything, mock.Anything).Return(nil)
 	c.artMgr.On("Count", mock.Anything, mock.Anything).Return(int64(0), nil)
 	c.artMgr.On("GetByDigest", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.NotFoundError(nil))
 	c.tagCtl.On("List").Return([]*tag.Tag{
