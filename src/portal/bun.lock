@@ -58,7 +58,7 @@
         "karma-chrome-launcher": "~3.1.0",
         "karma-coverage": "^2.2.1",
         "karma-jasmine": "~5.1.0",
-        "karma-jasmine-html-reporter": "^1.7.0",
+        "karma-jasmine-html-reporter": "^2.2.0",
         "ng-swagger-gen": "^1.8.1",
         "prettier": "^2.8.8",
         "prettier-eslint": "^14.1.0",
@@ -1566,7 +1566,7 @@
 
     "karma-jasmine": ["karma-jasmine@5.1.0", "", { "dependencies": { "jasmine-core": "^4.1.0" }, "peerDependencies": { "karma": "^6.0.0" } }, "sha512-i/zQLFrfEpRyQoJF9fsCdTMOF5c2dK7C7OmsuKg2D0YSsuZSfQDiLuaiktbuio6F2wiCsZSnSnieIQ0ant/uzQ=="],
 
-    "karma-jasmine-html-reporter": ["karma-jasmine-html-reporter@1.7.0", "", { "peerDependencies": { "jasmine-core": ">=3.8", "karma": ">=0.9", "karma-jasmine": ">=1.1" } }, "sha512-pzum1TL7j90DTE86eFt48/s12hqwQuiD+e5aXx2Dc9wDEn2LfGq6RoAxEZZjFiN0RDSCOnosEKRZWxbQ+iMpQQ=="],
+    "karma-jasmine-html-reporter": ["karma-jasmine-html-reporter@2.2.0", "", { "peerDependencies": { "jasmine-core": "^4.0.0 || ^5.0.0 || ^6.0.0", "karma": "^6.0.0", "karma-jasmine": "^5.0.0" } }, "sha512-J0laEC43Oy2RdR5V5R3bqmdo7yRIYySq6XHKbA+e5iSAgLjhR1oICLGeSREPlJXpeyNcdJf3J17YcdhD0mRssQ=="],
 
     "karma-source-map-support": ["karma-source-map-support@1.4.0", "", { "dependencies": { "source-map-support": "^0.5.5" } }, "sha512-RsBECncGO17KAoJCYXjv+ckIz+Ii9NCi+9enk+rq6XC81ezYkb4/RHE6CTXdA7IOJqoF3wcaLfVG0CPmE5ca6A=="],
 
