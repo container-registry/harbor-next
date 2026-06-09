@@ -337,42 +337,22 @@
           "type": "string",
           "description": "Key in registry.existingSecret that holds REGISTRY_HTTP_SECRET (defaults to REGISTRY_HTTP_SECRET)."
         },
-        "storage": {
+        "config": {
           "type": "object",
+          "additionalProperties": true,
+          "description": "Full distribution/distribution config.yml passed through verbatim. Chart-managed redis/log/http blocks are merged on top at render time. Used only when existingConfigMap is empty."
+        },
+        "existingConfigMap": {
+          "type": "string",
+          "description": "Externally-managed ConfigMap with config.yml + ctl-config.yml. When set, the chart skips generating the registry ConfigMap and mounts this one instead."
+        },
+        "storageCredentials": {
+          "type": "object",
+          "description": "BYO Secret references for storage credentials. The chart injects REGISTRY_STORAGE_<BACKEND>_<KEY> env vars on both the registry and registryctl containers (distribution honors these env overrides).",
           "properties": {
-            "type": {
-              "type": "string",
-              "enum": ["filesystem", "s3", "azure", "gcs", "oss"],
-              "default": "filesystem"
-            },
-            "filesystem": {
-              "type": "object",
-              "properties": {
-                "rootdirectory": {
-                  "type": "string"
-                }
-              }
-            },
             "s3": {
               "type": "object",
               "properties": {
-                "region": { "type": "string" },
-                "bucket": { "type": "string" },
-                "accesskey": { "type": "string" },
-                "secretkey": { "type": "string" },
-                "regionendpoint": { "type": "string" },
-                "forcepathstyle": { "type": "boolean" },
-                "encrypt": { "type": "boolean" },
-                "secure": { "type": "boolean" },
-                "skipverify": { "type": "boolean" },
-                "v4auth": { "type": "boolean" },
-                "chunksize": { "type": "integer" },
-                "rootdirectory": { "type": "string" },
-                "storageclass": { "type": "string" },
-                "keyid": { "type": "string" },
-                "multipartcopychunksize": { "type": "integer" },
-                "multipartcopymaxconcurrency": { "type": "integer" },
-                "multipartcopythresholdsize": { "type": "integer" },
                 "existingSecret": { "type": "string" },
                 "existingSecretAccessKeyKey": { "type": "string" },
                 "existingSecretSecretKeyKey": { "type": "string" }
@@ -381,10 +361,13 @@
             "azure": {
               "type": "object",
               "properties": {
-                "accountname": { "type": "string" },
-                "accountkey": { "type": "string" },
-                "container": { "type": "string" },
-                "realm": { "type": "string" },
+                "existingSecret": { "type": "string" },
+                "existingSecretKey": { "type": "string" }
+              }
+            },
+            "oss": {
+              "type": "object",
+              "properties": {
                 "existingSecret": { "type": "string" },
                 "existingSecretKey": { "type": "string" }
               }
@@ -392,25 +375,6 @@
             "gcs": {
               "type": "object",
               "properties": {
-                "bucket": { "type": "string" },
-                "keyfile": { "type": "string" },
-                "rootdirectory": { "type": "string" },
-                "chunksize": { "type": "integer" }
-              }
-            },
-            "oss": {
-              "type": "object",
-              "properties": {
-                "accesskeyid": { "type": "string" },
-                "accesskeysecret": { "type": "string" },
-                "region": { "type": "string" },
-                "bucket": { "type": "string" },
-                "endpoint": { "type": "string" },
-                "internal": { "type": "boolean" },
-                "encrypt": { "type": "boolean" },
-                "secure": { "type": "boolean" },
-                "chunksize": { "type": "integer" },
-                "rootdirectory": { "type": "string" },
                 "existingSecret": { "type": "string" },
                 "existingSecretKey": { "type": "string" }
               }
@@ -865,12 +829,21 @@
         "config": {
           "type": "object",
           "additionalProperties": true,
-          "description": "Application config (converted to env vars in ConfigMap)"
+          "description": "Primary component config. For env-driven components (core, exporter, trivy) it is flattened to env vars via toEnvVars. For file-driven components (registry, jobservice) it is the config file body passed through verbatim."
         },
         "secret": {
           "type": "object",
           "additionalProperties": true,
-          "description": "Sensitive config (converted to env vars in Secret)"
+          "description": "Sensitive config (converted to env vars in a Secret)"
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Supplementary env vars flattened via toEnvVars. Used by file-driven components (jobservice) where config holds the YAML config file rather than env vars."
+        },
+        "existingConfigMap": {
+          "type": "string",
+          "description": "Externally-managed ConfigMap holding the component's config file, used instead of the chart-generated one. Applies to file-driven components (registry, jobservice, portal)."
         },
         "extraEnv": {
           "type": "array",

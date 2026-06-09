@@ -45,6 +45,17 @@ spec:
             {{- toYaml .Values.trivy.securityContext | nindent 12 }}
           image: {{ include "harbor.image" (dict "imageRoot" .Values.trivy.image "global" .Values.image "chart" .Chart) }}
           imagePullPolicy: {{ include "harbor.imagePullPolicy" . }}
+          {{- if or .Values.trivy.config .Values.trivy.secret }}
+          envFrom:
+            {{- if .Values.trivy.config }}
+            - configMapRef:
+                name: "{{ include "harbor.trivy" . }}-env"
+            {{- end }}
+            {{- if .Values.trivy.secret }}
+            - secretRef:
+                name: "{{ include "harbor.trivy" . }}-env"
+            {{- end }}
+          {{- end }}
           env:
           {{- if has "trivy" .Values.proxy.components }}
             - name: HTTP_PROXY

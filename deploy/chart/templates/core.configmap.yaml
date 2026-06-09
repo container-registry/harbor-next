@@ -24,7 +24,7 @@ data:
   CORE_LOCAL_URL: "http://127.0.0.1:{{ include "harbor.core.port" . }}"
   WITH_TRIVY: {{ include "harbor.trivy.enabled" . | quote }}
   TRIVY_ADAPTER_URL: {{ include "harbor.trivy.url" . | quote }}
-  REGISTRY_STORAGE_PROVIDER_NAME: "{{ .Values.registry.storage.type }}"
+  REGISTRY_STORAGE_PROVIDER_NAME: {{ include "harbor.registry.storageType" . | quote }}
   CONFIG_PATH: "/etc/core/app.conf"
   REGISTRY_CONTROLLER_URL: {{ include "harbor.registryctl.url" . }}
   REGISTRY_CREDENTIAL_USERNAME: "{{ .Values.registry.credentials.username }}"

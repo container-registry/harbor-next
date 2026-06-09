@@ -1,0 +1,10 @@
+{{- if and .Values.exporter.enabled .Values.exporter.config }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ include "harbor.fullname" . }}-exporter-env"
+  labels:
+    {{- include "harbor.componentLabels" (dict "root" . "component" "exporter") | nindent 4 }}
+data:
+  {{- include "harbor.toEnvVars" (dict "values" .Values.exporter.config "prefix" "" "isSecret" false) | nindent 2 }}
+{{- end }}

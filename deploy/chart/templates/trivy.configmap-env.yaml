@@ -1,0 +1,10 @@
+{{- if and .Values.trivy.enabled .Values.trivy.config }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ include "harbor.trivy" . }}-env"
+  labels:
+    {{- include "harbor.componentLabels" (dict "root" . "component" "trivy") | nindent 4 }}
+data:
+  {{- include "harbor.toEnvVars" (dict "values" .Values.trivy.config "prefix" "" "isSecret" false) | nindent 2 }}
+{{- end }}

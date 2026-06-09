@@ -1,3 +1,11 @@
+{{- $sc := .Values.registry.storageCredentials | default dict -}}
+{{- $s3Ext := (default dict $sc.s3).existingSecret -}}
+{{- $azureExt := (default dict $sc.azure).existingSecret -}}
+{{- $ossExt := (default dict $sc.oss).existingSecret -}}
+{{- $gcsExt := (default dict $sc.gcs).existingSecret -}}
+{{- $extAuth := and (not .Values.valkey.enabled) (or .Values.externalRedis.existingSecret .Values.externalRedis.password) -}}
+{{- $redisAuth := or .Values.valkey.auth.enabled $extAuth -}}
+{{- $caExt := eq (include "harbor.redis.caBundleEnabled" .) "true" -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -60,11 +68,7 @@ spec:
           envFrom:
             - secretRef:
                 name: {{ include "harbor.registry.name" . }}
-          {{- $s3Ext := and (eq .Values.registry.storage.type "s3") .Values.registry.storage.s3.existingSecret -}}
-          {{- $azureExt := and (eq .Values.registry.storage.type "azure") .Values.registry.storage.azure.existingSecret -}}
-          {{- $ossExt := and (eq .Values.registry.storage.type "oss") .Values.registry.storage.oss.existingSecret -}}
-          {{- $caExt := eq (include "harbor.redis.caBundleEnabled" .) "true" -}}
-          {{- if or .Values.registry.existingSecret .Values.registry.extraEnv $s3Ext $azureExt $ossExt $caExt }}
+          {{- if or .Values.registry.existingSecret $redisAuth $s3Ext $azureExt $ossExt $caExt .Values.registry.extraEnv }}
           env:
             {{- if .Values.registry.existingSecret }}
             - name: REGISTRY_HTTP_SECRET
@@ -73,32 +77,39 @@ spec:
                   name: {{ .Values.registry.existingSecret }}
                   key: {{ .Values.registry.existingSecretKey | default "REGISTRY_HTTP_SECRET" }}
             {{- end }}
+            {{- if $redisAuth }}
+            - name: REGISTRY_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "harbor.redis.secretName" . }}
+                  key: {{ include "harbor.redis.secretKey" . }}
+            {{- end }}
             {{- include "harbor.extraCA.env" . | nindent 12 }}
             {{- if $s3Ext }}
             - name: REGISTRY_STORAGE_S3_ACCESSKEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.registry.storage.s3.existingSecret }}
-                  key: {{ .Values.registry.storage.s3.existingSecretAccessKeyKey | default "REGISTRY_STORAGE_S3_ACCESSKEY" }}
+                  name: {{ $s3Ext }}
+                  key: {{ $sc.s3.existingSecretAccessKeyKey | default "REGISTRY_STORAGE_S3_ACCESSKEY" }}
             - name: REGISTRY_STORAGE_S3_SECRETKEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.registry.storage.s3.existingSecret }}
-                  key: {{ .Values.registry.storage.s3.existingSecretSecretKeyKey | default "REGISTRY_STORAGE_S3_SECRETKEY" }}
+                  name: {{ $s3Ext }}
+                  key: {{ $sc.s3.existingSecretSecretKeyKey | default "REGISTRY_STORAGE_S3_SECRETKEY" }}
             {{- end }}
             {{- if $azureExt }}
             - name: REGISTRY_STORAGE_AZURE_ACCOUNTKEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.registry.storage.azure.existingSecret }}
-                  key: {{ .Values.registry.storage.azure.existingSecretKey | default "REGISTRY_STORAGE_AZURE_ACCOUNTKEY" }}
+                  name: {{ $azureExt }}
+                  key: {{ $sc.azure.existingSecretKey | default "REGISTRY_STORAGE_AZURE_ACCOUNTKEY" }}
             {{- end }}
             {{- if $ossExt }}
             - name: REGISTRY_STORAGE_OSS_ACCESSKEYSECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.registry.storage.oss.existingSecret }}
-                  key: {{ .Values.registry.storage.oss.existingSecretKey | default "REGISTRY_STORAGE_OSS_ACCESSKEYSECRET" }}
+                  name: {{ $ossExt }}
+                  key: {{ $sc.oss.existingSecretKey | default "REGISTRY_STORAGE_OSS_ACCESSKEYSECRET" }}
             {{- end }}
             {{- with .Values.registry.extraEnv }}
             {{- toYaml . | nindent 12 }}
@@ -124,8 +135,8 @@ spec:
           {{- end }}
           volumeMounts:
             - name: storage
-              mountPath: {{ .Values.registry.storage.filesystem.rootdirectory | default "/storage" }}
-            {{- if and (eq .Values.registry.storage.type "gcs") .Values.registry.storage.gcs.keyfile }}
+              mountPath: {{ include "harbor.registry.storageMountPath" . }}
+            {{- if $gcsExt }}
             - name: gcs-key
               mountPath: /etc/registry/gcs
               readOnly: true
@@ -150,7 +161,7 @@ spec:
               protocol: TCP
           envFrom:
             - configMapRef:
-                name: {{ include "harbor.registry.name" . }}
+                name: {{ .Values.registry.existingConfigMap | default (include "harbor.registry.name" .) }}
             - secretRef:
                 name: {{ include "harbor.registry.name" . }}
             - configMapRef:
@@ -165,6 +176,13 @@ spec:
                   name: {{ .Values.registry.existingSecret }}
                   key: {{ .Values.registry.existingSecretKey | default "REGISTRY_HTTP_SECRET" }}
             {{- end }}
+            {{- if $redisAuth }}
+            - name: REGISTRY_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "harbor.redis.secretName" . }}
+                  key: {{ include "harbor.redis.secretKey" . }}
+            {{- end }}
             {{- include "harbor.extraCA.env" . | nindent 12 }}
             {{- /* Per-backend storage credentials when sourced from a BYO Secret —
                    registryctl runs admin ops (GC) that need the same creds.
@@ -174,27 +192,27 @@ spec:
             - name: REGISTRY_STORAGE_S3_ACCESSKEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.registry.storage.s3.existingSecret }}
-                  key: {{ .Values.registry.storage.s3.existingSecretAccessKeyKey | default "REGISTRY_STORAGE_S3_ACCESSKEY" }}
+                  name: {{ $s3Ext }}
+                  key: {{ $sc.s3.existingSecretAccessKeyKey | default "REGISTRY_STORAGE_S3_ACCESSKEY" }}
             - name: REGISTRY_STORAGE_S3_SECRETKEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.registry.storage.s3.existingSecret }}
-                  key: {{ .Values.registry.storage.s3.existingSecretSecretKeyKey | default "REGISTRY_STORAGE_S3_SECRETKEY" }}
+                  name: {{ $s3Ext }}
+                  key: {{ $sc.s3.existingSecretSecretKeyKey | default "REGISTRY_STORAGE_S3_SECRETKEY" }}
             {{- end }}
             {{- if $azureExt }}
             - name: REGISTRY_STORAGE_AZURE_ACCOUNTKEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.registry.storage.azure.existingSecret }}
-                  key: {{ .Values.registry.storage.azure.existingSecretKey | default "REGISTRY_STORAGE_AZURE_ACCOUNTKEY" }}
+                  name: {{ $azureExt }}
+                  key: {{ $sc.azure.existingSecretKey | default "REGISTRY_STORAGE_AZURE_ACCOUNTKEY" }}
             {{- end }}
             {{- if $ossExt }}
             - name: REGISTRY_STORAGE_OSS_ACCESSKEYSECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.registry.storage.oss.existingSecret }}
-                  key: {{ .Values.registry.storage.oss.existingSecretKey | default "REGISTRY_STORAGE_OSS_ACCESSKEYSECRET" }}
+                  name: {{ $ossExt }}
+                  key: {{ $sc.oss.existingSecretKey | default "REGISTRY_STORAGE_OSS_ACCESSKEYSECRET" }}
             {{- end }}
             - name: CORE_SECRET
               valueFrom:
@@ -241,7 +259,7 @@ spec:
           {{- end }}
           volumeMounts:
             - name: storage
-              mountPath: {{ .Values.registry.storage.filesystem.rootdirectory | default "/storage" }}
+              mountPath: {{ include "harbor.registry.storageMountPath" . }}
             - name: registry-config
               mountPath: /etc/registry/config.yml
               subPath: config.yml
@@ -261,19 +279,22 @@ spec:
                 path: passwd
             secretName: {{ include "harbor.registry.name" . }}-htpasswd
         - configMap:
-            name: {{ include "harbor.registry.name" . }}
+            name: {{ .Values.registry.existingConfigMap | default (include "harbor.registry.name" .) }}
           name: registry-config
         - name: storage
-          {{- if and .Values.registry.persistence.enabled (eq .Values.registry.storage.type "filesystem") }}
+          {{- if .Values.registry.persistence.enabled }}
           persistentVolumeClaim:
             claimName: {{ .Values.registry.persistence.existingClaim | default (include "harbor.registry" .) }}
           {{- else }}
           emptyDir: {}
           {{- end }}
-        {{- if and (eq .Values.registry.storage.type "gcs") .Values.registry.storage.gcs.keyfile }}
+        {{- if $gcsExt }}
         - name: gcs-key
           secret:
-            secretName: {{ include "harbor.fullname" . }}-registry-gcs
+            secretName: {{ $gcsExt }}
+            items:
+              - key: {{ $sc.gcs.existingSecretKey | default "gcs-key.json" }}
+                path: key.json
         {{- end }}
         {{- include "harbor.extraCA.volume" . | nindent 8 }}
       {{- include "harbor.podScheduling" (dict "component" .Values.registry "root" $) | nindent 6 }}

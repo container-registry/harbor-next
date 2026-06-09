@@ -70,7 +70,9 @@ core:
 
 jobservice:
   replicas: 1
-  max_job_workers: 4
+  config:
+    worker_pool:
+      workers: 4
   resources:
     requests:
       cpu: 100m

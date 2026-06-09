@@ -81,7 +81,7 @@ spec:
       volumes:
         - name: portal-config
           configMap:
-            name: "{{ template "harbor.portal" . }}"
+            name: {{ .Values.portal.existingConfigMap | default (include "harbor.portal" .) }}
         - name: tmp
           emptyDir: {}
       {{- include "harbor.podScheduling" (dict "component" .Values.portal "root" $) | nindent 6 }}

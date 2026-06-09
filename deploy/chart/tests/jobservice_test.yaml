@@ -86,8 +86,13 @@ tests:
           path: spec.ports[0].port
           value: 80
 
-  # Pins default workers value (4) rendered in config.yml when user does not override
-  - it: should render default workers count in config.yml
+  # ============================================================================
+  # jobservice.config — YAML passthrough into /etc/jobservice/config.yml
+  # ============================================================================
+
+  # Default jobservice.config block contains worker_pool with workers=4.
+  # Verifies the user's YAML renders verbatim into config.yml.
+  - it: should render default workers count from jobservice.config
     template: templates/jobservice.configmap.yaml
     set:
       externalURL: https://harbor.example.com
@@ -100,70 +105,60 @@ tests:
           path: data["config.yml"]
           pattern: "workers: 4"
 
-  # Pins max_job_workers -> config.yml workers field mapping
-  - it: should render custom workers count in config.yml
+  # User overriding worker_pool.workers in jobservice.config flows
+  # directly into config.yml — no chart code change needed.
+  - it: should render custom workers count from jobservice.config
     template: templates/jobservice.configmap.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
-      jobservice.max_job_workers: 10
+      jobservice.config.worker_pool.workers: 10
     asserts:
       - matchRegex:
           path: data["config.yml"]
           pattern: "workers: 10"
 
-  # Pins jobLoggers: file -> name: "FILE" rendering in config.yml
-  - it: should render FILE logger block when file logger configured
+  # User-supplied job_loggers list renders verbatim.
+  - it: should render FILE logger from jobservice.config.job_loggers
     template: templates/jobservice.configmap.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
-      jobservice.jobLoggers:
-        - file
+      jobservice.config.job_loggers:
+        - name: FILE
+          level: INFO
+          settings:
+            base_dir: /var/log/jobs
     asserts:
       - matchRegex:
           path: data["config.yml"]
-          pattern: 'name: "FILE"'
+          pattern: "name: FILE"
 
-  # Pins jobLoggers: database -> name: "DB" rendering in config.yml
-  - it: should render DB logger block when database logger configured
+  - it: should render STD_OUTPUT logger from jobservice.config.job_loggers
     template: templates/jobservice.configmap.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
-      jobservice.jobLoggers:
-        - database
+      jobservice.config.job_loggers:
+        - name: STD_OUTPUT
+          level: INFO
     asserts:
       - matchRegex:
           path: data["config.yml"]
-          pattern: 'name: "DB"'
+          pattern: "name: STD_OUTPUT"
 
-  # Pins jobLoggers: stdout -> name: "STD_OUTPUT" rendering in config.yml
-  - it: should render STD_OUTPUT logger block when stdout logger configured
+  # User-supplied reaper block flows into config.yml verbatim.
+  - it: should render reaper hours from jobservice.config
     template: templates/jobservice.configmap.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
-      jobservice.jobLoggers:
-        - stdout
-    asserts:
-      - matchRegex:
-          path: data["config.yml"]
-          pattern: 'name: "STD_OUTPUT"'
-
-  # Pins reaper settings rendered into config.yml
-  - it: should render reaper max_update_hours and max_dangling_hours in config.yml
-    template: templates/jobservice.configmap.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      jobservice.reaper.max_update_hours: 48
-      jobservice.reaper.max_dangling_hours: 336
+      jobservice.config.reaper.max_update_hours: 48
+      jobservice.config.reaper.max_dangling_hours: 336
     asserts:
       - matchRegex:
           path: data["config.yml"]
@@ -172,15 +167,66 @@ tests:
           path: data["config.yml"]
           pattern: "max_dangling_hours: 336"
 
-  # Pins webhook int -> string coercion for env configmap (ConfigMap data must be strings)
-  - it: should coerce webhook int values to strings in configmap-env
+  # Chart-managed redis URL is injected via JOB_SERVICE_POOL_REDIS_URL
+  # env on the deployment, overriding whatever is in jobservice.config.worker_pool.redis_pool.redis_url.
+  - it: should inject JOB_SERVICE_POOL_REDIS_URL env on the jobservice container
+    template: templates/jobservice.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: JOB_SERVICE_POOL_REDIS_URL
+          any: true
+
+  # ============================================================================
+  # jobservice.existingConfigMap — chart skips ConfigMap generation
+  # ============================================================================
+
+  - it: should not render jobservice ConfigMap when existingConfigMap is set
+    template: templates/jobservice.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      jobservice.existingConfigMap: my-external-js
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should reference existingConfigMap on the jobservice-config volume
+    template: templates/jobservice.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      jobservice.existingConfigMap: my-external-js
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: jobservice-config
+            configMap:
+              name: my-external-js
+
+  # ============================================================================
+  # jobservice.env — supplementary env vars via toEnvVars (replaces the
+  # old jobservice.config which was env-passthrough, now config: is YAML)
+  # ============================================================================
+
+  # Pins int -> string coercion: ConfigMap data values must be strings.
+  - it: should coerce int env values to strings in configmap-env
     template: templates/jobservice.configmap-env.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
-      jobservice.notification.webhook_job_max_retry: 5
-      jobservice.notification.webhook_job_http_client_timeout: 10
+      jobservice.env:
+        JOBSERVICE_WEBHOOK_JOB_MAX_RETRY: 5
+        JOBSERVICE_WEBHOOK_JOB_HTTP_CLIENT_TIMEOUT: 10
     asserts:
       - isKind:
           of: ConfigMap

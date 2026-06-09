@@ -172,6 +172,109 @@ hostAliases:
 
 {{/*
 =============================================================================
+Registry helpers
+=============================================================================
+*/}}
+
+{{/*
+Chart-managed blocks merged on top of .Values.registry.config when
+rendering /etc/registry/config.yml. Sensitive values (redis.password,
+http.secret) come via env-var overrides on the Deployment, not via this
+ConfigMap-rendered block. User's `registry.config` keys win on collision
+(see registry.configmap.yaml mustMergeOverwrite call).
+
+The mount path under storage.filesystem is intentionally NOT set here —
+it's part of the user's config (or default) and the Deployment derives
+the volumeMount path from .Values.registry.config.storage.filesystem.rootdirectory.
+*/}}
+{{- define "harbor.registry.chartManagedConfig" -}}
+log:
+  {{- if eq .Values.logLevel "warning" }}
+  level: warn
+  {{- else if eq .Values.logLevel "fatal" }}
+  level: error
+  {{- else }}
+  level: {{ .Values.logLevel }}
+  {{- end }}
+redis:
+  addrs:
+    - {{ include "harbor.redis.hostWithPort" . | quote }}
+  {{- if contains "sentinel" (include "harbor.redis.scheme" .) }}
+  sentinelMasterSet: {{ include "harbor.redis.masterSet" . | quote }}
+  {{- end }}
+  db: {{ include "harbor.redis.url.registry.num" . | int }}
+  readtimeout: 10s
+  writetimeout: 10s
+  dialtimeout: 10s
+  enableTLS: {{ eq (include "harbor.redis.enableTLS" . | trim) "true" }}
+  pool:
+    maxidle: 100
+    maxactive: 500
+    idletimeout: 60s
+http:
+  addr: ":5000"
+  debug:
+    {{- if .Values.metrics.enabled }}
+    addr: ":{{ include "harbor.metrics.port" . }}"
+    prometheus:
+      enabled: true
+      path: {{ include "harbor.metrics.path" . | quote }}
+    {{- else }}
+    addr: "localhost:5001"
+    {{- end }}
+{{- end }}
+
+{{/*
+Filesystem rootdirectory honored by the storage volumeMount on the
+registry/registryctl containers. Reads from .Values.registry.config.storage.filesystem.rootdirectory
+with fallback to /storage.
+*/}}
+{{- define "harbor.registry.storageMountPath" -}}
+{{- $storage := dig "storage" "filesystem" "rootdirectory" "/storage" (.Values.registry.config | default dict) -}}
+{{- $storage -}}
+{{- end -}}
+
+{{/*
+Chart-managed blocks merged on top of .Values.jobservice.config when
+rendering /etc/jobservice/config.yml. Sensitive values (redis URL with
+auth) come via env-var overrides on the Deployment.
+User's `jobservice.config` keys win on collision.
+*/}}
+{{- define "harbor.jobservice.chartManagedConfig" -}}
+protocol: {{ include "harbor.component.scheme" . | quote }}
+port: {{ include "harbor.jobservice.port" . }}
+worker_pool:
+  backend: "redis"
+  redis_pool:
+    redis_url: {{ include "harbor.redis.url.jobservice" . | quote }}
+    namespace: "harbor_job_service_namespace"
+    idle_timeout_second: 3600
+{{- if .Values.metrics.enabled }}
+metric:
+  enabled: true
+  path: {{ include "harbor.metrics.path" . | quote }}
+  port: {{ include "harbor.metrics.port" . | int }}
+{{- end }}
+{{- end }}
+
+{{/*
+Detect the registry storage provider from the user's registry.config.storage
+block. Harbor Core needs this as REGISTRY_STORAGE_PROVIDER_NAME to compute
+redirects and presigned URLs. Returns the first known backend key found.
+Defaults to "filesystem" when nothing matches.
+*/}}
+{{- define "harbor.registry.storageType" -}}
+{{- $storage := dig "storage" (dict) (.Values.registry.config | default dict) -}}
+{{- if hasKey $storage "s3" -}}s3
+{{- else if hasKey $storage "azure" -}}azure
+{{- else if hasKey $storage "gcs" -}}gcs
+{{- else if hasKey $storage "oss" -}}oss
+{{- else -}}filesystem
+{{- end -}}
+{{- end -}}
+
+{{/*
+=============================================================================
 Core helpers
 =============================================================================
 */}}

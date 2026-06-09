@@ -12,9 +12,6 @@ data:
   REGISTRY_URL: {{ include "harbor.registry.url" . | quote }}
   REGISTRY_CONTROLLER_URL: {{ include "harbor.registryctl.url" . | quote }}
 
-  JOBSERVICE_WEBHOOK_JOB_MAX_RETRY: {{ .Values.jobservice.notification.webhook_job_max_retry | quote }}
-  JOBSERVICE_WEBHOOK_JOB_HTTP_CLIENT_TIMEOUT: {{ .Values.jobservice.notification.webhook_job_http_client_timeout | quote }}
-
   # Redis configuration
   _REDIS_URL_CORE: {{ include "harbor.redis.url.core" . | quote }}
   _REDIS_URL_CACHE_LAYER: {{ include "harbor.redis.url.cache" . | quote }}
@@ -36,7 +33,7 @@ data:
   METRIC_SUBSYSTEM: jobservice
   {{- end }}
   {{- template "harbor.trace.envs.jobservice" . }}
-  # Config via toEnvVars
-  {{- if .Values.jobservice.config }}
-  {{- include "harbor.toEnvVars" (dict "values" .Values.jobservice.config "prefix" "" "isSecret" false) | nindent 2 }}
+  # Supplementary env vars via toEnvVars
+  {{- if .Values.jobservice.env }}
+  {{- include "harbor.toEnvVars" (dict "values" .Values.jobservice.env "prefix" "" "isSecret" false) | nindent 2 }}
   {{- end }}

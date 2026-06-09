@@ -427,92 +427,177 @@ core:
 
 # --- Registry ---
 registry:
-  # -- If true, the registry returns relative URLs in Location headers
-  relativeurls: false
-  # -- Registry application config (converted to env vars in ConfigMap)
-  # @default -- {}
-  upload_purging:
-    enabled: true
-    age: 168h
-    interval: 24h
-    dryrun: false
-  config: {}
+  # -- Use an externally-managed ConfigMap containing `config.yml` and
+  # `ctl-config.yml` instead of generating one from `config:` below. When
+  # set, the chart skips ConfigMap generation and the Deployment mounts
+  # the named ConfigMap at /etc/registry. Chart-managed runtime values
+  # (redis URL with auth, HTTP secret, storage credentials from
+  # `storageCredentials`, log level, ports) are still injected via env-var
+  # overrides on the Deployment, so they take precedence over whatever is
+  # in the external ConfigMap. Use this for kustomize/GitOps workflows
+  # where `config.yml` is owned by a separate manifest pipeline.
+  existingConfigMap: ""
+
+  # -- Full [distribution/distribution](https://distribution.github.io/distribution/about/configuration/)
+  # `config.yml` passed through verbatim. Used only when
+  # `existingConfigMap` is empty. Replace this entire block to switch
+  # storage backends or add any field distribution supports (notifications,
+  # health, custom middleware, etc.).
+  #
+  # Chart-managed values injected via env-var override at runtime (these
+  # ALWAYS win over what's in this block — do not duplicate here):
+  #   - `http.addr`, `http.secret`, `http.debug.prometheus.enabled`
+  #   - `redis.*` (addr, password, db, tls)
+  #   - `log.level` (from `.Values.logLevel`)
+  #   - storage credentials when `storageCredentials.<backend>.existingSecret` is set
+  #
+  # See `storageCredentials` below for the BYO-Secret pattern. For inline
+  # credentials use `registry.secret` (b64-encoded into the generated
+  # Secret) — do not put plaintext credentials in this block, they would
+  # be visible in the ConfigMap.
+  # @default -- See [values.yaml](values.yaml)
+  config:
+    version: 0.1
+    log:
+      fields:
+        service: registry
+    storage:
+      filesystem:
+        rootdirectory: /storage
+      cache:
+        layerinfo: redis
+      maintenance:
+        uploadpurging:
+          enabled: true
+          age: 168h
+          interval: 24h
+          dryrun: false
+      delete:
+        enabled: true
+      redirect:
+        disable: false
+    auth:
+      htpasswd:
+        realm: harbor-registry-basic-realm
+        path: /etc/registry/passwd
+    validation:
+      disabled: true
+    compatibility:
+      schema1:
+        enabled: true
+    # Switching storage backend: Helm deep-merges values, so adding `s3:`
+    # alongside the default `filesystem:` results in BOTH being rendered into
+    # config.yml. Set `filesystem: null` (or `gcs: null`, etc.) to remove the
+    # chart default explicitly. Examples below assume this pattern.
+    #
+    # Example — S3 (replace `storage:` block above):
+    #
+    # storage:
+    #   filesystem: null          # remove chart default
+    #   s3:
+    #     region: us-east-1
+    #     bucket: my-harbor-bucket
+    #     # forcepathstyle: true   # MinIO / Ceph RGW / SeaweedFS
+    #     # v4auth: true
+    #     # encrypt: false
+    #   cache:
+    #     layerinfo: redis
+    #
+    # Example — Azure Blob:
+    #
+    # storage:
+    #   filesystem: null
+    #   azure:
+    #     accountname: <name>
+    #     container: <container>
+    #
+    # Example — GCS (with keyfile):
+    #
+    # storage:
+    #   filesystem: null
+    #   gcs:
+    #     bucket: my-bucket
+    #     keyfile: /etc/registry/gcs/key.json
+    #
+    # Example — GCS (Workload Identity, no keyfile):
+    #
+    # storage:
+    #   filesystem: null
+    #   gcs:
+    #     bucket: my-bucket
+    #
+    # Example — Alibaba OSS:
+    #
+    # storage:
+    #   filesystem: null
+    #   oss:
+    #     accesskeyid: <id>
+    #     region: <region>
+    #     bucket: <bucket>
+
+  # -- BYO Secret references for storage credentials. The chart injects
+  # the credential as an env var on both `registry` and `registryctl`
+  # containers; distribution honors `REGISTRY_STORAGE_<BACKEND>_<KEY>`
+  # env overrides for any backend. Set the entry matching the backend you
+  # configured in `config.storage`. Other entries stay empty.
+  #
+  # Env injection is gated only on `existingSecret` being non-empty (not
+  # on which backend is active in `config:`). Setting credentials for an
+  # inactive backend is harmless — distribution ignores env vars not
+  # matching its active driver.
+  # @default -- See [values.yaml](values.yaml)
+  storageCredentials:
+    s3:
+      # -- Existing Secret containing AWS S3 credentials.
+      existingSecret: ""
+      # -- Key in `existingSecret` holding the access key ID.
+      existingSecretAccessKeyKey: REGISTRY_STORAGE_S3_ACCESSKEY
+      # -- Key in `existingSecret` holding the secret access key.
+      existingSecretSecretKeyKey: REGISTRY_STORAGE_S3_SECRETKEY
+    azure:
+      # -- Existing Secret containing the Azure storage account key.
+      existingSecret: ""
+      # -- Key in `existingSecret` holding the account key.
+      existingSecretKey: REGISTRY_STORAGE_AZURE_ACCOUNTKEY
+    oss:
+      # -- Existing Secret containing the Alibaba OSS access key secret.
+      existingSecret: ""
+      # -- Key in `existingSecret` holding the access key secret.
+      existingSecretKey: REGISTRY_STORAGE_OSS_ACCESSKEYSECRET
+    gcs:
+      # -- Existing Secret containing the GCS service-account keyfile.
+      # When set, mounted at /etc/registry/gcs/key.json — reference this
+      # path from `config.storage.gcs.keyfile`. Leave empty when using
+      # Workload Identity (set `serviceAccount.annotations` instead).
+      existingSecret: ""
+      # -- Key in `existingSecret` holding the keyfile JSON content.
+      existingSecretKey: gcs-key.json
+
   # -- Existing Secret that supplies `REGISTRY_HTTP_SECRET`. When set,
   # the generated registry Secret omits `REGISTRY_HTTP_SECRET` and the
-  # deployment reads it from this Secret via env. Other registry-storage
-  # keys (S3, Azure, OSS) still come from the generated Secret.
+  # deployment reads it from this Secret via env. Independent of
+  # `storageCredentials`.
   existingSecret: ""
-  # -- Key in `registry.existingSecret` that holds REGISTRY_HTTP_SECRET.
+  # -- Key in `registry.existingSecret` that holds `REGISTRY_HTTP_SECRET`.
   existingSecretKey: "REGISTRY_HTTP_SECRET"
+
   credentials:
     username: "harbor_registry_user"
     password: ""
     existingSecret: ""
     htpasswdString: ""
-  # -- Registry storage configuration
-  storage:
-    disableredirect: false
-    # -- Storage type: filesystem, s3, azure, gcs, oss
-    type: filesystem
-    # -- Filesystem storage settings
-    filesystem:
-      rootdirectory: /storage
-      subPath: ""
-    # -- S3 storage settings. Set `forcepathstyle: true` for MinIO / Ceph
-    # RGW / SeaweedFS — virtual-host style is the libS3 default and most
-    # non-AWS S3-compatible backends only accept path-style addressing.
-    #
-    # For External-Secrets-Operator / Vault / SealedSecrets workflows set
-    # `existingSecret: my-creds` instead of inline `accesskey`/`secretkey`;
-    # the chart then pulls credentials from that Secret via env, and the
-    # generated `*-registry` Secret stops emitting those keys.
-    s3: {}
-      # region: us-east-1
-      # bucket: my-harbor-bucket
-      # accesskey: ""
-      # secretkey: ""
-      # existingSecret: ""
-      # existingSecretAccessKeyKey: REGISTRY_STORAGE_S3_ACCESSKEY
-      # existingSecretSecretKeyKey: REGISTRY_STORAGE_S3_SECRETKEY
-      # regionendpoint: ""
-      # forcepathstyle: false
-      # encrypt: false
-      # secure: true
-      # v4auth: true
-      # chunksize: 5242880
-      # rootdirectory: ""
-    # -- Azure Blob storage settings. `existingSecret` works the same as
-    # for s3 — set it to source `accountkey` from a BYO Secret.
-    azure: {}
-      # accountname: ""
-      # accountkey: ""
-      # existingSecret: ""
-      # existingSecretKey: REGISTRY_STORAGE_AZURE_ACCOUNTKEY
-      # container: ""
-      # realm: core.windows.net
-    # -- Google Cloud Storage settings
-    gcs: {}
-      # bucket: ""
-      # keyfile: ""
-      # rootdirectory: ""
-      # chunksize: 5242880
-    # -- Alibaba Cloud OSS settings. `existingSecret` works the same as
-    # for s3 — set it to source `accesskeysecret` from a BYO Secret.
-    oss: {}
-      # accesskeyid: ""
-      # accesskeysecret: ""
-      # existingSecret: ""
-      # existingSecretKey: REGISTRY_STORAGE_OSS_ACCESSKEYSECRET
-      # region: ""
-      # bucket: ""
-      # endpoint: ""
-      # internal: false
-      # encrypt: false
-      # secure: true
-      # chunksize: 10485760
-      # rootdirectory: ""
 
-  # -- Sensitive config for Registry (converted to env vars in Secret)
+  # -- Sensitive config for Registry. Each key is b64-encoded into the
+  # generated registry Secret and injected on both `registry` and
+  # `registryctl` containers via `envFrom`. Use for inline credentials,
+  # e.g.:
+  #
+  #     secret:
+  #       REGISTRY_STORAGE_S3_ACCESSKEY: <plaintext>
+  #       REGISTRY_STORAGE_S3_SECRETKEY: <plaintext>
+  #
+  # Prefer `storageCredentials.<backend>.existingSecret` for production
+  # (External-Secrets-Operator / Vault / SealedSecrets workflows).
   # @default -- {}
   secret: {}
 
@@ -660,13 +745,16 @@ registry:
 
 # --- Portal ---
 portal:
-  # -- Portal application config (converted to env vars in ConfigMap)
-  # @default -- {}
-  config: {}
-
-  # -- Sensitive config for Portal (converted to env vars in Secret)
-  # @default -- {}
-  secret: {}
+  # -- Use an externally-managed ConfigMap containing `nginx.conf` instead
+  # of the chart-generated one. When set, the chart skips ConfigMap
+  # generation and the Deployment mounts the named ConfigMap. Use for
+  # custom nginx configuration (TLS termination, custom headers, extra
+  # locations) without forking the chart. Semantics match
+  # `registry.existingConfigMap`.
+  # Portal serves static Angular assets via nginx and has no env/key
+  # config surface — to customize nginx.conf, point existingConfigMap at
+  # your own ConfigMap (there is no `config`/`secret` passthrough here).
+  existingConfigMap: ""
 
   # -- Extra environment variables with valueFrom support
   # @default -- []
@@ -787,24 +875,69 @@ portal:
 
 # --- Jobservice ---
 jobservice:
-  # -- Jobservice application config (converted to env vars in ConfigMap)
-  # @default -- {}
-  config: {}
-  max_job_workers: 4
+  # -- Use an externally-managed ConfigMap containing `config.yml` instead
+  # of generating one from `config:` below. Semantics match
+  # `registry.existingConfigMap`.
+  existingConfigMap: ""
 
-  # -- Job loggers: file, database, or stdout
-  jobLoggers:
-    - file
-  # -- Logger sweeper duration in days (ignored if logger is stdout)
-  loggerSweeperDuration: 14
-  # -- Notification settings
-  notification:
-    webhook_job_max_retry: 3
-    webhook_job_http_client_timeout: 3
-  # -- Reaper settings
-  reaper:
-    max_update_hours: 24
-    max_dangling_hours: 168
+  # -- Full Harbor jobservice `config.yml` passed through verbatim. Used
+  # only when `existingConfigMap` is empty.
+  #
+  # Chart-managed values injected via env-var override at runtime:
+  #   - `protocol`, `port` (from chart helpers)
+  #   - `worker_pool.backend`, `worker_pool.workers` (when JOB_SERVICE_*
+  #     env vars are wired by the chart)
+  #   - `worker_pool.redis_pool.redis_url` (chart sets the URL with auth
+  #     via JOB_SERVICE_POOL_REDIS_URL; you can leave a placeholder here)
+  #   - `worker_pool.redis_pool.namespace`
+  #
+  # The following keys are NOT env-overridable (Harbor jobservice limitation
+  # — see src/jobservice/config/config.go). You MUST set them in this
+  # block; changing `.Values.logLevel` or `.Values.metrics.enabled`
+  # globally will NOT propagate here:
+  #   - `metric.enabled`, `metric.path`, `metric.port`
+  #   - `loggers[].level`, `job_loggers[].level`
+  #   - `job_loggers[].sweeper.*`
+  #   - `reaper.*`
+  #   - `max_retrieve_size_mb`
+  # @default -- See [values.yaml](values.yaml)
+  config:
+    protocol: http
+    port: 8080
+    worker_pool:
+      workers: 4
+      backend: redis
+      redis_pool:
+        # redis_url overridden via JOB_SERVICE_POOL_REDIS_URL env at runtime
+        namespace: harbor_job_service_namespace
+        idle_timeout_second: 3600
+    job_loggers:
+      - name: FILE
+        level: INFO
+        settings:
+          base_dir: /var/log/jobs
+        sweeper:
+          duration: 14
+          settings:
+            work_dir: /var/log/jobs
+    loggers:
+      - name: STD_OUTPUT
+        level: INFO
+    reaper:
+      max_update_hours: 24
+      max_dangling_hours: 168
+    # Uncomment to enable Prometheus scraping (mirror .Values.metrics.enabled):
+    # metric:
+    #   enabled: true
+    #   path: /metrics
+    #   port: 8001
+
+  # -- Supplementary env vars for the jobservice container (and the
+  # jobservice ConfigMap-env). Nested maps flatten to `UPPER_SNAKE_CASE`
+  # keys via `harbor.toEnvVars`. Use for any setting Harbor reads from env
+  # but is not part of the YAML config (e.g. webhook tuning).
+  # @default -- {}
+  env: {}
 
   # -- Sensitive config for Jobservice (converted to env vars in Secret)
   # @default -- {}
@@ -952,7 +1085,9 @@ exporter:
   # -- Enable Harbor exporter for Prometheus metrics
   enabled: true
 
-  # -- Exporter application config (converted to env vars in ConfigMap)
+  # -- Exporter config as env vars. Exporter is env-driven (HARBOR_EXPORTER_*);
+  # nested maps flatten to UPPER_SNAKE_CASE via toEnvVars and are injected
+  # via envFrom. Any exporter setting works without chart changes.
   # @default -- {}
   config: {}
     # cache_time: 23
@@ -1190,6 +1325,21 @@ externalRedis:
 trivy:
   # -- Enable Trivy scanner
   enabled: false
+
+  # -- Trivy adapter config as env vars. Trivy is env-driven (SCANNER_*);
+  # nested maps flatten to UPPER_SNAKE_CASE via toEnvVars and are injected
+  # via envFrom. Any adapter setting works without chart changes.
+  # @default -- {}
+  config: {}
+
+  # -- Sensitive Trivy adapter config (converted to env vars in a Secret).
+  # @default -- {}
+  secret: {}
+
+  # -- Extra environment variables with valueFrom support
+  # @default -- []
+  extraEnv: []
+
   image:
     # -- Trivy adapter image repository
     repository: 8gears.container-registry.com/8gcr/trivy-adapter

@@ -175,8 +175,6 @@
       CORE_URL: http://harbor-harbor-next-core
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
-      JOBSERVICE_WEBHOOK_JOB_HTTP_CLIENT_TIMEOUT: "3"
-      JOBSERVICE_WEBHOOK_JOB_MAX_RETRY: "3"
       LOG_LEVEL: info
       NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
       REGISTRY_CONTROLLER_URL: http://harbor-harbor-next-registry:8080
@@ -197,36 +195,30 @@
     apiVersion: v1
     data:
       config.yml: |
-        #Server listening port
-        protocol: "http"
-        port: 8080
-        worker_pool:
-          workers: 4
-          backend: "redis"
-          redis_pool:
-            redis_url: "redis://valkey:6379/1"
-            namespace: "harbor_job_service_namespace"
-            idle_timeout_second: 3600
         job_loggers:
-          - name: "FILE"
-            level: INFO
+        - level: INFO
+          name: FILE
+          settings:
+            base_dir: /var/log/jobs
+          sweeper:
+            duration: 14
             settings:
-              base_dir: "/var/log/jobs"
-            sweeper:
-              duration: 14 #days
-              settings:
-                work_dir: "/var/log/jobs"
-        metric:
-          enabled: false
-          path: "/metrics"
-          port: 8001
-        #Loggers for the job service
+              work_dir: /var/log/jobs
         loggers:
-          - name: "STD_OUTPUT"
-            level: INFO
+        - level: INFO
+          name: STD_OUTPUT
+        port: 8080
+        protocol: http
         reaper:
-          max_update_hours: 24
           max_dangling_hours: 168
+          max_update_hours: 24
+        worker_pool:
+          backend: redis
+          redis_pool:
+            idle_timeout_second: 3600
+            namespace: harbor_job_service_namespace
+            redis_url: redis://valkey:6379/1
+          workers: 4
     kind: ConfigMap
     metadata:
       labels:
@@ -336,52 +328,51 @@
     apiVersion: v1
     data:
       config.yml: |
-        version: 0.1
-        log:
-          level: info
-          fields:
-            service: registry
-        storage:
-          filesystem:
-            rootdirectory: /storage
-          cache:
-            layerinfo: redis
-          maintenance:
-            uploadpurging:
-              enabled: true
-              age: 168h
-              interval: 24h
-              dryrun: false
-          delete:
-            enabled: true
-          redirect:
-            disable: false
-        redis:
-          addrs:
-            - valkey:6379
-          db: 2
-          readtimeout: 10s
-          writetimeout: 10s
-          dialtimeout: 10s
-          enableTLS: false
-          pool:
-            maxidle: 100
-            maxactive: 500
-            idletimeout: 60s
-        http:
-          addr: :5000
-          relativeurls: false
-          debug:
-            addr: localhost:5001
         auth:
           htpasswd:
-            realm: harbor-registry-basic-realm
             path: /etc/registry/passwd
-        validation:
-          disabled: true
+            realm: harbor-registry-basic-realm
         compatibility:
           schema1:
             enabled: true
+        http:
+          addr: :5000
+          debug:
+            addr: localhost:5001
+        log:
+          fields:
+            service: registry
+          level: info
+        redis:
+          addrs:
+          - valkey:6379
+          db: 2
+          dialtimeout: 10s
+          enableTLS: false
+          pool:
+            idletimeout: 60s
+            maxactive: 500
+            maxidle: 100
+          readtimeout: 10s
+          writetimeout: 10s
+        storage:
+          cache:
+            layerinfo: redis
+          delete:
+            enabled: true
+          filesystem:
+            rootdirectory: /storage
+          maintenance:
+            uploadpurging:
+              age: 168h
+              dryrun: false
+              enabled: true
+              interval: 24h
+          redirect:
+            disable: false
+        validation:
+          disabled: true
+        version: 0.1
       ctl-config.yml: |
         ---
         protocol: "http"
@@ -683,8 +674,6 @@
       CORE_URL: http://harbor-harbor-next-core
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
-      JOBSERVICE_WEBHOOK_JOB_HTTP_CLIENT_TIMEOUT: "3"
-      JOBSERVICE_WEBHOOK_JOB_MAX_RETRY: "3"
       LOG_LEVEL: info
       NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
       REGISTRY_CONTROLLER_URL: http://harbor-harbor-next-registry:8080
@@ -705,36 +694,30 @@
     apiVersion: v1
     data:
       config.yml: |
-        #Server listening port
-        protocol: "http"
-        port: 8080
-        worker_pool:
-          workers: 4
-          backend: "redis"
-          redis_pool:
-            redis_url: "redis://:$(REDIS_PASSWORD)@valkey:6379/1"
-            namespace: "harbor_job_service_namespace"
-            idle_timeout_second: 3600
         job_loggers:
-          - name: "FILE"
-            level: INFO
+        - level: INFO
+          name: FILE
+          settings:
+            base_dir: /var/log/jobs
+          sweeper:
+            duration: 14
             settings:
-              base_dir: "/var/log/jobs"
-            sweeper:
-              duration: 14 #days
-              settings:
-                work_dir: "/var/log/jobs"
-        metric:
-          enabled: false
-          path: "/metrics"
-          port: 8001
-        #Loggers for the job service
+              work_dir: /var/log/jobs
         loggers:
-          - name: "STD_OUTPUT"
-            level: INFO
+        - level: INFO
+          name: STD_OUTPUT
+        port: 8080
+        protocol: http
         reaper:
-          max_update_hours: 24
           max_dangling_hours: 168
+          max_update_hours: 24
+        worker_pool:
+          backend: redis
+          redis_pool:
+            idle_timeout_second: 3600
+            namespace: harbor_job_service_namespace
+            redis_url: redis://:$(REDIS_PASSWORD)@valkey:6379/1
+          workers: 4
     kind: ConfigMap
     metadata:
       labels:
@@ -844,52 +827,51 @@
     apiVersion: v1
     data:
       config.yml: |
-        version: 0.1
-        log:
-          level: info
-          fields:
-            service: registry
-        storage:
-          filesystem:
-            rootdirectory: /storage
-          cache:
-            layerinfo: redis
-          maintenance:
-            uploadpurging:
-              enabled: true
-              age: 168h
-              interval: 24h
-              dryrun: false
-          delete:
-            enabled: true
-          redirect:
-            disable: false
-        redis:
-          addrs:
-            - valkey:6379
-          db: 2
-          readtimeout: 10s
-          writetimeout: 10s
-          dialtimeout: 10s
-          enableTLS: false
-          pool:
-            maxidle: 100
-            maxactive: 500
-            idletimeout: 60s
-        http:
-          addr: :5000
-          relativeurls: false
-          debug:
-            addr: localhost:5001
         auth:
           htpasswd:
-            realm: harbor-registry-basic-realm
             path: /etc/registry/passwd
-        validation:
-          disabled: true
+            realm: harbor-registry-basic-realm
         compatibility:
           schema1:
             enabled: true
+        http:
+          addr: :5000
+          debug:
+            addr: localhost:5001
+        log:
+          fields:
+            service: registry
+          level: info
+        redis:
+          addrs:
+          - valkey:6379
+          db: 2
+          dialtimeout: 10s
+          enableTLS: false
+          pool:
+            idletimeout: 60s
+            maxactive: 500
+            maxidle: 100
+          readtimeout: 10s
+          writetimeout: 10s
+        storage:
+          cache:
+            layerinfo: redis
+          delete:
+            enabled: true
+          filesystem:
+            rootdirectory: /storage
+          maintenance:
+            uploadpurging:
+              age: 168h
+              dryrun: false
+              enabled: true
+              interval: 24h
+          redirect:
+            disable: false
+        validation:
+          disabled: true
+        version: 0.1
       ctl-config.yml: |
         ---
         protocol: "http"
@@ -1191,8 +1173,6 @@
       CORE_URL: http://harbor-harbor-next-core
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
-      JOBSERVICE_WEBHOOK_JOB_HTTP_CLIENT_TIMEOUT: "3"
-      JOBSERVICE_WEBHOOK_JOB_MAX_RETRY: "3"
       LOG_LEVEL: info
       NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
       REGISTRY_CONTROLLER_URL: http://harbor-harbor-next-registry:8080
@@ -1213,36 +1193,30 @@
     apiVersion: v1
     data:
       config.yml: |
-        #Server listening port
-        protocol: "http"
-        port: 8080
-        worker_pool:
-          workers: 4
-          backend: "redis"
-          redis_pool:
-            redis_url: "rediss+sentinel://:$(REDIS_PASSWORD)@sentinel.example.com:6379/mymaster/1"
-            namespace: "harbor_job_service_namespace"
-            idle_timeout_second: 3600
         job_loggers:
-          - name: "FILE"
-            level: INFO
+        - level: INFO
+          name: FILE
+          settings:
+            base_dir: /var/log/jobs
+          sweeper:
+            duration: 14
             settings:
-              base_dir: "/var/log/jobs"
-            sweeper:
-              duration: 14 #days
-              settings:
-                work_dir: "/var/log/jobs"
-        metric:
-          enabled: false
-          path: "/metrics"
-          port: 8001
-        #Loggers for the job service
+              work_dir: /var/log/jobs
         loggers:
-          - name: "STD_OUTPUT"
-            level: INFO
+        - level: INFO
+          name: STD_OUTPUT
+        port: 8080
+        protocol: http
         reaper:
-          max_update_hours: 24
           max_dangling_hours: 168
+          max_update_hours: 24
+        worker_pool:
+          backend: redis
+          redis_pool:
+            idle_timeout_second: 3600
+            namespace: harbor_job_service_namespace
+            redis_url: rediss+sentinel://:$(REDIS_PASSWORD)@sentinel.example.com:6379/mymaster/1
+          workers: 4
     kind: ConfigMap
     metadata:
       labels:
@@ -1352,54 +1326,52 @@
     apiVersion: v1
     data:
       config.yml: |
-        version: 0.1
-        log:
-          level: info
-          fields:
-            service: registry
-        storage:
-          filesystem:
-            rootdirectory: /storage
-          cache:
-            layerinfo: redis
-          maintenance:
-            uploadpurging:
-              enabled: true
-              age: 168h
-              interval: 24h
-              dryrun: false
-          delete:
-            enabled: true
-          redirect:
-            disable: false
-        redis:
-          addrs:
-            - sentinel.example.com:6379
-          sentinelMasterSet: mymaster
-          db: 2
-          password: snapshot-redis-pw
-          readtimeout: 10s
-          writetimeout: 10s
-          dialtimeout: 10s
-          enableTLS: true
-          pool:
-            maxidle: 100
-            maxactive: 500
-            idletimeout: 60s
-        http:
-          addr: :5000
-          relativeurls: false
-          debug:
-            addr: localhost:5001
         auth:
           htpasswd:
-            realm: harbor-registry-basic-realm
             path: /etc/registry/passwd
-        validation:
-          disabled: true
+            realm: harbor-registry-basic-realm
         compatibility:
           schema1:
             enabled: true
+        http:
+          addr: :5000
+          debug:
+            addr: localhost:5001
+        log:
+          fields:
+            service: registry
+          level: info
+        redis:
+          addrs:
+          - sentinel.example.com:6379
+          db: 2
+          dialtimeout: 10s
+          enableTLS: true
+          pool:
+            idletimeout: 60s
+            maxactive: 500
+            maxidle: 100
+          readtimeout: 10s
+          sentinelMasterSet: mymaster
+          writetimeout: 10s
+        storage:
+          cache:
+            layerinfo: redis
+          delete:
+            enabled: true
+          filesystem:
+            rootdirectory: /storage
+          maintenance:
+            uploadpurging:
+              age: 168h
+              dryrun: false
+              enabled: true
+              interval: 24h
+          redirect:
+            disable: false
+        validation:
+          disabled: true
+        version: 0.1
       ctl-config.yml: |
         ---
         protocol: "http"
@@ -1701,8 +1673,6 @@
       CORE_URL: http://harbor-harbor-next-core
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
-      JOBSERVICE_WEBHOOK_JOB_HTTP_CLIENT_TIMEOUT: "3"
-      JOBSERVICE_WEBHOOK_JOB_MAX_RETRY: "3"
       LOG_LEVEL: info
       NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
       REGISTRY_CONTROLLER_URL: http://harbor-harbor-next-registry:8080
@@ -1723,36 +1693,30 @@
     apiVersion: v1
     data:
       config.yml: |
-        #Server listening port
-        protocol: "http"
-        port: 8080
-        worker_pool:
-          workers: 4
-          backend: "redis"
-          redis_pool:
-            redis_url: "redis://:$(REDIS_PASSWORD)@redis.example.com:6379/1"
-            namespace: "harbor_job_service_namespace"
-            idle_timeout_second: 3600
         job_loggers:
-          - name: "FILE"
-            level: INFO
+        - level: INFO
+          name: FILE
+          settings:
+            base_dir: /var/log/jobs
+          sweeper:
+            duration: 14
             settings:
-              base_dir: "/var/log/jobs"
-            sweeper:
-              duration: 14 #days
-              settings:
-                work_dir: "/var/log/jobs"
-        metric:
-          enabled: false
-          path: "/metrics"
-          port: 8001
-        #Loggers for the job service
+              work_dir: /var/log/jobs
         loggers:
-          - name: "STD_OUTPUT"
-            level: INFO
+        - level: INFO
+          name: STD_OUTPUT
+        port: 8080
+        protocol: http
         reaper:
-          max_update_hours: 24
           max_dangling_hours: 168
+          max_update_hours: 24
+        worker_pool:
+          backend: redis
+          redis_pool:
+            idle_timeout_second: 3600
+            namespace: harbor_job_service_namespace
+            redis_url: redis://:$(REDIS_PASSWORD)@redis.example.com:6379/1
+          workers: 4
     kind: ConfigMap
     metadata:
       labels:
@@ -1862,52 +1826,51 @@
     apiVersion: v1
     data:
       config.yml: |
-        version: 0.1
-        log:
-          level: info
-          fields:
-            service: registry
-        storage:
-          filesystem:
-            rootdirectory: /storage
-          cache:
-            layerinfo: redis
-          maintenance:
-            uploadpurging:
-              enabled: true
-              age: 168h
-              interval: 24h
-              dryrun: false
-          delete:
-            enabled: true
-          redirect:
-            disable: false
-        redis:
-          addrs:
-            - redis.example.com:6379
-          db: 2
-          readtimeout: 10s
-          writetimeout: 10s
-          dialtimeout: 10s
-          enableTLS: false
-          pool:
-            maxidle: 100
-            maxactive: 500
-            idletimeout: 60s
-        http:
-          addr: :5000
-          relativeurls: false
-          debug:
-            addr: localhost:5001
         auth:
           htpasswd:
-            realm: harbor-registry-basic-realm
             path: /etc/registry/passwd
-        validation:
-          disabled: true
+            realm: harbor-registry-basic-realm
         compatibility:
           schema1:
             enabled: true
+        http:
+          addr: :5000
+          debug:
+            addr: localhost:5001
+        log:
+          fields:
+            service: registry
+          level: info
+        redis:
+          addrs:
+          - redis.example.com:6379
+          db: 2
+          dialtimeout: 10s
+          enableTLS: false
+          pool:
+            idletimeout: 60s
+            maxactive: 500
+            maxidle: 100
+          readtimeout: 10s
+          writetimeout: 10s
+        storage:
+          cache:
+            layerinfo: redis
+          delete:
+            enabled: true
+          filesystem:
+            rootdirectory: /storage
+          maintenance:
+            uploadpurging:
+              age: 168h
+              dryrun: false
+              enabled: true
+              interval: 24h
+          redirect:
+            disable: false
+        validation:
+          disabled: true
+        version: 0.1
       ctl-config.yml: |
         ---
         protocol: "http"
@@ -2214,8 +2177,6 @@
       CORE_URL: http://harbor-harbor-next-core
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
-      JOBSERVICE_WEBHOOK_JOB_HTTP_CLIENT_TIMEOUT: "3"
-      JOBSERVICE_WEBHOOK_JOB_MAX_RETRY: "3"
       LOG_LEVEL: info
       METRIC_NAMESPACE: harbor
       METRIC_SUBSYSTEM: jobservice
@@ -2243,36 +2204,34 @@
     apiVersion: v1
     data:
       config.yml: |
-        #Server listening port
-        protocol: "http"
-        port: 8080
-        worker_pool:
-          workers: 4
-          backend: "redis"
-          redis_pool:
-            redis_url: "redis://valkey:6379/1"
-            namespace: "harbor_job_service_namespace"
-            idle_timeout_second: 3600
         job_loggers:
-          - name: "FILE"
-            level: INFO
+        - level: INFO
+          name: FILE
+          settings:
+            base_dir: /var/log/jobs
+          sweeper:
+            duration: 14
             settings:
-              base_dir: "/var/log/jobs"
-            sweeper:
-              duration: 14 #days
-              settings:
-                work_dir: "/var/log/jobs"
+              work_dir: /var/log/jobs
+        loggers:
+        - level: INFO
+          name: STD_OUTPUT
         metric:
           enabled: true
-          path: "/metrics"
+          path: /metrics
           port: 8001
-        #Loggers for the job service
-        loggers:
-          - name: "STD_OUTPUT"
-            level: INFO
+        port: 8080
+        protocol: http
         reaper:
-          max_update_hours: 24
           max_dangling_hours: 168
+          max_update_hours: 24
+        worker_pool:
+          backend: redis
+          redis_pool:
+            idle_timeout_second: 3600
+            namespace: harbor_job_service_namespace
+            redis_url: redis://valkey:6379/1
+          workers: 4
     kind: ConfigMap
     metadata:
       labels:
@@ -2382,55 +2341,54 @@
     apiVersion: v1
     data:
       config.yml: |
-        version: 0.1
-        log:
-          level: info
-          fields:
-            service: registry
-        storage:
-          filesystem:
-            rootdirectory: /storage
-          cache:
-            layerinfo: redis
-          maintenance:
-            uploadpurging:
-              enabled: true
-              age: 168h
-              interval: 24h
-              dryrun: false
-          delete:
+        auth:
+          htpasswd:
+            path: /etc/registry/passwd
+            realm: harbor-registry-basic-realm
+        compatibility:
+          schema1:
             enabled: true
-          redirect:
-            disable: false
-        redis:
-          addrs:
-            - valkey:6379
-          db: 2
-          readtimeout: 10s
-          writetimeout: 10s
-          dialtimeout: 10s
-          enableTLS: false
-          pool:
-            maxidle: 100
-            maxactive: 500
-            idletimeout: 60s
         http:
           addr: :5000
-          relativeurls: false
           debug:
             addr: :8001
             prometheus:
               enabled: true
-              path: "/metrics"
-        auth:
-          htpasswd:
-            realm: harbor-registry-basic-realm
-            path: /etc/registry/passwd
+              path: /metrics
+        log:
+          fields:
+            service: registry
+          level: info
+        redis:
+          addrs:
+          - valkey:6379
+          db: 2
+          dialtimeout: 10s
+          enableTLS: false
+          pool:
+            idletimeout: 60s
+            maxactive: 500
+            maxidle: 100
+          readtimeout: 10s
+          writetimeout: 10s
+        storage:
+          cache:
+            layerinfo: redis
+          delete:
+            enabled: true
+          filesystem:
+            rootdirectory: /storage
+          maintenance:
+            uploadpurging:
+              age: 168h
+              dryrun: false
+              enabled: true
+              interval: 24h
+          redirect:
+            disable: false
         validation:
           disabled: true
-        compatibility:
-          schema1:
-            enabled: true
+        version: 0.1
       ctl-config.yml: |
         ---
         protocol: "http"
@@ -2861,8 +2819,6 @@
       CORE_URL: http://harbor-harbor-next-core
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
-      JOBSERVICE_WEBHOOK_JOB_HTTP_CLIENT_TIMEOUT: "3"
-      JOBSERVICE_WEBHOOK_JOB_MAX_RETRY: "3"
       LOG_LEVEL: info
       NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
       REGISTRY_CONTROLLER_URL: http://harbor-harbor-next-registry:8080
@@ -2883,36 +2839,30 @@
     apiVersion: v1
     data:
       config.yml: |
-        #Server listening port
-        protocol: "http"
-        port: 8080
-        worker_pool:
-          workers: 4
-          backend: "redis"
-          redis_pool:
-            redis_url: "redis://valkey:6379/1"
-            namespace: "harbor_job_service_namespace"
-            idle_timeout_second: 3600
         job_loggers:
-          - name: "FILE"
-            level: INFO
+        - level: INFO
+          name: FILE
+          settings:
+            base_dir: /var/log/jobs
+          sweeper:
+            duration: 14
             settings:
-              base_dir: "/var/log/jobs"
-            sweeper:
-              duration: 14 #days
-              settings:
-                work_dir: "/var/log/jobs"
-        metric:
-          enabled: false
-          path: "/metrics"
-          port: 8001
-        #Loggers for the job service
+              work_dir: /var/log/jobs
         loggers:
-          - name: "STD_OUTPUT"
-            level: INFO
+        - level: INFO
+          name: STD_OUTPUT
+        port: 8080
+        protocol: http
         reaper:
-          max_update_hours: 24
           max_dangling_hours: 168
+          max_update_hours: 24
+        worker_pool:
+          backend: redis
+          redis_pool:
+            idle_timeout_second: 3600
+            namespace: harbor_job_service_namespace
+            redis_url: redis://valkey:6379/1
+          workers: 4
     kind: ConfigMap
     metadata:
       labels:
@@ -3022,52 +2972,51 @@
     apiVersion: v1
     data:
       config.yml: |
-        version: 0.1
-        log:
-          level: info
-          fields:
-            service: registry
-        storage:
-          filesystem:
-            rootdirectory: /storage
-          cache:
-            layerinfo: redis
-          maintenance:
-            uploadpurging:
-              enabled: true
-              age: 168h
-              interval: 24h
-              dryrun: false
-          delete:
-            enabled: true
-          redirect:
-            disable: false
-        redis:
-          addrs:
-            - valkey:6379
-          db: 2
-          readtimeout: 10s
-          writetimeout: 10s
-          dialtimeout: 10s
-          enableTLS: false
-          pool:
-            maxidle: 100
-            maxactive: 500
-            idletimeout: 60s
-        http:
-          addr: :5000
-          relativeurls: false
-          debug:
-            addr: localhost:5001
         auth:
           htpasswd:
-            realm: harbor-registry-basic-realm
             path: /etc/registry/passwd
-        validation:
-          disabled: true
+            realm: harbor-registry-basic-realm
         compatibility:
           schema1:
             enabled: true
+        http:
+          addr: :5000
+          debug:
+            addr: localhost:5001
+        log:
+          fields:
+            service: registry
+          level: info
+        redis:
+          addrs:
+          - valkey:6379
+          db: 2
+          dialtimeout: 10s
+          enableTLS: false
+          pool:
+            idletimeout: 60s
+            maxactive: 500
+            maxidle: 100
+          readtimeout: 10s
+          writetimeout: 10s
+        storage:
+          cache:
+            layerinfo: redis
+          delete:
+            enabled: true
+          filesystem:
+            rootdirectory: /storage
+          maintenance:
+            uploadpurging:
+              age: 168h
+              dryrun: false
+              enabled: true
+              interval: 24h
+          redirect:
+            disable: false
+        validation:
+          disabled: true
+        version: 0.1
       ctl-config.yml: |
         ---
         protocol: "http"

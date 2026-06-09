@@ -49,6 +49,17 @@ spec:
             - name: {{ include "harbor.metrics.portName" . | quote }}
               containerPort: 8001
               protocol: TCP
+          {{- if or .Values.exporter.config .Values.exporter.secret }}
+          envFrom:
+            {{- if .Values.exporter.config }}
+            - configMapRef:
+                name: "{{ include "harbor.fullname" . }}-exporter-env"
+            {{- end }}
+            {{- if .Values.exporter.secret }}
+            - secretRef:
+                name: "{{ include "harbor.fullname" . }}-exporter"
+            {{- end }}
+          {{- end }}
           env:
             - name: HARBOR_EXPORTER_PORT
               value: "8001"

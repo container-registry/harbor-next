@@ -1,3 +1,4 @@
+{{- if not .Values.portal.existingConfigMap }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -43,3 +44,4 @@ data:
             }
         }
     }
+{{- end }}

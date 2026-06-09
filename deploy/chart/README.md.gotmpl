@@ -294,44 +294,81 @@ valkey:
   architecture: standalone
 ```
 
+### Registry configuration (YAML passthrough)
+
+`registry.config` accepts the full [distribution/distribution `config.yml` schema](https://distribution.github.io/distribution/about/configuration/) verbatim — every key distribution supports works without chart changes. The chart wholesale renders this block into `/etc/registry/config.yml`, merging only a small set of chart-managed runtime values (`redis`, `log.level`, `http.addr/debug`) on top via Helm `mustMergeOverwrite`. User keys always win on collision.
+
+Three customization tiers:
+
+1. **Default** — ship-shape filesystem backend out of the box, no override needed.
+2. **Inline** — edit `registry.config` in your values file.
+3. **External ConfigMap** — own `config.yml` outside the chart entirely.
+
+**Switching storage backend** — Helm deep-merges values, so adding `s3:` alongside the default `filesystem:` produces a config.yml with BOTH backends defined. Explicitly null out the chart default:
+
+```yaml
+registry:
+  config:
+    storage:
+      filesystem: null    # remove chart default
+      s3:
+        region: us-east-1
+        bucket: my-harbor-bucket
+        # forcepathstyle: true  # MinIO / Ceph RGW / SeaweedFS
+      cache:
+        layerinfo: redis
+```
+
+**Credentials never go in `registry.config`** (they'd be visible in the rendered ConfigMap). Use one of:
+
+- **BYO Secret (recommended)** — `registry.storageCredentials.<backend>.existingSecret` references a pre-existing Secret. The chart injects `REGISTRY_STORAGE_<BACKEND>_<KEY>` env vars on both the registry container and the registryctl sidecar (registryctl runs garbage collection and needs the same creds). Distribution honors these env overrides for any config.yml field.
+- **Inline (dev)** — `registry.secret: { REGISTRY_STORAGE_S3_ACCESSKEY: <plain> }` gets b64-encoded into the chart-generated Secret and injected via `envFrom`.
+
 ### S3 Storage Backend
 
 ```yaml
 registry:
-  storage:
-    type: s3
+  config:
+    storage:
+      filesystem: null
+      s3:
+        region: us-east-1
+        bucket: my-harbor-bucket
+        regionendpoint: https://s3.us-east-1.amazonaws.com
+        encrypt: true
+        secure: true
+        # forcepathstyle: true   # MinIO / Ceph RGW / SeaweedFS — virtual-host
+        #                        # style is the libS3 default and most non-AWS
+        #                        # S3-compatible backends only accept path-style.
+      cache:
+        layerinfo: redis
+  storageCredentials:
     s3:
-      region: us-east-1
-      bucket: my-harbor-bucket
-      # Credentials — either inline (dev) or via Secret (prod)
-      # accesskey: AKIAIOSFODNN7EXAMPLE
-      # secretkey: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-      existingSecret: my-s3-creds            # Secret with keys below
+      existingSecret: my-s3-creds                      # BYO Kubernetes Secret
       existingSecretAccessKeyKey: REGISTRY_STORAGE_S3_ACCESSKEY
       existingSecretSecretKeyKey: REGISTRY_STORAGE_S3_SECRETKEY
-      # Optional settings
-      regionendpoint: https://s3.us-east-1.amazonaws.com
-      encrypt: true
-      secure: true
-      # forcepathstyle: true                 # MinIO / Ceph RGW / SeaweedFS
   persistence:
-    enabled: false  # Disable PVC when using S3
+    enabled: false  # No PVC needed for S3
 ```
 
-When `existingSecret` is set the chart strips the credential keys from the generated `*-registry` Secret and sources them via `valueFrom.secretKeyRef` on both the registry container and the registryctl sidecar (registryctl runs garbage collection and needs the same creds). Same pattern works for `azure.existingSecret` and `oss.existingSecret`.
-
-For MinIO, Ceph RGW, or SeaweedFS, set `forcepathstyle: true` — those backends only accept path-style addressing, while the libS3 default is virtual-host style.
+For AWS EKS with IRSA (no static credentials), omit `storageCredentials` entirely — the AWS SDK credential chain picks up the projected service account token. Annotate the SAs with the role ARN: `core.serviceAccount.annotations`, `jobservice.serviceAccount.annotations`, `registry.serviceAccount.annotations`.
 
 ### Azure Blob Storage
 
 ```yaml
 registry:
-  storage:
-    type: azure
+  config:
+    storage:
+      filesystem: null
+      azure:
+        accountname: mystorageaccount
+        container: harbor
+      cache:
+        layerinfo: redis
+  storageCredentials:
     azure:
-      accountname: mystorageaccount
-      accountkey: base64-encoded-key
-      container: harbor
+      existingSecret: my-azure-creds                    # Secret with the accountkey
+      existingSecretKey: REGISTRY_STORAGE_AZURE_ACCOUNTKEY
   persistence:
     enabled: false
 ```
@@ -340,18 +377,41 @@ registry:
 
 ```yaml
 registry:
-  storage:
-    type: gcs
+  config:
+    storage:
+      filesystem: null
+      gcs:
+        bucket: my-harbor-bucket
+        keyfile: /etc/registry/gcs/key.json    # mounted from existingSecret
+      cache:
+        layerinfo: redis
+  storageCredentials:
     gcs:
-      bucket: my-harbor-bucket
-      keyfile: |
-        {
-          "type": "service_account",
-          ...
-        }
+      existingSecret: my-gcs-keyfile           # Secret with the JSON keyfile
+      existingSecretKey: gcs-key.json
   persistence:
     enabled: false
 ```
+
+For GCS with Workload Identity (no keyfile), omit `storageCredentials.gcs` and `config.storage.gcs.keyfile`. Annotate the SAs with the GSA mapping.
+
+### Externally-managed `config.yml` (existingConfigMap)
+
+For kustomize overlays, GitOps pipelines, or external config generators:
+
+```yaml
+registry:
+  existingConfigMap: my-registry-config       # ConfigMap with config.yml + ctl-config.yml
+  storageCredentials:
+    s3:
+      existingSecret: my-s3-creds             # still wired even with external ConfigMap
+  persistence:
+    enabled: false
+```
+
+The chart skips generating its own registry ConfigMap and mounts `my-registry-config` instead. Chart-managed credentials and runtime env-var overrides still apply — the Deployment doesn't know or care what's inside the external ConfigMap.
+
+Same pattern available for `jobservice.existingConfigMap` and `portal.existingConfigMap`.
 
 ### Gateway API Instead of Ingress
 
@@ -564,7 +624,7 @@ This chart is a redesign, not a drop-in replacement. Migration steps:
 | `database.external.*` | `database.*` |
 | `redis.type: internal` | `valkey.enabled: true` |
 | `redis.external.*` | `externalRedis.*` |
-| `persistence.imageChartStorage.*` | `registry.storage.*` |
+| `persistence.imageChartStorage.*` | `registry.config.storage.*` (YAML passthrough — see "Registry configuration" below) |
 | `nginx.*` | Not applicable — no nginx proxy |
 | `notary.*` | Not supported — Notary deprecated |
 | `chartmuseum.*` | Not supported — use OCI artifacts |

@@ -18,6 +18,8 @@ templates:
   - templates/trivy.statefulset.yaml
   - templates/trivy.service.yaml
   - templates/trivy.secret.yaml
+  - templates/trivy.configmap-env.yaml
+  - templates/trivy.secret-env.yaml
 tests:
   - it: should set correct image
     template: templates/trivy.statefulset.yaml
@@ -259,3 +261,74 @@ tests:
       - equal:
           path: spec.ports[0].name
           value: http-trivy
+
+  # ============================================================================
+  # trivy.config / trivy.secret — forward-compat env passthrough.
+  # A new SCANNER_* setting works with no chart change via toEnvVars →
+  # ConfigMap/Secret → envFrom.
+  # ============================================================================
+
+  - it: should render arbitrary trivy.config into the env ConfigMap
+    template: templates/trivy.configmap-env.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trivy.enabled: true
+      trivy.config:
+        SCANNER_SOME_FUTURE_FLAG: enabled
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: data.SCANNER_SOME_FUTURE_FLAG
+          value: "enabled"
+
+  - it: should envFrom the trivy env ConfigMap when config is set
+    template: templates/trivy.statefulset.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trivy.enabled: true
+      trivy.config:
+        SCANNER_SOME_FUTURE_FLAG: enabled
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: RELEASE-NAME-harbor-next-trivy-env
+
+  - it: should not render trivy env ConfigMap when config is empty
+    template: templates/trivy.configmap-env.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trivy.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Sensitive values land base64-encoded in a DEDICATED -env Secret, not
+  # the main trivy Secret (which holds redisURL/gitHubToken) — so envFrom
+  # does not leak those as REDISURL / GITHUBTOKEN env vars.
+  - it: should b64-encode trivy.secret into the dedicated -env Secret
+    template: templates/trivy.secret-env.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trivy.enabled: true
+      trivy.secret:
+        MY_SCANNER_TOKEN: s3cr3t
+    asserts:
+      - isKind:
+          of: Secret
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-harbor-next-trivy-env
+      - equal:
+          path: data.MY_SCANNER_TOKEN
+          value: "czNjcjN0"

@@ -71,6 +71,12 @@ spec:
                   name: {{ include "harbor.redis.secretName" . }}
                   key: {{ include "harbor.redis.secretKey" . }}
             {{- end }}
+            {{- /* Jobservice config loader honors JOB_SERVICE_POOL_REDIS_URL env override
+                   (see src/jobservice/config/config.go loadEnvs). Inject the full URL with
+                   auth here so the user's `jobservice.config.worker_pool.redis_pool.redis_url`
+                   is overridden at runtime with chart-computed credentials. */}}
+            - name: JOB_SERVICE_POOL_REDIS_URL
+              value: {{ include "harbor.redis.url.jobservice" . | quote }}
             {{- if eq (include "harbor.database.tlsEnabled" .) "true" }}
             - name: POSTGRESQL_PASSWORD
               valueFrom:
@@ -114,7 +120,7 @@ spec:
       volumes:
         - name: jobservice-config
           configMap:
-            name: "{{ template "harbor.jobservice" . }}"
+            name: {{ .Values.jobservice.existingConfigMap | default (include "harbor.jobservice" .) }}
         - name: job-logs
           {{- if and .Values.jobservice.persistence.enabled }}
           persistentVolumeClaim:

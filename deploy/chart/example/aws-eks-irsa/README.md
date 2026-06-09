@@ -150,7 +150,7 @@ helm install harbor-next oci://8gears.container-registry.com/8gcr/charts/harbor-
   --version 3.0.0 -n harbor --create-namespace \
   -f values-aws-irsa.yaml \
   --set database.host=<AURORA_ENDPOINT> \
-  --set registry.storage.s3.bucket=<BUCKET_NAME> \
+  --set-json 'registry.config.storage.s3={"region":"<AWS_REGION>","bucket":"<BUCKET_NAME>"}' \
   --set core.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=<ROLE_ARN> \
   --set jobservice.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=<ROLE_ARN> \
   --set registry.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=<ROLE_ARN>

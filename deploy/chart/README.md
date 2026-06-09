@@ -293,44 +293,81 @@ valkey:
   architecture: standalone
 ```
 
+### Registry configuration (YAML passthrough)
+
+`registry.config` accepts the full [distribution/distribution `config.yml` schema](https://distribution.github.io/distribution/about/configuration/) verbatim — every key distribution supports works without chart changes. The chart wholesale renders this block into `/etc/registry/config.yml`, merging only a small set of chart-managed runtime values (`redis`, `log.level`, `http.addr/debug`) on top via Helm `mustMergeOverwrite`. User keys always win on collision.
+
+Three customization tiers:
+
+1. **Default** — ship-shape filesystem backend out of the box, no override needed.
+2. **Inline** — edit `registry.config` in your values file.
+3. **External ConfigMap** — own `config.yml` outside the chart entirely.
+
+**Switching storage backend** — Helm deep-merges values, so adding `s3:` alongside the default `filesystem:` produces a config.yml with BOTH backends defined. Explicitly null out the chart default:
+
+```yaml
+registry:
+  config:
+    storage:
+      filesystem: null    # remove chart default
+      s3:
+        region: us-east-1
+        bucket: my-harbor-bucket
+        # forcepathstyle: true  # MinIO / Ceph RGW / SeaweedFS
+      cache:
+        layerinfo: redis
+```
+
+**Credentials never go in `registry.config`** (they'd be visible in the rendered ConfigMap). Use one of:
+
+- **BYO Secret (recommended)** — `registry.storageCredentials.<backend>.existingSecret` references a pre-existing Secret. The chart injects `REGISTRY_STORAGE_<BACKEND>_<KEY>` env vars on both the registry container and the registryctl sidecar (registryctl runs garbage collection and needs the same creds). Distribution honors these env overrides for any config.yml field.
+- **Inline (dev)** — `registry.secret: { REGISTRY_STORAGE_S3_ACCESSKEY: <plain> }` gets b64-encoded into the chart-generated Secret and injected via `envFrom`.
+
 ### S3 Storage Backend
 
 ```yaml
 registry:
-  storage:
-    type: s3
+  config:
+    storage:
+      filesystem: null
+      s3:
+        region: us-east-1
+        bucket: my-harbor-bucket
+        regionendpoint: https://s3.us-east-1.amazonaws.com
+        encrypt: true
+        secure: true
+        # forcepathstyle: true   # MinIO / Ceph RGW / SeaweedFS — virtual-host
+        #                        # style is the libS3 default and most non-AWS
+        #                        # S3-compatible backends only accept path-style.
+      cache:
+        layerinfo: redis
+  storageCredentials:
     s3:
-      region: us-east-1
-      bucket: my-harbor-bucket
-      # Credentials — either inline (dev) or via Secret (prod)
-      # accesskey: AKIAIOSFODNN7EXAMPLE
-      # secretkey: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-      existingSecret: my-s3-creds            # Secret with keys below
+      existingSecret: my-s3-creds                      # BYO Kubernetes Secret
       existingSecretAccessKeyKey: REGISTRY_STORAGE_S3_ACCESSKEY
       existingSecretSecretKeyKey: REGISTRY_STORAGE_S3_SECRETKEY
-      # Optional settings
-      regionendpoint: https://s3.us-east-1.amazonaws.com
-      encrypt: true
-      secure: true
-      # forcepathstyle: true                 # MinIO / Ceph RGW / SeaweedFS
   persistence:
-    enabled: false  # Disable PVC when using S3
+    enabled: false  # No PVC needed for S3
 ```
 
-When `existingSecret` is set the chart strips the credential keys from the generated `*-registry` Secret and sources them via `valueFrom.secretKeyRef` on both the registry container and the registryctl sidecar (registryctl runs garbage collection and needs the same creds). Same pattern works for `azure.existingSecret` and `oss.existingSecret`.
-
-For MinIO, Ceph RGW, or SeaweedFS, set `forcepathstyle: true` — those backends only accept path-style addressing, while the libS3 default is virtual-host style.
+For AWS EKS with IRSA (no static credentials), omit `storageCredentials` entirely — the AWS SDK credential chain picks up the projected service account token. Annotate the SAs with the role ARN: `core.serviceAccount.annotations`, `jobservice.serviceAccount.annotations`, `registry.serviceAccount.annotations`.
 
 ### Azure Blob Storage
 
 ```yaml
 registry:
-  storage:
-    type: azure
+  config:
+    storage:
+      filesystem: null
+      azure:
+        accountname: mystorageaccount
+        container: harbor
+      cache:
+        layerinfo: redis
+  storageCredentials:
     azure:
-      accountname: mystorageaccount
-      accountkey: base64-encoded-key
-      container: harbor
+      existingSecret: my-azure-creds                    # Secret with the accountkey
+      existingSecretKey: REGISTRY_STORAGE_AZURE_ACCOUNTKEY
   persistence:
     enabled: false
 ```
@@ -339,18 +376,41 @@ registry:
 
 ```yaml
 registry:
-  storage:
-    type: gcs
+  config:
+    storage:
+      filesystem: null
+      gcs:
+        bucket: my-harbor-bucket
+        keyfile: /etc/registry/gcs/key.json    # mounted from existingSecret
+      cache:
+        layerinfo: redis
+  storageCredentials:
     gcs:
-      bucket: my-harbor-bucket
-      keyfile: |
-        {
-          "type": "service_account",
-          ...
-        }
+      existingSecret: my-gcs-keyfile           # Secret with the JSON keyfile
+      existingSecretKey: gcs-key.json
   persistence:
     enabled: false
 ```
+
+For GCS with Workload Identity (no keyfile), omit `storageCredentials.gcs` and `config.storage.gcs.keyfile`. Annotate the SAs with the GSA mapping.
+
+### Externally-managed `config.yml` (existingConfigMap)
+
+For kustomize overlays, GitOps pipelines, or external config generators:
+
+```yaml
+registry:
+  existingConfigMap: my-registry-config       # ConfigMap with config.yml + ctl-config.yml
+  storageCredentials:
+    s3:
+      existingSecret: my-s3-creds             # still wired even with external ConfigMap
+  persistence:
+    enabled: false
+```
+
+The chart skips generating its own registry ConfigMap and mounts `my-registry-config` instead. Chart-managed credentials and runtime env-var overrides still apply — the Deployment doesn't know or care what's inside the external ConfigMap.
+
+Same pattern available for `jobservice.existingConfigMap` and `portal.existingConfigMap`.
 
 ### Gateway API Instead of Ingress
 
@@ -615,7 +675,7 @@ Kubernetes: `>=1.28.0-0`
 | existingSecretSecretKey | string | `""` | Existing secret containing the encryption key (overrides secretKey). The secret must hold the 16-char key under `SECRET_KEY` and `secretKey` (or override the key name via `existingSecretSecretKeyKey`). |
 | existingSecretSecretKeyKey | string | `"secretKey"` | Key in `existingSecretSecretKey` that holds the encryption key. Used both for the `SECRET_KEY` env on core and the `secret-key` volume mount (which Harbor reads as `/etc/core/key`). |
 | exporter.affinity | object | `{}` | Affinity rules for Exporter pods |
-| exporter.config | object | {} | Exporter application config (converted to env vars in ConfigMap) |
+| exporter.config | object | {} | Exporter config as env vars. Exporter is env-driven (HARBOR_EXPORTER_*); nested maps flatten to UPPER_SNAKE_CASE via toEnvVars and are injected via envFrom. Any exporter setting works without chart changes. |
 | exporter.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
 | exporter.enabled | bool | `true` | Enable Harbor exporter for Prometheus metrics |
 | exporter.extraEnv | list | [] | Extra environment variables with valueFrom support |
@@ -712,8 +772,10 @@ Kubernetes: `>=1.28.0-0`
 | ipFamily.ipv6.enabled | bool | `true` |  |
 | jobservice.affinity | object | `{}` | Affinity rules for Jobservice pods |
 | jobservice.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler. See `core.autoscaling` for full docs. |
-| jobservice.config | object | {} | Jobservice application config (converted to env vars in ConfigMap) |
+| jobservice.config | object | See [values.yaml](values.yaml) | Full Harbor jobservice `config.yml` passed through verbatim. Used only when `existingConfigMap` is empty.  Chart-managed values injected via env-var override at runtime:   - `protocol`, `port` (from chart helpers)   - `worker_pool.backend`, `worker_pool.workers` (when JOB_SERVICE_*     env vars are wired by the chart)   - `worker_pool.redis_pool.redis_url` (chart sets the URL with auth     via JOB_SERVICE_POOL_REDIS_URL; you can leave a placeholder here)   - `worker_pool.redis_pool.namespace`  The following keys are NOT env-overridable (Harbor jobservice limitation — see src/jobservice/config/config.go). You MUST set them in this block; changing `.Values.logLevel` or `.Values.metrics.enabled` globally will NOT propagate here:   - `metric.enabled`, `metric.path`, `metric.port`   - `loggers[].level`, `job_loggers[].level`   - `job_loggers[].sweeper.*`   - `reaper.*`   - `max_retrieve_size_mb` |
 | jobservice.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
+| jobservice.env | object | {} | Supplementary env vars for the jobservice container (and the jobservice ConfigMap-env). Nested maps flatten to `UPPER_SNAKE_CASE` keys via `harbor.toEnvVars`. Use for any setting Harbor reads from env but is not part of the YAML config (e.g. webhook tuning). |
+| jobservice.existingConfigMap | string | `""` | Use an externally-managed ConfigMap containing `config.yml` instead of generating one from `config:` below. Semantics match `registry.existingConfigMap`. |
 | jobservice.existingSecret | string | `""` | Use existing secret for Jobservice secret |
 | jobservice.existingSecretKey | string | `"JOBSERVICE_SECRET"` | Key in existing secret containing the Jobservice secret |
 | jobservice.extraEnv | list | [] | Extra environment variables with valueFrom support |
@@ -722,12 +784,8 @@ Kubernetes: `>=1.28.0-0`
 | jobservice.image.repository | string | `"8gears.container-registry.com/8gcr/harbor-jobservice"` | Jobservice image repository |
 | jobservice.image.tag | string | `""` | Jobservice image tag (defaults to appVersion) |
 | jobservice.initContainers | list | `[]` | Init containers (run before main containers) |
-| jobservice.jobLoggers | list | `["file"]` | Job loggers: file, database, or stdout |
 | jobservice.lifecycle | object | {} | Container `lifecycle` hook spec (preStop / postStart). Common use: preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`, `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all closed without merge, the gap was never closed there. |
-| jobservice.loggerSweeperDuration | int | `14` | Logger sweeper duration in days (ignored if logger is stdout) |
-| jobservice.max_job_workers | int | `4` |  |
 | jobservice.nodeSelector | object | `{}` | Node selector for Jobservice pods |
-| jobservice.notification | object | `{"webhook_job_http_client_timeout":3,"webhook_job_max_retry":3}` | Notification settings |
 | jobservice.pdb | object | `{"enabled":false}` | PodDisruptionBudget for Jobservice |
 | jobservice.pdb.enabled | bool | `false` | Enable PodDisruptionBudget. When true, exactly one of `minAvailable` or `maxUnavailable` must be set (Kubernetes rejects PDBs with both fields). |
 | jobservice.persistence | object | `{"accessModes":["ReadWriteOnce"],"annotations":{},"enabled":false,"existingClaim":"","resourcePolicy":"keep","size":"1Gi"}` | Jobservice persistence settings |
@@ -740,7 +798,6 @@ Kubernetes: `>=1.28.0-0`
 | jobservice.podAnnotations | object | `{}` | Additional pod annotations for Jobservice |
 | jobservice.podLabels | object | `{}` | Additional pod labels for Jobservice |
 | jobservice.podSecurityContext | object | `{"fsGroup":10000}` | Pod security context for Jobservice |
-| jobservice.reaper | object | `{"max_dangling_hours":168,"max_update_hours":24}` | Reaper settings |
 | jobservice.replicas | int | `1` | Number of Jobservice replicas (ignored when autoscaling.enabled=true) |
 | jobservice.resources | object | `{"limits":{"memory":"512Mi"},"requests":{"cpu":"100m","memory":"256Mi"}}` | Jobservice resource requests and limits |
 | jobservice.secret | object | {} | Sensitive config for Jobservice (converted to env vars in Secret) |
@@ -761,8 +818,8 @@ Kubernetes: `>=1.28.0-0`
 | nameOverride | string | `""` | Override the chart name |
 | portal.affinity | object | `{}` | Affinity rules for Portal pods |
 | portal.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler. See `core.autoscaling` for full docs. |
-| portal.config | object | {} | Portal application config (converted to env vars in ConfigMap) |
 | portal.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
+| portal.existingConfigMap | string | `""` | Use an externally-managed ConfigMap containing `nginx.conf` instead of the chart-generated one. When set, the chart skips ConfigMap generation and the Deployment mounts the named ConfigMap. Use for custom nginx configuration (TLS termination, custom headers, extra locations) without forking the chart. Semantics match `registry.existingConfigMap`. Portal serves static Angular assets via nginx and has no env/key config surface — to customize nginx.conf, point existingConfigMap at your own ConfigMap (there is no `config`/`secret` passthrough here). |
 | portal.extraEnv | list | [] | Extra environment variables with valueFrom support |
 | portal.hostAliases | list | [] | Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for private DNS that does not exist in cluster DNS — service-mesh sidecars, legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the Kubernetes PodSpec: a list of `{ip, hostnames}` entries. |
 | portal.image | object | `{"repository":"8gears.container-registry.com/8gcr/harbor-portal","tag":""}` | Portal image settings |
@@ -778,7 +835,6 @@ Kubernetes: `>=1.28.0-0`
 | portal.podSecurityContext | object | `{"fsGroup":10000}` | Pod security context for Portal |
 | portal.replicas | int | `1` | Number of Portal replicas (ignored when autoscaling.enabled=true) |
 | portal.resources | object | `{"limits":{"memory":"256Mi"},"requests":{"cpu":"100m","memory":"128Mi"}}` | Portal resource requests and limits |
-| portal.secret | object | {} | Sensitive config for Portal (converted to env vars in Secret) |
 | portal.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsGroup":10000,"runAsNonRoot":true,"runAsUser":10000,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for Portal container |
 | portal.serviceAccount | object | `{"annotations":{},"automountServiceAccountToken":false,"create":true,"name":""}` | Service account settings for Portal |
 | portal.serviceAccount.automountServiceAccountToken | bool | `false` | Automount service account token |
@@ -793,7 +849,7 @@ Kubernetes: `>=1.28.0-0`
 | proxy.noProxy | string | `"127.0.0.1,localhost,.local,.internal"` |  |
 | registry.affinity | object | `{}` | Affinity rules for Registry pods |
 | registry.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler. See `core.autoscaling` for full docs. |
-| registry.config | object | `{}` |  |
+| registry.config | object | See [values.yaml](values.yaml) | Full [distribution/distribution](https://distribution.github.io/distribution/about/configuration/) `config.yml` passed through verbatim. Used only when `existingConfigMap` is empty. Replace this entire block to switch storage backends or add any field distribution supports (notifications, health, custom middleware, etc.).  Chart-managed values injected via env-var override at runtime (these ALWAYS win over what's in this block — do not duplicate here):   - `http.addr`, `http.secret`, `http.debug.prometheus.enabled`   - `redis.*` (addr, password, db, tls)   - `log.level` (from `.Values.logLevel`)   - storage credentials when `storageCredentials.<backend>.existingSecret` is set  See `storageCredentials` below for the BYO-Secret pattern. For inline credentials use `registry.secret` (b64-encoded into the generated Secret) — do not put plaintext credentials in this block, they would be visible in the ConfigMap. |
 | registry.controller | object | `{"image":{"repository":"8gears.container-registry.com/8gcr/harbor-registryctl","tag":""}}` | Registryctl image settings |
 | registry.controller.image.repository | string | `"8gears.container-registry.com/8gcr/harbor-registryctl"` | Registryctl image repository |
 | registry.controller.image.tag | string | `""` | Registryctl image tag (defaults to appVersion) |
@@ -802,8 +858,9 @@ Kubernetes: `>=1.28.0-0`
 | registry.credentials.password | string | `""` |  |
 | registry.credentials.username | string | `"harbor_registry_user"` |  |
 | registry.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
-| registry.existingSecret | string | `""` | Existing Secret that supplies `REGISTRY_HTTP_SECRET`. When set, the generated registry Secret omits `REGISTRY_HTTP_SECRET` and the deployment reads it from this Secret via env. Other registry-storage keys (S3, Azure, OSS) still come from the generated Secret. |
-| registry.existingSecretKey | string | `"REGISTRY_HTTP_SECRET"` | Key in `registry.existingSecret` that holds REGISTRY_HTTP_SECRET. |
+| registry.existingConfigMap | string | `""` | Use an externally-managed ConfigMap containing `config.yml` and `ctl-config.yml` instead of generating one from `config:` below. When set, the chart skips ConfigMap generation and the Deployment mounts the named ConfigMap at /etc/registry. Chart-managed runtime values (redis URL with auth, HTTP secret, storage credentials from `storageCredentials`, log level, ports) are still injected via env-var overrides on the Deployment, so they take precedence over whatever is in the external ConfigMap. Use this for kustomize/GitOps workflows where `config.yml` is owned by a separate manifest pipeline. |
+| registry.existingSecret | string | `""` | Existing Secret that supplies `REGISTRY_HTTP_SECRET`. When set, the generated registry Secret omits `REGISTRY_HTTP_SECRET` and the deployment reads it from this Secret via env. Independent of `storageCredentials`. |
+| registry.existingSecretKey | string | `"REGISTRY_HTTP_SECRET"` | Key in `registry.existingSecret` that holds `REGISTRY_HTTP_SECRET`. |
 | registry.extraEnv | list | [] | Extra environment variables with valueFrom support |
 | registry.hostAliases | list | [] | Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for private DNS that does not exist in cluster DNS — service-mesh sidecars, legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the Kubernetes PodSpec: a list of `{ip, hostnames}` entries. |
 | registry.image | object | `{"repository":"8gears.container-registry.com/8gcr/harbor-registry","tag":""}` | Registry image settings |
@@ -824,23 +881,24 @@ Kubernetes: `>=1.28.0-0`
 | registry.podAnnotations | object | `{}` | Additional pod annotations for Registry |
 | registry.podLabels | object | `{}` | Additional pod labels for Registry |
 | registry.podSecurityContext | object | `{"fsGroup":10000,"fsGroupChangePolicy":"OnRootMismatch"}` | Pod security context for Registry |
-| registry.relativeurls | bool | `false` | If true, the registry returns relative URLs in Location headers |
 | registry.replicas | int | `1` | Number of Registry replicas (ignored when autoscaling.enabled=true) |
 | registry.resources | object | `{"limits":{"memory":"512Mi"},"requests":{"cpu":"100m","memory":"256Mi"}}` | Registry resource requests and limits |
-| registry.secret | object | {} | Sensitive config for Registry (converted to env vars in Secret) |
+| registry.secret | object | {} | Sensitive config for Registry. Each key is b64-encoded into the generated registry Secret and injected on both `registry` and `registryctl` containers via `envFrom`. Use for inline credentials, e.g.:      secret:       REGISTRY_STORAGE_S3_ACCESSKEY: <plaintext>       REGISTRY_STORAGE_S3_SECRETKEY: <plaintext>  Prefer `storageCredentials.<backend>.existingSecret` for production (External-Secrets-Operator / Vault / SealedSecrets workflows). |
 | registry.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsGroup":10000,"runAsNonRoot":true,"runAsUser":10000,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for Registry container |
 | registry.serviceAccount | object | `{"annotations":{},"automountServiceAccountToken":false,"create":true,"name":""}` | Service account settings for Registry |
 | registry.serviceAccount.automountServiceAccountToken | bool | `false` | Automount service account token |
-| registry.storage | object | `{"azure":{},"disableredirect":false,"filesystem":{"rootdirectory":"/storage","subPath":""},"gcs":{},"oss":{},"s3":{},"type":"filesystem"}` | Registry storage configuration |
-| registry.storage.azure | object | `{}` | Azure Blob storage settings. `existingSecret` works the same as for s3 — set it to source `accountkey` from a BYO Secret. |
-| registry.storage.filesystem | object | `{"rootdirectory":"/storage","subPath":""}` | Filesystem storage settings |
-| registry.storage.gcs | object | `{}` | Google Cloud Storage settings |
-| registry.storage.oss | object | `{}` | Alibaba Cloud OSS settings. `existingSecret` works the same as for s3 — set it to source `accesskeysecret` from a BYO Secret. |
-| registry.storage.s3 | object | `{}` | S3 storage settings. Set `forcepathstyle: true` for MinIO / Ceph RGW / SeaweedFS — virtual-host style is the libS3 default and most non-AWS S3-compatible backends only accept path-style addressing.  For External-Secrets-Operator / Vault / SealedSecrets workflows set `existingSecret: my-creds` instead of inline `accesskey`/`secretkey`; the chart then pulls credentials from that Secret via env, and the generated `*-registry` Secret stops emitting those keys. |
-| registry.storage.type | string | `"filesystem"` | Storage type: filesystem, s3, azure, gcs, oss |
+| registry.storageCredentials | object | See [values.yaml](values.yaml) | BYO Secret references for storage credentials. The chart injects the credential as an env var on both `registry` and `registryctl` containers; distribution honors `REGISTRY_STORAGE_<BACKEND>_<KEY>` env overrides for any backend. Set the entry matching the backend you configured in `config.storage`. Other entries stay empty.  Env injection is gated only on `existingSecret` being non-empty (not on which backend is active in `config:`). Setting credentials for an inactive backend is harmless — distribution ignores env vars not matching its active driver. |
+| registry.storageCredentials.azure.existingSecret | string | `""` | Existing Secret containing the Azure storage account key. |
+| registry.storageCredentials.azure.existingSecretKey | string | `"REGISTRY_STORAGE_AZURE_ACCOUNTKEY"` | Key in `existingSecret` holding the account key. |
+| registry.storageCredentials.gcs.existingSecret | string | `""` | Existing Secret containing the GCS service-account keyfile. When set, mounted at /etc/registry/gcs/key.json — reference this path from `config.storage.gcs.keyfile`. Leave empty when using Workload Identity (set `serviceAccount.annotations` instead). |
+| registry.storageCredentials.gcs.existingSecretKey | string | `"gcs-key.json"` | Key in `existingSecret` holding the keyfile JSON content. |
+| registry.storageCredentials.oss.existingSecret | string | `""` | Existing Secret containing the Alibaba OSS access key secret. |
+| registry.storageCredentials.oss.existingSecretKey | string | `"REGISTRY_STORAGE_OSS_ACCESSKEYSECRET"` | Key in `existingSecret` holding the access key secret. |
+| registry.storageCredentials.s3.existingSecret | string | `""` | Existing Secret containing AWS S3 credentials. |
+| registry.storageCredentials.s3.existingSecretAccessKeyKey | string | `"REGISTRY_STORAGE_S3_ACCESSKEY"` | Key in `existingSecret` holding the access key ID. |
+| registry.storageCredentials.s3.existingSecretSecretKeyKey | string | `"REGISTRY_STORAGE_S3_SECRETKEY"` | Key in `existingSecret` holding the secret access key. |
 | registry.tolerations | list | `[]` | Tolerations for Registry pods |
 | registry.topologySpreadConstraints | list | `[]` | Topology spread constraints for pod scheduling |
-| registry.upload_purging | object | {} | Registry application config (converted to env vars in ConfigMap) |
 | secretKey | string | auto-generated | Secret key for encryption (16 characters) Used for encrypting credentials stored in the database |
 | tls.certManager.duration | string | `"2160h"` | Certificate duration |
 | tls.certManager.enabled | bool | `false` | Enable cert-manager for TLS certificates |
@@ -862,10 +920,12 @@ Kubernetes: `>=1.28.0-0`
 | trace.sample_rate | int | `1` |  |
 | trivy.affinity | object | `{}` | Affinity rules for Trivy pods |
 | trivy.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler for the Trivy StatefulSet. See `core.autoscaling` for full docs. |
+| trivy.config | object | {} | Trivy adapter config as env vars. Trivy is env-driven (SCANNER_*); nested maps flatten to UPPER_SNAKE_CASE via toEnvVars and are injected via envFrom. Any adapter setting works without chart changes. |
 | trivy.dbRepository[0] | string | `"mirror.gcr.io/aquasec/trivy-db"` |  |
 | trivy.dbRepository[1] | string | `"ghcr.io/aquasecurity/trivy-db"` |  |
 | trivy.debugMode | bool | `false` | Debug mode for more verbose scanning log |
 | trivy.enabled | bool | `false` | Enable Trivy scanner |
+| trivy.extraEnv | list | [] | Extra environment variables with valueFrom support |
 | trivy.gitHubToken | string | `""` | GitHub token to download Trivy DB (optional) |
 | trivy.hostAliases | list | [] | Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for private DNS that does not exist in cluster DNS — service-mesh sidecars, legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the Kubernetes PodSpec: a list of `{ip, hostnames}` entries. |
 | trivy.ignoreUnfixed | bool | `false` | Skip unfixed vulnerabilities |
@@ -891,6 +951,7 @@ Kubernetes: `>=1.28.0-0`
 | trivy.podSecurityContext | object | `{"fsGroup":10000}` | Pod security context for Trivy |
 | trivy.replicas | int | `1` | Number of Trivy replicas (ignored when autoscaling.enabled=true) |
 | trivy.resources | object | `{"limits":{"cpu":1,"memory":"1Gi"},"requests":{"cpu":"200m","memory":"512Mi"}}` | Trivy resource requests and limits |
+| trivy.secret | object | {} | Sensitive Trivy adapter config (converted to env vars in a Secret). |
 | trivy.securityCheck | string | `"vuln"` |  |
 | trivy.securityContext | object | `{"runAsGroup":10000,"runAsNonRoot":true,"runAsUser":10000}` | Security context for Trivy container |
 | trivy.serviceAccount | object | `{"annotations":{},"automountServiceAccountToken":false,"create":false,"name":""}` | Service account settings for Trivy |
@@ -937,7 +998,7 @@ This chart is a redesign, not a drop-in replacement. Migration steps:
 | `database.external.*` | `database.*` |
 | `redis.type: internal` | `valkey.enabled: true` |
 | `redis.external.*` | `externalRedis.*` |
-| `persistence.imageChartStorage.*` | `registry.storage.*` |
+| `persistence.imageChartStorage.*` | `registry.config.storage.*` (YAML passthrough — see "Registry configuration" below) |
 | `nginx.*` | Not applicable — no nginx proxy |
 | `notary.*` | Not supported — Notary deprecated |
 | `chartmuseum.*` | Not supported — use OCI artifacts |

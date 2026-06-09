@@ -11,10 +11,13 @@
 #     --version 3.0.0 -n harbor --create-namespace \
 #     -f values-aws-irsa.yaml \
 #     --set database.host=<AURORA_ENDPOINT> \
-#     --set registry.storage.s3.bucket=<BUCKET_NAME> \
+#     --set-json 'registry.config.storage.s3={"region":"eu-central-1","bucket":"<BUCKET_NAME>"}' \
 #     --set core.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=<ROLE_ARN> \
 #     --set jobservice.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=<ROLE_ARN> \
 #     --set registry.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=<ROLE_ARN>
+#
+# Or skip --set-json by editing the `registry.config.storage.s3.bucket` field
+# directly in this file before installing.
 
 # Access via kubectl port-forward svc/harbor-next-core 8443:443 -n harbor
 externalURL: "https://localhost:8443"
@@ -89,8 +92,12 @@ core:
 # --- Job Service ---
 jobservice:
   replicas: 1
-  max_job_workers: 2
+  # Override the default worker count via YAML passthrough.
   config:
+    worker_pool:
+      workers: 2
+  # IAM-auth env vars go via .env (env passthrough), not .config (YAML config).
+  env:
     POSTGRESQL_USE_IAM_AUTH: "true"
     POSTGRESQL_AWS_REGION: "eu-central-1"
   serviceAccount:
@@ -108,14 +115,42 @@ jobservice:
 # --- Registry: S3 storage via IRSA ---
 registry:
   replicas: 1
-  config: {}
-  storage:
-    type: s3
-    s3:
-      region: eu-central-1
-      bucket: ""  # set via --set registry.storage.s3.bucket=<BUCKET_NAME>
-      # No accesskey/secretkey — IRSA provides credentials via
-      # AWS SDK default credential chain (projected service account token).
+  # Full distribution config.yml passed through verbatim. IRSA provides
+  # credentials via the AWS SDK default chain (projected service account
+  # token) — no access/secret key needed in this block.
+  config:
+    version: 0.1
+    log:
+      fields:
+        service: registry
+    storage:
+      # null out the chart-default filesystem backend (Helm deep-merges values,
+      # so omitting `filesystem:` doesn't remove the chart default — explicit null does).
+      filesystem: null
+      s3:
+        region: eu-central-1
+        bucket: ""  # set via --set-json or edit here before installing
+      cache:
+        layerinfo: redis
+      maintenance:
+        uploadpurging:
+          enabled: true
+          age: 168h
+          interval: 24h
+          dryrun: false
+      delete:
+        enabled: true
+      redirect:
+        disable: false
+    auth:
+      htpasswd:
+        realm: harbor-registry-basic-realm
+        path: /etc/registry/passwd
+    validation:
+      disabled: true
+    compatibility:
+      schema1:
+        enabled: true
   serviceAccount:
     create: true
     annotations: {}
