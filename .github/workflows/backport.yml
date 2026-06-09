@@ -58,8 +58,8 @@ jobs:
       - name: Load source PR
         id: source
         run: |
-          merged=$(gh pr view "${PR_NUMBER}" --json merged --jq .merged)
-          if [ "${merged}" != "true" ]; then
+          merged_at=$(gh pr view "${PR_NUMBER}" --json mergedAt --jq .mergedAt)
+          if [ -z "${merged_at}" ]; then
             gh pr comment "${PR_NUMBER}" --body "Cannot backport because this PR has not been merged."
             exit 1
           fi
