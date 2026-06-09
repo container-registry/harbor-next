@@ -6,6 +6,29 @@ This changelog mirrors [GitHub Releases](https://github.com/container-registry/h
 
 ---
 
+## [2.15.1](https://github.com/container-registry/harbor-next/compare/v2.15.0...v2.15.1) (2026-06-09)
+
+
+### Bug Fixes
+
+* Install gh CLI in release workflow ([d5f0674](https://github.com/container-registry/harbor-next/commit/d5f06748df52a65b0280bd6389fa164d874adcd4))
+* Preserve categorized release notes ([#215](https://github.com/container-registry/harbor-next/issues/215)) ([c0a8e97](https://github.com/container-registry/harbor-next/commit/c0a8e970df73eeff04d752111bd7f2216dbc27d6))
+* Push Trivy Adapter Images Without Harbor Prefix ([#227](https://github.com/container-registry/harbor-next/issues/227)) ([c2be7b7](https://github.com/container-registry/harbor-next/commit/c2be7b7789a6bc8bc2ea1e95c1dd89a95f4ab33d))
+
+
+### Upstream
+
+* Call /v2/auth/token api to get bearer token for dockerhub adapter ([ea94b88](https://github.com/container-registry/harbor-next/commit/ea94b88a40f6a603679ae31eccd66e8e6e2fc945))
+* feat(gc): use human-readable sizes in GC log messages ([f0d055c](https://github.com/container-registry/harbor-next/commit/f0d055cf6bfc44cb05b18607a3c5a251c799915d))
+* feat(session): prevent background polling from renewing session TTL ([50ec668](https://github.com/container-registry/harbor-next/commit/50ec66874ff64914459228554bd238a40a0b6477))
+* Fix issue related to scanner API ([c797f4b](https://github.com/container-registry/harbor-next/commit/c797f4b325de1f747af3b87f3a11dd6604a9e868))
+* fix(auditext): add nil guard in manager Create ([ce27031](https://github.com/container-registry/harbor-next/commit/ce270315f82f493c1f8495bebfb473f0d8169829))
+* fix(dao): use context-aware methods for database operations in MetaDAO ([cd6ddfe](https://github.com/container-registry/harbor-next/commit/cd6ddfe52219cb09b1cf5fa815689bdf0cf1a75f))
+* fix(distribution): allow editing instance without credentials ([d69e45e](https://github.com/container-registry/harbor-next/commit/d69e45e0f19d4fd2b6bdddec2fdec17639496b12))
+* fix(gc): redact redis_url_reg from GC extra attrs ([2bb39fc](https://github.com/container-registry/harbor-next/commit/2bb39fc9e99ce1284ccba1b029c9d0d2617785a3))
+* fix(scan): use created time from annotations in accessory art ([eb98ccb](https://github.com/container-registry/harbor-next/commit/eb98ccb3d935a527d33b15ae91a79c63c7e703e1))
+* perf(blob): fix full table scan in unassociation check ([6334975](https://github.com/container-registry/harbor-next/commit/633497513ae5d4278ee09985154b3c282e20a8a1))
+
 ## [2.15.0](https://github.com/container-registry/harbor-next/compare/v2.14.0...v2.15.0) (2026-05-12)
 
 
