@@ -2,13 +2,13 @@ name: Build
 
 on:
   pull_request:
-    branches: [main, "release-*"]
+    branches: [main, "release-[0-9]*.[0-9]*"]
     paths-ignore:
       - "**.md"
       - "docs/**"
       - "CLAUDE.md"
   push:
-    branches: [main, "release-*"]
+    branches: [main, "release-[0-9]*.[0-9]*"]
     paths-ignore:
       - "**.md"
       - "docs/**"
