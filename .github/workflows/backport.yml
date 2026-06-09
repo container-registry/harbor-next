@@ -25,9 +25,18 @@ jobs:
       COMMENT_BODY: ${{ github.event.comment.body }}
     steps:
       - name: Install gh CLI
-        uses: actions4gh/setup-gh@44a12005484c53be5bf51bebe8c985b4be8ba8de # v1.0.2
-        with:
-          gh-version: latest
+        run: |
+          if command -v gh >/dev/null 2>&1; then
+            exit 0
+          fi
+
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+            | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+            | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y gh
 
       - name: Resolve backport target
         id: target
@@ -49,8 +58,8 @@ jobs:
       - name: Load source PR
         id: source
         run: |
-          merged=$(gh pr view "${PR_NUMBER}" --json merged --jq .merged)
-          if [ "${merged}" != "true" ]; then
+          merged_at=$(gh pr view "${PR_NUMBER}" --json mergedAt --jq .mergedAt)
+          if [ -z "${merged_at}" ]; then
             gh pr comment "${PR_NUMBER}" --body "Cannot backport because this PR has not been merged."
             exit 1
           fi
