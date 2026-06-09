@@ -36,7 +36,7 @@ jobs:
           esac
 
           branches=$(gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/heads/release-" \
-            --jq '.[].ref | sub("refs/heads/"; "")' | sort -Vr)
+            --jq '.[].ref | sub("refs/heads/"; "") | select(test("^release-[0-9]+\\.[0-9]+$"))' | sort -Vr)
           if [ -z "${branches}" ]; then
             exit 0
           fi
