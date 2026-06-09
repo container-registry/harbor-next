@@ -24,19 +24,28 @@ jobs:
       PR_TITLE: ${{ github.event.pull_request.title }}
     steps:
       - name: Install gh CLI
-        uses: actions4gh/setup-gh@44a12005484c53be5bf51bebe8c985b4be8ba8de # v1.0.2
-        with:
-          gh-version: latest
+        run: |
+          if command -v gh >/dev/null 2>&1; then
+            exit 0
+          fi
+
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+            | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+            | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y gh
 
       - name: Comment with backport commands
         run: |
           case "${PR_TITLE}" in
-            fix:*|upstream:*|perf:*|revert:*) ;;
+            fix:*|upstream:*|perf:*|revert:*|ci:*|build:*) ;;
             *) exit 0 ;;
           esac
 
           branches=$(gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/heads/release-" \
-            --jq '.[].ref | sub("refs/heads/"; "")' | sort -Vr)
+            --jq '.[].ref | sub("refs/heads/"; "") | select(test("^release-[0-9]+\\.[0-9]+$"))' | sort -Vr)
           if [ -z "${branches}" ]; then
             exit 0
           fi
