@@ -12,7 +12,21 @@ permissions:
   pull-requests: write
 
 jobs:
+  validate-release-ref:
+    name: Validate Release Ref
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    steps:
+      - name: Allow only release refs
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == "main" || "${GITHUB_REF_NAME}" =~ ^release-[0-9]+\.[0-9]+$ ]]; then
+            exit 0
+          fi
+
+          echo "::error::Release Please can only run on main or release-X.Y branches. Current ref: ${GITHUB_REF_NAME}"
+          exit 1
+
   release-please:
+    needs: [validate-release-ref]
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
