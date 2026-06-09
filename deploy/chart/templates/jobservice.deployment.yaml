@@ -89,18 +89,7 @@ spec:
             {{- with .Values.jobservice.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-          livenessProbe:
-            httpGet:
-              path: /api/v1/stats
-              port: http
-            initialDelaySeconds: 20
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /api/v1/stats
-              port: http
-            initialDelaySeconds: 20
-            periodSeconds: 10
+          {{- include "harbor.probes" .Values.jobservice.probes | nindent 10 }}
           resources:
             {{- toYaml .Values.jobservice.resources | nindent 12 }}
           {{- with .Values.jobservice.lifecycle }}

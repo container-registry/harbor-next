@@ -54,18 +54,7 @@ spec:
             {{- with .Values.portal.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-          livenessProbe:
-            httpGet:
-              path: /
-              port: portal-http
-            initialDelaySeconds: 10
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /
-              port: portal-http
-            initialDelaySeconds: 10
-            periodSeconds: 10
+          {{- include "harbor.probes" .Values.portal.probes | nindent 10 }}
           resources:
             {{- toYaml .Values.portal.resources | nindent 12 }}
           {{- with .Values.portal.lifecycle }}

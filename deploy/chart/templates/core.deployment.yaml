@@ -108,27 +108,7 @@ spec:
             {{- with .Values.core.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-          livenessProbe:
-            httpGet:
-              path: /api/v2.0/ping
-              port: core-http
-            initialDelaySeconds: 20
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /api/v2.0/ping
-              port: core-http
-            initialDelaySeconds: 20
-            periodSeconds: 10
-          {{- if .Values.core.startupProbe.enabled }}
-          startupProbe:
-            httpGet:
-              path: /api/v2.0/ping
-              port: core-http
-            initialDelaySeconds: {{ .Values.core.startupProbe.initialDelaySeconds }}
-            periodSeconds: 10
-            failureThreshold: 12
-          {{- end }}
+          {{- include "harbor.probes" .Values.core.probes | nindent 10 }}
           resources:
             {{- toYaml .Values.core.resources | nindent 12 }}
           {{- with .Values.core.lifecycle }}

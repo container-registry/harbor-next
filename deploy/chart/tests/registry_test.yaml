@@ -92,9 +92,11 @@ tests:
   # registry.config — YAML passthrough into config.yml
   # ============================================================================
 
-  # Default registry.config block contains a filesystem storage definition.
-  # Verifies the chart renders user-provided storage YAML verbatim.
-  - it: should render default filesystem storage in config.yml
+  # The chart default ships NO storage driver — the filesystem default is
+  # injected at render time only when the user set none. This is what kills
+  # the deep-merge footgun: a user's `s3:` can't collide with a chart-side
+  # `filesystem:` because the chart side never has one.
+  - it: should inject filesystem driver when no driver is set
     template: templates/registry.configmap.yaml
     set:
       externalURL: https://harbor.example.com
@@ -108,31 +110,59 @@ tests:
           path: data["config.yml"]
           pattern: "rootdirectory: /storage"
 
-  # Replacing the entire storage block in registry.config switches the
-  # backend without any other chart changes. Verifies the passthrough.
-  - it: should render S3 storage from registry.config verbatim
+  # Setting a driver suppresses the filesystem injection — no `null` dance.
+  - it: should render S3 as the only driver without nulling filesystem
     template: templates/registry.configmap.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
-      registry.config.storage:
-        s3:
-          region: us-west-2
-          bucket: my-harbor-bucket
-          forcepathstyle: true
-        cache:
-          layerinfo: redis
+      registry.config.storage.s3:
+        region: us-west-2
+        bucket: my-harbor-bucket
+        forcepathstyle: true
     asserts:
       - matchRegex:
           path: data["config.yml"]
           pattern: "region: us-west-2"
       - matchRegex:
           path: data["config.yml"]
-          pattern: "bucket: my-harbor-bucket"
+          pattern: "forcepathstyle: true"
+      - notMatchRegex:
+          path: data["config.yml"]
+          pattern: "filesystem:"
+
+  # Two drivers must fail at template time — distribution requires exactly
+  # one and would CrashLoop at boot otherwise. Asserted against the
+  # deployment template: its checksum include re-renders the configmap, and
+  # helm-unittest attributes the failure there in multi-template suites.
+  - it: should fail template rendering when two storage drivers are set
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.config.storage.s3.bucket: b
+      registry.config.storage.azure.accountname: a
+    asserts:
+      - failedTemplate:
+          errorPattern: "multiple drivers"
+
+  # Meta keys (cache/maintenance/delete/redirect) are not drivers and never
+  # count toward the exactly-one rule.
+  - it: should not count storage meta keys as drivers
+    template: templates/registry.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.config.storage.s3.bucket: b
+      registry.config.storage.redirect.disable: true
+      registry.config.storage.delete.enabled: true
+    asserts:
       - matchRegex:
           path: data["config.yml"]
-          pattern: "forcepathstyle: true"
+          pattern: "bucket: b"
 
   # ============================================================================
   # registry.existingConfigMap — chart skips ConfigMap generation
@@ -460,6 +490,58 @@ tests:
               secretKeyRef:
                 name: my-oss-creds
                 key: REGISTRY_STORAGE_OSS_ACCESSKEYSECRET
+
+  # ============================================================================
+  # Probes — full K8s specs rendered verbatim from values; per-key overrides
+  # coalesce with defaults; null omits the probe entirely.
+  # ============================================================================
+
+  - it: should render fast-start probes with no initialDelay
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.periodSeconds
+          value: 2
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.periodSeconds
+          value: 5
+      - notExists:
+          path: spec.template.spec.containers[0].readinessProbe.initialDelaySeconds
+      - equal:
+          path: spec.template.spec.containers[1].startupProbe.httpGet.path
+          value: /api/health
+
+  - it: should coalesce a single probe override with the remaining defaults
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.probes.readiness.periodSeconds: 9
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.periodSeconds
+          value: 9
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.failureThreshold
+          value: 2
+
+  - it: should omit a probe set to null
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.probes.startup: null
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].startupProbe
+      - exists:
+          path: spec.template.spec.containers[0].livenessProbe
 
   - it: should mount GCS keyfile Secret when storageCredentials.gcs.existingSecret is set
     template: templates/registry.deployment.yaml

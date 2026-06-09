@@ -183,6 +183,7 @@ Each Harbor component (core, portal, registry, jobservice, exporter) supports:
 | `<component>.secret` | Sensitive config (becomes Secret env vars) |
 | `<component>.extraEnv` | Additional env vars with `valueFrom` support |
 | `<component>.lifecycle` | Container `preStop`/`postStart` hook spec — see [Lifecycle hooks](#lifecycle-hooks-prestop-drain) |
+| `<component>.probes` | Full K8s probe specs (`startup`/`liveness`/`readiness`), rendered verbatim. Defaults: 2s-period startupProbe (ready as soon as the endpoint responds, no fixed initialDelay), 5s readiness, 10s liveness. Set a probe to `null` to omit it |
 | `<component>.hostAliases` | `/etc/hosts` entries (list of `{ip, hostnames}`) for private DNS targets |
 | `<component>.pdb.enabled` | Enable PodDisruptionBudget |
 | `<component>.pdb.minAvailable` | Minimum available pods during disruption |
@@ -303,19 +304,16 @@ Three customization tiers:
 2. **Inline** — edit `registry.config` in your values file.
 3. **External ConfigMap** — own `config.yml` outside the chart entirely.
 
-**Switching storage backend** — Helm deep-merges values, so adding `s3:` alongside the default `filesystem:` produces a config.yml with BOTH backends defined. Explicitly null out the chart default:
+**Switching storage backend** — set exactly one driver key under `storage:`. The chart default deliberately ships **no** driver, so your `s3:` can't collide with a chart-side `filesystem:` (Helm deep-merge). When no driver is set, the chart injects `filesystem: {rootdirectory: /storage}` at render time; defining two or more drivers fails at `helm install/template` time with a message naming them — instead of distribution CrashLooping at boot:
 
 ```yaml
 registry:
   config:
     storage:
-      filesystem: null    # remove chart default
       s3:
         region: us-east-1
         bucket: my-harbor-bucket
         # forcepathstyle: true  # MinIO / Ceph RGW / SeaweedFS
-      cache:
-        layerinfo: redis
 ```
 
 **Credentials never go in `registry.config`** (they'd be visible in the rendered ConfigMap). Use one of:
@@ -329,7 +327,6 @@ registry:
 registry:
   config:
     storage:
-      filesystem: null
       s3:
         region: us-east-1
         bucket: my-harbor-bucket
@@ -358,7 +355,6 @@ For AWS EKS with IRSA (no static credentials), omit `storageCredentials` entirel
 registry:
   config:
     storage:
-      filesystem: null
       azure:
         accountname: mystorageaccount
         container: harbor
@@ -378,7 +374,6 @@ registry:
 registry:
   config:
     storage:
-      filesystem: null
       gcs:
         bucket: my-harbor-bucket
         keyfile: /etc/registry/gcs/key.json    # mounted from existingSecret
@@ -638,6 +633,7 @@ Kubernetes: `>=1.28.0-0`
 | core.podAnnotations | object | `{}` | Additional pod annotations for Core |
 | core.podLabels | object | `{}` | Additional pod labels for Core |
 | core.podSecurityContext | object | `{"fsGroup":10000}` | Pod security context for Core |
+| core.probes | object | See [values.yaml](values.yaml) | Container probes, rendered verbatim (full Kubernetes probe spec — change paths, ports, timings, or swap httpGet for exec/grpc freely). `startup` gates liveness/readiness: its 2s period makes the pod Ready as soon as the endpoint responds instead of after a fixed initialDelay, while the failureThreshold gives slow first boots (DB migrations) a 180s budget. Disable a probe by setting it to null. |
 | core.quotaUpdateProvider | string | `"db"` | Quota update provider (db or redis) |
 | core.replicas | int | `1` | Number of Core replicas (ignored when autoscaling.enabled=true) |
 | core.resources | object | `{"limits":{"memory":"512Mi"},"requests":{"cpu":"100m","memory":"256Mi"}}` | Core resource requests and limits |
@@ -649,7 +645,6 @@ Kubernetes: `>=1.28.0-0`
 | core.serviceAccount.create | bool | `true` | Create a service account for Core |
 | core.serviceAccount.name | string | `""` | Service account name (auto-generated if empty) |
 | core.serviceAnnotations | object | `{}` | Service annotations for Core service |
-| core.startupProbe | object | `{"enabled":true,"initialDelaySeconds":10}` | Startup probe for Core |
 | core.tokenCert | string | `""` | Token certificate (PEM, signed by tokenKey) |
 | core.tokenKey | string | `""` | Token private key (PEM). Auto-generated if both tokenKey and tokenCert are empty and tokenSecretName is empty. |
 | core.tokenSecretName | string | `""` | Existing secret for token service key/cert (must contain keys: tls.key, tls.crt) |
@@ -691,6 +686,7 @@ Kubernetes: `>=1.28.0-0`
 | exporter.podAnnotations | object | `{}` | Additional pod annotations for Exporter |
 | exporter.podLabels | object | `{}` | Additional pod labels for Exporter |
 | exporter.podSecurityContext | object | `{"fsGroup":10000}` | Pod security context for Exporter |
+| exporter.probes | object | See [values.yaml](values.yaml) | Container probes, rendered verbatim. See `core.probes` for the tuning rationale. |
 | exporter.replicas | int | `1` | Number of Exporter replicas |
 | exporter.resources | object | `{"limits":{"memory":"256Mi"},"requests":{"cpu":"100m","memory":"128Mi"}}` | Exporter resource requests and limits |
 | exporter.secret | object | {} | Sensitive config for Exporter (converted to env vars in Secret) |
@@ -798,6 +794,7 @@ Kubernetes: `>=1.28.0-0`
 | jobservice.podAnnotations | object | `{}` | Additional pod annotations for Jobservice |
 | jobservice.podLabels | object | `{}` | Additional pod labels for Jobservice |
 | jobservice.podSecurityContext | object | `{"fsGroup":10000}` | Pod security context for Jobservice |
+| jobservice.probes | object | See [values.yaml](values.yaml) | Container probes, rendered verbatim. See `core.probes` for the tuning rationale. Startup budget is long (120s) because jobservice waits on core availability during first boot. |
 | jobservice.replicas | int | `1` | Number of Jobservice replicas (ignored when autoscaling.enabled=true) |
 | jobservice.resources | object | `{"limits":{"memory":"512Mi"},"requests":{"cpu":"100m","memory":"256Mi"}}` | Jobservice resource requests and limits |
 | jobservice.secret | object | {} | Sensitive config for Jobservice (converted to env vars in Secret) |
@@ -833,6 +830,7 @@ Kubernetes: `>=1.28.0-0`
 | portal.podAnnotations | object | `{}` | Additional pod annotations for Portal |
 | portal.podLabels | object | `{}` | Additional pod labels for Portal |
 | portal.podSecurityContext | object | `{"fsGroup":10000}` | Pod security context for Portal |
+| portal.probes | object | See [values.yaml](values.yaml) | Container probes, rendered verbatim. See `core.probes` for the tuning rationale. |
 | portal.replicas | int | `1` | Number of Portal replicas (ignored when autoscaling.enabled=true) |
 | portal.resources | object | `{"limits":{"memory":"256Mi"},"requests":{"cpu":"100m","memory":"128Mi"}}` | Portal resource requests and limits |
 | portal.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsGroup":10000,"runAsNonRoot":true,"runAsUser":10000,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for Portal container |
@@ -850,9 +848,10 @@ Kubernetes: `>=1.28.0-0`
 | registry.affinity | object | `{}` | Affinity rules for Registry pods |
 | registry.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler. See `core.autoscaling` for full docs. |
 | registry.config | object | See [values.yaml](values.yaml) | Full [distribution/distribution](https://distribution.github.io/distribution/about/configuration/) `config.yml` passed through verbatim. Used only when `existingConfigMap` is empty. Replace this entire block to switch storage backends or add any field distribution supports (notifications, health, custom middleware, etc.).  Chart-managed values injected via env-var override at runtime (these ALWAYS win over what's in this block — do not duplicate here):   - `http.addr`, `http.secret`, `http.debug.prometheus.enabled`   - `redis.*` (addr, password, db, tls)   - `log.level` (from `.Values.logLevel`)   - storage credentials when `storageCredentials.<backend>.existingSecret` is set  See `storageCredentials` below for the BYO-Secret pattern. For inline credentials use `registry.secret` (b64-encoded into the generated Secret) — do not put plaintext credentials in this block, they would be visible in the ConfigMap. |
-| registry.controller | object | `{"image":{"repository":"8gears.container-registry.com/8gcr/harbor-registryctl","tag":""}}` | Registryctl image settings |
+| registry.controller | object | `{"image":{"repository":"8gears.container-registry.com/8gcr/harbor-registryctl","tag":""},"probes":{"liveness":{"failureThreshold":3,"httpGet":{"path":"/api/health","port":8080},"periodSeconds":10,"timeoutSeconds":3},"readiness":{"failureThreshold":2,"httpGet":{"path":"/api/health","port":8080},"periodSeconds":5,"timeoutSeconds":2},"startup":{"failureThreshold":15,"httpGet":{"path":"/api/health","port":8080},"periodSeconds":2,"timeoutSeconds":2}}}` | Registryctl image settings |
 | registry.controller.image.repository | string | `"8gears.container-registry.com/8gcr/harbor-registryctl"` | Registryctl image repository |
 | registry.controller.image.tag | string | `""` | Registryctl image tag (defaults to appVersion) |
+| registry.controller.probes | object | See [values.yaml](values.yaml) | Probes for the registryctl sidecar. Same shape as `core.probes`. |
 | registry.credentials.existingSecret | string | `""` |  |
 | registry.credentials.htpasswdString | string | `""` |  |
 | registry.credentials.password | string | `""` |  |
@@ -881,6 +880,7 @@ Kubernetes: `>=1.28.0-0`
 | registry.podAnnotations | object | `{}` | Additional pod annotations for Registry |
 | registry.podLabels | object | `{}` | Additional pod labels for Registry |
 | registry.podSecurityContext | object | `{"fsGroup":10000,"fsGroupChangePolicy":"OnRootMismatch"}` | Pod security context for Registry |
+| registry.probes | object | See [values.yaml](values.yaml) | Probes for the registry container. Full Kubernetes probe specs, rendered verbatim — see `core.probes` for the tuning rationale. |
 | registry.replicas | int | `1` | Number of Registry replicas (ignored when autoscaling.enabled=true) |
 | registry.resources | object | `{"limits":{"memory":"512Mi"},"requests":{"cpu":"100m","memory":"256Mi"}}` | Registry resource requests and limits |
 | registry.secret | object | {} | Sensitive config for Registry. Each key is b64-encoded into the generated registry Secret and injected on both `registry` and `registryctl` containers via `envFrom`. Use for inline credentials, e.g.:      secret:       REGISTRY_STORAGE_S3_ACCESSKEY: <plaintext>       REGISTRY_STORAGE_S3_SECRETKEY: <plaintext>  Prefer `storageCredentials.<backend>.existingSecret` for production (External-Secrets-Operator / Vault / SealedSecrets workflows). |
@@ -949,6 +949,7 @@ Kubernetes: `>=1.28.0-0`
 | trivy.podAnnotations | object | `{}` | Additional pod annotations for Trivy |
 | trivy.podLabels | object | `{}` | Additional pod labels for Trivy |
 | trivy.podSecurityContext | object | `{"fsGroup":10000}` | Pod security context for Trivy |
+| trivy.probes | object | See [values.yaml](values.yaml) | Container probes, rendered verbatim. See `core.probes` for the tuning rationale. Startup budget 60s covers adapter init. |
 | trivy.replicas | int | `1` | Number of Trivy replicas (ignored when autoscaling.enabled=true) |
 | trivy.resources | object | `{"limits":{"cpu":1,"memory":"1Gi"},"requests":{"cpu":"200m","memory":"512Mi"}}` | Trivy resource requests and limits |
 | trivy.secret | object | {} | Sensitive Trivy adapter config (converted to env vars in a Secret). |
@@ -978,6 +979,11 @@ Kubernetes: `>=1.28.0-0`
 
 ## Migrating from Legacy Harbor Chart
 
+> **📖 Full guide:** [docs/MIGRATION.md](docs/MIGRATION.md) maps **every**
+> value in the legacy [goharbor/harbor-helm](https://github.com/goharbor/harbor-helm)
+> chart to its equivalent here, lists removed settings with workarounds, and
+> includes a worked before/after example.
+
 This chart is a redesign, not a drop-in replacement. Migration steps:
 
 1. **Backup your Harbor data** using Harbor's built-in backup or database dumps
@@ -1002,6 +1008,11 @@ This chart is a redesign, not a drop-in replacement. Migration steps:
 | `nginx.*` | Not applicable — no nginx proxy |
 | `notary.*` | Not supported — Notary deprecated |
 | `chartmuseum.*` | Not supported — use OCI artifacts |
+
+This table is a teaser — the [full migration guide](docs/MIGRATION.md) covers
+all sections (expose/TLS, storage backends, per-component settings, secrets
+carry-over) including the `secretKey` requirement when reusing an existing
+database.
 
 ## Troubleshooting
 

@@ -129,24 +129,7 @@ spec:
               mountPath: /home/scanner/.cache
               readOnly: false
             {{- include "harbor.extraCA.volumeMount" . | nindent 12 }}
-          livenessProbe:
-            httpGet:
-              scheme: {{ include "harbor.component.scheme" . | upper }}
-              path: /probe/healthy
-              port: api-server
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            successThreshold: 1
-            failureThreshold: 10
-          readinessProbe:
-            httpGet:
-              scheme: {{ include "harbor.component.scheme" . | upper }}
-              path: /probe/ready
-              port: api-server
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            successThreshold: 1
-            failureThreshold: 3
+          {{- include "harbor.probes" .Values.trivy.probes | nindent 10 }}
           resources:
             {{- toYaml .Values.trivy.resources | nindent 12 }}
           {{- with .Values.trivy.lifecycle }}

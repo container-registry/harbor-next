@@ -288,10 +288,35 @@ core:
     # -- Enable audit logs GDPR compliance
     auditLogsCompliant: false
 
-  # -- Startup probe for Core
-  startupProbe:
-    enabled: true
-    initialDelaySeconds: 10
+  # -- Container probes, rendered verbatim (full Kubernetes probe spec —
+  # change paths, ports, timings, or swap httpGet for exec/grpc freely).
+  # `startup` gates liveness/readiness: its 2s period makes the pod Ready
+  # as soon as the endpoint responds instead of after a fixed initialDelay,
+  # while the failureThreshold gives slow first boots (DB migrations) a
+  # 180s budget. Disable a probe by setting it to null.
+  # @default -- See [values.yaml](values.yaml)
+  probes:
+    startup:
+      httpGet:
+        path: /api/v2.0/ping
+        port: core-http
+      periodSeconds: 2
+      failureThreshold: 90
+      timeoutSeconds: 2
+    readiness:
+      httpGet:
+        path: /api/v2.0/ping
+        port: core-http
+      periodSeconds: 5
+      failureThreshold: 2
+      timeoutSeconds: 2
+    liveness:
+      httpGet:
+        path: /api/v2.0/ping
+        port: core-http
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 3
 
   # -- Extra environment variables with valueFrom support
   # @default -- []
@@ -461,9 +486,14 @@ registry:
     log:
       fields:
         service: registry
+    # Storage driver selection: set EXACTLY ONE driver key (s3, azure, gcs,
+    # oss, ...) next to the meta keys below. The chart default deliberately
+    # carries NO driver — when none is set, `filesystem: {rootdirectory:
+    # /storage}` is injected at render time, and setting `s3:` here simply
+    # takes its place (no need to null anything out). Defining two or more
+    # drivers fails at `helm install/template` time — distribution requires
+    # exactly one and would otherwise CrashLoop at boot.
     storage:
-      filesystem:
-        rootdirectory: /storage
       cache:
         layerinfo: redis
       maintenance:
@@ -485,28 +515,19 @@ registry:
     compatibility:
       schema1:
         enabled: true
-    # Switching storage backend: Helm deep-merges values, so adding `s3:`
-    # alongside the default `filesystem:` results in BOTH being rendered into
-    # config.yml. Set `filesystem: null` (or `gcs: null`, etc.) to remove the
-    # chart default explicitly. Examples below assume this pattern.
-    #
-    # Example — S3 (replace `storage:` block above):
+    # Example — S3 (add under `storage:` above):
     #
     # storage:
-    #   filesystem: null          # remove chart default
     #   s3:
     #     region: us-east-1
     #     bucket: my-harbor-bucket
     #     # forcepathstyle: true   # MinIO / Ceph RGW / SeaweedFS
     #     # v4auth: true
     #     # encrypt: false
-    #   cache:
-    #     layerinfo: redis
     #
     # Example — Azure Blob:
     #
     # storage:
-    #   filesystem: null
     #   azure:
     #     accountname: <name>
     #     container: <container>
@@ -514,7 +535,6 @@ registry:
     # Example — GCS (with keyfile):
     #
     # storage:
-    #   filesystem: null
     #   gcs:
     #     bucket: my-bucket
     #     keyfile: /etc/registry/gcs/key.json
@@ -522,14 +542,12 @@ registry:
     # Example — GCS (Workload Identity, no keyfile):
     #
     # storage:
-    #   filesystem: null
     #   gcs:
     #     bucket: my-bucket
     #
     # Example — Alibaba OSS:
     #
     # storage:
-    #   filesystem: null
     #   oss:
     #     accesskeyid: <id>
     #     region: <region>
@@ -640,6 +658,32 @@ registry:
     # -- Registry image tag (defaults to appVersion)
     tag: ""
 
+  # -- Probes for the registry container. Full Kubernetes probe specs,
+  # rendered verbatim — see `core.probes` for the tuning rationale.
+  # @default -- See [values.yaml](values.yaml)
+  probes:
+    startup:
+      httpGet:
+        path: /
+        port: 5000
+      periodSeconds: 2
+      failureThreshold: 15
+      timeoutSeconds: 2
+    readiness:
+      httpGet:
+        path: /
+        port: 5000
+      periodSeconds: 5
+      failureThreshold: 2
+      timeoutSeconds: 2
+    liveness:
+      httpGet:
+        path: /
+        port: 5000
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 3
+
   # -- Registryctl image settings
   controller:
     image:
@@ -647,6 +691,30 @@ registry:
       repository: 8gears.container-registry.com/8gcr/harbor-registryctl
       # -- Registryctl image tag (defaults to appVersion)
       tag: ""
+    # -- Probes for the registryctl sidecar. Same shape as `core.probes`.
+    # @default -- See [values.yaml](values.yaml)
+    probes:
+      startup:
+        httpGet:
+          path: /api/health
+          port: 8080
+        periodSeconds: 2
+        failureThreshold: 15
+        timeoutSeconds: 2
+      readiness:
+        httpGet:
+          path: /api/health
+          port: 8080
+        periodSeconds: 5
+        failureThreshold: 2
+        timeoutSeconds: 2
+      liveness:
+        httpGet:
+          path: /api/health
+          port: 8080
+        periodSeconds: 10
+        failureThreshold: 3
+        timeoutSeconds: 3
 
   # -- Number of Registry replicas (ignored when autoscaling.enabled=true)
   replicas: 1
@@ -790,6 +858,32 @@ portal:
 
   # -- Service annotations for Portal service
   serviceAnnotations: {}
+
+  # -- Container probes, rendered verbatim. See `core.probes` for the
+  # tuning rationale.
+  # @default -- See [values.yaml](values.yaml)
+  probes:
+    startup:
+      httpGet:
+        path: /
+        port: portal-http
+      periodSeconds: 2
+      failureThreshold: 15
+      timeoutSeconds: 2
+    readiness:
+      httpGet:
+        path: /
+        port: portal-http
+      periodSeconds: 5
+      failureThreshold: 2
+      timeoutSeconds: 2
+    liveness:
+      httpGet:
+        path: /
+        port: portal-http
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 3
 
   # -- Portal image settings
   image:
@@ -979,6 +1073,33 @@ jobservice:
   # @default -- {}
   deploymentStrategy: {}
 
+  # -- Container probes, rendered verbatim. See `core.probes` for the
+  # tuning rationale. Startup budget is long (120s) because jobservice
+  # waits on core availability during first boot.
+  # @default -- See [values.yaml](values.yaml)
+  probes:
+    startup:
+      httpGet:
+        path: /api/v1/stats
+        port: http
+      periodSeconds: 2
+      failureThreshold: 60
+      timeoutSeconds: 2
+    readiness:
+      httpGet:
+        path: /api/v1/stats
+        port: http
+      periodSeconds: 5
+      failureThreshold: 2
+      timeoutSeconds: 2
+    liveness:
+      httpGet:
+        path: /api/v1/stats
+        port: http
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 3
+
   # -- Jobservice image settings
   image:
     # -- Jobservice image repository
@@ -1128,6 +1249,32 @@ exporter:
   # -- Deployment strategy (empty = K8s default RollingUpdate)
   # @default -- {}
   deploymentStrategy: {}
+
+  # -- Container probes, rendered verbatim. See `core.probes` for the
+  # tuning rationale.
+  # @default -- See [values.yaml](values.yaml)
+  probes:
+    startup:
+      httpGet:
+        path: /metrics
+        port: 8001
+      periodSeconds: 2
+      failureThreshold: 30
+      timeoutSeconds: 2
+    readiness:
+      httpGet:
+        path: /metrics
+        port: 8001
+      periodSeconds: 5
+      failureThreshold: 2
+      timeoutSeconds: 2
+    liveness:
+      httpGet:
+        path: /metrics
+        port: 8001
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 3
 
   # -- Exporter image settings
   image:
@@ -1339,6 +1486,32 @@ trivy:
   # -- Extra environment variables with valueFrom support
   # @default -- []
   extraEnv: []
+
+  # -- Container probes, rendered verbatim. See `core.probes` for the
+  # tuning rationale. Startup budget 60s covers adapter init.
+  # @default -- See [values.yaml](values.yaml)
+  probes:
+    startup:
+      httpGet:
+        path: /probe/ready
+        port: api-server
+      periodSeconds: 2
+      failureThreshold: 30
+      timeoutSeconds: 2
+    readiness:
+      httpGet:
+        path: /probe/ready
+        port: api-server
+      periodSeconds: 5
+      failureThreshold: 2
+      timeoutSeconds: 2
+    liveness:
+      httpGet:
+        path: /probe/healthy
+        port: api-server
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 3
 
   image:
     # -- Trivy adapter image repository

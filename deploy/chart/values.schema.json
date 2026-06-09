@@ -841,6 +841,15 @@
           "additionalProperties": true,
           "description": "Supplementary env vars flattened via toEnvVars. Used by file-driven components (jobservice) where config holds the YAML config file rather than env vars."
         },
+        "probes": {
+          "type": ["object", "null"],
+          "description": "Container probes. Each key holds a full Kubernetes probe spec rendered verbatim; set a probe to null to omit it.",
+          "properties": {
+            "startup": { "type": ["object", "null"] },
+            "liveness": { "type": ["object", "null"] },
+            "readiness": { "type": ["object", "null"] }
+          }
+        },
         "existingConfigMap": {
           "type": "string",
           "description": "Externally-managed ConfigMap holding the component's config file, used instead of the chart-generated one. Applies to file-driven components (registry, jobservice, portal)."

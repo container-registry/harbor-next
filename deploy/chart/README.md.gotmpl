@@ -184,6 +184,7 @@ Each Harbor component (core, portal, registry, jobservice, exporter) supports:
 | `<component>.secret` | Sensitive config (becomes Secret env vars) |
 | `<component>.extraEnv` | Additional env vars with `valueFrom` support |
 | `<component>.lifecycle` | Container `preStop`/`postStart` hook spec — see [Lifecycle hooks](#lifecycle-hooks-prestop-drain) |
+| `<component>.probes` | Full K8s probe specs (`startup`/`liveness`/`readiness`), rendered verbatim. Defaults: 2s-period startupProbe (ready as soon as the endpoint responds, no fixed initialDelay), 5s readiness, 10s liveness. Set a probe to `null` to omit it |
 | `<component>.hostAliases` | `/etc/hosts` entries (list of `{ip, hostnames}`) for private DNS targets |
 | `<component>.pdb.enabled` | Enable PodDisruptionBudget |
 | `<component>.pdb.minAvailable` | Minimum available pods during disruption |
@@ -304,19 +305,16 @@ Three customization tiers:
 2. **Inline** — edit `registry.config` in your values file.
 3. **External ConfigMap** — own `config.yml` outside the chart entirely.
 
-**Switching storage backend** — Helm deep-merges values, so adding `s3:` alongside the default `filesystem:` produces a config.yml with BOTH backends defined. Explicitly null out the chart default:
+**Switching storage backend** — set exactly one driver key under `storage:`. The chart default deliberately ships **no** driver, so your `s3:` can't collide with a chart-side `filesystem:` (Helm deep-merge). When no driver is set, the chart injects `filesystem: {rootdirectory: /storage}` at render time; defining two or more drivers fails at `helm install/template` time with a message naming them — instead of distribution CrashLooping at boot:
 
 ```yaml
 registry:
   config:
     storage:
-      filesystem: null    # remove chart default
       s3:
         region: us-east-1
         bucket: my-harbor-bucket
         # forcepathstyle: true  # MinIO / Ceph RGW / SeaweedFS
-      cache:
-        layerinfo: redis
 ```
 
 **Credentials never go in `registry.config`** (they'd be visible in the rendered ConfigMap). Use one of:
@@ -330,7 +328,6 @@ registry:
 registry:
   config:
     storage:
-      filesystem: null
       s3:
         region: us-east-1
         bucket: my-harbor-bucket
@@ -359,7 +356,6 @@ For AWS EKS with IRSA (no static credentials), omit `storageCredentials` entirel
 registry:
   config:
     storage:
-      filesystem: null
       azure:
         accountname: mystorageaccount
         container: harbor
@@ -379,7 +375,6 @@ registry:
 registry:
   config:
     storage:
-      filesystem: null
       gcs:
         bucket: my-harbor-bucket
         keyfile: /etc/registry/gcs/key.json    # mounted from existingSecret
@@ -604,6 +599,11 @@ helm uninstall my-harbor --namespace harbor
 
 ## Migrating from Legacy Harbor Chart
 
+> **📖 Full guide:** [docs/MIGRATION.md](docs/MIGRATION.md) maps **every**
+> value in the legacy [goharbor/harbor-helm](https://github.com/goharbor/harbor-helm)
+> chart to its equivalent here, lists removed settings with workarounds, and
+> includes a worked before/after example.
+
 This chart is a redesign, not a drop-in replacement. Migration steps:
 
 1. **Backup your Harbor data** using Harbor's built-in backup or database dumps
@@ -628,6 +628,11 @@ This chart is a redesign, not a drop-in replacement. Migration steps:
 | `nginx.*` | Not applicable — no nginx proxy |
 | `notary.*` | Not supported — Notary deprecated |
 | `chartmuseum.*` | Not supported — use OCI artifacts |
+
+This table is a teaser — the [full migration guide](docs/MIGRATION.md) covers
+all sections (expose/TLS, storage backends, per-component settings, secrets
+carry-over) including the `secretKey` requirement when reusing an existing
+database.
 
 ## Troubleshooting
 

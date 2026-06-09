@@ -124,9 +124,8 @@ registry:
       fields:
         service: registry
     storage:
-      # null out the chart-default filesystem backend (Helm deep-merges values,
-      # so omitting `filesystem:` doesn't remove the chart default — explicit null does).
-      filesystem: null
+      # The chart default carries no driver — setting `s3:` here makes it the
+      # active driver (filesystem is only injected when no driver is set).
       s3:
         region: eu-central-1
         bucket: ""  # set via --set-json or edit here before installing

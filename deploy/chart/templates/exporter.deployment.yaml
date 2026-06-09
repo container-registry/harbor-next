@@ -115,18 +115,7 @@ spec:
             {{- with .Values.exporter.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-          livenessProbe:
-            httpGet:
-              path: /metrics
-              port: {{ include "harbor.metrics.portName" . | quote }}
-            initialDelaySeconds: 10
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /metrics
-              port: {{ include "harbor.metrics.portName" . | quote }}
-            initialDelaySeconds: 10
-            periodSeconds: 10
+          {{- include "harbor.probes" .Values.exporter.probes | nindent 10 }}
           resources:
             {{- toYaml .Values.exporter.resources | nindent 12 }}
           {{- with .Values.exporter.lifecycle }}

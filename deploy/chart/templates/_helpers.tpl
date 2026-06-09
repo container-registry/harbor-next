@@ -172,6 +172,34 @@ hostAliases:
 
 {{/*
 =============================================================================
+Probe helpers
+=============================================================================
+*/}}
+
+{{/*
+Render startup/liveness/readiness probes from a component's `probes` block.
+Each probe is a full Kubernetes probe spec rendered verbatim; a probe set
+to null (or an absent probes block) is simply omitted.
+Usage: {{ include "harbor.probes" .Values.core.probes | nindent 10 }}
+*/}}
+{{- define "harbor.probes" -}}
+{{- $probes := . | default dict }}
+{{- with $probes.startup }}
+startupProbe:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- with $probes.liveness }}
+livenessProbe:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- with $probes.readiness }}
+readinessProbe:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end }}
+
+{{/*
+=============================================================================
 Registry helpers
 =============================================================================
 */}}
@@ -260,17 +288,20 @@ metric:
 {{/*
 Detect the registry storage provider from the user's registry.config.storage
 block. Harbor Core needs this as REGISTRY_STORAGE_PROVIDER_NAME to compute
-redirects and presigned URLs. Returns the first known backend key found.
-Defaults to "filesystem" when nothing matches.
+redirects and presigned URLs. A driver is any storage key that is not one of
+distribution's meta sections (cache/delete/maintenance/redirect/tag), so new
+distribution drivers are picked up without chart changes. Defaults to
+"filesystem" when no driver is set (mirrors registry.configmap.yaml).
 */}}
 {{- define "harbor.registry.storageType" -}}
 {{- $storage := dig "storage" (dict) (.Values.registry.config | default dict) -}}
-{{- if hasKey $storage "s3" -}}s3
-{{- else if hasKey $storage "azure" -}}azure
-{{- else if hasKey $storage "gcs" -}}gcs
-{{- else if hasKey $storage "oss" -}}oss
-{{- else -}}filesystem
+{{- $driver := "filesystem" -}}
+{{- range $k, $v := $storage -}}
+{{- if and (not (has $k (list "cache" "delete" "maintenance" "redirect" "tag"))) (not (kindIs "invalid" $v)) -}}
+{{- $driver = $k -}}
 {{- end -}}
+{{- end -}}
+{{- $driver -}}
 {{- end -}}
 
 {{/*
