@@ -47,4 +47,3 @@ Legend: ✅ Delivered · 🚧 In progress · 🗓️ Planned · 💲 Commercial 
 - 🗓 **New Portal** — A portal without Node/Angular — a simple HTML multi-page app (MPA).
 - 🗓 **Drop Redis** — With an architectural redesign, Redis is no longer needed for caching.
 - 🗓 **Simplified Stack** — Collapse to a single application container plus a database.
-
