@@ -7,6 +7,10 @@ on:
       - "**.md"
       - "docs/**"
       - "CLAUDE.md"
+      # Covered by their own path-filtered workflows (chart-ci, compose-ci);
+      # nothing in the image build consumes deploy/.
+      - "deploy/chart/**"
+      - "deploy/compose/**"
 
 permissions:
   contents: read
