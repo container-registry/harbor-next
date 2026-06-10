@@ -1,5 +1,10 @@
 # Create a Harbor deployment on SUSE Rancher
 
+A ready-made values file for this scenario lives at
+[`example/rke2-rancher/values.yaml`](../../example/rke2-rancher/values.yaml)
+(also shipped inside the chart package). This guide walks through the
+cluster preparation around it and explains the values that matter.
+
 ## Supported versions
 
 - Rancher manager >= 2.13.1
@@ -16,7 +21,7 @@ kubectl create namespace my-db
 In this guide we use local storage, so we install a storage provisioner:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.34/deploy/local-path-storage.yaml
+kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.35/deploy/local-path-storage.yaml
 ```
 
 Set it as default:
@@ -92,37 +97,36 @@ Decompress the downloaded chart:
 
 ```bash
 tar xzvf harbor-*.tgz
+cd harbor-next
 ```
 
-We update `values.yaml` to set the hostname, port and credentials of our database we will use with Harbor:
+The chart ships an RKE2/Rancher values file at
+`example/rke2-rancher/values.yaml`. Copy it and adjust the handful of
+values that are specific to your installation:
 
-```yaml
-database:
-  host: "postgresql.my-db.svc.cluster.local"
-  port: 5432
-  username: "postgres"
-  password: "test1234!"
-  database: registry
-```
+- **`externalURL`** and the `ingress` hostnames — the example uses
+  `harbor.example.com` throughout. RKE2 ships an Nginx ingress controller
+  by default; the example's annotations are tuned for it, most importantly
+  `nginx.ingress.kubernetes.io/proxy-body-size: "0"`, without which large
+  image pushes fail at the ingress.
+- **`harborAdminPassword`** — required, no default. Use
+  `existingSecretAdminPassword` for production.
+- **`database`** — pre-wired to the Bitnami PostgreSQL deployed above
+  (`postgresql.my-db.svc.cluster.local`, user `postgres`, database
+  `registry`). Set `database.password` to the password you chose during
+  the database installation (`test1234!` in this walkthrough), or better,
+  reference a Secret via `database.existingSecret`.
+- **TLS** — the example sets `tls.certSource: auto`, so the chart
+  generates its own certificates; the ingress serves them from the
+  `harbor-tls` secret. Replace with real certificates for anything
+  internet-facing.
+- **Persistence** — registry persistence is enabled with a 10Gi PVC on
+  the default storage class (the `local-path` provisioner installed
+  above).
 
-We set also `externalURL` and `harborAdminPassword`:
-
-```yaml
-externalURL: "https://harbor.example.com"
-harborAdminPassword: "strong-password"
-```
-
-Finally we configure the ingress:
-
-```yaml
-ingress:
-  core: harbor.example.com
-  hosts:
-    - host: harbor.example.com
-  tls:
-    - secretName: harbor-tls
-      hosts:
-        - harbor.example.com
+```bash
+cp example/rke2-rancher/values.yaml my-values.yaml
+# edit my-values.yaml
 ```
 
 The hostname chosen for our local deployment is `harbor.example.com`. To override our DNS resolver, we set a mapping to localhost in `/etc/hosts`:
@@ -135,6 +139,7 @@ We will now deploy Harbor:
 
 ```bash
 helm upgrade --install test-1 . \
+  -f my-values.yaml \
   --namespace my-container-registry \
   --create-namespace
 ```
@@ -159,11 +164,9 @@ Since RKE2 comes with an Nginx ingress deployed by default, we can access the po
 https://harbor.example.com
 ```
 
-Log in with username `admin` and the password you set in `harborAdminPassword`
-above (`strong-password` in this example — change it to a real strong password
-before deploying anywhere reachable from outside your cluster).
+Log in with username `admin` and the password you set in `harborAdminPassword`.
 
-> **⚠️ Security:** If you skip `harborAdminPassword`, Harbor falls back to the
-> well-known default `Harbor12345`. That default is publicly documented and must
-> never be used on a non-throwaway environment. Rotate the password from the
-> Harbor UI (User Profile → Change Password) immediately after first login.
+> **⚠️ Security:** If you skip `harborAdminPassword`, the install fails —
+> there is no default. Never reuse the legacy chart's well-known
+> `Harbor12345` outside throwaway environments. Rotate the password from
+> the Harbor UI (User Profile → Change Password) after first login.

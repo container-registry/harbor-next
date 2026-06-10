@@ -1,5 +1,10 @@
 # Create Deployment on K3S
 
+This guide deploys Harbor with a CloudNativePG-managed database in the
+same namespace — everything in one values file. For a plain local-dev
+setup on k3d (same Traefik ingress, throwaway Postgres Deployment instead
+of CNPG), see [`example/k3d-local/`](../../example/k3d-local/).
+
 ## Deploy Local CNPG System
 
 To deploy the database in the same namespace, first install the CloudNativePG (CNPG) operator:

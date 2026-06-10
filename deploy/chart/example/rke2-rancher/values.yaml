@@ -2,7 +2,7 @@
 # Usage: helm install harbor . -n harbor -f example/rke2-rancher/values.yaml
 
 # External URL for Harbor
-externalURL: "https://rancher-dev-16gb-fsn1-1.container-registry.com"
+externalURL: "https://harbor.example.com"
 
 # REQUIRED: set a strong password (min 8 chars) or use
 # existingSecretAdminPassword for production.
@@ -18,16 +18,16 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-buffering: "off"
     nginx.ingress.kubernetes.io/proxy-next-upstream-timeout: "30"
     nginx.ingress.kubernetes.io/proxy-next-upstream-tries: "5"
-  core: rancher-dev-16gb-fsn1-1.container-registry.com
+  core: harbor.example.com
   hosts:
-    - host: rancher-dev-16gb-fsn1-1.container-registry.com
+    - host: harbor.example.com
       paths:
         - path: /
           pathType: Prefix
   tls:
     - secretName: harbor-tls
       hosts:
-        - rancher-dev-16gb-fsn1-1.container-registry.com
+        - harbor.example.com
 
 # TLS configuration - auto-generate certs
 tls:

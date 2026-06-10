@@ -18,6 +18,10 @@ the top level.
 Every `example/*/values*.yaml` is render-checked in CI
 (`task helm:examples`) — new examples are picked up automatically.
 
+Platform walkthroughs (cluster prep, database setup, the reasoning behind
+the values) live in [`docs/guide/`](../docs/guide/) — K3S, Rancher/RKE2,
+OpenShift, and Nutanix NKP.
+
 ## Usage
 
 ```bash
@@ -27,63 +31,7 @@ helm install harbor . -n harbor --create-namespace -f example/k3d-local/values.y
 
 ## Prerequisites
 
-Each example may have specific prerequisites. See the comments in each
-values file (or the directory's README) for details.
-
-### k3d-local
-
-Requires a PostgreSQL database. Deploy one first:
-
-```bash
-kubectl create namespace harbor
-
-kubectl apply -n harbor -f - <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: postgres-secret
-stringData:
-  POSTGRES_PASSWORD: harbordbpass
-  POSTGRES_USER: postgres
-  POSTGRES_DB: registry
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: postgres
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: postgres
-  template:
-    metadata:
-      labels:
-        app: postgres
-    spec:
-      containers:
-      - name: postgres
-        image: postgres:15
-        ports:
-        - containerPort: 5432
-        envFrom:
-        - secretRef:
-            name: postgres-secret
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: postgres
-spec:
-  selector:
-    app: postgres
-  ports:
-  - port: 5432
-EOF
-
-# Wait for postgres to be ready
-kubectl wait -n harbor --for=condition=ready pod -l app=postgres --timeout=120s
-
-# Then install Harbor
-helm install harbor . -n harbor -f example/k3d-local/values.yaml
-```
+Each example has its own prerequisites — see the comments in its values
+file or the README in its directory. All scenarios need an external
+PostgreSQL (the chart ships none); `k3d-local/` and `openshift/` show two
+ways to deploy one alongside Harbor.

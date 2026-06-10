@@ -2,7 +2,7 @@
 
 ![Version: 3.0.0](https://img.shields.io/badge/Version-3.0.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: v2.15.0](https://img.shields.io/badge/AppVersion-v2.15.0-informational?style=flat-square)
 
-A modern, production-ready Helm chart for [Harbor Next](https://github.com/container-registry/harbor-next) - the cloud native container registry for Kubernetes.
+A modern, production-ready Helm chart for [Harbor Next](https://github.com/container-registry/harbor-next) - the cloud-native container registry for Kubernetes.
 
 ## TL;DR
 

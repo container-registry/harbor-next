@@ -2,6 +2,8 @@
 
 Thank you for contributing! This guide explains how to open PRs and merge them correctly so the automated release pipeline works as expected.
 
+> **Working on the Helm chart (`deploy/chart/`)?** Additional guidelines apply — see [deploy/chart/CONTRIBUTING.md](deploy/chart/CONTRIBUTING.md) for the chart change workflow, its CI quality gate, and the backward-compatibility rules.
+
 ## Table of Contents
 
 - [Workflow Overview](#workflow-overview)
