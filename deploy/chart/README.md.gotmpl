@@ -88,6 +88,10 @@ Built-in `values.schema.json` provides:
 - Required field enforcement (`externalURL`, `database.host`)
 - Type checking and enum validation
 - Immediate feedback on configuration errors
+- Typo detection: unknown **top-level** keys are rejected
+  (`additionalProperties: false` at the root). Component config blocks
+  stay open by design — the generic passthrough means new application
+  config keys never require a chart change.
 
 ## Architecture
 

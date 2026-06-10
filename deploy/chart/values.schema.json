@@ -4,6 +4,7 @@
   "title": "Harbor Next Helm Chart Values",
   "description": "Schema for Harbor Next Helm chart values.yaml validation",
   "type": "object",
+  "additionalProperties": false,
   "required": ["externalURL"],
   "allOf": [
     {
@@ -100,6 +101,36 @@
       "type": "boolean",
       "default": true,
       "description": "Allow auto-generation of secret material. Set false to fail at render time when a secret would be generated instead of pinned (GitOps/Argo CD)"
+    },
+    "ipFamily": {
+      "type": "object",
+      "description": "IP family configuration for dual-stack clusters",
+      "properties": {
+        "ipv4": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"}
+          }
+        },
+        "ipv6": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "trace": {
+      "type": "object",
+      "description": "Distributed tracing configuration (jaeger or otel provider)",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "provider": {"type": "string", "enum": ["jaeger", "otel"]},
+        "sample_rate": {"type": "number"},
+        "jaeger": {"type": "object"},
+        "otel": {"type": "object"}
+      },
+      "additionalProperties": true
     },
     "existingSecretSecretKey": {
       "type": "string",
