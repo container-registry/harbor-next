@@ -308,6 +308,29 @@ jobs:
           username: ${{ vars.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
+      - name: Add per-release Artifact Hub images annotation
+        # Image tags are only known at release time, so the
+        # artifacthub.io/images annotation is appended here instead of
+        # living in Chart.yaml (whose annotations block is deliberately
+        # the last top-level key).
+        run: |
+          {
+            echo "  artifacthub.io/images: |"
+            for component in core jobservice registryctl exporter portal registry trivy-adapter; do
+              image_name="harbor-${component}"
+              if [ "${component}" = "trivy-adapter" ]; then
+                image_name="trivy-adapter"
+              fi
+              echo "    - name: ${image_name}"
+              echo "      image: ${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/${image_name}:${TAG_NAME}"
+            done
+          } >> deploy/chart/Chart.yaml
+
+      - name: Validate Artifact Hub metadata
+        run: |
+          docker run --rm -v "$(pwd)/deploy/chart:/chart" \
+            "artifacthub/ah:v${AH_VERSION}" ah lint --kind helm --path /chart
+
       - name: Package chart
         # Chart version is bare semver (helm/Artifact Hub requirement);
         # appVersion is the tag so default image tags resolve to the
@@ -335,6 +358,21 @@ jobs:
         run: |
           cosign sign --yes \
             "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts/harbor-next@${{ steps.push.outputs.digest }}"
+
+      - name: Install oras
+        uses: oras-project/setup-oras@38de303aac69abb66f3e6255b7198bff35f323e3 # v2.0.0
+        with:
+          version: ${{ env.ORAS_VERSION }}
+
+      - name: Push Artifact Hub repository metadata
+        # artifacthub-repo.yml rides next to the chart as an OCI artifact
+        # (artifacthub.io tag) — Artifact Hub reads it for ownership /
+        # verified publisher. See deploy/chart/artifacthub-repo.yml.
+        working-directory: deploy/chart
+        run: |
+          oras push "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts/harbor-next:artifacthub.io" \
+            --config /dev/null:application/vnd.cncf.artifacthub.config.v1+yaml \
+            artifacthub-repo.yml:application/vnd.cncf.artifacthub.repository-metadata.layer.v1.yaml
 
   sign:
     name: Sign and Release

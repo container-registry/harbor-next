@@ -8,10 +8,9 @@ vars:
   CHART_DIR: deploy/chart
   CHART_NAME: harbor-next
 
-  # Tool versions
+  # Tool versions (AH_VERSION comes from versions.env)
   CT_VERSION: '{{.CT_VERSION | default "3.12.0"}}'
   KUBE_LINTER_VERSION: '{{.KUBE_LINTER_VERSION | default "0.7.3"}}'
-  AH_VERSION: '{{.AH_VERSION | default "1.22.0"}}'
   # Minimum required values for schema validation
   HELM_SET: >-
     --set externalURL=https://harbor.example.com
