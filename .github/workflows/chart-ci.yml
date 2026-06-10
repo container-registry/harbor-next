@@ -114,6 +114,10 @@ jobs:
             echo "CT_LINT_CONF=${RUNNER_TEMP}/ct/etc/lintconf.yaml"
             echo "CT_CHART_YAML_SCHEMA=${RUNNER_TEMP}/ct/etc/chart_schema.yaml"
           } >> "$GITHUB_ENV"
+          # Bootstrap pip if the runner python ships without it.
+          python3 -m pip --version >/dev/null 2>&1 \
+            || python3 -m ensurepip --user >/dev/null 2>&1 \
+            || { curl -fsSL https://bootstrap.pypa.io/get-pip.py | python3 - --user --quiet; }
           python3 -m pip install --user --quiet yamale yamllint
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 

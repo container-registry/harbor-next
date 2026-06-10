@@ -92,8 +92,9 @@ tasks:
     desc: "Run the values doctor (tools/values-lint.ys) over every example and CI values file"
     deps: [_require-ys]
     cmds:
-      # ERRORs (config that cannot render/work) fail the task; WARNs
-      # (inline credentials, consistency advisories) are informational.
+      # ERROR findings (config that cannot render/work) fail the task;
+      # WARN findings (inline credentials, consistency advisories) are
+      # informational.
       - for:
           - example/aws-eks-irsa/values-aws-irsa.yaml
           - example/k3d-local/values.yaml
@@ -116,7 +117,7 @@ tasks:
       - defer: rm -f tests/lint/.report-*.gen.txt
       - diff -u tests/lint/report-clean.txt tests/lint/.report-clean.gen.txt
       - diff -u tests/lint/report-tripwire.txt tests/lint/.report-tripwire.gen.txt
-      # the tripwire fixture must exit non-zero (it contains ERRORs)
+      # the tripwire fixture must exit non-zero (it contains ERROR findings)
       - cmd: ys tools/values-lint.ys tests/lint/values-tripwire.yaml > /dev/null 2>&1 && exit 1 || echo "tripwire fixture correctly exits non-zero"
       - echo "values-lint golden tests PASS"
 
