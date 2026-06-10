@@ -11,6 +11,12 @@ on:
 permissions:
   contents: read
 
+env:
+  # arduino/setup-task v2.0.0 (latest) still declares node20, which is
+  # deprecated and becomes node24-by-default on 2026-06-16. Opt in early
+  # so the forced switch can't surprise us.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   chart-quality:
     name: Chart Quality Gate
@@ -19,7 +25,15 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - name: Load versions
-        run: grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
+        # Helm homes: self-hosted runner images may ship a root-owned
+        # ~/.cache; keep all helm state in the always-writable temp.
+        run: |
+          grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
+          {
+            echo "HELM_CACHE_HOME=${RUNNER_TEMP}/helm/cache"
+            echo "HELM_CONFIG_HOME=${RUNNER_TEMP}/helm/config"
+            echo "HELM_DATA_HOME=${RUNNER_TEMP}/helm/data"
+          } >> "$GITHUB_ENV"
 
       - name: Install Task
         uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
@@ -38,6 +52,7 @@ jobs:
         run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version "${HELM_UNITTEST_VERSION}" --verify=false
 
       - name: Install helm-docs
+        # No sudo: self-hosted runners may not have it.
         run: |
           arch="$(uname -m)"
           case "${arch}" in
@@ -45,8 +60,10 @@ jobs:
             aarch64|arm64) asset_arch="arm64" ;;
             *) echo "unsupported arch: ${arch}" >&2; exit 1 ;;
           esac
+          mkdir -p "${RUNNER_TEMP}/bin"
           curl -fsSL "https://github.com/norwoodj/helm-docs/releases/download/v${HELM_DOCS_VERSION}/helm-docs_${HELM_DOCS_VERSION}_Linux_${asset_arch}.tar.gz" \
-            | sudo tar -xz -C /usr/local/bin helm-docs
+            | tar -xz -C "${RUNNER_TEMP}/bin" helm-docs
+          echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
 
       # helm lint + ct lint + kube-linter + ah lint (Artifact Hub metadata)
       - name: Lint
