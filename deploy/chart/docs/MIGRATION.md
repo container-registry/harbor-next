@@ -25,14 +25,14 @@ data migration.
 | TLS | `expose.tls.enabled: true` | `tls.enabled: false` (terminate at ingress) | Revisit the [TLS section](#tls) |
 | Internal TLS | `internalTLS.*` | **Not supported** | Use a service mesh for pod-to-pod TLS |
 | Images | `docker.io/goharbor/*` | `8gears.container-registry.com/8gcr/harbor-*` (Harbor Next builds) | Nothing, unless you mirror images |
-| Probes | Fully configurable per component | Fixed (only `core.startupProbe` is tunable) | Drop probe overrides |
+| Probes | Fully configurable per component | Fully configurable via `<component>.probes.{startup,liveness,readiness}` (full K8s probe specs) | Move probe overrides into `<component>.probes` |
 | Notary / ChartMuseum | Removed in later 2.x releases too | Not supported | Use cosign/OCI artifacts |
 
 ## Choosing a migration path
 
-**A. Replicate (recommended).** Install this chart as a new Harbor instance,
-then use Harbor's replication feature (or re-push from CI) to copy projects
-and artifacts. Users, robot accounts, and settings must be recreated (or
+**A. Replicate.** Install this chart as a new Harbor instance, then use
+Harbor's replication feature (or re-push from CI) to copy projects and
+artifacts. Users, robot accounts, and settings must be recreated (or
 scripted via the Harbor API). No secret carry-over needed.
 
 **B. Reuse the existing database and storage backend.** Possible when your
