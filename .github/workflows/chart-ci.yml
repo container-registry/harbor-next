@@ -65,6 +65,19 @@ jobs:
             | tar -xz -C "${RUNNER_TEMP}/bin" helm-docs
           echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
 
+      - name: Install ys (YAMLScript, for migration golden tests)
+        run: |
+          arch="$(uname -m)"
+          case "${arch}" in
+            x86_64) asset_arch="x64" ;;
+            aarch64|arm64) asset_arch="aarch64" ;;
+            *) echo "unsupported arch: ${arch}" >&2; exit 1 ;;
+          esac
+          mkdir -p "${RUNNER_TEMP}/ys"
+          curl -fsSL "https://github.com/yaml/yamlscript/releases/download/${YS_VERSION}/ys-${YS_VERSION}-linux-${asset_arch}.tar.xz" \
+            | tar -xJ -C "${RUNNER_TEMP}/ys" --strip-components=1
+          echo "${RUNNER_TEMP}/ys" >> "$GITHUB_PATH"
+
       # helm lint + ct lint + kube-linter + ah lint (Artifact Hub metadata)
       - name: Lint
         run: task helm:lint
@@ -86,6 +99,9 @@ jobs:
 
       - name: README in sync (helm-docs)
         run: task helm:helm-docs
+
+      - name: Migration golden tests
+        run: task helm:migrate:test
 
       - name: Trivy config scan
         run: task helm:trivy-chart

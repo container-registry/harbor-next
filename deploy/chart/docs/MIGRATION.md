@@ -20,11 +20,11 @@ everything that changes, gets dropped, or will not work as expected. It needs
 [YAMLScript](https://yamlscript.org) (`brew install yamlscript`):
 
 ```bash
-# from the chart directory
+# directly (from deploy/chart)
 ys docs/harbor-migrate.ys old-values.yaml new-values.yaml
 
-# or via Task
-task migrate -- old-values.yaml new-values.yaml
+# or via Task (from anywhere in the repo)
+task helm:migrate -- old-values.yaml new-values.yaml
 
 # report only (values to /dev/null)
 ys docs/harbor-migrate.ys old-values.yaml > /dev/null

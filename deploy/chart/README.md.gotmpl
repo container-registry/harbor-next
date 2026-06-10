@@ -670,7 +670,7 @@ helm uninstall my-harbor --namespace harbor
 > chart to its equivalent here and lists removed settings with workarounds —
 > written for humans and LLMs translating values files by hand.
 
-> **🤖 Automated:** `task migrate -- old-values.yaml new-values.yaml` runs
+> **🤖 Automated:** `task helm:migrate -- old-values.yaml new-values.yaml` runs
 > [docs/harbor-migrate.ys](docs/harbor-migrate.ys), a
 > [YAMLScript](https://yamlscript.org) translator that emits a migrated
 > values file plus an `ERROR`/`WARN`/`INFO` advisory report of everything
@@ -736,35 +736,20 @@ The chart uses `readOnlyRootFilesystem: true`. If a component needs to write:
 
 ## Development
 
-### Run Tests
+All chart tasks live in the repo-root Taskfile under the `helm:`
+namespace — one source of truth for humans and CI alike (tool versions
+pinned via `versions.env`). Run from anywhere in the repo; Task resolves
+the root Taskfile:
 
 ```bash
-helm unittest deploy/chart
-```
-
-### Lint Chart
-
-```bash
-helm lint deploy/chart \
-  --set externalURL=https://example.com \
-  --set database.host=db \
-  --set harborAdminPassword=changeme123
-```
-
-### Generate Docs
-
-```bash
-helm-docs --chart-search-root deploy/chart
-```
-
-### Render Templates
-
-```bash
-helm template test deploy/chart \
-  --set externalURL=https://example.com \
-  --set database.host=db \
-  --set harborAdminPassword=changeme123 \
-  --debug
+task helm:unittest            # helm unittest suites
+task helm:unittest:update     # refresh test snapshots
+task helm:lint                # helm + ct + kube-linter + ah + schema lint
+task helm:docs                # regenerate this README via helm-docs
+task helm:examples            # render every example values file
+task helm:gitops-determinism  # byte-identical double-render check
+task helm:migrate:test        # migration translator golden tests
+task helm:ci                  # full quality gate (what Chart CI runs)
 ```
 
 {{ template "helm-docs.versionFooter" . }}
