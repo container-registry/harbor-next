@@ -1,5 +1,5 @@
 # Harbor Helm Chart - k3d Local Development Values
-# Usage: helm install harbor . -n harbor -f example/k3d-local.yaml
+# Usage: helm install harbor . -n harbor -f example/k3d-local/values.yaml
 
 # External URL for Harbor (use localhost with k3d port mapping)
 externalURL: "https://harbor.localhost"

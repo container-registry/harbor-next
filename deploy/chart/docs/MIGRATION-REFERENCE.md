@@ -91,7 +91,7 @@ two or more drivers fail at `helm install` time):
 |---|---|---|
 | `persistence.imageChartStorage.type: <backend>` | `registry.config.storage.<backend>: {...}` | Any distribution storage driver/field works |
 | `persistence.imageChartStorage.disableredirect: true` | `registry.config.storage.redirect.disable: true` | Native distribution syntax |
-| `persistence.imageChartStorage.caBundleSecretName` | `externalRedis.tlsOptions.existingCaSecret` | Despite the name, this Secret is mounted on **every** component with `SSL_CERT_DIR` set — it covers private CAs for S3, OIDC, LDAP, and Redis alike. See `example/private-ca.yaml` |
+| `persistence.imageChartStorage.caBundleSecretName` | `externalRedis.tlsOptions.existingCaSecret` | Despite the name, this Secret is mounted on **every** component with `SSL_CERT_DIR` set — it covers private CAs for S3, OIDC, LDAP, and Redis alike. See `example/private-ca/values.yaml` |
 | `...filesystem.rootdirectory` | `registry.config.storage.filesystem.rootdirectory` | |
 | `...s3.{region,bucket,regionendpoint,...}` | `registry.config.storage.s3.{...}` | All distribution s3 fields pass through |
 | `...s3.existingSecret` | `registry.storageCredentials.s3.existingSecret` | Same key names (`REGISTRY_STORAGE_S3_ACCESSKEY` / `REGISTRY_STORAGE_S3_SECRETKEY`) — your existing Secret works as-is |

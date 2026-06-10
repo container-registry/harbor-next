@@ -210,19 +210,19 @@ Each Harbor component (core, portal, registry, jobservice, exporter) supports:
 
 ## Example Values Files
 
-The [`example/`](example/) directory contains ready-to-use values files for common environments:
+The [`example/`](example/) directory contains one directory per scenario, each with a ready-to-use `values.yaml` (every one is render-checked in CI):
 
-| File | Description |
-|------|-------------|
-| [`k3d-local.yaml`](example/k3d-local.yaml) | Local development with k3d cluster |
-| [`rke2-rancher.yaml`](example/rke2-rancher.yaml) | RKE2/Rancher deployment |
-| [`private-ca.yaml`](example/private-ca.yaml) | Private-CA / mTLS: PG with `verify-full` + Redis over TLS + shared CA for S3/OIDC |
+| Directory | Description |
+|-----------|-------------|
+| [`k3d-local/`](example/k3d-local/) | Local development with k3d cluster |
+| [`rke2-rancher/`](example/rke2-rancher/) | RKE2/Rancher deployment |
+| [`private-ca/`](example/private-ca/) | Private-CA / mTLS: PG with `verify-full` + Redis over TLS + shared CA for S3/OIDC |
 | [`openshift/`](example/openshift/) | OpenShift deployment with edge-terminated routes |
 | [`aws-eks-irsa/`](example/aws-eks-irsa/) | AWS EKS with IRSA for S3 storage and RDS IAM Auth |
 | [`flux/`](example/flux/) | FluxCD GitOps: HelmRelease + drift detection + pinned secrets (`autoGenSecrets: false`), works for Argo CD too |
 
 ```bash
-helm install harbor . -n harbor --create-namespace -f example/k3d-local.yaml
+helm install harbor . -n harbor --create-namespace -f example/k3d-local/values.yaml
 ```
 
 ## Configuration Examples
@@ -540,7 +540,7 @@ Expected keys in `existingTlsSecret` follow cert-manager convention:
 - **Exporter** does not yet plumb `POSTGRESQL_URL` through its viper config, so its DB connection ignores the URL env. Works fine for `sslmode=verify-ca` with a publicly-trusted CA; for mTLS the exporter will fail until a backend-side patch lands.
 - **Schema migrations** use Harbor's `NewMigrator`, which builds its own DSN from individual fields and ignores `cfg.URL`. Servers that **require** client certificates will reject the migrator. Use `sslmode=verify-ca` (CA-only verification) or coordinate the initial migration via an external trusted client until the migrator honors `URL`.
 
-A combined example covering DB TLS + private Redis CA + cert-manager-managed ingress lives at [`example/private-ca.yaml`](example/private-ca.yaml).
+A combined example covering DB TLS + private Redis CA + cert-manager-managed ingress lives at [`example/private-ca/`](example/private-ca/).
 
 ### Custom Configuration via `toEnvVars`
 

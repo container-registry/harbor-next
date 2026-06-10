@@ -39,7 +39,7 @@
 #   # 5. cert-manager ClusterIssuer / Issuer for ingress (out of scope).
 #
 # Usage:
-#   helm install harbor . -n harbor --create-namespace -f example/private-ca.yaml
+#   helm install harbor . -n harbor --create-namespace -f example/private-ca/values.yaml
 #
 # ─── Caveats ────────────────────────────────────────────────────────────────
 #

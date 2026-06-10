@@ -153,14 +153,14 @@ tasks:
 
   examples:
     desc: "Render every example values file standalone"
+    vars:
+      # One directory per example; any values*.yaml inside is a render
+      # scenario. New example dirs are picked up automatically.
+      EXAMPLE_VALUES:
+        sh: find {{.CHART_DIR}}/example -mindepth 2 -maxdepth 2 -name 'values*.yaml' | sort
     cmds:
-      - for:
-          - example/k3d-local.yaml
-          - example/rke2-rancher.yaml
-          - example/private-ca.yaml
-          - example/openshift/values.yaml
-          - example/aws-eks-irsa/values-aws-irsa.yaml
-        cmd: helm template harbor {{.CHART_DIR}} -f {{.CHART_DIR}}/{{.ITEM}} > /dev/null && echo "{{.ITEM}} OK"
+      - for: { var: EXAMPLE_VALUES }
+        cmd: helm template harbor {{.CHART_DIR}} -f {{.ITEM}} > /dev/null && echo "{{.ITEM}} OK"
 
   gitops-determinism:
     desc: "Render GitOps values twice and require byte-identical output"

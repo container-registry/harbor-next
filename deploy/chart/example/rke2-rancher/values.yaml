@@ -1,5 +1,5 @@
 # Harbor Helm Chart - RKE2/Rancher Values
-# Usage: helm install harbor . -n harbor -f examples/rke2-rancher.yaml
+# Usage: helm install harbor . -n harbor -f example/rke2-rancher/values.yaml
 
 # External URL for Harbor
 externalURL: "https://rancher-dev-16gb-fsn1-1.container-registry.com"

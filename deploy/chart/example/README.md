@@ -1,30 +1,36 @@
-# Example Values Files
+# Examples
 
-This directory contains example values files for deploying Harbor in different environments.
+Each example lives in its own directory with a `values.yaml` (plus any
+scenario-specific manifests, scripts, or docs). Only this README sits at
+the top level.
 
-## Files
+## Directories
 
-| File | Description |
-|------|-------------|
-| `k3d-local.yaml` | Local development with k3d cluster |
-| `rke2-rancher.yaml` | RKE2/Rancher deployment |
-| `private-ca.yaml` | Private-CA / mTLS scenario: PG with verify-full + Redis over TLS + shared CA for S3/OIDC |
+| Directory | Description |
+|-----------|-------------|
+| [`k3d-local/`](k3d-local/) | Local development with k3d cluster |
+| [`rke2-rancher/`](rke2-rancher/) | RKE2/Rancher deployment |
+| [`private-ca/`](private-ca/) | Private-CA / mTLS scenario: PG with verify-full + Redis over TLS + shared CA for S3/OIDC |
 | [`openshift/`](openshift/) | OpenShift deployment with ttl.sh images and edge-terminated routes |
 | [`aws-eks-irsa/`](aws-eks-irsa/) | AWS EKS with IRSA for S3 storage and RDS IAM Auth (Aurora PostgreSQL) |
 | [`flux/`](flux/) | FluxCD GitOps setup: HelmRelease with drift detection + fully pinned secrets (`autoGenSecrets: false`) for deterministic rendering — works for Argo CD too |
+
+Every `example/*/values*.yaml` is render-checked in CI
+(`task helm:examples`) — new examples are picked up automatically.
 
 ## Usage
 
 ```bash
 # Deploy with an example values file
-helm install harbor . -n harbor --create-namespace -f example/k3d-local.yaml
+helm install harbor . -n harbor --create-namespace -f example/k3d-local/values.yaml
 ```
 
 ## Prerequisites
 
-Each example may have specific prerequisites. See the comments in each file for details.
+Each example may have specific prerequisites. See the comments in each
+values file (or the directory's README) for details.
 
-### k3d-local.yaml
+### k3d-local
 
 Requires a PostgreSQL database. Deploy one first:
 
@@ -79,5 +85,5 @@ EOF
 kubectl wait -n harbor --for=condition=ready pod -l app=postgres --timeout=120s
 
 # Then install Harbor
-helm install harbor . -n harbor -f example/k3d-local.yaml
+helm install harbor . -n harbor -f example/k3d-local/values.yaml
 ```
