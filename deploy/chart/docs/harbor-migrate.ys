@@ -1,0 +1,1355 @@
+#!/usr/bin/env ys-0
+
+# harbor-migrate.ys — values translator + migration advisor for moving from
+# goharbor/harbor-helm (chart v1.x, Harbor app v2.x) to the Harbor Next chart.
+#
+# Usage:
+#   ys harbor-migrate.ys OLD-values.yaml                  # migrated values -> stdout
+#   ys harbor-migrate.ys OLD-values.yaml NEW-values.yaml  # migrated values -> file
+#
+# The advisory report always goes to stderr:
+#   ERROR — will not work; manual action required before install
+#   WARN  — migrated, but semantics changed or review is required
+#   INFO  — mapped automatically; listed so nothing changes silently
+#
+# Full value-by-value mapping reference: MIGRATION.md (same directory).
+# Requires YAMLScript: https://yamlscript.org  (brew install yamlscript)
+
+advice =: atom([])
+dropped-images =: atom([])
+coerced =: atom([])
+
+defn add-advice(level old new note):
+  swap! advice conj::
+    level:: level
+    old:: old
+    new:: new
+    note:: note
+
+defn add-error(old new note): add-advice('ERROR' old new note)
+defn add-warn(old new note): add-advice('WARN' old new note)
+defn add-info(old new note): add-advice('INFO' old new note)
+
+# like add-error, but returns nil (for use as a single cond-branch form)
+defn add-error-nil(old new note):
+  add-error old new: note
+  =>: nil
+
+#------------------------------------------------------------------------------
+# Generic helpers
+#------------------------------------------------------------------------------
+
+# NOTE: YS dot access (m.key) returns nil for a stored boolean false —
+# any read that must distinguish explicit false from unset uses get/get-in.
+
+# 'true'/'false' strings -> booleans (legacy values files quote them freely;
+# this chart's values.schema.json enforces native types)
+defn to-bool(v):
+  cond:
+    v == 'true': true
+    v == 'false': false
+    else: v
+
+defn truthy?(v): to-bool(v) == true
+
+defn note-coerce(path):
+  swap! coerced conj: path
+
+# to-bool + record the coercion for the report (use for OUTPUT values)
+defn bool-at(v path):
+  b =: to-bool(v)
+  when b != v:
+    note-coerce: path
+  =>: b
+
+# numeric string -> integer + record the coercion (use for OUTPUT values)
+defn int-at(v path):
+  cond:
+    v.nil?(): nil
+    (string? v):
+      n =: parse-long(v)
+      if n.nil?():
+        then: v
+        else:
+          note-coerce: path
+          =>: n
+    else: v
+
+# nil-coalescing that survives boolean false (unlike ||)
+defn bool-of(v default):
+  b =: to-bool(v)
+  if b.nil?(): default b
+
+defn to-int(v default):
+  cond:
+    v.nil?(): default
+    (string? v): parse-long(v) || default
+    else: v
+
+# '' -> nil (the legacy chart uses '' for "unset" everywhere)
+defn presence(v):
+  if v == '': nil v
+
+defn present?(v):
+  cond:
+    v.nil?(): false
+    v == '': false
+    (coll? v): not(empty?(v))
+    else: true
+
+defn bad?(v): not(present?(v))
+
+# drop v when it equals the legacy default (avoids restating defaults)
+defn keep-if-not(v default):
+  if v == default: nil v
+
+# recursively merge maps; non-map values from b win
+defn deep-merge(a b):
+  cond:
+    a.nil?(): b
+    b.nil?(): a
+    (map? a) && (map? b): merge-with(deep-merge a b)
+    else: b
+
+# recursively drop nils, empty strings, and empty collections
+defn prune(v):
+  cond:
+    (map? v):
+      walked =: reduce(\(assoc %1 %2 (prune (get %1 %2))) v v.keys())
+      =>: reduce(\(if (bad? (get %1 %2)) (dissoc %1 %2) %1) walked walked.keys())
+    (sequential? v):
+      =>: v.map(prune).remove(bad?).vec()
+    else: v
+
+defn url-host(url):
+  when present?(url):
+    h1 =: str/replace(url 'https://' '')
+    h2 =: str/replace(h1 'http://' '')
+    =>: h2.str/split(/[:\/]/).first()
+
+#------------------------------------------------------------------------------
+# Globals: required values, secrets, removed top-level toggles
+#------------------------------------------------------------------------------
+
+csc-2x-default =::
+  privileged: false
+  allowPrivilegeEscalation: false
+  seccompProfile:
+    type: RuntimeDefault
+  runAsNonRoot: true
+  capabilities:
+    drop:
+    - ALL
+
+defn check-required(legacy):
+  url =: legacy.externalURL
+  cond:
+    bad?(url):
+      add-error 'externalURL' 'externalURL':
+        'Required, no default. Set the URL users reach Harbor at —
+         install fails without it.'
+    url == 'https://core.harbor.domain':
+      add-warn 'externalURL' 'externalURL':
+        'Still the 2.x placeholder default — set your real URL.'
+    else: nil
+
+  pw =: legacy.harborAdminPassword
+  cond:
+    present?(legacy.existingSecretAdminPassword): nil
+    pw == 'Harbor12345':
+      add-warn 'harborAdminPassword' 'harborAdminPassword':
+        'Carried over, but this is the publicly known 2.x default.
+         Set a strong password (better, point existingSecretAdminPassword
+         at a pre-created Secret) and rotate it after first login.'
+    bad?(pw):
+      add-error 'harborAdminPassword' 'harborAdminPassword':
+        'Required now — there is no default admin password. Set
+         harborAdminPassword or existingSecretAdminPassword.'
+    else: nil
+
+  sk =: legacy.secretKey
+  cond:
+    sk == 'not-a-secure-key':
+      add-warn 'secretKey' 'secretKey':
+        'Carried over the publicly known 2.x default. If you reuse the
+         2.x database you MUST keep it (it decrypts credentials stored
+         there); on a fresh database remove it and let the chart
+         auto-generate a key.'
+    present?(sk):
+      add-info 'secretKey' 'secretKey':
+        'Carried over. Keep it identical to the old install whenever you
+         reuse the 2.x database — replication endpoints and scanner
+         credentials are encrypted with it.'
+    else:
+      add-warn 'secretKey' 'secretKey':
+        'Not set — the chart auto-generates one. If you reuse the 2.x
+         database you MUST set the old value instead (kubectl get secret
+         OLD-RELEASE-core -o jsonpath={.data.secretKey} | base64 -d).'
+
+  when present?(legacy.existingSecretSecretKey):
+    add-warn 'existingSecretSecretKey' 'existingSecretSecretKey':
+      'The Secret must now hold the key under BOTH names SECRET_KEY and
+       secretKey, or set existingSecretSecretKeyKey to your key name.'
+
+defn check-removed(legacy):
+  when bool-of(legacy.notary.enabled false):
+    add-error 'notary.*' nil:
+      'Notary is gone (also removed upstream). Migrate signing to
+       Sigstore cosign / OCI referrer artifacts.'
+
+  when bool-of(legacy.chartmuseum.enabled false):
+    add-error 'chartmuseum.*' nil:
+      'ChartMuseum is gone (also removed upstream). Push charts as OCI
+       artifacts instead (helm push oci://...).'
+
+  when bool-of(legacy.internalTLS.enabled false):
+    add-warn 'internalTLS.*' nil:
+      'Component-to-component TLS is not supported. Traffic inside the
+       cluster is plain HTTP — use a service mesh (Istio/Linkerd) if you
+       need pod-to-pod encryption.'
+
+  when present?(legacy.nginx):
+    add-warn 'nginx.*' nil:
+      'The nginx reverse proxy deployment is gone — Ingress/Gateway/
+       expose Services route to core directly (core proxies the portal).
+       Use ingress.annotations for body-size or ssl-redirect tuning and
+       portal.existingConfigMap for custom portal nginx config.'
+
+  when truthy?(legacy.enableMigrateHelmHook):
+    add-info 'enableMigrateHelmHook' nil:
+      'Schema migrations always run at core startup (the 2.x default
+       behavior); there is no Helm-hook mode.'
+
+  when present?(legacy.caSecretName):
+    add-warn 'caSecretName' nil:
+      'The portal CA-download link is gone. Distribute your CA via your
+       platform tooling.'
+
+  when to-bool(get-in(legacy ['podSecurityContext' 'enabled'])) == false:
+    add-warn 'podSecurityContext.enabled=false' '<component>.podSecurityContext':
+      'The global toggle is gone. For OpenShift-style auto-assigned UIDs
+       override podSecurityContext per component instead.'
+
+  csc =: legacy.containerSecurityContext
+  when present?(csc):
+    when csc != csc-2x-default:
+      add-warn 'containerSecurityContext' '<component>.securityContext':
+        'Customized global container security context is not carried
+         over — set securityContext / podSecurityContext per component.
+         Chart defaults already satisfy PSS Restricted.'
+
+# caBundleSecretName / imageChartStorage.caBundleSecretName / uaaSecretName
+# all collapse into the one extra-CA mount (externalRedis.tlsOptions).
+defn ca-secret(legacy):
+  cands =: vector(legacy.caBundleSecretName
+                  legacy.persistence.imageChartStorage.caBundleSecretName
+                  legacy.uaaSecretName)
+            .filter(present?).distinct().vec()
+  n =: cands.count()
+  when n > 1:
+    add-error 'caBundleSecretName / uaaSecretName' 'externalRedis.tlsOptions.existingCaSecret':
+      'Multiple different CA-bundle Secrets were set, but this chart has
+       ONE extra-CA mount. Combine the PEM bundles into a single Secret
+       (key ca.crt) and reference that.'
+  when n == 1:
+    add-warn 'caBundleSecretName' 'externalRedis.tlsOptions.existingCaSecret':
+      'Despite the new name this Secret is mounted on EVERY component
+       with SSL_CERT_DIR set — it covers private CAs for S3, OIDC, LDAP,
+       UAA, and Redis alike (key ca.crt). See example/private-ca.yaml.'
+  =>: cands.first()
+
+defn map-globals(legacy):
+  check-required: legacy
+  check-removed: legacy
+  ca =: ca-secret(legacy)
+
+  pull-policy =: keep-if-not(legacy.imagePullPolicy 'IfNotPresent')
+
+  proxy-out =:
+    when present?(legacy.proxy.httpProxy) || present?(legacy.proxy.httpsProxy):
+      add-info 'proxy.*' 'proxy.*': 'Identical structure — carried verbatim.'
+      =>: legacy.proxy
+
+  cache-out =:
+    when bool-of(bool-at(get-in(legacy ['cache' 'enabled']) 'cache.enabled') false):
+      add-info 'cache.*' 'cache.*': 'Identical structure — carried verbatim.'
+      =>: legacy.cache.assoc('enabled' true)
+
+  trace =: legacy.trace
+  trace-out =:
+    when bool-of(bool-at(get(trace 'enabled') 'trace.enabled') false):
+      add-info 'trace.*' 'trace.*': 'Identical structure — carried verbatim.'
+      =>: trace.assoc('enabled' true)
+
+  ipf =: legacy.ipFamily
+  when present?(ipf.policy):
+    add-warn 'ipFamily.policy' nil: 'No equivalent — dropped.'
+  when present?(ipf.families):
+    add-warn 'ipFamily.families' nil: 'No equivalent — dropped.'
+  ipv4-off =: to-bool(get-in(ipf ['ipv4' 'enabled'])) == false
+  ipv6-off =: to-bool(get-in(ipf ['ipv6' 'enabled'])) == false
+  ipf-out =:
+    when ipv4-off || ipv6-off::
+      ipv4:
+        enabled:: not(ipv4-off)
+      ipv6:
+        enabled:: not(ipv6-off)
+
+  ca-part =:
+    when ca::
+      externalRedis:
+        tlsOptions:
+          existingCaSecret:: ca
+
+  base =::
+    externalURL:: legacy.externalURL
+    harborAdminPassword:: legacy.harborAdminPassword
+    existingSecretAdminPassword:: legacy.existingSecretAdminPassword
+    existingSecretAdminPasswordKey::
+      keep-if-not(presence(legacy.existingSecretAdminPasswordKey) 'HARBOR_ADMIN_PASSWORD')
+    secretKey:: legacy.secretKey
+    existingSecretSecretKey:: legacy.existingSecretSecretKey
+    logLevel:: keep-if-not(legacy.logLevel 'info')
+    image::
+      when pull-policy::
+        pullPolicy:: pull-policy
+    imagePullSecrets:: legacy.imagePullSecrets
+    proxy:: proxy-out
+    cache:: cache-out
+    trace:: trace-out
+    ipFamily:: ipf-out
+  =>: deep-merge(base ca-part)
+
+#------------------------------------------------------------------------------
+# Exposure: ingress / gateway / direct services + TLS
+#------------------------------------------------------------------------------
+
+defn ingress-tls-entry(secret-name cert-host):
+  entry =::
+    secretName:: secret-name
+    hosts: [! cert-host]
+  =>: vector(entry)
+
+defn map-expose-ingress(legacy expose):
+  ing =: expose.ingress
+  tls =: expose.tls
+  tls-on =: bool-of(get(tls 'enabled') true)
+  cert-src =: presence(tls.certSource) || 'auto'
+  host =: presence(ing.hosts.core)
+  ext-host =: url-host(legacy.externalURL)
+  cert-host =: host || ext-host
+  secret-name =: presence(tls.secret.secretName)
+
+  when present?(keep-if-not(presence(ing.controller) 'default')):
+    add-warn 'expose.ingress.controller' nil:
+      'Controller-specific template logic (gce/ncp/alb) is gone — express
+       controller quirks via ingress.annotations.'
+  when present?(ing.kubeVersionOverride):
+    add-warn 'expose.ingress.kubeVersionOverride' nil: 'No equivalent — dropped.'
+  when bad?(ing.annotations):
+    add-info 'expose.ingress.annotations' 'ingress.annotations':
+      'This chart pre-sets NO ingress annotations (2.x shipped
+       ssl-redirect + proxy-body-size). Add what your controller needs,
+       e.g. nginx.ingress.kubernetes.io/proxy-body-size "0" so large
+       image layers can be pushed.'
+
+  host-differs =: present?(host) && (host != ext-host)
+  when host-differs:
+    add-warn 'expose.ingress.hosts.core' 'ingress.hosts[0].host':
+      'Hostname differs from the externalURL hostname — carried over,
+       but normally you leave ingress.hosts empty and the chart derives
+       the host from externalURL.'
+
+  use-secret =: tls-on && (cert-src == 'secret') && present?(secret-name)
+  ing-tls =:
+    when use-secret:
+      add-info 'expose.tls.secret.secretName' 'ingress.tls[0].secretName':
+        'TLS terminates at the ingress controller with your existing
+         certificate Secret. Pod-level TLS (tls.enabled) stays off — the
+         2.x-equivalent behavior for ingress exposure.'
+      =>: ingress-tls-entry(secret-name cert-host)
+
+  when-not tls-on:
+    add-warn 'expose.tls.enabled=false' 'ingress.autoGenCert=false':
+      'Plain HTTP kept. Docker clients must include the port and/or
+       configure an insecure registry exactly as before.'
+  when tls-on && (cert-src == 'none'):
+    add-info 'expose.tls.certSource=none' 'ingress.autoGenCert=false':
+      'No certificate is attached — the ingress controller default
+       certificate is used, as in 2.x.'
+  when tls-on && (cert-src != 'secret') && (cert-src != 'none'):
+    add-info 'expose.tls.certSource=auto' 'ingress.autoGenCert=true':
+      'Auto-generated (self-signed) ingress certificate kept — that
+       is the chart default. For trusted certificates switch to
+       cert-manager (ingress.annotations + ingress.tls) or
+       tls.certManager.'
+  auto-gen =:
+    cond:
+      not(tls-on): false
+      cert-src == 'secret': false
+      cert-src == 'none': false
+      else: nil
+
+  =>::
+    ingress:
+      enabled: true
+      className:: presence(ing.className)
+      annotations:: ing.annotations
+      labels:: ing.labels
+      autoGenCert:: auto-gen
+      core::
+        when cert-src == 'auto': presence(tls.auto.commonName)
+      hosts::
+        when host-differs::
+          - host:: host
+      tls:: ing-tls
+
+defn map-expose-service(legacy expose etype):
+  svc =: get(expose etype)
+  tls =: expose.tls
+  tls-on =: bool-of(get(tls 'enabled') true)
+  cert-src =: presence(tls.certSource) || 'auto'
+  secret-name =: presence(tls.secret.secretName)
+
+  add-info "expose.type=$etype" "expose.$etype.enabled=true":
+    'The expose.type selector became per-method enabled flags; ingress
+     is disabled explicitly (it is the chart default).'
+
+  when (svc.name == 'harbor'):
+    add-info "expose.$etype.name" "expose.$etype.name":
+      'Carried the 2.x default service name "harbor". Leave it empty to
+       default to the release fullname instead.'
+
+  ports =: svc.ports
+  ports-out =:
+    cond:
+      etype == 'nodePort': ports
+      else:
+        when present?(ports)::
+          http:: ports.httpPort
+          https::
+            when tls-on: ports.httpsPort
+
+  tls-out =:
+    when tls-on:
+      add-warn 'expose.tls.enabled' 'tls.enabled=true':
+        'For service exposure TLS now terminates IN the core/registry
+         pods (tls.* block). The chart default is false — terminate at a
+         load balancer / ingress where possible.'
+      when (cert-src == 'auto') && present?(tls.auto.commonName):
+        add-warn 'expose.tls.auto.commonName' nil:
+          'No equivalent — the auto-generated certificate uses the
+           externalURL hostname.'
+      =>::
+        enabled: true
+        certSource:: cert-src
+        customSecrets::
+          when (cert-src == 'secret') && present?(secret-name)::
+            core:: secret-name
+
+  svc-out =: !prune
+    deep-merge nil::
+      enabled: true
+      name:: presence(svc.name)
+      staticClusterIP:: presence(svc.staticClusterIP)
+      IP:: presence(svc.IP)
+      ports:: ports-out
+      sourceRanges:: svc.sourceRanges
+      annotations:: svc.annotations
+      labels:: svc.labels
+
+  =>::
+    ingress:
+      enabled: false
+    expose:: hash-map(etype svc-out)
+    tls:: tls-out
+
+defn map-expose-gateway(legacy expose):
+  rt =: expose.route
+  add-info 'expose.type=route' 'gateway.enabled=true':
+    '2.x reused "route" for a Gateway API HTTPRoute — that is gateway.*
+     here. Heads-up, expose.route in this chart is an OpenShift Route
+     instead.'
+  when present?(rt.annotations) || present?(rt.labels):
+    add-warn 'expose.route.annotations/labels' nil:
+      'The gateway block has no annotations/labels passthrough — dropped.'
+  =>::
+    ingress:
+      enabled: false
+    gateway:
+      enabled: true
+      parentRefs:: rt.parentRefs
+      hostnames:: rt.hosts
+
+defn map-expose(legacy):
+  expose =: legacy.expose
+  etype =: presence(expose.type) || 'ingress'
+  cond:
+    etype == 'ingress': map-expose-ingress(legacy expose)
+    etype == 'route': map-expose-gateway(legacy expose)
+    (etype == 'clusterIP') || (etype == 'nodePort') || (etype == 'loadBalancer'):
+      map-expose-service(legacy expose etype)
+    else:
+      add-error-nil("expose.type=$etype" nil 'Unknown expose.type — exposure was not migrated.')
+
+#------------------------------------------------------------------------------
+# Shared per-component plumbing
+#------------------------------------------------------------------------------
+
+defn image-block(comp name):
+  img =: comp.image
+  when present?(img):
+    repo =: presence(img.repository)
+    stock =:
+      cond:
+        bad?(repo): true
+        re-find(/goharbor/ repo): true
+        re-find(/8gears/ repo): true
+        else: false
+    if stock:
+      then:
+        swap! dropped-images conj: name
+        =>: nil
+      else:
+        add-warn "$name.image.repository" "$name.image.repository":
+          'Custom registry carried over — make sure it serves Harbor Next
+           images. The legacy tag was dropped; the tag now defaults to
+           the chart appVersion.'
+        =>: hash-map('repository' repo)
+
+defn sa-block(comp name):
+  sa-name =: presence(comp.serviceAccountName)
+  auto =: to-bool(comp.automountServiceAccountToken)
+  when sa-name:
+    add-info "$name.serviceAccountName" "$name.serviceAccount.name":
+      'Pre-existing ServiceAccount assumed — serviceAccount.create set
+       to false. Remove that to let the chart create one.'
+  when present?(sa-name) || (auto == true)::
+    create::
+      when sa-name: false
+    name:: sa-name
+    automountServiceAccountToken::
+      when auto == true: true
+
+defn pdb-block(comp name):
+  pdb =: comp.podDisruptionBudget
+  when present?(pdb):
+    mn =: pdb.minAvailable
+    mx =: pdb.maxUnavailable
+    both =: (some? mn) && (some? mx)
+    when both:
+      add-warn "$name.podDisruptionBudget" "$name.pdb":
+        'Both minAvailable and maxUnavailable were set — kept
+         minAvailable only; the chart enforces exactly one.'
+    =>::
+      enabled:: bool-of(get(pdb 'enabled') true)
+      minAvailable:: mn
+      maxUnavailable::
+        when-not both: mx
+
+defn probe-advice(comp name):
+  tuned =:
+    present?(comp.livenessProbe) ||
+    present?(comp.readinessProbe) ||
+    present?(comp.startupProbe.initialDelaySeconds)
+  when tuned:
+    add-warn "$name probe overrides" "$name.probes":
+      'Probe tuning is not auto-migrated. Probes are now full Kubernetes
+       probe specs under <component>.probes.{startup,liveness,readiness}
+       with retuned defaults (fast 2s startup polling instead of fixed
+       initialDelay) — review those before carrying old timings over.'
+  when to-bool(get-in(comp ['startupProbe' 'enabled'])) == false:
+    add-warn "$name.startupProbe.enabled=false" "$name.probes.startup":
+      'To disable the startup probe set <component>.probes.startup to
+       null in the output yourself — the generator does not emit nulls.'
+
+defn secret-string-advice(comp name):
+  when present?(get(comp 'secret')):
+    add-warn "$name.secret" "$name.existingSecret":
+      'Inline component-secret strings are gone (the secret key is now a
+       map of extra env vars). Dropped — the chart auto-generates the
+       inter-component secret; only in-flight uploads/jobs are
+       invalidated. To pin it, pre-create a Secret and reference it via
+       existingSecret.'
+
+defn base-component(comp name):
+  probe-advice comp: name
+  =>::
+    image:: image-block(comp name)
+    replicas:: int-at(comp.replicas (str name '.replicas'))
+    resources:: comp.resources
+    nodeSelector:: comp.nodeSelector
+    tolerations:: comp.tolerations
+    affinity:: comp.affinity
+    topologySpreadConstraints:: comp.topologySpreadConstraints
+    podAnnotations:: comp.podAnnotations
+    podLabels:: comp.podLabels
+    serviceAnnotations:: comp.serviceAnnotations
+    initContainers:: comp.initContainers
+    extraEnv:: comp.extraEnvVars
+    serviceAccount:: sa-block(comp name)
+    pdb:: pdb-block(comp name)
+
+defn global-block(legacy):
+  comps =: vector(legacy.core legacy.portal legacy.registry legacy.jobservice
+                  legacy.trivy legacy.exporter legacy.nginx)
+            .filter(some?).vec()
+  prio =: comps.map(\(get %1 'priorityClassName')).filter(present?).first()
+  rhl =: comps.map(\(get %1 'revisionHistoryLimit')).filter(some?).first()
+  when prio:
+    add-info '<component>.priorityClassName' 'global.priorityClassName':
+      'One global knob now — carried the first per-component value found.'
+  when some?(rhl):
+    add-info '<component>.revisionHistoryLimit' 'global.revisionHistoryLimit':
+      'One global knob now (chart default 3) — carried the first
+       per-component value found.'
+  when (some? prio) || (some? rhl)::
+    priorityClassName:: prio
+    revisionHistoryLimit:: rhl
+
+#------------------------------------------------------------------------------
+# Components
+#------------------------------------------------------------------------------
+
+defn map-core(legacy):
+  core =: legacy.core
+  when present?(core):
+    secret-string-advice core: 'core'
+    when present?(core.secretName):
+      add-info 'core.secretName' 'core.tokenSecretName':
+        'Renamed — the token service certificate Secret (keys tls.crt /
+         tls.key unchanged).'
+    gdpr-del =: bool-at(core.gdpr.deleteUser 'core.gdpr.deleteUser')
+    gdpr-audit =: bool-at(core.gdpr.auditLogsCompliant 'core.gdpr.auditLogsCompliant')
+    gdpr-on =: (gdpr-del == true) || (gdpr-audit == true)
+    extra =::
+      existingSecret:: presence(core.existingSecret)
+      tokenSecretName:: presence(core.secretName)
+      tokenKey:: presence(core.tokenKey)
+      tokenCert:: presence(core.tokenCert)
+      xsrfKey:: presence(core.xsrfKey)
+      existingXsrfSecret:: presence(core.existingXsrfSecret)
+      existingXsrfSecretKey::
+        keep-if-not(presence(core.existingXsrfSecretKey) 'CSRF_KEY')
+      configureUserSettings:: presence(core.configureUserSettings)
+      quotaUpdateProvider:: keep-if-not(core.quotaUpdateProvider 'db')
+      artifactPullAsyncFlushDuration:: core.artifactPullAsyncFlushDuration
+      gdpr::
+        when gdpr-on:
+          hash-map('deleteUser' keep-if-not(gdpr-del false)
+                   'auditLogsCompliant' keep-if-not(gdpr-audit false))
+    deep-merge base-component(core 'core'): extra
+
+defn map-portal(legacy):
+  portal =: legacy.portal
+  when present?(portal):
+    base-component portal: 'portal'
+
+jobservice-reaper-default =::
+  max_update_hours: 24
+  max_dangling_hours: 168
+
+defn job-logger-entry(kind sweep):
+  cond:
+    kind == 'file'::
+      name: FILE
+      level: INFO
+      settings:
+        base_dir: /var/log/jobs
+      sweeper:
+        duration:: sweep
+        settings:
+          work_dir: /var/log/jobs
+    kind == 'database'::
+      name: DB
+      level: INFO
+      sweeper:
+        duration:: sweep
+    else: nil
+
+defn map-jobservice(legacy):
+  js =: legacy.jobservice
+  when present?(js):
+    secret-string-advice js: 'jobservice'
+    sweep =: js.loggerSweeperDuration || 14
+    loggers =: js.jobLoggers
+    jl =:
+      when present?(loggers):
+        loggers.map(\(job-logger-entry %1 sweep)).filter(some?).vec()
+    when present?(jl):
+      add-info 'jobservice.jobLoggers' 'jobservice.config.job_loggers':
+        'Logger name list expanded to full logger structures (the
+         loggerSweeperDuration folded into each sweeper).'
+    workers =: int-at(js.maxJobWorkers 'jobservice.maxJobWorkers')
+    when present?(workers):
+      add-info 'jobservice.maxJobWorkers' 'jobservice.config.worker_pool.workers':
+        'jobservice.config is the verbatim jobservice config.yml now —
+         Helm deep-merges it over the chart default.'
+    notif =: js.notification
+    extra =::
+      config:
+        worker_pool::
+          when workers::
+            workers:: workers
+        job_loggers:: jl
+        reaper:: keep-if-not(js.reaper jobservice-reaper-default)
+      env:
+        jobservice_webhook_job_max_retry::
+          keep-if-not(notif.webhook_job_max_retry 3)
+        jobservice_webhook_job_http_client_timeout::
+          keep-if-not(notif.webhook_job_http_client_timeout 3)
+        registry_http_client_timeout:: js.registryHttpClientTimeout
+      existingSecret:: presence(js.existingSecret)
+      existingSecretKey::
+        keep-if-not(presence(js.existingSecretKey) 'JOBSERVICE_SECRET')
+    deep-merge base-component(js 'jobservice'): extra
+
+registry-upload-purging-default =::
+  enabled: true
+  age: 168h
+  interval: 24h
+  dryrun: false
+
+defn map-registry(legacy):
+  reg =: legacy.registry
+  when present?(reg):
+    rc =: reg.registry || hash-map()
+    ctl =: reg.controller || hash-map()
+    secret-string-advice reg: 'registry'
+    when present?(ctl.resources):
+      add-warn 'registry.controller.resources' 'registry.resources':
+        'Registry and registryctl share ONE resources block now —
+         controller-specific resources were dropped.'
+    when bool-of(reg.middleware.enabled false):
+      add-error 'registry.middleware' 'registry.config.middleware':
+        'CloudFront middleware is not auto-migrated. The distribution
+         config passes through registry.config.middleware, but the chart
+         cannot mount the CloudFront private-key Secret yet — open an
+         issue if you need this.'
+    env-a =: rc.extraEnvVars || []
+    env-b =: ctl.extraEnvVars || []
+    extra-env =: concat(env-a env-b).vec()
+    reg-img =: image-block(rc 'registry')
+    ctl-img =: image-block(ctl 'registry.controller')
+    up =: keep-if-not(reg.upload_purging registry-upload-purging-default)
+    when present?(up):
+      add-info 'registry.upload_purging' 'registry.config.storage.maintenance.uploadpurging':
+        'Now plain distribution config syntax.'
+    when truthy?(reg.relativeurls):
+      add-info 'registry.relativeurls' 'registry.config.http.relativeurls':
+        'Now plain distribution config syntax.'
+    creds =: reg.credentials
+    when (creds.password == 'harbor_registry_password'):
+      add-warn 'registry.credentials.password' 'registry.credentials.password':
+        'Carried over, but this is the publicly known 2.x default —
+         change it.'
+    =>::
+      image:: reg-img
+      controller::
+        when ctl-img::
+          image:: ctl-img
+      replicas:: int-at(reg.replicas 'registry.replicas')
+      resources:: rc.resources
+      nodeSelector:: reg.nodeSelector
+      tolerations:: reg.tolerations
+      affinity:: reg.affinity
+      topologySpreadConstraints:: reg.topologySpreadConstraints
+      podAnnotations:: reg.podAnnotations
+      podLabels:: reg.podLabels
+      initContainers:: reg.initContainers
+      extraEnv:: extra-env
+      serviceAccount:: sa-block(reg 'registry')
+      pdb:: pdb-block(reg 'registry')
+      existingSecret:: presence(reg.existingSecret)
+      existingSecretKey::
+        keep-if-not(presence(reg.existingSecretKey) 'REGISTRY_HTTP_SECRET')
+      credentials::
+        when present?(creds)::
+          username:: keep-if-not(creds.username 'harbor_registry_user')
+          password:: presence(creds.password)
+          existingSecret:: presence(creds.existingSecret)
+          htpasswdString:: presence(creds.htpasswdString)
+      config:
+        http::
+          when truthy?(reg.relativeurls)::
+            relativeurls: true
+        storage::
+          when present?(up)::
+            maintenance:
+              uploadpurging:: up
+
+trivy-db-repo-default =:
+  vector('mirror.gcr.io/aquasec/trivy-db' 'ghcr.io/aquasecurity/trivy-db')
+
+trivy-java-db-repo-default =:
+  vector('mirror.gcr.io/aquasec/trivy-java-db' 'ghcr.io/aquasecurity/trivy-java-db')
+
+defn map-trivy(legacy):
+  trivy =: legacy.trivy
+  when present?(trivy):
+    enabled =: bool-of(bool-at(get(trivy 'enabled') 'trivy.enabled') true)
+    when enabled:
+      add-info 'trivy.enabled' 'trivy.enabled':
+        'Default flipped to false in this chart — kept enabled because
+         your 2.x values had it on.'
+    scanner =::
+      enabled:: enabled
+      debugMode:: keep-if-not(trivy.debugMode false)
+      vulnType:: keep-if-not(trivy.vulnType 'os,library')
+      severity:: keep-if-not(trivy.severity 'UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL')
+      ignoreUnfixed:: keep-if-not(trivy.ignoreUnfixed false)
+      insecure:: keep-if-not(trivy.insecure false)
+      gitHubToken:: presence(trivy.gitHubToken)
+      skipUpdate:: keep-if-not(trivy.skipUpdate false)
+      skipJavaDBUpdate:: keep-if-not(trivy.skipJavaDBUpdate false)
+      offlineScan:: keep-if-not(trivy.offlineScan false)
+      securityCheck:: keep-if-not(trivy.securityCheck 'vuln')
+      timeout:: keep-if-not(trivy.timeout '5m0s')
+      dbRepository:: keep-if-not(trivy.dbRepository trivy-db-repo-default)
+      javaDBRepository:: keep-if-not(trivy.javaDBRepository trivy-java-db-repo-default)
+    deep-merge base-component(trivy 'trivy'): scanner
+
+defn map-exporter(legacy):
+  exp =: legacy.exporter
+  when present?(exp):
+    when present?(exp.override.database):
+      add-warn 'exporter.override.database' nil:
+        'Exporter-specific DB pool overrides have no equivalent — the
+         exporter uses the database.* pool settings.'
+    cache-time =: keep-if-not(int-at(exp.cacheDuration 'exporter.cacheDuration') 23)
+    cache-clean =: keep-if-not(int-at(exp.cacheCleanInterval 'exporter.cacheCleanInterval') 14400)
+    when (some? cache-time) || (some? cache-clean):
+      add-info 'exporter.cacheDuration/cacheCleanInterval' 'exporter.config.cache_time/cache_clean_interval':
+        'Exporter is env-driven now — config keys flatten to
+         HARBOR_EXPORTER_* env vars.'
+    extra =::
+      config:
+        cache_time:: cache-time
+        cache_clean_interval:: cache-clean
+    deep-merge base-component(exp 'exporter'): extra
+
+defn map-components(legacy):
+  strategy =: keep-if-not(legacy.updateStrategy.type 'RollingUpdate')
+  when strategy:
+    add-info 'updateStrategy.type' '<component>.deploymentStrategy.type':
+      'Now a full per-component Deployment strategy spec — applied to
+       core, portal, registry, jobservice, and exporter.'
+  strat =:
+    when strategy::
+      deploymentStrategy:
+        type:: strategy
+  out =::
+    global:: global-block(legacy)
+    core:: deep-merge(map-core(legacy) strat)
+    portal:: deep-merge(map-portal(legacy) strat)
+    registry:: deep-merge(map-registry(legacy) strat)
+    jobservice:: deep-merge(map-jobservice(legacy) strat)
+    exporter:: deep-merge(map-exporter(legacy) strat)
+    trivy:: map-trivy(legacy)
+  imgs =: dropped-images.deref()
+  when present?(imgs):
+    names =: str/join(', ' imgs)
+    add-info "image.repository/tag ($names)" 'chart image defaults':
+      'Legacy stock image references dropped — images default to Harbor
+       Next builds (8gears.container-registry.com/8gcr/harbor-*, tag =
+       chart appVersion). Set <component>.image.* only for mirrors.'
+  =>: out
+
+#------------------------------------------------------------------------------
+# Registry storage backend + persistence
+#------------------------------------------------------------------------------
+
+defn s3-backend(s3):
+  add-info 'persistence.imageChartStorage.s3' 'registry.config.storage.s3':
+    'registry.config is the verbatim distribution config.yml — every s3
+     field passes through unchanged. For MinIO / Ceph RGW / SeaweedFS
+     also set forcepathstyle true.'
+  existing =: presence(s3.existingSecret)
+  when existing:
+    add-info 'persistence.imageChartStorage.s3.existingSecret' 'registry.storageCredentials.s3.existingSecret':
+      'Same Secret keys (REGISTRY_STORAGE_S3_ACCESSKEY /
+       REGISTRY_STORAGE_S3_SECRETKEY) — your existing Secret works as-is.'
+  inline =: present?(s3.accesskey) || present?(s3.secretkey)
+  when inline:
+    add-warn 'persistence.imageChartStorage.s3.accesskey/secretkey' 'registry.secret.REGISTRY_STORAGE_S3_*':
+      'Inline credentials moved into registry.secret (base64-encoded
+       into a generated Secret). Prefer a pre-created Secret via
+       registry.storageCredentials.s3.existingSecret.'
+  =>::
+    config:
+      storage:
+        s3:: s3.dissoc('existingSecret' 'accesskey' 'secretkey')
+    storageCredentials::
+      when existing::
+        s3:
+          existingSecret:: existing
+    secret::
+      when inline::
+        REGISTRY_STORAGE_S3_ACCESSKEY:: presence(s3.accesskey)
+        REGISTRY_STORAGE_S3_SECRETKEY:: presence(s3.secretkey)
+
+defn azure-backend(az):
+  add-info 'persistence.imageChartStorage.azure' 'registry.config.storage.azure':
+    'Distribution config passthrough.'
+  existing =: presence(az.existingSecret)
+  when existing:
+    add-info 'persistence.imageChartStorage.azure.existingSecret' 'registry.storageCredentials.azure':
+      'Reused with existingSecretKey set to the 2.x key name
+       AZURE_STORAGE_ACCESS_KEY.'
+  inline =: presence(az.accountkey)
+  when inline && (inline != 'base64encodedaccountkey'):
+    add-warn 'persistence.imageChartStorage.azure.accountkey' 'registry.secret.REGISTRY_STORAGE_AZURE_ACCOUNTKEY':
+      'Inline account key moved into registry.secret. Prefer a
+       pre-created Secret via registry.storageCredentials.azure.'
+  =>::
+    config:
+      storage:
+        azure:: az.dissoc('existingSecret' 'accountkey')
+    storageCredentials::
+      when existing::
+        azure:
+          existingSecret:: existing
+          existingSecretKey: AZURE_STORAGE_ACCESS_KEY
+    secret::
+      when inline && (inline != 'base64encodedaccountkey')::
+        REGISTRY_STORAGE_AZURE_ACCOUNTKEY:: inline
+
+defn gcs-backend(g):
+  add-info 'persistence.imageChartStorage.gcs' 'registry.config.storage.gcs':
+    'Distribution config passthrough.'
+  existing =: presence(g.existingSecret)
+  wi =: truthy?(g.useWorkloadIdentity)
+  when existing:
+    add-info 'persistence.imageChartStorage.gcs.existingSecret' 'registry.storageCredentials.gcs':
+      'Reused with existingSecretKey set to the 2.x key name GCS_KEY_DATA.
+       The keyfile mounts at /etc/registry/gcs/key.json and
+       registry.config.storage.gcs.keyfile points there.'
+  when wi:
+    add-info 'persistence.imageChartStorage.gcs.useWorkloadIdentity' 'registry.serviceAccount.annotations':
+      'Leave storageCredentials.gcs empty and annotate the registry
+       ServiceAccount (iam.gke.io/gcp-service-account) yourself.'
+  enc =: presence(g.encodedkey)
+  when enc && (enc != 'base64-encoded-json-key-file') && (not existing) && (not wi):
+    add-error 'persistence.imageChartStorage.gcs.encodedkey' 'registry.storageCredentials.gcs.existingSecret':
+      'Inline GCS keys cannot be carried into values. Create a Secret
+       from the decoded keyfile (kubectl create secret generic
+       harbor-gcs --from-file=gcs-key.json=key.json) and set
+       registry.storageCredentials.gcs.existingSecret to it.'
+  base-cfg =: g.dissoc('existingSecret' 'encodedkey' 'useWorkloadIdentity')
+  gcs-cfg =:
+    if existing:
+      then: base-cfg.assoc('keyfile' '/etc/registry/gcs/key.json')
+      else: base-cfg
+  =>::
+    config:
+      storage:
+        gcs:: gcs-cfg
+    storageCredentials::
+      when existing::
+        gcs:
+          existingSecret:: existing
+          existingSecretKey: GCS_KEY_DATA
+
+defn swift-env-entry(secret-name):
+  entry =::
+    name: REGISTRY_STORAGE_SWIFT_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name:: secret-name
+        key: REGISTRY_STORAGE_SWIFT_PASSWORD
+  =>: vector(entry)
+
+defn swift-backend(sw):
+  add-info 'persistence.imageChartStorage.swift' 'registry.config.storage.swift':
+    'Distribution config passthrough. There is no storageCredentials
+     shortcut for swift — credentials go through registry.secret or
+     registry.extraEnv.'
+  existing =: presence(sw.existingSecret)
+  when existing:
+    add-warn 'persistence.imageChartStorage.swift.existingSecret' 'registry.extraEnv':
+      'Mapped the REGISTRY_STORAGE_SWIFT_PASSWORD key via extraEnv
+       valueFrom. If your Secret also holds SECRETKEY / ACCESSKEY keys,
+       add matching extraEnv entries yourself.'
+  inline-pw =: presence(sw.password)
+  when inline-pw && (inline-pw != 'password') && (not existing):
+    add-warn 'persistence.imageChartStorage.swift.password' 'registry.secret.REGISTRY_STORAGE_SWIFT_PASSWORD':
+      'Inline password moved into registry.secret. Prefer a pre-created
+       Secret referenced from registry.extraEnv.'
+  =>::
+    config:
+      storage:
+        swift:: sw.dissoc('existingSecret' 'password' 'secretkey' 'accesskey')
+    secret::
+      when inline-pw && (inline-pw != 'password') && (not existing)::
+        REGISTRY_STORAGE_SWIFT_PASSWORD:: inline-pw
+        REGISTRY_STORAGE_SWIFT_SECRETKEY:: presence(sw.secretkey)
+        REGISTRY_STORAGE_SWIFT_ACCESSKEY:: presence(sw.accesskey)
+    extraEnv::
+      when existing:
+        swift-env-entry(existing)
+
+defn oss-backend(oss):
+  add-info 'persistence.imageChartStorage.oss' 'registry.config.storage.oss':
+    'Distribution config passthrough.'
+  existing =: presence(oss.existingSecret)
+  when existing:
+    add-info 'persistence.imageChartStorage.oss.existingSecret' 'registry.storageCredentials.oss.existingSecret':
+      'Same Secret key (REGISTRY_STORAGE_OSS_ACCESSKEYSECRET) — reused
+       as-is.'
+  inline =: presence(oss.accesskeysecret)
+  when inline && (inline != 'accesskeysecret') && (not existing):
+    add-warn 'persistence.imageChartStorage.oss.accesskeysecret' 'registry.secret.REGISTRY_STORAGE_OSS_ACCESSKEYSECRET':
+      'Inline credential moved into registry.secret. Prefer a
+       pre-created Secret via registry.storageCredentials.oss.'
+  =>::
+    config:
+      storage:
+        oss:: oss.dissoc('existingSecret' 'accesskeysecret')
+    storageCredentials::
+      when existing::
+        oss:
+          existingSecret:: existing
+    secret::
+      when inline && (inline != 'accesskeysecret') && (not existing)::
+        REGISTRY_STORAGE_OSS_ACCESSKEYSECRET:: inline
+
+defn filesystem-backend(f):
+  rootdir =: keep-if-not(presence(f.rootdirectory) '/storage')
+  threads =: f.maxthreads
+  when present?(rootdir) || (some? threads)::
+    config:
+      storage:
+        filesystem:
+          rootdirectory:: rootdir || '/storage'
+          maxthreads:: threads
+
+defn storage-backend(stype ics):
+  cond:
+    stype == 's3': s3-backend(ics.s3)
+    stype == 'azure': azure-backend(ics.azure)
+    stype == 'gcs': gcs-backend(ics.gcs)
+    stype == 'swift': swift-backend(ics.swift)
+    stype == 'oss': oss-backend(ics.oss)
+    stype == 'filesystem': filesystem-backend(ics.filesystem || hash-map())
+    else:
+      add-error-nil("persistence.imageChartStorage.type=$stype" nil 'Unknown storage backend — not migrated.')
+
+defn pvc-block(claim en policy name):
+  when en:
+    c =: claim || hash-map()
+    when present?(c.subPath):
+      add-warn "persistence.persistentVolumeClaim.$name.subPath" nil:
+        'subPath is not supported — dedicate a volume per component.'
+    when policy == '':
+      add-warn 'persistence.resourcePolicy=""' "$name.persistence.resourcePolicy":
+        'Empty meant "delete PVCs on uninstall"; the chart default is
+         keep. Set resourcePolicy to an empty string yourself if you
+         really want deletion.'
+    am =: presence(c.accessMode)
+    =>::
+      enabled: true
+      existingClaim:: presence(c.existingClaim)
+      storageClass:: presence(c.storageClass)
+      accessModes::
+        when am && (am != 'ReadWriteOnce')::
+          - ! am
+      size:: c.size
+      annotations:: c.annotations
+
+defn file-logging?(loggers):
+  if loggers.nil?():
+    then: true
+    else:
+      n =: loggers.filter(\(%1 == 'file')).count()
+      =>: n > 0
+
+defn map-persistence(legacy):
+  p =: legacy.persistence
+  when present?(p):
+    pen =: bool-of(get(p 'enabled') true)
+    stype =: presence(p.imageChartStorage.type) || 'filesystem'
+    pvc =: p.persistentVolumeClaim
+    policy =: p.resourcePolicy
+    reg-en =: pen && (stype == 'filesystem')
+    when pen && (stype != 'filesystem'):
+      add-info 'persistence.enabled' 'registry.persistence':
+        "Registry stores images in $stype — no registry PVC needed, so
+         registry.persistence stays disabled."
+    when reg-en:
+      add-info 'persistence.enabled' '<component>.persistence.enabled':
+        'Persistence is per-component now and defaults to FALSE —
+         enabled here for the components your 2.x values used.'
+    js-en =: pen && file-logging?(legacy.jobservice.jobLoggers)
+    trivy-en =: pen && bool-of(get-in(legacy ['trivy' 'enabled']) true)
+    =>::
+      registry:
+        persistence:: pvc-block(pvc.registry reg-en policy 'registry')
+      jobservice:
+        persistence:: pvc-block(pvc.jobservice.jobLog js-en policy 'jobservice')
+      trivy:
+        persistence:: pvc-block(pvc.trivy trivy-en policy 'trivy')
+
+defn map-storage(legacy):
+  ics =: legacy.persistence.imageChartStorage
+  stype =: presence(ics.type) || 'filesystem'
+  backend =: storage-backend(stype ics)
+  redirect =:
+    when truthy?(ics.disableredirect):
+      add-info 'persistence.imageChartStorage.disableredirect' 'registry.config.storage.redirect.disable':
+        'Now plain distribution config syntax.'
+      =>::
+        config:
+          storage:
+            redirect:
+              disable: true
+  reg-part =: deep-merge(backend redirect)
+  out =:
+    when reg-part:
+      hash-map('registry' reg-part)
+  deep-merge out: map-persistence(legacy)
+
+#------------------------------------------------------------------------------
+# Database / Redis / metrics
+#------------------------------------------------------------------------------
+
+defn map-database(legacy):
+  db =: legacy.database
+  dtype =: presence(db.type) || 'internal'
+  when present?(db.podAnnotations):
+    add-info 'database.podAnnotations/podLabels' nil:
+      'No database pods in this chart — dropped.'
+  if dtype == 'internal':
+    then:
+      add-error 'database.type=internal' 'database.host':
+        'The internal PostgreSQL StatefulSet was removed — this chart
+         requires an external database and the install fails without
+         database.host. Provision PostgreSQL (managed PG or an operator
+         like CloudNativePG — see the chart README), pg_dump the old
+         harbor-database pod and restore it there if you keep your data,
+         then set database.host / username / password (or
+         existingSecret). Keep secretKey identical when reusing the data.'
+      =>: nil
+    else:
+      ext =: db.external || hash-map()
+      existing =: presence(ext.existingSecret)
+      when existing:
+        add-info 'database.external.existingSecret' 'database.existingSecret':
+          'Reused with existingSecretKey set to the 2.x key name
+           "password" (the chart default key is POSTGRESQL_PASSWORD).'
+      add-info 'database.external.*' 'database.*':
+        'Flattened one level; coreDatabase is now database.database and
+         the port is numeric.'
+      =>::
+        database:
+          host:: ext.host
+          port:: to-int(ext.port 5432)
+          username:: ext.username
+          password::
+            when-not existing: presence(ext.password)
+          database:: keep-if-not(presence(ext.coreDatabase) 'registry')
+          sslmode:: keep-if-not(presence(ext.sslmode) 'disable')
+          existingSecret:: existing
+          existingSecretKey::
+            when existing: 'password'
+          maxIdleConns:: int-at(db.maxIdleConns 'database.maxIdleConns')
+          maxOpenConns:: int-at(db.maxOpenConns 'database.maxOpenConns')
+          connMaxIdleTime:: db.connMaxIdleTime
+          connMaxLifetime:: db.connMaxLifetime
+
+defn redis-index-advice(block path):
+  custom =:
+    present?(keep-if-not(presence(block.coreDatabaseIndex) '0')) ||
+    present?(keep-if-not(presence(block.jobserviceDatabaseIndex) '1')) ||
+    present?(keep-if-not(presence(block.registryDatabaseIndex) '2')) ||
+    present?(keep-if-not(presence(block.trivyAdapterIndex) '5'))
+  when custom:
+    add-warn "$path.*DatabaseIndex" nil:
+      'Redis logical-DB indexes are FIXED now — core 0, jobservice 1,
+       registry 2, trivy 5, harbor 6, cache 7. Custom indexes were
+       dropped; point Harbor at a Redis instance or DB range nothing
+       else shares.'
+  when present?(block.harborDatabaseIndex) || present?(block.cacheLayerDatabaseIndex):
+    add-warn "$path.harborDatabaseIndex/cacheLayerDatabaseIndex" nil:
+      'These are fixed at 6 and 7 now (2.x defaulted both to 0). After
+       migration those caches simply rebuild — no action needed, but do
+       not share the DBs with other apps.'
+
+defn map-redis(legacy):
+  redis =: legacy.redis
+  rtype =: presence(redis.type) || 'internal'
+  if rtype == 'internal':
+    then:
+      add-info 'redis.type=internal' 'valkey.enabled=true':
+        'Internal Redis became a Valkey subchart (default-enabled, no
+         values needed). Redis only holds caches and job queues —
+         starting fresh is safe.'
+      internal =: redis.internal || hash-map()
+      redis-index-advice internal: 'redis.internal'
+      =>: nil
+    else:
+      ext =: redis.external || hash-map()
+      redis-index-advice ext: 'redis.external'
+      addr =: presence(ext.addr)
+      sentinel =: present?(addr) && str/includes?(addr ',')
+      host =:
+        if sentinel:
+          then: addr
+          else:
+            when addr:
+              addr.str/split(/:/).first()
+      port =:
+        when present?(addr) && (not sentinel):
+          parts =: addr.str/split(/:/)
+          if parts.count() > 1:
+            then: to-int(parts.second() 6379)
+            else: 6379
+      when sentinel:
+        add-warn 'redis.external.addr (sentinel list)' 'externalRedis.host':
+          'Sentinel address list carried verbatim into externalRedis.host
+           — verify the rendered Redis URLs; sentinelMasterSet was
+           carried too.'
+      add-info 'redis.external.addr' 'externalRedis.host/port':
+        'addr split into separate host and port fields; valkey subchart
+         disabled.'
+      =>::
+        valkey:
+          enabled: false
+        externalRedis:
+          host:: host
+          port:: port
+          username:: presence(ext.username)
+          password:: presence(ext.password)
+          sentinelMasterSet:: presence(ext.sentinelMasterSet)
+          existingSecret:: presence(ext.existingSecret)
+          tlsOptions::
+            when truthy?(ext.tlsOptions.enable)::
+              enable: true
+
+defn map-metrics(legacy):
+  m =: legacy.metrics
+  when present?(m):
+    enabled =: bool-of(bool-at(get(m 'enabled') 'metrics.enabled') false)
+    sm =: m.serviceMonitor
+    when present?(sm.metricRelabelings) || present?(sm.relabelings):
+      add-warn 'metrics.serviceMonitor.metricRelabelings/relabelings' nil:
+        'No equivalent — dropped. Apply relabelings in your Prometheus
+         config or via an own ServiceMonitor (extraManifests).'
+    ports-custom =:
+      present?(keep-if-not(m.core.port 8001)) ||
+      present?(keep-if-not(m.registry.port 8001)) ||
+      present?(keep-if-not(m.jobservice.port 8001)) ||
+      present?(keep-if-not(m.exporter.port 8001))
+    when ports-custom:
+      add-warn 'metrics.<component>.port/path' nil:
+        'Metrics endpoints are fixed at /metrics on port 8001 — custom
+         ports/paths were dropped.'
+    when enabled:
+      add-info 'metrics.enabled' 'metrics.enabled + jobservice.config.metric':
+        'metrics.enabled does NOT propagate to jobservice in this chart —
+         the jobservice metric block was added to its config.yml
+         explicitly.'
+    when-not enabled:
+      add-info 'metrics.enabled=false' 'exporter.enabled=false':
+        'In 2.x the exporter only deployed with metrics enabled; this
+         chart enables the exporter by default, so it was disabled
+         explicitly to preserve your 2.x behavior.'
+    =>::
+      metrics:
+        enabled:: enabled
+        serviceMonitor::
+          when bool-of(sm.enabled false)::
+            enabled: true
+            labels:: sm.additionalLabels
+            interval:: presence(sm.interval)
+      exporter:
+        enabled:: enabled
+      jobservice::
+        when enabled::
+          config:
+            metric:
+              enabled: true
+              path: /metrics
+              port: 8001
+
+#------------------------------------------------------------------------------
+# Report + entry point
+#------------------------------------------------------------------------------
+
+defn level-header(level):
+  cond:
+    level == 'ERROR': 'ERROR — will not work, fix before installing'
+    level == 'WARN': 'WARN — migrated, but review the changed behavior'
+    else: 'INFO — mapped automatically'
+
+defn print-group(ws level):
+  group =: ws.filter(\(%1.level == level)).vec()
+  when present?(group):
+    cnt =: group.count()
+    hdr =: level-header(level)
+    warn: ''
+    warn: "$hdr ($cnt)"
+    each w group:
+      old =: w.old
+      new =: w.new
+      note =: w.note
+      warn: "  * $old"
+      when new:
+        warn: "      -> $new"
+      warn: "      $note"
+
+defn print-report(input-file):
+  ws =: advice.deref()
+  warn: '============================================================'
+  warn: "  harbor-migrate: $input-file -> Harbor Next chart values"
+  warn: '  This chart is NOT a drop-in upgrade. Plan a new install'
+  warn: '  plus data migration. Full mapping tables: docs/MIGRATION.md'
+  warn: '============================================================'
+  if empty?(ws):
+    then:
+      warn: 'No advisories — values translated directly.'
+    else:
+      print-group ws: 'ERROR'
+      print-group ws: 'WARN'
+      print-group ws: 'INFO'
+  errors =: ws.filter(\(%1.level == 'ERROR')).count()
+  when errors > 0:
+    warn: ''
+    warn: "!!! $errors ERROR(s) above — the generated values will NOT install as-is."
+
+defn header-comment(input-file):
+  l1 =: "# Values for the Harbor Next chart, generated by harbor-migrate.ys\n"
+  l2 =: "# from: $input-file\n"
+  l3 =: "# Review the migration report (stderr of the generator) and\n"
+  l4 =: "# docs/MIGRATION.md before installing. This chart is not a\n"
+  l5 =: "# drop-in upgrade of goharbor/harbor-helm.\n"
+  =>: str(l1 l2 l3 l4 l5)
+
+defn migrate(legacy):
+  m =: map-globals(legacy)
+  m =: deep-merge(m map-expose(legacy))
+  m =: deep-merge(m map-components(legacy))
+  m =: deep-merge(m map-storage(legacy))
+  m =: deep-merge(m map-database(legacy))
+  m =: deep-merge(m map-redis(legacy))
+  m =: deep-merge(m map-metrics(legacy))
+  cs =: coerced.deref().distinct().vec()
+  when present?(cs):
+    paths =: str/join(', ' cs)
+    add-info "quoted booleans/numbers ($paths)" 'native YAML types':
+      'String-typed scalars were coerced — this chart validates value
+       types via values.schema.json, so "true"/"1" strings would be
+       rejected at install time.'
+  =>: prune(m)
+
+defn main(input-file output-file=nil):
+  legacy =: input-file:read:yaml/load
+  result =: migrate(legacy)
+  text =: str(header-comment(input-file) result:yaml/dump)
+  print-report: input-file
+  if output-file:
+    then:
+      write output-file: text
+      warn: ''
+      warn: "Migrated values written to $output-file"
+    else:
+      say: text

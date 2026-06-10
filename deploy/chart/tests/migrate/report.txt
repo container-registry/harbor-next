@@ -1,0 +1,72 @@
+============================================================
+  harbor-migrate: tests/migrate/values-2x.yaml -> Harbor Next chart values
+  This chart is NOT a drop-in upgrade. Plan a new install
+  plus data migration. Full mapping tables: docs/MIGRATION.md
+============================================================
+
+WARN — migrated, but review the changed behavior (6)
+  * nginx.*
+      The nginx reverse proxy deployment is gone — Ingress/Gateway/ expose Services route to core directly (core proxies the portal). Use ingress.annotations for body-size or ssl-redirect tuning and portal.existingConfigMap for custom portal nginx config.
+  * core.secret
+      -> core.existingSecret
+      Inline component-secret strings are gone (the secret key is now a map of extra env vars). Dropped — the chart auto-generates the inter-component secret; only in-flight uploads/jobs are invalidated. To pin it, pre-create a Secret and reference it via existingSecret.
+  * core probe overrides
+      -> core.probes
+      Probe tuning is not auto-migrated. Probes are now full Kubernetes probe specs under <component>.probes.{startup,liveness,readiness} with retuned defaults (fast 2s startup polling instead of fixed initialDelay) — review those before carrying old timings over.
+  * registry.credentials.password
+      -> registry.credentials.password
+      Carried over, but this is the publicly known 2.x default — change it.
+  * redis.external.*DatabaseIndex
+      Redis logical-DB indexes are FIXED now — core 0, jobservice 1, registry 2, trivy 5, harbor 6, cache 7. Custom indexes were dropped; point Harbor at a Redis instance or DB range nothing else shares.
+  * metrics.serviceMonitor.metricRelabelings/relabelings
+      No equivalent — dropped. Apply relabelings in your Prometheus config or via an own ServiceMonitor (extraManifests).
+
+INFO — mapped automatically (16)
+  * secretKey
+      -> secretKey
+      Carried over. Keep it identical to the old install whenever you reuse the 2.x database — replication endpoints and scanner credentials are encrypted with it.
+  * expose.ingress.annotations
+      -> ingress.annotations
+      This chart pre-sets NO ingress annotations (2.x shipped ssl-redirect + proxy-body-size). Add what your controller needs, e.g. nginx.ingress.kubernetes.io/proxy-body-size "0" so large image layers can be pushed.
+  * expose.tls.secret.secretName
+      -> ingress.tls[0].secretName
+      TLS terminates at the ingress controller with your existing certificate Secret. Pod-level TLS (tls.enabled) stays off — the 2.x-equivalent behavior for ingress exposure.
+  * updateStrategy.type
+      -> <component>.deploymentStrategy.type
+      Now a full per-component Deployment strategy spec — applied to core, portal, registry, jobservice, and exporter.
+  * registry.relativeurls
+      -> registry.config.http.relativeurls
+      Now plain distribution config syntax.
+  * jobservice.jobLoggers
+      -> jobservice.config.job_loggers
+      Logger name list expanded to full logger structures (the loggerSweeperDuration folded into each sweeper).
+  * jobservice.maxJobWorkers
+      -> jobservice.config.worker_pool.workers
+      jobservice.config is the verbatim jobservice config.yml now — Helm deep-merges it over the chart default.
+  * trivy.enabled
+      -> trivy.enabled
+      Default flipped to false in this chart — kept enabled because your 2.x values had it on.
+  * persistence.imageChartStorage.s3
+      -> registry.config.storage.s3
+      registry.config is the verbatim distribution config.yml — every s3 field passes through unchanged. For MinIO / Ceph RGW / SeaweedFS also set forcepathstyle true.
+  * persistence.imageChartStorage.s3.existingSecret
+      -> registry.storageCredentials.s3.existingSecret
+      Same Secret keys (REGISTRY_STORAGE_S3_ACCESSKEY / REGISTRY_STORAGE_S3_SECRETKEY) — your existing Secret works as-is.
+  * persistence.imageChartStorage.disableredirect
+      -> registry.config.storage.redirect.disable
+      Now plain distribution config syntax.
+  * persistence.enabled
+      -> registry.persistence
+      Registry stores images in s3 — no registry PVC needed, so registry.persistence stays disabled.
+  * database.external.existingSecret
+      -> database.existingSecret
+      Reused with existingSecretKey set to the 2.x key name "password" (the chart default key is POSTGRESQL_PASSWORD).
+  * database.external.*
+      -> database.*
+      Flattened one level; coreDatabase is now database.database and the port is numeric.
+  * redis.external.addr
+      -> externalRedis.host/port
+      addr split into separate host and port fields; valkey subchart disabled.
+  * metrics.enabled
+      -> metrics.enabled + jobservice.config.metric
+      metrics.enabled does NOT propagate to jobservice in this chart — the jobservice metric block was added to its config.yml explicitly.

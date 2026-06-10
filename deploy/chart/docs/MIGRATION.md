@@ -10,6 +10,59 @@ This chart is a ground-up redesign, **not a drop-in replacement**. You cannot
 selectors, and configuration model all differ. Plan a new installation plus a
 data migration.
 
+## Automated translation: harbor-migrate.ys
+
+[`harbor-migrate.ys`](harbor-migrate.ys) (in this directory) converts a 2.x
+values file to this chart's format and prints an advisory report of
+everything that changes, gets dropped, or will not work as expected. It needs
+[YAMLScript](https://yamlscript.org) (`brew install yamlscript`):
+
+```bash
+# from the chart directory
+ys docs/harbor-migrate.ys old-values.yaml new-values.yaml
+
+# or via Task
+task migrate -- old-values.yaml new-values.yaml
+
+# report only (values to /dev/null)
+ys docs/harbor-migrate.ys old-values.yaml > /dev/null
+```
+
+The migrated values go to `new-values.yaml` (or stdout); the report goes to
+stderr with three severity levels:
+
+| Level | Meaning |
+|---|---|
+| `ERROR` | Will not work — manual action required before install (internal database, Notary/ChartMuseum, CloudFront key Secret, inline GCS keys) |
+| `WARN` | Migrated, but semantics changed — review (publicly known default credentials, fixed Redis DB indexes, dropped inline component secrets, probe tuning) |
+| `INFO` | Mapped automatically — listed so nothing changes silently |
+
+What it does for you: applies every rename/restructure from the tables below,
+converts storage backends to the `registry.config` passthrough (wiring
+`storageCredentials` with the legacy Secret key names), expands
+`jobservice.jobLoggers` into full logger structures, splits
+`redis.external.addr` into host/port, flips `expose.type` to the per-method
+flags, translates ingress TLS, and adds the `jobservice.config.metric` block
+when metrics are enabled. Values that match the 2.x defaults of unchanged
+settings are omitted instead of restated.
+
+It also coerces quoted scalars (`"true"`, `"5432"`) to native booleans and
+integers — the legacy chart tolerated them, but this chart's
+`values.schema.json` rejects them at install time.
+
+What it cannot do: move data (database contents, images), create Kubernetes
+Secrets, carry over inline component secret strings, or make an in-place
+`helm upgrade` possible. Always read the report and run `helm template` with
+the output before installing — the script's golden tests
+(`task test:migrate`) do exactly that with two fixtures:
+[`tests/migrate/values-2x.yaml`](../tests/migrate/values-2x.yaml) (the worked
+example below) and
+[`tests/migrate/values-dedicated-2x.yaml`](../tests/migrate/values-dedicated-2x.yaml),
+a sanitized real-world tenant values file from the dedicated-container-registry
+deployment engine (S3 storage, external PG/Redis, cert-manager ingress,
+string-typed booleans). Their expected outputs and advisory reports sit next
+to them (`values*-next.yaml`, `report*.txt`).
+
 ## Breaking changes at a glance
 
 | Change | 2.x | This chart | What you must do |

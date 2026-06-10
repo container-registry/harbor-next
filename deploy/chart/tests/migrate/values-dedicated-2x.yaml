@@ -1,0 +1,123 @@
+# Real-world 2.x fixture: the per-tenant values file that the
+# dedicated-container-registry deployment engine renders for the legacy
+# harbor-helm chart (extracted from deployment_engine/harbor.py,
+# Harbor._harbor_values). All credentials/identifiers are placeholders —
+# the structure, quoting quirks ("true" strings, numeric strings, the
+# controller block nested one level too deep), and field selection are
+# kept exactly as generated.
+imagePullPolicy: Always
+portal:
+  podAnnotations:
+    restart-time: "1749500000.0"
+  image:
+    repository: 8gears.container-registry.com/8gcr/harbor-portal
+    tag: v2.14.4
+core:
+  replicas: 1
+  quotaUpdateProvider: redis
+  gdpr:
+    deleteUser: "true"
+  secret: REPLACE16CHARSEC
+  xsrfKey: REPLACE32CHARXSRFKEY0123456789AB
+  image:
+    repository: 8gears.container-registry.com/8gcr/harbor-core
+    tag: v2.14.4
+jobservice:
+  image:
+    repository: 8gears.container-registry.com/8gcr/harbor-jobservice
+    tag: v2.14.4
+  maxJobWorkers: 4
+registry:
+  replicas: 1
+  registry:
+    image:
+      repository: 8gears.container-registry.com/8gcr/harbor-registry
+      tag: v2.14.4
+    # NOTE: nested under registry.registry in the generator — the legacy
+    # chart expected registry.controller, so this block was silently
+    # ignored there too (default registryctl image was used).
+    controller:
+      image:
+        repository: 8gears.container-registry.com/8gcr/harbor-registryctl
+  credentials:
+    password: CHANGEME-registry-password
+    htpasswdString: "harbor_registry_user:$2a$10$CHANGEMECHANGEMECHANGEMECHANGEMECHANGEMECHANGEMECHANGE"
+trivy:
+  enabled: "true"
+  image:
+    repository: 8gears.container-registry.com/8gcr/trivy-adapter
+    tag: v2.14.4
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 1
+      memory: 1Gi
+exporter:
+  image:
+    repository: 8gears.container-registry.com/8gcr/harbor-exporter
+    tag: v2.14.4
+  override:
+    database:
+      maxIdleConns: "0"
+      maxOpenConns: "2"
+redis:
+  type: external
+  external:
+    addr: "redis-valkey:6379"
+imagePullSecrets:
+  - name: 8g-registry-secret
+harborAdminPassword: CHANGEME-admin-password
+secretKey: REPLACE16CHARKEY
+database:
+  type: external
+  external:
+    host: pg.tenant-infra.example.com
+    sslmode: 'require'
+    port: '5432'
+    username: v2_tenant1
+    password: CHANGEME-db-password
+    coreDatabase: 'v2_tenant1_core'
+  maxIdleConns: "1"
+  maxOpenConns: "20"
+  connMaxIdleTime: "30s"
+  connMaxLifetime: "5m"
+cache:
+  enabled: true
+expose:
+  tls:
+    certSource: secret
+    secret:
+      secretName: harbor-core-cert-tls
+  ingress:
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      kubernetes.io/ingress.class: nginx
+      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/proxy-buffering: "off"
+      nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+      nginx.ingress.kubernetes.io/configuration-snippet: "rewrite ^/setting.json(.*) /tenant1-setting.json$1 break;"
+      nginx.ingress.kubernetes.io/proxy-next-upstream: "error timeout http_502 http_503 http_504"
+      nginx.ingress.kubernetes.io/proxy-next-upstream-timeout: "30"
+      nginx.ingress.kubernetes.io/proxy-next-upstream-tries: "5"
+    hosts:
+      core: tenant1.registry.example.com
+persistence:
+  enabled: false # IMPORTANT not in quotes, we need that bug.
+  imageChartStorage:
+    type: s3
+    s3:
+      bucket: tenant1-registry
+      accesskey: CHANGEME-s3-access-key
+      secretkey: CHANGEME-s3-secret-key
+      region: eu-central-1
+      regionendpoint: https://objects.example.com
+externalURL: https://tenant1.registry.example.com
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    additionalLabels:
+      instance: primary

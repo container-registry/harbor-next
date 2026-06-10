@@ -109,6 +109,48 @@ tasks:
       - helm unittest {{.CHART_DIR}} --update-snapshot
 
   # ============================================================================
+  # Migration (goharbor/harbor-helm -> this chart)
+  # ============================================================================
+
+  _require-ys:
+    internal: true
+    preconditions:
+      - sh: command -v ys
+        msg: |
+          ys (YAMLScript) not found. Install:
+            macOS:  brew install yamlscript
+            other:  curl -s https://yamlscript.org/install | bash
+          (https://yamlscript.org)
+
+  migrate:
+    desc: 'Translate a goharbor/harbor-helm values file (usage: task migrate -- old-values.yaml [new-values.yaml])'
+    deps: [_require-ys]
+    cmds:
+      - ys docs/harbor-migrate.ys {{.CLI_ARGS}}
+
+  test:migrate:
+    desc: Golden tests for docs/harbor-migrate.ys, then helm-template the results
+    deps: [_require-ys]
+    cmds:
+      - for: &migrate-fixtures ['', '-dedicated']
+        cmd: ys docs/harbor-migrate.ys tests/migrate/values{{.ITEM}}-2x.yaml > tests/migrate/.values{{.ITEM}}-next.gen.yaml 2> tests/migrate/.report{{.ITEM}}.gen.txt
+      - defer: rm -f tests/migrate/.*.gen.*
+      - for: *migrate-fixtures
+        cmd: diff -u tests/migrate/values{{.ITEM}}-next.yaml tests/migrate/.values{{.ITEM}}-next.gen.yaml
+      - for: *migrate-fixtures
+        cmd: diff -u tests/migrate/report{{.ITEM}}.txt tests/migrate/.report{{.ITEM}}.gen.txt
+      - for: *migrate-fixtures
+        cmd: helm template migrate-test {{.CHART_DIR}} -f tests/migrate/.values{{.ITEM}}-next.gen.yaml > /dev/null
+      - echo "migration golden tests PASS"
+
+  test:migrate:update:
+    desc: Regenerate the migration golden files from the current script
+    deps: [_require-ys]
+    cmds:
+      - for: *migrate-fixtures
+        cmd: ys docs/harbor-migrate.ys tests/migrate/values{{.ITEM}}-2x.yaml > tests/migrate/values{{.ITEM}}-next.yaml 2> tests/migrate/report{{.ITEM}}.txt
+
+  # ============================================================================
   # Packaging
   # ============================================================================
 
