@@ -4,6 +4,10 @@
 # External URL for Harbor
 externalURL: "https://rancher-dev-16gb-fsn1-1.container-registry.com"
 
+# REQUIRED: set a strong password (min 8 chars) or use
+# existingSecretAdminPassword for production.
+harborAdminPassword: "CHANGE_ME_NOW"
+
 # Ingress configuration for nginx ingress controller
 ingress:
   enabled: true

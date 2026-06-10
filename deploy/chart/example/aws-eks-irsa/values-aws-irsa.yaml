@@ -41,7 +41,8 @@ tls:
 
 # --- External Database: Aurora PostgreSQL with RDS IAM Auth ---
 database:
-  host: ""       # set via --set database.host=<AURORA_ENDPOINT>
+  # Placeholder — override via --set database.host=<AURORA_ENDPOINT>
+  host: "CHANGEME.cluster-abc123.eu-central-1.rds.amazonaws.com"
   port: 5432
   username: harbor_iam_user
   password: "placeholder"  # ignored when IAM auth is active

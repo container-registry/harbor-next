@@ -17,6 +17,8 @@ trivy:
     create: true
   pdb:
     enabled: true
+    # Chart fails fast when a PDB is enabled without a disruption bound.
+    maxUnavailable: 1
 cache:
   enabled: true
   expireHours: 12

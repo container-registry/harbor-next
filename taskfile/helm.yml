@@ -109,6 +109,17 @@ tasks:
     desc: "Run helm unittest"
     cmd: helm unittest {{.CHART_DIR}}
 
+  examples:
+    desc: "Render every example values file standalone"
+    cmds:
+      - for:
+          - example/k3d-local.yaml
+          - example/rke2-rancher.yaml
+          - example/private-ca.yaml
+          - example/openshift/values.yaml
+          - example/aws-eks-irsa/values-aws-irsa.yaml
+        cmd: helm template harbor {{.CHART_DIR}} -f {{.CHART_DIR}}/{{.ITEM}} > /dev/null && echo "{{.ITEM}} OK"
+
   gitops-determinism:
     desc: "Render GitOps values twice and require byte-identical output"
     cmds:
@@ -162,6 +173,7 @@ tasks:
       - task: kube-linter
       - task: unittest
       - task: gitops-determinism
+      - task: examples
       - task: trivy-chart
       - task: kubescape
 
