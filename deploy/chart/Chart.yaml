@@ -28,22 +28,26 @@ maintainers:
   - name: Harbor Next Authors
     url: https://github.com/container-registry/harbor-next
 
-annotations:
-  artifacthub.io/license: Apache-2.0
-  artifacthub.io/category: integration-delivery
-  artifacthub.io/links: |
-    - name: Documentation
-      url: https://github.com/container-registry/harbor-next
-    - name: Source Helm Chart
-      url: https://github.com/container-registry/harbor-next/deploy/chart/
-    - name: Upstream Harbor
-      url: https://goharbor.io
-  artifacthub.io/screenshots: |
-    - title: Harbor Next
-      url: https://raw.githubusercontent.com/container-registry/harbor-next/refs/heads/main/docs/img/harbor-next-logo.svg
-
 dependencies:
   - name: valkey
     version: "0.9.3"
     repository: "oci://ghcr.io/valkey-io/valkey-helm"
     condition: valkey.enabled
+
+# Artifact Hub metadata (https://artifacthub.io/docs/topics/annotations/helm/).
+# Keep this the LAST top-level key: the release pipeline appends the
+# per-release artifacthub.io/images annotation to this block before
+# packaging (image tags are only known at release time).
+annotations:
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/category: integration-delivery
+  artifacthub.io/operator: "false"
+  artifacthub.io/links: |
+    - name: Documentation
+      url: https://github.com/container-registry/harbor-next
+    - name: Source Helm Chart
+      url: https://github.com/container-registry/harbor-next/tree/main/deploy/chart
+    - name: Migration from goharbor/harbor-helm
+      url: https://github.com/container-registry/harbor-next/blob/main/deploy/chart/docs/MIGRATION.md
+    - name: Upstream Harbor
+      url: https://goharbor.io

@@ -11,6 +11,7 @@ vars:
   # Tool versions
   CT_VERSION: '{{.CT_VERSION | default "3.12.0"}}'
   KUBE_LINTER_VERSION: '{{.KUBE_LINTER_VERSION | default "0.7.3"}}'
+  AH_VERSION: '{{.AH_VERSION | default "1.22.0"}}'
   # Minimum required values for schema validation
   HELM_SET: >-
     --set externalURL=https://harbor.example.com
@@ -39,6 +40,14 @@ tasks:
       ct lint
       --charts {{.CHART_DIR}}
       --validate-maintainers=false
+
+  ah-lint:
+    desc: "Validate Artifact Hub annotations/metadata with the ah CLI"
+    cmd: >-
+      docker run --rm
+      -v $(pwd)/{{.CHART_DIR}}:/chart
+      artifacthub/ah:v{{.AH_VERSION}}
+      ah lint --kind helm --path /chart
 
   kube-linter:
     desc: "Lint rendered manifests with kube-linter"
@@ -152,11 +161,12 @@ tasks:
   # ============================================================================
 
   lint:
-    desc: "Run all linters (helm lint, ct lint, kube-linter)"
+    desc: "Run all linters (helm lint, ct lint, kube-linter, ah lint)"
     cmds:
       - task: helm-lint
       - task: ct-lint
       - task: kube-linter
+      - task: ah-lint
 
   security:
     desc: "Run all security scanners (Trivy, Kubescape)"
@@ -174,6 +184,7 @@ tasks:
       - task: unittest
       - task: gitops-determinism
       - task: examples
+      - task: ah-lint
       - task: trivy-chart
       - task: kubescape
 
@@ -186,6 +197,7 @@ tasks:
       - task: kube-linter
       - task: unittest
       - task: gitops-determinism
+      - task: ah-lint
       - task: trivy-chart:report
       - task: kubescape:report
 

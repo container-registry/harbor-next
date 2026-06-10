@@ -25,6 +25,8 @@
 .claude/
 # Documentation sources
 README.md.gotmpl
+# Artifact Hub repo metadata — pushed as a separate OCI artifact, not chart content
+artifacthub-repo.yml
 # CI/CD
 .github/
 .gitlab-ci.yml
