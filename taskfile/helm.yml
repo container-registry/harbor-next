@@ -285,6 +285,7 @@ tasks:
       # doesn't also process the extracted valkey subchart in charts/.
       - helm-docs --chart-search-root={{.CHART_DIR}} --chart-to-generate={{.CHART_DIR}}
     sources:
+      - '{{.CHART_DIR}}/Chart.yaml'
       - '{{.CHART_DIR}}/values.yaml'
       - '{{.CHART_DIR}}/README.md.gotmpl'
     generates:
