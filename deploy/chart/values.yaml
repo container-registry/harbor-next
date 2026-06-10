@@ -1457,6 +1457,24 @@ valkey:
     runAsNonRoot: true
     runAsUser: 1000
 
+  # -- Resources for the valkey container (subchart passthrough).
+  # Set like every other component so the rendered manifests pass the
+  # kube-linter requests/limits checks.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+  # -- Resources for the valkey init container (subchart passthrough)
+  initResources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 64Mi
+
 # --- External Redis (when valkey.enabled=false) ---
 externalRedis:
   # -- External Redis host

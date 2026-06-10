@@ -82,6 +82,51 @@ jobs:
           tar -xf "${RUNNER_TEMP}/ys.tar" -C "${RUNNER_TEMP}/ys" --strip-components=1
           echo "${RUNNER_TEMP}/ys" >> "$GITHUB_PATH"
 
+      - name: Install Node
+        # For ajv-cli (schema strict compile) via npx — the taskfile
+        # falls back to docker only when npx is absent.
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: ${{ env.NODE_IMAGE_VERSION }}
+
+      - name: Install chart tools (ct, ah, trivy)
+        # Binaries instead of `docker run -v`: the self-hosted runners
+        # talk to a remote DinD daemon, so bind mounts resolve on the
+        # DinD host and silently see nothing from the runner workspace.
+        # (kube-linter stays docker-based — it reads stdin, which works
+        # over remote DinD.)
+        run: |
+          arch="$(uname -m)"
+          case "${arch}" in
+            x86_64) goarch="amd64"; trivy_arch="64bit" ;;
+            aarch64|arm64) goarch="arm64"; trivy_arch="ARM64" ;;
+            *) echo "unsupported arch: ${arch}" >&2; exit 1 ;;
+          esac
+          bin="${RUNNER_TEMP}/bin"
+          mkdir -p "${bin}"
+
+          # chart-testing (+ its lint config and python deps)
+          mkdir -p "${RUNNER_TEMP}/ct"
+          curl -fsSL "https://github.com/helm/chart-testing/releases/download/v${CT_VERSION}/chart-testing_${CT_VERSION}_linux_${goarch}.tar.gz" \
+            | tar -xz -C "${RUNNER_TEMP}/ct"
+          mv "${RUNNER_TEMP}/ct/ct" "${bin}/ct"
+          {
+            echo "CT_LINT_CONF=${RUNNER_TEMP}/ct/etc/lintconf.yaml"
+            echo "CT_CHART_YAML_SCHEMA=${RUNNER_TEMP}/ct/etc/chart_schema.yaml"
+          } >> "$GITHUB_ENV"
+          python3 -m pip install --user --quiet yamale yamllint
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+          # Artifact Hub CLI
+          curl -fsSL "https://github.com/artifacthub/hub/releases/download/v${AH_VERSION}/ah_${AH_VERSION}_linux_${goarch}.tar.gz" \
+            | tar -xz -C "${bin}" ah
+
+          # trivy
+          curl -fsSL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-${trivy_arch}.tar.gz" \
+            | tar -xz -C "${bin}" trivy
+
+          echo "${bin}" >> "$GITHUB_PATH"
+
       # helm lint + ct lint + kube-linter + ah lint (Artifact Hub metadata)
       - name: Lint
         run: task helm:lint

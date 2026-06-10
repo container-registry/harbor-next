@@ -1034,9 +1034,11 @@ Kubernetes: `>=1.28.0-0`
 | valkey.dataStorage | object | `{"enabled":false}` | Valkey persistence configuration |
 | valkey.enabled | bool | `true` | Enable Valkey subchart |
 | valkey.fullnameOverride | string | `"valkey"` |  |
+| valkey.initResources | object | `{"limits":{"memory":"64Mi"},"requests":{"cpu":"10m","memory":"32Mi"}}` | Resources for the valkey init container (subchart passthrough) |
 | valkey.podSecurityContext.fsGroup | int | `1000` |  |
 | valkey.podSecurityContext.runAsGroup | int | `1000` |  |
 | valkey.podSecurityContext.runAsUser | int | `1000` |  |
+| valkey.resources | object | `{"limits":{"memory":"256Mi"},"requests":{"cpu":"100m","memory":"128Mi"}}` | Resources for the valkey container (subchart passthrough). Set like every other component so the rendered manifests pass the kube-linter requests/limits checks. |
 | valkey.securityContext.capabilities.drop[0] | string | `"ALL"` |  |
 | valkey.securityContext.readOnlyRootFilesystem | bool | `true` |  |
 | valkey.securityContext.runAsNonRoot | bool | `true` |  |

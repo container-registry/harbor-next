@@ -8,9 +8,8 @@ vars:
   CHART_DIR: deploy/chart
   CHART_NAME: harbor-next
 
-  # Tool versions (AH_VERSION comes from versions.env)
-  CT_VERSION: '{{.CT_VERSION | default "3.12.0"}}'
-  KUBE_LINTER_VERSION: '{{.KUBE_LINTER_VERSION | default "0.7.3"}}'
+  # Tool versions come from versions.env (single source of truth,
+  # loaded via the root Taskfile dotenv; CI installs the same pins).
   # Minimum required values for schema validation
   HELM_SET: >-
     --set externalURL=https://harbor.example.com
@@ -30,23 +29,34 @@ tasks:
     desc: "Render templates and check for errors"
     cmd: helm template test {{.CHART_DIR}} {{.HELM_SET}} > /dev/null
 
+  # Tool tasks prefer a local binary and fall back to docker. CI runs on
+  # self-hosted runners with a REMOTE DinD daemon: `docker run -v $(pwd)`
+  # mounts a path on the DinD host, not the runner workspace, so bind
+  # mounts silently see nothing there. CI installs the binaries
+  # (chart-ci.yml); local dev works either way.
   ct-lint:
     desc: "Lint chart with chart-testing (ct)"
-    cmd: >-
-      docker run --rm
-      -v $(pwd):/workdir -w /workdir
-      quay.io/helmpack/chart-testing:v{{.CT_VERSION}}
-      ct lint
-      --charts {{.CHART_DIR}}
-      --validate-maintainers=false
+    cmd: |
+      if command -v ct >/dev/null 2>&1; then
+        ct lint --charts {{.CHART_DIR}} --validate-maintainers=false
+      else
+        docker run --rm \
+          -v $(pwd):/workdir -w /workdir \
+          quay.io/helmpack/chart-testing:v{{.CT_VERSION}} \
+          ct lint --charts {{.CHART_DIR}} --validate-maintainers=false
+      fi
 
   ah-lint:
     desc: "Validate Artifact Hub annotations/metadata with the ah CLI"
-    cmd: >-
-      docker run --rm
-      -v $(pwd)/{{.CHART_DIR}}:/chart
-      artifacthub/ah:v{{.AH_VERSION}}
-      ah lint --kind helm --path /chart
+    cmd: |
+      if command -v ah >/dev/null 2>&1; then
+        ah lint --kind helm --path {{.CHART_DIR}}
+      else
+        docker run --rm \
+          -v $(pwd)/{{.CHART_DIR}}:/chart \
+          artifacthub/ah:v{{.AH_VERSION}} \
+          ah lint --kind helm --path /chart
+      fi
 
   schema-check:
     desc: "Validate values.schema.json itself (strict compile + values drift)"
@@ -56,13 +66,19 @@ tasks:
       #    keywords, which JSON Schema otherwise ignores SILENTLY
       #    ("min" instead of "minimum" validates nothing). Union types
       #    are legitimate draft-2020 and explicitly allowed.
-      - >-
-        docker run --rm
-        -v $(pwd)/{{.CHART_DIR}}:/chart -w /chart
-        node:{{.NODE_IMAGE_VERSION}}-alpine
-        npx -y ajv-cli@{{.AJV_CLI_VERSION}} compile
-        -s values.schema.json --spec=draft2020
-        --strict=true --allowUnionTypes=true
+      - |
+        if command -v npx >/dev/null 2>&1; then
+          npx -y ajv-cli@{{.AJV_CLI_VERSION}} compile \
+            -s {{.CHART_DIR}}/values.schema.json --spec=draft2020 \
+            --strict=true --allowUnionTypes=true
+        else
+          docker run --rm \
+            -v $(pwd)/{{.CHART_DIR}}:/chart -w /chart \
+            node:{{.NODE_IMAGE_VERSION}}-alpine \
+            npx -y ajv-cli@{{.AJV_CLI_VERSION}} compile \
+            -s values.schema.json --spec=draft2020 \
+            --strict=true --allowUnionTypes=true
+        fi
       # 2. Two-way nested drift (tools/schema-drift.ys): values keys the
       #    schema is silent about (no validation, no IDE completion; at
       #    the closed root they break every render) and schema properties
@@ -128,6 +144,9 @@ tasks:
   kube-linter:
     desc: "Lint rendered manifests with kube-linter"
     cmds:
+      # Deliberately docker-only (unlike the other tool tasks): stdin
+      # piping works even against a remote DinD daemon, and a local
+      # binary of a different version would apply a different check set.
       - >-
         helm template test {{.CHART_DIR}} {{.HELM_SET}}
         | docker run --rm -i
@@ -141,13 +160,19 @@ tasks:
         helm template test {{.CHART_DIR}} {{.HELM_SET}}
         > {{.CHART_DIR}}/.trivy-manifests.yaml
       - defer: rm -f {{.CHART_DIR}}/.trivy-manifests.yaml
-      - >-
-        docker run --rm
-        -v $(pwd)/{{.CHART_DIR}}:/chart
-        aquasec/trivy:{{.TRIVY_VERSION}}
-        config /chart/.trivy-manifests.yaml
-        --severity HIGH,CRITICAL
-        --exit-code 1
+      - |
+        if command -v trivy >/dev/null 2>&1; then
+          trivy config {{.CHART_DIR}}/.trivy-manifests.yaml \
+            --ignorefile {{.CHART_DIR}}/.trivyignore \
+            --severity HIGH,CRITICAL --exit-code 1
+        else
+          docker run --rm \
+            -v $(pwd)/{{.CHART_DIR}}:/chart \
+            aquasec/trivy:{{.TRIVY_VERSION}} \
+            config /chart/.trivy-manifests.yaml \
+            --ignorefile /chart/.trivyignore \
+            --severity HIGH,CRITICAL --exit-code 1
+        fi
 
   trivy-chart:report:
     desc: "Scan chart with Trivy and output SARIF report"
@@ -156,15 +181,20 @@ tasks:
         helm template test {{.CHART_DIR}} {{.HELM_SET}}
         > {{.CHART_DIR}}/.trivy-manifests.yaml
       - defer: rm -f {{.CHART_DIR}}/.trivy-manifests.yaml
-      - >-
-        docker run --rm
-        -v $(pwd)/{{.CHART_DIR}}:/chart
-        -v $(pwd):/out
-        aquasec/trivy:{{.TRIVY_VERSION}}
-        config /chart/.trivy-manifests.yaml
-        --severity HIGH,CRITICAL
-        --format sarif
-        --output /out/trivy-chart.sarif
+      - |
+        if command -v trivy >/dev/null 2>&1; then
+          trivy config {{.CHART_DIR}}/.trivy-manifests.yaml \
+            --ignorefile {{.CHART_DIR}}/.trivyignore \
+            --severity HIGH,CRITICAL --format sarif --output trivy-chart.sarif
+        else
+          docker run --rm \
+            -v $(pwd)/{{.CHART_DIR}}:/chart \
+            -v $(pwd):/out \
+            aquasec/trivy:{{.TRIVY_VERSION}} \
+            config /chart/.trivy-manifests.yaml \
+            --ignorefile /chart/.trivyignore \
+            --severity HIGH,CRITICAL --format sarif --output /out/trivy-chart.sarif
+        fi
 
   _require-kubescape:
     internal: true
