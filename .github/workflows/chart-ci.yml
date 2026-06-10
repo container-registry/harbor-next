@@ -115,6 +115,11 @@ jobs:
             echo "CT_CHART_YAML_SCHEMA=${RUNNER_TEMP}/ct/etc/chart_schema.yaml"
           } >> "$GITHUB_ENV"
           # Bootstrap pip if the runner python ships without it.
+          # PIP_BREAK_SYSTEM_PACKAGES: Debian's PEP 668 guard refuses
+          # --user installs; the env var is honored by new pip and
+          # harmlessly ignored by old pip. Installs stay in ~/.local on
+          # an ephemeral runner.
+          export PIP_BREAK_SYSTEM_PACKAGES=1
           python3 -m pip --version >/dev/null 2>&1 \
             || python3 -m ensurepip --user >/dev/null 2>&1 \
             || { curl -fsSL https://bootstrap.pypa.io/get-pip.py | python3 - --user --quiet; }
