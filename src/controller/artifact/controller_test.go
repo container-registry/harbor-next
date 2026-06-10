@@ -336,8 +336,10 @@ func (c *controllerTestSuite) TestEnsureArtifact() {
 
 	// the artifact doesn't exist and includes a pending attestation accessory candidate
 	c.repoMgr.On("GetByName", mock.Anything, mock.Anything).Return(&repomodel.RepoRecord{
-		ProjectID: 1,
+		RepositoryID: 1,
+		ProjectID:    1,
 	}, nil)
+	c.repoMgr.On("Touch", mock.Anything, int64(1)).Return(nil)
 	c.artMgr.On("GetByDigest", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.NotFoundError(nil))
 	c.artMgr.On("Create", mock.Anything, mock.Anything).Return(int64(1), nil)
 	c.accMgr.On("Ensure", mock.Anything,
