@@ -318,6 +318,25 @@ Core helpers
 {{- end -}}
 
 {{/*
+Generate a random secret value, or fail when auto-generation is disabled.
+
+GitOps engines that render client-side (Argo CD) re-template on every sync;
+`lookup` returns nothing there, so an auto-generated value would rotate on
+each sync and roll every workload via the checksum annotations. With
+`autoGenSecrets: false` the chart refuses to generate and names the value
+to pin instead.
+
+Expects a dict: "root" ($), "len" (int), "hint" (the values to set).
+*/}}
+{{- define "harbor.autoGenValue" -}}
+{{- if .root.Values.autoGenSecrets -}}
+{{- randAlphaNum (.len | int) -}}
+{{- else -}}
+{{- fail (printf "autoGenSecrets is false: set %s to a fixed value" .hint) -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 =============================================================================
 Image helpers
 =============================================================================
@@ -403,7 +422,7 @@ Resolution order:
 {{- if $existingKey }}
 {{- $existingKey | b64dec }}
 {{- else }}
-{{- randAlphaNum 16 }}
+{{- include "harbor.autoGenValue" (dict "root" . "len" 16 "hint" "secretKey or existingSecretSecretKey") }}
 {{- end }}
 {{- end }}
 {{- end }}

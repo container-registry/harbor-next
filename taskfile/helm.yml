@@ -109,6 +109,17 @@ tasks:
     desc: "Run helm unittest"
     cmd: helm unittest {{.CHART_DIR}}
 
+  gitops-determinism:
+    desc: "Render GitOps values twice and require byte-identical output"
+    cmds:
+      # Two client-side renders must match exactly — this is what Argo CD
+      # does on every sync. Any diff means generated secret material
+      # leaked past the autoGenSecrets pinning surface.
+      - helm template harbor {{.CHART_DIR}} --namespace harbor -f {{.CHART_DIR}}/ci/gitops-values.yaml > /tmp/gitops-render-1.yaml
+      - helm template harbor {{.CHART_DIR}} --namespace harbor -f {{.CHART_DIR}}/ci/gitops-values.yaml > /tmp/gitops-render-2.yaml
+      - defer: rm -f /tmp/gitops-render-1.yaml /tmp/gitops-render-2.yaml
+      - diff -u /tmp/gitops-render-1.yaml /tmp/gitops-render-2.yaml || (echo "Chart rendering is not deterministic — GitOps engines would see perpetual drift." && exit 1)
+
   helm-docs:
     desc: "Check that chart README is up-to-date with helm-docs"
     preconditions:
@@ -150,6 +161,7 @@ tasks:
       - task: ct-lint
       - task: kube-linter
       - task: unittest
+      - task: gitops-determinism
       - task: trivy-chart
       - task: kubescape
 
@@ -161,6 +173,7 @@ tasks:
       - task: ct-lint
       - task: kube-linter
       - task: unittest
+      - task: gitops-determinism
       - task: trivy-chart:report
       - task: kubescape:report
 

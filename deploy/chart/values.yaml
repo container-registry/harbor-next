@@ -66,6 +66,16 @@ existingSecretAdminPassword: ""
 # -- Key in the existing secret for admin password
 existingSecretAdminPasswordKey: HARBOR_ADMIN_PASSWORD
 
+# -- Allow the chart to auto-generate secret material it needs
+# (encryption key, component identity secrets, CSRF key, token-service
+# CA, registry htpasswd, ingress certificate). Convenient for
+# `helm install`, but the generated values are random per render: GitOps
+# engines that template client-side (Argo CD) rotate them on every sync
+# and roll every workload. Set to `false` to instead **fail at render
+# time** naming the value that must be pinned — see the GitOps section
+# in the README and `example/flux/`.
+autoGenSecrets: true
+
 # -- Existing secret containing the encryption key (overrides secretKey).
 # The secret must hold the 16-char key under `SECRET_KEY` and `secretKey`
 # (or override the key name via `existingSecretSecretKeyKey`).
@@ -599,6 +609,19 @@ registry:
   # -- Key in `registry.existingSecret` that holds `REGISTRY_HTTP_SECRET`.
   existingSecretKey: "REGISTRY_HTTP_SECRET"
 
+  # Credentials core/jobservice use to authenticate against the registry.
+  # Resolution order:
+  #   1. `existingSecret` — BYO Secret holding BOTH
+  #      `REGISTRY_CREDENTIAL_PASSWORD` (plaintext password) and
+  #      `REGISTRY_HTPASSWD` (matching `<username>:<bcrypt>` htpasswd line,
+  #      mounted into the registry). Nothing is generated. Deterministic.
+  #   2. `htpasswdString` + `password` — fixed htpasswd line in the
+  #      generated Secret. Deterministic.
+  #   3. `password` only — the chart runs `htpasswd` at render time;
+  #      bcrypt re-salts on every render (fails when
+  #      `autoGenSecrets: false`).
+  # Generate the htpasswd line with:
+  #   docker run --rm --entrypoint htpasswd httpd:2 -nbB <username> <password>
   credentials:
     username: "harbor_registry_user"
     password: ""

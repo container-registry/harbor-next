@@ -322,3 +322,46 @@ tests:
       - equal:
           path: spec.template.spec.volumes[1].persistentVolumeClaim.claimName
           value: my-existing-pvc
+
+  # ============================================================================
+  # Pinned-secret env wiring (GitOps existingSecret paths)
+  # ============================================================================
+  # Pins: jobservice.existingSecret must reach the jobservice pod itself
+  # as explicit JOBSERVICE_SECRET env — envFrom stays on the generated
+  # Secret, which omits JOBSERVICE_SECRET when pinned.
+  - it: should wire JOBSERVICE_SECRET env from jobservice.existingSecret
+    template: templates/jobservice.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      jobservice.existingSecret: js-id
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: JOBSERVICE_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: js-id
+                key: JOBSERVICE_SECRET
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[1].secretRef.name
+          value: RELEASE-NAME-harbor-next-jobservice
+
+  - it: should wire REGISTRY_CREDENTIAL_PASSWORD env from credentials.existingSecret
+    template: templates/jobservice.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.credentials.existingSecret: reg-creds
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REGISTRY_CREDENTIAL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: reg-creds
+                key: REGISTRY_CREDENTIAL_PASSWORD

@@ -255,7 +255,9 @@ spec:
             items:
               - key: REGISTRY_HTPASSWD
                 path: passwd
-            secretName: {{ include "harbor.registry.name" . }}-htpasswd
+            {{- /* BYO credentials Secret must hold REGISTRY_HTPASSWD (the
+                  htpasswd line) alongside REGISTRY_CREDENTIAL_PASSWORD. */}}
+            secretName: {{ .Values.registry.credentials.existingSecret | default (printf "%s-htpasswd" (include "harbor.registry.name" .)) }}
         - configMap:
             name: {{ .Values.registry.existingConfigMap | default (include "harbor.registry.name" .) }}
           name: registry-config

@@ -11,6 +11,7 @@ This directory contains example values files for deploying Harbor in different e
 | `private-ca.yaml` | Private-CA / mTLS scenario: PG with verify-full + Redis over TLS + shared CA for S3/OIDC |
 | [`openshift/`](openshift/) | OpenShift deployment with ttl.sh images and edge-terminated routes |
 | [`aws-eks-irsa/`](aws-eks-irsa/) | AWS EKS with IRSA for S3 storage and RDS IAM Auth (Aurora PostgreSQL) |
+| [`flux/`](flux/) | FluxCD GitOps setup: HelmRelease with drift detection + fully pinned secrets (`autoGenSecrets: false`) for deterministic rendering — works for Argo CD too |
 
 ## Usage
 

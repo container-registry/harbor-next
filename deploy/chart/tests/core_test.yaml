@@ -180,3 +180,69 @@ tests:
       - equal:
           path: data.secretKey
           value: "c2l4dGVlbmtleWNoYXJzMQ=="
+
+  # ============================================================================
+  # Pinned-secret env wiring (GitOps existingSecret paths)
+  # ============================================================================
+  # Pins: envFrom must stay on the generated Secret even when
+  # core.existingSecret is set — it carries CSRF_KEY,
+  # REGISTRY_CREDENTIAL_PASSWORD, trace password and free-form
+  # `core.secret` keys. Pinned keys override per-key via explicit env.
+  - it: should keep envFrom on the generated Secret when core.existingSecret is set
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.existingSecret: core-id
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[1].secretRef.name
+          value: RELEASE-NAME-harbor-next-core
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: CORE_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: core-id
+                key: secret
+
+  # Pins: existingXsrfSecret must reach the pod as explicit CSRF_KEY env
+  # (it suppresses CSRF_KEY in the generated Secret).
+  - it: should wire CSRF_KEY env from existingXsrfSecret
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.existingXsrfSecret: xsrf-secret
+      core.existingXsrfSecretKey: MY_CSRF
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: CSRF_KEY
+            valueFrom:
+              secretKeyRef:
+                name: xsrf-secret
+                key: MY_CSRF
+
+  # Pins: registry.credentials.existingSecret must reach core as explicit
+  # REGISTRY_CREDENTIAL_PASSWORD env (suppressed in the generated Secret).
+  - it: should wire REGISTRY_CREDENTIAL_PASSWORD env from credentials.existingSecret
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.credentials.existingSecret: reg-creds
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REGISTRY_CREDENTIAL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: reg-creds
+                key: REGISTRY_CREDENTIAL_PASSWORD

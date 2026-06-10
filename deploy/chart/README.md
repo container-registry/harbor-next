@@ -215,6 +215,7 @@ The [`example/`](example/) directory contains ready-to-use values files for comm
 | [`private-ca.yaml`](example/private-ca.yaml) | Private-CA / mTLS: PG with `verify-full` + Redis over TLS + shared CA for S3/OIDC |
 | [`openshift/`](example/openshift/) | OpenShift deployment with edge-terminated routes |
 | [`aws-eks-irsa/`](example/aws-eks-irsa/) | AWS EKS with IRSA for S3 storage and RDS IAM Auth |
+| [`flux/`](example/flux/) | FluxCD GitOps: HelmRelease + drift detection + pinned secrets (`autoGenSecrets: false`), works for Argo CD too |
 
 ```bash
 helm install harbor . -n harbor --create-namespace -f example/k3d-local.yaml
@@ -584,6 +585,65 @@ extraManifests:
         size: 10Gi
 ```
 
+## GitOps (Flux / Argo CD)
+
+The chart renders **byte-for-byte deterministically** once its secret
+material is pinned — the property GitOps engines need to avoid perpetual
+drift, secret rotation on sync, and surprise pod rollouts.
+
+By default the chart auto-generates what it needs (encryption key,
+component identity secrets, CSRF key, token-signing CA, registry
+htpasswd). Generated values are random per render. That is fine for
+`helm install` (Helm persists them via `lookup` on upgrade), but **Argo
+CD templates client-side on every sync, where `lookup` returns nothing** —
+every sync would rotate all generated secrets and roll every workload
+through the `checksum/secret` annotations.
+
+Set `autoGenSecrets: false` for GitOps. Every would-be generation then
+becomes a render-time failure naming the value to pin:
+
+```yaml
+autoGenSecrets: false
+
+existingSecretAdminPassword: harbor-admin        # HARBOR_ADMIN_PASSWORD
+existingSecretSecretKey: harbor-encryption       # secretKey (16 chars)
+
+core:
+  existingSecret: harbor-core-identity           # secret
+  existingXsrfSecret: harbor-core-identity       # CSRF_KEY
+  tokenSecretName: harbor-token-cert             # tls.key + tls.crt
+
+registry:
+  existingSecret: harbor-registry-identity       # REGISTRY_HTTP_SECRET
+  credentials:
+    existingSecret: harbor-registry-credentials  # REGISTRY_CREDENTIAL_PASSWORD + REGISTRY_HTPASSWD
+
+jobservice:
+  existingSecret: harbor-jobservice-identity     # JOBSERVICE_SECRET
+
+database:
+  existingSecret: harbor-database                # POSTGRESQL_PASSWORD
+
+ingress:
+  autoGenCert: false                             # BYO TLS secret / cert-manager
+```
+
+Notes:
+
+- A complete Flux setup (GitRepository + HelmRelease with drift detection
+  + prerequisite Secret manifests with generation commands) lives at
+  [`example/flux/`](example/flux/). The same values work unchanged in an
+  Argo CD `Application` — no `ignoreDifferences` workarounds needed.
+- CI enforces determinism: `task helm:gitops-determinism` renders the
+  pinned values twice and requires byte-identical output.
+- Rotating a pinned Secret does **not** restart pods — trigger a rollout
+  (`kubectl rollout restart`) or run [Reloader](https://github.com/stakater/Reloader).
+- Even outside GitOps: without pinning, the registry htpasswd is
+  re-hashed (random bcrypt salt) on every `helm upgrade`, rolling the
+  registry each time. Pin `registry.credentials.htpasswdString` or
+  `registry.credentials.existingSecret` to stop that. The token-signing
+  CA is generated once and reused from the cluster on upgrades.
+
 ## Uninstalling the Chart
 
 ```bash
@@ -604,6 +664,7 @@ Kubernetes: `>=1.28.0-0`
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| autoGenSecrets | bool | `true` | Allow the chart to auto-generate secret material it needs (encryption key, component identity secrets, CSRF key, token-service CA, registry htpasswd, ingress certificate). Convenient for `helm install`, but the generated values are random per render: GitOps engines that template client-side (Argo CD) rotate them on every sync and roll every workload. Set to `false` to instead **fail at render time** naming the value that must be pinned — see the GitOps section in the README and `example/flux/`. |
 | cache | object | `{"enabled":false,"expireHours":24}` | Cache configuration (Redis-based caching for manifests) |
 | cache.enabled | bool | `false` | Enable Redis caching |
 | cache.expireHours | int | `24` | Cache expiration in hours |
@@ -983,6 +1044,13 @@ Kubernetes: `>=1.28.0-0`
 > value in the legacy [goharbor/harbor-helm](https://github.com/goharbor/harbor-helm)
 > chart to its equivalent here, lists removed settings with workarounds, and
 > includes a worked before/after example.
+
+> **🤖 Automated:** `task migrate -- old-values.yaml new-values.yaml` runs
+> [docs/harbor-migrate.ys](docs/harbor-migrate.ys), a
+> [YAMLScript](https://yamlscript.org) translator that emits a migrated
+> values file plus an `ERROR`/`WARN`/`INFO` advisory report of everything
+> that changes, gets dropped, or needs manual action
+> (`brew install yamlscript`).
 
 This chart is a redesign, not a drop-in replacement. Migration steps:
 

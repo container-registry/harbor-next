@@ -96,6 +96,11 @@
       "type": "string",
       "description": "Key in existing admin password secret"
     },
+    "autoGenSecrets": {
+      "type": "boolean",
+      "default": true,
+      "description": "Allow auto-generation of secret material. Set false to fail at render time when a secret would be generated instead of pinned (GitOps/Argo CD)"
+    },
     "existingSecretSecretKey": {
       "type": "string",
       "description": "Existing secret containing the encryption key"

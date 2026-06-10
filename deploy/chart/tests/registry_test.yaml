@@ -566,3 +566,26 @@ tests:
             name: gcs-key
             mountPath: /etc/registry/gcs
             readOnly: true
+
+  # ============================================================================
+  # Pinned-secret wiring (GitOps existingSecret paths)
+  # ============================================================================
+  # Pins: credentials.existingSecret swaps the htpasswd mount to the BYO
+  # Secret (key REGISTRY_HTPASSWD) instead of the generated -htpasswd one.
+  - it: should mount htpasswd from credentials.existingSecret when set
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.credentials.existingSecret: reg-creds
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: registry-htpasswd
+            secret:
+              items:
+                - key: REGISTRY_HTPASSWD
+                  path: passwd
+              secretName: reg-creds

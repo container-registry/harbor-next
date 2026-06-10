@@ -63,6 +63,20 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.core.existingSecret | default (include "harbor.core" .) }}
                   key: {{ .Values.core.existingSecretKey | default "secret" }}
+            {{- if .Values.jobservice.existingSecret }}
+            - name: JOBSERVICE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.jobservice.existingSecret }}
+                  key: {{ .Values.jobservice.existingSecretKey | default "JOBSERVICE_SECRET" }}
+            {{- end }}
+            {{- if .Values.registry.credentials.existingSecret }}
+            - name: REGISTRY_CREDENTIAL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.registry.credentials.existingSecret }}
+                  key: REGISTRY_CREDENTIAL_PASSWORD
+            {{- end }}
             {{- $extAuth := and (not .Values.valkey.enabled) (or .Values.externalRedis.existingSecret .Values.externalRedis.password) -}}
             {{- if or .Values.valkey.auth.enabled $extAuth }}
             - name: REDIS_PASSWORD
