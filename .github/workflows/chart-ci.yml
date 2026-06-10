@@ -75,7 +75,11 @@ jobs:
           esac
           mkdir -p "${RUNNER_TEMP}/ys"
           curl -fsSL "https://github.com/yaml/yamlscript/releases/download/${YS_VERSION}/ys-${YS_VERSION}-linux-${asset_arch}.tar.xz" \
-            | tar -xJ -C "${RUNNER_TEMP}/ys" --strip-components=1
+            -o "${RUNNER_TEMP}/ys.tar.xz"
+          # Self-hosted runners may lack the xz binary; python stdlib lzma
+          # decompresses without it.
+          python3 -c "import lzma, shutil; shutil.copyfileobj(lzma.open('${RUNNER_TEMP}/ys.tar.xz'), open('${RUNNER_TEMP}/ys.tar', 'wb'))"
+          tar -xf "${RUNNER_TEMP}/ys.tar" -C "${RUNNER_TEMP}/ys" --strip-components=1
           echo "${RUNNER_TEMP}/ys" >> "$GITHUB_PATH"
 
       # helm lint + ct lint + kube-linter + ah lint (Artifact Hub metadata)
