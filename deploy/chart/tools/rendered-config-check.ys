@@ -1,0 +1,117 @@
+#!/usr/bin/env ys-0
+
+# rendered-config-check.ys — semantic validation of the config.yml files
+# the chart renders into the registry and jobservice ConfigMaps.
+#
+# Usage (from the chart directory):
+#   helm template test . --set ... > .rendered.yaml
+#   ys tools/rendered-config-check.ys .rendered.yaml
+#
+# helm unittest asserts the ConfigMap *strings* look right; this tool
+# parses the embedded YAML and checks the invariants that otherwise only
+# surface as CrashLoopBackOff at pod start:
+#   registry (distribution config.yml):
+#     - exactly one storage driver
+#     - version present
+#     - auth.htpasswd.path set
+#   jobservice (config.yml):
+#     - worker_pool.backend == redis, workers >= 1
+#     - job_loggers non-empty, names within {FILE, DB, STD_OUTPUT}
+#     - metric.port == 8001 when metric.enabled (the Service targets it)
+#
+# Exit 1 on any violation.
+
+problems =: atom([])
+
+defn add-problem(where note):
+  swap! problems conj::
+    where:: where
+    note:: note
+
+defn present?(v):
+  cond:
+    v.nil?(): false
+    v == '': false
+    (coll? v): not(empty?(v))
+    else: true
+
+defn in?(coll x):
+  c =: coll.filter(\(%1 == x)).count()
+  =>: c > 0
+
+storage-drivers =:
+  vector('filesystem' 's3' 'azure' 'gcs' 'oss' 'swift' 'inmemory')
+
+logger-names =: vector('FILE' 'DB' 'STD_OUTPUT')
+
+defn check-registry(name cfg):
+  storage =: get(cfg 'storage') || hash-map()
+  drivers =: storage.keys().filter(\(in? storage-drivers %1)).sort().vec()
+  n =: drivers.count()
+  when n != 1:
+    names =: str/join(', ' drivers)
+    add-problem "$name storage":
+      "expected exactly one storage driver, found $n ($names) —
+       distribution refuses to start otherwise"
+  when-not present?(get(cfg 'version')):
+    add-problem "$name version": 'distribution config.yml needs a version key'
+  when-not present?(get-in(cfg ['auth' 'htpasswd' 'path'])):
+    add-problem "$name auth.htpasswd.path":
+      'htpasswd auth path missing — core cannot authenticate to the registry'
+
+defn check-jobservice(name cfg):
+  backend =: get-in(cfg ['worker_pool' 'backend'])
+  when backend != 'redis':
+    add-problem "$name worker_pool.backend":
+      "must be redis (got $backend) — the chart wires a redis pool URL"
+  workers =: get-in(cfg ['worker_pool' 'workers'])
+  ok-workers =: (int? workers) && (workers >= 1)
+  when-not ok-workers:
+    add-problem "$name worker_pool.workers":
+      "must be an integer >= 1 (got $workers)"
+  loggers =: get(cfg 'job_loggers') || []
+  when empty?(loggers):
+    add-problem "$name job_loggers":
+      'must not be empty — jobservice refuses to start without a job logger'
+  each lg loggers:
+    lname =: get(lg 'name')
+    when-not in?(logger-names lname):
+      add-problem "$name job_loggers":
+        "unknown logger name $lname (expected FILE, DB, or STD_OUTPUT)"
+  metric-on =: get-in(cfg ['metric' 'enabled'])
+  mport =: get-in(cfg ['metric' 'port'])
+  when (metric-on == true) && (mport != 8001):
+    add-problem "$name metric.port":
+      "must be 8001 (got $mport) — the metrics Service and ServiceMonitor
+       target that port"
+
+defn check-configmap(doc):
+  name =: get-in(doc ['metadata' 'name'])
+  text =: get-in(doc ['data' 'config.yml'])
+  when present?(text):
+    cfg =: yaml/load(text)
+    cond:
+      contains?(cfg 'storage'): check-registry(name cfg)
+      contains?(cfg 'worker_pool'): check-jobservice(name cfg)
+      else: nil
+
+defn main(rendered-file):
+  text =: rendered-file:read
+  docs =: yaml/load-all(text).filter(map?).vec()
+  cms =: docs.filter(\(get(%1 'kind') == 'ConfigMap')).vec()
+  checked =: cms.filter(\(present? (get-in %1 ['data' 'config.yml']))).vec()
+  each cm cms:
+    check-configmap: cm
+  ps =: problems.deref()
+  n =: checked.count()
+  if empty?(ps):
+    then:
+      say: "rendered-config-check: $n embedded config.yml documents OK"
+    else:
+      warn: 'rendered-config-check FAILURES:'
+      each p ps:
+        where =: get(p 'where')
+        note =: get(p 'note')
+        warn: "  * $where"
+        warn: "      $note"
+      exit: 1

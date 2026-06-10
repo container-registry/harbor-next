@@ -59,6 +59,8 @@ includes:
   helm:
     taskfile: ./taskfile/helm.yml
     aliases: [h]
+  compose:
+    taskfile: ./taskfile/compose.yml
 
 tasks:
   default:

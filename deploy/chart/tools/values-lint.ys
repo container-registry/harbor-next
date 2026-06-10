@@ -1,0 +1,234 @@
+#!/usr/bin/env ys-0
+
+# values-lint.ys — advisory lint ("values doctor") for THIS chart's values
+# files. Catches valid-but-wrong configurations that values.schema.json
+# cannot express and helm template only partially rejects.
+#
+# Usage (from the chart directory):
+#   ys tools/values-lint.ys my-values.yaml
+#
+# Report goes to stderr:
+#   ERROR — the chart will refuse to render, or the config cannot work
+#   WARN  — works, but insecure or surprising; review recommended
+# Exit 1 on ERROR only — warnings never break CI.
+#
+# NOTE for maintainers: YS dot access (m.key) returns nil for a stored
+# boolean false — boolean reads use get/get-in throughout.
+
+advice =: atom([])
+
+defn add-advice(level path note):
+  swap! advice conj::
+    level:: level
+    path:: path
+    note:: note
+
+defn add-error(path note): add-advice('ERROR' path note)
+defn add-warn(path note): add-advice('WARN' path note)
+
+defn present?(v):
+  cond:
+    v.nil?(): false
+    v == '': false
+    (coll? v): not(empty?(v))
+    else: true
+
+defn to-bool(v):
+  cond:
+    v == 'true': true
+    v == 'false': false
+    else: v
+
+# boolean read that survives false values and applies a default for nil
+defn flag(m path default):
+  v =: to-bool(get-in(m path))
+  if v.nil?(): default v
+
+components =: vector('core' 'portal' 'registry' 'jobservice' 'exporter' 'trivy')
+
+storage-drivers =:
+  vector('filesystem' 's3' 'azure' 'gcs' 'oss' 'swift' 'inmemory')
+
+#------------------------------------------------------------------------------
+# ERROR-class checks: chart refuses to render or config cannot work
+#------------------------------------------------------------------------------
+
+defn check-expose(vals):
+  ingress-on =: flag(vals ['ingress' 'enabled'] true)
+  gateway-on =: flag(vals ['gateway' 'enabled'] false)
+  cluster-on =: flag(vals ['expose' 'clusterIP' 'enabled'] false)
+  nodeport-on =: flag(vals ['expose' 'nodePort' 'enabled'] false)
+  lb-on =: flag(vals ['expose' 'loadBalancer' 'enabled'] false)
+  route-on =: flag(vals ['expose' 'route' 'enabled'] false)
+  flags =: vector(ingress-on gateway-on cluster-on nodeport-on lb-on route-on)
+  n =: flags.filter(\(%1 == true)).count()
+  when n > 1:
+    add-error 'ingress/gateway/expose.*':
+      "$n expose methods enabled — exactly one is allowed (remember
+       ingress.enabled defaults to TRUE; disable it explicitly when
+       enabling another method). helm template fails on this."
+  when n == 0:
+    add-error 'ingress/gateway/expose.*':
+      'No expose method enabled — Harbor would be unreachable.
+       helm template fails on this.'
+
+defn check-autoscaling(vals):
+  each comp components:
+    on =: flag(vals vector(comp 'autoscaling' 'enabled') false)
+    max =: get-in(vals vector(comp 'autoscaling' 'maxReplicas'))
+    when on && (not present?(max)):
+      add-error "$comp.autoscaling":
+        'autoscaling.enabled without maxReplicas — the HPA template
+         requires it and helm template fails.'
+
+defn check-pdb(vals):
+  each comp components:
+    on =: flag(vals vector(comp 'pdb' 'enabled') false)
+    mn =: get-in(vals vector(comp 'pdb' 'minAvailable'))
+    mx =: get-in(vals vector(comp 'pdb' 'maxUnavailable'))
+    both =: (some? mn) && (some? mx)
+    neither =: (nil? mn) && (nil? mx)
+    when on && both:
+      add-error "$comp.pdb":
+        'Both minAvailable and maxUnavailable set — Kubernetes rejects
+         PDBs with both fields. Set exactly one.'
+    when on && neither:
+      add-error "$comp.pdb":
+        'pdb.enabled without minAvailable or maxUnavailable — set
+         exactly one.'
+
+defn check-tls(vals):
+  tls-on =: flag(vals ['tls' 'enabled'] false)
+  src =: get-in(vals ['tls' 'certSource'])
+  core-secret =: get-in(vals ['tls' 'customSecrets' 'core'])
+  when tls-on && (src == 'secret') && (not present?(core-secret)):
+    add-error 'tls.customSecrets.core':
+      'tls.enabled with certSource=secret but no
+       tls.customSecrets.core — the core pod has no certificate to
+       serve.'
+
+defn check-storage-drivers(vals):
+  storage =: get-in(vals ['registry' 'config' 'storage']) || hash-map()
+  drivers =: storage.keys().filter(\(in? storage-drivers %1)).vec()
+  n =: drivers.count()
+  when n > 1:
+    names =: str/join(', ' drivers.sort())
+    add-error 'registry.config.storage':
+      "$n storage drivers configured ($names) — distribution requires
+       exactly one. helm template fails on this."
+
+defn in?(coll x):
+  c =: coll.filter(\(%1 == x)).count()
+  =>: c > 0
+
+#------------------------------------------------------------------------------
+# WARN-class checks: insecure or surprising
+#------------------------------------------------------------------------------
+
+defn warn-inline(vals path alternative):
+  v =: get-in(vals path)
+  when present?(v):
+    p =: str/join('.' path)
+    add-warn p:
+      "Plaintext credential in the values file — anyone with read access
+       to the file or the release manifest can read it. Prefer
+       $alternative."
+
+defn check-secret-hygiene(vals):
+  when-not present?(get(vals 'existingSecretAdminPassword')):
+    warn-inline vals ['harborAdminPassword']: 'existingSecretAdminPassword'
+  when-not present?(get-in(vals ['database' 'existingSecret'])):
+    warn-inline vals ['database' 'password']: 'database.existingSecret'
+  when-not present?(get-in(vals ['externalRedis' 'existingSecret'])):
+    warn-inline vals ['externalRedis' 'password']: 'externalRedis.existingSecret'
+  when-not present?(get(vals 'existingSecretSecretKey')):
+    warn-inline vals ['secretKey']: 'existingSecretSecretKey'
+  warn-inline vals ['trivy' 'gitHubToken']: 'trivy.secret via an extraEnv valueFrom'
+  warn-inline vals ['imageCredentials' 'password']: 'imagePullSecrets with a pre-created Secret'
+  warn-inline vals ['valkey' 'auth' 'password']: 'a pre-created Secret on the valkey subchart'
+  reg-secret =: get-in(vals ['registry' 'secret']) || hash-map()
+  each k reg-secret.keys().sort():
+    when re-find(/(?i)KEY|SECRET|PASSWORD|TOKEN/ str(k)):
+      add-warn "registry.secret.$k":
+        'Inline storage credential — prefer a pre-created Secret via
+         registry.storageCredentials.<backend>.existingSecret.'
+
+defn check-consistency(vals):
+  metrics-on =: flag(vals ['metrics' 'enabled'] false)
+  js-metric =: get-in(vals ['jobservice' 'config' 'metric'])
+  when metrics-on && (not present?(js-metric)):
+    add-warn 'jobservice.config.metric':
+      'metrics.enabled does NOT propagate to jobservice — add
+       jobservice.config.metric {enabled true, path /metrics, port 8001}
+       or its scrape target stays dark.'
+
+  storage =: get-in(vals ['registry' 'config' 'storage']) || hash-map()
+  drivers =: storage.keys().filter(\(in? storage-drivers %1)).vec()
+  pers-on =: flag(vals ['registry' 'persistence' 'enabled'] false)
+  ext-cm =: get-in(vals ['registry' 'existingConfigMap'])
+  when (drivers.count() == 0) && (not pers-on) && (not present?(ext-cm)):
+    add-warn 'registry.persistence.enabled':
+      'No object-storage driver and no registry PVC — the filesystem
+       driver writes into an emptyDir, so every image is lost on pod
+       restart. Enable registry.persistence or configure a storage
+       driver.'
+
+  valkey-on =: flag(vals ['valkey' 'enabled'] true)
+  redis-host =: get-in(vals ['externalRedis' 'host'])
+  when valkey-on && present?(redis-host):
+    add-warn 'valkey.enabled / externalRedis.host':
+      'Both the valkey subchart and externalRedis.host are set — the
+       chart uses the subchart and silently ignores externalRedis. Set
+       valkey.enabled false to use the external Redis.'
+
+  sslmode =: get-in(vals ['database' 'sslmode'])
+  tls-secret =: get-in(vals ['database' 'existingTlsSecret'])
+  verify =: (sslmode == 'verify-ca') || (sslmode == 'verify-full')
+  when verify && (not present?(tls-secret)):
+    add-warn 'database.existingTlsSecret':
+      'sslmode verify-ca/verify-full usually needs the CA bundle Secret
+       (database.existingTlsSecret) unless the PG certificate chains to
+       a public CA.'
+
+#------------------------------------------------------------------------------
+# Report
+#------------------------------------------------------------------------------
+
+defn print-group(ws level label):
+  group =: ws.filter(\(get(%1 'level') == level)).vec()
+  when present?(group):
+    cnt =: group.count()
+    warn: ''
+    warn: "$label ($cnt)"
+    each f group:
+      path =: get(f 'path')
+      note =: get(f 'note')
+      warn: "  * $path"
+      warn: "      $note"
+
+defn main(values-file):
+  vals =: values-file:read:yaml/load
+  check-expose: vals
+  check-autoscaling: vals
+  check-pdb: vals
+  check-tls: vals
+  check-storage-drivers: vals
+  check-secret-hygiene: vals
+  check-consistency: vals
+
+  ws =: advice.deref()
+  warn: '============================================================'
+  warn: "  values-lint: $values-file"
+  warn: '============================================================'
+  if empty?(ws):
+    then:
+      warn: 'No findings.'
+    else:
+      print-group ws 'ERROR': 'ERROR — will not render / cannot work'
+      print-group ws 'WARN': 'WARN — review recommended'
+  errors =: ws.filter(\(get(%1 'level') == 'ERROR')).count()
+  warns =: ws.filter(\(get(%1 'level') == 'WARN')).count()
+  warn: ''
+  warn: "$errors error(s), $warns warning(s)."
+  when errors > 0:
+    exit: 1

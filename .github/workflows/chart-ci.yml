@@ -65,7 +65,7 @@ jobs:
             | tar -xz -C "${RUNNER_TEMP}/bin" helm-docs
           echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
 
-      - name: Install ys (YAMLScript, for migration golden tests)
+      - name: Install ys (YAMLScript — schema drift, values lint, rendered-config, migration tools)
         run: |
           arch="$(uname -m)"
           case "${arch}" in
@@ -106,6 +106,14 @@ jobs:
 
       - name: Migration golden tests
         run: task helm:migrate:test
+
+      - name: Values doctor (golden tests + example/CI values)
+        run: |
+          task helm:values-lint:test
+          task helm:values-lint
+
+      - name: Rendered config.yml semantics
+        run: task helm:rendered-config
 
       - name: Trivy config scan
         run: task helm:trivy-chart

@@ -32,6 +32,9 @@ artifacthub-repo.yml
 .gitlab-ci.yml
 # Testing
 tests/
+# YAMLScript tooling (migrator, schema drift, values lint, rendered-config checks)
+tools/
+.schema-drift-allow
 # Development
 Taskfile.yaml
 Taskfile.yml

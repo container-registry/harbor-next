@@ -50,6 +50,7 @@ tasks:
 
   schema-check:
     desc: "Validate values.schema.json itself (strict compile + values drift)"
+    deps: [_require-ys]
     cmds:
       # 1. ajv strict compile: catches invalid or typo'd JSON-Schema
       #    keywords, which JSON Schema otherwise ignores SILENTLY
@@ -62,25 +63,67 @@ tasks:
         npx -y ajv-cli@{{.AJV_CLI_VERSION}} compile
         -s values.schema.json --spec=draft2020
         --strict=true --allowUnionTypes=true
-      # 2. Two-way top-level drift: the schema root is
-      #    additionalProperties:false, so a values.yaml key missing from
-      #    the schema breaks every render — and a schema property gone
-      #    from values.yaml is the advertised-but-dead anti-pattern.
-      - |
-        python3 - <<-'EOF'
-        import json, sys, yaml
-        vals = yaml.safe_load(open('{{.CHART_DIR}}/values.yaml'))
-        schema = json.load(open('{{.CHART_DIR}}/values.schema.json'))
-        missing = sorted(set(vals) - set(schema['properties']))
-        stale = sorted(set(schema['properties']) - set(vals))
-        if missing:
-            print(f"values.yaml keys missing from schema: {missing}")
-        if stale:
-            print(f"schema properties absent from values.yaml: {stale}")
-        if missing or stale:
-            sys.exit(1)
-        print("schema and values.yaml top-level keys in sync")
-        EOF
+      # 2. Two-way nested drift (tools/schema-drift.ys): values keys the
+      #    schema is silent about (no validation, no IDE completion; at
+      #    the closed root they break every render) and schema properties
+      #    with no values.yaml counterpart (advertised-but-dead).
+      #    helm lint covers type/enum errors wherever properties ARE
+      #    declared — this catches what it cannot see. Baseline file:
+      #    {{.CHART_DIR}}/.schema-drift-allow.
+      - cmd: cd {{.CHART_DIR}} && ys tools/schema-drift.ys values.yaml values.schema.json strict
+
+  values-lint:
+    desc: "Run the values doctor (tools/values-lint.ys) over every example and CI values file"
+    deps: [_require-ys]
+    cmds:
+      # ERRORs (config that cannot render/work) fail the task; WARNs
+      # (inline credentials, consistency advisories) are informational.
+      - for:
+          - example/aws-eks-irsa/values-aws-irsa.yaml
+          - example/k3d-local/values.yaml
+          - example/openshift/values.yaml
+          - example/private-ca/values.yaml
+          - example/rke2-rancher/values.yaml
+          - ci/default-values.yaml
+          - ci/expose-values.yaml
+          - ci/gitops-values.yaml
+        cmd: cd {{.CHART_DIR}} && ys tools/values-lint.ys {{.ITEM}}
+
+  values-lint:test:
+    desc: "Golden tests for tools/values-lint.ys"
+    deps: [_require-ys]
+    dir: deploy/chart
+    cmds:
+      - ys tools/values-lint.ys tests/lint/values-clean.yaml 2> tests/lint/.report-clean.gen.txt
+      - cmd: ys tools/values-lint.ys tests/lint/values-tripwire.yaml 2> tests/lint/.report-tripwire.gen.txt
+        ignore_error: true
+      - defer: rm -f tests/lint/.report-*.gen.txt
+      - diff -u tests/lint/report-clean.txt tests/lint/.report-clean.gen.txt
+      - diff -u tests/lint/report-tripwire.txt tests/lint/.report-tripwire.gen.txt
+      # the tripwire fixture must exit non-zero (it contains ERRORs)
+      - cmd: ys tools/values-lint.ys tests/lint/values-tripwire.yaml > /dev/null 2>&1 && exit 1 || echo "tripwire fixture correctly exits non-zero"
+      - echo "values-lint golden tests PASS"
+
+  rendered-config:
+    desc: "Semantic checks on the registry/jobservice config.yml the chart renders"
+    deps: [_require-ys]
+    cmds:
+      # helm unittest asserts the ConfigMap strings; this parses the
+      # embedded YAML and checks boot-blocking invariants (exactly one
+      # storage driver, sane jobservice worker pool / loggers / metric
+      # port) for the default render and every example/CI values file.
+      - defer: rm -f {{.CHART_DIR}}/.rendered-config.yaml
+      - cmd: helm template test {{.CHART_DIR}} {{.HELM_SET}} > {{.CHART_DIR}}/.rendered-config.yaml && cd {{.CHART_DIR}} && ys tools/rendered-config-check.ys .rendered-config.yaml
+      - for:
+          - example/aws-eks-irsa/values-aws-irsa.yaml
+          - example/k3d-local/values.yaml
+          - example/openshift/values.yaml
+          - example/private-ca/values.yaml
+          - example/rke2-rancher/values.yaml
+          - ci/default-values.yaml
+          - ci/expose-values.yaml
+          - ci/gitops-values.yaml
+        cmd: helm template harbor {{.CHART_DIR}} -f {{.CHART_DIR}}/{{.ITEM}} > {{.CHART_DIR}}/.rendered-config.yaml && cd {{.CHART_DIR}} && ys tools/rendered-config-check.ys .rendered-config.yaml
 
   kube-linter:
     desc: "Lint rendered manifests with kube-linter"

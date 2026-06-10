@@ -1,0 +1,39 @@
+============================================================
+  values-lint: tests/lint/values-tripwire.yaml
+============================================================
+
+ERROR — will not render / cannot work (5)
+  * ingress/gateway/expose.*
+      2 expose methods enabled — exactly one is allowed (remember ingress.enabled defaults to TRUE; disable it explicitly when enabling another method). helm template fails on this.
+  * core.autoscaling
+      autoscaling.enabled without maxReplicas — the HPA template requires it and helm template fails.
+  * core.pdb
+      Both minAvailable and maxUnavailable set — Kubernetes rejects PDBs with both fields. Set exactly one.
+  * tls.customSecrets.core
+      tls.enabled with certSource=secret but no tls.customSecrets.core — the core pod has no certificate to serve.
+  * registry.config.storage
+      2 storage drivers configured (azure, s3) — distribution requires exactly one. helm template fails on this.
+
+WARN — review recommended (10)
+  * harborAdminPassword
+      Plaintext credential in the values file — anyone with read access to the file or the release manifest can read it. Prefer existingSecretAdminPassword.
+  * database.password
+      Plaintext credential in the values file — anyone with read access to the file or the release manifest can read it. Prefer database.existingSecret.
+  * externalRedis.password
+      Plaintext credential in the values file — anyone with read access to the file or the release manifest can read it. Prefer externalRedis.existingSecret.
+  * secretKey
+      Plaintext credential in the values file — anyone with read access to the file or the release manifest can read it. Prefer existingSecretSecretKey.
+  * trivy.gitHubToken
+      Plaintext credential in the values file — anyone with read access to the file or the release manifest can read it. Prefer trivy.secret via an extraEnv valueFrom.
+  * registry.secret.REGISTRY_STORAGE_S3_ACCESSKEY
+      Inline storage credential — prefer a pre-created Secret via registry.storageCredentials.<backend>.existingSecret.
+  * registry.secret.REGISTRY_STORAGE_S3_SECRETKEY
+      Inline storage credential — prefer a pre-created Secret via registry.storageCredentials.<backend>.existingSecret.
+  * jobservice.config.metric
+      metrics.enabled does NOT propagate to jobservice — add jobservice.config.metric {enabled true, path /metrics, port 8001} or its scrape target stays dark.
+  * valkey.enabled / externalRedis.host
+      Both the valkey subchart and externalRedis.host are set — the chart uses the subchart and silently ignores externalRedis. Set valkey.enabled false to use the external Redis.
+  * database.existingTlsSecret
+      sslmode verify-ca/verify-full usually needs the CA bundle Secret (database.existingTlsSecret) unless the PG certificate chains to a public CA.
+
+5 error(s), 10 warning(s).
