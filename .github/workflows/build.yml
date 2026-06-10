@@ -21,6 +21,11 @@ concurrency:
   group: build-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  # arduino/setup-task (latest) still declares node20; opt in to the
+  # 2026-06-16 node24 default early.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   build:
     name: Build Binaries
