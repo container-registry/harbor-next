@@ -19,6 +19,9 @@ env:
   REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
   PR_REGISTRY_PROJECT: ${{ vars.PR_REGISTRY_PROJECT }}
   PREVIEW_TAG: pr-${{ github.event.pull_request.number }}
+  # arduino/setup-task (latest) still declares node20; opt in to the
+  # 2026-06-16 node24 default early.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   build:
