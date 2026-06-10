@@ -1044,10 +1044,12 @@ Kubernetes: `>=1.28.0-0`
 
 ## Migrating from Legacy Harbor Chart
 
-> **📖 Full guide:** [docs/MIGRATION.md](docs/MIGRATION.md) maps **every**
+> **📖 Full guide:** [docs/MIGRATION.md](docs/MIGRATION.md) covers migration
+> paths, secret carry-over, and a worked before/after example.
+> [docs/MIGRATION-REFERENCE.md](docs/MIGRATION-REFERENCE.md) maps **every**
 > value in the legacy [goharbor/harbor-helm](https://github.com/goharbor/harbor-helm)
-> chart to its equivalent here, lists removed settings with workarounds, and
-> includes a worked before/after example.
+> chart to its equivalent here and lists removed settings with workarounds —
+> written for humans and LLMs translating values files by hand.
 
 > **🤖 Automated:** `task migrate -- old-values.yaml new-values.yaml` runs
 > [docs/harbor-migrate.ys](docs/harbor-migrate.ys), a

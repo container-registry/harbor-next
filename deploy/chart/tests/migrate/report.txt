@@ -1,7 +1,8 @@
 ============================================================
   harbor-migrate: tests/migrate/values-2x.yaml -> Harbor Next chart values
   This chart is NOT a drop-in upgrade. Plan a new install
-  plus data migration. Full mapping tables: docs/MIGRATION.md
+  plus data migration (docs/MIGRATION.md). Full mapping
+  tables: docs/MIGRATION-REFERENCE.md
 ============================================================
 
 WARN — migrated, but review the changed behavior (6)

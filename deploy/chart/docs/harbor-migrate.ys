@@ -12,7 +12,9 @@
 #   WARN  — migrated, but semantics changed or review is required
 #   INFO  — mapped automatically; listed so nothing changes silently
 #
-# Full value-by-value mapping reference: MIGRATION.md (same directory).
+# This script is the executable version of MIGRATION-REFERENCE.md (same
+# directory) — the prose mapping tables and this code implement the same
+# spec; change them together. Migration guide: MIGRATION.md.
 # Requires YAMLScript: https://yamlscript.org  (brew install yamlscript)
 
 advice =: atom([])
@@ -1302,7 +1304,8 @@ defn print-report(input-file):
   warn: '============================================================'
   warn: "  harbor-migrate: $input-file -> Harbor Next chart values"
   warn: '  This chart is NOT a drop-in upgrade. Plan a new install'
-  warn: '  plus data migration. Full mapping tables: docs/MIGRATION.md'
+  warn: '  plus data migration (docs/MIGRATION.md). Full mapping'
+  warn: '  tables: docs/MIGRATION-REFERENCE.md'
   warn: '============================================================'
   if empty?(ws):
     then:
