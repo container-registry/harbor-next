@@ -90,6 +90,7 @@ import { UN_LOGGED_PARAM, YES } from '../../../account/sign-in/sign-in.service';
     selector: 'hbr-repository-gridview',
     templateUrl: './repository-gridview.component.html',
     styleUrls: ['./repository-gridview.component.scss'],
+    standalone: false,
 })
 export class RepositoryGridviewComponent
     implements OnChanges, OnInit, OnDestroy

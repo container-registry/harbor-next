@@ -20,6 +20,7 @@ import { SessionService } from '../../services/session.service';
     selector: 'list-project-ro',
     templateUrl: 'list-project-ro.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
+    standalone: false,
 })
 export class ListProjectROComponent {
     @Input() projects: Project[];

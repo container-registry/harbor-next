@@ -1,9 +1,9 @@
 <div>
-    <div class="command-title" *ngIf="!iconMode && !linkMode">
-        {{ headerTitle }}
-    </div>
+    @if (!iconMode) {
+    <div class="command-title">{{ headerTitle }}</div>
+    }
     <div>
-        <span [class.hide]="iconMode || linkMode">
+        <span [class.hide]="iconMode">
             <input
                 type="text"
                 class="command-input"
@@ -22,19 +22,7 @@
                 cols="{{ inputSize }}">
             </textarea>
         </span>
-        <span *ngIf="linkMode">
-            <button
-                type="button"
-                class="btn btn-link"
-                [class.is-success]="isCopied"
-                [class.is-error]="hasCopyError"
-                [ngxClipboard]="inputTarget1"
-                (cbOnSuccess)="onSuccess($event)"
-                (cbOnError)="onError($event)">
-                {{ linkName }}
-            </button>
-        </span>
-        <span *ngIf="!linkMode">
+        <span>
             <clr-icon
                 shape="copy"
                 [class.is-success]="isCopied"

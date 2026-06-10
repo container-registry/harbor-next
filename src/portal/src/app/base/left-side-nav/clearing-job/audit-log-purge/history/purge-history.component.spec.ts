@@ -27,6 +27,7 @@ import { PurgeHistoryComponent } from './purge-history.component';
 import { ExecHistory } from '../../../../../../../ng-swagger-gen/models/exec-history';
 import { PurgeService } from 'ng-swagger-gen/services/purge.service';
 import { ConfirmationDialogService } from '../../../../global-confirmation-dialog/confirmation-dialog.service';
+import { JOB_STATUS } from '../../clearing-job-interfact';
 
 describe('GcHistoryComponent', () => {
     let component: PurgeHistoryComponent;
@@ -37,17 +38,17 @@ describe('GcHistoryComponent', () => {
             job_name: 'test',
             job_kind: 'manual',
             schedule: null,
-            job_status: 'pending',
+            job_status: JOB_STATUS.PENDING,
             job_parameters: '{"dry_run":true}',
             creation_time: null,
             update_time: null,
         },
         {
-            id: 2,
+            id: 1,
             job_name: 'test',
             job_kind: 'manual',
             schedule: null,
-            job_status: 'finished',
+            job_status: JOB_STATUS.FINISHED,
             job_parameters: '{"dry_run":true}',
             creation_time: null,
             update_time: null,
@@ -80,7 +81,8 @@ describe('GcHistoryComponent', () => {
         },
     };
     const fakedConfirmationDialogService = {
-        openConfirmDialog() {},
+        openComfirmDialog() {},
+        confirmationConfirm$: of(null),
     };
     beforeEach(() => {
         TestBed.configureTestingModule({
@@ -98,11 +100,12 @@ describe('GcHistoryComponent', () => {
         });
     });
 
-    beforeEach(() => {
+    beforeEach(fakeAsync(() => {
         fixture = TestBed.createComponent(PurgeHistoryComponent);
         component = fixture.componentInstance;
         fixture.detectChanges();
-    });
+        tick(0);
+    }));
     afterEach(() => {
         if (component && component.timerDelay) {
             component.timerDelay.unsubscribe();
@@ -113,11 +116,9 @@ describe('GcHistoryComponent', () => {
         expect(component).toBeTruthy();
     });
     it('should retry getting jobs', fakeAsync(() => {
-        tick(10000);
+        tick(0);
         fixture.detectChanges();
-        fixture.whenStable().then(() => {
-            expect(component.jobs[0].job_status).toEqual('finished');
-        });
+        expect(component.jobs[0].job_status).toEqual(JOB_STATUS.FINISHED);
     }));
     it('should return right log link', () => {
         expect(component.getLogLink('1')).toEqual(
@@ -127,7 +128,7 @@ describe('GcHistoryComponent', () => {
     it('stopping purging should work', () => {
         const sy: jasmine.Spy = spyOn(
             fakedConfirmationDialogService,
-            'openConfirmDialog'
+            'openComfirmDialog'
         ).and.returnValue(undefined);
         const stopBtn: HTMLButtonElement =
             fixture.nativeElement.querySelector('#stop-purge');

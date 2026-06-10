@@ -30,6 +30,7 @@ src/portal/typings/
 .DS_Store
 .project
 .vscode/
+.devcontainer/
 **/node_modules
 **/ssl/
 

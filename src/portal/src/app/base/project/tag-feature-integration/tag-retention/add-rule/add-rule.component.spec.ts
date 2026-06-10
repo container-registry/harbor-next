@@ -22,12 +22,14 @@ import {
 import { ClarityModule } from '@clr/angular';
 import { FormsModule } from '@angular/forms';
 import { RouterTestingModule } from '@angular/router/testing';
-import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TagRetentionService } from '../tag-retention.service';
 import { ErrorHandler } from '../../../../../shared/units/error-handler';
 import { InlineAlertComponent } from '../../../../../shared/components/inline-alert/inline-alert.component';
-import { CallbackPipe } from '../../../../../shared/pipes/callback.pipe';
-
+import {
+    provideHttpClient,
+    withInterceptorsFromDi,
+} from '@angular/common/http';
 describe('AddRuleComponent', () => {
     let component: AddRuleComponent;
     let fixture: ComponentFixture<AddRuleComponent>;
@@ -36,6 +38,7 @@ describe('AddRuleComponent', () => {
     beforeEach(() => {
         TestBed.configureTestingModule({
             schemas: [CUSTOM_ELEMENTS_SCHEMA],
+            declarations: [AddRuleComponent, InlineAlertComponent],
             imports: [
                 BrowserAnimationsModule,
                 ClarityModule,
@@ -43,12 +46,6 @@ describe('AddRuleComponent', () => {
                 FormsModule,
                 RouterTestingModule,
                 NoopAnimationsModule,
-                HttpClientTestingModule,
-            ],
-            declarations: [
-                AddRuleComponent,
-                CallbackPipe,
-                InlineAlertComponent,
             ],
             providers: [
                 TranslateService,
@@ -57,6 +54,8 @@ describe('AddRuleComponent', () => {
                     provide: TagRetentionService,
                     useValue: mockTagRetentionService,
                 },
+                provideHttpClient(withInterceptorsFromDi()),
+                provideHttpClientTesting(),
             ],
         }).compileComponents();
     });

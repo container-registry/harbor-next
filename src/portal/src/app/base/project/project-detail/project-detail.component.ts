@@ -55,6 +55,7 @@ import { UN_LOGGED_PARAM, YES } from '../../../account/sign-in/sign-in.service';
     selector: 'project-detail',
     templateUrl: 'project-detail.component.html',
     styleUrls: ['project-detail.component.scss'],
+    standalone: false,
 })
 export class ProjectDetailComponent
     implements OnInit, AfterViewInit, OnDestroy
