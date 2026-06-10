@@ -1,0 +1,72 @@
+name: Chart CI
+
+on:
+  pull_request:
+    paths:
+      - "deploy/chart/**"
+      - "taskfile/helm.yml"
+      - "versions.env"
+      - ".github/workflows/chart-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  chart-quality:
+    name: Chart Quality Gate
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Load versions
+        run: grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
+
+      - name: Install Task
+        uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Helm
+        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Install helm-unittest plugin
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version "${HELM_UNITTEST_VERSION}"
+
+      - name: Install helm-docs
+        run: |
+          arch="$(uname -m)"
+          case "${arch}" in
+            x86_64) asset_arch="x86_64" ;;
+            aarch64|arm64) asset_arch="arm64" ;;
+            *) echo "unsupported arch: ${arch}" >&2; exit 1 ;;
+          esac
+          curl -fsSL "https://github.com/norwoodj/helm-docs/releases/download/v${HELM_DOCS_VERSION}/helm-docs_${HELM_DOCS_VERSION}_Linux_${asset_arch}.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin helm-docs
+
+      # helm lint + ct lint + kube-linter + ah lint (Artifact Hub metadata)
+      - name: Lint
+        run: task helm:lint
+
+      - name: Render templates
+        run: task helm:helm-template
+
+      - name: Unit tests
+        run: task helm:unittest
+
+      # Byte-identical double render of the pinned GitOps values —
+      # guards against generated secret material leaking past the
+      # autoGenSecrets pinning surface (Argo CD churn).
+      - name: GitOps determinism
+        run: task helm:gitops-determinism
+
+      - name: Render examples
+        run: task helm:examples
+
+      - name: README in sync (helm-docs)
+        run: task helm:helm-docs
+
+      - name: Trivy config scan
+        run: task helm:trivy-chart
