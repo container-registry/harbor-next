@@ -33,7 +33,9 @@ jobs:
           version: ${{ env.HELM_VERSION }}
 
       - name: Install helm-unittest plugin
-        run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version "${HELM_UNITTEST_VERSION}"
+        # --verify=false: Helm 4 verifies plugin provenance by default;
+        # git-sourced plugins don't ship one.
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version "${HELM_UNITTEST_VERSION}" --verify=false
 
       - name: Install helm-docs
         run: |
