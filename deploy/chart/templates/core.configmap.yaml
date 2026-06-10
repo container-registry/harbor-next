@@ -53,12 +53,10 @@ data:
   POSTGRESQL_MAX_OPEN_CONNS: {{ .Values.database.maxOpenConns | default 900 | quote }}
   POSTGRESQL_CONN_MAX_IDLE_TIME: {{ .Values.database.connMaxIdleTime | quote }}
   POSTGRESQL_CONN_MAX_LIFETIME: {{ .Values.database.connMaxLifetime | quote }}
-  # Redis configuration
+  # Redis configuration. The _REDIS_URL_* values live as explicit env on
+  # the Deployment, NOT here: they embed $(REDIS_PASSWORD) when Redis
+  # auth is on, and Kubernetes never expands $(VAR) in envFrom values.
   CHART_CACHE_DRIVER: "redis"
-  _REDIS_URL_CORE: {{ include "harbor.redis.url.core" . | quote }}
-  _REDIS_URL_REG: {{ include "harbor.redis.url.registry" . | quote }}
-  _REDIS_URL_HARBOR: {{ include "harbor.redis.url.harbor" . | quote }}
-  _REDIS_URL_CACHE_LAYER: {{ include "harbor.redis.url.cache" . | quote }}
   # Logging
   LOG_LEVEL: {{ .Values.logLevel | default "info" | quote }}
 

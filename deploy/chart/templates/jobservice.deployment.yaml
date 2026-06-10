@@ -91,6 +91,12 @@ spec:
                    is overridden at runtime with chart-computed credentials. */}}
             - name: JOB_SERVICE_POOL_REDIS_URL
               value: {{ include "harbor.redis.url.jobservice" . | quote }}
+            {{- /* Explicit env, AFTER REDIS_PASSWORD — never in the env
+                  ConfigMap (envFrom values are not $(VAR)-expanded). */}}
+            - name: _REDIS_URL_CORE
+              value: {{ include "harbor.redis.url.core" . | quote }}
+            - name: _REDIS_URL_CACHE_LAYER
+              value: {{ include "harbor.redis.url.cache" . | quote }}
             {{- if eq (include "harbor.database.tlsEnabled" .) "true" }}
             - name: POSTGRESQL_PASSWORD
               valueFrom:

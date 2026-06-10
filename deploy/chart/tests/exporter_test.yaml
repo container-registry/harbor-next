@@ -136,3 +136,34 @@ tests:
       - equal:
           path: data.MY_TOKEN
           value: "czNjcjN0"
+
+  # Regression guard for the Copilot review finding on PR #56: external
+  # Redis with a password put $(REDIS_PASSWORD) into HARBOR_REDIS_URL
+  # while the env var was only defined for valkey.auth.enabled — the
+  # exporter got a literal, unexpanded placeholder in its Redis URL.
+  # (REDIS_PASSWORD must also be defined BEFORE the URL in the env list;
+  # Kubernetes does not expand forward references.)
+  - it: should inject REDIS_PASSWORD env for external Redis with password
+    template: templates/exporter.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      exporter.enabled: true
+      valkey.enabled: false
+      externalRedis.host: redis.ext
+      externalRedis.password: secretpw
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_REDIS_URL
+            value: "redis://:$(REDIS_PASSWORD)@redis.ext:6379/1"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: RELEASE-NAME-harbor-next-redis
+                key: REDIS_PASSWORD

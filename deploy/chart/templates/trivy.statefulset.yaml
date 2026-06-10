@@ -102,21 +102,26 @@ spec:
               value: {{ .Values.trivy.insecure | default false | quote }}
             - name: SCANNER_API_SERVER_ADDR
               value: ":8080"
+            {{- /* REDIS_PASSWORD must precede the URL envs: Kubernetes
+                  expands $(REDIS_PASSWORD) only in env values defined
+                  later in the list — and never inside Secret values,
+                  which is why these are NOT secretKeyRefs. The URL
+                  itself is not sensitive; the password stays in a
+                  Secret. */}}
+            {{- $extAuth := and (not .Values.valkey.enabled) (or .Values.externalRedis.existingSecret .Values.externalRedis.password) -}}
+            {{- if or .Values.valkey.auth.enabled $extAuth }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "harbor.redis.secretName" . }}
+                  key: {{ include "harbor.redis.secretKey" . }}
+            {{- end }}
             - name: "SCANNER_REDIS_URL"
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "harbor.fullname" . }}-trivy
-                  key: redisURL
+              value: {{ include "harbor.redis.url.trivy" . | quote }}
             - name: "SCANNER_STORE_REDIS_URL"
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "harbor.fullname" . }}-trivy
-                  key: redisURL
+              value: {{ include "harbor.redis.url.trivy" . | quote }}
             - name: "SCANNER_JOB_QUEUE_REDIS_URL"
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "harbor.fullname" . }}-trivy
-                  key: redisURL
+              value: {{ include "harbor.redis.url.trivy" . | quote }}
             {{- include "harbor.extraCA.env" . | nindent 12 }}
             {{- with .Values.trivy.extraEnv }}
             {{- toYaml . | nindent 12 }}

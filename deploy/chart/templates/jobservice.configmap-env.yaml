@@ -12,9 +12,9 @@ data:
   REGISTRY_URL: {{ include "harbor.registry.url" . | quote }}
   REGISTRY_CONTROLLER_URL: {{ include "harbor.registryctl.url" . | quote }}
 
-  # Redis configuration
-  _REDIS_URL_CORE: {{ include "harbor.redis.url.core" . | quote }}
-  _REDIS_URL_CACHE_LAYER: {{ include "harbor.redis.url.cache" . | quote }}
+  # Redis configuration. The _REDIS_URL_* values live as explicit env on
+  # the Deployment, NOT here: they embed $(REDIS_PASSWORD) when Redis
+  # auth is on, and Kubernetes never expands $(VAR) in envFrom values.
   CACHE_ENABLED: {{ .Values.cache.enabled | quote }}
   {{- if .Values.cache.enabled }}
   CACHE_EXPIRE_HOURS: {{ .Values.cache.expireHours | quote }}

@@ -98,19 +98,24 @@ spec:
               value: {{ .Values.database.maxIdleConns | default 100 | quote }}
             - name: HARBOR_DATABASE_MAX_OPEN_CONNS
               value: {{ .Values.database.maxOpenConns | default 900 | quote }}
-            - name: HARBOR_REDIS_URL
-              value: {{ include "harbor.redis.url.jobservice" . | quote }}
-            - name: HARBOR_REDIS_NAMESPACE
-              value: "harbor_job_service_namespace"
-            - name: HARBOR_REDIS_TIMEOUT
-              value: "3600"
-            {{- if .Values.valkey.auth.enabled }}
+            {{- /* Must be defined BEFORE HARBOR_REDIS_URL: Kubernetes only
+                  expands $(REDIS_PASSWORD) from variables earlier in the
+                  env list. Same auth conditions as core/jobservice and the
+                  harbor.redis.url helper. */}}
+            {{- $extAuth := and (not .Values.valkey.enabled) (or .Values.externalRedis.existingSecret .Values.externalRedis.password) -}}
+            {{- if or .Values.valkey.auth.enabled $extAuth }}
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "harbor.redis.secretName" . }}
                   key: {{ include "harbor.redis.secretKey" . }}
             {{- end }}
+            - name: HARBOR_REDIS_URL
+              value: {{ include "harbor.redis.url.jobservice" . | quote }}
+            - name: HARBOR_REDIS_NAMESPACE
+              value: "harbor_job_service_namespace"
+            - name: HARBOR_REDIS_TIMEOUT
+              value: "3600"
             {{- include "harbor.extraCA.env" . | nindent 12 }}
             {{- with .Values.exporter.extraEnv }}
             {{- toYaml . | nindent 12 }}

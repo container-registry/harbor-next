@@ -2,10 +2,6 @@
   1: |
     apiVersion: v1
     data:
-      _REDIS_URL_CACHE_LAYER: redis://valkey:6379/7?idle_timeout_seconds=30
-      _REDIS_URL_CORE: redis://valkey:6379/0?idle_timeout_seconds=30
-      _REDIS_URL_HARBOR: redis://valkey:6379/6?idle_timeout_seconds=30
-      _REDIS_URL_REG: redis://valkey:6379/2?idle_timeout_seconds=30
       CACHE_ENABLED: "false"
       CHART_CACHE_DRIVER: redis
       CONFIG_PATH: /etc/core/app.conf
@@ -169,8 +165,6 @@
   5: |
     apiVersion: v1
     data:
-      _REDIS_URL_CACHE_LAYER: redis://valkey:6379/7?idle_timeout_seconds=30
-      _REDIS_URL_CORE: redis://valkey:6379/0?idle_timeout_seconds=30
       CACHE_ENABLED: "false"
       CORE_URL: http://harbor-harbor-next-core
       HTTP_PROXY: ""
@@ -501,10 +495,6 @@
   1: |
     apiVersion: v1
     data:
-      _REDIS_URL_CACHE_LAYER: redis://:$(REDIS_PASSWORD)@valkey:6379/7?idle_timeout_seconds=30
-      _REDIS_URL_CORE: redis://:$(REDIS_PASSWORD)@valkey:6379/0?idle_timeout_seconds=30
-      _REDIS_URL_HARBOR: redis://:$(REDIS_PASSWORD)@valkey:6379/6?idle_timeout_seconds=30
-      _REDIS_URL_REG: redis://:$(REDIS_PASSWORD)@valkey:6379/2?idle_timeout_seconds=30
       CACHE_ENABLED: "false"
       CHART_CACHE_DRIVER: redis
       CONFIG_PATH: /etc/core/app.conf
@@ -668,8 +658,6 @@
   5: |
     apiVersion: v1
     data:
-      _REDIS_URL_CACHE_LAYER: redis://:$(REDIS_PASSWORD)@valkey:6379/7?idle_timeout_seconds=30
-      _REDIS_URL_CORE: redis://:$(REDIS_PASSWORD)@valkey:6379/0?idle_timeout_seconds=30
       CACHE_ENABLED: "false"
       CORE_URL: http://harbor-harbor-next-core
       HTTP_PROXY: ""
@@ -1000,10 +988,6 @@
   1: |
     apiVersion: v1
     data:
-      _REDIS_URL_CACHE_LAYER: rediss+sentinel://:$(REDIS_PASSWORD)@sentinel.example.com:6379/mymaster/7?idle_timeout_seconds=30
-      _REDIS_URL_CORE: rediss+sentinel://:$(REDIS_PASSWORD)@sentinel.example.com:6379/mymaster/0?idle_timeout_seconds=30
-      _REDIS_URL_HARBOR: rediss+sentinel://:$(REDIS_PASSWORD)@sentinel.example.com:6379/mymaster/6?idle_timeout_seconds=30
-      _REDIS_URL_REG: rediss+sentinel://:$(REDIS_PASSWORD)@sentinel.example.com:6379/mymaster/2?idle_timeout_seconds=30
       CACHE_ENABLED: "false"
       CHART_CACHE_DRIVER: redis
       CONFIG_PATH: /etc/core/app.conf
@@ -1167,8 +1151,6 @@
   5: |
     apiVersion: v1
     data:
-      _REDIS_URL_CACHE_LAYER: rediss+sentinel://:$(REDIS_PASSWORD)@sentinel.example.com:6379/mymaster/7?idle_timeout_seconds=30
-      _REDIS_URL_CORE: rediss+sentinel://:$(REDIS_PASSWORD)@sentinel.example.com:6379/mymaster/0?idle_timeout_seconds=30
       CACHE_ENABLED: "false"
       CORE_URL: http://harbor-harbor-next-core
       HTTP_PROXY: ""
@@ -1500,10 +1482,6 @@
   1: |
     apiVersion: v1
     data:
-      _REDIS_URL_CACHE_LAYER: redis://:$(REDIS_PASSWORD)@redis.example.com:6379/7?idle_timeout_seconds=30
-      _REDIS_URL_CORE: redis://:$(REDIS_PASSWORD)@redis.example.com:6379/0?idle_timeout_seconds=30
-      _REDIS_URL_HARBOR: redis://:$(REDIS_PASSWORD)@redis.example.com:6379/6?idle_timeout_seconds=30
-      _REDIS_URL_REG: redis://:$(REDIS_PASSWORD)@redis.example.com:6379/2?idle_timeout_seconds=30
       CACHE_ENABLED: "false"
       CHART_CACHE_DRIVER: redis
       CONFIG_PATH: /etc/core/app.conf
@@ -1667,8 +1645,6 @@
   5: |
     apiVersion: v1
     data:
-      _REDIS_URL_CACHE_LAYER: redis://:$(REDIS_PASSWORD)@redis.example.com:6379/7?idle_timeout_seconds=30
-      _REDIS_URL_CORE: redis://:$(REDIS_PASSWORD)@redis.example.com:6379/0?idle_timeout_seconds=30
       CACHE_ENABLED: "false"
       CORE_URL: http://harbor-harbor-next-core
       HTTP_PROXY: ""
@@ -1999,10 +1975,6 @@
   1: |
     apiVersion: v1
     data:
-      _REDIS_URL_CACHE_LAYER: redis://valkey:6379/7?idle_timeout_seconds=30
-      _REDIS_URL_CORE: redis://valkey:6379/0?idle_timeout_seconds=30
-      _REDIS_URL_HARBOR: redis://valkey:6379/6?idle_timeout_seconds=30
-      _REDIS_URL_REG: redis://valkey:6379/2?idle_timeout_seconds=30
       CACHE_ENABLED: "false"
       CHART_CACHE_DRIVER: redis
       CONFIG_PATH: /etc/core/app.conf
@@ -2171,8 +2143,6 @@
   5: |
     apiVersion: v1
     data:
-      _REDIS_URL_CACHE_LAYER: redis://valkey:6379/7?idle_timeout_seconds=30
-      _REDIS_URL_CORE: redis://valkey:6379/0?idle_timeout_seconds=30
       CACHE_ENABLED: "false"
       CORE_URL: http://harbor-harbor-next-core
       HTTP_PROXY: ""
@@ -2556,10 +2526,6 @@
   1: |
     apiVersion: v1
     data:
-      _REDIS_URL_CACHE_LAYER: redis://valkey:6379/7?idle_timeout_seconds=30
-      _REDIS_URL_CORE: redis://valkey:6379/0?idle_timeout_seconds=30
-      _REDIS_URL_HARBOR: redis://valkey:6379/6?idle_timeout_seconds=30
-      _REDIS_URL_REG: redis://valkey:6379/2?idle_timeout_seconds=30
       CACHE_ENABLED: "false"
       CHART_CACHE_DRIVER: redis
       CONFIG_PATH: /etc/core/app.conf
@@ -2813,8 +2779,6 @@
   5: |
     apiVersion: v1
     data:
-      _REDIS_URL_CACHE_LAYER: redis://valkey:6379/7?idle_timeout_seconds=30
-      _REDIS_URL_CORE: redis://valkey:6379/0?idle_timeout_seconds=30
       CACHE_ENABLED: "false"
       CORE_URL: http://harbor-harbor-next-core
       HTTP_PROXY: ""

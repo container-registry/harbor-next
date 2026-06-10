@@ -236,19 +236,51 @@ tests:
           path: spec.template.spec.volumes[0].persistentVolumeClaim.claimName
           value: my-existing-pvc
 
-  - it: should compose redisURL using harbor.redis.url.trivy helper
-    template: templates/trivy.secret.yaml
+  # Redis URLs are explicit env values, NOT Secret/ConfigMap entries:
+  # Kubernetes expands $(REDIS_PASSWORD) only in env values defined after
+  # it in the list — never in envFrom/secretKeyRef material.
+  - it: should compose SCANNER_REDIS_URL env using harbor.redis.url.trivy helper
+    template: templates/trivy.statefulset.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
       trivy.enabled: true
     asserts:
-      # base64("redis://valkey:6379/5") -- proves helper composes scheme,
-      # host, port, and the /5 trivy db index.
-      - equal:
-          path: data.redisURL
-          value: cmVkaXM6Ly92YWxrZXk6NjM3OS81
+      # Proves helper composes scheme, host, port, and the /5 trivy db index.
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SCANNER_REDIS_URL
+            value: "redis://valkey:6379/5"
+
+  # Regression guard for the Copilot review finding on PR #56: external
+  # Redis with a password produced $(REDIS_PASSWORD) in the URL without
+  # the env var being defined on the pod.
+  - it: should inject REDIS_PASSWORD env for external Redis with password
+    template: templates/trivy.statefulset.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trivy.enabled: true
+      valkey.enabled: false
+      externalRedis.host: redis.ext
+      externalRedis.password: secretpw
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SCANNER_REDIS_URL
+            value: "redis://:$(REDIS_PASSWORD)@redis.ext:6379/5"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: RELEASE-NAME-harbor-next-redis
+                key: REDIS_PASSWORD
 
   - it: should expose service port named http-trivy
     template: templates/trivy.service.yaml

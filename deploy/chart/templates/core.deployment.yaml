@@ -123,6 +123,17 @@ spec:
                   name: {{ include "harbor.redis.secretName" . }}
                   key: {{ include "harbor.redis.secretKey" . }}
             {{- end }}
+            {{- /* Explicit env, AFTER REDIS_PASSWORD: Kubernetes expands
+                  $(REDIS_PASSWORD) only in env values defined later in
+                  the list — and never in envFrom (ConfigMap) values. */}}
+            - name: _REDIS_URL_CORE
+              value: {{ include "harbor.redis.url.core" . | quote }}
+            - name: _REDIS_URL_REG
+              value: {{ include "harbor.redis.url.registry" . | quote }}
+            - name: _REDIS_URL_HARBOR
+              value: {{ include "harbor.redis.url.harbor" . | quote }}
+            - name: _REDIS_URL_CACHE_LAYER
+              value: {{ include "harbor.redis.url.cache" . | quote }}
             {{- include "harbor.extraCA.env" . | nindent 12 }}
             {{- with .Values.core.extraEnv }}
             {{- toYaml . | nindent 12 }}
