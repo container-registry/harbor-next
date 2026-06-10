@@ -16,7 +16,8 @@ permissions:
   pull-requests: write
 
 env:
-  # Opt in to the 2026-06-16 Node 24 default early.
+  # arduino/setup-task and actions4gh/setup-gh (both latest) still
+  # declare node20; opt in to the 2026-06-16 node24 default early.
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
