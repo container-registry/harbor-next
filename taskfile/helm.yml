@@ -48,6 +48,40 @@ tasks:
       artifacthub/ah:v{{.AH_VERSION}}
       ah lint --kind helm --path /chart
 
+  schema-check:
+    desc: "Validate values.schema.json itself (strict compile + values drift)"
+    cmds:
+      # 1. ajv strict compile: catches invalid or typo'd JSON-Schema
+      #    keywords, which JSON Schema otherwise ignores SILENTLY
+      #    ("min" instead of "minimum" validates nothing). Union types
+      #    are legitimate draft-2020 and explicitly allowed.
+      - >-
+        docker run --rm
+        -v $(pwd)/{{.CHART_DIR}}:/chart -w /chart
+        node:{{.NODE_IMAGE_VERSION}}-alpine
+        npx -y ajv-cli@{{.AJV_CLI_VERSION}} compile
+        -s values.schema.json --spec=draft2020
+        --strict=true --allowUnionTypes=true
+      # 2. Two-way top-level drift: the schema root is
+      #    additionalProperties:false, so a values.yaml key missing from
+      #    the schema breaks every render — and a schema property gone
+      #    from values.yaml is the advertised-but-dead anti-pattern.
+      - |
+        python3 - <<-'EOF'
+        import json, sys, yaml
+        vals = yaml.safe_load(open('{{.CHART_DIR}}/values.yaml'))
+        schema = json.load(open('{{.CHART_DIR}}/values.schema.json'))
+        missing = sorted(set(vals) - set(schema['properties']))
+        stale = sorted(set(schema['properties']) - set(vals))
+        if missing:
+            print(f"values.yaml keys missing from schema: {missing}")
+        if stale:
+            print(f"schema properties absent from values.yaml: {stale}")
+        if missing or stale:
+            sys.exit(1)
+        print("schema and values.yaml top-level keys in sync")
+        EOF
+
   kube-linter:
     desc: "Lint rendered manifests with kube-linter"
     cmds:
@@ -160,12 +194,13 @@ tasks:
   # ============================================================================
 
   lint:
-    desc: "Run all linters (helm lint, ct lint, kube-linter, ah lint)"
+    desc: "Run all linters (helm lint, ct lint, kube-linter, ah lint, schema check)"
     cmds:
       - task: helm-lint
       - task: ct-lint
       - task: kube-linter
       - task: ah-lint
+      - task: schema-check
 
   security:
     desc: "Run all security scanners (Trivy, Kubescape)"
@@ -184,6 +219,7 @@ tasks:
       - task: gitops-determinism
       - task: examples
       - task: ah-lint
+      - task: schema-check
       - task: trivy-chart
       - task: kubescape
 
@@ -197,6 +233,7 @@ tasks:
       - task: unittest
       - task: gitops-determinism
       - task: ah-lint
+      - task: schema-check
       - task: trivy-chart:report
       - task: kubescape:report
 
