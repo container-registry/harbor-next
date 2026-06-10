@@ -14,20 +14,20 @@ data migration.
 
 ## Automated translation: harbor-migrate.ys
 
-[`harbor-migrate.ys`](harbor-migrate.ys) (in this directory) converts a 2.x
+[`harbor-migrate.ys`](../tools/harbor-migrate.ys) converts a 2.x
 values file to this chart's format and prints an advisory report of
 everything that changes, gets dropped, or will not work as expected. It needs
 [YAMLScript](https://yamlscript.org) (`brew install yamlscript`):
 
 ```bash
 # directly (from deploy/chart)
-ys docs/harbor-migrate.ys old-values.yaml new-values.yaml
+ys tools/harbor-migrate.ys old-values.yaml new-values.yaml
 
 # or via Task (from anywhere in the repo)
 task helm:migrate -- old-values.yaml new-values.yaml
 
 # report only (values to /dev/null)
-ys docs/harbor-migrate.ys old-values.yaml > /dev/null
+ys tools/harbor-migrate.ys old-values.yaml > /dev/null
 ```
 
 The migrated values go to `new-values.yaml` (or stdout); the report goes to

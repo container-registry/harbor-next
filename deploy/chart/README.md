@@ -1052,7 +1052,7 @@ Kubernetes: `>=1.28.0-0`
 > written for humans and LLMs translating values files by hand.
 
 > **🤖 Automated:** `task helm:migrate -- old-values.yaml new-values.yaml` runs
-> [docs/harbor-migrate.ys](docs/harbor-migrate.ys), a
+> [tools/harbor-migrate.ys](tools/harbor-migrate.ys), a
 > [YAMLScript](https://yamlscript.org) translator that emits a migrated
 > values file plus an `ERROR`/`WARN`/`INFO` advisory report of everything
 > that changes, gets dropped, or needs manual action

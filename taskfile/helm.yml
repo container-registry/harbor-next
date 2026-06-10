@@ -277,17 +277,17 @@ tasks:
   migrate:
     desc: 'Translate a goharbor/harbor-helm values file (usage: task helm:migrate -- old-values.yaml [new-values.yaml])'
     deps: [_require-ys]
-    cmd: ys {{.CHART_DIR}}/docs/harbor-migrate.ys {{.CLI_ARGS}}
+    cmd: ys {{.CHART_DIR}}/tools/harbor-migrate.ys {{.CLI_ARGS}}
 
   migrate:test:
-    desc: "Golden tests for docs/harbor-migrate.ys, then helm-template the results"
+    desc: "Golden tests for tools/harbor-migrate.ys, then helm-template the results"
     deps: [_require-ys]
     # Chart-relative cwd: the generated reports embed the input path, so
     # the golden files only match when run from the chart directory.
     dir: deploy/chart
     cmds:
       - for: ['', '-dedicated']
-        cmd: ys docs/harbor-migrate.ys tests/migrate/values{{.ITEM}}-2x.yaml > tests/migrate/.values{{.ITEM}}-next.gen.yaml 2> tests/migrate/.report{{.ITEM}}.gen.txt
+        cmd: ys tools/harbor-migrate.ys tests/migrate/values{{.ITEM}}-2x.yaml > tests/migrate/.values{{.ITEM}}-next.gen.yaml 2> tests/migrate/.report{{.ITEM}}.gen.txt
       - defer: rm -f tests/migrate/.*.gen.*
       - for: ['', '-dedicated']
         cmd: diff -u tests/migrate/values{{.ITEM}}-next.yaml tests/migrate/.values{{.ITEM}}-next.gen.yaml
@@ -303,7 +303,7 @@ tasks:
     dir: deploy/chart
     cmds:
       - for: ['', '-dedicated']
-        cmd: ys docs/harbor-migrate.ys tests/migrate/values{{.ITEM}}-2x.yaml > tests/migrate/values{{.ITEM}}-next.yaml 2> tests/migrate/report{{.ITEM}}.txt
+        cmd: ys tools/harbor-migrate.ys tests/migrate/values{{.ITEM}}-2x.yaml > tests/migrate/values{{.ITEM}}-next.yaml 2> tests/migrate/report{{.ITEM}}.txt
 
   # ============================================================================
   # Aggregate Tasks

@@ -3,7 +3,7 @@
 The normative, value-by-value mapping reference for migrating from the
 legacy [goharbor/harbor-helm](https://github.com/goharbor/harbor-helm)
 chart ("2.x" below) to this chart. It is the **prose version of
-[`harbor-migrate.ys`](harbor-migrate.ys)** — the script implements exactly
+[`harbor-migrate.ys`](../tools/harbor-migrate.ys)** — the script implements exactly
 these tables, and its `ERROR`/`WARN`/`INFO` advisories correspond to the
 *N/A* rows, the Notes columns, and the removed-settings table here.
 

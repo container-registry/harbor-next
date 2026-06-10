@@ -1,6 +1,6 @@
 # Test fixture: a typical goharbor/harbor-helm (2.x) production values file.
 # Mirrors the worked example in docs/MIGRATION.md, extended to exercise the
-# advisory paths of docs/harbor-migrate.ys.
+# advisory paths of tools/harbor-migrate.ys.
 expose:
   type: ingress
   tls:
