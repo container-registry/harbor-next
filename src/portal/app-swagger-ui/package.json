@@ -3,8 +3,8 @@
   "version": "2.10.0",
   "description": "Swagger UI for Harbor APIs",
   "scripts": {
-    "build": "webpack --config webpack.prod.js && mv dist/index.html dist/swagger-ui-index.html",
-    "start": "webpack serve --open --config webpack.dev.js"
+    "build": "webpack --mode production --config webpack.config.js",
+    "start": "webpack serve --open --mode development --config webpack.config.js"
   },
   "dependencies": {
     "css-loader": "^6.11.0",
