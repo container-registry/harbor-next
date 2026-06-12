@@ -40,7 +40,7 @@ require (
 	github.com/gorilla/handlers v1.5.2
 	github.com/gorilla/mux v1.8.1
 	github.com/graph-gophers/dataloader v5.0.0+incompatible
-	github.com/jackc/pgx/v5 v5.9.2
+	github.com/jackc/pgx/v5 v5.10.0
 	github.com/jpillora/backoff v1.0.0
 	github.com/klauspost/compress v1.18.1 // indirect
 	github.com/modelpack/model-spec v0.0.7
@@ -68,14 +68,13 @@ require (
 	go.opentelemetry.io/otel/trace v1.43.0
 	go.pinniped.dev v0.37.0
 	go.uber.org/ratelimit v0.3.1
-	golang.org/x/crypto v0.52.0
+	golang.org/x/crypto v0.52.0 // indirect
 	golang.org/x/net v0.55.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/text v0.37.0
 	golang.org/x/time v0.15.0
-	gopkg.in/h2non/gock.v1 v1.1.2
-	gopkg.in/yaml.v2 v2.4.0
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 	helm.sh/helm/v3 v3.20.2
 	k8s.io/api v0.36.1
 	k8s.io/apimachinery v0.36.1
@@ -89,6 +88,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.23
 	github.com/aws/aws-sdk-go-v2/service/ecr v1.58.4
 	github.com/aws/smithy-go v1.27.1
+	github.com/goccy/go-yaml v1.19.2
+	gopkg.in/h2non/gock.v1 v1.1.2
 )
 
 require (
