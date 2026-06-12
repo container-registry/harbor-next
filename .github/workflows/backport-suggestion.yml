@@ -2,7 +2,8 @@ name: Backport Suggestion
 
 on:
   pull_request_target:
-    types: [closed]
+    branches: [main]
+    types: [opened]
 
 permissions:
   contents: read
@@ -13,7 +14,6 @@ jobs:
   suggest:
     if: >-
       ${{
-        github.event.pull_request.merged == true &&
         github.event.pull_request.base.ref == 'main'
       }}
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
@@ -39,10 +39,17 @@ jobs:
 
       - name: Comment with backport commands
         run: |
+          marker='<!-- backport-suggestion -->'
+
           case "${PR_TITLE}" in
             fix:*|upstream:*|perf:*|revert:*|ci:*|build:*) ;;
             *) exit 0 ;;
           esac
+
+          if gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+            --jq '.[].body' | grep -Fqx "${marker}"; then
+            exit 0
+          fi
 
           branches=$(gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/heads/release-" \
             --jq '.[].ref | sub("refs/heads/"; "") | select(test("^release-[0-9]+\\.[0-9]+$"))' | sort -Vr)
@@ -50,7 +57,7 @@ jobs:
             exit 0
           fi
 
-          body=$'This change may need patch-release backports. Comment with one of these commands to open a cherry-pick PR:\n\n'
+          body="${marker}"$'\nThis change may need patch-release backports. Comment with one of these commands to open a cherry-pick PR:\n\n'
           while IFS= read -r branch; do
             [ -z "${branch}" ] && continue
             body="${body}\`/backport v${branch#release-}\`"$'\n'
