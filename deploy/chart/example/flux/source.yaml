@@ -28,4 +28,4 @@ spec:
 #   interval: 10m
 #   url: oci://8gears.container-registry.com/8gcr/charts/harbor-next
 #   ref:
-#     semver: ">=3.0.0 <4.0.0"
+#     semver: ">=2.0.0 <3.0.0"

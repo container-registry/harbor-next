@@ -8,7 +8,7 @@
 #
 # Usage:
 #   helm install harbor-next oci://8gears.container-registry.com/8gcr/charts/harbor-next \
-#     --version 3.0.0 -n harbor --create-namespace \
+#     --version 2.0.0 -n harbor --create-namespace \
 #     -f values-aws-irsa.yaml \
 #     --set database.host=<AURORA_ENDPOINT> \
 #     --set-json 'registry.config.storage.s3={"region":"eu-central-1","bucket":"<BUCKET_NAME>"}' \

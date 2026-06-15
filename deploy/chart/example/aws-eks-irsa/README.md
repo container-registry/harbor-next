@@ -55,7 +55,7 @@ All scripts accept these overrides:
 | `BUCKET_NAME` | `harbor-next-irsa-<ACCOUNT_ID>` | S3 bucket name |
 | `DB_CLUSTER_ID` | `harbor-next-aurora` | Aurora cluster identifier |
 | `DB_MASTER_PASSWORD` | (random) | Aurora master password |
-| `CHART_VERSION` | `3.0.0` | Helm chart version |
+| `CHART_VERSION` | `2.0.0` | Helm chart version |
 | `CHART_REF` | `oci://8gears.container-registry.com/8gcr/charts/harbor-next` | Chart OCI reference |
 | `KUBECONFIG_PATH` | `~/.kube/<CLUSTER_NAME>.yaml` | Kubeconfig file path |
 
@@ -147,7 +147,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO harbor_iam_u
 
 ```bash
 helm install harbor-next oci://8gears.container-registry.com/8gcr/charts/harbor-next \
-  --version 3.0.0 -n harbor --create-namespace \
+  --version 2.0.0 -n harbor --create-namespace \
   -f values-aws-irsa.yaml \
   --set database.host=<AURORA_ENDPOINT> \
   --set-json 'registry.config.storage.s3={"region":"<AWS_REGION>","bucket":"<BUCKET_NAME>"}' \
