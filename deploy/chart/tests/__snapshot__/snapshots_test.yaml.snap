@@ -52,7 +52,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-core
   2: |
     apiVersion: v1
@@ -64,7 +64,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-core
     spec:
       ports:
@@ -91,7 +91,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-exporter
     spec:
       ports:
@@ -113,7 +113,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next
     spec:
       rules:
@@ -183,7 +183,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-jobservice-env
   6: |
     apiVersion: v1
@@ -220,7 +220,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-jobservice
   7: |
     apiVersion: v1
@@ -232,7 +232,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-jobservice
     spec:
       ports:
@@ -293,7 +293,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-portal
   9: |
     apiVersion: v1
@@ -305,7 +305,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-portal
     spec:
       ports:
@@ -380,7 +380,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-registry
   11: |
     apiVersion: v1
@@ -392,7 +392,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-registry
     spec:
       ports:
@@ -424,7 +424,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-registryctl
   13: |
     apiVersion: v1
@@ -437,7 +437,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-core
   14: |
     apiVersion: v1
@@ -450,7 +450,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-exporter
   15: |
     apiVersion: v1
@@ -463,7 +463,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-jobservice
   16: |
     apiVersion: v1
@@ -476,7 +476,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-portal
   17: |
     apiVersion: v1
@@ -489,7 +489,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-registry
 2. valkey with auth enabled:
   1: |
@@ -545,7 +545,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-core
   2: |
     apiVersion: v1
@@ -557,7 +557,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-core
     spec:
       ports:
@@ -584,7 +584,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-exporter
     spec:
       ports:
@@ -606,7 +606,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next
     spec:
       rules:
@@ -676,7 +676,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-jobservice-env
   6: |
     apiVersion: v1
@@ -713,7 +713,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-jobservice
   7: |
     apiVersion: v1
@@ -725,7 +725,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-jobservice
     spec:
       ports:
@@ -786,7 +786,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-portal
   9: |
     apiVersion: v1
@@ -798,7 +798,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-portal
     spec:
       ports:
@@ -873,7 +873,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-registry
   11: |
     apiVersion: v1
@@ -885,7 +885,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-registry
     spec:
       ports:
@@ -917,7 +917,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-registryctl
   13: |
     apiVersion: v1
@@ -930,7 +930,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-core
   14: |
     apiVersion: v1
@@ -943,7 +943,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-exporter
   15: |
     apiVersion: v1
@@ -956,7 +956,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-jobservice
   16: |
     apiVersion: v1
@@ -969,7 +969,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-portal
   17: |
     apiVersion: v1
@@ -982,7 +982,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-registry
 3. external Redis with TLS + sentinel + password:
   1: |
@@ -1038,7 +1038,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-core
   2: |
     apiVersion: v1
@@ -1050,7 +1050,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-core
     spec:
       ports:
@@ -1077,7 +1077,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-exporter
     spec:
       ports:
@@ -1099,7 +1099,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next
     spec:
       rules:
@@ -1169,7 +1169,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-jobservice-env
   6: |
     apiVersion: v1
@@ -1206,7 +1206,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-jobservice
   7: |
     apiVersion: v1
@@ -1218,7 +1218,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-jobservice
     spec:
       ports:
@@ -1279,7 +1279,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-portal
   9: |
     apiVersion: v1
@@ -1291,7 +1291,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-portal
     spec:
       ports:
@@ -1367,7 +1367,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-registry
   11: |
     apiVersion: v1
@@ -1379,7 +1379,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-registry
     spec:
       ports:
@@ -1411,7 +1411,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-registryctl
   13: |
     apiVersion: v1
@@ -1424,7 +1424,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-core
   14: |
     apiVersion: v1
@@ -1437,7 +1437,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-exporter
   15: |
     apiVersion: v1
@@ -1450,7 +1450,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-jobservice
   16: |
     apiVersion: v1
@@ -1463,7 +1463,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-portal
   17: |
     apiVersion: v1
@@ -1476,7 +1476,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-registry
 4. BYO secrets matrix — every existingSecret path:
   1: |
@@ -1532,7 +1532,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-core
   2: |
     apiVersion: v1
@@ -1544,7 +1544,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-core
     spec:
       ports:
@@ -1571,7 +1571,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-exporter
     spec:
       ports:
@@ -1593,7 +1593,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next
     spec:
       rules:
@@ -1663,7 +1663,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-jobservice-env
   6: |
     apiVersion: v1
@@ -1700,7 +1700,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-jobservice
   7: |
     apiVersion: v1
@@ -1712,7 +1712,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-jobservice
     spec:
       ports:
@@ -1773,7 +1773,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-portal
   9: |
     apiVersion: v1
@@ -1785,7 +1785,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-portal
     spec:
       ports:
@@ -1860,7 +1860,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-registry
   11: |
     apiVersion: v1
@@ -1872,7 +1872,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-registry
     spec:
       ports:
@@ -1904,7 +1904,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-registryctl
   13: |
     apiVersion: v1
@@ -1917,7 +1917,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-core
   14: |
     apiVersion: v1
@@ -1930,7 +1930,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-exporter
   15: |
     apiVersion: v1
@@ -1943,7 +1943,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-jobservice
   16: |
     apiVersion: v1
@@ -1956,7 +1956,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-portal
   17: |
     apiVersion: v1
@@ -1969,7 +1969,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-registry
 5. trace (jaeger) + metrics + ServiceMonitor:
   1: |
@@ -2030,7 +2030,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-core
   2: |
     apiVersion: v1
@@ -2042,7 +2042,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-core
     spec:
       ports:
@@ -2069,7 +2069,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-exporter
     spec:
       ports:
@@ -2091,7 +2091,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next
     spec:
       rules:
@@ -2168,7 +2168,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-jobservice-env
   6: |
     apiVersion: v1
@@ -2209,7 +2209,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-jobservice
   7: |
     apiVersion: v1
@@ -2221,7 +2221,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-jobservice
     spec:
       ports:
@@ -2282,7 +2282,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-portal
   9: |
     apiVersion: v1
@@ -2294,7 +2294,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-portal
     spec:
       ports:
@@ -2372,7 +2372,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-registry
   11: |
     apiVersion: v1
@@ -2384,7 +2384,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-registry
     spec:
       ports:
@@ -2421,7 +2421,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-registryctl
   13: |
     apiVersion: v1
@@ -2434,7 +2434,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-core
   14: |
     apiVersion: v1
@@ -2447,7 +2447,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-exporter
   15: |
     apiVersion: v1
@@ -2460,7 +2460,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-jobservice
   16: |
     apiVersion: v1
@@ -2473,7 +2473,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-portal
   17: |
     apiVersion: v1
@@ -2486,7 +2486,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-registry
   18: |
     apiVersion: monitoring.coreos.com/v1
@@ -2497,7 +2497,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
         release: prometheus
       name: harbor-harbor-next
     spec:
@@ -2576,7 +2576,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-core
   2: |
     apiVersion: v1
@@ -2588,7 +2588,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-core
     spec:
       ports:
@@ -2615,7 +2615,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-exporter
     spec:
       ports:
@@ -2637,7 +2637,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next
     spec:
       rules:
@@ -2797,7 +2797,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-jobservice-env
   6: |
     apiVersion: v1
@@ -2834,7 +2834,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-jobservice
   7: |
     apiVersion: v1
@@ -2846,7 +2846,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-jobservice
     spec:
       ports:
@@ -2907,7 +2907,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-portal
   9: |
     apiVersion: v1
@@ -2919,7 +2919,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-portal
     spec:
       ports:
@@ -2994,7 +2994,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-registry
   11: |
     apiVersion: v1
@@ -3006,7 +3006,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-registry
     spec:
       ports:
@@ -3038,7 +3038,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-registryctl
   13: |
     apiVersion: v1
@@ -3051,7 +3051,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-core
   14: |
     apiVersion: v1
@@ -3064,7 +3064,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-exporter
   15: |
     apiVersion: v1
@@ -3077,7 +3077,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-jobservice
   16: |
     apiVersion: v1
@@ -3090,7 +3090,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-portal
   17: |
     apiVersion: v1
@@ -3103,7 +3103,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-registry
   18: |
     apiVersion: cert-manager.io/v1
@@ -3114,7 +3114,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-harbor-example-com-671b44f3
     spec:
       dnsNames:
@@ -3134,7 +3134,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-notary-example-com-cad059df
     spec:
       dnsNames:
@@ -3154,7 +3154,7 @@
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor-next
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-3.0.0
+        helm.sh/chart: harbor-next-2.0.0
       name: harbor-harbor-next-wildcard-harbor-example-com-16eaf6f2
     spec:
       dnsNames:
