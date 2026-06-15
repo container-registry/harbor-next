@@ -305,19 +305,38 @@ release must keep working.
 
 ## Versioning and Releases
 
-The chart has no release cycle of its own. On every repo release the
-pipeline packages it with the repo version
-(`helm package --version $VERSION --app-version $TAG`), pushes it to
-`oci://8gears.container-registry.com/8gcr/charts`, signs it with cosign,
-and pushes `artifacthub-repo.yml` as a separate OCI artifact.
+The chart releases on its own line, independent of the app (repo)
+version. A dedicated release-please instance, configured by
+`release-please-config-chart.json` and `.release-please-manifest-chart.json`,
+watches commits scoped to `deploy/chart/` and opens a
+`chore: release harbor-next chart X.Y.Z` PR (labelled `chart-release:
+pending`). Merging that PR tags `chart-vX.Y.Z`, writes the new `version`
+into `Chart.yaml`, updates `deploy/chart/CHANGELOG.md`, and triggers the
+`chart` job in `release-please.yml`, which packages, pushes, cosign-signs,
+and publishes the Artifact Hub metadata to
+`oci://8gears.container-registry.com/8gcr/charts`.
 
-- **Never hand-bump `version` or `appVersion` in `Chart.yaml`** — the
-  pipeline overrides both.
-- `feat(chart):` / `fix(chart):` bump the repo version like any other
-  code change. Use `docs(chart):` for chart docs and `ci(chart):` for
-  pipeline-only work. Note the root release-please `exclude-paths`
-  (`.github/`, `docs/`, `tests/`) are repo-root paths — everything under
-  `deploy/chart/`, including its docs and tests, counts toward a release.
+- **`version` in `Chart.yaml` is release-please-managed**, not hand-set.
+  The `release-type: helm` strategy bumps it on each chart release. Bumps
+  follow standard semver from the chart commit types: `fix(chart):` is a
+  patch, `feat(chart):` a minor, `feat(chart)!:` / `BREAKING CHANGE:` a
+  major. The major lands on the chart's own line, so a breaking chart
+  change never forces the app/repo version.
+- **`appVersion` is yours to set** (in a `feat(chart):` / `fix(chart):`
+  commit). It is the Harbor app version the chart targets and the default
+  image tag, and it is NOT overridden at release time, so point it at a
+  Harbor version whose images are already published. The chart release
+  does not build images.
+- **Chart commits do not release the app.** `deploy/chart` is in the app
+  release-please `exclude-paths`, so a commit touching only the chart never
+  bumps the repo `VERSION`. Root-level helpers the chart relies on
+  (`taskfile/helm.yml`, `versions.env`) still count toward the app.
+- **Chart releases run on `main` only** for now. Maintenance branches
+  (`release-X.Y`) release the app, not the chart.
+- **Bootstrap (one-time):** the initial release is pinned with
+  `"release-as": "2.0.0"` in `release-please-config-chart.json`. After the
+  first `chart-v2.0.0` release PR merges, delete that `release-as` line so
+  subsequent releases compute their version from commits.
 
 ## Command Cheat Sheet
 

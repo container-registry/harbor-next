@@ -6,7 +6,7 @@
   "release-type": "simple",
   "versioning": "always-bump-minor",
   "include-v-in-tag": true,
-  "exclude-paths": [".github", "docs", "tests"],
+  "exclude-paths": [".github", "docs", "tests", "deploy/chart"],
   "changelog-sections": [
     {"type": "feat",     "section": "Features"},
     {"type": "fix",      "section": "Bug Fixes"},

@@ -44,6 +44,33 @@ jobs:
           config-file: ${{ github.ref_name == 'main' && 'release-please-config.json' || 'release-please-config-maintenance.json' }}
           manifest-file: .release-please-manifest.json
 
+  release-please-chart:
+    name: Release Please (chart)
+    # Independent release line for the Helm chart, scoped to deploy/chart
+    # via its own config + manifest. Kept as a SEPARATE release-please
+    # instance (not a second package in the app manifest) on purpose:
+    # adding a package to a manifest switches every output to the
+    # "<path>--<name>" form, which would break the app jobs that read the
+    # unprefixed release-please outputs. Chart releases run on main only.
+    needs: [validate-release-ref]
+    if: ${{ github.ref_name == 'main' }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs['deploy/chart--release_created'] }}
+      tag_name: ${{ steps.release.outputs['deploy/chart--tag_name'] }}
+      version: ${{ steps.release.outputs['deploy/chart--version'] }}
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          target-branch: ${{ github.ref_name }}
+          config-file: release-please-config-chart.json
+          manifest-file: .release-please-manifest-chart.json
+
   create-maintenance-branch:
     name: Create Maintenance Branch
     needs: [release-please]
@@ -270,12 +297,12 @@ jobs:
 
   chart:
     name: Publish Helm Chart
-    # Images must exist before the chart that references them by tag is
-    # installable, hence the dependency on merge. Runs for main AND
-    # release-X.Y maintenance releases — chart patch versions track the
-    # repo version.
-    needs: [release-please, merge]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    # Driven by the chart's own release-please line (release-please-chart),
+    # not the app release. The chart references Harbor images by its
+    # appVersion (Chart.yaml), which a prior app release must already have
+    # published — so this job does NOT depend on the image build/merge.
+    needs: [release-please-chart]
+    if: ${{ needs.release-please-chart.outputs.release_created == 'true' }}
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
@@ -283,12 +310,12 @@ jobs:
     env:
       REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
       REGISTRY_PROJECT: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
-      VERSION: ${{ needs.release-please.outputs.version }}
-      TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+      VERSION: ${{ needs.release-please-chart.outputs.version }}
+      TAG_NAME: ${{ needs.release-please-chart.outputs.tag_name }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
-          ref: ${{ needs.release-please.outputs.tag_name }}
+          ref: ${{ needs.release-please-chart.outputs.tag_name }}
 
       - name: Load versions
         run: grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
@@ -309,11 +336,13 @@ jobs:
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
       - name: Add per-release Artifact Hub images annotation
-        # Image tags are only known at release time, so the
-        # artifacthub.io/images annotation is appended here instead of
-        # living in Chart.yaml (whose annotations block is deliberately
-        # the last top-level key).
+        # The artifacthub.io/images annotation is appended here instead of
+        # living in Chart.yaml (whose annotations block is deliberately the
+        # last top-level key). Image tags follow the chart's appVersion —
+        # the Harbor app version this chart targets — NOT the chart's own
+        # version/tag, since the chart releases on an independent line.
         run: |
+          app_version="$(grep '^appVersion:' deploy/chart/Chart.yaml | awk '{print $2}' | tr -d '"')"
           {
             echo "  artifacthub.io/images: |"
             for component in core jobservice registryctl exporter portal registry trivy-adapter; do
@@ -322,7 +351,7 @@ jobs:
                 image_name="trivy-adapter"
               fi
               echo "    - name: ${image_name}"
-              echo "      image: ${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/${image_name}:${TAG_NAME}"
+              echo "      image: ${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/${image_name}:${app_version}"
             done
           } >> deploy/chart/Chart.yaml
 
@@ -332,14 +361,14 @@ jobs:
             "artifacthub/ah:v${AH_VERSION}" ah lint --kind helm --path /chart
 
       - name: Package chart
-        # Chart version is bare semver (helm/Artifact Hub requirement);
-        # appVersion is the tag so default image tags resolve to the
-        # images this same workflow run just pushed (merge job tags with
-        # TAG_NAME). Chart.yaml's static values are dev placeholders.
+        # VERSION is the chart's own release-please version (release-please
+        # also wrote it into Chart.yaml via the helm release-type). appVersion
+        # is NOT overridden here: it stays as committed in Chart.yaml so
+        # default image tags resolve to an already-published Harbor app
+        # version, decoupled from the chart's release cadence.
         run: |
           helm package deploy/chart \
             --version "${VERSION}" \
-            --app-version "${TAG_NAME}" \
             --destination dist
 
       - name: Push chart
