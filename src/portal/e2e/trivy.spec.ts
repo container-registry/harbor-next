@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 
 // variables
 const LOCAL_REGISTRY: string = process.env.LOCAL_REGISTRY || 'registry.goharbor.io';
 const LOCAL_REGISTRY_NAMESPACE: string = process.env.LOCAL_REGISTRY_NAMESPACE || 'harbor-ci';
-const ip: string = process.env.IP;
+const ip: string = requiredEnv('IP');
 const user: string = process.env.HARBOR_ADMIN || 'admin';
 const pwd: string = process.env.HARBOR_PASSWORD || 'Harbor12345';
 
@@ -34,9 +34,9 @@ const project: string = 'aproject-'+ Date.now();
     // login
     await page.goto('/');
     await page.getByRole('textbox', { name: 'Username' }).click();
-    await page.getByRole('textbox', { name: 'Username' }).fill('admin');
+    await page.getByRole('textbox', { name: 'Username' }).fill(user);
     await page.getByRole('textbox', { name: 'Password' }).click();
-    await page.getByRole('textbox', { name: 'Password' }).fill('Harbor12345');
+    await page.getByRole('textbox', { name: 'Password' }).fill(pwd);
     await page.getByRole('button', { name: 'LOG IN' }).click();
 
   // create project
@@ -73,13 +73,18 @@ await page.goto('/');
   // await page.getByText(project).click();
 
 
-const command = `./e2e/scripts/docker_push_manifest_list.sh \
-  ${ip} ${user} ${pwd} \
-  "${ip}/${project}/${index_repo}:${tag}" \
-  "${ip}/${project}/${images[0]}:${tag}" \
-  "${ip}/${project}/${images[1]}:${tag}"`;
-
-  const output = runCommand(command);
+  const output = runCommand(
+    './e2e/scripts/docker_push_manifest_list.sh',
+    [
+      ip,
+      user,
+      pwd,
+      `${ip}/${project}/${index_repo}:${tag}`,
+      `${ip}/${project}/${images[0]}:${tag}`,
+      `${ip}/${project}/${images[1]}:${tag}`,
+    ],
+    { redactedArgs: [pwd] }
+  );
 
   expect(output).not.toContain('Error');
 
@@ -172,19 +177,23 @@ for (const cve of dangerousCVEs) {
 
 // check the quick search
   // select the first repo name on the right side - dangerous artifacts
-  await page.locator('app-vulnerability-summary').getByRole('link', { name: summary.dangerous_cves[0].repository_name }).first().click();
+  const firstDangerousArtifact = dangerousArtifacts[0];
+  if (!firstDangerousArtifact) {
+    throw new Error('Expected at least one dangerous artifact in the vulnerability summary');
+  }
+  await page.locator('app-vulnerability-summary').getByRole('link', { name: firstDangerousArtifact.repository_name }).first().click();
   // check if the below element got the right repo and digest
   console.log('Checking quick search values for repo:', dangerousCVEs[0].repository_name);
   console.log('Checking quick search values for repo:', summary.dangerous_cves[0].repository_name);
-  console.log('checking value of dangerous arts:', summary.dangerous_artifacts[0].repository_name);
+  console.log('checking value of dangerous arts:', firstDangerousArtifact.repository_name);
 
-  await expect(page.locator('app-vulnerability-filter form div').filter({ hasText: 'Filter by All Repository Name' }).getByRole('textbox')).toHaveValue(summary.dangerous_artifacts[0].repository_name);
-  await expect(page.getByRole('textbox').nth(2)).toHaveValue(summary.dangerous_artifacts[0].digest);
+  await expect(page.locator('app-vulnerability-filter form div').filter({ hasText: 'Filter by All Repository Name' }).getByRole('textbox')).toHaveValue(firstDangerousArtifact.repository_name);
+  await expect(page.getByRole('textbox').nth(2)).toHaveValue(firstDangerousArtifact.digest);
   // check if the table shows the right info
   await page.locator('.datagrid-inner-wrapper').click();
   await page.waitForTimeout(3000);
   // await expect(page.locator('#clr-dg-row33')).toContainText('CVE-2021-37600');
-  await expect(page.getByText(summary.dangerous_artifacts[0].repository_name).nth(2)).toBeVisible(); // this works no need for fuzzy i guess
+  await expect(page.getByText(firstDangerousArtifact.repository_name).nth(2)).toBeVisible(); // this works no need for fuzzy i guess
   // const repo = summary.dangerous_cves[0].cve_id;
   // // const repo = summary.dangerous_artifacts[0].repository_name;:w
 
@@ -198,8 +207,8 @@ for (const cve of dangerousCVEs) {
   // await expect(page.locator('#clr-dg-row33')).toContainText(summary.dangerous_artifacts[0].repository_name);
   await page.waitForTimeout(3000);
 
-  await expect(page.getByRole('gridcell', { name: summary.dangerous_artifacts[0].repository_name }).first()).toBeVisible();
-  await expect(page.getByRole('gridcell', { name: summary.dangerous_artifacts[0].digest.substring(0, 12) }).first()).toBeVisible();
+  await expect(page.getByRole('gridcell', { name: firstDangerousArtifact.repository_name }).first()).toBeVisible();
+  await expect(page.getByRole('gridcell', { name: firstDangerousArtifact.digest.substring(0, 12) }).first()).toBeVisible();
   // await expect(page.getByRole('gridcell', { name: summary.dangerous_cves[0].version }).first()).toBeVisible();
   // await expect(page.getByRole('gridcell', { name: summary.dangerous_cves[0].cvss_score_v3.toString() }).first()).toBeVisible();
   // await expect(page.locator('#clr-dg-row33')).toContainText(summary.dangerous_artifacts[0].digest.substring(0, 12));
@@ -410,24 +419,28 @@ for (const cve of dangerousCVEs) {
   // await page.getByRole('link', { name: 'Security Hub' }).click();
   // await page.locator('#clr-dg-row317').getByRole('link', { name: 'aproject-1764149771585/' }).click();
   // await expect(page.locator('h2')).toContainText('goharbor/harbor-registry-base');
-  await expect(page.getByRole('link', { name: summary.dangerous_artifacts[0].repository_name }).last()).toBeVisible();
-  await page.getByRole('link', { name: summary.dangerous_artifacts[0].repository_name }).last().click();
+  const indexArtifact = dangerousArtifacts.find(artifact => artifact.repository_name === `${project}/${index_repo}`);
+  if (!indexArtifact) {
+    throw new Error(`Expected dangerous artifact for ${project}/${index_repo}`);
+  }
+  await expect(page.getByRole('link', { name: indexArtifact.repository_name }).last()).toBeVisible();
+  await page.getByRole('link', { name: indexArtifact.repository_name }).last().click();
   await page.waitForTimeout(1000);
-  await page.getByRole('link', { name: summary.dangerous_artifacts[0].repository_name }).last().click();
-  // await page.getByRole('link', { name: summary.dangerous_artifacts[0].repository_name }).last().click();
+  await page.getByRole('link', { name: indexArtifact.repository_name }).last().click();
+  // await page.getByRole('link', { name: indexArtifact.repository_name }).last().click();
   await expect(page.locator('h2')).toContainText(index_repo);
 
   // do digest jump test
   await page.goto('/');
   await page.getByRole('link', { name: 'Interrogation Services' }).click();
   // await page.getByRole('link', { name: 'Security Hub' }).click();
-  await expect(page.getByRole('link', { name: summary.dangerous_artifacts[0].digest.substring(0, 12) }).last()).toBeVisible();
-  await page.getByRole('link', { name: summary.dangerous_artifacts[0].digest.substring(0, 12) }).last().click();
+  await expect(page.getByRole('link', { name: indexArtifact.digest.substring(0, 12) }).last()).toBeVisible();
+  await page.getByRole('link', { name: indexArtifact.digest.substring(0, 12) }).last().click();
   // await page.getByRole('gridcell', { name: 'sha256:3f42abf2' }).click();
   await page.waitForTimeout(1000);
   // await page.getByRole('link', { name: summary.dangerous_artifacts[0].digest.substring(0, 12) }).last().click();
   // await expect(page.getByRole('link', { name: summary.dangerous_artifacts[0].digest.substring(0, 12) })).toBeVisible();
-  await expect(page.locator('h2')).toContainText(summary.dangerous_artifacts[0].digest.substring(0, 12));
+  await expect(page.locator('h2')).toContainText(indexArtifact.digest.substring(0, 12));
 
   // top 5 dangerous artifacts jump test
   await page.goto('/');
@@ -481,45 +494,36 @@ await page.getByRole('button', { name: 'DELETE', exact: true }).click();
   // await page.getByRole('row', { name: /Select Select ${project} + '/' + ${image}/ }).locator('label').click();
     // logout
     await page.goto('/');
-    await page.getByRole('button', { name: 'admin', exact: true }).waitFor();
-    await page.getByRole('button', { name: 'admin', exact: true }).click();
+    await page.getByRole('button', { name: user, exact: true }).waitFor();
+    await page.getByRole('button', { name: user, exact: true }).click();
     await page.getByRole('menuitem', { name: 'Log Out' }).click();
 });
-
-
-
-// /**
-//  * Executes a shell command and waits until it succeeds.
-//  * Throws an error if the command fails.
-//  */
-// function runCommand(command: string): void {
-//   console.log(`\n$ ${command}`);
-//   try {
-//     const output = execSync(command, { stdio: 'inherit' }); // inherit = live logs
-//     console.log(output?.toString() || '');
-//     } catch (error) {
-//     console.error(`Command failed: ${command}`);
-//     throw error;
-//   }
-// }
-export async function getVulnerabilitySummaryFromAPI(ip, user, password) {
+export async function getVulnerabilitySummaryFromAPI(ip: string, user: string, password: string) {
   // Encode credentials for Basic Auth
   const credentials = Buffer.from(`${user}:${password}`).toString('base64');
 
   // API endpoint (mirrors your Robot curl command)
   const url = `https://${ip}/api/v2.0/security/summary?with_dangerous_cve=true&with_dangerous_artifact=true`;
 
-  // Perform the request (insecure curl -> we skip TLS validation)
-  // If you're using node-fetch or running in Node, set NODE_TLS_REJECT_UNAUTHORIZED=0
+  const previousTlsSetting = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Basic ${credentials}`,
-      'Content-Type': 'application/json',
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Basic ${credentials}`,
+        'Content-Type': 'application/json',
+      },
+    });
+  } finally {
+    if (previousTlsSetting === undefined) {
+      delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+    } else {
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = previousTlsSetting;
+    }
+  }
 
   if (!response.ok) {
     throw new Error(`Failed to fetch vulnerability summary: ${response.status} ${response.statusText}`);
@@ -529,24 +533,40 @@ export async function getVulnerabilitySummaryFromAPI(ip, user, password) {
   return json;
 }
 
-export function runCommand(command: string): string {
-  console.log(`\n$ ${command}`);
+type CommandOptions = {
+  input?: string;
+  redactedArgs?: string[];
+};
+
+export function runCommand(command: string, args: string[] = [], options: CommandOptions = {}): string {
+  const redactedArgs = new Set(options.redactedArgs || []);
+  const displayArgs = args.map(arg => redactedArgs.has(arg) ? '<redacted>' : arg);
+  const displayCommand = [command, ...displayArgs].join(' ');
+  console.log(`\n$ ${displayCommand}`);
 
   try {
-    // Run command and capture output (stdout + stderr)
-    const output = execSync(command, {
+    const output = execFileSync(command, args, {
       encoding: 'utf-8',  // ensures string output
       stdio: ['pipe', 'pipe', 'pipe'], // capture all streams
+      input: options.input,
     });
 
     console.log('Command output:\n', output.trim()); // print captured output
     return output.trim(); // return for further processing
   } catch (error: any) {
-    console.error(`Command failed: ${command}`);
+    console.error(`Command failed: ${displayCommand}`);
     console.error('--- STDOUT ---\n', error.stdout?.toString()?.trim() || '');
     console.error('--- STDERR ---\n', error.stderr?.toString()?.trim() || '');
     throw error;
   }
+}
+
+function requiredEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required env var: ${name}`);
+  }
+  return value;
 }
 
 /**
@@ -567,17 +587,19 @@ function pushImageWithTag(
   const targetImage = `${ip}/${project}/${image}:${tag}`;
 
   // Pull image from local registry
-  runCommand(`docker pull ${sourceImage}`);
+  runCommand('docker', ['pull', sourceImage]);
 
   // Login to Harbor
-  runCommand(`docker login -u ${user} -p ${pwd} ${ip}`);
+  runCommand('docker', ['login', '-u', user, '--password-stdin', ip], {
+    input: `${pwd}\n`,
+  });
 
   // Tag image for Harbor project
-  runCommand(`docker tag ${sourceImage} ${targetImage}`);
+  runCommand('docker', ['tag', sourceImage, targetImage]);
 
   // Push image to Harbor
-  runCommand(`docker push ${targetImage}`);
+  runCommand('docker', ['push', targetImage]);
 
   // Logout after push
-  runCommand(`docker logout ${ip}`);
+  runCommand('docker', ['logout', ip]);
 }
