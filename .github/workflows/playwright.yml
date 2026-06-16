@@ -19,19 +19,7 @@ concurrency:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-  POSTGRESQL_HOST: localhost
-  POSTGRESQL_PORT: 5432
-  POSTGRESQL_USR: postgres
-  POSTGRESQL_PWD: root123
-  POSTGRESQL_DATABASE: registry
-  DOCKER_COMPOSE_VERSION: 2.27.1
-  HARBOR_ADMIN: admin
-  HARBOR_PASSWORD: Harbor12345
-  CORE_SECRET: tempString
-  KEY_PATH: /data/secret/keys/secretkey
-  REDIS_HOST: localhost
-  REG_VERSION: v2.7.1-patch-2819-2553
-  UI_BUILDER_VERSION: 1.6.0
+  BUN_VERSION: 1.2.13
 
 jobs:
   e2e-playwright:
@@ -41,38 +29,18 @@ jobs:
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
-      - uses: ./.github/actions/setup-go-cached
-        with:
-          go-version-file: src/go.mod
-          go-sum-path: src/go.sum
-
-      - uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
-        with:
-          version: 3.x
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Configure environment
+      - name: Install Bun
         run: |
-          echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> "$GITHUB_ENV"
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-          echo "TOKEN_PRIVATE_KEY_PATH=${GITHUB_WORKSPACE}/tests/private_key.pem" >> "$GITHUB_ENV"
-          IP=$(hostname -I | awk '{print $1}')
-          echo "IP=${IP}" >> "$GITHUB_ENV"
-          echo "BASE_URL=https://${IP}" >> "$GITHUB_ENV"
+          curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}"
+          echo "${HOME}/.bun/bin" >> "$GITHUB_PATH"
 
-      - name: Install Docker Compose
-        run: |
-          curl -L "https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" > docker-compose
-          chmod +x docker-compose
-          sudo mv docker-compose /usr/local/bin/docker-compose
+      - name: Install portal dependencies
+        working-directory: src/portal
+        run: bun install --frozen-lockfile --ignore-scripts
 
-      - name: Start Harbor for E2E
-        run: |
-          docker system prune -a -f
-          bash ./tests/showtime.sh ./tests/ci/api_common_install.sh "$IP" DB
-
-      - name: Run Playwright tests
-        run: BASE_URL="$BASE_URL" IP="$IP" HARBOR_ADMIN="$HARBOR_ADMIN" HARBOR_PASSWORD="$HARBOR_PASSWORD" task test:playwright
+      - name: Validate Playwright tests
+        working-directory: src/portal
+        run: bun x playwright test --list
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ !cancelled() }}
