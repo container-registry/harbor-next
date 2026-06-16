@@ -4,6 +4,7 @@
   "pull-request-header": "This PR prepares the next release based on conventional commits.",
   "pull-request-title-pattern": "chore: release ${version}",
   "release-type": "simple",
+  "versioning": "always-bump-minor",
   "include-v-in-tag": true,
   "exclude-paths": [".github", "docs", "tests"],
   "changelog-sections": [

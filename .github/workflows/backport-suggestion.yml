@@ -2,49 +2,83 @@ name: Backport Suggestion
 
 on:
   pull_request_target:
-    types: [closed]
+    branches: [main]
+    types: [opened, reopened, synchronize, edited, ready_for_review]
 
 permissions:
   contents: read
   issues: write
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   suggest:
     if: >-
       ${{
-        github.event.pull_request.merged == true &&
         github.event.pull_request.base.ref == 'main'
       }}
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      GH_REPO: ${{ github.repository }}
-      PR_NUMBER: ${{ github.event.pull_request.number }}
-      PR_TITLE: ${{ github.event.pull_request.title }}
     steps:
-      - name: Install gh CLI
-        uses: actions4gh/setup-gh@44a12005484c53be5bf51bebe8c985b4be8ba8de # v1.0.2
+      - name: Suggest backports
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
-          gh-version: latest
+          script: |
+            const marker = '<!-- backport-suggestion -->';
+            const { owner, repo } = context.repo;
+            const pr = context.payload.pull_request;
+            const issue_number = pr.number;
 
-      - name: Comment with backport commands
-        run: |
-          case "${PR_TITLE}" in
-            fix:*|upstream:*|perf:*|revert:*) ;;
-            *) exit 0 ;;
-          esac
+            // This workflow's own prior suggestion comments: posted by a bot and carrying
+            // the hidden marker. Human comments that merely quote the marker are excluded.
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number, per_page: 100,
+            });
+            const mine = comments.filter(
+              (c) => c.user?.type === 'Bot' && (c.body ?? '').includes(marker),
+            );
 
-          branches=$(gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/heads/release-" \
-            --jq '.[].ref | sub("refs/heads/"; "")' | sort -Vr)
-          if [ -z "${branches}" ]; then
-            exit 0
-          fi
+            const removeComments = async (list) => {
+              for (const c of list) {
+                try {
+                  await github.rest.issues.deleteComment({ owner, repo, comment_id: c.id });
+                } catch (err) {
+                  if (err.status !== 404) throw err; // tolerate an already-deleted comment
+                }
+              }
+            };
 
-          body=$'This change may need patch-release backports. Comment with one of these commands to open a cherry-pick PR:\n\n'
-          while IFS= read -r branch; do
-            [ -z "${branch}" ] && continue
-            body="${body}\`/backport v${branch#release-}\`"$'\n'
-          done <<< "${branches}"
+            // Only backportable conventional-commit types qualify (optionally scoped, e.g. fix(portal):).
+            const backportable = /^(fix|upstream|perf|revert|ci|build)(\([^)]+\))?:/.test(pr.title);
 
-          gh pr comment "${PR_NUMBER}" --body "${body}"
+            // Active release-X.Y branches, newest first.
+            const refs = await github.paginate(github.rest.git.listMatchingRefs, {
+              owner, repo, ref: 'heads/release-',
+            });
+            const versions = refs
+              .map((r) => r.ref.replace('refs/heads/', ''))
+              .filter((b) => /^release-\d+\.\d+$/.test(b))
+              .map((b) => b.replace('release-', ''))
+              .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+
+            // PR no longer qualifies: remove every suggestion comment we left.
+            if (!backportable || versions.length === 0) {
+              await removeComments(mine);
+              return;
+            }
+
+            const body =
+              `${marker}\n` +
+              'This change may need patch-release backports. ' +
+              'Comment with one of these commands to open a cherry-pick PR:\n\n' +
+              versions.map((v) => `\`/backport v${v}\``).join('\n') +
+              '\n';
+
+            // Keep one comment current; delete any duplicates from earlier runs.
+            const [keep, ...extra] = mine;
+            if (!keep) {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            } else {
+              if (keep.body !== body) {
+                await github.rest.issues.updateComment({ owner, repo, comment_id: keep.id, body });
+              }
+              await removeComments(extra);
+            }
