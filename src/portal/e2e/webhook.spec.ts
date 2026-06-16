@@ -1,15 +1,17 @@
 import { test, expect, Page, BrowserContext } from '@playwright/test';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 
 // Environment variables
 const LOCAL_REGISTRY: string =
     process.env.LOCAL_REGISTRY || 'registry.goharbor.io';
 const LOCAL_REGISTRY_NAMESPACE: string =
     process.env.LOCAL_REGISTRY_NAMESPACE || 'harbor-ci';
-const ip: string = process.env.IP;
+const ip: string = requiredEnv('IP');
 const user: string = process.env.HARBOR_ADMIN || 'admin';
 const pwd: string = process.env.HARBOR_PASSWORD || 'Harbor12345';
-const WEBHOOK_ENDPOINT_UI: string = process.env.WEBHOOK_ENDPOINT_UI || '';
+const webhookEndpointUI: string = normalizeHTTPURL(
+    requiredEnv('WEBHOOK_ENDPOINT_UI')
+);
 
 /**
  * Test Case: Tag Retention And Replication Event Type Webhook Functionality By CloudEvents Format
@@ -47,7 +49,7 @@ test.describe('Tag Retention and Replication Webhook - CloudEvents Format', () =
         // Step 1: Setup Webhook Server Tab
         // ============================================
         const webhookPage = await context.newPage();
-        await webhookPage.goto(`http://${WEBHOOK_ENDPOINT_UI}`);
+        await webhookPage.goto(webhookEndpointUI);
 
         // Get webhook endpoint URL from the page
         const webhookEndpointUrl = await webhookPage
@@ -175,7 +177,8 @@ test.describe('Tag Retention and Replication Webhook - CloudEvents Format', () =
             .click();
         await harborPage.locator('#adapter').selectOption('harbor');
         await harborPage.locator('#destination_name').fill(endpointName);
-        await harborPage.locator('#destination_url').fill(`https://${ip}`);
+        const destinationURL = `https://${ip}`;
+        await harborPage.locator('#destination_url').fill(destinationURL);
         await harborPage.locator('#destination_access_key').fill(user);
         await harborPage.locator('#destination_password').fill(pwd);
 
@@ -203,8 +206,10 @@ test.describe('Tag Retention and Replication Webhook - CloudEvents Format', () =
             .filter({ hasText: 'Push-based' })
             .click();
 
-        // Select destination endpoint (partial match)
-        await harborPage.locator('#dest_registry').selectOption('1: Object');
+        // Select destination endpoint by its rendered label to avoid order-dependent values.
+        await harborPage
+            .locator('#dest_registry')
+            .selectOption({ label: `${endpointName}-${destinationURL}` });
         await expect(harborPage.locator('#dest_registry')).toContainText(
             endpointName
         );
@@ -442,7 +447,7 @@ test.describe('Tag Retention and Replication Webhook - CloudEvents Format', () =
         const cellCount1 = await cells1.count();
 
         for (let i = 0; i < cellCount1; i++) {
-            const cellText = await cells.nth(i).textContent();
+            const cellText = await cells1.nth(i).textContent();
             console.log(`Cell ${i}:`, cellText);
         }
 
@@ -573,23 +578,50 @@ async function deleteAllRequests(page: Page): Promise<void> {
 /**
  * Runs a shell command and returns the output
  */
-function runCommand(command: string): string {
-    console.log(`\n$ ${command}`);
+type CommandOptions = {
+    input?: string;
+    redactedArgs?: string[];
+};
+
+function runCommand(
+    command: string,
+    args: string[] = [],
+    options: CommandOptions = {}
+): string {
+    const redactedArgs = new Set(options.redactedArgs || []);
+    const displayArgs = args.map(arg =>
+        redactedArgs.has(arg) ? '<redacted>' : arg
+    );
+    const displayCommand = [command, ...displayArgs].join(' ');
+    console.log(`\n$ ${displayCommand}`);
 
     try {
-        const output = execSync(command, {
+        const output = execFileSync(command, args, {
             encoding: 'utf-8',
             stdio: ['pipe', 'pipe', 'pipe'],
+            input: options.input,
         });
 
         console.log('Command output:\n', output.trim());
         return output.trim();
     } catch (error: any) {
-        console.error(`Command failed: ${command}`);
+        console.error(`Command failed: ${displayCommand}`);
         console.error('STDOUT:', error.stdout?.toString()?.trim() || '');
         console.error('STDERR:', error.stderr?.toString()?.trim() || '');
         throw error;
     }
+}
+
+function requiredEnv(name: string): string {
+    const value = process.env[name];
+    if (!value) {
+        throw new Error(`Missing required env var: ${name}`);
+    }
+    return value;
+}
+
+function normalizeHTTPURL(value: string): string {
+    return /^https?:\/\//.test(value) ? value : `http://${value}`;
 }
 
 /**
@@ -610,19 +642,21 @@ function pushImageWithTag(
     const targetImage = `${ip}/${project}/${image}:${tag}`;
 
     // Pull image from local registry
-    runCommand(`docker pull ${sourceImage}`);
+    runCommand('docker', ['pull', sourceImage]);
 
     // Login to Harbor
-    runCommand(`docker login -u ${user} -p ${pwd} ${ip}`);
+    runCommand('docker', ['login', '-u', user, '--password-stdin', ip], {
+        input: `${pwd}\n`,
+    });
 
     // Tag image for Harbor project
-    runCommand(`docker tag ${sourceImage} ${targetImage}`);
+    runCommand('docker', ['tag', sourceImage, targetImage]);
 
     // Push image to Harbor
-    runCommand(`docker push ${targetImage}`);
+    runCommand('docker', ['push', targetImage]);
 
     // Logout after push
-    runCommand(`docker logout ${ip}`);
+    runCommand('docker', ['logout', ip]);
 
     console.log(`Successfully pushed ${targetImage}`);
 }

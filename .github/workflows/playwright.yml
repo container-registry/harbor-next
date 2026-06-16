@@ -40,6 +40,10 @@ jobs:
 
       - name: Validate Playwright tests
         working-directory: src/portal
+        env:
+          BASE_URL: https://127.0.0.1
+          IP: 127.0.0.1
+          WEBHOOK_ENDPOINT_UI: 127.0.0.1:8080
         run: bun x playwright test --list
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
