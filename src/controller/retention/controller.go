@@ -217,12 +217,13 @@ func (r *defaultController) DeleteRetention(ctx context.Context, id int64) error
 		return err
 	}
 
-	if err = r.manager.DeletePolicy(ctx, id); err != nil {
+	// Clean up retention_id before deleting the policy so a retry cannot leave
+	// stale project metadata after a successful policy deletion.
+	if err = r.proMetaMgr.Delete(ctx, p.Scope.Reference, "retention_id"); err != nil {
 		return err
 	}
 
-	// clean up retention_id from project metadata
-	return r.proMetaMgr.Delete(ctx, p.Scope.Reference, "retention_id")
+	return r.manager.DeletePolicy(ctx, id)
 }
 
 // deleteExecs delete executions
