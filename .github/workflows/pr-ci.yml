@@ -3,10 +3,26 @@ name: PR Preview Images
 on:
   pull_request:
     branches: [main, "release-[0-9]*.[0-9]*"]
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - "CLAUDE.md"
+    # Allowlist: only build preview images when an input that actually reaches
+    # one of the images changes. Each entry below is consumed by a dockerfile
+    # COPY/build-arg or by the task build steps (gen-apis / build:binary).
+    # Anything not listed (docs, tests, 8gcr-ee patches, lint config, dev
+    # taskfiles, other workflows) cannot change an image, so it is skipped.
+    paths:
+      - "src/**"                             # Go components + portal sources
+      - "api/v2.0/swagger.yaml"              # gen-apis (core) + portal API client
+      - "tools/swagger/templates/**"         # gen-apis output templates
+      - "make/migrations/**"                 # baked into harbor-core
+      - "icons/**"                           # baked into harbor-core
+      - "config/portal/**"                   # portal nginx.conf
+      - "LICENSE"                            # baked into harbor-portal
+      - "VERSION"                            # ReleaseVersion ldflag baked into the Go binaries
+      - "dockerfile/**"                      # every image
+      - "versions.env"                       # build-args + registry/trivy/distribution pins
+      - "Taskfile.yml"                       # build orchestration root
+      - "taskfile/build.yml"                 # gen-apis + build:binary recipes
+      - ".github/workflows/pr-ci.yml"        # this workflow
+      - ".github/actions/setup-go-cached/**" # Go build env used by the build jobs
 
 permissions:
   contents: read
