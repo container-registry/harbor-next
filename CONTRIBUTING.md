@@ -121,7 +121,8 @@ Use the following template for your PR description:
 
 ## Release Notes
 <!--
-Required for new features (feat:). Fill in for any user-facing change (breaking changes, deprecations).
+Required for new features (feat:); recommended for user-facing fixes (fix:).
+Also fill in for breaking changes and deprecations.
 Leave blank for ci:/chore:/refactor:/docs:/test: PRs.
 -->
 

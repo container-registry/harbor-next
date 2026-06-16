@@ -250,9 +250,9 @@ writeFileSync(outputPath, `${output.join('\n').trim()}\n`);
 // by the release workflow, so it is written to a separate file rather than nested
 // under `## What's Changed`.
 if (contributorsPath) {
-  const newContributors = generatedNotes.match(/## New Contributors[\s\S]*?(?=\n\n\*\*Full Changelog\*\*|$)/)?.[0];
+  const newContributors = generatedNotes.match(/## New Contributors[\s\S]*?(?=(?:\r?\n){2}\*\*Full Changelog\*\*|$)/)?.[0];
   writeFileSync(
     contributorsPath,
-    newContributors ? `${newContributors.replace(/^\*/gm, '-').trim()}\n` : '',
+    newContributors ? `${newContributors.replace(/^\* /gm, '- ').trim()}\n` : '',
   );
 }
