@@ -341,7 +341,7 @@ sequenceDiagram
     T->>L: change detected (2s debounce)
     L->>L: re-parse harbor.yaml, re-resolve *Ref secrets (no cache)
     alt parse/validation error
-        L-->>R: keep last-good in memory; surface line/col in /status; emit reload_errors_total
+        L-->>R: keep last-good in memory, surface line/col in /status, emit reload_errors_total
     else valid
         L->>R: desired spec
         R->>DB: read live state
