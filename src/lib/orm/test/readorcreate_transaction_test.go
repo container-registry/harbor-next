@@ -20,48 +20,19 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"testing"
 	"time"
 
 	"github.com/beego/beego/v2/client/orm"
-	"github.com/stretchr/testify/suite"
 
-	"github.com/goharbor/harbor/src/common/dao"
 	. "github.com/goharbor/harbor/src/lib/orm"
 )
-
-// ReadOrCreateTransactionSuite compares beego's native ReadOrCreate with
-// the custom orm.ReadOrCreate to demonstrate why the custom version is needed.
-// This is a regression test for the LDAP login bug (SQLSTATE 25P02).
-type ReadOrCreateTransactionSuite struct {
-	suite.Suite
-}
-
-func (suite *ReadOrCreateTransactionSuite) SetupSuite() {
-	dao.PrepareTestForPostgresSQL()
-
-	o, err := FromContext(Context())
-	suite.Require().NoError(err)
-
-	_, err = o.Raw(`CREATE TABLE IF NOT EXISTS foo (
-		id SERIAL PRIMARY KEY NOT NULL,
-		name VARCHAR(30),
-		UNIQUE (name)
-	)`).Exec()
-	suite.Require().NoError(err)
-}
-
-func (suite *ReadOrCreateTransactionSuite) TearDownSuite() {
-	o, _ := FromContext(Context())
-	o.Raw(`DROP TABLE IF EXISTS foo`).Exec()
-}
 
 // TestBeegoNativeCorruptsTransaction demonstrates that beego's native method
 // corrupts the transaction when any database error occurs.
 // This is the ROOT CAUSE of the LDAP login bug.
 //
 // EXPECTED: This test PASSES by proving the transaction IS corrupted (25P02).
-func (suite *ReadOrCreateTransactionSuite) TestBeegoNativeCorruptsTransaction() {
+func (suite *OrmSuite) TestBeegoNativeCorruptsTransaction() {
 	ctx := NewContext(context.TODO(), orm.NewOrm())
 	uniqueName := fmt.Sprintf("beego%d", time.Now().UnixNano())
 	var gotError25P02 bool
@@ -92,7 +63,7 @@ func (suite *ReadOrCreateTransactionSuite) TestBeegoNativeCorruptsTransaction() 
 // This is the FIX for the LDAP login bug.
 //
 // EXPECTED: This test PASSES by proving the transaction is NOT corrupted.
-func (suite *ReadOrCreateTransactionSuite) TestCustomReadOrCreateDoesNotCorruptTransaction() {
+func (suite *OrmSuite) TestCustomReadOrCreateDoesNotCorruptTransaction() {
 	ctx := NewContext(context.TODO(), orm.NewOrm())
 	recordName := fmt.Sprintf("custom%d", time.Now().UnixNano())
 
@@ -125,8 +96,4 @@ func (suite *ReadOrCreateTransactionSuite) TestCustomReadOrCreateDoesNotCorruptT
 
 	suite.NoError(err)
 	suite.True(transactionHealthy, "Custom ReadOrCreate should NOT corrupt the transaction")
-}
-
-func TestReadOrCreateTransactionSuite(t *testing.T) {
-	suite.Run(t, new(ReadOrCreateTransactionSuite))
 }
