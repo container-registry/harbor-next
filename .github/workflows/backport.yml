@@ -96,7 +96,9 @@ jobs:
           fi
           git switch -c "${backport_branch}"
 
-          if ! git cherry-pick -x "${SOURCE_SHA}"; then
+          # -s adds the committer (github-actions[bot]) sign-off so the backport passes
+          # DCO even when the squashed source commit on the base branch has none.
+          if ! git cherry-pick -x -s "${SOURCE_SHA}"; then
             git cherry-pick --abort || true
             gh pr comment "${PR_NUMBER}" --body "Backport to \`${TARGET_BRANCH}\` has conflicts. Please cherry-pick \`${SOURCE_SHA}\` manually."
             exit 1
