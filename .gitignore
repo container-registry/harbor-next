@@ -41,6 +41,8 @@ src/portal/docker-build/nginx.conf
 src/portal/.angular
 src/portal/cypress/videos
 src/portal/cypress/screenshots
+src/portal/playwright-report/
+src/portal/test-results/
 **/npm*.log
 
 **/*ngsummary.json

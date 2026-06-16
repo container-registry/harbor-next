@@ -244,6 +244,30 @@ tasks:
     dir: src/portal
     cmd: npm run lint
 
+  playwright:
+    desc: "Run Playwright E2E tests against a running Harbor instance"
+    dir: src/portal
+    cmd: bun run e2e:playwright
+
+  playwright:docker-build:
+    desc: "Build the Docker image for Playwright E2E tests"
+    cmd: docker build -t harbor-playwright-tests -f src/portal/e2e/Dockerfile .
+
+  playwright:docker:
+    desc: "Run Playwright E2E tests in Docker against a running Harbor instance"
+    deps: [playwright:docker-build]
+    cmd: >-
+      docker run --rm
+      -e BASE_URL
+      -e IP
+      -e HARBOR_ADMIN
+      -e HARBOR_PASSWORD
+      -e LOCAL_REGISTRY
+      -e LOCAL_REGISTRY_NAMESPACE
+      -e WEBHOOK_ENDPOINT_UI
+      -v /var/run/docker.sock:/var/run/docker.sock
+      harbor-playwright-tests
+
   # ============================================================================
   # Aggregate Test Tasks
   # ============================================================================
