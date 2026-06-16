@@ -409,6 +409,7 @@ jobs:
           GENERATED_NOTES="$(mktemp)"
           RELEASE_BODY="$(mktemp)"
           FORMATTED_BODY="$(mktemp)"
+          CONTRIBUTORS="$(mktemp)"
 
           gh api "repos/${{ github.repository }}/releases/generate-notes" \
             -f "tag_name=${TAG_NAME}" \
@@ -417,7 +418,8 @@ jobs:
           node .github/scripts/format-release-notes.mjs \
             "${RELEASE_BODY}" \
             "${GENERATED_NOTES}" \
-            "${FORMATTED_BODY}"
+            "${FORMATTED_BODY}" \
+            "${CONTRIBUTORS}"
 
           HIGHLIGHTS=""
           git fetch --tags --force
@@ -453,15 +455,19 @@ jobs:
           fi
 
           {
+            if [ -n "${HIGHLIGHTS}" ]; then
+              printf '%s\n\n' "${HIGHLIGHTS}"
+            fi
+            cat "${FORMATTED_BODY}"
+            echo ""
+            echo "---"
+            echo ""
             if [ -f applied-patches.txt ] && [ -s applied-patches.txt ]; then
               echo "## Commercial Features"
               echo ""
               echo "This release includes the following commercial enhancements:"
               cat applied-patches.txt
               echo ""
-            fi
-            if [ -n "${HIGHLIGHTS}" ]; then
-              printf '%s\n\n' "${HIGHLIGHTS}"
             fi
             echo "## Container Images"
             echo ""
@@ -484,8 +490,10 @@ jobs:
             echo "  --certificate-oidc-issuer \"https://token.actions.githubusercontent.com\" \\"
             echo "  ${REGISTRY}/harbor-core:${TAG_NAME}"
             echo "\`\`\`"
-            echo ""
-            echo "---"
-            echo ""
-            cat "${FORMATTED_BODY}"
+            if [ -s "${CONTRIBUTORS}" ]; then
+              echo ""
+              echo "---"
+              echo ""
+              cat "${CONTRIBUTORS}"
+            fi
           } | gh release edit "${TAG_NAME}" --notes-file -

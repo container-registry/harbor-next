@@ -19,6 +19,7 @@ task dev:up       # Local dev with hot reload
 - DCO sign-off required: `git commit -s`.
 - **Squash and merge only** — other merge types break release-please.
 - No `Co-Authored-By` / AI attribution trailers.
+- **New features (`feat:`) must add a `## Release Notes` section to the PR description.** Its prose is extracted and rendered under `## Highlights` on the GitHub Release. See CONTRIBUTING.md → "Adding Release Notes to Your PR".
 
 ## Release-please
 
