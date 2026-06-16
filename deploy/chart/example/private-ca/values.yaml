@@ -1,0 +1,175 @@
+# Harbor Helm Chart — Private-CA / mTLS deployment
+#
+# End-to-end example for environments where the cluster talks to PG and
+# Redis (and possibly S3) over a private PKI. Covers four moving parts
+# in one chart install:
+#
+#   1. Ingress cert via cert-manager (public CA — Let's Encrypt here,
+#      or an internal ClusterIssuer if you have one).
+#   2. External PostgreSQL with sslmode=verify-full, server cert signed
+#      by a private CA, password sourced from a Secret.
+#   3. External Redis (rediss://) with a private-CA-signed server cert.
+#   4. Same private CA also trusted by Harbor for S3 (registry storage)
+#      and OIDC connections — the chart mounts the CA on every
+#      component and sets SSL_CERT_DIR.
+#
+# Prerequisites (run before `helm install`):
+#
+#   # 1. Admin password Secret — keeps the value out of CLI history
+#   kubectl -n harbor create secret generic harbor-admin \
+#     --from-literal=HARBOR_ADMIN_PASSWORD='STRONG-PASSWORD-HERE'
+#
+#   # 2. Database password Secret — Harbor reads POSTGRESQL_PASSWORD
+#   kubectl -n harbor create secret generic harbor-db \
+#     --from-literal=POSTGRESQL_PASSWORD='STRONG-DB-PASSWORD'
+#
+#   # 3. PostgreSQL TLS Secret. cert-manager convention:
+#   #      ca.crt   — CA bundle (required when verify-ca / verify-full)
+#   #      tls.crt  — client cert (only when clientCertEnabled=true)
+#   #      tls.key  — client key  (only when clientCertEnabled=true)
+#   kubectl -n harbor create secret generic harbor-pg-tls \
+#     --from-file=ca.crt=./pg-ca.crt
+#     # add --from-file=tls.crt=... --from-file=tls.key=... for mTLS
+#
+#   # 4. Private CA bundle Secret — covers Redis TLS, S3 TLS, OIDC etc.
+#   #    Same `ca.crt` key convention. cert-manager Secrets work as-is.
+#   kubectl -n harbor create secret generic harbor-extra-ca \
+#     --from-file=ca.crt=./private-ca.crt
+#
+#   # 5. cert-manager ClusterIssuer / Issuer for ingress (out of scope).
+#
+# Usage:
+#   helm install harbor . -n harbor --create-namespace -f example/private-ca/values.yaml
+#
+# ─── Caveats ────────────────────────────────────────────────────────────────
+#
+# Harbor's exporter does not yet plumb POSTGRESQL_URL through its viper
+# config; for sslmode=verify-full against a private CA the exporter will
+# fail until a backend-side patch lands. The PG migrator (NewMigrator)
+# similarly ignores the URL field, so servers that REQUIRE a client cert
+# will reject the schema-upgrade run. Use sslmode=verify-ca (CA-only
+# verification) until those are addressed upstream.
+
+externalURL: "https://harbor.example.com"
+
+# Admin password from Secret
+existingSecretAdminPassword: "harbor-admin"
+
+# ─── PostgreSQL with private CA ─────────────────────────────────────────────
+database:
+  host: pg.private.example.com
+  port: 5432
+  username: harbor
+  database: registry
+  sslmode: verify-full              # use verify-ca if mTLS not required
+  existingSecret: "harbor-db"
+  existingTlsSecret: "harbor-pg-tls"
+  clientCertEnabled: false          # set true if PG requires client cert auth
+
+# ─── External Redis with private CA ─────────────────────────────────────────
+valkey:
+  enabled: false
+
+externalRedis:
+  host: redis.private.example.com
+  port: 6379
+  password: ""                      # set via existingSecret in real prod
+  tlsOptions:
+    enable: true
+    # Same CA Secret as above — the chart mounts it on every component
+    # and sets SSL_CERT_DIR. So this also covers S3 / OIDC / LDAP TLS
+    # endpoints signed by the same private CA. No need for a second
+    # Secret unless you split CAs by purpose.
+    existingCaSecret: "harbor-extra-ca"
+    existingCaSecretKey: ca.crt
+
+# ─── Ingress + cert-manager (public CA for the public URL) ──────────────────
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: harbor.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: harbor-ingress-tls
+      hosts:
+        - harbor.example.com
+
+tls:
+  certManager:
+    enabled: true
+    issuerRef:
+      name: letsencrypt-prod
+      kind: ClusterIssuer
+    duration: 2160h                 # 90 days
+    renewBefore: 360h               # 15 days
+
+# ─── Production-leaning component config ────────────────────────────────────
+core:
+  pdb:
+    enabled: true
+    minAvailable: 1
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+  # Graceful drain on rolling upgrade — typical when fronted by a cloud LB.
+  lifecycle:
+    preStop:
+      exec:
+        command: ["/bin/sh", "-c", "sleep 15"]
+
+jobservice:
+  pdb:
+    enabled: true
+    minAvailable: 1
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+  lifecycle:
+    preStop:
+      exec:
+        command: ["/bin/sh", "-c", "sleep 15"]
+
+registry:
+  pdb:
+    enabled: true
+    minAvailable: 1
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+  lifecycle:
+    preStop:
+      exec:
+        command: ["/bin/sh", "-c", "sleep 30"]
+  # If your S3 endpoint also lives behind the private CA, the
+  # harbor-extra-ca Secret above already covers it — no further config
+  # needed. Below is a placeholder; set type=s3 and the s3 block in
+  # your real values.
+  # storage:
+  #   type: s3
+  #   s3:
+  #     region: us-east-1
+  #     bucket: harbor-prod
+  #     regionendpoint: https://s3.private.example.com
+  #     existingSecret: harbor-s3
+  #     existingSecretAccessKeyKey: REGISTRY_STORAGE_S3_ACCESSKEY
+  #     existingSecretSecretKeyKey: REGISTRY_STORAGE_S3_SECRETKEY
+  #     forcepathstyle: true        # for MinIO / Ceph RGW
+
+portal:
+  pdb:
+    enabled: true
+    minAvailable: 1
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70

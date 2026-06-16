@@ -7,12 +7,18 @@ on:
       - "**.md"
       - "docs/**"
       - "CLAUDE.md"
+      # Covered by their own path-filtered workflows (chart-ci, compose-ci);
+      # Go tests don't consume deploy/.
+      - "deploy/chart/**"
+      - "deploy/compose/**"
   push:
     branches: [main, "release-[0-9]*.[0-9]*"]
     paths-ignore:
       - "**.md"
       - "docs/**"
       - "CLAUDE.md"
+      - "deploy/chart/**"
+      - "deploy/compose/**"
 
 permissions:
   contents: read

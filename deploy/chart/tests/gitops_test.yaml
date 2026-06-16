@@ -1,0 +1,238 @@
+# GitOps determinism guards: with autoGenSecrets=false every would-be
+# random generation must fail at render time naming the value to pin,
+# and fully pinned values must not emit any generated secret material.
+# Deployment-side wiring assertions live in the component test files.
+#
+# Suite scoping notes:
+# - No deployment templates here: their checksum includes would re-render
+#   the secret templates and misattribute failedTemplate errors.
+# - Every fail test pins ALL generation points except the one under test:
+#   all suite templates render per test, and a second failing template
+#   steals the error attribution ("No failed document" otherwise).
+suite: gitops autoGenSecrets tests
+templates:
+  - templates/core.secret.yaml
+  - templates/registry.secret.yaml
+  - templates/jobservice.secret.yaml
+  - templates/ingress.secret.yaml
+tests:
+  # ============================================================================
+  # Fail-fast: each unpinned generation point names its pin.
+  # ============================================================================
+  - it: should fail naming secretKey when encryption key is unpinned
+    template: templates/core.secret.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      autoGenSecrets: false
+      core.existingSecret: core-id
+      core.existingXsrfSecret: core-id
+      core.tokenSecretName: token-cert
+      registry.existingSecret: reg-id
+      registry.credentials.existingSecret: reg-creds
+      jobservice.existingSecret: js-id
+    asserts:
+      - failedTemplate:
+          errorPattern: "set secretKey or existingSecretSecretKey"
+
+  - it: should fail naming core.existingSecret when core secret is unpinned
+    template: templates/core.secret.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      autoGenSecrets: false
+      secretKey: "0123456789abcdef"
+      core.existingXsrfSecret: core-id
+      core.tokenSecretName: token-cert
+      registry.existingSecret: reg-id
+      registry.credentials.existingSecret: reg-creds
+      jobservice.existingSecret: js-id
+    asserts:
+      - failedTemplate:
+          errorPattern: "set core.existingSecret"
+
+  - it: should fail naming token-cert pins when token CA is unpinned
+    template: templates/core.secret.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      autoGenSecrets: false
+      secretKey: "0123456789abcdef"
+      core.existingSecret: core-id
+      core.existingXsrfSecret: core-id
+      registry.existingSecret: reg-id
+      registry.credentials.existingSecret: reg-creds
+      jobservice.existingSecret: js-id
+    asserts:
+      - failedTemplate:
+          errorPattern: "set core.tokenSecretName \\(or core.tokenKey \\+ core.tokenCert\\)"
+
+  - it: should fail naming CSRF pins when xsrf key is unpinned
+    template: templates/core.secret.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      autoGenSecrets: false
+      secretKey: "0123456789abcdef"
+      core.existingSecret: core-id
+      core.tokenSecretName: token-cert
+      registry.existingSecret: reg-id
+      registry.credentials.existingSecret: reg-creds
+      jobservice.existingSecret: js-id
+    asserts:
+      - failedTemplate:
+          errorPattern: "set core.xsrfKey or core.existingXsrfSecret"
+
+  - it: should fail naming registry.existingSecret when http secret is unpinned
+    template: templates/registry.secret.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      autoGenSecrets: false
+      secretKey: "0123456789abcdef"
+      core.existingSecret: core-id
+      core.existingXsrfSecret: core-id
+      core.tokenSecretName: token-cert
+      registry.credentials.existingSecret: reg-creds
+      jobservice.existingSecret: js-id
+    asserts:
+      - failedTemplate:
+          errorPattern: "set registry.existingSecret"
+
+  - it: should fail naming htpasswd pins when credentials are unpinned
+    template: templates/registry.secret.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      autoGenSecrets: false
+      secretKey: "0123456789abcdef"
+      core.existingSecret: core-id
+      core.existingXsrfSecret: core-id
+      core.tokenSecretName: token-cert
+      registry.existingSecret: reg-id
+      jobservice.existingSecret: js-id
+    asserts:
+      - failedTemplate:
+          errorPattern: "set registry.credentials.htpasswdString or registry.credentials.existingSecret"
+
+  - it: should fail naming jobservice.existingSecret when jobservice secret is unpinned
+    template: templates/jobservice.secret.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      autoGenSecrets: false
+      secretKey: "0123456789abcdef"
+      core.existingSecret: core-id
+      core.existingXsrfSecret: core-id
+      core.tokenSecretName: token-cert
+      registry.existingSecret: reg-id
+      registry.credentials.existingSecret: reg-creds
+    asserts:
+      - failedTemplate:
+          errorPattern: "set jobservice.existingSecret"
+
+  - it: should fail when ingress autoGenCert is combined with autoGenSecrets=false
+    template: templates/ingress.secret.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      autoGenSecrets: false
+      secretKey: "0123456789abcdef"
+      core.existingSecret: core-id
+      core.existingXsrfSecret: core-id
+      core.tokenSecretName: token-cert
+      registry.existingSecret: reg-id
+      registry.credentials.existingSecret: reg-creds
+      jobservice.existingSecret: js-id
+      ingress.tls:
+        - secretName: harbor-tls
+          hosts:
+            - harbor.example.com
+    asserts:
+      - failedTemplate:
+          errorPattern: "set ingress.autoGenCert=false"
+
+  # ============================================================================
+  # Fully pinned: no generated secret material may appear.
+  # ============================================================================
+  - it: should emit no generated keys in core Secret when fully pinned
+    template: templates/core.secret.yaml
+    documentIndex: 0
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      autoGenSecrets: false
+      existingSecretSecretKey: enc-key
+      core.existingSecret: core-id
+      core.existingXsrfSecret: core-id
+      core.tokenSecretName: token-cert
+      registry.existingSecret: reg-id
+      registry.credentials.existingSecret: reg-creds
+      jobservice.existingSecret: js-id
+    asserts:
+      - notExists:
+          path: data.SECRET_KEY
+      - notExists:
+          path: data.secret
+      - notExists:
+          path: data.CSRF_KEY
+      - notExists:
+          path: data["tls.key"]
+      - notExists:
+          path: data["tls.crt"]
+      - notExists:
+          path: data.REGISTRY_CREDENTIAL_PASSWORD
+
+  # Pins: credentials.existingSecret suppresses the generated htpasswd
+  # Secret entirely (the deployment mounts the BYO Secret instead).
+  - it: should not render htpasswd Secret when credentials.existingSecret is set
+    template: templates/registry.secret.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.credentials.existingSecret: reg-creds
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  # Pins: htpasswdString is passed through verbatim (b64), never re-hashed.
+  - it: should use htpasswdString verbatim in htpasswd Secret
+    template: templates/registry.secret.yaml
+    documentIndex: 1
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.credentials.htpasswdString: "user:hash"
+    asserts:
+      - equal:
+          path: data.REGISTRY_HTPASSWD
+          value: "dXNlcjpoYXNo"
+
+  # Pins: inline tokenKey/tokenCert pair is used verbatim, no genCA.
+  - it: should use inline tokenKey and tokenCert verbatim
+    template: templates/core.secret.yaml
+    documentIndex: 0
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.tokenKey: "KEYPEM"
+      core.tokenCert: "CERTPEM"
+    asserts:
+      - equal:
+          path: data["tls.key"]
+          value: "S0VZUEVN"
+      - equal:
+          path: data["tls.crt"]
+          value: "Q0VSVFBFTQ=="

@@ -1,0 +1,173 @@
+name: Chart CI
+
+on:
+  pull_request:
+    paths:
+      - "deploy/chart/**"
+      - "taskfile/helm.yml"
+      - "versions.env"
+      - ".github/workflows/chart-ci.yml"
+
+permissions:
+  contents: read
+
+env:
+  # arduino/setup-task v2.0.0 (latest) still declares node20, which is
+  # deprecated and becomes node24-by-default on 2026-06-16. Opt in early
+  # so the forced switch can't surprise us.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  chart-quality:
+    name: Chart Quality Gate
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Load versions
+        # Helm homes: self-hosted runner images may ship a root-owned
+        # ~/.cache; keep all helm state in the always-writable temp.
+        run: |
+          grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
+          {
+            echo "HELM_CACHE_HOME=${RUNNER_TEMP}/helm/cache"
+            echo "HELM_CONFIG_HOME=${RUNNER_TEMP}/helm/config"
+            echo "HELM_DATA_HOME=${RUNNER_TEMP}/helm/data"
+          } >> "$GITHUB_ENV"
+
+      - name: Install Task
+        uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Helm
+        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Install helm-unittest plugin
+        # --verify=false: Helm 4 verifies plugin provenance by default;
+        # git-sourced plugins don't ship one.
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version "${HELM_UNITTEST_VERSION}" --verify=false
+
+      - name: Install helm-docs
+        # No sudo: self-hosted runners may not have it.
+        run: |
+          arch="$(uname -m)"
+          case "${arch}" in
+            x86_64) asset_arch="x86_64" ;;
+            aarch64|arm64) asset_arch="arm64" ;;
+            *) echo "unsupported arch: ${arch}" >&2; exit 1 ;;
+          esac
+          mkdir -p "${RUNNER_TEMP}/bin"
+          curl -fsSL "https://github.com/norwoodj/helm-docs/releases/download/v${HELM_DOCS_VERSION}/helm-docs_${HELM_DOCS_VERSION}_Linux_${asset_arch}.tar.gz" \
+            | tar -xz -C "${RUNNER_TEMP}/bin" helm-docs
+          echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
+
+      - name: Install ys (YAMLScript — schema drift, values lint, rendered-config, migration tools)
+        run: |
+          arch="$(uname -m)"
+          case "${arch}" in
+            x86_64) asset_arch="x64" ;;
+            aarch64|arm64) asset_arch="aarch64" ;;
+            *) echo "unsupported arch: ${arch}" >&2; exit 1 ;;
+          esac
+          mkdir -p "${RUNNER_TEMP}/ys"
+          curl -fsSL "https://github.com/yaml/yamlscript/releases/download/${YS_VERSION}/ys-${YS_VERSION}-linux-${asset_arch}.tar.xz" \
+            -o "${RUNNER_TEMP}/ys.tar.xz"
+          # Self-hosted runners may lack the xz binary; python stdlib lzma
+          # decompresses without it.
+          python3 -c "import lzma, shutil; shutil.copyfileobj(lzma.open('${RUNNER_TEMP}/ys.tar.xz'), open('${RUNNER_TEMP}/ys.tar', 'wb'))"
+          tar -xf "${RUNNER_TEMP}/ys.tar" -C "${RUNNER_TEMP}/ys" --strip-components=1
+          echo "${RUNNER_TEMP}/ys" >> "$GITHUB_PATH"
+
+      - name: Install Node
+        # For ajv-cli (schema strict compile) via npx — the taskfile
+        # falls back to docker only when npx is absent.
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: ${{ env.NODE_IMAGE_VERSION }}
+
+      - name: Install chart tools (ct, ah, trivy)
+        # Binaries instead of `docker run -v`: the self-hosted runners
+        # talk to a remote DinD daemon, so bind mounts resolve on the
+        # DinD host and silently see nothing from the runner workspace.
+        # (kube-linter stays docker-based — it reads stdin, which works
+        # over remote DinD.)
+        run: |
+          arch="$(uname -m)"
+          case "${arch}" in
+            x86_64) goarch="amd64"; trivy_arch="64bit" ;;
+            aarch64|arm64) goarch="arm64"; trivy_arch="ARM64" ;;
+            *) echo "unsupported arch: ${arch}" >&2; exit 1 ;;
+          esac
+          bin="${RUNNER_TEMP}/bin"
+          mkdir -p "${bin}"
+
+          # chart-testing (+ its lint config and python deps)
+          mkdir -p "${RUNNER_TEMP}/ct"
+          curl -fsSL "https://github.com/helm/chart-testing/releases/download/v${CT_VERSION}/chart-testing_${CT_VERSION}_linux_${goarch}.tar.gz" \
+            | tar -xz -C "${RUNNER_TEMP}/ct"
+          mv "${RUNNER_TEMP}/ct/ct" "${bin}/ct"
+          {
+            echo "CT_LINT_CONF=${RUNNER_TEMP}/ct/etc/lintconf.yaml"
+            echo "CT_CHART_YAML_SCHEMA=${RUNNER_TEMP}/ct/etc/chart_schema.yaml"
+          } >> "$GITHUB_ENV"
+          # Bootstrap pip if the runner python ships without it.
+          # PIP_BREAK_SYSTEM_PACKAGES: Debian's PEP 668 guard refuses
+          # --user installs; the env var is honored by new pip and
+          # harmlessly ignored by old pip. Installs stay in ~/.local on
+          # an ephemeral runner.
+          export PIP_BREAK_SYSTEM_PACKAGES=1
+          python3 -m pip --version >/dev/null 2>&1 \
+            || python3 -m ensurepip --user >/dev/null 2>&1 \
+            || { curl -fsSL https://bootstrap.pypa.io/get-pip.py | python3 - --user --quiet; }
+          python3 -m pip install --user --quiet yamale yamllint
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+          # Artifact Hub CLI
+          curl -fsSL "https://github.com/artifacthub/hub/releases/download/v${AH_VERSION}/ah_${AH_VERSION}_linux_${goarch}.tar.gz" \
+            | tar -xz -C "${bin}" ah
+
+          # trivy
+          curl -fsSL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-${trivy_arch}.tar.gz" \
+            | tar -xz -C "${bin}" trivy
+
+          echo "${bin}" >> "$GITHUB_PATH"
+
+      # helm lint + ct lint + kube-linter + ah lint (Artifact Hub metadata)
+      - name: Lint
+        run: task helm:lint
+
+      - name: Render templates
+        run: task helm:helm-template
+
+      - name: Unit tests
+        run: task helm:unittest
+
+      # Byte-identical double render of the pinned GitOps values —
+      # guards against generated secret material leaking past the
+      # autoGenSecrets pinning surface (Argo CD churn).
+      - name: GitOps determinism
+        run: task helm:gitops-determinism
+
+      - name: Render examples
+        run: task helm:examples
+
+      - name: README in sync (helm-docs)
+        run: task helm:helm-docs
+
+      - name: Migration golden tests
+        run: task helm:migrate:test
+
+      - name: Values doctor (golden tests + example/CI values)
+        run: |
+          task helm:values-lint:test
+          task helm:values-lint
+
+      - name: Rendered config.yml semantics
+        run: task helm:rendered-config
+
+      - name: Trivy config scan
+        run: task helm:trivy-chart

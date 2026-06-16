@@ -1,0 +1,62 @@
+{{- if .Values.gateway.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "harbor.fullname" . }}
+  labels:
+    {{- include "harbor.labels" . | nindent 4 }}
+spec:
+  {{- with .Values.gateway.parentRefs }}
+  parentRefs:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.gateway.hostnames }}
+  hostnames:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    # API routes -> Core
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/
+      backendRefs:
+        - name: {{ include "harbor.fullname" . }}-core
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /service/
+      backendRefs:
+        - name: {{ include "harbor.fullname" . }}-core
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v2/
+      backendRefs:
+        - name: {{ include "harbor.fullname" . }}-core
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /chartrepo/
+      backendRefs:
+        - name: {{ include "harbor.fullname" . }}-core
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /c/
+      backendRefs:
+        - name: {{ include "harbor.fullname" . }}-core
+          port: 80
+    # Portal (default)
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: {{ include "harbor.fullname" . }}-portal
+          port: 80
+{{- end }}

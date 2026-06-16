@@ -1,0 +1,102 @@
+{{/*
+Expose Service — creates a front-door service pointing to core pods.
+Harbor core proxies portal requests, so a single service suffices.
+Supports ClusterIP, NodePort, and LoadBalancer types.
+*/}}
+{{- if or .Values.expose.clusterIP.enabled .Values.expose.nodePort.enabled .Values.expose.loadBalancer.enabled }}
+{{- $fullname := include "harbor.fullname" . }}
+apiVersion: v1
+kind: Service
+metadata:
+  {{- if .Values.expose.clusterIP.enabled }}
+  name: {{ .Values.expose.clusterIP.name | default $fullname }}
+  {{- else if .Values.expose.nodePort.enabled }}
+  name: {{ .Values.expose.nodePort.name | default $fullname }}
+  {{- else if .Values.expose.loadBalancer.enabled }}
+  name: {{ .Values.expose.loadBalancer.name | default $fullname }}
+  {{- end }}
+  labels:
+    {{- include "harbor.labels" . | nindent 4 }}
+    {{- if .Values.expose.clusterIP.enabled }}
+    {{- with .Values.expose.clusterIP.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- else if .Values.expose.nodePort.enabled }}
+    {{- with .Values.expose.nodePort.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- else if .Values.expose.loadBalancer.enabled }}
+    {{- with .Values.expose.loadBalancer.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- end }}
+  {{- if or (and .Values.expose.clusterIP.enabled .Values.expose.clusterIP.annotations) (and .Values.expose.nodePort.enabled .Values.expose.nodePort.annotations) (and .Values.expose.loadBalancer.enabled .Values.expose.loadBalancer.annotations) }}
+  annotations:
+    {{- if .Values.expose.clusterIP.enabled }}
+    {{- toYaml .Values.expose.clusterIP.annotations | nindent 4 }}
+    {{- else if .Values.expose.nodePort.enabled }}
+    {{- toYaml .Values.expose.nodePort.annotations | nindent 4 }}
+    {{- else if .Values.expose.loadBalancer.enabled }}
+    {{- toYaml .Values.expose.loadBalancer.annotations | nindent 4 }}
+    {{- end }}
+  {{- end }}
+spec:
+  {{- if .Values.expose.clusterIP.enabled }}
+  type: ClusterIP
+  {{- with .Values.expose.clusterIP.staticClusterIP }}
+  clusterIP: {{ . }}
+  {{- end }}
+  ports:
+    - name: http
+      port: {{ .Values.expose.clusterIP.ports.http }}
+      targetPort: {{ include "harbor.core.port" . }}
+      protocol: TCP
+    {{- if .Values.tls.enabled }}
+    - name: https
+      port: {{ .Values.expose.clusterIP.ports.https }}
+      targetPort: {{ include "harbor.core.port" . }}
+      protocol: TCP
+    {{- end }}
+  {{- else if .Values.expose.nodePort.enabled }}
+  type: NodePort
+  ports:
+    - name: http
+      port: {{ .Values.expose.nodePort.ports.http.port }}
+      targetPort: {{ include "harbor.core.port" . }}
+      {{- with .Values.expose.nodePort.ports.http.nodePort }}
+      nodePort: {{ . }}
+      {{- end }}
+      protocol: TCP
+    {{- if .Values.tls.enabled }}
+    - name: https
+      port: {{ .Values.expose.nodePort.ports.https.port }}
+      targetPort: {{ include "harbor.core.port" . }}
+      {{- with .Values.expose.nodePort.ports.https.nodePort }}
+      nodePort: {{ . }}
+      {{- end }}
+      protocol: TCP
+    {{- end }}
+  {{- else if .Values.expose.loadBalancer.enabled }}
+  type: LoadBalancer
+  {{- with .Values.expose.loadBalancer.IP }}
+  loadBalancerIP: {{ . }}
+  {{- end }}
+  {{- with .Values.expose.loadBalancer.sourceRanges }}
+  loadBalancerSourceRanges:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  ports:
+    - name: http
+      port: {{ .Values.expose.loadBalancer.ports.http }}
+      targetPort: {{ include "harbor.core.port" . }}
+      protocol: TCP
+    {{- if .Values.tls.enabled }}
+    - name: https
+      port: {{ .Values.expose.loadBalancer.ports.https }}
+      targetPort: {{ include "harbor.core.port" . }}
+      protocol: TCP
+    {{- end }}
+  {{- end }}
+  selector:
+    {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "core") | nindent 4 }}
+{{- end }}

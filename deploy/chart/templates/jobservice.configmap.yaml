@@ -1,0 +1,14 @@
+{{- if not .Values.jobservice.existingConfigMap }}
+{{- $chartConfig := include "harbor.jobservice.chartManagedConfig" . | fromYaml }}
+{{- $userConfig := deepCopy (.Values.jobservice.config | default dict) }}
+{{- $merged := mustMergeOverwrite $chartConfig $userConfig }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ template "harbor.jobservice" . }}"
+  labels:
+    {{- include "harbor.labels" . | nindent 4 }}
+data:
+  config.yml: |+
+{{ toYaml $merged | indent 4 }}
+{{- end }}

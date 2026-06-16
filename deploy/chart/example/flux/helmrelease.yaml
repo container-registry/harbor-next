@@ -1,0 +1,72 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: harbor
+  namespace: harbor
+spec:
+  interval: 30m
+  timeout: 10m
+  chart:
+    spec:
+      chart: deploy/chart
+      sourceRef:
+        kind: GitRepository
+        name: harbor-next
+      # Git-sourced charts don't bump Chart.yaml version per commit;
+      # rebuild the chart artifact on every new revision instead.
+      reconcileStrategy: Revision
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  # Re-assert the release when cluster objects drift from the stored
+  # manifest. Safe here because rendering is fully deterministic.
+  driftDetection:
+    mode: enabled
+  values:
+    externalURL: https://harbor.example.com
+
+    # Refuse to render if any secret would be auto-generated. Every
+    # identity below is pinned to a Secret from identity-secrets.yaml,
+    # so renders are byte-identical and syncs never rotate secrets or
+    # roll workloads.
+    autoGenSecrets: false
+
+    existingSecretAdminPassword: harbor-admin
+    existingSecretSecretKey: harbor-encryption
+
+    database:
+      host: postgres.database.svc
+      username: harbor
+      existingSecret: harbor-database
+
+    core:
+      existingSecret: harbor-core-identity
+      existingXsrfSecret: harbor-core-identity
+      tokenSecretName: harbor-token-cert
+
+    registry:
+      existingSecret: harbor-registry-identity
+      credentials:
+        existingSecret: harbor-registry-credentials
+      persistence:
+        enabled: true
+        size: 50Gi
+
+    jobservice:
+      existingSecret: harbor-jobservice-identity
+
+    ingress:
+      enabled: true
+      autoGenCert: false
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt
+      hosts:
+        - host: harbor.example.com
+      tls:
+        - secretName: harbor-tls
+          hosts:
+            - harbor.example.com

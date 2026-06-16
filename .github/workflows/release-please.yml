@@ -49,6 +49,33 @@ jobs:
           config-file: ${{ github.ref_name == 'main' && 'release-please-config.json' || 'release-please-config-maintenance.json' }}
           manifest-file: .release-please-manifest.json
 
+  release-please-chart:
+    name: Release Please (chart)
+    # Independent release line for the Helm chart, scoped to deploy/chart
+    # via its own config + manifest. Kept as a SEPARATE release-please
+    # instance (not a second package in the app manifest) on purpose:
+    # adding a package to a manifest switches every output to the
+    # "<path>--<name>" form, which would break the app jobs that read the
+    # unprefixed release-please outputs. Chart releases run on main only.
+    needs: [validate-release-ref]
+    if: ${{ github.ref_name == 'main' }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs['deploy/chart--release_created'] }}
+      tag_name: ${{ steps.release.outputs['deploy/chart--tag_name'] }}
+      version: ${{ steps.release.outputs['deploy/chart--version'] }}
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          target-branch: ${{ github.ref_name }}
+          config-file: release-please-config-chart.json
+          manifest-file: .release-please-manifest-chart.json
+
   create-maintenance-branch:
     name: Create Maintenance Branch
     needs: [release-please]
@@ -273,6 +300,114 @@ jobs:
             -t "${IMAGE}:${TAG_NAME}" \
             $(printf "${IMAGE}@sha256:%s " *)
 
+  chart:
+    name: Publish Helm Chart
+    # Driven by the chart's own release-please line (release-please-chart),
+    # not the app release. The chart references Harbor images by its
+    # appVersion (Chart.yaml), which a prior app release must already have
+    # published — so this job does NOT depend on the image build/merge.
+    needs: [release-please-chart]
+    if: ${{ needs.release-please-chart.outputs.release_created == 'true' }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
+      REGISTRY_PROJECT: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
+      VERSION: ${{ needs.release-please-chart.outputs.version }}
+      TAG_NAME: ${{ needs.release-please-chart.outputs.tag_name }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ needs.release-please-chart.outputs.tag_name }}
+
+      - name: Load versions
+        run: grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
+
+      - name: Install Helm
+        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Log in to registry
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        with:
+          registry: ${{ env.REGISTRY_ADDRESS }}
+          username: ${{ vars.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Add per-release Artifact Hub images annotation
+        # The artifacthub.io/images annotation is appended here instead of
+        # living in Chart.yaml (whose annotations block is deliberately the
+        # last top-level key). Image tags follow the chart's appVersion —
+        # the Harbor app version this chart targets — NOT the chart's own
+        # version/tag, since the chart releases on an independent line.
+        run: |
+          app_version="$(grep '^appVersion:' deploy/chart/Chart.yaml | awk '{print $2}' | tr -d '"')"
+          {
+            echo "  artifacthub.io/images: |"
+            for component in core jobservice registryctl exporter portal registry trivy-adapter; do
+              image_name="harbor-${component}"
+              if [ "${component}" = "trivy-adapter" ]; then
+                image_name="trivy-adapter"
+              fi
+              echo "    - name: ${image_name}"
+              echo "      image: ${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/${image_name}:${app_version}"
+            done
+          } >> deploy/chart/Chart.yaml
+
+      - name: Validate Artifact Hub metadata
+        run: |
+          docker run --rm -v "$(pwd)/deploy/chart:/chart" \
+            "artifacthub/ah:v${AH_VERSION}" ah lint --kind helm --path /chart
+
+      - name: Package chart
+        # VERSION is the chart's own release-please version (release-please
+        # also wrote it into Chart.yaml via the helm release-type). appVersion
+        # is NOT overridden here: it stays as committed in Chart.yaml so
+        # default image tags resolve to an already-published Harbor app
+        # version, decoupled from the chart's release cadence.
+        run: |
+          helm package deploy/chart \
+            --version "${VERSION}" \
+            --destination dist
+
+      - name: Push chart
+        id: push
+        run: |
+          helm push "dist/harbor-next-${VERSION}.tgz" \
+            "oci://${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts" 2>&1 | tee push.log
+          digest=$(grep -o 'sha256:[a-f0-9]\{64\}' push.log | head -1)
+          if [ -z "$digest" ]; then
+            echo "Failed to capture chart digest from helm push output" >&2
+            exit 1
+          fi
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+
+      - name: Sign chart
+        run: |
+          cosign sign --yes \
+            "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts/harbor-next@${{ steps.push.outputs.digest }}"
+
+      - name: Install oras
+        uses: oras-project/setup-oras@38de303aac69abb66f3e6255b7198bff35f323e3 # v2.0.0
+        with:
+          version: ${{ env.ORAS_VERSION }}
+
+      - name: Push Artifact Hub repository metadata
+        # artifacthub-repo.yml rides next to the chart as an OCI artifact
+        # (artifacthub.io tag) — Artifact Hub reads it for ownership /
+        # verified publisher. See deploy/chart/artifacthub-repo.yml.
+        working-directory: deploy/chart
+        run: |
+          oras push "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts/harbor-next:artifacthub.io" \
+            --config /dev/null:application/vnd.cncf.artifacthub.config.v1+yaml \
+            artifacthub-repo.yml:application/vnd.cncf.artifacthub.repository-metadata.layer.v1.yaml
+
   sign:
     name: Sign and Release
     needs: [release-please, merge]
@@ -411,6 +546,13 @@ jobs:
             if [ -n "${HIGHLIGHTS}" ]; then
               printf '%s\n\n' "${HIGHLIGHTS}"
             fi
+            echo "## Helm Chart"
+            echo ""
+            echo "\`\`\`sh"
+            echo "helm install harbor oci://${REGISTRY}/charts/harbor-next \\"
+            echo "  --version ${VERSION} -n harbor --create-namespace -f my-values.yaml"
+            echo "\`\`\`"
+            echo ""
             echo "## Container Images"
             echo ""
             echo "Multi-arch images (\`linux/amd64\`, \`linux/arm64\`) signed with [cosign](https://github.com/sigstore/cosign)."

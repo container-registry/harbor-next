@@ -1,0 +1,31 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "e11385c8c49528159a8b009590d48fe55455f8eb",
+  "pull-request-header": "This PR prepares the next Helm chart release based on conventional commits scoped to deploy/chart.",
+  "pull-request-title-pattern": "chore: release harbor-next chart ${version}",
+  "label": "chart-release: pending",
+  "release-label": "chart-release: tagged",
+  "include-v-in-tag": true,
+  "tag-separator": "-",
+  "changelog-sections": [
+    {"type": "feat",     "section": "Features"},
+    {"type": "fix",      "section": "Bug Fixes"},
+    {"type": "perf",     "section": "Performance Improvements"},
+    {"type": "refactor", "section": "Code Refactoring"},
+    {"type": "docs",     "section": "Documentation"},
+    {"type": "test",     "section": "Tests", "hidden": true},
+    {"type": "chore",    "section": "Miscellaneous", "hidden": true},
+    {"type": "ci",       "section": "CI/CD",        "hidden": true},
+    {"type": "build",    "section": "Build System", "hidden": true}
+  ],
+  "packages": {
+    "deploy/chart": {
+      "release-type": "helm",
+      "package-name": "harbor-next",
+      "component": "chart",
+      "include-component-in-tag": true,
+      "changelog-path": "CHANGELOG.md",
+      "release-as": "2.0.0"
+    }
+  }
+}

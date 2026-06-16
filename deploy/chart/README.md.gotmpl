@@ -1,0 +1,755 @@
+{{ template "chart.header" . }}
+{{ template "chart.deprecationWarning" . }}
+
+{{ template "chart.badgesSection" . }}
+
+{{ template "chart.description" . }}
+
+## TL;DR
+
+```bash
+# Provide DB credentials via a Secret instead of --set (process list + shell history leak)
+kubectl create secret generic my-harbor-db \
+  --from-literal=POSTGRESQL_PASSWORD='your-strong-password'
+
+helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-next \
+  --set externalURL=https://harbor.example.com \
+  --set database.host=my-postgres.example.com \
+  --set database.existingSecret=my-harbor-db
+```
+
+> **⚠️ Security:** Harbor's default admin credentials (`admin` / `Harbor12345`) are
+> publicly known. Set a strong password via `harborAdminPassword` (or, better, a
+> Kubernetes Secret referenced by `existingSecretAdminPassword`) and rotate it after
+> the first login.
+
+## Why This Chart?
+
+This chart is a ground-up redesign of the Harbor Helm chart with modern Kubernetes best practices, built for [Harbor Next](https://github.com/container-registry/harbor-next):
+
+| Feature | Legacy harbor-helm | This Chart |
+|---------|-------------------|------------|
+| **Configuration** | 70+ helper templates, hardcoded env vars | `toEnvVars` pattern — any config works |
+| **Database** | Built-in PostgreSQL StatefulSet | External only (production best practice) |
+| **Redis** | Built-in Redis Deployment | Valkey subchart or external |
+| **Ingress** | nginx reverse proxy + Ingress | Direct Ingress/Gateway API |
+| **Security** | Basic security context | PSS Restricted profile compliant |
+| **Validation** | None | JSON Schema validation |
+| **Resource Defaults** | None (comments only) | Sensible defaults for all components |
+| **PodDisruptionBudget** | Not available | Per-component PDB support |
+| **Templates** | 48 files, 607-line helpers | 43 files, ~800-line helpers |
+| **values.yaml** | 1,116 lines | ~1,150 lines (317 helm-docs annotations) |
+
+## Key Features
+
+### Future-Proof Configuration with `toEnvVars`
+
+The chart uses a unique `toEnvVars` pattern that converts nested YAML configuration to flat environment variables. This means **any Harbor configuration option works without chart updates**:
+
+```yaml
+core:
+  config:
+    # These become CONFIG_KEY and NESTED_VALUE env vars
+    config_key: "value"
+    nested:
+      value: "something"
+  secret:
+    # These become secrets (base64 encoded)
+    sensitive_data: "secret-value"
+```
+
+### Production-Ready Security
+
+All containers run with Pod Security Standards (PSS) **Restricted** profile:
+
+- `runAsNonRoot: true` — No root containers
+- `readOnlyRootFilesystem: true` — Immutable container filesystem
+- `allowPrivilegeEscalation: false` — No privilege escalation
+- `capabilities.drop: ["ALL"]` — No Linux capabilities
+- `seccompProfile.type: RuntimeDefault` — Seccomp filtering enabled
+
+### High Availability Ready
+
+- **PodDisruptionBudgets** — Ensure availability during node maintenance
+- **Resource requests/limits** — Guaranteed QoS with sensible defaults
+- **Affinity/Anti-affinity** — Control pod placement
+- **Multiple replicas** — Scale any component horizontally
+
+### Flexible Ingress Options
+
+1. **Standard Kubernetes Ingress** (default)
+2. **Gateway API HTTPRoute** (modern alternative)
+3. **extraManifests** for custom routing (Traefik IngressRoute, etc.)
+
+### Schema Validation
+
+Built-in `values.schema.json` provides:
+- IDE autocompletion and validation
+- Required field enforcement (`externalURL`, `database.host`)
+- Type checking and enum validation
+- Immediate feedback on configuration errors
+- Typo detection: unknown **top-level** keys are rejected
+  (`additionalProperties: false` at the root). Component config blocks
+  stay open by design — the generic passthrough means new application
+  config keys never require a chart change.
+
+## Architecture
+
+<!--
+```SVGBob
+┌───────────────────────────────────────────────────────────────────┐
+│                    "Ingress / Gateway API"                        │
+└───────────────────────────────────────────────────────────────────┘
+                                │
+          ┌─────────────────────┼─────────────────────┐
+          ▼                     ▼                     ▼
+   ┌─────────────┐       ┌─────────────┐       ┌─────────────┐
+   │   Portal    │       │    Core     │◄─────►│  Registry   │
+   │   "(UI)"    │       │   "(API)"   │       │  "(Images)" │
+   └─────────────┘       └──────┬──────┘       └──────┬──────┘
+                                │                     │
+                       ┌────────┴────────┐            │
+                       ▼                 ▼            │
+                ┌─────────────┐   ┌─────────────┐     │
+                │ Jobservice  │   │  Exporter   │     │
+                │  "(Tasks)"  │   │ "(Metrics)" │     │
+                └──────┬──────┘   └─────────────┘     │
+                       │                              │
+          ┌────────────┴────────────┬─────────────────┘
+          ▼                         ▼
+   ┌─────────────┐          ┌──────────────┐
+   │   Valkey    │          │   Storage    │
+   │  "(Redis)"  │          │"(PVC/S3/.)"  │
+   └─────────────┘          └──────────────┘
+          │
+          ▼
+   ┌────────────────┐
+   │   PostgreSQL   │  "(External — required)"
+   └────────────────┘
+```
+-->
+
+## Prerequisites
+
+- Kubernetes 1.28+ (we follow [endoflife.date/kubernetes](https://endoflife.date/kubernetes) for supported versions)
+- Helm 3.x
+- **External PostgreSQL database** (required)
+- PV provisioner (for filesystem storage)
+
+## Installing the Chart
+
+### Basic Installation
+
+```bash
+# Pre-create the DB credential and admin Secrets so passwords never appear on the CLI
+kubectl create namespace harbor
+kubectl -n harbor create secret generic my-harbor-db \
+  --from-literal=POSTGRESQL_PASSWORD='your-strong-db-password'
+kubectl -n harbor create secret generic my-harbor-admin \
+  --from-literal=HARBOR_ADMIN_PASSWORD='your-strong-admin-password'
+
+helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-next \
+  --namespace harbor \
+  --set externalURL=https://harbor.example.com \
+  --set database.host=postgres.example.com \
+  --set database.existingSecret=my-harbor-db \
+  --set existingSecretAdminPassword=my-harbor-admin
+```
+
+### With Values File
+
+```bash
+helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-next \
+  --namespace harbor \
+  --create-namespace \
+  -f values-production.yaml
+```
+
+## Configuration
+
+### Required Values
+
+| Key | Description |
+|-----|-------------|
+| `externalURL` | Public URL for Harbor (e.g., `https://harbor.example.com`) |
+| `database.host` | PostgreSQL host |
+| `database.password` | PostgreSQL password (or use `database.existingSecret`) |
+
+### Component Configuration
+
+Each Harbor component (core, portal, registry, jobservice, exporter) supports:
+
+| Key | Description |
+|-----|-------------|
+| `<component>.replicas` | Number of replicas (ignored when `autoscaling.enabled=true`) |
+| `<component>.autoscaling` | `enabled`/`minReplicas`/`maxReplicas`/CPU+memory targets — see [HPA section](#hpa--autoscaling) |
+| `<component>.resources` | CPU/memory requests and limits |
+| `<component>.config` | Application config (becomes ConfigMap env vars) |
+| `<component>.secret` | Sensitive config (becomes Secret env vars) |
+| `<component>.extraEnv` | Additional env vars with `valueFrom` support |
+| `<component>.lifecycle` | Container `preStop`/`postStart` hook spec — see [Lifecycle hooks](#lifecycle-hooks-prestop-drain) |
+| `<component>.probes` | Full K8s probe specs (`startup`/`liveness`/`readiness`), rendered verbatim. Defaults: 2s-period startupProbe (ready as soon as the endpoint responds, no fixed initialDelay), 5s readiness, 10s liveness. Set a probe to `null` to omit it |
+| `<component>.hostAliases` | `/etc/hosts` entries (list of `{ip, hostnames}`) for private DNS targets |
+| `<component>.pdb.enabled` | Enable PodDisruptionBudget |
+| `<component>.pdb.minAvailable` | Minimum available pods during disruption |
+| `<component>.affinity` | Pod affinity rules |
+| `<component>.nodeSelector` | Node selection constraints |
+| `<component>.tolerations` | Pod tolerations |
+| `<component>.securityContext` | Container security context |
+| `<component>.podSecurityContext` | Pod security context |
+| `<component>.serviceAccount.create` | Create dedicated ServiceAccount |
+
+### Default Resource Allocations
+
+| Component | CPU Request | Memory Request | Memory Limit |
+|-----------|-------------|----------------|--------------|
+| Core | 100m | 256Mi | 512Mi |
+| Registry | 100m | 256Mi | 512Mi |
+| Portal | 100m | 128Mi | 256Mi |
+| Jobservice | 100m | 256Mi | 512Mi |
+| Exporter | 100m | 128Mi | 256Mi |
+
+## Example Values Files
+
+The [`example/`](example/) directory contains one directory per scenario, each with a ready-to-use `values.yaml` (every one is render-checked in CI):
+
+| Directory | Description |
+|-----------|-------------|
+| [`k3d-local/`](example/k3d-local/) | Local development with k3d cluster |
+| [`rke2-rancher/`](example/rke2-rancher/) | RKE2/Rancher deployment |
+| [`private-ca/`](example/private-ca/) | Private-CA / mTLS: PG with `verify-full` + Redis over TLS + shared CA for S3/OIDC |
+| [`openshift/`](example/openshift/) | OpenShift deployment with edge-terminated routes |
+| [`aws-eks-irsa/`](example/aws-eks-irsa/) | AWS EKS with IRSA for S3 storage and RDS IAM Auth |
+| [`flux/`](example/flux/) | FluxCD GitOps: HelmRelease + drift detection + pinned secrets (`autoGenSecrets: false`), works for Argo CD too |
+
+```bash
+helm install harbor . -n harbor --create-namespace -f example/k3d-local/values.yaml
+```
+
+## Configuration Examples
+
+### Production Setup with High Availability
+
+```yaml
+externalURL: https://harbor.example.com
+
+# External database (required)
+database:
+  host: postgres.example.com
+  password: your-db-password
+  sslmode: require
+
+# HA: PDB + autoscaling. `replicas:` is ignored once autoscaling kicks
+# in — the HPA owns the count and the Deployment template OMITS the
+# field so helm upgrade does not fight the HPA on every roll-out.
+core:
+  pdb:
+    enabled: true
+    minAvailable: 1
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
+
+portal:
+  pdb:
+    enabled: true
+    minAvailable: 1
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+registry:
+  pdb:
+    enabled: true
+    minAvailable: 1
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+
+# Ingress with TLS
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: harbor.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: harbor-tls
+      hosts:
+        - harbor.example.com
+
+# Use Valkey for Redis
+valkey:
+  enabled: true
+  architecture: standalone
+```
+
+### Registry configuration (YAML passthrough)
+
+`registry.config` accepts the full [distribution/distribution `config.yml` schema](https://distribution.github.io/distribution/about/configuration/) verbatim — every key distribution supports works without chart changes. The chart wholesale renders this block into `/etc/registry/config.yml`, merging only a small set of chart-managed runtime values (`redis`, `log.level`, `http.addr/debug`) on top via Helm `mustMergeOverwrite`. User keys always win on collision.
+
+Three customization tiers:
+
+1. **Default** — ship-shape filesystem backend out of the box, no override needed.
+2. **Inline** — edit `registry.config` in your values file.
+3. **External ConfigMap** — own `config.yml` outside the chart entirely.
+
+**Switching storage backend** — set exactly one driver key under `storage:`. The chart default deliberately ships **no** driver, so your `s3:` can't collide with a chart-side `filesystem:` (Helm deep-merge). When no driver is set, the chart injects `filesystem: {rootdirectory: /storage}` at render time; defining two or more drivers fails at `helm install/template` time with a message naming them — instead of distribution CrashLooping at boot:
+
+```yaml
+registry:
+  config:
+    storage:
+      s3:
+        region: us-east-1
+        bucket: my-harbor-bucket
+        # forcepathstyle: true  # MinIO / Ceph RGW / SeaweedFS
+```
+
+**Credentials never go in `registry.config`** (they'd be visible in the rendered ConfigMap). Use one of:
+
+- **BYO Secret (recommended)** — `registry.storageCredentials.<backend>.existingSecret` references a pre-existing Secret. The chart injects `REGISTRY_STORAGE_<BACKEND>_<KEY>` env vars on both the registry container and the registryctl sidecar (registryctl runs garbage collection and needs the same creds). Distribution honors these env overrides for any config.yml field.
+- **Inline (dev)** — `registry.secret: { REGISTRY_STORAGE_S3_ACCESSKEY: <plain> }` gets b64-encoded into the chart-generated Secret and injected via `envFrom`.
+
+### S3 Storage Backend
+
+```yaml
+registry:
+  config:
+    storage:
+      s3:
+        region: us-east-1
+        bucket: my-harbor-bucket
+        regionendpoint: https://s3.us-east-1.amazonaws.com
+        encrypt: true
+        secure: true
+        # forcepathstyle: true   # MinIO / Ceph RGW / SeaweedFS — virtual-host
+        #                        # style is the libS3 default and most non-AWS
+        #                        # S3-compatible backends only accept path-style.
+      cache:
+        layerinfo: redis
+  storageCredentials:
+    s3:
+      existingSecret: my-s3-creds                      # BYO Kubernetes Secret
+      existingSecretAccessKeyKey: REGISTRY_STORAGE_S3_ACCESSKEY
+      existingSecretSecretKeyKey: REGISTRY_STORAGE_S3_SECRETKEY
+  persistence:
+    enabled: false  # No PVC needed for S3
+```
+
+For AWS EKS with IRSA (no static credentials), omit `storageCredentials` entirely — the AWS SDK credential chain picks up the projected service account token. Annotate the SAs with the role ARN: `core.serviceAccount.annotations`, `jobservice.serviceAccount.annotations`, `registry.serviceAccount.annotations`.
+
+### Azure Blob Storage
+
+```yaml
+registry:
+  config:
+    storage:
+      azure:
+        accountname: mystorageaccount
+        container: harbor
+      cache:
+        layerinfo: redis
+  storageCredentials:
+    azure:
+      existingSecret: my-azure-creds                    # Secret with the accountkey
+      existingSecretKey: REGISTRY_STORAGE_AZURE_ACCOUNTKEY
+  persistence:
+    enabled: false
+```
+
+### Google Cloud Storage
+
+```yaml
+registry:
+  config:
+    storage:
+      gcs:
+        bucket: my-harbor-bucket
+        keyfile: /etc/registry/gcs/key.json    # mounted from existingSecret
+      cache:
+        layerinfo: redis
+  storageCredentials:
+    gcs:
+      existingSecret: my-gcs-keyfile           # Secret with the JSON keyfile
+      existingSecretKey: gcs-key.json
+  persistence:
+    enabled: false
+```
+
+For GCS with Workload Identity (no keyfile), omit `storageCredentials.gcs` and `config.storage.gcs.keyfile`. Annotate the SAs with the GSA mapping.
+
+### Externally-managed `config.yml` (existingConfigMap)
+
+For kustomize overlays, GitOps pipelines, or external config generators:
+
+```yaml
+registry:
+  existingConfigMap: my-registry-config       # ConfigMap with config.yml + ctl-config.yml
+  storageCredentials:
+    s3:
+      existingSecret: my-s3-creds             # still wired even with external ConfigMap
+  persistence:
+    enabled: false
+```
+
+The chart skips generating its own registry ConfigMap and mounts `my-registry-config` instead. Chart-managed credentials and runtime env-var overrides still apply — the Deployment doesn't know or care what's inside the external ConfigMap.
+
+Same pattern available for `jobservice.existingConfigMap` and `portal.existingConfigMap`.
+
+### Gateway API Instead of Ingress
+
+```yaml
+ingress:
+  enabled: false
+
+gateway:
+  enabled: true
+  parentRefs:
+    - name: my-gateway
+      namespace: default
+  hostnames:
+    - harbor.example.com
+```
+
+### External Redis (Instead of Valkey)
+
+```yaml
+valkey:
+  enabled: false
+
+externalRedis:
+  host: redis.example.com
+  port: 6379
+  password: redis-password
+  # For Redis Sentinel:
+  # sentinelMasterSet: mymaster
+```
+
+### cert-manager Integration
+
+```yaml
+tls:
+  certManager:
+    enabled: true
+    issuerRef:
+      name: letsencrypt-prod
+      kind: ClusterIssuer
+    duration: 2160h    # 90 days
+    renewBefore: 360h  # 15 days
+```
+
+### HPA / Autoscaling
+
+Per-component HPAs target the matching Deployment (or the trivy StatefulSet) and the controller template OMITS `replicas:` whenever `autoscaling.enabled=true` — otherwise each `helm upgrade` would reset the count and fight the HPA. Available on `core`, `jobservice`, `registry`, `portal`, and `trivy`.
+
+```yaml
+core:
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80   # optional
+    # Raw HPAv2 pass-through:
+    # metrics: []     # external / object / pods metrics
+    # behavior: {}    # scaleUp/scaleDown stabilization windows
+```
+
+The chart fails fast at `helm install` / `helm template` time if `maxReplicas` is missing or `minReplicas > maxReplicas`.
+
+### Lifecycle hooks (preStop drain)
+
+Behind AWS NLB, GCP load balancers, or any setup with eventually-consistent LB deregistration, in-flight requests during a rolling upgrade hit a SIGTERM'd pod and surface as `504 Gateway Timeout` or `EOF`. A `preStop` sleep gives the LB time to deregister before the container exits:
+
+```yaml
+core:
+  lifecycle:
+    preStop:
+      exec:
+        command: ["/bin/sh", "-c", "sleep 15"]
+
+registry:           # applied to both registry + registryctl containers
+  lifecycle:
+    preStop:
+      exec:
+        command: ["/bin/sh", "-c", "sleep 30"]
+```
+
+Available on every component. `httpGet` and `tcpSocket` hook handlers are accepted too.
+
+### External Redis with a private CA
+
+For managed Redis hosting (self-hosted with cert-manager, some on-prem managed offerings) where the server cert is signed by a private CA, set `externalRedis.tlsOptions.existingCaSecret` to a Secret holding the CA bundle. The chart mounts that Secret on every Harbor component and sets `SSL_CERT_DIR` so Go's `crypto/x509` reads from the mount **in addition to** the default system trust bundle.
+
+```yaml
+valkey:
+  enabled: false
+
+externalRedis:
+  host: redis.private.example.com
+  port: 6379
+  password: redis-password
+  tlsOptions:
+    enable: true
+    existingCaSecret: my-redis-ca            # Secret with `ca.crt` key
+    existingCaSecretKey: ca.crt              # default, override if needed
+```
+
+Because the mount affects the system trust pool, the **same Secret also covers private CAs used for S3 endpoints, OIDC providers, LDAP**, etc. — not just Redis. The plumbing is skipped automatically when `valkey.enabled=true` (in-cluster Redis uses cluster-internal trust, no custom CA involved).
+
+### PostgreSQL TLS / mTLS
+
+For managed PostgreSQL that requires `verify-full` sslmode (RDS-with-custom-CA, GCP CloudSQL, on-prem with internal PKI), point `database.existingTlsSecret` at a Secret containing the cert files. The chart mounts it read-only at `/etc/harbor/db-tls` and auto-constructs `POSTGRESQL_URL` env on core and jobservice (Harbor's runtime DB pool returns `cfg.URL` verbatim when set).
+
+```yaml
+database:
+  host: pg.example.com
+  username: harbor
+  database: registry
+  sslmode: verify-full
+  existingSecret: my-harbor-db               # POSTGRESQL_PASSWORD
+  existingTlsSecret: my-pg-tls               # ca.crt (+ tls.crt + tls.key for mTLS)
+  clientCertEnabled: false                   # set true for client-cert auth
+```
+
+Expected keys in `existingTlsSecret` follow cert-manager convention:
+
+| Key | When |
+|-----|------|
+| `ca.crt` | Always (server-cert verification) |
+| `tls.crt` | When `clientCertEnabled: true` |
+| `tls.key` | When `clientCertEnabled: true` |
+
+**Caveats:**
+- **Exporter** does not yet plumb `POSTGRESQL_URL` through its viper config, so its DB connection ignores the URL env. Works fine for `sslmode=verify-ca` with a publicly-trusted CA; for mTLS the exporter will fail until a backend-side patch lands.
+- **Schema migrations** use Harbor's `NewMigrator`, which builds its own DSN from individual fields and ignores `cfg.URL`. Servers that **require** client certificates will reject the migrator. Use `sslmode=verify-ca` (CA-only verification) or coordinate the initial migration via an external trusted client until the migrator honors `URL`.
+
+A combined example covering DB TLS + private Redis CA + cert-manager-managed ingress lives at [`example/private-ca/`](example/private-ca/).
+
+### Custom Configuration via `toEnvVars`
+
+```yaml
+core:
+  config:
+    # Any Harbor Core config option
+    token_expiration: 30
+    robot_token_duration: 30
+    # Nested config becomes NESTED_KEY_HERE env var
+    nested:
+      key_here: value
+  secret:
+    # Sensitive values (stored in Secret)
+    csrf_key: "your-csrf-key"
+
+jobservice:
+  config:
+    max_job_workers: 20
+    job_loggers: "file,stdout"
+```
+
+### Prometheus ServiceMonitor
+
+```yaml
+metrics:
+  serviceMonitor:
+    enabled: true
+    namespace: monitoring  # Optional, defaults to release namespace
+    interval: 30s
+    labels:
+      release: prometheus
+```
+
+### CloudNativePG via extraManifests
+
+```yaml
+extraManifests:
+  - apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    metadata:
+      name: harbor-db
+    spec:
+      instances: 3
+      storage:
+        size: 10Gi
+```
+
+## GitOps (Flux / Argo CD)
+
+The chart renders **byte-for-byte deterministically** once its secret
+material is pinned — the property GitOps engines need to avoid perpetual
+drift, secret rotation on sync, and surprise pod rollouts.
+
+By default the chart auto-generates what it needs (encryption key,
+component identity secrets, CSRF key, token-signing CA, registry
+htpasswd). Generated values are random per render. That is fine for
+`helm install` (Helm persists them via `lookup` on upgrade), but **Argo
+CD templates client-side on every sync, where `lookup` returns nothing** —
+every sync would rotate all generated secrets and roll every workload
+through the `checksum/secret` annotations.
+
+Set `autoGenSecrets: false` for GitOps. Every would-be generation then
+becomes a render-time failure naming the value to pin:
+
+```yaml
+autoGenSecrets: false
+
+existingSecretAdminPassword: harbor-admin        # HARBOR_ADMIN_PASSWORD
+existingSecretSecretKey: harbor-encryption       # secretKey (16 chars)
+
+core:
+  existingSecret: harbor-core-identity           # secret
+  existingXsrfSecret: harbor-core-identity       # CSRF_KEY
+  tokenSecretName: harbor-token-cert             # tls.key + tls.crt
+
+registry:
+  existingSecret: harbor-registry-identity       # REGISTRY_HTTP_SECRET
+  credentials:
+    existingSecret: harbor-registry-credentials  # REGISTRY_CREDENTIAL_PASSWORD + REGISTRY_HTPASSWD
+
+jobservice:
+  existingSecret: harbor-jobservice-identity     # JOBSERVICE_SECRET
+
+database:
+  existingSecret: harbor-database                # POSTGRESQL_PASSWORD
+
+ingress:
+  autoGenCert: false                             # BYO TLS secret / cert-manager
+```
+
+Notes:
+
+- A complete Flux setup (GitRepository + HelmRelease with drift detection
+  + prerequisite Secret manifests with generation commands) lives at
+  [`example/flux/`](example/flux/). The same values work unchanged in an
+  Argo CD `Application` — no `ignoreDifferences` workarounds needed.
+- CI enforces determinism: `task helm:gitops-determinism` renders the
+  pinned values twice and requires byte-identical output.
+- Rotating a pinned Secret does **not** restart pods — trigger a rollout
+  (`kubectl rollout restart`) or run [Reloader](https://github.com/stakater/Reloader).
+- Even outside GitOps: without pinning, the registry htpasswd is
+  re-hashed (random bcrypt salt) on every `helm upgrade`, rolling the
+  registry each time. Pin `registry.credentials.htpasswdString` or
+  `registry.credentials.existingSecret` to stop that. The token-signing
+  CA is generated once and reused from the cluster on upgrades.
+
+## Uninstalling the Chart
+
+```bash
+helm uninstall my-harbor --namespace harbor
+```
+
+> **Note**: PersistentVolumeClaims are not deleted automatically. Remove them manually if needed.
+
+{{ template "chart.requirementsSection" . }}
+
+{{ template "chart.valuesSection" . }}
+
+## Migrating from Legacy Harbor Chart
+
+> **📖 Full guide:** [docs/MIGRATION.md](docs/MIGRATION.md) covers migration
+> paths, secret carry-over, and a worked before/after example.
+> [docs/MIGRATION-REFERENCE.md](docs/MIGRATION-REFERENCE.md) maps **every**
+> value in the legacy [goharbor/harbor-helm](https://github.com/goharbor/harbor-helm)
+> chart to its equivalent here and lists removed settings with workarounds —
+> written for humans and LLMs translating values files by hand.
+
+> **🤖 Automated:** `task helm:migrate -- old-values.yaml new-values.yaml` runs
+> [tools/harbor-migrate.ys](tools/harbor-migrate.ys), a
+> [YAMLScript](https://yamlscript.org) translator that emits a migrated
+> values file plus an `ERROR`/`WARN`/`INFO` advisory report of everything
+> that changes, gets dropped, or needs manual action
+> (`brew install yamlscript`).
+
+This chart is a redesign, not a drop-in replacement. Migration steps:
+
+1. **Backup your Harbor data** using Harbor's built-in backup or database dumps
+2. **Export your projects and artifacts** if needed
+3. **Deploy this chart** as a new installation
+4. **Migrate data** using one of:
+   - Harbor's replication feature (recommended)
+   - Database migration with external tooling
+   - Re-push images from your CI/CD pipeline
+
+### Legacy-to-New Settings Mapping
+
+| Legacy Setting | New Setting |
+|---------------|-------------|
+| `expose.type: ingress` | `ingress.enabled: true` |
+| `expose.ingress.*` | `ingress.*` |
+| `database.type: internal` | Not supported — use external DB |
+| `database.external.*` | `database.*` |
+| `redis.type: internal` | `valkey.enabled: true` |
+| `redis.external.*` | `externalRedis.*` |
+| `persistence.imageChartStorage.*` | `registry.config.storage.*` (YAML passthrough — see "Registry configuration" below) |
+| `nginx.*` | Not applicable — no nginx proxy |
+| `notary.*` | Not supported — Notary deprecated |
+| `chartmuseum.*` | Not supported — use OCI artifacts |
+
+This table is a teaser — the [full migration guide](docs/MIGRATION.md) covers
+all sections (expose/TLS, storage backends, per-component settings, secrets
+carry-over) including the `secretKey` requirement when reusing an existing
+database.
+
+## Troubleshooting
+
+### Schema Validation Errors
+
+If you see validation errors, check:
+- `externalURL` must be a valid URL starting with `http://` or `https://`
+- `database.host` is required
+- Resource values must be valid Kubernetes quantities
+
+### Pods CrashLooping
+
+Check logs with:
+```bash
+kubectl logs -n harbor deploy/my-harbor-core
+kubectl logs -n harbor deploy/my-harbor-registry
+```
+
+Common issues:
+- Database connection failed — verify `database.host` and credentials
+- Redis connection failed — verify Valkey is running or `externalRedis` config
+
+### Permission Denied Errors
+
+The chart uses `readOnlyRootFilesystem: true`. If a component needs to write:
+- Check if a writable volume mount is needed
+- Volumes for `/tmp` and other writable paths are pre-configured
+
+## Development
+
+All chart tasks live in the repo-root Taskfile under the `helm:`
+namespace — one source of truth for humans and CI alike (tool versions
+pinned via `versions.env`). Run from anywhere in the repo; Task resolves
+the root Taskfile:
+
+```bash
+task helm:unittest            # helm unittest suites
+task helm:unittest:update     # refresh test snapshots
+task helm:lint                # helm + ct + kube-linter + ah + schema lint
+task helm:docs                # regenerate this README via helm-docs
+task helm:examples            # render every example values file
+task helm:gitops-determinism  # byte-identical double-render check
+task helm:migrate:test        # migration translator golden tests
+task helm:ci                  # full quality gate (what Chart CI runs)
+```
+
+{{ template "helm-docs.versionFooter" . }}

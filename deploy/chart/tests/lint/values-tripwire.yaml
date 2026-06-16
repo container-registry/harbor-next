@@ -1,0 +1,55 @@
+# Lint fixture: every class of finding the doctor knows, in one file.
+# Expected: see report-tripwire.txt (5 errors, 10 warnings).
+externalURL: https://harbor.example.com
+harborAdminPassword: hunter2-inline
+secretKey: 0123456789abcdef
+
+# two expose methods on at once (ingress defaults to true)
+expose:
+  nodePort:
+    enabled: true
+
+# pod TLS with certSource=secret but no Secret named
+tls:
+  enabled: true
+  certSource: secret
+
+database:
+  host: pg.example.com
+  username: harbor
+  password: inline-db-password
+  sslmode: verify-full
+
+# subchart on (default) AND external redis configured
+externalRedis:
+  host: redis.example.com
+  password: inline-redis-password
+
+registry:
+  config:
+    storage:
+      s3:
+        region: eu-central-1
+        bucket: harbor
+      azure:
+        accountname: acct
+        container: harbor
+  secret:
+    REGISTRY_STORAGE_S3_ACCESSKEY: AKIAINLINE
+    REGISTRY_STORAGE_S3_SECRETKEY: inline-secret
+
+# metrics on, but no jobservice.config.metric block
+metrics:
+  enabled: true
+
+trivy:
+  enabled: true
+  gitHubToken: ghp_inline
+
+core:
+  autoscaling:
+    enabled: true
+  pdb:
+    enabled: true
+    minAvailable: 1
+    maxUnavailable: 1

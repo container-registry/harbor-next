@@ -1,0 +1,51 @@
+============================================================
+  harbor-migrate: tests/migrate/values-dedicated-2x.yaml -> Harbor Next chart values
+  This chart is NOT a drop-in upgrade. Plan a new install
+  plus data migration (docs/MIGRATION.md). Full mapping
+  tables: docs/MIGRATION-REFERENCE.md
+============================================================
+
+WARN — migrated, but review the changed behavior (3)
+  * core.secret
+      -> core.existingSecret
+      Inline component-secret strings are gone (the secret key is now a map of extra env vars). Dropped — the chart auto-generates the inter-component secret; only in-flight uploads/jobs are invalidated. To pin it, pre-create a Secret and reference it via existingSecret.
+  * exporter.override.database
+      Exporter-specific DB pool overrides have no equivalent — the exporter uses the database.* pool settings.
+  * persistence.imageChartStorage.s3.accesskey/secretkey
+      -> registry.secret.REGISTRY_STORAGE_S3_*
+      Inline credentials moved into registry.secret (base64-encoded into a generated Secret). Prefer a pre-created Secret via registry.storageCredentials.s3.existingSecret.
+
+INFO — mapped automatically (11)
+  * secretKey
+      -> secretKey
+      Carried over. Keep it identical to the old install whenever you reuse the 2.x database — replication endpoints and scanner credentials are encrypted with it.
+  * cache.*
+      -> cache.*
+      Identical structure — carried verbatim.
+  * expose.tls.secret.secretName
+      -> ingress.tls[0].secretName
+      TLS terminates at the ingress controller with your existing certificate Secret. Pod-level TLS (tls.enabled) stays off — the 2.x-equivalent behavior for ingress exposure.
+  * jobservice.maxJobWorkers
+      -> jobservice.config.worker_pool.workers
+      jobservice.config is the verbatim jobservice config.yml now — Helm deep-merges it over the chart default.
+  * trivy.enabled
+      -> trivy.enabled
+      Default flipped to false in this chart — kept enabled because your 2.x values had it on.
+  * image.repository/tag (core, portal, registry, jobservice, exporter, trivy)
+      -> chart image defaults
+      Legacy stock image references dropped — images default to Harbor Next builds (8gears.container-registry.com/8gcr/harbor-*, tag = chart appVersion). Set <component>.image.* only for mirrors.
+  * persistence.imageChartStorage.s3
+      -> registry.config.storage.s3
+      registry.config is the verbatim distribution config.yml — every s3 field passes through unchanged. For MinIO / Ceph RGW / SeaweedFS also set forcepathstyle true.
+  * database.external.*
+      -> database.*
+      Flattened one level; coreDatabase is now database.database and the port is numeric.
+  * redis.external.addr
+      -> externalRedis.host/port
+      addr split into separate host and port fields; valkey subchart disabled.
+  * metrics.enabled
+      -> metrics.enabled + jobservice.config.metric
+      metrics.enabled does NOT propagate to jobservice in this chart — the jobservice metric block was added to its config.yml explicitly.
+  * quoted booleans/numbers (core.gdpr.deleteUser, trivy.enabled, database.maxIdleConns, database.maxOpenConns)
+      -> native YAML types
+      String-typed scalars were coerced — this chart validates value types via values.schema.json, so "true"/"1" strings would be rejected at install time.

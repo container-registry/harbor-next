@@ -1,0 +1,123 @@
+suite: redis / valkey wiring tests
+templates:
+  - templates/core.deployment.yaml
+  - templates/core.configmap.yaml
+  - templates/core.secret.yaml
+tests:
+  # Regression guard for ab6bab46b (Fix #1). The valkey 0.9.3 subchart
+  # names its auth Secret `<valkey.fullname>-auth` and stores passwords
+  # under `<aclUser>-password` keys. The harbor.redis.secretName /
+  # secretKey helpers used to return `<release>-valkey` and
+  # `valkey-password` — neither matched what the subchart created.
+  # Pods with valkey.auth.enabled=true could not find their Redis
+  # password and crash-looped.
+  - it: should reference the valkey-auth Secret with the default-password key
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      valkey.enabled: true
+      valkey.auth.enabled: true
+      valkey.auth.aclUsers.default.password: pw
+      valkey.auth.aclUsers.default.permissions: "~* &* +@all"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: valkey-auth
+                key: default-password
+
+  - it: should honor valkey.fullnameOverride in the secret name
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      valkey.enabled: true
+      valkey.fullnameOverride: my-cache
+      valkey.auth.enabled: true
+      valkey.auth.aclUsers.default.password: pw
+      valkey.auth.aclUsers.default.permissions: "~* &* +@all"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: my-cache-auth
+                key: default-password
+
+  # Regression guards for 3773fd7a7 (Fix #2). harbor.redis.url used to
+  # hardcode `redis://` and only inject `:$(REDIS_PASSWORD)@` when
+  # valkey.auth.enabled was true. External Redis with TLS, sentinel, or
+  # password-only auth all produced broken plain-redis URLs.
+  - it: should render rediss:// for external Redis with TLS
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      valkey.enabled: false
+      externalRedis.host: redis.ext
+      externalRedis.password: secretpw
+      externalRedis.tlsOptions.enable: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: _REDIS_URL_CORE
+            value: "rediss://:$(REDIS_PASSWORD)@redis.ext:6379/0?idle_timeout_seconds=30"
+
+  - it: should render rediss+sentinel:// with masterSet for sentinel mode
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      valkey.enabled: false
+      externalRedis.host: sentinel.ext
+      externalRedis.password: secretpw
+      externalRedis.sentinelMasterSet: master
+      externalRedis.tlsOptions.enable: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: _REDIS_URL_CORE
+            value: "rediss+sentinel://:$(REDIS_PASSWORD)@sentinel.ext:6379/master/0?idle_timeout_seconds=30"
+
+  - it: should include $(REDIS_PASSWORD) for external Redis with password but no TLS
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      valkey.enabled: false
+      externalRedis.host: redis.ext
+      externalRedis.password: secretpw
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: _REDIS_URL_CORE
+            value: "redis://:$(REDIS_PASSWORD)@redis.ext:6379/0?idle_timeout_seconds=30"
+
+  - it: should omit credentials when external Redis has no auth
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      valkey.enabled: false
+      externalRedis.host: redis.ext
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: _REDIS_URL_CORE
+            value: "redis://redis.ext:6379/0?idle_timeout_seconds=30"

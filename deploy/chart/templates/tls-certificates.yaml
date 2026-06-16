@@ -1,0 +1,32 @@
+{{- if .Values.tls.certManager.enabled }}
+{{- $fullname := include "harbor.fullname" . }}
+{{- $ingressHosts := .Values.ingress.hosts -}}
+{{- if eq (len $ingressHosts) 0 -}}
+{{- $ingressHosts = list (dict "host" (include "harbor.ingress.primaryHost" .)) -}}
+{{- end -}}
+{{- range $ingressHosts }}
+{{- $hostSlug := include "harbor.dnsSafeName" (.host | replace "*." "wildcard-") }}
+{{- /* Hash over fullname + host so two releases sharing the same 22-char
+       prefix and the same host still get distinct Certificate names. */}}
+{{- $hostHash := printf "%s/%s" $fullname .host | sha256sum | trunc 8 }}
+{{- /* Layout: <fullname (≤22)>-<hostSlug (≤27)>-<hash (8)> = ≤59, leaving room for "-tls" suffix in secretName under the 63-char DNS-1123 label limit. */}}
+{{- $certName := printf "%s-%s" ($fullname | trunc 22 | trimSuffix "-") ($hostSlug | trunc 27 | trimSuffix "-") | trimSuffix "-" }}
+{{- $certName = printf "%s-%s" $certName $hostHash }}
+{{- $secretName := printf "%s-tls" $certName }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $certName }}
+  labels:
+    {{- include "harbor.labels" $ | nindent 4 }}
+spec:
+  secretName: {{ $secretName }}
+  duration: {{ $.Values.tls.certManager.duration | default "2160h" }}
+  renewBefore: {{ $.Values.tls.certManager.renewBefore | default "360h" }}
+  issuerRef:
+    {{- toYaml $.Values.tls.certManager.issuerRef | nindent 4 }}
+  dnsNames:
+    - {{ .host | quote }}
+{{- end }}
+{{- end }}

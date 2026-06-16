@@ -1,0 +1,280 @@
+{{- $sc := .Values.registry.storageCredentials | default dict -}}
+{{- $s3Ext := (default dict $sc.s3).existingSecret -}}
+{{- $azureExt := (default dict $sc.azure).existingSecret -}}
+{{- $ossExt := (default dict $sc.oss).existingSecret -}}
+{{- $gcsExt := (default dict $sc.gcs).existingSecret -}}
+{{- $extAuth := and (not .Values.valkey.enabled) (or .Values.externalRedis.existingSecret .Values.externalRedis.password) -}}
+{{- $redisAuth := or .Values.valkey.auth.enabled $extAuth -}}
+{{- $caExt := eq (include "harbor.redis.caBundleEnabled" .) "true" -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "harbor.registry.name" . }}
+  labels:
+    {{- include "harbor.componentLabels" (dict "root" . "component" "registry") | nindent 4 }}
+spec:
+  {{- if not (and .Values.registry.autoscaling .Values.registry.autoscaling.enabled) }}
+  replicas: {{ .Values.registry.replicas }}
+  {{- end }}
+  revisionHistoryLimit: {{ .Values.registry.revisionHistoryLimit | default .Values.global.revisionHistoryLimit }}
+  {{- with .Values.registry.deploymentStrategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "registry") | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/configmap: {{ include (print $.Template.BasePath "/registry.configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/registry.secret.yaml") . | sha256sum }}
+        checksum/registryctl-configmap: {{ include (print $.Template.BasePath "/registryctl.configmap.yaml") . | sha256sum }}
+        checksum/registryctl-secret: {{ include (print $.Template.BasePath "/registryctl.secret.yaml") . | sha256sum }}
+        {{- with .Values.registry.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "registry") | nindent 8 }}
+        {{- with .Values.registry.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- include "harbor.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "harbor.serviceAccountName" (dict "root" . "component" "registry" "serviceAccount" .Values.registry.serviceAccount) }}
+      automountServiceAccountToken: {{ .Values.registry.serviceAccount.automountServiceAccountToken | default false }}
+      {{- with (.Values.registry.priorityClassName | default .Values.global.priorityClassName) }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.registry.podSecurityContext | nindent 8 }}
+      {{- with .Values.registry.initContainers }}
+      initContainers:
+        {{- tpl (toYaml .) $ | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: registry
+          securityContext:
+            {{- toYaml .Values.registry.securityContext | nindent 12 }}
+          image: {{ include "harbor.image" (dict "imageRoot" .Values.registry.image "global" .Values.image "chart" .Chart) }}
+          imagePullPolicy: {{ include "harbor.imagePullPolicy" . }}
+          ports:
+            - name: http
+              containerPort: 5000
+              protocol: TCP
+            - name: metrics
+              containerPort: 5001
+              protocol: TCP
+          envFrom:
+            - secretRef:
+                name: {{ include "harbor.registry.name" . }}
+          {{- if or .Values.registry.existingSecret $redisAuth $s3Ext $azureExt $ossExt $caExt .Values.registry.extraEnv }}
+          env:
+            {{- if .Values.registry.existingSecret }}
+            - name: REGISTRY_HTTP_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.registry.existingSecret }}
+                  key: {{ .Values.registry.existingSecretKey | default "REGISTRY_HTTP_SECRET" }}
+            {{- end }}
+            {{- if $redisAuth }}
+            - name: REGISTRY_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "harbor.redis.secretName" . }}
+                  key: {{ include "harbor.redis.secretKey" . }}
+            {{- end }}
+            {{- include "harbor.extraCA.env" . | nindent 12 }}
+            {{- if $s3Ext }}
+            - name: REGISTRY_STORAGE_S3_ACCESSKEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $s3Ext }}
+                  key: {{ $sc.s3.existingSecretAccessKeyKey | default "REGISTRY_STORAGE_S3_ACCESSKEY" }}
+            - name: REGISTRY_STORAGE_S3_SECRETKEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $s3Ext }}
+                  key: {{ $sc.s3.existingSecretSecretKeyKey | default "REGISTRY_STORAGE_S3_SECRETKEY" }}
+            {{- end }}
+            {{- if $azureExt }}
+            - name: REGISTRY_STORAGE_AZURE_ACCOUNTKEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $azureExt }}
+                  key: {{ $sc.azure.existingSecretKey | default "REGISTRY_STORAGE_AZURE_ACCOUNTKEY" }}
+            {{- end }}
+            {{- if $ossExt }}
+            - name: REGISTRY_STORAGE_OSS_ACCESSKEYSECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $ossExt }}
+                  key: {{ $sc.oss.existingSecretKey | default "REGISTRY_STORAGE_OSS_ACCESSKEYSECRET" }}
+            {{- end }}
+            {{- with .Values.registry.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          {{- include "harbor.probes" .Values.registry.probes | nindent 10 }}
+          resources:
+            {{- toYaml .Values.registry.resources | nindent 12 }}
+          {{- with .Values.registry.lifecycle }}
+          lifecycle:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: storage
+              mountPath: {{ include "harbor.registry.storageMountPath" . }}
+            {{- if $gcsExt }}
+            - name: gcs-key
+              mountPath: /etc/registry/gcs
+              readOnly: true
+            {{- end }}
+            - mountPath: /etc/registry/passwd
+              name: registry-htpasswd
+              subPath: passwd
+            - mountPath: /etc/registry/config.yml
+              name: registry-config
+              subPath: config.yml
+            - name: tmp
+              mountPath: /tmp
+            {{- include "harbor.extraCA.volumeMount" . | nindent 12 }}
+        - name: registryctl
+          securityContext:
+            {{- toYaml .Values.registry.securityContext | nindent 12 }}
+          image: {{ include "harbor.image" (dict "imageRoot" .Values.registry.controller.image "global" .Values.image "chart" .Chart) }}
+          imagePullPolicy: {{ include "harbor.imagePullPolicy" . }}
+          ports:
+            - name: ctl
+              containerPort: 8080
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.registry.existingConfigMap | default (include "harbor.registry.name" .) }}
+            - secretRef:
+                name: {{ include "harbor.registry.name" . }}
+            - configMapRef:
+                name: {{ include "harbor.fullname" . }}-registryctl
+            - secretRef:
+                name: {{ include "harbor.fullname" . }}-registryctl
+          env:
+            {{- if .Values.registry.existingSecret }}
+            - name: REGISTRY_HTTP_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.registry.existingSecret }}
+                  key: {{ .Values.registry.existingSecretKey | default "REGISTRY_HTTP_SECRET" }}
+            {{- end }}
+            {{- if $redisAuth }}
+            - name: REGISTRY_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "harbor.redis.secretName" . }}
+                  key: {{ include "harbor.redis.secretKey" . }}
+            {{- end }}
+            {{- include "harbor.extraCA.env" . | nindent 12 }}
+            {{- /* Per-backend storage credentials when sourced from a BYO Secret —
+                   registryctl runs admin ops (GC) that need the same creds.
+                   When `<backend>.existingSecret` is set the generated registry
+                   Secret strips these keys, so we must inject them here too. */}}
+            {{- if $s3Ext }}
+            - name: REGISTRY_STORAGE_S3_ACCESSKEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $s3Ext }}
+                  key: {{ $sc.s3.existingSecretAccessKeyKey | default "REGISTRY_STORAGE_S3_ACCESSKEY" }}
+            - name: REGISTRY_STORAGE_S3_SECRETKEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $s3Ext }}
+                  key: {{ $sc.s3.existingSecretSecretKeyKey | default "REGISTRY_STORAGE_S3_SECRETKEY" }}
+            {{- end }}
+            {{- if $azureExt }}
+            - name: REGISTRY_STORAGE_AZURE_ACCOUNTKEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $azureExt }}
+                  key: {{ $sc.azure.existingSecretKey | default "REGISTRY_STORAGE_AZURE_ACCOUNTKEY" }}
+            {{- end }}
+            {{- if $ossExt }}
+            - name: REGISTRY_STORAGE_OSS_ACCESSKEYSECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $ossExt }}
+                  key: {{ $sc.oss.existingSecretKey | default "REGISTRY_STORAGE_OSS_ACCESSKEYSECRET" }}
+            {{- end }}
+            - name: CORE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default (include "harbor.core" .) .Values.core.existingSecret }}
+                  key: secret
+            - name: JOBSERVICE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default (include "harbor.jobservice" .) .Values.jobservice.existingSecret }}
+                  {{- if .Values.jobservice.existingSecret }}
+                  key: {{ .Values.jobservice.existingSecretKey }}
+                  {{- else }}
+                  key: JOBSERVICE_SECRET
+                  {{- end }}
+            {{- if has "registry" .Values.proxy.components }}
+            - name: HTTP_PROXY
+              value: "{{ .Values.proxy.httpProxy }}"
+            - name: HTTPS_PROXY
+              value: "{{ .Values.proxy.httpsProxy }}"
+            - name: NO_PROXY
+              value: "{{ template "harbor.noProxy" . }}"
+            {{- end }}
+            {{- with .Values.registry.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- include "harbor.probes" .Values.registry.controller.probes | nindent 10 }}
+          resources:
+            {{- toYaml .Values.registry.resources | nindent 12 }}
+          {{- with .Values.registry.lifecycle }}
+          lifecycle:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: storage
+              mountPath: {{ include "harbor.registry.storageMountPath" . }}
+            - name: registry-config
+              mountPath: /etc/registry/config.yml
+              subPath: config.yml
+            - name: registry-config
+              mountPath: /etc/registryctl/config.yml
+              subPath: ctl-config.yml
+            - name: tmp
+              mountPath: /tmp
+            {{- include "harbor.extraCA.volumeMount" . | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: registry-htpasswd
+          secret:
+            items:
+              - key: REGISTRY_HTPASSWD
+                path: passwd
+            {{- /* BYO credentials Secret must hold REGISTRY_HTPASSWD (the
+                  htpasswd line) alongside REGISTRY_CREDENTIAL_PASSWORD. */}}
+            secretName: {{ .Values.registry.credentials.existingSecret | default (printf "%s-htpasswd" (include "harbor.registry.name" .)) }}
+        - configMap:
+            name: {{ .Values.registry.existingConfigMap | default (include "harbor.registry.name" .) }}
+          name: registry-config
+        - name: storage
+          {{- if .Values.registry.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.registry.persistence.existingClaim | default (include "harbor.registry" .) }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- if $gcsExt }}
+        - name: gcs-key
+          secret:
+            secretName: {{ $gcsExt }}
+            items:
+              - key: {{ $sc.gcs.existingSecretKey | default "gcs-key.json" }}
+                path: key.json
+        {{- end }}
+        {{- include "harbor.extraCA.volume" . | nindent 8 }}
+      {{- include "harbor.podScheduling" (dict "component" .Values.registry "root" $) | nindent 6 }}

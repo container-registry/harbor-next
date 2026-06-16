@@ -1,0 +1,69 @@
+suite: portal component tests
+# All tests assert chart-computed output for known inputs (image
+# composition, container port naming, volumeMount order, configmap key
+# presence). Pure Helm pass-through tests (replicas, podAnnotations,
+# nodeSelector, tolerations, affinity, securityContext, deploymentStrategy,
+# priorityClassName, revisionHistoryLimit, initContainers, extraEnv) were
+# removed — they only proved `--set` works, not that the chart does
+# anything with the value. Full-render regression coverage for portal
+# lives in snapshots_test.yaml.
+templates:
+  - templates/portal.deployment.yaml
+  - templates/portal.service.yaml
+  - templates/portal.configmap.yaml
+tests:
+  - it: should compose image from values.image.repository + tag
+    template: templates/portal.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      portal.image.repository: goharbor/harbor-portal
+      portal.image.tag: "2.10.0"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: goharbor/harbor-portal:2.10.0
+
+  - it: should expose containerPort 8080 named portal-http
+    # Port name is load-bearing: portal.service.yaml references it by
+    # name for the targetPort. A rename in deployment without service
+    # update silently breaks traffic.
+    template: templates/portal.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 8080
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].name
+          value: portal-http
+
+  - it: should mount portal-config and tmp volumes in deterministic order
+    # Order matters: nginx.conf subPath mount targets volumeMounts[0].
+    # Reordering would break the container at startup.
+    template: templates/portal.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].name
+          value: portal-config
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[1].name
+          value: tmp
+
+  - it: should render nginx.conf in the configmap
+    template: templates/portal.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - exists:
+          path: data["nginx.conf"]

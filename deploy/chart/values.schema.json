@@ -1,0 +1,1188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/container-registry/harbor-next/deploy/chart/values.schema.json",
+  "title": "Harbor Next Helm Chart Values",
+  "description": "Schema for Harbor Next Helm chart values.yaml validation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["externalURL"],
+  "allOf": [
+    {
+      "anyOf": [
+        {
+          "required": ["harborAdminPassword"],
+          "properties": {
+            "harborAdminPassword": {
+              "type": "string",
+              "minLength": 8
+            }
+          }
+        },
+        {
+          "required": ["existingSecretAdminPassword"],
+          "properties": {
+            "existingSecretAdminPassword": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "image": {
+      "type": "object",
+      "description": "Global image settings",
+      "properties": {
+        "pullPolicy": {
+          "type": "string",
+          "enum": ["Always", "IfNotPresent", "Never"],
+          "default": "IfNotPresent",
+          "description": "Image pull policy for all Harbor components"
+        }
+      }
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "description": "List of image pull secrets",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string",
+            "minLength": 1
+          },
+          {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": ["name"]
+          }
+        ]
+      }
+    },
+    "nameOverride": {
+      "type": "string",
+      "description": "Override the chart name"
+    },
+    "fullnameOverride": {
+      "type": "string",
+      "description": "Override the full name"
+    },
+    "externalURL": {
+      "type": "string",
+      "description": "External URL for Harbor (REQUIRED). Must be a valid URL starting with http:// or https://",
+      "pattern": "^https?://.*$",
+      "minLength": 1
+    },
+    "logLevel": {
+      "type": "string",
+      "enum": ["debug", "info", "warning", "error", "fatal"],
+      "default": "info",
+      "description": "Log level for all components"
+    },
+    "harborAdminPassword": {
+      "type": "string",
+      "description": "Harbor admin password (initial setup)"
+    },
+    "existingSecretAdminPassword": {
+      "type": "string",
+      "description": "Existing secret containing the admin password"
+    },
+    "existingSecretAdminPasswordKey": {
+      "type": "string",
+      "description": "Key in existing admin password secret"
+    },
+    "autoGenSecrets": {
+      "type": "boolean",
+      "default": true,
+      "description": "Allow auto-generation of secret material. Set false to fail at render time when a secret would be generated instead of pinned (GitOps/Argo CD)"
+    },
+    "ipFamily": {
+      "type": "object",
+      "description": "IP family configuration for dual-stack clusters",
+      "properties": {
+        "ipv4": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"}
+          }
+        },
+        "ipv6": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "trace": {
+      "type": "object",
+      "description": "Distributed tracing configuration (jaeger or otel provider)",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "provider": {"type": "string", "enum": ["jaeger", "otel"]},
+        "sample_rate": {"type": "number"},
+        "jaeger": {"type": "object"},
+        "otel": {"type": "object"}
+      },
+      "additionalProperties": true
+    },
+    "existingSecretSecretKey": {
+      "type": "string",
+      "description": "Existing secret containing the encryption key"
+    },
+    "existingSecretSecretKeyKey": {
+      "type": "string",
+      "description": "Key in existingSecretSecretKey that holds the encryption key (defaults to secretKey). Used for both SECRET_KEY env and the secret-key volume mount."
+    },
+    "secretKey": {
+      "type": "string",
+      "description": "Secret key for encryption (16 characters)",
+      "minLength": 0,
+      "maxLength": 16
+    },
+    "global": {
+      "type": "object",
+      "description": "Global defaults inherited by all components",
+      "properties": {
+        "revisionHistoryLimit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "priorityClassName": {
+          "type": "string"
+        }
+      }
+    },
+    "imageCredentials": {
+      "type": "object",
+      "properties": {
+        "registry": { "type": "string" },
+        "username": { "type": "string" },
+        "password": { "type": "string" },
+        "email": { "type": "string" }
+      }
+    },
+    "cache": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "expireHours": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "proxy": {
+      "type": "object",
+      "properties": {
+        "httpProxy": { "type": ["string", "null"] },
+        "httpsProxy": { "type": ["string", "null"] },
+        "noProxy": { "type": "string" },
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["core", "jobservice", "registry", "trivy"]
+          }
+        }
+      }
+    },
+    "expose": {
+      "type": "object",
+      "properties": {
+        "clusterIP": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "name": { "type": "string" },
+            "staticClusterIP": { "type": "string" },
+            "ports": {
+              "type": "object",
+              "properties": {
+                "http": { "type": "integer", "minimum": 1, "maximum": 65535 },
+                "https": { "type": "integer", "minimum": 1, "maximum": 65535 }
+              }
+            },
+            "annotations": { "type": "object", "additionalProperties": { "type": "string" } },
+            "labels": { "type": "object", "additionalProperties": { "type": "string" } }
+          }
+        },
+        "nodePort": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "name": { "type": "string" },
+            "ports": {
+              "type": "object",
+              "properties": {
+                "http": {
+                  "type": "object",
+                  "properties": {
+                    "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+                    "nodePort": { "type": "integer", "minimum": 1, "maximum": 65535 }
+                  }
+                },
+                "https": {
+                  "type": "object",
+                  "properties": {
+                    "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+                    "nodePort": { "type": "integer", "minimum": 1, "maximum": 65535 }
+                  }
+                }
+              }
+            },
+            "annotations": { "type": "object", "additionalProperties": { "type": "string" } },
+            "labels": { "type": "object", "additionalProperties": { "type": "string" } }
+          }
+        },
+        "loadBalancer": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "name": { "type": "string" },
+            "IP": { "type": "string" },
+            "ports": {
+              "type": "object",
+              "properties": {
+                "http": { "type": "integer", "minimum": 1, "maximum": 65535 },
+                "https": { "type": "integer", "minimum": 1, "maximum": 65535 }
+              }
+            },
+            "sourceRanges": { "type": "array", "items": { "type": "string" } },
+            "annotations": { "type": "object", "additionalProperties": { "type": "string" } },
+            "labels": { "type": "object", "additionalProperties": { "type": "string" } }
+          }
+        },
+        "route": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "host": { "type": "string" },
+            "annotations": { "type": "object", "additionalProperties": { "type": "string" } },
+            "labels": { "type": "object", "additionalProperties": { "type": "string" } },
+            "tls": {
+              "type": "object",
+              "properties": {
+                "termination": { "type": "string", "enum": ["edge", "passthrough", "reencrypt"] },
+                "insecureEdgeTerminationPolicy": { "type": "string", "enum": ["Allow", "Disable", "Redirect"] }
+              }
+            }
+          }
+        }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "description": "Ingress configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "autoGenCert": {
+          "type": "boolean",
+          "default": true
+        },
+        "className": {
+          "type": "string"
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "core": {
+          "type": "string",
+          "description": "Legacy hostname override for generated ingress certificate"
+        },
+        "hosts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "tls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "secretName": {
+                "type": "string"
+              },
+              "hosts": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "gateway": {
+      "type": "object",
+      "description": "Gateway API configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "parentRefs": {
+          "type": "array"
+        },
+        "hostnames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "core": {
+      "type": "object",
+      "description": "Harbor Core component configuration",
+      "allOf": [
+        { "$ref": "#/$defs/harborComponent" }
+      ],
+      "properties": {
+        "existingSecret": {
+          "type": "string",
+          "description": "Existing Secret holding the core inter-component secret (auto-generated when empty)."
+        },
+        "existingSecretKey": {
+          "type": "string",
+          "description": "Key in core.existingSecret that holds the core secret (defaults to secret)."
+        },
+        "tokenSecretName": {
+          "type": "string",
+          "description": "Existing Secret for the token service key/cert. Must contain keys tls.key and tls.crt."
+        },
+        "tokenKey": {
+          "type": "string",
+          "description": "Token service private key (PEM). Auto-generated if tokenKey, tokenCert, and tokenSecretName are all empty."
+        },
+        "tokenCert": {
+          "type": "string",
+          "description": "Token service certificate (PEM, signed by tokenKey)."
+        },
+        "xsrfKey": {
+          "type": "string",
+          "description": "XSRF key (32 chars, auto-generated if empty)."
+        },
+        "existingXsrfSecret": {
+          "type": "string",
+          "description": "Existing Secret holding the XSRF key."
+        },
+        "existingXsrfSecretKey": {
+          "type": "string",
+          "description": "Key in core.existingXsrfSecret that holds the XSRF key (defaults to CSRF_KEY)."
+        },
+        "configureUserSettings": {
+          "type": "string",
+          "description": "Initial user settings JSON applied on first boot (CONFIG_OVERWRITE_JSON)."
+        },
+        "quotaUpdateProvider": {
+          "type": "string",
+          "enum": ["db", "redis"],
+          "description": "Quota update provider."
+        },
+        "artifactPullAsyncFlushDuration": {
+          "type": ["string", "integer"],
+          "description": "Async flush duration (seconds) for artifact pull time / pull count updates."
+        },
+        "gdpr": {
+          "type": "object",
+          "description": "GDPR compliance settings.",
+          "properties": {
+            "deleteUser": {
+              "type": "boolean",
+              "description": "Anonymize user data on deletion."
+            },
+            "auditLogsCompliant": {
+              "type": "boolean",
+              "description": "GDPR-compliant audit logs."
+            }
+          }
+        },
+        "serviceAnnotations": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Annotations for the core Service."
+        }
+      }
+    },
+    "registry": {
+      "type": "object",
+      "description": "Harbor Registry component configuration",
+      "allOf": [
+        { "$ref": "#/$defs/harborComponent" }
+      ],
+      "properties": {
+        "existingSecret": {
+          "type": "string",
+          "description": "Existing Secret supplying REGISTRY_HTTP_SECRET. When set, the generated registry Secret omits this key and both the registry container and registryctl sidecar source it from here via env."
+        },
+        "existingSecretKey": {
+          "type": "string",
+          "description": "Key in registry.existingSecret that holds REGISTRY_HTTP_SECRET (defaults to REGISTRY_HTTP_SECRET)."
+        },
+        "config": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Full distribution/distribution config.yml passed through verbatim. Chart-managed redis/log/http blocks are merged on top at render time. Used only when existingConfigMap is empty."
+        },
+        "existingConfigMap": {
+          "type": "string",
+          "description": "Externally-managed ConfigMap with config.yml + ctl-config.yml. When set, the chart skips generating the registry ConfigMap and mounts this one instead."
+        },
+        "storageCredentials": {
+          "type": "object",
+          "description": "BYO Secret references for storage credentials. The chart injects REGISTRY_STORAGE_<BACKEND>_<KEY> env vars on both the registry and registryctl containers (distribution honors these env overrides).",
+          "properties": {
+            "s3": {
+              "type": "object",
+              "properties": {
+                "existingSecret": { "type": "string" },
+                "existingSecretAccessKeyKey": { "type": "string" },
+                "existingSecretSecretKeyKey": { "type": "string" }
+              }
+            },
+            "azure": {
+              "type": "object",
+              "properties": {
+                "existingSecret": { "type": "string" },
+                "existingSecretKey": { "type": "string" }
+              }
+            },
+            "oss": {
+              "type": "object",
+              "properties": {
+                "existingSecret": { "type": "string" },
+                "existingSecretKey": { "type": "string" }
+              }
+            },
+            "gcs": {
+              "type": "object",
+              "properties": {
+                "existingSecret": { "type": "string" },
+                "existingSecretKey": { "type": "string" }
+              }
+            }
+          }
+        },
+        "controller": {
+          "type": "object",
+          "properties": {
+            "image": {
+              "$ref": "#/$defs/imageSpec"
+            },
+            "probes": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Probes for the registryctl sidecar (full Kubernetes probe specs, rendered verbatim)."
+            }
+          }
+        },
+        "credentials": {
+          "type": "object",
+          "description": "Registry basic-auth credentials used by core/jobservice to talk to the registry.",
+          "properties": {
+            "username": { "type": "string" },
+            "password": { "type": "string" },
+            "existingSecret": {
+              "type": "string",
+              "description": "Existing Secret with keys REGISTRY_PASSWD and REGISTRY_HTPASSWD."
+            },
+            "htpasswdString": {
+              "type": "string",
+              "description": "Pre-computed htpasswd line (stable across renders, GitOps-friendly)."
+            }
+          }
+        },
+        "persistence": {
+          "$ref": "#/$defs/persistence"
+        }
+      }
+    },
+    "portal": {
+      "type": "object",
+      "description": "Harbor Portal component configuration",
+      "allOf": [
+        { "$ref": "#/$defs/harborComponent" }
+      ],
+      "properties": {
+        "serviceAnnotations": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Annotations for the portal Service."
+        }
+      }
+    },
+    "jobservice": {
+      "type": "object",
+      "description": "Harbor Jobservice component configuration",
+      "allOf": [
+        { "$ref": "#/$defs/harborComponent" }
+      ],
+      "properties": {
+        "existingSecret": {
+          "type": "string",
+          "description": "Existing Secret holding the jobservice inter-component secret (auto-generated when empty)."
+        },
+        "existingSecretKey": {
+          "type": "string",
+          "description": "Key in jobservice.existingSecret that holds the secret (defaults to JOBSERVICE_SECRET)."
+        },
+        "persistence": {
+          "$ref": "#/$defs/persistence"
+        }
+      }
+    },
+    "exporter": {
+      "type": "object",
+      "description": "Harbor Exporter component configuration",
+      "allOf": [
+        { "$ref": "#/$defs/harborComponent" }
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "database": {
+      "type": "object",
+      "description": "External database configuration (required)",
+      "required": ["host"],
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "Database host",
+          "minLength": 1
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 5432
+        },
+        "username": {
+          "type": "string",
+          "default": "postgres"
+        },
+        "password": {
+          "type": "string"
+        },
+        "database": {
+          "type": "string",
+          "default": "registry"
+        },
+        "sslmode": {
+          "type": "string",
+          "enum": ["disable", "require", "verify-ca", "verify-full"],
+          "default": "disable"
+        },
+        "maxIdleConns": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 100
+        },
+        "maxOpenConns": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 900
+        },
+        "existingSecret": {
+          "type": "string"
+        },
+        "existingSecretKey": {
+          "type": "string"
+        },
+        "existingTlsSecret": {
+          "type": "string",
+          "description": "Secret with ca.crt (+ tls.crt + tls.key for mTLS) for PostgreSQL TLS"
+        },
+        "clientCertEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include sslcert/sslkey in the auto-built POSTGRESQL_URL"
+        },
+        "connMaxIdleTime": {
+          "type": "string"
+        },
+        "connMaxLifetime": {
+          "type": "string"
+        }
+      }
+    },
+    "valkey": {
+      "type": "object",
+      "description": "Valkey (Redis-compatible) subchart configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "architecture": {
+          "type": "string",
+          "enum": ["standalone", "replication"],
+          "default": "standalone"
+        },
+        "auth": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "password": {
+              "type": "string"
+            }
+          }
+        },
+        "master": {
+          "type": "object"
+        }
+      }
+    },
+    "externalRedis": {
+      "type": "object",
+      "description": "External Redis configuration (when valkey.enabled=false)",
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 6379
+        },
+        "password": {
+          "type": "string"
+        },
+        "sentinelMasterSet": {
+          "type": "string"
+        },
+        "existingSecret": {
+          "type": "string",
+          "description": "Existing Secret containing the Redis password"
+        },
+        "existingSecretKey": {
+          "type": "string",
+          "description": "Key in externalRedis.existingSecret that holds the Redis password (defaults to REDIS_PASSWORD)"
+        },
+        "username": {
+          "type": "string"
+        },
+        "tlsOptions": {
+          "type": "object",
+          "properties": {
+            "enable": {
+              "type": "boolean",
+              "default": false
+            },
+            "existingCaSecret": {
+              "type": "string",
+              "description": "Secret holding a CA bundle that all Harbor components should trust (Redis, S3, OIDC, etc.). Mounted at /etc/harbor/extra-ca."
+            },
+            "existingCaSecretKey": {
+              "type": "string",
+              "default": "ca.crt",
+              "description": "Key inside existingCaSecret that holds the PEM-encoded CA bundle"
+            }
+          }
+        }
+      }
+    },
+    "trivy": {
+      "type": "object",
+      "description": "Trivy scanner subchart configuration",
+      "allOf": [
+        { "$ref": "#/$defs/harborComponent" }
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "persistence": {
+          "$ref": "#/$defs/persistence"
+        },
+        "debugMode": {
+          "type": "boolean",
+          "description": "Verbose scanning log."
+        },
+        "vulnType": {
+          "type": "string",
+          "description": "Comma-separated vulnerability types (os,library)."
+        },
+        "severity": {
+          "type": "string",
+          "description": "Comma-separated severities to check."
+        },
+        "ignoreUnfixed": {
+          "type": "boolean",
+          "description": "Display only fixed vulnerabilities."
+        },
+        "insecure": {
+          "type": "boolean",
+          "description": "Skip verifying the registry certificate."
+        },
+        "gitHubToken": {
+          "type": "string",
+          "description": "GitHub token for Trivy DB downloads (raises the anonymous rate limit)."
+        },
+        "skipUpdate": {
+          "type": "boolean",
+          "description": "Disable Trivy DB downloads."
+        },
+        "skipJavaDBUpdate": {
+          "type": "boolean",
+          "description": "Disable Trivy Java DB downloads."
+        },
+        "offlineScan": {
+          "type": "boolean",
+          "description": "Do not resolve dependencies over the network during scans."
+        },
+        "securityCheck": {
+          "type": "string",
+          "description": "Comma-separated security issue kinds to detect (defaults to vuln)."
+        },
+        "timeout": {
+          "type": "string",
+          "description": "Scan timeout (Go duration, e.g. 5m0s)."
+        },
+        "dbRepository": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "OCI repositories for the Trivy vulnerability DB, in priority order."
+        },
+        "javaDBRepository": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "OCI repositories for the Trivy Java DB, in priority order."
+        }
+      }
+    },
+    "tls": {
+      "type": "object",
+      "description": "TLS configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Pod-level TLS for core/registry (set false when terminating TLS at the ingress / load balancer)."
+        },
+        "certSource": {
+          "type": "string",
+          "enum": ["auto", "secret", "none"],
+          "description": "TLS certificate source."
+        },
+        "certManager": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "issuerRef": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "kind": { "type": "string" }
+              }
+            },
+            "duration": {
+              "type": "string"
+            },
+            "renewBefore": {
+              "type": "string"
+            }
+          }
+        },
+        "customSecrets": {
+          "type": "object",
+          "properties": {
+            "core": { "type": "string" },
+            "registry": { "type": "string" }
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "description": "Monitoring configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "serviceMonitor": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "namespace": {
+              "type": "string"
+            },
+            "labels": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "interval": {
+              "type": "string",
+              "pattern": "^[0-9]+(ms|s|m|h)$"
+            },
+            "scrapeTimeout": {
+              "type": "string",
+              "pattern": "^[0-9]+(ms|s|m|h)$"
+            },
+            "honorLabels": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "extraManifests": {
+      "type": "array",
+      "description": "Extra static manifests to deploy"
+    },
+    "extraTemplateManifests": {
+      "type": "array",
+      "description": "Extra templated manifests to deploy"
+    }
+  },
+  "$defs": {
+    "imageSpec": {
+      "type": "object",
+      "properties": {
+        "repository": {
+          "type": "string"
+        },
+        "tag": {
+          "type": "string"
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "description": "Kubernetes resource requests and limits",
+      "properties": {
+        "requests": {
+          "type": "object",
+          "properties": {
+            "cpu": { "type": ["string", "integer", "number"] },
+            "memory": { "type": "string" }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "cpu": { "type": ["string", "integer", "number"] },
+            "memory": { "type": "string" }
+          }
+        }
+      }
+    },
+    "securityContext": {
+      "type": "object",
+      "description": "Container security context",
+      "properties": {
+        "runAsNonRoot": { "type": "boolean" },
+        "runAsUser": { "type": "integer" },
+        "runAsGroup": { "type": "integer" },
+        "readOnlyRootFilesystem": { "type": "boolean" },
+        "allowPrivilegeEscalation": { "type": "boolean" },
+        "capabilities": {
+          "type": "object",
+          "properties": {
+            "drop": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "add": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "seccompProfile": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["RuntimeDefault", "Localhost", "Unconfined"]
+            }
+          }
+        }
+      }
+    },
+    "podSecurityContext": {
+      "type": "object",
+      "description": "Pod security context",
+      "properties": {
+        "fsGroup": { "type": "integer" },
+        "fsGroupChangePolicy": {
+          "type": "string",
+          "enum": ["OnRootMismatch", "Always"]
+        },
+        "runAsNonRoot": { "type": "boolean" },
+        "runAsUser": { "type": "integer" },
+        "runAsGroup": { "type": "integer" },
+        "seccompProfile": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["RuntimeDefault", "Localhost", "Unconfined"]
+            }
+          }
+        }
+      }
+    },
+    "serviceAccount": {
+      "type": "object",
+      "properties": {
+        "create": {
+          "type": "boolean",
+          "default": true
+        },
+        "name": {
+          "type": "string"
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "automountServiceAccountToken": {
+          "type": "boolean"
+        }
+      }
+    },
+    "persistence": {
+      "type": "object",
+      "description": "Persistence configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "resourcePolicy": {
+          "type": "string",
+          "description": "Set to keep to prevent PVC deletion on helm uninstall (empty string opts into deletion)."
+        },
+        "storageClass": {
+          "type": "string"
+        },
+        "accessModes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["ReadWriteOnce", "ReadOnlyMany", "ReadWriteMany"]
+          }
+        },
+        "size": {
+          "type": "string",
+          "pattern": "^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)?$"
+        },
+        "existingClaim": {
+          "type": "string"
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "pdb": {
+      "type": "object",
+      "description": "PodDisruptionBudget configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "minAvailable": {
+          "oneOf": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "string", "pattern": "^[0-9]+%$" }
+          ]
+        },
+        "maxUnavailable": {
+          "oneOf": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "string", "pattern": "^[0-9]+%$" }
+          ]
+        }
+      }
+    },
+    "harborComponent": {
+      "type": "object",
+      "properties": {
+        "config": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Primary component config. For env-driven components (core, exporter, trivy) it is flattened to env vars via toEnvVars. For file-driven components (registry, jobservice) it is the config file body passed through verbatim."
+        },
+        "secret": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Sensitive config (converted to env vars in a Secret)"
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Supplementary env vars flattened via toEnvVars. Used by file-driven components (jobservice) where config holds the YAML config file rather than env vars."
+        },
+        "probes": {
+          "type": ["object", "null"],
+          "description": "Container probes. Each key holds a full Kubernetes probe spec rendered verbatim; set a probe to null to omit it.",
+          "properties": {
+            "startup": { "type": ["object", "null"] },
+            "liveness": { "type": ["object", "null"] },
+            "readiness": { "type": ["object", "null"] }
+          }
+        },
+        "existingConfigMap": {
+          "type": "string",
+          "description": "Externally-managed ConfigMap holding the component's config file, used instead of the chart-generated one. Applies to file-driven components (registry, jobservice, portal)."
+        },
+        "extraEnv": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "value": { "type": "string" },
+              "valueFrom": { "type": "object" }
+            },
+            "required": ["name"]
+          }
+        },
+        "initContainers": {
+          "type": "array"
+        },
+        "topologySpreadConstraints": {
+          "type": "array"
+        },
+        "deploymentStrategy": {
+          "type": "object"
+        },
+        "priorityClassName": {
+          "type": "string"
+        },
+        "revisionHistoryLimit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "image": {
+          "$ref": "#/$defs/imageSpec"
+        },
+        "replicas": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 1
+        },
+        "resources": {
+          "$ref": "#/$defs/resources"
+        },
+        "nodeSelector": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "tolerations": {
+          "type": "array"
+        },
+        "hostAliases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "ip": { "type": "string" },
+              "hostnames": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            },
+            "required": ["ip", "hostnames"]
+          }
+        },
+        "lifecycle": {
+          "type": "object",
+          "properties": {
+            "postStart": { "type": "object" },
+            "preStop": { "type": "object" }
+          }
+        },
+        "autoscaling": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "minReplicas": { "type": "integer", "minimum": 1 },
+            "maxReplicas": { "type": "integer", "minimum": 1 },
+            "targetCPUUtilizationPercentage": { "type": "integer", "minimum": 1, "maximum": 100 },
+            "targetMemoryUtilizationPercentage": { "type": "integer", "minimum": 1, "maximum": 100 },
+            "metrics": { "type": "array" },
+            "behavior": { "type": "object" }
+          }
+        },
+        "affinity": {
+          "type": "object"
+        },
+        "podAnnotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "podLabels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "serviceAccount": {
+          "$ref": "#/$defs/serviceAccount"
+        },
+        "securityContext": {
+          "$ref": "#/$defs/securityContext"
+        },
+        "podSecurityContext": {
+          "$ref": "#/$defs/podSecurityContext"
+        },
+        "pdb": {
+          "$ref": "#/$defs/pdb"
+        }
+      }
+    }
+  }
+}

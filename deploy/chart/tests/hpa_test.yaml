@@ -1,0 +1,210 @@
+# Regression guards for the HorizontalPodAutoscaler feature.
+# Tracks upstream goharbor/harbor-helm#1068.
+#
+# When a component opts in via `<component>.autoscaling.enabled=true`:
+#   1. An HPA targeting that component is rendered (autoscaling/v2)
+#   2. The component's Deployment / StatefulSet must NOT set `replicas:`
+#      (otherwise helm upgrade would fight the HPA on every roll-out)
+#   3. Helm fails fast at template time if maxReplicas is missing or
+#      minReplicas > maxReplicas (rather than letting K8s reject)
+suite: HPA / autoscaling
+templates:
+  - templates/hpa.yaml
+  - templates/core.deployment.yaml
+  - templates/core.configmap.yaml
+  - templates/core.secret.yaml
+  - templates/jobservice.deployment.yaml
+  - templates/jobservice.configmap.yaml
+  - templates/jobservice.configmap-env.yaml
+  - templates/jobservice.secret.yaml
+  - templates/registry.deployment.yaml
+  - templates/registry.configmap.yaml
+  - templates/registry.secret.yaml
+  - templates/registryctl.configmap.yaml
+  - templates/registryctl.secret.yaml
+  - templates/portal.deployment.yaml
+  - templates/portal.configmap.yaml
+  - templates/trivy.statefulset.yaml
+  - templates/trivy.secret.yaml
+  - templates/validate-values.yaml
+tests:
+  # Default: no HPA exists for any component.
+  - it: should render zero HPAs when no component enables autoscaling
+    template: templates/hpa.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render core HPA and omit replicas when core.autoscaling.enabled
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.autoscaling.enabled: true
+      core.autoscaling.minReplicas: 2
+      core.autoscaling.maxReplicas: 8
+      core.autoscaling.targetCPUUtilizationPercentage: 70
+    template: templates/hpa.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: HorizontalPodAutoscaler
+      - equal:
+          path: spec.scaleTargetRef.kind
+          value: Deployment
+      - equal:
+          path: spec.scaleTargetRef.name
+          value: RELEASE-NAME-harbor-next-core
+      - equal:
+          path: spec.minReplicas
+          value: 2
+      - equal:
+          path: spec.maxReplicas
+          value: 8
+      - equal:
+          path: spec.metrics[0].resource.target.averageUtilization
+          value: 70
+
+  - it: should omit replicas on core Deployment when core.autoscaling.enabled
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.autoscaling.enabled: true
+      core.autoscaling.maxReplicas: 5
+    asserts:
+      - notExists:
+          path: spec.replicas
+
+  # When autoscaling is disabled (default), replicas: must still render —
+  # otherwise the Deployment has no replicas at all.
+  - it: should keep replicas on core Deployment when autoscaling is disabled
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.replicas: 3
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3
+
+  - it: should render memory metric in addition to CPU when set
+    template: templates/hpa.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.autoscaling.enabled: true
+      core.autoscaling.maxReplicas: 5
+      core.autoscaling.targetCPUUtilizationPercentage: 60
+      core.autoscaling.targetMemoryUtilizationPercentage: 80
+    asserts:
+      - lengthEqual:
+          path: spec.metrics
+          count: 2
+      - equal:
+          path: spec.metrics[0].resource.name
+          value: cpu
+      - equal:
+          path: spec.metrics[1].resource.name
+          value: memory
+
+  - it: should pass through behavior block
+    template: templates/hpa.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.autoscaling.enabled: true
+      core.autoscaling.maxReplicas: 5
+      core.autoscaling.behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 300
+    asserts:
+      - equal:
+          path: spec.behavior.scaleDown.stabilizationWindowSeconds
+          value: 300
+
+  # Trivy is a StatefulSet — HPA scaleTargetRef.kind must reflect that.
+  - it: should render HPA targeting StatefulSet for trivy
+    template: templates/hpa.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trivy.enabled: true
+      trivy.autoscaling.enabled: true
+      trivy.autoscaling.maxReplicas: 4
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.scaleTargetRef.kind
+          value: StatefulSet
+      - equal:
+          path: spec.scaleTargetRef.name
+          value: RELEASE-NAME-harbor-next-trivy
+
+  # Trivy HPA must NOT render when trivy itself is disabled — otherwise
+  # the HPA targets a non-existent StatefulSet and K8s warns.
+  - it: should skip trivy HPA when trivy.enabled=false
+    template: templates/hpa.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trivy.enabled: false
+      trivy.autoscaling.enabled: true
+      trivy.autoscaling.maxReplicas: 4
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render one HPA per opted-in component
+    template: templates/hpa.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.autoscaling.enabled: true
+      core.autoscaling.maxReplicas: 5
+      jobservice.autoscaling.enabled: true
+      jobservice.autoscaling.maxReplicas: 5
+      registry.autoscaling.enabled: true
+      registry.autoscaling.maxReplicas: 5
+    asserts:
+      - hasDocuments:
+          count: 3
+
+  # Validation: fail-fast when minReplicas > maxReplicas.
+  - it: should fail when minReplicas exceeds maxReplicas
+    template: templates/validate-values.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.autoscaling.enabled: true
+      core.autoscaling.minReplicas: 10
+      core.autoscaling.maxReplicas: 5
+    asserts:
+      - failedTemplate:
+          errorMessage: "core.autoscaling.minReplicas (10) must be <= core.autoscaling.maxReplicas (5)."
+
+  - it: should fail when maxReplicas is missing
+    template: templates/validate-values.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.autoscaling.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "core.autoscaling.enabled=true requires core.autoscaling.maxReplicas to be set."

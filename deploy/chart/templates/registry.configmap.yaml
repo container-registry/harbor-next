@@ -1,0 +1,38 @@
+{{- if not .Values.registry.existingConfigMap }}
+{{- $chartConfig := include "harbor.registry.chartManagedConfig" . | fromYaml }}
+{{- $userConfig := deepCopy (.Values.registry.config | default dict) }}
+{{- $merged := mustMergeOverwrite $chartConfig $userConfig }}
+{{- /* Storage driver resolution. The chart default storage block carries
+       only meta keys (cache/maintenance/delete/redirect) — never a driver —
+       so a user setting `storage.s3` can never collide with a chart default.
+       No driver set -> default to filesystem. More than one -> fail at
+       template time instead of letting distribution CrashLoop at boot. */}}
+{{- $storage := $merged.storage | default dict }}
+{{- $drivers := list }}
+{{- range $k, $v := $storage }}
+{{- if and (not (has $k (list "cache" "delete" "maintenance" "redirect" "tag"))) (not (kindIs "invalid" $v)) }}
+{{- $drivers = append $drivers $k }}
+{{- end }}
+{{- end }}
+{{- if gt (len $drivers) 1 }}
+{{- fail (printf "registry.config.storage defines multiple drivers (%s) — distribution requires exactly one. Remove all but one driver key." (join ", " $drivers)) }}
+{{- else if eq (len $drivers) 0 }}
+{{- $_ := set $storage "filesystem" (dict "rootdirectory" "/storage") }}
+{{- $_ := set $merged "storage" $storage }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "harbor.fullname" . }}-registry
+  labels:
+{{ include "harbor.labels" . | indent 4 }}
+data:
+  config.yml: |+
+{{ toYaml $merged | indent 4 }}
+  ctl-config.yml: |+
+    ---
+    protocol: "http"
+    port: 8080
+    log_level: {{ .Values.logLevel }}
+    registry_config: "/etc/registry/config.yml"
+{{- end }}

@@ -1,0 +1,169 @@
+# All tests assert chart-computed output for known inputs. Pure Helm
+# pass-through tests (replicas, podAnnotations, nodeSelector, etc.)
+# were removed — they only proved `--set` works, not that the chart
+# does anything with the value. Full-render regression coverage for
+# the exporter component lives in snapshots_test.yaml.
+suite: exporter component tests
+templates:
+  - templates/exporter.deployment.yaml
+  - templates/exporter.service.yaml
+  - templates/exporter.configmap-env.yaml
+  - templates/exporter.secret.yaml
+  - templates/serviceaccounts.yaml
+tests:
+  # Pins: exporter Deployment is gated by .Values.exporter.enabled (default-off, off-by-flag).
+  - it: should not render exporter Deployment when disabled
+    template: templates/exporter.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      exporter.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Pins: exporter Service is gated by the same .Values.exporter.enabled flag.
+  - it: should not render exporter Service when disabled
+    template: templates/exporter.service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      exporter.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Pins: chart writes HARBOR_DATABASE_HOST/PORT/USERNAME env entries from
+  # the shared .Values.database.* block (not exporter-local config).
+  - it: should wire database env from .Values.database
+    template: templates/exporter.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: mydb.example.com
+      harborAdminPassword: Harbor12345
+      database.port: 5433
+      database.username: harbor_user
+      exporter.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_DATABASE_HOST
+            value: "mydb.example.com"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_DATABASE_PORT
+            value: "5433"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_DATABASE_USERNAME
+            value: "harbor_user"
+
+  # ============================================================================
+  # exporter.config / exporter.secret — forward-compat env passthrough.
+  # Exporter is env-driven; a new HARBOR_EXPORTER_* setting works with no
+  # chart change via toEnvVars → ConfigMap/Secret → envFrom.
+  # ============================================================================
+
+  # A brand-new config key the chart has never heard of round-trips into the
+  # exporter env ConfigMap.
+  - it: should render arbitrary exporter.config into the env ConfigMap
+    template: templates/exporter.configmap-env.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      exporter.enabled: true
+      exporter.config:
+        SOME_FUTURE_EXPORTER_FLAG: enabled
+        cache_time: 23
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: data.SOME_FUTURE_EXPORTER_FLAG
+          value: "enabled"
+      - equal:
+          path: data.CACHE_TIME
+          value: "23"
+
+  # The Deployment envFrom-references the env ConfigMap when config is set.
+  - it: should envFrom the exporter env ConfigMap when config is set
+    template: templates/exporter.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      exporter.enabled: true
+      exporter.config:
+        SOME_FUTURE_EXPORTER_FLAG: enabled
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: RELEASE-NAME-harbor-next-exporter-env
+
+  # No empty ConfigMap and no envFrom when config is unset (default).
+  - it: should not render exporter env ConfigMap when config is empty
+    template: templates/exporter.configmap-env.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      exporter.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Sensitive values land base64-encoded in a dedicated Secret.
+  - it: should b64-encode exporter.secret into the exporter Secret
+    template: templates/exporter.secret.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      exporter.enabled: true
+      exporter.secret:
+        MY_TOKEN: s3cr3t
+    asserts:
+      - isKind:
+          of: Secret
+      - equal:
+          path: data.MY_TOKEN
+          value: "czNjcjN0"
+
+  # Regression guard for the Copilot review finding on PR #56: external
+  # Redis with a password put $(REDIS_PASSWORD) into HARBOR_REDIS_URL
+  # while the env var was only defined for valkey.auth.enabled — the
+  # exporter got a literal, unexpanded placeholder in its Redis URL.
+  # (REDIS_PASSWORD must also be defined BEFORE the URL in the env list;
+  # Kubernetes does not expand forward references.)
+  - it: should inject REDIS_PASSWORD env for external Redis with password
+    template: templates/exporter.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      exporter.enabled: true
+      valkey.enabled: false
+      externalRedis.host: redis.ext
+      externalRedis.password: secretpw
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_REDIS_URL
+            value: "redis://:$(REDIS_PASSWORD)@redis.ext:6379/1"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: RELEASE-NAME-harbor-next-redis
+                key: REDIS_PASSWORD

@@ -1,0 +1,591 @@
+# Tests assert chart-computed output for known inputs or fail-fast guards.
+# Pure Helm pass-through tests were removed — they only proved `--set`
+# works, not that the chart does anything with the value. Full-render
+# regression coverage lives in snapshots_test.yaml.
+suite: registry component tests
+templates:
+  - templates/registry.deployment.yaml
+  - templates/registry.service.yaml
+  - templates/registry.configmap.yaml
+  - templates/registry.secret.yaml
+  - templates/registry.pvc.yaml
+  - templates/registryctl.configmap.yaml
+  - templates/registryctl.secret.yaml
+tests:
+  # Pins the two-container layout (registry + registryctl sidecar) and
+  # the container ordering that the REGISTRY_HTTP_SECRET tests below
+  # depend on (containers[0]=registry, containers[1]=registryctl).
+  - it: should have both registry and registryctl containers in order
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 2
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: registry
+      - equal:
+          path: spec.template.spec.containers[1].name
+          value: registryctl
+
+  # Pins the hardcoded registry (5000) and registryctl (8080) ports and
+  # their port names — both names are consumed by Service selectors and
+  # the ingress/HTTPRoute backend.service.port.name references.
+  - it: should create registry service with correct ports
+    template: templates/registry.service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - equal:
+          path: spec.ports[0].name
+          value: http-registry
+      - equal:
+          path: spec.ports[0].port
+          value: 5000
+      - equal:
+          path: spec.ports[1].name
+          value: http-controller
+      - equal:
+          path: spec.ports[1].port
+          value: 8080
+
+  # Pins the PVC-gating conditional: a PVC is rendered only when
+  # persistence.enabled=true AND no existingClaim is set. The chart no
+  # longer inspects storage backend (registry.config is opaque to the
+  # PVC template) — users are responsible for aligning persistence with
+  # their chosen backend.
+  - it: should create PVC when persistence is enabled
+    template: templates/registry.pvc.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.persistence.enabled: true
+      registry.persistence.size: 100Gi
+    asserts:
+      - isKind:
+          of: PersistentVolumeClaim
+      - equal:
+          path: spec.resources.requests.storage
+          value: 100Gi
+
+  # Pins the gating: persistence.enabled=false suppresses the PVC
+  # regardless of which storage backend is in registry.config.
+  - it: should not create PVC when persistence is disabled
+    template: templates/registry.pvc.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.persistence.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # ============================================================================
+  # registry.config — YAML passthrough into config.yml
+  # ============================================================================
+
+  # The chart default ships NO storage driver — the filesystem default is
+  # injected at render time only when the user set none. This is what kills
+  # the deep-merge footgun: a user's `s3:` can't collide with a chart-side
+  # `filesystem:` because the chart side never has one.
+  - it: should inject filesystem driver when no driver is set
+    template: templates/registry.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - matchRegex:
+          path: data["config.yml"]
+          pattern: "filesystem:"
+      - matchRegex:
+          path: data["config.yml"]
+          pattern: "rootdirectory: /storage"
+
+  # Setting a driver suppresses the filesystem injection — no `null` dance.
+  - it: should render S3 as the only driver without nulling filesystem
+    template: templates/registry.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.config.storage.s3:
+        region: us-west-2
+        bucket: my-harbor-bucket
+        forcepathstyle: true
+    asserts:
+      - matchRegex:
+          path: data["config.yml"]
+          pattern: "region: us-west-2"
+      - matchRegex:
+          path: data["config.yml"]
+          pattern: "forcepathstyle: true"
+      - notMatchRegex:
+          path: data["config.yml"]
+          pattern: "filesystem:"
+
+  # Two drivers must fail at template time — distribution requires exactly
+  # one and would CrashLoop at boot otherwise. Asserted against the
+  # deployment template: its checksum include re-renders the configmap, and
+  # helm-unittest attributes the failure there in multi-template suites.
+  - it: should fail template rendering when two storage drivers are set
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.config.storage.s3.bucket: b
+      registry.config.storage.azure.accountname: a
+    asserts:
+      - failedTemplate:
+          errorPattern: "multiple drivers"
+
+  # Meta keys (cache/maintenance/delete/redirect) are not drivers and never
+  # count toward the exactly-one rule.
+  - it: should not count storage meta keys as drivers
+    template: templates/registry.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.config.storage.s3.bucket: b
+      registry.config.storage.redirect.disable: true
+      registry.config.storage.delete.enabled: true
+    asserts:
+      - matchRegex:
+          path: data["config.yml"]
+          pattern: "bucket: b"
+
+  # ============================================================================
+  # registry.existingConfigMap — chart skips ConfigMap generation
+  # ============================================================================
+
+  - it: should not render registry ConfigMap when existingConfigMap is set
+    template: templates/registry.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.existingConfigMap: my-external-cfg
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should reference existingConfigMap on the registry-config volume
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.existingConfigMap: my-external-cfg
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: registry-config
+            configMap:
+              name: my-external-cfg
+
+  - it: should reference existingConfigMap in registryctl envFrom
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.existingConfigMap: my-external-cfg
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[1].envFrom
+          content:
+            configMapRef:
+              name: my-external-cfg
+
+  # Storage credentials injection is independent of registry.config, so
+  # existingConfigMap users still get correct credential wiring.
+  - it: should still inject S3 env when existingConfigMap and storageCredentials.s3 are both set
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.existingConfigMap: my-external-cfg
+      registry.storageCredentials.s3.existingSecret: my-s3-creds
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REGISTRY_STORAGE_S3_ACCESSKEY
+            valueFrom:
+              secretKeyRef:
+                name: my-s3-creds
+                key: REGISTRY_STORAGE_S3_ACCESSKEY
+
+  # Pins the gating: setting persistence.existingClaim must suppress the
+  # generated PVC (else the chart would create a PVC AND the deployment
+  # would reference an unrelated one).
+  - it: should not render generated PVC when existingClaim is set
+    template: templates/registry.pvc.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.persistence.enabled: true
+      registry.persistence.existingClaim: my-existing-pvc
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Pins the cross-template wiring: when existingClaim is set, the
+  # deployment's storage volume must reference that claim verbatim.
+  - it: should wire existingClaim into the deployment volume
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.persistence.enabled: true
+      registry.persistence.existingClaim: my-existing-pvc
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: storage
+            persistentVolumeClaim:
+              claimName: my-existing-pvc
+
+  # ============================================================================
+  # registry.existingSecret wiring
+  # Regression guards for facffbd3c (Fix #19) and 4fd719d7a.
+  #
+  # When `registry.existingSecret` is set, the generated `*-registry`
+  # Secret stops emitting REGISTRY_HTTP_SECRET. Two consumers must
+  # source it from the BYO Secret instead:
+  #   - the registry container (was missed in facffbd3c → fixed in
+  #     4fd719d7a — only had envFrom on the generated Secret)
+  #   - the registryctl sidecar (had an explicit env from facffbd3c)
+  # `existingSecretKey` defaults to REGISTRY_HTTP_SECRET so an unset
+  # key value can't render `secretKeyRef.key: ""`.
+  # ============================================================================
+
+  - it: should strip REGISTRY_HTTP_SECRET from generated Secret when existingSecret is set
+    template: templates/registry.secret.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.existingSecret: my-reg
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-harbor-next-registry
+    asserts:
+      - notExists:
+          path: data.REGISTRY_HTTP_SECRET
+
+  - it: should inject REGISTRY_HTTP_SECRET into the registry container from existingSecret
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.existingSecret: my-reg
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REGISTRY_HTTP_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: my-reg
+                key: REGISTRY_HTTP_SECRET
+
+  - it: should inject REGISTRY_HTTP_SECRET into the registryctl sidecar from existingSecret
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.existingSecret: my-reg
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: REGISTRY_HTTP_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: my-reg
+                key: REGISTRY_HTTP_SECRET
+
+  - it: should honor a custom existingSecretKey in both containers
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.existingSecret: my-reg
+      registry.existingSecretKey: customRegKey
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REGISTRY_HTTP_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: my-reg
+                key: customRegKey
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: REGISTRY_HTTP_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: my-reg
+                key: customRegKey
+
+  # ============================================================================
+  # registry.storageCredentials.<backend> — BYO Secret patterns.
+  # Tracks the External-Secrets-Operator / Vault use case from
+  # goharbor/harbor-helm#189. Production users need credentials to come
+  # from a managed Secret, not plaintext in values.yaml.
+  #
+  # In the new chart, env injection is gated solely on
+  # `storageCredentials.<backend>.existingSecret` being set — independent
+  # of what backend is active in registry.config (distribution ignores
+  # env vars that don't match its active driver).
+  # ============================================================================
+
+  - it: should inject S3 accesskey/secretkey on both containers from storageCredentials
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.storageCredentials.s3.existingSecret: my-s3-creds
+    asserts:
+      # registry container (index 0)
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REGISTRY_STORAGE_S3_ACCESSKEY
+            valueFrom:
+              secretKeyRef:
+                name: my-s3-creds
+                key: REGISTRY_STORAGE_S3_ACCESSKEY
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REGISTRY_STORAGE_S3_SECRETKEY
+            valueFrom:
+              secretKeyRef:
+                name: my-s3-creds
+                key: REGISTRY_STORAGE_S3_SECRETKEY
+      # registryctl sidecar (index 1) — GC needs the creds too
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: REGISTRY_STORAGE_S3_ACCESSKEY
+            valueFrom:
+              secretKeyRef:
+                name: my-s3-creds
+                key: REGISTRY_STORAGE_S3_ACCESSKEY
+
+  - it: should honor custom S3 key names in the BYO Secret
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.storageCredentials.s3.existingSecret: my-s3-creds
+      registry.storageCredentials.s3.existingSecretAccessKeyKey: AWS_ACCESS_KEY_ID
+      registry.storageCredentials.s3.existingSecretSecretKeyKey: AWS_SECRET_ACCESS_KEY
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REGISTRY_STORAGE_S3_ACCESSKEY
+            valueFrom:
+              secretKeyRef:
+                name: my-s3-creds
+                key: AWS_ACCESS_KEY_ID
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REGISTRY_STORAGE_S3_SECRETKEY
+            valueFrom:
+              secretKeyRef:
+                name: my-s3-creds
+                key: AWS_SECRET_ACCESS_KEY
+
+  - it: should not inject S3 env when storageCredentials.s3.existingSecret is unset
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      # set extraEnv so env: block renders (otherwise path is null and notContains can't assert)
+      registry.extraEnv:
+        - name: SENTINEL_FOR_TEST
+          value: "x"
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REGISTRY_STORAGE_S3_ACCESSKEY
+          any: true
+
+  - it: should inject Azure accountkey on both containers from storageCredentials
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.storageCredentials.azure.existingSecret: my-azure-creds
+      registry.storageCredentials.azure.existingSecretKey: AZURE_KEY
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REGISTRY_STORAGE_AZURE_ACCOUNTKEY
+            valueFrom:
+              secretKeyRef:
+                name: my-azure-creds
+                key: AZURE_KEY
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: REGISTRY_STORAGE_AZURE_ACCOUNTKEY
+            valueFrom:
+              secretKeyRef:
+                name: my-azure-creds
+                key: AZURE_KEY
+
+  - it: should inject OSS accesskeysecret on both containers from storageCredentials
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.storageCredentials.oss.existingSecret: my-oss-creds
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REGISTRY_STORAGE_OSS_ACCESSKEYSECRET
+            valueFrom:
+              secretKeyRef:
+                name: my-oss-creds
+                key: REGISTRY_STORAGE_OSS_ACCESSKEYSECRET
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: REGISTRY_STORAGE_OSS_ACCESSKEYSECRET
+            valueFrom:
+              secretKeyRef:
+                name: my-oss-creds
+                key: REGISTRY_STORAGE_OSS_ACCESSKEYSECRET
+
+  # ============================================================================
+  # Probes — full K8s specs rendered verbatim from values; per-key overrides
+  # coalesce with defaults; null omits the probe entirely.
+  # ============================================================================
+
+  - it: should render fast-start probes with no initialDelay
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.periodSeconds
+          value: 2
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.periodSeconds
+          value: 5
+      - notExists:
+          path: spec.template.spec.containers[0].readinessProbe.initialDelaySeconds
+      - equal:
+          path: spec.template.spec.containers[1].startupProbe.httpGet.path
+          value: /api/health
+
+  - it: should coalesce a single probe override with the remaining defaults
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.probes.readiness.periodSeconds: 9
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.periodSeconds
+          value: 9
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.failureThreshold
+          value: 2
+
+  - it: should omit a probe set to null
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.probes.startup: null
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].startupProbe
+      - exists:
+          path: spec.template.spec.containers[0].livenessProbe
+
+  - it: should mount GCS keyfile Secret when storageCredentials.gcs.existingSecret is set
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.storageCredentials.gcs.existingSecret: my-gcs-key
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: gcs-key
+            secret:
+              secretName: my-gcs-key
+              items:
+                - key: gcs-key.json
+                  path: key.json
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: gcs-key
+            mountPath: /etc/registry/gcs
+            readOnly: true
+
+  # ============================================================================
+  # Pinned-secret wiring (GitOps existingSecret paths)
+  # ============================================================================
+  # Pins: credentials.existingSecret swaps the htpasswd mount to the BYO
+  # Secret (key REGISTRY_HTPASSWD) instead of the generated -htpasswd one.
+  - it: should mount htpasswd from credentials.existingSecret when set
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.credentials.existingSecret: reg-creds
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: registry-htpasswd
+            secret:
+              items:
+                - key: REGISTRY_HTPASSWD
+                  path: passwd
+              secretName: reg-creds

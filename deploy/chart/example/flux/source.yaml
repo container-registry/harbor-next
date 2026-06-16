@@ -1,0 +1,31 @@
+# Chart source. The chart lives in-repo under deploy/chart, so a
+# GitRepository with a path filter is the source today.
+#
+# Once the chart is published to an OCI registry, switch to the
+# OCIRepository at the bottom — it reconciles faster (no git clone) and
+# pins by chart version instead of git revision.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: harbor-next
+  namespace: harbor
+spec:
+  interval: 5m
+  url: https://github.com/container-registry/harbor-next
+  ref:
+    branch: main
+  ignore: |
+    # Only the chart directory matters for this source.
+    /*
+    !/deploy/chart/
+---
+# apiVersion: source.toolkit.fluxcd.io/v1
+# kind: OCIRepository
+# metadata:
+#   name: harbor-next
+#   namespace: harbor
+# spec:
+#   interval: 10m
+#   url: oci://8gears.container-registry.com/8gcr/charts/harbor-next
+#   ref:
+#     semver: ">=2.0.0 <3.0.0"

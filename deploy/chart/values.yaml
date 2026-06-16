@@ -1,0 +1,1805 @@
+# ============================================================================
+# HARBOR NEXT HELM CHART - VALUES
+# ============================================================================
+# This chart uses the `toEnvVars` pattern for configuration.
+# Any Harbor config option can be set via component config/secret sections
+# without requiring chart updates.
+# ============================================================================
+
+# ============================================================================
+# 1. GLOBAL SETTINGS
+# ============================================================================
+
+# -- Global defaults inherited by all components
+global:
+  # -- Number of old ReplicaSets to retain (K8s default is 10)
+  revisionHistoryLimit: 3
+  # -- Priority class name for all component pods
+  priorityClassName: ""
+
+# -- Credentials to pull images
+# imageCredentials:
+#   registry: xyz.com
+#   username: xxx
+#   password: yyy
+#   email: zzz@xyz.com
+imageCredentials: {}
+
+# -- Global image settings
+image:
+  # -- Image pull policy for all Harbor components
+  pullPolicy: IfNotPresent
+
+# -- List of image pull secrets
+# @default -- []
+imagePullSecrets: []
+
+# -- Override the chart name
+nameOverride: ""
+
+# -- Override the full name
+fullnameOverride: ""
+
+# -- External URL for Harbor (REQUIRED)
+# This is the URL users will use to access Harbor (e.g., https://harbor.example.com)
+# @default -- ""
+externalURL: ""
+
+# -- Log level for all components (debug, info, warning, error, fatal)
+logLevel: info
+
+# -- Harbor admin password (initial setup).
+# **REQUIRED** unless `existingSecretAdminPassword` is set.
+# Do not use the legacy default `Harbor12345` — it is publicly known.
+# For production reference a pre-created Secret via
+# `existingSecretAdminPassword` rather than passing the value here.
+# Rotate from the Harbor UI after first login.
+harborAdminPassword: ""
+
+# -- Secret key for encryption (16 characters)
+# Used for encrypting credentials stored in the database
+# @default -- auto-generated
+secretKey: ""
+
+# -- Existing secret containing the admin password (overrides harborAdminPassword)
+existingSecretAdminPassword: ""
+# -- Key in the existing secret for admin password
+existingSecretAdminPasswordKey: HARBOR_ADMIN_PASSWORD
+
+# -- Allow the chart to auto-generate secret material it needs
+# (encryption key, component identity secrets, CSRF key, token-service
+# CA, registry htpasswd, ingress certificate). Convenient for
+# `helm install`, but the generated values are random per render: GitOps
+# engines that template client-side (Argo CD) rotate them on every sync
+# and roll every workload. Set to `false` to instead **fail at render
+# time** naming the value that must be pinned — see the GitOps section
+# in the README and `example/flux/`.
+autoGenSecrets: true
+
+# -- Existing secret containing the encryption key (overrides secretKey).
+# The secret must hold the 16-char key under `SECRET_KEY` and `secretKey`
+# (or override the key name via `existingSecretSecretKeyKey`).
+existingSecretSecretKey: ""
+# -- Key in `existingSecretSecretKey` that holds the encryption key.
+# Used both for the `SECRET_KEY` env on core and the `secret-key`
+# volume mount (which Harbor reads as `/etc/core/key`).
+existingSecretSecretKeyKey: "secretKey"
+
+# -- Cache configuration (Redis-based caching for manifests)
+cache:
+  # -- Enable Redis caching
+  enabled: false
+  # -- Cache expiration in hours
+  expireHours: 24
+
+# The proxy settings for updating trivy vulnerabilities from the Internet and replicating
+# artifacts from/to the registries that cannot be reached directly
+proxy:
+  httpProxy:
+  httpsProxy:
+  noProxy: 127.0.0.1,localhost,.local,.internal
+  components:
+    - core
+    - jobservice
+    - trivy
+
+# ============================================================================
+# 2. EXPOSE / INGRESS / GATEWAY
+# ============================================================================
+# Multiple expose methods are available. Enable only one at a time (enforced by template validation):
+#   - ingress (default) — Kubernetes Ingress resource
+#   - gateway — Gateway API HTTPRoute
+#   - expose.clusterIP — Direct ClusterIP service (for in-cluster or port-forward access)
+#   - expose.nodePort — NodePort service (exposes on every node IP)
+#   - expose.loadBalancer — LoadBalancer service (cloud provider external IP)
+#   - expose.route — OpenShift Route
+
+# -- Direct service exposure (ClusterIP / NodePort / LoadBalancer)
+# Creates a front-door service pointing to core (which proxies portal requests).
+# Internal per-component services are always created regardless of this setting.
+expose:
+  # -- ClusterIP service for direct exposure
+  clusterIP:
+    # -- Enable ClusterIP expose service
+    enabled: false
+    # -- Service name override (defaults to fullname)
+    name: ""
+    # -- Static ClusterIP (empty = auto-assigned)
+    staticClusterIP: ""
+    ports:
+      # -- HTTP port
+      http: 80
+      # -- HTTPS port (only used when tls.enabled=true)
+      https: 443
+    # -- Service annotations
+    annotations: {}
+    # -- Service labels
+    labels: {}
+
+  # -- NodePort service for external access via node IPs
+  nodePort:
+    # -- Enable NodePort expose service
+    enabled: false
+    # -- Service name override (defaults to fullname)
+    name: ""
+    ports:
+      http:
+        # -- Service port for HTTP
+        port: 80
+        # -- NodePort for HTTP (30000-32767, empty = auto-assigned)
+        nodePort: 30002
+      https:
+        # -- Service port for HTTPS
+        port: 443
+        # -- NodePort for HTTPS (30000-32767, empty = auto-assigned)
+        nodePort: 30003
+    # -- Service annotations
+    annotations: {}
+    # -- Service labels
+    labels: {}
+
+  # -- LoadBalancer service for cloud provider external access
+  loadBalancer:
+    # -- Enable LoadBalancer expose service
+    enabled: false
+    # -- Service name override (defaults to fullname)
+    name: ""
+    # -- Static LoadBalancer IP (empty = auto-assigned, cloud-provider dependent)
+    IP: ""
+    ports:
+      # -- HTTP port
+      http: 80
+      # -- HTTPS port
+      https: 443
+    # -- Allowed source IP ranges
+    sourceRanges: []
+    # -- Service annotations
+    annotations: {}
+    # -- Service labels
+    labels: {}
+
+  # -- OpenShift Route for external access
+  route:
+    # -- Enable OpenShift Route
+    enabled: false
+    # -- Route hostname (empty = auto-generated by OpenShift)
+    host: ""
+    # -- Route annotations
+    annotations: {}
+    # -- Route labels
+    labels: {}
+    tls:
+      # -- TLS termination type: edge, passthrough, or reencrypt
+      termination: edge
+      # -- Insecure edge termination policy: Allow, Disable, Redirect
+      insecureEdgeTerminationPolicy: Redirect
+
+# -- Ingress configuration
+ingress:
+  # tls certificate auto-generated
+  autoGenCert: true
+  # -- Enable ingress
+  enabled: true
+  # -- Ingress class name
+  className: ""
+  # -- Ingress annotations
+  annotations: {}
+    # nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  # -- Ingress labels
+  labels: {}
+  # -- Hostname override used by auto-generated ingress certificate
+  # Defaults to first ingress host, or externalURL hostname when ingress.hosts is empty
+  core: ""
+  # -- Additional ingress hosts
+  hosts: []
+    # - host: harbor.example.com
+  # -- Ingress TLS configuration
+  tls: []
+    # - secretName: harbor-tls
+    #   hosts:
+    #     - harbor.example.com
+
+# -- Gateway API configuration (alternative to ingress)
+gateway:
+  # -- Enable Gateway API HTTPRoute
+  enabled: false
+  # -- Gateway parent references
+  parentRefs: []
+    # - name: my-gateway
+    #   namespace: default
+  # -- Hostnames for the HTTPRoute
+  hostnames: []
+    # - harbor.example.com
+
+ipFamily:
+  # ipv6Enabled set to true if ipv6 is enabled in cluster, currently it affected the nginx related component
+  ipv6:
+    enabled: true
+  # ipv4Enabled set to true if ipv4 is enabled in cluster, currently it affected the nginx related component
+  ipv4:
+    enabled: true
+
+# ============================================================================
+# 3. HARBOR COMPONENTS
+# ============================================================================
+# Pattern per component:
+#   config: {} -> ConfigMap (via toEnvVars)
+#   secret: {} -> Secret (via toEnvVars)
+#   extraEnv: [] -> Additional env vars with valueFrom support
+#   K8s settings: image, replicas, resources, etc.
+# ============================================================================
+
+# --- Core ---
+core:
+  # -- Harbor Core application config (converted to env vars in ConfigMap)
+  # Any Harbor Core config can be set here without chart changes
+  # @default -- {}
+  config: {}
+    # Example: CSRF protection, token expiration, etc.
+    # csrf_key: ""
+    # token_expiration: 30
+
+  # -- Sensitive config for Core (converted to env vars in Secret)
+  # @default -- {}
+  secret: {}
+  # -- Use existing secret for Core secret
+  existingSecret: ""
+  # -- Key in existing secret containing the Core secret
+  existingSecretKey: "secret"
+
+  # -- Existing secret for token service key/cert (must contain keys: tls.key, tls.crt)
+  tokenSecretName: ""
+  # -- Token private key (PEM). Auto-generated if both tokenKey and tokenCert are empty and tokenSecretName is empty.
+  tokenKey: ""
+  # -- Token certificate (PEM, signed by tokenKey)
+  tokenCert: ""
+
+  # -- XSRF key (auto-generated if empty)
+  xsrfKey: ""
+  # -- Existing secret for XSRF key
+  existingXsrfSecret: ""
+  # -- Key in existing XSRF secret
+  existingXsrfSecretKey: CSRF_KEY
+
+  # -- Initial user settings JSON applied on first boot
+  configureUserSettings: ""
+
+  # -- Quota update provider (db or redis)
+  quotaUpdateProvider: db
+
+  # -- Artifact pull async flush duration
+  artifactPullAsyncFlushDuration: ""
+
+  # -- GDPR settings
+  gdpr:
+    # -- Enable user deletion for GDPR compliance
+    deleteUser: false
+    # -- Enable audit logs GDPR compliance
+    auditLogsCompliant: false
+
+  # -- Container probes, rendered verbatim (full Kubernetes probe spec —
+  # change paths, ports, timings, or swap httpGet for exec/grpc freely).
+  # `startup` gates liveness/readiness: its 2s period makes the pod Ready
+  # as soon as the endpoint responds instead of after a fixed initialDelay,
+  # while the failureThreshold gives slow first boots (DB migrations) a
+  # 180s budget. Disable a probe by setting it to null.
+  # @default -- See [values.yaml](values.yaml)
+  probes:
+    startup:
+      httpGet:
+        path: /api/v2.0/ping
+        port: core-http
+      periodSeconds: 2
+      failureThreshold: 90
+      timeoutSeconds: 2
+    readiness:
+      httpGet:
+        path: /api/v2.0/ping
+        port: core-http
+      periodSeconds: 5
+      failureThreshold: 2
+      timeoutSeconds: 2
+    liveness:
+      httpGet:
+        path: /api/v2.0/ping
+        port: core-http
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 3
+
+  # -- Extra environment variables with valueFrom support
+  # @default -- []
+  extraEnv: []
+    # - name: MY_SECRET
+    #   valueFrom:
+    #     secretKeyRef:
+    #       name: my-secret
+    #       key: value
+
+  # -- Init containers (run before main containers)
+  initContainers: []
+  # -- Topology spread constraints for pod scheduling
+  topologySpreadConstraints: []
+  # -- Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for
+  # private DNS that does not exist in cluster DNS — service-mesh sidecars,
+  # legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the
+  # Kubernetes PodSpec: a list of `{ip, hostnames}` entries.
+  # @default -- []
+  hostAliases: []
+    # - ip: "10.0.0.10"
+    #   hostnames:
+    #     - "ldap.internal"
+    #     - "smtp.internal"
+  # -- Container `lifecycle` hook spec (preStop / postStart). Common use:
+  # preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding
+  # 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`,
+  # `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all
+  # closed without merge, the gap was never closed there.
+  # @default -- {}
+  lifecycle: {}
+    # preStop:
+    #   exec:
+    #     command: ["/bin/sh", "-c", "sleep 15"]
+  # -- Deployment strategy (empty = K8s default RollingUpdate)
+  # @default -- {}
+  deploymentStrategy: {}
+  #   type: RollingUpdate
+  #   rollingUpdate:
+  #     maxSurge: 25%
+  #     maxUnavailable: 25%
+
+  # -- Service annotations for Core service
+  serviceAnnotations: {}
+
+  # -- Core image settings
+  image:
+    # -- Core image repository
+    repository: 8gears.container-registry.com/8gcr/harbor-core
+    # -- Core image tag (defaults to appVersion)
+    tag: ""
+
+  # -- Number of Core replicas (ignored when autoscaling.enabled=true)
+  replicas: 1
+
+  # -- HorizontalPodAutoscaler configuration. When enabled the chart
+  # OMITS the static `replicas:` field on the Deployment so HPA owns
+  # the replica count. `maxReplicas` is REQUIRED. Tracks upstream
+  # goharbor/harbor-helm#1068.
+  # @default -- See [values.yaml](values.yaml)
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    # maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
+    # metrics: []   # raw HPAv2 metric specs (external / object / pods)
+    # behavior: {}  # scaleUp / scaleDown stabilization windows
+
+  # -- Core resource requests and limits
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+  # -- Node selector for Core pods
+  nodeSelector: {}
+
+  # -- Tolerations for Core pods
+  tolerations: []
+
+  # -- Affinity rules for Core pods
+  affinity: {}
+
+  # -- Additional pod annotations for Core
+  podAnnotations: {}
+
+  # -- Additional pod labels for Core
+  podLabels: {}
+
+  # -- Service account settings for Core
+  serviceAccount:
+    # -- Create a service account for Core
+    create: true
+    # -- Service account name (auto-generated if empty)
+    name: ""
+    # -- Service account annotations
+    annotations: {}
+    # -- Automount service account token
+    automountServiceAccountToken: false
+
+  # -- PodDisruptionBudget for Core
+  pdb:
+    # -- Enable PodDisruptionBudget. When true, exactly one of
+    # `minAvailable` or `maxUnavailable` must be set (Kubernetes
+    # rejects PDBs with both fields).
+    enabled: false
+    # -- Minimum available pods (integer or percentage). Mutually
+    # exclusive with maxUnavailable.
+    # minAvailable: 1
+    # -- Maximum unavailable pods (integer or percentage). Mutually
+    # exclusive with minAvailable.
+    # maxUnavailable: 1
+
+  # -- Security context for Core container
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10000
+    runAsGroup: 10000
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
+
+  # -- Pod security context for Core
+  podSecurityContext:
+    fsGroup: 10000
+
+# --- Registry ---
+registry:
+  # -- Use an externally-managed ConfigMap containing `config.yml` and
+  # `ctl-config.yml` instead of generating one from `config:` below. When
+  # set, the chart skips ConfigMap generation and the Deployment mounts
+  # the named ConfigMap at /etc/registry. Chart-managed runtime values
+  # (redis URL with auth, HTTP secret, storage credentials from
+  # `storageCredentials`, log level, ports) are still injected via env-var
+  # overrides on the Deployment, so they take precedence over whatever is
+  # in the external ConfigMap. Use this for kustomize/GitOps workflows
+  # where `config.yml` is owned by a separate manifest pipeline.
+  existingConfigMap: ""
+
+  # -- Full [distribution/distribution](https://distribution.github.io/distribution/about/configuration/)
+  # `config.yml` passed through verbatim. Used only when
+  # `existingConfigMap` is empty. Replace this entire block to switch
+  # storage backends or add any field distribution supports (notifications,
+  # health, custom middleware, etc.).
+  #
+  # Chart-managed values injected via env-var override at runtime (these
+  # ALWAYS win over what's in this block — do not duplicate here):
+  #   - `http.addr`, `http.secret`, `http.debug.prometheus.enabled`
+  #   - `redis.*` (addr, password, db, tls)
+  #   - `log.level` (from `.Values.logLevel`)
+  #   - storage credentials when `storageCredentials.<backend>.existingSecret` is set
+  #
+  # See `storageCredentials` below for the BYO-Secret pattern. For inline
+  # credentials use `registry.secret` (b64-encoded into the generated
+  # Secret) — do not put plaintext credentials in this block, they would
+  # be visible in the ConfigMap.
+  # @default -- See [values.yaml](values.yaml)
+  config:
+    version: 0.1
+    log:
+      fields:
+        service: registry
+    # Storage driver selection: set EXACTLY ONE driver key (s3, azure, gcs,
+    # oss, ...) next to the meta keys below. The chart default deliberately
+    # carries NO driver — when none is set, `filesystem: {rootdirectory:
+    # /storage}` is injected at render time, and setting `s3:` here simply
+    # takes its place (no need to null anything out). Defining two or more
+    # drivers fails at `helm install/template` time — distribution requires
+    # exactly one and would otherwise CrashLoop at boot.
+    storage:
+      cache:
+        layerinfo: redis
+      maintenance:
+        uploadpurging:
+          enabled: true
+          age: 168h
+          interval: 24h
+          dryrun: false
+      delete:
+        enabled: true
+      redirect:
+        disable: false
+    auth:
+      htpasswd:
+        realm: harbor-registry-basic-realm
+        path: /etc/registry/passwd
+    validation:
+      disabled: true
+    compatibility:
+      schema1:
+        enabled: true
+    # Example — S3 (add under `storage:` above):
+    #
+    # storage:
+    #   s3:
+    #     region: us-east-1
+    #     bucket: my-harbor-bucket
+    #     # forcepathstyle: true   # MinIO / Ceph RGW / SeaweedFS
+    #     # v4auth: true
+    #     # encrypt: false
+    #
+    # Example — Azure Blob:
+    #
+    # storage:
+    #   azure:
+    #     accountname: <name>
+    #     container: <container>
+    #
+    # Example — GCS (with keyfile):
+    #
+    # storage:
+    #   gcs:
+    #     bucket: my-bucket
+    #     keyfile: /etc/registry/gcs/key.json
+    #
+    # Example — GCS (Workload Identity, no keyfile):
+    #
+    # storage:
+    #   gcs:
+    #     bucket: my-bucket
+    #
+    # Example — Alibaba OSS:
+    #
+    # storage:
+    #   oss:
+    #     accesskeyid: <id>
+    #     region: <region>
+    #     bucket: <bucket>
+
+  # -- BYO Secret references for storage credentials. The chart injects
+  # the credential as an env var on both `registry` and `registryctl`
+  # containers; distribution honors `REGISTRY_STORAGE_<BACKEND>_<KEY>`
+  # env overrides for any backend. Set the entry matching the backend you
+  # configured in `config.storage`. Other entries stay empty.
+  #
+  # Env injection is gated only on `existingSecret` being non-empty (not
+  # on which backend is active in `config:`). Setting credentials for an
+  # inactive backend is harmless — distribution ignores env vars not
+  # matching its active driver.
+  # @default -- See [values.yaml](values.yaml)
+  storageCredentials:
+    s3:
+      # -- Existing Secret containing AWS S3 credentials.
+      existingSecret: ""
+      # -- Key in `existingSecret` holding the access key ID.
+      existingSecretAccessKeyKey: REGISTRY_STORAGE_S3_ACCESSKEY
+      # -- Key in `existingSecret` holding the secret access key.
+      existingSecretSecretKeyKey: REGISTRY_STORAGE_S3_SECRETKEY
+    azure:
+      # -- Existing Secret containing the Azure storage account key.
+      existingSecret: ""
+      # -- Key in `existingSecret` holding the account key.
+      existingSecretKey: REGISTRY_STORAGE_AZURE_ACCOUNTKEY
+    oss:
+      # -- Existing Secret containing the Alibaba OSS access key secret.
+      existingSecret: ""
+      # -- Key in `existingSecret` holding the access key secret.
+      existingSecretKey: REGISTRY_STORAGE_OSS_ACCESSKEYSECRET
+    gcs:
+      # -- Existing Secret containing the GCS service-account keyfile.
+      # When set, mounted at /etc/registry/gcs/key.json — reference this
+      # path from `config.storage.gcs.keyfile`. Leave empty when using
+      # Workload Identity (set `serviceAccount.annotations` instead).
+      existingSecret: ""
+      # -- Key in `existingSecret` holding the keyfile JSON content.
+      existingSecretKey: gcs-key.json
+
+  # -- Existing Secret that supplies `REGISTRY_HTTP_SECRET`. When set,
+  # the generated registry Secret omits `REGISTRY_HTTP_SECRET` and the
+  # deployment reads it from this Secret via env. Independent of
+  # `storageCredentials`.
+  existingSecret: ""
+  # -- Key in `registry.existingSecret` that holds `REGISTRY_HTTP_SECRET`.
+  existingSecretKey: "REGISTRY_HTTP_SECRET"
+
+  # Credentials core/jobservice use to authenticate against the registry.
+  # Resolution order:
+  #   1. `existingSecret` — BYO Secret holding BOTH
+  #      `REGISTRY_CREDENTIAL_PASSWORD` (plaintext password) and
+  #      `REGISTRY_HTPASSWD` (matching `<username>:<bcrypt>` htpasswd line,
+  #      mounted into the registry). Nothing is generated. Deterministic.
+  #   2. `htpasswdString` + `password` — fixed htpasswd line in the
+  #      generated Secret. Deterministic.
+  #   3. `password` only — the chart runs `htpasswd` at render time;
+  #      bcrypt re-salts on every render (fails when
+  #      `autoGenSecrets: false`).
+  # Generate the htpasswd line with:
+  #   docker run --rm --entrypoint htpasswd httpd:2 -nbB <username> <password>
+  credentials:
+    username: "harbor_registry_user"
+    password: ""
+    existingSecret: ""
+    htpasswdString: ""
+
+  # -- Sensitive config for Registry. Each key is b64-encoded into the
+  # generated registry Secret and injected on both `registry` and
+  # `registryctl` containers via `envFrom`. Use for inline credentials,
+  # e.g.:
+  #
+  #     secret:
+  #       REGISTRY_STORAGE_S3_ACCESSKEY: <plaintext>
+  #       REGISTRY_STORAGE_S3_SECRETKEY: <plaintext>
+  #
+  # Prefer `storageCredentials.<backend>.existingSecret` for production
+  # (External-Secrets-Operator / Vault / SealedSecrets workflows).
+  # @default -- {}
+  secret: {}
+
+  # -- Extra environment variables with valueFrom support
+  # @default -- []
+  extraEnv: []
+
+  # -- Init containers (run before main containers)
+  initContainers: []
+  # -- Topology spread constraints for pod scheduling
+  topologySpreadConstraints: []
+  # -- Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for
+  # private DNS that does not exist in cluster DNS — service-mesh sidecars,
+  # legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the
+  # Kubernetes PodSpec: a list of `{ip, hostnames}` entries.
+  # @default -- []
+  hostAliases: []
+    # - ip: "10.0.0.10"
+    #   hostnames:
+    #     - "ldap.internal"
+    #     - "smtp.internal"
+  # -- Container `lifecycle` hook spec (preStop / postStart). Common use:
+  # preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding
+  # 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`,
+  # `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all
+  # closed without merge, the gap was never closed there.
+  # @default -- {}
+  lifecycle: {}
+    # preStop:
+    #   exec:
+    #     command: ["/bin/sh", "-c", "sleep 15"]
+  # -- Deployment strategy (empty = K8s default RollingUpdate)
+  # @default -- {}
+  deploymentStrategy: {}
+
+  # -- Registry image settings
+  image:
+    # -- Registry image repository
+    repository: 8gears.container-registry.com/8gcr/harbor-registry
+    # -- Registry image tag (defaults to appVersion)
+    tag: ""
+
+  # -- Probes for the registry container. Full Kubernetes probe specs,
+  # rendered verbatim — see `core.probes` for the tuning rationale.
+  # @default -- See [values.yaml](values.yaml)
+  probes:
+    startup:
+      httpGet:
+        path: /
+        port: 5000
+      periodSeconds: 2
+      failureThreshold: 15
+      timeoutSeconds: 2
+    readiness:
+      httpGet:
+        path: /
+        port: 5000
+      periodSeconds: 5
+      failureThreshold: 2
+      timeoutSeconds: 2
+    liveness:
+      httpGet:
+        path: /
+        port: 5000
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 3
+
+  # -- Registryctl image settings
+  controller:
+    image:
+      # -- Registryctl image repository
+      repository: 8gears.container-registry.com/8gcr/harbor-registryctl
+      # -- Registryctl image tag (defaults to appVersion)
+      tag: ""
+    # -- Probes for the registryctl sidecar. Same shape as `core.probes`.
+    # @default -- See [values.yaml](values.yaml)
+    probes:
+      startup:
+        httpGet:
+          path: /api/health
+          port: 8080
+        periodSeconds: 2
+        failureThreshold: 15
+        timeoutSeconds: 2
+      readiness:
+        httpGet:
+          path: /api/health
+          port: 8080
+        periodSeconds: 5
+        failureThreshold: 2
+        timeoutSeconds: 2
+      liveness:
+        httpGet:
+          path: /api/health
+          port: 8080
+        periodSeconds: 10
+        failureThreshold: 3
+        timeoutSeconds: 3
+
+  # -- Number of Registry replicas (ignored when autoscaling.enabled=true)
+  replicas: 1
+
+  # -- HorizontalPodAutoscaler. See `core.autoscaling` for full docs.
+  # @default -- See [values.yaml](values.yaml)
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    # maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
+    # metrics: []
+    # behavior: {}
+
+  # -- Registry persistence settings
+  persistence:
+    # -- Enable persistence for registry
+    enabled: false
+    # -- Resource policy: "keep" prevents PVC deletion on helm uninstall
+    resourcePolicy: "keep"
+    # -- Storage class for PVC. Omit to use the cluster default StorageClass;
+    # set to "" to opt out of any StorageClass (binds only to PVs with no class).
+    # storageClass: gp3
+    # -- PVC access modes
+    accessModes:
+      - ReadWriteOnce
+    # -- PVC size
+    size: 10Gi
+    # -- Existing PVC name (disables dynamic provisioning)
+    existingClaim: ""
+    # -- Annotations for PVC
+    annotations: {}
+
+  # -- Registry resource requests and limits
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+  # -- Node selector for Registry pods
+  nodeSelector: {}
+
+  # -- Tolerations for Registry pods
+  tolerations: []
+
+  # -- Affinity rules for Registry pods
+  affinity: {}
+
+  # -- Additional pod annotations for Registry
+  podAnnotations: {}
+
+  # -- Additional pod labels for Registry
+  podLabels: {}
+
+  # -- Service account settings for Registry
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+    # -- Automount service account token
+    automountServiceAccountToken: false
+
+  # -- PodDisruptionBudget for Registry
+  pdb:
+    # -- Enable PodDisruptionBudget. When true, exactly one of
+    # `minAvailable` or `maxUnavailable` must be set (Kubernetes
+    # rejects PDBs with both fields).
+    enabled: false
+    # -- Minimum available pods (integer or percentage). Mutually
+    # exclusive with maxUnavailable.
+    # minAvailable: 1
+    # -- Maximum unavailable pods (integer or percentage). Mutually
+    # exclusive with minAvailable.
+    # maxUnavailable: 1
+
+  # -- Security context for Registry container
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10000
+    runAsGroup: 10000
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
+
+  # -- Pod security context for Registry
+  podSecurityContext:
+    fsGroup: 10000
+    fsGroupChangePolicy: OnRootMismatch
+
+# --- Portal ---
+portal:
+  # -- Use an externally-managed ConfigMap containing `nginx.conf` instead
+  # of the chart-generated one. When set, the chart skips ConfigMap
+  # generation and the Deployment mounts the named ConfigMap. Use for
+  # custom nginx configuration (TLS termination, custom headers, extra
+  # locations) without forking the chart. Semantics match
+  # `registry.existingConfigMap`.
+  # Portal serves static Angular assets via nginx and has no env/key
+  # config surface — to customize nginx.conf, point existingConfigMap at
+  # your own ConfigMap (there is no `config`/`secret` passthrough here).
+  existingConfigMap: ""
+
+  # -- Extra environment variables with valueFrom support
+  # @default -- []
+  extraEnv: []
+
+  # -- Init containers (run before main containers)
+  initContainers: []
+  # -- Topology spread constraints for pod scheduling
+  topologySpreadConstraints: []
+  # -- Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for
+  # private DNS that does not exist in cluster DNS — service-mesh sidecars,
+  # legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the
+  # Kubernetes PodSpec: a list of `{ip, hostnames}` entries.
+  # @default -- []
+  hostAliases: []
+    # - ip: "10.0.0.10"
+    #   hostnames:
+    #     - "ldap.internal"
+    #     - "smtp.internal"
+  # -- Container `lifecycle` hook spec (preStop / postStart). Common use:
+  # preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding
+  # 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`,
+  # `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all
+  # closed without merge, the gap was never closed there.
+  # @default -- {}
+  lifecycle: {}
+    # preStop:
+    #   exec:
+    #     command: ["/bin/sh", "-c", "sleep 15"]
+  # -- Deployment strategy (empty = K8s default RollingUpdate)
+  # @default -- {}
+  deploymentStrategy: {}
+
+  # -- Service annotations for Portal service
+  serviceAnnotations: {}
+
+  # -- Container probes, rendered verbatim. See `core.probes` for the
+  # tuning rationale.
+  # @default -- See [values.yaml](values.yaml)
+  probes:
+    startup:
+      httpGet:
+        path: /
+        port: portal-http
+      periodSeconds: 2
+      failureThreshold: 15
+      timeoutSeconds: 2
+    readiness:
+      httpGet:
+        path: /
+        port: portal-http
+      periodSeconds: 5
+      failureThreshold: 2
+      timeoutSeconds: 2
+    liveness:
+      httpGet:
+        path: /
+        port: portal-http
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 3
+
+  # -- Portal image settings
+  image:
+    # -- Portal image repository
+    repository: 8gears.container-registry.com/8gcr/harbor-portal
+    # -- Portal image tag (defaults to appVersion)
+    tag: ""
+
+  # -- Number of Portal replicas (ignored when autoscaling.enabled=true)
+  replicas: 1
+
+  # -- HorizontalPodAutoscaler. See `core.autoscaling` for full docs.
+  # @default -- See [values.yaml](values.yaml)
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    # maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
+    # metrics: []
+    # behavior: {}
+
+  # -- Portal resource requests and limits
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+  # -- Node selector for Portal pods
+  nodeSelector: {}
+
+  # -- Tolerations for Portal pods
+  tolerations: []
+
+  # -- Affinity rules for Portal pods
+  affinity: {}
+
+  # -- Additional pod annotations for Portal
+  podAnnotations: {}
+
+  # -- Additional pod labels for Portal
+  podLabels: {}
+
+  # -- Service account settings for Portal
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+    # -- Automount service account token
+    automountServiceAccountToken: false
+
+  # -- PodDisruptionBudget for Portal
+  pdb:
+    # -- Enable PodDisruptionBudget. When true, exactly one of
+    # `minAvailable` or `maxUnavailable` must be set (Kubernetes
+    # rejects PDBs with both fields).
+    enabled: false
+    # -- Minimum available pods (integer or percentage). Mutually
+    # exclusive with maxUnavailable.
+    # minAvailable: 1
+    # -- Maximum unavailable pods (integer or percentage). Mutually
+    # exclusive with minAvailable.
+    # maxUnavailable: 1
+
+  # -- Security context for Portal container
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10000
+    runAsGroup: 10000
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
+
+  # -- Pod security context for Portal
+  podSecurityContext:
+    fsGroup: 10000
+
+# --- Jobservice ---
+jobservice:
+  # -- Use an externally-managed ConfigMap containing `config.yml` instead
+  # of generating one from `config:` below. Semantics match
+  # `registry.existingConfigMap`.
+  existingConfigMap: ""
+
+  # -- Full Harbor jobservice `config.yml` passed through verbatim. Used
+  # only when `existingConfigMap` is empty.
+  #
+  # Chart-managed values injected via env-var override at runtime:
+  #   - `protocol`, `port` (from chart helpers)
+  #   - `worker_pool.backend`, `worker_pool.workers` (when JOB_SERVICE_*
+  #     env vars are wired by the chart)
+  #   - `worker_pool.redis_pool.redis_url` (chart sets the URL with auth
+  #     via JOB_SERVICE_POOL_REDIS_URL; you can leave a placeholder here)
+  #   - `worker_pool.redis_pool.namespace`
+  #
+  # The following keys are NOT env-overridable (Harbor jobservice limitation
+  # — see src/jobservice/config/config.go). You MUST set them in this
+  # block; changing `.Values.logLevel` or `.Values.metrics.enabled`
+  # globally will NOT propagate here:
+  #   - `metric.enabled`, `metric.path`, `metric.port`
+  #   - `loggers[].level`, `job_loggers[].level`
+  #   - `job_loggers[].sweeper.*`
+  #   - `reaper.*`
+  #   - `max_retrieve_size_mb`
+  # @default -- See [values.yaml](values.yaml)
+  config:
+    protocol: http
+    port: 8080
+    worker_pool:
+      workers: 4
+      backend: redis
+      redis_pool:
+        # redis_url overridden via JOB_SERVICE_POOL_REDIS_URL env at runtime
+        namespace: harbor_job_service_namespace
+        idle_timeout_second: 3600
+    job_loggers:
+      - name: FILE
+        level: INFO
+        settings:
+          base_dir: /var/log/jobs
+        sweeper:
+          duration: 14
+          settings:
+            work_dir: /var/log/jobs
+    loggers:
+      - name: STD_OUTPUT
+        level: INFO
+    reaper:
+      max_update_hours: 24
+      max_dangling_hours: 168
+    # Uncomment to enable Prometheus scraping (mirror .Values.metrics.enabled):
+    # metric:
+    #   enabled: true
+    #   path: /metrics
+    #   port: 8001
+
+  # -- Supplementary env vars for the jobservice container (and the
+  # jobservice ConfigMap-env). Nested maps flatten to `UPPER_SNAKE_CASE`
+  # keys via `harbor.toEnvVars`. Use for any setting Harbor reads from env
+  # but is not part of the YAML config (e.g. webhook tuning).
+  # @default -- {}
+  env: {}
+
+  # -- Sensitive config for Jobservice (converted to env vars in Secret)
+  # @default -- {}
+  secret: {}
+  # -- Use existing secret for Jobservice secret
+  existingSecret: ""
+  # -- Key in existing secret containing the Jobservice secret
+  existingSecretKey: "JOBSERVICE_SECRET"
+
+  # -- Extra environment variables with valueFrom support
+  # @default -- []
+  extraEnv: []
+
+  # -- Init containers (run before main containers)
+  initContainers: []
+  # -- Topology spread constraints for pod scheduling
+  topologySpreadConstraints: []
+  # -- Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for
+  # private DNS that does not exist in cluster DNS — service-mesh sidecars,
+  # legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the
+  # Kubernetes PodSpec: a list of `{ip, hostnames}` entries.
+  # @default -- []
+  hostAliases: []
+    # - ip: "10.0.0.10"
+    #   hostnames:
+    #     - "ldap.internal"
+    #     - "smtp.internal"
+  # -- Container `lifecycle` hook spec (preStop / postStart). Common use:
+  # preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding
+  # 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`,
+  # `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all
+  # closed without merge, the gap was never closed there.
+  # @default -- {}
+  lifecycle: {}
+    # preStop:
+    #   exec:
+    #     command: ["/bin/sh", "-c", "sleep 15"]
+  # -- Deployment strategy (empty = K8s default RollingUpdate)
+  # @default -- {}
+  deploymentStrategy: {}
+
+  # -- Container probes, rendered verbatim. See `core.probes` for the
+  # tuning rationale. Startup budget is long (120s) because jobservice
+  # waits on core availability during first boot.
+  # @default -- See [values.yaml](values.yaml)
+  probes:
+    startup:
+      httpGet:
+        path: /api/v1/stats
+        port: http
+      periodSeconds: 2
+      failureThreshold: 60
+      timeoutSeconds: 2
+    readiness:
+      httpGet:
+        path: /api/v1/stats
+        port: http
+      periodSeconds: 5
+      failureThreshold: 2
+      timeoutSeconds: 2
+    liveness:
+      httpGet:
+        path: /api/v1/stats
+        port: http
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 3
+
+  # -- Jobservice image settings
+  image:
+    # -- Jobservice image repository
+    repository: 8gears.container-registry.com/8gcr/harbor-jobservice
+    # -- Jobservice image tag (defaults to appVersion)
+    tag: ""
+
+  # -- Number of Jobservice replicas (ignored when autoscaling.enabled=true)
+  replicas: 1
+
+  # -- HorizontalPodAutoscaler. See `core.autoscaling` for full docs.
+  # @default -- See [values.yaml](values.yaml)
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    # maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
+    # metrics: []
+    # behavior: {}
+
+  # -- Jobservice resource requests and limits
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+  # -- Node selector for Jobservice pods
+  nodeSelector: {}
+
+  # -- Tolerations for Jobservice pods
+  tolerations: []
+
+  # -- Affinity rules for Jobservice pods
+  affinity: {}
+
+  # -- Additional pod annotations for Jobservice
+  podAnnotations: {}
+
+  # -- Additional pod labels for Jobservice
+  podLabels: {}
+
+  # -- Service account settings for Jobservice
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+    # -- Automount service account token
+    automountServiceAccountToken: false
+
+  # -- PodDisruptionBudget for Jobservice
+  pdb:
+    # -- Enable PodDisruptionBudget. When true, exactly one of
+    # `minAvailable` or `maxUnavailable` must be set (Kubernetes
+    # rejects PDBs with both fields).
+    enabled: false
+    # -- Minimum available pods (integer or percentage). Mutually
+    # exclusive with maxUnavailable.
+    # minAvailable: 1
+    # -- Maximum unavailable pods (integer or percentage). Mutually
+    # exclusive with minAvailable.
+    # maxUnavailable: 1
+
+  # -- Security context for Jobservice container
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10000
+    runAsGroup: 10000
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
+
+  # -- Pod security context for Jobservice
+  podSecurityContext:
+    fsGroup: 10000
+
+  # -- Jobservice persistence settings
+  persistence:
+    # -- Enable persistence for jobservice
+    enabled: false
+    # -- Resource policy: "keep" prevents PVC deletion on helm uninstall
+    resourcePolicy: "keep"
+    # -- Storage class for PVC. Omit to use the cluster default StorageClass;
+    # set to "" to opt out of any StorageClass (binds only to PVs with no class).
+    # storageClass: gp3
+    # -- PVC access modes
+    accessModes:
+      - ReadWriteOnce
+    # -- PVC size
+    size: 1Gi
+    # -- Existing PVC name (disables dynamic provisioning)
+    existingClaim: ""
+    # -- Annotations for PVC
+    annotations: {}
+
+# --- Exporter ---
+exporter:
+  # -- Enable Harbor exporter for Prometheus metrics
+  enabled: true
+
+  # -- Exporter config as env vars. Exporter is env-driven (HARBOR_EXPORTER_*);
+  # nested maps flatten to UPPER_SNAKE_CASE via toEnvVars and are injected
+  # via envFrom. Any exporter setting works without chart changes.
+  # @default -- {}
+  config: {}
+    # cache_time: 23
+    # cache_clean_interval: 14400
+
+  # -- Sensitive config for Exporter (converted to env vars in Secret)
+  # @default -- {}
+  secret: {}
+
+  # -- Extra environment variables with valueFrom support
+  # @default -- []
+  extraEnv: []
+
+  # -- Init containers (run before main containers)
+  initContainers: []
+  # -- Topology spread constraints for pod scheduling
+  topologySpreadConstraints: []
+  # -- Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for
+  # private DNS that does not exist in cluster DNS — service-mesh sidecars,
+  # legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the
+  # Kubernetes PodSpec: a list of `{ip, hostnames}` entries.
+  # @default -- []
+  hostAliases: []
+    # - ip: "10.0.0.10"
+    #   hostnames:
+    #     - "ldap.internal"
+    #     - "smtp.internal"
+  # -- Container `lifecycle` hook spec (preStop / postStart). Common use:
+  # preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding
+  # 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`,
+  # `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all
+  # closed without merge, the gap was never closed there.
+  # @default -- {}
+  lifecycle: {}
+    # preStop:
+    #   exec:
+    #     command: ["/bin/sh", "-c", "sleep 15"]
+  # -- Deployment strategy (empty = K8s default RollingUpdate)
+  # @default -- {}
+  deploymentStrategy: {}
+
+  # -- Container probes, rendered verbatim. See `core.probes` for the
+  # tuning rationale.
+  # @default -- See [values.yaml](values.yaml)
+  probes:
+    startup:
+      httpGet:
+        path: /metrics
+        port: 8001
+      periodSeconds: 2
+      failureThreshold: 30
+      timeoutSeconds: 2
+    readiness:
+      httpGet:
+        path: /metrics
+        port: 8001
+      periodSeconds: 5
+      failureThreshold: 2
+      timeoutSeconds: 2
+    liveness:
+      httpGet:
+        path: /metrics
+        port: 8001
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 3
+
+  # -- Exporter image settings
+  image:
+    # -- Exporter image repository
+    repository: 8gears.container-registry.com/8gcr/harbor-exporter
+    # -- Exporter image tag (defaults to appVersion)
+    tag: ""
+
+  # -- Number of Exporter replicas
+  replicas: 1
+
+  # -- Exporter resource requests and limits
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+  # -- Node selector for Exporter pods
+  nodeSelector: {}
+
+  # -- Tolerations for Exporter pods
+  tolerations: []
+
+  # -- Affinity rules for Exporter pods
+  affinity: {}
+
+  # -- Additional pod annotations for Exporter
+  podAnnotations: {}
+
+  # -- Additional pod labels for Exporter
+  podLabels: {}
+
+  # -- Service account settings for Exporter
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+    # -- Automount service account token
+    automountServiceAccountToken: false
+
+  # -- PodDisruptionBudget for Exporter
+  pdb:
+    # -- Enable PodDisruptionBudget. When true, exactly one of
+    # `minAvailable` or `maxUnavailable` must be set (Kubernetes
+    # rejects PDBs with both fields).
+    enabled: false
+    # -- Minimum available pods (integer or percentage). Mutually
+    # exclusive with maxUnavailable.
+    # minAvailable: 1
+    # -- Maximum unavailable pods (integer or percentage). Mutually
+    # exclusive with minAvailable.
+    # maxUnavailable: 1
+
+  # -- Security context for Exporter container
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10000
+    runAsGroup: 10000
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
+
+  # -- Pod security context for Exporter
+  podSecurityContext:
+    fsGroup: 10000
+
+# ============================================================================
+# 4. DEPENDENCIES
+# ============================================================================
+
+# --- Database (EXTERNAL ONLY) ---
+database:
+  # -- Database host (required)
+  host: ""
+  # -- Database port
+  port: 5432
+  # -- Database username
+  username: ""
+  # -- Database password (ignored if existingSecret is set)
+  password: ""
+  # -- Database name
+  database: registry
+  # -- SSL mode for database connection
+  sslmode: disable
+  # -- Maximum idle connections
+  maxIdleConns: 100
+  # -- Maximum open connections
+  maxOpenConns: 900
+  # -- Maximum idle time for connections (0 = no limit)
+  connMaxIdleTime: "0"
+  # -- Maximum lifetime of connections (0 = no limit)
+  connMaxLifetime: "0"
+  # -- Existing secret containing database credentials
+  # Default secret key: POSTGRESQL_PASSWORD
+  existingSecret: ""
+  existingSecretKey: ""
+  # -- Secret holding the PEM-encoded CA bundle (and optionally client
+  # cert + key) for verifying / authenticating to PostgreSQL. Required
+  # for `verify-ca` / `verify-full` sslmode against managed PG with a
+  # private CA (RDS-with-custom-CA, GCP CloudSQL, on-prem with internal
+  # PKI). Tracks upstream goharbor/harbor-helm#1859.
+  #
+  # Expected keys (cert-manager convention):
+  #   ca.crt   — CA bundle (always required when this Secret is set)
+  #   tls.crt  — client cert (only when clientCertEnabled=true)
+  #   tls.key  — client key  (only when clientCertEnabled=true)
+  #
+  # When set, the chart mounts the Secret at /etc/harbor/db-tls and
+  # injects POSTGRESQL_URL env on core + jobservice. The runtime DB
+  # pool honors that env over the individual fields.
+  #
+  # Caveats:
+  #   - Exporter does not yet plumb POSTGRESQL_URL into its viper config,
+  #     so its DB connection ignores client certs (it'll work fine for
+  #     sslmode=verify-ca with a publicly-trusted CA).
+  #   - Harbor's migration tool (NewMigrator) does not honor cfg.URL
+  #     either, so schema migrations against a server that REQUIRES
+  #     mTLS will fail. Use sslmode=verify-ca or migrate via an external
+  #     trusted client until that's fixed upstream.
+  existingTlsSecret: ""
+  # -- Include client cert + key in the auto-built POSTGRESQL_URL.
+  # Set to true only when PG is configured to require client certificate
+  # authentication. libpq fails if `sslcert` is set but the file is missing.
+  clientCertEnabled: false
+
+# --- Valkey (Redis-compatible) ---
+valkey:
+  # -- Enable Valkey subchart
+  enabled: true
+  # -- Valkey architecture: standalone or replication
+  architecture: standalone
+  # -- Valkey authentication settings
+  auth:
+    enabled: false
+    password: ""
+  fullnameOverride: "valkey"
+  # -- Valkey persistence configuration
+  dataStorage:
+    enabled: false
+
+  podSecurityContext:
+    fsGroup: 1000
+    runAsUser: 1000
+    runAsGroup: 1000
+
+  securityContext:
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 1000
+
+  # -- Resources for the valkey container (subchart passthrough).
+  # Set like every other component so the rendered manifests pass the
+  # kube-linter requests/limits checks.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+  # -- Resources for the valkey init container (subchart passthrough)
+  initResources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 64Mi
+
+# --- External Redis (when valkey.enabled=false) ---
+externalRedis:
+  # -- External Redis host
+  host: ""
+  # -- External Redis port
+  port: 6379
+  # -- External Redis username
+  username: ""
+  # -- External Redis password
+  password: ""
+  # -- Sentinel master set name (for Redis Sentinel)
+  sentinelMasterSet: ""
+  # -- Existing secret containing Redis password
+  existingSecret: ""
+  # -- Key in the existing secret that holds the Redis password
+  existingSecretKey: "REDIS_PASSWORD"
+  # -- TLS options for external Redis. For managed Redis with a private
+  # CA (self-hosted Redis, some on-prem managed offerings, custom certs
+  # via cert-manager), set `existingCaSecret` to a Secret holding the
+  # CA bundle. The chart mounts it on every Harbor component at
+  # `/etc/harbor/extra-ca` and sets `SSL_CERT_DIR` so Go's TLS adds it
+  # to the system trust pool — so the same Secret also covers private
+  # CAs used for S3 endpoints, OIDC, etc. Tracks upstream
+  # goharbor/harbor-helm#549.
+  tlsOptions:
+    # -- Enable TLS for external Redis connection
+    enable: false
+    # -- Name of an existing Secret containing the CA bundle. Leave
+    # empty to use only the cluster's default trust store.
+    existingCaSecret: ""
+    # -- Key inside `existingCaSecret` that holds the PEM-encoded CA
+    # bundle. Default `ca.crt` is the convention cert-manager uses.
+    existingCaSecretKey: "ca.crt"
+
+# --- Trivy Scanner ---
+trivy:
+  # -- Enable Trivy scanner
+  enabled: false
+
+  # -- Trivy adapter config as env vars. Trivy is env-driven (SCANNER_*);
+  # nested maps flatten to UPPER_SNAKE_CASE via toEnvVars and are injected
+  # via envFrom. Any adapter setting works without chart changes.
+  # @default -- {}
+  config: {}
+
+  # -- Sensitive Trivy adapter config (converted to env vars in a Secret).
+  # @default -- {}
+  secret: {}
+
+  # -- Extra environment variables with valueFrom support
+  # @default -- []
+  extraEnv: []
+
+  # -- Container probes, rendered verbatim. See `core.probes` for the
+  # tuning rationale. Startup budget 60s covers adapter init.
+  # @default -- See [values.yaml](values.yaml)
+  probes:
+    startup:
+      httpGet:
+        path: /probe/ready
+        port: api-server
+      periodSeconds: 2
+      failureThreshold: 30
+      timeoutSeconds: 2
+    readiness:
+      httpGet:
+        path: /probe/ready
+        port: api-server
+      periodSeconds: 5
+      failureThreshold: 2
+      timeoutSeconds: 2
+    liveness:
+      httpGet:
+        path: /probe/healthy
+        port: api-server
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 3
+
+  image:
+    # -- Trivy adapter image repository
+    repository: 8gears.container-registry.com/8gcr/trivy-adapter
+    # -- Trivy adapter image tag (defaults to appVersion)
+    tag: ""
+  # -- Number of Trivy replicas (ignored when autoscaling.enabled=true)
+  replicas: 1
+
+  # -- HorizontalPodAutoscaler for the Trivy StatefulSet. See
+  # `core.autoscaling` for full docs.
+  # @default -- See [values.yaml](values.yaml)
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    # maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
+    # metrics: []
+    # behavior: {}
+
+  # -- Trivy resource requests and limits
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 1Gi
+  # -- Debug mode for more verbose scanning log
+  debugMode: false
+  dbRepository:
+    - mirror.gcr.io/aquasec/trivy-db
+    - ghcr.io/aquasecurity/trivy-db
+  javaDBRepository:
+    - mirror.gcr.io/aquasec/trivy-java-db
+    - ghcr.io/aquasecurity/trivy-java-db
+  securityCheck: "vuln"
+  # -- Vulnerability types to scan (os,library)
+  vulnType: "os,library"
+  # -- Severity levels to check
+  severity: "UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL"
+  # -- Skip unfixed vulnerabilities
+  ignoreUnfixed: false
+  # -- Skip verifying registry certificate
+  insecure: false
+  # -- GitHub token to download Trivy DB (optional)
+  gitHubToken: ""
+  # -- Skip Java DB updates
+  skipJavaDBUpdate: false
+  # -- Enable offline scan mode
+  offlineScan: false
+  # -- Skip Trivy DB updates
+  skipUpdate: false
+  # -- Timeout for scanning
+  timeout: "5m0s"
+
+  # -- Init containers (run before main containers)
+  initContainers: []
+  # -- Topology spread constraints for pod scheduling
+  topologySpreadConstraints: []
+  # -- Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for
+  # private DNS that does not exist in cluster DNS — service-mesh sidecars,
+  # legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the
+  # Kubernetes PodSpec: a list of `{ip, hostnames}` entries.
+  # @default -- []
+  hostAliases: []
+    # - ip: "10.0.0.10"
+    #   hostnames:
+    #     - "ldap.internal"
+    #     - "smtp.internal"
+  # -- Container `lifecycle` hook spec (preStop / postStart). Common use:
+  # preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding
+  # 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`,
+  # `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all
+  # closed without merge, the gap was never closed there.
+  # @default -- {}
+  lifecycle: {}
+    # preStop:
+    #   exec:
+    #     command: ["/bin/sh", "-c", "sleep 15"]
+
+  # -- Service account settings for Trivy
+  serviceAccount:
+    create: false
+    name: ""
+    annotations: {}
+    # -- Automount service account token
+    automountServiceAccountToken: false
+
+  # -- PodDisruptionBudget for Trivy
+  pdb:
+    # -- Enable PodDisruptionBudget. When true, exactly one of
+    # `minAvailable` or `maxUnavailable` must be set (Kubernetes
+    # rejects PDBs with both fields).
+    enabled: false
+    # -- Minimum available pods (integer or percentage). Mutually
+    # exclusive with maxUnavailable.
+    # minAvailable: 1
+    # -- Maximum unavailable pods (integer or percentage). Mutually
+    # exclusive with minAvailable.
+    # maxUnavailable: 1
+
+  # -- Node selector for Trivy pods
+  nodeSelector: {}
+  # -- Tolerations for Trivy pods
+  tolerations: []
+  # -- Affinity rules for Trivy pods
+  affinity: {}
+  # -- Additional pod annotations for Trivy
+  podAnnotations: {}
+  # -- Additional pod labels for Trivy
+  podLabels: {}
+  # -- Security context for Trivy container
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10000
+    runAsGroup: 10000
+  # -- Pod security context for Trivy
+  podSecurityContext:
+    fsGroup: 10000
+
+  # -- Trivy persistence settings - used for cache
+  persistence:
+    # -- Enable persistence for registry
+    enabled: false
+    # -- Storage class for PVC. Omit to use the cluster default StorageClass;
+    # set to "" to opt out of any StorageClass (binds only to PVs with no class).
+    # storageClass: gp3
+    # -- PVC access modes
+    accessModes:
+      - ReadWriteOnce
+    # -- PVC size
+    size: 5Gi
+    # -- Existing PVC name (disables dynamic provisioning)
+    existingClaim: ""
+    # -- Annotations for PVC
+    annotations: {}
+
+# ============================================================================
+# 5. TLS CONFIGURATION
+# ============================================================================
+
+tls:
+  # -- Enable TLS (set to false if terminating TLS at ingress/load balancer)
+  enabled: false
+  # -- TLS certificate source: auto, secret, or none
+  certSource: none
+  certManager:
+    # -- Enable cert-manager for TLS certificates
+    enabled: false
+    # -- cert-manager issuer reference
+    issuerRef: {}
+      # name: letsencrypt-prod
+      # kind: ClusterIssuer
+    # -- Certificate duration
+    duration: 2160h  # 90 days
+    # -- Certificate renewal before expiry
+    renewBefore: 360h  # 15 days
+
+  # -- Custom TLS secrets (alternative to cert-manager)
+  customSecrets:
+    # -- TLS secret for core/portal
+    core: ""
+    # -- TLS secret for registry
+    registry: ""
+
+# ============================================================================
+# 6. MONITORING
+# ============================================================================
+
+metrics:
+  # -- Enable metrics endpoints on all components
+  enabled: false
+  # -- Enable Prometheus ServiceMonitor
+  serviceMonitor:
+    # -- Create ServiceMonitor resource
+    enabled: false
+    # -- ServiceMonitor namespace (defaults to release namespace)
+    namespace: ""
+    # -- Additional labels for ServiceMonitor
+    labels: {}
+    # -- Scrape interval
+    interval: 30s
+    # -- Scrape timeout
+    scrapeTimeout: 10s
+    # -- Honor labels
+    honorLabels: true
+
+# ============================================================================
+# 7. ESCAPE HATCHES
+# ============================================================================
+
+# -- Extra static manifests to deploy
+# These are merged with chart labels and deployed as-is
+# @default -- []
+extraManifests: []
+  # - apiVersion: v1
+  #   kind: ConfigMap
+  #   metadata:
+  #     name: my-custom-config
+  #   data:
+  #     key: value
+
+# -- Extra templated manifests to deploy
+# These can use .Values, .Release, and other template functions
+# @default -- []
+extraTemplateManifests: []
+  # - |
+  #     apiVersion: v1
+  #     kind: ConfigMap
+  #     metadata:
+  #       name: {{ .Release.Name }}-custom
+  #     data:
+  #       externalURL: {{ .Values.externalURL }}
+
+
+# ============================================================================
+# 8. Tracing
+# ============================================================================
+
+trace:
+  enabled: false
+  # trace provider: jaeger or otel
+  # jaeger should be 1.26+
+  provider: jaeger
+  # set sample_rate to 1 if you wanna sampling 100% of trace data; set 0.5 if you wanna sampling 50% of trace data, and so forth
+  sample_rate: 1
+  # namespace used to differentiate different harbor services
+  # namespace:
+  # attributes is a key value dict contains user defined attributes used to initialize trace provider
+  # attributes:
+  #   application: harbor
+  jaeger:
+    # jaeger supports two modes:
+    #   collector mode(uncomment endpoint and uncomment username, password if needed)
+    #   agent mode(uncomment agent_host and agent_port)
+    endpoint: http://hostname:14268/api/traces
+    # username:
+    # password:
+    # agent_host: hostname
+    # export trace data by jaeger.thrift in compact mode
+    # agent_port: 6831
+  otel:
+    endpoint: hostname:4318
+    url_path: /v1/traces
+    compression: false
+    insecure: true
+    # timeout is in seconds
+    timeout: 10

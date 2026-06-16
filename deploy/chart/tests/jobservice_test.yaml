@@ -1,0 +1,367 @@
+suite: jobservice component tests
+# All tests assert chart-computed output for known inputs. Pure Helm
+# pass-through tests (replicas, podAnnotations, nodeSelector, etc.)
+# were removed — they only proved `--set` works, not that the chart
+# does anything with the value. Full-render regression coverage for
+# jobservice lives in snapshots_test.yaml.
+templates:
+  - templates/jobservice.deployment.yaml
+  - templates/jobservice.service.yaml
+  - templates/jobservice.configmap.yaml
+  - templates/jobservice.configmap-env.yaml
+  - templates/jobservice.secret.yaml
+  - templates/jobservice.pvc.yaml
+tests:
+  # Pins fullname helper: deployment name = <release>-<chart>-jobservice
+  - it: should compute jobservice deployment name from fullname helper
+    template: templates/jobservice.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-harbor-next-jobservice
+
+  # Pins image concat: <repository>:<tag>
+  - it: should concat image repository and tag
+    template: templates/jobservice.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      jobservice.image.repository: goharbor/harbor-jobservice
+      jobservice.image.tag: "2.10.0"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: goharbor/harbor-jobservice:2.10.0
+
+  # Pins hardcoded chart container port (not user-settable)
+  - it: should expose hardcoded container port 8080
+    template: templates/jobservice.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 8080
+
+  # Pins CORE_SECRET valueFrom routing to core secret name + 'secret' key from helpers
+  - it: should wire CORE_SECRET env to core Secret via secretKeyRef
+    template: templates/jobservice.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: CORE_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: RELEASE-NAME-harbor-next-core
+                key: secret
+
+  # Pins service fullname + chart-hardcoded port 80
+  - it: should compute service name from fullname and expose port 80
+    template: templates/jobservice.service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-harbor-next-jobservice
+      - equal:
+          path: spec.ports[0].port
+          value: 80
+
+  # ============================================================================
+  # jobservice.config — YAML passthrough into /etc/jobservice/config.yml
+  # ============================================================================
+
+  # Default jobservice.config block contains worker_pool with workers=4.
+  # Verifies the user's YAML renders verbatim into config.yml.
+  - it: should render default workers count from jobservice.config
+    template: templates/jobservice.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["config.yml"]
+          pattern: "workers: 4"
+
+  # User overriding worker_pool.workers in jobservice.config flows
+  # directly into config.yml — no chart code change needed.
+  - it: should render custom workers count from jobservice.config
+    template: templates/jobservice.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      jobservice.config.worker_pool.workers: 10
+    asserts:
+      - matchRegex:
+          path: data["config.yml"]
+          pattern: "workers: 10"
+
+  # User-supplied job_loggers list renders verbatim.
+  - it: should render FILE logger from jobservice.config.job_loggers
+    template: templates/jobservice.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      jobservice.config.job_loggers:
+        - name: FILE
+          level: INFO
+          settings:
+            base_dir: /var/log/jobs
+    asserts:
+      - matchRegex:
+          path: data["config.yml"]
+          pattern: "name: FILE"
+
+  - it: should render STD_OUTPUT logger from jobservice.config.job_loggers
+    template: templates/jobservice.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      jobservice.config.job_loggers:
+        - name: STD_OUTPUT
+          level: INFO
+    asserts:
+      - matchRegex:
+          path: data["config.yml"]
+          pattern: "name: STD_OUTPUT"
+
+  # User-supplied reaper block flows into config.yml verbatim.
+  - it: should render reaper hours from jobservice.config
+    template: templates/jobservice.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      jobservice.config.reaper.max_update_hours: 48
+      jobservice.config.reaper.max_dangling_hours: 336
+    asserts:
+      - matchRegex:
+          path: data["config.yml"]
+          pattern: "max_update_hours: 48"
+      - matchRegex:
+          path: data["config.yml"]
+          pattern: "max_dangling_hours: 336"
+
+  # Chart-managed redis URL is injected via JOB_SERVICE_POOL_REDIS_URL
+  # env on the deployment, overriding whatever is in jobservice.config.worker_pool.redis_pool.redis_url.
+  - it: should inject JOB_SERVICE_POOL_REDIS_URL env on the jobservice container
+    template: templates/jobservice.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: JOB_SERVICE_POOL_REDIS_URL
+          any: true
+
+  # ============================================================================
+  # jobservice.existingConfigMap — chart skips ConfigMap generation
+  # ============================================================================
+
+  - it: should not render jobservice ConfigMap when existingConfigMap is set
+    template: templates/jobservice.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      jobservice.existingConfigMap: my-external-js
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should reference existingConfigMap on the jobservice-config volume
+    template: templates/jobservice.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      jobservice.existingConfigMap: my-external-js
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: jobservice-config
+            configMap:
+              name: my-external-js
+
+  # ============================================================================
+  # jobservice.env — supplementary env vars via toEnvVars (replaces the
+  # old jobservice.config which was env-passthrough, now config: is YAML)
+  # ============================================================================
+
+  # Pins int -> string coercion: ConfigMap data values must be strings.
+  - it: should coerce int env values to strings in configmap-env
+    template: templates/jobservice.configmap-env.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      jobservice.env:
+        JOBSERVICE_WEBHOOK_JOB_MAX_RETRY: 5
+        JOBSERVICE_WEBHOOK_JOB_HTTP_CLIENT_TIMEOUT: 10
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: data.JOBSERVICE_WEBHOOK_JOB_MAX_RETRY
+          value: "5"
+      - equal:
+          path: data.JOBSERVICE_WEBHOOK_JOB_HTTP_CLIENT_TIMEOUT
+          value: "10"
+
+  # Pins PVC gating: rendered when persistence.enabled=true, size flows to storage request
+  - it: should render PVC with requested storage when persistence enabled
+    template: templates/jobservice.pvc.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      jobservice.persistence.enabled: true
+      jobservice.persistence.size: 10Gi
+    asserts:
+      - isKind:
+          of: PersistentVolumeClaim
+      - equal:
+          path: spec.resources.requests.storage
+          value: 10Gi
+
+  # Pins PVC gating: not rendered when persistence disabled (doc count 0)
+  - it: should not render PVC when persistence disabled
+    template: templates/jobservice.pvc.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      jobservice.persistence.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Pins PVC gating: not rendered when existingClaim set (chart skips PVC creation)
+  - it: should not render PVC when existingClaim set
+    template: templates/jobservice.pvc.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      jobservice.persistence.enabled: true
+      jobservice.persistence.existingClaim: my-existing-pvc
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Pins volume selection: emptyDir variant when persistence disabled
+  - it: should mount emptyDir for job-logs when persistence disabled
+    template: templates/jobservice.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      jobservice.persistence.enabled: false
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[1].name
+          value: job-logs
+      - isNotNull:
+          path: spec.template.spec.volumes[1].emptyDir
+
+  # Pins volume selection: PVC variant with claimName computed from fullname helper
+  - it: should mount PVC with chart-computed claimName when persistence enabled
+    template: templates/jobservice.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      jobservice.persistence.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[1].name
+          value: job-logs
+      - equal:
+          path: spec.template.spec.volumes[1].persistentVolumeClaim.claimName
+          value: RELEASE-NAME-harbor-next-jobservice
+
+  # Pins volume selection: existingClaim overrides chart-computed claimName
+  - it: should mount existingClaim verbatim when set
+    template: templates/jobservice.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      jobservice.persistence.enabled: true
+      jobservice.persistence.existingClaim: my-existing-pvc
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[1].persistentVolumeClaim.claimName
+          value: my-existing-pvc
+
+  # ============================================================================
+  # Pinned-secret env wiring (GitOps existingSecret paths)
+  # ============================================================================
+  # Pins: jobservice.existingSecret must reach the jobservice pod itself
+  # as explicit JOBSERVICE_SECRET env — envFrom stays on the generated
+  # Secret, which omits JOBSERVICE_SECRET when pinned.
+  - it: should wire JOBSERVICE_SECRET env from jobservice.existingSecret
+    template: templates/jobservice.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      jobservice.existingSecret: js-id
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: JOBSERVICE_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: js-id
+                key: JOBSERVICE_SECRET
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[1].secretRef.name
+          value: RELEASE-NAME-harbor-next-jobservice
+
+  - it: should wire REGISTRY_CREDENTIAL_PASSWORD env from credentials.existingSecret
+    template: templates/jobservice.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.credentials.existingSecret: reg-creds
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REGISTRY_CREDENTIAL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: reg-creds
+                key: REGISTRY_CREDENTIAL_PASSWORD
