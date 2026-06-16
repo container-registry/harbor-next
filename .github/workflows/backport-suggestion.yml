@@ -40,20 +40,30 @@ jobs:
       - name: Comment with backport commands
         run: |
           marker='<!-- backport-suggestion -->'
+          existing_comment_ids=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+            --jq '.[] | select((.body // "") | contains("<!-- backport-suggestion -->")) | .id')
+          existing_comment_id="${existing_comment_ids%%$'\n'*}"
 
           case "${PR_TITLE}" in
-            fix:*|upstream:*|perf:*|revert:*|ci:*|build:*) ;;
-            *) exit 0 ;;
+            fix:*|fix\(*\):*|upstream:*|upstream\(*\):*|perf:*|perf\(*\):*|revert:*|revert\(*\):*|ci:*|ci\(*\):*|build:*|build\(*\):*) ;;
+            *)
+              if [ -n "${existing_comment_id}" ]; then
+                gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${existing_comment_id}" \
+                  --method DELETE \
+                  --silent
+              fi
+              exit 0
+              ;;
           esac
-
-          if gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
-            --jq '.[].body' | grep -Fq "${marker}"; then
-            exit 0
-          fi
 
           branches=$(gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/heads/release-" \
             --jq '.[].ref | sub("refs/heads/"; "") | select(test("^release-[0-9]+\\.[0-9]+$"))' | sort -Vr)
           if [ -z "${branches}" ]; then
+            if [ -n "${existing_comment_id}" ]; then
+              gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${existing_comment_id}" \
+                --method DELETE \
+                --silent
+            fi
             exit 0
           fi
 
@@ -63,6 +73,12 @@ jobs:
             body="${body}\`/backport v${branch#release-}\`"$'\n'
           done <<< "${branches}"
 
-          gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
-            --method POST \
-            -f body="${body}"
+          if [ -n "${existing_comment_id}" ]; then
+            gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${existing_comment_id}" \
+              --method PATCH \
+              --raw-field body="${body}"
+          else
+            gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+              --method POST \
+              --raw-field body="${body}"
+          fi
