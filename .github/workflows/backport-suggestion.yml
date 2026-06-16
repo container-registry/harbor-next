@@ -8,6 +8,7 @@ on:
 permissions:
   contents: read
   issues: write
+  pull-requests: write
 
 jobs:
   suggest:
@@ -32,15 +33,24 @@ jobs:
               owner, repo, issue_number, per_page: 100,
             });
             const mine = comments.filter(
-              (c) => c.user?.type === 'Bot' && (c.body ?? '').includes(marker),
+              (c) => c.user?.login === 'github-actions[bot]' && (c.body ?? '').includes(marker),
             );
+
+            const canIgnoreWriteError = (err) => err.status === 403 || err.status === 404;
+            const warnWriteError = (action, err) => {
+              core.warning(
+                `Could not ${action} backport suggestion comment: ${err.message}. ` +
+                'The workflow will continue because comment permissions can be unavailable for some PR events.',
+              );
+            };
 
             const removeComments = async (list) => {
               for (const c of list) {
                 try {
                   await github.rest.issues.deleteComment({ owner, repo, comment_id: c.id });
                 } catch (err) {
-                  if (err.status !== 404) throw err; // tolerate an already-deleted comment
+                  if (!canIgnoreWriteError(err)) throw err;
+                  warnWriteError('delete', err);
                 }
               }
             };
@@ -74,10 +84,20 @@ jobs:
             // Keep one comment current; delete any duplicates from earlier runs.
             const [keep, ...extra] = mine;
             if (!keep) {
-              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+              try {
+                await github.rest.issues.createComment({ owner, repo, issue_number, body });
+              } catch (err) {
+                if (!canIgnoreWriteError(err)) throw err;
+                warnWriteError('create', err);
+              }
             } else {
               if (keep.body !== body) {
-                await github.rest.issues.updateComment({ owner, repo, comment_id: keep.id, body });
+                try {
+                  await github.rest.issues.updateComment({ owner, repo, comment_id: keep.id, body });
+                } catch (err) {
+                  if (!canIgnoreWriteError(err)) throw err;
+                  warnWriteError('update', err);
+                }
               }
               await removeComments(extra);
             }
