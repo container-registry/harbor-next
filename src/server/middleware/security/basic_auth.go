@@ -82,13 +82,13 @@ func (b *basicAuth) Generate(req *http.Request) security.Context {
 	})
 
 	if err != nil {
-		logEntry := log.WithField("client IP", GetClientIP(req)).WithField("user agent", GetUserAgent(req))
-		// Bad credentials are expected probe traffic (scanners/bots) -> DEBUG;
-		// unexpected backend/config errors stay at ERROR so outages stay visible.
+		// Bad credentials are expected probe traffic (scanners/bots): log at DEBUG
+		// without the eager WithField structured-logger cost on this hot path.
+		// Unexpected backend/config errors stay at ERROR with client context.
 		if _, ok := err.(auth.ErrAuth); ok {
-			logEntry.Debugf("failed to authenticate user:%s, error:%v", username, err)
+			log.Debugf("failed to authenticate user:%s, error:%v", username, err)
 		} else {
-			logEntry.Errorf("failed to authenticate user:%s, error:%v", username, err)
+			log.WithField("client IP", GetClientIP(req)).WithField("user agent", GetUserAgent(req)).Errorf("failed to authenticate user:%s, error:%v", username, err)
 		}
 		return nil
 	}
