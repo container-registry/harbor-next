@@ -69,7 +69,7 @@ func (b *basicAuth) Generate(req *http.Request) security.Context {
 	})
 
 	if err != nil {
-		log.WithField("client IP", GetClientIP(req)).WithField("user agent", GetUserAgent(req)).Errorf("failed to authenticate user:%s, error:%v", username, err)
+		log.WithField("client IP", GetClientIP(req)).WithField("user agent", GetUserAgent(req)).Debugf("failed to authenticate user:%s, error:%v", username, err)
 		return nil
 	}
 	if user == nil {
