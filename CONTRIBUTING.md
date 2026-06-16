@@ -121,7 +121,8 @@ Use the following template for your PR description:
 
 ## Release Notes
 <!--
-Optional. Fill in for user-facing changes (new features, breaking changes, deprecations).
+Required for new features (feat:); recommended for user-facing fixes (fix:).
+Also fill in for breaking changes and deprecations.
 Leave blank for ci:/chore:/refactor:/docs:/test: PRs.
 -->
 
@@ -264,7 +265,7 @@ This renders in the release notes as:
 
 ## Adding Release Notes to Your PR
 
-For user-facing changes (new features, breaking changes, deprecations), you can add rich release notes that appear on the GitHub Release page as a `## Highlights` section.
+**New features (`feat:`) must add a `## Release Notes` section to the PR description.** It is also expected for other user-facing changes (breaking changes, deprecations). The prose appears on the GitHub Release page under a `## Highlights` section.
 
 Fill in the `## Release Notes` section in the PR description:
 
@@ -277,6 +278,7 @@ See the [OIDC documentation](https://docs.example.com/oidc) for configuration de
 
 **Rules:**
 
+- Required for `feat:` PRs; recommended for any user-facing `fix:` PRs
 - Leave it blank for `ci:`, `chore:`, `refactor:`, `docs:` PRs
 - Write for your users, not for developers (explain what changed and why it matters)
 - Links are fine and encouraged
