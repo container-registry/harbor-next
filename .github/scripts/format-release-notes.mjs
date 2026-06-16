@@ -1,10 +1,10 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 
-const [releaseBodyPath, generatedNotesPath, outputPath] = process.argv.slice(2);
+const [releaseBodyPath, generatedNotesPath, outputPath, contributorsPath] = process.argv.slice(2);
 
 if (!releaseBodyPath || !generatedNotesPath || !outputPath) {
-  throw new Error('usage: format-release-notes.mjs <release-body> <generated-notes> <output>');
+  throw new Error('usage: format-release-notes.mjs <release-body> <generated-notes> <output> [contributors]');
 }
 
 const releaseBody = readFileSync(releaseBodyPath, 'utf8');
@@ -244,9 +244,15 @@ if (trailing.length > 0) {
   output.push('', ...trailing);
 }
 
-const newContributors = generatedNotes.match(/## New Contributors[\s\S]*?(?=\n\n\*\*Full Changelog\*\*|$)/)?.[0];
-if (newContributors) {
-  output.push('', newContributors.replace('## New Contributors', '### New Contributors').replace(/^\*/gm, '-'));
-}
-
 writeFileSync(outputPath, `${output.join('\n').trim()}\n`);
+
+// New Contributors is emitted as its own top-level `## New Contributors` section
+// by the release workflow, so it is written to a separate file rather than nested
+// under `## What's Changed`.
+if (contributorsPath) {
+  const newContributors = generatedNotes.match(/## New Contributors[\s\S]*?(?=\n\n\*\*Full Changelog\*\*|$)/)?.[0];
+  writeFileSync(
+    contributorsPath,
+    newContributors ? `${newContributors.replace(/^\*/gm, '-').trim()}\n` : '',
+  );
+}
