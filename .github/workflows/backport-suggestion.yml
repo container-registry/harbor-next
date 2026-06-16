@@ -8,7 +8,6 @@ on:
 permissions:
   contents: read
   issues: write
-  pull-requests: read
 
 jobs:
   suggest:
@@ -17,82 +16,68 @@ jobs:
         github.event.pull_request.base.ref == 'main'
       }}
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      GH_REPO: ${{ github.repository }}
-      PR_NUMBER: ${{ github.event.pull_request.number }}
-      PR_TITLE: ${{ github.event.pull_request.title }}
     steps:
-      - name: Install gh CLI
-        run: |
-          if command -v gh >/dev/null 2>&1; then
-            exit 0
-          fi
+      - name: Suggest backports
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const marker = '<!-- backport-suggestion -->';
+            const { owner, repo } = context.repo;
+            const pr = context.payload.pull_request;
+            const issue_number = pr.number;
 
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-            | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
-            | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-          sudo apt-get update
-          sudo apt-get install -y gh
+            // This workflow's own prior suggestion comments: posted by a bot and carrying
+            // the hidden marker. Human comments that merely quote the marker are excluded.
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number, per_page: 100,
+            });
+            const mine = comments.filter(
+              (c) => c.user?.type === 'Bot' && (c.body ?? '').includes(marker),
+            );
 
-      - name: Comment with backport commands
-        run: |
-          marker='<!-- backport-suggestion -->'
+            const removeComments = async (list) => {
+              for (const c of list) {
+                try {
+                  await github.rest.issues.deleteComment({ owner, repo, comment_id: c.id });
+                } catch (err) {
+                  if (err.status !== 404) throw err; // tolerate an already-deleted comment
+                }
+              }
+            };
 
-          # Collect every existing marker comment (oldest first). Keep the first to update
-          # in place; any others are duplicates from earlier runs and are removed below.
-          existing_comment_ids=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
-            --jq '.[] | select((.body // "") | contains("<!-- backport-suggestion -->")) | .id')
-          keep_id="${existing_comment_ids%%$'\n'*}"
+            // Only backportable conventional-commit types qualify (optionally scoped, e.g. fix(portal):).
+            const backportable = /^(fix|upstream|perf|revert|ci|build)(\([^)]+\))?:/.test(pr.title);
 
-          delete_comment() {
-            gh api "repos/${GITHUB_REPOSITORY}/issues/comments/$1" \
-              --method DELETE \
-              --silent
-          }
+            // Active release-X.Y branches, newest first.
+            const refs = await github.paginate(github.rest.git.listMatchingRefs, {
+              owner, repo, ref: 'heads/release-',
+            });
+            const versions = refs
+              .map((r) => r.ref.replace('refs/heads/', ''))
+              .filter((b) => /^release-\d+\.\d+$/.test(b))
+              .map((b) => b.replace('release-', ''))
+              .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
 
-          delete_all_comments() {
-            while IFS= read -r id; do
-              [ -z "${id}" ] && continue
-              delete_comment "${id}"
-            done <<< "${existing_comment_ids}"
-          }
+            // PR no longer qualifies: remove every suggestion comment we left.
+            if (!backportable || versions.length === 0) {
+              await removeComments(mine);
+              return;
+            }
 
-          case "${PR_TITLE}" in
-            fix:*|fix\(*\):*|upstream:*|upstream\(*\):*|perf:*|perf\(*\):*|revert:*|revert\(*\):*|ci:*|ci\(*\):*|build:*|build\(*\):*) ;;
-            *)
-              delete_all_comments
-              exit 0
-              ;;
-          esac
+            const body =
+              `${marker}\n` +
+              'This change may need patch-release backports. ' +
+              'Comment with one of these commands to open a cherry-pick PR:\n\n' +
+              versions.map((v) => `\`/backport v${v}\``).join('\n') +
+              '\n';
 
-          branches=$(gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/heads/release-" \
-            --jq '.[].ref | sub("refs/heads/"; "") | select(test("^release-[0-9]+\\.[0-9]+$"))' | sort -Vr)
-          if [ -z "${branches}" ]; then
-            delete_all_comments
-            exit 0
-          fi
-
-          body="${marker}"$'\nThis change may need patch-release backports. Comment with one of these commands to open a cherry-pick PR:\n\n'
-          while IFS= read -r branch; do
-            [ -z "${branch}" ] && continue
-            body="${body}\`/backport v${branch#release-}\`"$'\n'
-          done <<< "${branches}"
-
-          if [ -n "${keep_id}" ]; then
-            gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${keep_id}" \
-              --method PATCH \
-              --raw-field body="${body}"
-            # Remove any leftover duplicate marker comments from earlier runs.
-            while IFS= read -r id; do
-              [ -z "${id}" ] && continue
-              [ "${id}" = "${keep_id}" ] && continue
-              delete_comment "${id}"
-            done <<< "${existing_comment_ids}"
-          else
-            gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
-              --method POST \
-              --raw-field body="${body}"
-          fi
+            // Keep one comment current; delete any duplicates from earlier runs.
+            const [keep, ...extra] = mine;
+            if (!keep) {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            } else {
+              if (keep.body !== body) {
+                await github.rest.issues.updateComment({ owner, repo, comment_id: keep.id, body });
+              }
+              await removeComments(extra);
+            }
