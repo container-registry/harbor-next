@@ -191,7 +191,7 @@ merged into one precedence chain:
 |---|---|---|
 | **Bootstrap** — DB connection, Redis, signing keys, inter-service URLs, log level, encryption key | env vars only | env vars only |
 | **Application config** — the ~117 keys in `src/lib/config/metadata/metadatalist.go` plus all per-resource state | PostgreSQL `properties` + per-resource tables, via REST/UI | `harbor.yaml`, via Git |
-| **Secrets referenced** inside application config | encrypted in DB | resolved at apply time from exactly one of `env` / `file` / `k8s-secret` — no fallback chain |
+| **Secrets referenced** inside application config | encrypted in DB | resolved at apply time from exactly one of `env` / `file` / `secret` — no fallback chain. Core resolves only `env`/`file`; the `secret` (Kubernetes name/key) form is projected to a file by the operator/Helm and reaches Core as a `file` ref (see §13.1) |
 
 DB and file are never both authoritative for application config in the same boot. That is what makes
 drift detection meaningful: the reconciler can compute `desired − live` because there is exactly one
@@ -437,7 +437,7 @@ The new `FileCfgManager` slots in by registering itself at process start and swi
    └─ declarative
        - DefaultCfgManager = FileCfgManager
        - config.Load(ctx) reads HARBOR_DECLARATIVE_CONFIG path
-       - resolve *Ref secrets via env / file / k8s-secret
+       - resolve *Ref secrets via env / file (secret: arrives as a projected file — see §13.1)
        - reconcile apply order: system → registries → projects → robots → labels →
          scanners → replications → retentions → webhooks → immutables → schedules
        - readOnlyForAll = true
@@ -616,7 +616,7 @@ Observable).
 ### 8.2 New Harbor-side packages
 
 - `src/pkg/declarative/spec/` — typed Go structs for `HarborConfig` v1alpha1; YAML unmarshal; defaulting; cross-ref index.
-- `src/pkg/declarative/secrets/` — `*Ref` resolution (env, file, k8s-secret).
+- `src/pkg/declarative/secrets/` — `*Ref` resolution (`env`, `file`; `secret:` is operator-projected to a file, §13.1).
 - `src/pkg/declarative/loader/` — file load + fsnotify + SIGHUP + debounce.
 - `src/pkg/declarative/reconciler/` — reconcile loop, per-kind reconcilers, apply order, drift, prune.
   One file per kind: `project.go`, `robot.go`, `registry.go`, `replication.go`, `retention.go`,
@@ -703,7 +703,7 @@ End-to-end scenarios mirror the three-scenario rig (`task dev:up` SLOT=1; `deplo
 | V7 | Live reload — polling fallback | chaos-disable fsnotify, edit file | reconcile within ~32s |
 | V8 | Live reload — SIGHUP | `kill -HUP <pid>` on Core | reconcile triggers |
 | V9 | Prune | Remove a replication from spec; then re-add with `deletionPolicy: orphan` and remove again | first deleted; second left in place |
-| V10 | Secrets rotation | Rotate `OIDC_CLIENT_SECRET` env, trigger reload | new value applied without spec change |
+| V10 | Secrets rotation | Rotate a `file:`-backed value (projected Secret), trigger reload | new value applied without spec change. `env:` refs are static for the process — rotating one needs a pod restart (§13.1) |
 | V11 | GitOps end-to-end | Rebuild flux-operator-harbor-example | Flux delivers `harbor.yaml`; push Job + tenant `OCIRepository`s succeed on first run, zero manual steps |
 | V12 | Legacy mode unchanged | Deploy without `HARBOR_CONFIG_MODE` | bit-for-bit today: no badges, no `managed` fields, no disabled controls, no reconciler |
 | V13 | UI affordance | With mode on, exercise each touched Portal page | badge renders; tooltip correct; edit/delete disabled (not hidden); no network call on click; badges only on managed rows |
@@ -808,7 +808,7 @@ User Guide in Notion (TAS-484).
 Conventions:
 
 - **`${VAR}`** — non-secret externalised values, resolved at parse time from process env. Unset → validation fails before apply.
-- **`*Ref` blocks** — secrets. Each declares **exactly one** of `env:` / `file:` / `secret:` (k8s-only). No fallback chain (D4).
+- **`*Ref` blocks** — secrets. Each declares **exactly one** of `env:` / `file:` / `secret:`. No fallback chain (D4). Core resolves only `env:`/`file:`; the `secret:` (Kubernetes name/key) form is projected to a file by the operator/Helm and reaches Core as a `file:` ref (§13.1).
 - **Cross-resource references by name** (`srcRegistryRef: dockerhub`, `members[].principal: developers`) resolve to IDs at apply time, in dependency order. Missing references fail validation; never partial-apply.
 - **`adopt: true`** — omitted below for readability. Add it the first time you declare a same-named resource that already exists (D5).
 
@@ -1234,7 +1234,7 @@ robots:
     duration: -1                                      # days; -1 = no expiry
     disable: false
     level: system                                     # system | project
-    secretRef: { env: CI_PUSHER_SECRET }              # if omitted, Harbor generates and surfaces in /declarative/status
+    secretRef: { env: CI_PUSHER_SECRET }              # alpha: secretRef is required (§13.1); auto-generation is post-alpha
     permissions:
       - kind: project
         namespace: "*"
@@ -1265,7 +1265,7 @@ robots:
     disable: false
     level: project
     project: library                                  # required when level=project
-    secretRef: null                                   # auto-generated; surface in /declarative/status
+    secretRef: { env: LIBRARY_RO_SECRET }             # alpha: secretRef is required (§13.1); auto-generation is post-alpha
     permissions:
       - kind: project
         namespace: library
