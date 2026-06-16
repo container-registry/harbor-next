@@ -40,18 +40,30 @@ jobs:
       - name: Comment with backport commands
         run: |
           marker='<!-- backport-suggestion -->'
+
+          # Collect every existing marker comment (oldest first). Keep the first to update
+          # in place; any others are duplicates from earlier runs and are removed below.
           existing_comment_ids=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
             --jq '.[] | select((.body // "") | contains("<!-- backport-suggestion -->")) | .id')
-          existing_comment_id="${existing_comment_ids%%$'\n'*}"
+          keep_id="${existing_comment_ids%%$'\n'*}"
+
+          delete_comment() {
+            gh api "repos/${GITHUB_REPOSITORY}/issues/comments/$1" \
+              --method DELETE \
+              --silent
+          }
+
+          delete_all_comments() {
+            while IFS= read -r id; do
+              [ -z "${id}" ] && continue
+              delete_comment "${id}"
+            done <<< "${existing_comment_ids}"
+          }
 
           case "${PR_TITLE}" in
             fix:*|fix\(*\):*|upstream:*|upstream\(*\):*|perf:*|perf\(*\):*|revert:*|revert\(*\):*|ci:*|ci\(*\):*|build:*|build\(*\):*) ;;
             *)
-              if [ -n "${existing_comment_id}" ]; then
-                gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${existing_comment_id}" \
-                  --method DELETE \
-                  --silent
-              fi
+              delete_all_comments
               exit 0
               ;;
           esac
@@ -59,11 +71,7 @@ jobs:
           branches=$(gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/heads/release-" \
             --jq '.[].ref | sub("refs/heads/"; "") | select(test("^release-[0-9]+\\.[0-9]+$"))' | sort -Vr)
           if [ -z "${branches}" ]; then
-            if [ -n "${existing_comment_id}" ]; then
-              gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${existing_comment_id}" \
-                --method DELETE \
-                --silent
-            fi
+            delete_all_comments
             exit 0
           fi
 
@@ -73,10 +81,16 @@ jobs:
             body="${body}\`/backport v${branch#release-}\`"$'\n'
           done <<< "${branches}"
 
-          if [ -n "${existing_comment_id}" ]; then
-            gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${existing_comment_id}" \
+          if [ -n "${keep_id}" ]; then
+            gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${keep_id}" \
               --method PATCH \
               --raw-field body="${body}"
+            # Remove any leftover duplicate marker comments from earlier runs.
+            while IFS= read -r id; do
+              [ -z "${id}" ] && continue
+              [ "${id}" = "${keep_id}" ] && continue
+              delete_comment "${id}"
+            done <<< "${existing_comment_ids}"
           else
             gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
               --method POST \
