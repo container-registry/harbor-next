@@ -10,20 +10,6 @@
 | **Technical Area** | Core configuration, GitOps, Kubernetes integration |
 | **Related** | [flux-operator-harbor-example](https://github.com/matheuscscp/flux-operator-harbor-example) · [steadforce/harbor-day2-operator](https://github.com/steadforce/harbor-day2-operator) · [rkthtrifork/harbor-operator](https://github.com/rkthtrifork/harbor-operator) · [vtmocanu/harbor-crossplane](https://github.com/vtmocanu/harbor-crossplane) |
 
-> **Naming note.** This work was originally drafted under the title *"Harbor Day 2 Operator."*
-> That name is misleading: per Decision 1 below, we explicitly do **not** build a Kubernetes
-> operator that installs or runs Harbor. The deliverable is *declarative configuration of an
-> already-running Harbor*. The only operator involved is a thin component that renders CRDs into a
-> ConfigMap. The feature is referred to throughout as **declarative configuration** or
-> **config-as-code**.
-
----
-
-> **Document structure.** This is a single decision record in two parts: **Part I — Decision Record**
-> (problem, options, decisions, consequences) and **Part II — Technical Design** (architecture,
-> verified baseline, implementation plan, verification, and the exhaustive `harbor.yaml` reference in
-> Appendix A). Product- and user-facing material lives in Notion (task TAS-484).
-
 ---
 
 ## Table of Contents
@@ -46,7 +32,7 @@
 6. CRD surface and multi-Harbor model
 7. Read-only behaviour in the Web UI
 8. Implementation plan
-9. Baseline verification & corrections
+9. Verified baseline
 10. Delivery & upstreaming
 11. Verification matrix
 12. Traceability: goals → decisions → phases → tests
@@ -215,11 +201,10 @@ transaction layer (e.g. project create + members + metadata atomically). A `cont
 (`declarative.WithReconcilerContext(ctx)`) marks reconciler-originated calls for audit attribution
 and to bypass the read-only middleware.
 
-> **Correction vs the original brainstorm.** The brainstorm listed `label` among
-> `src/controller/{...}`. There is **no `src/controller/label/` package**. Labels are managed via
-> `src/pkg/label/manager.go` (`label.Mgr`, full CRUD). The reconciler's label path uses that manager
-> directly. See Part II — Reconciler behaviour / Implementation plan (below) for the full,
-> verified controller/manager inventory.
+> **Note.** Labels have no `src/controller/label/` package; CRUD is via `src/pkg/label/manager.go`
+> (`label.Mgr`), which the reconciler's label path calls directly. The other domains (project, robot,
+> registry, replication, retention, webhook, scanner, immutable, quota) expose `Controller` interfaces
+> the reconciler uses. See §5 and §8 for the full controller/manager inventory.
 
 ### Decision 7 — 1:1 CRDs (not macros) when CRDs land
 
@@ -476,8 +461,8 @@ surfaces line/column in `/declarative/status`, and emits `declarative_config_rel
 **first boot** there is no last-good config, so a parse/validation/secret-resolution/DB failure is
 **fail-closed** — Core reports un-ready and does not serve the API rather than booting with empty
 config (see §13.2). Apply is **checkpointed per kind, not a single global transaction** (see §13 and
-§5 "Apply semantics") — the earlier "never partial-apply" wording was inaccurate. If
-`fsnotify.Watcher.Errors` reports a fatal, recreate the watcher; polling continues uninterrupted.
+§5 "Apply semantics"). If `fsnotify.Watcher.Errors` reports a fatal, recreate the watcher; polling
+continues uninterrupted.
 
 **Secret rotation.** `file:` (and the operator's projected `secret:`) refs resolve to a path re-read
 every reconcile, so a rotated projected Kubernetes Secret is picked up on the next reload. `env:` refs
@@ -653,26 +638,27 @@ Observable).
 - **Phase 5 — Post-alpha follow-ons.** Macro CRDs (Project + Replication + Retention). WebUI status page
   in the Portal. Push-style watch reconcile from the operator instead of the loop.
 
-## 9. Baseline verification & corrections
+## 9. Verified baseline
 
-All claims below were verified against the tree on 2026-06-16. The original brainstorm ("Harbor Day 2
-Operator") contained these inaccuracies; they are corrected throughout this doc and the appendix.
+Facts below were verified against the codebase (2026-06-16) and are load-bearing for the design:
 
-| Original claim | Verified reality | Source |
-|---|---|---|
-| `metadatalist.go` "~150 keys" | **~117 entries** | `src/lib/config/metadata/metadatalist.go` |
-| SFTP adapter = patch `0004-sftp-replication` | **`0003-sftp-replication`** | `8gcr-ee/patches/0003-sftp-replication` |
-| "all webhook event types" (14 listed) | webhook-selectable set is **10** (PUSH/PULL/DELETE_ARTIFACT, QUOTA_EXCEED/WARNING, SCANNING_FAILED/STOPPED/COMPLETED, REPLICATION, TAG_RETENTION); the 19 topics in `event/topic.go` include internal-only events not subscribable as webhooks | `src/pkg/notification/notification.go:84-95` |
-| reconciler calls a `label` **controller** | no `src/controller/label/`; labels use `label.Mgr` (full CRUD) | `src/pkg/label/manager.go:31` |
-| manager-name constants in `lib/config` | constants in `src/common/const.go:28-30` | — |
-| 5 retention templates "all demonstrated" | a 6th, `latestActiveK`, also exists | `src/pkg/retention/policy/rule/latestk/` |
-| adapter list | also includes `dtr` (Docker Trusted Registry) | `src/pkg/reg/adapter/dtr/` |
+| Fact | Source |
+|---|---|
+| Application config is **~117 keys** | `src/lib/config/metadata/metadatalist.go` |
+| The SFTP replication adapter ships as fork patch `0003-sftp-replication` (registry type `sftp`) | `8gcr-ee/patches/0003-sftp-replication` |
+| Webhook-selectable event types are the **10** in `notification.go` (PUSH/PULL/DELETE_ARTIFACT, QUOTA_EXCEED/WARNING, SCANNING_FAILED/STOPPED/COMPLETED, REPLICATION, TAG_RETENTION); the 19 topics in `event/topic.go` include internal-only events not subscribable as webhooks | `src/pkg/notification/notification.go:84-95` |
+| Labels have **no controller**; CRUD is via `label.Mgr` | `src/pkg/label/manager.go:31` |
+| Config-manager name constants live in `common` | `src/common/const.go:28-30` |
+| Retention templates: `latestPushedK`, `latestPulledN`, `nDaysSinceLastPush`, `nDaysSinceLastPull`, `always`, `latestActiveK` | `src/pkg/retention/policy/rule/` |
+| Replication adapters include `dtr` alongside the public-cloud set | `src/pkg/reg/adapter/` |
+| Registry type strings are the `Registry*` constants (e.g. `harbor-satellite`, `docker-hub`, `github-ghcr`) | `src/pkg/reg/model/registry.go` |
 
-**Confirmed correct** (kept as-is): the `--mode` flag at `main.go:143-144`; the pluggable `Manager`
-interface + `Register`; `readOnlyForAll` (controller.go:41) + `OverwriteConfig()` (controller.go:272-286);
-controller interfaces for project/robot/registry/replication/retention/webhook/scanner/immutable/quota;
-the replication adapter set; the global read-only middleware; the Portal per-field `editable` flag;
-webhook target types `http`/`slack`/`email` (`src/pkg/notifier/model/topic.go`).
+The design reuses existing seams: the single `--mode` CLI flag (`main.go:143-144`); the pluggable
+`Manager` interface + `Register`; `readOnlyForAll` (`controller.go:41`) + `OverwriteConfig()`
+(`controller.go:272-286`); the CRUD `Controller` interfaces for
+project/robot/registry/replication/retention/webhook/scanner/immutable/quota; the global read-only
+middleware; the Portal per-field `editable` flag; and webhook target types `http`/`slack`/`email`
+(`src/pkg/notifier/model/topic.go`).
 
 ## 10. Delivery & upstreaming
 
