@@ -9,4 +9,5 @@ npm install -q --no-progress
 # check code lint first then run ut test
 npm run lint
 npm run lint:style
+node scripts/find-missing-i18n.js
 npm run test && cd -
