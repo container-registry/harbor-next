@@ -277,7 +277,7 @@ See the [OIDC documentation](https://docs.example.com/oidc) for configuration de
 
 **Rules:**
 
-- Required for `feat:` PRs; recommended for any user-facing `fix:`
+- Required for `feat:` PRs; recommended for any user-facing `fix:` PRs
 - Leave it blank for `ci:`, `chore:`, `refactor:`, `docs:` PRs
 - Write for your users, not for developers (explain what changed and why it matters)
 - Links are fine and encouraged
