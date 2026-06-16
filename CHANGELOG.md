@@ -6,6 +6,17 @@ This changelog mirrors [GitHub Releases](https://github.com/container-registry/h
 
 ---
 
+## [2.15.2](https://github.com/container-registry/harbor-next/compare/v2.15.1...v2.15.2) (2026-06-16)
+
+
+### Bug Fixes
+
+* **cache:** Defer Cache Eviction Until After Commit And Make Retry Context-Aware ([#310](https://github.com/container-registry/harbor-next/issues/310)) ([00e5d12](https://github.com/container-registry/harbor-next/commit/00e5d12f2a0ab098c3e19f7273acfd530f6eca1a))
+* **cache:** replace keyMutex with singleflight and avoid canceling cache Save (upstream [#23336](https://github.com/container-registry/harbor-next/issues/23336)) ([#307](https://github.com/container-registry/harbor-next/issues/307)) ([c28cbd4](https://github.com/container-registry/harbor-next/commit/c28cbd4e97ec37b649d41ebc50f5187e74a05071))
+* Point More Info Link to 8GCR ([#295](https://github.com/container-registry/harbor-next/issues/295)) ([09f0b9a](https://github.com/container-registry/harbor-next/commit/09f0b9a089b1ff8a9668c460e1d967bcede7eb1a))
+* Prevent Core FD/Goroutine Leak When Registry Is Unresponsive ([#306](https://github.com/container-registry/harbor-next/issues/306)) ([49f24ab](https://github.com/container-registry/harbor-next/commit/49f24ab12d9e809730f3ebc0d786d59525e80c10))
+* Restore 0171 Migration For Upstream 2.14.x Upgrade Path ([#296](https://github.com/container-registry/harbor-next/issues/296)) ([145d1f3](https://github.com/container-registry/harbor-next/commit/145d1f3686d498ac7679dab85b9060480449610f))
+
 ## [2.15.1](https://github.com/container-registry/harbor-next/compare/v2.15.0...v2.15.1) (2026-06-11)
 
 
