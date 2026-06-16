@@ -19,18 +19,6 @@
 
 ---
 
-## Table of Contents
-
-1. [Executive Summary](#1-executive-summary)
-2. [Problem Statement](#2-problem-statement)
-3. [Decision Drivers](#3-decision-drivers)
-4. [Options Considered](#4-options-considered)
-5. [Decisions](#5-decisions)
-6. [Consequences](#6-consequences)
-7. [References (Prior Art)](#7-references-prior-art)
-
----
-
 > **Document structure.** This is a single decision record in two parts: **Part I — Decision Record**
 > (problem, options, decisions, consequences) and **Part II — Technical Design** (architecture,
 > verified baseline, implementation plan, verification, and the exhaustive `harbor.yaml` reference in
@@ -45,7 +33,7 @@
 2. Problem Statement
 3. Decision Drivers
 4. Options Considered
-5. Decisions (D1–D10)
+5. Decisions (D1–D11)
 6. Consequences
 7. References (Prior Art)
 
@@ -62,6 +50,7 @@
 10. Delivery & upstreaming
 11. Verification matrix
 12. Traceability: goals → decisions → phases → tests
+13. Operational design (review-driven resolutions)
 - Appendix A — exhaustive `harbor.yaml` reference
 
 ---
@@ -232,12 +221,14 @@ and to bypass the read-only middleware.
 > directly. See Part II — Reconciler behaviour / Implementation plan (below) for the full,
 > verified controller/manager inventory.
 
-### Decision 7 — 1:1 CRDs in alpha, macros post-alpha
+### Decision 7 — 1:1 CRDs (not macros) when CRDs land
 
-Each file resource kind maps to one CRD (`HarborProject`, `HarborRobot`, `HarborRegistry`,
-`HarborReplicationPolicy`, …). Higher-level macro CRDs (the Crossplane pattern where one
-`HarborReplication` composes Project + Replication + Retention) are deferred to Phase 5. Alpha needs
-the primitives clean first.
+When the CRD surface is introduced (deferred out of the alpha by Decision 11), each file resource kind
+maps to one CRD (`HarborProject`, `HarborRobot`, `HarborRegistry`, `HarborReplicationPolicy`, …).
+Higher-level macro CRDs (the Crossplane pattern where one `HarborReplication` composes Project +
+Replication + Retention) are deferred further, to Phase 5 — the primitives must be clean first. A
+single `HarborConfig` CRD per target (embedding the file schema) is an alternative starting point if
+1:1 CRD sprawl proves heavy; see §13.8.
 
 ### Decision 8 — Multi-Harbor on one cluster is first-class
 
@@ -261,6 +252,29 @@ question. Instead: `HARBOR_CONFIG_MODE=declarative` and
 > lets just ship a alpha, very unpolished to get feedback from community … alpha allows us for breaking changes
 
 The schema carries `apiVersion: harbor.goharbor.io/v1alpha1`. Breaking changes are expected before v1.
+
+### Decision 11 — Alpha scope is deliberately narrow (MVP first)
+
+Decisions 1–10 describe the **target** design. Review feedback flagged the full surface (file + 1:1
+CRDs + operator + all resource kinds + drift-enforce + prune + per-resource UI) as too large and too
+risky for a first cut. The alpha is therefore scoped down; the rest is deferred to follow-up ADRs once
+the file contract proves out:
+
+- **File-first.** Alpha ships the Core-side **file** reconciler only. The `harbor-config-operator` and
+  the 1:1 CRDs (Decisions 2, 7, 8) are deferred to a follow-up ADR; the canonical `harbor.yaml` contract
+  is validated first. Flux can mount a `harbor.yaml` ConfigMap directly in the meantime.
+- **Minimal resource set** tied to the motivating Flux demo: system/auth (OIDC), projects + members, and
+  robots. Registries, replications, retentions, webhooks, immutables, scanners, schedules, labels, user
+  groups, and quotas land in later phases.
+- **Reload:** polling + authenticated manual `POST /declarative/reload` first; fsnotify and
+  operator-coordinated reload are accelerations added after convergence is proven.
+- **Convergence + status-only drift:** create/update convergence with drift **reported** (`warn`); no
+  automatic `enforce` and no automatic prune of destructive kinds in alpha (see §5, §13).
+- **UI:** a global declarative-mode read-only banner only; per-resource `managed` badges/fields are
+  deferred until ownership markers are stable.
+
+This decision narrows the day-one breadth of Decisions 2/6/7 **for the alpha only**; the full design
+remains the target.
 
 ## 6. Consequences
 
@@ -444,7 +458,7 @@ kubelet creates a new timestamped directory and swaps the `..data` symlink; a wa
 typically sees no `WRITE`. The watcher must observe the **parent directory** and react to
 `CREATE`/`RENAME`/`REMOVE` events, then re-stat the configured path.
 
-Five equivalent trigger paths funnel into the same reconcile entry point:
+Six equivalent trigger paths funnel into the same reconcile entry point:
 
 | Source of change | Trigger | Latency | Notes |
 |---|---|---|---|
@@ -457,26 +471,50 @@ Five equivalent trigger paths funnel into the same reconcile entry point:
 
 All triggers: re-parse, re-resolve `*Ref` secrets fresh (no cache, so kubelet's symlink swap delivers
 rotated secrets too), reconcile diff against live state, update the last-applied snapshot. Debounce 2s.
-On parse/validation error, keep last-good config in memory, surface line/column in
-`/declarative/status`, emit `declarative_config_reload_errors_total`. **Never partial-apply.** If
+On a parse/validation error during a **reload**, the loader keeps the **last-good in-memory config**,
+surfaces line/column in `/declarative/status`, and emits `declarative_config_reload_errors_total`. On
+**first boot** there is no last-good config, so a parse/validation/secret-resolution/DB failure is
+**fail-closed** — Core reports un-ready and does not serve the API rather than booting with empty
+config (see §13.2). Apply is **checkpointed per kind, not a single global transaction** (see §13 and
+§5 "Apply semantics") — the earlier "never partial-apply" wording was inaccurate. If
 `fsnotify.Watcher.Errors` reports a fatal, recreate the watcher; polling continues uninterrupted.
 
-**Env-var changes** take effect on the next file event or restart; rotating e.g. `OIDC_CLIENT_SECRET`
-requires a no-op file touch or a reload call.
+**Secret rotation.** `file:` (and the operator's projected `secret:`) refs resolve to a path re-read
+every reconcile, so a rotated projected Kubernetes Secret is picked up on the next reload. `env:` refs
+are **static for the life of the process** (container env does not change after start); rotating an
+env-sourced secret requires a pod/process restart. Prefer `file:` refs for anything that must rotate at
+runtime.
 
 ## 5. Reconciler behaviour
 
-- **Apply order** is fixed and dependency-aware: `system → registries → projects → robots → labels →
-  scanners → replications → retentions → webhooks → immutables → schedules`. A topological sort ensures
-  registries exist before replications reference them, projects before project-scoped robots.
-- **Adoption** matches by name (D5). An adopted resource gains `harbor.goharbor.io/managed-by`.
-  Resources without the label are out of scope.
-- **Drift detection** runs after each apply: read live state back, compare to the last-applied snapshot
-  in the single-row `declarative_state` table, then `enforce` (default) / `warn` / `off`.
-- **Prune** removes managed resources that disappear from the spec. Per-resource `deletionPolicy:
-  orphan` opts out.
-- **Last-applied snapshot** (checksum + serialised last-good spec) in the new `declarative_state` table
-  is the basis for both drift and prune.
+- **Three states.** The reconciler distinguishes **desired** (parsed spec), **last-applied** (snapshot
+  in the single-row `declarative_state` table), and **live** (current DB state). *Convergence* applies
+  `desired − live`; *drift* is `live ≠ last-applied`; *prune* removes entries in `last-applied` absent
+  from `desired`.
+- **Apply order follows a dependency graph, not a fixed list.** Edges: `system` and `userGroups` first;
+  `registries` before proxy-cache `projects` and before `replications` that reference them; `labels`
+  before `replications` whose filters reference a label; `projects` before their `members` (which
+  reference users/groups), `robots`, `retention`, `webhooks`, `immutable`, and `quota`. The reconciler
+  topologically sorts from this graph and **fails validation before any write** on a cycle or an
+  unresolved cross-reference.
+- **Identity & adoption (D5).** Each kind has an explicit identity key — project by `name`; robot by
+  `(level, project, name)`; registry/replication/scanner by `name`; webhook/immutable by
+  `(project, name)`; retention/quota by `project`; label by `(name, scope)`; user group by
+  `(name, type)`. Adoption matches on that key; an adopted resource and its managed nested sub-resources
+  gain `harbor.goharbor.io/managed-by`. A same-key resource that already exists **without** the label
+  and **without** `adopt: true` is a **conflict**: that resource fails reconcile and is reported in
+  `/status`; it is never silently overwritten or duplicated.
+- **Drift policy.** `enforce` restores declared state, `warn` reports only, `off` ignores. **Alpha
+  defaults to `warn` (status-only)** — automatic correction is gated until ownership and backup/restore
+  semantics are proven (Decision 11).
+- **Prune safety.** `deletionPolicy: orphan` opts a resource out of deletion. **Destructive kinds
+  (projects and anything holding artifacts) default to `orphan` in alpha**; pruning a non-empty project
+  requires an explicit `force` and is otherwise refused. With the default policy, removing a resource
+  from the spec detaches its `managed-by` label rather than deleting data.
+- **Apply semantics.** Each kind is applied through the existing controller/manager and is atomic only
+  at that controller's transaction boundary; there is **no cross-kind transaction**. `last-applied` is
+  updated per kind only after that kind applies cleanly; a mid-run failure leaves earlier kinds applied,
+  later kinds untouched, and the failure recorded per-resource in `/status` (§13.5).
 
 Reconciler-originated calls carry `declarative.WithReconcilerContext(ctx)` for audit attribution and to
 bypass the read-only middleware (D6).
@@ -686,6 +724,75 @@ End-to-end scenarios mirror the three-scenario rig (`task dev:up` SLOT=1; `deplo
 | No regression to legacy behaviour | D3 | 1 | V12 |
 | Secrets resolved, rotatable | D4 | 1–2 | V10 |
 
+## 13. Operational design (review-driven resolutions)
+
+These close concerns raised in design review. They are part of the contract even where Decision 11
+scopes them down for alpha.
+
+### 13.1 Secrets contract
+
+- **Core resolves only `env:` and `file:` refs.** The `secret:` form (Kubernetes Secret `name`/`key`)
+  is an **operator/Helm** concern: it is projected into the pod as a file and reaches Core as a `file:`
+  ref. Core never imports Kubernetes client libraries (D2), so it never reads the Kubernetes API.
+- **Resolved secret values are never persisted or echoed.** `declarative_state` stores a checksum of
+  the *spec with refs unresolved*; resolved values are excluded from the snapshot, `/declarative/status`,
+  audit, and logs (redacted).
+- **Robot secrets:** in alpha a robot must declare an explicit `secretRef`; Harbor does not
+  auto-generate and surface secrets via `/status`. Any future generated-secret support writes only to a
+  designated external sink.
+
+### 13.2 Startup & failure semantics
+
+- **Fail-closed on first boot:** missing/invalid config, an unresolvable `*Ref`, or an unreachable DB
+  makes Core report un-ready and refuse to serve the API; it never boots with empty/partial config.
+- **Last-good** applies only to reloads of an already-running process. The persisted `last-applied`
+  snapshot drives drift/prune comparison; it is not a desired-state fallback on a failed boot.
+- **Readiness** flips ready only after the first full reconcile succeeds.
+
+### 13.3 High availability (multi-replica Core)
+
+- Only **one replica reconciles**, elected via a Postgres advisory lock / lease recorded in
+  `declarative_state`. Non-leaders serve API and watch but do not apply or write the snapshot.
+- `POST /declarative/reload` is idempotent; the leader performs the apply and owns `/status`.
+  Leadership transfers on lease expiry.
+
+### 13.4 RBAC & API authorization
+
+- `/declarative/status` requires system read; `/declarative/reload` requires system config-write (or
+  the operator's service identity). Reload is allowed in declarative read-only mode because it is
+  reconciler-originated (D6), not a user write, and is audited under the caller's identity.
+- **CRD path (post-alpha):** cross-namespace `targetRef` is denied unless the target's `acceptedTargets`
+  names the source namespace; admission validates target existence and the allowed kinds per namespace,
+  so an app-team namespace cannot escalate access to a shared Harbor.
+
+### 13.5 Observability
+
+- `/declarative/status` reports overall and **per-resource** conditions (`Synced` / `OutOfSync` /
+  `Error`), current-vs-desired generation/checksum, last successful apply, and a diff summary.
+- Metrics: reconcile duration, applies/drifts/prunes per kind, `declarative_config_reload_errors_total`,
+  leader status. Structured, redacted audit events per apply.
+
+### 13.6 Backup / restore
+
+- Restoring Postgres/S3 without the matching `harbor.yaml` + `declarative_state` could drive drift/prune
+  against the wrong desired state. Restore guidance: start Core with declarative mode **disabled** (or
+  drift `off`), restore the matching config, verify the `declarative_state` checksum, then re-enable.
+  Alpha's `warn`-by-default drift and `orphan`-by-default prune keep a mismatched restore non-destructive.
+
+### 13.7 API & schema compatibility
+
+- Core accepts `apiVersion: harbor.goharbor.io/v1alpha1`; unknown `apiVersion` is rejected. Unknown
+  fields are rejected by default (strict) so typos fail loudly. `declarative_state` carries a schema
+  version for forward migration. New REST response fields (`managed`, `managed_by`) are additive/optional.
+
+### 13.8 CRD merge semantics (post-alpha)
+
+- The operator renders a deterministic, name-sorted `harbor.yaml`. A project sub-resource may be
+  expressed **either** embedded in `HarborProject` **or** as a standalone CR (`HarborProjectMember`,
+  etc.), not both for the same item; a duplicate `(project, identity)` is a render-time conflict
+  surfaced on the owning CR's status. Singleton CRDs resolve ties by oldest `creationTimestamp` then
+  name; losers get an `Ineffective` status condition; on winner deletion the next-oldest takes over.
+
 ## Appendix A — exhaustive `harbor.yaml` reference
 
 This is the **reference** schema — intentionally exhaustive, not an onboarding example. It covers every
@@ -693,6 +800,10 @@ key in `src/lib/config/metadata/metadatalist.go`, every replication adapter in `
 every retention template in `src/pkg/retention/policy/` (note: `latestActiveK` also exists and can be
 added), and every webhook-selectable event type. For a minimal "hello world" `harbor.yaml`, see the
 User Guide in Notion (TAS-484).
+
+> **Note.** This reference is the bulk of the ADR and is slated to move to generated schema docs; it
+> stays inline for now. Secret refs follow §13.1 — Core resolves only `env:` and `file:`; the `secret:`
+> form is projected to a file by the operator/Helm.
 
 Conventions:
 
@@ -962,7 +1073,7 @@ registries:
     url: https://example-cn-shanghai.cr.volces.com
     credential: { type: basic, accessKey: "${VOLC_AK}", accessSecretRef: { env: VOLC_SK } }
   - name: harbor-satellite
-    type: harborsatellite
+    type: harbor-satellite
     url: https://satellite.example.com
   - name: native-oci
     type: docker-registry                           # generic Docker Distribution / OCI
