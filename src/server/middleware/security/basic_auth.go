@@ -18,10 +18,12 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/common/models"
 	"github.com/goharbor/harbor/src/common/security"
 	"github.com/goharbor/harbor/src/common/security/local"
 	"github.com/goharbor/harbor/src/core/auth"
+	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/log"
 )
 
@@ -63,13 +65,31 @@ func (b *basicAuth) Generate(req *http.Request) security.Context {
 	if !ok {
 		return nil
 	}
+
+	// In OIDC/LDAP/UAA modes only the admin uses basic auth; other principals are
+	// handled by earlier generators (robot, OIDC CLI), so skipping them spares a
+	// useless auth-backend round-trip. Empty mode is treated as DB auth (as in
+	// auth.Login) so a config lookup failure can't lock out basic auth.
+	authMode := lib.GetAuthMode(req.Context())
+	if authMode != "" && authMode != common.DBAuth && !auth.IsSuperUser(req.Context(), username) {
+		log.Debugf("basic auth skipped for user %s, auth mode is %s", username, authMode)
+		return nil
+	}
+
 	user, err := auth.Login(req.Context(), models.AuthModel{
 		Principal: username,
 		Password:  password,
 	})
 
 	if err != nil {
-		log.WithField("client IP", GetClientIP(req)).WithField("user agent", GetUserAgent(req)).Errorf("failed to authenticate user:%s, error:%v", username, err)
+		logEntry := log.WithField("client IP", GetClientIP(req)).WithField("user agent", GetUserAgent(req))
+		// Bad credentials are expected probe traffic (scanners/bots) -> DEBUG;
+		// unexpected backend/config errors stay at ERROR so outages stay visible.
+		if _, ok := err.(auth.ErrAuth); ok {
+			logEntry.Debugf("failed to authenticate user:%s, error:%v", username, err)
+		} else {
+			logEntry.Errorf("failed to authenticate user:%s, error:%v", username, err)
+		}
 		return nil
 	}
 	if user == nil {

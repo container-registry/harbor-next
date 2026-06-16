@@ -23,7 +23,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/goharbor/harbor/src/common"
 	_ "github.com/goharbor/harbor/src/core/auth/db"
+	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/orm"
 )
 
@@ -35,6 +37,30 @@ func TestBasicAuth(t *testing.T) {
 	req = req.WithContext(orm.Context())
 	ctx := basicAuth.Generate(req)
 	assert.NotNil(t, ctx)
+}
+
+func TestBasicAuthNonDBMode(t *testing.T) {
+	basicAuth := &basicAuth{}
+
+	// admin is the super user, so the skip must not apply in OIDC mode.
+	adminReq, err := http.NewRequest(http.MethodGet, "http://127.0.0.1/api/projects/", nil)
+	require.Nil(t, err)
+	adminReq.SetBasicAuth("admin", "Harbor12345")
+	adminReq = adminReq.WithContext(lib.WithAuthMode(orm.Context(), common.OIDCAuth))
+	assert.NotNil(t, basicAuth.Generate(adminReq), "admin must still authenticate via basic auth in OIDC mode")
+
+	userReq, err := http.NewRequest(http.MethodGet, "http://127.0.0.1/api/projects/", nil)
+	require.Nil(t, err)
+	userReq.SetBasicAuth("nonadmin-probe", "whatever")
+	userReq = userReq.WithContext(lib.WithAuthMode(orm.Context(), common.OIDCAuth))
+	assert.Nil(t, basicAuth.Generate(userReq), "non-admin basic auth must be skipped in OIDC mode")
+
+	// empty auth mode is treated as DB auth, so the skip must not lock out basic auth.
+	emptyModeReq, err := http.NewRequest(http.MethodGet, "http://127.0.0.1/api/projects/", nil)
+	require.Nil(t, err)
+	emptyModeReq.SetBasicAuth("admin", "Harbor12345")
+	emptyModeReq = emptyModeReq.WithContext(orm.Context())
+	assert.NotNil(t, basicAuth.Generate(emptyModeReq), "admin must authenticate when auth mode is empty (treated as DB)")
 }
 
 func TestGetClientIP(t *testing.T) {
