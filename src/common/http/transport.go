@@ -21,7 +21,10 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -57,6 +60,67 @@ func AddTracingWithGlobalTransport() {
 	secureHTTPTransport = otelhttp.NewTransport(secureHTTPTransport, trace.HarborHTTPTraceOptions...)
 }
 
+const (
+	// responseHeaderTimeoutEnvKey overrides defaultResponseHeaderTimeout, in
+	// seconds. A value of 0 disables the response-header timeout entirely.
+	responseHeaderTimeoutEnvKey = "HTTP_RESPONSE_HEADER_TIMEOUT_SECONDS"
+
+	// defaultMaxIdleConnsPerHost caps idle keep-alive connections retained per
+	// host. Go's net/http default is only 2; when harbor-core proxies many
+	// concurrent requests to a single backend (notably the registry), that
+	// forces constant connection churn and the associated FD/goroutine
+	// pressure. A higher cap lets connections be reused.
+	defaultMaxIdleConnsPerHost = 32
+
+	// defaultResponseHeaderTimeout bounds how long the transport waits for a
+	// backend's response headers after the request has been written. Without
+	// it, a request that reuses a pooled keep-alive connection to an
+	// unresponsive backend (e.g. the registry pod after it is rescheduled to a
+	// new IP) blocks indefinitely, leaking one goroutine and one socket per
+	// in-flight request until the process is restarted. It does NOT limit body
+	// transfer, so large blob pushes/pulls are unaffected.
+	defaultResponseHeaderTimeout = 90 * time.Second
+)
+
+var (
+	responseHeaderTimeoutOnce  sync.Once
+	responseHeaderTimeoutValue time.Duration
+)
+
+// responseHeaderTimeout returns the response-header timeout applied to the
+// default transport. The value is read from the environment once and cached
+// for the lifetime of the process, mirroring the read-once style of
+// config.RegistryHTTPClientTimeout (goharbor/harbor#23154).
+//
+// It intentionally lives in this package rather than in lib/config: lib/config
+// already imports common/http, so importing it from here would create a
+// cycle. This setting is also complementary to REGISTRY_HTTP_CLIENT_TIMEOUT --
+// that bounds the whole request (including the body), whereas this bounds only
+// the wait for response headers, so it can be short without affecting large
+// blob transfers.
+func responseHeaderTimeout() time.Duration {
+	responseHeaderTimeoutOnce.Do(func() {
+		responseHeaderTimeoutValue = parseResponseHeaderTimeout()
+	})
+	return responseHeaderTimeoutValue
+}
+
+// parseResponseHeaderTimeout reads HTTP_RESPONSE_HEADER_TIMEOUT_SECONDS (in
+// seconds). A value of 0 disables the timeout; an empty, negative or otherwise
+// invalid value falls back to defaultResponseHeaderTimeout.
+func parseResponseHeaderTimeout() time.Duration {
+	env := os.Getenv(responseHeaderTimeoutEnvKey)
+	if env == "" {
+		return defaultResponseHeaderTimeout
+	}
+	secs, err := strconv.Atoi(env)
+	if err != nil || secs < 0 {
+		log.Warningf("invalid %s=%q, using default %s", responseHeaderTimeoutEnvKey, env, defaultResponseHeaderTimeout)
+		return defaultResponseHeaderTimeout
+	}
+	return time.Duration(secs) * time.Second
+}
+
 // Use this instead of Default Transport in library because it sets ForceAttemptHTTP2 to true
 // And that options introduced in go 1.13 will cause the https requests hang forever in replication environment
 func newDefaultTransport() *http.Transport {
@@ -69,9 +133,11 @@ func newDefaultTransport() *http.Transport {
 		}).DialContext,
 		TLSClientConfig:       &tls.Config{},
 		MaxIdleConns:          100,
+		MaxIdleConnsPerHost:   defaultMaxIdleConnsPerHost,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
+		ResponseHeaderTimeout: responseHeaderTimeout(),
 	}
 }
 
