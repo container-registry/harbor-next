@@ -717,15 +717,15 @@ Kubernetes: `>=1.28.0-0`
 | core.topologySpreadConstraints | list | `[]` | Topology spread constraints for pod scheduling |
 | core.xsrfKey | string | `""` | XSRF key (auto-generated if empty) |
 | database.clientCertEnabled | bool | `false` | Include client cert + key in the auto-built POSTGRESQL_URL. Set to true only when PG is configured to require client certificate authentication. libpq fails if `sslcert` is set but the file is missing. |
-| database.connMaxIdleTime | string | `"0"` | Maximum idle time for connections (0 = no limit) |
-| database.connMaxLifetime | string | `"0"` | Maximum lifetime of connections (0 = no limit) |
+| database.connMaxIdleTime | string | `"300s"` | Max time a connection may sit idle before the pool closes it (empty/0 keeps the pool's built-in default). |
+| database.connMaxLifetime | string | `"30m"` | Max total lifetime before a connection is recycled, useful for failover/LB hygiene (empty/0 keeps the pool's built-in default). |
 | database.database | string | `"registry"` | Database name |
 | database.existingSecret | string | `""` | Existing secret containing database credentials Default secret key: POSTGRESQL_PASSWORD |
 | database.existingSecretKey | string | `""` |  |
 | database.existingTlsSecret | string | `""` | Secret holding the PEM-encoded CA bundle (and optionally client cert + key) for verifying / authenticating to PostgreSQL. Required for `verify-ca` / `verify-full` sslmode against managed PG with a private CA (RDS-with-custom-CA, GCP CloudSQL, on-prem with internal PKI). Tracks upstream goharbor/harbor-helm#1859.  Expected keys (cert-manager convention):   ca.crt   — CA bundle (always required when this Secret is set)   tls.crt  — client cert (only when clientCertEnabled=true)   tls.key  — client key  (only when clientCertEnabled=true)  When set, the chart mounts the Secret at /etc/harbor/db-tls and injects POSTGRESQL_URL env on core + jobservice. The runtime DB pool honors that env over the individual fields.  Caveats:   - Exporter does not yet plumb POSTGRESQL_URL into its viper config,     so its DB connection ignores client certs (it'll work fine for     sslmode=verify-ca with a publicly-trusted CA).   - Harbor's migration tool (NewMigrator) does not honor cfg.URL     either, so schema migrations against a server that REQUIRES     mTLS will fail. Use sslmode=verify-ca or migrate via an external     trusted client until that's fixed upstream. |
 | database.host | string | `""` | Database host (required) |
-| database.maxIdleConns | int | `100` | Maximum idle connections |
-| database.maxOpenConns | int | `900` | Maximum open connections |
+| database.maxOpenConns | int | `100` | Hard cap on open connections per pool (POSTGRESQL_MAX_OPEN_CONNS). Core, jobservice (via core's config), and the exporter each open their own pool, so the per-release total is roughly this times the number of pooled components. Lower it on small/shared PostgreSQL. |
+| database.minConns | int | `2` | Minimum idle connections kept warm per pool (POSTGRESQL_MIN_CONNS). pgxpool floor; replaces the removed maxIdleConns. |
 | database.password | string | `""` | Database password (ignored if existingSecret is set) |
 | database.port | int | `5432` | Database port |
 | database.sslmode | string | `"disable"` | SSL mode for database connection |

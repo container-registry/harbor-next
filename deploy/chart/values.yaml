@@ -1388,14 +1388,20 @@ database:
   database: registry
   # -- SSL mode for database connection
   sslmode: disable
-  # -- Maximum idle connections
-  maxIdleConns: 100
-  # -- Maximum open connections
-  maxOpenConns: 900
-  # -- Maximum idle time for connections (0 = no limit)
-  connMaxIdleTime: "0"
-  # -- Maximum lifetime of connections (0 = no limit)
-  connMaxLifetime: "0"
+  # -- Hard cap on open connections per pool (POSTGRESQL_MAX_OPEN_CONNS).
+  # Core, jobservice (via core's config), and the exporter each open their
+  # own pool, so the per-release total is roughly this times the number of
+  # pooled components. Lower it on small/shared PostgreSQL.
+  maxOpenConns: 100
+  # -- Minimum idle connections kept warm per pool (POSTGRESQL_MIN_CONNS).
+  # pgxpool floor; replaces the removed maxIdleConns.
+  minConns: 2
+  # -- Max time a connection may sit idle before the pool closes it
+  # (empty/0 keeps the pool's built-in default).
+  connMaxIdleTime: "300s"
+  # -- Max total lifetime before a connection is recycled, useful for
+  # failover/LB hygiene (empty/0 keeps the pool's built-in default).
+  connMaxLifetime: "30m"
   # -- Existing secret containing database credentials
   # Default secret key: POSTGRESQL_PASSWORD
   existingSecret: ""

@@ -79,7 +79,6 @@ database:
   password: CHANGEME-db-password
   database: v2_tenant1_core
   sslmode: require
-  maxIdleConns: 1
   maxOpenConns: 20
   connMaxIdleTime: 30s
   connMaxLifetime: 5m

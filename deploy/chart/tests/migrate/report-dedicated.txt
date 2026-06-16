@@ -15,7 +15,7 @@ WARN — migrated, but review the changed behavior (3)
       -> registry.secret.REGISTRY_STORAGE_S3_*
       Inline credentials moved into registry.secret (base64-encoded into a generated Secret). Prefer a pre-created Secret via registry.storageCredentials.s3.existingSecret.
 
-INFO — mapped automatically (11)
+INFO — mapped automatically (12)
   * secretKey
       -> secretKey
       Carried over. Keep it identical to the old install whenever you reuse the 2.x database — replication endpoints and scanner credentials are encrypted with it.
@@ -40,12 +40,14 @@ INFO — mapped automatically (11)
   * database.external.*
       -> database.*
       Flattened one level; coreDatabase is now database.database and the port is numeric.
+  * database.maxIdleConns
+      Removed. The pgxpool-based pool has no max-idle cap; it keeps a minimum idle floor instead. Set database.minConns (default 2) to tune it.
   * redis.external.addr
       -> externalRedis.host/port
       addr split into separate host and port fields; valkey subchart disabled.
   * metrics.enabled
       -> metrics.enabled + jobservice.config.metric
       metrics.enabled does NOT propagate to jobservice in this chart — the jobservice metric block was added to its config.yml explicitly.
-  * quoted booleans/numbers (core.gdpr.deleteUser, trivy.enabled, database.maxIdleConns, database.maxOpenConns)
+  * quoted booleans/numbers (core.gdpr.deleteUser, trivy.enabled, database.maxOpenConns)
       -> native YAML types
       String-typed scalars were coerced — this chart validates value types via values.schema.json, so "true"/"1" strings would be rejected at install time.

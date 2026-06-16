@@ -22,7 +22,7 @@ WARN — migrated, but review the changed behavior (6)
   * metrics.serviceMonitor.metricRelabelings/relabelings
       No equivalent — dropped. Apply relabelings in your Prometheus config or via an own ServiceMonitor (extraManifests).
 
-INFO — mapped automatically (16)
+INFO — mapped automatically (17)
   * secretKey
       -> secretKey
       Carried over. Keep it identical to the old install whenever you reuse the 2.x database — replication endpoints and scanner credentials are encrypted with it.
@@ -65,6 +65,8 @@ INFO — mapped automatically (16)
   * database.external.*
       -> database.*
       Flattened one level; coreDatabase is now database.database and the port is numeric.
+  * database.maxIdleConns
+      Removed. The pgxpool-based pool has no max-idle cap; it keeps a minimum idle floor instead. Set database.minConns (default 2) to tune it.
   * redis.external.addr
       -> externalRedis.host/port
       addr split into separate host and port fields; valkey subchart disabled.

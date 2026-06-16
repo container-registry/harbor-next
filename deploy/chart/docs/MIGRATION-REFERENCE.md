@@ -216,7 +216,8 @@ Jobservice config moved into a verbatim `config.yml` passthrough
 | `database.external.coreDatabase` | `database.database` | Rename |
 | `database.external.existingSecret` | `database.existingSecret` | 2.x required key `password`; default key here is `POSTGRESQL_PASSWORD` — set `database.existingSecretKey: password` to reuse your existing Secret |
 | `database.external.sslmode` | `database.sslmode` | |
-| `database.maxIdleConns` / `maxOpenConns` | same | New: `connMaxIdleTime`, `connMaxLifetime` |
+| `database.maxOpenConns` | same | Default lowered to `100`. New: `database.minConns` (pgxpool idle floor, default 2), `connMaxIdleTime`, `connMaxLifetime` |
+| `database.maxIdleConns` | *removed* | The pgxpool pool has no max-idle cap; use `database.minConns` instead. The old env was ignored and logged a deprecation warning |
 | `database.podAnnotations` / `podLabels` | *N/A* | No database pods |
 | — | `database.existingTlsSecret`, `database.clientCertEnabled` | New: `verify-ca`/`verify-full` with a private CA, optional mTLS |
 

@@ -19,12 +19,12 @@
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       PORT: "8080"
       PORTAL_URL: http://harbor-harbor-next-portal
-      POSTGRESQL_CONN_MAX_IDLE_TIME: "0"
-      POSTGRESQL_CONN_MAX_LIFETIME: "0"
+      POSTGRESQL_CONN_MAX_IDLE_TIME: 300s
+      POSTGRESQL_CONN_MAX_LIFETIME: 30m
       POSTGRESQL_DATABASE: registry
       POSTGRESQL_HOST: postgres.example.com
-      POSTGRESQL_MAX_IDLE_CONNS: "100"
-      POSTGRESQL_MAX_OPEN_CONNS: "900"
+      POSTGRESQL_MAX_OPEN_CONNS: "100"
+      POSTGRESQL_MIN_CONNS: "2"
       POSTGRESQL_PORT: "5432"
       POSTGRESQL_SSLMODE: disable
       POSTGRESQL_USERNAME: postgres
@@ -512,12 +512,12 @@
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       PORT: "8080"
       PORTAL_URL: http://harbor-harbor-next-portal
-      POSTGRESQL_CONN_MAX_IDLE_TIME: "0"
-      POSTGRESQL_CONN_MAX_LIFETIME: "0"
+      POSTGRESQL_CONN_MAX_IDLE_TIME: 300s
+      POSTGRESQL_CONN_MAX_LIFETIME: 30m
       POSTGRESQL_DATABASE: registry
       POSTGRESQL_HOST: postgres.example.com
-      POSTGRESQL_MAX_IDLE_CONNS: "100"
-      POSTGRESQL_MAX_OPEN_CONNS: "900"
+      POSTGRESQL_MAX_OPEN_CONNS: "100"
+      POSTGRESQL_MIN_CONNS: "2"
       POSTGRESQL_PORT: "5432"
       POSTGRESQL_SSLMODE: disable
       POSTGRESQL_USERNAME: postgres
@@ -1005,12 +1005,12 @@
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       PORT: "8080"
       PORTAL_URL: http://harbor-harbor-next-portal
-      POSTGRESQL_CONN_MAX_IDLE_TIME: "0"
-      POSTGRESQL_CONN_MAX_LIFETIME: "0"
+      POSTGRESQL_CONN_MAX_IDLE_TIME: 300s
+      POSTGRESQL_CONN_MAX_LIFETIME: 30m
       POSTGRESQL_DATABASE: registry
       POSTGRESQL_HOST: postgres.example.com
-      POSTGRESQL_MAX_IDLE_CONNS: "100"
-      POSTGRESQL_MAX_OPEN_CONNS: "900"
+      POSTGRESQL_MAX_OPEN_CONNS: "100"
+      POSTGRESQL_MIN_CONNS: "2"
       POSTGRESQL_PORT: "5432"
       POSTGRESQL_SSLMODE: disable
       POSTGRESQL_USERNAME: postgres
@@ -1499,12 +1499,12 @@
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       PORT: "8080"
       PORTAL_URL: http://harbor-harbor-next-portal
-      POSTGRESQL_CONN_MAX_IDLE_TIME: "0"
-      POSTGRESQL_CONN_MAX_LIFETIME: "0"
+      POSTGRESQL_CONN_MAX_IDLE_TIME: 300s
+      POSTGRESQL_CONN_MAX_LIFETIME: 30m
       POSTGRESQL_DATABASE: registry
       POSTGRESQL_HOST: postgres.example.com
-      POSTGRESQL_MAX_IDLE_CONNS: "100"
-      POSTGRESQL_MAX_OPEN_CONNS: "900"
+      POSTGRESQL_MAX_OPEN_CONNS: "100"
+      POSTGRESQL_MIN_CONNS: "2"
       POSTGRESQL_PORT: "5432"
       POSTGRESQL_SSLMODE: disable
       POSTGRESQL_USERNAME: postgres
@@ -1997,12 +1997,12 @@
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       PORT: "8080"
       PORTAL_URL: http://harbor-harbor-next-portal
-      POSTGRESQL_CONN_MAX_IDLE_TIME: "0"
-      POSTGRESQL_CONN_MAX_LIFETIME: "0"
+      POSTGRESQL_CONN_MAX_IDLE_TIME: 300s
+      POSTGRESQL_CONN_MAX_LIFETIME: 30m
       POSTGRESQL_DATABASE: registry
       POSTGRESQL_HOST: postgres.example.com
-      POSTGRESQL_MAX_IDLE_CONNS: "100"
-      POSTGRESQL_MAX_OPEN_CONNS: "900"
+      POSTGRESQL_MAX_OPEN_CONNS: "100"
+      POSTGRESQL_MIN_CONNS: "2"
       POSTGRESQL_PORT: "5432"
       POSTGRESQL_SSLMODE: disable
       POSTGRESQL_USERNAME: postgres
@@ -2543,12 +2543,12 @@
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       PORT: "8080"
       PORTAL_URL: http://harbor-harbor-next-portal
-      POSTGRESQL_CONN_MAX_IDLE_TIME: "0"
-      POSTGRESQL_CONN_MAX_LIFETIME: "0"
+      POSTGRESQL_CONN_MAX_IDLE_TIME: 300s
+      POSTGRESQL_CONN_MAX_LIFETIME: 30m
       POSTGRESQL_DATABASE: registry
       POSTGRESQL_HOST: postgres.example.com
-      POSTGRESQL_MAX_IDLE_CONNS: "100"
-      POSTGRESQL_MAX_OPEN_CONNS: "900"
+      POSTGRESQL_MAX_OPEN_CONNS: "100"
+      POSTGRESQL_MIN_CONNS: "2"
       POSTGRESQL_PORT: "5432"
       POSTGRESQL_SSLMODE: disable
       POSTGRESQL_USERNAME: postgres

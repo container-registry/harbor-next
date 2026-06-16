@@ -1141,6 +1141,10 @@ defn map-database(legacy):
       add-info 'database.external.*' 'database.*':
         'Flattened one level; coreDatabase is now database.database and
          the port is numeric.'
+      add-info 'database.maxIdleConns' nil:
+        'Removed. The pgxpool-based pool has no max-idle cap; it keeps a
+         minimum idle floor instead. Set database.minConns (default 2) to
+         tune it.'
       =>::
         database:
           host:: ext.host
@@ -1153,7 +1157,6 @@ defn map-database(legacy):
           existingSecret:: existing
           existingSecretKey::
             when existing: 'password'
-          maxIdleConns:: int-at(db.maxIdleConns 'database.maxIdleConns')
           maxOpenConns:: int-at(db.maxOpenConns 'database.maxOpenConns')
           connMaxIdleTime:: db.connMaxIdleTime
           connMaxLifetime:: db.connMaxLifetime

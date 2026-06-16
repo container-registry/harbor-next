@@ -94,10 +94,14 @@ spec:
               value: {{ include "harbor.database.database" . | quote }}
             - name: HARBOR_DATABASE_SSLMODE
               value: {{ include "harbor.database.sslmode" . | quote }}
-            - name: HARBOR_DATABASE_MAX_IDLE_CONNS
-              value: {{ .Values.database.maxIdleConns | default 100 | quote }}
             - name: HARBOR_DATABASE_MAX_OPEN_CONNS
-              value: {{ .Values.database.maxOpenConns | default 900 | quote }}
+              value: {{ .Values.database.maxOpenConns | default 100 | quote }}
+            - name: HARBOR_DATABASE_MIN_CONNS
+              value: {{ .Values.database.minConns | default 2 | quote }}
+            - name: HARBOR_DATABASE_CONN_MAX_IDLE_TIME
+              value: {{ .Values.database.connMaxIdleTime | quote }}
+            - name: HARBOR_DATABASE_CONN_MAX_LIFETIME
+              value: {{ .Values.database.connMaxLifetime | quote }}
             {{- /* Must be defined BEFORE HARBOR_REDIS_URL: Kubernetes only
                   expands $(REDIS_PASSWORD) from variables earlier in the
                   env list. Same auth conditions as core/jobservice and the

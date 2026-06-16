@@ -599,15 +599,15 @@
           "enum": ["disable", "require", "verify-ca", "verify-full"],
           "default": "disable"
         },
-        "maxIdleConns": {
-          "type": "integer",
-          "minimum": 0,
-          "default": 100
-        },
         "maxOpenConns": {
           "type": "integer",
           "minimum": 1,
-          "default": 900
+          "default": 100
+        },
+        "minConns": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 2
         },
         "existingSecret": {
           "type": "string"

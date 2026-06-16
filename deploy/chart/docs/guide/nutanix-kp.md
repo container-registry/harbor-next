@@ -222,10 +222,10 @@ database:
   password: ""
   database: registry
   sslmode: disable
-  maxIdleConns: 100
-  maxOpenConns: 900
-  connMaxIdleTime: "0"
-  connMaxLifetime: "0"
+  maxOpenConns: 100
+  minConns: 2
+  connMaxIdleTime: "300s"
+  connMaxLifetime: "30m"
   existingSecret: "harbor-db-app"
   existingSecretKey: "password"
 ```
