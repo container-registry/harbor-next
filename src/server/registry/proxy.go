@@ -33,9 +33,13 @@ func newProxy() http.Handler {
 		panic(fmt.Sprintf("failed to parse the URL of registry: %v", err))
 	}
 	proxy := httputil.NewSingleHostReverseProxy(url)
-	if commonhttp.InternalTLSEnabled() {
-		proxy.Transport = commonhttp.GetHTTPTransport()
-	}
+	// Always use Harbor's transport (not http.DefaultTransport) so the proxy to
+	// the backend registry has a bounded ResponseHeaderTimeout and a sane
+	// per-host idle-connection pool. Otherwise, when the backend registry
+	// becomes unresponsive on a pooled connection, proxied /v2/ requests hang
+	// indefinitely and leak goroutines/FDs. GetHTTPTransport also applies the
+	// internal TLS configuration when it is enabled.
+	proxy.Transport = commonhttp.GetHTTPTransport()
 
 	proxy.Director = basicAuthDirector(proxy.Director)
 	return proxy
