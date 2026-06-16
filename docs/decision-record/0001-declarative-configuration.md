@@ -382,10 +382,12 @@ All Core configuration is layered through:
 func (c *controller) OverwriteConfig(ctx context.Context) error {
     cfgMap := map[string]any{}
     if v, ok := os.LookupEnv(configOverwriteJSON); ok {
-        if err := json.Unmarshal([]byte(v), &cfgMap); err != nil {
+        err := json.Unmarshal([]byte(v), &cfgMap)
+        if err != nil {
             return err
         }
-        if err := c.UpdateUserConfigs(ctx, cfgMap); err != nil {
+        err = c.UpdateUserConfigs(ctx, cfgMap)
+        if err != nil {
             return err
         }
         readOnlyForAll = true
@@ -621,11 +623,12 @@ Observable).
 
 ### 8.4 Phasing (each phase independently demoable; aligns with D10)
 
-- **Phase 1 — Harbor-side skeleton + system config + projects.** File loader, reconciler scaffold,
+- **Phase 1 — Harbor-side skeleton + system config + projects + robots.** File loader, reconciler scaffold,
   per-resource interface, last-applied store, system config (reusing the `CONFIG_OVERWRITE_JSON`
-  payload shape), projects with members + metadata, status endpoint. Read-only uses the existing global
-  `readOnlyForAll`. *Demo:* rebuild flux-operator-harbor-example with no manual project setup.
-- **Phase 2 — Workloads, policies, UI affordance.** Registries, replications, retentions, robots,
+  payload shape), projects with members + metadata, robots (explicit `secretRef`, §13.1), status endpoint.
+  Read-only uses the existing global `readOnlyForAll`. This is the alpha resource set (D11). *Demo:* rebuild
+  flux-operator-harbor-example with no manual project setup.
+- **Phase 2 — Workloads, policies, UI affordance.** Registries, replications, retentions,
   scanners, immutables, labels, user groups, schedules. Drift detection + enforce. Prune. Per-resource
   read-only middleware. Portal `<managed-badge>` / directive / service. Backend populates
   `managed`/`managed_by` on every resource GET.
@@ -647,9 +650,9 @@ Facts below were verified against the codebase (2026-06-16) and are load-bearing
 | Application config is **~117 keys** | `src/lib/config/metadata/metadatalist.go` |
 | The SFTP replication adapter ships as fork patch `0003-sftp-replication` (registry type `sftp`) | `8gcr-ee/patches/0003-sftp-replication` |
 | Webhook-selectable event types are the **10** in `notification.go` (PUSH/PULL/DELETE_ARTIFACT, QUOTA_EXCEED/WARNING, SCANNING_FAILED/STOPPED/COMPLETED, REPLICATION, TAG_RETENTION); the 19 topics in `event/topic.go` include internal-only events not subscribable as webhooks | `src/pkg/notification/notification.go:84-95` |
-| Labels have **no controller**; CRUD is via `label.Mgr` | `src/pkg/label/manager.go:31` |
+| Labels have **no controller**; CRUD is via `label.Mgr` | `src/pkg/label/manager.go:28` |
 | Config-manager name constants live in `common` | `src/common/const.go:28-30` |
-| Retention templates: `latestPushedK`, `latestPulledN`, `nDaysSinceLastPush`, `nDaysSinceLastPull`, `always`, `latestActiveK` | `src/pkg/retention/policy/rule/` |
+| Retention `TemplateID`s: `latestPushedK`, `latestPulledN`, `nDaysSinceLastPush`, `nDaysSinceLastPull`, `always`, `latestActiveK`, `lastXDays`, `nothing` (the appendix exemplifies the five UI-exposed ones) | `src/pkg/retention/policy/rule/` |
 | Replication adapters include `dtr` alongside the public-cloud set | `src/pkg/reg/adapter/` |
 | Registry type strings are the `Registry*` constants (e.g. `harbor-satellite`, `docker-hub`, `github-ghcr`) | `src/pkg/reg/model/registry.go` |
 
@@ -657,8 +660,10 @@ The design reuses existing seams: the single `--mode` CLI flag (`main.go:143-144
 `Manager` interface + `Register`; `readOnlyForAll` (`controller.go:41`) + `OverwriteConfig()`
 (`controller.go:272-286`); the CRUD `Controller` interfaces for
 project/robot/registry/replication/retention/webhook/scanner/immutable/quota; the global read-only
-middleware; the Portal per-field `editable` flag; and webhook target types `http`/`slack`/`email`
-(`src/pkg/notifier/model/topic.go`).
+middleware; the Portal per-field `editable` flag; and the webhook target types `http`/`slack`
+(`NotifyTypeHTTP`/`NotifyTypeSlack` in `src/pkg/notifier/model/const.go:19-20`, the only two registered in
+`notification.go:100`; the `email` topic in `notifier/model/topic.go` is Harbor's internal mail channel,
+not a webhook target).
 
 ## 10. Delivery & upstreaming
 
@@ -782,10 +787,10 @@ scopes them down for alpha.
 ## Appendix A — exhaustive `harbor.yaml` reference
 
 This is the **reference** schema — intentionally exhaustive, not an onboarding example. It covers every
-key in `src/lib/config/metadata/metadatalist.go`, every replication adapter in `src/pkg/reg/adapter/`,
-every retention template in `src/pkg/retention/policy/` (note: `latestActiveK` also exists and can be
-added), and every webhook-selectable event type. For a minimal "hello world" `harbor.yaml`, see the
-User Guide in Notion (TAS-484).
+key in `src/lib/config/metadata/metadatalist.go`, every replication adapter in `src/pkg/reg/adapter/`
+(including `dtr`), the five UI-exposed retention templates in `src/pkg/retention/policy/rule/` (the code
+additionally defines `latestActiveK`, `lastXDays`, and `nothing`, omitted here), and every
+webhook-selectable event type. For a minimal "hello world" `harbor.yaml`, see the User Guide in Notion (TAS-484).
 
 > **Note.** This reference is the bulk of the ADR and is slated to move to generated schema docs; it
 > stays inline for now. Secret refs follow §13.1 — Core resolves only `env:` and `file:`; the `secret:`
@@ -810,16 +815,16 @@ kind: HarborConfig
 metadata:
   managedByLabel: harbor.goharbor.io/managed-by
   adoption: explicit              # explicit | byName
-  driftPolicy: enforce            # enforce | warn | off
-  prune: true
-  deletionPolicy: delete          # default; can be overridden per-resource at the bottom
+  driftPolicy: enforce            # enforce | warn | off. Target default enforce; ALPHA default is warn (status-only) until ownership + restore are proven (D11, §5)
+  prune: true                     # target default; ALPHA performs no automatic prune of destructive kinds (D11, §5)
+  deletionPolicy: delete          # target default; can be overridden per-resource at the bottom. ALPHA: destructive kinds (projects et al.) default to orphan (§5)
   reconcileInterval: 60s          # safety-net loop; live-reload is event-driven
   schemaVersion: v1alpha1
 # --- System configuration ----------------------------------------------------
 # steadforce parity: configurations.json
 # Every key in src/lib/config/metadata/metadatalist.go is settable here.
 # Bootstrap-only keys (DB, Redis, signing keys, ports, log level) come from env
-# vars and CANNOT be set in this file (DR-4). System-scope keys included below
+# vars and CANNOT be set in this file (D4). System-scope keys included below
 # for completeness; the loader logs a warning when the value differs from the
 # value already loaded from env at process start.
 system:
@@ -1066,6 +1071,10 @@ registries:
     description: "Generic OCI registry"
     url: https://registry.example.com:5000
     credential: { type: basic, accessKey: pusher, accessSecretRef: { env: NATIVE_REGISTRY_PASSWORD } }
+  - name: legacy-dtr
+    type: dtr                                        # Docker Trusted Registry (legacy / Mirantis MSR)
+    url: https://dtr.example.com
+    credential: { type: basic, accessKey: "${DTR_USERNAME}", accessSecretRef: { env: DTR_PASSWORD } }
   - name: backup-sftp                              # 8gcr-ee fork only (patch 0003-sftp-replication)
     type: sftp
     url: sftp://backup.example.com:22/harbor
