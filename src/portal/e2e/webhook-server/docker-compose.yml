@@ -44,6 +44,9 @@ services:
   laravel-echo-server:
     container_name: "laravel-echo-server"
     image: "webhooksite/laravel-echo-server"
+    depends_on:
+      - webhook
+      - redis
     command:
       - exec
       - laravel-echo-server

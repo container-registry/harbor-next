@@ -78,12 +78,11 @@ await page.goto('/');
     [
       ip,
       user,
-      pwd,
       `${ip}/${project}/${index_repo}:${tag}`,
       `${ip}/${project}/${images[0]}:${tag}`,
       `${ip}/${project}/${images[1]}:${tag}`,
     ],
-    { redactedArgs: [pwd] }
+    { input: `${pwd}\n` }
   );
 
   expect(output).not.toContain('Error');
