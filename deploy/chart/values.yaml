@@ -738,6 +738,11 @@ registry:
         periodSeconds: 10
         failureThreshold: 3
         timeoutSeconds: 3
+    # -- registryctl sidecar resource requests/limits. Falls back to
+    # `registry.resources` when unset, so the sidecar can be sized
+    # independently of the registry container in the same pod.
+    # @default -- {} (uses registry.resources)
+    resources: {}
 
   # -- Number of Registry replicas (ignored when autoscaling.enabled=true)
   replicas: 1

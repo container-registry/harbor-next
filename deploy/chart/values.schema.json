@@ -496,6 +496,10 @@
               "type": "object",
               "additionalProperties": true,
               "description": "Probes for the registryctl sidecar (full Kubernetes probe specs, rendered verbatim)."
+            },
+            "resources": {
+              "$ref": "#/$defs/resources",
+              "description": "registryctl sidecar resources; falls back to registry.resources when unset."
             }
           }
         },

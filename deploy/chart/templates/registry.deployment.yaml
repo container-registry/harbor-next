@@ -230,7 +230,7 @@ spec:
             {{- end }}
           {{- include "harbor.probes" .Values.registry.controller.probes | nindent 10 }}
           resources:
-            {{- toYaml .Values.registry.resources | nindent 12 }}
+            {{- toYaml (.Values.registry.controller.resources | default .Values.registry.resources) | nindent 12 }}
           {{- with .Values.registry.lifecycle }}
           lifecycle:
             {{- toYaml . | nindent 12 }}

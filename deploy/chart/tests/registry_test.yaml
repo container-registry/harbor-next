@@ -32,6 +32,55 @@ tests:
           path: spec.template.spec.containers[1].name
           value: registryctl
 
+  # registryctl (containers[1]) can be sized independently of the registry
+  # container (containers[0]) they share a pod with.
+  - it: registryctl uses registry.controller.resources when set; registry keeps its own
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+      registry.controller.resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          memory: 128Mi
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: 100m
+      - equal:
+          path: spec.template.spec.containers[1].resources.requests.cpu
+          value: 25m
+      - equal:
+          path: spec.template.spec.containers[1].resources.limits.memory
+          value: 128Mi
+
+  # When controller.resources is unset (default), the sidecar inherits
+  # registry.resources so existing values files keep their behavior.
+  - it: registryctl falls back to registry.resources when controller.resources unset
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.resources:
+        requests:
+          cpu: 111m
+          memory: 222Mi
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[1].resources.requests.cpu
+          value: 111m
+      - equal:
+          path: spec.template.spec.containers[1].resources.requests.memory
+          value: 222Mi
+
   # Pins the hardcoded registry (5000) and registryctl (8080) ports and
   # their port names — both names are consumed by Service selectors and
   # the ingress/HTTPRoute backend.service.port.name references.
