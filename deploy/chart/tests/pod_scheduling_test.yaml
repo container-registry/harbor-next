@@ -19,8 +19,12 @@ templates:
   - templates/registryctl.configmap.yaml
   - templates/registryctl.secret.yaml
   - templates/exporter.deployment.yaml
+  - templates/exporter.configmap-env.yaml
+  - templates/exporter.secret.yaml
   - templates/trivy.statefulset.yaml
   - templates/trivy.secret.yaml
+  - templates/trivy.configmap-env.yaml
+  - templates/trivy.secret-env.yaml
 tests:
   # Regression guard for hostAliases support. The PodSpec.hostAliases
   # field is what backs the in-cluster /etc/hosts override — without it

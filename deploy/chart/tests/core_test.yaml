@@ -11,19 +11,20 @@ templates:
   - templates/core.secret.yaml
   - templates/serviceaccounts.yaml
 tests:
-  # Pins: image string is composed by chart from image.repository + image.tag.
-  - it: should compose image from repository + tag
+  # Pins: image string is composed by chart from image.registry + image.repository + image.tag.
+  - it: should compose image from registry + repository + tag
     template: templates/core.deployment.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
-      core.image.repository: goharbor/harbor-core
+      core.image.registry: example.com
+      core.image.repository: myproj/harbor-core
       core.image.tag: "2.10.0"
     asserts:
       - equal:
           path: spec.template.spec.containers[0].image
-          value: goharbor/harbor-core:2.10.0
+          value: example.com/myproj/harbor-core:2.10.0
 
   # Pins: ConfigMap EXT_ENDPOINT is interpolated from .Values.externalURL.
   - it: should render EXT_ENDPOINT from externalURL

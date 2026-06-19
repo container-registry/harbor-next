@@ -167,3 +167,19 @@ tests:
               secretKeyRef:
                 name: RELEASE-NAME-harbor-next-redis
                 key: REDIS_PASSWORD
+
+  # Config-reload: exporter.config / exporter.secret feed env via envFrom by
+  # name, so editing their values would not otherwise roll the pod. Asserts
+  # both checksum annotations are wired on the pod template.
+  - it: should annotate the pod template with config/secret checksums
+    template: templates/exporter.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      exporter.enabled: true
+    asserts:
+      - exists:
+          path: spec.template.metadata.annotations["checksum/configmap-env"]
+      - exists:
+          path: spec.template.metadata.annotations["checksum/secret"]

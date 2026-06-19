@@ -18,6 +18,8 @@ spec:
     metadata:
       annotations:
         checksum/secret: {{ include (print $.Template.BasePath "/trivy.secret.yaml") . | sha256sum }}
+        checksum/configmap-env: {{ include (print $.Template.BasePath "/trivy.configmap-env.yaml") . | sha256sum }}
+        checksum/secret-env: {{ include (print $.Template.BasePath "/trivy.secret-env.yaml") . | sha256sum }}
         {{- with .Values.trivy.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -43,7 +45,7 @@ spec:
         - name: trivy
           securityContext:
             {{- toYaml .Values.trivy.securityContext | nindent 12 }}
-          image: {{ include "harbor.image" (dict "imageRoot" .Values.trivy.image "global" .Values.image "chart" .Chart) }}
+          image: {{ include "harbor.image" (dict "imageRoot" .Values.trivy.image "component" "trivy" "root" .) }}
           imagePullPolicy: {{ include "harbor.imagePullPolicy" . }}
           {{- if or .Values.trivy.config .Values.trivy.secret }}
           envFrom:

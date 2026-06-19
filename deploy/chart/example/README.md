@@ -14,6 +14,7 @@ the top level.
 | [`openshift/`](openshift/) | OpenShift deployment with ttl.sh images and edge-terminated routes |
 | [`aws-eks-irsa/`](aws-eks-irsa/) | AWS EKS with IRSA for S3 storage and RDS IAM Auth (Aurora PostgreSQL) |
 | [`flux/`](flux/) | FluxCD GitOps setup: HelmRelease with drift detection + fully pinned secrets (`autoGenSecrets: false`) for deterministic rendering — works for Argo CD too |
+| [`upstream-goharbor/`](upstream-goharbor/) | Run upstream goharbor images (`docker.io/goharbor/*`) instead of the 8gcr default via `image.source: upstream` |
 
 Every `example/*/values*.yaml` is render-checked in CI
 (`task helm:examples`) — new examples are picked up automatically.

@@ -175,6 +175,23 @@ helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-ne
 | `database.host` | PostgreSQL host |
 | `database.password` | PostgreSQL password (or use `database.existingSecret`) |
 
+### Image source and registry
+
+By default the chart pulls the 8gcr Harbor Next images. Switch every component to
+the upstream goharbor images (`docker.io/goharbor/*`) with a single value:
+
+```yaml
+image:
+  source: upstream   # 8gcr (default) | upstream
+```
+
+Override an individual image with `<component>.image.{registry,repository,tag,digest}`
+— `repository` is the path without the registry host, and `digest` pins by
+sha256 instead of the tag. For an air-gapped mirror, set `global.imageRegistry`
+to override the host for **all** images at once; it preserves the repository
+path and wins over `image.source`. See
+[`example/upstream-goharbor/`](example/upstream-goharbor/).
+
 ### Component Configuration
 
 Each Harbor component (core, portal, registry, jobservice, exporter) supports:

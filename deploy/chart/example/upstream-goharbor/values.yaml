@@ -1,0 +1,44 @@
+# Harbor Helm Chart - upstream goharbor images
+#
+# Runs the chart against the upstream goharbor images on Docker Hub
+# (docker.io/goharbor/*) instead of the default 8gcr Harbor Next builds.
+#
+# Usage: helm install harbor . -n harbor -f example/upstream-goharbor/values.yaml
+#
+# The single switch is `image.source: upstream`. It selects docker.io and the
+# goharbor repositories for every component (including the renamed
+# registry-photon and trivy-adapter-photon). No per-component image config is
+# needed — see the harbor.image.sourceMap helper for the exact map.
+
+externalURL: "https://harbor.example.com"
+# REQUIRED — change this (or point existingSecretAdminPassword at a Secret).
+harborAdminPassword: "Harbor12345"
+
+# The chart ships no database — point at your external PostgreSQL.
+database:
+  host: "postgres.example.com"
+
+image:
+  source: upstream
+
+# --- Optional: pin every component by digest for supply-chain integrity ---
+# Digests take precedence over the appVersion tag. Look them up per release,
+# e.g. `crane digest docker.io/goharbor/harbor-core:v2.15.0`.
+# core:
+#   image:
+#     digest: "sha256:..."
+# registry:
+#   image:
+#     digest: "sha256:..."          # goharbor/registry-photon
+#   controller:
+#     image:
+#       digest: "sha256:..."        # goharbor/harbor-registryctl
+
+# --- Optional: air-gapped mirror ---
+# Mirror docker.io/goharbor/* into your registry and override the host once.
+# global.imageRegistry preserves the repository path (goharbor/harbor-core ->
+# mirror.internal/goharbor/harbor-core) and wins over image.source.
+# global:
+#   imageRegistry: mirror.internal
+# Note: the bundled valkey subchart image is NOT covered by global.imageRegistry;
+# mirror and override it via the valkey.* values separately.

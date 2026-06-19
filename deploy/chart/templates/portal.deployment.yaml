@@ -18,10 +18,11 @@ spec:
       {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "portal") | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.portal.podAnnotations }}
       annotations:
+        checksum/configmap: {{ include (print $.Template.BasePath "/portal.configmap.yaml") . | sha256sum }}
+        {{- with .Values.portal.podAnnotations }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
       labels:
         {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "portal") | nindent 8 }}
         {{- with .Values.portal.podLabels }}
@@ -44,7 +45,7 @@ spec:
         - name: portal
           securityContext:
             {{- toYaml .Values.portal.securityContext | nindent 12 }}
-          image: {{ include "harbor.image" (dict "imageRoot" .Values.portal.image "global" .Values.image "chart" .Chart) }}
+          image: {{ include "harbor.image" (dict "imageRoot" .Values.portal.image "component" "portal" "root" .) }}
           imagePullPolicy: {{ include "harbor.imagePullPolicy" . }}
           ports:
             - name: portal-http

@@ -26,6 +26,8 @@ templates:
   - templates/portal.configmap.yaml
   - templates/trivy.statefulset.yaml
   - templates/trivy.secret.yaml
+  - templates/trivy.configmap-env.yaml
+  - templates/trivy.secret-env.yaml
   - templates/validate-values.yaml
 tests:
   # Default: no HPA exists for any component.

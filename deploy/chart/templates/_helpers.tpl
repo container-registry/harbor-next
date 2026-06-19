@@ -343,12 +343,76 @@ Image helpers
 */}}
 
 {{/*
-Return the proper image name
-Usage: {{ include "harbor.image" (dict "imageRoot" .Values.core.image "global" .Values.image "chart" .Chart) }}
+Per-source image defaults. `image.source` (8gcr | upstream) picks a registry and
+the per-component repository path. Upstream goharbor renames two images
+(`registry-photon`, `trivy-adapter-photon`), so this is a real map, not a host
+swap — keep it in sync with goharbor/harbor-helm on appVersion bumps.
+*/}}
+{{- define "harbor.image.sourceMap" -}}
+8gcr:
+  registry: 8gears.container-registry.com
+  repos:
+    core: 8gcr/harbor-core
+    jobservice: 8gcr/harbor-jobservice
+    registry: 8gcr/harbor-registry
+    registryctl: 8gcr/harbor-registryctl
+    portal: 8gcr/harbor-portal
+    trivy: 8gcr/trivy-adapter
+    exporter: 8gcr/harbor-exporter
+upstream:
+  registry: docker.io
+  repos:
+    core: goharbor/harbor-core
+    jobservice: goharbor/harbor-jobservice
+    registry: goharbor/registry-photon
+    registryctl: goharbor/harbor-registryctl
+    portal: goharbor/harbor-portal
+    trivy: goharbor/trivy-adapter-photon
+    exporter: goharbor/harbor-exporter
+{{- end -}}
+
+{{/*
+Return the fully-qualified image reference for a component.
+Usage: {{ include "harbor.image" (dict "imageRoot" .Values.core.image "component" "core" "root" .) }}
+
+Resolution (per-component overrides win, except global.imageRegistry which wins
+over everything so an air-gapped mirror can be forced in one place):
+  registry   = global.imageRegistry | imageRoot.registry | sourceMap[source].registry
+  repository = imageRoot.repository | sourceMap[source].repos[component]
+  registry   = global.imageRegistry | imageRoot.registry
+               | (sourceMap[source].registry IF repository has no host)
+  ref        = registry ? "{registry}/{repository}" : repository
+  digest set -> "{ref}@{digest}" ; else "{ref}:{tag | AppVersion}"
+
+Back-compat: when `repository` already carries a registry host (its first
+path segment contains a "." or ":") and no explicit registry override is given,
+it is used verbatim — so a full-path `repository` (the legacy / upstream-chart
+style, e.g. ttl.sh/foo/harbor-core) is NOT double-prefixed by the source map.
 */}}
 {{- define "harbor.image" -}}
-{{- $tag := .imageRoot.tag | default .chart.AppVersion -}}
-{{- printf "%s:%s" .imageRoot.repository $tag -}}
+{{- $root := .root -}}
+{{- $img := .imageRoot | default dict -}}
+{{- $source := $root.Values.image.source | default "8gcr" -}}
+{{- $cfg := index (fromYaml (include "harbor.image.sourceMap" .)) $source -}}
+{{- $repository := $img.repository | default (index $cfg.repos .component) -}}
+{{- $firstSeg := splitList "/" $repository | first -}}
+{{- $repoHasHost := and (contains "/" $repository) (or (contains "." $firstSeg) (contains ":" $firstSeg)) -}}
+{{- $registry := "" -}}
+{{- if $root.Values.global.imageRegistry -}}
+{{-   $registry = $root.Values.global.imageRegistry -}}
+{{- else if $img.registry -}}
+{{-   $registry = $img.registry -}}
+{{- else if not $repoHasHost -}}
+{{-   $registry = $cfg.registry -}}
+{{- end -}}
+{{- $ref := $repository -}}
+{{- if $registry -}}{{- $ref = printf "%s/%s" $registry $repository -}}{{- end -}}
+{{- if $img.digest -}}
+{{- printf "%s@%s" $ref $img.digest -}}
+{{- else -}}
+{{- $tag := $img.tag | default $root.Chart.AppVersion -}}
+{{- printf "%s:%s" $ref $tag -}}
+{{- end -}}
 {{- end }}
 
 {{/*

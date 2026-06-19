@@ -20,6 +20,7 @@ spec:
     metadata:
       annotations:
         checksum/configmap: {{ include (print $.Template.BasePath "/jobservice.configmap.yaml") . | sha256sum }}
+        checksum/configmap-env: {{ include (print $.Template.BasePath "/jobservice.configmap-env.yaml") . | sha256sum }}
         checksum/secret: {{ include (print $.Template.BasePath "/jobservice.secret.yaml") . | sha256sum }}
         {{- with .Values.jobservice.podAnnotations }}
         {{- toYaml . | nindent 8 }}
@@ -46,7 +47,7 @@ spec:
         - name: jobservice
           securityContext:
             {{- toYaml .Values.jobservice.securityContext | nindent 12 }}
-          image: {{ include "harbor.image" (dict "imageRoot" .Values.jobservice.image "global" .Values.image "chart" .Chart) }}
+          image: {{ include "harbor.image" (dict "imageRoot" .Values.jobservice.image "component" "jobservice" "root" .) }}
           imagePullPolicy: {{ include "harbor.imagePullPolicy" . }}
           ports:
             - name: http

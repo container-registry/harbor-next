@@ -46,7 +46,7 @@ spec:
         - name: core
           securityContext:
             {{- toYaml .Values.core.securityContext | nindent 12 }}
-          image: {{ include "harbor.image" (dict "imageRoot" .Values.core.image "global" .Values.image "chart" .Chart) }}
+          image: {{ include "harbor.image" (dict "imageRoot" .Values.core.image "component" "core" "root" .) }}
           imagePullPolicy: {{ include "harbor.imagePullPolicy" . }}
           ports:
             - name: core-http

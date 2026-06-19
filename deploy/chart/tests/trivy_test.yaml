@@ -28,12 +28,13 @@ tests:
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
       trivy.enabled: true
-      trivy.image.repository: goharbor/trivy-adapter
+      trivy.image.registry: example.com
+      trivy.image.repository: myproj/trivy-adapter
       trivy.image.tag: "2.10.0"
     asserts:
       - equal:
           path: spec.template.spec.containers[0].image
-          value: goharbor/trivy-adapter:2.10.0
+          value: example.com/myproj/trivy-adapter:2.10.0
 
   - it: should set debugMode env
     template: templates/trivy.statefulset.yaml
@@ -364,3 +365,19 @@ tests:
       - equal:
           path: data.MY_SCANNER_TOKEN
           value: "czNjcjN0"
+
+  # Config-reload: trivy.config / trivy.secret feed env via envFrom by name, so
+  # editing their values would not otherwise roll the pod. Asserts the -env
+  # checksum annotations are wired alongside the existing secret checksum.
+  - it: should annotate the pod template with config/secret-env checksums
+    template: templates/trivy.statefulset.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trivy.enabled: true
+    asserts:
+      - exists:
+          path: spec.template.metadata.annotations["checksum/configmap-env"]
+      - exists:
+          path: spec.template.metadata.annotations["checksum/secret-env"]

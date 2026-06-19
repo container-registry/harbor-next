@@ -16,6 +16,13 @@ global:
   revisionHistoryLimit: 3
   # -- Priority class name for all component pods
   priorityClassName: ""
+  # -- Override the registry host for ALL component images at once (air-gap /
+  # mirror). When set it wins over per-component `image.registry` and
+  # `image.source`. Repository paths are preserved, so a flat mirror works
+  # (`global.imageRegistry=mirror.io` -> `mirror.io/8gcr/harbor-core`). Propagated
+  # to subcharts; the valkey subchart image must be mirrored/overridden separately
+  # (it may not honor this).
+  imageRegistry: ""
 
 # -- Credentials to pull images
 # imageCredentials:
@@ -27,6 +34,13 @@ imageCredentials: {}
 
 # -- Global image settings
 image:
+  # -- Image source preset: `8gcr` (Harbor Next builds, default) or `upstream`
+  # (docker.io/goharbor/*). Selects the registry + per-component repository for
+  # every component. Per-component `image.registry`/`image.repository` override
+  # it; `global.imageRegistry` overrides the registry on top. See the
+  # `harbor.image.sourceMap` helper for the exact map (upstream renames the
+  # registry image to `registry-photon` and trivy to `trivy-adapter-photon`).
+  source: 8gcr
   # -- Image pull policy for all Harbor components
   pullPolicy: IfNotPresent
 
@@ -374,10 +388,14 @@ core:
 
   # -- Core image settings
   image:
-    # -- Core image repository
-    repository: 8gears.container-registry.com/8gcr/harbor-core
+    # -- Registry host override; empty uses `image.source` (`global.imageRegistry` wins over both)
+    registry: ""
+    # -- Repository override (path WITHOUT registry host); empty uses `image.source`
+    repository: ""
     # -- Core image tag (defaults to appVersion)
     tag: ""
+    # -- Pin by digest (sha256:...); used instead of tag when set
+    digest: ""
 
   # -- Number of Core replicas (ignored when autoscaling.enabled=true)
   replicas: 1
@@ -676,10 +694,14 @@ registry:
 
   # -- Registry image settings
   image:
-    # -- Registry image repository
-    repository: 8gears.container-registry.com/8gcr/harbor-registry
+    # -- Registry host override; empty uses `image.source` (`global.imageRegistry` wins over both)
+    registry: ""
+    # -- Repository override (path WITHOUT registry host); empty uses `image.source`
+    repository: ""
     # -- Registry image tag (defaults to appVersion)
     tag: ""
+    # -- Pin by digest (sha256:...); used instead of tag when set
+    digest: ""
 
   # -- Probes for the registry container. Full Kubernetes probe specs,
   # rendered verbatim — see `core.probes` for the tuning rationale.
@@ -710,10 +732,14 @@ registry:
   # -- Registryctl image settings
   controller:
     image:
-      # -- Registryctl image repository
-      repository: 8gears.container-registry.com/8gcr/harbor-registryctl
+      # -- Registry host override; empty uses `image.source` (`global.imageRegistry` wins over both)
+      registry: ""
+      # -- Repository override (path WITHOUT registry host); empty uses `image.source`
+      repository: ""
       # -- Registryctl image tag (defaults to appVersion)
       tag: ""
+      # -- Pin by digest (sha256:...); used instead of tag when set
+      digest: ""
     # -- Probes for the registryctl sidecar. Same shape as `core.probes`.
     # @default -- See [values.yaml](values.yaml)
     probes:
@@ -915,10 +941,14 @@ portal:
 
   # -- Portal image settings
   image:
-    # -- Portal image repository
-    repository: 8gears.container-registry.com/8gcr/harbor-portal
+    # -- Registry host override; empty uses `image.source` (`global.imageRegistry` wins over both)
+    registry: ""
+    # -- Repository override (path WITHOUT registry host); empty uses `image.source`
+    repository: ""
     # -- Portal image tag (defaults to appVersion)
     tag: ""
+    # -- Pin by digest (sha256:...); used instead of tag when set
+    digest: ""
 
   # -- Number of Portal replicas (ignored when autoscaling.enabled=true)
   replicas: 1
@@ -1130,10 +1160,14 @@ jobservice:
 
   # -- Jobservice image settings
   image:
-    # -- Jobservice image repository
-    repository: 8gears.container-registry.com/8gcr/harbor-jobservice
+    # -- Registry host override; empty uses `image.source` (`global.imageRegistry` wins over both)
+    registry: ""
+    # -- Repository override (path WITHOUT registry host); empty uses `image.source`
+    repository: ""
     # -- Jobservice image tag (defaults to appVersion)
     tag: ""
+    # -- Pin by digest (sha256:...); used instead of tag when set
+    digest: ""
 
   # -- Number of Jobservice replicas (ignored when autoscaling.enabled=true)
   replicas: 1
@@ -1306,10 +1340,14 @@ exporter:
 
   # -- Exporter image settings
   image:
-    # -- Exporter image repository
-    repository: 8gears.container-registry.com/8gcr/harbor-exporter
+    # -- Registry host override; empty uses `image.source` (`global.imageRegistry` wins over both)
+    registry: ""
+    # -- Repository override (path WITHOUT registry host); empty uses `image.source`
+    repository: ""
     # -- Exporter image tag (defaults to appVersion)
     tag: ""
+    # -- Pin by digest (sha256:...); used instead of tag when set
+    digest: ""
 
   # -- Number of Exporter replicas
   replicas: 1
@@ -1566,10 +1604,14 @@ trivy:
       timeoutSeconds: 3
 
   image:
-    # -- Trivy adapter image repository
-    repository: 8gears.container-registry.com/8gcr/trivy-adapter
+    # -- Registry host override; empty uses `image.source` (`global.imageRegistry` wins over both)
+    registry: ""
+    # -- Repository override (path WITHOUT registry host); empty uses `image.source`
+    repository: ""
     # -- Trivy adapter image tag (defaults to appVersion)
     tag: ""
+    # -- Pin by digest (sha256:...); used instead of tag when set
+    digest: ""
   # -- Number of Trivy replicas (ignored when autoscaling.enabled=true)
   replicas: 1
 

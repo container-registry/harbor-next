@@ -35,6 +35,12 @@
       "type": "object",
       "description": "Global image settings",
       "properties": {
+        "source": {
+          "type": "string",
+          "enum": ["8gcr", "upstream"],
+          "default": "8gcr",
+          "description": "Image source preset: 8gcr (Harbor Next builds) or upstream (docker.io/goharbor/*). Selects the registry + per-component repository."
+        },
         "pullPolicy": {
           "type": "string",
           "enum": ["Always", "IfNotPresent", "Never"],
@@ -156,6 +162,10 @@
         },
         "priorityClassName": {
           "type": "string"
+        },
+        "imageRegistry": {
+          "type": "string",
+          "description": "Override the registry host for all component images at once (air-gap/mirror). Wins over image.source and per-component image.registry."
         }
       }
     },
@@ -883,11 +893,20 @@
     "imageSpec": {
       "type": "object",
       "properties": {
+        "registry": {
+          "type": "string",
+          "description": "Registry host override; empty uses image.source"
+        },
         "repository": {
-          "type": "string"
+          "type": "string",
+          "description": "Repository path without registry host; empty uses image.source"
         },
         "tag": {
           "type": "string"
+        },
+        "digest": {
+          "type": "string",
+          "description": "Pin by digest (sha256:...); used instead of tag when set"
         }
       }
     },

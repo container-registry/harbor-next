@@ -174,6 +174,23 @@ helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-ne
 | `database.host` | PostgreSQL host |
 | `database.password` | PostgreSQL password (or use `database.existingSecret`) |
 
+### Image source and registry
+
+By default the chart pulls the 8gcr Harbor Next images. Switch every component to
+the upstream goharbor images (`docker.io/goharbor/*`) with a single value:
+
+```yaml
+image:
+  source: upstream   # 8gcr (default) | upstream
+```
+
+Override an individual image with `<component>.image.{registry,repository,tag,digest}`
+— `repository` is the path without the registry host, and `digest` pins by
+sha256 instead of the tag. For an air-gapped mirror, set `global.imageRegistry`
+to override the host for **all** images at once; it preserves the repository
+path and wins over `image.source`. See
+[`example/upstream-goharbor/`](example/upstream-goharbor/).
+
 ### Component Configuration
 
 Each Harbor component (core, portal, registry, jobservice, exporter) supports:
@@ -687,8 +704,10 @@ Kubernetes: `>=1.28.0-0`
 | core.gdpr.auditLogsCompliant | bool | `false` | Enable audit logs GDPR compliance |
 | core.gdpr.deleteUser | bool | `false` | Enable user deletion for GDPR compliance |
 | core.hostAliases | list | [] | Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for private DNS that does not exist in cluster DNS — service-mesh sidecars, legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the Kubernetes PodSpec: a list of `{ip, hostnames}` entries. |
-| core.image | object | `{"repository":"8gears.container-registry.com/8gcr/harbor-core","tag":""}` | Core image settings |
-| core.image.repository | string | `"8gears.container-registry.com/8gcr/harbor-core"` | Core image repository |
+| core.image | object | `{"digest":"","registry":"","repository":"","tag":""}` | Core image settings |
+| core.image.digest | string | `""` | Pin by digest (sha256:...); used instead of tag when set |
+| core.image.registry | string | `""` | Registry host override; empty uses `image.source` (`global.imageRegistry` wins over both) |
+| core.image.repository | string | `""` | Repository override (path WITHOUT registry host); empty uses `image.source` |
 | core.image.tag | string | `""` | Core image tag (defaults to appVersion) |
 | core.initContainers | list | `[]` | Init containers (run before main containers) |
 | core.lifecycle | object | {} | Container `lifecycle` hook spec (preStop / postStart). Common use: preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`, `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all closed without merge, the gap was never closed there. |
@@ -740,8 +759,10 @@ Kubernetes: `>=1.28.0-0`
 | exporter.enabled | bool | `true` | Enable Harbor exporter for Prometheus metrics |
 | exporter.extraEnv | list | [] | Extra environment variables with valueFrom support |
 | exporter.hostAliases | list | [] | Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for private DNS that does not exist in cluster DNS — service-mesh sidecars, legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the Kubernetes PodSpec: a list of `{ip, hostnames}` entries. |
-| exporter.image | object | `{"repository":"8gears.container-registry.com/8gcr/harbor-exporter","tag":""}` | Exporter image settings |
-| exporter.image.repository | string | `"8gears.container-registry.com/8gcr/harbor-exporter"` | Exporter image repository |
+| exporter.image | object | `{"digest":"","registry":"","repository":"","tag":""}` | Exporter image settings |
+| exporter.image.digest | string | `""` | Pin by digest (sha256:...); used instead of tag when set |
+| exporter.image.registry | string | `""` | Registry host override; empty uses `image.source` (`global.imageRegistry` wins over both) |
+| exporter.image.repository | string | `""` | Repository override (path WITHOUT registry host); empty uses `image.source` |
 | exporter.image.tag | string | `""` | Exporter image tag (defaults to appVersion) |
 | exporter.initContainers | list | `[]` | Init containers (run before main containers) |
 | exporter.lifecycle | object | {} | Container `lifecycle` hook spec (preStop / postStart). Common use: preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`, `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all closed without merge, the gap was never closed there. |
@@ -813,12 +834,14 @@ Kubernetes: `>=1.28.0-0`
 | gateway.enabled | bool | `false` | Enable Gateway API HTTPRoute |
 | gateway.hostnames | list | `[]` | Hostnames for the HTTPRoute |
 | gateway.parentRefs | list | `[]` | Gateway parent references |
-| global | object | `{"priorityClassName":"","revisionHistoryLimit":3}` | Global defaults inherited by all components |
+| global | object | `{"imageRegistry":"","priorityClassName":"","revisionHistoryLimit":3}` | Global defaults inherited by all components |
+| global.imageRegistry | string | `""` | Override the registry host for ALL component images at once (air-gap / mirror). When set it wins over per-component `image.registry` and `image.source`. Repository paths are preserved, so a flat mirror works (`global.imageRegistry=mirror.io` -> `mirror.io/8gcr/harbor-core`). Propagated to subcharts; the valkey subchart image must be mirrored/overridden separately (it may not honor this). |
 | global.priorityClassName | string | `""` | Priority class name for all component pods |
 | global.revisionHistoryLimit | int | `3` | Number of old ReplicaSets to retain (K8s default is 10) |
 | harborAdminPassword | string | `""` | Harbor admin password (initial setup). **REQUIRED** unless `existingSecretAdminPassword` is set. Do not use the legacy default `Harbor12345` — it is publicly known. For production reference a pre-created Secret via `existingSecretAdminPassword` rather than passing the value here. Rotate from the Harbor UI after first login. |
-| image | object | `{"pullPolicy":"IfNotPresent"}` | Global image settings |
+| image | object | `{"pullPolicy":"IfNotPresent","source":"8gcr"}` | Global image settings |
 | image.pullPolicy | string | `"IfNotPresent"` | Image pull policy for all Harbor components |
+| image.source | string | `"8gcr"` | Image source preset: `8gcr` (Harbor Next builds, default) or `upstream` (docker.io/goharbor/*). Selects the registry + per-component repository for every component. Per-component `image.registry`/`image.repository` override it; `global.imageRegistry` overrides the registry on top. See the `harbor.image.sourceMap` helper for the exact map (upstream renames the registry image to `registry-photon` and trivy to `trivy-adapter-photon`). |
 | imageCredentials | object | `{}` | Credentials to pull images imageCredentials:   registry: xyz.com   username: xxx   password: yyy   email: zzz@xyz.com |
 | imagePullSecrets | list | [] | List of image pull secrets |
 | ingress | object | `{"annotations":{},"autoGenCert":true,"className":"","core":"","enabled":true,"hosts":[],"labels":{},"tls":[]}` | Ingress configuration |
@@ -841,8 +864,10 @@ Kubernetes: `>=1.28.0-0`
 | jobservice.existingSecretKey | string | `"JOBSERVICE_SECRET"` | Key in existing secret containing the Jobservice secret |
 | jobservice.extraEnv | list | [] | Extra environment variables with valueFrom support |
 | jobservice.hostAliases | list | [] | Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for private DNS that does not exist in cluster DNS — service-mesh sidecars, legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the Kubernetes PodSpec: a list of `{ip, hostnames}` entries. |
-| jobservice.image | object | `{"repository":"8gears.container-registry.com/8gcr/harbor-jobservice","tag":""}` | Jobservice image settings |
-| jobservice.image.repository | string | `"8gears.container-registry.com/8gcr/harbor-jobservice"` | Jobservice image repository |
+| jobservice.image | object | `{"digest":"","registry":"","repository":"","tag":""}` | Jobservice image settings |
+| jobservice.image.digest | string | `""` | Pin by digest (sha256:...); used instead of tag when set |
+| jobservice.image.registry | string | `""` | Registry host override; empty uses `image.source` (`global.imageRegistry` wins over both) |
+| jobservice.image.repository | string | `""` | Repository override (path WITHOUT registry host); empty uses `image.source` |
 | jobservice.image.tag | string | `""` | Jobservice image tag (defaults to appVersion) |
 | jobservice.initContainers | list | `[]` | Init containers (run before main containers) |
 | jobservice.lifecycle | object | {} | Container `lifecycle` hook spec (preStop / postStart). Common use: preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`, `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all closed without merge, the gap was never closed there. |
@@ -884,8 +909,10 @@ Kubernetes: `>=1.28.0-0`
 | portal.existingConfigMap | string | `""` | Use an externally-managed ConfigMap containing `nginx.conf` instead of the chart-generated one. When set, the chart skips ConfigMap generation and the Deployment mounts the named ConfigMap. Use for custom nginx configuration (TLS termination, custom headers, extra locations) without forking the chart. Semantics match `registry.existingConfigMap`. Portal serves static Angular assets via nginx and has no env/key config surface — to customize nginx.conf, point existingConfigMap at your own ConfigMap (there is no `config`/`secret` passthrough here). |
 | portal.extraEnv | list | [] | Extra environment variables with valueFrom support |
 | portal.hostAliases | list | [] | Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for private DNS that does not exist in cluster DNS — service-mesh sidecars, legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the Kubernetes PodSpec: a list of `{ip, hostnames}` entries. |
-| portal.image | object | `{"repository":"8gears.container-registry.com/8gcr/harbor-portal","tag":""}` | Portal image settings |
-| portal.image.repository | string | `"8gears.container-registry.com/8gcr/harbor-portal"` | Portal image repository |
+| portal.image | object | `{"digest":"","registry":"","repository":"","tag":""}` | Portal image settings |
+| portal.image.digest | string | `""` | Pin by digest (sha256:...); used instead of tag when set |
+| portal.image.registry | string | `""` | Registry host override; empty uses `image.source` (`global.imageRegistry` wins over both) |
+| portal.image.repository | string | `""` | Repository override (path WITHOUT registry host); empty uses `image.source` |
 | portal.image.tag | string | `""` | Portal image tag (defaults to appVersion) |
 | portal.initContainers | list | `[]` | Init containers (run before main containers) |
 | portal.lifecycle | object | {} | Container `lifecycle` hook spec (preStop / postStart). Common use: preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`, `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all closed without merge, the gap was never closed there. |
@@ -913,8 +940,10 @@ Kubernetes: `>=1.28.0-0`
 | registry.affinity | object | `{}` | Affinity rules for Registry pods |
 | registry.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler. See `core.autoscaling` for full docs. |
 | registry.config | object | See [values.yaml](values.yaml) | Full [distribution/distribution](https://distribution.github.io/distribution/about/configuration/) `config.yml` passed through verbatim. Used only when `existingConfigMap` is empty. Replace this entire block to switch storage backends or add any field distribution supports (notifications, health, custom middleware, etc.).  Chart-managed values injected via env-var override at runtime (these ALWAYS win over what's in this block — do not duplicate here):   - `http.addr`, `http.secret`, `http.debug.prometheus.enabled`   - `redis.*` (addr, password, db, tls)   - `log.level` (from `.Values.logLevel`)   - storage credentials when `storageCredentials.<backend>.existingSecret` is set  See `storageCredentials` below for the BYO-Secret pattern. For inline credentials use `registry.secret` (b64-encoded into the generated Secret) — do not put plaintext credentials in this block, they would be visible in the ConfigMap. |
-| registry.controller | object | `{"image":{"repository":"8gears.container-registry.com/8gcr/harbor-registryctl","tag":""},"probes":{"liveness":{"failureThreshold":3,"httpGet":{"path":"/api/health","port":8080},"periodSeconds":10,"timeoutSeconds":3},"readiness":{"failureThreshold":2,"httpGet":{"path":"/api/health","port":8080},"periodSeconds":5,"timeoutSeconds":2},"startup":{"failureThreshold":15,"httpGet":{"path":"/api/health","port":8080},"periodSeconds":2,"timeoutSeconds":2}},"resources":{}}` | Registryctl image settings |
-| registry.controller.image.repository | string | `"8gears.container-registry.com/8gcr/harbor-registryctl"` | Registryctl image repository |
+| registry.controller | object | `{"image":{"digest":"","registry":"","repository":"","tag":""},"probes":{"liveness":{"failureThreshold":3,"httpGet":{"path":"/api/health","port":8080},"periodSeconds":10,"timeoutSeconds":3},"readiness":{"failureThreshold":2,"httpGet":{"path":"/api/health","port":8080},"periodSeconds":5,"timeoutSeconds":2},"startup":{"failureThreshold":15,"httpGet":{"path":"/api/health","port":8080},"periodSeconds":2,"timeoutSeconds":2}},"resources":{}}` | Registryctl image settings |
+| registry.controller.image.digest | string | `""` | Pin by digest (sha256:...); used instead of tag when set |
+| registry.controller.image.registry | string | `""` | Registry host override; empty uses `image.source` (`global.imageRegistry` wins over both) |
+| registry.controller.image.repository | string | `""` | Repository override (path WITHOUT registry host); empty uses `image.source` |
 | registry.controller.image.tag | string | `""` | Registryctl image tag (defaults to appVersion) |
 | registry.controller.probes | object | See [values.yaml](values.yaml) | Probes for the registryctl sidecar. Same shape as `core.probes`. |
 | registry.controller.resources | object | {} (uses registry.resources) | registryctl sidecar resource requests/limits. Falls back to `registry.resources` when unset, so the sidecar can be sized independently of the registry container in the same pod. |
@@ -928,8 +957,10 @@ Kubernetes: `>=1.28.0-0`
 | registry.existingSecretKey | string | `"REGISTRY_HTTP_SECRET"` | Key in `registry.existingSecret` that holds `REGISTRY_HTTP_SECRET`. |
 | registry.extraEnv | list | [] | Extra environment variables with valueFrom support |
 | registry.hostAliases | list | [] | Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for private DNS that does not exist in cluster DNS — service-mesh sidecars, legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the Kubernetes PodSpec: a list of `{ip, hostnames}` entries. |
-| registry.image | object | `{"repository":"8gears.container-registry.com/8gcr/harbor-registry","tag":""}` | Registry image settings |
-| registry.image.repository | string | `"8gears.container-registry.com/8gcr/harbor-registry"` | Registry image repository |
+| registry.image | object | `{"digest":"","registry":"","repository":"","tag":""}` | Registry image settings |
+| registry.image.digest | string | `""` | Pin by digest (sha256:...); used instead of tag when set |
+| registry.image.registry | string | `""` | Registry host override; empty uses `image.source` (`global.imageRegistry` wins over both) |
+| registry.image.repository | string | `""` | Repository override (path WITHOUT registry host); empty uses `image.source` |
 | registry.image.tag | string | `""` | Registry image tag (defaults to appVersion) |
 | registry.initContainers | list | `[]` | Init containers (run before main containers) |
 | registry.lifecycle | object | {} | Container `lifecycle` hook spec (preStop / postStart). Common use: preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`, `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all closed without merge, the gap was never closed there. |
@@ -995,7 +1026,9 @@ Kubernetes: `>=1.28.0-0`
 | trivy.gitHubToken | string | `""` | GitHub token to download Trivy DB (optional) |
 | trivy.hostAliases | list | [] | Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for private DNS that does not exist in cluster DNS — service-mesh sidecars, legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the Kubernetes PodSpec: a list of `{ip, hostnames}` entries. |
 | trivy.ignoreUnfixed | bool | `false` | Skip unfixed vulnerabilities |
-| trivy.image.repository | string | `"8gears.container-registry.com/8gcr/trivy-adapter"` | Trivy adapter image repository |
+| trivy.image.digest | string | `""` | Pin by digest (sha256:...); used instead of tag when set |
+| trivy.image.registry | string | `""` | Registry host override; empty uses `image.source` (`global.imageRegistry` wins over both) |
+| trivy.image.repository | string | `""` | Repository override (path WITHOUT registry host); empty uses `image.source` |
 | trivy.image.tag | string | `""` | Trivy adapter image tag (defaults to appVersion) |
 | trivy.initContainers | list | `[]` | Init containers (run before main containers) |
 | trivy.insecure | bool | `false` | Skip verifying registry certificate |

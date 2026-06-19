@@ -56,7 +56,7 @@ spec:
         - name: registry
           securityContext:
             {{- toYaml .Values.registry.securityContext | nindent 12 }}
-          image: {{ include "harbor.image" (dict "imageRoot" .Values.registry.image "global" .Values.image "chart" .Chart) }}
+          image: {{ include "harbor.image" (dict "imageRoot" .Values.registry.image "component" "registry" "root" .) }}
           imagePullPolicy: {{ include "harbor.imagePullPolicy" . }}
           ports:
             - name: http
@@ -142,7 +142,7 @@ spec:
         - name: registryctl
           securityContext:
             {{- toYaml .Values.registry.securityContext | nindent 12 }}
-          image: {{ include "harbor.image" (dict "imageRoot" .Values.registry.controller.image "global" .Values.image "chart" .Chart) }}
+          image: {{ include "harbor.image" (dict "imageRoot" .Values.registry.controller.image "component" "registryctl" "root" .) }}
           imagePullPolicy: {{ include "harbor.imagePullPolicy" . }}
           ports:
             - name: ctl
@@ -212,11 +212,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ default (include "harbor.jobservice" .) .Values.jobservice.existingSecret }}
-                  {{- if .Values.jobservice.existingSecret }}
-                  key: {{ .Values.jobservice.existingSecretKey }}
-                  {{- else }}
-                  key: JOBSERVICE_SECRET
-                  {{- end }}
+                  key: {{ .Values.jobservice.existingSecretKey | default "JOBSERVICE_SECRET" }}
             {{- if has "registry" .Values.proxy.components }}
             - name: HTTP_PROXY
               value: "{{ .Values.proxy.httpProxy }}"

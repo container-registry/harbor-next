@@ -12,18 +12,19 @@ templates:
   - templates/portal.service.yaml
   - templates/portal.configmap.yaml
 tests:
-  - it: should compose image from values.image.repository + tag
+  - it: should compose image from registry + repository + tag
     template: templates/portal.deployment.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
-      portal.image.repository: goharbor/harbor-portal
+      portal.image.registry: example.com
+      portal.image.repository: myproj/harbor-portal
       portal.image.tag: "2.10.0"
     asserts:
       - equal:
           path: spec.template.spec.containers[0].image
-          value: goharbor/harbor-portal:2.10.0
+          value: example.com/myproj/harbor-portal:2.10.0
 
   - it: should expose containerPort 8080 named portal-http
     # Port name is load-bearing: portal.service.yaml references it by
@@ -67,3 +68,16 @@ tests:
     asserts:
       - exists:
           path: data["nginx.conf"]
+
+  # Config-reload: nginx.conf is mounted from the portal ConfigMap, so an
+  # nginx.conf-only change (e.g. an ipFamily toggle) must roll the pod. The
+  # checksum annotation is the only thing that would. Asserts it is wired.
+  - it: should annotate the pod template with the portal configmap checksum
+    template: templates/portal.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - exists:
+          path: spec.template.metadata.annotations["checksum/configmap"]

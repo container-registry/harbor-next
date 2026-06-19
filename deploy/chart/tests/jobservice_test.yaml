@@ -26,19 +26,20 @@ tests:
           path: metadata.name
           value: RELEASE-NAME-harbor-next-jobservice
 
-  # Pins image concat: <repository>:<tag>
-  - it: should concat image repository and tag
+  # Pins image concat: <registry>/<repository>:<tag>
+  - it: should concat registry, repository and tag
     template: templates/jobservice.deployment.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
-      jobservice.image.repository: goharbor/harbor-jobservice
+      jobservice.image.registry: example.com
+      jobservice.image.repository: myproj/harbor-jobservice
       jobservice.image.tag: "2.10.0"
     asserts:
       - equal:
           path: spec.template.spec.containers[0].image
-          value: goharbor/harbor-jobservice:2.10.0
+          value: example.com/myproj/harbor-jobservice:2.10.0
 
   # Pins hardcoded chart container port (not user-settable)
   - it: should expose hardcoded container port 8080
@@ -365,3 +366,17 @@ tests:
               secretKeyRef:
                 name: reg-creds
                 key: REGISTRY_CREDENTIAL_PASSWORD
+
+  # Config-reload: the -env ConfigMap carries tunables (LOG_LEVEL, CACHE_*,
+  # trace, jobservice.env) consumed via envFrom by name, so editing them would
+  # not otherwise roll the pod. Asserts the -env checksum is wired alongside the
+  # existing configmap + secret checksums.
+  - it: should annotate the pod template with the configmap-env checksum
+    template: templates/jobservice.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - exists:
+          path: spec.template.metadata.annotations["checksum/configmap-env"]

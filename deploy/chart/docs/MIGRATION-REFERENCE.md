@@ -117,6 +117,8 @@ two or more drivers fail at `helm install` time):
 | `logLevel` | `logLevel` | Does **not** propagate to jobservice loggers — set those in `jobservice.config.loggers[].level` / `job_loggers[].level` |
 | `imagePullPolicy` | `image.pullPolicy` | |
 | `imagePullSecrets` | `imagePullSecrets` | New alternative: `imageCredentials` creates the pull Secret for you |
+| registry baked into each `<component>.image.repository` | `image.source` (preset) + `<component>.image.registry` | New: `image.source` picks `8gcr` (default) or `upstream` (`docker.io/goharbor/*`) for all components; the migrator splits any custom host out of the legacy `repository` into `image.registry` |
+| *N/A* | `global.imageRegistry` | New: override the registry host for **all** images at once (air-gap / mirror); preserves the repository path and wins over `image.source` |
 | `updateStrategy.type` | `core.deploymentStrategy`, `registry.deploymentStrategy`, … per component | Full Deployment strategy spec, e.g. `deploymentStrategy.type: Recreate` for RWO volumes |
 | `proxy.*` | `proxy.*` | Identical |
 | `cache.*` | `cache.*` | Identical |
@@ -135,7 +137,7 @@ two or more drivers fail at `helm install` time):
 
 | 2.x | This chart | Notes |
 |---|---|---|
-| `core.image.repository` / `tag` | `core.image.repository` / `tag` | Different default registry; tag defaults to chart `appVersion` |
+| `core.image.repository` / `tag` | `image.source` or `core.image.{registry,repository,tag,digest}` | `repository` is now the path **without** the host; the host comes from `image.source` (default `8gcr`) or `core.image.registry`. Tag defaults to chart `appVersion`; new `digest` pins by sha256. The migrator splits a custom registry host out of the legacy `repository`. |
 | `core.replicas` | `core.replicas` | New: `core.autoscaling` (HPA) — when enabled, `replicas` is ignored |
 | `core.serviceAccountName` | `core.serviceAccount.name` | Chart creates an SA by default (`create: true`); set `create: false` to bring your own |
 | `core.automountServiceAccountToken` | `core.serviceAccount.automountServiceAccountToken` | |
