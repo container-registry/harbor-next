@@ -69,5 +69,5 @@ INFO — mapped automatically (16)
       -> externalRedis.host/port
       addr split into separate host and port fields; valkey subchart disabled.
   * metrics.enabled
-      -> metrics.enabled + jobservice.config.metric
-      metrics.enabled does NOT propagate to jobservice in this chart — the jobservice metric block was added to its config.yml explicitly.
+      -> metrics.enabled
+      Carried over. This chart auto-enables the jobservice metric endpoint from metrics.enabled (chart-managed config.yml) — no explicit jobservice.config.metric block is needed.

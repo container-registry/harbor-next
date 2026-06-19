@@ -155,12 +155,13 @@ defn check-secret-hygiene(vals):
 
 defn check-consistency(vals):
   metrics-on =: flag(vals ['metrics' 'enabled'] false)
-  js-metric =: get-in(vals ['jobservice' 'config' 'metric'])
-  when metrics-on && (not present?(js-metric)):
-    add-warn 'jobservice.config.metric':
-      'metrics.enabled does NOT propagate to jobservice — add
-       jobservice.config.metric {enabled true, path /metrics, port 8001}
-       or its scrape target stays dark.'
+  js-metric-off =: to-bool(get-in(vals ['jobservice' 'config' 'metric' 'enabled'])) == false
+  when metrics-on && js-metric-off:
+    add-warn 'jobservice.config.metric.enabled':
+      'metrics.enabled auto-enables the jobservice metric endpoint
+       (chart-managed config.yml), but jobservice.config.metric.enabled is
+       false here — the ServiceMonitor still scrapes jobservice, so its
+       target stays dark. Remove the override or stop scraping jobservice.'
 
   storage =: get-in(vals ['registry' 'config' 'storage']) || hash-map()
   drivers =: storage.keys().filter(\(in? storage-drivers %1)).vec()

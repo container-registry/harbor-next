@@ -45,9 +45,9 @@ converts storage backends to the `registry.config` passthrough (wiring
 `storageCredentials` with the legacy Secret key names), expands
 `jobservice.jobLoggers` into full logger structures, splits
 `redis.external.addr` into host/port, flips `expose.type` to the per-method
-flags, translates ingress TLS, and adds the `jobservice.config.metric` block
-when metrics are enabled. Values that match the 2.x defaults of unchanged
-settings are omitted instead of restated.
+flags, and translates ingress TLS. (Jobservice metrics need no extra values —
+this chart auto-enables them from `metrics.enabled`.) Values that match the
+2.x defaults of unchanged settings are omitted instead of restated.
 
 It also coerces quoted scalars (`"true"`, `"5432"`) to native booleans and
 integers — the legacy chart tolerated them, but this chart's

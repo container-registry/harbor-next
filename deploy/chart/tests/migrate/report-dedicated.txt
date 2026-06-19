@@ -46,8 +46,8 @@ INFO — mapped automatically (12)
       -> externalRedis.host/port
       addr split into separate host and port fields; valkey subchart disabled.
   * metrics.enabled
-      -> metrics.enabled + jobservice.config.metric
-      metrics.enabled does NOT propagate to jobservice in this chart — the jobservice metric block was added to its config.yml explicitly.
+      -> metrics.enabled
+      Carried over. This chart auto-enables the jobservice metric endpoint from metrics.enabled (chart-managed config.yml) — no explicit jobservice.config.metric block is needed.
   * quoted booleans/numbers (core.gdpr.deleteUser, trivy.enabled, database.maxOpenConns)
       -> native YAML types
       String-typed scalars were coerced — this chart validates value types via values.schema.json, so "true"/"1" strings would be rejected at install time.

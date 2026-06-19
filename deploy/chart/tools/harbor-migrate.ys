@@ -513,11 +513,19 @@ defn image-block(comp name):
         swap! dropped-images conj: name
         =>: nil
       else:
-        add-warn "$name.image.repository" "$name.image.repository":
+        add-warn "$name.image.repository" "$name.image.registry / .repository":
           'Custom registry carried over — make sure it serves Harbor Next
-           images. The legacy tag was dropped; the tag now defaults to
-           the chart appVersion.'
-        =>: hash-map('repository' repo)
+           images. A registry host (if present) was split into
+           image.registry; the legacy tag was dropped (now defaults to
+           the chart appVersion).'
+        parts =: repo.str/split(/[\/]/)
+        head =: parts.first()
+        has-host =: (count(parts) > 1) && re-find(/[.:]/ head)
+        out =:
+          if has-host:
+            then: hash-map('registry' head 'repository' str/join('/' rest(parts)))
+            else: hash-map('registry' 'docker.io' 'repository' repo)
+        =>: out
 
 defn sa-block(comp name):
   sa-name =: presence(comp.serviceAccountName)
@@ -1250,10 +1258,10 @@ defn map-metrics(legacy):
         'Metrics endpoints are fixed at /metrics on port 8001 — custom
          ports/paths were dropped.'
     when enabled:
-      add-info 'metrics.enabled' 'metrics.enabled + jobservice.config.metric':
-        'metrics.enabled does NOT propagate to jobservice in this chart —
-         the jobservice metric block was added to its config.yml
-         explicitly.'
+      add-info 'metrics.enabled' 'metrics.enabled':
+        'Carried over. This chart auto-enables the jobservice metric
+         endpoint from metrics.enabled (chart-managed config.yml) — no
+         explicit jobservice.config.metric block is needed.'
     when-not enabled:
       add-info 'metrics.enabled=false' 'exporter.enabled=false':
         'In 2.x the exporter only deployed with metrics enabled; this
@@ -1269,13 +1277,6 @@ defn map-metrics(legacy):
             interval:: presence(sm.interval)
       exporter:
         enabled:: enabled
-      jobservice::
-        when enabled::
-          config:
-            metric:
-              enabled: true
-              path: /metrics
-              port: 8001
 
 #------------------------------------------------------------------------------
 # Report + entry point

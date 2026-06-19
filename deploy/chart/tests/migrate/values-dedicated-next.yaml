@@ -57,10 +57,6 @@ jobservice:
   config:
     worker_pool:
       workers: 4
-    metric:
-      enabled: true
-      path: /metrics
-      port: 8001
 exporter:
   enabled: true
 trivy:

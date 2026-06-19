@@ -53,10 +53,6 @@ jobservice:
         duration: 30
         settings:
           work_dir: /var/log/jobs
-    metric:
-      enabled: true
-      path: /metrics
-      port: 8001
   deploymentStrategy:
     type: Recreate
   persistence:

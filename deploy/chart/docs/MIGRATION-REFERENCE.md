@@ -242,7 +242,7 @@ Jobservice config moved into a verbatim `config.yml` passthrough
 | `exporter.cacheDuration` | `exporter.config.cache_time` | |
 | `exporter.cacheCleanInterval` | `exporter.config.cache_clean_interval` | |
 | `exporter.image`, `replicas`, `podDisruptionBudget`→`pdb`, `extraEnvVars`→`extraEnv`, scheduling fields | same pattern as core | |
-| `metrics.enabled` | `metrics.enabled` | Does **not** propagate to jobservice — also set `jobservice.config.metric.{enabled,path,port}` |
+| `metrics.enabled` | `metrics.enabled` | Auto-propagates to jobservice (chart-managed `config.yml` adds the `metric` block) — no `jobservice.config.metric` needed |
 | `metrics.{core,registry,jobservice,exporter}.path` / `port` | *N/A* — fixed | Always `/metrics` on port `8001` |
 | `metrics.serviceMonitor.enabled` | same | Requires `metrics.enabled: true` (validated at template time) |
 | `metrics.serviceMonitor.additionalLabels` | `metrics.serviceMonitor.labels` | Rename |

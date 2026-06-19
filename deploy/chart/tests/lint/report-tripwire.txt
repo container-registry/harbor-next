@@ -29,8 +29,8 @@ WARN — review recommended (10)
       Inline storage credential — prefer a pre-created Secret via registry.storageCredentials.<backend>.existingSecret.
   * registry.secret.REGISTRY_STORAGE_S3_SECRETKEY
       Inline storage credential — prefer a pre-created Secret via registry.storageCredentials.<backend>.existingSecret.
-  * jobservice.config.metric
-      metrics.enabled does NOT propagate to jobservice — add jobservice.config.metric {enabled true, path /metrics, port 8001} or its scrape target stays dark.
+  * jobservice.config.metric.enabled
+      metrics.enabled auto-enables the jobservice metric endpoint (chart-managed config.yml), but jobservice.config.metric.enabled is false here — the ServiceMonitor still scrapes jobservice, so its target stays dark. Remove the override or stop scraping jobservice.
   * valkey.enabled / externalRedis.host
       Both the valkey subchart and externalRedis.host are set — the chart uses the subchart and silently ignores externalRedis. Set valkey.enabled false to use the external Redis.
   * database.existingTlsSecret

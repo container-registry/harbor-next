@@ -38,9 +38,14 @@ registry:
     REGISTRY_STORAGE_S3_ACCESSKEY: AKIAINLINE
     REGISTRY_STORAGE_S3_SECRETKEY: inline-secret
 
-# metrics on, but no jobservice.config.metric block
+# metrics on, but jobservice's metric endpoint explicitly disabled while the
+# ServiceMonitor still scrapes jobservice (its scrape target stays dark)
 metrics:
   enabled: true
+jobservice:
+  config:
+    metric:
+      enabled: false
 
 trivy:
   enabled: true
