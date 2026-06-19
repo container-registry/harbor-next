@@ -906,6 +906,7 @@ Kubernetes: `>=1.28.0-0`
 | portal.affinity | object | `{}` | Affinity rules for Portal pods |
 | portal.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler. See `core.autoscaling` for full docs. |
 | portal.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
+| portal.enabled | bool | `true` | Deploy the portal (Harbor UI). Set `false` for API-only installs — core serves the API, and the Ingress / Gateway route `/` to core instead of the portal. Mirrors `trivy.enabled` / `exporter.enabled`. |
 | portal.existingConfigMap | string | `""` | Use an externally-managed ConfigMap containing `nginx.conf` instead of the chart-generated one. When set, the chart skips ConfigMap generation and the Deployment mounts the named ConfigMap. Use for custom nginx configuration (TLS termination, custom headers, extra locations) without forking the chart. Semantics match `registry.existingConfigMap`. Portal serves static Angular assets via nginx and has no env/key config surface — to customize nginx.conf, point existingConfigMap at your own ConfigMap (there is no `config`/`secret` passthrough here). |
 | portal.extraEnv | list | [] | Extra environment variables with valueFrom support |
 | portal.hostAliases | list | [] | Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for private DNS that does not exist in cluster DNS — service-mesh sidecars, legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the Kubernetes PodSpec: a list of `{ip, hostnames}` entries. |
@@ -931,6 +932,7 @@ Kubernetes: `>=1.28.0-0`
 | portal.serviceAnnotations | object | `{}` | Service annotations for Portal service |
 | portal.tolerations | list | `[]` | Tolerations for Portal pods |
 | portal.topologySpreadConstraints | list | `[]` | Topology spread constraints for pod scheduling |
+| portal.url | string | `""` | URL core uses to reach the portal (`PORTAL_URL`). Empty auto-derives the in-cluster portal service. Set this when `enabled: false` but the UI is hosted externally, so core can still proxy to it. |
 | proxy.components[0] | string | `"core"` |  |
 | proxy.components[1] | string | `"jobservice"` |  |
 | proxy.components[2] | string | `"trivy"` |  |

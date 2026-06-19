@@ -11,6 +11,7 @@ templates:
   - templates/portal.deployment.yaml
   - templates/portal.service.yaml
   - templates/portal.configmap.yaml
+  - templates/core.configmap.yaml
 tests:
   - it: should compose image from registry + repository + tag
     template: templates/portal.deployment.yaml
@@ -81,3 +82,54 @@ tests:
     asserts:
       - exists:
           path: spec.template.metadata.annotations["checksum/configmap"]
+
+  # Portal is optional (API-only installs). When disabled, none of its
+  # workload templates render.
+  - it: should not render the portal Deployment when disabled
+    template: templates/portal.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      portal.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render the portal Service when disabled
+    template: templates/portal.service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      portal.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render the portal ConfigMap when disabled
+    template: templates/portal.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      portal.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # core's PORTAL_URL uses portal.url when set (so core can reach an
+  # externally-hosted portal when portal.enabled=false), else the in-cluster
+  # service.
+  - it: should set core PORTAL_URL from portal.url when set
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      portal.enabled: false
+      portal.url: https://ui.external.example
+    asserts:
+      - equal:
+          path: data.PORTAL_URL
+          value: https://ui.external.example

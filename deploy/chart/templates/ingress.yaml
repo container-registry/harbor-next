@@ -74,12 +74,12 @@ spec:
                 name: {{ include "harbor.fullname" $ }}-core
                 port:
                   number: 80
-          # Portal (default)
+          # Portal (default) — falls back to core when the portal is disabled
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: {{ include "harbor.fullname" $ }}-portal
+                name: {{ include "harbor.fullname" $ }}-{{ if $.Values.portal.enabled }}portal{{ else }}core{{ end }}
                 port:
                   number: 80
     {{- end }}

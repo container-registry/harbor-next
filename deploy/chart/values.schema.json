@@ -541,6 +541,15 @@
         { "$ref": "#/$defs/harborComponent" }
       ],
       "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Deploy the portal (Harbor UI). False for API-only installs."
+        },
+        "url": {
+          "type": "string",
+          "description": "URL core uses to reach the portal (PORTAL_URL); empty auto-derives the in-cluster service."
+        },
         "serviceAnnotations": {
           "type": "object",
           "additionalProperties": { "type": "string" },

@@ -1,4 +1,4 @@
-{{- if not .Values.portal.existingConfigMap }}
+{{- if and .Values.portal.enabled (not .Values.portal.existingConfigMap) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:

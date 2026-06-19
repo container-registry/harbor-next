@@ -118,6 +118,24 @@ tests:
           path: spec.rules[0].http.paths[5].backend.service.name
           pattern: .*-portal$
 
+  # Portal optional: the `/` route falls back to core when portal is disabled,
+  # so API-only installs have no dangling portal backend.
+  - it: should route / to core when portal is disabled
+    template: templates/ingress.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      ingress.enabled: true
+      portal.enabled: false
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[5].path
+          value: /
+      - matchRegex:
+          path: spec.rules[0].http.paths[5].backend.service.name
+          pattern: .*-core$
+
   # Regression guard for fdbd99f5b (Fix #7). With autoGenCert=true and
   # multiple ingress.hosts entries, the chart must emit ONE tls Secret
   # whose cert SAN covers every host (the helper passes the full host

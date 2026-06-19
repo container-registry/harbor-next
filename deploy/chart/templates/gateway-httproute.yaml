@@ -51,12 +51,12 @@ spec:
       backendRefs:
         - name: {{ include "harbor.fullname" . }}-core
           port: 80
-    # Portal (default)
+    # Portal (default) — falls back to core when the portal is disabled
     - matches:
         - path:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: {{ include "harbor.fullname" . }}-portal
+        - name: {{ include "harbor.fullname" . }}-{{ if .Values.portal.enabled }}portal{{ else }}core{{ end }}
           port: 80
 {{- end }}

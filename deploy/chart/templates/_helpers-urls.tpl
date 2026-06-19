@@ -34,7 +34,11 @@ Container port
 Return the Portal internal URL
 */}}
 {{- define "harbor.portal.url" -}}
+{{- if .Values.portal.url -}}
+{{- .Values.portal.url -}}
+{{- else -}}
 http://{{ include "harbor.fullname" . }}-portal
+{{- end -}}
 {{- end }}
 
 {{/*
