@@ -71,7 +71,7 @@ jobs:
       MAJOR: ${{ needs.release-please.outputs.major }}
       MINOR: ${{ needs.release-please.outputs.minor }}
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
 
@@ -120,7 +120,7 @@ jobs:
             echo "BUILDX_HOST=$BUILDX_HOST" >> "$GITHUB_ENV"
           fi
 
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.release-please.outputs.tag_name }}
 
@@ -314,7 +314,7 @@ jobs:
       TAG_NAME: ${{ needs.release-please.outputs.tag_name || inputs.finalize_tag }}
       RELEASE_BRANCH: ${{ github.ref_name }}
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
 
