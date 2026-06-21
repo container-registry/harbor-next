@@ -49,8 +49,6 @@ for (const image of images) {
 
 
   // scan the repo
-//   const tagname = process.env.TAG_NAME || 'v2.2.0';
-// const row = page.getByRole('row', { name: new RegExp(tagname) });
 await page.waitForTimeout(1000);
 await page.getByRole('gridcell', { name: 'Select Select' }).locator('label').click();
 await page.waitForTimeout(1000);
@@ -62,10 +60,6 @@ await page.getByRole('gridcell', { name: /Total/ }).waitFor();
 
 await page.goto('/');
 }
-
-  // // get back to the project page
-  // await page.getByText(project).click();
-
 
   const output = runCommand(
     './e2e/scripts/docker_push_manifest_list.sh',
@@ -113,7 +107,6 @@ await page.getByRole('gridcell', { name: /Total/ }).waitFor();
 // go to security hub
 await page.getByRole('link', { name: 'Interrogation Services' }).click();
 await page.getByRole('link', { name: 'Security Hub' }).click();
-// await page.getByRole('button', { name: 'SEARCH' }).click();
 
 // get vuln summary from api and compare it with the ui display
 const summary = await getVulnerabilitySummaryFromAPI(ip, user, pwd);
@@ -152,7 +145,6 @@ for (const artifact of dangerousArtifacts) {
 }
 await page.waitForTimeout(2000);
 
-// // check the top 5 dangerous CVEs
 const dangerousCVEs = summary.dangerous_cves;
 console.log('Dangerous CVEs from API:', dangerousCVEs);
 
@@ -203,61 +195,23 @@ for (const cve of dangerousCVEs) {
   // check if the table shows the right info
   await page.locator('.datagrid-inner-wrapper').click();
   await page.waitForTimeout(3000);
-  // await expect(page.locator('#clr-dg-row33')).toContainText('CVE-2021-37600');
   await expect(page.getByText(firstDangerousArtifact.repository_name).nth(2)).toBeVisible(); // this works no need for fuzzy i guess
-  // const repo = summary.dangerous_cves[0].cve_id;
-  // // const repo = summary.dangerous_artifacts[0].repository_name;:w
-
-  // // create fuzzy version (partial match)
-  // const fuzzyRepo = new RegExp(repo.replace(/[.*+?^${}()|[\]\\]/g, ''), 'i');
-
-  // // check visibility using fuzzy matching
-  // await expect(page.getByText(fuzzyRepo).first()).toBeVisible();
-
-  // await expect(page.locator('#clr-dg-row33')).toContainText('CVE-2021-37600');
-  // await expect(page.locator('#clr-dg-row33')).toContainText(summary.dangerous_artifacts[0].repository_name);
   await page.waitForTimeout(3000);
 
   await expect(page.getByRole('gridcell', { name: firstDangerousArtifact.repository_name }).first()).toBeVisible();
   await expect(page.getByRole('gridcell', { name: firstDangerousArtifact.digest.substring(0, 12) }).first()).toBeVisible();
-  // await expect(page.getByRole('gridcell', { name: summary.dangerous_cves[0].version }).first()).toBeVisible();
-  // await expect(page.getByRole('gridcell', { name: summary.dangerous_cves[0].cvss_score_v3.toString() }).first()).toBeVisible();
-  // await expect(page.locator('#clr-dg-row33')).toContainText(summary.dangerous_artifacts[0].digest.substring(0, 12));
-  // previously the below 2 lines were using cves
-  // await expect(page.locator('#clr-dg-row33')).toContainText(summary.dangerous_cves[0].version);
-  // await expect(page.locator('#clr-dg-row33')).toContainText(summary.dangerous_cves[0].cvss_score_v3.toString());
  await page.waitForTimeout(2000);
 
  // check for the cve id
-//  // ---  remove this once test passes -- start
-//   await page.goto('/');
-//   // login
-//   await page.goto('/');
-//   await page.getByRole('textbox', { name: 'Username' }).click();
-//   await page.getByRole('textbox', { name: 'Username' }).fill('admin');
-//   await page.getByRole('textbox', { name: 'Password' }).click();
-//   await page.getByRole('textbox', { name: 'Password' }).fill('Harbor12345');
-//   await page.getByRole('button', { name: 'LOG IN' }).click();
-//   await page.getByRole('link', { name: 'Interrogation Services' }).click();
-//   // --- remove this once test passes -- end
-
   // search for dangerous cves
   await page.getByRole('link', { name: cveID }).first().click();
   await page.waitForTimeout(2000);
-  // await page.getByText('Top 5 Most Dangerous CVEs CVE').click();
   await page.getByText('Top 5 Most Dangerous CVEs').click();
-  const value = await page.locator('div:nth-child(3) > .card-block > div > div').first();
-  // console.log("what the hell", value.textContent());
-  // console.log("what is this", value);
 
-  // TODO: this should be dynamic
   await page.getByRole('link', { name: cveID }).first().click();
   await expect(page.locator('app-vulnerability-filter').getByRole('textbox')).toHaveValue(cveID);
-  // await page.locator('.datagrid-inner-wrapper').click();
   await expect(page.locator('app-vulnerability-filter').getByRole('combobox')).toHaveValue('cve_id');
-  // await page.locator('.datagrid').click();
   await expect(page.getByRole('gridcell', { name: cveID }).first()).toBeVisible();
-  // await expect(page.locator('#clr-dg-row31')).toContainText(dangerousCVEs[0].cve_id);
   await page.waitForTimeout(2000);
   // quick search done ---
 
@@ -273,7 +227,6 @@ for (const cve of dangerousCVEs) {
   await page.locator('app-vulnerability-filter').getByRole('textbox').click();
   await page.locator('app-vulnerability-filter').getByRole('textbox').fill(`${project}/${images[2]}`);
   await page.getByRole('button', { name: 'SEARCH' }).click();
-  // await expect(page.locator('#clr-dg-row58')).toContainText(`${project}/${images[2]}`);
   await expect(page.getByRole('gridcell', { name: `${project}/${images[2]}` }).first()).toBeVisible();
 
   await page.locator('app-vulnerability-filter').getByRole('combobox').selectOption('digest');
@@ -290,7 +243,6 @@ for (const cve of dangerousCVEs) {
   await page.locator('app-vulnerability-filter').getByRole('textbox').fill(cveID);
   await page.getByRole('button', { name: 'SEARCH' }).click();
   await page.waitForTimeout(2000);
-  // await expect(page.locator('#clr-dg-row118')).toContainText('CVE-2022-29155');
   await expect(page.getByRole('gridcell', { name: cveID }).first()).toBeVisible();
 
   await page.locator('app-vulnerability-filter').getByRole('combobox').selectOption('package');
@@ -299,7 +251,6 @@ for (const cve of dangerousCVEs) {
   await page.getByRole('button', { name: 'SEARCH' }).click();
   await page.waitForTimeout(2000);
   await expect(page.getByRole('gridcell', { name: packageName }).first()).toBeVisible();
-  // await expect(page.locator('#clr-dg-row129')).toContainText('curl');
 
   await page.locator('app-vulnerability-filter').getByRole('combobox').selectOption('tag');
   await page.locator('app-vulnerability-filter').getByRole('textbox').click();
@@ -307,8 +258,6 @@ for (const cve of dangerousCVEs) {
   await page.getByRole('button', { name: 'SEARCH' }).click();
   await page.waitForTimeout(2000);
   await expect(page.getByRole('gridcell', { name: tag }).first()).toBeVisible();
-  // await expect(page.locator('#clr-dg-row144')).toContainText('v2.2.0');
-  // await page.getByText('CVE-2022-32207aproject-1764110949942/goharbor/harbor-redis-basesha256:').click();
   await page.locator('app-vulnerability-filter').getByRole('combobox').selectOption('cvss_score_v3');
   await page.getByRole('textbox').nth(1).click();
   await page.getByRole('textbox').nth(1).fill(cvssScore);
@@ -316,7 +265,6 @@ for (const cve of dangerousCVEs) {
   await page.getByRole('textbox').nth(2).fill(cvssScore);
   await page.getByRole('button', { name: 'SEARCH' }).click();
   await page.waitForTimeout(2000);
-  // await expect(page.locator('#clr-dg-row159')).toContainText('7.5');
   await expect(page.getByRole('gridcell', { name: cvssScore }).first()).toBeVisible();
 
   await page.locator('app-vulnerability-filter').getByRole('combobox').selectOption('severity');
@@ -329,7 +277,6 @@ for (const cve of dangerousCVEs) {
     await expect(page.locator('clr-dg-footer')).toContainText(summary.critical_cnt + ' CVEs');
   }
   await expect(page.getByRole('gridcell', { name: 'Critical' }).first()).toBeVisible();
-  // await expect(page.locator('#clr-dg-row174')).toContainText('Critical');
   await page.getByRole('combobox').nth(1).selectOption('High');
   await page.getByRole('button', { name: 'SEARCH' }).click();
   await page.waitForTimeout(2000);
@@ -338,9 +285,7 @@ for (const cve of dangerousCVEs) {
   } else {
     await expect(page.locator('clr-dg-footer')).toContainText(summary.high_cnt + ' CVEs');
   }
-  // await expect(page.locator('clr-dg-footer')).toContainText(summary.high_cnt + ' CVEs');
   await expect(page.getByRole('gridcell', { name: 'High' }).first()).toBeVisible();
-  // await expect(page.locator('#clr-dg-row189')).toContainText('High');
   await page.getByRole('combobox').nth(1).selectOption('Medium');
   await page.getByRole('button', { name: 'SEARCH' }).click();
   await page.waitForTimeout(2000);
@@ -350,7 +295,6 @@ for (const cve of dangerousCVEs) {
     await expect(page.locator('clr-dg-footer')).toContainText(summary.medium_cnt + ' CVEs');
   }
   await expect(page.getByRole('gridcell', { name: 'Medium' }).first()).toBeVisible();
-  // await expect(page.locator('#clr-dg-row204')).toContainText('Medium');
   await page.getByRole('combobox').nth(1).selectOption('Low');
   await page.getByRole('button', { name: 'SEARCH' }).click();
   await page.waitForTimeout(2000);
@@ -360,7 +304,6 @@ for (const cve of dangerousCVEs) {
     await expect(page.locator('clr-dg-footer')).toContainText(summary.low_cnt + ' CVEs');
   }
   await expect(page.getByRole('gridcell', { name: 'Low' }).first()).toBeVisible();
-  // await expect(page.locator('#clr-dg-row219')).toContainText('Low');
   await page.getByRole('combobox').nth(1).selectOption('Unknown');
   await page.getByRole('button', { name: 'SEARCH' }).click();
   await page.waitForTimeout(2000);
@@ -409,27 +352,18 @@ for (const cve of dangerousCVEs) {
   await page.locator('app-vulnerability-filter clr-icon').nth(1).click();
   await page.locator('.clr-select-wrapper.ml-1 > .clr-select').selectOption(severity);
   await page.getByRole('button', { name: 'SEARCH' }).click();
-  // await expect(page.locator('#clr-dg-row281')).toContainText('High');
   await expect(page.getByRole('gridcell', { name: severity }).first()).toBeVisible();
 
   await page.getByRole('button', { name: 'Open' }).first().click();
-  // await expect(page.locator('#clr-dg-expandable-row-281')).toContainText('Description: libcurl-using applications can ask for a specific client certificate to be used in a transfer');
-  // await page.getByRole('gridcell', { name: 'Close' }).click();
   await expect(page.locator('clr-datagrid')).toContainText(cveDescription);
 
 // do page jump test
-  // await page.getByRole('link', { name: 'Projects' }).click();
-  // await page.getByRole('link', { name: 'Interrogation Services' }).click();
-  // await page.getByText('CVE-2022-22823').click();
   await page.getByRole('link', { name: cveID }).first().click();
   await page.waitForTimeout(2000);
 
   // do repo jump test
   await page.goto('/');
   await page.getByRole('link', { name: 'Interrogation Services' }).click();
-  // await page.getByRole('link', { name: 'Security Hub' }).click();
-  // await page.locator('#clr-dg-row317').getByRole('link', { name: 'aproject-1764149771585/' }).click();
-  // await expect(page.locator('h2')).toContainText('goharbor/harbor-registry-base');
   const indexArtifact = dangerousArtifacts.find(artifact => artifact.repository_name === `${project}/${index_repo}`);
   if (!indexArtifact) {
     throw new Error(`Expected dangerous artifact for ${project}/${index_repo}`);
@@ -438,19 +372,14 @@ for (const cve of dangerousCVEs) {
   await page.getByRole('link', { name: indexArtifact.repository_name }).last().click();
   await page.waitForTimeout(1000);
   await page.getByRole('link', { name: indexArtifact.repository_name }).last().click();
-  // await page.getByRole('link', { name: indexArtifact.repository_name }).last().click();
   await expect(page.locator('h2')).toContainText(index_repo);
 
   // do digest jump test
   await page.goto('/');
   await page.getByRole('link', { name: 'Interrogation Services' }).click();
-  // await page.getByRole('link', { name: 'Security Hub' }).click();
   await expect(page.getByRole('link', { name: indexArtifact.digest.substring(0, 12) }).last()).toBeVisible();
   await page.getByRole('link', { name: indexArtifact.digest.substring(0, 12) }).last().click();
-  // await page.getByRole('gridcell', { name: 'sha256:3f42abf2' }).click();
   await page.waitForTimeout(1000);
-  // await page.getByRole('link', { name: summary.dangerous_artifacts[0].digest.substring(0, 12) }).last().click();
-  // await expect(page.getByRole('link', { name: summary.dangerous_artifacts[0].digest.substring(0, 12) })).toBeVisible();
   await expect(page.locator('h2')).toContainText(indexArtifact.digest.substring(0, 12));
 
   // top 5 dangerous artifacts jump test
@@ -477,7 +406,6 @@ for (const cve of dangerousCVEs) {
 
   await page.getByRole('link', { name: 'Projects' }).click();
   await page.getByRole('link', { name: project }).click();
-  // await expect(page.locator('#clr-dg-row381')).toContainText(project + '/' + index_repo);
   // delete index repo
   const rowRegex = new RegExp(`Select\\s+Select\\s+${project}/${index_repo}`, 'i');
 
@@ -489,10 +417,6 @@ await page.waitForTimeout(5000);
 await page.getByRole('button', { name: 'Delete' }).click();
 await page.getByRole('button', { name: 'DELETE', exact: true }).click();
 
-  // await page.getByRole('row', { name: 'Select Select aproject-1764149771585/index1 1 4 11/26/25, 3:07 PM' }).locator('label').click();
-  // await page.getByRole('button', { name: 'Delete' }).click();
-  // await page.getByRole('button', { name: 'DELETE', exact: true }).click();
-
   await page.getByRole('link', { name: 'Interrogation Services' }).click();
   await expect(page.locator('app-vulnerability-summary')).not.toContainText(project + '/' + index_repo);
 
@@ -502,7 +426,6 @@ await page.getByRole('button', { name: 'DELETE', exact: true }).click();
   await page.getByRole('button', { name: 'SEARCH' }).click();
   await expect(page.locator('clr-dg-placeholder')).toContainText('We could not find any vulnerability');
 
-  // await page.getByRole('row', { name: /Select Select ${project} + '/' + ${image}/ }).locator('label').click();
     // logout
     await page.goto('/');
     await page.getByRole('button', { name: user, exact: true }).waitFor();

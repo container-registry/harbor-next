@@ -23,7 +23,7 @@ Open http://localhost:8084 in your browser. You should see the webhook.site inte
 
 ```bash
 cd src/portal
-WEBHOOK_ENDPOINT_UI=localhost:8084 IP=<harbor-ip> bun x playwright test webhook.spec.ts
+BASE_URL=https://<harbor-ip> WEBHOOK_ENDPOINT_UI=localhost:8084 IP=<harbor-ip> bun x playwright test webhook.spec.ts
 ```
 
 ### 4. Stop the Server (when done)
@@ -46,6 +46,7 @@ Set these when running Playwright tests:
 
 | Variable | Description | Example |
 |----------|-------------|---------|
+| `BASE_URL` | Harbor portal URL | `https://192.168.1.100` |
 | `WEBHOOK_ENDPOINT_UI` | Webhook server address | `localhost:8084` |
 | `IP` | Harbor server IP/hostname | `192.168.1.100` |
 | `HARBOR_ADMIN` | Harbor admin username | `admin` |

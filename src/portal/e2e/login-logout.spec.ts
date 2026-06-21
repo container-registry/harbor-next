@@ -1,9 +1,9 @@
-import { test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 const harborUser = process.env.HARBOR_ADMIN || 'admin';
 const harborPassword = process.env.HARBOR_PASSWORD || 'Harbor12345';
 
-test('login and logout', async ({ page }) => {
+test('should login and logout', async ({ page }) => {
     // login
     await page.goto('/');
     await page.getByRole('textbox', { name: 'Username' }).click();
@@ -16,4 +16,5 @@ test('login and logout', async ({ page }) => {
     await page.getByRole('button', { name: harborUser, exact: true }).waitFor();
     await page.getByRole('button', { name: harborUser, exact: true }).click();
     await page.getByRole('menuitem', { name: 'Log Out' }).click();
+    await expect(page.getByRole('button', { name: 'LOG IN' })).toBeVisible();
 });

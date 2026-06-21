@@ -191,6 +191,9 @@ function runCommand(command: string): string {
 }
 
 function pushImageWithTag(ip, user, pwd, project, image, tag) {
+  const sourceImage = `${LOCAL_REGISTRY}/${LOCAL_REGISTRY_NAMESPACE}/${image}:latest`;
+  const targetImage = `${ip}/${project}/${image}:${tag}`;
+
   runCommand(`docker pull ${sourceImage}`);
   runCommand(`docker login -u ${user} -p ${pwd} ${ip}`);
   runCommand(`docker tag ${sourceImage} ${targetImage}`);
@@ -204,17 +207,19 @@ function pushImageWithTag(ip, user, pwd, project, image, tag) {
 For tests requiring multiple browser tabs:
 
 ```typescript
-const context = await browser.newContext();
-const page1 = await context.newPage();
-const page2 = await context.newPage();
+test('should handle multiple tabs', async ({ browser }) => {
+  const context = await browser.newContext();
+  const page1 = await context.newPage();
+  const page2 = await context.newPage();
 
-// Switch between pages
-await page1.bringToFront();
-// ... do something
-await page2.bringToFront();
-// ... do something else
+  // Switch between pages
+  await page1.bringToFront();
+  // ... do something
+  await page2.bringToFront();
+  // ... do something else
 
-await context.close();
+  await context.close();
+});
 ```
 
 ### 7. Waiting Strategies

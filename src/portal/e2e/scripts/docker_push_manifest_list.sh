@@ -13,5 +13,5 @@ IMAGE1=$4
 IMAGE2=$5
 
 docker login "$IP" -u "$USER" --password-stdin
-docker manifest create "$INDEX" "$IMAGE1" "$IMAGE2"
-docker manifest push "$INDEX"
+docker manifest create --insecure "$INDEX" "$IMAGE1" "$IMAGE2"
+docker manifest push --insecure "$INDEX"
