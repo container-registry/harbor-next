@@ -163,11 +163,22 @@ func (suite *FetchOrSaveTestSuite) TestBuildResultNotEncodable() {
 func (suite *FetchOrSaveTestSuite) TestConcurrentCallersShareResult() {
 	c := &mockCache{}
 	var builderCalls atomic.Int32
-
-	mock.OnAnything(c, "Fetch").Return(ErrNotFound)
-	mock.OnAnything(c, "Save").Return(nil)
+	var data sync.Map
 
 	const n = 100
+	mock.OnAnything(c, "Fetch").Return(func(ctx context.Context, key string, value any) error {
+		cached, ok := data.Load(key)
+		if !ok {
+			return ErrNotFound
+		}
+		*(value.(*string)) = cached.(string)
+		return nil
+	})
+	mock.OnAnything(c, "Save").Return(func(ctx context.Context, key string, value any, exp ...time.Duration) error {
+		data.Store(key, value)
+		return nil
+	})
+
 	var wg sync.WaitGroup
 	results := make([]string, n)
 
