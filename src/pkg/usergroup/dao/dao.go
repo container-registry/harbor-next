@@ -105,6 +105,8 @@ func (d *dao) Query(ctx context.Context, query *q.Query) ([]*model.UserGroup, er
 }
 
 // Get ...
+//
+//nolint:nilnil // A missing user group is represented by a nil result and nil error.
 func (d *dao) Get(ctx context.Context, id int) (*model.UserGroup, error) {
 	userGroupList, err := d.Query(ctx, q.New(q.KeyWords{"ID": id}))
 	if err != nil {
