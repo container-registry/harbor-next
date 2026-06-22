@@ -49,6 +49,7 @@ type buildKitSubject struct {
 
 func (a *abstractor) toBuildKitAttestationCandidate(ctx context.Context, repository string, descriptor v1.Descriptor, siblings []v1.Descriptor) (*pkgartifact.AccessoryCandidate, error) {
 	if !isBuildKitAttestationDescriptor(descriptor) {
+		//nolint:nilnil // descriptor is not a BuildKit attestation
 		return nil, nil
 	}
 
@@ -59,6 +60,7 @@ func (a *abstractor) toBuildKitAttestationCandidate(ctx context.Context, reposit
 
 	targetDigest := resolveBuildKitAttestationSubject(descriptor, siblings, subjects)
 	if targetDigest == "" {
+		//nolint:nilnil // no target artifact could be resolved
 		return nil, nil
 	}
 
