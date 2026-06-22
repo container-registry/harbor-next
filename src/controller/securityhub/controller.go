@@ -87,6 +87,7 @@ func (c *controller) SecuritySummary(ctx context.Context, projectID int64, optio
 	opts := newOptions(options...)
 	scannerUUID, err := c.scannerMgr.DefaultScannerUUID(ctx)
 	if len(scannerUUID) == 0 || err != nil {
+		// nolint:nilerr // Return empty summary when no scanner configured or unavailable
 		return &secHubModel.Summary{}, nil
 	}
 	sum, err := c.secHubMgr.Summary(ctx, scannerUUID, projectID, nil)
@@ -116,6 +117,7 @@ func (c *controller) SecuritySummary(ctx context.Context, projectID int64, optio
 	return sum, nil
 }
 
+//nolint:unused // covered by tests; lint excludes test-only usage
 func (c *controller) scannedArtifactCount(ctx context.Context, projectID int64) (int64, error) {
 	scannerUUID, err := c.scannerMgr.DefaultScannerUUID(ctx)
 	if err != nil {
