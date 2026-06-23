@@ -32,9 +32,6 @@ extend-exclude = [
     "ADOPTERS.md",
     "CONTRIBUTORS.md",
 
-    # Upstream test suite (robot framework, testcase filenames have typos)
-    "tests/",
-
     # Claude Code agent/plan files (auto-generated, not shipped)
     ".claude/",
 
