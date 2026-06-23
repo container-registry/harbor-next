@@ -1,0 +1,53 @@
+name: Go Lint
+
+on:
+  pull_request:
+    branches: [main, "release-[0-9]*.[0-9]*"]
+    paths:
+      - "**/*.go"
+      - "Taskfile.yml"
+      - "versions.env"
+      - "taskfile/**/*.yml"
+      - ".github/workflows/lint-go.yml"
+  push:
+    branches: [main, "release-[0-9]*.[0-9]*"]
+    paths:
+      - "**/*.go"
+      - "Taskfile.yml"
+      - "versions.env"
+      - "taskfile/**/*.yml"
+      - ".github/workflows/lint-go.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: go-lint-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # arduino/setup-task (latest) still declares node20; opt in to the
+  # 2026-06-16 node24 default early.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  lint:
+    name: Go Lint
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository || contains(fromJSON('["OWNER","MEMBER"]'), github.event.pull_request.author_association)) && vars.RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-go-cached
+        with:
+          go-version-file: src/go.mod
+          go-sum-path: src/go.sum
+
+      - uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Go lint
+        run: task lint:go
