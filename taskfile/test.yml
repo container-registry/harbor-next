@@ -244,6 +244,11 @@ tasks:
     dir: src/portal
     cmd: npm run lint
 
+  frontend:lint:style:
+    desc: "Lint frontend SCSS code"
+    dir: src/portal
+    cmd: npm run lint:style
+
   # ============================================================================
   # Aggregate Test Tasks
   # ============================================================================

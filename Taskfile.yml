@@ -80,6 +80,17 @@ tasks:
       - task: test:lint
       - task: test:vuln-check
 
+  lint:go:
+    desc: "Run Go lint"
+    cmds:
+      - task: test:lint
+
+  lint:ui:
+    desc: "Run UI lint"
+    cmds:
+      - task: test:frontend:lint
+      - task: test:frontend:lint:style
+
   lint:api:
     desc: "Run API lint"
     cmds:

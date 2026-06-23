@@ -1,0 +1,50 @@
+name: UI Lint
+
+on:
+  pull_request:
+    branches: [main, "release-[0-9]*.[0-9]*"]
+    paths:
+      - "src/portal/**"
+  push:
+    branches: [main, "release-[0-9]*.[0-9]*"]
+    paths:
+      - "src/portal/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-lint-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # arduino/setup-task (latest) still declares node20; opt in to the
+  # 2026-06-16 node24 default early.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  lint:
+    name: UI Lint
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository || contains(fromJSON('["OWNER","MEMBER"]'), github.event.pull_request.author_association)) && vars.RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Load versions
+        run: grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
+
+      - name: Install Bun
+        run: |
+          curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}"
+          echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
+
+      - name: Install UI dependencies
+        working-directory: src/portal
+        run: bun install --frozen-lockfile
+
+      - name: Run UI lint
+        run: task lint:ui
