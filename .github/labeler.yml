@@ -42,5 +42,4 @@ component/api:
 tests:
   - changed-files:
       - any-glob-to-any-file:
-          - 'tests/**/*'
           - '**/*_test.go'
