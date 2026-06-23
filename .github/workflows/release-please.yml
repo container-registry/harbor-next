@@ -133,8 +133,13 @@ jobs:
           fi
 
           if command -v apt-get >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y stgit
+            if command -v sudo >/dev/null 2>&1; then
+              sudo apt-get update
+              sudo apt-get install -y stgit
+            else
+              apt-get update
+              apt-get install -y stgit
+            fi
           elif command -v brew >/dev/null 2>&1; then
             brew install stgit
           else
@@ -156,7 +161,7 @@ jobs:
       - name: Apply commercial patches
         env:
           PATCHES_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: task release-ready:apply-commercial-patches
+        run: task --taskfile taskfile/release-ready.yml apply-commercial-patches
 
       - name: Load versions
         run: grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
