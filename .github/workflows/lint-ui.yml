@@ -5,10 +5,16 @@ on:
     branches: [main, "release-[0-9]*.[0-9]*"]
     paths:
       - "src/portal/**"
+      - "Taskfile.yml"
+      - "taskfile/test.yml"
+      - ".github/workflows/lint-ui.yml"
   push:
     branches: [main, "release-[0-9]*.[0-9]*"]
     paths:
       - "src/portal/**"
+      - "Taskfile.yml"
+      - "taskfile/test.yml"
+      - ".github/workflows/lint-ui.yml"
 
 permissions:
   contents: read
@@ -28,6 +34,8 @@ jobs:
     runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository || contains(fromJSON('["OWNER","MEMBER"]'), github.event.pull_request.author_association)) && vars.RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
         with:
@@ -37,10 +45,9 @@ jobs:
       - name: Load versions
         run: grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
 
-      - name: Install Bun
-        run: |
-          curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}"
-          echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
 
       - name: Install UI dependencies
         working-directory: src/portal
