@@ -280,7 +280,7 @@ func (rAPI *robotAPI) RefreshSec(ctx context.Context, params operation.RefreshSe
 		if !robot.IsValidSec(params.RobotSec.Secret) {
 			return rAPI.SendError(ctx, errors.New("the secret must be 8-128, inclusively, characters long with at least 1 uppercase letter, 1 lowercase letter and 1 number").WithCode(errors.BadRequestCode))
 		}
-		secret = utils.Encrypt(params.RobotSec.Secret, r.Salt, utils.PBKDF2SHA256)
+		secret = utils.Encrypt(params.RobotSec.Secret, r.Salt, utils.SHA256)
 		robotSec.Secret = ""
 	} else {
 		sec, pwd, _, err := robot.CreateSec(r.Salt)
