@@ -61,4 +61,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Run UI lint
-        run: task lint:ui
+        working-directory: src/portal
+        run: |
+          bun run lint
+          ./node_modules/.bin/stylelint "**/*.scss"
