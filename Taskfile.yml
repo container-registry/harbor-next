@@ -83,7 +83,7 @@ tasks:
   lint:go:
     desc: "Run Go lint"
     cmds:
-      - task: test:lint
+      - task: test:lint:local
 
   lint:ui:
     desc: "Run UI lint"
