@@ -68,6 +68,9 @@ tasks:
         series_dir="$(dirname "${series_file}")"
         base_commit=$(git -C "${patch_target_dir}" rev-parse HEAD)
 
+        git -C "${patch_target_dir}" config user.name "${GIT_AUTHOR_NAME:-Release Ready}"
+        git -C "${patch_target_dir}" config user.email "${GIT_AUTHOR_EMAIL:-release-ready@example.invalid}"
+
         stg_in_target() {
           (cd "${patch_target_dir}" && stg "$@")
         }
