@@ -24,7 +24,7 @@
                 <input
                     type="checkbox"
                     clrCheckbox
-                    disabled
+                    [disabled]="!allowUpdateProxyCacheConfiguration"
                     [(ngModel)]="projectPolicy.ProxyCacheEnabled"
                     name="project-proxy-cache-enabled" />
             </clr-checkbox-wrapper>

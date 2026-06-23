@@ -202,9 +202,6 @@ export class ProjectPolicyConfigComponent implements OnInit {
         this.retrieve();
         this.getPermission();
         this.getSystemAllowlist();
-        if (this.isSystemAdmin) {
-            this.getRegistries();
-        }
     }
 
     validateBandwidth(): void {
@@ -307,7 +304,10 @@ export class ProjectPolicyConfigComponent implements OnInit {
             .subscribe(permissins => {
                 this.hasChangeConfigRole = permissins as boolean;
                 this.allowUpdateProxyCacheConfiguration =
-                    this.hasChangeConfigRole && !this.isProxyCacheProject;
+                    this.hasChangeConfigRole;
+                if (this.allowUpdateProxyCacheConfiguration) {
+                    this.getRegistries();
+                }
             });
     }
 
