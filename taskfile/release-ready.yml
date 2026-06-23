@@ -9,6 +9,7 @@ vars:
 tasks:
   check:
     desc: "Verify commercial release patches apply cleanly"
+    dir: ..
     preconditions:
       - sh: command -v git >/dev/null 2>&1
         msg: "git is required"
@@ -34,7 +35,7 @@ tasks:
         mkdir -p "${tmp_root}"
         git worktree add -b "${branch_name}" "${worktree_dir}" HEAD
 
-        task --taskfile "${repo_root}/Taskfile.yml" release-ready:apply-commercial-patches \
+        task --taskfile "${repo_root}/taskfile/release-ready.yml" apply-commercial-patches \
           RELEASE_PATCH_TARGET_DIR="${worktree_dir}" \
           PATCHES_REPO="{{.PATCHES_REPO}}" \
           PATCHES_SERIES="{{.PATCHES_SERIES}}" \
@@ -44,6 +45,7 @@ tasks:
 
   apply-commercial-patches:
     desc: "Apply commercial release patches to the current worktree"
+    dir: ..
     preconditions:
       - sh: command -v git >/dev/null 2>&1
         msg: "git is required"
@@ -65,6 +67,13 @@ tasks:
         series_file="${patches_repo_dir}/{{.PATCHES_SERIES}}"
         series_dir="$(dirname "${series_file}")"
         base_commit=$(git -C "${patch_target_dir}" rev-parse HEAD)
+
+        git -C "${patch_target_dir}" config user.name "${GIT_AUTHOR_NAME:-Release Ready}"
+        git -C "${patch_target_dir}" config user.email "${GIT_AUTHOR_EMAIL:-release-ready@example.invalid}"
+
+        stg_in_target() {
+          (cd "${patch_target_dir}" && stg "$@")
+        }
 
         cleanup_patches_repo() {
           rm -rf "${patches_repo_dir}"
@@ -98,8 +107,8 @@ tasks:
           git -C "${patch_target_dir}" switch -c "${current_branch}"
         fi
 
-        if ! stg -C "${patch_target_dir}" series --short >/dev/null 2>&1; then
-          stg -C "${patch_target_dir}" init
+        if ! stg_in_target series --short >/dev/null 2>&1; then
+          stg_in_target init
         fi
 
         while IFS= read -r patch || [ -n "${patch}" ]; do
@@ -114,7 +123,7 @@ tasks:
 
           echo "Applying release patch: ${patch}"
           apply_output="${patches_repo_dir}/stg-import-output.log"
-          if ! stg -C "${patch_target_dir}" import "${patch_file}" >"${apply_output}" 2>&1; then
+          if ! stg_in_target import "${patch_file}" >"${apply_output}" 2>&1; then
             branch=$(git -C "${patch_target_dir}" symbolic-ref --quiet --short HEAD || echo "detached")
             sha=$(git -C "${patch_target_dir}" rev-parse HEAD)
             {
@@ -132,6 +141,6 @@ tasks:
         done < "${series_file}"
 
         echo "Applied release patches:"
-        stg -C "${patch_target_dir}" series --applied --description
+        stg_in_target series --applied --description
 
         git -C "${patch_target_dir}" reset --mixed "${base_commit}" >/dev/null
