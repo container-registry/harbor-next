@@ -9,6 +9,8 @@ dist/
 src/portal/node_modules/
 src/portal/.angular/
 src/portal/dist/
+src/portal/playwright-report/
+src/portal/test-results/
 
 # Git & CI
 .git/
