@@ -121,12 +121,15 @@ func getAwsSvc(region, accessKey, accessSecret string, insecure bool, caCertific
 }
 
 func (a *awsAuthCredential) getAuthorization(url string) (string, string, string, *time.Time, error) {
-	_, _, err := parseAccountRegion(url)
+	id, _, err := parseAccountRegion(url)
 	if err != nil {
 		return "", "", "", nil, err
 	}
 
 	input := &awsecrapi.GetAuthorizationTokenInput{}
+	if id != "" {
+		input.RegistryIds = []string{id}
+	}
 	svc := a.awssvc
 	result, err := svc.GetAuthorizationToken(context.TODO(), input)
 	if err != nil {
