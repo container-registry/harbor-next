@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package url // nolint:revive
+package url //nolint:revive
 
 import (
 	"net/http"
