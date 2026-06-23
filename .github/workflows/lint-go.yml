@@ -34,6 +34,9 @@ jobs:
   lint:
     name: Go Lint
     runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository || contains(fromJSON('["OWNER","MEMBER"]'), github.event.pull_request.author_association)) && vars.RUNNER || 'ubuntu-latest' }}
+    env:
+      GOLANGCI_LINT_CACHE: ${{ github.workspace }}/.ci-cache/golangci-lint
+      XDG_CACHE_HOME: ${{ github.workspace }}/.ci-cache/xdg
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
