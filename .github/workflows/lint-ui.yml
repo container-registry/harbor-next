@@ -64,4 +64,4 @@ jobs:
         working-directory: src/portal
         run: |
           bun run lint
-          ./node_modules/.bin/stylelint "**/*.scss"
+          bun ./node_modules/stylelint/bin/stylelint.js "**/*.scss"
