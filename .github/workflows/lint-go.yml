@@ -6,6 +6,7 @@ on:
     paths:
       - "**/*.go"
       - "Taskfile.yml"
+      - "versions.env"
       - "taskfile/**/*.yml"
       - ".github/workflows/lint-go.yml"
   push:
@@ -13,6 +14,7 @@ on:
     paths:
       - "**/*.go"
       - "Taskfile.yml"
+      - "versions.env"
       - "taskfile/**/*.yml"
       - ".github/workflows/lint-go.yml"
 
