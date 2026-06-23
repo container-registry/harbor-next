@@ -112,6 +112,7 @@ func (suite *FetchOrSaveTestSuite) TestSaveCalledOnlyOneTime() {
 
 			var str string
 			FetchOrSave(suite.ctx, c, "key", &str, func() (any, error) {
+				time.Sleep(10 * time.Millisecond) // widen the singleflight window
 				return "str", nil
 			})
 		}()
