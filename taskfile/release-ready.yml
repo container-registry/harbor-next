@@ -7,13 +7,11 @@ vars:
   RELEASE_PATCHES_TMP_DIR: '{{.RELEASE_PATCHES_TMP_DIR | default ".opencode/tmp/release-patches"}}'
 
 tasks:
-  ready:
-    desc: "Verify commercial release patches apply cleanly with StGit"
+  check:
+    desc: "Verify commercial release patches apply cleanly"
     preconditions:
       - sh: command -v git >/dev/null 2>&1
         msg: "git is required"
-      - sh: command -v stg >/dev/null 2>&1
-        msg: "StGit is required. Install the stg command before running release:ready."
       - sh: command -v task >/dev/null 2>&1
         msg: "Task is required"
     cmds:
@@ -36,7 +34,8 @@ tasks:
         mkdir -p "${tmp_root}"
         git worktree add -b "${branch_name}" "${worktree_dir}" HEAD
 
-        task --dir "${worktree_dir}" release:apply-commercial-patches \
+        task --taskfile "${repo_root}/Taskfile.yml" release-ready:apply-commercial-patches \
+          RELEASE_PATCH_TARGET_DIR="${worktree_dir}" \
           PATCHES_REPO="{{.PATCHES_REPO}}" \
           PATCHES_SERIES="{{.PATCHES_SERIES}}" \
           RELEASE_PATCHES_TMP_DIR="${patches_repo_dir}"
@@ -44,19 +43,28 @@ tasks:
         echo "Release-ready patch validation succeeded."
 
   apply-commercial-patches:
-    desc: "Apply commercial release patches to the current worktree with StGit"
+    desc: "Apply commercial release patches to the current worktree"
     preconditions:
       - sh: command -v git >/dev/null 2>&1
         msg: "git is required"
       - sh: command -v stg >/dev/null 2>&1
         msg: "StGit is required. Install the stg command before applying release patches."
+      - sh: test -z "$(git -C '{{.RELEASE_PATCH_TARGET_DIR | default "."}}' status --porcelain)"
+        msg: "release patch application requires a clean worktree"
     cmds:
       - |
+        patch_target_dir="{{.RELEASE_PATCH_TARGET_DIR | default "."}}"
+        if [ "${patch_target_dir#/}" = "${patch_target_dir}" ]; then
+          patch_target_dir="$(pwd -P)/${patch_target_dir}"
+        fi
+
         patches_repo_dir="{{.RELEASE_PATCHES_TMP_DIR}}"
         if [ "${patches_repo_dir#/}" = "${patches_repo_dir}" ]; then
           patches_repo_dir="$(pwd -P)/${patches_repo_dir}"
         fi
         series_file="${patches_repo_dir}/{{.PATCHES_SERIES}}"
+        series_dir="$(dirname "${series_file}")"
+        base_commit=$(git -C "${patch_target_dir}" rev-parse HEAD)
 
         cleanup_patches_repo() {
           rm -rf "${patches_repo_dir}"
@@ -74,8 +82,9 @@ tasks:
             echo "PATCHES_TOKEN is required unless PATCHES_CLONE_URL is set." >&2
             exit 1
           fi
-          git -c "http.https://github.com/.extraheader=AUTHORIZATION: bearer ${PATCHES_TOKEN}" \
-            clone --depth=1 "https://{{.PATCHES_REPO}}" "${patches_repo_dir}"
+          git clone --depth=1 \
+            "https://x-access-token:${PATCHES_TOKEN}@{{.PATCHES_REPO}}" \
+            "${patches_repo_dir}"
         fi
 
         if [ ! -f "${series_file}" ]; then
@@ -83,15 +92,46 @@ tasks:
           exit 1
         fi
 
-        current_branch=$(git symbolic-ref --quiet --short HEAD || true)
+        current_branch=$(git -C "${patch_target_dir}" symbolic-ref --quiet --short HEAD || true)
         if [ -z "${current_branch}" ]; then
           current_branch="release-patches-${GITHUB_RUN_ID:-local-$$}"
-          git switch -c "${current_branch}"
+          git -C "${patch_target_dir}" switch -c "${current_branch}"
         fi
 
-        if ! stg series --short >/dev/null 2>&1; then
-          stg init
+        if ! stg -C "${patch_target_dir}" series --short >/dev/null 2>&1; then
+          stg -C "${patch_target_dir}" init
         fi
 
-        stg import --series "${series_file}"
-        stg series --applied --description
+        while IFS= read -r patch || [ -n "${patch}" ]; do
+          patch=$(printf '%s' "${patch}" | sed 's/#.*//' | xargs)
+          [ -z "${patch}" ] && continue
+
+          patch_file="${series_dir}/${patch}"
+          if [ ! -f "${patch_file}" ]; then
+            echo "Patch file not found: ${patch_file}" >&2
+            exit 1
+          fi
+
+          echo "Applying release patch: ${patch}"
+          apply_output="${patches_repo_dir}/stg-import-output.log"
+          if ! stg -C "${patch_target_dir}" import "${patch_file}" >"${apply_output}" 2>&1; then
+            branch=$(git -C "${patch_target_dir}" symbolic-ref --quiet --short HEAD || echo "detached")
+            sha=$(git -C "${patch_target_dir}" rev-parse HEAD)
+            {
+              echo "::error::Failed to apply release patch: ${patch}"
+              echo "Failed to apply release patch: ${patch}"
+              echo "Branch: ${branch}"
+              echo "Commit: ${sha}"
+              echo "Patch file: ${patch_file}"
+              echo "StGit output:"
+              cat "${apply_output}"
+            } >&2
+            exit 1
+          fi
+          rm -f "${apply_output}"
+        done < "${series_file}"
+
+        echo "Applied release patches:"
+        stg -C "${patch_target_dir}" series --applied --description
+
+        git -C "${patch_target_dir}" reset --mixed "${base_commit}" >/dev/null
