@@ -123,6 +123,31 @@ jobs:
         with:
           ref: ${{ needs.release-please.outputs.tag_name }}
 
+      - name: Install Task
+        uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install StGit
+        run: |
+          if command -v stg >/dev/null 2>&1; then
+            stg --version
+            exit 0
+          fi
+
+          if command -v apt-get >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y stgit
+          elif command -v brew >/dev/null 2>&1; then
+            brew install stgit
+          else
+            echo "::error::StGit is required but no supported package manager was found."
+            exit 1
+          fi
+
+          stg --version
+
       - name: Generate GitHub App token
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
@@ -135,16 +160,7 @@ jobs:
       - name: Apply commercial patches
         env:
           PATCHES_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          git clone --depth=1 \
-            "https://x-access-token:${PATCHES_TOKEN}@github.com/container-registry/8gcr" \
-            /tmp/patches-repo
-          while IFS= read -r patch; do
-            patch=$(echo "$patch" | sed 's/#.*//' | xargs)
-            [ -z "$patch" ] && continue
-            git apply --binary "/tmp/patches-repo/8gcr-ee/patches/$patch"
-          done < /tmp/patches-repo/8gcr-ee/patches/series
-          rm -rf /tmp/patches-repo
+        run: task release-ready:apply-commercial-patches
 
       - name: Load versions
         run: grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
@@ -155,13 +171,6 @@ jobs:
         with:
           go-version-file: src/go.mod
           go-sum-path: src/go.sum
-
-      - name: Install Task
-        if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
-        uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
-        with:
-          version: 3.x
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate API code
         if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
