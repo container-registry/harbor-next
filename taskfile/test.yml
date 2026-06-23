@@ -34,10 +34,32 @@ tasks:
       golangci/golangci-lint:{{.GOLANGCILINT_VERSION}}-alpine
       golangci-lint -v run --timeout=10m {{.LINT_ARGS}}
 
+  _require-golangci-lint:
+    internal: true
+    run: once
+    status:
+      - test -x {{.GOPATH_BIN}}/golangci-lint
+      - |
+        version='{{.GOLANGCILINT_VERSION}}'
+        {{.GOPATH_BIN}}/golangci-lint version | grep -Eq "version v?${version#v}"
+      - |
+        target_go=$(awk '/^go / { split($2, v, "."); print v[1] * 1000 + v[2]; exit }' src/go.mod)
+        lint_go=$({{.GOPATH_BIN}}/golangci-lint version | sed -n 's/.*built with go\([0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | awk -F. '{ print $1 * 1000 + $2 }')
+        test "${lint_go}" -ge "${target_go}"
+    cmd: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCILINT_VERSION}}
+
   lint:
     desc: "Lint Go code with golangci-lint in Docker"
     cmds:
       - task: _golangci-lint
+
+  lint:local:
+    desc: "Lint Go code with local golangci-lint"
+    deps:
+      - build:gen-apis
+      - _require-golangci-lint
+    dir: src
+    cmd: "{{.GOPATH_BIN}}/golangci-lint -v run --timeout=10m {{.LINT_ARGS}}"
 
   lint:report:
     desc: "Lint Go code and write report to golangci-lint.report"
@@ -235,6 +257,11 @@ tasks:
     desc: "Lint frontend TypeScript code"
     dir: src/portal
     cmd: npm run lint
+
+  frontend:lint:style:
+    desc: "Lint frontend SCSS code"
+    dir: src/portal
+    cmd: npm run lint:style
 
   # ============================================================================
   # Aggregate Test Tasks
