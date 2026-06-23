@@ -1,0 +1,97 @@
+version: '3'
+
+vars:
+  PATCHES_REPO: '{{.PATCHES_REPO | default "github.com/container-registry/8gcr"}}'
+  PATCHES_SERIES: '{{.PATCHES_SERIES | default "8gcr-ee/patches/series"}}'
+  RELEASE_READY_TMP_DIR: '{{.RELEASE_READY_TMP_DIR | default ".opencode/tmp/release-ready"}}'
+  RELEASE_PATCHES_TMP_DIR: '{{.RELEASE_PATCHES_TMP_DIR | default ".opencode/tmp/release-patches"}}'
+
+tasks:
+  ready:
+    desc: "Verify commercial release patches apply cleanly with StGit"
+    preconditions:
+      - sh: command -v git >/dev/null 2>&1
+        msg: "git is required"
+      - sh: command -v stg >/dev/null 2>&1
+        msg: "StGit is required. Install the stg command before running release:ready."
+      - sh: command -v task >/dev/null 2>&1
+        msg: "Task is required"
+    cmds:
+      - |
+        repo_root=$(pwd -P)
+        tmp_root="${repo_root}/{{.RELEASE_READY_TMP_DIR}}"
+        worktree_dir="${tmp_root}/worktree"
+        patches_repo_dir="${tmp_root}/patches-repo"
+        branch_name="release-ready-check-${GITHUB_RUN_ID:-local-$$}"
+
+        cleanup() {
+          git -C "${repo_root}" worktree remove --force "${worktree_dir}" >/dev/null 2>&1 || true
+          git -C "${repo_root}" branch -D "${branch_name}" >/dev/null 2>&1 || true
+          rm -rf "${tmp_root}"
+        }
+
+        cleanup
+        trap cleanup EXIT
+
+        mkdir -p "${tmp_root}"
+        git worktree add -b "${branch_name}" "${worktree_dir}" HEAD
+
+        task --dir "${worktree_dir}" release:apply-commercial-patches \
+          PATCHES_REPO="{{.PATCHES_REPO}}" \
+          PATCHES_SERIES="{{.PATCHES_SERIES}}" \
+          RELEASE_PATCHES_TMP_DIR="${patches_repo_dir}"
+
+        echo "Release-ready patch validation succeeded."
+
+  apply-commercial-patches:
+    desc: "Apply commercial release patches to the current worktree with StGit"
+    preconditions:
+      - sh: command -v git >/dev/null 2>&1
+        msg: "git is required"
+      - sh: command -v stg >/dev/null 2>&1
+        msg: "StGit is required. Install the stg command before applying release patches."
+    cmds:
+      - |
+        patches_repo_dir="{{.RELEASE_PATCHES_TMP_DIR}}"
+        if [ "${patches_repo_dir#/}" = "${patches_repo_dir}" ]; then
+          patches_repo_dir="$(pwd -P)/${patches_repo_dir}"
+        fi
+        series_file="${patches_repo_dir}/{{.PATCHES_SERIES}}"
+
+        cleanup_patches_repo() {
+          rm -rf "${patches_repo_dir}"
+        }
+
+        cleanup_patches_repo
+        trap cleanup_patches_repo EXIT
+
+        mkdir -p "$(dirname "${patches_repo_dir}")"
+
+        if [ -n "${PATCHES_CLONE_URL:-}" ]; then
+          git clone --depth=1 "${PATCHES_CLONE_URL}" "${patches_repo_dir}"
+        else
+          if [ -z "${PATCHES_TOKEN:-}" ]; then
+            echo "PATCHES_TOKEN is required unless PATCHES_CLONE_URL is set." >&2
+            exit 1
+          fi
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: bearer ${PATCHES_TOKEN}" \
+            clone --depth=1 "https://{{.PATCHES_REPO}}" "${patches_repo_dir}"
+        fi
+
+        if [ ! -f "${series_file}" ]; then
+          echo "Patch series file not found: ${series_file}" >&2
+          exit 1
+        fi
+
+        current_branch=$(git symbolic-ref --quiet --short HEAD || true)
+        if [ -z "${current_branch}" ]; then
+          current_branch="release-patches-${GITHUB_RUN_ID:-local-$$}"
+          git switch -c "${current_branch}"
+        fi
+
+        if ! stg series --short >/dev/null 2>&1; then
+          stg init
+        fi
+
+        stg import --series "${series_file}"
+        stg series --applied --description
