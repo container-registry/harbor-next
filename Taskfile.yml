@@ -54,6 +54,8 @@ includes:
     aliases: [d]
   docs:
     taskfile: ./taskfile/docs.yml
+  release-ready:
+    taskfile: ./taskfile/release-ready.yml
 
 tasks:
   default:
@@ -92,6 +94,11 @@ tasks:
     desc: "Build all container images (PUSH=false for local, PLATFORMS=linux/arm64 for single arch)"
     cmds:
       - task: image:all-images
+
+  release-ready:
+    desc: "Verify release patches apply cleanly"
+    cmds:
+      - task: release-ready:check
 
   clean:
     desc: "Remove all build artifacts, images, test output, and dev environment"
