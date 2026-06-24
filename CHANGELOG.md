@@ -6,6 +6,21 @@ This changelog mirrors [GitHub Releases](https://github.com/container-registry/h
 
 ---
 
+## [2.15.3](https://github.com/container-registry/harbor-next/compare/v2.15.2...v2.15.3) (2026-06-23)
+
+
+### Bug Fixes
+
+* **core:** Reduce auth-failure log noise and skip basic auth for non-admin in OIDC/LDAP/UAA ([#314](https://github.com/container-registry/harbor-next/issues/314)) ([c957b8a](https://github.com/container-registry/harbor-next/commit/c957b8ad5c118cb63d81d7be4a509d0971e51fd7))
+* Invalid UTF-8 Input Should not Cause HTTP 500 Errors ([#344](https://github.com/container-registry/harbor-next/issues/344)) ([e931400](https://github.com/container-registry/harbor-next/commit/e9314001f7daa0133fde782a1f7745ab30a75e7b))
+* **ldap:** Use custom orm.ReadOrCreate to prevent LDAP login failure ([#341](https://github.com/container-registry/harbor-next/issues/341)) ([5426f9b](https://github.com/container-registry/harbor-next/commit/5426f9b62652aa79bb8488436c740dbac9c4c1d5))
+* Return 404 For Missing Repository Artifacts ([#342](https://github.com/container-registry/harbor-next/issues/342)) ([bb81448](https://github.com/container-registry/harbor-next/commit/bb81448d4a77aea46eff45073b4522826490b54c))
+
+
+### Performance Improvements
+
+* **core:** Avoid eager structured-logger build on demoted auth-failure logs ([#319](https://github.com/container-registry/harbor-next/issues/319)) ([7702de0](https://github.com/container-registry/harbor-next/commit/7702de0b24cc633bbb2118dc5951c75b198eeb47))
+
 ## [2.15.2](https://github.com/container-registry/harbor-next/compare/v2.15.1...v2.15.2) (2026-06-16)
 
 
