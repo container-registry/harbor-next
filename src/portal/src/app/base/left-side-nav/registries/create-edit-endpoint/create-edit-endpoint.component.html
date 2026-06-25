@@ -14,6 +14,10 @@
                 </span>
             </div>
         </div>
+<<<<<<< HEAD
+=======
+        } @if (createEditDestinationOpened) {
+>>>>>>> d73dd429f (fix(ui): fix UI issues #48–#54 across portal components (#23427))
         <form #targetForm="ngForm" class="clr-form clr-form-horizontal">
             <!-- provider -->
             <clr-select-container>
@@ -278,6 +282,7 @@
                 </clr-control-helper>
             </clr-textarea-container>
         </form>
+        }
     </div>
     <div class="modal-footer">
         <button
@@ -285,7 +290,7 @@
             type="button"
             class="btn btn-outline"
             (click)="testConnection()"
-            [disabled]="inProgress || targetEndpoint?.errors">
+            [disabled]="inProgress || isEndpointInvalid">
             {{ 'DESTINATION.TEST_CONNECTION' | translate }}
         </button>
         <button

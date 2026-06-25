@@ -96,6 +96,7 @@
                                 (passwordInput.dirty || passwordInput.touched)
                             ">
                             <div class="clr-input-wrapper">
+<<<<<<< HEAD
                                 <input
                                     class="clr-input pwd-input"
                                     [type]="showPwd ? 'text' : 'password'"
@@ -120,6 +121,36 @@
                                 <clr-icon
                                     class="clr-validate-icon"
                                     shape="exclamation-circle"></clr-icon>
+=======
+                                <div class="clr-input-group">
+                                    <input
+                                        class="clr-input pwd-input"
+                                        [type]="showPwd ? 'text' : 'password'"
+                                        required
+                                        [(ngModel)]="signInCredential.password"
+                                        name="login_password"
+                                        id="login_password"
+                                        placeholder="{{
+                                            'PLACEHOLDER.SIGN_IN_PWD'
+                                                | translate
+                                        }}"
+                                        #passwordInput="ngModel" />
+                                    @if (!showPwd) {
+                                    <clr-icon
+                                        shape="eye"
+                                        class="pw-eye"
+                                        (click)="showPwd = !showPwd"></clr-icon>
+                                    } @if (showPwd) {
+                                    <clr-icon
+                                        shape="eye-hide"
+                                        class="pw-eye"
+                                        (click)="showPwd = !showPwd"></clr-icon>
+                                    }
+                                    <clr-icon
+                                        class="clr-validate-icon"
+                                        shape="exclamation-circle"></clr-icon>
+                                </div>
+>>>>>>> d73dd429f (fix(ui): fix UI issues #48–#54 across portal components (#23427))
                             </div>
                             <clr-control-error
                                 *ngIf="
