@@ -49,6 +49,37 @@ jobs:
           config-file: ${{ github.ref_name == 'main' && 'release-please-config.json' || 'release-please-config-maintenance.json' }}
           manifest-file: .release-please-manifest.json
 
+      - name: Check out release PR branch
+        if: ${{ github.ref_name == 'main' && steps.release.outputs.prs_created == 'true' && steps.release.outputs.release_created != 'true' }}
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ fromJSON(steps.release.outputs.prs)[0].headBranchName }}
+
+      - name: Advance main development version
+        if: ${{ github.ref_name == 'main' && steps.release.outputs.prs_created == 'true' && steps.release.outputs.release_created != 'true' }}
+        run: |
+          release_version=$(node -e "const manifest = require('./.release-please-manifest.json'); const version = manifest['.']; if (!version) { throw new Error('missing root release version'); } console.log(version);")
+          if [[ ! "${release_version}" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "::error::Unsupported release version: ${release_version}"
+            exit 1
+          fi
+
+          major="${BASH_REMATCH[1]}"
+          minor="${BASH_REMATCH[2]}"
+          next_version="${major}.$((minor + 1)).0"
+          printf '%s\n' "${next_version}" > VERSION
+
+          if git diff --quiet -- VERSION; then
+            echo "VERSION already targets ${next_version}"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add VERSION
+          git commit -s -m "chore: target next development version ${next_version}"
+          git push
+
   create-maintenance-branch:
     name: Create Maintenance Branch
     needs: [release-please]
@@ -63,6 +94,7 @@ jobs:
       contents: write
     env:
       TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+      VERSION: ${{ needs.release-please.outputs.version }}
       MAJOR: ${{ needs.release-please.outputs.major }}
       MINOR: ${{ needs.release-please.outputs.minor }}
     steps:
@@ -80,7 +112,19 @@ jobs:
 
           git fetch --depth=1 origin "refs/tags/${TAG_NAME}:refs/tags/${TAG_NAME}"
           sha=$(git rev-list -n 1 "${TAG_NAME}")
-          git push origin "${sha}:refs/heads/${branch}"
+          git switch --detach "${sha}"
+
+          printf '%s\n' "${VERSION}" > VERSION
+          if git diff --quiet -- VERSION; then
+            git push origin "${sha}:refs/heads/${branch}"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add VERSION
+          git commit -s -m "chore: initialize ${branch} version"
+          git push origin "HEAD:refs/heads/${branch}"
 
   build:
     name: "${{ matrix.component }} (${{ matrix.platform }})"

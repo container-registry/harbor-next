@@ -12,6 +12,10 @@ Release state is defined by:
 - `VERSION`
 - `CHANGELOG.md`
 
+`main` intentionally tracks the next development release in `VERSION`. For example, while `main` is preparing `2.16.0`, `VERSION` is `2.16.0` even though the last published release may still be `2.15.0`. The authoritative release-please state for the last published version is `.release-please-manifest.json`.
+
+On `main`, release-please uses the Go strategy and does not own `VERSION`; the workflow advances `VERSION` on the generated release PR branch. On `release-X.Y`, release-please uses the simple strategy and updates `VERSION` to the patch release version.
+
 ## Repository Flow
 
 ```mermaid
@@ -47,17 +51,17 @@ Rules:
 
 ```mermaid
 flowchart LR
-  a["harbor-next/main\nv2.15.0"]
+  a["harbor-next/main\nVERSION 2.16.0\nmanifest 2.15.0"]
   b["harbor-next/main\nfeat: new capability"]
   c["harbor-next/main\nfix: bug fix"]
-  d["harbor-next/main\nchore: release 2.16.0"]
+  d["release PR\nchore: release 2.16.0\nVERSION 2.17.0"]
   e["tag\nv2.16.0"]
-  f["harbor-next/release-2.16\ncreated from v2.16.0"]
+  f["harbor-next/release-2.16\nVERSION reset to 2.16.0"]
   g["harbor-next/main\nfix: later main fix"]
-  h["backport PR\n/backport v2.15"]
-  i["harbor-next/release-2.15\nfix: later main fix"]
-  j["harbor-next/release-2.15\nchore: release 2.15.1"]
-  k["tag\nv2.15.1"]
+  h["backport PR\n/backport v2.16"]
+  i["harbor-next/release-2.16\nfix: later main fix"]
+  j["harbor-next/release-2.16\nchore: release 2.16.1"]
+  k["tag\nv2.16.1"]
 
   a --> b --> c --> d --> e --> f
   d --> g --> h --> i --> j --> k
@@ -80,10 +84,12 @@ sequenceDiagram
   Actions->>RP: Run release-please for github.ref_name
   alt github.ref_name == main
     RP->>RP: Use release-please-config.json
+    RP->>GitHub: Open or update chore: release X.Y.0 PR
+    Actions->>GitHub: Advance VERSION on release PR branch to X.(Y+1).0
   else github.ref_name == release-X.Y
     RP->>RP: Use release-please-config-maintenance.json
+    RP->>GitHub: Open or update chore: release X.Y.Z PR
   end
-  RP->>GitHub: Open or update chore: release X.Y.Z PR
   Maintainer->>GitHub: Squash-merge release PR
   GitHub->>Actions: Push starts Release Please workflow again
   RP->>GitHub: Create vX.Y.Z tag and GitHub Release
@@ -101,10 +107,10 @@ sequenceDiagram
 
 | Branch | Config | Release behavior |
 |--------|--------|------------------|
-| `main` | `release-please-config.json` | Normal semver bumps |
+| `main` | `release-please-config.json` | Always bumps to the next minor release |
 | `release-X.Y` | `release-please-config-maintenance.json` | Patch-only releases |
 
-`main` releases can create major, minor, or patch versions. A new `.0` release from `main` automatically creates `release-X.Y` from the release tag.
+`main` uses `versioning: always-bump-minor`. All release-worthy commits on `main` are collected into the next minor release. A new `.0` release from `main` automatically creates `release-X.Y` from the release tag, then resets `VERSION` on that maintenance branch to the released `X.Y.0` value.
 
 `release-X.Y` uses `versioning: always-bump-patch`. Any release-worthy commit on a maintenance branch produces the next patch version.
 
@@ -112,12 +118,12 @@ sequenceDiagram
 
 | Commit type | `main` bump | `release-X.Y` bump | Notes section |
 |-------------|-------------|--------------------|---------------|
-| `fix:` | Patch | Patch | Bug Fixes |
-| `upstream:` | Patch | Patch | Upstream |
-| `perf:` | Patch | Patch | Performance Improvements |
+| `fix:` | Minor | Patch | Bug Fixes |
+| `upstream:` | Minor | Patch | Upstream |
+| `perf:` | Minor | Patch | Performance Improvements |
 | `feat:` | Minor | Patch | Features |
-| `feat!:` or `BREAKING CHANGE:` | Major | Patch | Breaking changes |
-| `revert:` | Patch when reverting releasable change | Patch when reverting releasable change | Reverts |
+| `feat!:` or `BREAKING CHANGE:` | Minor | Patch | Breaking changes |
+| `revert:` | Minor when reverting releasable change | Patch when reverting releasable change | Reverts |
 | `ci:`, `chore:`, `build:`, `test:` | No release | No release | Hidden |
 
 Release-please ignores changes that only touch:
@@ -131,16 +137,17 @@ Use `ci:` for workflow-only changes.
 ## Main Release Flow
 
 1. Squash-merge PRs to `main` with valid conventional titles.
-2. Release-please opens or updates `chore: release X.Y.Z`.
-3. Review `VERSION`, `.release-please-manifest.json`, and `CHANGELOG.md`.
-4. Squash-merge the release PR.
-5. Release-please creates the `vX.Y.Z` tag and GitHub Release.
-6. The release workflow checks out the Harbor Next release source.
-7. The workflow applies 8gcr patches at release runtime.
-8. The workflow builds and pushes multi-arch images.
-9. The workflow signs images with cosign.
-10. The workflow rewrites the GitHub Release notes.
-11. If the version is `vX.Y.0`, the workflow creates `release-X.Y`.
+2. Release-please opens or updates `chore: release X.Y.0`.
+3. The workflow advances `VERSION` on that release PR branch to `X.(Y+1).0` so `main` moves straight into the next development cycle after the release PR merges.
+4. Review `.release-please-manifest.json` and `CHANGELOG.md` for the released `X.Y.0` version, and review `VERSION` for the next development target.
+5. Squash-merge the release PR.
+6. Release-please creates the `vX.Y.0` tag and GitHub Release from the manifest version, not from `VERSION`.
+7. The release workflow checks out the Harbor Next release source.
+8. The workflow applies 8gcr patches at release runtime.
+9. The workflow builds and pushes multi-arch images with the release-please output version.
+10. The workflow signs images with cosign.
+11. The workflow rewrites the GitHub Release notes.
+12. The workflow creates `release-X.Y` and resets `VERSION` on that maintenance branch to `X.Y.0`.
 
 ## Maintenance Release Flow
 
@@ -237,10 +244,11 @@ Before merging a release-please PR:
 
 1. Target branch is correct.
 2. Version bump is correct for the branch.
-3. `VERSION`, `.release-please-manifest.json`, and `CHANGELOG.md` are correct.
-4. Merge method is **Squash and merge**.
-5. `Release Please` workflow completes.
-6. GitHub Release notes include images and cosign verification.
+3. On `main`, `.release-please-manifest.json` and `CHANGELOG.md` match the release being published, while `VERSION` points at the following minor development target.
+4. On `release-X.Y`, `VERSION`, `.release-please-manifest.json`, and `CHANGELOG.md` all match the patch release being published.
+5. Merge method is **Squash and merge**.
+6. `Release Please` workflow completes.
+7. GitHub Release notes include images and cosign verification.
 
 Before merging a backport PR:
 

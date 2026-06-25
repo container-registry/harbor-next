@@ -17,7 +17,7 @@ It serves as the foundation for [8gcr](https://container-registry.com/8gcr) (8ge
 We're developing Harbor Next as a [community proposal](https://github.com/goharbor/community/pull/272) with the goal of advancing Harbor and the container registry ecosystem.
 
 - Harbor Next and CNCF Harbor cross-pollinate: Harbor Next cherry-picks features and fixes from Harbor, and upstream Harbor adopts features and concepts proven in Harbor Next.
-- Harbor Next follows the same release versioning and cadence as Harbor.
+- Harbor Next follows Harbor's release cadence. The `main` branch always targets the next development release in `VERSION`; published release state is tracked by release-please.
 - Harbor Next is a drop-in replacement for Harbor.
 
 
