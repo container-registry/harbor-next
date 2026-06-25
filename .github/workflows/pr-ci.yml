@@ -75,14 +75,12 @@ jobs:
         run: grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
 
       - name: Setup Go
-        if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
         uses: ./.github/actions/setup-go-cached
         with:
           go-version-file: src/go.mod
           go-sum-path: src/go.sum
 
       - name: Install Task
-        if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
         uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
         with:
           version: 3.49.1
@@ -95,6 +93,13 @@ jobs:
       - name: Compile Go binary
         if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
         run: task build:binary:${{ matrix.component }}:${{ env.PLATFORM_PAIR }} GIT_COMMIT="${GITHUB_SHA:0:8}"
+
+      - name: Compile image helper binaries
+        run: |
+          task build:binary:lprobe:${{ env.PLATFORM_PAIR }}
+          if [ "${{ matrix.component }}" = "trivy-adapter" ]; then
+            task build:binary:trivy:${{ env.PLATFORM_PAIR }}
+          fi
 
       - uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4.1.0
         if: env.BUILDX_HOST == ''
@@ -120,12 +125,10 @@ jobs:
           platforms: ${{ matrix.platform }}
           build-args: |
             ALPINE_VERSION=${{ env.ALPINE_VERSION }}
-            LPROBE_VERSION=${{ env.LPROBE_VERSION }}
             NGINX_VERSION=${{ env.NGINX_VERSION }}
             BUN_VERSION=${{ env.BUN_VERSION }}
             GO_VERSION=${{ env.GO_VERSION }}
             DISTRIBUTION_VERSION=${{ env.DISTRIBUTION_VERSION }}
-            TRIVY_VERSION=${{ env.TRIVY_VERSION }}
             TRIVY_BASE_IMAGE_VERSION=${{ env.TRIVY_BASE_IMAGE_VERSION }}
             HARBOR_SCANNER_TRIVY_VERSION=${{ env.HARBOR_SCANNER_TRIVY_VERSION }}
           tags: ${{ env.REGISTRY_ADDRESS }}/${{ env.PR_REGISTRY_PROJECT }}/${{ steps.prepare.outputs.image_name }}
