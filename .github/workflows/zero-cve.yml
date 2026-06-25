@@ -1,6 +1,8 @@
 name: Zero CVE
 
 on:
+  push:
+    branches: [main]
   schedule:
     - cron: '17 2 * * *'
   workflow_dispatch:
@@ -108,6 +110,8 @@ jobs:
             echo "TRIVY_VERSION must be X.Y.Z" >&2
             exit 1
           fi
+          echo "GH_CLI_VERSION=${gh_cli_version}" >> "${GITHUB_ENV}"
+          echo "GOVULNCHECK_VERSION=${govulncheck_version}" >> "${GITHUB_ENV}"
           echo "gh-cli-version=${gh_cli_version}" >> "${GITHUB_OUTPUT}"
           echo "govulncheck-version=${govulncheck_version}" >> "${GITHUB_OUTPUT}"
           echo "trivy-version=v${trivy_version}" >> "${GITHUB_OUTPUT}"
@@ -118,8 +122,6 @@ jobs:
           cache: true
 
       - name: Install GitHub CLI
-        env:
-          GH_CLI_VERSION: ${{ steps.versions.outputs.gh-cli-version }}
         run: |
           case "$(uname -m)" in
             x86_64|amd64) arch="amd64" ;;
@@ -136,8 +138,6 @@ jobs:
           echo "${tool_dir}/bin" >> "${GITHUB_PATH}"
 
       - name: Install govulncheck
-        env:
-          GOVULNCHECK_VERSION: ${{ steps.versions.outputs.govulncheck-version }}
         run: |
           go install "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}"
           echo "$(go env GOPATH)/bin" >> "${GITHUB_PATH}"
