@@ -28,6 +28,7 @@ env:
   GOTOOLCHAIN: auto
   REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
   REGISTRY_PROJECT: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
+  TRIVY_CACHE_DIR: ${{ github.workspace }}/.trivy-cache
   ZERO_CVE_APPLY: "true"
   ZERO_CVE_BASE_BRANCH: ${{ inputs.base_branch || vars.ZERO_CVE_BASE_BRANCH || github.ref_name }}
   ZERO_CVE_BRANCH: automation/zero-cve
@@ -61,19 +62,42 @@ jobs:
           go-version-file: src/go.mod
           go-sum-path: src/go.sum
 
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+
+      - uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
+        with:
+          version: 3.49.1
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Load tool versions
         id: versions
         run: |
+          gh_cli_version=""
           trivy_version=""
+          govulncheck_version=""
           while IFS='=' read -r name value; do
             case "${name}" in
+              GH_CLI_VERSION) gh_cli_version="${value}" ;;
+              GOVULNCHECK_VERSION) govulncheck_version="${value}" ;;
               TRIVY_VERSION) trivy_version="v${value}" ;;
             esac
           done < versions.env
+          if [ -z "${gh_cli_version}" ]; then
+            echo "GH_CLI_VERSION is missing from versions.env" >&2
+            exit 1
+          fi
+          if [ -z "${govulncheck_version}" ]; then
+            echo "GOVULNCHECK_VERSION is missing from versions.env" >&2
+            exit 1
+          fi
           if [ -z "${trivy_version}" ]; then
             echo "TRIVY_VERSION is missing from versions.env" >&2
             exit 1
           fi
+          echo "gh-cli-version=${gh_cli_version}" >> "${GITHUB_OUTPUT}"
+          echo "govulncheck-version=${govulncheck_version}" >> "${GITHUB_OUTPUT}"
           echo "trivy-version=${trivy_version}" >> "${GITHUB_OUTPUT}"
 
       - uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
@@ -81,14 +105,43 @@ jobs:
           version: ${{ steps.versions.outputs.trivy-version }}
           cache: true
 
+      - name: Install GitHub CLI
+        run: |
+          case "$(uname -m)" in
+            x86_64|amd64) arch="amd64" ;;
+            aarch64|arm64) arch="arm64" ;;
+            *) echo "Unsupported architecture for gh: $(uname -m)" >&2; exit 1 ;;
+          esac
+
+          version="${{ steps.versions.outputs.gh-cli-version }}"
+          tool_dir="${RUNNER_TEMP:-${PWD}/.tools}/gh-cli"
+          mkdir -p "${tool_dir}/bin"
+          curl -fsSL "https://github.com/cli/cli/releases/download/v${version}/gh_${version}_linux_${arch}.tar.gz" -o "${tool_dir}/gh.tar.gz"
+          tar -xzf "${tool_dir}/gh.tar.gz" -C "${tool_dir}"
+          install -m 0755 "${tool_dir}/gh_${version}_linux_${arch}/bin/gh" "${tool_dir}/bin/gh"
+          echo "${tool_dir}/bin" >> "${GITHUB_PATH}"
+
       - name: Install govulncheck
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
+          go install golang.org/x/vuln/cmd/govulncheck@${{ steps.versions.outputs.govulncheck-version }}
           echo "$(go env GOPATH)/bin" >> "${GITHUB_PATH}"
+
+      - name: Verify installed tools
+        run: |
+          git --version
+          gh --version
+          go version
+          node --version
+          task --version
+          trivy --version
+          govulncheck -version
+
+      - name: Generate API code
+        run: task build:gen-apis
 
       - name: Run vulnerability scans
         run: |
-          mkdir -p "${ZERO_CVE_REPORT_DIR}"
+          mkdir -p "${ZERO_CVE_REPORT_DIR}" "${TRIVY_CACHE_DIR}"
 
           if [ -n "${ZERO_CVE_IMAGE_OVERRIDE}" ]; then
             image_refs="${ZERO_CVE_IMAGE_OVERRIDE}"
