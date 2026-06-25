@@ -66,7 +66,6 @@ deploy/compose/config/certs/
 .env
 .env.local
 CLAUDE.md
-AGENTS.md
 tmp/
 bin
 .mcp.json
