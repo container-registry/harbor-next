@@ -180,11 +180,14 @@ Maintainers should use [RELEASE.md](RELEASE.md) as the release and backport runb
 
 1. A `feat:`, `fix:`, or `upstream:` PR is squash-merged to `main`
 2. Release-please scans commits since the last release
-3. It opens a `chore: release X.Y.Z` PR that updates `VERSION` and `CHANGELOG.md`
-4. Maintainer reviews and merges the release PR (squash merge)
-5. GitHub Release is created automatically
-6. Docker images are built, signed, and pushed
-7. If the release is a new minor `.0` release, a `release-X.Y` maintenance branch is created automatically from the release tag
+3. It opens a `chore: release X.Y.0` PR that updates `.release-please-manifest.json` and `CHANGELOG.md`
+4. The release workflow advances `VERSION` on that PR branch to the following minor development target
+5. Maintainer reviews and merges the release PR (squash merge)
+6. GitHub Release is created automatically from the manifest version
+7. Docker images are built, signed, and pushed with the release-please output version
+8. A `release-X.Y` maintenance branch is created automatically and its `VERSION` is reset to `X.Y.0`
+
+On `main`, `VERSION` is the next development target, not the last published release. For example, after publishing `v2.16.0`, `main` immediately moves to `VERSION` `2.17.0`. `.release-please-manifest.json` remains the authoritative release-please record of published versions.
 
 ### Maintenance Branches
 
@@ -196,13 +199,14 @@ For eligible merged PRs on `main`, a maintainer can comment `/backport vX.Y` on 
 
 ### Version Bump Rules
 
-| Commit type | Version bump | Example |
-|-------------|-------------|---------|
-| `fix:` | Patch | `2.16.0` -> `2.16.1` |
-| `upstream:` | Patch | `2.16.0` -> `2.16.1` |
-| `feat:` | Minor | `2.16.0` -> `2.17.0` |
-| `feat!:` / `BREAKING CHANGE:` | Major | `2.16.0` -> `3.0.0` |
-| `ci:` / `chore:` / `docs:` / `test:` / `build:` | No release | - |
+| Commit type | `main` bump | `release-X.Y` bump | Example |
+|-------------|-------------|--------------------|---------|
+| `fix:` | Minor | Patch | `main`: `2.16.0` -> `2.17.0`; `release-2.16`: `2.16.0` -> `2.16.1` |
+| `upstream:` | Minor | Patch | `main`: `2.16.0` -> `2.17.0`; `release-2.16`: `2.16.0` -> `2.16.1` |
+| `perf:` | Minor | Patch | `main`: `2.16.0` -> `2.17.0`; `release-2.16`: `2.16.0` -> `2.16.1` |
+| `feat:` | Minor | Patch | `main`: `2.16.0` -> `2.17.0`; `release-2.16`: `2.16.0` -> `2.16.1` |
+| `feat!:` / `BREAKING CHANGE:` | Minor | Patch | `main`: `2.16.0` -> `2.17.0`; `release-2.16`: `2.16.0` -> `2.16.1` |
+| `ci:` / `chore:` / `docs:` / `test:` / `build:` | No release | No release | - |
 
 ### What Triggers a Release PR
 

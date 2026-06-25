@@ -23,7 +23,7 @@ task dev:up       # Local dev with hot reload
 
 ## Release-please
 
-`feat:` → minor, `fix:` / `upstream:` → patch, `feat!:` / `BREAKING CHANGE:` → major. `ci:`, `build:`, `chore:`, `test:` are hidden from release notes.
+`main` uses `always-bump-minor`; `VERSION` on `main` tracks the next development release while `.release-please-manifest.json` tracks the published release. `release-X.Y` branches use patch-only versioning. `ci:`, `build:`, `chore:`, `test:` are hidden from release notes.
 
 **exclude-paths:** changes touching only `.github/`, `docs/`, or `tests/` don't bump version — use `ci:` for CI-only changes.
 

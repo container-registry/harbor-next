@@ -1,10 +1,11 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "bootstrap-sha": "123fb099df0cc04c99bdb92f01a6da552fafd0fd",
-  "pull-request-header": "This PR prepares the next release based on conventional commits.",
+  "pull-request-header": "This PR prepares the next release based on conventional commits. On main, .release-please-manifest.json tracks the release version and VERSION is advanced to the following minor development target before the PR is merged.",
   "pull-request-title-pattern": "chore: release ${version}",
-  "release-type": "simple",
+  "release-type": "go",
   "versioning": "always-bump-minor",
+  "always-update": true,
   "include-v-in-tag": true,
   "exclude-paths": [".github", "docs", "tests"],
   "changelog-sections": [
@@ -21,8 +22,6 @@
     {"type": "build",    "section": "Build System",   "hidden": true}
   ],
   "packages": {
-    ".": {
-      "version-file": "VERSION"
-    }
+    ".": {}
   }
 }
