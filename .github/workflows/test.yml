@@ -21,11 +21,6 @@ concurrency:
   group: test-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-env:
-  # arduino/setup-task (latest) still declares node20; opt in to the
-  # 2026-06-16 node24 default early.
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
   # --------------------------------------------------------------------------
   # Pure unit tests — no external services, full parallelism
@@ -44,10 +39,9 @@ jobs:
           go-version-file: src/go.mod
           go-sum-path: src/go.sum
 
-      - uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
+      - uses: ./.github/actions/setup-task
         with:
-          version: 3.x
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          version: 3.49.1
 
       - name: Ensure C toolchain for race detector
         if: env.RACE_FLAGS != ''
@@ -145,10 +139,9 @@ jobs:
           go-version-file: src/go.mod
           go-sum-path: src/go.sum
 
-      - uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
+      - uses: ./.github/actions/setup-task
         with:
-          version: 3.x
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          version: 3.49.1
 
       - name: Ensure C toolchain for race detector
         if: env.RACE_FLAGS != ''

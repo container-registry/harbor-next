@@ -11,11 +11,6 @@ permissions:
   contents: write
   pull-requests: write
 
-env:
-  # arduino/setup-task and actions4gh/setup-gh (both latest) still
-  # declare node20; opt in to the 2026-06-16 node24 default early.
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
   validate-release-ref:
     name: Validate Release Ref
@@ -60,6 +55,7 @@ jobs:
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 24
+          package-manager-cache: false
 
       - name: Advance main development version
         if: ${{ github.ref_name == 'main' && steps.release.outputs.prs_created == 'true' && steps.release.outputs.release_created != 'true' }}
@@ -170,10 +166,35 @@ jobs:
       - name: Install envsubst
         run: command -v envsubst || (sudo apt-get update && sudo apt-get install -y gettext-base)
 
-      - name: Install gh CLI
-        uses: actions4gh/setup-gh@44a12005484c53be5bf51bebe8c985b4be8ba8de # v1.0.2
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          gh-version: latest
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Install gh CLI
+        run: |
+          case "$(uname -m)" in
+            x86_64|amd64) arch="amd64" ;;
+            aarch64|arm64) arch="arm64" ;;
+            *) echo "Unsupported architecture for gh: $(uname -m)" >&2; exit 1 ;;
+          esac
+
+          version=$(awk -F= '$1 == "GH_CLI_VERSION" { print $2 }' versions.env)
+          if ! [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "GH_CLI_VERSION must be X.Y.Z" >&2
+            exit 1
+          fi
+
+          archive="gh_${version}_linux_${arch}.tar.gz"
+          tool_dir="${RUNNER_TEMP:-${PWD}/.tools}/gh-cli"
+          mkdir -p "${tool_dir}/bin"
+          curl -fsSL "https://github.com/cli/cli/releases/download/v${version}/${archive}" -o "${tool_dir}/${archive}"
+          curl -fsSL "https://github.com/cli/cli/releases/download/v${version}/gh_${version}_checksums.txt" -o "${tool_dir}/gh_checksums.txt"
+          (cd "${tool_dir}" && grep "  ${archive}$" gh_checksums.txt | sha256sum -c -)
+          tar -xzf "${tool_dir}/${archive}" -C "${tool_dir}"
+          install -m 0755 "${tool_dir}/gh_${version}_linux_${arch}/bin/gh" "${tool_dir}/bin/gh"
+          echo "${tool_dir}/bin" >> "${GITHUB_PATH}"
 
       - name: Generate GitHub App token
         id: app-token
