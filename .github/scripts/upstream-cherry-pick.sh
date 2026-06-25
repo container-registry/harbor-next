@@ -300,9 +300,9 @@ cherry_pick_commit() {
   upstream_subject="${pr_title:-${upstream_subject}}"
 
   if [ -n "${pr_number}" ]; then
-    pr_title_final="upstream: Cherry-Pick ${upstream_subject} (${UPSTREAM_REPO}#${pr_number})"
+    pr_title_final="upstream: ${upstream_subject} (${UPSTREAM_REPO}#${pr_number})"
   else
-    pr_title_final="upstream: Cherry-Pick ${upstream_subject}"
+    pr_title_final="upstream: ${upstream_subject}"
   fi
 
   echo "candidate: ${sha} ${upstream_subject}"
