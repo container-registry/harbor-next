@@ -1,0 +1,249 @@
+name: Zero CVE
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+    inputs:
+      image:
+        description: Image reference or comma-separated image refs to scan; leave blank to derive from branch
+        required: false
+        default: ''
+      base_branch:
+        description: Base branch for the rolling remediation PR; leave blank to use ZERO_CVE_BASE_BRANCH/main
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: zero-cve-${{ github.repository }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  GOTOOLCHAIN: auto
+  REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
+  REGISTRY_PROJECT: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
+  ZERO_CVE_APPLY: "true"
+  ZERO_CVE_BASE_BRANCH: ${{ inputs.base_branch || vars.ZERO_CVE_BASE_BRANCH || github.ref_name }}
+  ZERO_CVE_BRANCH: automation/zero-cve
+  ZERO_CVE_IMAGE_OVERRIDE: ${{ inputs.image || vars.ZERO_CVE_IMAGES || vars.ZERO_CVE_IMAGE }}
+  ZERO_CVE_ISSUE_TITLE: Zero CVE Daily Report
+  ZERO_CVE_MAX_TABLE_ROWS: "100"
+  ZERO_CVE_PR_TITLE: 'fix(deps): Remediate zero CVE findings'
+  ZERO_CVE_REPORT_DIR: zero-cve-reports
+  ZERO_CVE_SEVERITY: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+
+jobs:
+  scan-remediate:
+    name: Scan, Remediate, and Report
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TRIVY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD || secrets.HARBOR_PASSWORD }}
+      TRIVY_USERNAME: ${{ vars.REGISTRY_USERNAME || secrets.REGISTRY_USERNAME || vars.HARBOR_USERNAME || secrets.HARBOR_USERNAME }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Prepare base branch for scanning
+        run: |
+          git fetch origin "+refs/heads/${ZERO_CVE_BASE_BRANCH}:refs/remotes/origin/${ZERO_CVE_BASE_BRANCH}" --depth=1
+          git checkout --detach "origin/${ZERO_CVE_BASE_BRANCH}"
+
+      - uses: ./.github/actions/setup-go-cached
+        with:
+          go-version-file: src/go.mod
+          go-sum-path: src/go.sum
+
+      - name: Load tool versions
+        id: versions
+        run: |
+          trivy_version=""
+          while IFS='=' read -r name value; do
+            case "${name}" in
+              TRIVY_VERSION) trivy_version="v${value}" ;;
+            esac
+          done < versions.env
+          if [ -z "${trivy_version}" ]; then
+            echo "TRIVY_VERSION is missing from versions.env" >&2
+            exit 1
+          fi
+          echo "trivy-version=${trivy_version}" >> "${GITHUB_OUTPUT}"
+
+      - uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: ${{ steps.versions.outputs.trivy-version }}
+          cache: true
+
+      - name: Install govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          echo "$(go env GOPATH)/bin" >> "${GITHUB_PATH}"
+
+      - name: Run vulnerability scans
+        run: |
+          mkdir -p "${ZERO_CVE_REPORT_DIR}"
+
+          if [ -n "${ZERO_CVE_IMAGE_OVERRIDE}" ]; then
+            image_refs="${ZERO_CVE_IMAGE_OVERRIDE}"
+          else
+            tag="latest"
+            if [[ "${ZERO_CVE_BASE_BRANCH}" =~ ^release-([0-9]+\.[0-9]+)$ ]]; then
+              release_minor="${BASH_REMATCH[1]}"
+              git fetch --tags --force
+              tag=$(git tag --list "v${release_minor}.*" --sort=-v:refname | awk 'NR == 1 { print; exit }')
+              if [ -z "${tag}" ]; then
+                echo "No release tag found for ${ZERO_CVE_BASE_BRANCH}; expected v${release_minor}.x" >&2
+                exit 1
+              fi
+            elif [ "${ZERO_CVE_BASE_BRANCH}" != "main" ]; then
+              echo "Unsupported zero-CVE image branch: ${ZERO_CVE_BASE_BRANCH}" >&2
+              exit 1
+            fi
+
+            registry="${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}"
+            image_refs="${registry}/harbor-core:${tag} ${registry}/harbor-jobservice:${tag} ${registry}/harbor-registryctl:${tag} ${registry}/harbor-exporter:${tag} ${registry}/harbor-portal:${tag} ${registry}/harbor-registry:${tag} ${registry}/trivy-adapter:${tag}"
+          fi
+
+          image_list=$(printf '%s\n' "${image_refs}" | tr ', ' '\n' | awk 'NF')
+          if [ -z "${image_list}" ]; then
+            echo "ZERO_CVE_IMAGES did not contain any image references" >&2
+            printf '%s\n' 1 > "${ZERO_CVE_REPORT_DIR}/trivy-image.exit"
+            exit 1
+          fi
+
+          image_refs=$(printf '%s\n' "${image_list}" | awk 'BEGIN { sep = "" } { printf "%s%s", sep, $0; sep = " " } END { print "" }')
+          echo "ZERO_CVE_IMAGES=${image_refs}" >> "${GITHUB_ENV}"
+          printf '%s\n' "${image_list}" > "${ZERO_CVE_REPORT_DIR}/images.txt"
+
+          set +e
+          trivy fs \
+            --scanners vuln \
+            --severity "${ZERO_CVE_SEVERITY}" \
+            --format json \
+            --output "${ZERO_CVE_REPORT_DIR}/trivy-fs.json" \
+            --no-progress \
+            . 2> "${ZERO_CVE_REPORT_DIR}/trivy-fs.stderr"
+          printf '%s\n' "$?" > "${ZERO_CVE_REPORT_DIR}/trivy-fs.exit"
+
+          (
+            cd src
+            govulncheck -format json ./... > "../${ZERO_CVE_REPORT_DIR}/govulncheck.json" 2> "../${ZERO_CVE_REPORT_DIR}/govulncheck.stderr"
+          )
+          printf '%s\n' "$?" > "${ZERO_CVE_REPORT_DIR}/govulncheck.exit"
+
+          image_index=0
+          while IFS= read -r image_ref; do
+            [ -n "${image_ref}" ] || continue
+            image_index=$((image_index + 1))
+            trivy image \
+              --scanners vuln \
+              --severity "${ZERO_CVE_SEVERITY}" \
+              --format json \
+              --output "${ZERO_CVE_REPORT_DIR}/trivy-image-${image_index}.json" \
+              --image-src remote \
+              --no-progress \
+              "${image_ref}" 2> "${ZERO_CVE_REPORT_DIR}/trivy-image-${image_index}.stderr"
+            printf '%s\n' "$?" > "${ZERO_CVE_REPORT_DIR}/trivy-image-${image_index}.exit"
+          done <<< "${image_list}"
+
+          if [ "${image_index}" -eq 0 ]; then
+            echo "ZERO_CVE_IMAGES did not contain any image references" >&2
+            printf '%s\n' 1 > "${ZERO_CVE_REPORT_DIR}/trivy-image.exit"
+          fi
+          set -e
+
+      - name: Prepare rolling remediation branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin "${ZERO_CVE_BRANCH}" >/dev/null 2>&1; then
+            git fetch origin "+refs/heads/${ZERO_CVE_BRANCH}:refs/remotes/origin/${ZERO_CVE_BRANCH}" --depth=1
+            git checkout -B "${ZERO_CVE_BRANCH}" "origin/${ZERO_CVE_BRANCH}"
+            git merge --no-edit --signoff "origin/${ZERO_CVE_BASE_BRANCH}"
+          else
+            git checkout -B "${ZERO_CVE_BRANCH}" "origin/${ZERO_CVE_BASE_BRANCH}"
+          fi
+
+      - name: Remediate Go dependencies and render reports
+        run: node tools/zero-cve/remediate-and-report.mjs
+
+      - name: Detect dependency changes
+        id: dependency-changes
+        run: |
+          if git diff --quiet -- src/go.mod src/go.sum; then
+            echo "changed=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "changed=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Commit dependency remediation
+        if: steps.dependency-changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/go.mod src/go.sum
+          git commit -s -m "${ZERO_CVE_PR_TITLE}"
+          git push origin "HEAD:${ZERO_CVE_BRANCH}"
+
+      - name: Create or update rolling PR
+        run: |
+          pr_number=$(gh pr list \
+            --head "${ZERO_CVE_BRANCH}" \
+            --base "${ZERO_CVE_BASE_BRANCH}" \
+            --state open \
+            --json number \
+            --jq '.[0].number // ""')
+
+          if [ "${{ steps.dependency-changes.outputs.changed }}" = "true" ]; then
+            if [ -n "${pr_number}" ]; then
+              gh pr edit "${pr_number}" --title "${ZERO_CVE_PR_TITLE}" --body-file "${ZERO_CVE_REPORT_DIR}/pr-body.md"
+            else
+              gh pr create \
+                --title "${ZERO_CVE_PR_TITLE}" \
+                --body-file "${ZERO_CVE_REPORT_DIR}/pr-body.md" \
+                --base "${ZERO_CVE_BASE_BRANCH}" \
+                --head "${ZERO_CVE_BRANCH}"
+            fi
+          elif [ -n "${pr_number}" ]; then
+            gh pr edit "${pr_number}" --title "${ZERO_CVE_PR_TITLE}" --body-file "${ZERO_CVE_REPORT_DIR}/pr-body.md"
+          fi
+
+      - name: Update tracking issue
+        run: |
+          issue_number=$(TITLE="${ZERO_CVE_ISSUE_TITLE}" gh issue list \
+            --state open \
+            --search "${ZERO_CVE_ISSUE_TITLE} in:title" \
+            --json number,title \
+            --jq 'map(select(.title == env.TITLE))[0].number // ""')
+
+          if [ -n "${issue_number}" ]; then
+            gh issue edit "${issue_number}" --body-file "${ZERO_CVE_REPORT_DIR}/issue-body.md"
+          else
+            gh issue create --title "${ZERO_CVE_ISSUE_TITLE}" --body-file "${ZERO_CVE_REPORT_DIR}/issue-body.md"
+          fi
+
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        if: always()
+        with:
+          name: zero-cve-reports
+          path: ${{ env.ZERO_CVE_REPORT_DIR }}/
+          if-no-files-found: warn
+
+      - name: Enforce zero-CVE gate
+        run: |
+          node <<'NODE'
+          const { readFileSync } = require('node:fs');
+          const summary = JSON.parse(readFileSync('zero-cve-reports/summary.json', 'utf8'));
+          if (summary.scannerErrorCount > 0 || summary.remainingFindingCount > 0) {
+            console.error(`Zero-CVE gate failed: ${summary.remainingFindingCount} remaining findings, ${summary.scannerErrorCount} scanner errors.`);
+            process.exit(1);
+          }
+          console.log('Zero-CVE gate passed.');
+          NODE
