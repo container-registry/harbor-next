@@ -147,7 +147,8 @@ tasks:
         trap "rm -rf $DIST_DIR" EXIT
         git clone --branch {{.DISTRIBUTION_VERSION}} --depth 1 {{.DISTRIBUTION_SRC}} "$DIST_DIR"
         cd "$DIST_DIR"
-        go mod edit -require golang.org/x/net@v0.49.0
+        go mod edit -require golang.org/x/crypto@v0.52.0
+        go mod edit -require golang.org/x/net@v0.55.0
         go mod tidy -e
         go mod vendor
         REVISION=$(git rev-parse HEAD)
@@ -155,6 +156,49 @@ tasks:
         VERSION_STR={{.DISTRIBUTION_VERSION}}
         LDFLAGS="-X ${PKG}/version.version=${VERSION_STR#v} -X ${PKG}/version.revision=${REVISION} -X ${PKG}/version.mainpkg=${PKG} -s -w"
         CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath -ldflags "${LDFLAGS}" -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/registry" ./cmd/registry
+
+  binary:lprobe:*:
+    desc: "Build lprobe healthcheck binary"
+    run: once
+    generates:
+      - bin/{{index .MATCH 0}}/lprobe
+    vars:
+      PLATFORM: '{{index .MATCH 0}}'
+      GOOS: '{{index (splitList "-" (index .MATCH 0)) 0}}'
+      GOARCH: '{{index (splitList "-" (index .MATCH 0)) 1}}'
+    cmds:
+      - cmd: mkdir -p bin/{{.PLATFORM}}
+        silent: true
+      - |
+        LPROBE_DIR=$(mktemp -d)
+        trap "rm -rf $LPROBE_DIR" EXIT
+        git clone --branch v{{.LPROBE_VERSION}} --depth 1 https://github.com/fivexl/lprobe.git "$LPROBE_DIR"
+        cd "$LPROBE_DIR"
+        go mod edit -require github.com/go-jose/go-jose/v4@v4.1.4
+        go mod edit -require golang.org/x/net@v0.55.0
+        go mod tidy -e
+        CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/lprobe" .
+
+  binary:trivy:*:
+    desc: "Build Trivy CLI binary"
+    run: once
+    generates:
+      - bin/{{index .MATCH 0}}/trivy
+    vars:
+      PLATFORM: '{{index .MATCH 0}}'
+      GOOS: '{{index (splitList "-" (index .MATCH 0)) 0}}'
+      GOARCH: '{{index (splitList "-" (index .MATCH 0)) 1}}'
+    cmds:
+      - cmd: mkdir -p bin/{{.PLATFORM}}
+        silent: true
+      - |
+        TRIVY_DIR=$(mktemp -d)
+        trap "rm -rf $TRIVY_DIR" EXIT
+        git clone --branch v{{.TRIVY_VERSION}} --depth 1 https://github.com/aquasecurity/trivy.git "$TRIVY_DIR"
+        cd "$TRIVY_DIR"
+        go mod edit -require github.com/containerd/containerd/v2@v2.3.2
+        go mod tidy -e
+        GOEXPERIMENT=jsonv2 CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/trivy" ./cmd/trivy
 
   binary:trivy-adapter:*:
     desc: "Build harbor-scanner-trivy binary (cross-compiled from source)"
@@ -172,6 +216,8 @@ tasks:
         trap "rm -rf $TRIVY_DIR" EXIT
         git clone --branch {{.HARBOR_SCANNER_TRIVY_VERSION}} --depth 1 https://github.com/container-registry/harbor-scanner-trivy.git "$TRIVY_DIR"
         cd "$TRIVY_DIR"
+        go mod edit -require golang.org/x/net@v0.55.0
+        go mod tidy -e
         CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/scanner-trivy" cmd/scanner-trivy/main.go
 
   # --- API Generation ---

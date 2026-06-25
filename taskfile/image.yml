@@ -71,6 +71,9 @@ tasks:
       - sh: '[ "{{.CONTAINER_ENGINE}}" != "unknown" ]'
         msg: "No container engine found. Install Docker or Podman."
     cmds:
+      - task: _build-binaries
+        vars:
+          SERVICE: lprobe
       - task: '{{if eq .CONTAINER_ENGINE "docker"}}_build:docker{{else}}_build:podman{{end}}'
         vars:
           IMAGE_NAME: '{{.IMAGE_NAME}}'
@@ -88,7 +91,6 @@ tasks:
       docker buildx build
       --builder {{.IMAGE_BUILDER}}
       --platform {{.PLATFORMS}}
-      --build-arg LPROBE_VERSION={{.LPROBE_VERSION}}
       --build-arg ALPINE_VERSION={{.ALPINE_VERSION}}
       {{.BUILD_ARGS}}
       -t {{.FULL_TAG}}
@@ -104,7 +106,6 @@ tasks:
       - >-
         podman build
         --platform {{.PLATFORMS}}
-        --build-arg LPROBE_VERSION={{.LPROBE_VERSION}}
         --build-arg ALPINE_VERSION={{.ALPINE_VERSION}}
         {{.BUILD_ARGS}}
         -t {{.FULL_TAG}}
@@ -189,11 +190,14 @@ tasks:
       - task: _build-binaries
         vars:
           SERVICE: trivy-adapter
+      - task: _build-binaries
+        vars:
+          SERVICE: trivy
       - task: _build
         vars:
           IMAGE_NAME: trivy-adapter
           DOCKERFILE: trivy-adapter.dockerfile
-          BUILD_ARGS: '--build-arg HARBOR_SCANNER_TRIVY_VERSION={{.HARBOR_SCANNER_TRIVY_VERSION}} --build-arg TRIVY_VERSION={{.TRIVY_VERSION}} --build-arg TRIVY_BASE_IMAGE_VERSION={{.TRIVY_BASE_IMAGE_VERSION}}'
+          BUILD_ARGS: '--build-arg HARBOR_SCANNER_TRIVY_VERSION={{.HARBOR_SCANNER_TRIVY_VERSION}} --build-arg TRIVY_BASE_IMAGE_VERSION={{.TRIVY_BASE_IMAGE_VERSION}}'
 
   # --- Utilities ---
 
