@@ -1,0 +1,46 @@
+name: Main Images
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: main-images-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  version:
+    name: Read Version
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Read VERSION
+        id: version
+        run: |
+          version=$(tr -d '\n' < VERSION)
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+  publish-images:
+    name: Publish Latest Images
+    needs: [version]
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/publish-images.yml
+    with:
+      checkout_ref: ${{ github.sha }}
+      image_tag: latest
+      version: ${{ needs.version.outputs.version }}
+      artifact_prefix: main-latest
+      registry_address: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
+      registry_project: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
+    secrets: inherit
