@@ -1,8 +1,6 @@
 # Dockerfile for Harbor Portal (Angular Frontend) on Nginx
 
 ARG BUN_VERSION=MISSING-BUILD-ARG
-ARG GO_VERSION=MISSING-BUILD-ARG
-ARG LPROBE_VERSION=MISSING-BUILD-ARG
 ARG NGINX_VERSION=MISSING-BUILD-ARG
 
 #
@@ -22,21 +20,9 @@ COPY LICENSE ./dist/LICENSE
 WORKDIR /harbor/src/portal/app-swagger-ui
 RUN bun install --ignore-scripts && bun run build
 
-#
-FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-alpine AS lprobe
-ARG LPROBE_VERSION
-ARG TARGETARCH
-ARG TARGETOS
-RUN apk add --no-cache git && \
-    git clone --branch v${LPROBE_VERSION} --depth 1 https://github.com/fivexl/lprobe.git /src/lprobe && \
-    cd /src/lprobe && \
-    go mod edit -require github.com/go-jose/go-jose/v4@v4.1.4 && \
-    go mod edit -require golang.org/x/net@v0.55.0 && \
-    go mod tidy -e && \
-    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -o /lprobe .
-
 FROM 8gears.container-registry.com/dhi.io/nginx:${NGINX_VERSION}-debian13
-COPY --from=lprobe /lprobe /lprobe
+ARG TARGETARCH
+COPY bin/linux-${TARGETARCH}/lprobe /lprobe
 COPY --from=builder /harbor/src/portal/dist /usr/share/nginx/html
 COPY --from=builder /harbor/src/portal/app-swagger-ui/dist /usr/share/nginx/html
 COPY config/portal/nginx.conf /etc/nginx/nginx.conf
