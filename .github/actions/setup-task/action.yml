@@ -1,0 +1,51 @@
+name: Setup Task
+description: Install Task CLI without a JavaScript action runtime
+
+inputs:
+  version:
+    description: Task version to install
+    required: false
+    default: 3.49.1
+
+runs:
+  using: composite
+  steps:
+    - name: Install Task
+      shell: bash
+      env:
+        TASK_VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+
+        version="${TASK_VERSION}"
+        version="${version#v}"
+
+        case "$(uname -s)" in
+          Linux) os="linux" ;;
+          Darwin) os="darwin" ;;
+          *) echo "Unsupported OS for Task: $(uname -s)" >&2; exit 1 ;;
+        esac
+
+        case "$(uname -m)" in
+          x86_64|amd64) arch="amd64" ;;
+          aarch64|arm64) arch="arm64" ;;
+          *) echo "Unsupported architecture for Task: $(uname -m)" >&2; exit 1 ;;
+        esac
+
+        archive="task_${os}_${arch}.tar.gz"
+        tool_dir="${RUNNER_TEMP:-${PWD}/.tools}/task"
+        mkdir -p "${tool_dir}/bin"
+        curl -fsSL "https://github.com/go-task/task/releases/download/v${version}/${archive}" -o "${tool_dir}/${archive}"
+        curl -fsSL "https://github.com/go-task/task/releases/download/v${version}/task_checksums.txt" -o "${tool_dir}/task_checksums.txt"
+        (cd "${tool_dir}" && grep "  ${archive}$" task_checksums.txt | sha256sum -c -)
+        tar -xzf "${tool_dir}/${archive}" -C "${tool_dir}" task
+
+        if [ -w /usr/local/bin ]; then
+          install -m 0755 "${tool_dir}/task" /usr/local/bin/task
+        else
+          sudo install -m 0755 "${tool_dir}/task" /usr/local/bin/task
+        fi
+
+    - name: Verify Task
+      shell: bash
+      run: task --version
