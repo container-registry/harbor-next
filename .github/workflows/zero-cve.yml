@@ -307,10 +307,15 @@ jobs:
           path: ${{ env.ZERO_CVE_REPORT_DIR }}/
           if-no-files-found: warn
 
-      - name: Summarize zero-CVE findings
+      - name: Summarize zero-CVE status
         run: |
           node <<'NODE'
           const { readFileSync } = require('node:fs');
           const summary = JSON.parse(readFileSync('zero-cve-reports/summary.json', 'utf8'));
-          console.log(`Zero-CVE report completed: ${summary.remainingFindingCount} remaining findings, ${summary.scannerErrorCount} scanner errors.`);
+          const message = `Zero-CVE report: ${summary.findingCount} total findings, ${summary.fixedFindingCount} remediated, ${summary.remainingFindingCount} remaining, ${summary.scannerErrorCount} scanner errors.`;
+          console.log(message);
+          if (process.env.GITHUB_STEP_SUMMARY) {
+            const { appendFileSync } = require('node:fs');
+            appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## Zero CVE Report\n\n${message}\n\n`);
+          }
           NODE
