@@ -3,10 +3,27 @@ name: PR Preview Images
 on:
   pull_request:
     branches: [main, "release-[0-9]*.[0-9]*"]
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - "CLAUDE.md"
+    # Allowlist: only build preview images when an input that actually reaches
+    # one of the images changes. Each entry below is consumed by a dockerfile
+    # COPY/build-arg or by the task build steps (gen-apis / build:binary).
+    # Anything not listed (docs, tests, 8gcr-ee patches, lint config, dev
+    # taskfiles, other workflows) cannot change an image, so it is skipped.
+    paths:
+      - "src/**"                             # Go components + portal sources
+      - "api/v2.0/swagger.yaml"              # gen-apis (core) + portal API client
+      - "tools/swagger/templates/**"         # gen-apis output templates
+      - "make/migrations/**"                 # baked into harbor-core
+      - "icons/**"                           # baked into harbor-core
+      - "config/portal/**"                   # portal nginx.conf
+      - "LICENSE"                            # baked into harbor-portal
+      - "VERSION"                            # ReleaseVersion ldflag baked into the Go binaries
+      - "dockerfile/**"                      # every image
+      - "versions.env"                       # build-args + registry/trivy/distribution pins
+      - "Taskfile.yml"                       # build orchestration root
+      - "taskfile/build.yml"                 # gen-apis + build:binary recipes
+      - ".github/workflows/pr-ci.yml"        # this workflow
+      - ".github/actions/setup-go-cached/**" # Go build env used by the build jobs
+      - ".github/actions/setup-task/**"      # Task install action used by the build jobs
 
 permissions:
   contents: read
@@ -19,9 +36,6 @@ env:
   REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
   PR_REGISTRY_PROJECT: ${{ vars.PR_REGISTRY_PROJECT }}
   PREVIEW_TAG: pr-${{ github.event.pull_request.number }}
-  # arduino/setup-task (latest) still declares node20; opt in to the
-  # 2026-06-16 node24 default early.
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   build:
@@ -59,18 +73,15 @@ jobs:
         run: grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
 
       - name: Setup Go
-        if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
         uses: ./.github/actions/setup-go-cached
         with:
           go-version-file: src/go.mod
           go-sum-path: src/go.sum
 
       - name: Install Task
-        if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
-        uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
+        uses: ./.github/actions/setup-task
         with:
           version: 3.49.1
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate API code
         if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
@@ -78,7 +89,20 @@ jobs:
 
       - name: Compile Go binary
         if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
-        run: task build:binary:${{ matrix.component }}:${{ env.PLATFORM_PAIR }} GIT_COMMIT="${GITHUB_SHA:0:8}"
+        env:
+          COMPONENT: ${{ matrix.component }}
+          PLATFORM_PAIR: ${{ env.PLATFORM_PAIR }}
+        run: task build:binary:${COMPONENT}:${PLATFORM_PAIR} GIT_COMMIT="${GITHUB_SHA:0:8}"
+
+      - name: Compile image helper binaries
+        env:
+          COMPONENT: ${{ matrix.component }}
+          PLATFORM_PAIR: ${{ env.PLATFORM_PAIR }}
+        run: |
+          task build:binary:lprobe:${PLATFORM_PAIR}
+          if [ "${COMPONENT}" = "trivy-adapter" ]; then
+            task build:binary:trivy:${PLATFORM_PAIR}
+          fi
 
       - uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
         if: env.BUILDX_HOST == ''
@@ -104,12 +128,11 @@ jobs:
           platforms: ${{ matrix.platform }}
           build-args: |
             ALPINE_VERSION=${{ env.ALPINE_VERSION }}
-            LPROBE_VERSION=${{ env.LPROBE_VERSION }}
             NGINX_VERSION=${{ env.NGINX_VERSION }}
             BUN_VERSION=${{ env.BUN_VERSION }}
             GO_VERSION=${{ env.GO_VERSION }}
             DISTRIBUTION_VERSION=${{ env.DISTRIBUTION_VERSION }}
-            TRIVY_VERSION=${{ env.TRIVY_VERSION }}
+            LPROBE_VERSION=${{ env.LPROBE_VERSION }}
             TRIVY_BASE_IMAGE_VERSION=${{ env.TRIVY_BASE_IMAGE_VERSION }}
             HARBOR_SCANNER_TRIVY_VERSION=${{ env.HARBOR_SCANNER_TRIVY_VERSION }}
           tags: ${{ env.REGISTRY_ADDRESS }}/${{ env.PR_REGISTRY_PROJECT }}/${{ steps.prepare.outputs.image_name }}
