@@ -248,6 +248,9 @@ jobs:
       REGISTRY_PROJECT: ${{ inputs.registry_project }}
       IMAGE_TAG: ${{ inputs.image_tag }}
     steps:
+      - name: Install envsubst
+        run: command -v envsubst || (sudo apt-get update && sudo apt-get install -y gettext-base)
+
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
