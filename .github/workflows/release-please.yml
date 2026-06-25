@@ -165,6 +165,11 @@ jobs:
       - name: Install envsubst
         run: command -v envsubst || (sudo apt-get update && sudo apt-get install -y gettext-base)
 
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+
       - name: Install gh CLI
         run: |
           case "$(uname -m)" in
@@ -179,10 +184,13 @@ jobs:
             exit 1
           fi
 
+          archive="gh_${version}_linux_${arch}.tar.gz"
           tool_dir="${RUNNER_TEMP:-${PWD}/.tools}/gh-cli"
           mkdir -p "${tool_dir}/bin"
-          curl -fsSL "https://github.com/cli/cli/releases/download/v${version}/gh_${version}_linux_${arch}.tar.gz" -o "${tool_dir}/gh.tar.gz"
-          tar -xzf "${tool_dir}/gh.tar.gz" -C "${tool_dir}"
+          curl -fsSL "https://github.com/cli/cli/releases/download/v${version}/${archive}" -o "${tool_dir}/${archive}"
+          curl -fsSL "https://github.com/cli/cli/releases/download/v${version}/gh_${version}_checksums.txt" -o "${tool_dir}/gh_checksums.txt"
+          (cd "${tool_dir}" && grep "  ${archive}$" gh_checksums.txt | sha256sum -c -)
+          tar -xzf "${tool_dir}/${archive}" -C "${tool_dir}"
           install -m 0755 "${tool_dir}/gh_${version}_linux_${arch}/bin/gh" "${tool_dir}/bin/gh"
           echo "${tool_dir}/bin" >> "${GITHUB_PATH}"
 

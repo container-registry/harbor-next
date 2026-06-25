@@ -175,7 +175,7 @@ tasks:
         vars:
           IMAGE_NAME: harbor-portal
           DOCKERFILE: portal.dockerfile
-          BUILD_ARGS: '--build-arg BUN_VERSION={{.BUN_VERSION}} --build-arg NGINX_VERSION={{.NGINX_VERSION}}'
+          BUILD_ARGS: '--build-arg BUN_VERSION={{.BUN_VERSION}} --build-arg GO_VERSION={{.GO_VERSION}} --build-arg LPROBE_VERSION={{.LPROBE_VERSION}} --build-arg NGINX_VERSION={{.NGINX_VERSION}}'
 
   registry:
     desc: "Build Distribution Registry image (compiles binary, then builds container)"
