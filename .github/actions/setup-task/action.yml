@@ -1,0 +1,42 @@
+name: Setup Task
+description: Install Task CLI without a JavaScript action runtime
+
+inputs:
+  version:
+    description: Task version to install
+    required: false
+    default: 3.49.1
+
+runs:
+  using: composite
+  steps:
+    - name: Install Task
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        version="${{ inputs.version }}"
+        version="${version#v}"
+
+        case "$(uname -s)" in
+          Linux) os="linux" ;;
+          Darwin) os="darwin" ;;
+          *) echo "Unsupported OS for Task: $(uname -s)" >&2; exit 1 ;;
+        esac
+
+        case "$(uname -m)" in
+          x86_64|amd64) arch="amd64" ;;
+          aarch64|arm64) arch="arm64" ;;
+          *) echo "Unsupported architecture for Task: $(uname -m)" >&2; exit 1 ;;
+        esac
+
+        tool_dir="${RUNNER_TEMP:-${PWD}/.tools}/task"
+        mkdir -p "${tool_dir}/bin"
+        curl -fsSL "https://github.com/go-task/task/releases/download/v${version}/task_${os}_${arch}.tar.gz" -o "${tool_dir}/task.tar.gz"
+        tar -xzf "${tool_dir}/task.tar.gz" -C "${tool_dir}" task
+        install -m 0755 "${tool_dir}/task" "${tool_dir}/bin/task"
+        echo "${tool_dir}/bin" >> "${GITHUB_PATH}"
+
+    - name: Verify Task
+      shell: bash
+      run: task --version

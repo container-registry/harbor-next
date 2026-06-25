@@ -29,11 +29,6 @@ on:
       SYNC_APP_PRIVATE_KEY:
         required: true
 
-env:
-  # arduino/setup-task still declares node20; opt in to the
-  # 2026-06-16 node24 default early.
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
   build:
     name: "${{ matrix.component }} (${{ matrix.platform }})"
@@ -71,10 +66,9 @@ jobs:
           ref: ${{ inputs.checkout_ref }}
 
       - name: Install Task
-        uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
+        uses: ./.github/actions/setup-task
         with:
-          version: 3.x
-          repo-token: ${{ github.token }}
+          version: 3.49.1
 
       - name: Install StGit
         run: |
