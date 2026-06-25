@@ -23,7 +23,7 @@ task dev:up       # Local dev with hot reload
 
 ## GitHub Actions
 
-- When adding a workflow shell command that calls a CLI or interpreter, explicitly install or set up that tool in the same job before using it. Do not assume runner images or JavaScript action runtimes expose tools on `PATH`.
+- Self-hosted runners are intentionally minimal. When adding a workflow shell command that calls a CLI or interpreter, explicitly install or set up that tool in the same job before using it. Do not assume runner images or JavaScript action runtimes expose tools on `PATH`.
 - Pin actions by full commit SHA and keep a version comment, matching the existing workflow style.
 - If a workflow calls `node`, add an explicit `actions/setup-node` step first.
 
