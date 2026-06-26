@@ -65,6 +65,7 @@
                             }}</span>
                         </button>
                     </a>
+<<<<<<< HEAD
                 </ng-container>
                 <ng-container
                     *ngIf="
@@ -88,6 +89,44 @@
                             'TOOLTIP.SIGN_IN_USERNAME' | translate
                         }}</clr-control-error>
                     </clr-input-container>
+=======
+                    } @if ( (!isOidcLoginMode && steps === 1) ||
+                    (isOidcLoginMode && steps === 2) ) {
+                    <div class="clr-form-control mt-3">
+                        <div
+                            class="clr-control-container"
+                            [class.clr-error]="
+                                userNameInput.invalid &&
+                                (userNameInput.dirty || userNameInput.touched)
+                            ">
+                            <div class="clr-input-wrapper">
+                                <div class="clr-input-group">
+                                    <input
+                                        class="clr-input username"
+                                        type="text"
+                                        required
+                                        [(ngModel)]="signInCredential.principal"
+                                        name="login_username"
+                                        id="login_username"
+                                        placeholder="{{
+                                            'PLACEHOLDER.SIGN_IN_NAME'
+                                                | translate
+                                        }}"
+                                        #userNameInput="ngModel" />
+                                    <clr-icon
+                                        class="clr-validate-icon"
+                                        shape="exclamation-circle"></clr-icon>
+                                </div>
+                            </div>
+                            @if ( userNameInput.invalid && (userNameInput.dirty
+                            || userNameInput.touched) ) {
+                            <clr-control-error>
+                                {{ 'TOOLTIP.SIGN_IN_USERNAME' | translate }}
+                            </clr-control-error>
+                            }
+                        </div>
+                    </div>
+>>>>>>> 1ace7d68a (fix: multiple UI/UX fixes for checkboxes, alignment, dark theme, and i18n (#23439))
                     <div class="clr-form-control">
                         <div
                             class="clr-control-container"

@@ -31,6 +31,7 @@
                             }}</span>
                         </clr-tooltip-content>
                     </clr-tooltip>
+<<<<<<< HEAD
                     <div class="clr-select-wrapper">
                         <select
                             id="select-error"
@@ -48,6 +49,8 @@
                             </ng-template>
                         </select>
                     </div>
+=======
+>>>>>>> 1ace7d68a (fix: multiple UI/UX fixes for checkboxes, alignment, dark theme, and i18n (#23439))
 
                     <div
                         class="progress-block progress-min-width progress-div"
@@ -133,6 +136,20 @@
                     [(ngModel)]="quotaHardLimitValue.storageLimit"
                     id="storage"
                     size="40" />
+                <div clrInputSuffix class="clr-select-wrapper">
+                    <select
+                        id="select-error"
+                        class="clr-select"
+                        name="storageUnit"
+                        [(ngModel)]="quotaHardLimitValue.storageUnit">
+                        @for (quotaUnit of quotaUnits; track quotaUnit; let i =
+                        $index) { @if (i > 1) {
+                        <option [value]="quotaUnit.UNIT">
+                            {{ quotaUnit?.UNIT }}
+                        </option>
+                        } }
+                    </select>
+                </div>
                 <clr-control-error>{{
                     'PROJECT.STORAGE_QUOTA_TIP' | translate
                 }}</clr-control-error>
