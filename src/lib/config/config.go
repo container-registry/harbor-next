@@ -81,6 +81,9 @@ func DefaultMgr() Manager {
 	if err != nil {
 		log.Error("failed to get config manager")
 	}
+	if manager == nil {
+		log.Error("config manager is nil")
+	}
 	return manager
 }
 
