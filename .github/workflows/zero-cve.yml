@@ -311,7 +311,9 @@ jobs:
         run: |
           node <<'NODE'
           const { readFileSync } = require('node:fs');
-          const summary = JSON.parse(readFileSync('zero-cve-reports/summary.json', 'utf8'));
+          const { join } = require('node:path');
+          const reportDir = process.env.ZERO_CVE_REPORT_DIR || 'zero-cve-reports';
+          const summary = JSON.parse(readFileSync(join(reportDir, 'summary.json'), 'utf8'));
           const message = `Zero-CVE report: ${summary.findingCount} total findings, ${summary.fixedFindingCount} remediated, ${summary.remainingFindingCount} remaining, ${summary.scannerErrorCount} scanner errors.`;
           console.log(message);
           if (process.env.GITHUB_STEP_SUMMARY) {
