@@ -111,11 +111,24 @@ func (c *controllerTestSuite) TestEnsureTag() {
 	// reset the mock
 	c.SetupTest()
 
-	// a concurrent create conflict means this request did not change tag state
-	c.tagMgr.On("List", mock.Anything, mock.Anything).Return([]*tag.Tag{}, nil)
+	// a concurrent create conflict re-reads the tag created by the other request
+	c.tagMgr.On("List", mock.Anything, mock.Anything).Return([]*tag.Tag{}, nil).Once()
 	c.tagMgr.On("Create", mock.Anything, mock.Anything).Return(int64(0), errors.ConflictError(nil))
-	_, err = c.ctl.Ensure(orm.NewContext(nil, &ormtesting.FakeOrmer{}), 1, 1, "latest")
+	c.tagMgr.On("List", mock.Anything, mock.Anything).Return([]*tag.Tag{
+		{
+			ID:           2,
+			RepositoryID: 1,
+			ArtifactID:   1,
+			Name:         "latest",
+		},
+	}, nil).Once()
+	c.artMgr.On("Get", mock.Anything, mock.Anything).Return(&pkg_artifact.Artifact{
+		ID: 1,
+	}, nil)
+	mock.OnAnything(c.immutableMtr, "Match").Return(false, nil)
+	id, err := c.ctl.Ensure(orm.NewContext(nil, &ormtesting.FakeOrmer{}), 1, 1, "latest")
 	c.Require().Nil(err)
+	c.Equal(int64(2), id)
 	c.tagMgr.AssertExpectations(c.T())
 }
 

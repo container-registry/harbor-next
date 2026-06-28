@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package parser // nolint:revive
+package parser //nolint:revive
 
 import (
 	"context"
