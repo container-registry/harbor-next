@@ -101,7 +101,7 @@ func (c *controller) EnsureTag(ctx context.Context, art lib.ArtifactInfo, tagNam
 	// search the digest in cache and query with trimmed digest
 	var trimmedDigest string
 	err := c.cache.Fetch(ctx, TrimmedManifestlist+art.Digest, &trimmedDigest)
-	if errors.Is(err, cache.ErrNotFound) { // nolint:revive
+	if errors.Is(err, cache.ErrNotFound) { //nolint:revive
 		// skip to update digest, continue
 	} else if err != nil {
 		// for other error, return

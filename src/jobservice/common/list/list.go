@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package list // nolint:revive
+package list //nolint:revive
 
 import (
 	"container/list"

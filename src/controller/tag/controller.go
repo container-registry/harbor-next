@@ -91,9 +91,7 @@ func (c *controller) Ensure(ctx context.Context, repositoryID, artifactID int64,
 	if err != nil {
 		return 0, err
 	}
-	// the tag already exists under the repository
-	if len(tags) > 0 {
-		tag := tags[0]
+	ensureExistingTag := func(tag *Tag) (int64, error) {
 		// the tag already exists under the repository and is attached to the artifact, return directly
 		if tag.ArtifactID == artifactID {
 			return tag.ID, nil
@@ -113,6 +111,10 @@ func (c *controller) Ensure(ctx context.Context, repositoryID, artifactID int64,
 		c.touchRepo(ctx, repositoryID)
 		return tag.ID, nil
 	}
+	// the tag already exists under the repository
+	if len(tags) > 0 {
+		return ensureExistingTag(tags[0])
+	}
 
 	// the tag doesn't exist under the repository, create it
 	// use orm.WithTransaction here to avoid the issue:
@@ -128,7 +130,14 @@ func (c *controller) Ensure(ctx context.Context, repositoryID, artifactID int64,
 		return err
 	})(orm.SetTransactionOpNameToContext(ctx, "tx-tag-ensure")); err != nil {
 		if errors.IsConflictErr(err) {
-			return tagID, nil
+			tags, listErr := c.List(ctx, query, &Option{WithImmutableStatus: true})
+			if listErr != nil {
+				return 0, listErr
+			}
+			if len(tags) == 0 {
+				return 0, err
+			}
+			return ensureExistingTag(tags[0])
 		}
 		return 0, err
 	}
