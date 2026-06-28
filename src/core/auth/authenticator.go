@@ -173,7 +173,7 @@ func getHelper(ctx context.Context) (AuthenticateHelper, error) {
 	}
 	AuthenticateHelper, ok := registry[authMode]
 	if !ok {
-		return nil, fmt.Errorf("can not get authenticator, authmode: %s", authMode)
+		return nil, fmt.Errorf("cannot get authenticator, authmode: %s", authMode)
 	}
 	return AuthenticateHelper, nil
 }

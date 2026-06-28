@@ -6268,7 +6268,7 @@ parameters:
     maximum: 10000
   requestId:
     name: X-Request-Id
-    description: An unique ID for the request
+    description: A unique ID for the request
     in: header
     type: string
     required: false

@@ -83,7 +83,7 @@ func unescapePathParams(params any, fieldNames ...string) error {
 		}
 
 		if !field.CanSet() {
-			log.Debugf("field %s can not be changed in %s", name, val.Type().Name())
+			log.Debugf("field %s cannot be changed in %s", name, val.Type().Name())
 			continue
 		}
 
@@ -95,7 +95,7 @@ func unescapePathParams(params any, fieldNames ...string) error {
 			}
 			field.SetString(v)
 		default:
-			log.Debugf("field %s can not be unescaped in %s", name, val.Type().Name())
+			log.Debugf("field %s cannot be unescaped in %s", name, val.Type().Name())
 		}
 	}
 
