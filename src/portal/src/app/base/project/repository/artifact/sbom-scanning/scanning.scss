@@ -17,6 +17,10 @@ hbr-sbom-bar {
         max-width: 60%;
         min-width: 50%;
     }
+
+    .not-scan {
+        cursor: default;
+    }
 }
 
 .bar-state-chart {

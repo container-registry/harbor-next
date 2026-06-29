@@ -6,6 +6,7 @@
         <div class="duration text-truncate">
             {{ 'REPLICATION.TOTAL' | translate }}: {{ total() }}
         </div>
+<<<<<<< HEAD
         <ng-container *ngIf="!loading">
             <div class="clr-row" *ngIf="jobQueue?.length">
                 <div class="clr-col center">
@@ -33,6 +34,37 @@
             </div>
         </ng-container>
         <div *ngIf="loading" class="loading">
+=======
+        @if (!loading) { @if (jobQueue?.length) {
+        <div class="clr-row queue-row">
+            <div class="clr-col-6 center">
+                <label class="clr-control-label text-truncate">
+                    {{ jobQueue[0]?.job_type }}
+                </label>
+            </div>
+            <div class="clr-col-6 count">{{ jobQueue[0]?.count || 0 }}</div>
+        </div>
+        } @if (jobQueue?.length > 1) {
+        <div class="clr-row queue-row">
+            <div class="clr-col-6 center">
+                <label class="clr-control-label text-truncate">
+                    {{ jobQueue[1]?.job_type }}
+                </label>
+            </div>
+            <div class="clr-col-6 count">{{ jobQueue[1]?.count || 0 }}</div>
+        </div>
+        } @if (jobQueue?.length > 2) {
+        <div class="clr-row queue-row">
+            <div class="clr-col-6 center">
+                <label class="clr-control-label text-truncate">{{
+                    'JOB_SERVICE_DASHBOARD.OTHERS' | translate
+                }}</label>
+            </div>
+            <div class="clr-col-6 count">{{ otherCount() }}</div>
+        </div>
+        } } @if (loading) {
+        <div class="loading">
+>>>>>>> f1fde6037 (fix(portal): align pending job queue counts and improve form styling (#23457))
             <span class="spinner spinner-inline"></span>
         </div>
     </div>

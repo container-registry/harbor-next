@@ -56,6 +56,7 @@
                             </clr-tooltip-content>
                         </clr-tooltip>
                     </label>
+<<<<<<< HEAD
                     <div
                         class="clr-control-container"
                         [class.clr-error]="
@@ -113,6 +114,40 @@
                     </div>
                 </div>
                 <clr-textarea-container class="mt-2">
+=======
+                    <input
+                        clrInput
+                        [disabled]="loading || isEditMode"
+                        type="text"
+                        id="name"
+                        class="input-width"
+                        [(ngModel)]="systemRobot.name"
+                        required
+                        pattern="^[a-z0-9]+(?:[._\-][a-z0-9]+)*$"
+                        maxLengthExt="255"
+                        autocomplete="off"
+                        size="30"
+                        name="name"
+                        #name="ngModel"
+                        (keyup)="inputName()" />
+
+                    <clr-control-error>
+                        @if ( !( (name.dirty || name.touched) && name.invalid )
+                        && isNameExisting ) {
+                        <span>{{
+                            'ROBOT_ACCOUNT.ACCOUNT_EXISTING' | translate
+                        }}</span>
+                        } @if ( (name.dirty || name.touched) && name.invalid ) {
+                        <span>{{
+                            'SYSTEM_ROBOT.NAME_TOOLTIP' | translate
+                        }}</span>
+                        }
+                    </clr-control-error>
+                </clr-input-container>
+
+                <!-- Description -->
+                <clr-textarea-container class="">
+>>>>>>> f1fde6037 (fix(portal): align pending job queue counts and improve form styling (#23457))
                     <label>{{ 'DISTRIBUTION.DESCRIPTION' | translate }}</label>
                     <textarea
                         class="input-width"
