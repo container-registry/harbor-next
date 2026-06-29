@@ -112,6 +112,8 @@ func TestParseScopes(t *testing.T) {
 	require.Len(t, scopes, 1)
 	assert.Equal(t, scopeTypeRepository, scopes[0].Type)
 	assert.Equal(t, "library/hello-world", scopes[0].Name)
+	require.Len(t, scopes[0].Actions, 1)
+	assert.Equal(t, scopeActionPull, scopes[0].Actions[0])
 
 	// no match
 	req, _ = http.NewRequest(http.MethodPost, "/api/others", nil)
