@@ -59,14 +59,20 @@ func maxConcurrentCacheFill() int {
 // sockets they hold, accumulate without bound. It returns true if fn was
 // scheduled, false if it was skipped.
 func GoCacheFill(label string, fn func()) bool {
+	sem := cacheFillSem
 	select {
-	case cacheFillSem <- struct{}{}:
+	case sem <- struct{}{}:
 	default:
-		log.Warningf("proxy-cache background task %q skipped: concurrency limit (%d) reached", label, cap(cacheFillSem))
+		log.Warningf("proxy-cache background task %q skipped: concurrency limit (%d) reached", label, cap(sem))
 		return false
 	}
 	go func() {
-		defer func() { <-cacheFillSem }()
+		defer func() { <-sem }()
+		defer func() {
+			if r := recover(); r != nil {
+				log.Errorf("proxy-cache background task %q panicked: %v", label, r)
+			}
+		}()
 		fn()
 	}()
 	return true

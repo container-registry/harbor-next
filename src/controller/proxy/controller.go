@@ -233,7 +233,7 @@ func (c *controller) ProxyManifest(ctx context.Context, art lib.ArtifactInfo, re
 	// proxy-cache concurrency limit so a slow/unresponsive backend cannot make
 	// these detached goroutines accumulate without bound.
 	op := operator.FromContext(ctx)
-	GoCacheFill("manifest:"+art.Repository, func() {
+	if !GoCacheFill("manifest:"+art.Repository, func() {
 		bCtx := orm.Copy(ctx)
 		a, err := c.local.GetManifest(bCtx, art)
 		if err != nil {
@@ -258,9 +258,28 @@ func (c *controller) ProxyManifest(ctx context.Context, art lib.ArtifactInfo, re
 		if a != nil {
 			SendPullEvent(bCtx, a, art.Tag, op)
 		}
-	})
+	}) {
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Errorf("proxy-cache pull event task for %q panicked: %v", art.Repository, r)
+				}
+			}()
+			c.sendManifestPullEvent(orm.Copy(ctx), art, op)
+		}()
+	}
 
 	return man, nil
+}
+
+func (c *controller) sendManifestPullEvent(ctx context.Context, art lib.ArtifactInfo, op string) {
+	a, err := c.local.GetManifest(ctx, art)
+	if err != nil {
+		log.Errorf("failed to get manifest, error %v", err)
+	}
+	if a != nil {
+		SendPullEvent(ctx, a, art.Tag, op)
+	}
 }
 
 func (c *controller) HeadManifest(_ context.Context, art lib.ArtifactInfo, remote RemoteInterface) (bool, *distribution.Descriptor, error) {

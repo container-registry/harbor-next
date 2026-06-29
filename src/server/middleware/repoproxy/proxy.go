@@ -401,10 +401,21 @@ type tagEnsurer interface {
 func ensureTagWithRetry(ctx context.Context, te tagEnsurer, art lib.ArtifactInfo, digest string) {
 	bArt := lib.ArtifactInfo{ProjectName: art.ProjectName, Repository: art.Repository, Digest: digest}
 	for range ensureTagMaxRetry {
+		if ctx.Err() != nil {
+			return
+		}
+
+		timer := time.NewTimer(ensureTagInterval)
 		select {
 		case <-ctx.Done():
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
 			return
-		case <-time.After(ensureTagInterval):
+		case <-timer.C:
 		}
 		err := te.EnsureTag(ctx, bArt, art.Tag)
 		if err == nil {
