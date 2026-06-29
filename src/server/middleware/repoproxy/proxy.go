@@ -367,25 +367,60 @@ func proxyManifestHead(ctx context.Context, w http.ResponseWriter, ctl proxy.Con
 	if !exist || desc == nil {
 		return errors.NotFoundError(fmt.Errorf("the tag %v:%v is not found", art.Repository, art.Tag))
 	}
-	go func(art lib.ArtifactInfo) {
-		// After docker 20.10 or containerd, the client heads the tag first,
-		// Then GET the image by digest, in order to associate the tag with the digest
-		// Ensure tag after head request, make sure tags in proxy cache keep update
-		bCtx := orm.Context()
-		for range ensureTagMaxRetry {
-			time.Sleep(ensureTagInterval)
-			bArt := lib.ArtifactInfo{ProjectName: art.ProjectName, Repository: art.Repository, Digest: string(desc.Digest)}
-			err := ctl.EnsureTag(bCtx, bArt, art.Tag)
-			if err == nil {
-				return
-			}
-			log.Debugf("Failed to ensure tag %+v , error %v", art, err)
-		}
-	}(art)
+	// Ensure the tag in the proxy cache after the HEAD, bounded by the global
+	// proxy-cache concurrency limit and an overall deadline so this retry loop
+	// can neither accumulate without bound under load nor run unbounded when
+	// EnsureTag keeps failing.
+	dgst := string(desc.Digest)
+	proxy.GoCacheFill("ensure-tag:"+art.Repository, func() {
+		bCtx, cancel := context.WithTimeout(orm.Context(), time.Duration(ensureTagMaxRetry)*ensureTagInterval)
+		defer cancel()
+		ensureTagWithRetry(bCtx, ctl, art, dgst)
+	})
 
 	w.Header().Set(contentType, desc.MediaType)
 	w.Header().Set(contentLength, fmt.Sprintf("%v", desc.Size))
 	w.Header().Set(dockerContentDigest, string(desc.Digest))
 	w.Header().Set(etag, string(desc.Digest))
 	return nil
+}
+
+// tagEnsurer is the subset of proxy.Controller used by ensureTagWithRetry.
+type tagEnsurer interface {
+	EnsureTag(ctx context.Context, art lib.ArtifactInfo, tagName string) error
+}
+
+// ensureTagWithRetry retries EnsureTag until it succeeds, the context is done,
+// or the retry budget (ensureTagMaxRetry) is exhausted. It is context-aware, so
+// it stops promptly on cancellation/deadline instead of always sleeping the
+// full interval.
+//
+// Background: after docker 20.10 or containerd, the client HEADs the tag first
+// and then GETs the image by digest; the GET is what associates the tag with
+// the digest, so we retry to keep the proxy-cache tag up to date.
+func ensureTagWithRetry(ctx context.Context, te tagEnsurer, art lib.ArtifactInfo, digest string) {
+	bArt := lib.ArtifactInfo{ProjectName: art.ProjectName, Repository: art.Repository, Digest: digest}
+	for range ensureTagMaxRetry {
+		if ctx.Err() != nil {
+			return
+		}
+
+		timer := time.NewTimer(ensureTagInterval)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			return
+		case <-timer.C:
+		}
+		err := te.EnsureTag(ctx, bArt, art.Tag)
+		if err == nil {
+			return
+		}
+		log.Debugf("Failed to ensure tag %+v , error %v", art, err)
+	}
 }
