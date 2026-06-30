@@ -123,6 +123,68 @@ func (suite *FetchOrSaveTestSuite) TestSaveCalledOnlyOneTime() {
 	c.AssertNumberOfCalls(suite.T(), "Save", 1)
 }
 
+func (suite *FetchOrSaveTestSuite) TestRefetchesAfterSingleflightGap() {
+	c := &mockCache{}
+
+	var builderCalls atomic.Int32
+	var saved atomic.Bool
+	var secondFetchOnce sync.Once
+	firstBuilderStarted := make(chan struct{})
+	secondFetchStarted := make(chan struct{})
+	firstDone := make(chan struct{})
+
+	mock.OnAnything(c, "Fetch").Return(func(ctx context.Context, key string, value any) error {
+		if saved.Load() {
+			*(value.(*string)) = "built"
+			return nil
+		}
+
+		select {
+		case <-firstBuilderStarted:
+			secondFetchOnce.Do(func() { close(secondFetchStarted) })
+			select {
+			case <-firstDone:
+				return ErrNotFound
+			case <-time.After(time.Second):
+				return fmt.Errorf("timed out waiting for first FetchOrSave call")
+			}
+		default:
+		}
+
+		return ErrNotFound
+	})
+	mock.OnAnything(c, "Save").Return(func(ctx context.Context, key string, value any, exp ...time.Duration) error {
+		saved.Store(true)
+		return nil
+	})
+
+	var first string
+	firstErr := make(chan error, 1)
+	go func() {
+		defer close(firstDone)
+		firstErr <- FetchOrSave(suite.ctx, c, "key", &first, func() (any, error) {
+			builderCalls.Add(1)
+			close(firstBuilderStarted)
+			<-secondFetchStarted
+			return "built", nil
+		})
+	}()
+
+	<-firstBuilderStarted
+	var second string
+	err := FetchOrSave(suite.ctx, c, "key", &second, func() (any, error) {
+		builderCalls.Add(1)
+		return "rebuilt", nil
+	})
+
+	suite.NoError(<-firstErr)
+	suite.NoError(err)
+	suite.Equal("built", first)
+	suite.Equal("built", second)
+	suite.Equal(int32(1), builderCalls.Load())
+	c.AssertNumberOfCalls(suite.T(), "Save", 1)
+}
+
 // Save must be called even if the HTTP request context is already canceled,
 // because helper.go uses context.WithoutCancel before calling Save.
 func (suite *FetchOrSaveTestSuite) TestSaveCalledEvenWhenContextCanceled() {

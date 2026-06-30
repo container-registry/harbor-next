@@ -43,6 +43,12 @@ func FetchOrSave(ctx context.Context, c Cache, key string, value any, builder fu
 	groupKey := fmt.Sprintf("%p:%s", c, key)
 
 	result, err, _ := fetchOrSaveGroup.Do(groupKey, func() (any, error) {
+		if err := c.Fetch(ctx, key, value); err == nil {
+			return value, nil
+		} else if !errors.Is(err, ErrNotFound) {
+			return nil, err
+		}
+
 		val, err := builder()
 		if err != nil {
 			return nil, err
