@@ -39,12 +39,33 @@ func probeBlob(r *http.Request, digest string) error {
 		return err
 	}
 
-	switch bb.Status {
-	case models.StatusNone, models.StatusDelete, models.StatusDeleteFailed:
+	// touch resets the blob to StatusNone, bumping version/update_time. Its only
+	// purpose is to coordinate with GC, so it is called only when it actually
+	// matters (see the switch below).
+	touch := func() error {
 		if err := blobController.Touch(r.Context(), bb); err != nil {
 			logger.Errorf("failed to update blob: %s status to StatusNone, error:%v", bb.Digest, err)
 			return errors.Wrapf(err, "the request id is: %s", r.Header.Get(requestid.HeaderXRequestID))
 		}
+		return nil
+	}
+
+	switch bb.Status {
+	case models.StatusNone:
+		// Already in the normal state: not a GC candidate, nothing to rescue.
+		// Touch here would only bump version/update_time - a redundant single-row
+		// UPDATE that, under concurrent re-pushes of the same digest, becomes a
+		// row-lock contention hot spot and blocks the push for minutes. Skip it,
+		// but still refresh update_time when it is stale enough that a not-yet-
+		// associated blob could fall inside the GC time window.
+		window := time.Duration(config.GetGCTimeWindow()) * time.Hour
+		if window > 0 && time.Since(bb.UpdateTime) > window/2 {
+			return touch()
+		}
+	case models.StatusDelete, models.StatusDeleteFailed:
+		// GC marked this blob for deletion but an incoming push needs it: pull it
+		// back to StatusNone (the version bump defeats GC's compare-and-swap).
+		return touch()
 	case models.StatusDeleting:
 		now := time.Now().UTC()
 		// if the deleting exceed 2 hours, marks the blob as StatusDeleteFailed
