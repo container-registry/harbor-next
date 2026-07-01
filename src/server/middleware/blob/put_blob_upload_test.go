@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
@@ -146,6 +147,57 @@ func (suite *PutBlobUploadMiddlewareTestSuite) TestBlobInDelete() {
 			suite.Equal(int64(512), blob.Size)
 			suite.Equal(blob_models.StatusNone, blob.Status)
 		}
+	})
+}
+
+func (suite *PutBlobUploadMiddlewareTestSuite) TestBlobFreshRePushSkipsTouch() {
+	suite.WithProject(func(projectID int64, projectName string) {
+		suite.T().Setenv("GC_TIME_WINDOW_HOURS", "2")
+		digest := suite.DigestString()
+
+		_, err := blob.Ctl.Ensure(suite.Context(), digest, "application/octet-stream", 512)
+		suite.Nil(err)
+		before, err := blob.Ctl.Get(suite.Context(), digest)
+		suite.Nil(err)
+
+		req := suite.NewRequest(http.MethodPut, fmt.Sprintf("/v2/%s/photon/blobs/uploads/%s?digest=%s", projectName, uuid.New().String(), digest), nil)
+		req.Header.Set("Content-Length", "512")
+		res := httptest.NewRecorder()
+
+		next := suite.NextHandler(http.StatusCreated, map[string]string{"Docker-Content-Digest": digest})
+		PutBlobUploadMiddleware()(next).ServeHTTP(res, req)
+		suite.Equal(http.StatusCreated, res.Code)
+
+		after, err := blob.Ctl.Get(suite.Context(), digest)
+		suite.Nil(err)
+		suite.Equal(blob_models.StatusNone, after.Status)
+		suite.Equal(before.Version, after.Version, "fresh StatusNone blob must not be touched")
+	})
+}
+
+func (suite *PutBlobUploadMiddlewareTestSuite) TestBlobStaleRePushTouches() {
+	suite.WithProject(func(projectID int64, projectName string) {
+		suite.T().Setenv("GC_TIME_WINDOW_HOURS", "2")
+		digest := suite.DigestString()
+
+		id, err := blob.Ctl.Ensure(suite.Context(), digest, "application/octet-stream", 512)
+		suite.Nil(err)
+		before, err := blob.Ctl.Get(suite.Context(), digest)
+		suite.Nil(err)
+		suite.Nil(backdateBlob(suite.Context(), id, 2*time.Hour))
+
+		req := suite.NewRequest(http.MethodPut, fmt.Sprintf("/v2/%s/photon/blobs/uploads/%s?digest=%s", projectName, uuid.New().String(), digest), nil)
+		req.Header.Set("Content-Length", "512")
+		res := httptest.NewRecorder()
+
+		next := suite.NextHandler(http.StatusCreated, map[string]string{"Docker-Content-Digest": digest})
+		PutBlobUploadMiddleware()(next).ServeHTTP(res, req)
+		suite.Equal(http.StatusCreated, res.Code)
+
+		after, err := blob.Ctl.Get(suite.Context(), digest)
+		suite.Nil(err)
+		suite.Equal(blob_models.StatusNone, after.Status)
+		suite.Equal(before.Version+1, after.Version, "stale StatusNone blob must be touched to stay out of the GC window")
 	})
 }
 

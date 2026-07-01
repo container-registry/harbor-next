@@ -26,6 +26,20 @@ import (
 	"github.com/goharbor/harbor/src/server/middleware/requestid"
 )
 
+// shouldTouchNone decides whether a blob that is already StatusNone still needs
+// a Touch. In that state Touch only bumps version/update_time to coordinate
+// with GC - a redundant single-row UPDATE that, under concurrent re-pushes of
+// the same digest, becomes a row-lock contention hot spot (the lock is held for
+// the whole request transaction on PUT manifest). Skip it while update_time is
+// fresh: GC only considers blobs older than the full time window, so anything
+// younger than half the window cannot become a candidate before this request
+// associates the blob. A non-positive window leaves no such safety margin, so
+// always touch then.
+func shouldTouchNone(bb *models.Blob) bool {
+	window := time.Duration(config.GetGCTimeWindow()) * time.Hour
+	return window <= 0 || time.Since(bb.UpdateTime) > window/2
+}
+
 // probeBlob handles config/layer and manifest status in the PUT Blob & Manifest middleware, and update the status before it passed into proxy(distribution).
 func probeBlob(r *http.Request, digest string) error {
 	logger := log.G(r.Context())
@@ -52,14 +66,7 @@ func probeBlob(r *http.Request, digest string) error {
 
 	switch bb.Status {
 	case models.StatusNone:
-		// Already in the normal state: not a GC candidate, nothing to rescue.
-		// Touch here would only bump version/update_time - a redundant single-row
-		// UPDATE that, under concurrent re-pushes of the same digest, becomes a
-		// row-lock contention hot spot and blocks the push for minutes. Skip it,
-		// but still refresh update_time when it is stale enough that a not-yet-
-		// associated blob could fall inside the GC time window.
-		window := time.Duration(config.GetGCTimeWindow()) * time.Hour
-		if window > 0 && time.Since(bb.UpdateTime) > window/2 {
+		if shouldTouchNone(bb) {
 			return touch()
 		}
 	case models.StatusDelete, models.StatusDeleteFailed:
