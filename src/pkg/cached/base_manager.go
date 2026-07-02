@@ -50,7 +50,7 @@ func (*cacheClient) Ping(ctx context.Context) error {
 func (*cacheClient) Save(ctx context.Context, key string, value any, expiration ...time.Duration) error {
 	// intercept here
 	// it should ignore save cache if this request is wrapped by orm.Transaction,
-	// because if tx rollback, we can not rollback cache,
+	// because if tx rollback, we cannot rollback cache,
 	// identify whether in transaction by checking the committedKey in context.
 	// committedKey is a context value which be injected in the transaction middleware.
 	if orm.HasCommittedKey(ctx) {

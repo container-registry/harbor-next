@@ -285,7 +285,7 @@ func ReadOrCreate(ctx context.Context, md any, col1 string, cols ...string) (cre
 		return
 	}
 
-	if !errors.Is(err, orm.ErrNoRows) { // met a error when read database
+	if !errors.Is(err, orm.ErrNoRows) { // met an error when reading the database
 		return
 	}
 
