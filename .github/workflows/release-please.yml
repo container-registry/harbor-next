@@ -281,14 +281,20 @@ jobs:
             if [ -n "${HIGHLIGHTS}" ]; then
               printf '%s\n\n' "${HIGHLIGHTS}"
             fi
-            cat "${FORMATTED_BODY}"
             if [ -f applied-patches.txt ] && [ -s applied-patches.txt ]; then
-              echo ""
-              echo "### Commercial Features"
-              echo ""
-              echo "This release includes the following commercial enhancements:"
-              echo ""
-              cat applied-patches.txt
+              while IFS= read -r line; do
+                echo "${line}"
+                if [ "${line}" = "## What's Changed" ]; then
+                  echo ""
+                  echo "### Commercial Features"
+                  echo ""
+                  echo "This release includes the following commercial enhancements:"
+                  echo ""
+                  cat applied-patches.txt
+                fi
+              done < "${FORMATTED_BODY}"
+            else
+              cat "${FORMATTED_BODY}"
             fi
             echo ""
             echo "---"
