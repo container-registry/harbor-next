@@ -228,7 +228,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           REGISTRY="${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}"
-          IMAGES="core jobservice registryctl exporter portal registry trivy-adapter"
+          IMAGES=(core jobservice registryctl exporter portal registry trivy-adapter)
           GENERATED_NOTES="$(mktemp)"
           RELEASE_BODY="$(mktemp)"
           FORMATTED_BODY="$(mktemp)"
@@ -269,7 +269,7 @@ jobs:
             echo ""
             echo "| Image | Reference |"
             echo "|-------|-----------|"
-            for image in $IMAGES; do
+            for image in "${IMAGES[@]}"; do
               image_name="harbor-${image}"
               if [ "${image}" = "trivy-adapter" ]; then
                 image_name="trivy-adapter"
