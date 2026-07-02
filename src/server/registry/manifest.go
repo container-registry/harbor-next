@@ -176,6 +176,17 @@ func putManifest(w http.ResponseWriter, req *http.Request) {
 	repo := router.Param(req.Context(), ":splat")
 	reference := router.Param(req.Context(), ":reference")
 
+	// Verify the writer is a ResponseBuffer from outer middleware.
+	// This is required for error recovery: when artifact registration fails after
+	// a successful proxy response (201), we need the outer buffer to Reset() the
+	// buffered 201 and send an error response instead. If the writer is not a
+	// ResponseBuffer, the 201 would be sent directly to the client, preventing
+	// error recovery and causing storage-only orphans (issue #23199).
+	if _, isBuffer := w.(*lib.ResponseBuffer); !isBuffer {
+		lib_http.SendError(w, errors.New("putManifest requires outer ResponseBuffer middleware for error recovery"))
+		return
+	}
+
 	// make sure the repository exist before pushing the manifest
 	_, _, err := repository.Ctl.Ensure(req.Context(), repo)
 	if err != nil {

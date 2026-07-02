@@ -29,6 +29,7 @@ import (
 
 	"github.com/goharbor/harbor/src/controller/artifact"
 	"github.com/goharbor/harbor/src/controller/repository"
+	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/pkg"
@@ -174,10 +175,12 @@ func (m *manifestTestSuite) TestPutManifest() {
 	input.SetParam(":splat", "library/hello-world")
 	input.SetParam(":reference", "latest")
 	*req = *(req.WithContext(context.WithValue(req.Context(), router.ContextKeyInput{}, input)))
-	w := &httptest.ResponseRecorder{}
+	recorder := &httptest.ResponseRecorder{}
+	w := lib.NewResponseBuffer(recorder)
 	mock.OnAnything(m.repoCtl, "Ensure").Return(false, int64(1), nil)
 	putManifest(w, req)
-	m.Equal(http.StatusInternalServerError, w.Code)
+	w.Flush()
+	m.Equal(http.StatusInternalServerError, recorder.Code)
 
 	m.SetupTest()
 
@@ -196,11 +199,66 @@ func (m *manifestTestSuite) TestPutManifest() {
 	input.SetParam(":splat", "library/hello-world")
 	input.SetParam(":reference", "latest")
 	*req = *(req.WithContext(context.WithValue(req.Context(), router.ContextKeyInput{}, input)))
-	w = &httptest.ResponseRecorder{}
+	recorder = &httptest.ResponseRecorder{}
+	w = lib.NewResponseBuffer(recorder)
 	mock.OnAnything(m.repoCtl, "Ensure").Return(false, int64(1), nil)
 	mock.OnAnything(m.artCtl, "Ensure").Return(true, int64(1), nil)
 	putManifest(w, req)
-	m.Equal(http.StatusCreated, w.Code)
+	w.Flush()
+	m.Equal(http.StatusCreated, recorder.Code)
+}
+
+func (m *manifestTestSuite) TestPutManifestRequiresResponseBuffer() {
+	// Validation test: putManifest requires outer ResponseBuffer middleware
+	// for error recovery. If called without it, should fail with a clear error.
+	manifestContent := []byte(`{"schemaVersion":2}`)
+
+	req := httptest.NewRequest(http.MethodPut, "/v2/library/hello-world/manifests/latest", bytes.NewReader(manifestContent))
+	input := &beegocontext.BeegoInput{}
+	input.SetParam(":splat", "library/hello-world")
+	input.SetParam(":reference", "latest")
+	*req = *(req.WithContext(context.WithValue(req.Context(), router.ContextKeyInput{}, input)))
+
+	// Call with a plain httptest.ResponseRecorder (NOT wrapped in ResponseBuffer)
+	// to simulate missing middleware.
+	w := &httptest.ResponseRecorder{}
+	putManifest(w, req)
+
+	m.NotEqual(http.StatusCreated, w.Code, "should fail when ResponseBuffer middleware is missing")
+	m.True(w.Code >= 400, "should return 4xx/5xx error code")
+}
+
+func (m *manifestTestSuite) TestPutManifestArtifactEnsureFailure() {
+	// Regression test for issue #23199: "storage-only orphans" — manifest push
+	// would return HTTP 201 even if artifact registration failed, because the
+	// buffered response could be flushed to the client before artifact.Ctl.Ensure
+	// completed. Verifies an error response (not 201) is returned when Ensure fails.
+	manifestContent := []byte(`{"schemaVersion":2}`)
+
+	proxy = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.Method == http.MethodPut && strings.Contains(req.URL.Path, "/v2/library/hello-world/manifests/") {
+			w.Header().Set("Docker-Content-Digest", digest.FromBytes(manifestContent).String())
+			w.WriteHeader(http.StatusCreated)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	})
+
+	req := httptest.NewRequest(http.MethodPut, "/v2/library/hello-world/manifests/latest", bytes.NewReader(manifestContent))
+	input := &beegocontext.BeegoInput{}
+	input.SetParam(":splat", "library/hello-world")
+	input.SetParam(":reference", "latest")
+	*req = *(req.WithContext(context.WithValue(req.Context(), router.ContextKeyInput{}, input)))
+
+	recorder := &httptest.ResponseRecorder{}
+	w := lib.NewResponseBuffer(recorder)
+	mock.OnAnything(m.repoCtl, "Ensure").Return(false, int64(1), nil)
+	mock.OnAnything(m.artCtl, "Ensure").Return(false, int64(0), errors.New("artifact registration failed"))
+	putManifest(w, req)
+	w.Flush()
+
+	m.Equal(http.StatusInternalServerError, recorder.Code, "expected 500 error when artifact registration fails")
+	m.NotEqual(http.StatusCreated, recorder.Code, "should NOT return 201 when artifact registration fails")
 }
 
 func (m *manifestTestSuite) TestPutManifestWithTagToDigestReplacement() {
@@ -245,11 +303,13 @@ func (m *manifestTestSuite) TestPutManifestWithTagToDigestReplacement() {
 	input.SetParam(":reference", "latest")
 	*req = *(req.WithContext(context.WithValue(req.Context(), router.ContextKeyInput{}, input)))
 
-	w := &httptest.ResponseRecorder{}
+	recorder := &httptest.ResponseRecorder{}
+	w := lib.NewResponseBuffer(recorder)
 	mock.OnAnything(m.repoCtl, "Ensure").Return(false, int64(1), nil)
 	mock.OnAnything(m.artCtl, "Ensure").Return(true, int64(1), nil)
 	putManifest(w, req)
-	m.Equal(http.StatusCreated, w.Code)
+	w.Flush()
+	m.Equal(http.StatusCreated, recorder.Code)
 	m.NotNil(proxyRequest, "Request was not captured by proxy")
 	m.Contains(proxyRequest.URL.Path, expectedDigest, "URL should contain digest")
 }
@@ -290,11 +350,13 @@ func (m *manifestTestSuite) TestPutManifestWithDigest() {
 	input.SetParam(":reference", providedDigest)
 	*req = *(req.WithContext(context.WithValue(req.Context(), router.ContextKeyInput{}, input)))
 
-	w := &httptest.ResponseRecorder{}
+	recorder := &httptest.ResponseRecorder{}
+	w := lib.NewResponseBuffer(recorder)
 	mock.OnAnything(m.repoCtl, "Ensure").Return(false, int64(1), nil)
 	mock.OnAnything(m.artCtl, "Ensure").Return(true, int64(1), nil)
 	putManifest(w, req)
-	m.Equal(http.StatusCreated, w.Code)
+	w.Flush()
+	m.Equal(http.StatusCreated, recorder.Code)
 	m.NotNil(proxyRequest, "Request was not captured by proxy")
 	m.Contains(proxyRequest.URL.Path, providedDigest, "URL should contain original digest")
 }
@@ -313,12 +375,14 @@ func (m *manifestTestSuite) TestPutManifestEmptyBody() {
 	input.SetParam(":reference", "latest")
 	*req = *(req.WithContext(context.WithValue(req.Context(), router.ContextKeyInput{}, input)))
 
-	w := &httptest.ResponseRecorder{}
+	recorder := &httptest.ResponseRecorder{}
+	w := lib.NewResponseBuffer(recorder)
 	mock.OnAnything(m.repoCtl, "Ensure").Return(false, int64(1), nil)
 	mock.OnAnything(m.artCtl, "Ensure").Return(true, int64(1), nil)
 
 	putManifest(w, req)
-	m.Equal(http.StatusCreated, w.Code)
+	w.Flush()
+	m.Equal(http.StatusCreated, recorder.Code)
 }
 
 func TestManifestTestSuite(t *testing.T) {
