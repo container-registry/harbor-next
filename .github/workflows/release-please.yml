@@ -282,16 +282,17 @@ jobs:
               printf '%s\n\n' "${HIGHLIGHTS}"
             fi
             cat "${FORMATTED_BODY}"
+            if [ -f applied-patches.txt ] && [ -s applied-patches.txt ]; then
+              echo ""
+              echo "### Commercial Features"
+              echo ""
+              echo "This release includes the following commercial enhancements:"
+              echo ""
+              cat applied-patches.txt
+            fi
             echo ""
             echo "---"
             echo ""
-            if [ -f applied-patches.txt ] && [ -s applied-patches.txt ]; then
-              echo "## Commercial Features"
-              echo ""
-              echo "This release includes the following commercial enhancements:"
-              cat applied-patches.txt
-              echo ""
-            fi
             echo "## Container Images"
             echo ""
             echo "Multi-arch images (\`linux/amd64\`, \`linux/arm64\`) signed with [cosign](https://github.com/sigstore/cosign)."
