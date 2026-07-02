@@ -244,43 +244,7 @@ jobs:
             "${FORMATTED_BODY}" \
             "${CONTRIBUTORS}"
 
-          HIGHLIGHTS=""
-          git fetch --tags --force
-          PREV_TAG=$(git tag --merged HEAD --sort=-creatordate \
-            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
-            | grep -v "^${TAG_NAME}$" \
-            | head -n 1 || true)
-          if [ -n "${PREV_TAG}" ]; then
-            SINCE=$(gh release view "${PREV_TAG}" --json createdAt -q '.createdAt')
-            SINCE_DATE="${SINCE%T*}"
-            HIGHLIGHTS=$(gh pr list \
-              --state merged \
-              --base "${RELEASE_BRANCH}" \
-              --search "merged:>=${SINCE_DATE}" \
-              --json number,title,url,body \
-              --limit 100 \
-              --jq '
-                [.[] | select(.body | test("(?m)^## Release Notes"))] |
-                if length == 0 then ""
-                else
-                  "## Highlights\n\n" +
-                  (map(
-                    "### [#\(.number)](\(.url)) \(.title)\n" +
-                    (.body |
-                      gsub("(?s).*\n## Release Notes\n"; "") |
-                      gsub("(?s)\n## .*"; "") |
-                      gsub("<!--[\\s\\S]*?-->"; "") |
-                      ltrimstr("\n") | rtrimstr("\n")
-                    ) + "\n"
-                  ) | join("\n"))
-                end
-              ')
-          fi
-
           {
-            if [ -n "${HIGHLIGHTS}" ]; then
-              printf '%s\n\n' "${HIGHLIGHTS}"
-            fi
             if [ -f applied-patches.txt ] && [ -s applied-patches.txt ]; then
               while IFS= read -r line; do
                 echo "${line}"
