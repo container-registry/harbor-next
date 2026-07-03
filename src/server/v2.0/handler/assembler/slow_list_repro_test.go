@@ -42,10 +42,10 @@ import (
 // re-walks the same shared descendants once per top-level index, fanning out
 // thousands of accessory/blob queries per response.
 //
-// The test is opt-in because it requires a database that already contains an
-// affected repository. Point it at any database (a dump or a synthetic one
-// produced by pushing N image-index artifacts that each reference M children)
-// via the standard test env vars plus:
+// The test is opt-in because it requires a disposable database that already
+// contains an affected repository. PrepareTestForPostgresSQL runs migrations, so
+// point this only at a restored dump, snapshot, or synthetic database that can
+// be modified. Use the standard test env vars plus:
 //
 //	SLOW_REPRO_REPO=<project>/<repo>           # required
 //	SLOW_REPRO_PAGE_SIZE=100                   # optional, default 100
@@ -77,12 +77,13 @@ func TestSlowArtifactListRepro(t *testing.T) {
 
 	// SQL counter via beego ORM debug
 	var sqlCount int64
-	prev := beegoorm.DebugLog
+	prevDebug := beegoorm.Debug
+	prevDebugLog := beegoorm.DebugLog
 	beegoorm.Debug = true
 	beegoorm.DebugLog = beegoorm.NewLog(countingWriter{counter: &sqlCount})
 	t.Cleanup(func() {
-		beegoorm.Debug = false
-		beegoorm.DebugLog = prev
+		beegoorm.Debug = prevDebug
+		beegoorm.DebugLog = prevDebugLog
 	})
 
 	ctx := orm.Context()
@@ -130,7 +131,7 @@ func TestSlowArtifactListRepro(t *testing.T) {
 		atomic.StoreInt64(&sqlCount, 0)
 		asm := NewScanReportAssembler(overviewOpts, mimeTypes).WithArtifacts(am)
 		if err := asm.Assemble(ctx); err != nil {
-			t.Logf("Assemble error for artifact %d: %v", a.ID, err)
+			t.Fatalf("Assemble failed for artifact %d: %v", a.ID, err)
 		}
 		d := time.Since(startAsm)
 		n := atomic.LoadInt64(&sqlCount)
@@ -153,7 +154,7 @@ func TestSlowArtifactListRepro(t *testing.T) {
 	startBatch := time.Now()
 	atomic.StoreInt64(&sqlCount, 0)
 	if err := NewScanReportAssembler(overviewOpts, mimeTypes).WithArtifacts(allModels...).Assemble(ctx); err != nil {
-		t.Logf("Batch Assemble error: %v", err)
+		t.Fatalf("Batch Assemble failed: %v", err)
 	}
 	batchElapsed := time.Since(startBatch)
 	batchSQL := atomic.LoadInt64(&sqlCount)
