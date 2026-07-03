@@ -34,7 +34,7 @@ Why:
 - Reproduced locally as a core OOM with a push-capable user and a 1 GiB core memory cap.
 - Same uncapped test against `localhost:8080` did not crash a 16 GiB container, but memory rose to about 6.9 GiB for a 1.5 GiB invalid manifest body and remained high after the request.
 - The PoC is deterministic, standalone, and safe for local test environments.
-- Verified locally with `security-pocs/simple.sh`.
+- Verified locally with `security-pocs/poc-35-manifest-upload-oom.sh`.
 
 ## Important Skips
 
@@ -50,6 +50,6 @@ Why:
 - `security-pocs/poc-45-robot-userupdate-sysadmin.sh`
 - `security-pocs/poc-56-webhook-ssrf-readback.sh`
 - `security-pocs/poc-49-project-robot-member-projectadmin.sh`
-- `security-pocs/simple.sh`
+- `security-pocs/poc-35-manifest-upload-oom.sh`
 
 Keep these private until coordinated disclosure completes.
