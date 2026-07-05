@@ -79,6 +79,7 @@ func TestMiddlewareRejectsPlaintextHTTPOriginByDefault(t *testing.T) {
 		common.ExtEndpoint: "http://localhost:4500",
 	}
 	config.InitWithSettings(conf)
+	t.Setenv(csrfPlaintextHTTPEnv, "false")
 	resetMiddleware()
 	defer func() {
 		config.InitWithSettings(map[string]any{
