@@ -43,6 +43,12 @@ func FetchOrSave(ctx context.Context, c Cache, key string, value any, builder fu
 	groupKey := fmt.Sprintf("%p:%s", c, key)
 
 	result, err, _ := fetchOrSaveGroup.Do(groupKey, func() (any, error) {
+		if err := c.Fetch(ctx, key, value); err == nil {
+			return codec.Encode(value)
+		} else if !errors.Is(err, ErrNotFound) {
+			return nil, err
+		}
+
 		val, err := builder()
 		if err != nil {
 			return nil, err
@@ -55,17 +61,12 @@ func FetchOrSave(ctx context.Context, c Cache, key string, value any, builder fu
 			log.Warningf("failed to save value to cache, error: %v", err)
 		}
 
-		return val, nil
+		return codec.Encode(val)
 	})
 	if err != nil {
 		return err
 	}
 
-	// Copy the shared result into the caller's value via the codec, so every caller
-	// (the leader and all waiters) gets its own populated value.
-	data, err := codec.Encode(result)
-	if err != nil {
-		return err
-	}
+	data := result.([]byte)
 	return codec.Decode(data, value)
 }
