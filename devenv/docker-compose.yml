@@ -60,6 +60,7 @@ services:
         DEV_UID: ${DEV_UID:-1000}
         DEV_GID: ${DEV_GID:-1000}
     profiles: [core]
+    user: "${DEV_CONTAINER_USER:-harbor}"
     volumes:
       - ..:/app
       - ${HOST_GOMODCACHE:?}:/go/pkg/mod
@@ -88,6 +89,7 @@ services:
       REGISTRY_CREDENTIAL_PASSWORD: ""
       # Core settings
       EXT_ENDPOINT: http://core:8080
+      CSRF_PLAINTEXT_HTTP: ${CSRF_PLAINTEXT_HTTP:-true}
       CORE_URL: http://core:8080
       HARBOR_ADMIN_PASSWORD: Harbor12345
       CACHE_ENABLED: "false"
@@ -122,6 +124,7 @@ services:
   jobservice:
     image: harbor-dev-go
     profiles: [jobservice]
+    user: "${DEV_CONTAINER_USER:-harbor}"
     volumes:
       - ..:/app
       - ${HOST_GOMODCACHE:?}:/go/pkg/mod
@@ -160,6 +163,7 @@ services:
   registryctl:
     image: harbor-dev-go
     profiles: [registryctl]
+    user: "${DEV_CONTAINER_USER:-harbor}"
     volumes:
       - ..:/app
       - ${HOST_GOMODCACHE:?}:/go/pkg/mod
