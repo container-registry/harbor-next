@@ -54,6 +54,24 @@ env:
   PORT_DEBUG_CORE:        '{{.PORT_DEBUG_CORE}}'
   PORT_DEBUG_JOBSERVICE:  '{{.PORT_DEBUG_JOB}}'
   PORT_DEBUG_REGISTRYCTL: '{{.PORT_DEBUG_REGCTL}}'
+  CSRF_PLAINTEXT_HTTP:    '{{.CSRF_PLAINTEXT_HTTP | default "true"}}'
+  DEV_UID:
+    sh: id -u
+  DEV_GID:
+    sh: id -g
+  # Rootless Podman maps the host user to container root, so UID 0 is the
+  # writable identity for bind-mounted worktrees there.
+  DEV_CONTAINER_USER:
+    sh: |
+      if command -v podman >/dev/null 2>&1 && \
+        [ "$(podman info --format '{{"{{.Host.Security.Rootless}}"}}' 2>/dev/null)" = "true" ]; then
+        echo "0:0"
+      elif command -v docker >/dev/null 2>&1 && \
+        docker info --format '{{"{{.SecurityOptions}}"}}' 2>/dev/null | grep -q "name=rootless"; then
+        echo "0:0"
+      else
+        echo "harbor"
+      fi
 
 tasks:
   # ---------------------------------------------------------------------------

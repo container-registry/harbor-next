@@ -92,7 +92,11 @@
           "options": {
             "browserTarget": "harbor-portal:build",
             "proxyConfig": "proxy.config.mjs",
-            "allowedHosts": ["localhost", "127.0.0.1"]
+            "allowedHosts": [
+              "localhost",
+              "127.0.0.1",
+              "0.0.0.0"
+            ]
           },
           "configurations": {
             "production": {
