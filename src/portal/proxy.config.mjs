@@ -17,7 +17,7 @@ const HarborProxyConfig = [
     ],
     target: apiProxyTarget,
     secure: false,
-    changeOrigin: true,
+    changeOrigin: false,
     logLevel,
   },
 ];
