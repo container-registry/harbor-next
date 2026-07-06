@@ -229,8 +229,11 @@ func (c *controller) ProxyManifest(ctx context.Context, art lib.ArtifactInfo, re
 		return man, err
 	}
 
-	// Push manifest in background
-	go func(operator string) {
+	// Push manifest to the local cache in the background, bounded by the global
+	// proxy-cache concurrency limit so a slow/unresponsive backend cannot make
+	// these detached goroutines accumulate without bound.
+	op := operator.FromContext(ctx)
+	if !GoCacheFill("manifest:"+art.Repository, func() {
 		bCtx := orm.Copy(ctx)
 		a, err := c.local.GetManifest(bCtx, art)
 		if err != nil {
@@ -253,11 +256,30 @@ func (c *controller) ProxyManifest(ctx context.Context, art lib.ArtifactInfo, re
 			}
 		}
 		if a != nil {
-			SendPullEvent(bCtx, a, art.Tag, operator)
+			SendPullEvent(bCtx, a, art.Tag, op)
 		}
-	}(operator.FromContext(ctx))
+	}) {
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Errorf("proxy-cache pull event task for %q panicked: %v", art.Repository, r)
+				}
+			}()
+			c.sendManifestPullEvent(orm.Copy(ctx), art, op)
+		}()
+	}
 
 	return man, nil
+}
+
+func (c *controller) sendManifestPullEvent(ctx context.Context, art lib.ArtifactInfo, op string) {
+	a, err := c.local.GetManifest(ctx, art)
+	if err != nil {
+		log.Errorf("failed to get manifest, error %v", err)
+	}
+	if a != nil {
+		SendPullEvent(ctx, a, art.Tag, op)
+	}
 }
 
 func (c *controller) HeadManifest(_ context.Context, art lib.ArtifactInfo, remote RemoteInterface) (bool, *distribution.Descriptor, error) {
@@ -280,12 +302,13 @@ func (c *controller) ProxyBlob(ctx context.Context, p *proModels.Project, art li
 		return 0, nil, err
 	}
 	desc := distribution.Descriptor{Size: size, Digest: digest.Digest(art.Digest)}
-	go func() {
-		err := c.putBlobToLocal(remoteRepo, art.Repository, desc, rHelper)
-		if err != nil {
+	// Populate the local cache in the background, bounded by the global
+	// proxy-cache concurrency limit (see GoCacheFill).
+	GoCacheFill("blob:"+art.Repository, func() {
+		if err := c.putBlobToLocal(remoteRepo, art.Repository, desc, rHelper); err != nil {
 			log.Errorf("error while putting blob to local repo, %v", err)
 		}
-	}()
+	})
 	return size, bReader, nil
 }
 
