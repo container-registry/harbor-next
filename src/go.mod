@@ -1,8 +1,11 @@
 module github.com/goharbor/harbor/src
 
 go 1.26.4
+<<<<<<< HEAD
 
 godebug x509negativeserial=1
+=======
+>>>>>>> f6f3a6eb5 (bump: bump up golang to 1.26.4 and trivy adapter version to v0.37.2-rc2 (#23460))
 
 require (
 	github.com/FZambia/sentinel v1.1.0
