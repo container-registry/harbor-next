@@ -1,0 +1,95 @@
+# Harbor Next behind Airlock Microgateway 5.1 (Gateway API)
+# Usage: helm install harbor . -n harbor -f example/airlock-microgateway/values.yaml
+#
+# Airlock Microgateway 5.x is a Gateway API implementation (the sidecar model was
+# removed in 5.0). It fronts Harbor as the Gateway; this chart emits the HTTPRoute
+# that attaches to it. TLS is terminated at the Gateway, so Harbor runs plain HTTP
+# internally. See example/airlock-microgateway/README.md for the full walkthrough.
+
+# Must match the hostname clients use through the Gateway (drives registry
+# redirects and the token realm).
+externalURL: "https://harbor.mgw.local"
+harborAdminPassword: "Harbor12345"
+
+# The Airlock Gateway is the front door - no in-cluster Ingress.
+ingress:
+  enabled: false
+
+# Emit an HTTPRoute that attaches to the Airlock Gateway object named "harbor"
+# in this namespace. The chart routes /api/, /service/, /v2/, /c/, /chartrepo/
+# and / to harbor-core, which proxies portal + registry.
+gateway:
+  enabled: true
+  parentRefs:
+    - name: harbor
+  hostnames:
+    - harbor.mgw.local
+  # Large layer uploads stream through /v2/; give the registry data path a long
+  # backendRequest so big pushes are not cut off. The portal keeps the default.
+  routeOverrides:
+    core:
+      timeouts:
+        backendRequest: "3600s"
+    # Chart-native portal CSP - the Community Edition alternative to the
+    # Premium WAF ContentSecurityPolicy in waf-premium.yaml. Scoped to the
+    # portal so the registry API path is untouched.
+    # default:
+    #   filters:
+    #     - type: ResponseHeaderModifier
+    #       responseHeaderModifier:
+    #         set:
+    #           - name: Content-Security-Policy
+    #             value: "default-src 'self'"
+
+# Gateway terminates TLS; internal traffic is HTTP.
+tls:
+  enabled: false
+
+# External PostgreSQL (throwaway Deployment in postgres.yaml for this example).
+database:
+  host: postgres.harbor.svc.cluster.local
+  port: 5432
+  username: postgres
+  password: harbordbpass
+  database: registry
+  sslmode: disable
+
+# Internal Valkey (Redis-compatible), ephemeral.
+valkey:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: false
+
+# Trimmed for a POC / local cluster.
+trivy:
+  enabled: false
+metrics:
+  enabled: false
+
+core:
+  replicas: 1
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+jobservice:
+  replicas: 1
+  config:
+    worker_pool:
+      workers: 2
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+registry:
+  replicas: 1
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+portal:
+  replicas: 1
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+exporter:
+  replicas: 1
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }

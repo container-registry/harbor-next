@@ -9,8 +9,8 @@ metadata:
     {{- if eq .Values.registry.persistence.resourcePolicy "keep" }}
     helm.sh/resource-policy: keep
     {{- end }}
-    {{- with .Values.registry.persistence.annotations }}
-    {{- toYaml . | nindent 4 }}
+    {{- with (include "harbor.annotations" (dict "root" . "local" .Values.registry.persistence.annotations)) }}
+    {{- . | nindent 4 }}
     {{- end }}
 spec:
   accessModes:

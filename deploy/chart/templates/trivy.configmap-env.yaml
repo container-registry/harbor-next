@@ -5,6 +5,10 @@ metadata:
   name: "{{ include "harbor.trivy" . }}-env"
   labels:
     {{- include "harbor.componentLabels" (dict "root" . "component" "trivy") | nindent 4 }}
+  {{- with (include "harbor.annotations" (dict "root" . "local" nil)) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 data:
   {{- include "harbor.toEnvVars" (dict "values" .Values.trivy.config "prefix" "" "isSecret" false) | nindent 2 }}
 {{- end }}

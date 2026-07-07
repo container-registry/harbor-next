@@ -27,6 +27,10 @@ metadata:
   name: {{ include "harbor.fullname" $root }}-{{ .name }}
   labels:
     {{- include "harbor.componentLabels" (dict "root" $root "component" .name) | nindent 4 }}
+  {{- with (include "harbor.annotations" (dict "root" $root "local" nil)) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 spec:
   {{- if hasKey .values.pdb "maxUnavailable" }}
   maxUnavailable: {{ .values.pdb.maxUnavailable }}

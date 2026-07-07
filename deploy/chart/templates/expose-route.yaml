@@ -11,9 +11,9 @@ metadata:
     {{- with .Values.expose.route.labels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
-  {{- with .Values.expose.route.annotations }}
+  {{- with (include "harbor.annotations" (dict "root" . "local" .Values.expose.route.annotations)) }}
   annotations:
-    {{- toYaml . | nindent 4 }}
+    {{- . | nindent 4 }}
   {{- end }}
 spec:
   {{- with .Values.expose.route.host }}

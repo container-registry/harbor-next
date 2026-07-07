@@ -445,6 +445,39 @@ gateway:
     - harbor.example.com
 ```
 
+The Harbor path routing (which paths reach `core` vs the portal) is owned by
+the chart and is not user-editable. What you tune are the cross-cutting fields
+applied to the generated rules:
+
+- `gateway.timeouts` / `gateway.filters` apply to every rule.
+- `gateway.routeOverrides` targets a single route group: `core` (the `/api/`,
+  `/service/`, `/v2/`, `/chartrepo/`, `/c/` API and data paths) or `default`
+  (the portal / catch-all). Per-group `timeouts` merge over `gateway.timeouts`
+  (group wins); per-group `filters` replace `gateway.filters` for that group.
+- `gateway.extraRules` appends raw HTTPRoute rules after the chart-managed ones.
+
+Large layer pushes stream through `/v2/`, so the registry data path needs a
+longer `backendRequest` than the portal. Scope the long timeout to `core` and
+attach a portal-only Content-Security-Policy without touching the API path:
+
+```yaml
+gateway:
+  enabled: true
+  parentRefs:
+    - name: my-gateway
+  routeOverrides:
+    core:
+      timeouts:
+        backendRequest: "3600s"   # room for large layer uploads
+    default:
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: Content-Security-Policy
+                value: "default-src 'self'"
+```
+
 ### External Redis (Instead of Valkey)
 
 ```yaml

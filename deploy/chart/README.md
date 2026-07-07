@@ -444,6 +444,39 @@ gateway:
     - harbor.example.com
 ```
 
+The Harbor path routing (which paths reach `core` vs the portal) is owned by
+the chart and is not user-editable. What you tune are the cross-cutting fields
+applied to the generated rules:
+
+- `gateway.timeouts` / `gateway.filters` apply to every rule.
+- `gateway.routeOverrides` targets a single route group: `core` (the `/api/`,
+  `/service/`, `/v2/`, `/chartrepo/`, `/c/` API and data paths) or `default`
+  (the portal / catch-all). Per-group `timeouts` merge over `gateway.timeouts`
+  (group wins); per-group `filters` replace `gateway.filters` for that group.
+- `gateway.extraRules` appends raw HTTPRoute rules after the chart-managed ones.
+
+Large layer pushes stream through `/v2/`, so the registry data path needs a
+longer `backendRequest` than the portal. Scope the long timeout to `core` and
+attach a portal-only Content-Security-Policy without touching the API path:
+
+```yaml
+gateway:
+  enabled: true
+  parentRefs:
+    - name: my-gateway
+  routeOverrides:
+    core:
+      timeouts:
+        backendRequest: "3600s"   # room for large layer uploads
+    default:
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: Content-Security-Policy
+                value: "default-src 'self'"
+```
+
 ### External Redis (Instead of Valkey)
 
 ```yaml
@@ -689,7 +722,10 @@ Kubernetes: `>=1.28.0-0`
 | cache | object | `{"enabled":false,"expireHours":24}` | Cache configuration (Redis-based caching for manifests) |
 | cache.enabled | bool | `false` | Enable Redis caching |
 | cache.expireHours | int | `24` | Cache expiration in hours |
+| commonAnnotations | object | `{}` | Annotations to add to all resources this chart deploys. `checksum/*` keys are reserved by the chart (used for config/secret-driven pod rollout) — setting one here renders a duplicate key on pod templates. |
+| commonLabels | object | `{}` | Labels to add to all resources this chart deploys. Never applied to selectors (`spec.selector` / `matchLabels` stay immutable). |
 | core.affinity | object | `{}` | Affinity rules for Core pods |
+| core.annotations | object | `{}` | Annotations for the Core workload object (Deployment) |
 | core.artifactPullAsyncFlushDuration | string | `""` | Artifact pull async flush duration |
 | core.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler configuration. When enabled the chart OMITS the static `replicas:` field on the Deployment so HPA owns the replica count. `maxReplicas` is REQUIRED. Tracks upstream goharbor/harbor-helm#1068. |
 | core.config | object | {} | Harbor Core application config (converted to env vars in ConfigMap) Any Harbor Core config can be set here without chart changes |
@@ -754,6 +790,7 @@ Kubernetes: `>=1.28.0-0`
 | existingSecretSecretKey | string | `""` | Existing secret containing the encryption key (overrides secretKey). The secret must hold the 16-char key under `SECRET_KEY` and `secretKey` (or override the key name via `existingSecretSecretKeyKey`). |
 | existingSecretSecretKeyKey | string | `"secretKey"` | Key in `existingSecretSecretKey` that holds the encryption key. Used both for the `SECRET_KEY` env on core and the `secret-key` volume mount (which Harbor reads as `/etc/core/key`). |
 | exporter.affinity | object | `{}` | Affinity rules for Exporter pods |
+| exporter.annotations | object | `{}` | Annotations for the Exporter workload object (Deployment) |
 | exporter.config | object | {} | Exporter config as env vars. Exporter is env-driven (HARBOR_EXPORTER_*); nested maps flatten to UPPER_SNAKE_CASE via toEnvVars and are injected via envFrom. Any exporter setting works without chart changes. |
 | exporter.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
 | exporter.enabled | bool | `true` | Enable Harbor exporter for Prometheus metrics |
@@ -830,10 +867,14 @@ Kubernetes: `>=1.28.0-0`
 | extraManifests | list | [] | Extra static manifests to deploy These are merged with chart labels and deployed as-is |
 | extraTemplateManifests | list | [] | Extra templated manifests to deploy These can use .Values, .Release, and other template functions |
 | fullnameOverride | string | `""` | Override the full name |
-| gateway | object | `{"enabled":false,"hostnames":[],"parentRefs":[]}` | Gateway API configuration (alternative to ingress) |
+| gateway | object | `{"enabled":false,"extraRules":[],"filters":[],"hostnames":[],"parentRefs":[],"routeOverrides":{},"timeouts":{}}` | Gateway API configuration (alternative to ingress) |
 | gateway.enabled | bool | `false` | Enable Gateway API HTTPRoute |
+| gateway.extraRules | list | `[]` | Extra HTTPRoute rules appended verbatim after the chart-managed rules. |
+| gateway.filters | list | `[]` | HTTPRoute filters applied to every generated rule (RequestHeaderModifier, ResponseHeaderModifier, RequestRedirect, URLRewrite, ...). Prefer `routeOverrides.default.filters` for portal-only headers (e.g. CSP) so the registry API path is left untouched. |
 | gateway.hostnames | list | `[]` | Hostnames for the HTTPRoute |
 | gateway.parentRefs | list | `[]` | Gateway parent references |
+| gateway.routeOverrides | object | `{}` | Per-group overrides keyed by route group: `core` (the /api/, /v2/, ... API + data paths) and `default` (the portal / catch-all). Each group accepts `timeouts` (merged over gateway.timeouts, group wins) and `filters` (replaces gateway.filters for that group). |
+| gateway.timeouts | object | `{}` | Timeouts applied to every generated rule. Gateway API durations (e.g. "0s", "3600s"). Keys: `request`, `backendRequest`. The registry data path (`/v2/`) often needs a long `backendRequest` for large layer pushes — set it here for all rules, or per-group under `routeOverrides`. |
 | global | object | `{"imageRegistry":"","priorityClassName":"","revisionHistoryLimit":3}` | Global defaults inherited by all components |
 | global.imageRegistry | string | `""` | Override the registry host for ALL component images at once (air-gap / mirror). When set it wins over per-component `image.registry` and `image.source`. Repository paths are preserved, so a flat mirror works (`global.imageRegistry=mirror.io` -> `mirror.io/8gcr/harbor-core`). Propagated to subcharts; the valkey subchart image must be mirrored/overridden separately (it may not honor this). |
 | global.priorityClassName | string | `""` | Priority class name for all component pods |
@@ -855,6 +896,7 @@ Kubernetes: `>=1.28.0-0`
 | ipFamily.ipv4.enabled | bool | `true` |  |
 | ipFamily.ipv6.enabled | bool | `true` |  |
 | jobservice.affinity | object | `{}` | Affinity rules for Jobservice pods |
+| jobservice.annotations | object | `{}` | Annotations for the Jobservice workload object (Deployment) |
 | jobservice.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler. See `core.autoscaling` for full docs. |
 | jobservice.config | object | See [values.yaml](values.yaml) | Full Harbor jobservice `config.yml` passed through verbatim. Used only when `existingConfigMap` is empty.  Chart-managed values injected via env-var override at runtime:   - `protocol`, `port` (from chart helpers)   - `worker_pool.backend`, `worker_pool.workers` (when JOB_SERVICE_*     env vars are wired by the chart)   - `worker_pool.redis_pool.redis_url` (chart sets the URL with auth     via JOB_SERVICE_POOL_REDIS_URL; you can leave a placeholder here)   - `worker_pool.redis_pool.namespace`  The following keys are NOT env-overridable (Harbor jobservice limitation — see src/jobservice/config/config.go). You MUST set them in this block; changing `.Values.logLevel` or `.Values.metrics.enabled` globally will NOT propagate here:   - `metric.enabled`, `metric.path`, `metric.port`   - `loggers[].level`, `job_loggers[].level`   - `job_loggers[].sweeper.*`   - `reaper.*`   - `max_retrieve_size_mb` |
 | jobservice.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
@@ -904,6 +946,7 @@ Kubernetes: `>=1.28.0-0`
 | metrics.serviceMonitor.scrapeTimeout | string | `"10s"` | Scrape timeout |
 | nameOverride | string | `""` | Override the chart name |
 | portal.affinity | object | `{}` | Affinity rules for Portal pods |
+| portal.annotations | object | `{}` | Annotations for the Portal workload object (Deployment) |
 | portal.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler. See `core.autoscaling` for full docs. |
 | portal.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
 | portal.enabled | bool | `true` | Deploy the portal (Harbor UI). Set `false` for API-only installs — core serves the API, and the Ingress / Gateway route `/` to core instead of the portal. Mirrors `trivy.enabled` / `exporter.enabled`. |
@@ -940,6 +983,7 @@ Kubernetes: `>=1.28.0-0`
 | proxy.httpsProxy | string | `nil` |  |
 | proxy.noProxy | string | `"127.0.0.1,localhost,.local,.internal"` |  |
 | registry.affinity | object | `{}` | Affinity rules for Registry pods |
+| registry.annotations | object | `{}` | Annotations for the Registry workload object (Deployment) |
 | registry.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler. See `core.autoscaling` for full docs. |
 | registry.config | object | See [values.yaml](values.yaml) | Full [distribution/distribution](https://distribution.github.io/distribution/about/configuration/) `config.yml` passed through verbatim. Used only when `existingConfigMap` is empty. Replace this entire block to switch storage backends or add any field distribution supports (notifications, health, custom middleware, etc.).  Chart-managed values injected via env-var override at runtime (these ALWAYS win over what's in this block — do not duplicate here):   - `http.addr`, `http.secret`, `http.debug.prometheus.enabled`   - `redis.*` (addr, password, db, tls)   - `log.level` (from `.Values.logLevel`)   - storage credentials when `storageCredentials.<backend>.existingSecret` is set  See `storageCredentials` below for the BYO-Secret pattern. For inline credentials use `registry.secret` (b64-encoded into the generated Secret) — do not put plaintext credentials in this block, they would be visible in the ConfigMap. |
 | registry.controller | object | `{"image":{"digest":"","registry":"","repository":"","tag":""},"probes":{"liveness":{"failureThreshold":3,"httpGet":{"path":"/api/health","port":8080},"periodSeconds":10,"timeoutSeconds":3},"readiness":{"failureThreshold":2,"httpGet":{"path":"/api/health","port":8080},"periodSeconds":5,"timeoutSeconds":2},"startup":{"failureThreshold":15,"httpGet":{"path":"/api/health","port":8080},"periodSeconds":2,"timeoutSeconds":2}},"resources":{}}` | Registryctl image settings |
@@ -1018,6 +1062,7 @@ Kubernetes: `>=1.28.0-0`
 | trace.provider | string | `"jaeger"` |  |
 | trace.sample_rate | int | `1` |  |
 | trivy.affinity | object | `{}` | Affinity rules for Trivy pods |
+| trivy.annotations | object | `{}` | Annotations for the Trivy workload object (StatefulSet) |
 | trivy.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler for the Trivy StatefulSet. See `core.autoscaling` for full docs. |
 | trivy.config | object | {} | Trivy adapter config as env vars. Trivy is env-driven (SCANNER_*); nested maps flatten to UPPER_SNAKE_CASE via toEnvVars and are injected via envFrom. Any adapter setting works without chart changes. |
 | trivy.dbRepository[0] | string | `"mirror.gcr.io/aquasec/trivy-db"` |  |

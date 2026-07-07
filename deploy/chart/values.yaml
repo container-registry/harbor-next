@@ -24,6 +24,14 @@ global:
   # (it may not honor this).
   imageRegistry: ""
 
+# -- Annotations to add to all resources this chart deploys. `checksum/*` keys are
+# reserved by the chart (used for config/secret-driven pod rollout) — setting one
+# here renders a duplicate key on pod templates.
+commonAnnotations: {}
+# -- Labels to add to all resources this chart deploys. Never applied to selectors
+# (`spec.selector` / `matchLabels` stay immutable).
+commonLabels: {}
+
 # -- Credentials to pull images
 # imageCredentials:
 #   registry: xyz.com
@@ -245,6 +253,35 @@ gateway:
   # -- Hostnames for the HTTPRoute
   hostnames: []
     # - harbor.example.com
+  # -- Timeouts applied to every generated rule. Gateway API durations
+  # (e.g. "0s", "3600s"). Keys: `request`, `backendRequest`. The registry
+  # data path (`/v2/`) often needs a long `backendRequest` for large layer
+  # pushes — set it here for all rules, or per-group under `routeOverrides`.
+  timeouts: {}
+    # request: 0s
+    # backendRequest: 3600s
+  # -- HTTPRoute filters applied to every generated rule (RequestHeaderModifier,
+  # ResponseHeaderModifier, RequestRedirect, URLRewrite, ...). Prefer
+  # `routeOverrides.default.filters` for portal-only headers (e.g. CSP) so the
+  # registry API path is left untouched.
+  filters: []
+  # -- Per-group overrides keyed by route group: `core` (the /api/, /v2/, ...
+  # API + data paths) and `default` (the portal / catch-all). Each group
+  # accepts `timeouts` (merged over gateway.timeouts, group wins) and `filters`
+  # (replaces gateway.filters for that group).
+  routeOverrides: {}
+    # core:
+    #   timeouts:
+    #     backendRequest: 3600s
+    # default:
+    #   filters:
+    #     - type: ResponseHeaderModifier
+    #       responseHeaderModifier:
+    #         set:
+    #           - name: Content-Security-Policy
+    #             value: "default-src 'self'"
+  # -- Extra HTTPRoute rules appended verbatim after the chart-managed rules.
+  extraRules: []
 
 ipFamily:
   # ipv6Enabled set to true if ipv6 is enabled in cluster, currently it affected the nginx related component
@@ -431,6 +468,8 @@ core:
   # -- Affinity rules for Core pods
   affinity: {}
 
+  # -- Annotations for the Core workload object (Deployment)
+  annotations: {}
   # -- Additional pod annotations for Core
   podAnnotations: {}
 
@@ -820,6 +859,8 @@ registry:
   # -- Affinity rules for Registry pods
   affinity: {}
 
+  # -- Annotations for the Registry workload object (Deployment)
+  annotations: {}
   # -- Additional pod annotations for Registry
   podAnnotations: {}
 
@@ -989,6 +1030,8 @@ portal:
   # -- Affinity rules for Portal pods
   affinity: {}
 
+  # -- Annotations for the Portal workload object (Deployment)
+  annotations: {}
   # -- Additional pod annotations for Portal
   podAnnotations: {}
 
@@ -1208,6 +1251,8 @@ jobservice:
   # -- Affinity rules for Jobservice pods
   affinity: {}
 
+  # -- Annotations for the Jobservice workload object (Deployment)
+  annotations: {}
   # -- Additional pod annotations for Jobservice
   podAnnotations: {}
 
@@ -1377,6 +1422,8 @@ exporter:
   # -- Affinity rules for Exporter pods
   affinity: {}
 
+  # -- Annotations for the Exporter workload object (Deployment)
+  annotations: {}
   # -- Additional pod annotations for Exporter
   podAnnotations: {}
 
@@ -1723,6 +1770,8 @@ trivy:
   tolerations: []
   # -- Affinity rules for Trivy pods
   affinity: {}
+  # -- Annotations for the Trivy workload object (StatefulSet)
+  annotations: {}
   # -- Additional pod annotations for Trivy
   podAnnotations: {}
   # -- Additional pod labels for Trivy

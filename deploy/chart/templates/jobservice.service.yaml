@@ -4,6 +4,10 @@ metadata:
   name: {{ include "harbor.fullname" . }}-jobservice
   labels:
     {{- include "harbor.componentLabels" (dict "root" . "component" "jobservice") | nindent 4 }}
+  {{- with (include "harbor.annotations" (dict "root" . "local" nil)) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 spec:
   type: ClusterIP
   ports:

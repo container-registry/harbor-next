@@ -5,6 +5,10 @@ metadata:
   name: {{ include "harbor.fullname" . }}-portal
   labels:
     {{- include "harbor.componentLabels" (dict "root" . "component" "portal") | nindent 4 }}
+  {{- with (include "harbor.annotations" (dict "root" . "local" .Values.portal.annotations)) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 spec:
   {{- if not (and .Values.portal.autoscaling .Values.portal.autoscaling.enabled) }}
   replicas: {{ .Values.portal.replicas }}
@@ -21,11 +25,14 @@ spec:
     metadata:
       annotations:
         checksum/configmap: {{ include (print $.Template.BasePath "/portal.configmap.yaml") . | sha256sum }}
-        {{- with .Values.portal.podAnnotations }}
-        {{- toYaml . | nindent 8 }}
+        {{- with (include "harbor.annotations" (dict "root" . "local" .Values.portal.podAnnotations)) }}
+        {{- . | nindent 8 }}
         {{- end }}
       labels:
         {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "portal") | nindent 8 }}
+        {{- with .Values.commonLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         {{- with .Values.portal.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

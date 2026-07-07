@@ -35,6 +35,10 @@ metadata:
   name: {{ include "harbor.fullname" $ }}-{{ $c.name }}
   labels:
     {{- include "harbor.componentLabels" (dict "root" $ "component" $c.name) | nindent 4 }}
+  {{- with (include "harbor.annotations" (dict "root" $ "local" nil)) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1

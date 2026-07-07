@@ -26,6 +26,10 @@ metadata:
   name: {{ include "harbor.fullname" . }}-registry
   labels:
 {{ include "harbor.labels" . | indent 4 }}
+  {{- with (include "harbor.annotations" (dict "root" . "local" nil)) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 data:
   config.yml: |+
 {{ toYaml $merged | indent 4 }}

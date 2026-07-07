@@ -169,6 +169,16 @@
         }
       }
     },
+    "commonAnnotations": {
+      "type": "object",
+      "description": "Annotations to add to all resources this chart deploys",
+      "additionalProperties": { "type": "string" }
+    },
+    "commonLabels": {
+      "type": "object",
+      "description": "Labels to add to all resources this chart deploys (never applied to selectors)",
+      "additionalProperties": { "type": "string" }
+    },
     "imageCredentials": {
       "type": "object",
       "properties": {
@@ -361,6 +371,22 @@
           "items": {
             "type": "string"
           }
+        },
+        "timeouts": {
+          "type": "object",
+          "description": "Timeouts applied to every generated HTTPRoute rule (Gateway API durations)."
+        },
+        "filters": {
+          "type": "array",
+          "description": "HTTPRoute filters applied to every generated rule."
+        },
+        "routeOverrides": {
+          "type": "object",
+          "description": "Per-group (core/default) timeouts and filters overrides."
+        },
+        "extraRules": {
+          "type": "array",
+          "description": "Extra HTTPRoute rules appended verbatim after the chart-managed rules."
         }
       }
     },
@@ -1189,6 +1215,11 @@
         },
         "affinity": {
           "type": "object"
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Annotations for the component workload object (Deployment/StatefulSet)"
         },
         "podAnnotations": {
           "type": "object",

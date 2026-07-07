@@ -5,9 +5,9 @@ metadata:
   name: {{ include "harbor.fullname" . }}-portal
   labels:
     {{- include "harbor.componentLabels" (dict "root" . "component" "portal") | nindent 4 }}
-  {{- with .Values.portal.serviceAnnotations }}
+  {{- with (include "harbor.annotations" (dict "root" . "local" .Values.portal.serviceAnnotations)) }}
   annotations:
-    {{- toYaml . | nindent 4 }}
+    {{- . | nindent 4 }}
   {{- end }}
 spec:
   type: ClusterIP

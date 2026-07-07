@@ -20,6 +20,10 @@ metadata:
   name: {{ $certName }}
   labels:
     {{- include "harbor.labels" $ | nindent 4 }}
+  {{- with (include "harbor.annotations" (dict "root" $ "local" nil)) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 spec:
   secretName: {{ $secretName }}
   duration: {{ $.Values.tls.certManager.duration | default "2160h" }}

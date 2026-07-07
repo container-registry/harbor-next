@@ -4,6 +4,10 @@ metadata:
   name: {{ include "harbor.fullname" . }}-jobservice
   labels:
     {{- include "harbor.componentLabels" (dict "root" . "component" "jobservice") | nindent 4 }}
+  {{- with (include "harbor.annotations" (dict "root" . "local" .Values.jobservice.annotations)) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 spec:
   {{- if not (and .Values.jobservice.autoscaling .Values.jobservice.autoscaling.enabled) }}
   replicas: {{ .Values.jobservice.replicas }}
@@ -22,11 +26,14 @@ spec:
         checksum/configmap: {{ include (print $.Template.BasePath "/jobservice.configmap.yaml") . | sha256sum }}
         checksum/configmap-env: {{ include (print $.Template.BasePath "/jobservice.configmap-env.yaml") . | sha256sum }}
         checksum/secret: {{ include (print $.Template.BasePath "/jobservice.secret.yaml") . | sha256sum }}
-        {{- with .Values.jobservice.podAnnotations }}
-        {{- toYaml . | nindent 8 }}
+        {{- with (include "harbor.annotations" (dict "root" . "local" .Values.jobservice.podAnnotations)) }}
+        {{- . | nindent 8 }}
         {{- end }}
       labels:
         {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "jobservice") | nindent 8 }}
+        {{- with .Values.commonLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         {{- with .Values.jobservice.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

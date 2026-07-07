@@ -5,6 +5,14 @@ Supports ClusterIP, NodePort, and LoadBalancer types.
 */}}
 {{- if or .Values.expose.clusterIP.enabled .Values.expose.nodePort.enabled .Values.expose.loadBalancer.enabled }}
 {{- $fullname := include "harbor.fullname" . }}
+{{- $exposeAnnotations := dict }}
+{{- if .Values.expose.clusterIP.enabled }}
+{{- $exposeAnnotations = .Values.expose.clusterIP.annotations }}
+{{- else if .Values.expose.nodePort.enabled }}
+{{- $exposeAnnotations = .Values.expose.nodePort.annotations }}
+{{- else if .Values.expose.loadBalancer.enabled }}
+{{- $exposeAnnotations = .Values.expose.loadBalancer.annotations }}
+{{- end }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -30,15 +38,9 @@ metadata:
     {{- toYaml . | nindent 4 }}
     {{- end }}
     {{- end }}
-  {{- if or (and .Values.expose.clusterIP.enabled .Values.expose.clusterIP.annotations) (and .Values.expose.nodePort.enabled .Values.expose.nodePort.annotations) (and .Values.expose.loadBalancer.enabled .Values.expose.loadBalancer.annotations) }}
+  {{- with (include "harbor.annotations" (dict "root" . "local" $exposeAnnotations)) }}
   annotations:
-    {{- if .Values.expose.clusterIP.enabled }}
-    {{- toYaml .Values.expose.clusterIP.annotations | nindent 4 }}
-    {{- else if .Values.expose.nodePort.enabled }}
-    {{- toYaml .Values.expose.nodePort.annotations | nindent 4 }}
-    {{- else if .Values.expose.loadBalancer.enabled }}
-    {{- toYaml .Values.expose.loadBalancer.annotations | nindent 4 }}
-    {{- end }}
+    {{- . | nindent 4 }}
   {{- end }}
 spec:
   {{- if .Values.expose.clusterIP.enabled }}

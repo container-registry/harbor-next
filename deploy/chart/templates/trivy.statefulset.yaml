@@ -5,6 +5,10 @@ metadata:
   name: {{ include "harbor.fullname" . }}-trivy
   labels:
     {{- include "harbor.componentLabels" (dict "root" . "component" "trivy") | nindent 4 }}
+  {{- with (include "harbor.annotations" (dict "root" . "local" .Values.trivy.annotations)) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 spec:
   {{- if not (and .Values.trivy.autoscaling .Values.trivy.autoscaling.enabled) }}
   replicas: {{ .Values.trivy.replicas }}
@@ -20,11 +24,14 @@ spec:
         checksum/secret: {{ include (print $.Template.BasePath "/trivy.secret.yaml") . | sha256sum }}
         checksum/configmap-env: {{ include (print $.Template.BasePath "/trivy.configmap-env.yaml") . | sha256sum }}
         checksum/secret-env: {{ include (print $.Template.BasePath "/trivy.secret-env.yaml") . | sha256sum }}
-        {{- with .Values.trivy.podAnnotations }}
-        {{- toYaml . | nindent 8 }}
+        {{- with (include "harbor.annotations" (dict "root" . "local" .Values.trivy.podAnnotations)) }}
+        {{- . | nindent 8 }}
         {{- end }}
       labels:
         {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "trivy") | nindent 8 }}
+        {{- with .Values.commonLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         {{- with .Values.trivy.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

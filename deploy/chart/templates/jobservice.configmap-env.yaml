@@ -4,6 +4,10 @@ metadata:
   name: "{{ template "harbor.jobservice" . }}-env"
   labels:
     {{- include "harbor.componentLabels" (dict "root" . "component" "jobservice") | nindent 4 }}
+  {{- with (include "harbor.annotations" (dict "root" . "local" nil)) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 data:
   # Jobservice configuration
   CORE_URL: {{ include "harbor.core.url" . | quote }}

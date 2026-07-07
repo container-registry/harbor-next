@@ -5,6 +5,10 @@ metadata:
   name: "{{ template "harbor.portal" . }}"
   labels:
 {{ include "harbor.labels" . | indent 4 }}
+  {{- with (include "harbor.annotations" (dict "root" . "local" nil)) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 data:
   nginx.conf: |+
     worker_processes auto;

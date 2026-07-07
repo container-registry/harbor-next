@@ -5,6 +5,10 @@ metadata:
   name: {{ include "harbor.fullname" . }}
   labels:
     {{- include "harbor.labels" . | nindent 4 }}
+  {{- with (include "harbor.annotations" (dict "root" . "local" nil)) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 spec:
   {{- with .Values.gateway.parentRefs }}
   parentRefs:
@@ -14,49 +18,43 @@ spec:
   hostnames:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- /* Harbor's path-routing contract lives here, in-chart, so users can't
+         break it: /api/, /service/, /v2/, /chartrepo/, /c/ must reach core;
+         / reaches the portal (or core when the portal is disabled). Users tune
+         cross-cutting fields via gateway.timeouts / .filters / .routeOverrides
+         / .extraRules — never the routing itself. Group keys are `core` and
+         `default`. */}}
+  {{- $core := printf "%s-core" (include "harbor.fullname" .) }}
+  {{- $default := printf "%s-%s" (include "harbor.fullname" .) (ternary "portal" "core" .Values.portal.enabled) }}
+  {{- $rules := list
+        (dict "key" "core"    "paths" (list "/api/" "/service/" "/v2/" "/chartrepo/" "/c/") "backend" $core)
+        (dict "key" "default" "paths" (list "/")                                             "backend" $default) }}
+  {{- $overrides := .Values.gateway.routeOverrides | default dict }}
   rules:
-    # API routes -> Core
+  {{- range $r := $rules }}
     - matches:
+        {{- range $p := $r.paths }}
         - path:
             type: PathPrefix
-            value: /api/
+            value: {{ $p }}
+        {{- end }}
       backendRefs:
-        - name: {{ include "harbor.fullname" . }}-core
+        - name: {{ $r.backend }}
           port: 80
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /service/
-      backendRefs:
-        - name: {{ include "harbor.fullname" . }}-core
-          port: 80
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /v2/
-      backendRefs:
-        - name: {{ include "harbor.fullname" . }}-core
-          port: 80
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /chartrepo/
-      backendRefs:
-        - name: {{ include "harbor.fullname" . }}-core
-          port: 80
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /c/
-      backendRefs:
-        - name: {{ include "harbor.fullname" . }}-core
-          port: 80
-    # Portal (default) — falls back to core when the portal is disabled
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /
-      backendRefs:
-        - name: {{ include "harbor.fullname" . }}-{{ if .Values.portal.enabled }}portal{{ else }}core{{ end }}
-          port: 80
+      {{- /* Per-group timeouts merge over the global default (group wins);
+             per-group filters replace the global list for that group. */}}
+      {{- $timeouts := merge (deepCopy (dig $r.key "timeouts" dict $overrides)) ($.Values.gateway.timeouts | default dict) }}
+      {{- with $timeouts }}
+      timeouts:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- $filters := (dig $r.key "filters" list $overrides) | default $.Values.gateway.filters }}
+      {{- with $filters }}
+      filters:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- end }}
+  {{- with .Values.gateway.extraRules }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 {{- end }}

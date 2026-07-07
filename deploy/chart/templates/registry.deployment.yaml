@@ -12,6 +12,10 @@ metadata:
   name: {{ include "harbor.registry.name" . }}
   labels:
     {{- include "harbor.componentLabels" (dict "root" . "component" "registry") | nindent 4 }}
+  {{- with (include "harbor.annotations" (dict "root" . "local" .Values.registry.annotations)) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 spec:
   {{- if not (and .Values.registry.autoscaling .Values.registry.autoscaling.enabled) }}
   replicas: {{ .Values.registry.replicas }}
@@ -31,11 +35,14 @@ spec:
         checksum/secret: {{ include (print $.Template.BasePath "/registry.secret.yaml") . | sha256sum }}
         checksum/registryctl-configmap: {{ include (print $.Template.BasePath "/registryctl.configmap.yaml") . | sha256sum }}
         checksum/registryctl-secret: {{ include (print $.Template.BasePath "/registryctl.secret.yaml") . | sha256sum }}
-        {{- with .Values.registry.podAnnotations }}
-        {{- toYaml . | nindent 8 }}
+        {{- with (include "harbor.annotations" (dict "root" . "local" .Values.registry.podAnnotations)) }}
+        {{- . | nindent 8 }}
         {{- end }}
       labels:
         {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "registry") | nindent 8 }}
+        {{- with .Values.commonLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         {{- with .Values.registry.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

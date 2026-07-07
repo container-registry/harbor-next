@@ -4,6 +4,10 @@ metadata:
   name: {{ include "harbor.fullname" . }}-core
   labels:
     {{- include "harbor.componentLabels" (dict "root" . "component" "core") | nindent 4 }}
+  {{- with (include "harbor.annotations" (dict "root" . "local" .Values.core.annotations)) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 spec:
   {{- if not (and .Values.core.autoscaling .Values.core.autoscaling.enabled) }}
   replicas: {{ .Values.core.replicas }}
@@ -21,11 +25,14 @@ spec:
       annotations:
         checksum/configmap: {{ include (print $.Template.BasePath "/core.configmap.yaml") . | sha256sum }}
         checksum/secret: {{ include (print $.Template.BasePath "/core.secret.yaml") . | sha256sum }}
-        {{- with .Values.core.podAnnotations }}
-        {{- toYaml . | nindent 8 }}
+        {{- with (include "harbor.annotations" (dict "root" . "local" .Values.core.podAnnotations)) }}
+        {{- . | nindent 8 }}
         {{- end }}
       labels:
         {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "core") | nindent 8 }}
+        {{- with .Values.commonLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         {{- with .Values.core.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

@@ -381,3 +381,35 @@ tests:
           path: spec.template.metadata.annotations["checksum/configmap-env"]
       - exists:
           path: spec.template.metadata.annotations["checksum/secret-env"]
+
+  # Pins: commonAnnotations/commonLabels + trivy.annotations reach the StatefulSet,
+  # component annotation wins on collision, and commonLabels stay out of the selector.
+  - it: should stamp common + component annotations/labels on the StatefulSet
+    template: templates/trivy.statefulset.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trivy.enabled: true
+      commonAnnotations.team: platform
+      commonAnnotations.foo: common
+      commonLabels.tier: backend
+      trivy.annotations.foo: componentwins
+    asserts:
+      - equal:
+          path: metadata.annotations.team
+          value: platform
+      - equal:
+          path: metadata.annotations.foo
+          value: componentwins
+      - equal:
+          path: metadata.labels.tier
+          value: backend
+      - equal:
+          path: spec.template.metadata.annotations.team
+          value: platform
+      - equal:
+          path: spec.template.metadata.labels.tier
+          value: backend
+      - notExists:
+          path: spec.selector.matchLabels.tier

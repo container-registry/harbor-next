@@ -36,6 +36,9 @@ Create chart name and version as used by the chart label.
 
 {{/*
 Common labels
+
+commonLabels are appended AFTER selectorLabels so they land on metadata.labels
+but never on selectors (harbor.selectorLabels is the only thing selectors use).
 */}}
 {{- define "harbor.labels" -}}
 helm.sh/chart: {{ include "harbor.chart" . }}
@@ -44,6 +47,22 @@ helm.sh/chart: {{ include "harbor.chart" . }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- with .Values.commonLabels }}
+{{ toYaml . }}
+{{- end }}
+{{- end }}
+
+{{/*
+Merged annotations: commonAnnotations plus an optional local map (local wins on
+key collision). A fresh (dict) is the merge target so neither source map is mutated.
+Emits nothing when both are empty, so callers can guard with `with`.
+Usage: {{ include "harbor.annotations" (dict "root" . "local" .Values.core.annotations) }}
+*/}}
+{{- define "harbor.annotations" -}}
+{{- $common := .root.Values.commonAnnotations | default dict -}}
+{{- with merge (dict) (.local | default dict) $common }}
+{{- toYaml . }}
+{{- end }}
 {{- end }}
 
 

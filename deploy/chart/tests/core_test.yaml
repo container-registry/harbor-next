@@ -247,3 +247,130 @@ tests:
               secretKeyRef:
                 name: reg-creds
                 key: REGISTRY_CREDENTIAL_PASSWORD
+
+  # ============================================================================
+  # commonAnnotations / commonLabels + per-component annotations
+  # ============================================================================
+
+  # Pins: commonAnnotations stamp the workload object metadata.
+  - it: should stamp commonAnnotations on the Deployment metadata
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      commonAnnotations.team: platform
+    asserts:
+      - equal:
+          path: metadata.annotations.team
+          value: platform
+
+  # Pins: per-component core.annotations stamp the workload object metadata.
+  - it: should stamp core.annotations on the Deployment metadata
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.annotations.foo: bar
+    asserts:
+      - equal:
+          path: metadata.annotations.foo
+          value: bar
+
+  # Pins: on key collision, the component annotation wins over the common one.
+  - it: should let core.annotations win over commonAnnotations on collision
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      commonAnnotations.foo: common
+      core.annotations.foo: componentwins
+    asserts:
+      - equal:
+          path: metadata.annotations.foo
+          value: componentwins
+
+  # Pins: pods included — commonAnnotations also land on the pod template.
+  - it: should stamp commonAnnotations on the pod template metadata
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      commonAnnotations.team: platform
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations.team
+          value: platform
+
+  # Pins: pod-level podAnnotations win over commonAnnotations on collision.
+  - it: should let core.podAnnotations win over commonAnnotations on the pod template
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      commonAnnotations.foo: common
+      core.podAnnotations.foo: podwins
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations.foo
+          value: podwins
+
+  # Pins: commonLabels land on workload + pod metadata.labels.
+  - it: should stamp commonLabels on the Deployment and pod metadata.labels
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      commonLabels.tier: backend
+    asserts:
+      - equal:
+          path: metadata.labels.tier
+          value: backend
+      - equal:
+          path: spec.template.metadata.labels.tier
+          value: backend
+
+  # Pins: commonLabels MUST NOT leak into the selector (immutable field).
+  - it: should NOT put commonLabels into the Deployment selector
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      commonLabels.tier: backend
+    asserts:
+      - notExists:
+          path: spec.selector.matchLabels.tier
+
+  # Pins: commonLabels on a Service land on metadata.labels but NOT spec.selector.
+  - it: should keep commonLabels out of the core Service selector
+    template: templates/core.service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      commonLabels.tier: backend
+    asserts:
+      - equal:
+          path: metadata.labels.tier
+          value: backend
+      - notExists:
+          path: spec.selector.tier
+
+  # Pins: commonAnnotations reach a chart resource that has no local override (Service).
+  - it: should stamp commonAnnotations on the core Service
+    template: templates/core.service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      commonAnnotations.team: platform
+    asserts:
+      - equal:
+          path: metadata.annotations.team
+          value: platform

@@ -5,6 +5,10 @@ metadata:
   name: "{{ template "harbor.trivy" . }}"
   labels:
     {{- include "harbor.componentLabels" (dict "root" . "component" "trivy") | nindent 4 }}
+  {{- with (include "harbor.annotations" (dict "root" . "local" nil)) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 spec:
   ports:
     - name: http-trivy

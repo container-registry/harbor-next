@@ -5,6 +5,10 @@ metadata:
   name: {{ include "harbor.fullname" . }}-exporter
   labels:
     {{- include "harbor.componentLabels" (dict "root" . "component" "exporter") | nindent 4 }}
+  {{- with (include "harbor.annotations" (dict "root" . "local" .Values.exporter.annotations)) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 spec:
   replicas: {{ .Values.exporter.replicas }}
   revisionHistoryLimit: {{ .Values.exporter.revisionHistoryLimit | default .Values.global.revisionHistoryLimit }}
@@ -20,11 +24,14 @@ spec:
       annotations:
         checksum/configmap-env: {{ include (print $.Template.BasePath "/exporter.configmap-env.yaml") . | sha256sum }}
         checksum/secret: {{ include (print $.Template.BasePath "/exporter.secret.yaml") . | sha256sum }}
-        {{- with .Values.exporter.podAnnotations }}
-        {{- toYaml . | nindent 8 }}
+        {{- with (include "harbor.annotations" (dict "root" . "local" .Values.exporter.podAnnotations)) }}
+        {{- . | nindent 8 }}
         {{- end }}
       labels:
         {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "exporter") | nindent 8 }}
+        {{- with .Values.commonLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         {{- with .Values.exporter.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
