@@ -20,7 +20,7 @@ env:
   REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
   OPS_REGISTRY_PROJECT: ops
   OPS_ARTIFACT_REPOSITORY: hz-hopper/8gcr-rolling
-  OPS_REGISTRY_USERNAME: ${{ vars.OPS_REGISTRY_USERNAME || vars.REGISTRY_USERNAME }}
+  OPS_REGISTRY_USERNAME: ${{ vars.OPS_REGISTRY_USERNAME || 'robot_8gears.container-registry.dev' }}
 
 jobs:
   publish:
