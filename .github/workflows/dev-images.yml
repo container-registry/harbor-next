@@ -19,7 +19,8 @@ concurrency:
 
 env:
   REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
-  REGISTRY_PROJECT: 8gcr
+  IMAGE_REGISTRY_PROJECT: 8gcr
+  DEPLOY_REGISTRY_PROJECT: ops
 
 jobs:
   build:
@@ -103,7 +104,7 @@ jobs:
             TRIVY_VERSION=${{ env.TRIVY_VERSION }}
             TRIVY_BASE_IMAGE_VERSION=${{ env.TRIVY_BASE_IMAGE_VERSION }}
             HARBOR_SCANNER_TRIVY_VERSION=${{ env.HARBOR_SCANNER_TRIVY_VERSION }}
-          tags: ${{ env.REGISTRY_ADDRESS }}/${{ env.REGISTRY_PROJECT }}/harbor-${{ matrix.component }}
+          tags: ${{ env.REGISTRY_ADDRESS }}/${{ env.IMAGE_REGISTRY_PROJECT }}/harbor-${{ matrix.component }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
@@ -160,7 +161,7 @@ jobs:
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests
         env:
-          IMAGE: ${{ env.REGISTRY_ADDRESS }}/${{ env.REGISTRY_PROJECT }}/harbor-${{ matrix.component }}
+          IMAGE: ${{ env.REGISTRY_ADDRESS }}/${{ env.IMAGE_REGISTRY_PROJECT }}/harbor-${{ matrix.component }}
         run: |
           # shellcheck disable=SC2046
           docker buildx imagetools create \
@@ -207,11 +208,11 @@ jobs:
             -exec sed -i "s/__IMAGE_REVISION__/${GITHUB_SHA}/g" {} +
 
           flux push artifact \
-            "oci://${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/deploy:${DEV_TAG}" \
+            "oci://${REGISTRY_ADDRESS}/${DEPLOY_REGISTRY_PROJECT}/deploy:${DEV_TAG}" \
             --path="${BUNDLE_PATH}" \
             --source="${{ github.server_url }}/${{ github.repository }}" \
             --revision="${GITHUB_REF_NAME}@sha1:${GITHUB_SHA}"
 
           oras tag \
-            "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/deploy:${DEV_TAG}" \
+            "${REGISTRY_ADDRESS}/${DEPLOY_REGISTRY_PROJECT}/deploy:${DEV_TAG}" \
             latest

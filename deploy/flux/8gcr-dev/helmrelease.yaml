@@ -23,7 +23,7 @@ spec:
     image:
       pullPolicy: Always
     imagePullSecrets:
-      - name: harbor-8gcr-pull
+      - name: harbor-system-pull
 
     # Admin password provisioned by secrets.sops.yaml in this bundle.
     existingSecretAdminPassword: harbor-admin

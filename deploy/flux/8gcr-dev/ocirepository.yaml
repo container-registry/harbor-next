@@ -5,8 +5,8 @@ metadata:
   namespace: 8gcr-dev-main
 spec:
   interval: 5m
-  url: oci://8gears.container-registry.com/8gcr/charts/harbor-next
+  url: oci://8gears.container-registry.com/ops/charts/harbor-next
   ref:
     tag: 2.0.0
   secretRef:
-    name: harbor-8gcr-pull
+    name: harbor-system-pull

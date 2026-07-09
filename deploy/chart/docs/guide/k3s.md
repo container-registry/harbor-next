@@ -16,7 +16,7 @@ Pull the Harbor Helm chart from the OCI registry.
 1. Pull the chart:
 
    ```bash
-   helm pull oci://8gears.container-registry.com/8gcr/charts/harbor-next
+   helm pull oci://8gears.container-registry.com/ops/charts/harbor-next
    ```
 
 2. Decompress the downloaded chart:

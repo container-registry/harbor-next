@@ -11,7 +11,7 @@ A modern, production-ready Helm chart for [Harbor Next](https://github.com/conta
 kubectl create secret generic my-harbor-db \
   --from-literal=POSTGRESQL_PASSWORD='your-strong-password'
 
-helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-next \
+helm install my-harbor oci://8gears.container-registry.com/ops/charts/harbor-next \
   --set externalURL=https://harbor.example.com \
   --set database.host=my-postgres.example.com \
   --set database.existingSecret=my-harbor-db
@@ -141,7 +141,7 @@ kubectl create namespace harbor
 kubectl -n harbor create secret generic my-harbor-db \
   --from-literal=POSTGRESQL_PASSWORD='your-strong-password'
 
-helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-next \
+helm install my-harbor oci://8gears.container-registry.com/ops/charts/harbor-next \
   --namespace harbor \
   --set externalURL=https://harbor.example.com \
   --set database.host=postgres.example.com \
@@ -151,7 +151,7 @@ helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-ne
 ### With Values File
 
 ```bash
-helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-next \
+helm install my-harbor oci://8gears.container-registry.com/ops/charts/harbor-next \
   --namespace harbor \
   --create-namespace \
   -f values-production.yaml
