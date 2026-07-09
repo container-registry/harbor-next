@@ -22,7 +22,7 @@ jobs:
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     env:
       REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
-      REGISTRY_PROJECT: 8gcr-dev
+      REGISTRY_PROJECT: 8gcr
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -86,7 +86,7 @@ jobs:
           FLOATING_TAG: ${{ steps.version.outputs.floating_tag }}
         run: |
           helm push "dist/harbor-next-${FLOATING_TAG}.tgz" \
-            "oci://${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/chart"
+            "oci://${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts"
 
       - name: Add immutable per-commit tag on chart
         # The per-push tag (3.0.0-main.<sha7>) is a stable audit-trail
@@ -97,7 +97,7 @@ jobs:
           FLOATING_TAG: ${{ steps.version.outputs.floating_tag }}
         run: |
           oras tag \
-            "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/chart/harbor-next:${FLOATING_TAG}" \
+            "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts/harbor-next:${FLOATING_TAG}" \
             "${VERSION}"
 
       - name: Push Flux deploy bundle
@@ -105,7 +105,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           IMAGE_REVISION: ${{ github.sha }}
         run: |
-          BUNDLE_PATH="${RUNNER_TEMP}/8gcr-dev-flux"
+          BUNDLE_PATH="${RUNNER_TEMP}/8gcr-flux"
           rm -rf "${BUNDLE_PATH}"
           cp -R deploy/flux/8gcr-dev "${BUNDLE_PATH}"
           find "${BUNDLE_PATH}" -type f -name '*.yaml' \
@@ -198,7 +198,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           IMAGE_REVISION: ${{ github.sha }}
         run: |
-          BUNDLE_PATH="${RUNNER_TEMP}/8gcr-dev-flux"
+          BUNDLE_PATH="${RUNNER_TEMP}/8gcr-flux"
           rm -rf "${BUNDLE_PATH}"
           cp -R deploy/flux/8gcr-dev "${BUNDLE_PATH}"
           find "${BUNDLE_PATH}" -type f -name '*.yaml' \

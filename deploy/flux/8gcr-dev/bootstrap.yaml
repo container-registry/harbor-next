@@ -1,10 +1,10 @@
-# One-time bootstrap for the 8gcr-dev Harbor deployment on hz-hopper.
+# One-time bootstrap for the 8gcr Harbor deployment on hz-hopper.
 #
 # Apply once per cluster:
 #   kubectl apply -f https://raw.githubusercontent.com/container-registry/harbor-next/main/deploy/flux/8gcr-dev/bootstrap.yaml
 #
 # This creates the OCIRepository + Kustomization in flux-system that fetches
-# the deploy bundle at oci://8gears.container-registry.com/8gcr-dev/deploy:latest
+# the deploy bundle at oci://8gears.container-registry.com/8gcr/deploy:latest
 # with the existing flux-system registry pull secret and reconciles every
 # resource in it (including SOPS-encrypted secrets).
 #
@@ -13,7 +13,7 @@
 #
 # Prerequisites on the cluster:
 #   - FluxCD v2 with source-controller, kustomize-controller, helm-controller
-#   - Secret/harbor-8gcr-dev-pull in flux-system (dockerconfigjson for
+#   - Secret/harbor-8gcr-pull in flux-system (dockerconfigjson for
 #     8gears.container-registry.com OCI artifact pulls)
 #   - Secret/sops-age in flux-system (holds the age private key matching
 #     age18jfefmcak9zk6jrh7j59ap0rg3zxg577suvmlyrgm3sn0l28zq4slcu94r)
@@ -25,20 +25,20 @@
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: OCIRepository
 metadata:
-  name: harbor-8gcr-dev
+  name: harbor-8gcr
   namespace: flux-system
 spec:
   interval: 5m
-  url: oci://8gears.container-registry.com/8gcr-dev/deploy
+  url: oci://8gears.container-registry.com/8gcr/deploy
   ref:
     tag: latest
   secretRef:
-    name: harbor-8gcr-dev-pull
+    name: harbor-8gcr-pull
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: harbor-8gcr-dev
+  name: harbor-8gcr
   namespace: flux-system
 spec:
   interval: 5m
@@ -47,7 +47,7 @@ spec:
   wait: true
   sourceRef:
     kind: OCIRepository
-    name: harbor-8gcr-dev
+  name: harbor-8gcr
   path: ./
   decryption:
     provider: sops

@@ -23,7 +23,7 @@ spec:
     image:
       pullPolicy: Always
     imagePullSecrets:
-      - name: harbor-8gcr-dev-pull
+      - name: harbor-8gcr-pull
 
     # Admin password provisioned by secrets.sops.yaml in this bundle.
     existingSecretAdminPassword: harbor-admin
@@ -73,7 +73,7 @@ spec:
       auth:
         enabled: false
 
-    # ---- Component image pins (continuous deploy via 8gcr-dev/:latest) ----
+    # ---- Component image pins (continuous deploy via 8gcr/:latest) ----
     # The dev image pipeline rewrites __IMAGE_REVISION__ before publishing the
     # Flux bundle. That pod-template annotation forces a rollout after the
     # pipeline moves the component :latest tags, and imagePullPolicy: Always
@@ -82,7 +82,7 @@ spec:
       podAnnotations:
         deploy.8gears.io/image-revision: "__IMAGE_REVISION__"
       image:
-        repository: 8gears.container-registry.com/8gcr-dev/harbor-core
+        repository: 8gears.container-registry.com/8gcr/harbor-core
         tag: latest
       replicas: 1
 
@@ -90,7 +90,7 @@ spec:
       podAnnotations:
         deploy.8gears.io/image-revision: "__IMAGE_REVISION__"
       image:
-        repository: 8gears.container-registry.com/8gcr-dev/harbor-jobservice
+        repository: 8gears.container-registry.com/8gcr/harbor-jobservice
         tag: latest
       replicas: 1
       persistence:
@@ -102,11 +102,11 @@ spec:
       podAnnotations:
         deploy.8gears.io/image-revision: "__IMAGE_REVISION__"
       image:
-        repository: 8gears.container-registry.com/8gcr-dev/harbor-registry
+        repository: 8gears.container-registry.com/8gcr/harbor-registry
         tag: latest
       controller:
         image:
-          repository: 8gears.container-registry.com/8gcr-dev/harbor-registryctl
+          repository: 8gears.container-registry.com/8gcr/harbor-registryctl
           tag: latest
       replicas: 1
       persistence:
@@ -118,7 +118,7 @@ spec:
       podAnnotations:
         deploy.8gears.io/image-revision: "__IMAGE_REVISION__"
       image:
-        repository: 8gears.container-registry.com/8gcr-dev/harbor-portal
+        repository: 8gears.container-registry.com/8gcr/harbor-portal
         tag: latest
       replicas: 1
 
@@ -127,7 +127,7 @@ spec:
       podAnnotations:
         deploy.8gears.io/image-revision: "__IMAGE_REVISION__"
       image:
-        repository: 8gears.container-registry.com/8gcr-dev/harbor-exporter
+        repository: 8gears.container-registry.com/8gcr/harbor-exporter
         tag: latest
       replicas: 1
 
@@ -136,7 +136,7 @@ spec:
       podAnnotations:
         deploy.8gears.io/image-revision: "__IMAGE_REVISION__"
       image:
-        repository: 8gears.container-registry.com/8gcr-dev/harbor-trivy-adapter
+        repository: 8gears.container-registry.com/8gcr/harbor-trivy-adapter
         tag: latest
       replicas: 1
 

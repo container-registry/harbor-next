@@ -19,7 +19,7 @@ concurrency:
 
 env:
   REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
-  REGISTRY_PROJECT: 8gcr-dev
+  REGISTRY_PROJECT: 8gcr
 
 jobs:
   build:
@@ -200,7 +200,7 @@ jobs:
 
       - name: Publish Flux deploy bundle
         run: |
-          BUNDLE_PATH="${RUNNER_TEMP}/8gcr-dev-flux"
+          BUNDLE_PATH="${RUNNER_TEMP}/8gcr-flux"
           rm -rf "${BUNDLE_PATH}"
           cp -R deploy/flux/8gcr-dev "${BUNDLE_PATH}"
           find "${BUNDLE_PATH}" -type f -name '*.yaml' \
