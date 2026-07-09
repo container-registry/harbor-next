@@ -29,13 +29,16 @@ spec:
         {{- . | nindent 8 }}
         {{- end }}
       labels:
-        {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "core") | nindent 8 }}
+        {{- /* Selector labels render last: user commonLabels/podLabels must not
+               override them, or the pod labels stop matching the immutable
+               spec.selector.matchLabels and the API rejects the workload. */}}
         {{- with .Values.commonLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
         {{- with .Values.core.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
+        {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "core") | nindent 8 }}
     spec:
       {{- include "harbor.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "harbor.serviceAccountName" (dict "root" . "component" "core" "serviceAccount" .Values.core.serviceAccount) }}

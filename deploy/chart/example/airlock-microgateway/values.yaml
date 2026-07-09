@@ -8,7 +8,10 @@
 
 # Must match the hostname clients use through the Gateway (drives registry
 # redirects and the token realm).
-externalURL: "https://harbor.mgw.local"
+# Carries :8443 to match the non-privileged `kubectl port-forward 8443:443` in the
+# README test: externalURL drives the registry token realm, so the port clients
+# use must be reachable. Behind a real LB on 443, drop the port.
+externalURL: "https://harbor.mgw.local:8443"
 harborAdminPassword: "Harbor12345"
 
 # The Airlock Gateway is the front door - no in-cluster Ingress.

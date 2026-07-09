@@ -28,13 +28,13 @@ spec:
         {{- . | nindent 8 }}
         {{- end }}
       labels:
-        {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "trivy") | nindent 8 }}
         {{- with .Values.commonLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
         {{- with .Values.trivy.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
+        {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "trivy") | nindent 8 }}
     spec:
       {{- include "harbor.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "harbor.serviceAccountName" (dict "root" . "component" "trivy" "serviceAccount" .Values.trivy.serviceAccount) }}

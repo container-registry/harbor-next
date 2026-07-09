@@ -28,13 +28,13 @@ spec:
         {{- . | nindent 8 }}
         {{- end }}
       labels:
-        {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "exporter") | nindent 8 }}
         {{- with .Values.commonLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
         {{- with .Values.exporter.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
+        {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "exporter") | nindent 8 }}
     spec:
       {{- include "harbor.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "harbor.serviceAccountName" (dict "root" . "component" "exporter" "serviceAccount" .Values.exporter.serviceAccount) }}

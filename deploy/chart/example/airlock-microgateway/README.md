@@ -73,7 +73,7 @@ Point `harbor.mgw.local` at the Gateway. On a k3d/kind cluster the simplest path
 Docker daemon's networking is out of the loop:
 
 ```bash
-kubectl -n harbor port-forward svc/harbor 8443:443
+kubectl -n harbor port-forward svc/harbor 8443:443 &
 echo "127.0.0.1 harbor.mgw.local" | sudo tee -a /etc/hosts
 
 crane auth login harbor.mgw.local:8443 -u admin -p Harbor12345 --insecure
@@ -98,8 +98,9 @@ untouched.
 
 ## Notes
 
-- `externalURL` must be the hostname clients use through the Gateway; it drives
-  registry redirects and the token realm.
+- `externalURL` must be the exact host **and port** clients use through the Gateway;
+  it drives registry redirects and the token realm. It carries `:8443` here to match
+  the port-forward above — behind a real LB on 443, drop the port.
 - The example registry and PostgreSQL use `emptyDir`. A rolling upgrade wipes them —
   use real storage (S3/PVC + managed DB) for anything persistent.
 - Airlock emits rich Envoy access logs (ECS JSON) — `kubectl -n harbor logs deploy/harbor`.
