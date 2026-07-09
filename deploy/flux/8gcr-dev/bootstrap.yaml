@@ -5,13 +5,16 @@
 #
 # This creates the OCIRepository + Kustomization in flux-system that fetches
 # the deploy bundle at oci://8gears.container-registry.com/8gcr-dev/deploy:latest
-# and reconciles every resource in it (including SOPS-encrypted secrets).
+# with the existing flux-system registry pull secret and reconciles every
+# resource in it (including SOPS-encrypted secrets).
 #
 # Re-applying is a no-op. After this single step, all subsequent changes flow
 # through chart-publish.yml → OCI artifact → Flux reconcile.
 #
 # Prerequisites on the cluster:
 #   - FluxCD v2 with source-controller, kustomize-controller, helm-controller
+#   - Secret/harbor-8gcr-dev-pull in flux-system (dockerconfigjson for
+#     8gears.container-registry.com OCI artifact pulls)
 #   - Secret/sops-age in flux-system (holds the age private key matching
 #     age18jfefmcak9zk6jrh7j59ap0rg3zxg577suvmlyrgm3sn0l28zq4slcu94r)
 #   - CloudNativePG operator in cnpg-system (provisions Postgres via extraManifests)
@@ -29,6 +32,8 @@ spec:
   url: oci://8gears.container-registry.com/8gcr-dev/deploy
   ref:
     tag: latest
+  secretRef:
+    name: harbor-8gcr-dev-pull
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization

@@ -20,6 +20,10 @@ spec:
   values:
     externalURL: https://8gcr.container-registry.dev
     logLevel: info
+    image:
+      pullPolicy: Always
+    imagePullSecrets:
+      - name: harbor-8gcr-dev-pull
 
     # Admin password provisioned by secrets.sops.yaml in this bundle.
     existingSecretAdminPassword: harbor-admin
@@ -69,18 +73,22 @@ spec:
       auth:
         enabled: false
 
-    # ---- Component image pins (continuous deploy via existing 8gcr-dev/:latest) ----
-    # The :latest tag in 8gcr-dev/ is maintained by an out-of-band buildah pipeline
-    # (not the harbor-next GitHub workflows). HelmRelease's 5-min OCIRepository
-    # interval picks up new chart digests; component images update via the
-    # imagePullPolicy + the moving :latest tag.
+    # ---- Component image pins (continuous deploy via 8gcr-dev/:latest) ----
+    # The dev image pipeline rewrites __IMAGE_REVISION__ before publishing the
+    # Flux bundle. That pod-template annotation forces a rollout after the
+    # pipeline moves the component :latest tags, and imagePullPolicy: Always
+    # makes the restarted pods pull the new digest.
     core:
+      podAnnotations:
+        deploy.8gears.io/image-revision: "__IMAGE_REVISION__"
       image:
         repository: 8gears.container-registry.com/8gcr-dev/harbor-core
         tag: latest
       replicas: 1
 
     jobservice:
+      podAnnotations:
+        deploy.8gears.io/image-revision: "__IMAGE_REVISION__"
       image:
         repository: 8gears.container-registry.com/8gcr-dev/harbor-jobservice
         tag: latest
@@ -91,6 +99,8 @@ spec:
         size: 1Gi
 
     registry:
+      podAnnotations:
+        deploy.8gears.io/image-revision: "__IMAGE_REVISION__"
       image:
         repository: 8gears.container-registry.com/8gcr-dev/harbor-registry
         tag: latest
@@ -105,6 +115,8 @@ spec:
         size: 10Gi
 
     portal:
+      podAnnotations:
+        deploy.8gears.io/image-revision: "__IMAGE_REVISION__"
       image:
         repository: 8gears.container-registry.com/8gcr-dev/harbor-portal
         tag: latest
@@ -112,6 +124,8 @@ spec:
 
     exporter:
       enabled: true
+      podAnnotations:
+        deploy.8gears.io/image-revision: "__IMAGE_REVISION__"
       image:
         repository: 8gears.container-registry.com/8gcr-dev/harbor-exporter
         tag: latest
@@ -119,6 +133,8 @@ spec:
 
     trivy:
       enabled: true
+      podAnnotations:
+        deploy.8gears.io/image-revision: "__IMAGE_REVISION__"
       image:
         repository: 8gears.container-registry.com/8gcr-dev/harbor-trivy-adapter
         tag: latest

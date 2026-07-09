@@ -1,0 +1,217 @@
+name: Publish Dev Images
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "CLAUDE.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-images-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
+  REGISTRY_PROJECT: 8gcr-dev
+
+jobs:
+  build:
+    name: "${{ matrix.component }} (${{ matrix.platform }})"
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter]
+        platform:
+          - linux/amd64
+          - linux/arm64
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+    steps:
+      - name: Prepare
+        run: |
+          platform=${{ matrix.platform }}
+          echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
+          echo "DEV_TAG=main-${GITHUB_SHA:0:7}" >> "$GITHUB_ENV"
+          if [ -n "$BUILDX_HOST" ]; then
+            echo "BUILDX_HOST=$BUILDX_HOST" >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Load versions
+        run: grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
+
+      - name: Setup Go
+        if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
+        uses: ./.github/actions/setup-go-cached
+        with:
+          go-version-file: src/go.mod
+          go-sum-path: src/go.sum
+
+      - name: Install Task
+        if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
+        uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
+        with:
+          version: 3.49.1
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate API code
+        if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
+        run: task build:gen-apis
+
+      - name: Compile Go binary
+        if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
+        run: task build:binary:${{ matrix.component }}:${{ env.PLATFORM_PAIR }} GIT_COMMIT="${GITHUB_SHA:0:8}"
+
+      - uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
+        if: env.BUILDX_HOST == ''
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+        with:
+          driver: ${{ env.BUILDX_HOST && 'remote' || '' }}
+          endpoint: ${{ env.BUILDX_HOST }}
+
+      - name: Log in to registry
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ${{ env.REGISTRY_ADDRESS }}
+          username: ${{ vars.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          file: dockerfile/${{ matrix.component }}.dockerfile
+          platforms: ${{ matrix.platform }}
+          build-args: |
+            ALPINE_VERSION=${{ env.ALPINE_VERSION }}
+            LPROBE_VERSION=${{ env.LPROBE_VERSION }}
+            NGINX_VERSION=${{ env.NGINX_VERSION }}
+            BUN_VERSION=${{ env.BUN_VERSION }}
+            GO_VERSION=${{ env.GO_VERSION }}
+            DISTRIBUTION_VERSION=${{ env.DISTRIBUTION_VERSION }}
+            TRIVY_VERSION=${{ env.TRIVY_VERSION }}
+            TRIVY_BASE_IMAGE_VERSION=${{ env.TRIVY_BASE_IMAGE_VERSION }}
+            HARBOR_SCANNER_TRIVY_VERSION=${{ env.HARBOR_SCANNER_TRIVY_VERSION }}
+          tags: ${{ env.REGISTRY_ADDRESS }}/${{ env.REGISTRY_PROJECT }}/harbor-${{ matrix.component }}
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+
+      - name: Export digest
+        run: |
+          mkdir -p "${{ runner.temp }}/digests"
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dev-digest-${{ matrix.component }}-${{ env.PLATFORM_PAIR }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: "Publish ${{ matrix.component }} tags"
+    needs: [build]
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter]
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+    steps:
+      - name: Prepare
+        run: |
+          echo "DEV_TAG=main-${GITHUB_SHA:0:7}" >> "$GITHUB_ENV"
+          if [ -n "$BUILDX_HOST" ]; then
+            echo "BUILDX_HOST=$BUILDX_HOST" >> "$GITHUB_ENV"
+          fi
+
+      - name: Download digests
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: dev-digest-${{ matrix.component }}-*
+          merge-multiple: true
+
+      - name: Log in to registry
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ${{ env.REGISTRY_ADDRESS }}
+          username: ${{ vars.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+        with:
+          driver: ${{ env.BUILDX_HOST && 'remote' || '' }}
+          endpoint: ${{ env.BUILDX_HOST }}
+
+      - name: Create manifest list and push
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          IMAGE: ${{ env.REGISTRY_ADDRESS }}/${{ env.REGISTRY_PROJECT }}/harbor-${{ matrix.component }}
+        run: |
+          # shellcheck disable=SC2046
+          docker buildx imagetools create \
+            -t "${IMAGE}:${DEV_TAG}" \
+            -t "${IMAGE}:latest" \
+            $(printf "${IMAGE}@sha256:%s " *)
+
+  publish-deploy-bundle:
+    name: Publish rolling Flux bundle
+    needs: [merge]
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Prepare
+        run: |
+          echo "DEV_TAG=main-${GITHUB_SHA:0:7}" >> "$GITHUB_ENV"
+
+      - name: Setup ORAS
+        uses: oras-project/setup-oras@5c0b487ce3fe0ce3ab0d034e63669e426e294e4d # v1.2.3
+        with:
+          version: 1.2.0
+
+      - name: Setup Flux CLI
+        uses: fluxcd/flux2/action@8d5f40dca5aa5d3c0fc3414457dda15a0ac92fa4 # v2.4.0
+        with:
+          version: 2.4.0
+
+      - name: Registry login
+        env:
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: |
+          echo "${REGISTRY_PASSWORD}" | oras login "${REGISTRY_ADDRESS}" \
+            --username "${{ vars.REGISTRY_USERNAME }}" --password-stdin
+
+      - name: Publish Flux deploy bundle
+        run: |
+          BUNDLE_PATH="${RUNNER_TEMP}/8gcr-dev-flux"
+          rm -rf "${BUNDLE_PATH}"
+          cp -R deploy/flux/8gcr-dev "${BUNDLE_PATH}"
+          find "${BUNDLE_PATH}" -type f -name '*.yaml' \
+            -exec sed -i "s/__IMAGE_REVISION__/${GITHUB_SHA}/g" {} +
+
+          flux push artifact \
+            "oci://${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/deploy:${DEV_TAG}" \
+            --path="${BUNDLE_PATH}" \
+            --source="${{ github.server_url }}/${{ github.repository }}" \
+            --revision="${GITHUB_REF_NAME}@sha1:${GITHUB_SHA}"
+
+          oras tag \
+            "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/deploy:${DEV_TAG}" \
+            latest

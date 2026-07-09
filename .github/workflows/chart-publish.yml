@@ -103,10 +103,17 @@ jobs:
       - name: Push Flux deploy bundle
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          IMAGE_REVISION: ${{ github.sha }}
         run: |
+          BUNDLE_PATH="${RUNNER_TEMP}/8gcr-dev-flux"
+          rm -rf "${BUNDLE_PATH}"
+          cp -R deploy/flux/8gcr-dev "${BUNDLE_PATH}"
+          find "${BUNDLE_PATH}" -type f -name '*.yaml' \
+            -exec sed -i "s/__IMAGE_REVISION__/${IMAGE_REVISION}/g" {} +
+
           flux push artifact \
             "oci://${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/deploy:${VERSION}" \
-            --path=./deploy/flux/8gcr-dev \
+            --path="${BUNDLE_PATH}" \
             --source="${{ github.server_url }}/${{ github.repository }}" \
             --revision="${GITHUB_REF_NAME}@sha1:${GITHUB_SHA}"
 
@@ -189,9 +196,16 @@ jobs:
       - name: Push Flux deploy bundle
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          IMAGE_REVISION: ${{ github.sha }}
         run: |
+          BUNDLE_PATH="${RUNNER_TEMP}/8gcr-dev-flux"
+          rm -rf "${BUNDLE_PATH}"
+          cp -R deploy/flux/8gcr-dev "${BUNDLE_PATH}"
+          find "${BUNDLE_PATH}" -type f -name '*.yaml' \
+            -exec sed -i "s/__IMAGE_REVISION__/${IMAGE_REVISION}/g" {} +
+
           flux push artifact \
             "oci://${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/deploy:${VERSION}" \
-            --path=./deploy/flux/8gcr-dev \
+            --path="${BUNDLE_PATH}" \
             --source="${{ github.server_url }}/${{ github.repository }}" \
             --revision="${{ github.event.release.tag_name }}@sha1:${{ github.sha }}"

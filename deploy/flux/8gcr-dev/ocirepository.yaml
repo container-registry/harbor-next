@@ -12,4 +12,5 @@ spec:
     # workflow rewrites this tag on every push to main; the underlying
     # versioned tags (3.0.0-main.<sha7>) stay immutable for traceability.
     tag: 3.0.0-dev
-  # 8gcr-dev is a public Harbor project — anonymous pulls work, no secretRef.
+  secretRef:
+    name: harbor-8gcr-dev-pull
