@@ -106,7 +106,8 @@ spec:
   filterTags:
     pattern: ^latest$
   policy:
-    alphabetical: {}
+    alphabetical:
+      order: asc
   digestReflectionPolicy: Always
   interval: 1m
 ---
@@ -121,7 +122,8 @@ spec:
   filterTags:
     pattern: ^latest$
   policy:
-    alphabetical: {}
+    alphabetical:
+      order: asc
   digestReflectionPolicy: Always
   interval: 1m
 ---
@@ -136,7 +138,8 @@ spec:
   filterTags:
     pattern: ^latest$
   policy:
-    alphabetical: {}
+    alphabetical:
+      order: asc
   digestReflectionPolicy: Always
   interval: 1m
 ---
@@ -151,7 +154,8 @@ spec:
   filterTags:
     pattern: ^latest$
   policy:
-    alphabetical: {}
+    alphabetical:
+      order: asc
   digestReflectionPolicy: Always
   interval: 1m
 ---
@@ -166,7 +170,8 @@ spec:
   filterTags:
     pattern: ^latest$
   policy:
-    alphabetical: {}
+    alphabetical:
+      order: asc
   digestReflectionPolicy: Always
   interval: 1m
 ---
@@ -181,7 +186,8 @@ spec:
   filterTags:
     pattern: ^latest$
   policy:
-    alphabetical: {}
+    alphabetical:
+      order: asc
   digestReflectionPolicy: Always
   interval: 1m
 ---
@@ -196,7 +202,8 @@ spec:
   filterTags:
     pattern: ^latest$
   policy:
-    alphabetical: {}
+    alphabetical:
+      order: asc
   digestReflectionPolicy: Always
   interval: 1m
 ---

@@ -45,7 +45,7 @@ spec:
   interval: 5m
   timeout: 10m
   prune: true
-  wait: true
+  wait: false
   sourceRef:
     kind: OCIRepository
   name: harbor-8gcr
