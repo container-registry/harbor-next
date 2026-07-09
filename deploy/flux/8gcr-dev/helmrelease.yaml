@@ -74,13 +74,14 @@ spec:
         enabled: false
 
     # ---- Component image pins (continuous deploy via 8gcr/:latest) ----
-    # The dev image pipeline rewrites __IMAGE_REVISION__ before publishing the
-    # Flux bundle. That pod-template annotation forces a rollout after the
-    # pipeline moves the component :latest tags, and imagePullPolicy: Always
-    # makes the restarted pods pull the new digest.
+    # Flux image automation follows each mutable latest tag by digest and
+    # rewrites these pod-template annotations in this branch. The branch push
+    # then publishes the bundle to ops/hz-hopper/8gcr-rolling, Flux applies the
+    # changed HelmRelease, and Kubernetes restarts pods with imagePullPolicy:
+    # Always so they pull the new digest behind latest.
     core:
       podAnnotations:
-        deploy.8gears.io/image-revision: "__IMAGE_REVISION__"
+        deploy.8gears.io/image-revision: "latest" # {"$imagepolicy": "flux-system:harbor-core:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-core
         tag: latest
@@ -88,7 +89,7 @@ spec:
 
     jobservice:
       podAnnotations:
-        deploy.8gears.io/image-revision: "__IMAGE_REVISION__"
+        deploy.8gears.io/image-revision: "latest" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-jobservice
         tag: latest
@@ -100,7 +101,8 @@ spec:
 
     registry:
       podAnnotations:
-        deploy.8gears.io/image-revision: "__IMAGE_REVISION__"
+        deploy.8gears.io/image-revision: "latest" # {"$imagepolicy": "flux-system:harbor-registry:digest"}
+        deploy.8gears.io/registryctl-image-revision: "latest" # {"$imagepolicy": "flux-system:harbor-registryctl:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-registry
         tag: latest
@@ -116,7 +118,7 @@ spec:
 
     portal:
       podAnnotations:
-        deploy.8gears.io/image-revision: "__IMAGE_REVISION__"
+        deploy.8gears.io/image-revision: "latest" # {"$imagepolicy": "flux-system:harbor-portal:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-portal
         tag: latest
@@ -125,7 +127,7 @@ spec:
     exporter:
       enabled: true
       podAnnotations:
-        deploy.8gears.io/image-revision: "__IMAGE_REVISION__"
+        deploy.8gears.io/image-revision: "latest" # {"$imagepolicy": "flux-system:harbor-exporter:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-exporter
         tag: latest
@@ -134,7 +136,7 @@ spec:
     trivy:
       enabled: true
       podAnnotations:
-        deploy.8gears.io/image-revision: "__IMAGE_REVISION__"
+        deploy.8gears.io/image-revision: "latest" # {"$imagepolicy": "flux-system:harbor-trivy-adapter:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-trivy-adapter
         tag: latest

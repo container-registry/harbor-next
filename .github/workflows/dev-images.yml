@@ -20,7 +20,6 @@ concurrency:
 env:
   REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
   IMAGE_REGISTRY_PROJECT: 8gcr
-  DEPLOY_REGISTRY_PROJECT: ops
 
 jobs:
   build:
@@ -106,6 +105,8 @@ jobs:
             HARBOR_SCANNER_TRIVY_VERSION=${{ env.HARBOR_SCANNER_TRIVY_VERSION }}
           tags: ${{ env.REGISTRY_ADDRESS }}/${{ env.IMAGE_REGISTRY_PROJECT }}/harbor-${{ matrix.component }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+          provenance: mode=max
+          sbom: true
 
       - name: Export digest
         run: |
@@ -169,12 +170,13 @@ jobs:
             -t "${IMAGE}:latest" \
             $(printf "${IMAGE}@sha256:%s " *)
 
-  publish-deploy-bundle:
-    name: Publish rolling Flux bundle
+  sign:
+    name: Sign dev images
     needs: [merge]
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -182,37 +184,31 @@ jobs:
         run: |
           echo "DEV_TAG=main-${GITHUB_SHA:0:7}" >> "$GITHUB_ENV"
 
-      - name: Setup ORAS
-        uses: oras-project/setup-oras@5c0b487ce3fe0ce3ab0d034e63669e426e294e4d # v1.2.3
+      - name: Setup Go
+        uses: ./.github/actions/setup-go-cached
         with:
-          version: 1.2.0
+          go-version-file: src/go.mod
+          go-sum-path: src/go.sum
 
-      - name: Setup Flux CLI
-        uses: fluxcd/flux2/action@8d5f40dca5aa5d3c0fc3414457dda15a0ac92fa4 # v2.4.0
+      - name: Install crane
+        run: go install github.com/google/go-containerregistry/cmd/crane@v0.20.3
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
+
+      - name: Log in to registry
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         with:
-          version: 2.4.0
+          registry: ${{ env.REGISTRY_ADDRESS }}
+          username: ${{ vars.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
 
-      - name: Registry login
-        env:
-          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+      - name: Sign image manifests
         run: |
-          echo "${REGISTRY_PASSWORD}" | oras login "${REGISTRY_ADDRESS}" \
-            --username "${{ vars.REGISTRY_USERNAME }}" --password-stdin
+          for image in core jobservice registryctl exporter portal registry trivy-adapter; do
+            ref="${REGISTRY_ADDRESS}/${IMAGE_REGISTRY_PROJECT}/harbor-${image}:${DEV_TAG}"
+            digest="$(crane digest "${ref}")"
+            image_ref="${REGISTRY_ADDRESS}/${IMAGE_REGISTRY_PROJECT}/harbor-${image}@${digest}"
 
-      - name: Publish Flux deploy bundle
-        run: |
-          BUNDLE_PATH="${RUNNER_TEMP}/8gcr-flux"
-          rm -rf "${BUNDLE_PATH}"
-          cp -R deploy/flux/8gcr-dev "${BUNDLE_PATH}"
-          find "${BUNDLE_PATH}" -type f -name '*.yaml' \
-            -exec sed -i "s/__IMAGE_REVISION__/${GITHUB_SHA}/g" {} +
-
-          flux push artifact \
-            "oci://${REGISTRY_ADDRESS}/${DEPLOY_REGISTRY_PROJECT}/deploy:${DEV_TAG}" \
-            --path="${BUNDLE_PATH}" \
-            --source="${{ github.server_url }}/${{ github.repository }}" \
-            --revision="${GITHUB_REF_NAME}@sha1:${GITHUB_SHA}"
-
-          oras tag \
-            "${REGISTRY_ADDRESS}/${DEPLOY_REGISTRY_PROJECT}/deploy:${DEV_TAG}" \
-            latest
+            cosign sign --yes "${image_ref}"
+          done

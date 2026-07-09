@@ -6,7 +6,6 @@ on:
       - main
     paths:
       - 'deploy/chart/**'
-      - 'deploy/flux/**'
       - '.github/workflows/chart-publish.yml'
   release:
     types: [published]
@@ -22,19 +21,20 @@ jobs:
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     env:
       REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
-      DEPLOY_REGISTRY_PROJECT: ops
+      REGISTRY_PROJECT: 8gcr
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Compute version
         id: version
         run: |
+          BASE_VERSION=$(awk '/^version:/ {print $2}' deploy/chart/Chart.yaml)
           SHORT_SHA="${GITHUB_SHA:0:7}"
-          # The hz-hopper 8gcr deployment is pinned to chart tag 2.0.0.
-          # Keep this SemVer tag moving in the ops project for the dev
-          # deployment; the component images still roll via :latest.
-          FLOATING_TAG="2.0.0"
-          VERSION="${FLOATING_TAG}-main.${SHORT_SHA}"
+          VERSION="${BASE_VERSION}-main.${SHORT_SHA}"
+          # Floating tag MUST be SemVer-parseable: helm-controller v1.3+
+          # rejects plain "latest" via "failed parsing artifact revision".
+          # "<base>-dev" satisfies SemVer (pre-release identifier "dev").
+          FLOATING_TAG="${BASE_VERSION}-dev"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "floating_tag=${FLOATING_TAG}" >> "$GITHUB_OUTPUT"
           echo "Publishing dev version: ${VERSION} (also tagged ${FLOATING_TAG})"
@@ -48,11 +48,6 @@ jobs:
         uses: oras-project/setup-oras@5c0b487ce3fe0ce3ab0d034e63669e426e294e4d # v1.2.3
         with:
           version: 1.2.0
-
-      - name: Setup Flux CLI
-        uses: fluxcd/flux2/action@8d5f40dca5aa5d3c0fc3414457dda15a0ac92fa4 # v2.4.0
-        with:
-          version: 2.4.0
 
       - name: Registry login
         env:
@@ -85,10 +80,10 @@ jobs:
           FLOATING_TAG: ${{ steps.version.outputs.floating_tag }}
         run: |
           helm push "dist/harbor-next-${FLOATING_TAG}.tgz" \
-            "oci://${REGISTRY_ADDRESS}/${DEPLOY_REGISTRY_PROJECT}/charts"
+            "oci://${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts"
 
       - name: Add immutable per-commit tag on chart
-        # The per-push tag (2.0.0-main.<sha7>) is a stable audit-trail
+        # The per-push tag (3.0.0-main.<sha7>) is a stable audit-trail
         # reference. The OCIRepository tracks the floating tag; this immutable
         # tag lets us roll back / pin to a specific commit when needed.
         env:
@@ -96,36 +91,8 @@ jobs:
           FLOATING_TAG: ${{ steps.version.outputs.floating_tag }}
         run: |
           oras tag \
-            "${REGISTRY_ADDRESS}/${DEPLOY_REGISTRY_PROJECT}/charts/harbor-next:${FLOATING_TAG}" \
+            "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts/harbor-next:${FLOATING_TAG}" \
             "${VERSION}"
-
-      - name: Push Flux deploy bundle
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-          IMAGE_REVISION: ${{ github.sha }}
-        run: |
-          BUNDLE_PATH="${RUNNER_TEMP}/8gcr-flux"
-          rm -rf "${BUNDLE_PATH}"
-          cp -R deploy/flux/8gcr-dev "${BUNDLE_PATH}"
-          find "${BUNDLE_PATH}" -type f -name '*.yaml' \
-            -exec sed -i "s/__IMAGE_REVISION__/${IMAGE_REVISION}/g" {} +
-
-          flux push artifact \
-            "oci://${REGISTRY_ADDRESS}/${DEPLOY_REGISTRY_PROJECT}/deploy:${VERSION}" \
-            --path="${BUNDLE_PATH}" \
-            --source="${{ github.server_url }}/${{ github.repository }}" \
-            --revision="${GITHUB_REF_NAME}@sha1:${GITHUB_SHA}"
-
-      - name: Move latest tag on deploy bundle
-        # Bundle artifacts are consumed by Flux's kustomize-controller, which
-        # does NOT impose a SemVer constraint on the revision (unlike
-        # helm-controller). Plain "latest" is fine here.
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          oras tag \
-            "${REGISTRY_ADDRESS}/${DEPLOY_REGISTRY_PROJECT}/deploy:${VERSION}" \
-            latest
 
   publish-release:
     name: Publish release
@@ -133,7 +100,7 @@ jobs:
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     env:
       REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
-      DEPLOY_REGISTRY_PROJECT: ${{ vars.DEPLOY_REGISTRY_PROJECT || 'ops' }}
+      REGISTRY_PROJECT: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -153,23 +120,11 @@ jobs:
         with:
           version: v3.16.4
 
-      - name: Setup ORAS
-        uses: oras-project/setup-oras@5c0b487ce3fe0ce3ab0d034e63669e426e294e4d # v1.2.3
-        with:
-          version: 1.2.0
-
-      - name: Setup Flux CLI
-        uses: fluxcd/flux2/action@8d5f40dca5aa5d3c0fc3414457dda15a0ac92fa4 # v2.4.0
-        with:
-          version: 2.4.0
-
       - name: Registry login
         env:
           REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
         run: |
           echo "${REGISTRY_PASSWORD}" | helm registry login "${REGISTRY_ADDRESS}" \
-            --username "${{ vars.REGISTRY_USERNAME }}" --password-stdin
-          echo "${REGISTRY_PASSWORD}" | oras login "${REGISTRY_ADDRESS}" \
             --username "${{ vars.REGISTRY_USERNAME }}" --password-stdin
 
       - name: Update chart dependencies
@@ -190,21 +145,4 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           helm push "dist/harbor-next-${VERSION}.tgz" \
-            "oci://${REGISTRY_ADDRESS}/${DEPLOY_REGISTRY_PROJECT}/charts"
-
-      - name: Push Flux deploy bundle
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-          IMAGE_REVISION: ${{ github.sha }}
-        run: |
-          BUNDLE_PATH="${RUNNER_TEMP}/8gcr-flux"
-          rm -rf "${BUNDLE_PATH}"
-          cp -R deploy/flux/8gcr-dev "${BUNDLE_PATH}"
-          find "${BUNDLE_PATH}" -type f -name '*.yaml' \
-            -exec sed -i "s/__IMAGE_REVISION__/${IMAGE_REVISION}/g" {} +
-
-          flux push artifact \
-            "oci://${REGISTRY_ADDRESS}/${DEPLOY_REGISTRY_PROJECT}/deploy:${VERSION}" \
-            --path="${BUNDLE_PATH}" \
-            --source="${{ github.server_url }}/${{ github.repository }}" \
-            --revision="${{ github.event.release.tag_name }}@sha1:${{ github.sha }}"
+            "oci://${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts"

@@ -4,12 +4,13 @@
 #   kubectl apply -f https://raw.githubusercontent.com/container-registry/harbor-next/main/deploy/flux/8gcr-dev/bootstrap.yaml
 #
 # This creates the OCIRepository + Kustomization in flux-system that fetches
-# the deploy bundle at oci://8gears.container-registry.com/ops/deploy:latest
+# the deploy bundle at
+# oci://8gears.container-registry.com/ops/hz-hopper/8gcr-rolling:latest
 # with the existing flux-system registry pull secret and reconciles every
 # resource in it (including SOPS-encrypted secrets).
 #
 # Re-applying is a no-op. After this single step, all subsequent changes flow
-# through chart-publish.yml → OCI artifact → Flux reconcile.
+# through rolling-flux.yml → OCI artifact → Flux reconcile.
 #
 # Prerequisites on the cluster:
 #   - FluxCD v2 with source-controller, kustomize-controller, helm-controller
@@ -29,7 +30,7 @@ metadata:
   namespace: flux-system
 spec:
   interval: 5m
-  url: oci://8gears.container-registry.com/ops/deploy
+  url: oci://8gears.container-registry.com/ops/hz-hopper/8gcr-rolling
   ref:
     tag: latest
   secretRef:
