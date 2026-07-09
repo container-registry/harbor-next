@@ -20,7 +20,7 @@ Continuous-deploy bundle for `https://8gcr.container-registry.dev` on the **hz-h
 
 1. **Component image publish** (`.github/workflows/dev-images.yml`, every non-doc push to `main`):
    - Builds all Harbor component images for `linux/amd64` and `linux/arm64`.
-   - Pushes immutable `main-<sha7>` tags and moves `latest` for `8gears.container-registry.com/8gcr/harbor-<component>`.
+   - Pushes immutable `main-<sha7>` tags and moves `latest` for `8gears.container-registry.com/8gcr/harbor-<component>` (`trivy-adapter` keeps its existing `8gcr/trivy-adapter` repository name).
    - Signs the moved multi-arch image manifests with keyless cosign and publishes build provenance/SBOM metadata from BuildKit.
    - It does not publish Flux deployment configuration.
 2. **Chart publish** (`.github/workflows/chart-publish.yml`, chart changes on `main`):

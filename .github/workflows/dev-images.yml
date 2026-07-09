@@ -36,10 +36,18 @@ jobs:
       contents: read
     steps:
       - name: Prepare
+        id: prepare
         run: |
           platform=${{ matrix.platform }}
           echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
           echo "DEV_TAG=main-${GITHUB_SHA:0:7}" >> "$GITHUB_ENV"
+          if [ "${{ matrix.component }}" = "trivy-adapter" ]; then
+            echo "IMAGE_NAME=trivy-adapter" >> "$GITHUB_ENV"
+            echo "image_name=trivy-adapter" >> "$GITHUB_OUTPUT"
+          else
+            echo "IMAGE_NAME=harbor-${{ matrix.component }}" >> "$GITHUB_ENV"
+            echo "image_name=harbor-${{ matrix.component }}" >> "$GITHUB_OUTPUT"
+          fi
           if [ -n "$BUILDX_HOST" ]; then
             echo "BUILDX_HOST=$BUILDX_HOST" >> "$GITHUB_ENV"
           fi
@@ -103,7 +111,7 @@ jobs:
             TRIVY_VERSION=${{ env.TRIVY_VERSION }}
             TRIVY_BASE_IMAGE_VERSION=${{ env.TRIVY_BASE_IMAGE_VERSION }}
             HARBOR_SCANNER_TRIVY_VERSION=${{ env.HARBOR_SCANNER_TRIVY_VERSION }}
-          tags: ${{ env.REGISTRY_ADDRESS }}/${{ env.IMAGE_REGISTRY_PROJECT }}/harbor-${{ matrix.component }}
+          tags: ${{ env.REGISTRY_ADDRESS }}/${{ env.IMAGE_REGISTRY_PROJECT }}/${{ steps.prepare.outputs.image_name }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
           provenance: mode=max
           sbom: true
@@ -134,8 +142,16 @@ jobs:
       contents: read
     steps:
       - name: Prepare
+        id: prepare
         run: |
           echo "DEV_TAG=main-${GITHUB_SHA:0:7}" >> "$GITHUB_ENV"
+          if [ "${{ matrix.component }}" = "trivy-adapter" ]; then
+            echo "IMAGE_NAME=trivy-adapter" >> "$GITHUB_ENV"
+            echo "image_name=trivy-adapter" >> "$GITHUB_OUTPUT"
+          else
+            echo "IMAGE_NAME=harbor-${{ matrix.component }}" >> "$GITHUB_ENV"
+            echo "image_name=harbor-${{ matrix.component }}" >> "$GITHUB_OUTPUT"
+          fi
           if [ -n "$BUILDX_HOST" ]; then
             echo "BUILDX_HOST=$BUILDX_HOST" >> "$GITHUB_ENV"
           fi
@@ -162,7 +178,7 @@ jobs:
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests
         env:
-          IMAGE: ${{ env.REGISTRY_ADDRESS }}/${{ env.IMAGE_REGISTRY_PROJECT }}/harbor-${{ matrix.component }}
+          IMAGE: ${{ env.REGISTRY_ADDRESS }}/${{ env.IMAGE_REGISTRY_PROJECT }}/${{ steps.prepare.outputs.image_name }}
         run: |
           # shellcheck disable=SC2046
           docker buildx imagetools create \
@@ -206,9 +222,13 @@ jobs:
       - name: Sign image manifests
         run: |
           for image in core jobservice registryctl exporter portal registry trivy-adapter; do
-            ref="${REGISTRY_ADDRESS}/${IMAGE_REGISTRY_PROJECT}/harbor-${image}:${DEV_TAG}"
+            image_name="harbor-${image}"
+            if [ "${image}" = "trivy-adapter" ]; then
+              image_name="trivy-adapter"
+            fi
+            ref="${REGISTRY_ADDRESS}/${IMAGE_REGISTRY_PROJECT}/${image_name}:${DEV_TAG}"
             digest="$(crane digest "${ref}")"
-            image_ref="${REGISTRY_ADDRESS}/${IMAGE_REGISTRY_PROJECT}/harbor-${image}@${digest}"
+            image_ref="${REGISTRY_ADDRESS}/${IMAGE_REGISTRY_PROJECT}/${image_name}@${digest}"
 
             cosign sign --yes "${image_ref}"
           done

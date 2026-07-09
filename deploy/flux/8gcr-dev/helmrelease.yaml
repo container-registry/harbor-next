@@ -136,9 +136,9 @@ spec:
     trivy:
       enabled: true
       podAnnotations:
-        deploy.8gears.io/image-revision: "latest" # {"$imagepolicy": "flux-system:harbor-trivy-adapter:digest"}
+        deploy.8gears.io/image-revision: "latest" # {"$imagepolicy": "flux-system:trivy-adapter:digest"}
       image:
-        repository: 8gears.container-registry.com/8gcr/harbor-trivy-adapter
+        repository: 8gears.container-registry.com/8gcr/trivy-adapter
         tag: latest
       replicas: 1
 

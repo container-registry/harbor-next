@@ -86,10 +86,10 @@ spec:
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
 metadata:
-  name: harbor-trivy-adapter
+  name: trivy-adapter
   namespace: flux-system
 spec:
-  image: 8gears.container-registry.com/8gcr/harbor-trivy-adapter
+  image: 8gears.container-registry.com/8gcr/trivy-adapter
   interval: 1m
   provider: generic
   secretRef:
@@ -188,11 +188,11 @@ spec:
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImagePolicy
 metadata:
-  name: harbor-trivy-adapter
+  name: trivy-adapter
   namespace: flux-system
 spec:
   imageRepositoryRef:
-    name: harbor-trivy-adapter
+    name: trivy-adapter
   filterTags:
     pattern: ^latest$
   policy:
