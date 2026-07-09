@@ -24,17 +24,14 @@ spec:
       pullPolicy: Always
     imagePullSecrets:
       - name: harbor-system-pull
-
     # Admin password provisioned by secrets.sops.yaml in this bundle.
     existingSecretAdminPassword: harbor-admin
     existingSecretAdminPasswordKey: HARBOR_ADMIN_PASSWORD
-
     expose:
-      clusterIP: { enabled: false }
-      nodePort: { enabled: false }
-      loadBalancer: { enabled: false }
-      route: { enabled: false }
-
+      clusterIP: {enabled: false}
+      nodePort: {enabled: false}
+      loadBalancer: {enabled: false}
+      route: {enabled: false}
     ingress:
       enabled: true
       className: nginx
@@ -50,7 +47,6 @@ spec:
         nginx.ingress.kubernetes.io/proxy-body-size: "0"
         nginx.ingress.kubernetes.io/ssl-redirect: "true"
         cert-manager.io/cluster-issuer: letsencrypt-prod
-
     # ---- Database ----
     # Both CNPG bootstrap (extraManifests below) and Harbor's runtime DB client
     # read the SAME Secret/harbor-db-password. CNPG requires basic-auth type
@@ -65,14 +61,12 @@ spec:
       sslmode: disable
       existingSecret: harbor-db-password
       existingSecretKey: password
-
     # ---- Valkey (in-chart, default standalone) ----
     valkey:
       enabled: true
       architecture: standalone
       auth:
         enabled: false
-
     # ---- Component image pins (continuous deploy via 8gcr/:latest) ----
     # Flux image automation follows each mutable latest tag by digest and
     # rewrites these pod-template annotations in this branch. The branch push
@@ -81,15 +75,14 @@ spec:
     # Always so they pull the new digest behind latest.
     core:
       podAnnotations:
-        deploy.8gears.io/image-revision: "latest" # {"$imagepolicy": "flux-system:harbor-core:digest"}
+        deploy.8gears.io/image-revision: "sha256:e6bddef444145982e57db9f43a9d9643c1a751276f299354ba407b1101bbb01f" # {"$imagepolicy": "flux-system:harbor-core:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-core
         tag: latest
       replicas: 1
-
     jobservice:
       podAnnotations:
-        deploy.8gears.io/image-revision: "latest" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
+        deploy.8gears.io/image-revision: "sha256:0f9fe0e06f89d8e9013c9ce85510eab4e1d65c46ce0cac543210055328a330f3" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-jobservice
         tag: latest
@@ -98,11 +91,10 @@ spec:
         enabled: true
         storageClass: local-path
         size: 1Gi
-
     registry:
       podAnnotations:
-        deploy.8gears.io/image-revision: "latest" # {"$imagepolicy": "flux-system:harbor-registry:digest"}
-        deploy.8gears.io/registryctl-image-revision: "latest" # {"$imagepolicy": "flux-system:harbor-registryctl:digest"}
+        deploy.8gears.io/image-revision: "sha256:dc2970e21ac2a1d9a6157dca6f420be1d789c6ec64325b782b2c01047cf22485" # {"$imagepolicy": "flux-system:harbor-registry:digest"}
+        deploy.8gears.io/registryctl-image-revision: "sha256:69f5384339dd8f524fd2df02ec5870c8094e789f39bb256ec7d1de87abbf9d02" # {"$imagepolicy": "flux-system:harbor-registryctl:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-registry
         tag: latest
@@ -115,33 +107,29 @@ spec:
         enabled: true
         storageClass: local-path
         size: 10Gi
-
     portal:
       podAnnotations:
-        deploy.8gears.io/image-revision: "latest" # {"$imagepolicy": "flux-system:harbor-portal:digest"}
+        deploy.8gears.io/image-revision: "sha256:333844bfae5c5e0495ac69b5b00de60f9da2392d8e60bea6a0919af3b498f3ee" # {"$imagepolicy": "flux-system:harbor-portal:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-portal
         tag: latest
       replicas: 1
-
     exporter:
       enabled: true
       podAnnotations:
-        deploy.8gears.io/image-revision: "latest" # {"$imagepolicy": "flux-system:harbor-exporter:digest"}
+        deploy.8gears.io/image-revision: "sha256:b5bd41e3fef225e4ff4ad7a80ea9528ebf19cf8e58159f65faede5e6c3008b81" # {"$imagepolicy": "flux-system:harbor-exporter:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-exporter
         tag: latest
       replicas: 1
-
     trivy:
       enabled: true
       podAnnotations:
-        deploy.8gears.io/image-revision: "latest" # {"$imagepolicy": "flux-system:trivy-adapter:digest"}
+        deploy.8gears.io/image-revision: "sha256:0e1a62effc6e41c4e70a0b0442ccc154118faeddc930096aac2880e9613b5382" # {"$imagepolicy": "flux-system:trivy-adapter:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/trivy-adapter
         tag: latest
       replicas: 1
-
     # ---- CNPG Postgres provisioned via the chart's extraManifests escape hatch ----
     # The harbor-db-password Secret it references is provisioned out-of-band
     # (SOPS-encrypted in k8s/apps); must contain keys: username, password.
