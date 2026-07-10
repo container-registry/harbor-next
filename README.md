@@ -9,7 +9,7 @@ Harbor is hosted by the [Cloud Native Computing Foundation](https://cncf.io)
 If you are an organization that wants to help shape the evolution of Harbor,
 [reach out](https://container-registry.com/contact/) to us.
 
-## What is Harbor Next
+## What Is Harbor Next
 
 Harbor Next is a community-driven evolution of Harbor, designed to accelerate innovation and lower the barrier to entry for contributors.
 It serves as the foundation for [8gcr](https://container-registry.com/8gcr) (8gears Container Registry), used across enterprises, government agencies, and cloud providers.
@@ -26,7 +26,7 @@ We're developing Harbor Next as a [community proposal](https://github.com/goharb
 - Continuous delivery
 - Easy Contributor onboarding with out of the box dev environments
 - Multi-architecture artifacts
-- Scratch images with minimal size and attack surface.
+- Scratch images with minimal size and attack surface
 - Use of Docker Distribution V3
 - Replicate images to SFTP endpoints
 - Harbor Satellite Support
