@@ -8,6 +8,8 @@ body:
       value: |
         Thanks for taking the time to fill out this bug report!
 
+        **If this is a security vulnerability, do NOT file a public issue.** Report it privately via [GitHub private vulnerability reporting](https://github.com/container-registry/harbor-next/security/advisories/new). See [SECURITY.md](https://github.com/container-registry/harbor-next/blob/main/SECURITY.md) for the full disclosure policy.
+
         **Before submitting**, please search [existing issues](https://github.com/container-registry/harbor-next/issues) to avoid duplicates.
 
   - type: textarea

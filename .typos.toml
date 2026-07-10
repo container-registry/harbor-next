@@ -22,6 +22,8 @@ intoto = "intoto"
 # Common Go abbreviations referenced in docs
 cfg  = "cfg"
 ctx  = "ctx"
+# Security terminology (CVE Numbering Authority)
+CNA = "CNA"
 
 [files]
 extend-exclude = [
