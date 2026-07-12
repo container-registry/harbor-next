@@ -216,7 +216,10 @@ tasks:
         GOTOOLCHAIN=auto go mod tidy -e
         # GOTOOLCHAIN=auto: the trivy tag's go.mod may require a newer Go than
         # Harbor's pinned toolchain (CI runs GOTOOLCHAIN=local).
-        GOTOOLCHAIN=auto GOEXPERIMENT=jsonv2 CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/trivy" ./cmd/trivy
+        GOTOOLCHAIN=auto GOEXPERIMENT=jsonv2 CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath \
+          -ldflags "-s -w -X github.com/aquasecurity/trivy/pkg/version/app.ver={{.TRIVY_VERSION}}" \
+          -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/trivy" ./cmd/trivy
+        git rev-parse --short=8 HEAD > "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/.trivy-commit"
 
   binary:trivy-adapter:*:
     desc: "Build harbor-scanner-trivy binary (cross-compiled from source)"
@@ -234,7 +237,12 @@ tasks:
         trap "rm -rf $TRIVY_DIR" EXIT
         git clone --branch {{.HARBOR_SCANNER_TRIVY_VERSION}} --depth 1 https://github.com/container-registry/harbor-scanner-trivy.git "$TRIVY_DIR"
         cd "$TRIVY_DIR"
-        CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/scanner-trivy" cmd/scanner-trivy/main.go
+        ADAPTER_COMMIT=$(git rev-parse --short=8 HEAD)
+        VERSION_STR={{.HARBOR_SCANNER_TRIVY_VERSION}}
+        LDFLAGS="-s -w -X main.version=${VERSION_STR#v} -X main.commit=${ADAPTER_COMMIT} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        # GOTOOLCHAIN=auto: the adapter's go.mod may require a newer patch
+        # toolchain than Harbor's pinned Go (CI runs GOTOOLCHAIN=local).
+        GOTOOLCHAIN=auto CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath -ldflags "${LDFLAGS}" -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/scanner-trivy" cmd/scanner-trivy/main.go
 
   # --- API Generation ---
 
