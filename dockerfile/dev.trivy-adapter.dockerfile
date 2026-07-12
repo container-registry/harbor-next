@@ -32,6 +32,11 @@ RUN addgroup -S scanner && adduser -S -G scanner -h /home/scanner scanner && \
 
 ARG HARBOR_SCANNER_TRIVY_VERSION
 ENV SCANNER_VERSION=${HARBOR_SCANNER_TRIVY_VERSION}
+
+# Read by the scanner's GetScannerMetadata(); the dev image ships the
+# unmodified upstream trivy binary, so no commit suffix here.
+ARG TRIVY_VERSION
+ENV TRIVY_VERSION=${TRIVY_VERSION}
 WORKDIR /
 
 EXPOSE 8080
