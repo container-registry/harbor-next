@@ -10,6 +10,9 @@ ARG LPROBE_VERSION=MISSING-BUILD-ARG
 
 FROM golang:${GO_VERSION}-alpine AS builder
 ARG HARBOR_SCANNER_TRIVY_VERSION
+# golang images pin GOTOOLCHAIN=local; the adapter's go.mod may require a
+# newer patch toolchain than the pinned GO_VERSION.
+ENV GOTOOLCHAIN=auto
 RUN apk add --no-cache git
 RUN git clone --branch ${HARBOR_SCANNER_TRIVY_VERSION} --depth 1 \
       https://github.com/container-registry/harbor-scanner-trivy.git /src

@@ -222,7 +222,9 @@ tasks:
         ADAPTER_COMMIT=$(git rev-parse --short=8 HEAD)
         VERSION_STR={{.HARBOR_SCANNER_TRIVY_VERSION}}
         LDFLAGS="-s -w -X main.version=${VERSION_STR#v} -X main.commit=${ADAPTER_COMMIT} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-        CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath -ldflags "${LDFLAGS}" -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/scanner-trivy" cmd/scanner-trivy/main.go
+        # GOTOOLCHAIN=auto: the adapter's go.mod may require a newer patch
+        # toolchain than Harbor's pinned Go (CI runs GOTOOLCHAIN=local).
+        GOTOOLCHAIN=auto CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath -ldflags "${LDFLAGS}" -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/scanner-trivy" cmd/scanner-trivy/main.go
 
   # --- API Generation ---
 
