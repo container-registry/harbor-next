@@ -82,7 +82,7 @@ spec:
       replicas: 1
     jobservice:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:0f9fe0e06f89d8e9013c9ce85510eab4e1d65c46ce0cac543210055328a330f3" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
+        deploy.8gears.io/image-revision: "sha256:bd042ddd80877ace1bdc9659f6216749053ac010c96f31d86ca0dba619788c10" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-jobservice
         tag: latest
@@ -93,8 +93,8 @@ spec:
         size: 1Gi
     registry:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:dc2970e21ac2a1d9a6157dca6f420be1d789c6ec64325b782b2c01047cf22485" # {"$imagepolicy": "flux-system:harbor-registry:digest"}
-        deploy.8gears.io/registryctl-image-revision: "sha256:69f5384339dd8f524fd2df02ec5870c8094e789f39bb256ec7d1de87abbf9d02" # {"$imagepolicy": "flux-system:harbor-registryctl:digest"}
+        deploy.8gears.io/image-revision: "sha256:4d1a4157442bf2efd633f72be5d7eb3a174440a92a76d0b279003ccb958c2e31" # {"$imagepolicy": "flux-system:harbor-registry:digest"}
+        deploy.8gears.io/registryctl-image-revision: "sha256:6e8d869e2dec385d01aa80363072146d1bae917d3da18ea1b2fc4d0ec09a4104" # {"$imagepolicy": "flux-system:harbor-registryctl:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-registry
         tag: latest
@@ -109,7 +109,7 @@ spec:
         size: 10Gi
     portal:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:333844bfae5c5e0495ac69b5b00de60f9da2392d8e60bea6a0919af3b498f3ee" # {"$imagepolicy": "flux-system:harbor-portal:digest"}
+        deploy.8gears.io/image-revision: "sha256:f8b89de62f54b5643d9ec88e61dc11a9302bcbfd4d8ce7a468964f01a7ffd48d" # {"$imagepolicy": "flux-system:harbor-portal:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-portal
         tag: latest
@@ -117,7 +117,7 @@ spec:
     exporter:
       enabled: true
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:b5bd41e3fef225e4ff4ad7a80ea9528ebf19cf8e58159f65faede5e6c3008b81" # {"$imagepolicy": "flux-system:harbor-exporter:digest"}
+        deploy.8gears.io/image-revision: "sha256:9d80cfe3ae4675266e478db1d250dfc0eb3f1ae9ba62e7b106cf11b92b48ea9a" # {"$imagepolicy": "flux-system:harbor-exporter:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-exporter
         tag: latest
