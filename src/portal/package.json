@@ -84,7 +84,7 @@
     "karma-jasmine-html-reporter": "^1.7.0",
     "ng-swagger-gen": "^1.8.1",
     "prettier": "^2.8.8",
-    "prettier-eslint": "^14.1.0",
+    "prettier-eslint": "^17.1.1",
     "stylelint": "^14.16.1",
     "stylelint-config-prettier": "^9.0.5",
     "stylelint-config-prettier-scss": "^0.0.1",
