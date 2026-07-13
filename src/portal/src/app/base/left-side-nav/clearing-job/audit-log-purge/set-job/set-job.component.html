@@ -176,44 +176,32 @@
             </div>
         </div>
     </form>
-    <div class="clr-row execution-status">
-        <div class="clr-col-2 flex-200 font-style">
-            {{ 'WEBHOOK.STATUS' | translate }}
+    <div class="execution-status">
+        <div class="font-style">{{ 'WEBHOOK.STATUS' | translate }}</div>
+        <div class="status-line">
+            <span class="mr-1"
+                >{{ 'CLEARANCES.LAST_COMPLETED' | translate }}:</span
+            >
+            <span
+                *ngIf="loadingLastCompletedTime"
+                class="spinner spinner-inline"></span>
+            <ng-container *ngIf="!loadingLastCompletedTime">
+                <span *ngIf="!lastCompletedTime">{{
+                    'SCHEDULE.NONE' | translate
+                }}</span>
+                <span *ngIf="lastCompletedTime"
+                    >{{ lastCompletedTime | harborDatetime
+                    }}<span *ngIf="isDryRun"
+                        >({{ 'TAG_RETENTION.DRY_RUN' | translate }})</span
+                    ></span
+                >
+            </ng-container>
         </div>
-        <div class="clr-col">
-            <div class="clr-row">
-                <div class="p-06 mr-2">
-                    <span class="mr-1 font-style">{{
-                        'CLEARANCES.LAST_COMPLETED' | translate
-                    }}</span>
-                    <span class="mr-3">
-                        <span
-                            *ngIf="loadingLastCompletedTime"
-                            class="spinner spinner-inline"></span>
-                        <ng-container *ngIf="!loadingLastCompletedTime">
-                            <span *ngIf="!lastCompletedTime">{{
-                                'SCHEDULE.NONE' | translate
-                            }}</span>
-                            <span *ngIf="lastCompletedTime"
-                                >{{ lastCompletedTime | harborDatetime
-                                }}<span *ngIf="isDryRun"
-                                    >({{
-                                        'TAG_RETENTION.DRY_RUN' | translate
-                                    }})</span
-                                ></span
-                            >
-                        </ng-container>
-                    </span>
-                </div>
-                <div class="p-06">
-                    <span class="mr-1 font-style" *ngIf="nextScheduledTime">{{
-                        'CLEARANCES.NEXT_SCHEDULED_TIME' | translate
-                    }}</span>
-                    <span *ngIf="nextScheduledTime">{{
-                        nextScheduledTime | harborDatetime
-                    }}</span>
-                </div>
-            </div>
+        <div class="status-line" *ngIf="nextScheduledTime">
+            <span class="mr-1"
+                >{{ 'CLEARANCES.NEXT_SCHEDULED_TIME' | translate }}:</span
+            >
+            <span>{{ nextScheduledTime | harborDatetime }}</span>
         </div>
     </div>
     <div class="clr-row manual-actions">

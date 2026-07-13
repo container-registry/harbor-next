@@ -72,6 +72,10 @@
 // detached from the settings form above by plain vertical spacing
 .execution-status {
     margin-top: 2rem;
+
+    .status-line {
+        margin-top: 0.25rem;
+    }
 }
 
 .manual-actions {
