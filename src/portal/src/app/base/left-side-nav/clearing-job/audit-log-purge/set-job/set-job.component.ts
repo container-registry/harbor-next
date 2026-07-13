@@ -59,12 +59,9 @@ export class SetJobComponent implements OnInit, OnDestroy {
 
     retentionTime: number;
     retentionUnit: string = RetentionTimeUnit.DAYS;
-    // schedule is edited in place as part of the form; no edit mode
     scheduleType: string = ScheduleType.NONE;
     cronString: string = '';
     ScheduleType = ScheduleType;
-    // canonical form of the last loaded/saved settings, used to
-    // enable SAVE only when there is an actual change to persist
     private savedParamsKey: string;
 
     eventTypes: Record<string, string>[] = [];
@@ -322,8 +319,6 @@ export class SetJobComponent implements OnInit, OnDestroy {
         this.disableGC = false;
     }
 
-    // single save for the whole settings group: schedule, retention
-    // time and event types; everything is validated here
     saveCurrentParameters() {
         if (!this.isFormValid() || !this.isDirty()) {
             return;
@@ -345,7 +340,7 @@ export class SetJobComponent implements OnInit, OnDestroy {
         request.pipe(finalize(() => (this.savingParams = false))).subscribe({
             next: () => {
                 this.errorHandler.info('CLEARANCES.PURGE_PARAMS_SAVED');
-                this.getCurrentSchedule(false); // refresh schedule
+                this.getCurrentSchedule(false);
             },
             error: error => {
                 this.errorHandler.error(error);
@@ -399,7 +394,6 @@ export class SetJobComponent implements OnInit, OnDestroy {
         }
         return this.selectedEventTypes?.length > 0;
     }
-    // gates PURGE NOW / DRY RUN, which always need full parameters
     canRunNow(): boolean {
         return (
             !this.purgeForm?.invalid &&

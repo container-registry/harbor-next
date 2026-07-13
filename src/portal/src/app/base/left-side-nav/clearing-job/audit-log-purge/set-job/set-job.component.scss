@@ -67,13 +67,11 @@
     margin-top: 1rem;
 }
 
-// execution group: run status plus the one-off actions, visually
-// detached from the settings form above by plain vertical spacing
 .execution-status {
     margin-top: 2rem;
 
-    // label column sizes to the longest label so the timestamps
-    // align vertically in every locale
+    // max-content column, not a fixed width: longer translated labels
+    // (e.g. German) must not wrap or break the timestamp alignment
     .status-grid {
         display: grid;
         grid-template-columns: max-content auto;
