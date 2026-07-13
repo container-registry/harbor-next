@@ -64,6 +64,9 @@ export class SetJobComponent implements OnInit, OnDestroy {
 
     retentionTime: number;
     retentionUnit: string = RetentionTimeUnit.DAYS;
+    // canonical form of the last loaded/saved parameters, used to
+    // enable SAVE only when there is an actual change to persist
+    private savedParamsKey: string;
 
     eventTypes: Record<string, string>[] = [];
     selectedEventTypes: string[] = clone([]);
@@ -212,6 +215,22 @@ export class SetJobComponent implements OnInit, OnDestroy {
                 cron: '',
             };
         }
+        this.savedParamsKey = this.currentParamsKey();
+    }
+
+    private currentParamsKey(): string {
+        const hours =
+            this.retentionUnit === RetentionTimeUnit.DAYS
+                ? +this.retentionTime * ONE_DAY
+                : +this.retentionTime;
+        const eventTypes = [...(this.selectedEventTypes ?? [])]
+            .sort()
+            .join(',');
+        return `${hours}|${eventTypes}`;
+    }
+
+    isDirty(): boolean {
+        return this.currentParamsKey() !== this.savedParamsKey;
     }
 
     private buildParameters(dryRun: boolean): {
@@ -334,7 +353,7 @@ export class SetJobComponent implements OnInit, OnDestroy {
     // persist retention time and event types onto the existing schedule
     // without requiring the user to re-edit the schedule itself
     saveCurrentParameters() {
-        if (!this.scheduleExists || !this.isFormValid()) {
+        if (!this.scheduleExists || !this.isFormValid() || !this.isDirty()) {
             return;
         }
         this.savingParams = true;

@@ -68,9 +68,14 @@
     margin-top: 1rem;
 }
 
-// visually detach the immediate manual actions from the settings form above
-.manual-actions {
+// execution group: run status plus the one-off actions, visually
+// detached from the settings form above by plain vertical spacing
+.execution-status {
     margin-top: 2rem;
+}
+
+.manual-actions {
+    margin-top: 0.5rem;
 
     .gc-start-btn {
         margin-top: 0;
