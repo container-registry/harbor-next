@@ -90,6 +90,7 @@ describe('GcComponent', () => {
             of(null)
         );
         component.selectedEventTypes = ['create_artifact'];
+        component.retentionTime = 30;
         fixture.detectChanges();
     });
     it('should create', () => {

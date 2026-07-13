@@ -1760,7 +1760,10 @@
         "STOP_GC_SUCCESS": "已成功觸發停止垃圾回收操作。",
         "STOP_PURGE_SUCCESS": "已成功觸發停止清除操作。",
         "NO_GC_RECORDS": "找不到任何垃圾回收歷史記錄！",
-        "NO_PURGE_RECORDS": "找不到任何清除歷史記錄！"
+        "NO_PURGE_RECORDS": "找不到任何清除歷史記錄！",
+        "PURGE_PARAMS_SAVED": "日誌清理設定儲存成功",
+        "NO_EVENT_TYPES_WARNING": "由於未選擇任何事件類型，此排程不會清理任何內容。請至少選擇一個事件類型並點擊儲存。",
+        "SAVE_DISABLED_HINT": "請在下方輸入有效的保留時間並至少選擇一個事件類型後才能儲存"
     },
     "CVE_EXPORT": {
         "EXPORT_SOME_PROJECTS": "匯出 CVE",

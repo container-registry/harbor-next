@@ -46,10 +46,28 @@
         <cron-selection
             class="w-100"
             [externalValidation]="isValid()"
+            externalValidationMessage="CLEARANCES.SAVE_DISABLED_HINT"
             [labelCurrent]="getLabelCurrent"
             [labelEdit]="getLabelCurrent"
             [originCron]="originCron"
             (inputvalue)="saveGcSchedule($event)"></cron-selection>
+    </div>
+    <div
+        class="alert alert-warning noop-warning"
+        role="alert"
+        *ngIf="isNoopSchedule">
+        <div class="alert-items p-0">
+            <div class="alert-item static">
+                <div class="alert-icon-wrapper">
+                    <clr-icon
+                        class="alert-icon"
+                        shape="exclamation-triangle"></clr-icon>
+                </div>
+                <span class="alert-text">{{
+                    'CLEARANCES.NO_EVENT_TYPES_WARNING' | translate
+                }}</span>
+            </div>
+        </div>
     </div>
 
     <form #purgeForm="ngForm" class="clr-form clr-form-horizontal p-0">
@@ -89,7 +107,7 @@
                             autocomplete="off"
                             [(ngModel)]="retentionTime"
                             required
-                            pattern="^[\-1-9]{1}[0-9]*$"
+                            pattern="^[1-9][0-9]*$"
                             id="retentionTime"
                             size="20" />
                         <clr-icon
@@ -189,27 +207,36 @@
     <div class="clr-row">
         <div class="clr-col-2 flex-200">
             <button
+                id="save-purge-params"
+                class="btn btn-primary gc-start-btn"
+                (click)="saveCurrentParameters()"
+                *ngIf="scheduleExists"
+                [disabled]="savingParams || !isFormValid()">
+                {{ 'BUTTON.SAVE' | translate }}
+            </button>
+            <button
                 id="gc-now"
                 class="btn btn-primary gc-start-btn"
+                *ngIf="!scheduleExists"
                 (click)="gcNow()"
-                [disabled]="
-                    disableGC ||
-                    purgeForm.invalid ||
-                    !(selectedEventTypes?.length > 0)
-                ">
+                [disabled]="disableGC || !isFormValid()">
                 {{ 'CLEARANCES.PURGE_NOW' | translate }}
             </button>
         </div>
         <div class="clr-col">
             <button
+                id="gc-now"
+                class="btn btn-outline gc-start-btn"
+                *ngIf="scheduleExists"
+                (click)="gcNow()"
+                [disabled]="disableGC || !isFormValid()">
+                {{ 'CLEARANCES.PURGE_NOW' | translate }}
+            </button>
+            <button
                 id="gc-dry-run"
                 class="btn btn-outline gc-start-btn"
                 (click)="dryRun()"
-                [disabled]="
-                    dryRunOnGoing ||
-                    purgeForm.invalid ||
-                    !(selectedEventTypes?.length > 0)
-                ">
+                [disabled]="dryRunOnGoing || !isFormValid()">
                 {{ 'TAG_RETENTION.WHAT_IF_RUN' | translate }}
             </button>
         </div>

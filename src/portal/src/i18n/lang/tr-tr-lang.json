@@ -1758,7 +1758,10 @@
         "STOP_GC_SUCCESS": "Trigger stopping GC operation successfully",
         "STOP_PURGE_SUCCESS": "Trigger stopping purging operation successfully",
         "NO_GC_RECORDS": "We couldn't find any GC histories!",
-        "NO_PURGE_RECORDS": "We couldn't find any purge histories!"
+        "NO_PURGE_RECORDS": "We couldn't find any purge histories!",
+        "PURGE_PARAMS_SAVED": "Log rotasyon ayarları başarıyla kaydedildi",
+        "NO_EVENT_TYPES_WARNING": "Hiçbir olay türü seçilmediği için bu zamanlama hiçbir şey silmeyecek. En az bir olay türü seçin ve KAYDET'e tıklayın.",
+        "SAVE_DISABLED_HINT": "Kaydetmeyi etkinleştirmek için geçerli bir saklama süresi girin ve aşağıdan en az bir olay türü seçin"
     },
     "CVE_EXPORT": {
         "EXPORT_SOME_PROJECTS": "Export CVEs",

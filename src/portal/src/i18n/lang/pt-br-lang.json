@@ -1767,7 +1767,10 @@
         "STOP_GC_SUCCESS": "Trigger stopping GC operation successfully",
         "STOP_PURGE_SUCCESS": "Trigger stopping purging operation successfully",
         "NO_GC_RECORDS": "We couldn't find any GC histories!",
-        "NO_PURGE_RECORDS": "We couldn't find any purge histories!"
+        "NO_PURGE_RECORDS": "We couldn't find any purge histories!",
+        "PURGE_PARAMS_SAVED": "Configurações de rotação de logs salvas com sucesso",
+        "NO_EVENT_TYPES_WARNING": "Este agendamento não limpará nada porque nenhum tipo de evento está selecionado. Selecione pelo menos um tipo de evento e clique em SALVAR.",
+        "SAVE_DISABLED_HINT": "Informe um tempo de retenção válido e selecione pelo menos um tipo de evento abaixo para habilitar o salvamento"
     },
     "CVE_EXPORT": {
         "EXPORT_SOME_PROJECTS": "Export CVEs",

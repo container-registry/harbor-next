@@ -1758,7 +1758,10 @@
         "STOP_GC_SUCCESS": "Signal zum stoppen der Speicherbereinigungs-Aktion erfolgreich",
         "STOP_PURGE_SUCCESS": "Signal zum Anhalten der Bereinigung erfolgreich",
         "NO_GC_RECORDS": "Es konnte keine Speicherbereinigungs-Historie gefunden werden!",
-        "NO_PURGE_RECORDS": "Es konnte keine Bereinigungs-Historie gefunden werden!"
+        "NO_PURGE_RECORDS": "Es konnte keine Bereinigungs-Historie gefunden werden!",
+        "PURGE_PARAMS_SAVED": "Log-Rotation-Einstellungen erfolgreich gespeichert",
+        "NO_EVENT_TYPES_WARNING": "Dieser Zeitplan bereinigt nichts, da keine Event-Typen ausgewählt sind. Wähle mindestens einen Event-Typ aus und klicke auf SPEICHERN.",
+        "SAVE_DISABLED_HINT": "Gib unten eine gültige Aufbewahrungszeit ein und wähle mindestens einen Event-Typ aus, um speichern zu können"
     },
     "CVE_EXPORT": {
         "EXPORT_SOME_PROJECTS": "Exportiere CVEs",
