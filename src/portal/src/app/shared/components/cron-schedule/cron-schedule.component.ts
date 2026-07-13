@@ -42,9 +42,6 @@ const PREFIX: string = '0 ';
 })
 export class CronScheduleComponent implements OnChanges, OnInit {
     @Input() externalValidation: boolean = true; //extra check
-    // translation key shown next to the disabled save button explaining
-    // why externalValidation blocks saving; omitted -> no hint rendered
-    @Input() externalValidationMessage: string;
     @Input() isInlineModel: boolean = false;
     @Input() originCron: OriginCron;
     @Input() labelEdit: string;

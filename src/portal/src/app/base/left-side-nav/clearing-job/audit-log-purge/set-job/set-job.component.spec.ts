@@ -13,8 +13,6 @@
 // limitations under the License.
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ErrorHandler } from '../../../../../shared/units/error-handler';
-import { CronScheduleComponent } from '../../../../../shared/components/cron-schedule';
-import { CronTooltipComponent } from '../../../../../shared/components/cron-schedule';
 import { delay, of } from 'rxjs';
 import { SharedTestingModule } from '../../../../../shared/shared.module';
 import { SetJobComponent } from './set-job.component';
@@ -65,11 +63,7 @@ describe('GcComponent', () => {
     beforeEach(() => {
         TestBed.configureTestingModule({
             imports: [SharedTestingModule],
-            declarations: [
-                SetJobComponent,
-                CronScheduleComponent,
-                CronTooltipComponent,
-            ],
+            declarations: [SetJobComponent],
             providers: [
                 { provide: ErrorHandler, useValue: fakedErrorHandler },
                 { provide: AuditlogService, useValue: fakedAuditlogService },

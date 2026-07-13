@@ -1768,8 +1768,7 @@
         "NO_GC_RECORDS": "No pudimos encontrar ningún historial de GC!",
         "NO_PURGE_RECORDS": "No pudimos encontrar ningún historial de purgas!",
         "PURGE_PARAMS_SAVED": "Configuración de rotación de logs guardada correctamente",
-        "NO_EVENT_TYPES_WARNING": "Esta programación no purgará nada porque no hay tipos de evento seleccionados. Seleccione al menos un tipo de evento y haga clic en GUARDAR.",
-        "SAVE_DISABLED_HINT": "Introduzca un tiempo de retención válido y seleccione al menos un tipo de evento abajo para poder guardar"
+        "NO_EVENT_TYPES_WARNING": "Esta programación no purgará nada porque no hay tipos de evento seleccionados. Seleccione al menos un tipo de evento y haga clic en GUARDAR."
     },
     "CVE_EXPORT": {
         "EXPORT_SOME_PROJECTS": "Exportar CVEs",

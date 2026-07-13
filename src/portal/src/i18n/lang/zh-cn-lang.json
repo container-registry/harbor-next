@@ -1764,8 +1764,7 @@
         "NO_GC_RECORDS": "未发现任何清理记录！",
         "NO_PURGE_RECORDS": "未发现任何清理记录！",
         "PURGE_PARAMS_SAVED": "日志清理设置保存成功",
-        "NO_EVENT_TYPES_WARNING": "由于未选择任何事件类型，此计划不会清理任何内容。请至少选择一个事件类型并点击保存。",
-        "SAVE_DISABLED_HINT": "请在下方输入有效的保留时间并至少选择一个事件类型后才能保存"
+        "NO_EVENT_TYPES_WARNING": "由于未选择任何事件类型，此计划不会清理任何内容。请至少选择一个事件类型并点击保存。"
     },
     "CVE_EXPORT": {
         "EXPORT_SOME_PROJECTS": "导出 CVEs",

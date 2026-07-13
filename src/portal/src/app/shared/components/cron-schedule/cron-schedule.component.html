@@ -146,12 +146,6 @@
         <button class="btn btn-link" (click)="isEditMode = false">
             {{ 'BUTTON.CANCEL' | translate }}
         </button>
-        <span
-            class="save-disabled-hint"
-            *ngIf="!externalValidation && externalValidationMessage">
-            <clr-icon shape="exclamation-circle" size="16"></clr-icon>
-            {{ externalValidationMessage | translate }}
-        </span>
     </div>
     <div *ngIf="paused && oriCron" class="clr-row mb-1">
         <span class="font-style" [style.width]="labelWidth"></span>

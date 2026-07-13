@@ -1764,8 +1764,7 @@
         "NO_GC_RECORDS": "Nous n'avons trouvé aucun historique du GC !",
         "NO_PURGE_RECORDS": "Nous n'avons trouvé aucun historique de purges !",
         "PURGE_PARAMS_SAVED": "Paramètres de rotation des logs enregistrés avec succès",
-        "NO_EVENT_TYPES_WARNING": "Cette planification ne purgera rien car aucun type d'événement n'est sélectionné. Sélectionnez au moins un type d'événement et cliquez sur ENREGISTRER.",
-        "SAVE_DISABLED_HINT": "Saisissez une durée de rétention valide et sélectionnez au moins un type d'événement ci-dessous pour pouvoir enregistrer"
+        "NO_EVENT_TYPES_WARNING": "Cette planification ne purgera rien car aucun type d'événement n'est sélectionné. Sélectionnez au moins un type d'événement et cliquez sur ENREGISTRER."
     },
     "CVE_EXPORT": {
         "EXPORT_SOME_PROJECTS": "Exporter les CVEs",

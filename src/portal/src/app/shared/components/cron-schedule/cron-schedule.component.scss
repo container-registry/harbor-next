@@ -38,12 +38,3 @@ span.required {
   margin-right: 0.6rem;
   margin-left: 0.6rem;
 }
-
-.save-disabled-hint {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.2rem;
-  margin-left: 0.5rem;
-  font-size: 0.55rem;
-  color: var(--clr-forms-invalid-color, #c21d00);
-}
