@@ -1749,6 +1749,8 @@
         "PURGE_NOW": "立即清除",
         "PURGE_NOW_SUCCESS": "已成功觸發清除。",
         "PURGE_SCHEDULE_RESET": "清除排程已重設。",
+        "ROTATION_POLICY": "輪換策略",
+        "EXECUTION": "執行",
         "PURGE_HISTORY": "清除歷史",
         "FORWARD_ENDPOINT": "稽核日誌轉送 Syslog 端點",
         "FORWARD_ENDPOINT_TOOLTIP": "將稽核日誌轉送至 syslog 端點，例如：harbor-log:10514",

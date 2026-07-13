@@ -1753,6 +1753,8 @@
         "PURGE_NOW": "PURGAR AHORA",
         "PURGE_NOW_SUCCESS": "Purga activada exitosamente",
         "PURGE_SCHEDULE_RESET": "Se ha restablecido la programación de purga",
+        "ROTATION_POLICY": "Política de rotación",
+        "EXECUTION": "Ejecución",
         "PURGE_HISTORY": "Historial de purga",
         "FORWARD_ENDPOINT": "Audit Log Reenviar Syslog Endpoint",
         "FORWARD_ENDPOINT_TOOLTIP": "Reenviar audit logs al endpoint de syslog, por ejemplo: harbor-log:10514",

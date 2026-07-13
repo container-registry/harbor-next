@@ -13,11 +13,9 @@
 // limitations under the License.
 import { Component, ViewChild, OnInit, OnDestroy } from '@angular/core';
 import { ErrorHandler } from '../../../../../shared/units/error-handler';
-import { CronScheduleComponent } from '../../../../../shared/components/cron-schedule';
 import { OriginCron } from '../../../../../shared/services';
 import { finalize } from 'rxjs/operators';
 import { ScheduleType } from '../../../../../shared/entities/shared.const';
-import { GcComponent } from '../../gc-page/gc/gc.component';
 import { PurgeService } from '../../../../../../../ng-swagger-gen/services/purge.service';
 import { ExecHistory } from '../../../../../../../ng-swagger-gen/models/exec-history';
 import { ScheduleObj } from '../../../../../../../ng-swagger-gen/models/schedule-obj';
@@ -27,7 +25,7 @@ import {
     RESOURCE_TYPES,
     RetentionTimeUnit,
 } from '../../clearing-job-interface';
-import { clone } from '../../../../../shared/units/utils';
+import { clone, cronRegex } from '../../../../../shared/units/utils';
 import { PurgeHistoryComponent } from '../history/purge-history.component';
 import { NgForm } from '@angular/forms';
 import { AuditlogService } from 'ng-swagger-gen/services';
@@ -50,10 +48,7 @@ export class SetJobComponent implements OnInit, OnDestroy {
     originCron: OriginCron;
     disableGC: boolean = false;
     loading: boolean = false;
-    getLabelCurrent = 'CLEARANCES.SCHEDULE_TO_PURGE';
     loadingGcStatus = false;
-    @ViewChild(CronScheduleComponent)
-    cronScheduleComponent: CronScheduleComponent;
     dryRunOnGoing: boolean = false;
     savingParams: boolean = false;
     lastCompletedTime: string;
@@ -64,7 +59,11 @@ export class SetJobComponent implements OnInit, OnDestroy {
 
     retentionTime: number;
     retentionUnit: string = RetentionTimeUnit.DAYS;
-    // canonical form of the last loaded/saved parameters, used to
+    // schedule is edited in place as part of the form; no edit mode
+    scheduleType: string = ScheduleType.NONE;
+    cronString: string = '';
+    ScheduleType = ScheduleType;
+    // canonical form of the last loaded/saved settings, used to
     // enable SAVE only when there is an actual change to persist
     private savedParamsKey: string;
 
@@ -215,7 +214,29 @@ export class SetJobComponent implements OnInit, OnDestroy {
                 cron: '',
             };
         }
+        this.scheduleType = this.originCron.type;
+        // the scheduler persists the cron with a randomized seconds field,
+        // but the API rejects any submitted cron whose seconds are not 0
+        this.cronString =
+            this.originCron.type === ScheduleType.CUSTOM
+                ? (this.originCron.cron || '').replace(/^\S+/, '0')
+                : '';
         this.savedParamsKey = this.currentParamsKey();
+    }
+
+    private effectiveCron(): string {
+        switch (this.scheduleType) {
+            case ScheduleType.NONE:
+                return '';
+            case ScheduleType.HOURLY:
+                return '0 0 * * * *';
+            case ScheduleType.DAILY:
+                return '0 0 0 * * *';
+            case ScheduleType.WEEKLY:
+                return '0 0 0 * * 0';
+            default:
+                return (this.cronString || '').replace(/\s+/g, ' ').trim();
+        }
     }
 
     private currentParamsKey(): string {
@@ -226,7 +247,9 @@ export class SetJobComponent implements OnInit, OnDestroy {
         const eventTypes = [...(this.selectedEventTypes ?? [])]
             .sort()
             .join(',');
-        return `${hours}|${eventTypes}`;
+        return `${
+            this.scheduleType
+        }|${this.effectiveCron()}|${hours}|${eventTypes}`;
     }
 
     isDirty(): boolean {
@@ -299,87 +322,35 @@ export class SetJobComponent implements OnInit, OnDestroy {
         this.disableGC = false;
     }
 
-    saveGcSchedule(cron: string) {
-        if (this.originCron && this.originCron.type === ScheduleType.NONE) {
-            // no schedule, then create
-            this.purgeService
-                .createPurgeSchedule({
-                    schedule: {
-                        parameters: this.buildParameters(false),
-                        schedule: {
-                            type: GcComponent.getScheduleType(cron),
-                            cron: cron,
-                        },
-                    },
-                })
-                .subscribe({
-                    next: response => {
-                        this.errorHandler.info(
-                            'CLEARANCES.PURGE_SCHEDULE_RESET'
-                        );
-                        this.cronScheduleComponent.resetSchedule();
-                        this.getCurrentSchedule(false); // refresh schedule
-                    },
-                    error: error => {
-                        this.errorHandler.error(error);
-                    },
-                });
-        } else {
-            this.purgeService
-                .updatePurgeSchedule({
-                    schedule: {
-                        parameters: this.buildParameters(false),
-                        schedule: {
-                            type: GcComponent.getScheduleType(cron),
-                            cron: cron,
-                        },
-                    },
-                })
-                .subscribe({
-                    next: response => {
-                        this.errorHandler.info(
-                            'CLEARANCES.PURGE_SCHEDULE_RESET'
-                        );
-                        this.cronScheduleComponent.resetSchedule();
-                        this.getCurrentSchedule(false); // refresh schedule
-                    },
-                    error: error => {
-                        this.errorHandler.error(error);
-                    },
-                });
-        }
-    }
-
-    // persist retention time and event types onto the existing schedule
-    // without requiring the user to re-edit the schedule itself
+    // single save for the whole settings group: schedule, retention
+    // time and event types; everything is validated here
     saveCurrentParameters() {
-        if (!this.scheduleExists || !this.isFormValid() || !this.isDirty()) {
+        if (!this.isFormValid() || !this.isDirty()) {
             return;
         }
         this.savingParams = true;
-        // the scheduler persists the cron with a randomized seconds field,
-        // but the API rejects any submitted cron whose seconds are not 0
-        const cron = this.originCron.cron?.replace(/^\S+/, '0');
-        this.purgeService
-            .updatePurgeSchedule({
+        const body = {
+            schedule: {
+                parameters: this.buildParameters(false),
                 schedule: {
-                    parameters: this.buildParameters(false),
-                    schedule: {
-                        type: this.originCron.type as ScheduleObj['type'],
-                        cron: cron,
-                    },
+                    type: this.scheduleType as ScheduleObj['type'],
+                    cron: this.effectiveCron(),
                 },
-            })
-            .pipe(finalize(() => (this.savingParams = false)))
-            .subscribe({
-                next: () => {
-                    this.errorHandler.info('CLEARANCES.PURGE_PARAMS_SAVED');
-                    this.getCurrentSchedule(false); // refresh schedule
-                },
-                error: error => {
-                    this.errorHandler.error(error);
-                },
-            });
+            },
+        };
+        const request =
+            this.originCron?.type === ScheduleType.NONE
+                ? this.purgeService.createPurgeSchedule(body)
+                : this.purgeService.updatePurgeSchedule(body);
+        request.pipe(finalize(() => (this.savingParams = false))).subscribe({
+            next: () => {
+                this.errorHandler.info('CLEARANCES.PURGE_PARAMS_SAVED');
+                this.getCurrentSchedule(false); // refresh schedule
+            },
+            error: error => {
+                this.errorHandler.error(error);
+            },
+        });
     }
 
     get scheduleExists(): boolean {
@@ -412,17 +383,28 @@ export class SetJobComponent implements OnInit, OnDestroy {
         this.getStatus();
         this.purgeHistoryComponent?.refresh();
     }
-    isValid(): boolean {
-        if (this.cronScheduleComponent?.scheduleType === ScheduleType.NONE) {
+    isCronValid(): boolean {
+        if (this.scheduleType !== ScheduleType.CUSTOM) {
             return true;
         }
-        return this.isFormValid();
+        return cronRegex(this.effectiveCron());
     }
+    // gates SAVE: schedule removal (type None) does not need event types
     isFormValid(): boolean {
+        if (!this.isRetentionTimeValid() || !this.isCronValid()) {
+            return false;
+        }
+        if (this.scheduleType === ScheduleType.NONE) {
+            return true;
+        }
+        return this.selectedEventTypes?.length > 0;
+    }
+    // gates PURGE NOW / DRY RUN, which always need full parameters
+    canRunNow(): boolean {
         return (
             !this.purgeForm?.invalid &&
-            this.selectedEventTypes?.length > 0 &&
-            this.isRetentionTimeValid()
+            this.isRetentionTimeValid() &&
+            this.selectedEventTypes?.length > 0
         );
     }
     isRetentionTimeValid() {

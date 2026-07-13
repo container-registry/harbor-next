@@ -1748,6 +1748,8 @@
         "PURGE_NOW": "PURGE NOW",
         "PURGE_NOW_SUCCESS": "Purge triggered successfully",
         "PURGE_SCHEDULE_RESET": "Purge schedule has been reset",
+        "ROTATION_POLICY": "Rotation Policy",
+        "EXECUTION": "Execution",
         "PURGE_HISTORY": "Purge History",
         "FORWARD_ENDPOINT": "Audit Log Forward Syslog Endpoint",
         "FORWARD_ENDPOINT_TOOLTIP": "Forward audit logs to the syslog endpoint, for example: harbor-log:10514",

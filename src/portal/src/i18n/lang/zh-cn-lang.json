@@ -1749,6 +1749,8 @@
         "PURGE_NOW": "立即清理",
         "PURGE_NOW_SUCCESS": "触发清理成功",
         "PURGE_SCHEDULE_RESET": "清理计划已被重置",
+        "ROTATION_POLICY": "轮转策略",
+        "EXECUTION": "执行",
         "PURGE_HISTORY": "清理历史",
         "FORWARD_ENDPOINT": "日志转发端点",
         "FORWARD_ENDPOINT_TOOLTIP": "将日志转发到指定的 syslog 端点，例如：harbor-log:10514",

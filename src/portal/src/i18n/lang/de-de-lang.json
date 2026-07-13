@@ -1747,6 +1747,8 @@
         "PURGE_NOW": "JETZT SÄUBERN",
         "PURGE_NOW_SUCCESS": "Signal zur Bereinigung erfolgreich gesendet",
         "PURGE_SCHEDULE_RESET": "Bereinigungsplan wurde zurückgesetzt",
+        "ROTATION_POLICY": "Rotationsrichtlinie",
+        "EXECUTION": "Ausführung",
         "PURGE_HISTORY": "Bereinigungshistorie",
         "FORWARD_ENDPOINT": "Syslog Endpunkt für die Weiterleitung des Audit-Logs",
         "FORWARD_ENDPOINT_TOOLTIP": "Leite Audit-Logs an einen Syslog-Endpunkt, zum Beispiel: harbor-log:10514",

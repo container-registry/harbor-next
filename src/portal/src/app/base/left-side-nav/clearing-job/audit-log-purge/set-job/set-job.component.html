@@ -2,16 +2,9 @@
     <span class="spinner spinner-md"></span>
 </div>
 <div [hidden]="loadingGcStatus">
-    <div class="cron-selection mt-1">
-        <cron-selection
-            class="w-100"
-            [externalValidation]="isValid()"
-            externalValidationMessage="CLEARANCES.SAVE_DISABLED_HINT"
-            [labelCurrent]="getLabelCurrent"
-            [labelEdit]="getLabelCurrent"
-            [originCron]="originCron"
-            (inputvalue)="saveGcSchedule($event)"></cron-selection>
-    </div>
+    <h5 class="font-style mt-1" id="policy-header">
+        {{ 'CLEARANCES.ROTATION_POLICY' | translate }}
+    </h5>
     <div
         class="alert alert-warning noop-warning"
         role="alert"
@@ -32,6 +25,74 @@
 
     <form #purgeForm="ngForm" class="clr-form clr-form-horizontal p-0">
         <div class="clr-form-control mt-0">
+            <span class="font-style flex-200">{{
+                'CLEARANCES.SCHEDULE_TO_PURGE' | translate
+            }}</span>
+            <div class="clr-control-container">
+                <div class="flex">
+                    <div class="clr-select-wrapper">
+                        <select
+                            id="schedule-type"
+                            name="scheduleType"
+                            class="clr-select"
+                            [(ngModel)]="scheduleType">
+                            <option [value]="ScheduleType.NONE">
+                                {{ 'SCHEDULE.NONE' | translate }}
+                            </option>
+                            <option [value]="ScheduleType.HOURLY">
+                                {{ 'SCHEDULE.HOURLY' | translate }}
+                            </option>
+                            <option [value]="ScheduleType.DAILY">
+                                {{ 'SCHEDULE.DAILY' | translate }}
+                            </option>
+                            <option [value]="ScheduleType.WEEKLY">
+                                {{ 'SCHEDULE.WEEKLY' | translate }}
+                            </option>
+                            <option [value]="ScheduleType.CUSTOM">
+                                {{ 'SCHEDULE.CUSTOM' | translate }}
+                            </option>
+                        </select>
+                    </div>
+                    <ng-container *ngIf="scheduleType === ScheduleType.CUSTOM">
+                        <span class="required ml-1 mt-02">{{
+                            'SCHEDULE.CRON' | translate
+                        }}</span>
+                        <div class="clr-input-wrapper">
+                            <input
+                                id="targetCron"
+                                name="targetCron"
+                                class="clr-input ml-1"
+                                autocomplete="off"
+                                type="text"
+                                required
+                                #cronNgModel="ngModel"
+                                [(ngModel)]="cronString" />
+                            <clr-tooltip>
+                                <clr-icon
+                                    clrTooltipTrigger
+                                    shape="info-circle"
+                                    size="24"></clr-icon>
+                                <clr-tooltip-content
+                                    clrPosition="bottom-right"
+                                    clrSize="lg"
+                                    *clrIfOpen>
+                                    <cron-tooltip></cron-tooltip>
+                                </clr-tooltip-content>
+                            </clr-tooltip>
+                            <clr-control-error
+                                class="ml-1"
+                                *ngIf="
+                                    !isCronValid() &&
+                                    (cronNgModel.dirty || cronNgModel.touched)
+                                ">
+                                {{ 'TOOLTIP.CRON_REQUIRED' | translate }}
+                            </clr-control-error>
+                        </div>
+                    </ng-container>
+                </div>
+            </div>
+        </div>
+        <div class="clr-form-control">
             <span class="required font-style flex-200"
                 >{{ 'CLEARANCES.KEEP_IN' | translate
                 }}<clr-tooltip>
@@ -163,7 +224,7 @@
                 </div>
             </div>
         </div>
-        <div class="clr-row" *ngIf="scheduleExists">
+        <div class="clr-row">
             <div class="clr-col">
                 <button
                     id="save-purge-params"
@@ -177,7 +238,9 @@
         </div>
     </form>
     <div class="execution-status">
-        <div class="font-style">{{ 'WEBHOOK.STATUS' | translate }}</div>
+        <h5 class="font-style mt-0" id="execution-header">
+            {{ 'CLEARANCES.EXECUTION' | translate }}
+        </h5>
         <div class="status-line">
             <span class="mr-1"
                 >{{ 'CLEARANCES.LAST_COMPLETED' | translate }}:</span
@@ -208,17 +271,16 @@
         <div class="clr-col">
             <button
                 id="gc-now"
-                class="btn gc-start-btn"
-                [ngClass]="scheduleExists ? 'btn-outline' : 'btn-primary'"
+                class="btn btn-outline gc-start-btn"
                 (click)="gcNow()"
-                [disabled]="disableGC || !isFormValid()">
+                [disabled]="disableGC || !canRunNow()">
                 {{ 'CLEARANCES.PURGE_NOW' | translate }}
             </button>
             <button
                 id="gc-dry-run"
                 class="btn btn-outline gc-start-btn"
                 (click)="dryRun()"
-                [disabled]="dryRunOnGoing || !isFormValid()">
+                [disabled]="dryRunOnGoing || !canRunNow()">
                 {{ 'TAG_RETENTION.WHAT_IF_RUN' | translate }}
             </button>
         </div>

@@ -2971,6 +2971,8 @@
     "PURGE_NOW": "ОЧИСТИТЬ СЕЙЧАС",
     "PURGE_NOW_SUCCESS": "Успешно вызвана очистка",
     "PURGE_SCHEDULE_RESET": "Расписание очистки было сброшено",
+    "ROTATION_POLICY": "Политика ротации",
+    "EXECUTION": "Выполнение",
     "PURGE_HISTORY": "История очистки",
     "FORWARD_ENDPOINT": "Адрес Syslog для пересылки Журнала Аудита",
     "FORWARD_ENDPOINT_TOOLTIP": "Пересылает журнал аудита на адрес syslog, например: \"harbor-log:10514\"",
