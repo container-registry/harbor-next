@@ -25,9 +25,9 @@
 
     <form #purgeForm="ngForm" class="clr-form clr-form-horizontal p-0">
         <div class="clr-form-control mt-0">
-            <span class="font-style flex-200">{{
+            <label class="font-style flex-200" for="schedule-type">{{
                 'CLEARANCES.SCHEDULE_TO_PURGE' | translate
-            }}</span>
+            }}</label>
             <div class="clr-control-container">
                 <div class="flex">
                     <div class="clr-select-wrapper">
@@ -54,9 +54,9 @@
                         </select>
                     </div>
                     <ng-container *ngIf="scheduleType === ScheduleType.CUSTOM">
-                        <span class="required ml-1 mt-02">{{
+                        <label class="required ml-1 mt-02" for="targetCron">{{
                             'SCHEDULE.CRON' | translate
-                        }}</span>
+                        }}</label>
                         <div class="clr-input-wrapper">
                             <input
                                 id="targetCron"

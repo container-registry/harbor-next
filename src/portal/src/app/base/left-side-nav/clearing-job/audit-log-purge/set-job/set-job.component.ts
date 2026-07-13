@@ -216,7 +216,7 @@ export class SetJobComponent implements OnInit, OnDestroy {
         // but the API rejects any submitted cron whose seconds are not 0
         this.cronString =
             this.originCron.type === ScheduleType.CUSTOM
-                ? (this.originCron.cron || '').replace(/^\S+/, '0')
+                ? (this.originCron.cron || '').trim().replace(/^\S+/, '0')
                 : '';
         this.savedParamsKey = this.currentParamsKey();
     }
@@ -232,7 +232,11 @@ export class SetJobComponent implements OnInit, OnDestroy {
             case ScheduleType.WEEKLY:
                 return '0 0 0 * * 0';
             default:
-                return (this.cronString || '').replace(/\s+/g, ' ').trim();
+                // user-typed seconds also must be 0 for the API
+                return (this.cronString || '')
+                    .replace(/\s+/g, ' ')
+                    .trim()
+                    .replace(/^\S+/, '0');
         }
     }
 
@@ -356,7 +360,7 @@ export class SetJobComponent implements OnInit, OnDestroy {
     get isNoopSchedule(): boolean {
         return (
             this.scheduleExists &&
-            this.eventTypes?.length > 0 &&
+            !this.loading &&
             !(this.selectedEventTypes?.length > 0)
         );
     }
