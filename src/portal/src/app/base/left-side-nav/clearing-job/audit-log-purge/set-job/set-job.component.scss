@@ -4,7 +4,7 @@
 }
 
 .gc-start-btn {
-    width:150px;
+    width: 150px;
     margin-top: 35px;
 }
 
@@ -48,12 +48,12 @@
 }
 
 .p-06 {
-    padding-left: .6rem;
-    padding-right: .6rem;
+    padding-left: 0.6rem;
+    padding-right: 0.6rem;
 }
 
 .float-left {
-    float:left;
+    float: left;
     margin-right: 1rem;
 }
 
@@ -61,4 +61,19 @@
     margin-top: 0.5rem;
     margin-bottom: 0.5rem;
     max-width: 44rem;
+}
+
+.form-save-btn {
+    width: 150px;
+    margin-top: 1rem;
+}
+
+// visually detach the immediate manual actions from the settings form above
+.manual-actions {
+    margin-top: 2rem;
+
+    .gc-start-btn {
+        margin-top: 0;
+        margin-right: 1rem;
+    }
 }

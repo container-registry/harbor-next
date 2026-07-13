@@ -203,31 +203,25 @@
                 </div>
             </div>
         </div>
-    </form>
-    <div class="clr-row">
-        <div class="clr-col-2 flex-200">
-            <button
-                id="save-purge-params"
-                class="btn btn-primary gc-start-btn"
-                (click)="saveCurrentParameters()"
-                *ngIf="scheduleExists"
-                [disabled]="savingParams || !isFormValid()">
-                {{ 'BUTTON.SAVE' | translate }}
-            </button>
-            <button
-                id="gc-now"
-                class="btn btn-primary gc-start-btn"
-                *ngIf="!scheduleExists"
-                (click)="gcNow()"
-                [disabled]="disableGC || !isFormValid()">
-                {{ 'CLEARANCES.PURGE_NOW' | translate }}
-            </button>
+        <div class="clr-row" *ngIf="scheduleExists">
+            <div class="clr-col">
+                <button
+                    id="save-purge-params"
+                    type="button"
+                    class="btn btn-primary form-save-btn"
+                    (click)="saveCurrentParameters()"
+                    [disabled]="savingParams || !isFormValid()">
+                    {{ 'BUTTON.SAVE' | translate }}
+                </button>
+            </div>
         </div>
+    </form>
+    <div class="clr-row manual-actions">
         <div class="clr-col">
             <button
                 id="gc-now"
-                class="btn btn-outline gc-start-btn"
-                *ngIf="scheduleExists"
+                class="btn gc-start-btn"
+                [ngClass]="scheduleExists ? 'btn-outline' : 'btn-primary'"
                 (click)="gcNow()"
                 [disabled]="disableGC || !isFormValid()">
                 {{ 'CLEARANCES.PURGE_NOW' | translate }}
