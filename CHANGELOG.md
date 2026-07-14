@@ -6,6 +6,31 @@ This changelog mirrors [GitHub Releases](https://github.com/container-registry/h
 
 ---
 
+## [2.15.5](https://github.com/container-registry/harbor-next/compare/v2.15.4...v2.15.5) (2026-07-14)
+
+
+### Features
+
+* **ci:** Add Zero CVE Pipeline ([#359](https://github.com/container-registry/harbor-next/issues/359)) ([a435200](https://github.com/container-registry/harbor-next/commit/a435200ec042114573e566a28dfa5653c590830c))
+* **lint:** Add Go Quality Linters ([#325](https://github.com/container-registry/harbor-next/issues/325)) ([0dfb924](https://github.com/container-registry/harbor-next/commit/0dfb9245e50882fb43a59161c80b4dc20f0371cb))
+
+
+### Bug Fixes
+
+* add missing release cherry-pick updates ([fa878ce](https://github.com/container-registry/harbor-next/commit/fa878cea3acc3a9cfd80d8ebd78328915e5ddd82))
+
+
+### Upstream
+
+* 【fix issue 22865】TCR provider adaptor can't parse intertional secret ID ([950e99e](https://github.com/container-registry/harbor-next/commit/950e99edd036e920769ccf31c61fef3127795847))
+
+
+### Code Refactoring
+
+* **task:** use Redis SET with SPOP for outdate execution status refresh ([1b7f4e1](https://github.com/container-registry/harbor-next/commit/1b7f4e1d9d431ec520a2372ef88d435d05a9969e))
+
+
+
 ## [2.15.0](https://github.com/container-registry/harbor-next/compare/v2.14.0...v2.15.0) (2026-05-12)
 
 
