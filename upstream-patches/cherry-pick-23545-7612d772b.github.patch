@@ -1,0 +1,1160 @@
+diff --git a/.github/workflows/CI.yml b/.github/workflows/CI.yml
+new file mode 100644
+index 000000000..fb1e190ce
+--- /dev/null
++++ b/.github/workflows/CI.yml
+@@ -0,0 +1,377 @@
++name: CI
++env:
++   POSTGRESQL_HOST: localhost
++   POSTGRESQL_PORT: 5432
++   POSTGRESQL_USR: postgres
++   POSTGRESQL_PWD: root123
++   POSTGRESQL_DATABASE: registry
++   DOCKER_COMPOSE_VERSION: 2.27.1
++   HARBOR_ADMIN: admin
++   HARBOR_ADMIN_PASSWD: Harbor12345
++   CORE_SECRET: tempString
++   KEY_PATH: "/data/secret/keys/secretkey"
++   REDIS_HOST: localhost
++   REG_VERSION: v2.7.1-patch-2819-2553
++   UI_BUILDER_VERSION: 1.6.0
++
++on:
++  # the paths-ignore is the same as the paths in pass-CI.yml, they should be synced together
++  # see https://web.archive.org/web/20230506145443/https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/troubleshooting-required-status-checks#handling-skipped-but-required-checks
++  pull_request:
++    paths-ignore:
++      - 'docs/**'
++      - '**.md'
++      - 'tests/**'
++      - '!tests/**.sh'
++      - '!tests/apitests/**'
++      - '!tests/ci/**'
++      - '!tests/resources/**'
++      - '!tests/robot-cases/**'
++      - '!tests/robot-cases/Group1-Nightly/**'
++  push:
++    # the paths-ignore is the same as the paths in pass-CI.yml, they should be synced together
++    paths-ignore:
++      - 'docs/**'
++      - '**.md'
++      - 'tests/**'
++      - '!tests/**.sh'
++      - '!tests/apitests/**'
++      - '!tests/ci/**'
++      - '!tests/resources/**'
++      - '!tests/robot-cases/**'
++      - '!tests/robot-cases/Group1-Nightly/**'
++
++jobs:
++  UTTEST:
++    env:
++       UTTEST: true
++    runs-on:
++      #- self-hosted
++      - cncf-ubuntu-16-64-x86
++    timeout-minutes: 100
++    steps:
++      - uses: actions/checkout@v7
++        with:
++         path: src/github.com/goharbor/harbor
++      - name: Set up Go 1.26
++        uses: actions/setup-go@v5
++        with:
++           go-version: 1.26.4
++           cache-dependency-path: src/github.com/goharbor/harbor/src/go.sum
++        id: go
++      - name: Cache CI Go tools
++        uses: actions/cache@v4
++        with:
++          path: ~/go/bin
++          key: ci-gotools-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src/github.com/goharbor/harbor/tests/ci/ut_install.sh') }}
++      - name: setup env
++        run: |
++          cd src/github.com/goharbor/harbor
++          pwd
++          go env
++          echo "GOPATH=$(go env GOPATH):$GITHUB_WORKSPACE" >> $GITHUB_ENV
++          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
++          echo "TOKEN_PRIVATE_KEY_PATH=${GITHUB_WORKSPACE}/src/github.com/goharbor/harbor/tests/private_key.pem" >> $GITHUB_ENV
++        shell: bash
++      - name: before_install
++        run: |
++          set -x
++          cd src/github.com/goharbor/harbor
++          pwd
++          env
++          #sudo apt install -y xvfb
++          #xvfb-run ls
++          curl -L https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > docker-compose
++          chmod +x docker-compose
++          sudo mv docker-compose /usr/local/bin
++          IP=`hostname -I | awk '{print $1}'`
++          echo '{"insecure-registries" : ["'$IP':5000"]}' | sudo tee /etc/docker/daemon.json
++          echo "IP=$IP" >> $GITHUB_ENV
++          sudo cp ./tests/harbor_ca.crt /usr/local/share/ca-certificates/
++          sudo update-ca-certificates
++          sudo service docker restart
++      - name: install
++        run: |
++          cd src/github.com/goharbor/harbor
++          env
++          df -h
++          bash ./tests/showtime.sh ./tests/ci/ut_install.sh
++      - name: script
++        run: |
++          echo IP: $IP
++          df -h
++          cd src/github.com/goharbor/harbor
++          bash ./tests/showtime.sh ./tests/ci/ut_run.sh $IP
++          df -h
++      - name: Codecov For BackEnd
++        uses: codecov/codecov-action@v7
++        with:
++          files: ./src/github.com/goharbor/harbor/profile.cov
++          flags: unittests
++          token: ${{ secrets.CODECOV_TOKEN }}
++
++  APITEST_DB:
++    env:
++      APITEST_DB: true
++    runs-on:
++      #- self-hosted
++      - cncf-ubuntu-16-64-x86
++    timeout-minutes: 100
++    steps:
++      - uses: actions/checkout@v7
++        with:
++          path: src/github.com/goharbor/harbor
++      - name: Set up Go 1.23
++        uses: actions/setup-go@v5
++        with:
++          go-version: 1.23.2
++          cache-dependency-path: src/github.com/goharbor/harbor/src/go.sum
++        id: go
++      - name: setup env
++        run: |
++          cd src/github.com/goharbor/harbor
++          pwd
++          go env
++          echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
++          echo "GOPATH=$(go env GOPATH):$GITHUB_WORKSPACE" >> $GITHUB_ENV
++          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
++          echo "TOKEN_PRIVATE_KEY_PATH=${GITHUB_WORKSPACE}/src/github.com/goharbor/harbor/tests/private_key.pem" >> $GITHUB_ENV
++          IP=`hostname -I | awk '{print $1}'`
++          echo "IP=$IP" >> $GITHUB_ENV
++        shell: bash
++      - name: before_install
++        run: |
++          set -x
++          cd src/github.com/goharbor/harbor
++          pwd
++          env
++          df -h
++          #sudo apt install -y xvfb
++          #xvfb-run ls
++          curl -L https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > docker-compose
++          chmod +x docker-compose
++          sudo mv docker-compose /usr/local/bin
++      - name: install
++        run: |
++          cd src/github.com/goharbor/harbor
++          env
++          df -h
++          docker system prune -a -f
++          bash ./tests/showtime.sh ./tests/ci/api_common_install.sh $IP DB
++      - name: script
++        run: |
++          cd src/github.com/goharbor/harbor
++          echo IP: $IP
++          df -h
++          bash ./tests/showtime.sh ./tests/ci/api_run.sh DB $IP
++          df -h
++      - name: upload_logs
++        uses: actions/upload-artifact@v6
++        if: always()
++        with:
++          name: db-api-harbor-logs.tar.gz
++          path: /home/ubuntu/_work/harbor/harbor/src/github.com/goharbor/harbor/integration_logs.tar.gz
++          retention-days: 5
++  APITEST_DB_PROXY_CACHE:
++    env:
++      APITEST_DB: true
++    if: ${{ github.event.repository.custom_properties.SKIP_PROXY_CACHE != 'true' }}
++    runs-on:
++      #- self-hosted
++      - cncf-ubuntu-16-64-x86
++    timeout-minutes: 100
++    steps:
++      - uses: actions/checkout@v7
++        with:
++          path: src/github.com/goharbor/harbor
++      - name: Set up Go 1.23
++        uses: actions/setup-go@v5
++        with:
++          go-version: 1.23.2
++          cache-dependency-path: src/github.com/goharbor/harbor/src/go.sum
++        id: go
++      - name: setup env
++        run: |
++          cd src/github.com/goharbor/harbor
++          pwd
++          go env
++          echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
++          echo "GOPATH=$(go env GOPATH):$GITHUB_WORKSPACE" >> $GITHUB_ENV
++          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
++          echo "TOKEN_PRIVATE_KEY_PATH=${GITHUB_WORKSPACE}/src/github.com/goharbor/harbor/tests/private_key.pem" >> $GITHUB_ENV
++          IP=`hostname -I | awk '{print $1}'`
++          echo "IP=$IP" >> $GITHUB_ENV
++        shell: bash
++      - name: before_install
++        run: |
++          set -x
++          cd src/github.com/goharbor/harbor
++          pwd
++          env
++          df -h
++          #sudo apt install -y xvfb
++          #xvfb-run ls
++          curl -L https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > docker-compose
++          chmod +x docker-compose
++          sudo mv docker-compose /usr/local/bin
++      - name: install
++        run: |
++          cd src/github.com/goharbor/harbor
++          env
++          df -h
++          docker system prune -a -f
++          bash ./tests/showtime.sh ./tests/ci/api_common_install.sh $IP DB
++      - name: script
++        run: |
++          cd src/github.com/goharbor/harbor
++          echo IP: $IP
++          df -h
++          bash ./tests/showtime.sh ./tests/ci/api_run.sh PROXY_CACHE $IP
++          df -h
++      - name: upload_logs
++        if: always()
++        uses: actions/upload-artifact@v6
++        with:
++          name: proxy-api-harbor-logs.tar.gz
++          path: /home/ubuntu/_work/harbor/harbor/src/github.com/goharbor/harbor/integration_logs.tar.gz
++          retention-days: 5
++  APITEST_LDAP:
++    env:
++      APITEST_LDAP: true
++    runs-on:
++      #- self-hosted
++      - cncf-ubuntu-16-64-x86
++    timeout-minutes: 100
++    steps:
++      - uses: actions/checkout@v7
++        with:
++          path: src/github.com/goharbor/harbor
++      - name: Set up Go 1.23
++        uses: actions/setup-go@v5
++        with:
++          go-version: 1.23.2
++          cache-dependency-path: src/github.com/goharbor/harbor/src/go.sum
++        id: go
++      - name: setup env
++        run: |
++          cd src/github.com/goharbor/harbor
++          pwd
++          go env
++          echo "GOPATH=$(go env GOPATH):$GITHUB_WORKSPACE" >> $GITHUB_ENV
++          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
++          echo "TOKEN_PRIVATE_KEY_PATH=${GITHUB_WORKSPACE}/src/github.com/goharbor/harbor/tests/private_key.pem" >> $GITHUB_ENV
++          IP=`hostname -I | awk '{print $1}'`
++          echo "IP=$IP" >> $GITHUB_ENV
++        shell: bash
++      - name: before_install
++        run: |
++          set -x
++          cd src/github.com/goharbor/harbor
++          pwd
++          env
++          df -h
++          #sudo apt install -y xvfb
++          #xvfb-run ls
++          curl -L https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > docker-compose
++          chmod +x docker-compose
++          sudo mv docker-compose /usr/local/bin
++      - name: install
++        run: |
++          cd src/github.com/goharbor/harbor
++          env
++          df -h
++          bash ./tests/showtime.sh ./tests/ci/api_common_install.sh $IP LDAP
++      - name: script
++        run: |
++          echo IP: $IP
++          df -h
++          cd src/github.com/goharbor/harbor
++          bash ./tests/showtime.sh ./tests/ci/api_run.sh LDAP $IP
++          df -h
++      - name: upload_logs
++        if: always()
++        uses: actions/upload-artifact@v6
++        with:
++          name: ldap-api-harbor-logs.tar.gz
++          path: /home/ubuntu/_work/harbor/harbor/src/github.com/goharbor/harbor/integration_logs.tar.gz
++          retention-days: 5
++  OFFLINE:
++    env:
++      OFFLINE: true
++    runs-on:
++      #- self-hosted
++      - cncf-ubuntu-16-64-x86
++    timeout-minutes: 100
++    steps:
++      - uses: actions/checkout@v7
++        with:
++          path: src/github.com/goharbor/harbor
++      - name: Set up Go 1.23
++        uses: actions/setup-go@v5
++        with:
++          go-version: 1.23.2
++          cache-dependency-path: src/github.com/goharbor/harbor/src/go.sum
++        id: go
++      - name: setup env
++        run: |
++          cd src/github.com/goharbor/harbor
++          pwd
++          docker version
++          go env
++          echo "GOPATH=$(go env GOPATH):$GITHUB_WORKSPACE" >> $GITHUB_ENV
++          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
++          echo "TOKEN_PRIVATE_KEY_PATH=${GITHUB_WORKSPACE}/src/github.com/goharbor/harbor/tests/private_key.pem" >> $GITHUB_ENV
++        shell: bash
++      - name: before_install
++        run: |
++          set -x
++          cd src/github.com/goharbor/harbor
++          pwd
++          env
++          df -h
++          #sudo apt install -y xvfb
++          #xvfb-run ls
++          curl -L https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > docker-compose
++          chmod +x docker-compose
++          sudo mv docker-compose /usr/local/bin
++          IP=`hostname -I | awk '{print $1}'`
++          echo '{"insecure-registries" : ["'$IP':5000"]}' | sudo tee /etc/docker/daemon.json
++          echo "IP=$IP" >> $GITHUB_ENV
++          sudo cp ./tests/harbor_ca.crt /usr/local/share/ca-certificates/
++          sudo update-ca-certificates
++          sudo service docker restart
++      - name: script
++        run: |
++          echo IP: $IP
++          df -h
++          cd src/github.com/goharbor/harbor
++          bash ./tests/showtime.sh ./tests/ci/distro_installer.sh
++          df -h
++
++  UI_UT:
++    env:
++      UI_UT: true
++    runs-on:
++      #- self-hosted
++      - cncf-ubuntu-16-64-x86
++    timeout-minutes: 100
++    steps:
++      - uses: actions/setup-node@v6
++        with:
++          node-version: '22'
++      - uses: actions/checkout@v7
++        with:
++          path: src/github.com/goharbor/harbor
++      - name: script
++        run: |
++          echo IP: $IP
++          df -h
++          cd src/github.com/goharbor/harbor
++          bash ./tests/showtime.sh ./tests/ci/ui_ut_run.sh
++          df -h
++      - name: Codecov For UI
++        uses: codecov/codecov-action@v7
++        with:
++          files: ./src/github.com/goharbor/harbor/src/portal/coverage/lcov.info
++          flags: unittests
++          token: ${{ secrets.CODECOV_TOKEN }}
+diff --git a/.github/workflows/api-schema-check.yml b/.github/workflows/api-schema-check.yml
+index e25c7c5e0..c27cb0375 100644
+--- a/.github/workflows/api-schema-check.yml
++++ b/.github/workflows/api-schema-check.yml
+@@ -11,7 +11,7 @@ permissions:
+ 
+ jobs:
+   check:
+-    runs-on: ubuntu-latest
++    runs-on: cncf-ubuntu-16-64-x86
+     steps:
+       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+         with:
+diff --git a/.github/workflows/auto_assign_prs.yml b/.github/workflows/auto_assign_prs.yml
+new file mode 100644
+index 000000000..1ec199176
+--- /dev/null
++++ b/.github/workflows/auto_assign_prs.yml
+@@ -0,0 +1,18 @@
++---
++name: "Auto Assign"
++
++# pull_request_target means that this will run on pull requests, but in
++# the context of the base repo. This should mean PRs from forks are supported.
++on:
++  pull_request_target:
++    types: [opened, reopened, ready_for_review]
++
++jobs:
++  # Automatically assigns reviewers and owner
++  add-reviews:
++    runs-on: cncf-ubuntu-16-64-x86
++    steps:
++      - name: Set the author of a PR as the assignee
++        uses: kentaro-m/auto-assign-action@v2.0.2
++        with:
++          configuration-path: ".github/auto-assignees.yml"
+diff --git a/.github/workflows/build-package.yml b/.github/workflows/build-package.yml
+new file mode 100644
+index 000000000..c7af9f552
+--- /dev/null
++++ b/.github/workflows/build-package.yml
+@@ -0,0 +1,261 @@
++name: "Build Package Workflow"
++env:
++  DOCKER_COMPOSE_VERSION: 1.23.0
++
++on:
++  push:
++    branches:
++      - main
++      - release-*
++
++# Serialize runs per branch so concurrent pushes don't race when pushing the
++# shared mutable tags (dev / latest) and the multi-arch manifests. Queue rather
++# than cancel to avoid leaving a half-published set of images.
++concurrency:
++  group: build-package-${{ github.ref }}
++  cancel-in-progress: false
++
++jobs:
++  BUILD_BASE_IMAGE:
++    runs-on: cncf-ubuntu-16-64-x86
++    permissions:
++      contents: read
++    outputs:
++      build_base: ${{ steps.decide.outputs.build_base || 'false' }}
++    steps:
++      - uses: actions/checkout@v7
++      - uses: jitterbit/get-changed-files@v1
++        id: changed-files
++        continue-on-error: true
++        with:
++          format: space-delimited
++          token: ${{ secrets.GITHUB_TOKEN }}
++      - name: Decide whether to (re)build the base image
++        id: decide
++        if: |
++            steps.changed-files.outcome != 'success' ||
++            contains(steps.changed-files.outputs.modified, 'common/Dockerfile') ||
++            contains(steps.changed-files.outputs.modified, 'Dockerfile.base') ||
++            contains(steps.changed-files.outputs.modified, 'VERSION') ||
++            contains(steps.changed-files.outputs.modified, '.buildbaselog') ||
++            github.ref == 'refs/heads/main'
++        run: echo "build_base=true" >> "$GITHUB_OUTPUT"
++      - name: Set up QEMU
++        if: steps.decide.outputs.build_base == 'true'
++        uses: docker/setup-qemu-action@v3
++        with:
++          # Pin to a known-good binfmt image. The default "tonistiigi/binfmt:latest"
++          # has shipped broken releases that fail arm64 emulation with
++          # 'exec /bin/sh: no such file or directory' during container init.
++          image: tonistiigi/binfmt:qemu-v9.2.2
++          platforms: linux/amd64,linux/arm64
++      - name: Set up Docker Buildx
++        if: steps.decide.outputs.build_base == 'true'
++        uses: docker/setup-buildx-action@v3
++      - name: Build and push goharbor/photon:5.0 multi-arch manifest
++        if: steps.decide.outputs.build_base == 'true'
++        run: |
++          set -x
++          echo "${{ secrets.DOCKER_HUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
++          docker buildx build --platform linux/amd64,linux/arm64 \
++            -f make/photon/common/Dockerfile -t goharbor/photon:5.0 --push .
++          docker logout
++
++  BUILD_PACKAGE:
++    needs: [BUILD_BASE_IMAGE]
++    strategy:
++      fail-fast: false
++      matrix:
++        arch: [amd64, arm64]
++    env:
++        BUILD_PACKAGE: true
++        ARCH: ${{ matrix.arch }}
++        BUILD_BASE: ${{ needs.BUILD_BASE_IMAGE.outputs.build_base }}
++    runs-on: ${{ matrix.arch == 'arm64' && 'cncf-ubuntu-16-64-arm' || 'cncf-ubuntu-16-64-x86' }}
++    steps:
++      - name: Configure AWS credentials
++        uses: aws-actions/configure-aws-credentials@v6.2.1
++        with:
++          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
++          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
++          aws-region: us-east-1
++      - name: Setup Docker
++        uses: docker-practice/actions-setup-docker@master
++        with:
++          docker_version: 20.10
++          docker_channel: stable
++      - uses: actions/checkout@v7
++      - uses: actions/checkout@v7
++        with:
++          path: src/github.com/goharbor/harbor
++      - name: Set up Go
++        uses: actions/setup-go@v5
++        with:
++          go-version: 1.26.4
++          cache-dependency-path: src/go.sum
++        id: go
++      - name: Build Package
++        run: |
++          set -x
++          env
++          df -h
++          harbor_target_bucket=""
++          target_branch="$(echo ${GITHUB_REF#refs/heads/})"
++          harbor_offline_build_bundle=""
++          harbor_online_build_bundle=""
++          harbor_logs_bucket="harbor-ci-logs"
++          harbor_builds_bucket="harbor-builds"
++          harbor_releases_bucket="harbor-releases"
++          harbor_ci_pipeline_store_bucket="harbor-ci-pipeline-store/latest"
++          # the target release version is the version of next release(RC or GA). It needs to be updated on creating new release branch.
++          target_release_version=$(cat ./VERSION)
++          Harbor_Package_Version=$target_release_version-'build.'$GITHUB_RUN_NUMBER
++
++          if [[ $target_branch == "main" ]]; then
++            Harbor_Assets_Version=$Harbor_Package_Version
++            harbor_target_bucket=$harbor_builds_bucket
++          else
++            Harbor_Assets_Version=$target_release_version
++            harbor_target_bucket=$harbor_releases_bucket/$target_branch
++          fi
++
++          if [[ $target_branch == "release-"* ]]; then
++            Harbor_Build_Base_Tag=$target_release_version
++          else
++            Harbor_Build_Base_Tag=dev
++          fi
++
++          build_base_params=" BUILD_BASE=false"
++          cd src/github.com/goharbor/harbor
++          if [ -z "$BUILD_BASE"  ] || [ "$BUILD_BASE" != "true"  ]; then
++            echo "Do not need to build base images!"
++          else
++            # Use the locally built per-arch base, not the remote ":<tag>" manifest,
++            # which is only updated later in CREATE_MANIFEST and may be stale.
++            build_base_params=" BUILD_BASE=true PULL_BASE_FROM_DOCKERHUB=false PUSHBASEIMAGE=true REGISTRYUSER=\"${{ secrets.DOCKER_HUB_USERNAME }}\" REGISTRYPASSWORD=\"${{ secrets.DOCKER_HUB_PASSWORD }}\""
++          fi
++
++          sudo make package_offline ARCH=${ARCH} GOBUILDTAGS="include_oss include_gcs" BASEIMAGETAG=${Harbor_Build_Base_Tag} VERSIONTAG=${Harbor_Assets_Version} PKGVERSIONTAG=${Harbor_Package_Version} TRIVYFLAG=true EXPORTERFLAG=true HTTPPROXY= ${build_base_params}
++          sudo make package_online ARCH=${ARCH} GOBUILDTAGS="include_oss include_gcs" BASEIMAGETAG=${Harbor_Build_Base_Tag} VERSIONTAG=${Harbor_Assets_Version} PKGVERSIONTAG=${Harbor_Package_Version} TRIVYFLAG=true EXPORTERFLAG=true HTTPPROXY= ${build_base_params}
++
++          # fail before publishing if any image was built on a wrong-arch
++          # base (e.g. a stale base pulled from Docker Hub), which produces an
++          # image labeled ${ARCH} but containing binaries of another arch.
++          expected_base_arch=$([ "${ARCH}" = "arm64" ] && echo "aarch64" || echo "x86_64")
++          for img in $(docker images --format '{{.Repository}}:{{.Tag}}' | grep '^goharbor/' | grep -- "${Harbor_Assets_Version}" | grep -v '\-base'); do
++            base_label=$(docker inspect --format '{{index .Config.Labels "name"}}' "$img")
++            if [ -n "$base_label" ] && [[ "$base_label" != *"$expected_base_arch"* ]]; then
++              echo "ERROR: $img is built on a wrong-arch base: '$base_label' (expected *$expected_base_arch*)"
++              exit 1
++            fi
++          done
++
++          harbor_offline_build_bundle=$(basename harbor-offline-installer-*.tgz)
++          harbor_online_build_bundle=$(basename harbor-online-installer-*.tgz)
++          mv "${harbor_offline_build_bundle}" "harbor-offline-installer-${Harbor_Package_Version}-${ARCH}.tgz"
++          mv "${harbor_online_build_bundle}" "harbor-online-installer-${Harbor_Package_Version}-${ARCH}.tgz"
++          harbor_offline_build_bundle="harbor-offline-installer-${Harbor_Package_Version}-${ARCH}.tgz"
++          harbor_online_build_bundle="harbor-online-installer-${Harbor_Package_Version}-${ARCH}.tgz"
++
++          source tests/ci/build_util.sh
++          cp "${harbor_offline_build_bundle}"  "harbor-offline-installer-latest-${ARCH}.tgz"
++          cp "${harbor_online_build_bundle}"   "harbor-online-installer-latest-${ARCH}.tgz"
++          uploader "${harbor_offline_build_bundle}"                    $harbor_target_bucket
++          uploader "${harbor_online_build_bundle}"                     $harbor_target_bucket
++          uploader "harbor-offline-installer-latest-${ARCH}.tgz"      $harbor_target_bucket
++          uploader "harbor-online-installer-latest-${ARCH}.tgz"       $harbor_target_bucket
++          # Backwards compatibility: keep the unsuffixed legacy "latest" name
++          # pointing to amd64 (what it historically was) so existing downstream
++          # consumers that expect harbor-*-installer-latest.tgz don't break.
++          if [ "${ARCH}" = "amd64" ]; then
++            cp "${harbor_offline_build_bundle}"  "harbor-offline-installer-latest.tgz"
++            cp "${harbor_online_build_bundle}"   "harbor-online-installer-latest.tgz"
++            uploader "harbor-offline-installer-latest.tgz"             $harbor_target_bucket
++            uploader "harbor-online-installer-latest.tgz"              $harbor_target_bucket
++          fi
++          echo "BUILD_BUNDLE=${harbor_offline_build_bundle}" >> $GITHUB_ENV
++          echo "harbor_target_bucket=$harbor_target_bucket" >> $GITHUB_ENV
++
++          publishImage $target_branch $Harbor_Assets_Version "${{ secrets.DOCKER_HUB_USERNAME }}" "${{ secrets.DOCKER_HUB_PASSWORD }}" ${ARCH}
++      - name: Save repo list
++        run: |
++          { docker images --format '{{.Repository}}' | grep '^goharbor/' | grep -v '\-base' | grep -v '^goharbor/photon$' | grep -v '^goharbor/spectral$' | grep -v '^goharbor/swagger$' | grep -v '^goharbor/mockery$' || true; } | sort -u > "$GITHUB_WORKSPACE/_repos_${ARCH}.txt"
++          # base images are pushed arch-suffixed by the _build_base make macro
++          # and combined into multi-arch manifests by CREATE_MANIFEST. Derive the
++          # list from the Dockerfile.base directories (the source of truth) so it
++          # stays correct regardless of local image cleanup behavior.
++          if [ "$BUILD_BASE" = "true" ]; then
++            for d in make/photon/*/Dockerfile.base; do
++              component=$(basename "$(dirname "$d")")
++              echo "goharbor/harbor-${component}-base"
++            done | sort -u > "$GITHUB_WORKSPACE/_base_repos_${ARCH}.txt"
++          else
++            : > "$GITHUB_WORKSPACE/_base_repos_${ARCH}.txt"
++          fi
++      - name: Upload repo list
++        uses: actions/upload-artifact@v4
++        with:
++          name: repos-${{ matrix.arch }}
++          path: |
++            ${{ github.workspace }}/_repos_${{ matrix.arch }}.txt
++            ${{ github.workspace }}/_base_repos_${{ matrix.arch }}.txt
++
++  CREATE_MANIFEST:
++    needs: [BUILD_BASE_IMAGE, BUILD_PACKAGE]
++    runs-on: cncf-ubuntu-16-64-x86
++    permissions:
++      contents: read
++    steps:
++      - uses: actions/checkout@v7
++      - uses: actions/download-artifact@v8
++        with:
++          pattern: repos-*
++          merge-multiple: true
++      - name: Set up Docker Buildx
++        uses: docker/setup-buildx-action@v3
++      - name: Determine image tag
++        id: tag
++        run: |
++          target_branch="$(echo ${GITHUB_REF#refs/heads/})"
++          version=$(cat ./VERSION)
++          if [[ $target_branch == "main" ]]; then
++            echo "image_tag=dev" >> $GITHUB_OUTPUT
++          elif [[ $target_branch == "release-"* ]]; then
++            echo "image_tag=${version}-dev" >> $GITHUB_OUTPUT
++          else
++            echo "image_tag=${version}" >> $GITHUB_OUTPUT
++          fi
++          # base images use BASEIMAGETAG (see Harbor_Build_Base_Tag in BUILD_PACKAGE):
++          # "dev" on main, the release version on release-* branches
++          if [[ $target_branch == "release-"* ]]; then
++            echo "base_tag=${version}" >> $GITHUB_OUTPUT
++          else
++            echo "base_tag=dev" >> $GITHUB_OUTPUT
++          fi
++      - name: Login to Docker Hub
++        run: echo "${{ secrets.DOCKER_HUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
++      - name: Create multi-arch manifests
++        run: |
++          set -euo pipefail
++          image_tag="${{ steps.tag.outputs.image_tag }}"
++          cat _repos_*.txt | sort -u | while IFS= read -r repo; do
++            [ -z "$repo" ] && continue
++            echo "Creating manifest ${repo}:${image_tag}"
++            docker buildx imagetools create -t "${repo}:${image_tag}" \
++              "${repo}:${image_tag}-amd64" \
++              "${repo}:${image_tag}-arm64"
++          done
++          # The harbor-*-base images are only (re)built and pushed (arch-suffixed)
++          # when BUILD_BASE_IMAGE decided to rebuild the base; otherwise the
++          # suffixed tags from this run don't exist and there is nothing to combine.
++          if [ "${{ needs.BUILD_BASE_IMAGE.outputs.build_base }}" = "true" ]; then
++            base_tag="${{ steps.tag.outputs.base_tag }}"
++            cat _base_repos_*.txt | sort -u | while IFS= read -r repo; do
++              [ -z "$repo" ] && continue
++              echo "Creating manifest ${repo}:${base_tag}"
++              docker buildx imagetools create -t "${repo}:${base_tag}" \
++                "${repo}:${base_tag}-amd64" \
++                "${repo}:${base_tag}-arm64"
++            done
++          fi
++          docker logout
+diff --git a/.github/workflows/codeql-analysis.yml b/.github/workflows/codeql-analysis.yml
+new file mode 100644
+index 000000000..71e5b2821
+--- /dev/null
++++ b/.github/workflows/codeql-analysis.yml
+@@ -0,0 +1,54 @@
++name: "Code scanning - action"
++
++on:
++  push:
++  pull_request:
++  schedule:
++    - cron: '0 16 * * 6'
++
++jobs:
++  CodeQL-Build:
++
++    runs-on: cncf-ubuntu-16-64-x86
++
++    steps:
++    - name: Checkout repository
++      uses: actions/checkout@v7
++      with:
++        # We must fetch at least the immediate parents so that if this is
++        # a pull request then we can checkout the head.
++        fetch-depth: 2
++
++    # If this run was triggered by a pull request event, then checkout
++    # the head of the pull request instead of the merge commit.
++    - run: git checkout HEAD^2
++      if: ${{ github.event_name == 'pull_request' }}
++
++    # Initializes the CodeQL tools for scanning.
++    - name: Initialize CodeQL
++      uses: github/codeql-action/init@v4
++      # Override language selection by uncommenting this and choosing your languages
++      # with:
++      #   languages: go, javascript, csharp, python, cpp, java
++
++    # Autobuild attempts to build any compiled languages  (C/C++, C#, or Java).
++    # If this step fails, then you should remove it and run the build manually (see below)
++    #- name: Autobuild
++    #  uses: github/codeql-action/autobuild@v1
++
++    # ℹ️ Command-line programs to run using the OS shell.
++    # 📚 https://git.io/JvXDl
++
++    # ✏️ If the Autobuild fails above, remove it and uncomment the following three lines
++    #    and modify them (or add more) to build your code if your project
++    #    uses a compiled language
++
++    #- run: |
++    #   make bootstrap
++    #   make release
++
++    # to make sure autobuild success, specifify golang version in go.mod
++    # https://github.com/github/codeql/issues/15647#issuecomment-2003768106
++
++    - name: Perform CodeQL Analysis
++      uses: github/codeql-action/analyze@v4
+diff --git a/.github/workflows/conformance_test.yml b/.github/workflows/conformance_test.yml
+new file mode 100644
+index 000000000..35b131caa
+--- /dev/null
++++ b/.github/workflows/conformance_test.yml
+@@ -0,0 +1,68 @@
++name: CONFORMANCE_TEST
++env:
++  DOCKER_COMPOSE_VERSION: 1.23.0
++
++on:
++  repository_dispatch:
++    types:
++      - manual-trigger-conformance
++  schedule:
++    - cron: '0 6 * * *'
++
++jobs:
++  CONFORMANCE_TEST:
++    env:
++      CONFORMANCE_TEST: true
++    runs-on:
++      #- self-hosted
++      - cncf-ubuntu-16-64-x86
++    steps:
++      - name: Configure AWS credentials
++        uses: aws-actions/configure-aws-credentials@v6.2.1
++        with:
++          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
++          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
++          aws-region: us-east-1
++      - uses: actions/checkout@v7
++        with:
++          path: src/github.com/goharbor/harbor
++      - name: Set up Go 1.21
++        uses: actions/setup-go@v5
++        with:
++          go-version: 1.23.2
++          cache-dependency-path: src/github.com/goharbor/harbor/src/go.sum
++        id: go
++      - name: before_install
++        run: |
++          set -x
++          cd src/github.com/goharbor/harbor
++          pwd
++          env
++          df -h
++          curl -L https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > docker-compose
++          chmod +x docker-compose
++          sudo mv docker-compose /usr/local/bin
++          IP=`hostname -I | awk '{print $1}'`
++          echo '{"insecure-registries" : ["'$IP':5000"]}' | sudo tee /etc/docker/daemon.json
++          echo "IP=$IP" >> $GITHUB_ENV
++          sudo cp ./tests/harbor_ca.crt /usr/local/share/ca-certificates/
++          sudo update-ca-certificates
++          sudo service docker restart
++      - name: install
++        run: |
++          cd src/github.com/goharbor/harbor
++          env
++          df -h
++          bash ./tests/showtime.sh ./tests/ci/api_common_install.sh $IP DB
++      - name: script
++        run: |
++          echo IP: $IP
++          df -h
++          cd src/github.com/goharbor/harbor
++          bash ./tests/showtime.sh ./tests/ci/conformance_test.sh $IP
++          df -h
++      - name: upload test result to gs
++        run: |
++          cd src/github.com/goharbor/harbor
++          aws s3 cp ./distribution-spec/conformance/report.html s3://harbor-conformance-test/report.html
++        if: always()
+diff --git a/.github/workflows/housekeeping-stale-issues-prs.yaml b/.github/workflows/housekeeping-stale-issues-prs.yaml
+new file mode 100644
+index 000000000..ec614822d
+--- /dev/null
++++ b/.github/workflows/housekeeping-stale-issues-prs.yaml
+@@ -0,0 +1,26 @@
++name: Housekeeping - Close stale issues and PRs
++on:
++  schedule:
++    - cron: '0 9 * * *'
++
++jobs:
++  stale:
++    runs-on: cncf-ubuntu-16-64-x86
++    steps:
++      - uses: actions/stale@v10.0.0
++        with:
++          stale-issue-message: 'This issue is being marked stale due to a period of inactivity. If this issue is still relevant, please comment or remove the stale label. Otherwise, this issue will close in 30 days.'
++          stale-pr-message: 'This PR is being marked stale due to a period of inactivty. If this PR is still relevant, please comment or remove the stale label. Otherwise, this PR will close in 30 days.'
++          close-issue-message: 'This issue was closed because it has been stalled for 30 days with no activity. If this issue is still relevant, please re-open a new issue.'
++          close-pr-message: 'This PR was closed because it has been stalled for 30 days with no activity. If this PR is still relevant, please re-open a new PR against main.'
++          days-before-issue-stale: 60
++          days-before-pr-stale: 60
++          days-before-issue-close: 30
++          days-before-pr-close: 30
++          # Don't add stale label to PRs / issues with milestones "upcoming" attached.
++          exempt-milestones: "upcoming"
++          # Don't add stale label to PRs / issues with this label
++          exempt-issue-labels: 'never-stale, kind/requirement'
++          exempt-pr-labels: 'never-stale, kind/requirement'
++          # Make it 1000 to clean up a bit then wen can lower it
++          operations-per-run: 1000
+diff --git a/.github/workflows/label_check.yaml b/.github/workflows/label_check.yaml
+new file mode 100644
+index 000000000..53d7a0a3c
+--- /dev/null
++++ b/.github/workflows/label_check.yaml
+@@ -0,0 +1,24 @@
++name: Release Note Label Check
++
++# Trigger the workflow on pull requests only
++on:
++  pull_request:
++    types: [opened, labeled, unlabeled, synchronize]
++
++env:
++  GOPROXY: https://proxy.golang.org/
++  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
++jobs:
++  # Ensures correct release-note labels are set:
++  # - At least one label
++  # - At most one two the main category labels
++  check-label:
++    name: Check release-note label set
++    runs-on: cncf-ubuntu-16-64-x86
++    steps:
++      - uses: mheap/github-action-required-labels@v5
++        with:
++          mode: minimum
++          count: 1
++          labels: "release-note/.*"
++          use_regex: true
+diff --git a/.github/workflows/nightly-trivy-scan.yml b/.github/workflows/nightly-trivy-scan.yml
+new file mode 100644
+index 000000000..bfcccc791
+--- /dev/null
++++ b/.github/workflows/nightly-trivy-scan.yml
+@@ -0,0 +1,42 @@
++name: Trivy Nightly Scan
++on:
++  schedule:
++    - cron: '0 2 * * *' # run at 2 AM UTC
++
++
++jobs:
++  nightly-scan:
++    name: Trivy Scan nightly
++    strategy:
++      fail-fast: false
++      matrix:
++        # maintain the tags of harbor that need to be actively security scanned on a nightly basis,
++        # it is the image tags that need to be scanned in the dockerhub goharbor, for example: goharbor/harbor-core:dev, dev is the tag.
++        tags: [dev]
++        # list of images that need to be scanned
++        images: [harbor-core, harbor-db, harbor-exporter, harbor-jobservice, harbor-log, harbor-portal, harbor-registryctl, prepare, registry-photon, nginx-photon, valkey-photon, trivy-adapter-photon]
++    permissions:
++      security-events: write  # for github/codeql-action/upload-sarif to upload SARIF results
++
++    runs-on: cncf-ubuntu-16-64-x86
++    steps:
++      - name: Checkout code
++        uses: actions/checkout@v7
++      - name: Run Trivy vulnerability scanner
++        # tag 0.35.0, get the commit hash from https://github.com/aquasecurity/trivy-action.git
++        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
++        with:
++          image-ref: 'docker.io/goharbor/${{ matrix.images }}:${{ matrix.tags }}'
++          severity: 'CRITICAL,HIGH'
++          format: 'template'
++          template: '@/contrib/sarif.tpl'
++          output: 'trivy-results.sarif'
++        env:
++          # Use AWS' ECR mirror for the trivy-db image, as GitHub's Container
++          # Registry is returning a TOOMANYREQUESTS error.
++          # Ref: https://github.com/aquasecurity/trivy-action/issues/389
++          TRIVY_DB_REPOSITORY: 'public.ecr.aws/aquasecurity/trivy-db:2'
++      - name: Upload Trivy scan results to GitHub Security tab
++        uses: github/codeql-action/upload-sarif@v4
++        with:
++          sarif_file: 'trivy-results.sarif'
+diff --git a/.github/workflows/pass-CI.yml b/.github/workflows/pass-CI.yml
+new file mode 100644
+index 000000000..6a04db2cf
+--- /dev/null
++++ b/.github/workflows/pass-CI.yml
+@@ -0,0 +1,64 @@
++name: CI
++
++on:
++  pull_request:
++    # the paths is the same as the paths-ignore in CI.yml, they should be synced together
++    paths:
++      - 'docs/**'
++      - '**.md'
++      - 'tests/**'
++      - '!tests/**.sh'
++      - '!tests/apitests/**'
++      - '!tests/ci/**'
++      - '!tests/resources/**'
++      - '!tests/robot-cases/**'
++      - '!tests/robot-cases/Group1-Nightly/**'
++  push:
++    # the paths is the same as the paths-ignore in CI.yml, they should be synced together
++    paths:
++      - 'docs/**'
++      - '**.md'
++      - 'tests/**'
++      - '!tests/**.sh'
++      - '!tests/apitests/**'
++      - '!tests/ci/**'
++      - '!tests/resources/**'
++      - '!tests/robot-cases/**'
++      - '!tests/robot-cases/Group1-Nightly/**'
++
++jobs:
++  UTTEST:
++    runs-on:
++      - cncf-ubuntu-2-8-x86
++    steps:
++      - run: 'echo "No run required"'
++
++  APITEST_DB:
++    runs-on:
++      - cncf-ubuntu-2-8-x86
++    steps:
++      - run: 'echo "No run required"'
++
++  APITEST_DB_PROXY_CACHE:
++    runs-on:
++      - cncf-ubuntu-2-8-x86
++    steps:
++      - run: 'echo "No run required"'
++
++  APITEST_LDAP:
++    runs-on:
++      - cncf-ubuntu-2-8-x86
++    steps:
++      - run: 'echo "No run required"'
++
++  OFFLINE:
++    runs-on:
++      - cncf-ubuntu-2-8-x86
++    steps:
++      - run: 'echo "No run required"'
++
++  UI_UT:
++    runs-on:
++      - cncf-ubuntu-2-8-x86
++    steps:
++      - run: 'echo "No run required"'
+diff --git a/.github/workflows/publish_release.yml b/.github/workflows/publish_release.yml
+new file mode 100644
+index 000000000..b87db2664
+--- /dev/null
++++ b/.github/workflows/publish_release.yml
+@@ -0,0 +1,153 @@
++name: Publish Release
++
++on:
++  push:
++    tags:
++      - 'v*.*.*'
++
++jobs:
++  release:
++    runs-on: cncf-ubuntu-16-64-x86
++    permissions:
++      contents: write   # Required for creating GitHub releases and uploading assets
++      id-token: write   # Required for Cosign keyless signing
++      packages: write   # Required for pushing images to ghcr.io
++    steps:
++      - uses: actions/checkout@v7
++      - name: Setup env
++        run: |
++          echo "CUR_TAG=${{ github.ref_name }}" >> $GITHUB_ENV
++          echo "BASE_TAG=$(cat ./VERSION)" >> $GITHUB_ENV
++          release=$(curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/goharbor/harbor/releases/tags/${{ github.ref_name }})
++          echo "BUILD_NO=$(echo $release | jq -r '.body' | jq -r '.buildNo')" >> $GITHUB_ENV
++          echo "PRE_TAG=$(echo $release | jq -r '.body' | jq -r '.preTag')" >> $GITHUB_ENV
++          echo "BRANCH=$(echo $release | jq -r '.target_commitish')" >> $GITHUB_ENV
++          echo "PRERELEASE=$(echo $release | jq -r '.prerelease')" >> $GITHUB_ENV
++      - name: Configure AWS credentials
++        uses: aws-actions/configure-aws-credentials@v6.2.1
++        with:
++          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
++          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
++          aws-region: us-east-1
++      - name: Prepare Assets
++        run: |
++          if [ ! ${{ env.BUILD_NO }} -o ${{ env.BUILD_NO }} = "null" ]
++          then
++              echo "missing required parameter buildNo."
++              exit 1
++          fi
++          echo "buildNo:${{ env.BUILD_NO }}"
++          echo "preTag:${{ env.PRE_TAG }}"
++
++          base=${{ env.BASE_TAG }}
++          cur=${{ env.CUR_TAG }}
++          bucket=${{ secrets.HARBOR_RELEASE_BUILD }}
++          branch=${{ env.BRANCH }}
++          assets_path=$(pwd)/assets
++          mkdir -p "$assets_path"
++
++          for arch in amd64 arm64; do
++            src_offline=harbor-offline-installer-${base}-${{ env.BUILD_NO }}-${arch}.tgz
++            dst_offline=harbor-offline-installer-${cur}-${arch}.tgz
++            dst_online=
++            aws s3 cp s3://${bucket}/${branch}/${src_offline} s3://${bucket}/${branch}/${dst_offline}
++
++            if [ "${{ env.PRERELEASE }}" = "false" ]; then
++              src_online=harbor-online-installer-${base}-${{ env.BUILD_NO }}-${arch}.tgz
++              dst_online=harbor-online-installer-${cur}-${arch}.tgz
++              aws s3 cp s3://${bucket}/${branch}/${src_online} s3://${bucket}/${branch}/${dst_online}
++            fi
++            source tools/release/release_utils.sh && getAssets ${bucket} ${branch} ${dst_offline} ${dst_online} ${{ env.PRERELEASE }} ${assets_path}
++          done
++
++          echo "ASSETS_DIR=$assets_path" >> $GITHUB_ENV
++          echo "MD5SUM_PATH=$assets_path/md5sum" >> $GITHUB_ENV
++      - name: Install Cosign
++        uses: sigstore/cosign-installer@v4.1.2
++      - name: Sign Release Artifacts
++        run: |
++          cur=${{ env.CUR_TAG }}
++          for arch in amd64 arm64; do
++            cosign sign-blob --yes \
++              --bundle=${{ env.ASSETS_DIR }}/harbor-offline-installer-${cur}-${arch}.tgz.sigstore.json \
++              ${{ env.ASSETS_DIR }}/harbor-offline-installer-${cur}-${arch}.tgz
++
++            if [ "${{ env.PRERELEASE }}" = "false" ]; then
++              cosign sign-blob --yes \
++                --bundle=${{ env.ASSETS_DIR }}/harbor-online-installer-${cur}-${arch}.tgz.sigstore.json \
++                ${{ env.ASSETS_DIR }}/harbor-online-installer-${cur}-${arch}.tgz
++            fi
++          done
++      - name: Setup Docker
++        uses: docker-practice/actions-setup-docker@master
++        with:
++          docker_version: 20.10
++          docker_channel: stable
++      - name: Set up Docker Buildx
++        uses: docker/setup-buildx-action@v3
++      - name: Publish Images (amd64 + arm64)
++        run: |
++          set -euo pipefail
++          base=${{ env.BASE_TAG }}
++          cur=${{ env.CUR_TAG }}
++          : > "$GITHUB_WORKSPACE/_images_all.txt"
++
++          for arch in amd64 arm64; do
++            export ARCH="$arch"
++            tar -zxf "${{ env.ASSETS_DIR }}/harbor-offline-installer-${cur}-${arch}.tgz"
++            docker load -i ./harbor/harbor.${base}.tar.gz
++            images="$(docker images --format "{{.Repository}}" --filter=reference="goharbor/*:${base}" | xargs)"
++            echo "$images" | tr ' ' '\n' >> "$GITHUB_WORKSPACE/_images_all.txt"
++            source tools/release/release_utils.sh
++            publishImages "$cur" "$base" "${{ secrets.DOCKER_HUB_USERNAME }}" "${{ secrets.DOCKER_HUB_PASSWORD }}" $images
++            publishPackages "$cur" "$base" "${{ github.actor }}" "${{ secrets.GITHUB_TOKEN }}" $images
++            rm -rf harbor
++          done
++      - name: Create multi-arch manifests
++        run: |
++          set -euo pipefail
++          cur=${{ env.CUR_TAG }}
++          printf '%s\n' "${{ secrets.DOCKER_HUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
++          printf '%s\n' "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
++          sort -u "$GITHUB_WORKSPACE/_images_all.txt" | while IFS= read -r repo; do
++            [ -z "$repo" ] && continue
++            docker buildx imagetools create -t "${repo}:${cur}" \
++              "${repo}:${cur}-amd64" \
++              "${repo}:${cur}-arm64"
++            docker buildx imagetools create -t "ghcr.io/${repo}:${cur}" \
++              "ghcr.io/${repo}:${cur}-amd64" \
++              "ghcr.io/${repo}:${cur}-arm64"
++          done
++          docker logout ghcr.io
++          docker logout
++      - name: Generate release notes
++        run: |
++          release_notes_path=$(pwd)/release-notes.txt
++          source tools/release/release_utils.sh && generateReleaseNotes ${{ env.CUR_TAG }} ${{ env.PRE_TAG }} ${{ secrets.GITHUB_TOKEN }} $release_notes_path
++          echo "RELEASE_NOTES_PATH=$release_notes_path" >> $GITHUB_ENV
++      - name: RC Release
++        uses: softprops/action-gh-release@v2
++        if: ${{ env.PRERELEASE == 'true' }}
++        with:
++          body_path: ${{ env.RELEASE_NOTES_PATH }}
++          files: |
++            ${{ env.ASSETS_DIR }}/harbor-offline-installer-*-amd64.tgz
++            ${{ env.ASSETS_DIR }}/harbor-offline-installer-*-amd64.tgz.sigstore.json
++            ${{ env.ASSETS_DIR }}/harbor-offline-installer-*-arm64.tgz
++            ${{ env.ASSETS_DIR }}/harbor-offline-installer-*-arm64.tgz.sigstore.json
++            ${{ env.MD5SUM_PATH }}
++      - name: GA Release
++        uses: softprops/action-gh-release@v2
++        if: ${{ env.PRERELEASE == 'false' }}
++        with:
++          body_path: ${{ env.RELEASE_NOTES_PATH }}
++          files: |
++            ${{ env.ASSETS_DIR }}/harbor-offline-installer-*-amd64.tgz
++            ${{ env.ASSETS_DIR }}/harbor-offline-installer-*-amd64.tgz.sigstore.json
++            ${{ env.ASSETS_DIR }}/harbor-offline-installer-*-arm64.tgz
++            ${{ env.ASSETS_DIR }}/harbor-offline-installer-*-arm64.tgz.sigstore.json
++            ${{ env.ASSETS_DIR }}/harbor-online-installer-*-amd64.tgz
++            ${{ env.ASSETS_DIR }}/harbor-online-installer-*-amd64.tgz.sigstore.json
++            ${{ env.ASSETS_DIR }}/harbor-online-installer-*-arm64.tgz
++            ${{ env.ASSETS_DIR }}/harbor-online-installer-*-arm64.tgz.sigstore.json
++            ${{ env.MD5SUM_PATH }}

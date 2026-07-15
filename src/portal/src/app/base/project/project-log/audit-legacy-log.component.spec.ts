@@ -159,9 +159,18 @@ describe('ProjectAuditLegacyLogComponent', () => {
     });
     it('should support pagination', async () => {
         fixture.autoDetectChanges(true);
+<<<<<<< HEAD
         await fixture.whenStable();
         let el: HTMLButtonElement =
             fixture.nativeElement.querySelector('.pagination-next');
+=======
+        let el: HTMLButtonElement = null;
+        for (let i = 0; i < 20 && !el; i++) {
+            fixture.detectChanges();
+            await fixture.whenStable();
+            el = fixture.nativeElement.querySelector('.pagination-next');
+        }
+>>>>>>> 7612d772b (ci: migrate all GitHub workflows to CNCF-hosted runners (#23545))
         expect(el).toBeTruthy();
         el.click();
         fixture.detectChanges();
