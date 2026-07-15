@@ -1,8 +1,27 @@
+<<<<<<< HEAD
 # Harbor Next
+=======
+# Harbor
+[![CI](https://github.com/goharbor/harbor/actions/workflows/CI.yml/badge.svg)](https://github.com/goharbor/harbor/actions/workflows/CI.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/goharbor/harbor)](https://goreportcard.com/report/github.com/goharbor/harbor)
+[![Coverage Status](https://codecov.io/gh/goharbor/harbor/branch/main/graph/badge.svg)](https://codecov.io/gh/goharbor/harbor)
+[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2095/badge)](https://bestpractices.coreinfrastructure.org/projects/2095)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/792fe1755edc4d6e91f4c3469f553389)](https://www.codacy.com/gh/goharbor/harbor/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=goharbor/harbor&amp;utm_campaign=Badge_Grade)
+![Code scanning - action](https://github.com/goharbor/harbor/workflows/Code%20scanning%20-%20action/badge.svg)
+![OCI Distribution Conformance Tests](https://github.com/goharbor/harbor/workflows/CONFORMANCE_TEST/badge.svg)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fgoharbor%2Fharbor.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fgoharbor%2Fharbor?ref=badge_shield)
+[![Helm Chart on Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/harbor)](https://artifacthub.io/packages/helm/harbor/harbor)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/goharbor/harbor/badge)](https://scorecard.dev/viewer/?uri=github.com/goharbor/harbor)
+<br>
+>>>>>>> 36d6e8c24 (docs: fix markdown formatting issues in CONTRIBUTING.md and README.md (#23537))
 
 <p align="center"><img alt="Harbor Next" width="256px" src="https://raw.githubusercontent.com/container-registry/harbor-next/refs/heads/main/docs/img/harbor-next-logo.svg"></p>
 
+<<<<<<< HEAD
 Harbor is a CNCF graduated open-source container registry to store and manage container images and other OCI artifacts securely with policies, role-based access control, vulnerability scans and signing.
+=======
+<br><br>
+>>>>>>> 36d6e8c24 (docs: fix markdown formatting issues in CONTRIBUTING.md and README.md (#23537))
 
 Harbor is hosted by the [Cloud Native Computing Foundation](https://cncf.io)
 (CNCF).
@@ -62,7 +81,11 @@ Harbor Next exposes a RESTful API for administrative operations and integration.
 
 ## Install & Run
 
+<<<<<<< HEAD
 **System requirements:** Docker Engine 24+ with Compose v2.24+.
+=======
+**On a Linux host:** docker 20.10.10-ce+ and docker-compose 1.18.0+.
+>>>>>>> 36d6e8c24 (docs: fix markdown formatting issues in CONTRIBUTING.md and README.md (#23537))
 
 **Docker Compose** — see [deploy/compose/README.md](deploy/compose/README.md):
 

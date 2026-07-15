@@ -13,7 +13,40 @@ Thank you for contributing! This guide explains how to open PRs and merge them c
 
 ---
 
+<<<<<<< HEAD
 ## Workflow Overview
+=======
+* [Bi-weekly public community meetings][community-meetings]
+  * Catch up with [past meetings on YouTube][past-meetings]
+* Chat with us on the CNCF Slack ([get an invitation here][cncf-slack])
+  * [#harbor][users-slack] for end-user discussions
+  * [#harbor-dev][dev-slack] for development of Harbor
+* Want long-form communication instead of Slack? We have two distribution lists:
+  * [harbor-users][users-dl] for end-user discussions
+  * [harbor-dev][dev-dl] for development of Harbor
+
+Follow us on Twitter at [@project_harbor][twitter]
+
+## Getting Started
+
+### Fork Repository
+
+Fork the Harbor repository on GitHub to your personal account.
+```sh
+#Set golang environment
+export GOPATH=$HOME/go
+mkdir -p $GOPATH/src/github.com/goharbor
+
+#Get code
+cd $GOPATH/src/github.com/goharbor/harbor
+git clone git@github.com:goharbor/harbor.git
+
+#Track repository under your personal account
+git config push.default nothing # Anything to avoid pushing to goharbor/harbor by default
+git remote rename origin goharbor
+git remote add $USER git@github.com:$USER/harbor.git
+git fetch $USER
+>>>>>>> 36d6e8c24 (docs: fix markdown formatting issues in CONTRIBUTING.md and README.md (#23537))
 
 ```
 fork/branch -> commit (conventional) -> PR -> CI passes -> squash merge -> release-please -> release
@@ -317,4 +350,86 @@ task images           # Build and push Docker images
 task info             # Print version and build info
 ```
 
+<<<<<<< HEAD
 See [README.md](README.md) for full prerequisites and setup instructions.
+=======
+The commit message should follow the convention on [How to Write a Git Commit Message](http://chris.beams.io/posts/git-commit/). Be sure to include any related GitHub issue references in the commit message. See [GFM syntax](https://guides.github.com/features/mastering-markdown/#GitHub-flavored-markdown) for referencing issues and commits.
+
+To help write conformant commit messages, it is recommended to set up the [git-good-commit](https://github.com/tommarshall/git-good-commit) commit hook. Run this command in the Harbor repo's root directory:
+
+```sh
+curl https://cdn.jsdelivr.net/gh/tommarshall/git-good-commit@v0.6.1/hook.sh > .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg
+```
+
+### Automated Testing
+Once your pull request has been opened, Harbor will run two CI pipelines against it.
+1. In the travis CI, your source code will be checked via `golint`, `go vet` and `go race` that makes sure the code is readable, safe and correct. Also, all of unit tests will be triggered via `go test` against the pull request. What you need to pay attention to is the travis result and the coverage report.
+* If any failure in travis, you need to figure out whether it is introduced by your commits.
+* If the coverage dramatically declines, then you need to commit a unit test to cover your code.
+2. In the drone CI, the E2E test will be triggered against the pull request. Also, the source code will be checked via `gosec`, and the result is stored in google storage for later analysis. The pipeline is about to build and install harbor from source code, then to run four very basic E2E tests to validate the basic functionalities of Harbor, like:
+* Registry Basic Verification, to validate that the image can be pulled and pushed successfully.
+* Trivy Basic Verification, to validate that the image can be scanned successfully.
+* Notary Basic Verification, to validate that the image can be signed successfully.
+* Ldap Basic Verification, to validate that Harbor can work in LDAP environment.
+
+### Push and Create PR
+When ready for review, push your branch to your fork repository on `github.com`:
+```sh
+git push --force-with-lease $user my_feature
+
+```
+
+Then visit your fork at https://github.com/$user/harbor and click the `Compare & Pull Request` button next to your `my_feature` branch to create a new pull request (PR). Description of a pull request should refer to all the issues that it addresses. Remember to put a reference to issues (such as `Closes #XXX` and `Fixes #XXX`) in commits so that the issues can be closed when the PR is merged.
+
+Once your pull request has been opened it will be assigned to one or more reviewers. Those reviewers will do a thorough code review, looking for correctness, bugs, opportunities for improvement, documentation and comments, and style.
+
+Commit changes made in response to review comments to the same branch on your fork.
+
+## Reporting issues
+
+It is a great way to contribute to Harbor by reporting an issue. Well-written and complete bug reports are always welcome! Please open an issue on GitHub and follow the template to fill in required information.
+
+Before opening any issue, please look up the existing [issues](https://github.com/goharbor/harbor/issues) to avoid submitting a duplicate.
+If you find a match, you can "subscribe" to it to get notified on updates. If you have additional helpful information about the issue, please leave a comment.
+
+When reporting issues, always include:
+
+* Version of docker engine and docker-compose
+* Configuration files of Harbor
+* Log files in /var/log/harbor/
+
+Because the issues are open to the public, when submitting the log and configuration files, be sure to remove any sensitive information, e.g. user name, password, IP address, and company name. You can
+replace those parts with "REDACTED" or other strings like "****".
+
+Be sure to include the steps to reproduce the problem if applicable. It can help us understand and fix your issue faster.
+
+## Documenting
+
+Update the documentation if you are creating or changing features. Good documentation is as important as the code itself.
+
+The main location for the documentation is the [website repository](https://github.com/goharbor/website). The images referred to in documents can be placed in `docs/img` in that repo.
+
+Documents are written with Markdown. See [Writing on GitHub](https://help.github.com/categories/writing-on-github/) for more details.
+
+## Develop and propose new features.
+### The following simple process can be used to submit new features or changes to the existing code.
+
+- See if your feature is already being worked on. Check both the [Issues](https://github.com/goharbor/harbor/issues) and the [PRs](https://github.com/goharbor/harbor/pulls) in the main Harbor repository as well as the [Community repository](https://github.com/goharbor/community).
+- Submit(open PR) the new proposal at [community/proposals/new](https://github.com/goharbor/community/tree/main/proposals/new) using the already existing [template](https://github.com/goharbor/community/blob/main/proposals/TEMPLATE.md)
+- The proposal must be labeled as "kind/proposal" - check examples [here](https://github.com/goharbor/community/pulls?q=is%3Apr+is%3Aopen+sort%3Aupdated-desc+label%3Akind%2Fproposal)
+- The proposal can be modified and adapted to meet the requirements from the community, other maintainers and contributors. The overall architecture needs to be consistent to avoid duplicate work in the [Roadmap](https://github.com/goharbor/harbor/wiki#roadmap).
+- Proposal should be discussed at Community meeting [Community Meeting agenda](https://github.com/goharbor/community/wiki/Harbor-Community-Meetings) to be presented to maintainers and contributors.
+- When reviewed and approved it can be implemented either by the original submitter or anyone else from the community which we highly encourage, as the project is community driven. Open PRs in the respective repositories with all the necessary code and test changes as described in the current document.
+- Once implemented or during the implementation, the PRs are reviewed by maintainers and contributors, following the best practices and methods.
+- After merging the new PRs, the proposal must be moved to [community/proposals](https://github.com/goharbor/community/tree/main/proposals) and marked as done!
+- You have made Harbor even better, congratulations. Thank you!
+
+[community-meetings]: https://github.com/goharbor/community/blob/main/MEETING_SCHEDULE.md
+[past-meetings]: https://www.youtube.com/playlist?list=PLgInP-D86bCwTC0DYAa1pgupsQIAWPomv
+[users-slack]: https://cloud-native.slack.com/archives/CC1E09J6S
+[dev-slack]: https://cloud-native.slack.com/archives/CC1E0J0MC
+[cncf-slack]: https://slack.cncf.io
+[users-dl]: https://lists.cncf.io/g/harbor-users
+[dev-dl]: https://lists.cncf.io/g/harbor-dev
+[twitter]: http://twitter.com/project_harbor
+>>>>>>> 36d6e8c24 (docs: fix markdown formatting issues in CONTRIBUTING.md and README.md (#23537))
