@@ -1,6 +1,6 @@
 # CodeQL static analysis for the Go backend and the Angular/TypeScript portal.
 # Results appear under Security -> Code scanning.
-# build-mode: none scans Go without compiling, so no toolchain setup is needed.
+# Go requires a build for analysis (autobuild); JS/TS is scanned without one.
 
 name: CodeQL
 
@@ -23,6 +23,8 @@ jobs:
     name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
     permissions:
+      actions: read
+      contents: read
       security-events: write
 
     strategy:
@@ -30,7 +32,7 @@ jobs:
       matrix:
         include:
           - language: go
-            build-mode: none
+            build-mode: autobuild
           - language: javascript-typescript
             build-mode: none
 

@@ -23,7 +23,7 @@ intoto = "intoto"
 cfg  = "cfg"
 ctx  = "ctx"
 # Security terminology (CVE Numbering Authority)
-CNA = "CNA"
+cna = "CNA"
 
 [files]
 extend-exclude = [
