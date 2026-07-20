@@ -162,9 +162,10 @@
                                 tabindex="0"
                                 role="button"
                                 [attr.aria-label]="
-                                    showSecretPassword
-                                        ? 'Hide secret'
-                                        : 'Show secret'
+                                    (showSecretPassword
+                                        ? 'SYSTEM_ROBOT.HIDE_SECRET'
+                                        : 'SYSTEM_ROBOT.SHOW_SECRET'
+                                    ) | translate
                                 "
                                 (keyup.enter)="toggleSecretVisibility()"
                                 class="clr-input-icon-action"></clr-icon>
@@ -278,7 +279,10 @@
                             }}"
                             autocomplete="off"
                             [ngModelOptions]="{ standalone: true }" />
-                        <clr-control-error *ngIf="!secretsMatch()">
+                        <clr-control-error
+                            *ngIf="
+                                userProvidedSecretConfirm && !secretsMatch()
+                            ">
                             {{ 'SYSTEM_ROBOT.SECRETS_NOT_MATCH' | translate }}
                         </clr-control-error>
                     </clr-input-container>

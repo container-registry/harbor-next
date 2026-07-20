@@ -1721,7 +1721,9 @@
         "SECRET_UPPERCASE_REQUIREMENT": "At least 1 uppercase letter",
         "SECRET_LOWERCASE_REQUIREMENT": "At least 1 lowercase letter",
         "SECRET_DIGIT_REQUIREMENT": "At least 1 digit",
-        "SECRETS_NOT_MATCH": "Secrets do not match"
+        "SECRETS_NOT_MATCH": "Secrets do not match",
+        "HIDE_SECRET": "Hide secret",
+        "SHOW_SECRET": "Show secret"
     },
     "ACCESSORY": {
         "DELETION_TITLE_ACCESSORY": "Confirm Accessory Deletion",
