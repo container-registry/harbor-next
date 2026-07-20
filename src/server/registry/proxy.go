@@ -73,9 +73,7 @@ func newProxy() http.Handler {
 		panic(fmt.Sprintf("failed to parse URL of registry: %v", err))
 	}
 	proxy := httputil.NewSingleHostReverseProxy(url)
-	if commonhttp.InternalTLSEnabled() {
-		proxy.Transport = commonhttp.GetHTTPTransport()
-	}
+	proxy.Transport = commonhttp.GetHTTPTransport()
 
 	proxy.Director = authDirector(proxy.Director)
 	return proxy
@@ -209,7 +207,8 @@ func probeRegistry() (string, error) {
 
 // getRegistryToken obtains a bearer token for the upstream registry by
 // exchanging the shared registry credential with Harbor's /service/token
-// endpoint. The token is cached for 30 minutes per scope.
+// endpoint. The token is cached per scope until shortly before it expires,
+// per the expires_in returned by the token service.
 func getRegistryToken(r *http.Request) string {
 	scope := scopeFromRequest(r)
 
@@ -256,7 +255,8 @@ func getRegistryToken(r *http.Request) string {
 	}
 
 	var tokenResp struct {
-		Token string `json:"token"`
+		Token     string `json:"token"`
+		ExpiresIn int    `json:"expires_in"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
 		log.Warningf("failed to decode token response: %v", err)
@@ -266,14 +266,39 @@ func getRegistryToken(r *http.Request) string {
 		return ""
 	}
 
+	// Per the Docker registry token spec, expires_in defaults to 60 seconds
+	// when omitted. Shave off a refresh margin so we don't hand out a token
+	// that's about to expire by the time the backend registry sees it.
+	expiresIn := tokenResp.ExpiresIn
+	if expiresIn <= 0 {
+		expiresIn = 60
+	}
+	const refreshMargin = 10 * time.Second
+	ttl := time.Duration(expiresIn)*time.Second - refreshMargin
+	if ttl <= 0 {
+		ttl = time.Duration(expiresIn) * time.Second
+	}
+
 	tokenCache.data[scope] = &cachedToken{
 		token:   tokenResp.Token,
-		expires: time.Now().Add(30 * time.Minute),
+		expires: time.Now().Add(ttl),
 	}
 	return tokenResp.Token
 }
 
+// registryOperationSegments are the path segments that mark the end of the
+// repository name and the start of the registry operation, per the
+// distribution API spec (manifests, blobs, blobs/uploads, tags).
+var registryOperationSegments = map[string]bool{
+	"manifests": true,
+	"blobs":     true,
+	"tags":      true,
+}
+
 // scopeFromRequest extracts the Docker registry scope from the request path.
+// The repository name is everything between "/v2/" and the first operation
+// segment, so nested repository names (e.g. project/app/subimage) are
+// preserved in full rather than truncated to two path components.
 // For a path like /v2/library/nginx/manifests/latest it returns
 // repository:library/nginx:pull,push.
 func scopeFromRequest(r *http.Request) string {
@@ -284,9 +309,16 @@ func scopeFromRequest(r *http.Request) string {
 	if !strings.HasPrefix(path, "/v2/") {
 		return "repository:*:pull,push"
 	}
-	parts := strings.SplitN(strings.TrimPrefix(path, "/v2/"), "/", 3)
-	if len(parts) < 2 {
+	segments := strings.Split(strings.TrimPrefix(path, "/v2/"), "/")
+	opIndex := -1
+	for i, seg := range segments {
+		if registryOperationSegments[seg] {
+			opIndex = i
+			break
+		}
+	}
+	if opIndex <= 0 {
 		return "repository:*:pull,push"
 	}
-	return fmt.Sprintf("repository:%s/%s:pull,push", parts[0], parts[1])
+	return fmt.Sprintf("repository:%s:pull,push", strings.Join(segments[:opIndex], "/"))
 }

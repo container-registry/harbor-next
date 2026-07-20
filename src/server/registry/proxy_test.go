@@ -199,7 +199,7 @@ func TestScopeFromRequest(t *testing.T) {
 		{
 			name:     "multi-level repository",
 			path:     "/v2/registry.example.com/port/agent/blobs/sha256:def456",
-			expected: "repository:registry.example.com/port:pull,push",
+			expected: "repository:registry.example.com/port/agent:pull,push",
 		},
 	}
 
@@ -300,6 +300,44 @@ func TestGetRegistryTokenCaching(t *testing.T) {
 	token3 := getRegistryToken(req)
 	assert.Equal(t, "cached.jwt.token", token3)
 	assert.Equal(t, 2, callCount, "should call token server again after expiry")
+}
+
+func TestGetRegistryTokenRespectsExpiresIn(t *testing.T) {
+	callCount := 0
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"token":      "short.lived.token",
+			"expires_in": 1,
+		})
+	}))
+	defer tokenServer.Close()
+
+	originalTokenURL := getTokenServiceURL
+	getTokenServiceURL = func() string {
+		return tokenServer.URL
+	}
+	defer func() { getTokenServiceURL = originalTokenURL }()
+
+	tokenCache.mu.Lock()
+	tokenCache.data = make(map[string]*cachedToken)
+	tokenCache.mu.Unlock()
+
+	t.Setenv("REGISTRY_CREDENTIAL_USERNAME", "u")
+	t.Setenv("REGISTRY_CREDENTIAL_PASSWORD", "p")
+
+	req, _ := http.NewRequest(http.MethodGet, "http://example.com/v2/repo/manifests/latest", nil)
+
+	token1 := getRegistryToken(req)
+	require.Equal(t, "short.lived.token", token1)
+	assert.Equal(t, 1, callCount)
+
+	time.Sleep(1100 * time.Millisecond)
+
+	token2 := getRegistryToken(req)
+	assert.Equal(t, "short.lived.token", token2)
+	assert.Equal(t, 2, callCount, "a short expires_in should not be overridden by a longer fixed cache TTL")
 }
 
 func TestProbeRegistryBasic(t *testing.T) {
