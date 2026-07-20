@@ -35,7 +35,8 @@ func GetSystemCfg(ctx context.Context) (map[string]any, error) {
 	return sysCfg, nil
 }
 
-// AuthMode ...
+// AuthMode returns the authentication mode from system configuration.
+// Deprecated: Use DetectAuthMode instead for auto-detection based on configured backends.
 // DetectAuthMode derives the auth mode from configured backends.
 // Priority: Explicit database setting > OIDC > LDAP > UAA > HTTP Auth Proxy > DB (default).
 func DetectAuthMode(ctx context.Context) string {

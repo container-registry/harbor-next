@@ -89,7 +89,9 @@ type AuthenticateHelper interface {
 	PostAuthenticate(ctx context.Context, u *models.User) error
 }
 
-// DefaultAuthenticateHelper - default AuthenticateHelper implementation
+// DefaultAuthenticateHelper is a default implementation of AuthenticateHelper
+// that returns false for Match and ErrNotSupported for all other methods.
+// This is used as a fallback when no auth backend is configured.
 type DefaultAuthenticateHelper struct {
 }
 

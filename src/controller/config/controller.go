@@ -63,18 +63,21 @@ func NewController() Controller {
 	return &controller{userManager: user.Mgr}
 }
 
+// UserConfigs returns user-scoped configuration values.
 func (c *controller) UserConfigs(ctx context.Context) (map[string]*models.Value, error) {
 	mgr := config.GetCfgManager(ctx)
 	configs := mgr.GetUserCfgs(ctx)
 	return c.ConvertForGet(ctx, configs, false)
 }
 
+// AllConfigs returns all configuration values including system configs.
 func (c *controller) AllConfigs(ctx context.Context) (map[string]any, error) {
 	mgr := config.GetCfgManager(ctx)
 	configs := mgr.GetAll(ctx)
 	return configs, nil
 }
 
+// UpdateUserConfigs updates user-scoped configuration values.
 func (c *controller) UpdateUserConfigs(ctx context.Context, conf map[string]any) error {
 	if readOnlyForAll {
 		return errors.ForbiddenError(nil).WithMessage("current config is init by env variable: CONFIG_OVERWRITE_JSON, it cannot be updated")
