@@ -18,12 +18,10 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/common/models"
 	"github.com/goharbor/harbor/src/common/security"
 	"github.com/goharbor/harbor/src/common/security/local"
 	"github.com/goharbor/harbor/src/core/auth"
-	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/log"
 )
 
@@ -63,16 +61,6 @@ func (b *basicAuth) Generate(req *http.Request) security.Context {
 	log := log.G(req.Context())
 	username, password, ok := req.BasicAuth()
 	if !ok {
-		return nil
-	}
-
-	// In OIDC/LDAP/UAA modes only the admin uses basic auth; other principals are
-	// handled by earlier generators (robot, OIDC CLI), so skipping them spares a
-	// useless auth-backend round-trip. Empty mode is treated as DB auth (as in
-	// auth.Login) so a config lookup failure can't lock out basic auth.
-	authMode := lib.GetAuthMode(req.Context())
-	if authMode != "" && authMode != common.DBAuth && !auth.IsSuperUser(req.Context(), username) {
-		log.Debugf("basic auth skipped for user %s, auth mode is %s", username, authMode)
 		return nil
 	}
 

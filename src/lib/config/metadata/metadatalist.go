@@ -68,9 +68,6 @@ var (
 	ConfigList = []Item{
 
 		{Name: common.AdminInitialPassword, Scope: SystemScope, Group: BasicGroup, EnvKey: "HARBOR_ADMIN_PASSWORD", DefaultValue: "", ItemType: &PasswordType{}, Editable: true},
-		{Name: common.AUTHMode, Scope: UserScope, Group: BasicGroup, EnvKey: "AUTH_MODE", DefaultValue: "db_auth", ItemType: &AuthModeType{}, Editable: false, Description: `The auth mode of current system, such as "db_auth", "ldap_auth", "oidc_auth"`},
-
-		{Name: common.PrimaryAuthMode, Scope: UserScope, Group: BasicGroup, EnvKey: "PRIMARY_AUTH_MODE", DefaultValue: "false", ItemType: &BoolType{}, Description: `Use current auth mode as a primary one`},
 
 		{Name: common.UnauthenticatedLandingPage, Scope: UserScope, Group: BasicGroup, EnvKey: "UNAUTHENTICATED_LANDING_PAGE", DefaultValue: common.LandingPageLogin, ItemType: &LandingPageType{}, Editable: true, Description: `The default landing page for unauthenticated users. Valid values are "login" and "public_projects".`},
 
