@@ -1,8 +1,8 @@
-@if (additionLinks) {
+<ng-container *ngIf="additionLinks">
 <h4 class="margin-bottom-025">{{ 'ARTIFACT.ADDITIONS' | translate }}</h4>
 <div class="min-15">
     <clr-tabs #additionsTab>
-        @if (getVulnerability()) {
+        <ng-container *ngIf="getVulnerability()">
         <clr-tab>
             <button
                 clrTabLink
@@ -12,7 +12,7 @@
             </button>
             <ng-template [clrIfActive]="currentTabLinkId === 'vulnerability'">
                 <clr-tab-content id="vulnerability-content">
-                    @if (currentTabLinkId === 'vulnerability') {
+                    <ng-container *ngIf="currentTabLinkId === 'vulnerability'">
                     <hbr-artifact-vulnerabilities
                         [artifact]="artifact"
                         [projectName]="projectName"
@@ -24,18 +24,19 @@
                         [vulnerabilitiesLink]="
                             getVulnerability()
                         "></hbr-artifact-vulnerabilities>
-                    }
+                    </ng-container>
                 </clr-tab-content>
             </ng-template>
         </clr-tab>
-        } @if (hasScannerSupportSBOM()) {
+        </ng-container>
+        <ng-container *ngIf="hasScannerSupportSBOM()">
         <clr-tab>
             <button clrTabLink id="sbom" (click)="actionTab('sbom')">
                 {{ 'REPOSITORY.SBOM' | translate }}
             </button>
             <ng-template [clrIfActive]="currentTabLinkId === 'sbom'">
                 <clr-tab-content id="sbom-content">
-                    @if (currentTabLinkId === 'sbom') {
+                    <ng-container *ngIf="currentTabLinkId === 'sbom'">
                     <hbr-artifact-sbom
                         [artifact]="artifact"
                         [projectName]="projectName"
@@ -43,11 +44,12 @@
                         [hasScannerSupportSBOM]="hasScannerSupportSBOM()"
                         [repoName]="repoName"
                         [sbomDigest]="sbomDigest"></hbr-artifact-sbom>
-                    }
+                    </ng-container>
                 </clr-tab-content>
             </ng-template>
         </clr-tab>
-        } @if (getBuildHistory()) {
+        </ng-container>
+        <ng-container *ngIf="getBuildHistory()">
         <clr-tab>
             <button
                 clrTabLink
@@ -57,16 +59,17 @@
             </button>
             <ng-template [clrIfActive]="currentTabLinkId === 'build-history'">
                 <clr-tab-content>
-                    @if (currentTabLinkId === 'build-history') {
+                    <ng-container *ngIf="currentTabLinkId === 'build-history'">
                     <hbr-artifact-build-history
                         [buildHistoryLink]="
                             getBuildHistory()
                         "></hbr-artifact-build-history>
-                    }
+                    </ng-container>
                 </clr-tab-content>
             </ng-template>
         </clr-tab>
-        } @if (getSummary()) {
+        </ng-container>
+        <ng-container *ngIf="getSummary()">
         <clr-tab>
             <button
                 clrTabLink
@@ -76,15 +79,16 @@
             </button>
             <ng-template [clrIfActive]="currentTabLinkId === 'summary-link'">
                 <clr-tab-content id="summary-content">
-                    @if (currentTabLinkId === 'summary-link') {
+                    <ng-container *ngIf="currentTabLinkId === 'summary-link'">
                     <hbr-artifact-summary
                         [summaryLink]="getSummary()"
                         [artifactDetails]="artifact"></hbr-artifact-summary>
-                    }
+                    </ng-container>
                 </clr-tab-content>
             </ng-template>
         </clr-tab>
-        } @if (getLicense()) {
+        </ng-container>
+        <ng-container *ngIf="getLicense()">
         <clr-tab>
             <button
                 clrTabLink
@@ -94,14 +98,15 @@
             </button>
             <ng-template [clrIfActive]="currentTabLinkId === 'license-link'">
                 <clr-tab-content id="license-content">
-                    @if (currentTabLinkId === 'license-link') {
+                    <ng-container *ngIf="currentTabLinkId === 'license-link'">
                     <hbr-artifact-license
                         [licenseLink]="getLicense()"></hbr-artifact-license>
-                    }
+                    </ng-container>
                 </clr-tab-content>
             </ng-template>
         </clr-tab>
-        } @if (getFile()) {
+        </ng-container>
+        <ng-container *ngIf="getFile()">
         <clr-tab>
             <button
                 clrTabLink
@@ -111,14 +116,15 @@
             </button>
             <ng-template [clrIfActive]="currentTabLinkId === 'files-link'">
                 <clr-tab-content id="files-content">
-                    @if (currentTabLinkId === 'files-link') {
+                    <ng-container *ngIf="currentTabLinkId === 'files-link'">
                     <hbr-artifact-files
                         [filesLink]="getFile()"></hbr-artifact-files>
-                    }
+                    </ng-container>
                 </clr-tab-content>
             </ng-template>
         </clr-tab>
-        } @if (getDependencies()) {
+        </ng-container>
+        <ng-container *ngIf="getDependencies()">
         <clr-tab>
             <button
                 clrTabLink
@@ -128,16 +134,17 @@
             </button>
             <ng-template [clrIfActive]="currentTabLinkId === 'depend-link'">
                 <clr-tab-content id="depend-content">
-                    @if (currentTabLinkId === 'depend-link') {
+                    <ng-container *ngIf="currentTabLinkId === 'depend-link'">
                     <hbr-artifact-dependencies
                         [dependenciesLink]="
                             getDependencies()
                         "></hbr-artifact-dependencies>
-                    }
+                    </ng-container>
                 </clr-tab-content>
             </ng-template>
         </clr-tab>
-        } @if (getValues()) {
+        </ng-container>
+        <ng-container *ngIf="getValues()">
         <clr-tab>
             <button
                 clrTabLink
@@ -147,14 +154,15 @@
             </button>
             <ng-template [clrIfActive]="currentTabLinkId === 'value-link'">
                 <clr-tab-content id="value-content">
-                    @if (currentTabLinkId === 'value-link') {
+                    <ng-container *ngIf="currentTabLinkId === 'value-link'">
                     <hbr-artifact-values
                         [valuesLink]="getValues()"></hbr-artifact-values>
-                    }
+                    </ng-container>
                 </clr-tab-content>
             </ng-template>
         </clr-tab>
-        } @if (getDockerfile()) {
+        </ng-container>
+        <ng-container *ngIf="getDockerfile()">
         <clr-tab>
             <button
                 clrTabLink
@@ -164,16 +172,16 @@
             </button>
             <ng-template [clrIfActive]="currentTabLinkId === 'dockerfile-link'">
                 <clr-tab-content id="dockerfile-content">
-                    @if (currentTabLinkId === 'dockerfile-link') {
+                    <ng-container *ngIf="currentTabLinkId === 'dockerfile-link'">
                     <hbr-artifact-dockerfile
                         [dockerfileLink]="getDockerfile()"
                         [buildHistoryLink]="getBuildHistory()"
                         (switchTab)="onDockerfileSwitchTab($event)"></hbr-artifact-dockerfile>
-                    }
+                    </ng-container>
                 </clr-tab-content>
             </ng-template>
         </clr-tab>
-        }
+        </ng-container>
     </clr-tabs>
 </div>
-}
+</ng-container>
