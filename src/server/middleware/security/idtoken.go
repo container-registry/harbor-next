@@ -44,7 +44,7 @@ func (i *idToken) Generate(req *http.Request) security.Context {
 	}
 	claims, err := oidc.VerifyToken(ctx, token)
 	if err != nil {
-		log.Warningf("failed to verify token: %v", err)
+		log.Debugf("failed to verify token: %v", err)
 		return nil
 	}
 	u, err := user.Ctl.GetBySubIss(ctx, claims.Subject, claims.Issuer)
