@@ -406,7 +406,7 @@ func TestNewOptionsRSAPKCS8(t *testing.T) {
 	// Verify the key can actually be parsed via GetKey()
 	gotKey, err := opt.GetKey()
 	require.NoError(t, err)
-	assert.IsType(t, &rsa.PrivateKey{}, gotKey)
+	require.IsType(t, &rsa.PrivateKey{}, gotKey)
 	privKey := gotKey.(*rsa.PrivateKey)
 	assert.Equal(t, key.PublicKey.E, privKey.PublicKey.E)
 }

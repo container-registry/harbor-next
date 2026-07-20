@@ -16,12 +16,16 @@ package token //nolint:revive
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/docker/distribution/registry/auth/token"
-	"github.com/docker/libtrust"
 	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/goharbor/harbor/src/common/models"
@@ -135,11 +139,16 @@ func MakeToken(ctx context.Context, username, service string, access []*token.Re
 	}
 	// Add kid to token header for compatibility with docker distribution's code
 	// see https://github.com/docker/distribution/blob/release/2.7/registry/auth/token/token.go#L197
-	k, err := libtrust.UnmarshalPrivateKeyPEM(options.PrivateKey)
+	// Use the key from options.GetKey() to derive the kid, supporting both PKCS8 and traditional PEM formats
+	key, err := options.GetKey()
 	if err != nil {
 		return nil, err
 	}
-	tok.Header["kid"] = k.KeyID()
+	kid, err := generateKeyID(key)
+	if err != nil {
+		return nil, err
+	}
+	tok.Header["kid"] = kid
 
 	rawToken, err := tok.Raw()
 	if err != nil {
@@ -150,4 +159,36 @@ func MakeToken(ctx context.Context, username, service string, access []*token.Re
 		ExpiresIn: expiration * 60,
 		IssuedAt:  now.Format(time.RFC3339),
 	}, nil
+}
+
+// generateKeyID derives a key ID from a crypto key.
+// This approach supports RSA, ECDSA, and Ed25519 keys without relying on libtrust.
+func generateKeyID(key any) (string, error) {
+	var pubBytes []byte
+	var err error
+
+	switch k := key.(type) {
+	case *rsa.PrivateKey:
+		pubBytes, err = x509.MarshalPKIXPublicKey(&k.PublicKey)
+	case *ecdsa.PrivateKey:
+		pubBytes, err = x509.MarshalPKIXPublicKey(&k.PublicKey)
+	case ed25519.PrivateKey:
+		pubBytes = []byte(k)
+	case *rsa.PublicKey:
+		pubBytes, err = x509.MarshalPKIXPublicKey(k)
+	case *ecdsa.PublicKey:
+		pubBytes, err = x509.MarshalPKIXPublicKey(k)
+	case ed25519.PublicKey:
+		pubBytes = []byte(k)
+	default:
+		return "", fmt.Errorf("unsupported key type: %T", key)
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	// Use SHA256 hash of the key bytes as the key ID (first 8 hex chars)
+	hash := sha256.Sum256(pubBytes)
+	return fmt.Sprintf("%x", hash[:8]), nil
 }
