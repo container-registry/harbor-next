@@ -33,6 +33,11 @@
             }
 
             .clickable-link {
+                border: none;
+                background: none;
+                padding: 0;
+                margin: 0;
+                font: inherit;
                 color: #06c;
                 cursor: pointer;
                 text-decoration: underline;

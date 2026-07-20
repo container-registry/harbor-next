@@ -1589,6 +1589,7 @@ paths:
           type: string
           enum:
             - build_history
+            - dockerfile
             - values.yaml
             - readme.md
             - dependencies
