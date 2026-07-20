@@ -98,6 +98,13 @@ func getChallenge(req *http.Request, accessList []access) string {
 		return `Basic realm="harbor"`
 	}
 
+	// A request that already carries Basic credentials isn't following the
+	// OCI/Docker Bearer token flow, so challenge it with Basic too instead of
+	// pointing it at the token service.
+	if strings.HasPrefix(auth, "Basic ") {
+		return `Basic realm="harbor"`
+	}
+
 	// Build scope string (shared by all Bearer challenges)
 	scope := ""
 	for _, a := range accessList {
@@ -111,10 +118,6 @@ func getChallenge(req *http.Request, accessList []access) string {
 	tokenSvc, err := tokenSvcURL(req)
 	if err != nil {
 		logger.Errorf("failed to get the endpoint for token service, error: %v", err)
-		// If token service unavailable and Basic auth, fallback to Basic
-		if strings.HasPrefix(auth, "Basic ") {
-			return `Basic realm="harbor"`
-		}
 	}
 
 	// Build Bearer challenge
@@ -123,10 +126,9 @@ func getChallenge(req *http.Request, accessList []access) string {
 		challenge = fmt.Sprintf(`%s,scope="%s"`, challenge, scope)
 	}
 
-	// If Docker sends Basic auth, return Bearer challenge to redirect to token service
-	// If Docker sends Bearer auth but validation failed, return Bearer to get new token
+	// If Docker sends Bearer auth but validation failed, return Bearer to get a new token
 	// If no auth header, treat it as CLI and redirect to token service
-	// All paths use the same Bearer challenge constructed above
+	// Both paths use the same Bearer challenge constructed above
 	return challenge
 }
 
