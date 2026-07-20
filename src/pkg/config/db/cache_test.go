@@ -36,6 +36,9 @@ func TestCacheLoadAndSave(t *testing.T) {
 	driver := NewCacheDriver(cache, &Database{cfgDAO: dao.New()})
 
 	cfgs := map[string]any{
+		// auth_mode is no longer a registered metadata item (replaced by
+		// probe-based per-backend auth detection), so Save must silently
+		// skip it rather than persisting it.
 		common.AUTHMode: "db_auth",
 		common.LDAPURL:  "ldap://ldap.vmware.com",
 	}
@@ -46,7 +49,7 @@ func TestCacheLoadAndSave(t *testing.T) {
 		fmt.Printf("load failed %v", err)
 	}
 
-	assert.Contains(t, cf, common.AUTHMode)
+	assert.NotContains(t, cf, common.AUTHMode)
 	assert.Contains(t, cf, common.LDAPURL)
 }
 

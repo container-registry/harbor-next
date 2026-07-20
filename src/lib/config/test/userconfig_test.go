@@ -151,9 +151,13 @@ func TestConfig(t *testing.T) {
 		t.Errorf(`extURL should be "host01.com".`)
 	}
 
+	// defaultConfig (uploaded above) populates an LDAP URL, so with the
+	// probe-based DetectAuthMode, LDAP auth is now correctly detected
+	// (previously this required an explicit auth_mode=ldap_auth switch,
+	// which defaultConfig never set).
 	mode = DetectAuthMode(ctx)
-	if mode != "db_auth" {
-		t.Errorf("unexpected mode: %s != %s", mode, "db_auth")
+	if mode != "ldap_auth" {
+		t.Errorf("unexpected mode: %s != %s", mode, "ldap_auth")
 	}
 
 	if tokenKeyPath := TokenPrivateKeyPath(); tokenKeyPath != "/etc/core/private_key.pem" {
