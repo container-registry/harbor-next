@@ -28,6 +28,11 @@ import (
 	"github.com/goharbor/harbor/src/pkg/artifact"
 )
 
+const (
+	// maxDockerfileSize is the maximum size of Dockerfile content in bytes (4MB)
+	maxDockerfileSize = 4 * 1024 * 1024
+)
+
 // const definitions
 const (
 	// ArtifactTypeImage is the artifact type for image
@@ -115,13 +120,15 @@ func (m *manifestV2Processor) AbstractAddition(ctx context.Context, artifact *ar
 		}, nil
 	}
 
-	dockerfile := m.getDockerfileFromLabels(config.Config.Labels)
-	if dockerfile == "" {
-		dockerfile = m.getDockerfileFromManifestAnnotations(content)
-	}
+	// AdditionTypeDockerfile
+	dockerfile := m.getDockerfileFromLabels(config)
 	if dockerfile == "" {
 		return nil, errors.New(nil).WithCode(errors.NotFoundCode).
-			WithMessage("dockerfile not found in image labels or manifest annotations")
+			WithMessage("dockerfile not found in image labels")
+	}
+	if len(dockerfile) > maxDockerfileSize {
+		return nil, errors.New(nil).WithCode(errors.RequestEntityTooLargeCode).
+			WithMessage("dockerfile content exceeds maximum size limit")
 	}
 	return &processor.Addition{
 		Content:     []byte(dockerfile),
@@ -129,40 +136,30 @@ func (m *manifestV2Processor) AbstractAddition(ctx context.Context, artifact *ar
 	}, nil
 }
 
-// dockerfileKeys are the label/annotation keys checked, in order, for
-// Dockerfile content embedded by image build tools.
-var dockerfileKeys = []string{
-	"com.example.dockerfile",
-	"dockerfile",
-}
-
-func (m *manifestV2Processor) getDockerfileFromLabels(labels map[string]string) string {
-	if len(labels) == 0 {
+func (m *manifestV2Processor) getDockerfileFromLabels(config *v1.Image) string {
+	if config == nil || len(config.Config.Labels) == 0 {
 		return ""
 	}
+
+	// Check for common Dockerfile label keys
+	dockerfileKeys := []string{
+		"com.example.dockerfile",
+		"dockerfile",
+	}
 	for _, key := range dockerfileKeys {
-		if val, ok := labels[key]; ok && len(val) > 0 {
+		if val, ok := config.Config.Labels[key]; ok && len(val) > 0 {
 			return val
 		}
 	}
 	return ""
 }
 
-// getDockerfileFromManifestAnnotations looks for Dockerfile content in the
-// top-level OCI manifest annotations, as opposed to the image config labels
-// (https://github.com/opencontainers/image-spec/blob/main/annotations.md).
-func (m *manifestV2Processor) getDockerfileFromManifestAnnotations(manifestPayload []byte) string {
-	mani := &v1.Manifest{}
-	if err := json.Unmarshal(manifestPayload, mani); err != nil {
-		return ""
-	}
-	return m.getDockerfileFromLabels(mani.Annotations)
-}
-
 func (m *manifestV2Processor) GetArtifactType(_ context.Context, _ *artifact.Artifact) string {
 	return ArtifactTypeImage
 }
 
-func (m *manifestV2Processor) ListAdditionTypes(_ context.Context, _ *artifact.Artifact) []string {
+func (m *manifestV2Processor) ListAdditionTypes(ctx context.Context, artifact *artifact.Artifact) []string {
+	// Dockerfile support is always available for Docker images, but may not have content
+	// The UI will show the tab, and AbstractAddition will handle missing Dockerfile gracefully
 	return []string{AdditionTypeBuildHistory, AdditionTypeDockerfile}
 }
