@@ -7,10 +7,16 @@ if (!patchPath) {
 }
 
 const lines = readFileSync(patchPath, 'utf8').split(/\r?\n/);
-const subjectIndex = lines.findIndex(line => line.startsWith('Subject: '));
+let subjectIndex = lines.findIndex(line => line.startsWith('Subject: '));
+let includeBody = true;
 
 if (subjectIndex === -1) {
-  process.exit(0);
+  subjectIndex = lines.findIndex(line => line.trim() !== '');
+  includeBody = false;
+
+  if (subjectIndex === -1 || lines[subjectIndex].startsWith('From ')) {
+    process.exit(0);
+  }
 }
 
 const subject = lines[subjectIndex]
@@ -18,13 +24,16 @@ const subject = lines[subjectIndex]
   .replace(/^\[PATCH[^\]]*\]\s*/, '')
   .trim();
 
-let bodyStart = lines.findIndex((line, index) => index > subjectIndex && line === '');
-if (bodyStart === -1) {
-  bodyStart = subjectIndex;
+let bodyStart = subjectIndex;
+if (includeBody) {
+  bodyStart = lines.findIndex((line, index) => index > subjectIndex && line === '');
+  if (bodyStart === -1) {
+    bodyStart = subjectIndex;
+  }
 }
 
-const bodyEnd = lines.findIndex((line, index) => index > bodyStart && line === '---');
-const bodyLines = lines.slice(bodyStart + 1, bodyEnd === -1 ? lines.length : bodyEnd);
+const bodyEnd = includeBody ? lines.findIndex((line, index) => index > bodyStart && line === '---') : -1;
+const bodyLines = includeBody ? lines.slice(bodyStart + 1, bodyEnd === -1 ? lines.length : bodyEnd) : [];
 
 while (bodyLines.length > 0 && bodyLines[0].trim() === '') {
   bodyLines.shift();

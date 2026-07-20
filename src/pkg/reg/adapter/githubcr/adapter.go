@@ -75,7 +75,7 @@ var (
 	_ adp.ArtifactRegistry = (*adapter)(nil)
 )
 
-// adapter for to github container registry
+// adapter for GitHub container registry
 type adapter struct {
 	client *common_http.Client
 	*native.Adapter

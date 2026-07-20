@@ -28,7 +28,7 @@ import (
 )
 
 // Client is a util for common HTTP operations, such Get, Head, Post, Put and Delete.
-// Use Do instead if  those methods can not meet your requirement
+// Use Do instead if those methods cannot meet your requirement
 type Client struct {
 	modifiers []modifier.Modifier
 	client    *http.Client

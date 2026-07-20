@@ -94,7 +94,7 @@ func (m *memberAPI) GetProjectMember(ctx context.Context, params operation.GetPr
 	}
 
 	if params.Mid == 0 {
-		return m.SendError(ctx, errors.BadRequestError(nil).WithMessage("the member id can not be empty!"))
+		return m.SendError(ctx, errors.BadRequestError(nil).WithMessage("the member id cannot be empty!"))
 	}
 
 	member, err := m.ctl.Get(ctx, projectNameOrID, int(params.Mid))
@@ -159,10 +159,10 @@ func (m *memberAPI) UpdateProjectMember(ctx context.Context, params operation.Up
 		return m.SendError(ctx, err)
 	}
 	if params.Role == nil {
-		return m.SendError(ctx, errors.BadRequestError(nil).WithMessage("role can not be empty"))
+		return m.SendError(ctx, errors.BadRequestError(nil).WithMessage("role cannot be empty"))
 	}
 	if params.Mid == 0 {
-		return m.SendError(ctx, errors.BadRequestError(nil).WithMessage("member id can not be empty"))
+		return m.SendError(ctx, errors.BadRequestError(nil).WithMessage("member id cannot be empty"))
 	}
 
 	err := m.ctl.UpdateRole(ctx, projectNameOrID, int(params.Mid), int(params.Role.RoleID))

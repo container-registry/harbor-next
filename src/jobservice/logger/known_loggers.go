@@ -43,7 +43,7 @@ type Declaration struct {
 
 // knownLoggers is a static logger registry.
 // All the implemented loggers (w/ sweeper) should be registered
-// with an unique name in this registry. Then they can be used to
+// with a unique name in this registry. Then they can be used to
 // log info.
 var knownLoggers = map[string]*Declaration{
 	// File logger

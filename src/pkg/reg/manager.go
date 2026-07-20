@@ -34,7 +34,7 @@ import (
 	_ "github.com/goharbor/harbor/src/pkg/reg/adapter/dockerhub"
 	// register the DTR adapter
 	_ "github.com/goharbor/harbor/src/pkg/reg/adapter/dtr"
-	// register the Github Container Registry adapter
+	// register the GitHub Container Registry adapter
 	_ "github.com/goharbor/harbor/src/pkg/reg/adapter/githubcr"
 	// register the GitLab adapter
 	_ "github.com/goharbor/harbor/src/pkg/reg/adapter/gitlab"

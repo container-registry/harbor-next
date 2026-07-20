@@ -64,12 +64,12 @@ func TestLdapGroupValidateRule_Validate(t *testing.T) {
 		{
 			name: `empty ldap group membership attribute, update all`,
 			in:   args{ctx: orm.Context(), cfgMgr: mgr, cfgs: map[string]any{"ldap_group_search_filter": "objectClass=groupOfNames", "ldap_group_attribute_name": "cn", "ldap_group_membership_attribute": ""}},
-			want: errors.New("ldap group membership attribute can not be empty"),
+			want: errors.New("ldap group membership attribute cannot be empty"),
 		},
 		{
 			name: `empty ldap group attribute name, update partially`,
 			in:   args{ctx: orm.Context(), cfgMgr: mgr, cfgs: map[string]any{"ldap_group_search_filter": "objectClass=groupOfNames", "ldap_group_membership_attribute": "memberof"}},
-			want: errors.New("ldap group name attribute can not be empty"),
+			want: errors.New("ldap group name attribute cannot be empty"),
 		},
 	}
 	for _, tt := range cases {

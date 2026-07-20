@@ -40,7 +40,7 @@ jobs:
           if [ "$failed" -eq 1 ]; then
             echo ""
             echo "All 'uses:' references must be pinned to a full commit SHA."
-            echo "Example: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v4"
+            echo "Example: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0"
             exit 1
           fi
           echo "All actions are pinned."
