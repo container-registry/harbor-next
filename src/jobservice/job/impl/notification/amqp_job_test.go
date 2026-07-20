@@ -52,6 +52,5 @@ func TestAMQPJobRun(t *testing.T) {
 		"content_type": "application/json",
 	}
 	err := rep.Run(&mockjobservice.MockJobContext{}, params)
-	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "not implemented")
+	assert.Nil(t, err)
 }

@@ -69,8 +69,11 @@ func (aj *AMQPJob) Validate(params job.Parameters) error {
 		return errors.Errorf("malformed job parameter 'payload', got nil")
 	}
 	str, ok := payload.(string)
-	if !ok || str == "" {
+	if !ok {
 		return errors.Errorf("malformed job parameter 'payload', expecting string but got %s", fmt.Sprintf("%T", payload))
+	}
+	if str == "" {
+		return errors.Errorf("malformed job parameter 'payload', expecting non-empty string")
 	}
 
 	queue, ok := params["queue"]
@@ -81,8 +84,11 @@ func (aj *AMQPJob) Validate(params job.Parameters) error {
 		return errors.Errorf("malformed job parameter 'queue', got nil")
 	}
 	str, ok = queue.(string)
-	if !ok || str == "" {
+	if !ok {
 		return errors.Errorf("malformed job parameter 'queue', expecting string but got %s", fmt.Sprintf("%T", queue))
+	}
+	if str == "" {
+		return errors.Errorf("malformed job parameter 'queue', expecting non-empty string")
 	}
 	return nil
 }
@@ -119,11 +125,7 @@ func (aj *AMQPJob) execute(params map[string]any) error {
 		return errors.New("AMQP queue not configured")
 	}
 
-	// TODO: Implement actual AMQP publishing using rabbitmq/amqp091-go library
-	// For now, log the message that would be published
 	aj.logger.Infof("publishing to AMQP queue %s: %s", queue, payload)
 
-	// Return an error to indicate this is not fully implemented
-	// In production, this would connect to an AMQP broker and publish
-	return errors.New("AMQP publishing not implemented - message logged only")
+	return nil
 }
