@@ -133,26 +133,37 @@ describe('NewRobotComponent', () => {
     });
 
     describe('provided secret', () => {
+        beforeEach(() => {
+            // this test module doesn't declare InlineAlertComponent, so the
+            // @ViewChild never resolves; stub it since open()/reset()/cancel()
+            // all call inlineAlertComponent.close()
+            component.inlineAlertComponent = { close: () => {} } as any;
+        });
+
         it('should default to accepting no secret', () => {
             expect(component.userProvidedSecret).toBe('');
             expect(component.isProvidedSecretAcceptable).toBeTruthy();
         });
 
         it('should block creation when the shared secret input reports invalid', () => {
+            component.systemRobot.name = 'testsystemrobot';
             component.coverAll = true;
             component.permissionForCoverAll.access = [
                 { resource: Resource.ARTIFACT, action: Action.PULL },
             ];
             component.isProvidedSecretAcceptable = false;
+            fixture.detectChanges();
             expect(component.canAdd()).toBeFalsy();
         });
 
         it('should allow creation when the shared secret input reports valid', () => {
+            component.systemRobot.name = 'testsystemrobot';
             component.coverAll = true;
             component.permissionForCoverAll.access = [
                 { resource: Resource.ARTIFACT, action: Action.PULL },
             ];
             component.isProvidedSecretAcceptable = true;
+            fixture.detectChanges();
             expect(component.canAdd()).toBeTruthy();
         });
 
