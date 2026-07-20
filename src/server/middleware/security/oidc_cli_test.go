@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build db
-
 package security
 
 import (
@@ -47,7 +45,7 @@ func TestOIDCCli(t *testing.T) {
 	assert.Nil(t, ctx)
 
 	// pass
-	username := "oidcModifierTester"
+	username := "oidcModiferTester"
 	password := "oidcSecret"
 	testCtl := &testingUser.Controller{}
 	testCtl.On("GetByName", mock.Anything, username).Return(
