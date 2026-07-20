@@ -132,7 +132,6 @@ func (m *manifestV2Processor) getDockerfileFromLabels(config *v1.Image) string {
 	}
 
 	dockerfileKeys := []string{
-		"org.opencontainers.image.source",
 		"com.example.dockerfile",
 		"dockerfile",
 	}
