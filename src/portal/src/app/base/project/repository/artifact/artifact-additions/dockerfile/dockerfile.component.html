@@ -1,0 +1,65 @@
+<ng-template [ngIf]="!loading">
+    <div class="row content-wrapper">
+        <div class="col-md-8">
+            <div class="col-xs-8">
+                <ng-template [ngIf]="dockerfile">
+                    <div
+                        class="yaml-container"
+                        [innerHTML]="
+                            dockerfile
+                                | language : 'dockerfile'
+                                | markdown
+                                | async
+                        "></div>
+                </ng-template>
+            </div>
+            <ng-template [ngIf]="!dockerfile">
+                <div>
+                    <ng-template [ngIf]="fileTooLargeStatus">
+                        <div class="col-md-8 md-container pl-1">
+                            {{ 'ARTIFACT.FILE_TOO_LARGE' | translate }}
+                        </div>
+                    </ng-template>
+                    <ng-template [ngIf]="noDockerfileStatus">
+                        <div class="col-md-8 md-container info-box pl-1">
+                            <clr-icon
+                                shape="info-circle"
+                                class="info-icon"></clr-icon>
+                            <div class="info-text">
+                                <p>
+                                    {{
+                                        'ARTIFACT.NO_DOCKERFILE_EXPLANATION'
+                                            | translate
+                                    }}
+                                </p>
+                                <ng-template [ngIf]="buildHistoryLink">
+                                    <p>
+                                        {{
+                                            'ARTIFACT.NO_DOCKERFILE_SUGGESTION'
+                                                | translate
+                                        }}
+                                        <a
+                                            class="clickable-link"
+                                            (click)="
+                                                switchTab.emit('build-history')
+                                            ">
+                                            {{
+                                                'REPOSITORY.BUILD_HISTORY'
+                                                    | translate
+                                            }}
+                                        </a>
+                                    </p>
+                                </ng-template>
+                            </div>
+                        </div>
+                    </ng-template>
+                </div>
+            </ng-template>
+        </div>
+    </div>
+</ng-template>
+<ng-template [ngIf]="loading">
+    <div class="clr-row mt-3 center">
+        <span class="spinner spinner-md"></span>
+    </div>
+</ng-template>

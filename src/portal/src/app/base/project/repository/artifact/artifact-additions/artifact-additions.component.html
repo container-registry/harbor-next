@@ -62,6 +62,26 @@
                     </clr-tab-content>
                 </ng-template>
             </clr-tab>
+            <clr-tab>
+                <button
+                    clrTabLink
+                    id="dockerfile-link"
+                    (click)="actionTab('dockerfile-link')">
+                    {{ 'ARTIFACT.DOCKERFILE' | translate }}
+                </button>
+                <ng-template
+                    [clrIfActive]="currentTabLinkId === 'dockerfile-link'">
+                    <clr-tab-content id="dockerfile-content">
+                        <hbr-artifact-dockerfile
+                            *ngIf="currentTabLinkId === 'dockerfile-link'"
+                            [dockerfileLink]="getDockerfile()"
+                            [buildHistoryLink]="getBuildHistory()"
+                            (switchTab)="
+                                onDockerfileSwitchTab($event)
+                            "></hbr-artifact-dockerfile>
+                    </clr-tab-content>
+                </ng-template>
+            </clr-tab>
             <clr-tab *ngIf="getSummary()">
                 <button
                     clrTabLink
