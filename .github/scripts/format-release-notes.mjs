@@ -181,6 +181,10 @@ function releaseNotesLines(body) {
   return block;
 }
 
+function isReleasePleaseFooter(line) {
+  return line.trim() === '---' || line.startsWith('This PR was generated with [Release Please]');
+}
+
 for (const line of releaseNotesLines(releaseBody)) {
   if (line.startsWith('## ')) {
     continue;
@@ -214,7 +218,7 @@ for (const line of releaseNotesLines(releaseBody)) {
     continue;
   }
 
-  if (sawSection && line.trim()) {
+  if (sawSection && line.trim() && !isReleasePleaseFooter(line)) {
     trailing.push(line);
   }
 }
@@ -246,13 +250,13 @@ if (trailing.length > 0) {
 
 writeFileSync(outputPath, `${output.join('\n').trim()}\n`);
 
-// New Contributors is emitted as its own top-level `## New Contributors` section
-// by the release workflow, so it is written to a separate file rather than nested
-// under `## What's Changed`.
+// New Contributors is emitted after the release metadata separator by the
+// workflow, so it is written to a separate file rather than nested under
+// `## What's Changed`.
 if (contributorsPath) {
   const newContributors = generatedNotes.match(/## New Contributors[\s\S]*?(?=(?:\r?\n){2}\*\*Full Changelog\*\*|$)/)?.[0];
   writeFileSync(
     contributorsPath,
-    newContributors ? `${newContributors.replace(/^\* /gm, '- ').trim()}\n` : '',
+    newContributors ? `${newContributors.replace(/^## New Contributors$/m, '### New Contributors').replace(/^\* /gm, '- ').trim()}\n` : '',
   );
 }

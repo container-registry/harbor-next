@@ -228,7 +228,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           REGISTRY="${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}"
-          IMAGES="core jobservice registryctl exporter portal registry trivy-adapter"
+          IMAGES=(core jobservice registryctl exporter portal registry trivy-adapter)
           GENERATED_NOTES="$(mktemp)"
           RELEASE_BODY="$(mktemp)"
           FORMATTED_BODY="$(mktemp)"
@@ -244,61 +244,32 @@ jobs:
             "${FORMATTED_BODY}" \
             "${CONTRIBUTORS}"
 
-          HIGHLIGHTS=""
-          git fetch --tags --force
-          PREV_TAG=$(git tag --merged HEAD --sort=-creatordate \
-            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
-            | grep -v "^${TAG_NAME}$" \
-            | head -n 1 || true)
-          if [ -n "${PREV_TAG}" ]; then
-            SINCE=$(gh release view "${PREV_TAG}" --json createdAt -q '.createdAt')
-            SINCE_DATE="${SINCE%T*}"
-            HIGHLIGHTS=$(gh pr list \
-              --state merged \
-              --base "${RELEASE_BRANCH}" \
-              --search "merged:>=${SINCE_DATE}" \
-              --json number,title,url,body \
-              --limit 100 \
-              --jq '
-                [.[] | select(.body | test("(?m)^## Release Notes"))] |
-                if length == 0 then ""
-                else
-                  "## Highlights\n\n" +
-                  (map(
-                    "### [#\(.number)](\(.url)) \(.title)\n" +
-                    (.body |
-                      gsub("(?s).*\n## Release Notes\n"; "") |
-                      gsub("(?s)\n## .*"; "") |
-                      gsub("<!--[\\s\\S]*?-->"; "") |
-                      ltrimstr("\n") | rtrimstr("\n")
-                    ) + "\n"
-                  ) | join("\n"))
-                end
-              ')
-          fi
-
           {
-            if [ -n "${HIGHLIGHTS}" ]; then
-              printf '%s\n\n' "${HIGHLIGHTS}"
+            if [ -f applied-patches.txt ] && [ -s applied-patches.txt ]; then
+              while IFS= read -r line; do
+                echo "${line}"
+                if [ "${line}" = "## What's Changed" ]; then
+                  echo ""
+                  echo "### Commercial Features"
+                  echo ""
+                  echo "This release includes the following commercial enhancements:"
+                  echo ""
+                  cat applied-patches.txt
+                fi
+              done < "${FORMATTED_BODY}"
+            else
+              cat "${FORMATTED_BODY}"
             fi
-            cat "${FORMATTED_BODY}"
             echo ""
             echo "---"
             echo ""
-            if [ -f applied-patches.txt ] && [ -s applied-patches.txt ]; then
-              echo "## Commercial Features"
-              echo ""
-              echo "This release includes the following commercial enhancements:"
-              cat applied-patches.txt
-              echo ""
-            fi
             echo "## Container Images"
             echo ""
             echo "Multi-arch images (\`linux/amd64\`, \`linux/arm64\`) signed with [cosign](https://github.com/sigstore/cosign)."
             echo ""
             echo "| Image | Reference |"
             echo "|-------|-----------|"
-            for image in $IMAGES; do
+            for image in "${IMAGES[@]}"; do
               image_name="harbor-${image}"
               if [ "${image}" = "trivy-adapter" ]; then
                 image_name="trivy-adapter"

@@ -269,7 +269,7 @@ func (s *Session) SearchLdap(filter string) (*goldap.SearchResult, error) {
 // SearchLdapAttribute - to search ldap with the provide filter, with specified attributes
 func (s *Session) SearchLdapAttribute(baseDN, filter string, attributes []string) (*goldap.SearchResult, error) {
 	if err := s.Bind(s.basicCfg.SearchDn, s.basicCfg.SearchPassword); err != nil {
-		return nil, fmt.Errorf("can not bind search dn, error: %v", err)
+		return nil, fmt.Errorf("cannot bind search dn, error: %v", err)
 	}
 	log.Debugf("baseDN: %v, filter: %v, attributes: %v", baseDN, filter, attributes)
 	filter = normalizeFilter(filter)

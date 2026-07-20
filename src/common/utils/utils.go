@@ -224,7 +224,7 @@ func GetStrValueOfAnyType(value any) string {
 	if _, ok := value.(map[string]any); ok {
 		b, err := json.Marshal(value)
 		if err != nil {
-			log.Errorf("can not marshal json object, error %v", err)
+			log.Errorf("cannot marshal json object, error %v", err)
 			return ""
 		}
 		strVal = string(b)

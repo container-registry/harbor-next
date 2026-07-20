@@ -769,7 +769,7 @@ func (a *projectAPI) deletable(ctx context.Context, projectNameOrID any) (*proje
 	result := &models.ProjectDeletable{Deletable: true}
 	if p.RepoCount > 0 {
 		result.Deletable = false
-		result.Message = "the project contains repositories, can not be deleted"
+		result.Message = "the project contains repositories, cannot be deleted"
 	}
 
 	return p, result, nil

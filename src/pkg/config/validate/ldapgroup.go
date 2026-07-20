@@ -62,10 +62,10 @@ func (l LdapGroupValidateRule) Validate(ctx context.Context, cfgMgr config.Manag
 		return nil
 	}
 	if len(cfg.NameAttribute) == 0 {
-		return errors.New("ldap group name attribute can not be empty")
+		return errors.New("ldap group name attribute cannot be empty")
 	}
 	if len(cfg.MembershipAttribute) == 0 {
-		return errors.New("ldap group membership attribute can not be empty")
+		return errors.New("ldap group membership attribute cannot be empty")
 	}
 	return nil
 }
