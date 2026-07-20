@@ -92,54 +92,13 @@ func (rc *reqChecker) projectID(ctx context.Context, name string) (int64, error)
 func getChallenge(req *http.Request, accessList []access) string {
 	logger := log.G(req.Context())
 	auth := req.Header.Get(authHeader)
-	// If Docker sends Basic auth, return Bearer challenge to redirect to token service
-	if strings.HasPrefix(auth, "Basic ") {
-		tokenSvc, err := tokenSvcURL(req)
-		if err != nil {
-			logger.Errorf("failed to get the endpoint for token service, error: %v", err)
-			return `Basic realm="harbor"`
-		}
-		scope := ""
-		for _, a := range accessList {
-			if len(scope) > 0 {
-				scope += " "
-			}
-			scope += a.scopeStr(req.Context())
-		}
-		challenge := fmt.Sprintf(`Bearer realm="%s",service="%s"`, tokenSvc, tokensvc.Registry)
-		if len(scope) > 0 {
-			challenge = fmt.Sprintf(`%s,scope="%s"`, challenge, scope)
-		}
-		return challenge
-	}
-	// If Docker sends Bearer auth but validation failed, return Bearer to get new token
-	if strings.HasPrefix(auth, "Bearer ") {
-		tokenSvc, err := tokenSvcURL(req)
-		if err != nil {
-			logger.Errorf("failed to get the endpoint for token service, error: %v", err)
-		}
-		scope := ""
-		for _, a := range accessList {
-			if len(scope) > 0 {
-				scope += " "
-			}
-			scope += a.scopeStr(req.Context())
-		}
-		challenge := fmt.Sprintf(`Bearer realm="%s",service="%s"`, tokenSvc, tokensvc.Registry)
-		if len(scope) > 0 {
-			challenge = fmt.Sprintf(`%s,scope="%s"`, challenge, scope)
-		}
-		return challenge
-	}
-	// For catalog or no auth, treat as CLI and redirect to token service
+
+	// For catalog requests, always return Basic challenge regardless of auth header
 	if lib.V2CatalogURLRe.MatchString(req.URL.Path) {
 		return `Basic realm="harbor"`
 	}
-	// No auth header, treat it as CLI and redirect to token service
-	tokenSvc, err := tokenSvcURL(req)
-	if err != nil {
-		logger.Errorf("failed to get the endpoint for token service, error: %v", err)
-	}
+
+	// Build scope string (shared by all Bearer challenges)
 	scope := ""
 	for _, a := range accessList {
 		if len(scope) > 0 {
@@ -147,10 +106,27 @@ func getChallenge(req *http.Request, accessList []access) string {
 		}
 		scope += a.scopeStr(req.Context())
 	}
+
+	// Get token service URL (shared by all Bearer challenges)
+	tokenSvc, err := tokenSvcURL(req)
+	if err != nil {
+		logger.Errorf("failed to get the endpoint for token service, error: %v", err)
+		// If token service unavailable and Basic auth, fallback to Basic
+		if strings.HasPrefix(auth, "Basic ") {
+			return `Basic realm="harbor"`
+		}
+	}
+
+	// Build Bearer challenge
 	challenge := fmt.Sprintf(`Bearer realm="%s",service="%s"`, tokenSvc, tokensvc.Registry)
 	if len(scope) > 0 {
 		challenge = fmt.Sprintf(`%s,scope="%s"`, challenge, scope)
 	}
+
+	// If Docker sends Basic auth, return Bearer challenge to redirect to token service
+	// If Docker sends Bearer auth but validation failed, return Bearer to get new token
+	// If no auth header, treat it as CLI and redirect to token service
+	// All paths use the same Bearer challenge constructed above
 	return challenge
 }
 

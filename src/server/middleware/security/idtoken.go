@@ -54,7 +54,7 @@ func (i *idToken) Generate(req *http.Request) security.Context {
 	}
 	info, err := oidc.UserInfoFromIDToken(ctx, &oidc.Token{RawIDToken: token}, *setting)
 	if err != nil {
-		log.Errorf("Failed to get user info from ID token: %v", err)
+		log.Debugf("Failed to get user info from ID token: %v", err)
 		return nil
 	}
 	oidc.InjectGroupsToUser(info, u)

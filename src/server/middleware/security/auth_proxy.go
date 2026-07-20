@@ -33,11 +33,7 @@ type authProxy struct{}
 
 func (a *authProxy) Generate(req *http.Request) security.Context {
 	log := log.G(req.Context())
-	httpAuthProxyConf, err := config.HTTPAuthProxySetting(req.Context())
-	if err != nil || httpAuthProxyConf.Endpoint == "" {
-		return nil
-	}
-	// only support docker login
+	// only support docker login - cheap check first
 	if !strings.HasPrefix(req.URL.Path, "/v2") {
 		return nil
 	}
@@ -45,18 +41,23 @@ func (a *authProxy) Generate(req *http.Request) security.Context {
 	if !ok {
 		return nil
 	}
+	// Load HTTP auth-proxy settings after cheap eligibility checks
+	httpAuthProxyConf, err := config.HTTPAuthProxySetting(req.Context())
+	if err != nil || httpAuthProxyConf.Endpoint == "" {
+		return nil
+	}
 	rawUserName, match := a.matchAuthProxyUserName(proxyUserName)
 	if !match {
-		log.Errorf("user name %s doesn't meet the auth proxy name pattern", proxyUserName)
+		log.Debugf("user name %s doesn't meet the auth proxy name pattern", proxyUserName)
 		return nil
 	}
 	tokenReviewStatus, err := authproxy.TokenReview(proxyPwd, httpAuthProxyConf)
 	if err != nil {
-		log.Errorf("failed to review token: %v", err)
+		log.Debugf("failed to review token: %v", err)
 		return nil
 	}
 	if rawUserName != tokenReviewStatus.User.Username {
-		log.Errorf("user name doesn't match with token: %s", rawUserName)
+		log.Debugf("user name doesn't match with token: %s", rawUserName)
 		return nil
 	}
 	user, err := pkguser.Mgr.GetByName(req.Context(), rawUserName)

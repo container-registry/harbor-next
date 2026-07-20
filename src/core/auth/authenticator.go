@@ -212,7 +212,9 @@ func loginHelpers(ctx context.Context) ([]AuthenticateHelper, error) {
 	case common.OIDCAuth:
 		h := registry[common.OIDCAuth]
 		if h != nil && h.Match(ctx) {
-			return []AuthenticateHelper{h, registry[common.DBAuth]}, nil
+			// OIDC as primary - no DB fallback for security.
+			// DB fallback previously allowed any user with a stored password to bypass OIDC.
+			return []AuthenticateHelper{h}, nil
 		}
 		// OIDC mode with no OIDC configuration — fall back to DB only
 		return []AuthenticateHelper{registry[common.DBAuth]}, nil

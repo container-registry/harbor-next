@@ -39,7 +39,13 @@ type AuthProxyController struct {
 // Prepare checks the auth mode and fail early
 func (apc *AuthProxyController) Prepare() {
 	s, err := config.HTTPAuthProxySetting(apc.Context())
-	if err != nil || s.Endpoint == "" {
+	if err != nil {
+		// Config load failure - 500 Internal Server Error
+		apc.SendInternalServerError(fmt.Errorf("failed to load HTTP auth proxy settings: %v", err))
+		return
+	}
+	if s.Endpoint == "" {
+		// Not configured - 412 Precondition Failed
 		apc.SendPreconditionFailedError(fmt.Errorf("HTTP auth proxy is not configured"))
 		return
 	}
