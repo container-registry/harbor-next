@@ -19,16 +19,22 @@ package token
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"math/big"
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"runtime"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/docker/distribution/registry/auth/token"
 	jwt "github.com/golang-jwt/jwt/v5"
@@ -126,6 +132,52 @@ func getPublicKey(crtPath string) (*rsa.PublicKey, error) {
 	return cert.PublicKey.(*rsa.PublicKey), nil
 }
 
+// writeECDSAKeyAndCert generates a fresh P-256 key and a self-signed cert for
+// it into t.TempDir(), instead of relying on a static key/cert checked into
+// git (which trips secret/vuln scanners indefinitely, even for test fixtures).
+func writeECDSAKeyAndCert(t *testing.T) (keyPath, crtPath string) {
+	t.Helper()
+
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("failed to generate ECDSA key: %v", err)
+	}
+
+	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		t.Fatalf("failed to generate cert serial number: %v", err)
+	}
+	template := &x509.Certificate{
+		SerialNumber: serial,
+		Subject:      pkix.Name{CommonName: "harbor-test-ecdsa"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		IsCA:         true,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	if err != nil {
+		t.Fatalf("failed to create self-signed cert: %v", err)
+	}
+
+	keyDER, err := x509.MarshalECPrivateKey(key)
+	if err != nil {
+		t.Fatalf("failed to marshal ECDSA private key: %v", err)
+	}
+
+	dir := t.TempDir()
+	keyPath = filepath.Join(dir, "ecdsa_private_key.pem")
+	crtPath = filepath.Join(dir, "ecdsa_root.crt")
+
+	if err := os.WriteFile(keyPath, pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER}), 0o600); err != nil {
+		t.Fatalf("failed to write ECDSA private key: %v", err)
+	}
+	if err := os.WriteFile(crtPath, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0o600); err != nil {
+		t.Fatalf("failed to write ECDSA cert: %v", err)
+	}
+	return keyPath, crtPath
+}
+
 func getECDSAPublicKey(crtPath string) (*ecdsa.PublicKey, error) {
 	crt, err := os.ReadFile(crtPath)
 	if err != nil {
@@ -188,10 +240,7 @@ func TestMakeToken(t *testing.T) {
 }
 
 func TestMakeTokenECDSA(t *testing.T) {
-	pk, crt := getKeyAndCertPath()
-	// Use ECDSA keys for testing
-	pkECDSA := path.Join(path.Dir(pk), "ecdsa_private_key.pem")
-	crtECDSA := path.Join(path.Dir(crt), "ecdsa_root.crt")
+	pkECDSA, crtECDSA := writeECDSAKeyAndCert(t)
 
 	// overwrite the config values for testing.
 	oldPrivateKey := privateKey
@@ -230,10 +279,7 @@ func TestMakeTokenECDSA(t *testing.T) {
 }
 
 func TestParseTokenECDSA(t *testing.T) {
-	pk, crt := getKeyAndCertPath()
-	// Use ECDSA keys for testing
-	pkECDSA := path.Join(path.Dir(pk), "ecdsa_private_key.pem")
-	crtECDSA := path.Join(path.Dir(crt), "ecdsa_root.crt")
+	pkECDSA, crtECDSA := writeECDSAKeyAndCert(t)
 
 	// overwrite the config values for testing.
 	oldPrivateKey := privateKey
