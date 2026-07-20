@@ -62,7 +62,7 @@
                     </clr-tab-content>
                 </ng-template>
             </clr-tab>
-            <clr-tab>
+            <clr-tab *ngIf="getDockerfile()">
                 <button
                     clrTabLink
                     id="dockerfile-link"
