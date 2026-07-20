@@ -22,6 +22,7 @@ import (
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/manifest/schema2"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/goharbor/harbor/src/controller/artifact/processor/base"
@@ -187,26 +188,6 @@ func (m *manifestV2ProcessorTestSuite) TestAbstractAdditionDockerfileFromLabels(
 	m.Equal("FROM alpine\nCMD [\"/hello\"]", string(addition.Content))
 }
 
-func (m *manifestV2ProcessorTestSuite) TestAbstractAdditionDockerfileFromManifestAnnotations() {
-	manifestWithAnnotations := strings.Replace(manifest, `"layers": [`,
-		`"annotations": {
-			"dockerfile": "FROM alpine\nCMD [\"/hello\"]"
-		},
-		"layers": [`, 1)
-
-	artifact := &artifact.Artifact{}
-	mani, _, err := distribution.UnmarshalManifest(schema2.MediaTypeManifest, []byte(manifestWithAnnotations))
-	m.Require().Nil(err)
-	m.regCli.On("PullManifest", mock.Anything, mock.Anything).Return(mani, "", nil).Once()
-	// config has no dockerfile label, so the fallback to manifest annotations must kick in
-	m.regCli.On("PullBlob", mock.Anything, mock.Anything).Return(int64(0), io.NopCloser(strings.NewReader(config)), nil).Once()
-
-	addition, err := m.processor.AbstractAddition(nil, artifact, AdditionTypeDockerfile)
-	m.Require().Nil(err)
-	m.Equal("text/plain; charset=utf-8", addition.ContentType)
-	m.Equal("FROM alpine\nCMD [\"/hello\"]", string(addition.Content))
-}
-
 func (m *manifestV2ProcessorTestSuite) TestAbstractAdditionDockerfileNotFound() {
 	artifact := &artifact.Artifact{}
 	mani, _, err := distribution.UnmarshalManifest(schema2.MediaTypeManifest, []byte(manifest))
@@ -219,50 +200,48 @@ func (m *manifestV2ProcessorTestSuite) TestAbstractAdditionDockerfileNotFound() 
 }
 
 func (m *manifestV2ProcessorTestSuite) TestGetDockerfileFromLabels() {
-	// nil / empty labels
+	// nil config / nil / empty labels
 	m.Equal("", m.processor.getDockerfileFromLabels(nil))
-	m.Equal("", m.processor.getDockerfileFromLabels(map[string]string{}))
+	m.Equal("", m.processor.getDockerfileFromLabels(&v1.Image{}))
+	m.Equal("", m.processor.getDockerfileFromLabels(&v1.Image{
+		Config: v1.ImageConfig{Labels: map[string]string{}},
+	}))
 
 	// no matching key
-	m.Equal("", m.processor.getDockerfileFromLabels(map[string]string{
-		"maintainer": "tester@vmware.com",
+	m.Equal("", m.processor.getDockerfileFromLabels(&v1.Image{
+		Config: v1.ImageConfig{Labels: map[string]string{
+			"maintainer": "tester@vmware.com",
+		}},
 	}))
 
 	// matching key with an empty value is treated as not present
-	m.Equal("", m.processor.getDockerfileFromLabels(map[string]string{
-		"dockerfile": "",
+	m.Equal("", m.processor.getDockerfileFromLabels(&v1.Image{
+		Config: v1.ImageConfig{Labels: map[string]string{
+			"dockerfile": "",
+		}},
 	}))
 
 	// matching "dockerfile" key
-	m.Equal("FROM alpine", m.processor.getDockerfileFromLabels(map[string]string{
-		"dockerfile": "FROM alpine",
+	m.Equal("FROM alpine", m.processor.getDockerfileFromLabels(&v1.Image{
+		Config: v1.ImageConfig{Labels: map[string]string{
+			"dockerfile": "FROM alpine",
+		}},
 	}))
 
 	// matching "com.example.dockerfile" key
-	m.Equal("FROM alpine", m.processor.getDockerfileFromLabels(map[string]string{
-		"com.example.dockerfile": "FROM alpine",
+	m.Equal("FROM alpine", m.processor.getDockerfileFromLabels(&v1.Image{
+		Config: v1.ImageConfig{Labels: map[string]string{
+			"com.example.dockerfile": "FROM alpine",
+		}},
 	}))
 
 	// "com.example.dockerfile" takes priority over "dockerfile" when both are present
-	m.Equal("FROM ubuntu", m.processor.getDockerfileFromLabels(map[string]string{
-		"com.example.dockerfile": "FROM ubuntu",
-		"dockerfile":             "FROM alpine",
+	m.Equal("FROM ubuntu", m.processor.getDockerfileFromLabels(&v1.Image{
+		Config: v1.ImageConfig{Labels: map[string]string{
+			"com.example.dockerfile": "FROM ubuntu",
+			"dockerfile":             "FROM alpine",
+		}},
 	}))
-}
-
-func (m *manifestV2ProcessorTestSuite) TestGetDockerfileFromManifestAnnotations() {
-	// invalid JSON payload
-	m.Equal("", m.processor.getDockerfileFromManifestAnnotations([]byte("not json")))
-
-	// no annotations field
-	m.Equal("", m.processor.getDockerfileFromManifestAnnotations([]byte(manifest)))
-
-	// annotations present but no dockerfile key
-	m.Equal("", m.processor.getDockerfileFromManifestAnnotations([]byte(`{"annotations":{"foo":"bar"}}`)))
-
-	// annotations containing a dockerfile key
-	m.Equal("FROM alpine", m.processor.getDockerfileFromManifestAnnotations(
-		[]byte(`{"annotations":{"dockerfile":"FROM alpine"}}`)))
 }
 
 func (m *manifestV2ProcessorTestSuite) TestGetArtifactType() {
