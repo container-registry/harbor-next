@@ -115,10 +115,13 @@ func (m *manifestV2Processor) AbstractAddition(ctx context.Context, artifact *ar
 		}, nil
 	}
 
-	dockerfile := m.getDockerfileFromLabels(config)
+	dockerfile := m.getDockerfileFromLabels(config.Config.Labels)
+	if dockerfile == "" {
+		dockerfile = m.getDockerfileFromManifestAnnotations(content)
+	}
 	if dockerfile == "" {
 		return nil, errors.New(nil).WithCode(errors.NotFoundCode).
-			WithMessage("dockerfile not found in image labels")
+			WithMessage("dockerfile not found in image labels or manifest annotations")
 	}
 	return &processor.Addition{
 		Content:     []byte(dockerfile),
@@ -126,21 +129,34 @@ func (m *manifestV2Processor) AbstractAddition(ctx context.Context, artifact *ar
 	}, nil
 }
 
-func (m *manifestV2Processor) getDockerfileFromLabels(config *v1.Image) string {
-	if config == nil || len(config.Config.Labels) == 0 {
+// dockerfileKeys are the label/annotation keys checked, in order, for
+// Dockerfile content embedded by image build tools.
+var dockerfileKeys = []string{
+	"com.example.dockerfile",
+	"dockerfile",
+}
+
+func (m *manifestV2Processor) getDockerfileFromLabels(labels map[string]string) string {
+	if len(labels) == 0 {
 		return ""
 	}
-
-	dockerfileKeys := []string{
-		"com.example.dockerfile",
-		"dockerfile",
-	}
 	for _, key := range dockerfileKeys {
-		if val, ok := config.Config.Labels[key]; ok && len(val) > 0 {
+		if val, ok := labels[key]; ok && len(val) > 0 {
 			return val
 		}
 	}
 	return ""
+}
+
+// getDockerfileFromManifestAnnotations looks for Dockerfile content in the
+// top-level OCI manifest annotations, as opposed to the image config labels
+// (https://github.com/opencontainers/image-spec/blob/main/annotations.md).
+func (m *manifestV2Processor) getDockerfileFromManifestAnnotations(manifestPayload []byte) string {
+	mani := &v1.Manifest{}
+	if err := json.Unmarshal(manifestPayload, mani); err != nil {
+		return ""
+	}
+	return m.getDockerfileFromLabels(mani.Annotations)
 }
 
 func (m *manifestV2Processor) GetArtifactType(_ context.Context, _ *artifact.Artifact) string {
