@@ -56,6 +56,9 @@ describe('NewRobotComponent', () => {
         ListRobot() {
             return of([]).pipe(delay(0));
         },
+        CreateRobot() {
+            return of({});
+        },
     };
     const mockConfigurationService = {
         getConfiguration() {
@@ -127,5 +130,98 @@ describe('NewRobotComponent', () => {
         await fixture.whenStable();
         const nameInput = fixture.nativeElement.querySelector('#name');
         expect(nameInput.value).toEqual('robot1');
+    });
+
+    describe('provided secret', () => {
+        it('should flag a weak secret as invalid with errors', () => {
+            component.userProvidedSecret = 'weak';
+            component.validateSecret();
+            expect(component.secretValidationErrors.length).toBeGreaterThan(0);
+            expect(component.isSecretInputValid()).toBeFalsy();
+        });
+
+        it('should accept a secret meeting all requirements', () => {
+            component.userProvidedSecret = 'StrongPass123';
+            component.validateSecret();
+            expect(component.secretValidationErrors.length).toBe(0);
+            expect(component.isSecretInputValid()).toBeTruthy();
+        });
+
+        it('should detect mismatched confirmation', () => {
+            component.userProvidedSecret = 'StrongPass123';
+            component.userProvidedSecretConfirm = 'Different123';
+            expect(component.secretsMatch()).toBeFalsy();
+        });
+
+        it('should not gate creation when no secret is provided', () => {
+            component.userProvidedSecret = '';
+            expect(component.isProvidedSecretAcceptable()).toBeTruthy();
+        });
+
+        it('should block creation when the provided secret is invalid', () => {
+            component.userProvidedSecret = 'weak';
+            component.userProvidedSecretConfirm = 'weak';
+            expect(component.isProvidedSecretAcceptable()).toBeFalsy();
+        });
+
+        it('should block creation when the confirmation does not match', () => {
+            component.userProvidedSecret = 'StrongPass123';
+            component.userProvidedSecretConfirm = 'Mismatch123';
+            expect(component.isProvidedSecretAcceptable()).toBeFalsy();
+        });
+
+        it('should allow creation when a valid secret is confirmed', () => {
+            component.userProvidedSecret = 'StrongPass123';
+            component.userProvidedSecretConfirm = 'StrongPass123';
+            expect(component.isProvidedSecretAcceptable()).toBeTruthy();
+        });
+
+        it('should send the provided secret in the create request', () => {
+            const robotService = TestBed.inject(RobotService);
+            const createSpy = spyOn(
+                robotService,
+                'CreateRobot'
+            ).and.callThrough();
+            component.isEditMode = false;
+            component.systemRobot.name = 'testsystemrobot';
+            component.coverAll = true;
+            component.permissionForCoverAll.access = [
+                { resource: Resource.ARTIFACT, action: Action.PULL },
+            ];
+            component.userProvidedSecret = 'StrongPass123';
+            component.userProvidedSecretConfirm = 'StrongPass123';
+            component.save();
+            expect(createSpy).toHaveBeenCalled();
+            const callArgs = createSpy.calls.mostRecent().args[0];
+            expect(callArgs.robot.secret).toBe('StrongPass123');
+        });
+
+        it('should not send a secret when none was provided', () => {
+            const robotService = TestBed.inject(RobotService);
+            const createSpy = spyOn(
+                robotService,
+                'CreateRobot'
+            ).and.callThrough();
+            component.isEditMode = false;
+            component.systemRobot.name = 'testsystemrobot';
+            component.coverAll = true;
+            component.permissionForCoverAll.access = [
+                { resource: Resource.ARTIFACT, action: Action.PULL },
+            ];
+            component.save();
+            expect(createSpy).toHaveBeenCalled();
+            const callArgs = createSpy.calls.mostRecent().args[0];
+            expect(callArgs.robot.secret).toBeFalsy();
+        });
+
+        it('should reset secret fields on reset()', () => {
+            component.userProvidedSecret = 'StrongPass123';
+            component.userProvidedSecretConfirm = 'StrongPass123';
+            component.isSecretDirty = true;
+            component.reset();
+            expect(component.userProvidedSecret).toBe('');
+            expect(component.userProvidedSecretConfirm).toBe('');
+            expect(component.isSecretDirty).toBeFalsy();
+        });
     });
 });

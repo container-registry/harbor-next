@@ -399,7 +399,11 @@
         "USER": "User",
         "LDAPUSER": "LDAP User",
         "GROUP": "User Group",
-        "MEMBER": "Project Member"
+        "MEMBER": "Project Member",
+        "SECRET_LENGTH_ERROR": "Secret must be 8-128 characters long",
+        "SECRET_UPPERCASE_ERROR": "Secret must contain at least 1 uppercase letter",
+        "SECRET_LOWERCASE_ERROR": "Secret must contain at least 1 lowercase letter",
+        "SECRET_DIGIT_ERROR": "Secret must contain at least 1 digit"
     },
     "WEBHOOK": {
         "ENABLED_BUTTON": "ENABLE",
@@ -1710,7 +1714,14 @@
         "EXPIRES_IN": "Expires in",
         "EXPIRED": "Expired",
         "SELECT_ALL_PROJECT": "SELECT ALL PROJECTS",
-        "UNSELECT_ALL_PROJECT": "UNSELECT ALL PROJECTS"
+        "UNSELECT_ALL_PROJECT": "UNSELECT ALL PROJECTS",
+        "PROVIDED_SECRET": "Provided Secret",
+        "OPTIONAL_CUSTOM_SECRET": "Optional: provide your own secret",
+        "SECRET_LENGTH_REQUIREMENT": "8-128 characters",
+        "SECRET_UPPERCASE_REQUIREMENT": "At least 1 uppercase letter",
+        "SECRET_LOWERCASE_REQUIREMENT": "At least 1 lowercase letter",
+        "SECRET_DIGIT_REQUIREMENT": "At least 1 digit",
+        "SECRETS_NOT_MATCH": "Secrets do not match"
     },
     "ACCESSORY": {
         "DELETION_TITLE_ACCESSORY": "Confirm Accessory Deletion",

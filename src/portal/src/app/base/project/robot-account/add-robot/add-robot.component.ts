@@ -51,6 +51,10 @@ import { InlineAlertComponent } from '../../../../shared/components/inline-alert
 import { errorHandler } from '../../../../shared/units/shared.utils';
 import { PermissionSelectPanelModes } from '../../../../shared/components/robot-permissions-panel/robot-permissions-panel.component';
 import { Permissions } from '../../../../../../ng-swagger-gen/models/permissions';
+import {
+    SecretValidator,
+    SecretValidationError,
+} from '../../../../shared/entities/secret-validator';
 
 const MINI_SECONDS_ONE_DAY: number = 60 * 24 * 60 * 1000;
 
@@ -81,6 +85,12 @@ export class AddRobotComponent implements OnInit, OnDestroy {
 
     @Input()
     robotMetadata: Permissions;
+
+    userProvidedSecret: string = '';
+    userProvidedSecretConfirm: string = '';
+    showSecretPassword: boolean = false;
+    secretValidationErrors: SecretValidationError[] = [];
+    isSecretDirty: boolean = false;
 
     @ViewChild('wizard') wizard: ClrWizard;
     constructor(
@@ -171,6 +181,11 @@ export class AddRobotComponent implements OnInit, OnDestroy {
         this.robot = clone(NEW_EMPTY_ROBOT);
         this.robotBasicForm.reset();
         this.expirationType = ExpirationType.DAYS;
+        this.userProvidedSecret = '';
+        this.userProvidedSecretConfirm = '';
+        this.showSecretPassword = false;
+        this.secretValidationErrors = [];
+        this.isSecretDirty = false;
     }
     resetForEdit(robot: Robot) {
         this.open(true);
@@ -200,8 +215,15 @@ export class AddRobotComponent implements OnInit, OnDestroy {
     canAdd(): boolean {
         return (
             this.robot?.permissions[0]?.access?.length > 0 &&
-            !this.robotBasicForm.invalid
+            !this.robotBasicForm.invalid &&
+            this.isProvidedSecretAcceptable()
         );
+    }
+    isProvidedSecretAcceptable(): boolean {
+        if (this.isEditMode || !this.userProvidedSecret) {
+            return true;
+        }
+        return !!(this.isSecretInputValid() && this.secretsMatch());
     }
     canEdit() {
         if (!this.canAdd()) {
@@ -227,6 +249,9 @@ export class AddRobotComponent implements OnInit, OnDestroy {
         robot.duration = +this.robot.duration;
         robot.permissions[0].kind = PermissionsKinds.PROJECT;
         robot.permissions[0].namespace = this.projectName;
+        if (!this.isEditMode && this.userProvidedSecret) {
+            robot.secret = this.userProvidedSecret;
+        }
         // Push permission must work with pull permission
         if (onlyHasPushPermission(robot.permissions[0].access)) {
             this.inlineAlertComponent.showInlineError(
@@ -317,5 +342,35 @@ export class AddRobotComponent implements OnInit, OnDestroy {
         this.inlineAlertComponent.close();
     }
 
+    validateSecret() {
+        this.isSecretDirty = true;
+        if (this.userProvidedSecret) {
+            const result = SecretValidator.validate(this.userProvidedSecret);
+            this.secretValidationErrors = result.errors;
+        } else {
+            this.secretValidationErrors = [];
+        }
+    }
+
+    toggleSecretVisibility() {
+        this.showSecretPassword = !this.showSecretPassword;
+    }
+
+    isSecretInputValid(): boolean {
+        return (
+            !!this.userProvidedSecret &&
+            SecretValidator.validate(this.userProvidedSecret).isValid
+        );
+    }
+
+    secretsMatch(): boolean {
+        return (
+            !!this.userProvidedSecret &&
+            !!this.userProvidedSecretConfirm &&
+            this.userProvidedSecret === this.userProvidedSecretConfirm
+        );
+    }
+
     protected readonly PermissionSelectPanelModes = PermissionSelectPanelModes;
+    protected readonly SecretValidator = SecretValidator;
 }
