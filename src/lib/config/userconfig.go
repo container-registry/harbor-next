@@ -36,19 +36,8 @@ func GetSystemCfg(ctx context.Context) (map[string]any, error) {
 }
 
 // DetectAuthMode derives the authentication mode from configured backends.
-// Deprecated: AuthMode was the legacy explicit setting. DetectAuthMode now
-// auto-detects based on configured backends with priority:
-// Explicit database setting > OIDC > LDAP > UAA > HTTP Auth Proxy > DB (default).
+// Auto-detection priority: OIDC > LDAP > UAA > HTTP Auth Proxy > DB (default).
 func DetectAuthMode(ctx context.Context) string {
-	mgr := DefaultMgr()
-	if err := mgr.Load(ctx); err == nil {
-		// Respect explicit auth_mode setting from database - only auto-detect if not set
-		if authMode := mgr.Get(ctx, common.AUTHMode).GetString(); authMode != "" {
-			return authMode
-		}
-	}
-
-	// Only auto-detect if no explicit auth_mode is set in database
 	if setting, err := OIDCSetting(ctx); err == nil && setting.Endpoint != "" {
 		return common.OIDCAuth
 	}
