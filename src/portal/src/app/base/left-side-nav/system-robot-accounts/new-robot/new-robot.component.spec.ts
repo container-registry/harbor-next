@@ -133,47 +133,27 @@ describe('NewRobotComponent', () => {
     });
 
     describe('provided secret', () => {
-        it('should flag a weak secret as invalid with errors', () => {
-            component.userProvidedSecret = 'weak';
-            component.validateSecret();
-            expect(component.secretValidationErrors.length).toBeGreaterThan(0);
-            expect(component.isSecretInputValid()).toBeFalsy();
+        it('should default to accepting no secret', () => {
+            expect(component.userProvidedSecret).toBe('');
+            expect(component.isProvidedSecretAcceptable).toBeTruthy();
         });
 
-        it('should accept a secret meeting all requirements', () => {
-            component.userProvidedSecret = 'StrongPass123';
-            component.validateSecret();
-            expect(component.secretValidationErrors.length).toBe(0);
-            expect(component.isSecretInputValid()).toBeTruthy();
+        it('should block creation when the shared secret input reports invalid', () => {
+            component.coverAll = true;
+            component.permissionForCoverAll.access = [
+                { resource: Resource.ARTIFACT, action: Action.PULL },
+            ];
+            component.isProvidedSecretAcceptable = false;
+            expect(component.canAdd()).toBeFalsy();
         });
 
-        it('should detect mismatched confirmation', () => {
-            component.userProvidedSecret = 'StrongPass123';
-            component.userProvidedSecretConfirm = 'Different123';
-            expect(component.secretsMatch()).toBeFalsy();
-        });
-
-        it('should not gate creation when no secret is provided', () => {
-            component.userProvidedSecret = '';
-            expect(component.isProvidedSecretAcceptable()).toBeTruthy();
-        });
-
-        it('should block creation when the provided secret is invalid', () => {
-            component.userProvidedSecret = 'weak';
-            component.userProvidedSecretConfirm = 'weak';
-            expect(component.isProvidedSecretAcceptable()).toBeFalsy();
-        });
-
-        it('should block creation when the confirmation does not match', () => {
-            component.userProvidedSecret = 'StrongPass123';
-            component.userProvidedSecretConfirm = 'Mismatch123';
-            expect(component.isProvidedSecretAcceptable()).toBeFalsy();
-        });
-
-        it('should allow creation when a valid secret is confirmed', () => {
-            component.userProvidedSecret = 'StrongPass123';
-            component.userProvidedSecretConfirm = 'StrongPass123';
-            expect(component.isProvidedSecretAcceptable()).toBeTruthy();
+        it('should allow creation when the shared secret input reports valid', () => {
+            component.coverAll = true;
+            component.permissionForCoverAll.access = [
+                { resource: Resource.ARTIFACT, action: Action.PULL },
+            ];
+            component.isProvidedSecretAcceptable = true;
+            expect(component.canAdd()).toBeTruthy();
         });
 
         it('should send the provided secret in the create request', () => {
@@ -189,7 +169,6 @@ describe('NewRobotComponent', () => {
                 { resource: Resource.ARTIFACT, action: Action.PULL },
             ];
             component.userProvidedSecret = 'StrongPass123';
-            component.userProvidedSecretConfirm = 'StrongPass123';
             component.save();
             expect(createSpy).toHaveBeenCalled();
             const callArgs = createSpy.calls.mostRecent().args[0];
@@ -214,14 +193,12 @@ describe('NewRobotComponent', () => {
             expect(callArgs.robot.secret).toBeFalsy();
         });
 
-        it('should reset secret fields on reset()', () => {
+        it('should reset secret state on reset()', () => {
             component.userProvidedSecret = 'StrongPass123';
-            component.userProvidedSecretConfirm = 'StrongPass123';
-            component.isSecretDirty = true;
+            component.isProvidedSecretAcceptable = false;
             component.reset();
             expect(component.userProvidedSecret).toBe('');
-            expect(component.userProvidedSecretConfirm).toBe('');
-            expect(component.isSecretDirty).toBeFalsy();
+            expect(component.isProvidedSecretAcceptable).toBeTruthy();
         });
     });
 });
