@@ -288,15 +288,17 @@ func getRegistryToken(r *http.Request) string {
 
 // registryOperationSegments are the path segments that mark the end of the
 // repository name and the start of the registry operation, per the
-// distribution API spec (manifests, blobs, blobs/uploads, tags).
+// distribution/OCI API spec (manifests, blobs, blobs/uploads, tags,
+// referrers).
 var registryOperationSegments = map[string]bool{
 	"manifests": true,
 	"blobs":     true,
 	"tags":      true,
+	"referrers": true,
 }
 
 // scopeFromRequest extracts the Docker registry scope from the request path.
-// The repository name is everything between "/v2/" and the first operation
+// The repository name is everything between "/v2/" and the operation
 // segment, so nested repository names (e.g. project/app/subimage) are
 // preserved in full rather than truncated to two path components.
 // For a path like /v2/library/nginx/manifests/latest it returns
@@ -310,9 +312,13 @@ func scopeFromRequest(r *http.Request) string {
 		return "repository:*:pull,push"
 	}
 	segments := strings.Split(strings.TrimPrefix(path, "/v2/"), "/")
+	// Scan from the right for the operation segment, since a repository name
+	// component can itself legally be "manifests", "blobs", or "tags" (e.g.
+	// myorg/manifests/app); the actual operation is always the rightmost
+	// match, adjacent to the trailing reference/digest/uuid component.
 	opIndex := -1
-	for i, seg := range segments {
-		if registryOperationSegments[seg] {
+	for i := len(segments) - 1; i > 0; i-- {
+		if registryOperationSegments[segments[i]] {
 			opIndex = i
 			break
 		}
