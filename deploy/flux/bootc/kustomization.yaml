@@ -6,8 +6,10 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - secrets.sops.yaml
-  - pull-secret-flux-system.sops.yaml
-  - pull-secret-8gcr-dev-main.sops.yaml
+  - pull-secret-flux-system-bootc.sops.yaml
+  - pull-secret-8gcr-dev-bootc.sops.yaml
   - ocirepository.yaml
   - image-automation.yaml
+  - database.yaml
+  - grype.yaml
   - helmrelease.yaml

@@ -1,108 +1,120 @@
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: GitRepository
 metadata:
-  name: harbor-next-rolling
+  name: harbor-next-bootc
   namespace: flux-system
 spec:
   interval: 1m
   url: https://github.com/container-registry/harbor-next.git
   ref:
-    branch: 8gcr-rolling
+    branch: bootc
   secretRef:
     name: flux-git-auth
 ---
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
 metadata:
-  name: harbor-core
+  name: bootc-harbor-core
   namespace: flux-system
 spec:
-  image: 8gears.container-registry.com/8gcr/harbor-core
+  image: 8gears.container-registry.com/8gcr-dev/harbor-core-bootc
   interval: 1m
   provider: generic
   secretRef:
-    name: harbor-system-pull
+    name: harbor-bootc-pull
 ---
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
 metadata:
-  name: harbor-jobservice
+  name: bootc-harbor-jobservice
   namespace: flux-system
 spec:
-  image: 8gears.container-registry.com/8gcr/harbor-jobservice
+  image: 8gears.container-registry.com/8gcr-dev/harbor-jobservice-bootc
   interval: 1m
   provider: generic
   secretRef:
-    name: harbor-system-pull
+    name: harbor-bootc-pull
 ---
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
 metadata:
-  name: harbor-registry
+  name: bootc-harbor-registry
   namespace: flux-system
 spec:
-  image: 8gears.container-registry.com/8gcr/harbor-registry
+  image: 8gears.container-registry.com/8gcr-dev/harbor-registry-bootc
   interval: 1m
   provider: generic
   secretRef:
-    name: harbor-system-pull
+    name: harbor-bootc-pull
 ---
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
 metadata:
-  name: harbor-registryctl
+  name: bootc-harbor-registryctl
   namespace: flux-system
 spec:
-  image: 8gears.container-registry.com/8gcr/harbor-registryctl
+  image: 8gears.container-registry.com/8gcr-dev/harbor-registryctl-bootc
   interval: 1m
   provider: generic
   secretRef:
-    name: harbor-system-pull
+    name: harbor-bootc-pull
 ---
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
 metadata:
-  name: harbor-portal
+  name: bootc-harbor-portal
   namespace: flux-system
 spec:
-  image: 8gears.container-registry.com/8gcr/harbor-portal
+  image: 8gears.container-registry.com/8gcr-dev/harbor-portal-bootc
   interval: 1m
   provider: generic
   secretRef:
-    name: harbor-system-pull
+    name: harbor-bootc-pull
 ---
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
 metadata:
-  name: harbor-exporter
+  name: bootc-harbor-exporter
   namespace: flux-system
 spec:
-  image: 8gears.container-registry.com/8gcr/harbor-exporter
+  image: 8gears.container-registry.com/8gcr-dev/harbor-exporter-bootc
   interval: 1m
   provider: generic
   secretRef:
-    name: harbor-system-pull
+    name: harbor-bootc-pull
 ---
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
 metadata:
-  name: trivy-adapter
+  name: bootc-trivy-adapter
   namespace: flux-system
 spec:
-  image: 8gears.container-registry.com/8gcr/trivy-adapter
+  image: 8gears.container-registry.com/8gcr-dev/harbor-trivy-adapter-bootc
   interval: 1m
   provider: generic
   secretRef:
-    name: harbor-system-pull
+    name: harbor-bootc-pull
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: bootc-grype-scanner
+  namespace: flux-system
+spec:
+  image: 8gears.container-registry.com/8gcr-dev/harbor-grype-scanner-bootc
+  interval: 1m
+  provider: generic
+  secretRef:
+    name: harbor-bootc-pull
 ---
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImagePolicy
 metadata:
-  name: harbor-core
+  name: bootc-harbor-core
   namespace: flux-system
 spec:
   imageRepositoryRef:
-    name: harbor-core
+    name: bootc-harbor-core
   filterTags:
     pattern: ^latest$
   policy:
@@ -114,11 +126,11 @@ spec:
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImagePolicy
 metadata:
-  name: harbor-jobservice
+  name: bootc-harbor-jobservice
   namespace: flux-system
 spec:
   imageRepositoryRef:
-    name: harbor-jobservice
+    name: bootc-harbor-jobservice
   filterTags:
     pattern: ^latest$
   policy:
@@ -130,11 +142,11 @@ spec:
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImagePolicy
 metadata:
-  name: harbor-registry
+  name: bootc-harbor-registry
   namespace: flux-system
 spec:
   imageRepositoryRef:
-    name: harbor-registry
+    name: bootc-harbor-registry
   filterTags:
     pattern: ^latest$
   policy:
@@ -146,11 +158,11 @@ spec:
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImagePolicy
 metadata:
-  name: harbor-registryctl
+  name: bootc-harbor-registryctl
   namespace: flux-system
 spec:
   imageRepositoryRef:
-    name: harbor-registryctl
+    name: bootc-harbor-registryctl
   filterTags:
     pattern: ^latest$
   policy:
@@ -162,11 +174,11 @@ spec:
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImagePolicy
 metadata:
-  name: harbor-portal
+  name: bootc-harbor-portal
   namespace: flux-system
 spec:
   imageRepositoryRef:
-    name: harbor-portal
+    name: bootc-harbor-portal
   filterTags:
     pattern: ^latest$
   policy:
@@ -178,11 +190,11 @@ spec:
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImagePolicy
 metadata:
-  name: harbor-exporter
+  name: bootc-harbor-exporter
   namespace: flux-system
 spec:
   imageRepositoryRef:
-    name: harbor-exporter
+    name: bootc-harbor-exporter
   filterTags:
     pattern: ^latest$
   policy:
@@ -194,11 +206,27 @@ spec:
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImagePolicy
 metadata:
-  name: trivy-adapter
+  name: bootc-trivy-adapter
   namespace: flux-system
 spec:
   imageRepositoryRef:
-    name: trivy-adapter
+    name: bootc-trivy-adapter
+  filterTags:
+    pattern: ^latest$
+  policy:
+    alphabetical:
+      order: asc
+  digestReflectionPolicy: Always
+  interval: 1m
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: bootc-grype-scanner
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: bootc-grype-scanner
   filterTags:
     pattern: ^latest$
   policy:
@@ -210,24 +238,24 @@ spec:
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageUpdateAutomation
 metadata:
-  name: harbor-next-rolling
+  name: harbor-next-bootc
   namespace: flux-system
 spec:
   interval: 1m
   sourceRef:
     kind: GitRepository
-    name: harbor-next-rolling
+    name: harbor-next-bootc
   git:
     checkout:
       ref:
-        branch: 8gcr-rolling
+        branch: bootc
     commit:
       author:
         name: fluxcdbot
         email: fluxcdbot@users.noreply.github.com
-      messageTemplate: "chore(rolling): update 8gcr image digests"
+      messageTemplate: "chore(rolling): Update bootc image digests"
     push:
-      branch: 8gcr-rolling
+      branch: bootc
   update:
-    path: ./deploy/flux/8gcr-dev
+    path: ./deploy/flux/bootc
     strategy: Setters

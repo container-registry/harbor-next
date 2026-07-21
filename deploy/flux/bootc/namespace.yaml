@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: 8gcr-dev-main
+  name: 8gcr-dev-bootc
   labels:
     app.kubernetes.io/name: harbor
-    app.kubernetes.io/instance: 8gcr-dev-main
+    app.kubernetes.io/instance: 8gcr-dev-bootc
     app.kubernetes.io/managed-by: flux

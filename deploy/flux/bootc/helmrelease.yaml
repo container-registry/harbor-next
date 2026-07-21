@@ -1,0 +1,138 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: harbor
+  namespace: 8gcr-dev-bootc
+spec:
+  interval: 10m
+  releaseName: harbor-bootc
+  chartRef:
+    kind: OCIRepository
+    name: harbor-next-chart
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+    cleanupOnFail: true
+  values:
+    fullnameOverride: harbor-bootc
+    externalURL: https://bootc.8gears.container-registry.dev
+    logLevel: info
+    image:
+      pullPolicy: Always
+    imagePullSecrets:
+      - name: harbor-bootc-pull
+    # Admin password provisioned by secrets.sops.yaml in this bundle.
+    existingSecretAdminPassword: harbor-admin
+    existingSecretAdminPasswordKey: HARBOR_ADMIN_PASSWORD
+    expose:
+      clusterIP: {enabled: false}
+      nodePort: {enabled: false}
+      loadBalancer: {enabled: false}
+      route: {enabled: false}
+    ingress:
+      enabled: true
+      className: nginx
+      autoGenCert: false
+      core: bootc.8gears.container-registry.dev
+      hosts:
+        - host: bootc.8gears.container-registry.dev
+      tls:
+        - secretName: harbor-tls
+          hosts:
+            - bootc.8gears.container-registry.dev
+      annotations:
+        nginx.ingress.kubernetes.io/proxy-body-size: "0"
+        nginx.ingress.kubernetes.io/ssl-redirect: "true"
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+    # ---- Database ----
+    # Both CNPG bootstrap (extraManifests below) and Harbor's runtime DB client
+    # read the SAME Secret/harbor-db-password. CNPG requires basic-auth type
+    # (keys: username, password); Harbor's chart reads .password via
+    # existingSecretKey. One secret, one source of truth — no drift between
+    # bootstrap and runtime.
+    database:
+      host: harbor-db-rw.8gcr-dev-bootc.svc.cluster.local
+      port: 5432
+      username: harbor
+      database: registry
+      sslmode: disable
+      existingSecret: harbor-db-password
+      existingSecretKey: password
+    # ---- Valkey (in-chart, default standalone) ----
+    valkey:
+      enabled: true
+      architecture: standalone
+      auth:
+        enabled: false
+    # ---- Component image pins (continuous deploy via 8gcr-dev/*-bootc:latest) ----
+    # Flux image automation follows each mutable latest tag by digest and
+    # rewrites these pod-template annotations in this branch. The branch push
+    # then publishes the bundle to ops/hz-hopper/bootc-rolling, Flux applies the
+    # changed HelmRelease, and Kubernetes restarts pods with imagePullPolicy:
+    # Always so they pull the new digest behind latest.
+    core:
+      podAnnotations:
+        deploy.8gears.io/image-revision: "sha256:69049487c6f71c45f5ddef3485cf6f28cac824b5a1b9dd79d4d747d352887d41" # {"$imagepolicy": "flux-system:bootc-harbor-core:digest"}
+      image:
+        repository: 8gears.container-registry.com/8gcr-dev/harbor-core-bootc
+        tag: latest
+      config:
+        with_grype: true
+        grype_adapter_url: http://harbor-bootc-grype:8080
+        with_snyk: false
+        default_scanner: Grype
+      replicas: 1
+    jobservice:
+      podAnnotations:
+        deploy.8gears.io/image-revision: "sha256:5787ab885d949046a58fbda43bf1706760f871fe553c45d9742cc152c1231f7b" # {"$imagepolicy": "flux-system:bootc-harbor-jobservice:digest"}
+      image:
+        repository: 8gears.container-registry.com/8gcr-dev/harbor-jobservice-bootc
+        tag: latest
+      replicas: 1
+      persistence:
+        enabled: true
+        storageClass: local-path
+        size: 1Gi
+    registry:
+      podAnnotations:
+        deploy.8gears.io/image-revision: "sha256:8cc41d9e54d30deba9014455196a0da88926f525efc741392cd827815a9ea45a" # {"$imagepolicy": "flux-system:bootc-harbor-registry:digest"}
+        deploy.8gears.io/registryctl-image-revision: "sha256:a7f17ee0499279a1efd15b0af2b3548b894a819692eac6a25225a9f7bd23c0aa" # {"$imagepolicy": "flux-system:bootc-harbor-registryctl:digest"}
+      image:
+        repository: 8gears.container-registry.com/8gcr-dev/harbor-registry-bootc
+        tag: latest
+      controller:
+        image:
+          repository: 8gears.container-registry.com/8gcr-dev/harbor-registryctl-bootc
+          tag: latest
+      replicas: 1
+      persistence:
+        enabled: true
+        storageClass: local-path
+        size: 10Gi
+    portal:
+      podAnnotations:
+        deploy.8gears.io/image-revision: "sha256:1e20ad0c8ac55d35488c156be4f1c6c5b2a3629ffacfecb3b0c26961cd7a1dfc" # {"$imagepolicy": "flux-system:bootc-harbor-portal:digest"}
+      image:
+        repository: 8gears.container-registry.com/8gcr-dev/harbor-portal-bootc
+        tag: latest
+      replicas: 1
+    exporter:
+      enabled: true
+      podAnnotations:
+        deploy.8gears.io/image-revision: "sha256:87cbbc00c0fd793206a9df8e9623de7828c42ef9e4fc7333eb938e020c46ab38" # {"$imagepolicy": "flux-system:bootc-harbor-exporter:digest"}
+      image:
+        repository: 8gears.container-registry.com/8gcr-dev/harbor-exporter-bootc
+        tag: latest
+      replicas: 1
+    trivy:
+      enabled: true
+      podAnnotations:
+        deploy.8gears.io/image-revision: "sha256:f617992b85e26c12f9b08d5c2ccb7bfe11611da6c3a098b3ebdb49fac0bd4480" # {"$imagepolicy": "flux-system:bootc-trivy-adapter:digest"}
+      image:
+        repository: 8gears.container-registry.com/8gcr-dev/harbor-trivy-adapter-bootc
+        tag: latest
+      replicas: 1

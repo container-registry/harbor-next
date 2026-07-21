@@ -1,30 +1,30 @@
-name: Publish Rolling Flux Bundle
+name: Publish Bootc Rolling Flux Bundle
 
 on:
   push:
     branches:
-      - 8gcr-rolling
+      - bootc
     paths:
-      - "deploy/flux/8gcr-dev/**"
-      - ".github/workflows/rolling-flux.yml"
+      - "deploy/flux/bootc/**"
+      - ".github/workflows/bootc-rolling-flux.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: rolling-flux-${{ github.ref }}
+  group: bootc-rolling-flux-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
   OPS_REGISTRY_PROJECT: ops
-  OPS_ARTIFACT_REPOSITORY: hz-hopper/8gcr-rolling
+  OPS_ARTIFACT_REPOSITORY: hz-hopper/bootc-rolling
   OPS_REGISTRY_USERNAME: ${{ vars.OPS_REGISTRY_USERNAME || 'robot_8gears.container-registry.dev' }}
 
 jobs:
   publish:
-    name: Publish hz-hopper 8gcr-rolling config
+    name: Publish hz-hopper bootc config
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -53,11 +53,11 @@ jobs:
 
       - name: Publish Flux deploy bundle
         run: |
-          BUNDLE_PATH="${RUNNER_TEMP}/8gcr-rolling-flux"
+          BUNDLE_PATH="${RUNNER_TEMP}/bootc-rolling-flux"
           ARTIFACT="oci://${REGISTRY_ADDRESS}/${OPS_REGISTRY_PROJECT}/${OPS_ARTIFACT_REPOSITORY}"
 
           rm -rf "${BUNDLE_PATH}"
-          cp -R deploy/flux/8gcr-dev "${BUNDLE_PATH}"
+          cp -R deploy/flux/bootc "${BUNDLE_PATH}"
 
           flux push artifact \
             "${ARTIFACT}:${ROLLING_TAG}" \

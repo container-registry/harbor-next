@@ -1,11 +1,11 @@
-# One-time bootstrap for the 8gcr Harbor deployment on hz-hopper.
+# One-time bootstrap for the bootc Harbor deployment on hz-hopper.
 #
 # Apply once per cluster:
-#   kubectl apply -f https://raw.githubusercontent.com/container-registry/harbor-next/main/deploy/flux/8gcr-dev/bootstrap.yaml
+#   kubectl apply -f https://raw.githubusercontent.com/container-registry/harbor-next/bootc/deploy/flux/bootc/bootstrap.yaml
 #
 # This creates the OCIRepository + Kustomization in flux-system that fetches
 # the deploy bundle at
-# oci://8gears.container-registry.com/ops/hz-hopper/8gcr-rolling:latest
+# oci://8gears.container-registry.com/ops/hz-hopper/bootc-rolling:latest
 # with the existing flux-system registry pull secret and reconciles every
 # resource in it (including SOPS-encrypted secrets).
 #
@@ -21,16 +21,16 @@
 #   - CloudNativePG operator in cnpg-system (provisions Postgres via extraManifests)
 #   - cert-manager + letsencrypt-prod ClusterIssuer
 #   - nginx IngressClass
-#   - DNS A record 8gcr.container-registry.dev pointing at the cluster ingress
+#   - ExternalDNS manages bootc.8gears.container-registry.dev
 ---
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: OCIRepository
 metadata:
-  name: harbor-8gcr
+  name: harbor-bootc
   namespace: flux-system
 spec:
   interval: 5m
-  url: oci://8gears.container-registry.com/ops/hz-hopper/8gcr-rolling
+  url: oci://8gears.container-registry.com/ops/hz-hopper/bootc-rolling
   ref:
     tag: latest
   secretRef:
@@ -39,7 +39,7 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: harbor-8gcr
+  name: harbor-bootc
   namespace: flux-system
 spec:
   interval: 5m
@@ -48,7 +48,7 @@ spec:
   wait: false
   sourceRef:
     kind: OCIRepository
-  name: harbor-8gcr
+    name: harbor-bootc
   path: ./
   decryption:
     provider: sops

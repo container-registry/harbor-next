@@ -1,0 +1,20 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: harbor-db
+  namespace: 8gcr-dev-bootc
+  labels:
+    app.kubernetes.io/name: harbor-db
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: harbor-bootc
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:17
+  instances: 1
+  storage:
+    size: 5Gi
+  bootstrap:
+    initdb:
+      database: registry
+      owner: harbor
+      secret:
+        name: harbor-db-password

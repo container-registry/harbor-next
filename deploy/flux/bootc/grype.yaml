@@ -1,0 +1,112 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: harbor-bootc-grype-cache
+  namespace: 8gcr-dev-bootc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: harbor-bootc-grype
+  namespace: 8gcr-dev-bootc
+  labels:
+    app.kubernetes.io/name: harbor-bootc-grype
+    app.kubernetes.io/component: scanner
+    app.kubernetes.io/part-of: harbor-bootc
+spec:
+  selector:
+    app.kubernetes.io/name: harbor-bootc-grype
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: harbor-bootc-grype
+  namespace: 8gcr-dev-bootc
+  labels:
+    app.kubernetes.io/name: harbor-bootc-grype
+    app.kubernetes.io/component: scanner
+    app.kubernetes.io/part-of: harbor-bootc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: harbor-bootc-grype
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: harbor-bootc-grype
+        app.kubernetes.io/component: scanner
+        app.kubernetes.io/part-of: harbor-bootc
+      annotations:
+        deploy.8gears.io/image-revision: "sha256:9f1a4ad331f2672cfefd4f7da78efd1a8b1f196afdb4216d3915f71304fbb066" # {"$imagepolicy": "flux-system:bootc-grype-scanner:digest"}
+    spec:
+      imagePullSecrets:
+        - name: harbor-bootc-pull
+      securityContext:
+        fsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: grype
+          image: 8gears.container-registry.com/8gcr-dev/harbor-grype-scanner-bootc:latest
+          imagePullPolicy: Always
+          env:
+            - name: SCANNER_API_SERVER_ADDR
+              value: :8080
+            - name: SCANNER_GRYPE_CACHE_DIR
+              value: /home/scanner/cache
+            - name: SCANNER_LOG_LEVEL
+              value: info
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /api/v1/metadata
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/v1/metadata
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 2
+              memory: 2Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 100
+            runAsGroup: 101
+          volumeMounts:
+            - name: cache
+              mountPath: /home/scanner/cache
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: cache
+          persistentVolumeClaim:
+            claimName: harbor-bootc-grype-cache
+        - name: tmp
+          emptyDir: {}
