@@ -16,12 +16,18 @@ package token //nolint:revive
 
 import (
 	"context"
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/rsa"
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
 	"github.com/docker/distribution/registry/auth/token"
-	"github.com/docker/libtrust"
 	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/goharbor/harbor/src/common/models"
@@ -32,10 +38,6 @@ import (
 	"github.com/goharbor/harbor/src/lib/log"
 	tokenpkg "github.com/goharbor/harbor/src/pkg/token"
 	v2 "github.com/goharbor/harbor/src/pkg/token/claims/v2"
-)
-
-const (
-	signingMethod = "RS256"
 )
 
 var (
@@ -111,7 +113,7 @@ func filterAccess(ctx context.Context, access []*token.ResourceActions,
 
 // MakeToken makes a valid jwt token based on parms.
 func MakeToken(ctx context.Context, username, service string, access []*token.ResourceActions) (*models.Token, error) {
-	options, err := tokenpkg.NewOptions(signingMethod, v2.Issuer, privateKey)
+	options, err := tokenpkg.NewOptions("", v2.Issuer, privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -139,11 +141,16 @@ func MakeToken(ctx context.Context, username, service string, access []*token.Re
 	}
 	// Add kid to token header for compatibility with docker distribution's code
 	// see https://github.com/docker/distribution/blob/release/2.7/registry/auth/token/token.go#L197
-	k, err := libtrust.UnmarshalPrivateKeyPEM(options.PrivateKey)
+	// Use the key from options.GetKey() to derive the kid, supporting both PKCS8 and traditional PEM formats
+	key, err := options.GetKey()
 	if err != nil {
 		return nil, err
 	}
-	tok.Header["kid"] = k.KeyID()
+	kid, err := generateKeyID(key)
+	if err != nil {
+		return nil, err
+	}
+	tok.Header["kid"] = kid
 
 	rawToken, err := tok.Raw()
 	if err != nil {
@@ -154,4 +161,49 @@ func MakeToken(ctx context.Context, username, service string, access []*token.Re
 		ExpiresIn: expiration * 60,
 		IssuedAt:  now.Format(time.RFC3339),
 	}, nil
+}
+
+// generateKeyID derives an RFC 7638 JSON Web Key (JWK) Thumbprint from a
+// crypto key, matching docker distribution's GetJWKThumbprint (see
+// registry/auth/token/util.go). This is what a distribution registry
+// actually uses (as of v3.1.1) to compute the trusted key IDs it loads from
+// rootcertbundle -- distribution moved off the older libtrust key-ID format
+// entirely, so replicating that legacy format (as an earlier version of
+// this function did) produces a well-formed but unrecognized key ID, and
+// every token is rejected as signed by an "untrusted key" even though the
+// underlying key material matches. Supports RSA, ECDSA, and Ed25519 keys.
+func generateKeyID(key any) (string, error) {
+	var pub crypto.PublicKey
+	switch k := key.(type) {
+	case *rsa.PrivateKey:
+		pub = &k.PublicKey
+	case *ecdsa.PrivateKey:
+		pub = &k.PublicKey
+	case ed25519.PrivateKey:
+		pub = k.Public()
+	case *rsa.PublicKey, *ecdsa.PublicKey, ed25519.PublicKey:
+		pub = k
+	default:
+		return "", fmt.Errorf("unsupported key type: %T", key)
+	}
+
+	var payload string
+	switch p := pub.(type) {
+	case *rsa.PublicKey:
+		e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(p.E)).Bytes())
+		n := base64.RawURLEncoding.EncodeToString(p.N.Bytes())
+		payload = fmt.Sprintf(`{"e":"%s","kty":"RSA","n":"%s"}`, e, n)
+	case *ecdsa.PublicKey:
+		x := base64.RawURLEncoding.EncodeToString(p.X.Bytes())
+		y := base64.RawURLEncoding.EncodeToString(p.Y.Bytes())
+		payload = fmt.Sprintf(`{"crv":"%s","kty":"EC","x":"%s","y":"%s"}`, p.Params().Name, x, y)
+	case ed25519.PublicKey:
+		x := base64.RawURLEncoding.EncodeToString(p)
+		payload = fmt.Sprintf(`{"crv":"Ed25519","kty":"OKP","x":"%s"}`, x)
+	default:
+		return "", fmt.Errorf("unsupported public key type: %T", pub)
+	}
+
+	hash := sha256.Sum256([]byte(payload))
+	return base64.RawURLEncoding.EncodeToString(hash[:]), nil
 }
