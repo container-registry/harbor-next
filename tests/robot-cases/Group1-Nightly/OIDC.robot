@@ -69,7 +69,7 @@ Test Case - Delete A Project
     [Tags]  oidc_delete_project
     Init Chrome Driver
     Sign In Harbor With OIDC User  ${HARBOR_URL}
-    ${secret}=  Get Secrete By API  ${HARBOR_URL}
+    ${secret}=  Get Secret By API  ${HARBOR_URL}
     Delete A Project Without Sign In Harbor   harbor_ip=${OIDC_HOSTNAME}  username=${OIDC_USERNAME}  password=${secret}
     Close Browser
 
@@ -77,7 +77,7 @@ Test Case - Manage Project Member
     [Tags]  oidc_manage_project_member
     Init Chrome Driver
     Sign In Harbor With OIDC User  ${HARBOR_URL}
-    ${secret}=  Get Secrete By API  ${HARBOR_URL}
+    ${secret}=  Get Secret By API  ${HARBOR_URL}
     Manage Project Member Without Sign In Harbor  sign_in_user=${OIDC_USERNAME}  sign_in_pwd=${secret}  test_user1=test2  test_user2=test3  is_oidc_mode=${true}
     Close Browser
 
@@ -88,7 +88,7 @@ Test Case - Generate User CLI Secret
     ${image}=  Set Variable  hello-world
     Sign In Harbor With OIDC User  ${HARBOR_URL}
     Create An New Project And Go Into Project  project${d}
-    ${secret_old}=  Get Secrete By API  ${HARBOR_URL}
+    ${secret_old}=  Get Secret By API  ${HARBOR_URL}
     Push image  ${ip}  ${OIDC_USERNAME}  ${secret_old}  project${d}  ${image}
     ${secret_new}=  Generate And Return Secret  ${HARBOR_URL}
     Log To Console  ${secret_old}
@@ -138,7 +138,7 @@ Test Case - OIDC Group User
     Sign In Harbor With OIDC User  ${HARBOR_URL}  username=${admin_user}  password=${admin_pwd}  login_with_provider=ldap
     Switch To Registries
     Create A New Endpoint    harbor    test_oidc_admin    https://${LOCAL_REGISTRY}    ${null}    ${null}    Y
-    ${secret}=  Get Secrete By API  ${HARBOR_URL}  username=${admin_user}
+    ${secret}=  Get Secret By API  ${HARBOR_URL}  username=${admin_user}
     Push image  ${ip}  ${admin_user}  ${secret}  library  ${image}
     Logout Harbor
     Sign In Harbor With OIDC User  ${HARBOR_URL}  username=${user}  password=${pwd}  login_with_provider=ldap

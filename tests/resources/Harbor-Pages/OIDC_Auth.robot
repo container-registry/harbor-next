@@ -46,7 +46,7 @@ Sign In Harbor With OIDC User
     Run Keyword If  '${username_claim}' == 'email'  Should Be Equal As Strings  ${name_display}  ${full_name}
     ...  ELSE    Should Be Equal As Strings  ${name_display}  ${username}
 
-Get Secrete By API
+Get Secret By API
     [Arguments]  ${url}  ${username}=${OIDC_USERNAME}
     ${json}=  Run Curl And Return Json  curl -s -k -X GET --header 'Accept: application/json' -u '${HARBOR_ADMIN}:${HARBOR_PASSWORD}' '${url}/api/v2.0/users/search?username=${username}'
     ${user_info}=    Set Variable    ${json[0]}
@@ -63,7 +63,7 @@ Generate And Return Secret
     Retry Element Click  ${generate_secret_btn}
     Retry Double Keywords When Error  Retry Element Click  ${confirm_btn}  Retry Wait Until Page Not Contains Element  ${confirm_btn}
     Retry Wait Until Page Contains  Cli secret setting is successful
-    ${secret}=  Get Secrete By API  ${url}
+    ${secret}=  Get Secret By API  ${url}
     [Return]  ${secret}
 
 Able To Delete An OIDC User
@@ -77,3 +77,29 @@ Able To Delete An OIDC User
 Should Contain Target User
     Switch to User Tag
     Retry Wait Until Page Contains Element  ${user_test7_row}
+
+Check Automatic Onboarding And Save
+    Switch To Configuration Authentication
+    Retry Element Click  //*[@id='oidcAutoOnboard']
+    Retry Element Click  ${config_auth_save_button_xpath}
+
+Set User Name Claim And Save
+    [Arguments]  ${claim}=${null}
+    Switch To Configuration Authentication
+    Run Keyword If  '${claim}' == '${null}' or '${claim}' == 'None' or '${claim}' == '${EMPTY}'
+    ...  Clear Field Of Characters  //*[@id='oidcUserClaim']  ${20}
+    ...  ELSE  Retry Text Input  //*[@id='oidcUserClaim']  ${claim}
+    Retry Element Click  ${config_auth_save_button_xpath}
+
+Delete A Project Without Sign In Harbor
+    [Arguments]  ${harbor_ip}  ${username}  ${password}
+    ${json}=  Run Curl And Return Json  curl -s -k -X GET --header 'Accept: application/json' -u '${username}:${password}' 'https://${harbor_ip}/api/v2.0/projects?page_size=1'
+    ${project_id}=  Set Variable  ${json[0]["project_id"]}
+    Run Curl And Return Json  curl -s -k -X DELETE --header 'Accept: application/json' -u '${username}:${password}' 'https://${harbor_ip}/api/v2.0/projects/${project_id}'
+
+Manage Project Member Without Sign In Harbor
+    [Arguments]  ${sign_in_user}  ${sign_in_pwd}  ${test_user1}  ${test_user2}  ${is_oidc_mode}=${false}
+    ${json}=  Run Curl And Return Json  curl -s -k -X GET --header 'Accept: application/json' -u '${sign_in_user}:${sign_in_pwd}' 'https://${OIDC_HOSTNAME}/api/v2.0/projects?page_size=1'
+    ${project_id}=  Set Variable  ${json[0]["project_id"]}
+    Run Curl And Return Json  curl -s -k -X POST --header 'Content-Type: application/json' -u '${sign_in_user}:${sign_in_pwd}' 'https://${OIDC_HOSTNAME}/api/v2.0/projects/${project_id}/members' -d '{"role_id": 2, "member_user": {"username": "${test_user1}"}}'
+    Run Curl And Return Json  curl -s -k -X POST --header 'Content-Type: application/json' -u '${sign_in_user}:${sign_in_pwd}' 'https://${OIDC_HOSTNAME}/api/v2.0/projects/${project_id}/members' -d '{"role_id": 2, "member_user": {"username": "${test_user2}"}}'

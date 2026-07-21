@@ -142,8 +142,11 @@ func (c *controller) OnboardOIDCUser(ctx context.Context, u *commonmodels.User) 
 
 // LinkExistingUserToOIDC links an existing user to OIDC by creating the OIDC metadata record.
 // This handles the case where a user exists in harbor_user but not in oidc_user.
+// The caller is expected to have already verified that no user is linked to this sub/iss
+// identity, so a conflict here means the target user already has a *different* OIDC
+// identity linked; in that case the link is rejected rather than overwritten.
 func (c *controller) LinkExistingUserToOIDC(ctx context.Context, userID int, sub, iss, secret, token string) error {
-	subIss := sub + ":" + iss
+	subIss := sub + iss
 	oidcUser := &commonmodels.OIDCUser{
 		UserID: userID,
 		SubIss: subIss,
@@ -153,16 +156,7 @@ func (c *controller) LinkExistingUserToOIDC(ctx context.Context, userID int, sub
 	_, err := c.oidcMetaMgr.Create(ctx, oidcUser)
 	if err != nil {
 		if errors.IsConflictErr(err) {
-			// Conflict means OIDC metadata already exists for this user.
-			// Retrieve the existing record to get its ID, then update.
-			existing, err := c.oidcMetaMgr.GetByUserID(ctx, userID)
-			if err != nil {
-				return errors.Wrap(err, "failed to retrieve existing OIDC metadata")
-			}
-			existing.SubIss = subIss
-			existing.Secret = secret
-			existing.Token = token
-			return c.oidcMetaMgr.Update(ctx, existing, "subiss", "secret", "token")
+			return errors.ConflictError(nil).WithMessagef("user %d is already linked to a different OIDC identity", userID)
 		}
 		return errors.Wrap(err, "failed to create OIDC metadata record")
 	}

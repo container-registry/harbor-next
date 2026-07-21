@@ -95,7 +95,7 @@ func (oc *OIDCController) RedirectLogin() {
 		oc.SendInternalServerError(err)
 		return
 	}
-	log.Infof("State dumped to session: %s", state)
+	log.Debugf("State dumped to session: %s", state)
 	// Force to use the func 'Redirect' of beego.Controller
 	oc.Controller.Redirect(url, http.StatusFound)
 }
@@ -286,39 +286,8 @@ func (oc *OIDCController) RedirectLogout() {
 		url.QueryEscape(token.RawIDToken),
 		url.QueryEscape(postRedirectURL),
 	)
-	log.Infof("Redirect user to logout page of OIDC provider: %s", logoutURL)
+	log.Debugf("Redirect user to logout page of OIDC provider: %s", logoutURL)
 	oc.Controller.Redirect(logoutURL, http.StatusFound)
-}
-
-func userOnboard(ctx context.Context, oc *OIDCController, info *oidc.UserInfo, username string, tokenBytes []byte) (*models.User, bool) {
-	s, t, err := secretAndToken(tokenBytes)
-	if err != nil {
-		oc.SendInternalServerError(err)
-		return nil, false
-	}
-	oidcUser := models.OIDCUser{
-		SubIss: info.Subject + info.Issuer,
-		Secret: s,
-		Token:  t,
-	}
-
-	user := &models.User{
-		Username:     username,
-		Realname:     username,
-		Email:        info.Email,
-		OIDCUserMeta: &oidcUser,
-		Comment:      oidcUserComment,
-	}
-	oidc.InjectGroupsToUser(info, user)
-
-	log.Infof("User created: %v\n", user.Username)
-
-	err = ctluser.Ctl.OnboardOIDCUser(ctx, user)
-	if err != nil {
-		oc.SendError(err)
-		return nil, false
-	}
-	return user, true
 }
 
 // resolveOIDCUser determines which Harbor user should be used for the given OIDC identity.
@@ -339,7 +308,10 @@ func resolveOIDCUser(ctx context.Context, info *oidc.UserInfo, tokenBytes []byte
 
 	// User not found by sub/iss; try to find an existing local user by email
 	existingUser, err := ctluser.Ctl.GetByEmail(ctx, info.Email)
-	if err == nil && existingUser != nil {
+	if err != nil && !errors.IsNotFoundErr(err) {
+		return nil, err
+	}
+	if existingUser != nil {
 		// Found an existing local user with matching email; link them
 		s, t, err := secretAndToken(tokenBytes)
 		if err != nil {
@@ -393,7 +365,6 @@ func resolveOIDCUser(ctx context.Context, info *oidc.UserInfo, tokenBytes []byte
 		OIDCUserMeta: &oidcUser,
 		Comment:      oidcUserComment,
 	}
-	oidc.InjectGroupsToUser(info, user)
 
 	err = ctluser.Ctl.OnboardOIDCUser(ctx, user)
 	if err != nil {
