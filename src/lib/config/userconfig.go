@@ -22,6 +22,7 @@ import (
 	"github.com/goharbor/harbor/src/common/models"
 	cfgModels "github.com/goharbor/harbor/src/lib/config/models"
 	"github.com/goharbor/harbor/src/lib/errors"
+	"github.com/goharbor/harbor/src/lib/log"
 )
 
 // It contains all user related configurations, each of user related settings requires a context provided
@@ -40,15 +41,23 @@ func GetSystemCfg(ctx context.Context) (map[string]any, error) {
 func DetectAuthMode(ctx context.Context) string {
 	if setting, err := OIDCSetting(ctx); err == nil && setting.Endpoint != "" {
 		return common.OIDCAuth
+	} else if err != nil {
+		log.Debugf("failed to load OIDC config for auth mode detection: %v", err)
 	}
 	if conf, err := LDAPConf(ctx); err == nil && conf.URL != "" {
 		return common.LDAPAuth
+	} else if err != nil {
+		log.Debugf("failed to load LDAP config for auth mode detection: %v", err)
 	}
 	if setting, err := UAASettings(ctx); err == nil && setting.Endpoint != "" {
 		return common.UAAAuth
+	} else if err != nil {
+		log.Debugf("failed to load UAA config for auth mode detection: %v", err)
 	}
 	if conf, err := HTTPAuthProxySetting(ctx); err == nil && conf.Endpoint != "" {
 		return common.HTTPAuth
+	} else if err != nil {
+		log.Debugf("failed to load HTTP auth proxy config for auth mode detection: %v", err)
 	}
 	return common.DBAuth
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/goharbor/harbor/src/jobservice/job/impl/gdpr"
 	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/errors"
+	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/member"
 	"github.com/goharbor/harbor/src/pkg/oidc"
@@ -182,7 +183,9 @@ func (c *controller) Delete(ctx context.Context, id int) error {
 	}
 	// delete oidc metadata under the user
 	setting, err := config.OIDCSetting(ctx)
-	if err == nil && setting.Endpoint != "" {
+	if err != nil {
+		log.Debugf("failed to load OIDC setting, skipping OIDC metadata cleanup: %v", err)
+	} else if setting.Endpoint != "" {
 		if err := c.oidcMetaMgr.DeleteByUserID(ctx, id); err != nil {
 			return errors.UnknownError(err).WithMessagef("delete user failed, user id: %v, cannot delete oidc user, error:%v", id, err)
 		}

@@ -100,8 +100,8 @@ func getChallenge(req *http.Request, accessList []access) string {
 
 	// A request that already carries Basic credentials isn't following the
 	// OCI/Docker Bearer token flow, so challenge it with Basic too instead of
-	// pointing it at the token service.
-	if strings.HasPrefix(auth, "Basic ") {
+	// pointing it at the token service. Scheme is case-insensitive per HTTP spec.
+	if len(auth) >= 6 && strings.EqualFold(auth[:6], "basic ") {
 		return `Basic realm="harbor"`
 	}
 

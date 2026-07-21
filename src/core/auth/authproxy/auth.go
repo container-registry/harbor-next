@@ -65,6 +65,7 @@ type Auth struct {
 func (a *Auth) Match(ctx context.Context) bool {
 	setting, err := config.HTTPAuthProxySetting(ctx)
 	if err != nil {
+		log.Debugf("failed to load HTTP auth proxy config: %v", err)
 		return false
 	}
 	return setting.Endpoint != ""
