@@ -99,6 +99,25 @@ func TestLoadCustomCACertificatesMerges(t *testing.T) {
 	assert.Contains(t, string(got), customCert)
 }
 
+func TestLoadCustomCACertificatesRespectsExistingSSLCertFile(t *testing.T) {
+	withCleanSSLCertFileEnv(t)
+
+	customCert := generateSelfSignedCert(t)
+	certDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(certDir, "internal-ca.crt"), []byte(customCert), 0o644))
+
+	overrideBundle := filepath.Join(t.TempDir(), "override-bundle.crt")
+	require.NoError(t, os.WriteFile(overrideBundle, []byte("-----BEGIN OVERRIDE BUNDLE-----\n"), 0o644))
+	os.Setenv("SSL_CERT_FILE", overrideBundle)
+
+	combined := filepath.Join(t.TempDir(), "combined.crt")
+	loadCustomCACertificates(certDir, "/should/not/be/used", combined)
+
+	got, err := os.ReadFile(combined)
+	require.NoError(t, err)
+	assert.Contains(t, string(got), "-----BEGIN OVERRIDE BUNDLE-----")
+}
+
 func TestLoadCustomCACertificatesMissingSystemBundle(t *testing.T) {
 	withCleanSSLCertFileEnv(t)
 

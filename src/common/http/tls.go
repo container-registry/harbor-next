@@ -151,9 +151,14 @@ func loadCustomCACertificates(certDir, defaultSystemBundlePath, combinedBundlePa
 		return
 	}
 
-	combined, err := os.ReadFile(defaultSystemBundlePath)
+	systemBundlePath := os.Getenv("SSL_CERT_FILE")
+	if systemBundlePath == "" {
+		systemBundlePath = defaultSystemBundlePath
+	}
+	systemBundlePath = filepath.Clean(systemBundlePath)
+	combined, err := os.ReadFile(systemBundlePath)
 	if err != nil {
-		log.Errorf("custom CA certs found in %s but failed to read system CA bundle %s: %v", certDir, defaultSystemBundlePath, err)
+		log.Errorf("custom CA certs found in %s but failed to read system CA bundle %s: %v", certDir, systemBundlePath, err)
 		return
 	}
 
