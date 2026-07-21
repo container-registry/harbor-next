@@ -7,7 +7,7 @@ RUN addgroup -S -g 10000 harbor && adduser -S -G harbor -u 10000 harbor && \
 FROM scratch
 COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=certs /etc/passwd /etc/group /etc/
-COPY --from=certs /harbor-ca-writable /etc/ssl/harbor-custom-ca
+COPY --chown=10000:10000 --from=certs /harbor-ca-writable /etc/ssl/harbor-custom-ca
 ARG TARGETARCH
 COPY bin/linux-${TARGETARCH}/lprobe /lprobe
 COPY bin/linux-${TARGETARCH}/core /core
