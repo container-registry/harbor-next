@@ -21,6 +21,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
@@ -33,9 +34,16 @@ import (
 // notification job may be retried, independent of the webhook job setting.
 const maxFailsAMQP = "JOBSERVICE_AMQP_JOB_MAX_RETRY"
 
+// confirmTimeout bounds how long execute waits for the broker to
+// acknowledge a published message once the channel is in confirm mode.
+const confirmTimeout = 10 * time.Second
+
 // amqpChannel is the subset of *amqp.Channel used to publish a message,
 // abstracted so tests can substitute a fake broker connection.
 type amqpChannel interface {
+	Confirm(noWait bool) error
+	NotifyPublish(confirm chan amqp.Confirmation) chan amqp.Confirmation
+	NotifyReturn(c chan amqp.Return) chan amqp.Return
 	Publish(exchange, key string, mandatory, immediate bool, msg amqp.Publishing) error
 	Close() error
 }
@@ -60,7 +68,7 @@ var dialAMQP = func(brokerURL string, skipCertVerify bool) (amqpConnection, erro
 	var conn *amqp.Connection
 	var err error
 	if strings.HasPrefix(brokerURL, "amqps://") {
-		conn, err = amqp.DialTLS(brokerURL, &tls.Config{InsecureSkipVerify: skipCertVerify})
+		conn, err = amqp.DialTLS(brokerURL, &tls.Config{InsecureSkipVerify: skipCertVerify, MinVersion: tls.VersionTLS12})
 	} else {
 		conn, err = amqp.Dial(brokerURL)
 	}
@@ -192,11 +200,37 @@ func (aj *AMQPJob) execute(params map[string]any) error {
 	}
 	defer ch.Close()
 
-	if err := ch.Publish("", queue, false, false, amqp.Publishing{
+	if err := ch.Confirm(false); err != nil {
+		return fmt.Errorf("failed to enable AMQP publisher confirms on queue %s: %w", queue, err)
+	}
+	confirms := ch.NotifyPublish(make(chan amqp.Confirmation, 1))
+	returns := ch.NotifyReturn(make(chan amqp.Return, 1))
+
+	// mandatory=true so an unroutable message (e.g. the queue does not
+	// exist) is reported back via returns instead of being silently dropped.
+	if err := ch.Publish("", queue, true, false, amqp.Publishing{
 		ContentType: contentType,
 		Body:        []byte(payload),
 	}); err != nil {
 		return fmt.Errorf("failed to publish to AMQP queue %s: %w", queue, err)
+	}
+
+	select {
+	case confirm := <-confirms:
+		if !confirm.Ack {
+			return fmt.Errorf("AMQP broker nacked publish to queue %s", queue)
+		}
+	case <-time.After(confirmTimeout):
+		return fmt.Errorf("timed out waiting for AMQP publisher confirmation for queue %s", queue)
+	}
+
+	// The broker sends a return frame for an unroutable mandatory message
+	// before it sends the ack, so by the time the confirm above has been
+	// received, a corresponding return (if any) is already queued here.
+	select {
+	case ret := <-returns:
+		return fmt.Errorf("AMQP message to queue %s was returned as undeliverable: %s (code %d)", queue, ret.ReplyText, ret.ReplyCode)
+	default:
 	}
 
 	aj.logger.Infof("published to AMQP queue %s", queue)

@@ -420,6 +420,11 @@ func (n *webhookAPI) validateTargets(policy *policy_model.Policy) (bool, error) 
 				WithMessagef("amqp target address must be a full amqp:// or amqps:// URI with policy %s", policy.Name).
 				WithCode(errors.BadRequestCode)
 		}
+		if target.Type == "amqp" && strings.Trim(url.EscapedPath(), "/") == "" {
+			return false, errors.New(nil).
+				WithMessagef("amqp target address must include a queue name in its path with policy %s", policy.Name).
+				WithCode(errors.BadRequestCode)
+		}
 		// Prevent SSRF security issue #3755
 		target.Address = url.Scheme + "://" + url.Host + url.Path
 

@@ -273,6 +273,20 @@ func TestValidateTargets(t *testing.T) {
 			wantOK: false,
 		},
 		{
+			name: "amqp target with no queue path is rejected",
+			targets: []policyModel.EventTarget{
+				{Type: "amqp", Address: "amqp://broker:5672"},
+			},
+			wantOK: false,
+		},
+		{
+			name: "amqp target with only a trailing slash is rejected",
+			targets: []policyModel.EventTarget{
+				{Type: "amqp", Address: "amqp://broker:5672/"},
+			},
+			wantOK: false,
+		},
+		{
 			name: "amqp target with http:// address is rejected",
 			targets: []policyModel.EventTarget{
 				{Type: "amqp", Address: "http://broker:5672/vhost/queue"},

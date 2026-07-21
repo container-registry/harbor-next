@@ -15,14 +15,44 @@ import (
 // fakeAMQPChannel is a test double for amqpChannel.
 type fakeAMQPChannel struct {
 	publishErr  error
+	confirmErr  error
 	closed      bool
 	publishedTo string
 	published   amqp.Publishing
+	mandatory   bool
+
+	// confirm, if nil, defaults to an ack. Set to a non-nil value to
+	// simulate a broker nack.
+	confirm *amqp.Confirmation
+	// ret, if non-nil, simulates the broker returning the message as
+	// undeliverable.
+	ret *amqp.Return
 }
 
-func (c *fakeAMQPChannel) Publish(_, key string, _, _ bool, msg amqp.Publishing) error {
+func (c *fakeAMQPChannel) Confirm(_ bool) error {
+	return c.confirmErr
+}
+
+func (c *fakeAMQPChannel) NotifyPublish(confirm chan amqp.Confirmation) chan amqp.Confirmation {
+	result := amqp.Confirmation{Ack: true}
+	if c.confirm != nil {
+		result = *c.confirm
+	}
+	confirm <- result
+	return confirm
+}
+
+func (c *fakeAMQPChannel) NotifyReturn(ret chan amqp.Return) chan amqp.Return {
+	if c.ret != nil {
+		ret <- *c.ret
+	}
+	return ret
+}
+
+func (c *fakeAMQPChannel) Publish(_, key string, mandatory, _ bool, msg amqp.Publishing) error {
 	c.publishedTo = key
 	c.published = msg
+	c.mandatory = mandatory
 	return c.publishErr
 }
 
@@ -122,8 +152,64 @@ func TestAMQPJobRun(t *testing.T) {
 	assert.Equal(t, "harbor.events", ch.publishedTo)
 	assert.Equal(t, "application/json", ch.published.ContentType)
 	assert.Equal(t, "amqp payload", string(ch.published.Body))
+	assert.True(t, ch.mandatory)
 	assert.True(t, ch.closed)
 	assert.True(t, conn.closed)
+}
+
+func TestAMQPJobRunConfirmError(t *testing.T) {
+	ch := &fakeAMQPChannel{confirmErr: errors.New("confirm not supported")}
+	conn := &fakeAMQPConnection{channel: ch}
+	withFakeDialAMQP(t, func(_ string, _ bool) (amqpConnection, error) {
+		return conn, nil
+	})
+
+	rep := &AMQPJob{}
+	params := map[string]any{
+		"payload":    "amqp payload",
+		"queue":      "harbor.events",
+		"broker_url": "amqp://broker:5672/vhost",
+	}
+	err := rep.Run(&mockjobservice.MockJobContext{}, params)
+	require.Error(t, err)
+	assert.True(t, ch.closed)
+	assert.True(t, conn.closed)
+}
+
+func TestAMQPJobRunNacked(t *testing.T) {
+	ch := &fakeAMQPChannel{confirm: &amqp.Confirmation{Ack: false}}
+	conn := &fakeAMQPConnection{channel: ch}
+	withFakeDialAMQP(t, func(_ string, _ bool) (amqpConnection, error) {
+		return conn, nil
+	})
+
+	rep := &AMQPJob{}
+	params := map[string]any{
+		"payload":    "amqp payload",
+		"queue":      "harbor.events",
+		"broker_url": "amqp://broker:5672/vhost",
+	}
+	err := rep.Run(&mockjobservice.MockJobContext{}, params)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "nacked")
+}
+
+func TestAMQPJobRunUndeliverable(t *testing.T) {
+	ch := &fakeAMQPChannel{ret: &amqp.Return{ReplyCode: 312, ReplyText: "NO_ROUTE"}}
+	conn := &fakeAMQPConnection{channel: ch}
+	withFakeDialAMQP(t, func(_ string, _ bool) (amqpConnection, error) {
+		return conn, nil
+	})
+
+	rep := &AMQPJob{}
+	params := map[string]any{
+		"payload":    "amqp payload",
+		"queue":      "harbor.events",
+		"broker_url": "amqp://broker:5672/vhost",
+	}
+	err := rep.Run(&mockjobservice.MockJobContext{}, params)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "undeliverable")
 }
 
 func TestAMQPJobRunDialError(t *testing.T) {

@@ -181,6 +181,18 @@ func TestSplitAMQPAddress(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:          "queue name with encoded slash is not split as a path separator",
+			address:       "amqp://broker:5672/vhost/harbor%2Fevents",
+			wantBrokerURL: "amqp://broker:5672/vhost",
+			wantQueue:     "harbor/events",
+		},
+		{
+			name:          "encoded default vhost is preserved in the broker URL",
+			address:       "amqp://broker:5672/%2F/harbor.events",
+			wantBrokerURL: "amqp://broker:5672/%2F",
+			wantQueue:     "harbor.events",
+		},
+		{
 			name:    "malformed URL",
 			address: "://not-a-url",
 			wantErr: true,

@@ -103,16 +103,24 @@ func (a *AMQPHandler) process(ctx context.Context, event *model.HookEvent) error
 // connection URL, including any vhost, and the destination queue name,
 // which is the final path segment.
 // e.g. amqp://broker:5672/vhost/queue -> ("amqp://broker:5672/vhost", "queue")
+//
+// Splitting is done on the escaped path so a queue name containing an
+// encoded slash (%2F) is not mistaken for a path separator; only the
+// extracted queue segment is then unescaped, since it is used verbatim as
+// a routing key rather than re-embedded in a URL.
 func splitAMQPAddress(address string) (brokerURL string, queue string, err error) {
 	u, err := url.Parse(address)
 	if err != nil {
 		return "", "", err
 	}
-	segments := strings.Split(strings.Trim(u.Path, "/"), "/")
+	segments := strings.Split(strings.Trim(u.EscapedPath(), "/"), "/")
 	if len(segments) == 0 || segments[len(segments)-1] == "" {
 		return "", "", fmt.Errorf("address %q has no queue name in its path", address)
 	}
-	queue = segments[len(segments)-1]
+	queue, err = url.PathUnescape(segments[len(segments)-1])
+	if err != nil {
+		return "", "", fmt.Errorf("address %q has an invalid queue segment: %w", address, err)
+	}
 	vhost := strings.Join(segments[:len(segments)-1], "/")
 	return u.Scheme + "://" + u.Host + "/" + vhost, queue, nil
 }
