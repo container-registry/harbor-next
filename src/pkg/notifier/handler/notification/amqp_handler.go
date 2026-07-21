@@ -18,6 +18,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"strings"
 
 	"github.com/goharbor/harbor/src/common/job/models"
 	"github.com/goharbor/harbor/src/jobservice/job"
@@ -66,6 +68,11 @@ func (a *AMQPHandler) process(ctx context.Context, event *model.HookEvent) error
 		return fmt.Errorf("invalid AMQP event: nil target")
 	}
 
+	brokerURL, queue, err := splitAMQPAddress(event.Target.Address)
+	if err != nil {
+		return fmt.Errorf("invalid AMQP target address: %v", err)
+	}
+
 	j := &models.JobData{
 		Metadata: &models.JobMetadata{
 			JobKind: job.KindGeneric,
@@ -82,11 +89,32 @@ func (a *AMQPHandler) process(ctx context.Context, event *model.HookEvent) error
 
 	j.Parameters = map[string]any{
 		"payload":          payload,
-		"queue":            event.Target.Address, // Assume address is the queue name
+		"broker_url":       brokerURL,
+		"queue":            queue,
 		"content_type":     AMQPContentType,
+		"auth":             event.Target.AuthHeader,
 		"skip_cert_verify": event.Target.SkipCertVerify,
 	}
 	return notification.HookManager.StartHook(ctx, event, j)
+}
+
+// splitAMQPAddress splits a normalized amqp(s):// target address (as
+// rewritten by the webhook API's validateTargets) into the broker
+// connection URL, including any vhost, and the destination queue name,
+// which is the final path segment.
+// e.g. amqp://broker:5672/vhost/queue -> ("amqp://broker:5672/vhost", "queue")
+func splitAMQPAddress(address string) (brokerURL string, queue string, err error) {
+	u, err := url.Parse(address)
+	if err != nil {
+		return "", "", err
+	}
+	segments := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(segments) == 0 || segments[len(segments)-1] == "" {
+		return "", "", fmt.Errorf("address %q has no queue name in its path", address)
+	}
+	queue = segments[len(segments)-1]
+	vhost := strings.Join(segments[:len(segments)-1], "/")
+	return u.Scheme + "://" + u.Host + "/" + vhost, queue, nil
 }
 
 func (a *AMQPHandler) convert(payLoad *model.Payload) (string, error) {

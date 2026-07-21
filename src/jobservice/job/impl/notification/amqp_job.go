@@ -15,16 +15,63 @@
 package notification
 
 import (
+	"crypto/tls"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
+	"strings"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 
 	"github.com/goharbor/harbor/src/jobservice/job"
 	"github.com/goharbor/harbor/src/jobservice/logger"
 	"github.com/goharbor/harbor/src/lib/errors"
 )
 
-// AMQPJob implements the job interface, which publish notification to amqp.
+// maxFailsAMQP is the env var controlling how many times an AMQP
+// notification job may be retried, independent of the webhook job setting.
+const maxFailsAMQP = "JOBSERVICE_AMQP_JOB_MAX_RETRY"
+
+// amqpChannel is the subset of *amqp.Channel used to publish a message,
+// abstracted so tests can substitute a fake broker connection.
+type amqpChannel interface {
+	Publish(exchange, key string, mandatory, immediate bool, msg amqp.Publishing) error
+	Close() error
+}
+
+// amqpConnection is the subset of *amqp.Connection used to obtain a channel.
+type amqpConnection interface {
+	Channel() (amqpChannel, error)
+	Close() error
+}
+
+type realAMQPConnection struct {
+	*amqp.Connection
+}
+
+func (c realAMQPConnection) Channel() (amqpChannel, error) {
+	return c.Connection.Channel()
+}
+
+// dialAMQP opens a connection to the broker at brokerURL. Overridden in
+// tests to avoid depending on a real broker.
+var dialAMQP = func(brokerURL string, skipCertVerify bool) (amqpConnection, error) {
+	var conn *amqp.Connection
+	var err error
+	if strings.HasPrefix(brokerURL, "amqps://") {
+		conn, err = amqp.DialTLS(brokerURL, &tls.Config{InsecureSkipVerify: skipCertVerify})
+	} else {
+		conn, err = amqp.Dial(brokerURL)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return realAMQPConnection{conn}, nil
+}
+
+// AMQPJob implements the job interface, which publishes notifications to an
+// AMQP broker.
 type AMQPJob struct {
 	logger logger.Interface
 }
@@ -61,34 +108,28 @@ func (aj *AMQPJob) Validate(params job.Parameters) error {
 		return errors.New("missing parameter of amqp job")
 	}
 
-	payload, ok := params["payload"]
-	if !ok {
-		return errors.Errorf("missing job parameter 'payload'")
+	for _, name := range []string{"payload", "queue", "broker_url"} {
+		if err := validateNonEmptyStringParam(params, name); err != nil {
+			return err
+		}
 	}
-	if payload == nil {
-		return errors.Errorf("malformed job parameter 'payload', got nil")
-	}
-	str, ok := payload.(string)
-	if !ok {
-		return errors.Errorf("malformed job parameter 'payload', expecting string but got %s", fmt.Sprintf("%T", payload))
-	}
-	if str == "" {
-		return errors.Errorf("malformed job parameter 'payload', expecting non-empty string")
-	}
+	return nil
+}
 
-	queue, ok := params["queue"]
+func validateNonEmptyStringParam(params job.Parameters, name string) error {
+	val, ok := params[name]
 	if !ok {
-		return errors.Errorf("missing job parameter 'queue'")
+		return errors.Errorf("missing job parameter '%s'", name)
 	}
-	if queue == nil {
-		return errors.Errorf("malformed job parameter 'queue', got nil")
+	if val == nil {
+		return errors.Errorf("malformed job parameter '%s', got nil", name)
 	}
-	str, ok = queue.(string)
+	str, ok := val.(string)
 	if !ok {
-		return errors.Errorf("malformed job parameter 'queue', expecting string but got %s", fmt.Sprintf("%T", queue))
+		return errors.Errorf("malformed job parameter '%s', expecting string but got %s", name, fmt.Sprintf("%T", val))
 	}
 	if str == "" {
-		return errors.Errorf("malformed job parameter 'queue', expecting non-empty string")
+		return errors.Errorf("malformed job parameter '%s', expecting non-empty string", name)
 	}
 	return nil
 }
@@ -116,16 +157,64 @@ func (aj *AMQPJob) init(ctx job.Context, _ map[string]any) error {
 	return nil
 }
 
-// execute amqp job
+// execute connects to the configured AMQP broker and publishes the payload
+// to the target queue via the default exchange, using the queue name as the
+// routing key -- the standard AMQP pattern for delivering directly to a
+// single declared queue.
 func (aj *AMQPJob) execute(params map[string]any) error {
 	payload := params["payload"].(string)
 	queue := params["queue"].(string)
+	brokerURL := params["broker_url"].(string)
 
-	if queue == "" {
-		return errors.New("AMQP queue not configured")
+	contentType, _ := params["content_type"].(string)
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	skipCertVerify, _ := params["skip_cert_verify"].(bool)
+
+	if auth, ok := params["auth"].(string); ok && auth != "" {
+		var err error
+		brokerURL, err = injectAMQPCredentials(brokerURL, auth)
+		if err != nil {
+			return fmt.Errorf("failed to apply AMQP credentials: %w", err)
+		}
 	}
 
-	aj.logger.Infof("publishing to AMQP queue %s: %s", queue, payload)
+	conn, err := dialAMQP(brokerURL, skipCertVerify)
+	if err != nil {
+		return fmt.Errorf("failed to connect to AMQP broker: %w", err)
+	}
+	defer conn.Close()
 
+	ch, err := conn.Channel()
+	if err != nil {
+		return fmt.Errorf("failed to open AMQP channel: %w", err)
+	}
+	defer ch.Close()
+
+	if err := ch.Publish("", queue, false, false, amqp.Publishing{
+		ContentType: contentType,
+		Body:        []byte(payload),
+	}); err != nil {
+		return fmt.Errorf("failed to publish to AMQP queue %s: %w", queue, err)
+	}
+
+	aj.logger.Infof("published to AMQP queue %s", queue)
 	return nil
+}
+
+// injectAMQPCredentials sets the userinfo (user:password, from the
+// notification target's auth header) on a broker URL that had its
+// credentials stripped during webhook target validation.
+func injectAMQPCredentials(brokerURL, auth string) (string, error) {
+	u, err := url.Parse(brokerURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid broker URL: %w", err)
+	}
+	user, pass, found := strings.Cut(auth, ":")
+	if !found {
+		return "", errors.New("malformed auth header, expecting 'user:password'")
+	}
+	u.User = url.UserPassword(user, pass)
+	return u.String(), nil
 }
