@@ -31,6 +31,12 @@ import (
 const (
 	// maxDockerfileSize is the maximum size of Dockerfile content in bytes (4MB)
 	maxDockerfileSize = 4 * 1024 * 1024
+	// maxDockerfileConfigBlobSize bounds the config blob we'll pull and decode when
+	// serving the Dockerfile addition, so a request for Dockerfile content can't force
+	// unbounded memory use decoding an oversized config blob. This limit only applies
+	// to the Dockerfile addition path; other addition types and metadata extraction
+	// are unaffected.
+	maxDockerfileConfigBlobSize = 8 * 1024 * 1024
 )
 
 // const definitions
@@ -104,6 +110,18 @@ func (m *manifestV2Processor) AbstractAddition(ctx context.Context, artifact *ar
 	if err != nil {
 		return nil, err
 	}
+
+	if addition == AdditionTypeDockerfile {
+		configSize, err := m.ManifestProcessor.ConfigSize(content)
+		if err != nil {
+			return nil, err
+		}
+		if configSize > maxDockerfileConfigBlobSize {
+			return nil, errors.New(nil).WithCode(errors.RequestEntityTooLargeCode).
+				WithMessage("dockerfile content exceeds maximum size limit")
+		}
+	}
+
 	config := &v1.Image{}
 	if err = m.ManifestProcessor.UnmarshalConfig(ctx, artifact.RepositoryName, content, config); err != nil {
 		return nil, err
