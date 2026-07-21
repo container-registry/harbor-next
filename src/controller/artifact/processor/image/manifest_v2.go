@@ -118,7 +118,7 @@ func (m *manifestV2Processor) AbstractAddition(ctx context.Context, artifact *ar
 		}
 		if configSize > maxDockerfileConfigBlobSize {
 			return nil, errors.New(nil).WithCode(errors.RequestEntityTooLargeCode).
-				WithMessage("dockerfile content exceeds maximum size limit")
+				WithMessagef("image config blob size %d exceeds maximum size limit %d", configSize, maxDockerfileConfigBlobSize)
 		}
 	}
 
