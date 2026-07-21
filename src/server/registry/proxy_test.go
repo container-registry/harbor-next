@@ -111,6 +111,44 @@ func TestAuthDirectorBearerToken(t *testing.T) {
 	assert.Equal(t, "Bearer test.jwt.token", req.Header.Get("Authorization"))
 }
 
+func TestAuthDirectorPreservesIncomingBearerToken(t *testing.T) {
+	tokenCache.mu.Lock()
+	tokenCache.data = make(map[string]*cachedToken)
+	tokenCache.mu.Unlock()
+
+	req, _ := http.NewRequest(http.MethodGet, "http://example.com/v2/test/repo/manifests/latest", nil)
+	req.Header.Set("Authorization", "Bearer user.provided.token")
+	d := authDirector(direct)
+	d(req)
+	assert.Equal(t, "Bearer user.provided.token", req.Header.Get("Authorization"))
+}
+
+func TestAuthDirectorExchangesClientBasicAuth(t *testing.T) {
+	tokenCache.mu.Lock()
+	tokenCache.data = make(map[string]*cachedToken)
+	tokenCache.mu.Unlock()
+
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, pass, ok := r.BasicAuth()
+		require.True(t, ok, "should receive basic auth")
+		assert.Equal(t, "clientuser", user)
+		assert.Equal(t, "clientpass", pass)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"token": "exchanged.jwt"})
+	}))
+	defer tokenServer.Close()
+
+	originalTokenURL := getTokenServiceURL
+	getTokenServiceURL = func() string { return tokenServer.URL }
+	defer func() { getTokenServiceURL = originalTokenURL }()
+
+	req, _ := http.NewRequest(http.MethodGet, "http://example.com/v2/test/repo/manifests/latest", nil)
+	req.SetBasicAuth("clientuser", "clientpass")
+	d := authDirector(direct)
+	d(req)
+	assert.Equal(t, "Bearer exchanged.jwt", req.Header.Get("Authorization"))
+}
+
 func TestAuthDirectorProbeFailureDefaultsToBasic(t *testing.T) {
 	detectedAuthType = atomic.Value{} // reset to empty (not yet probed)
 
