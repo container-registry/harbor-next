@@ -125,7 +125,7 @@ spec:
     trivy:
       enabled: true
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:13b9614bcc1fe99b09889f037935912fab2d98196d6090aef1719aef0511ceb4" # {"$imagepolicy": "flux-system:trivy-adapter:digest"}
+        deploy.8gears.io/image-revision: "sha256:7115b080360119dbaaf234424ef0b043a001629bfa9fe09d3e5fbe827ebf9aa8" # {"$imagepolicy": "flux-system:trivy-adapter:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/trivy-adapter
         tag: latest
