@@ -137,6 +137,10 @@ func gracefulShutdown(closing, done chan struct{}, shutdowns ...func()) {
 }
 
 func main() {
+	// Merge any mounted custom CA certificates into the trust store before
+	// any TLS connection is attempted.
+	common_http.LoadCustomCACertificates()
+
 	// Start pprof server
 	lib.StartPprof()
 

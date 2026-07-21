@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/goharbor/harbor/src/common"
+	common_http "github.com/goharbor/harbor/src/common/http"
 	"github.com/goharbor/harbor/src/jobservice/common/utils"
 	"github.com/goharbor/harbor/src/jobservice/config"
 	"github.com/goharbor/harbor/src/jobservice/job"
@@ -46,6 +47,10 @@ import (
 )
 
 func main() {
+	// Merge any mounted custom CA certificates into the trust store before
+	// any TLS connection is attempted.
+	common_http.LoadCustomCACertificates()
+
 	// Start pprof server
 	lib.StartPprof()
 
