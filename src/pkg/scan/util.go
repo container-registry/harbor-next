@@ -40,6 +40,25 @@ func RemoteOptions() []remote.Option {
 	return []remote.Option{remote.WithTransport(tr)}
 }
 
+// accessoryRef builds the reference the accessory artifact is pushed to. The
+// registry host is constructed as a typed name.Registry instead of being
+// string-joined into name.ParseReference: ParseReference only treats the first
+// path segment as a registry if it contains a '.' or ':', so a portless
+// single-label host like "harbor-core" (the in-cluster core service) would be
+// parsed as a Docker Hub namespace and the push would leave the cluster,
+// sending robot credentials to auth.docker.io.
+func accessoryRef(registryURL, repository, dgst string, insecure bool) (name.Reference, error) {
+	var opts []name.Option
+	if insecure {
+		opts = append(opts, name.Insecure)
+	}
+	reg, err := name.NewRegistry(registryURL, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("parsing registry %q: %w", registryURL, err)
+	}
+	return reg.Repo(repository).Digest(dgst), nil
+}
+
 // GenAccessoryArt composes the accessory oci object and push it back to harbor core as an accessory of the scanned artifact.
 func GenAccessoryArt(sq v1sq.ScanRequest, accData []byte, accAnnotations map[string]string, mediaType string, robot *model.Robot) (string, error) {
 	createdTime := v1.Time{}
@@ -83,10 +102,7 @@ func GenAccessoryArt(sq v1sq.ScanRequest, accData []byte, accAnnotations map[str
 	if err != nil {
 		return "", err
 	}
-	accRef, err := name.ParseReference(fmt.Sprintf("%s/%s@%s", sq.Registry.URL, sq.Artifact.Repository, dgst.String()))
-	if sq.Registry.Insecure {
-		accRef, err = name.ParseReference(fmt.Sprintf("%s/%s@%s", sq.Registry.URL, sq.Artifact.Repository, dgst.String()), name.Insecure)
-	}
+	accRef, err := accessoryRef(sq.Registry.URL, sq.Artifact.Repository, dgst.String(), sq.Registry.Insecure)
 	if err != nil {
 		return "", err
 	}
