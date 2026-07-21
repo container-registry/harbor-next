@@ -28,6 +28,8 @@ import (
 	commonhttp "github.com/goharbor/harbor/src/common/http"
 	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/log"
+
+	"golang.org/x/sync/singleflight"
 )
 
 var proxy = newProxy()
@@ -45,6 +47,8 @@ var tokenCache struct {
 func init() {
 	tokenCache.data = make(map[string]*cachedToken)
 }
+
+var tokenFetchGroup singleflight.Group
 
 var detectedAuthType atomic.Value
 
@@ -211,6 +215,8 @@ func probeRegistry() (string, error) {
 // exchanging the shared registry credential with Harbor's /service/token
 // endpoint. The token is cached per scope until shortly before it expires,
 // per the expires_in returned by the token service.
+// Uses singleflight to coordinate concurrent requests for the same scope,
+// preventing stampede to the token service on cache miss.
 func getRegistryToken(r *http.Request) string {
 	scope := scopeFromRequest(r)
 
@@ -222,63 +228,75 @@ func getRegistryToken(r *http.Request) string {
 	}
 	tokenCache.mu.RUnlock()
 
-	tokenURL := fmt.Sprintf("%s?service=harbor-registry&scope=%s", getTokenServiceURL(), url.QueryEscape(scope))
+	result, err, _ := tokenFetchGroup.Do(scope, func() (interface{}, error) {
+		tokenCache.mu.RLock()
+		if cached, ok := tokenCache.data[scope]; ok && cached.token != "" && time.Now().Before(cached.expires) {
+			tk := cached.token
+			tokenCache.mu.RUnlock()
+			return tk, nil
+		}
+		tokenCache.mu.RUnlock()
 
-	req, err := http.NewRequest(http.MethodGet, tokenURL, nil)
+		tokenURL := fmt.Sprintf("%s?service=harbor-registry&scope=%s", getTokenServiceURL(), url.QueryEscape(scope))
+
+		req, err := http.NewRequest(http.MethodGet, tokenURL, nil)
+		if err != nil {
+			log.Warningf("failed to create token request: %v", err)
+			return "", nil
+		}
+
+		username, password := config.RegistryCredential()
+		if username != "" && password != "" {
+			req.SetBasicAuth(username, password)
+		}
+
+		resp, err := exchangeHTTPClient.Do(req)
+		if err != nil {
+			log.Warningf("failed to get registry token: %v", err)
+			return "", nil
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			log.Warningf("token service returned status %d", resp.StatusCode)
+			return "", nil
+		}
+
+		var tokenResp struct {
+			Token     string `json:"token"`
+			ExpiresIn int    `json:"expires_in"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+			log.Warningf("failed to decode token response: %v", err)
+			return "", nil
+		}
+		if tokenResp.Token == "" {
+			return "", nil
+		}
+
+		expiresIn := tokenResp.ExpiresIn
+		if expiresIn <= 0 {
+			expiresIn = 60
+		}
+		const refreshMargin = 10 * time.Second
+		ttl := time.Duration(expiresIn)*time.Second - refreshMargin
+		if ttl <= 0 {
+			ttl = time.Duration(expiresIn) * time.Second
+		}
+
+		tokenCache.mu.Lock()
+		tokenCache.data[scope] = &cachedToken{
+			token:   tokenResp.Token,
+			expires: time.Now().Add(ttl),
+		}
+		tokenCache.mu.Unlock()
+		return tokenResp.Token, nil
+	})
+
 	if err != nil {
-		log.Warningf("failed to create token request: %v", err)
 		return ""
 	}
-
-	username, password := config.RegistryCredential()
-	if username != "" && password != "" {
-		req.SetBasicAuth(username, password)
-	}
-
-	resp, err := exchangeHTTPClient.Do(req)
-	if err != nil {
-		log.Warningf("failed to get registry token: %v", err)
-		return ""
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		log.Warningf("token service returned status %d", resp.StatusCode)
-		return ""
-	}
-
-	var tokenResp struct {
-		Token     string `json:"token"`
-		ExpiresIn int    `json:"expires_in"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
-		log.Warningf("failed to decode token response: %v", err)
-		return ""
-	}
-	if tokenResp.Token == "" {
-		return ""
-	}
-
-	// Per the Docker registry token spec, expires_in defaults to 60 seconds
-	// when omitted. Shave off a refresh margin so we don't hand out a token
-	// that's about to expire by the time the backend registry sees it.
-	expiresIn := tokenResp.ExpiresIn
-	if expiresIn <= 0 {
-		expiresIn = 60
-	}
-	const refreshMargin = 10 * time.Second
-	ttl := time.Duration(expiresIn)*time.Second - refreshMargin
-	if ttl <= 0 {
-		ttl = time.Duration(expiresIn) * time.Second
-	}
-
-	tokenCache.mu.Lock()
-	tokenCache.data[scope] = &cachedToken{
-		token:   tokenResp.Token,
-		expires: time.Now().Add(ttl),
-	}
-	tokenCache.mu.Unlock()
-	return tokenResp.Token
+	return result.(string)
 }
 
 // registryOperationSegments are the path segments that mark the end of the
