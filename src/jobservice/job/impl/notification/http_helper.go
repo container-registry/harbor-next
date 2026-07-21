@@ -29,8 +29,7 @@ const (
 	insecure = "insecure"
 
 	// Max retry has the same meaning as max fails.
-	maxFails     = "JOBSERVICE_WEBHOOK_JOB_MAX_RETRY"
-	maxFailsAMQP = "JOBSERVICE_AMQP_JOB_MAX_RETRY"
+	maxFails = "JOBSERVICE_WEBHOOK_JOB_MAX_RETRY"
 	// http client timeout for webhook job(seconds).
 	httpClientTimeout = "JOBSERVICE_WEBHOOK_JOB_HTTP_CLIENT_TIMEOUT"
 )

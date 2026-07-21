@@ -407,9 +407,18 @@ func (n *webhookAPI) validateTargets(policy *policy_model.Policy) (bool, error) 
 		return false, errors.New(nil).WithMessagef("empty notification target with policy %s", policy.Name).WithCode(errors.BadRequestCode)
 	}
 	for i, target := range policy.Targets {
-		url, err := utils.ParseEndpoint(target.Address)
+		var allowedSchemes []string
+		if target.Type == "amqp" {
+			allowedSchemes = []string{"amqp", "amqps"}
+		}
+		url, err := utils.ParseEndpoint(target.Address, allowedSchemes...)
 		if err != nil {
 			return false, errors.New(err).WithCode(errors.BadRequestCode)
+		}
+		if target.Type == "amqp" && url.Scheme != "amqp" && url.Scheme != "amqps" {
+			return false, errors.New(nil).
+				WithMessagef("amqp target address must be a full amqp:// or amqps:// URI with policy %s", policy.Name).
+				WithCode(errors.BadRequestCode)
 		}
 		// Prevent SSRF security issue #3755
 		target.Address = url.Scheme + "://" + url.Host + url.Path

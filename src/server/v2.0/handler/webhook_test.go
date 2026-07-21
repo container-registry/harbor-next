@@ -30,6 +30,7 @@ import (
 	"github.com/goharbor/harbor/src/testing/controller/webhook"
 	"github.com/goharbor/harbor/src/testing/mock"
 	htesting "github.com/goharbor/harbor/src/testing/server/v2.0/handler"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -234,4 +235,77 @@ func (suite *WebhookTestSuite) TestGetSupportedEventTypes() {
 
 func TestWebhookTestSuite(t *testing.T) {
 	suite.Run(t, &WebhookTestSuite{})
+}
+
+func TestValidateTargets(t *testing.T) {
+	notification.Init()
+	api := &webhookAPI{}
+
+	tests := []struct {
+		name    string
+		targets []policyModel.EventTarget
+		wantOK  bool
+	}{
+		{
+			name:    "no targets",
+			targets: nil,
+			wantOK:  false,
+		},
+		{
+			name: "amqp target with amqp:// address",
+			targets: []policyModel.EventTarget{
+				{Type: "amqp", Address: "amqp://broker:5672/vhost/queue"},
+			},
+			wantOK: true,
+		},
+		{
+			name: "amqp target with amqps:// address",
+			targets: []policyModel.EventTarget{
+				{Type: "amqp", Address: "amqps://broker:5671/vhost/queue"},
+			},
+			wantOK: true,
+		},
+		{
+			name: "amqp target with bare name is rejected",
+			targets: []policyModel.EventTarget{
+				{Type: "amqp", Address: "harbor.events"},
+			},
+			wantOK: false,
+		},
+		{
+			name: "amqp target with http:// address is rejected",
+			targets: []policyModel.EventTarget{
+				{Type: "amqp", Address: "http://broker:5672/vhost/queue"},
+			},
+			wantOK: false,
+		},
+		{
+			name: "http target with amqp:// address is rejected",
+			targets: []policyModel.EventTarget{
+				{Type: "http", Address: "amqp://broker:5672/vhost/queue"},
+			},
+			wantOK: false,
+		},
+		{
+			name: "http target with http:// address",
+			targets: []policyModel.EventTarget{
+				{Type: "http", Address: "http://example.com/webhook"},
+			},
+			wantOK: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			policy := &policyModel.Policy{Name: "test-policy", Targets: tt.targets}
+			ok, err := api.validateTargets(policy)
+			if tt.wantOK {
+				assert.True(t, ok)
+				assert.NoError(t, err)
+				return
+			}
+			assert.False(t, ok)
+			assert.Error(t, err)
+		})
+	}
 }
