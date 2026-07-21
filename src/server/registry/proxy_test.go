@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -348,6 +349,56 @@ func TestGetRegistryTokenCaching(t *testing.T) {
 	token3 := getRegistryToken(req)
 	assert.Equal(t, "cached.jwt.token", token3)
 	assert.Equal(t, int32(2), callCount.Load(), "should call token server again after expiry")
+}
+
+func TestGetRegistryTokenSingleflightPreventsStampede(t *testing.T) {
+	var callCount atomic.Int32
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount.Add(1)
+		time.Sleep(50 * time.Millisecond)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"token": "single.jwt.token"})
+	}))
+	defer tokenServer.Close()
+
+	originalTokenURL := getTokenServiceURL
+	getTokenServiceURL = func() string { return tokenServer.URL }
+	defer func() { getTokenServiceURL = originalTokenURL }()
+
+	tokenCache.mu.Lock()
+	tokenCache.data = make(map[string]*cachedToken)
+	tokenCache.mu.Unlock()
+
+	t.Setenv("REGISTRY_CREDENTIAL_USERNAME", "u")
+	t.Setenv("REGISTRY_CREDENTIAL_PASSWORD", "p")
+
+	req, _ := http.NewRequest(http.MethodGet, "http://example.com/v2/concurrent/repo", nil)
+
+	var wg sync.WaitGroup
+	const numConcurrent = 10
+	results := make(chan string, numConcurrent)
+
+	for i := 0; i < numConcurrent; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			results <- getRegistryToken(req)
+		}()
+	}
+
+	wg.Wait()
+	close(results)
+
+	var tokens []string
+	for token := range results {
+		tokens = append(tokens, token)
+	}
+
+	assert.Equal(t, int32(1), callCount.Load(), "only one token request should be made despite concurrent calls")
+	assert.Len(t, tokens, numConcurrent)
+	for _, token := range tokens {
+		assert.Equal(t, "single.jwt.token", token, "all goroutines should receive the same token")
+	}
 }
 
 func TestGetRegistryTokenRespectsExpiresIn(t *testing.T) {
