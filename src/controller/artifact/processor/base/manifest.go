@@ -17,8 +17,6 @@ package base
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"io"
 
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 
@@ -27,11 +25,6 @@ import (
 	"github.com/goharbor/harbor/src/pkg/artifact"
 	"github.com/goharbor/harbor/src/pkg/registry"
 )
-
-// maxConfigBlobSize is the maximum size of a config blob that will be pulled and
-// decoded into memory. Config blobs contain metadata (labels, history, etc.) and
-// are expected to be small; this bounds memory use against oversized or malicious blobs.
-const maxConfigBlobSize = 10 * 1024 * 1024
 
 // NewManifestProcessor creates a new base manifest processor.
 // All metadata read from config layer will be populated if specifying no "properties"
@@ -97,9 +90,6 @@ func (m *ManifestProcessor) UnmarshalConfig(_ context.Context, repository string
 	if mani.Config.Size == 0 {
 		return nil
 	}
-	if mani.Config.Size > maxConfigBlobSize {
-		return fmt.Errorf("config blob size %d exceeds the maximum allowed size of %d bytes", mani.Config.Size, maxConfigBlobSize)
-	}
 	// get config layer
 	_, blob, err := m.RegCli.PullBlob(repository, mani.Config.Digest.String())
 	if err != nil {
@@ -107,7 +97,16 @@ func (m *ManifestProcessor) UnmarshalConfig(_ context.Context, repository string
 	}
 	defer blob.Close()
 
-	// unmarshal config layer, bounding the read as defense-in-depth against a blob
-	// whose actual size doesn't match the size declared in the manifest
-	return json.NewDecoder(io.LimitReader(blob, maxConfigBlobSize+1)).Decode(v)
+	// unmarshal config layer
+	return json.NewDecoder(blob).Decode(v)
+}
+
+// ConfigSize returns the size of the config blob declared by the given manifest payload,
+// without pulling the blob itself.
+func (m *ManifestProcessor) ConfigSize(manifest []byte) (int64, error) {
+	mani := &v1.Manifest{}
+	if err := json.Unmarshal(manifest, mani); err != nil {
+		return 0, err
+	}
+	return mani.Config.Size, nil
 }

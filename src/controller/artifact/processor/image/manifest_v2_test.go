@@ -188,6 +188,37 @@ func (m *manifestV2ProcessorTestSuite) TestAbstractAdditionDockerfileFromLabels(
 	m.Equal("FROM alpine\nCMD [\"/hello\"]", string(addition.Content))
 }
 
+func (m *manifestV2ProcessorTestSuite) TestAbstractAdditionDockerfileTooLarge() {
+	oversizedDockerfile := strings.Repeat("A", maxDockerfileSize+1)
+	configWithDockerfile := strings.Replace(config, `"maintainer": "tester@vmware.com"`,
+		`"maintainer": "tester@vmware.com",
+		"dockerfile": "`+oversizedDockerfile+`"`, 1)
+
+	artifact := &artifact.Artifact{}
+	mani, _, err := distribution.UnmarshalManifest(schema2.MediaTypeManifest, []byte(manifest))
+	m.Require().Nil(err)
+	m.regCli.On("PullManifest", mock.Anything, mock.Anything).Return(mani, "", nil).Once()
+	m.regCli.On("PullBlob", mock.Anything, mock.Anything).Return(int64(0), io.NopCloser(strings.NewReader(configWithDockerfile)), nil).Once()
+
+	_, err = m.processor.AbstractAddition(nil, artifact, AdditionTypeDockerfile)
+	m.True(errors.IsErr(err, errors.RequestEntityTooLargeCode))
+}
+
+func (m *manifestV2ProcessorTestSuite) TestAbstractAdditionDockerfileOversizedConfigBlob() {
+	oversizedManifest := strings.Replace(manifest, `"size": 1510,`,
+		`"size": 8388609,`, 1)
+
+	artifact := &artifact.Artifact{}
+	mani, _, err := distribution.UnmarshalManifest(schema2.MediaTypeManifest, []byte(oversizedManifest))
+	m.Require().Nil(err)
+	m.regCli.On("PullManifest", mock.Anything, mock.Anything).Return(mani, "", nil).Once()
+
+	_, err = m.processor.AbstractAddition(nil, artifact, AdditionTypeDockerfile)
+	m.True(errors.IsErr(err, errors.RequestEntityTooLargeCode))
+	// PullBlob must not be called when the declared config size already exceeds the limit
+	m.regCli.AssertNotCalled(m.T(), "PullBlob", mock.Anything, mock.Anything)
+}
+
 func (m *manifestV2ProcessorTestSuite) TestAbstractAdditionDockerfileNotFound() {
 	artifact := &artifact.Artifact{}
 	mani, _, err := distribution.UnmarshalManifest(schema2.MediaTypeManifest, []byte(manifest))
