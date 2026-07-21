@@ -75,14 +75,14 @@ spec:
     # Always so they pull the new digest behind latest.
     core:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:c6043c52475b9fa90e0d11ea9522940f37cd8203624d002229ae4b336f13aa53" # {"$imagepolicy": "flux-system:harbor-core:digest"}
+        deploy.8gears.io/image-revision: "sha256:74f34a1f318a5ef71f0878318b9110455e63aa52a4f38d038187770f08c08b1d" # {"$imagepolicy": "flux-system:harbor-core:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-core
         tag: latest
       replicas: 1
     jobservice:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:bd042ddd80877ace1bdc9659f6216749053ac010c96f31d86ca0dba619788c10" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
+        deploy.8gears.io/image-revision: "sha256:034cd8d6fb73d8a968148e94e8834ba18620e24a6fa0eb2b4956519f656a6a18" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-jobservice
         tag: latest
@@ -109,7 +109,7 @@ spec:
         size: 10Gi
     portal:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:f8b89de62f54b5643d9ec88e61dc11a9302bcbfd4d8ce7a468964f01a7ffd48d" # {"$imagepolicy": "flux-system:harbor-portal:digest"}
+        deploy.8gears.io/image-revision: "sha256:9c982f8ae12a319223b62737a05924344f14fce2867559a07a2f4c59c702c4e4" # {"$imagepolicy": "flux-system:harbor-portal:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-portal
         tag: latest
@@ -117,7 +117,7 @@ spec:
     exporter:
       enabled: true
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:9d80cfe3ae4675266e478db1d250dfc0eb3f1ae9ba62e7b106cf11b92b48ea9a" # {"$imagepolicy": "flux-system:harbor-exporter:digest"}
+        deploy.8gears.io/image-revision: "sha256:129356f2ca46d75c873efa7d884887de26fab9893544f0fe141d5be070db9982" # {"$imagepolicy": "flux-system:harbor-exporter:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-exporter
         tag: latest
