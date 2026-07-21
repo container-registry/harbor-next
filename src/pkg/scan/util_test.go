@@ -59,3 +59,72 @@ func TestGenAccessoryArt(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, "sha256:a39c6456d3cd1d87b7ee5706f67133d7a6d27a2dbc9ed66d50e504ff8920efc3", s)
 }
+
+func TestAccessoryRef(t *testing.T) {
+	const dgst = "sha256:13b9614bcc1fe99b09889f037935912fab2d98196d6090aef1719aef0511ceb4"
+
+	cases := []struct {
+		name         string
+		registryURL  string
+		repository   string
+		insecure     bool
+		wantRegistry string
+		wantScheme   string
+	}{
+		{
+			// A single-label host without a port is what the in-cluster
+			// CORE_URL resolves to when the chart omits the service port.
+			// name.ParseReference would classify it as a Docker Hub namespace.
+			name:         "portless single-label host stays the registry",
+			registryURL:  "harbor-core",
+			repository:   "library/app",
+			insecure:     true,
+			wantRegistry: "harbor-core",
+			wantScheme:   "http",
+		},
+		{
+			name:         "host with port",
+			registryURL:  "harbor-core:80",
+			repository:   "library/app",
+			insecure:     true,
+			wantRegistry: "harbor-core:80",
+			wantScheme:   "http",
+		},
+		{
+			name:         "fqdn without port, secure",
+			registryURL:  "harbor.example.com",
+			repository:   "library/app",
+			insecure:     false,
+			wantRegistry: "harbor.example.com",
+			wantScheme:   "https",
+		},
+		{
+			// Harbor project names may contain dots; the repository must
+			// never be re-parsed for a registry component.
+			name:         "dotted project name is not mistaken for a registry",
+			registryURL:  "harbor-core",
+			repository:   "my.project/app",
+			insecure:     true,
+			wantRegistry: "harbor-core",
+			wantScheme:   "http",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ref, err := accessoryRef(tc.registryURL, tc.repository, dgst, tc.insecure)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.wantRegistry, ref.Context().RegistryStr())
+			assert.NotEqual(t, "index.docker.io", ref.Context().RegistryStr())
+			assert.Equal(t, tc.repository, ref.Context().RepositoryStr())
+			assert.Equal(t, tc.wantScheme, ref.Context().Registry.Scheme())
+			assert.Equal(t, dgst, ref.Identifier())
+		})
+	}
+}
+
+func TestAccessoryRefInvalidRegistry(t *testing.T) {
+	_, err := accessoryRef("harbor core with spaces", "library/app",
+		"sha256:13b9614bcc1fe99b09889f037935912fab2d98196d6090aef1719aef0511ceb4", false)
+	assert.Error(t, err)
+}
