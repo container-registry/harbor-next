@@ -201,6 +201,16 @@ func TestScopeFromRequest(t *testing.T) {
 			path:     "/v2/registry.example.com/port/agent/blobs/sha256:def456",
 			expected: "repository:registry.example.com/port/agent:pull,push",
 		},
+		{
+			name:     "repository name component shares an operation keyword",
+			path:     "/v2/project/manifests/image/manifests/latest",
+			expected: "repository:project/manifests/image:pull,push",
+		},
+		{
+			name:     "referrers",
+			path:     "/v2/library/nginx/referrers/sha256:abc123",
+			expected: "repository:library/nginx:pull,push",
+		},
 	}
 
 	for _, tt := range tests {
@@ -256,9 +266,9 @@ func TestGetRegistryToken(t *testing.T) {
 }
 
 func TestGetRegistryTokenCaching(t *testing.T) {
-	callCount := 0
+	var callCount atomic.Int32
 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		callCount++
+		callCount.Add(1)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"token": "cached.jwt.token"})
 	}))
@@ -282,12 +292,12 @@ func TestGetRegistryTokenCaching(t *testing.T) {
 	// First call should hit the server
 	token1 := getRegistryToken(req)
 	require.Equal(t, "cached.jwt.token", token1)
-	assert.Equal(t, 1, callCount)
+	assert.Equal(t, int32(1), callCount.Load())
 
 	// Second call should use cached token
 	token2 := getRegistryToken(req)
 	assert.Equal(t, "cached.jwt.token", token2)
-	assert.Equal(t, 1, callCount, "should not call token server again (cached)")
+	assert.Equal(t, int32(1), callCount.Load(), "should not call token server again (cached)")
 
 	// Force expiry and verify re-fetch
 	tokenCache.mu.Lock()
@@ -299,13 +309,13 @@ func TestGetRegistryTokenCaching(t *testing.T) {
 
 	token3 := getRegistryToken(req)
 	assert.Equal(t, "cached.jwt.token", token3)
-	assert.Equal(t, 2, callCount, "should call token server again after expiry")
+	assert.Equal(t, int32(2), callCount.Load(), "should call token server again after expiry")
 }
 
 func TestGetRegistryTokenRespectsExpiresIn(t *testing.T) {
-	callCount := 0
+	var callCount atomic.Int32
 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		callCount++
+		callCount.Add(1)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"token":      "short.lived.token",
@@ -331,13 +341,13 @@ func TestGetRegistryTokenRespectsExpiresIn(t *testing.T) {
 
 	token1 := getRegistryToken(req)
 	require.Equal(t, "short.lived.token", token1)
-	assert.Equal(t, 1, callCount)
+	assert.Equal(t, int32(1), callCount.Load())
 
 	time.Sleep(1100 * time.Millisecond)
 
 	token2 := getRegistryToken(req)
 	assert.Equal(t, "short.lived.token", token2)
-	assert.Equal(t, 2, callCount, "a short expires_in should not be overridden by a longer fixed cache TTL")
+	assert.Equal(t, int32(2), callCount.Load(), "a short expires_in should not be overridden by a longer fixed cache TTL")
 }
 
 func TestProbeRegistryBasic(t *testing.T) {
