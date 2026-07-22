@@ -361,11 +361,12 @@ func userInfoFromRemote(ctx context.Context, token *Token, setting cfgModels.OID
 	return userInfoFromClaims(u, setting)
 }
 
+var errNoIDToken = errors.New("no ID token provided")
+
 // UserInfoFromIDToken extract user info from ID token
 func UserInfoFromIDToken(ctx context.Context, token *Token, setting cfgModels.OIDCSetting) (*UserInfo, error) {
 	if token.RawIDToken == "" {
-		// nolint:nilnil // no ID token present
-		return nil, nil
+		return nil, errNoIDToken
 	}
 	idt, err := parseIDToken(ctx, token.RawIDToken)
 	if err != nil {
@@ -496,6 +497,13 @@ func InjectGroupsToUser(info *UserInfo, user *models.User, f ...populate) {
 		log.Warningf("failed to get group ID, error: %v, skip populating groups", err)
 	} else {
 		user.GroupIDs = gids
+		// Persist the group IDs so a later, non-live-session lookup (e.g.
+		// PAT authorization) can read them back. Fail closed: log error if sync fails.
+		if user.UserID > 0 {
+			if err := usergroup.Mgr.SyncUserGroupMembership(orm.Context(), user.UserID, gids); err != nil {
+				log.Errorf("failed to sync group membership for user %d: %v", user.UserID, err)
+			}
+		}
 	}
 	user.AdminRoleInAuth = info.AdminGroupMember
 }
