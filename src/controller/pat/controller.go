@@ -26,6 +26,7 @@ import (
 	"github.com/goharbor/harbor/src/controller/project"
 	"github.com/goharbor/harbor/src/controller/robot"
 	"github.com/goharbor/harbor/src/controller/user"
+	"github.com/goharbor/harbor/src/controller/usergroup"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/q"
@@ -76,17 +77,19 @@ type Controller interface {
 
 // controller implements the Controller interface
 type controller struct {
-	patMgr     pat.Manager
-	projectCtl project.Controller
-	userCtl    user.Controller
+	patMgr       pat.Manager
+	projectCtl   project.Controller
+	userCtl      user.Controller
+	usergroupCtl usergroup.Controller
 }
 
 // NewController returns a new PAT controller
 func NewController() Controller {
 	return &controller{
-		patMgr:     pat.NewManager(),
-		projectCtl: project.Ctl,
-		userCtl:    user.Ctl,
+		patMgr:       pat.NewManager(),
+		projectCtl:   project.Ctl,
+		userCtl:      user.Ctl,
+		usergroupCtl: usergroup.Ctl,
 	}
 }
 
@@ -158,6 +161,15 @@ func (c *controller) computeScope(ctx context.Context, userID int) (string, erro
 	u, err := c.userCtl.Get(ctx, userID, nil)
 	if err != nil {
 		return "[]", err
+	}
+	// ListRoles below needs u.GroupIDs to resolve project access granted
+	// via an LDAP/OIDC group rather than a direct project_member row;
+	// userCtl.Get doesn't populate it, so read it back from the group
+	// membership persisted at the user's last login.
+	if groupIDs, err := c.usergroupCtl.ListUserGroupIDs(ctx, userID); err != nil {
+		log.Debugf("failed to list group membership for user %d: %v", userID, err)
+	} else {
+		u.GroupIDs = groupIDs
 	}
 
 	// List all projects the user has access to (including public projects)
