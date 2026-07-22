@@ -16,6 +16,34 @@ type Controller struct {
 	mock.Mock
 }
 
+// ComputeScope provides a mock function with given fields: ctx, userID
+func (_m *Controller) ComputeScope(ctx context.Context, userID int) (string, error) {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ComputeScope")
+	}
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int) (string, error)); ok {
+		return rf(ctx, userID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int) string); ok {
+		r0 = rf(ctx, userID)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int) error); ok {
+		r1 = rf(ctx, userID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Count provides a mock function with given fields: ctx, query
 func (_m *Controller) Count(ctx context.Context, query *q.Query) (int64, error) {
 	ret := _m.Called(ctx, query)

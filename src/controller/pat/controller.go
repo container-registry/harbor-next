@@ -64,6 +64,14 @@ type Controller interface {
 
 	// RefreshSecret refreshes the secret of a personal access token
 	RefreshSecret(ctx context.Context, id int64, newSecret string) (string, error)
+
+	// ComputeScope returns the scope JSON reflecting userID's current
+	// project permissions, the same computation Create uses when no
+	// scope is supplied. Exported for the CLI-secret migration, which
+	// creates legacy PAT records outside the normal Create flow but
+	// still needs them to carry a real scope rather than an empty one
+	// (an empty scope denies all access once narrowed against live RBAC).
+	ComputeScope(ctx context.Context, userID int) (string, error)
 }
 
 // controller implements the Controller interface
@@ -137,6 +145,11 @@ func (c *controller) Create(ctx context.Context, pat *model.PersonalAccessToken)
 
 	log.Debugf("created personal access token %d for user %d", id, pat.UserID)
 	return id, fullPlaintextSecret, nil
+}
+
+// ComputeScope returns the scope JSON reflecting userID's current project permissions.
+func (c *controller) ComputeScope(ctx context.Context, userID int) (string, error) {
+	return c.computeScope(ctx, userID)
 }
 
 // computeScope generates the scope for a PAT based on the user's project permissions

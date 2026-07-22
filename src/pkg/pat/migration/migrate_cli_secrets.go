@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/goharbor/harbor/src/common/utils"
+	pat_ctl "github.com/goharbor/harbor/src/controller/pat"
 	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
@@ -102,6 +103,16 @@ func MigrateCliSecretsToLegacyPATs(ctx context.Context) error {
 		salt := utils.GenerateRandomString()
 		hashed := utils.HashPATSecret(plaintext, salt)
 
+		// Compute the user's current scope so the migrated token isn't
+		// left with an empty one — PATSecurityContext.Can narrows live
+		// RBAC results by the stored scope for non-admins, so an empty
+		// scope would deny this token all access rather than preserving
+		// whatever access the user's old CLI secret effectively had.
+		scope, err := pat_ctl.Ctl.ComputeScope(ctx, userID)
+		if err != nil {
+			logger.Warningf("failed to compute scope for user %d, migrating with empty scope: %v", userID, err)
+		}
+
 		// Create a legacy PAT record
 		legacyPAT := &pat_model.PersonalAccessToken{
 			UserID:      userID,
@@ -112,6 +123,7 @@ func MigrateCliSecretsToLegacyPATs(ctx context.Context) error {
 			ExpiresAt:   -1,
 			Disabled:    false,
 			IsLegacy:    true,
+			Scope:       scope,
 		}
 
 		_, err = patMgr.Create(ctx, legacyPAT)
