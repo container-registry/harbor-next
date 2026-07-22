@@ -92,19 +92,16 @@ func (rc *reqChecker) projectID(ctx context.Context, name string) (int64, error)
 func getChallenge(req *http.Request, accessList []access) string {
 	logger := log.G(req.Context())
 	auth := req.Header.Get(authHeader)
-	if len(auth) > 0 || lib.V2CatalogURLRe.MatchString(req.URL.Path) {
-		// Return basic auth challenge by default, incl. request to '/v2/_catalog'
-		return `Basic realm="harbor"`
-	}
-
 	// A request that already carries Basic credentials isn't following the
 	// OCI/Docker Bearer token flow, so challenge it with Basic too instead of
-	// pointing it at the token service.
-	if strings.HasPrefix(auth, "Basic ") {
+	// pointing it at the token service. '/v2/_catalog' always gets a Basic
+	// challenge regardless of any auth header present.
+	if strings.HasPrefix(auth, "Basic ") || lib.V2CatalogURLRe.MatchString(req.URL.Path) {
 		return `Basic realm="harbor"`
 	}
 
-	// No auth header, treat it as CLI and redirect to token service
+	// No auth header, or a Bearer header needing refresh: treat it as an
+	// OCI/CLI client and redirect to token service
 	tokenSvc, err := tokenSvcURL(req)
 	if err != nil {
 		logger.Errorf("failed to get the endpoint for token service, error: %v", err)
