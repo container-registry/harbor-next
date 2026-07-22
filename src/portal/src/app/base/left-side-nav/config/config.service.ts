@@ -98,6 +98,16 @@ export class ConfigService {
                     );
                     this._currentConfig.oidc_client_secret =
                         new StringValueItem(fakePass, true);
+                    if (!this._currentConfig.auth_mode) {
+                        // auth_mode is no longer returned by GET /configurations
+                        // (it's derived server-side from configured backends);
+                        // keep a local placeholder so template bindings relying
+                        // on currentConfig.auth_mode.value don't break.
+                        this._currentConfig.auth_mode = new StringValueItem(
+                            'db_auth',
+                            true
+                        );
+                    }
                     if (!this._currentConfig.disabled_audit_log_event_types) {
                         this._currentConfig.disabled_audit_log_event_types =
                             new StringValueItem('', true);

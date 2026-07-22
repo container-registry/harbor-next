@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/core/api"
 	"github.com/goharbor/harbor/src/core/auth/authproxy"
 	"github.com/goharbor/harbor/src/lib/config"
@@ -39,13 +38,15 @@ type AuthProxyController struct {
 
 // Prepare checks the auth mode and fail early
 func (apc *AuthProxyController) Prepare() {
-	am, err := config.AuthMode(apc.Context())
+	s, err := config.HTTPAuthProxySetting(apc.Context())
 	if err != nil {
-		apc.SendInternalServerError(err)
+		// Config load failure - 500 Internal Server Error
+		apc.SendInternalServerError(fmt.Errorf("failed to load HTTP auth proxy settings: %v", err))
 		return
 	}
-	if am != common.HTTPAuth {
-		apc.SendPreconditionFailedError(fmt.Errorf("the auth mode %s does not support this flow", am))
+	if s.Endpoint == "" {
+		// Not configured - 412 Precondition Failed
+		apc.SendPreconditionFailedError(fmt.Errorf("HTTP auth proxy is not configured"))
 		return
 	}
 }

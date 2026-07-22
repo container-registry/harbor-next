@@ -8214,6 +8214,12 @@ definitions:
         x-nullable: true
         x-omitempty: true
         description: The auth mode of current Harbor instance.
+      configured_auth_modes:
+        type: array
+        items:
+          type: string
+        x-omitempty: true
+        description: All auth backends (OIDC, LDAP, UAA, HTTP auth proxy) that currently have non-empty endpoint configuration, in dispatch priority order. auth_mode reflects only the first (active) entry; additional entries indicate leftover or conflicting configuration from other backends.
       primary_auth_mode:
         type: boolean
         x-nullable: true

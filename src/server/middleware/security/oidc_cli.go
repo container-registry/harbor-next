@@ -20,14 +20,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/common/api"
 	"github.com/goharbor/harbor/src/common/security"
 	"github.com/goharbor/harbor/src/common/security/local"
 	"github.com/goharbor/harbor/src/controller/user"
-	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/config"
-	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/pkg/oidc"
 )
@@ -48,10 +45,11 @@ type oidcCli struct{}
 
 func (o *oidcCli) Generate(req *http.Request) security.Context {
 	ctx := req.Context()
-	if lib.GetAuthMode(ctx) != common.OIDCAuth {
+	logger := log.G(ctx)
+	setting, err := config.OIDCSetting(ctx)
+	if err != nil || setting.Endpoint == "" {
 		return nil
 	}
-	logger := log.G(ctx)
 	username, secret, ok := req.BasicAuth()
 	if !ok {
 		return nil
@@ -66,19 +64,14 @@ func (o *oidcCli) Generate(req *http.Request) security.Context {
 
 	u, err := uctl.GetByName(ctx, username)
 	if err != nil {
-		// NotFound is expected probe traffic -> DEBUG; real DB/DAO errors stay ERROR.
-		if errors.IsNotFoundErr(err) {
-			logger.Debugf("failed to get user model, username: %s, error: %v", username, err)
-		} else {
-			logger.Errorf("failed to get user model, username: %s, error: %v", username, err)
-		}
+		logger.Debugf("failed to get user model, username: %s, error: %v", username, err)
 		return nil
 	}
 
 	info, err := oidc.VerifySecret(ctx, username, secret)
 	if err != nil {
 		if u.UserID != 1 { // skip the admin user
-			logger.Errorf("failed to verify secret, username: %s, error: %v", username, err)
+			logger.Debugf("failed to verify secret, username: %s, error: %v", username, err)
 		}
 		return nil
 	}

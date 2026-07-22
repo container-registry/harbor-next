@@ -799,6 +799,7 @@
         "AUTH_MODE_UAA": "UAA",
         "AUTH_MODE_HTTP": "Http Auth",
         "AUTH_MODE_OIDC": "OIDC",
+        "MULTIPLE_AUTH_BACKENDS_CONFIGURED": "More than one authentication backend is currently configured ({{param}}). Only the first one is active; the others are unused and may be leftover configuration you should remove.",
         "SCOPE_BASE": "Base",
         "SCOPE_ONE_LEVEL": "OneLevel",
         "SCOPE_SUBTREE": "Subtree",

@@ -69,6 +69,9 @@ func (c *controllerTestSuite) TestGetUserCfg() {
 }
 
 func (c *controllerTestSuite) TestConvertForGet() {
+	// auth_mode is no longer a registered metadata item (replaced by
+	// probe-based per-backend auth detection), so ConvertForGet must not
+	// include it in the result even if it's present in the input map.
 	conf := map[string]any{
 		"ldap_url":             "ldaps.myexample,com",
 		"ldap_base_dn":         "dc=myexample,dc=com",
@@ -80,7 +83,8 @@ func (c *controllerTestSuite) TestConvertForGet() {
 	resp, err := c.controller.ConvertForGet(ctx, conf, false)
 	c.Nil(err)
 	c.Equal("ldaps.myexample,com", resp["ldap_url"].Val)
-	c.Equal("ldap_auth", resp["auth_mode"].Val)
+	_, authModeExists := resp["auth_mode"]
+	c.False(authModeExists)
 	_, exist := resp["ldap_search_password"]
 	c.False(exist)
 
@@ -94,7 +98,8 @@ func (c *controllerTestSuite) TestConvertForGet() {
 	resp2, err2 := c.controller.ConvertForGet(ctx, conf2, true)
 	c.Nil(err2)
 	c.Equal("ldaps.myexample,com", resp2["ldap_url"].Val)
-	c.Equal("ldap_auth", resp2["auth_mode"].Val)
+	_, authModeExists2 := resp2["auth_mode"]
+	c.False(authModeExists2)
 	_, exist2 := resp2["ldap_search_password"]
 	c.True(exist2)
 
@@ -131,16 +136,17 @@ func (c *controllerTestSuite) TestUpdateUserCfg() {
 	c.True(errors.IsErr(err2, errors.BadRequestCode))
 }
 
-/*func (c *controllerTestSuite) TestCheckUnmodifiable() {
-	conf := map[string]any{
-		"ldap_url":     "ldaps.myexample,com",
-		"ldap_base_dn": "dc=myexample,dc=com",
-		"auth_mode":    "ldap_auth",
+/*
+	func (c *controllerTestSuite) TestCheckUnmodifiable() {
+		conf := map[string]any{
+			"ldap_url":     "ldaps.myexample,com",
+			"ldap_base_dn": "dc=myexample,dc=com",
+			"auth_mode":    "ldap_auth",
+		}
+		failed := c.controller.checkUnmodifiable(ctx, conf, "auth_mode")
+		c.True(len(failed) > 0)
+		c.Equal(failed[0], "auth_mode")
 	}
-	failed := c.controller.checkUnmodifiable(ctx, conf, "auth_mode")
-	c.True(len(failed) > 0)
-	c.Equal(failed[0], "auth_mode")
-}
 */
 func TestControllerTestSuite(t *testing.T) {
 	suite.Run(t, &controllerTestSuite{})

@@ -27,7 +27,7 @@ import (
 	"github.com/goharbor/harbor/src/common/rbac/system"
 	"github.com/goharbor/harbor/src/common/security"
 	"github.com/goharbor/harbor/src/controller/project"
-	"github.com/goharbor/harbor/src/core/service/token"
+	tokensvc "github.com/goharbor/harbor/src/core/service/token"
 	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/errors"
@@ -92,15 +92,20 @@ func (rc *reqChecker) projectID(ctx context.Context, name string) (int64, error)
 func getChallenge(req *http.Request, accessList []access) string {
 	logger := log.G(req.Context())
 	auth := req.Header.Get(authHeader)
-	if len(auth) > 0 || lib.V2CatalogURLRe.MatchString(req.URL.Path) {
-		// Return basic auth challenge by default, incl. request to '/v2/_catalog'
+
+	// For catalog requests, always return Basic challenge regardless of auth header
+	if lib.V2CatalogURLRe.MatchString(req.URL.Path) {
 		return `Basic realm="harbor"`
 	}
-	// No auth header, treat it as CLI and redirect to token service
-	tokenSvc, err := tokenSvcURL(req)
-	if err != nil {
-		logger.Errorf("failed to get the endpoint for token service, error: %v", err)
+
+	// A request that already carries Basic credentials isn't following the
+	// OCI/Docker Bearer token flow, so challenge it with Basic too instead of
+	// pointing it at the token service. Scheme is case-insensitive per HTTP spec.
+	if len(auth) >= 6 && strings.EqualFold(auth[:6], "basic ") {
+		return `Basic realm="harbor"`
 	}
+
+	// Build scope string (shared by all Bearer challenges)
 	scope := ""
 	for _, a := range accessList {
 		if len(scope) > 0 {
@@ -108,10 +113,22 @@ func getChallenge(req *http.Request, accessList []access) string {
 		}
 		scope += a.scopeStr(req.Context())
 	}
-	challenge := fmt.Sprintf(`Bearer realm="%s",service="%s"`, tokenSvc, token.Registry)
+
+	// Get token service URL (shared by all Bearer challenges)
+	tokenSvc, err := tokenSvcURL(req)
+	if err != nil {
+		logger.Errorf("failed to get the endpoint for token service, error: %v", err)
+	}
+
+	// Build Bearer challenge
+	challenge := fmt.Sprintf(`Bearer realm="%s",service="%s"`, tokenSvc, tokensvc.Registry)
 	if len(scope) > 0 {
 		challenge = fmt.Sprintf(`%s,scope="%s"`, challenge, scope)
 	}
+
+	// If Docker sends Bearer auth but validation failed, return Bearer to get a new token
+	// If no auth header, treat it as CLI and redirect to token service
+	// Both paths use the same Bearer challenge constructed above
 	return challenge
 }
 

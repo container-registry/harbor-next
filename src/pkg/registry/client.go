@@ -645,6 +645,10 @@ func (c *client) do(req *http.Request) (*http.Response, error) {
 		}
 	}
 	utils.SetUserAgentHeader(req)
+	// #nosec G704 -- SSRF false positive: req's URL host is always c.url, which
+	// is fixed at client construction from Harbor's trusted registry config and
+	// never mutated afterwards. Callers only vary the path (repository/tag/
+	// digest), so this holds for every do() call site, not just the current ones.
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
