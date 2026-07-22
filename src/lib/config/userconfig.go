@@ -66,26 +66,11 @@ func ConfiguredAuthBackends(ctx context.Context) []string {
 	return backends
 }
 
-// DetectAuthMode derives the authentication mode used for dispatch.
-// Priority: explicit auth_mode (if set and valid) > auto-detected from configured backends > DB (default).
-// The explicit auth_mode is kept for upgrade compatibility - if operator explicitly set auth_mode
-// before this refactor, we respect it to avoid unexpected auth switches.
+// DetectAuthMode derives the authentication mode used for dispatch: the
+// highest-priority backend with a non-empty endpoint, or DB auth if none are
+// configured. See ConfiguredAuthBackends for the full set of configured
+// backends, including any lower-priority ones left over from a prior setup.
 func DetectAuthMode(ctx context.Context) string {
-	mgr := DefaultMgr()
-	if err := mgr.Load(ctx); err == nil {
-		if explicit := mgr.Get(ctx, common.AUTHMode).GetString(); explicit != "" {
-			validModes := map[string]bool{
-				common.DBAuth:    true,
-				common.LDAPAuth:  true,
-				common.OIDCAuth:  true,
-				common.UAAAuth:   true,
-				common.HTTPAuth: true,
-			}
-			if validModes[explicit] {
-				return explicit
-			}
-		}
-	}
 	if backends := ConfiguredAuthBackends(ctx); len(backends) > 0 {
 		return backends[0]
 	}
