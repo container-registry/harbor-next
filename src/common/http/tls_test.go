@@ -210,3 +210,84 @@ func TestResolveCustomCACertDirOverride(t *testing.T) {
 	os.Setenv(customCACertDirEnv, "/tls")
 	assert.Equal(t, "/tls", resolveCustomCACertDir())
 }
+
+func TestLoadCustomCACertificatesEmptyCertFile(t *testing.T) {
+	withCleanSSLCertFileEnv(t)
+
+	certDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(certDir, "empty.crt"), []byte(""), 0o644))
+
+	systemBundle := filepath.Join(t.TempDir(), "ca-certificates.crt")
+	require.NoError(t, os.WriteFile(systemBundle, []byte("-----BEGIN SYSTEM BUNDLE-----\n"), 0o644))
+
+	combined := filepath.Join(t.TempDir(), "combined.crt")
+	loadCustomCACertificates(certDir, systemBundle, combined)
+
+	_, ok := os.LookupEnv("SSL_CERT_FILE")
+	assert.True(t, ok, "SSL_CERT_FILE should be set even with empty cert file")
+	got, err := os.ReadFile(combined)
+	require.NoError(t, err)
+	assert.NotContains(t, string(got), "empty.crt", "empty file content should not appear in combined bundle")
+}
+
+func TestLoadCustomCACertificatesSSLCertFileWithTrailingSlash(t *testing.T) {
+	withCleanSSLCertFileEnv(t)
+
+	customCert := generateSelfSignedCert(t)
+	certDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(certDir, "internal-ca.crt"), []byte(customCert), 0o644))
+
+	sslCertDir := t.TempDir()
+	systemBundle := filepath.Join(sslCertDir, "ca-certificates.crt")
+	require.NoError(t, os.WriteFile(systemBundle, []byte("-----BEGIN SYSTEM BUNDLE-----\n"), 0o644))
+	expected := sslCertDir + "/"
+	os.Setenv("SSL_CERT_FILE", expected)
+
+	combined := filepath.Join(t.TempDir(), "combined.crt")
+	loadCustomCACertificates(certDir, "/should/not/be/used", combined)
+
+	val, ok := os.LookupEnv("SSL_CERT_FILE")
+	assert.True(t, ok, "SSL_CERT_FILE should remain set")
+	assert.Equal(t, expected, val, "SSL_CERT_FILE should be untouched when it points to directory")
+}
+
+func TestLoadCustomCACertificatesAllCustomCertsUnreadable(t *testing.T) {
+	withCleanSSLCertFileEnv(t)
+
+	certDir := t.TempDir()
+	unreadable := filepath.Join(certDir, "unreadable.crt")
+	require.NoError(t, os.WriteFile(unreadable, []byte("cert"), 0o644))
+	require.NoError(t, os.Chmod(unreadable, 0o000))
+
+	systemBundle := filepath.Join(t.TempDir(), "ca-certificates.crt")
+	require.NoError(t, os.WriteFile(systemBundle, []byte("-----BEGIN SYSTEM BUNDLE-----\n"), 0o644))
+
+	combined := filepath.Join(t.TempDir(), "combined.crt")
+	loadCustomCACertificates(certDir, systemBundle, combined)
+
+	_, ok := os.LookupEnv("SSL_CERT_FILE")
+	assert.False(t, ok, "SSL_CERT_FILE should be untouched when all custom certs are unreadable")
+	_, err := os.Stat(combined)
+	assert.True(t, os.IsNotExist(err), "combined bundle should not be written when no custom certs loaded")
+}
+
+func TestLoadCustomCACertificatesExistingSSLCertFileMissing(t *testing.T) {
+	withCleanSSLCertFileEnv(t)
+
+	customCert := generateSelfSignedCert(t)
+	certDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(certDir, "internal-ca.crt"), []byte(customCert), 0o644))
+
+	missingDir := t.TempDir()
+	expected := filepath.Join(missingDir, "nonexistent-bundle.crt")
+	os.Setenv("SSL_CERT_FILE", expected)
+
+	combined := filepath.Join(t.TempDir(), "combined.crt")
+	loadCustomCACertificates(certDir, "/should/not/be/used", combined)
+
+	val, ok := os.LookupEnv("SSL_CERT_FILE")
+	assert.True(t, ok, "SSL_CERT_FILE should remain set")
+	assert.Equal(t, expected, val, "SSL_CERT_FILE should be untouched when it points to missing file")
+	_, err := os.Stat(combined)
+	assert.True(t, os.IsNotExist(err), "combined bundle should not be written when SSL_CERT_FILE is missing")
+}
