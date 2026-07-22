@@ -40,6 +40,10 @@ import (
 	v2 "github.com/goharbor/harbor/src/pkg/token/claims/v2"
 )
 
+const (
+	signingMethod = "RS256"
+)
+
 var (
 	privateKey string
 )
@@ -113,7 +117,7 @@ func filterAccess(ctx context.Context, access []*token.ResourceActions,
 
 // MakeToken makes a valid jwt token based on parms.
 func MakeToken(ctx context.Context, username, service string, access []*token.ResourceActions) (*models.Token, error) {
-	options, err := tokenpkg.NewOptions("", v2.Issuer, privateKey)
+	options, err := tokenpkg.NewOptions(signingMethod, v2.Issuer, privateKey)
 	if err != nil {
 		return nil, err
 	}
