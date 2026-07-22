@@ -11,12 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import {
-    ChangeDetectorRef,
-    Component,
-    OnInit,
-    ViewChild,
-} from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, ViewChild } from '@angular/core';
 import { NgForm } from '@angular/forms';
 import { MessageHandlerService } from '../../../../shared/services/message-handler.service';
 import { AppConfigService } from '../../../../services/app-config.service';
@@ -72,8 +67,7 @@ export class ConfigurationAuthComponent implements OnInit {
                     systemInfo.configured_auth_modes || [];
                 if (this.currentConfig && this.currentConfig.auth_mode) {
                     this.currentConfig.auth_mode.value =
-                        this.configuredAuthModes[0] ||
-                        CONFIG_AUTH_MODE.DB_AUTH;
+                        this.configuredAuthModes[0] || CONFIG_AUTH_MODE.DB_AUTH;
                 }
                 // force a synchronous re-check now so any pending async
                 // change detection (e.g. from an unrelated zone task) doesn't
