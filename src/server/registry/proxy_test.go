@@ -131,7 +131,10 @@ func TestAuthDirectorExchangesClientBasicAuth(t *testing.T) {
 
 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, pass, ok := r.BasicAuth()
-		require.True(t, ok, "should receive basic auth")
+		if !assert.True(t, ok, "should receive basic auth") {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
 		assert.Equal(t, "clientuser", user)
 		assert.Equal(t, "clientpass", pass)
 		w.Header().Set("Content-Type", "application/json")
