@@ -62,7 +62,7 @@
                             {{ 'PROFILE.TOKEN_NEVER' | translate }}
                         </span>
                         <span *ngIf="token.expires_at !== -1">
-                            {{ token.expires_at | date : 'short' }}
+                            {{ token.expires_at * 1000 | date : 'short' }}
                         </span>
                     </clr-dg-cell>
                     <clr-dg-cell>
@@ -88,6 +88,13 @@
                                     (click)="revokeToken(token.id)"
                                     *ngIf="!token.disabled">
                                     {{ 'PROFILE.REVOKE_TOKEN' | translate }}
+                                </button>
+                                <button
+                                    clrDropdownItem
+                                    *ngIf="!token.disabled && !token.expired"
+                                    [disabled]="refreshingTokenId !== null"
+                                    (click)="refreshTokenSecret(token.id)">
+                                    {{ 'PROFILE.REFRESH_TOKEN' | translate }}
                                 </button>
                                 <button
                                     clrDropdownItem
@@ -145,8 +152,96 @@
                     clrTextarea
                     placeholder="Enter token description (optional)"
                     [(ngModel)]="newTokenForm.description"
+                    [disabled]="!!createdTokenSecret"
                     name="token_description"></textarea>
             </clr-textarea-container>
+
+            <clr-number-input-container>
+                <label>{{ 'PROFILE.PAT_EXPIRES_IN_DAYS' | translate }}</label>
+                <input
+                    clrNumberInput
+                    name="token_expires"
+                    [(ngModel)]="newTokenForm.expiresInDays"
+                    [disabled]="!!createdTokenSecret"
+                    min="0" />
+                <clr-control-helper>{{
+                    'PROFILE.PAT_EXPIRES_PLACEHOLDER' | translate
+                }}</clr-control-helper>
+            </clr-number-input-container>
+
+            <div class="scope-section" style="margin-top: 16px">
+                <label style="font-weight: 600; display: block">
+                    {{ 'PROFILE.PAT_SCOPE' | translate }}
+                </label>
+                <p style="font-size: 13px; color: #666; margin-bottom: 8px">
+                    {{ 'PROFILE.PAT_SCOPE_HELP' | translate }}
+                </p>
+                <div *ngIf="scopeLoading">
+                    <span class="spinner spinner-sm"></span>
+                    {{ 'PROFILE.LOADING' | translate }}
+                </div>
+                <div *ngIf="!scopeLoading && scopeProjects.length > 0">
+                    <div style="margin-bottom: 8px">
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-link"
+                            [disabled]="!!createdTokenSecret"
+                            (click)="selectAllScope()">
+                            {{ 'PROFILE.PAT_SCOPE_SELECT_ALL' | translate }}
+                        </button>
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-link"
+                            [disabled]="!!createdTokenSecret"
+                            (click)="deselectAllScope()">
+                            {{ 'PROFILE.PAT_SCOPE_DESELECT_ALL' | translate }}
+                        </button>
+                    </div>
+                    <table class="table table-noborder" style="width: 100%">
+                        <thead>
+                            <tr>
+                                <th>
+                                    {{
+                                        'PROFILE.PAT_SCOPE_PROJECT' | translate
+                                    }}
+                                </th>
+                                <th style="width: 80px; text-align: center">
+                                    {{ 'PROFILE.PAT_SCOPE_PULL' | translate }}
+                                </th>
+                                <th style="width: 80px; text-align: center">
+                                    {{ 'PROFILE.PAT_SCOPE_PUSH' | translate }}
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr *ngFor="let p of scopeProjects">
+                                <td>{{ p.project_name }}</td>
+                                <td style="text-align: center">
+                                    <input
+                                        clrCheckbox
+                                        type="checkbox"
+                                        [(ngModel)]="p.pull"
+                                        [disabled]="!!createdTokenSecret"
+                                        [name]="'pull_' + p.project_id" />
+                                </td>
+                                <td style="text-align: center">
+                                    <input
+                                        clrCheckbox
+                                        type="checkbox"
+                                        [(ngModel)]="p.push"
+                                        [disabled]="!!createdTokenSecret"
+                                        [name]="'push_' + p.project_id" />
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div
+                    *ngIf="!scopeLoading && scopeProjects.length === 0"
+                    style="font-size: 13px; color: #666">
+                    {{ 'PROFILE.PAT_SCOPE_NO_PROJECTS' | translate }}
+                </div>
+            </div>
 
             <div *ngIf="createdTokenSecret" class="alert alert-info">
                 <div class="alert-items">
@@ -214,3 +309,60 @@
         </button>
     </div>
 </clr-modal>
+
+<!-- Refreshed Secret Modal -->
+<clr-modal
+    [(clrModalOpen)]="showRefreshedSecretModal"
+    [clrModalStaticBackdrop]="true"
+    id="refreshed-secret-modal">
+    <h3 class="modal-title">
+        {{ 'PROFILE.REFRESH_TOKEN' | translate }}
+    </h3>
+
+    <div class="modal-body">
+        <div class="alert alert-info">
+            <div class="alert-items">
+                <div class="alert-item static">
+                    <div class="alert-icon-wrapper">
+                        <clr-icon
+                            class="alert-icon"
+                            shape="info-circle"></clr-icon>
+                    </div>
+                    <span class="alert-text">
+                        {{ 'PROFILE.PAT_SECRET_COPY_WARNING' | translate }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>{{ 'PROFILE.TOKEN_SECRET' | translate }}</label>
+            <div class="input-group">
+                <input
+                    type="text"
+                    class="form-control"
+                    [value]="refreshedTokenSecret"
+                    readonly />
+                <button
+                    type="button"
+                    class="btn btn-primary"
+                    (click)="copyRefreshedTokenSecret()">
+                    {{ 'BUTTON.COPY' | translate }}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-footer">
+        <button
+            type="button"
+            class="btn btn-primary"
+            (click)="closeRefreshedSecretModal()">
+            {{ 'BUTTON.CLOSE' | translate }}
+        </button>
+    </div>
+</clr-modal>
+
+<confirmation-dialog
+    #confirmationDialog
+    (confirmAction)="confirmDeleteToken($event)"></confirmation-dialog>
