@@ -96,6 +96,14 @@ func getChallenge(req *http.Request, accessList []access) string {
 		// Return basic auth challenge by default, incl. request to '/v2/_catalog'
 		return `Basic realm="harbor"`
 	}
+
+	// A request that already carries Basic credentials isn't following the
+	// OCI/Docker Bearer token flow, so challenge it with Basic too instead of
+	// pointing it at the token service.
+	if strings.HasPrefix(auth, "Basic ") {
+		return `Basic realm="harbor"`
+	}
+
 	// No auth header, treat it as CLI and redirect to token service
 	tokenSvc, err := tokenSvcURL(req)
 	if err != nil {
