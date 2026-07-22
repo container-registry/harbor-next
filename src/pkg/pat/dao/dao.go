@@ -124,7 +124,7 @@ func (d *dao) Count(ctx context.Context, query *q.Query) (int64, error) {
 	return qs.Count()
 }
 
-// ListBySecretPrefix returns non-disabled PATs matching the user and secret prefix.
+// ListBySecretPrefix returns PATs for the given user and secret prefix, filtered by disabled status.
 // This enables efficient lookup before expensive PBKDF2 verification.
 func (d *dao) ListBySecretPrefix(ctx context.Context, userID int, secretPrefix string, disabled bool) ([]*model.PersonalAccessToken, error) {
 	pats := []*model.PersonalAccessToken{}

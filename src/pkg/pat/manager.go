@@ -74,7 +74,7 @@ func (m *manager) Count(ctx context.Context, query *q.Query) (total int64, err e
 	return m.dao.Count(ctx, query)
 }
 
-// ListBySecretPrefix returns non-disabled PATs matching the user and secret prefix.
+// ListBySecretPrefix returns PATs for the given user and secret prefix, filtered by disabled status.
 func (m *manager) ListBySecretPrefix(ctx context.Context, userID int, secretPrefix string, disabled bool) ([]*model.PersonalAccessToken, error) {
 	return m.dao.ListBySecretPrefix(ctx, userID, secretPrefix, disabled)
 }
