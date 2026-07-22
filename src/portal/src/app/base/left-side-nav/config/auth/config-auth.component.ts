@@ -11,7 +11,12 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import { Component, OnInit, ViewChild } from '@angular/core';
+import {
+    ChangeDetectorRef,
+    Component,
+    OnInit,
+    ViewChild,
+} from '@angular/core';
 import { NgForm } from '@angular/forms';
 import { MessageHandlerService } from '../../../../shared/services/message-handler.service';
 import { AppConfigService } from '../../../../services/app-config.service';
@@ -36,6 +41,7 @@ export class ConfigurationAuthComponent implements OnInit {
     testingOnGoing = false;
     onGoing = false;
     redirectUrl: string;
+    configuredAuthModes: string[] = [];
     @ViewChild('authConfigFrom') authForm: NgForm;
 
     get currentConfig(): Configuration {
@@ -51,7 +57,8 @@ export class ConfigurationAuthComponent implements OnInit {
         private configService: ConfigurationService,
         private appConfigService: AppConfigService,
         private conf: ConfigService,
-        private systemInfo: SystemInfoService
+        private systemInfo: SystemInfoService,
+        private cdr: ChangeDetectorRef
     ) {}
     ngOnInit() {
         this.conf.resetConfig();
@@ -59,9 +66,26 @@ export class ConfigurationAuthComponent implements OnInit {
     }
     getSystemInfo(): void {
         this.systemInfo.getSystemInfo().subscribe(
-            systemInfo => (this.redirectUrl = systemInfo.external_url),
+            systemInfo => {
+                this.redirectUrl = systemInfo.external_url;
+                this.configuredAuthModes =
+                    systemInfo.configured_auth_modes || [];
+                if (this.currentConfig && this.currentConfig.auth_mode) {
+                    this.currentConfig.auth_mode.value =
+                        this.configuredAuthModes[0] ||
+                        CONFIG_AUTH_MODE.DB_AUTH;
+                }
+                // force a synchronous re-check now so any pending async
+                // change detection (e.g. from an unrelated zone task) doesn't
+                // later observe this value transitioning against a stale check.
+                this.cdr.detectChanges();
+            },
             error => this.msgHandler.error(error)
         );
+    }
+
+    public get multipleAuthBackendsConfigured(): boolean {
+        return this.configuredAuthModes.length > 1;
     }
     get checkable() {
         return (
@@ -237,7 +261,6 @@ export class ConfigurationAuthComponent implements OnInit {
                 prop.startsWith('ldap_') ||
                 prop.startsWith('uaa_') ||
                 prop.startsWith('oidc_') ||
-                prop === 'auth_mode' ||
                 prop === 'project_creattion_restriction' ||
                 prop === 'primary_auth_mode' ||
                 prop === 'self_registration' ||

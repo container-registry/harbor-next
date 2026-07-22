@@ -1,3 +1,14 @@
+<clr-alert
+    *ngIf="multipleAuthBackendsConfigured"
+    [clrAlertType]="'warning'"
+    [clrAlertClosable]="false">
+    <clr-alert-item>
+        <span class="alert-text">{{
+            'CONFIG.MULTIPLE_AUTH_BACKENDS_CONFIGURED'
+                | translate: { param: configuredAuthModes.join(', ') }
+        }}</span>
+    </clr-alert-item>
+</clr-alert>
 <form #authConfigFrom="ngForm" class="clr-form clr-form-horizontal">
     <div class="clr-form-control">
         <label

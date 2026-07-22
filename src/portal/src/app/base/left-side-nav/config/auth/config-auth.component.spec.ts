@@ -92,4 +92,35 @@ describe('ConfigurationAuthComponent', () => {
     it('should create', () => {
         expect(component).toBeTruthy();
     });
+
+    it('should not include auth_mode in getChanges() payload', () => {
+        component.currentConfig.auth_mode.value = 'ldap_auth';
+        component.currentConfig.ldap_url.value = 'ldap://example.com';
+        const changes = component.getChanges();
+        expect(changes['auth_mode']).toBeUndefined();
+        expect(changes['ldap_url']).toBe('ldap://example.com');
+    });
+
+    it('should report multipleAuthBackendsConfigured based on configured_auth_modes length', () => {
+        expect(component.multipleAuthBackendsConfigured).toBeFalse();
+        component.configuredAuthModes = ['oidc_auth', 'ldap_auth'];
+        fixture.detectChanges();
+        expect(component.multipleAuthBackendsConfigured).toBeTrue();
+    });
+
+    it('should set auth_mode from configured_auth_modes returned by systeminfo', () => {
+        spyOn(
+            TestBed.inject(SystemInfoService),
+            'getSystemInfo'
+        ).and.returnValue(
+            of({
+                external_url: 'expectedUrl',
+                configured_auth_modes: ['oidc_auth', 'ldap_auth'],
+            })
+        );
+        component.getSystemInfo();
+        fixture.detectChanges();
+        expect(component.currentConfig.auth_mode.value).toBe('oidc_auth');
+        expect(component.multipleAuthBackendsConfigured).toBeTrue();
+    });
 });
