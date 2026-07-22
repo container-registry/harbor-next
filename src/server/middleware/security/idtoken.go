@@ -63,7 +63,10 @@ func (i *idToken) Generate(req *http.Request) security.Context {
 		log.Errorf("Failed to get user info from ID token: %v", err)
 		return nil
 	}
-	oidc.InjectGroupsToUser(info, u)
+	if err := oidc.InjectGroupsToUser(info, u); err != nil {
+		log.Errorf("failed to sync group membership for user %d: %v", u.UserID, err)
+		return nil
+	}
 	log.Debugf("an ID token security context generated for request %s %s", req.Method, req.URL.Path)
 	return local.NewSecurityContext(u)
 }

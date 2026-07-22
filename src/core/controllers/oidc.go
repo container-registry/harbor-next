@@ -208,7 +208,10 @@ func (oc *OIDCController) Callback() {
 		oc.SendError(err)
 		return
 	}
-	oidc.InjectGroupsToUser(info, u)
+	if err := oidc.InjectGroupsToUser(info, u); err != nil {
+		oc.SendError(err)
+		return
+	}
 	um, err := ctluser.Ctl.Get(ctx, u.UserID, &ctluser.Option{WithOIDCInfo: true})
 	if err != nil {
 		oc.SendError(err)
@@ -344,7 +347,10 @@ func userOnboard(ctx context.Context, oc *OIDCController, info *oidc.UserInfo, u
 		OIDCUserMeta: &oidcUser,
 		Comment:      oidcUserComment,
 	}
-	oidc.InjectGroupsToUser(info, user)
+	if err := oidc.InjectGroupsToUser(info, user); err != nil {
+		oc.SendError(err)
+		return nil, false
+	}
 
 	log.Debugf("User created: %v\n", user.Username)
 
