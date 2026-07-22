@@ -29,6 +29,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/pkg/notifier/event"
+	"github.com/goharbor/harbor/src/pkg/oidc"
 )
 
 type logoutResolver struct {
@@ -65,6 +66,12 @@ func isOIDCAuthCommonUser(ctx context.Context, username string) bool {
 	}
 	// for admin user under oidc, it should be handled by /c/log_out, not /c/oidc/logout
 	if u.UserID == 1 {
+		return false
+	}
+	// only route to oidc logout handling if this specific user actually has
+	// oidc metadata; a non-admin local user isn't an oidc user just because
+	// oidc is configured somewhere in the system.
+	if _, err := oidc.NewMetaMgr().GetByUserID(ctx, u.UserID); err != nil {
 		return false
 	}
 	return true

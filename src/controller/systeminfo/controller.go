@@ -44,6 +44,7 @@ var Ctl = NewController()
 // Data wraps common systeminfo data
 type Data struct {
 	AuthMode                   string
+	ConfiguredAuthModes        []string
 	PrimaryAuthMode            bool
 	SelfRegistration           bool
 	BannerMessage              string
@@ -99,13 +100,15 @@ func (c *controller) GetInfo(ctx context.Context, opt Options) (*Data, error) {
 		logger.Errorf("Error occurred loading config: %v", err)
 		return nil, err
 	}
+	authMode := config.DetectAuthMode(ctx)
 	res := &Data{
-		AuthMode:                   config.DetectAuthMode(ctx),
+		AuthMode:                   authMode,
+		ConfiguredAuthModes:        config.ConfiguredAuthBackends(ctx),
 		PrimaryAuthMode:            utils.SafeCastBool(cfg[common.PrimaryAuthMode]),
 		SelfRegistration:           utils.SafeCastBool(cfg[common.SelfRegistration]),
 		BannerMessage:              utils.SafeCastString(mgr.Get(ctx, common.BannerMessage).GetString()),
 		UnauthenticatedLandingPage: utils.SafeCastString(cfg[common.UnauthenticatedLandingPage]),
-		OIDCProviderName:           OIDCProviderName(ctx, cfg),
+		OIDCProviderName:           OIDCProviderName(authMode, cfg),
 	}
 	if res.AuthMode == common.HTTPAuth {
 		if s, err := config.HTTPAuthProxySetting(ctx); err == nil {
@@ -141,8 +144,8 @@ func (c *controller) GetInfo(ctx context.Context, opt Options) (*Data, error) {
 	return res, nil
 }
 
-func OIDCProviderName(ctx context.Context, cfg map[string]any) string {
-	if config.DetectAuthMode(ctx) != common.OIDCAuth {
+func OIDCProviderName(authMode string, cfg map[string]any) string {
+	if authMode != common.OIDCAuth {
 		return ""
 	}
 	return utils.SafeCastString(cfg[common.OIDCName])

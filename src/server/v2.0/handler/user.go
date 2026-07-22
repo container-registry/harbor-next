@@ -52,6 +52,9 @@ func newUsersAPI() *usersAPI {
 	return &usersAPI{
 		ctl: user.Ctl,
 		getPrimaryAuth: func(ctx context.Context) (string, error) {
+			if err := config.Load(ctx); err != nil {
+				return "", err
+			}
 			return config.DetectAuthMode(ctx), nil
 		},
 	}

@@ -127,7 +127,8 @@ func TestOIDCProviderName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config.InitWithSettings(tt.config)
-			if got := OIDCProviderName(context.Background(), tt.args.cfg); got != tt.want {
+			authMode := config.DetectAuthMode(context.Background())
+			if got := OIDCProviderName(authMode, tt.args.cfg); got != tt.want {
 				t.Errorf("OIDCProviderName() = %v, want %v", got, tt.want)
 			}
 		})

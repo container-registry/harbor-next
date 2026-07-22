@@ -83,6 +83,7 @@ func (s *sysInfoAPI) convertInfo(d *si.Data) *models.GeneralInfo {
 	}
 	res := &models.GeneralInfo{
 		AuthMode:                   &d.AuthMode,
+		ConfiguredAuthModes:        d.ConfiguredAuthModes,
 		PrimaryAuthMode:            &d.PrimaryAuthMode,
 		SelfRegistration:           &d.SelfRegistration,
 		BannerMessage:              &d.BannerMessage,

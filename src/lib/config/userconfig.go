@@ -36,28 +36,43 @@ func GetSystemCfg(ctx context.Context) (map[string]any, error) {
 	return sysCfg, nil
 }
 
-// DetectAuthMode derives the authentication mode from configured backends.
-// Auto-detection priority: OIDC > LDAP > UAA > HTTP Auth Proxy > DB (default).
-func DetectAuthMode(ctx context.Context) string {
+// ConfiguredAuthBackends returns every non-DB auth backend that currently has
+// a non-empty endpoint configured, in priority order: OIDC > LDAP > UAA >
+// HTTP Auth Proxy. More than one entry means the operator has leftover or
+// conflicting backend configuration - only the first entry is actually used
+// for dispatch (see DetectAuthMode), the rest are effectively stale.
+func ConfiguredAuthBackends(ctx context.Context) []string {
+	var backends []string
 	if setting, err := OIDCSetting(ctx); err == nil && setting.Endpoint != "" {
-		return common.OIDCAuth
+		backends = append(backends, common.OIDCAuth)
 	} else if err != nil {
 		log.Debugf("failed to load OIDC config for auth mode detection: %v", err)
 	}
 	if conf, err := LDAPConf(ctx); err == nil && conf.URL != "" {
-		return common.LDAPAuth
+		backends = append(backends, common.LDAPAuth)
 	} else if err != nil {
 		log.Debugf("failed to load LDAP config for auth mode detection: %v", err)
 	}
 	if setting, err := UAASettings(ctx); err == nil && setting.Endpoint != "" {
-		return common.UAAAuth
+		backends = append(backends, common.UAAAuth)
 	} else if err != nil {
 		log.Debugf("failed to load UAA config for auth mode detection: %v", err)
 	}
 	if conf, err := HTTPAuthProxySetting(ctx); err == nil && conf.Endpoint != "" {
-		return common.HTTPAuth
+		backends = append(backends, common.HTTPAuth)
 	} else if err != nil {
 		log.Debugf("failed to load HTTP auth proxy config for auth mode detection: %v", err)
+	}
+	return backends
+}
+
+// DetectAuthMode derives the authentication mode used for dispatch: the
+// highest-priority backend with a non-empty endpoint, or DB auth if none are
+// configured. See ConfiguredAuthBackends for the full set of configured
+// backends, including any lower-priority ones left over from a prior setup.
+func DetectAuthMode(ctx context.Context) string {
+	if backends := ConfiguredAuthBackends(ctx); len(backends) > 0 {
+		return backends[0]
 	}
 	return common.DBAuth
 }
