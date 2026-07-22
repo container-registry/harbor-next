@@ -23,7 +23,6 @@ import (
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/orm"
-	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/pat"
 	pat_model "github.com/goharbor/harbor/src/pkg/pat/model"
 )
@@ -78,19 +77,6 @@ func MigrateCliSecretsToLegacyPATs(ctx context.Context) error {
 		userID := int(row.UserID)
 		encryptedSecret := row.Secret
 
-		// Check if a PAT named "cli-secret" already exists for this user
-		existing, err := patMgr.List(ctx, q.New(q.KeyWords{"user_id": userID, "name": "cli-secret"}))
-		if err != nil {
-			logger.Warningf("failed to check existing PAT for user %d: %v", userID, err)
-			errorCount++
-			continue
-		}
-		if len(existing) > 0 {
-			logger.Debugf("user %d already has a cli-secret PAT, skipping", userID)
-			skippedCount++
-			continue
-		}
-
 		// Decrypt the AES CLI secret
 		plaintext, err := utils.ReversibleDecrypt(encryptedSecret, secretKey)
 		if err != nil {
@@ -126,8 +112,17 @@ func MigrateCliSecretsToLegacyPATs(ctx context.Context) error {
 			Scope:       scope,
 		}
 
+		// Create atomically and rely on the unique_pat_name (user_id, name)
+		// constraint to detect an existing "cli-secret" PAT, rather than a
+		// separate list-then-create check that races under concurrent
+		// migration runs (e.g. multiple core replicas starting together).
 		_, err = patMgr.Create(ctx, legacyPAT)
 		if err != nil {
+			if errors.IsConflictErr(err) {
+				logger.Debugf("user %d already has a cli-secret PAT, skipping", userID)
+				skippedCount++
+				continue
+			}
 			logger.Warningf("failed to create legacy PAT for user %d: %v", userID, err)
 			errorCount++
 			continue

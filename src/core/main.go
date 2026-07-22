@@ -248,7 +248,7 @@ func main() {
 	// Migrate existing OIDC CLI secrets to legacy personal access tokens.
 	// Safe to run on every startup: skips users that already have one.
 	if err := patmigration.MigrateCliSecretsToLegacyPATs(orm.Context()); err != nil {
-		log.Errorf("failed to migrate OIDC CLI secrets to legacy personal access tokens: %v", err)
+		log.Fatalf("failed to migrate OIDC CLI secrets to legacy personal access tokens: %v", err)
 	}
 
 	// Init API handler
