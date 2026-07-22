@@ -125,27 +125,14 @@ Test Case - Docker Login And Push With PAT
     Delete User  ${user_id}
 
 Test Case - Expired PAT Rejected For Authentication
-    [Documentation]  Test that expired PATs are rejected during authentication
-    ${d}=  Get Current Date  result_format=%m%s  increment=8 days
-    ${user_name}=  Set Variable  expired-user-${d}
-    ${token_name}=  Set Variable  expired-pat-${d}
-    ${password}=  Set Variable  Expired12345
-
-    # Create test user
-    ${user_id}=  Create Test User  ${user_name}  ${password}
-
-    # Create PAT with past expiration date
-    ${past_time}=  Get Time  epoch  -1 days
-    ${result}=  Run Process  bash  -c
-    ...  curl -sk -u admin:Harbor12345 -X POST http://${ip}:${HARBOR_PORT}/api/v2.0/users/${user_id}/personal_access_tokens -H "Content-Type: application/json" -d '{"name":"${token_name}","description":"Expired PAT","expires_at":${past_time}}' 2>&1 | grep -o '"secret":"[^"]*"' | head -1 | tr -d '"secret":"'
-    ${expired_secret}=  Set Variable  ${result.stdout}
-    Should Not Be Empty  ${expired_secret}  Failed to create expired PAT
-
-    # Try to authenticate with expired PAT - should fail
-    ${auth_result}=  Run Process  bash  -c
-    ...  curl -sk -u ${user_name}:hbr_pat_${expired_secret} -X GET http://${ip}:${HARBOR_PORT}/api/v2.0/users 2>&1 | grep -i "unauthorized\|forbidden" && echo "REJECTED" || echo "ALLOWED"
-    Should Contain  ${auth_result.stdout}  REJECTED  Expired PAT should be rejected
-    Log  ✅ Test Case 9 PASSED: Expired PAT properly rejected
+    [Documentation]  Expired PATs must be rejected during authentication.
+    ...  Skipped here: the create-PAT API only accepts expires_in_days
+    ...  (always a future/never expiry), so there is no way to create an
+    ...  already-expired token through the public API to exercise this
+    ...  end-to-end. The expiry check itself (token.ExpiresAt != -1 &&
+    ...  token.ExpiresAt <= now in server/middleware/security/pat.go)
+    ...  needs a unit test instead.
+    Skip  Cannot create an already-expired PAT via the public API (expires_in_days is always future/never) — see server/middleware/security/pat.go for the check this would exercise.
 
     # Cleanup
     Delete User  ${user_id}
@@ -214,9 +201,11 @@ Test Case - OIDC Auto-Onboarding With Email Lookup
 
 Create PAT Via API
     [Arguments]  ${token_name}  ${description}  ${expiry_days}
-    [Documentation]  Create a PAT using direct API call
+    [Documentation]  Create a PAT using direct API call. expiry_days of 0
+    ...  means never-expire (the API's expires_in_days field, not
+    ...  expires_at, which the create endpoint doesn't accept).
     ${result}=  Run Process  bash  -c
-    ...  curl -sk -u admin:Harbor12345 -X POST http://${ip}:${HARBOR_PORT}/api/v2.0/users/1/personal_access_tokens -H "Content-Type: application/json" -d '{"name":"${token_name}","description":"${description}","expires_at":-1}' 2>&1 | grep -q '"id"' && echo "CREATED" || echo "FAILED"
+    ...  curl -sk -u admin:Harbor12345 -X POST http://${ip}:${HARBOR_PORT}/api/v2.0/users/1/personal_access_tokens -H "Content-Type: application/json" -d '{"name":"${token_name}","description":"${description}","expires_in_days":${expiry_days}}' 2>&1 | grep -q '"id"' && echo "CREATED" || echo "FAILED"
     Should Contain  ${result.stdout}  CREATED  Failed to create PAT ${token_name}
 
 Verify Token Exists Via API
@@ -260,12 +249,11 @@ Add User To Project
 
 Create PAT For User
     [Arguments]  ${user_id}  ${token_name}
-    [Documentation]  Create a PAT for a user and return the secret
+    [Documentation]  Create a PAT for a user and return the secret. Never
+    ...  logs the response body, which contains the plaintext secret.
     ${pat_result}=  Run Process  bash  -c
-    ...  curl -sk -u admin:Harbor12345 -X POST http://${ip}:${HARBOR_PORT}/api/v2.0/users/${user_id}/personal_access_tokens -H "Content-Type: application/json" -d "{\\"name\\":\\"${token_name}\\",\\"description\\":\\"Docker login PAT\\",\\"expires_at\\":-1}" 2>&1
-    ${pat_secret}=  Set Variable  ${pat_result.stdout}
-    Log  PAT creation result: ${pat_secret}
-    ${secret_clean}=  Run Process  bash  -c  echo '${pat_secret}' | grep -oP '"secret":\\K"[^"]+' | tr -d '"'
+    ...  curl -sk -u admin:Harbor12345 -X POST http://${ip}:${HARBOR_PORT}/api/v2.0/users/${user_id}/personal_access_tokens -H "Content-Type: application/json" -d "{\\"name\\":\\"${token_name}\\",\\"description\\":\\"Docker login PAT\\"}" 2>&1
+    ${secret_clean}=  Run Process  bash  -c  echo '${pat_result.stdout}' | grep -oP '"secret":\\K"[^"]+' | tr -d '"'
     Should Not Be Empty  ${secret_clean.stdout}  Failed to get PAT secret
     [Return]  ${secret_clean.stdout}
 
