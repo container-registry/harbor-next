@@ -49,7 +49,7 @@ spec:
         app.kubernetes.io/component: scanner
         app.kubernetes.io/part-of: harbor-bootc
       annotations:
-        deploy.8gears.io/image-revision: "sha256:d3dc385b5eca75f839c3f62b5acf66bccf496f76f86376733be6d2437561546c" # {"$imagepolicy": "flux-system:bootc-grype-scanner:digest"}
+        deploy.8gears.io/image-revision: "sha256:672c37e527bf44c43b1d990463d2f3b0e3c63e526db1da72e52c3eacbd29b228" # {"$imagepolicy": "flux-system:bootc-grype-scanner:digest"}
     spec:
       imagePullSecrets:
         - name: harbor-bootc-pull
