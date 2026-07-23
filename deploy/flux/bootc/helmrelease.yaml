@@ -86,6 +86,13 @@ spec:
         with_snyk: false
         default_scanner: Grype
       replicas: 1
+      resources:
+        requests:
+          cpu: 200m
+          memory: 1Gi
+        limits:
+          cpu: 2
+          memory: 4Gi
     jobservice:
       podAnnotations:
         deploy.8gears.io/image-revision: "sha256:1d5dea7fa9dfdb97174dabcad98a4c4be668c89633568015d193fbb0209b1568" # {"$imagepolicy": "flux-system:bootc-harbor-jobservice:digest"}
