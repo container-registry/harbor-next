@@ -66,6 +66,8 @@ spec:
               value: :8080
             - name: SCANNER_GRYPE_CACHE_DIR
               value: /home/scanner/cache
+            - name: SCANNER_GRYPE_DB_CACHE_DIR
+              value: /home/scanner/cache/grype-db
             - name: SCANNER_LOG_LEVEL
               value: info
           ports:
