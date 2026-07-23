@@ -20,8 +20,8 @@ const sectionNames = new Map([
   ['Bug Fixes', 'Fixes'],
   ['Performance Improvements', 'Updates'],
   ['Code Refactoring', 'Updates'],
-  ['Documentation', 'Updates'],
 ]);
+const droppedSections = new Set(['Documentation']);
 const sectionOrder = ['Commercial Features', 'Features', 'Fixes', 'Updates', 'Upstream', 'Reverts'];
 const sections = new Map(sectionOrder.map(section => [section, []]));
 const trailing = [];
@@ -193,9 +193,13 @@ for (const line of releaseNotesLines(releaseBody)) {
   if (line.startsWith('### ')) {
     sawSection = true;
     currentSection = sectionNames.get(line.slice(4)) ?? line.slice(4);
-    if (!sections.has(currentSection)) {
+    if (!droppedSections.has(currentSection) && !sections.has(currentSection)) {
       sections.set(currentSection, []);
     }
+    continue;
+  }
+
+  if (droppedSections.has(currentSection)) {
     continue;
   }
 
