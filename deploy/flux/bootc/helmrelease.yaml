@@ -93,6 +93,13 @@ spec:
         repository: 8gears.container-registry.com/8gcr-dev/harbor-jobservice-bootc
         tag: latest
       replicas: 1
+      resources:
+        requests:
+          cpu: 200m
+          memory: 1Gi
+        limits:
+          cpu: 2
+          memory: 4Gi
       persistence:
         enabled: true
         storageClass: local-path
