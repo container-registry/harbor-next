@@ -83,7 +83,10 @@ func (o *oidcCli) Generate(req *http.Request) security.Context {
 		return nil
 	}
 
-	oidc.InjectGroupsToUser(info, u)
+	if err := oidc.InjectGroupsToUser(info, u); err != nil {
+		logger.Errorf("failed to sync group membership for user %d: %v", u.UserID, err)
+		return nil
+	}
 	logger.Debugf("an OIDC CLI security context generated for request %s %s", req.Method, req.URL.Path)
 	return local.NewSecurityContext(u)
 }

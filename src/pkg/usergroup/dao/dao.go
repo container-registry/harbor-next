@@ -16,6 +16,7 @@ package dao
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/goharbor/harbor/src/common"
@@ -51,6 +52,10 @@ type DAO interface {
 	ReadOrCreate(ctx context.Context, g *model.UserGroup, keyAttribute string, combinedKeyAttributes ...string) (bool, int64, error)
 	// Search search user groups by names with fuzzy search
 	SearchByName(ctx context.Context, name string, limitSize int) ([]*model.UserGroup, error)
+	// SyncUserGroupMembership persists group membership for a user
+	SyncUserGroupMembership(ctx context.Context, userID int, groupIDs []int) error
+	// ListUserGroupIDs returns the group IDs for a user
+	ListUserGroupIDs(ctx context.Context, userID int) ([]int, error)
 }
 
 type dao struct {
@@ -179,4 +184,47 @@ func (d *dao) SearchByName(ctx context.Context, name string, limitSize int) ([]*
 		return nil, err
 	}
 	return usergroups, nil
+}
+
+// SyncUserGroupMembership replaces the user_group_membership rows for
+// userID with groupIDs. Runs as delete-then-insert; callers that need this
+// atomic with other writes should wrap the call in orm.WithTransaction.
+// Locks the user row via SELECT FOR UPDATE to prevent concurrent sync races.
+func (d *dao) SyncUserGroupMembership(ctx context.Context, userID int, groupIDs []int) error {
+	o, err := orm.FromContext(ctx)
+	if err != nil {
+		return err
+	}
+	// Lock the user row to prevent concurrent membership modifications
+	var dummy int
+	if err := o.Raw("SELECT user_id FROM harbor_user WHERE user_id = ? FOR UPDATE", userID).QueryRow(&dummy); err != nil {
+		return fmt.Errorf("user %d not found or lock failed: %v", userID, err)
+	}
+	if _, err := o.Raw("DELETE FROM user_group_membership WHERE user_id = ?", userID).Exec(); err != nil {
+		return err
+	}
+	for _, groupID := range groupIDs {
+		if _, err := o.Raw(
+			"INSERT INTO user_group_membership (user_id, group_id) VALUES (?, ?) ON CONFLICT (user_id, group_id) DO NOTHING",
+			userID, groupID,
+		).Exec(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ListUserGroupIDs returns the group IDs userID currently belongs to, per
+// the last successful SyncUserGroupMembership call for that user.
+func (d *dao) ListUserGroupIDs(ctx context.Context, userID int) ([]int, error) {
+	o, err := orm.FromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var groupIDs []int
+	_, err = o.Raw("SELECT group_id FROM user_group_membership WHERE user_id = ?", userID).QueryRows(&groupIDs)
+	if err != nil {
+		return nil, err
+	}
+	return groupIDs, nil
 }
