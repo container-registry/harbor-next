@@ -17,10 +17,6 @@ package action
 import (
 	"context"
 
-<<<<<<< HEAD
-=======
-	"github.com/goharbor/harbor/src/lib/log"
->>>>>>> 20ccb7778 (fix(retention): avoid stripping repository path twice (#23546))
 	"github.com/goharbor/harbor/src/lib/selector"
 )
 
@@ -44,85 +40,3 @@ type Performer interface {
 
 // PerformerFactory is factory method for creating Performer
 type PerformerFactory func(params any, isDryRun bool) Performer
-<<<<<<< HEAD
-=======
-
-// retainAction make sure all the candidates will be retained and others will be cleared
-type retainAction struct {
-	all []*selector.Candidate
-	// Indicate if it is a dry run
-	isDryRun bool
-}
-
-// Perform the action
-func (ra *retainAction) Perform(ctx context.Context, candidates []*selector.Candidate) (results []*selector.Result, err error) {
-	retainedShare := make(map[string]bool)
-	immutableShare := make(map[string]bool)
-	for _, c := range candidates {
-		retainedShare[c.Hash()] = true
-	}
-
-	for _, c := range ra.all {
-		if _, ok := retainedShare[c.Hash()]; ok {
-			continue
-		}
-		if isImmutable(ctx, c) {
-			immutableShare[c.Hash()] = true
-		}
-	}
-
-	// start to delete
-	if len(ra.all) > 0 {
-		for _, c := range ra.all {
-			if _, ok := retainedShare[c.Hash()]; !ok {
-				result := &selector.Result{
-					Target: c,
-				}
-				if _, ok = immutableShare[c.Hash()]; ok {
-					result.Error = &selector.ImmutableError{}
-				} else {
-					if !ra.isDryRun {
-						if err := dep.DefaultClient.Delete(c); err != nil {
-							result.Error = err
-						}
-					}
-				}
-				results = append(results, result)
-			}
-		}
-	}
-
-	return
-}
-
-func isImmutable(ctx context.Context, c *selector.Candidate) bool {
-	projectID := c.NamespaceID
-	matched, err := rule.NewRuleMatcher().Match(ctx, projectID, selector.Candidate{
-		Repository:  c.Repository,
-		Tags:        c.Tags,
-		NamespaceID: projectID,
-	})
-	if err != nil {
-		log.Error(err)
-		return false
-	}
-	return matched
-}
-
-// NewRetainAction is factory method for RetainAction
-func NewRetainAction(params any, isDryRun bool) Performer {
-	if params != nil {
-		if all, ok := params.([]*selector.Candidate); ok {
-			return &retainAction{
-				all:      all,
-				isDryRun: isDryRun,
-			}
-		}
-	}
-
-	return &retainAction{
-		all:      make([]*selector.Candidate, 0),
-		isDryRun: isDryRun,
-	}
-}
->>>>>>> 20ccb7778 (fix(retention): avoid stripping repository path twice (#23546))
