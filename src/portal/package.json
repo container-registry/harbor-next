@@ -65,7 +65,7 @@
     "@cypress/schematic": "^2.5.2",
     "@types/express": "^4.17.21",
     "@types/jasmine": "~4.3.1",
-    "@types/node": "^16.18.108",
+    "@types/node": "^26.1.1",
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
     "cypress": "13.1.0",
