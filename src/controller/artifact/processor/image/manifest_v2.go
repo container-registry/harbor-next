@@ -28,11 +28,23 @@ import (
 	"github.com/goharbor/harbor/src/pkg/artifact"
 )
 
+const (
+	// maxDockerfileSize is the maximum size of Dockerfile content in bytes (4MB)
+	maxDockerfileSize = 4 * 1024 * 1024
+	// maxDockerfileConfigBlobSize bounds the config blob we'll pull and decode when
+	// serving the Dockerfile addition, so a request for Dockerfile content can't force
+	// unbounded memory use decoding an oversized config blob. This limit only applies
+	// to the Dockerfile addition path; other addition types and metadata extraction
+	// are unaffected.
+	maxDockerfileConfigBlobSize = 8 * 1024 * 1024
+)
+
 // const definitions
 const (
 	// ArtifactTypeImage is the artifact type for image
 	ArtifactTypeImage        = "IMAGE"
 	AdditionTypeBuildHistory = "BUILD_HISTORY"
+	AdditionTypeDockerfile   = "DOCKERFILE"
 )
 
 func init() {
@@ -85,7 +97,7 @@ func (m *manifestV2Processor) AbstractMetadata(ctx context.Context, artifact *ar
 }
 
 func (m *manifestV2Processor) AbstractAddition(ctx context.Context, artifact *artifact.Artifact, addition string) (*processor.Addition, error) {
-	if addition != AdditionTypeBuildHistory {
+	if addition != AdditionTypeBuildHistory && addition != AdditionTypeDockerfile {
 		return nil, errors.New(nil).WithCode(errors.BadRequestCode).
 			WithMessagef("addition %s isn't supported for %s(manifest version 2)", addition, ArtifactTypeImage)
 	}
@@ -98,18 +110,66 @@ func (m *manifestV2Processor) AbstractAddition(ctx context.Context, artifact *ar
 	if err != nil {
 		return nil, err
 	}
+
+	if addition == AdditionTypeDockerfile {
+		configSize, err := m.ManifestProcessor.ConfigSize(content)
+		if err != nil {
+			return nil, err
+		}
+		if configSize > maxDockerfileConfigBlobSize {
+			return nil, errors.New(nil).WithCode(errors.RequestEntityTooLargeCode).
+				WithMessagef("image config blob size %d exceeds maximum size limit %d", configSize, maxDockerfileConfigBlobSize)
+		}
+	}
+
 	config := &v1.Image{}
 	if err = m.ManifestProcessor.UnmarshalConfig(ctx, artifact.RepositoryName, content, config); err != nil {
 		return nil, err
 	}
-	content, err = json.Marshal(config.History)
-	if err != nil {
-		return nil, err
+
+	if addition == AdditionTypeBuildHistory {
+		content, err = json.Marshal(config.History)
+		if err != nil {
+			return nil, err
+		}
+		return &processor.Addition{
+			Content:     content,
+			ContentType: "application/json; charset=utf-8",
+		}, nil
+	}
+
+	// AdditionTypeDockerfile
+	dockerfile := m.getDockerfileFromLabels(config)
+	if dockerfile == "" {
+		return nil, errors.New(nil).WithCode(errors.NotFoundCode).
+			WithMessage("dockerfile not found in image labels")
+	}
+	if len(dockerfile) > maxDockerfileSize {
+		return nil, errors.New(nil).WithCode(errors.RequestEntityTooLargeCode).
+			WithMessage("dockerfile content exceeds maximum size limit")
 	}
 	return &processor.Addition{
-		Content:     content,
-		ContentType: "application/json; charset=utf-8",
+		Content:     []byte(dockerfile),
+		ContentType: "text/plain; charset=utf-8",
 	}, nil
+}
+
+func (m *manifestV2Processor) getDockerfileFromLabels(config *v1.Image) string {
+	if config == nil || len(config.Config.Labels) == 0 {
+		return ""
+	}
+
+	// Check for common Dockerfile label keys
+	dockerfileKeys := []string{
+		"com.example.dockerfile",
+		"dockerfile",
+	}
+	for _, key := range dockerfileKeys {
+		if val, ok := config.Config.Labels[key]; ok && len(val) > 0 {
+			return val
+		}
+	}
+	return ""
 }
 
 func (m *manifestV2Processor) GetArtifactType(_ context.Context, _ *artifact.Artifact) string {
@@ -117,5 +177,7 @@ func (m *manifestV2Processor) GetArtifactType(_ context.Context, _ *artifact.Art
 }
 
 func (m *manifestV2Processor) ListAdditionTypes(_ context.Context, _ *artifact.Artifact) []string {
-	return []string{AdditionTypeBuildHistory}
+	// Dockerfile support is always available for Docker images, but may not have content
+	// The UI will show the tab, and AbstractAddition will handle missing Dockerfile gracefully
+	return []string{AdditionTypeBuildHistory, AdditionTypeDockerfile}
 }

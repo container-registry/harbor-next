@@ -1085,6 +1085,9 @@
         "NO_FILES": "Nenhum arquivo fornecido para este modelo.",
         "MODEL_NO_README": "Não há arquivo README fornecido para este modelo.",
         "FILE_TOO_LARGE": "O arquivo é muito grande para ser processado.",
+        "DOCKERFILE": "Dockerfile",
+        "NO_DOCKERFILE_EXPLANATION": "Nenhum Dockerfile encontrado na imagem. O conteúdo do Dockerfile das labels da imagem não está disponível.",
+        "NO_DOCKERFILE_SUGGESTION": "Ver o",
         "ITEMS": "itens",
         "SHOW_KV": "Pares chave-valor",
         "SHOW_YAML": "Arquivo YAML"
