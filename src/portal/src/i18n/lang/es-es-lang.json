@@ -1753,6 +1753,8 @@
         "PURGE_NOW": "PURGAR AHORA",
         "PURGE_NOW_SUCCESS": "Purga activada exitosamente",
         "PURGE_SCHEDULE_RESET": "Se ha restablecido la programación de purga",
+        "ROTATION_POLICY": "Política de rotación",
+        "EXECUTION": "Ejecución",
         "PURGE_HISTORY": "Historial de purga",
         "FORWARD_ENDPOINT": "Audit Log Reenviar Syslog Endpoint",
         "FORWARD_ENDPOINT_TOOLTIP": "Reenviar audit logs al endpoint de syslog, por ejemplo: harbor-log:10514",
@@ -1764,7 +1766,9 @@
         "STOP_GC_SUCCESS": "El disparador detiene con éxito la operación GC",
         "STOP_PURGE_SUCCESS": "El disparador detiene con éxito la operación de purga",
         "NO_GC_RECORDS": "No pudimos encontrar ningún historial de GC!",
-        "NO_PURGE_RECORDS": "No pudimos encontrar ningún historial de purgas!"
+        "NO_PURGE_RECORDS": "No pudimos encontrar ningún historial de purgas!",
+        "PURGE_PARAMS_SAVED": "Configuración de rotación de logs guardada correctamente",
+        "NO_EVENT_TYPES_WARNING": "Esta programación no purgará nada porque no hay tipos de evento seleccionados. Seleccione al menos un tipo de evento y haga clic en GUARDAR."
     },
     "CVE_EXPORT": {
         "EXPORT_SOME_PROJECTS": "Exportar CVEs",

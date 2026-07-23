@@ -1749,6 +1749,8 @@
         "PURGE_NOW": "Purger maintenant",
         "PURGE_NOW_SUCCESS": "La purge s'est déclenchée avec succès",
         "PURGE_SCHEDULE_RESET": "Le programme de purge a été réinitialisé",
+        "ROTATION_POLICY": "Politique de rotation",
+        "EXECUTION": "Exécution",
         "PURGE_HISTORY": "Historique de purges",
         "FORWARD_ENDPOINT": "Endpoint Syslog de transfert de logs d'audit",
         "FORWARD_ENDPOINT_TOOLTIP": "Transfère les logs d'audit à l'endpoint Syslog, par exemple : harbor-log:10514",
@@ -1760,7 +1762,9 @@
         "STOP_GC_SUCCESS": "Déclenchement avec succès de l'arrêt de l'exécution du GC",
         "STOP_PURGE_SUCCESS": "Déclenchement avec succès de l'arrêt de la purge",
         "NO_GC_RECORDS": "Nous n'avons trouvé aucun historique du GC !",
-        "NO_PURGE_RECORDS": "Nous n'avons trouvé aucun historique de purges !"
+        "NO_PURGE_RECORDS": "Nous n'avons trouvé aucun historique de purges !",
+        "PURGE_PARAMS_SAVED": "Paramètres de rotation des logs enregistrés avec succès",
+        "NO_EVENT_TYPES_WARNING": "Cette planification ne purgera rien car aucun type d'événement n'est sélectionné. Sélectionnez au moins un type d'événement et cliquez sur ENREGISTRER."
     },
     "CVE_EXPORT": {
         "EXPORT_SOME_PROJECTS": "Exporter les CVEs",

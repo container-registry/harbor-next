@@ -1747,6 +1747,8 @@
         "PURGE_NOW": "JETZT SÄUBERN",
         "PURGE_NOW_SUCCESS": "Signal zur Bereinigung erfolgreich gesendet",
         "PURGE_SCHEDULE_RESET": "Bereinigungsplan wurde zurückgesetzt",
+        "ROTATION_POLICY": "Rotationsrichtlinie",
+        "EXECUTION": "Ausführung",
         "PURGE_HISTORY": "Bereinigungshistorie",
         "FORWARD_ENDPOINT": "Syslog Endpunkt für die Weiterleitung des Audit-Logs",
         "FORWARD_ENDPOINT_TOOLTIP": "Leite Audit-Logs an einen Syslog-Endpunkt, zum Beispiel: harbor-log:10514",
@@ -1758,7 +1760,9 @@
         "STOP_GC_SUCCESS": "Signal zum stoppen der Speicherbereinigungs-Aktion erfolgreich",
         "STOP_PURGE_SUCCESS": "Signal zum Anhalten der Bereinigung erfolgreich",
         "NO_GC_RECORDS": "Es konnte keine Speicherbereinigungs-Historie gefunden werden!",
-        "NO_PURGE_RECORDS": "Es konnte keine Bereinigungs-Historie gefunden werden!"
+        "NO_PURGE_RECORDS": "Es konnte keine Bereinigungs-Historie gefunden werden!",
+        "PURGE_PARAMS_SAVED": "Log-Rotation-Einstellungen erfolgreich gespeichert",
+        "NO_EVENT_TYPES_WARNING": "Dieser Zeitplan bereinigt nichts, da keine Event-Typen ausgewählt sind. Wähle mindestens einen Event-Typ aus und klicke auf SPEICHERN."
     },
     "CVE_EXPORT": {
         "EXPORT_SOME_PROJECTS": "Exportiere CVEs",

@@ -1747,6 +1747,8 @@
         "PURGE_NOW": "PURGE NOW",
         "PURGE_NOW_SUCCESS": "Purge triggered successfully",
         "PURGE_SCHEDULE_RESET": "Purge schedule has been reset",
+        "ROTATION_POLICY": "Rotasyon Politikası",
+        "EXECUTION": "Yürütme",
         "PURGE_HISTORY": "Purge History",
         "FORWARD_ENDPOINT": "Audit Log Forward Syslog Endpoint",
         "FORWARD_ENDPOINT_TOOLTIP": "Forward audit logs to the syslog endpoint, for example: harbor-log:10514",
@@ -1758,7 +1760,9 @@
         "STOP_GC_SUCCESS": "Trigger stopping GC operation successfully",
         "STOP_PURGE_SUCCESS": "Trigger stopping purging operation successfully",
         "NO_GC_RECORDS": "We couldn't find any GC histories!",
-        "NO_PURGE_RECORDS": "We couldn't find any purge histories!"
+        "NO_PURGE_RECORDS": "We couldn't find any purge histories!",
+        "PURGE_PARAMS_SAVED": "Log rotasyon ayarları başarıyla kaydedildi",
+        "NO_EVENT_TYPES_WARNING": "Hiçbir olay türü seçilmediği için bu zamanlama hiçbir şey silmeyecek. En az bir olay türü seçin ve KAYDET'e tıklayın."
     },
     "CVE_EXPORT": {
         "EXPORT_SOME_PROJECTS": "Export CVEs",
