@@ -116,7 +116,7 @@ func (r *resolver) Resolve(ce *commonevent.Metadata, evt *event.Event) error {
 		ResourceType: rbac.ResourceMember.String(),
 		Operation:    operation,
 		ProjectID:    projectID,
-		OcurrAt:      time.Now(),
+		OccurAt:      time.Now(),
 		IsSuccessful: true,
 	}
 
