@@ -20,17 +20,18 @@ spec:
   values:
     externalURL: https://8gcr.container-registry.dev
     logLevel: info
-
+    image:
+      pullPolicy: Always
+    imagePullSecrets:
+      - name: harbor-system-pull
     # Admin password provisioned by secrets.sops.yaml in this bundle.
     existingSecretAdminPassword: harbor-admin
     existingSecretAdminPasswordKey: HARBOR_ADMIN_PASSWORD
-
     expose:
-      clusterIP: { enabled: false }
-      nodePort: { enabled: false }
-      loadBalancer: { enabled: false }
-      route: { enabled: false }
-
+      clusterIP: {enabled: false}
+      nodePort: {enabled: false}
+      loadBalancer: {enabled: false}
+      route: {enabled: false}
     ingress:
       enabled: true
       className: nginx
@@ -46,7 +47,6 @@ spec:
         nginx.ingress.kubernetes.io/proxy-body-size: "0"
         nginx.ingress.kubernetes.io/ssl-redirect: "true"
         cert-manager.io/cluster-issuer: letsencrypt-prod
-
     # ---- Database ----
     # Both CNPG bootstrap (extraManifests below) and Harbor's runtime DB client
     # read the SAME Secret/harbor-db-password. CNPG requires basic-auth type
@@ -61,69 +61,75 @@ spec:
       sslmode: disable
       existingSecret: harbor-db-password
       existingSecretKey: password
-
     # ---- Valkey (in-chart, default standalone) ----
     valkey:
       enabled: true
       architecture: standalone
       auth:
         enabled: false
-
-    # ---- Component image pins (continuous deploy via existing 8gcr-dev/:latest) ----
-    # The :latest tag in 8gcr-dev/ is maintained by an out-of-band buildah pipeline
-    # (not the harbor-next GitHub workflows). HelmRelease's 5-min OCIRepository
-    # interval picks up new chart digests; component images update via the
-    # imagePullPolicy + the moving :latest tag.
+    # ---- Component image pins (continuous deploy via 8gcr/:latest) ----
+    # Flux image automation follows each mutable latest tag by digest and
+    # rewrites these pod-template annotations in this branch. The branch push
+    # then publishes the bundle to ops/hz-hopper/8gcr-rolling, Flux applies the
+    # changed HelmRelease, and Kubernetes restarts pods with imagePullPolicy:
+    # Always so they pull the new digest behind latest.
     core:
+      podAnnotations:
+        deploy.8gears.io/image-revision: "sha256:41ccaa1b2ca828c9d1f97bb62f913087cec2a086535ce62cb1e4fbf53ade9d75" # {"$imagepolicy": "flux-system:harbor-core:digest"}
       image:
-        repository: 8gears.container-registry.com/8gcr-dev/harbor-core
+        repository: 8gears.container-registry.com/8gcr/harbor-core
         tag: latest
       replicas: 1
-
     jobservice:
+      podAnnotations:
+        deploy.8gears.io/image-revision: "sha256:a9b1a5c5a854ea1241b8d0934a82e6ea12ee9bd44cbd7927d85b80697dbe6ee9" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
       image:
-        repository: 8gears.container-registry.com/8gcr-dev/harbor-jobservice
+        repository: 8gears.container-registry.com/8gcr/harbor-jobservice
         tag: latest
       replicas: 1
       persistence:
         enabled: true
         storageClass: local-path
         size: 1Gi
-
     registry:
+      podAnnotations:
+        deploy.8gears.io/image-revision: "sha256:32dfe0ba7a1d2a9ab51093c768d8d0fabeb2cb6d8738fdb25e0822f51ab6e6a7" # {"$imagepolicy": "flux-system:harbor-registry:digest"}
+        deploy.8gears.io/registryctl-image-revision: "sha256:7edd9e8b88ae3c703cac1c68f173ff5cefbe30ecf34b265003b5dcd6e39aaac8" # {"$imagepolicy": "flux-system:harbor-registryctl:digest"}
       image:
-        repository: 8gears.container-registry.com/8gcr-dev/harbor-registry
+        repository: 8gears.container-registry.com/8gcr/harbor-registry
         tag: latest
       controller:
         image:
-          repository: 8gears.container-registry.com/8gcr-dev/harbor-registryctl
+          repository: 8gears.container-registry.com/8gcr/harbor-registryctl
           tag: latest
       replicas: 1
       persistence:
         enabled: true
         storageClass: local-path
         size: 10Gi
-
     portal:
+      podAnnotations:
+        deploy.8gears.io/image-revision: "sha256:f1010198fc6de31cbc8a1d6e0a08d547832746d32f2cb8075abc801eb867908a" # {"$imagepolicy": "flux-system:harbor-portal:digest"}
       image:
-        repository: 8gears.container-registry.com/8gcr-dev/harbor-portal
+        repository: 8gears.container-registry.com/8gcr/harbor-portal
         tag: latest
       replicas: 1
-
     exporter:
       enabled: true
+      podAnnotations:
+        deploy.8gears.io/image-revision: "sha256:ba5c1504dea51480b088cdcac3e46bd350fc35a01cfb2d329950bbe1669ad1a5" # {"$imagepolicy": "flux-system:harbor-exporter:digest"}
       image:
-        repository: 8gears.container-registry.com/8gcr-dev/harbor-exporter
+        repository: 8gears.container-registry.com/8gcr/harbor-exporter
         tag: latest
       replicas: 1
-
     trivy:
       enabled: true
+      podAnnotations:
+        deploy.8gears.io/image-revision: "sha256:0208f35dcbeaf46eddc0e3d13bd0e258dab7230e0ca0adc5dfd3671d12b4e5fc" # {"$imagepolicy": "flux-system:trivy-adapter:digest"}
       image:
-        repository: 8gears.container-registry.com/8gcr-dev/harbor-trivy-adapter
+        repository: 8gears.container-registry.com/8gcr/trivy-adapter
         tag: latest
       replicas: 1
-
     # ---- CNPG Postgres provisioned via the chart's extraManifests escape hatch ----
     # The harbor-db-password Secret it references is provisioned out-of-band
     # (SOPS-encrypted in k8s/apps); must contain keys: username, password.
