@@ -136,6 +136,9 @@ services:
       - registry-data:/var/lib/registry
     environment:
       REGISTRY_HTTP_SECRET: ${CORE_SECRET}
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-}
     healthcheck:
       test: ["CMD", "/lprobe", "-port", "5001", "-endpoint", "/debug/health"]
       interval: 5s
