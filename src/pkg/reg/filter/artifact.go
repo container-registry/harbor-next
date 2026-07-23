@@ -15,12 +15,8 @@
 package filter
 
 import (
-<<<<<<< HEAD
-=======
 	"fmt"
-	"strings"
 
->>>>>>> 61cc4bbab (fix: address unsafe type assertions causing potential panics across packages (#23571))
 	"github.com/goharbor/harbor/src/pkg/reg/model"
 	"github.com/goharbor/harbor/src/pkg/reg/util"
 )
