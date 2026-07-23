@@ -82,7 +82,7 @@ spec:
       replicas: 1
     jobservice:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:034cd8d6fb73d8a968148e94e8834ba18620e24a6fa0eb2b4956519f656a6a18" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
+        deploy.8gears.io/image-revision: "sha256:a9b1a5c5a854ea1241b8d0934a82e6ea12ee9bd44cbd7927d85b80697dbe6ee9" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-jobservice
         tag: latest
@@ -117,7 +117,7 @@ spec:
     exporter:
       enabled: true
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:129356f2ca46d75c873efa7d884887de26fab9893544f0fe141d5be070db9982" # {"$imagepolicy": "flux-system:harbor-exporter:digest"}
+        deploy.8gears.io/image-revision: "sha256:ba5c1504dea51480b088cdcac3e46bd350fc35a01cfb2d329950bbe1669ad1a5" # {"$imagepolicy": "flux-system:harbor-exporter:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-exporter
         tag: latest
