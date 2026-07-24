@@ -1,0 +1,10 @@
+# Benchmark-only override. Apply this after devenv/docker-compose.yml.
+# It recreates the production incident's 512 MiB Jobservice cgroup limit
+# without changing the normal hot-reload development environment.
+services:
+  jobservice:
+    mem_limit: ${BENCHMARK_JOBSERVICE_MEMORY_LIMIT:-512m}
+    environment:
+      # The baseline intentionally leaves the Go runtime unconstrained.
+      # Set this in the invoking environment for the GC-control run.
+      GOMEMLIMIT: ${BENCHMARK_GOMEMLIMIT:-}

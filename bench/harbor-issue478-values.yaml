@@ -1,0 +1,31 @@
+# Isolated Harbor configuration for Issue #478.
+expose:
+  type: nodePort
+  tls:
+    enabled: false
+  nodePort:
+    ports:
+      http:
+        nodePort: 30002
+      https:
+        nodePort: 30003
+externalURL: http://localhost:18080
+persistence:
+  enabled: false
+logLevel: debug
+imagePullPolicy: IfNotPresent
+jobservice:
+  resources:
+    limits:
+      memory: 512Mi
+    requests:
+      memory: 256Mi
+trivy:
+  image:
+    repository: localhost/issue478/trivy-adapter
+    tag: v0.39.1
+  resources:
+    limits:
+      memory: 2Gi
+    requests:
+      memory: 512Mi

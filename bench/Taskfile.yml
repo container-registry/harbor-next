@@ -1,0 +1,50 @@
+version: '3'
+
+tasks:
+  deploy:
+    desc: Create or reuse the benchmark Kind cluster and deploy Harbor
+    dir: '..'
+    cmds:
+      - ./bench/deploy-issue478.sh up
+
+  deploy:fresh:
+    desc: Recreate only the dedicated benchmark cluster, then deploy Harbor
+    dir: '..'
+    cmds:
+      - ./bench/deploy-issue478.sh fresh
+
+  deploy:apply:
+    desc: Explicitly apply Harbor chart values and roll services if needed
+    dir: '..'
+    cmds:
+      - ./bench/deploy-issue478.sh apply
+
+  deploy:down:
+    desc: Delete only the dedicated benchmark Kind cluster
+    dir: '..'
+    cmds:
+      - ./bench/deploy-issue478.sh down
+
+  deploy:status:
+    desc: Show Harbor benchmark pod and API health
+    dir: '..'
+    cmds:
+      - ./bench/deploy-issue478.sh status
+
+  images:list:
+    desc: Generate the validated 500-800-image benchmark manifest from Docker Hub
+    dir: '..'
+    cmds:
+      - ./bench/generate-issue478-image-list.sh
+
+  images:lock:
+    desc: Resolve the manifest to immutable Linux/amd64 digests using registry mirrors
+    dir: '..'
+    cmds:
+      - ./bench/issue478-mirror-images.sh lock
+
+  images:mirror:
+    desc: Stream all digest-locked images into the isolated Harbor project
+    dir: '..'
+    cmds:
+      - ./bench/issue478-mirror-images.sh mirror
