@@ -126,7 +126,8 @@ jobs:
         env:
           COMPONENT: ${{ matrix.component }}
           PLATFORM_PAIR: ${{ env.PLATFORM_PAIR }}
-        run: task build:binary:${COMPONENT}:${PLATFORM_PAIR} GIT_COMMIT="$(git rev-parse --short=8 \"${{ inputs.checkout_ref }}\")"
+          CHECKOUT_REF: ${{ inputs.checkout_ref }}
+        run: task build:binary:${COMPONENT}:${PLATFORM_PAIR} GIT_COMMIT="$(git rev-parse --short=8 "$CHECKOUT_REF")"
 
       - name: Compile image helper binaries
         env:
