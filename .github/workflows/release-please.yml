@@ -35,6 +35,8 @@ jobs:
       major: ${{ steps.release.outputs.major }}
       minor: ${{ steps.release.outputs.minor }}
       patch: ${{ steps.release.outputs.patch }}
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
@@ -49,6 +51,23 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ fromJSON(steps.release.outputs.prs)[0].headBranchName }}
+          persist-credentials: false
+
+      - name: Configure ephemeral Git authentication
+        if: ${{ github.ref_name == 'main' && steps.release.outputs.prs_created == 'true' && steps.release.outputs.release_created != 'true' }}
+        run: |
+          askpass="${RUNNER_TEMP}/git-askpass"
+          cat > "${askpass}" <<'EOF'
+          #!/usr/bin/env bash
+          case "$1" in
+            *Username*) printf '%s\n' 'x-access-token' ;;
+            *Password*) printf '%s\n' "${GH_TOKEN}" ;;
+            *) exit 1 ;;
+          esac
+          EOF
+          chmod 700 "${askpass}"
+          echo "GIT_ASKPASS=${askpass}" >> "${GITHUB_ENV}"
+          echo "GIT_TERMINAL_PROMPT=0" >> "${GITHUB_ENV}"
 
       - name: Setup Node
         if: ${{ github.ref_name == 'main' && steps.release.outputs.prs_created == 'true' && steps.release.outputs.release_created != 'true' }}
@@ -99,10 +118,27 @@ jobs:
       VERSION: ${{ needs.release-please.outputs.version }}
       MAJOR: ${{ needs.release-please.outputs.major }}
       MINOR: ${{ needs.release-please.outputs.minor }}
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
+
+      - name: Configure ephemeral Git authentication
+        run: |
+          askpass="${RUNNER_TEMP}/git-askpass"
+          cat > "${askpass}" <<'EOF'
+          #!/usr/bin/env bash
+          case "$1" in
+            *Username*) printf '%s\n' 'x-access-token' ;;
+            *Password*) printf '%s\n' "${GH_TOKEN}" ;;
+            *) exit 1 ;;
+          esac
+          EOF
+          chmod 700 "${askpass}"
+          echo "GIT_ASKPASS=${askpass}" >> "${GITHUB_ENV}"
+          echo "GIT_TERMINAL_PROMPT=0" >> "${GITHUB_ENV}"
 
       - name: Create branch for patch releases
         run: |
@@ -162,6 +198,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Install envsubst
         run: command -v envsubst || (sudo apt-get update && sudo apt-get install -y gettext-base)
