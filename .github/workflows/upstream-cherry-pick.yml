@@ -23,6 +23,8 @@ concurrency:
 jobs:
   upstream-cherry-pick:
     name: Open upstream cherry-pick PRs
+    # Forks may use the manual dry-run, but must not run the canonical schedule.
+    if: github.event_name != 'schedule' || github.repository == 'container-registry/harbor-next'
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
