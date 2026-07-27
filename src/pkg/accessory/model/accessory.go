@@ -95,7 +95,6 @@ type AccessoryData struct {
 	Type              string    `json:"type"`
 	Size              int64     `json:"size"`
 	Digest            string    `json:"digest"`
-	Source            string    `json:"source"`
 	CreatTime         time.Time `json:"creation_time"`
 	Icon              string    `json:"icon"`
 }
