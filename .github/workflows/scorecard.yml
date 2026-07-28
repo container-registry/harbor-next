@@ -13,6 +13,8 @@ permissions: read-all
 jobs:
   analysis:
     name: Scorecard Analysis
+    # Scheduled runs are reserved for the canonical repository; forks retain push checks.
+    if: github.event_name != 'schedule' || github.repository == 'container-registry/harbor-next'
     # Scorecard result publishing requires a single GitHub-hosted Ubuntu runner.
     runs-on: ubuntu-latest
     permissions:

@@ -43,6 +43,8 @@ env:
 jobs:
   scan-remediate:
     name: Scan, Remediate, and Report
+    # Forks may dispatch an ad-hoc scan, but must not run the canonical remediation schedule.
+    if: github.event_name != 'schedule' || github.repository == 'container-registry/harbor-next'
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     env:
       GH_TOKEN: ${{ github.token }}
