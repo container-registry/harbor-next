@@ -253,9 +253,14 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if git ls-remote --exit-code --heads origin "${ZERO_CVE_BRANCH}" >/dev/null 2>&1; then
-            git fetch origin "+refs/heads/${ZERO_CVE_BRANCH}:refs/remotes/origin/${ZERO_CVE_BRANCH}" --depth=1
-            git checkout -B "${ZERO_CVE_BRANCH}" "origin/${ZERO_CVE_BRANCH}"
-            git merge --no-edit --signoff "origin/${ZERO_CVE_BASE_BRANCH}"
+            git fetch origin "+refs/heads/${ZERO_CVE_BRANCH}:refs/remotes/origin/${ZERO_CVE_BRANCH}"
+            if git merge-base --is-ancestor "origin/${ZERO_CVE_BASE_BRANCH}" "origin/${ZERO_CVE_BRANCH}"; then
+              git checkout -B "${ZERO_CVE_BRANCH}" "origin/${ZERO_CVE_BRANCH}"
+              git merge --no-edit --signoff "origin/${ZERO_CVE_BASE_BRANCH}"
+            else
+              echo "${ZERO_CVE_BRANCH} is not based on ${ZERO_CVE_BASE_BRANCH}; recreating the managed branch"
+              git checkout -B "${ZERO_CVE_BRANCH}" "origin/${ZERO_CVE_BASE_BRANCH}"
+            fi
           else
             git checkout -B "${ZERO_CVE_BRANCH}" "origin/${ZERO_CVE_BASE_BRANCH}"
           fi
