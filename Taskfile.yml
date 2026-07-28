@@ -13,7 +13,7 @@ vars:
   GIT_COMMIT:
     sh: git rev-parse --short=8 HEAD || echo "unknown"
   VERSION:
-    sh: cat VERSION 2>/dev/null | tr -d '\n' || echo "dev"
+    sh: printf '%s' "${HARBOR_VERSION:-$(cat VERSION 2>/dev/null | tr -d '\n' || echo dev)}"
   TIMESTAMP:
     sh: date -u +%Y%m%d%H%M%S
 

@@ -45,7 +45,7 @@ jobs:
     env:
       REGISTRY_ADDRESS: ${{ inputs.registry_address }}
       REGISTRY_PROJECT: ${{ inputs.registry_project }}
-      VERSION: ${{ inputs.version }}
+      HARBOR_VERSION: ${{ inputs.version }}
     steps:
       - name: Prepare
         id: prepare
