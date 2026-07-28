@@ -13,20 +13,19 @@
 // limitations under the License.
 import { Component, ViewChild, OnInit, OnDestroy } from '@angular/core';
 import { ErrorHandler } from '../../../../../shared/units/error-handler';
-import { CronScheduleComponent } from '../../../../../shared/components/cron-schedule';
 import { OriginCron } from '../../../../../shared/services';
 import { finalize } from 'rxjs/operators';
 import { ScheduleType } from '../../../../../shared/entities/shared.const';
-import { GcComponent } from '../../gc-page/gc/gc.component';
 import { PurgeService } from '../../../../../../../ng-swagger-gen/services/purge.service';
 import { ExecHistory } from '../../../../../../../ng-swagger-gen/models/exec-history';
+import { ScheduleObj } from '../../../../../../../ng-swagger-gen/models/schedule-obj';
 import {
     JOB_STATUS,
     REFRESH_STATUS_TIME_DIFFERENCE,
     RESOURCE_TYPES,
     RetentionTimeUnit,
 } from '../../clearing-job-interface';
-import { clone } from '../../../../../shared/units/utils';
+import { clone, cronRegex } from '../../../../../shared/units/utils';
 import { PurgeHistoryComponent } from '../history/purge-history.component';
 import { NgForm } from '@angular/forms';
 import { AuditlogService } from 'ng-swagger-gen/services';
@@ -49,11 +48,9 @@ export class SetJobComponent implements OnInit, OnDestroy {
     originCron: OriginCron;
     disableGC: boolean = false;
     loading: boolean = false;
-    getLabelCurrent = 'CLEARANCES.SCHEDULE_TO_PURGE';
     loadingGcStatus = false;
-    @ViewChild(CronScheduleComponent)
-    cronScheduleComponent: CronScheduleComponent;
     dryRunOnGoing: boolean = false;
+    savingParams: boolean = false;
     lastCompletedTime: string;
     loadingLastCompletedTime: boolean = false;
     isDryRun: boolean = false;
@@ -62,6 +59,10 @@ export class SetJobComponent implements OnInit, OnDestroy {
 
     retentionTime: number;
     retentionUnit: string = RetentionTimeUnit.DAYS;
+    scheduleType: string = ScheduleType.NONE;
+    cronString: string = '';
+    ScheduleType = ScheduleType;
+    private savedParamsKey: string;
 
     eventTypes: Record<string, string>[] = [];
     selectedEventTypes: string[] = clone([]);
@@ -210,6 +211,64 @@ export class SetJobComponent implements OnInit, OnDestroy {
                 cron: '',
             };
         }
+        this.scheduleType = this.originCron.type;
+        // the scheduler persists the cron with a randomized seconds field,
+        // but the API rejects any submitted cron whose seconds are not 0
+        this.cronString =
+            this.originCron.type === ScheduleType.CUSTOM
+                ? (this.originCron.cron || '').trim().replace(/^\S+/, '0')
+                : '';
+        this.savedParamsKey = this.currentParamsKey();
+    }
+
+    private effectiveCron(): string {
+        switch (this.scheduleType) {
+            case ScheduleType.NONE:
+                return '';
+            case ScheduleType.HOURLY:
+                return '0 0 * * * *';
+            case ScheduleType.DAILY:
+                return '0 0 0 * * *';
+            case ScheduleType.WEEKLY:
+                return '0 0 0 * * 0';
+            default:
+                // user-typed seconds also must be 0 for the API
+                return (this.cronString || '')
+                    .replace(/\s+/g, ' ')
+                    .trim()
+                    .replace(/^\S+/, '0');
+        }
+    }
+
+    private currentParamsKey(): string {
+        const hours =
+            this.retentionUnit === RetentionTimeUnit.DAYS
+                ? +this.retentionTime * ONE_DAY
+                : +this.retentionTime;
+        const eventTypes = [...(this.selectedEventTypes ?? [])]
+            .sort()
+            .join(',');
+        return `${
+            this.scheduleType
+        }|${this.effectiveCron()}|${hours}|${eventTypes}`;
+    }
+
+    isDirty(): boolean {
+        return this.currentParamsKey() !== this.savedParamsKey;
+    }
+
+    private buildParameters(dryRun: boolean): {
+        [key: string]: any;
+    } {
+        const retentionTime: number =
+            this.retentionUnit === RetentionTimeUnit.DAYS
+                ? this.retentionTime * ONE_DAY
+                : this.retentionTime;
+        return {
+            audit_retention_hour: +retentionTime,
+            include_event_types: this.selectedEventTypes.join(','),
+            dry_run: dryRun,
+        };
     }
 
     gcNow(): void {
@@ -217,18 +276,10 @@ export class SetJobComponent implements OnInit, OnDestroy {
         setTimeout(() => {
             this.enableGc();
         }, ONE_MINUTE);
-        const retentionTime: number =
-            this.retentionUnit === RetentionTimeUnit.DAYS
-                ? this.retentionTime * 24
-                : this.retentionTime;
         this.purgeService
             .createPurgeSchedule({
                 schedule: {
-                    parameters: {
-                        audit_retention_hour: +retentionTime,
-                        include_event_types: this.selectedEventTypes.join(','),
-                        dry_run: false,
-                    },
+                    parameters: this.buildParameters(false),
                     schedule: {
                         type: ScheduleType.MANUAL,
                     },
@@ -247,18 +298,10 @@ export class SetJobComponent implements OnInit, OnDestroy {
 
     dryRun() {
         this.dryRunOnGoing = true;
-        const retentionTime: number =
-            this.retentionUnit === RetentionTimeUnit.DAYS
-                ? this.retentionTime * 24
-                : this.retentionTime;
         this.purgeService
             .createPurgeSchedule({
                 schedule: {
-                    parameters: {
-                        audit_retention_hour: +retentionTime,
-                        include_event_types: this.selectedEventTypes.join(','),
-                        dry_run: true,
-                    },
+                    parameters: this.buildParameters(true),
                     schedule: {
                         type: ScheduleType.MANUAL,
                     },
@@ -280,69 +323,46 @@ export class SetJobComponent implements OnInit, OnDestroy {
         this.disableGC = false;
     }
 
-    saveGcSchedule(cron: string) {
-        const retentionTime: number =
-            this.retentionUnit === RetentionTimeUnit.DAYS
-                ? this.retentionTime * 24
-                : this.retentionTime;
-        if (this.originCron && this.originCron.type === ScheduleType.NONE) {
-            // no schedule, then create
-            this.purgeService
-                .createPurgeSchedule({
-                    schedule: {
-                        parameters: {
-                            audit_retention_hour: +retentionTime,
-                            include_event_types:
-                                this.selectedEventTypes.join(','),
-                            dry_run: false,
-                        },
-                        schedule: {
-                            type: GcComponent.getScheduleType(cron),
-                            cron: cron,
-                        },
-                    },
-                })
-                .subscribe({
-                    next: response => {
-                        this.errorHandler.info(
-                            'CLEARANCES.PURGE_SCHEDULE_RESET'
-                        );
-                        this.cronScheduleComponent.resetSchedule();
-                        this.getCurrentSchedule(false); // refresh schedule
-                    },
-                    error: error => {
-                        this.errorHandler.error(error);
-                    },
-                });
-        } else {
-            this.purgeService
-                .updatePurgeSchedule({
-                    schedule: {
-                        parameters: {
-                            audit_retention_hour: +retentionTime,
-                            include_event_types:
-                                this.selectedEventTypes.join(','),
-                            dry_run: false,
-                        },
-                        schedule: {
-                            type: GcComponent.getScheduleType(cron),
-                            cron: cron,
-                        },
-                    },
-                })
-                .subscribe({
-                    next: response => {
-                        this.errorHandler.info(
-                            'CLEARANCES.PURGE_SCHEDULE_RESET'
-                        );
-                        this.cronScheduleComponent.resetSchedule();
-                        this.getCurrentSchedule(false); // refresh schedule
-                    },
-                    error: error => {
-                        this.errorHandler.error(error);
-                    },
-                });
+    saveCurrentParameters() {
+        if (!this.isFormValid() || !this.isDirty()) {
+            return;
         }
+        this.savingParams = true;
+        const body = {
+            schedule: {
+                parameters: this.buildParameters(false),
+                schedule: {
+                    type: this.scheduleType as ScheduleObj['type'],
+                    cron: this.effectiveCron(),
+                },
+            },
+        };
+        const request =
+            this.originCron?.type === ScheduleType.NONE
+                ? this.purgeService.createPurgeSchedule(body)
+                : this.purgeService.updatePurgeSchedule(body);
+        request.pipe(finalize(() => (this.savingParams = false))).subscribe({
+            next: () => {
+                this.errorHandler.info('CLEARANCES.PURGE_PARAMS_SAVED');
+                this.getCurrentSchedule(false);
+            },
+            error: error => {
+                this.errorHandler.error(error);
+            },
+        });
+    }
+
+    get scheduleExists(): boolean {
+        return !!this.originCron && this.originCron.type !== ScheduleType.NONE;
+    }
+
+    // an existing schedule without any event type never purges anything
+    get isNoopSchedule(): boolean {
+        return (
+            this.scheduleExists &&
+            !this.loading &&
+            !(this.selectedEventTypes?.length > 0)
+        );
     }
     hasEventType(eventType: string): boolean {
         return this.selectedEventTypes?.indexOf(eventType) !== -1;
@@ -362,12 +382,27 @@ export class SetJobComponent implements OnInit, OnDestroy {
         this.getStatus();
         this.purgeHistoryComponent?.refresh();
     }
-    isValid(): boolean {
-        if (this.cronScheduleComponent?.scheduleType === ScheduleType.NONE) {
+    isCronValid(): boolean {
+        if (this.scheduleType !== ScheduleType.CUSTOM) {
             return true;
         }
-        return !(
-            this.purgeForm?.invalid || !(this.selectedEventTypes?.length > 0)
+        return cronRegex(this.effectiveCron());
+    }
+    // gates SAVE: schedule removal (type None) does not need event types
+    isFormValid(): boolean {
+        if (!this.isRetentionTimeValid() || !this.isCronValid()) {
+            return false;
+        }
+        if (this.scheduleType === ScheduleType.NONE) {
+            return true;
+        }
+        return this.selectedEventTypes?.length > 0;
+    }
+    canRunNow(): boolean {
+        return (
+            !this.purgeForm?.invalid &&
+            this.isRetentionTimeValid() &&
+            this.selectedEventTypes?.length > 0
         );
     }
     isRetentionTimeValid() {

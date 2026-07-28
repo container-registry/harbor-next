@@ -1747,6 +1747,8 @@
         "PURGE_NOW": "지금 제거",
         "PURGE_NOW_SUCCESS": "제거가 성공적으로 발생됐습니다",
         "PURGE_SCHEDULE_RESET": "제거 예약이 초기화됐습니다",
+        "ROTATION_POLICY": "로테이션 정책",
+        "EXECUTION": "실행",
         "PURGE_HISTORY": "제거 기록",
         "FORWARD_ENDPOINT": "감사 로그를 Syslog 엔트포인트로 전달",
         "FORWARD_ENDPOINT_TOOLTIP": "감사 로그를 syslog 엔드포인트로 전달합니다(예: harbor-log:10514)",
@@ -1758,7 +1760,9 @@
         "STOP_GC_SUCCESS": "가비지 컬렉션 작업 중지를 성공적으로 발생시켰습니다",
         "STOP_PURGE_SUCCESS": "제거 중지를 성공적으로 발생시켰습니다",
         "NO_GC_RECORDS": "가비지 컬렉션 기록을 찾을 수 없습니다!",
-        "NO_PURGE_RECORDS": "제거 기록을 찾을 수 없습니다!"
+        "NO_PURGE_RECORDS": "제거 기록을 찾을 수 없습니다!",
+        "PURGE_PARAMS_SAVED": "로그 로테이션 설정이 저장되었습니다",
+        "NO_EVENT_TYPES_WARNING": "이벤트 유형이 선택되지 않아 이 일정은 아무것도 삭제하지 않습니다. 하나 이상의 이벤트 유형을 선택하고 저장을 클릭하세요."
     },
     "CVE_EXPORT": {
         "EXPORT_SOME_PROJECTS": "CVE 내보내기",
