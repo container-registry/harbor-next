@@ -93,7 +93,7 @@ spec:
         size: 1Gi
     registry:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:32dfe0ba7a1d2a9ab51093c768d8d0fabeb2cb6d8738fdb25e0822f51ab6e6a7" # {"$imagepolicy": "flux-system:harbor-registry:digest"}
+        deploy.8gears.io/image-revision: "sha256:c19b7447a9ab686764b797e3221b2a0a3dd966cb738e230211cc0fba7f7b441b" # {"$imagepolicy": "flux-system:harbor-registry:digest"}
         deploy.8gears.io/registryctl-image-revision: "sha256:7edd9e8b88ae3c703cac1c68f173ff5cefbe30ecf34b265003b5dcd6e39aaac8" # {"$imagepolicy": "flux-system:harbor-registryctl:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-registry
@@ -109,7 +109,7 @@ spec:
         size: 10Gi
     portal:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:f1010198fc6de31cbc8a1d6e0a08d547832746d32f2cb8075abc801eb867908a" # {"$imagepolicy": "flux-system:harbor-portal:digest"}
+        deploy.8gears.io/image-revision: "sha256:ef5f067b1cb04efa36a1c91b8ecc7532aca1540396a443daf2cad4c126318b19" # {"$imagepolicy": "flux-system:harbor-portal:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-portal
         tag: latest
