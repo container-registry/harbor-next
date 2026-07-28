@@ -6,7 +6,7 @@
 # Usage:
 #   task image:core                         # CI: multi-arch push, local: native push
 #   task image:core PUSH=false              # load locally (native arch)
-#   task image:all-images                   # all images
+#   task image:all-images IMAGE_TAG=pr-516  # all images with an explicit registry tag
 
 version: '3'
 
@@ -64,7 +64,7 @@ tasks:
     vars:
       OUTPUT: '{{ternary "--push" "--load" (eq .PUSH "true")}}'
       TAG_PREFIX: '{{ternary (printf "%s/%s/" .REGISTRY_ADDRESS .REGISTRY_PROJECT) "" (eq .PUSH "true")}}'
-      FULL_TAG: '{{.TAG_PREFIX}}{{.IMAGE_NAME}}:{{.VERSION}}'
+      FULL_TAG: '{{.TAG_PREFIX}}{{.IMAGE_NAME}}:{{.IMAGE_TAG | default .VERSION}}'
     preconditions:
       - sh: '{{if and (ne .PUSH "true") (contains "," .PLATFORMS)}}exit 1{{end}}'
         msg: "PUSH=false requires single platform (--load limitation)"
@@ -164,7 +164,7 @@ tasks:
       - task: _binary-image
         vars:
           SERVICE: exporter
-          BUILD_ARGS: '--build-arg harbor_version={{.VERSION}} --build-arg git_commit={{.GIT_COMMIT}}'
+          BUILD_ARGS: '--build-arg harbor_version={{.IMAGE_TAG | default .VERSION}} --build-arg git_commit={{.GIT_COMMIT}}'
 
   # --- Standalone Images ---
 
@@ -218,4 +218,4 @@ tasks:
 
   inspect:*:
     desc: "Inspect multi-arch manifest in remote registry"
-    cmd: docker buildx imagetools inspect {{.REGISTRY_ADDRESS}}/{{.REGISTRY_PROJECT}}/{{index .MATCH 0}}:{{.VERSION}}
+    cmd: docker buildx imagetools inspect {{.REGISTRY_ADDRESS}}/{{.REGISTRY_PROJECT}}/{{index .MATCH 0}}:{{.IMAGE_TAG | default .VERSION}}

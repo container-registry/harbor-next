@@ -29,6 +29,49 @@ docker compose ps
 curl https://registry.example.com/api/v2.0/systeminfo
 ```
 
+## Podman: Launch a Published Build Locally
+
+From the repository root, one command starts a disposable local Harbor using
+the same tag for every Harbor component. The Core image reference selects the
+matching Jobservice, Registry, Portal, Exporter, and Trivy Adapter images.
+
+```bash
+podman login 8gears.container-registry.com
+./harbor-deploy 8gears.container-registry.com/8gcr-pr/harbor-core:pr-516
+```
+
+Pasting a `docker pull` or `podman pull` command also works; the launcher
+removes that prefix and pulls every matching Harbor component itself.
+
+The launcher uses `podman compose`, exposes Harbor at
+`http://localhost:8088`, enables Core and Jobservice debug logging, and writes
+generated secrets and the signing key only under the ignored
+`.harbor-deploy/` directory. It is intended for local testing, not a
+production deployment. It also enables Harbor's HTTP CSRF mode, so browser
+logins work over the local HTTP endpoint.
+
+Task shortcuts provide the same workflow:
+
+```bash
+task deploy:up -- 8gears.container-registry.com/8gcr-pr/harbor-core:pr-516
+task deploy:status
+task deploy:logs
+task deploy:down       # preserves volumes
+task deploy:down-clean # explicitly removes volumes
+```
+
+Run multiple published builds side by side with distinct ports. Each port gets
+an isolated Compose project and data volumes by default:
+
+```bash
+./harbor-deploy 8gears.container-registry.com/8gcr-pr/harbor-core:pr-516 --port 8089
+./harbor-deploy status --port 8089
+./harbor-deploy down-clean --port 8089
+```
+
+Use `--project name` only when you want a name other than the default
+`harbor-deploy-PORT`.
+
 ## TLS Certificates
 
 TLS is enabled by default. Set `TLS_CERT` and `TLS_KEY` in `.env` to absolute paths on the host:

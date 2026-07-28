@@ -24,7 +24,7 @@ services:
     tmpfs:
       - /tmp:size=256M,mode=1777
     volumes:
-      - ./config/token_service_key.pem:/etc/core/token_service_key.pem:ro
+      - ${TOKEN_SERVICE_KEY:-./config/token_service_key.pem}:/etc/core/token_service_key.pem:ro
     environment:
       # Database
       POSTGRESQL_HOST: postgresql
@@ -47,6 +47,8 @@ services:
       HARBOR_ADMIN_PASSWORD: ${HARBOR_ADMIN_PASSWORD}
       CACHE_ENABLED: ${CACHE_ENABLED:-true}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Needed only by the local HTTP launcher; secure deployments keep false.
+      CSRF_PLAINTEXT_HTTP: ${CSRF_PLAINTEXT_HTTP:-false}
       TOKEN_PRIVATE_KEY_PATH: /etc/core/token_service_key.pem
       # JobService
       JOBSERVICE_URL: http://jobservice:8888

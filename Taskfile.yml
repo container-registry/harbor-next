@@ -52,6 +52,8 @@ includes:
   dev:
     taskfile: ./taskfile/dev.yml
     aliases: [d]
+  deploy:
+    taskfile: ./taskfile/deploy.yml
   docs:
     taskfile: ./taskfile/docs.yml
   release-ready:

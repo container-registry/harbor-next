@@ -65,6 +65,7 @@ deploy/compose/config/*.pem
 deploy/compose/config/certs/
 .env
 .env.local
+.harbor-deploy/
 CLAUDE.md
 tmp/
 bin

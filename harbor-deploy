@@ -1,0 +1,192 @@
+#!/usr/bin/env bash
+# Start a local, disposable Harbor instance from a published Harbor core image.
+set -euo pipefail
+
+root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+compose_file="$root_dir/deploy/compose/docker-compose.yaml"
+project_name=""
+runtime_dir=""
+
+usage() {
+  cat <<'EOF'
+Usage:
+  harbor-deploy [docker|podman pull] <registry/path/harbor-core:tag> [--port PORT] [--project NAME]
+  harbor-deploy {status|logs|down|down-clean} [--port PORT] [--project NAME]
+
+Starts the published Harbor component images matching the tagged harbor-core
+reference with Podman Compose. Login to a private image registry first.
+Copied `docker pull` and `podman pull` prefixes are accepted and ignored.
+
+Options:
+  --port PORT              HTTP port; also selects the default project (default: 8088)
+  --project NAME           Compose project name (default: harbor-deploy-PORT)
+  --log-level LEVEL        Harbor Core and Jobservice log level (default: debug)
+EOF
+}
+
+die() {
+  printf 'harbor-deploy: %s\n' "$*" >&2
+  exit 1
+}
+
+require() {
+  command -v "$1" >/dev/null 2>&1 || die "required command not found: $1"
+}
+
+compose() {
+  PODMAN_COMPOSE_PROVIDER=podman-compose podman compose \
+    -p "$project_name" \
+    --env-file "$runtime_dir/compose.env" \
+    -f "$compose_file" "$@"
+}
+
+random_secret() {
+  openssl rand -hex 32
+}
+
+write_runtime_files() {
+  local port="$1" log_level="$2"
+  umask 077
+  mkdir -p "$runtime_dir"
+
+  if [[ ! -f "$runtime_dir/secrets.env" ]]; then
+    cat >"$runtime_dir/secrets.env" <<EOF
+HARBOR_ADMIN_PASSWORD=${HARBOR_DEPLOY_ADMIN_PASSWORD:-Harbor12345}
+CORE_SECRET=$(random_secret)
+JOBSERVICE_SECRET=$(random_secret)
+DB_PASSWORD=$(random_secret)
+EOF
+  fi
+
+  if [[ ! -f "$runtime_dir/token_service_key.pem" ]]; then
+    openssl genpkey -algorithm RSA -outform PEM -pkeyopt rsa_keygen_bits:4096 \
+      | openssl rsa -traditional -out "$runtime_dir/token_service_key.pem" >/dev/null 2>&1
+    # Core runs as a non-root container user, so the bind-mounted key must be readable.
+    chmod 644 "$runtime_dir/token_service_key.pem"
+  fi
+
+  cat >"$runtime_dir/compose.env" <<EOF
+COMPOSE_PROJECT_NAME=$project_name
+IMAGE_REPO=$image_repo/
+HARBOR_TAG=$image_tag
+EXT_ENDPOINT=http://localhost:$port
+PORT_HTTP=$port
+PORT_HTTPS=${HARBOR_DEPLOY_HTTPS_PORT:-8443}
+TOKEN_SERVICE_KEY=$runtime_dir/token_service_key.pem
+TLS_CONF=/dev/null
+TLS_CERT=/dev/null
+TLS_KEY=/dev/null
+LOG_LEVEL=$log_level
+CSRF_PLAINTEXT_HTTP=true
+POSTGRES_VERSION=${POSTGRES_VERSION:-16}
+VALKEY_VERSION=${VALKEY_VERSION:-8}
+EOF
+  cat "$runtime_dir/secrets.env" >>"$runtime_dir/compose.env"
+}
+
+initialize_image_reference() {
+  local core_image="$1"
+  [[ "$core_image" != *@* ]] || die "use a tagged harbor-core image; digest references cannot select matching sibling images"
+  [[ "$core_image" == */harbor-core:* ]] || die "image must end in /harbor-core:<tag>"
+
+  image_repo="${core_image%/harbor-core:*}"
+  image_tag="${core_image##*/harbor-core:}"
+  [[ -n "$image_repo" && -n "$image_tag" ]] || die "image must include an image repository and tag"
+}
+
+pull_harbor_images() {
+  local component
+  for component in harbor-core harbor-jobservice harbor-registryctl harbor-registry harbor-portal harbor-exporter trivy-adapter; do
+    printf 'Pulling %s/%s:%s\n' "$image_repo" "$component" "$image_tag"
+    podman pull "$image_repo/$component:$image_tag"
+  done
+}
+
+wait_for_harbor() {
+  local endpoint="http://localhost:$1/api/v2.0/health"
+  local attempt
+  for attempt in $(seq 1 60); do
+    if curl --fail --silent --show-error "$endpoint" | jq --exit-status '.status == "healthy"' >/dev/null; then
+      printf 'Harbor is healthy at http://localhost:%s\n' "$1"
+      return 0
+    fi
+    sleep 2
+  done
+  die "Harbor did not become healthy within 120 seconds; inspect with: ./harbor-deploy logs"
+}
+
+main() {
+  require podman
+  require podman-compose
+  require openssl
+  require curl
+  require jq
+
+  # A common paste includes the transport command. The launcher pulls every
+  # required component itself, so only the image reference is needed.
+  if [[ $# -ge 2 && ( "$1" == "docker" || "$1" == "podman" ) && "$2" == "pull" ]]; then
+    shift 2
+  fi
+
+  local action="" core_image="" local_port="8088" log_level="debug"
+  while (($#)); do
+    case "$1" in
+      -h|--help|help) usage; return ;;
+      --port)
+        (($# >= 2)) || die "--port requires a value"
+        local_port="$2"
+        shift 2
+        ;;
+      --project)
+        (($# >= 2)) || die "--project requires a value"
+        project_name="$2"
+        shift 2
+        ;;
+      --log-level)
+        (($# >= 2)) || die "--log-level requires a value"
+        log_level="$2"
+        shift 2
+        ;;
+      status|logs|down|down-clean)
+        [[ -z "$action" && -z "$core_image" ]] || die "only one action or Core image may be specified"
+        action="$1"
+        shift
+        ;;
+      *)
+        [[ -z "$core_image" && -z "$action" ]] || die "only one Core image may be specified"
+        core_image="$1"
+        shift
+        ;;
+    esac
+  done
+
+  [[ "$local_port" =~ ^[0-9]+$ ]] || die "--port must be a numeric TCP port"
+  project_name="${project_name:-harbor-deploy-$local_port}"
+  runtime_dir="$root_dir/.harbor-deploy/$project_name"
+
+  case "$action" in
+    '')
+      [[ -n "$core_image" ]] || { usage; return; }
+      initialize_image_reference "$core_image"
+      write_runtime_files "$local_port" "$log_level"
+      pull_harbor_images
+      compose up --detach
+      wait_for_harbor "$local_port"
+      ;;
+    status|logs|down|down-clean)
+      [[ -f "$runtime_dir/compose.env" ]] || die "no deployment state for project $project_name"
+      case "$action" in
+        status)
+          compose ps
+          endpoint_port="$(awk -F= '$1 == "PORT_HTTP" {print $2; exit}' "$runtime_dir/compose.env")"
+          curl --fail --silent "http://localhost:$endpoint_port/api/v2.0/health" | jq . || true
+          ;;
+        logs) compose logs --follow ;;
+        down) compose down ;;
+        down-clean) compose down --volumes ;;
+      esac
+      ;;
+  esac
+}
+
+main "$@"

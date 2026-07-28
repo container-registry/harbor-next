@@ -1,0 +1,30 @@
+version: '3'
+
+tasks:
+  up:
+    desc: Start Harbor from a published tagged harbor-core image (Podman Compose)
+    preconditions:
+      - sh: test -n "{{.CLI_ARGS}}"
+        msg: 'Pass a Core image, for example: task deploy:up -- registry.example/harbor-core:tag'
+    cmds:
+      - ./harbor-deploy {{.CLI_ARGS}}
+
+  status:
+    desc: Show the local Harbor Compose deployment status
+    cmds:
+      - ./harbor-deploy status {{.CLI_ARGS}}
+
+  logs:
+    desc: Follow logs for the local Harbor Compose deployment
+    cmds:
+      - ./harbor-deploy logs {{.CLI_ARGS}}
+
+  down:
+    desc: Stop the local Harbor Compose deployment (preserves data volumes)
+    cmds:
+      - ./harbor-deploy down {{.CLI_ARGS}}
+
+  down-clean:
+    desc: Stop the local Harbor Compose deployment and remove its data volumes
+    cmds:
+      - ./harbor-deploy down-clean {{.CLI_ARGS}}
