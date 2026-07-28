@@ -49,9 +49,25 @@ jobs:
       TRIVY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD || secrets.HARBOR_PASSWORD }}
       TRIVY_USERNAME: ${{ vars.REGISTRY_USERNAME || secrets.REGISTRY_USERNAME || vars.HARBOR_USERNAME || secrets.HARBOR_USERNAME }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
+
+      - name: Configure ephemeral Git authentication
+        run: |
+          askpass="${RUNNER_TEMP}/git-askpass"
+          cat > "${askpass}" <<'EOF'
+          #!/usr/bin/env bash
+          case "$1" in
+            *Username*) printf '%s\n' 'x-access-token' ;;
+            *Password*) printf '%s\n' "${GH_TOKEN}" ;;
+            *) exit 1 ;;
+          esac
+          EOF
+          chmod 700 "${askpass}"
+          echo "GIT_ASKPASS=${askpass}" >> "${GITHUB_ENV}"
+          echo "GIT_TERMINAL_PROMPT=0" >> "${GITHUB_ENV}"
 
       - name: Prepare base branch for scanning
         run: |
