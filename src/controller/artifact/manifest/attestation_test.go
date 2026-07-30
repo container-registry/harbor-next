@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package artifact
+package manifest
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/docker/distribution/manifest/schema2"
@@ -23,7 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIsBuildKitAttestationDescriptor(t *testing.T) {
+func TestIsAttestationDescriptor(t *testing.T) {
 	tests := []struct {
 		name       string
 		descriptor v1.Descriptor
@@ -34,7 +35,7 @@ func TestIsBuildKitAttestationDescriptor(t *testing.T) {
 			descriptor: v1.Descriptor{
 				MediaType: v1.MediaTypeImageManifest,
 				Annotations: map[string]string{
-					buildKitReferenceTypeAnnotation: buildKitAttestationManifestType,
+					referenceTypeAnnotation: attestationManifestType,
 				},
 			},
 			want: true,
@@ -44,7 +45,7 @@ func TestIsBuildKitAttestationDescriptor(t *testing.T) {
 			descriptor: v1.Descriptor{
 				MediaType: schema2.MediaTypeManifest,
 				Annotations: map[string]string{
-					buildKitReferenceTypeAnnotation: buildKitAttestationManifestType,
+					referenceTypeAnnotation: attestationManifestType,
 				},
 			},
 			want: true,
@@ -61,7 +62,7 @@ func TestIsBuildKitAttestationDescriptor(t *testing.T) {
 			descriptor: v1.Descriptor{
 				MediaType: v1.MediaTypeImageManifest,
 				Annotations: map[string]string{
-					buildKitReferenceTypeAnnotation: "not-attestation",
+					referenceTypeAnnotation: "not-attestation",
 				},
 			},
 			want: false,
@@ -71,25 +72,25 @@ func TestIsBuildKitAttestationDescriptor(t *testing.T) {
 			descriptor: v1.Descriptor{
 				MediaType: v1.MediaTypeImageIndex,
 				Annotations: map[string]string{
-					buildKitReferenceTypeAnnotation: buildKitAttestationManifestType,
+					referenceTypeAnnotation: attestationManifestType,
 				},
 			},
 			want: false,
 		},
 		{
-			name: "empty descriptor",
+			name:       "empty descriptor",
 			descriptor: v1.Descriptor{},
 			want:       false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, isBuildKitAttestationDescriptor(tt.descriptor))
+			assert.Equal(t, tt.want, isAttestationDescriptor(tt.descriptor))
 		})
 	}
 }
 
-func TestBuildKitPlatformChildren(t *testing.T) {
+func TestPlatformChildren(t *testing.T) {
 	amd64 := v1.Descriptor{
 		Digest:   digest.FromString("amd64"),
 		Platform: &v1.Platform{OS: "linux", Architecture: "amd64"},
@@ -102,60 +103,60 @@ func TestBuildKitPlatformChildren(t *testing.T) {
 		MediaType: v1.MediaTypeImageManifest,
 		Digest:    digest.FromString("attestation"),
 		Annotations: map[string]string{
-			buildKitReferenceTypeAnnotation: buildKitAttestationManifestType,
+			referenceTypeAnnotation: attestationManifestType,
 		},
 	}
 
-	children := buildKitPlatformChildren([]v1.Descriptor{amd64, attestation, arm64})
+	children := platformChildren([]v1.Descriptor{amd64, attestation, arm64})
 	assert.Len(t, children, 2)
 	assert.Equal(t, amd64.Digest, children[0].Digest)
 	assert.Equal(t, arm64.Digest, children[1].Digest)
 
 	// all attestations
-	children = buildKitPlatformChildren([]v1.Descriptor{attestation})
+	children = platformChildren([]v1.Descriptor{attestation})
 	assert.Empty(t, children)
 
 	// empty input
-	children = buildKitPlatformChildren(nil)
+	children = platformChildren(nil)
 	assert.Empty(t, children)
 }
 
-func TestBuildKitSubjectDigests(t *testing.T) {
+func TestSubjectDigests(t *testing.T) {
 	t.Run("valid sha256 digest", func(t *testing.T) {
-		subject := buildKitSubject{
+		subject := inTotoSubject{
 			Name: "amd64",
 			Digest: map[string]string{
 				"sha256": "cad250bb95ea402adf4f687cc7d6747ecf0de875e6d6117f74437893964903df",
 			},
 		}
-		digests := buildKitSubjectDigests(subject)
+		digests := subjectDigests(subject)
 		assert.Equal(t, []string{"sha256:cad250bb95ea402adf4f687cc7d6747ecf0de875e6d6117f74437893964903df"}, digests)
 	})
 
 	t.Run("empty encoded value is skipped", func(t *testing.T) {
-		subject := buildKitSubject{
+		subject := inTotoSubject{
 			Digest: map[string]string{"sha256": ""},
 		}
-		digests := buildKitSubjectDigests(subject)
+		digests := subjectDigests(subject)
 		assert.Empty(t, digests)
 	})
 
 	t.Run("invalid digest is skipped", func(t *testing.T) {
-		subject := buildKitSubject{
+		subject := inTotoSubject{
 			Digest: map[string]string{"sha256": "too-short"},
 		}
-		digests := buildKitSubjectDigests(subject)
+		digests := subjectDigests(subject)
 		assert.Empty(t, digests)
 	})
 
 	t.Run("empty digest map", func(t *testing.T) {
-		subject := buildKitSubject{}
-		digests := buildKitSubjectDigests(subject)
+		subject := inTotoSubject{}
+		digests := subjectDigests(subject)
 		assert.Empty(t, digests)
 	})
 }
 
-func TestBuildKitPlatformMatchesName(t *testing.T) {
+func TestPlatformMatchesName(t *testing.T) {
 	tests := []struct {
 		name     string
 		platform *v1.Platform
@@ -207,12 +208,12 @@ func TestBuildKitPlatformMatchesName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, buildKitPlatformMatchesName(tt.platform, tt.input))
+			assert.Equal(t, tt.want, platformMatchesName(tt.platform, tt.input))
 		})
 	}
 }
 
-func TestBuildKitDigestBySubjectName(t *testing.T) {
+func TestDigestBySubjectName(t *testing.T) {
 	amd64Digest := digest.FromString("amd64-content")
 	arm64Digest := digest.FromString("arm64-content")
 
@@ -228,27 +229,27 @@ func TestBuildKitDigestBySubjectName(t *testing.T) {
 	}
 
 	t.Run("match by architecture name", func(t *testing.T) {
-		got := buildKitDigestBySubjectName(siblings, "amd64")
+		got := digestBySubjectName(siblings, "amd64")
 		assert.Equal(t, amd64Digest.String(), got)
 	})
 
 	t.Run("match by os/arch name", func(t *testing.T) {
-		got := buildKitDigestBySubjectName(siblings, "linux/arm64")
+		got := digestBySubjectName(siblings, "linux/arm64")
 		assert.Equal(t, arm64Digest.String(), got)
 	})
 
 	t.Run("empty name returns empty", func(t *testing.T) {
-		got := buildKitDigestBySubjectName(siblings, "")
+		got := digestBySubjectName(siblings, "")
 		assert.Empty(t, got)
 	})
 
 	t.Run("whitespace-only name returns empty", func(t *testing.T) {
-		got := buildKitDigestBySubjectName(siblings, "   ")
+		got := digestBySubjectName(siblings, "   ")
 		assert.Empty(t, got)
 	})
 
 	t.Run("no match returns empty", func(t *testing.T) {
-		got := buildKitDigestBySubjectName(siblings, "s390x")
+		got := digestBySubjectName(siblings, "s390x")
 		assert.Empty(t, got)
 	})
 
@@ -264,105 +265,67 @@ func TestBuildKitDigestBySubjectName(t *testing.T) {
 				Platform: &v1.Platform{OS: "linux", Architecture: "amd64"},
 			},
 		}
-		got := buildKitDigestBySubjectName(dupes, "amd64")
+		got := digestBySubjectName(dupes, "amd64")
 		assert.Empty(t, got)
 	})
 }
 
-func TestResolveBuildKitAttestationSubject(t *testing.T) {
-	amd64Digest := "sha256:cad250bb95ea402adf4f687cc7d6747ecf0de875e6d6117f74437893964903df"
-	arm64Digest := "sha256:480b518ed0138eacf2d070de80cb8eb019fb0b3565e2598ed654a541c31061a0"
+func TestResolveSubjectFromStatement(t *testing.T) {
+	amd64Encoded := "cad250bb95ea402adf4f687cc7d6747ecf0de875e6d6117f74437893964903df"
+	arm64Encoded := "480b518ed0138eacf2d070de80cb8eb019fb0b3565e2598ed654a541c31061a0"
+	amd64Ref := "sha256:" + amd64Encoded
+	arm64Ref := "sha256:" + arm64Encoded
 
-	amd64Child := v1.Descriptor{
-		Digest:   digest.Digest(amd64Digest),
-		Platform: &v1.Platform{OS: "linux", Architecture: "amd64"},
+	children := []v1.Descriptor{
+		{Digest: digest.Digest(amd64Ref), Platform: &v1.Platform{OS: "linux", Architecture: "amd64"}},
+		{Digest: digest.Digest(arm64Ref), Platform: &v1.Platform{OS: "linux", Architecture: "arm64"}},
 	}
-	arm64Child := v1.Descriptor{
-		Digest:   digest.Digest(arm64Digest),
-		Platform: &v1.Platform{OS: "linux", Architecture: "arm64"},
-	}
-	attestation := v1.Descriptor{
-		MediaType: v1.MediaTypeImageManifest,
-		Digest:    digest.FromString("attestation"),
-		Annotations: map[string]string{
-			buildKitReferenceTypeAnnotation:   buildKitAttestationManifestType,
-			buildKitReferenceDigestAnnotation: amd64Digest,
-		},
-	}
-	siblings := []v1.Descriptor{amd64Child, arm64Child, attestation}
 
-	t.Run("annotation digest matches platform child", func(t *testing.T) {
-		got := resolveBuildKitAttestationSubject(attestation, siblings, nil)
-		assert.Equal(t, amd64Digest, got)
+	t.Run("subject digest matches a child", func(t *testing.T) {
+		subjects := []inTotoSubject{{Name: "amd64", Digest: map[string]string{"sha256": amd64Encoded}}}
+		assert.Equal(t, amd64Ref, resolveSubjectFromStatement(children, subjects))
 	})
 
-	t.Run("annotation digest not in index falls back to subject digest", func(t *testing.T) {
-		desc := v1.Descriptor{
-			MediaType: v1.MediaTypeImageManifest,
-			Annotations: map[string]string{
-				buildKitReferenceTypeAnnotation:   buildKitAttestationManifestType,
-				buildKitReferenceDigestAnnotation: "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-			},
-		}
-		subjects := []buildKitSubject{
-			{
-				Name:   "amd64",
-				Digest: map[string]string{"sha256": "cad250bb95ea402adf4f687cc7d6747ecf0de875e6d6117f74437893964903df"},
-			},
-		}
-		got := resolveBuildKitAttestationSubject(desc, siblings, subjects)
-		assert.Equal(t, amd64Digest, got)
+	t.Run("falls back to the subject name", func(t *testing.T) {
+		subjects := []inTotoSubject{{Name: "linux/arm64", Digest: map[string]string{"sha256": "not-a-digest"}}}
+		assert.Equal(t, arm64Ref, resolveSubjectFromStatement(children, subjects))
 	})
 
-	t.Run("falls back to subject name matching", func(t *testing.T) {
-		desc := v1.Descriptor{
-			MediaType: v1.MediaTypeImageManifest,
-			Annotations: map[string]string{
-				buildKitReferenceTypeAnnotation:   buildKitAttestationManifestType,
-				buildKitReferenceDigestAnnotation: "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-			},
-		}
-		subjects := []buildKitSubject{
-			{
-				Name:   "linux/arm64",
-				Digest: map[string]string{"sha256": "not-a-valid-hex-that-matches"},
-			},
-		}
-		got := resolveBuildKitAttestationSubject(desc, siblings, subjects)
-		assert.Equal(t, arm64Digest, got)
+	t.Run("no subjects resolves to nothing", func(t *testing.T) {
+		assert.Empty(t, resolveSubjectFromStatement(children, nil))
 	})
 
-	t.Run("no siblings returns empty", func(t *testing.T) {
-		got := resolveBuildKitAttestationSubject(attestation, []v1.Descriptor{attestation}, nil)
-		assert.Empty(t, got)
+	t.Run("unknown subject resolves to nothing", func(t *testing.T) {
+		subjects := []inTotoSubject{{Name: "s390x"}}
+		assert.Empty(t, resolveSubjectFromStatement(children, subjects))
 	})
 
-	t.Run("nil subjects with annotation not matching returns empty", func(t *testing.T) {
-		desc := v1.Descriptor{
-			MediaType: v1.MediaTypeImageManifest,
-			Annotations: map[string]string{
-				buildKitReferenceTypeAnnotation:   buildKitAttestationManifestType,
-				buildKitReferenceDigestAnnotation: "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-			},
+	// A statement naming two different children does not identify a single
+	// target, so nothing is attached rather than taking whichever came first.
+	t.Run("two subjects matching different children is ambiguous", func(t *testing.T) {
+		subjects := []inTotoSubject{
+			{Name: "amd64", Digest: map[string]string{"sha256": amd64Encoded}},
+			{Name: "arm64", Digest: map[string]string{"sha256": arm64Encoded}},
 		}
-		got := resolveBuildKitAttestationSubject(desc, siblings, nil)
-		assert.Empty(t, got)
+		assert.Empty(t, resolveSubjectFromStatement(children, subjects))
 	})
 
-	t.Run("no annotation digest falls back to subject", func(t *testing.T) {
-		desc := v1.Descriptor{
-			MediaType: v1.MediaTypeImageManifest,
-			Annotations: map[string]string{
-				buildKitReferenceTypeAnnotation: buildKitAttestationManifestType,
-			},
+	t.Run("ambiguous names resolve to nothing", func(t *testing.T) {
+		subjects := []inTotoSubject{{Name: "amd64"}, {Name: "arm64"}}
+		assert.Empty(t, resolveSubjectFromStatement(children, subjects))
+	})
+
+	// The digest map iterates in unspecified order, so the same subject naming
+	// two children must not resolve differently between runs.
+	t.Run("ambiguous digests within one subject are order independent", func(t *testing.T) {
+		sha512Encoded := strings.Repeat("ab", 64)
+		withSha512 := append(children, v1.Descriptor{
+			Digest:   digest.Digest("sha512:" + sha512Encoded),
+			Platform: &v1.Platform{OS: "linux", Architecture: "s390x"},
+		})
+		subjects := []inTotoSubject{{Digest: map[string]string{"sha256": amd64Encoded, "sha512": sha512Encoded}}}
+		for range 50 {
+			assert.Empty(t, resolveSubjectFromStatement(withSha512, subjects))
 		}
-		subjects := []buildKitSubject{
-			{
-				Name:   "arm64",
-				Digest: map[string]string{"sha256": "480b518ed0138eacf2d070de80cb8eb019fb0b3565e2598ed654a541c31061a0"},
-			},
-		}
-		got := resolveBuildKitAttestationSubject(desc, siblings, subjects)
-		assert.Equal(t, arm64Digest, got)
 	})
 }
