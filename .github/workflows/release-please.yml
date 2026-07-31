@@ -175,7 +175,6 @@ jobs:
           echo "VERSION=${VERSION:-${TAG_NAME#v}}" >> "$GITHUB_ENV"
 
       - name: Setup Go
-        if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
         uses: ./.github/actions/setup-go-cached
         with:
           go-version-file: src/go.mod

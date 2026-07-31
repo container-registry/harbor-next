@@ -9,6 +9,8 @@
 extend-ignore-identifiers-re = [
     # Hex strings and base64 blobs
     "[A-Za-z0-9+/]{20,}",
+    # Abbreviated commit IDs in changelogs
+    "[0-9a-f]{7,40}",
 ]
 
 [default.extend-words]
