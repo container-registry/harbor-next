@@ -186,6 +186,16 @@ jobs:
         if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
         run: task build:binary:${{ matrix.component }}:${{ env.PLATFORM_PAIR }} GIT_COMMIT="${GITHUB_SHA:0:8}"
 
+      - name: Compile image helper binaries
+        env:
+          COMPONENT: ${{ matrix.component }}
+          PLATFORM_PAIR: ${{ env.PLATFORM_PAIR }}
+        run: |
+          task build:binary:lprobe:${PLATFORM_PAIR}
+          if [ "${COMPONENT}" = "trivy-adapter" ]; then
+            task build:binary:trivy:${PLATFORM_PAIR}
+          fi
+
       - uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4.1.0
         if: env.BUILDX_HOST == ''
 
