@@ -52,7 +52,7 @@ This changelog mirrors [GitHub Releases](https://github.com/container-registry/h
 * fix: Disallow Empty `robot_name_prefix` to prevent OIDC CLI login from being blocked ([14ce6f2](https://github.com/container-registry/harbor-next/commit/14ce6f2e290000ae44eeface17f256a48f877427))
 * fix: duplicated "by" in beego ORM TableName comments ([51bc61c](https://github.com/container-registry/harbor-next/commit/51bc61cfb3f072c74430df92855081ff35f3ebbb))
 * fix: enable chunked blob upload for Azure ACR replication ([d0ce3f2](https://github.com/container-registry/harbor-next/commit/d0ce3f22c77d2b2e7a4d334e509decc57eef308d))
-* fix: Fix potentional SQLi ([d4262e4](https://github.com/container-registry/harbor-next/commit/d4262e447eed527d328cbb58288f31897c027a02))
+* fix: Fix potential SQLi ([d4262e4](https://github.com/container-registry/harbor-next/commit/d4262e447eed527d328cbb58288f31897c027a02))
 * fix: Fix theoretical timing vulnerability (goharbor/harbor[#23433](https://github.com/container-registry/harbor-next/issues/23433)) ([#378](https://github.com/container-registry/harbor-next/issues/378)) ([60411b7](https://github.com/container-registry/harbor-next/commit/60411b7da3fa664fbbc8ee666157e352c286c2c5))
 * fix: propagate CSV marshal errors in scan data export ([aec93bc](https://github.com/container-registry/harbor-next/commit/aec93bccef2ea00fbf227df463beed2b5d45d669))
 * fix: skip corrupted encrypted config values on decryption failure ([9db88ca](https://github.com/container-registry/harbor-next/commit/9db88cab7b6da45686639b509b30a4ae2ceb670a))
@@ -71,7 +71,7 @@ This changelog mirrors [GitHub Releases](https://github.com/container-registry/h
 * Replace gopkg.in/yaml.v2 with github.com/goccy/go-yaml ([9f3f58e](https://github.com/container-registry/harbor-next/commit/9f3f58e9b3dab32ea009a6d5e7f3a085857c6705))
 * Update and improve zh-TW Traditional Chinese locale ([8c354ef](https://github.com/container-registry/harbor-next/commit/8c354efd111c6a0937b310175c64d88ccd8c6a6e))
 * Update artifact_accessory to add source column to identify accessory ([aa455ab](https://github.com/container-registry/harbor-next/commit/aa455abf592fe5ff43854e38dcc0b32900ea0712))
-* update ECR adapter to allow for ecr-public to be mirored ([b4c3c66](https://github.com/container-registry/harbor-next/commit/b4c3c66b0c8ec0e2c8ce17b03b360d0fe6389b39))
+* update ECR adapter to allow for ecr-public to be mirrored ([b4c3c66](https://github.com/container-registry/harbor-next/commit/b4c3c66b0c8ec0e2c8ce17b03b360d0fe6389b39))
 * Upgrade harbor go.mod OSS packages ([dbceb18](https://github.com/container-registry/harbor-next/commit/dbceb1810419b304b6342bb8ae6427227ea58b18))
 
 
