@@ -308,11 +308,16 @@ func (a *ArtifactEventHandler) onPush(ctx context.Context, event *event.Artifact
 					return
 				}
 
-				if errors.IsErr(err, errors.PreconditionCode) {
+				if errors.IsErr(err, errors.ScannerUnreachableCode) {
 					if attempt < 4 {
-						log.Warningf("%s for artifact %s@%s precondition failed (scanner unreachable). Retrying in 45s (attempt %d/4)...", actionName, event.Artifact.RepositoryName, event.Artifact.Digest, attempt)
-						time.Sleep(45 * time.Second)
-						continue
+						log.Warningf("%s for artifact %s@%s scanner unreachable. Retrying in 45s (attempt %d/4)...", actionName, event.Artifact.RepositoryName, event.Artifact.Digest, attempt)
+						select {
+						case <-ctx.Done():
+							log.Debugf("%s for artifact %s@%s cancelled during retry delay", actionName, event.Artifact.RepositoryName, event.Artifact.Digest)
+							return
+						case <-time.After(45 * time.Second):
+							continue
+						}
 					}
 				}
 
