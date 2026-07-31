@@ -262,7 +262,7 @@ func (bc *basicController) Scan(ctx context.Context, artifact *ar.Artifact, opti
 	}
 
 	if r.Metadata == nil {
-		return errors.PreconditionFailedError(nil).WithMessagef("scanner %s is unreachable (metadata ping failed)", r.Name)
+		return errors.ScannerUnreachableError(nil).WithMessagef("scanner %s is unreachable (metadata ping failed)", r.Name)
 	}
 
 	if !scannable {
