@@ -7,6 +7,14 @@ on:
         description: Existing release tag to update
         required: true
         type: string
+      checkout_ref:
+        description: Ref containing the changelog to render
+        required: false
+        type: string
+      preview_pr_number:
+        description: Release PR number to update with a visible preview
+        required: false
+        type: string
     secrets:
       SYNC_APP_PRIVATE_KEY:
         description: Private key for reading commercial patch metadata
@@ -25,6 +33,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: release-notes-${{ inputs.tag_name || github.ref_name }}
@@ -42,9 +51,11 @@ jobs:
       REGISTRY_PROJECT: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
       RELEASE_NOTES_DRY_RUN: ${{ inputs.dry_run || false }}
       TAG_NAME: ${{ inputs.tag_name || github.ref_name }}
+      RELEASE_NOTES_PREVIEW_PR_NUMBER: ${{ inputs.preview_pr_number }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.checkout_ref || github.ref }}
           fetch-depth: 0
           persist-credentials: false
 
