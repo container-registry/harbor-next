@@ -56,6 +56,8 @@ includes:
     taskfile: ./taskfile/docs.yml
   release-ready:
     taskfile: ./taskfile/release-ready.yml
+  release-notes:
+    taskfile: ./taskfile/release-notes.yml
 
 tasks:
   default:
@@ -110,6 +112,11 @@ tasks:
     desc: "Verify release patches apply cleanly"
     cmds:
       - task: release-ready:check
+
+  release-notes:
+    desc: "Recreate a GitHub release's notes from its tagged changelog"
+    cmds:
+      - task: release-notes:update
 
   clean:
     desc: "Remove all build artifacts, images, test output, and dev environment"
