@@ -21,32 +21,15 @@ registry_address="${REGISTRY_ADDRESS:-8gears.container-registry.com}"
 registry_project="${REGISTRY_PROJECT:-8gcr}"
 registry="${registry_address}/${registry_project}"
 dry_run="${RELEASE_NOTES_DRY_RUN:-false}"
-preview="${RELEASE_NOTES_PREVIEW:-false}"
-preview_pr_number="${RELEASE_NOTES_PR_NUMBER:-}"
-use_release_pr_snapshot="${RELEASE_NOTES_USE_PR_SNAPSHOT:-true}"
 release_notes_output="${RELEASE_NOTES_OUTPUT:-}"
+preview_pr_number="${RELEASE_NOTES_PREVIEW_PR_NUMBER:-}"
 images=(core jobservice registryctl exporter portal registry trivy-adapter)
 
 tmp_dir=$(mktemp -d)
 trap 'rm -rf "${tmp_dir}"' EXIT
 
-if [[ "${preview}" == "true" ]]; then
-  : "${preview_pr_number:?RELEASE_NOTES_PR_NUMBER is required for a preview}"
+if [[ -n "${preview_pr_number}" ]]; then
   cp CHANGELOG.md "${tmp_dir}/CHANGELOG.md"
-elif [[ "${use_release_pr_snapshot}" == "true" ]]; then
-  preview_bodies="${tmp_dir}/release-prs.json"
-  gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/commits/${TAG_NAME}/pulls" > "${preview_bodies}"
-
-  if node .github/scripts/release-notes-preview.mjs extract \
-    "${preview_bodies}" \
-    "${tmp_dir}/release-notes.md"; then
-    gh release edit "${TAG_NAME}" \
-      --repo "${GITHUB_REPOSITORY}" \
-      --notes-file "${tmp_dir}/release-notes.md"
-    exit 0
-  fi
-
-  git show "${TAG_NAME}:CHANGELOG.md" > "${tmp_dir}/CHANGELOG.md"
 else
   git show "${TAG_NAME}:CHANGELOG.md" > "${tmp_dir}/CHANGELOG.md"
 fi
@@ -55,7 +38,7 @@ node .github/scripts/extract-changelog-release.mjs \
   "${version}" \
   "${tmp_dir}/release-source.md"
 
-if [[ "${preview}" == "true" ]]; then
+if [[ -n "${preview_pr_number}" ]]; then
   : > "${tmp_dir}/generated-notes.md"
 else
   gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
@@ -69,8 +52,8 @@ node .github/scripts/format-release-notes.mjs \
   "${tmp_dir}/formatted-notes.md" \
   "${tmp_dir}/contributors.md"
 
-if [[ "${preview}" == "true" ]]; then
-  release_branch="${GITHUB_REF_NAME:?GITHUB_REF_NAME is required for a preview}"
+if [[ -n "${preview_pr_number}" ]]; then
+  release_branch="${GITHUB_REF_NAME:?GITHUB_REF_NAME is required for a release PR preview}"
 else
   release_branch=$(gh release view "${TAG_NAME}" \
     --repo "${GITHUB_REPOSITORY}" \
@@ -151,15 +134,15 @@ fi
   fi
 } > "${tmp_dir}/release-notes.md"
 
-if [[ "${preview}" == "true" ]]; then
+if [[ -n "${preview_pr_number}" ]]; then
   gh pr view "${preview_pr_number}" --repo "${GITHUB_REPOSITORY}" --json body --jq .body > "${tmp_dir}/release-pr-body.md"
-  node .github/scripts/release-notes-preview.mjs upsert \
+  node .github/scripts/update-release-notes-preview.mjs \
     "${tmp_dir}/release-pr-body.md" \
     "${tmp_dir}/release-notes.md" \
-    "${tmp_dir}/release-pr-body-with-notes.md"
+    "${tmp_dir}/release-pr-body-with-preview.md"
   gh pr edit "${preview_pr_number}" \
     --repo "${GITHUB_REPOSITORY}" \
-    --body-file "${tmp_dir}/release-pr-body-with-notes.md"
+    --body-file "${tmp_dir}/release-pr-body-with-preview.md"
 elif [[ "${dry_run}" == "true" ]]; then
   if [[ -n "${release_notes_output}" ]]; then
     cp "${tmp_dir}/release-notes.md" "${release_notes_output}"
