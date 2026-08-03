@@ -1,0 +1,22 @@
+import { readFileSync, writeFileSync } from 'node:fs';
+
+const [changelogPath, version, outputPath] = process.argv.slice(2);
+
+if (!changelogPath || !version || !outputPath) {
+  throw new Error('usage: extract-changelog-release.mjs <changelog> <version> <output>');
+}
+
+const lines = readFileSync(changelogPath, 'utf8').split(/\r?\n/);
+const heading = new RegExp(`^## \\[(?:v)?${version.replaceAll('.', '\\.')}]`);
+const start = lines.findIndex(line => heading.test(line));
+
+if (start === -1) {
+  throw new Error(`CHANGELOG.md has no release section for ${version}`);
+}
+
+let end = lines.findIndex((line, index) => index > start && line.startsWith('## '));
+if (end === -1) {
+  end = lines.length;
+}
+
+writeFileSync(outputPath, `${lines.slice(start, end).join('\n').trim()}\n`);
