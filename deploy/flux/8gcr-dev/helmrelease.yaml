@@ -75,7 +75,7 @@ spec:
     # Always so they pull the new digest behind latest.
     core:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:d3aa187387ebf9fefe9862360e8e78a84ac90d5e00788544933048a6ef90f8b1" # {"$imagepolicy": "flux-system:harbor-core:digest"}
+        deploy.8gears.io/image-revision: "sha256:44eafc8a9f1057acb1ed5ee4bcbe4635cc7f9cdf10403edbb533bd949ba09a64" # {"$imagepolicy": "flux-system:harbor-core:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-core
         tag: latest
