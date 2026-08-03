@@ -7,6 +7,10 @@ on:
         description: Existing release tag to update
         required: true
         type: string
+    secrets:
+      SYNC_APP_PRIVATE_KEY:
+        description: Private key for reading commercial patch metadata
+        required: true
   workflow_dispatch:
     inputs:
       tag_name:
@@ -84,6 +88,7 @@ jobs:
           private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
           owner: container-registry
           repositories: 8gcr
+          permission-contents: read
 
       - name: Recreate release notes
         env:
