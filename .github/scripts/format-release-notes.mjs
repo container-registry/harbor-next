@@ -221,9 +221,16 @@ for (const line of releaseNotesLines(releaseBody)) {
 
 const output = ['## What\'s Changed'];
 const emittedSections = new Set();
+const upstreamCommitShas = new Set(
+  sections.get('Upstream')
+    .map(commitShaFromEntry)
+    .filter(Boolean),
+);
 
 for (const section of sectionOrder) {
-  const entries = sections.get(section) ?? [];
+  const entries = (sections.get(section) ?? []).filter(entry =>
+    section === 'Upstream' || !upstreamCommitShas.has(commitShaFromEntry(entry)),
+  );
   if (entries.length === 0) {
     continue;
   }
