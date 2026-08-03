@@ -31,10 +31,6 @@ on:
         default: false
         type: boolean
 
-permissions:
-  contents: write
-  pull-requests: write
-
 concurrency:
   group: release-notes-${{ inputs.tag_name || github.ref_name }}
   cancel-in-progress: false
