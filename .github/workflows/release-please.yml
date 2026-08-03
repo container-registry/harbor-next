@@ -363,4 +363,5 @@ jobs:
     uses: ./.github/workflows/release-notes.yml
     with:
       tag_name: ${{ needs.release-please.outputs.tag_name || inputs.finalize_tag }}
-    secrets: inherit
+    secrets:
+      SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
