@@ -40,7 +40,7 @@ env:
 jobs:
   build:
     name: "${{ matrix.component }} (${{ matrix.platform }})"
-    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'renovate[bot]' }}
     strategy:
       fail-fast: false
       matrix:
@@ -156,7 +156,7 @@ jobs:
 
   merge:
     name: "Merge ${{ matrix.component }}"
-    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'renovate[bot]' }}
     needs: [build]
     strategy:
       fail-fast: false
@@ -209,7 +209,7 @@ jobs:
 
   sign:
     name: Sign preview images
-    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'renovate[bot]' }}
     needs: [merge]
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
@@ -266,7 +266,7 @@ jobs:
 
   pr-comment:
     name: Comment preview image refs
-    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'renovate[bot]' }}
     needs: [sign]
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
