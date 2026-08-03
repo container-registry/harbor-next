@@ -41,10 +41,52 @@ release_branch=$(gh release view "${TAG_NAME}" \
   --repo "${GITHUB_REPOSITORY}" \
   --json targetCommitish \
   --jq .targetCommitish)
+release_created_at=$(gh release view "${TAG_NAME}" \
+  --repo "${GITHUB_REPOSITORY}" \
+  --json createdAt \
+  --jq .createdAt)
 
 if [[ -z "${release_branch}" ]]; then
   echo "Release ${TAG_NAME} has no target branch" >&2
   exit 1
+fi
+
+previous_tag=$(git tag --merged "${TAG_NAME}" --sort=-version:refname \
+  | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+  | grep -v "^${TAG_NAME}$" \
+  | head -n 1 || true)
+highlights=""
+
+if [[ -n "${previous_tag}" ]]; then
+  previous_release_created_at=$(gh release view "${previous_tag}" \
+    --repo "${GITHUB_REPOSITORY}" \
+    --json createdAt \
+    --jq .createdAt)
+  previous_release_date="${previous_release_created_at%%T*}"
+  release_date="${release_created_at%%T*}"
+  highlights=$(gh pr list \
+    --repo "${GITHUB_REPOSITORY}" \
+    --state merged \
+    --base "${release_branch}" \
+    --search "merged:${previous_release_date}..${release_date}" \
+    --json number,title,url,body \
+    --limit 100 \
+    --jq '
+      [.[] | select(.body | test("(?m)^## Release Notes"))] |
+      if length == 0 then ""
+      else
+        "## Highlights\n\n" +
+        (map(
+          "### [#\(.number)](\(.url)) \(.title)\n" +
+          (.body |
+            gsub("(?s).*\n## Release Notes\n"; "") |
+            gsub("(?s)\n## .*"; "") |
+            gsub("<!--[\\s\\S]*?-->"; "") |
+            ltrimstr("\n") | rtrimstr("\n")
+          ) + "\n"
+        ) | join("\n"))
+      end
+    ')
 fi
 
 GH_TOKEN="${PATCHES_TOKEN}" gh repo clone container-registry/8gcr \
@@ -72,6 +114,10 @@ if [[ -f "${series}" ]]; then
 fi
 
 {
+  if [[ -n "${highlights}" ]]; then
+    printf '%s\n\n' "${highlights}"
+  fi
+
   if [[ -s "${patch_notes}" ]]; then
     echo "## Commercial Features"
     echo
@@ -102,7 +148,7 @@ fi
   echo "**Verify an image signature:**"
   echo '\`\`\`sh'
   echo "cosign verify \\"
-  echo "  --certificate-identity \"https://github.com/${GITHUB_REPOSITORY}/.github/workflows/publish-images.yml@refs/heads/${release_branch}\" \\"
+  echo "  --certificate-identity \"https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release-please.yml@refs/heads/${release_branch}\" \\"
   echo '  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \\'
   echo "  ${registry}/harbor-core:${TAG_NAME}"
   echo '\`\`\`'
