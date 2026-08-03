@@ -19,4 +19,4 @@ tasks:
       - sh: test -n "${GH_TOKEN:-}"
         msg: "GH_TOKEN is required"
     cmds:
-      - RELEASE_NOTES_DRY_RUN=true RELEASE_NOTES_USE_PR_SNAPSHOT=false RELEASE_NOTES_OUTPUT="${RELEASE_NOTES_OUTPUT:-release-notes-${TAG_NAME}.md}" .github/scripts/update-release-notes.sh
+      - RELEASE_NOTES_DRY_RUN=true RELEASE_NOTES_OUTPUT="${RELEASE_NOTES_OUTPUT:-release-notes-${TAG_NAME}.md}" .github/scripts/update-release-notes.sh
