@@ -54,6 +54,11 @@ jobs:
           node-version: 24
           package-manager-cache: false
 
+      - uses: ./.github/actions/setup-go-cached
+        with:
+          go-version-file: src/go.mod
+          go-sum-path: src/go.sum
+
       - uses: ./.github/actions/setup-task
 
       - name: Install gh CLI
