@@ -43,7 +43,7 @@ while (bodyLines.length > 0 && bodyLines.at(-1).trim() === '') {
   bodyLines.pop();
 }
 
-console.log(`- **${subject}**`);
+console.log(`- ${subject}`);
 
 if (bodyLines.length > 0) {
   console.log('');
