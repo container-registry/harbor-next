@@ -2,9 +2,14 @@
 set -euo pipefail
 
 : "${GH_TOKEN:?GH_TOKEN is required}"
-: "${PATCHES_TOKEN:?PATCHES_TOKEN is required}"
-: "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}"
 : "${TAG_NAME:?TAG_NAME is required}"
+
+PATCHES_TOKEN="${PATCHES_TOKEN:-${GH_TOKEN}}"
+if [[ -z "${GITHUB_REPOSITORY:-}" ]]; then
+  GITHUB_REPOSITORY=$(git remote get-url next 2>/dev/null \
+    | sed -E 's#^(git@github\.com:|https://github\.com/)##; s#\.git$##' || true)
+  GITHUB_REPOSITORY="${GITHUB_REPOSITORY:-$(gh repo view --json nameWithOwner --jq .nameWithOwner)}"
+fi
 
 if [[ ! "${TAG_NAME}" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
   echo "TAG_NAME must be a semantic version tag such as v2.15.4" >&2
@@ -16,20 +21,47 @@ registry_address="${REGISTRY_ADDRESS:-8gears.container-registry.com}"
 registry_project="${REGISTRY_PROJECT:-8gcr}"
 registry="${registry_address}/${registry_project}"
 dry_run="${RELEASE_NOTES_DRY_RUN:-false}"
+preview="${RELEASE_NOTES_PREVIEW:-false}"
+preview_pr_number="${RELEASE_NOTES_PR_NUMBER:-}"
+use_release_pr_snapshot="${RELEASE_NOTES_USE_PR_SNAPSHOT:-true}"
+release_notes_output="${RELEASE_NOTES_OUTPUT:-}"
 images=(core jobservice registryctl exporter portal registry trivy-adapter)
 
 tmp_dir=$(mktemp -d)
 trap 'rm -rf "${tmp_dir}"' EXIT
 
-git show "${TAG_NAME}:CHANGELOG.md" > "${tmp_dir}/CHANGELOG.md"
+if [[ "${preview}" == "true" ]]; then
+  : "${preview_pr_number:?RELEASE_NOTES_PR_NUMBER is required for a preview}"
+  cp CHANGELOG.md "${tmp_dir}/CHANGELOG.md"
+elif [[ "${use_release_pr_snapshot}" == "true" ]]; then
+  preview_bodies="${tmp_dir}/release-prs.json"
+  gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/commits/${TAG_NAME}/pulls" > "${preview_bodies}"
+
+  if node .github/scripts/release-notes-preview.mjs extract \
+    "${preview_bodies}" \
+    "${tmp_dir}/release-notes.md"; then
+    gh release edit "${TAG_NAME}" \
+      --repo "${GITHUB_REPOSITORY}" \
+      --notes-file "${tmp_dir}/release-notes.md"
+    exit 0
+  fi
+
+  git show "${TAG_NAME}:CHANGELOG.md" > "${tmp_dir}/CHANGELOG.md"
+else
+  git show "${TAG_NAME}:CHANGELOG.md" > "${tmp_dir}/CHANGELOG.md"
+fi
 node .github/scripts/extract-changelog-release.mjs \
   "${tmp_dir}/CHANGELOG.md" \
   "${version}" \
   "${tmp_dir}/release-source.md"
 
-gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
-  -f "tag_name=${TAG_NAME}" \
-  --jq .body > "${tmp_dir}/generated-notes.md"
+if [[ "${preview}" == "true" ]]; then
+  : > "${tmp_dir}/generated-notes.md"
+else
+  gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+    -f "tag_name=${TAG_NAME}" \
+    --jq .body > "${tmp_dir}/generated-notes.md"
+fi
 
 node .github/scripts/format-release-notes.mjs \
   "${tmp_dir}/release-source.md" \
@@ -37,56 +69,18 @@ node .github/scripts/format-release-notes.mjs \
   "${tmp_dir}/formatted-notes.md" \
   "${tmp_dir}/contributors.md"
 
-release_branch=$(gh release view "${TAG_NAME}" \
-  --repo "${GITHUB_REPOSITORY}" \
-  --json targetCommitish \
-  --jq .targetCommitish)
-release_created_at=$(gh release view "${TAG_NAME}" \
-  --repo "${GITHUB_REPOSITORY}" \
-  --json createdAt \
-  --jq .createdAt)
+if [[ "${preview}" == "true" ]]; then
+  release_branch="${GITHUB_REF_NAME:?GITHUB_REF_NAME is required for a preview}"
+else
+  release_branch=$(gh release view "${TAG_NAME}" \
+    --repo "${GITHUB_REPOSITORY}" \
+    --json targetCommitish \
+    --jq .targetCommitish)
+fi
 
 if [[ -z "${release_branch}" ]]; then
   echo "Release ${TAG_NAME} has no target branch" >&2
   exit 1
-fi
-
-previous_tag=$(git tag --merged "${TAG_NAME}" --sort=-version:refname \
-  | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
-  | grep -v "^${TAG_NAME}$" \
-  | head -n 1 || true)
-highlights=""
-
-if [[ -n "${previous_tag}" ]]; then
-  previous_release_created_at=$(gh release view "${previous_tag}" \
-    --repo "${GITHUB_REPOSITORY}" \
-    --json createdAt \
-    --jq .createdAt)
-  previous_release_date="${previous_release_created_at%%T*}"
-  release_date="${release_created_at%%T*}"
-  highlights=$(gh pr list \
-    --repo "${GITHUB_REPOSITORY}" \
-    --state merged \
-    --base "${release_branch}" \
-    --search "merged:${previous_release_date}..${release_date}" \
-    --json number,title,url,body \
-    --limit 100 \
-    --jq '
-      [.[] | select(.body | test("(?m)^## Release Notes"))] |
-      if length == 0 then ""
-      else
-        "## Highlights\n\n" +
-        (map(
-          "### [#\(.number)](\(.url)) \(.title)\n" +
-          (.body |
-            gsub("(?s).*\n## Release Notes\n"; "") |
-            gsub("(?s)\n## .*"; "") |
-            gsub("<!--[\\s\\S]*?-->"; "") |
-            ltrimstr("\n") | rtrimstr("\n")
-          ) + "\n"
-        ) | join("\n"))
-      end
-    ')
 fi
 
 GH_TOKEN="${PATCHES_TOKEN}" gh repo clone container-registry/8gcr \
@@ -114,10 +108,6 @@ if [[ -f "${series}" ]]; then
 fi
 
 {
-  if [[ -n "${highlights}" ]]; then
-    printf '%s\n\n' "${highlights}"
-  fi
-
   if [[ -s "${patch_notes}" ]]; then
     echo "## Commercial Features"
     echo
@@ -148,7 +138,7 @@ fi
   echo "**Verify an image signature:**"
   echo '\`\`\`sh'
   echo "cosign verify \\"
-  echo "  --certificate-identity \"https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release-please.yml@refs/heads/${release_branch}\" \\"
+  echo "  --certificate-identity \"https://github.com/${GITHUB_REPOSITORY}/.github/workflows/publish-images.yml@refs/heads/${release_branch}\" \\"
   echo '  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \\'
   echo "  ${registry}/harbor-core:${TAG_NAME}"
   echo '\`\`\`'
@@ -161,8 +151,22 @@ fi
   fi
 } > "${tmp_dir}/release-notes.md"
 
-if [[ "${dry_run}" == "true" ]]; then
-  cat "${tmp_dir}/release-notes.md"
+if [[ "${preview}" == "true" ]]; then
+  gh pr view "${preview_pr_number}" --repo "${GITHUB_REPOSITORY}" --json body --jq .body > "${tmp_dir}/release-pr-body.md"
+  node .github/scripts/release-notes-preview.mjs upsert \
+    "${tmp_dir}/release-pr-body.md" \
+    "${tmp_dir}/release-notes.md" \
+    "${tmp_dir}/release-pr-body-with-notes.md"
+  gh pr edit "${preview_pr_number}" \
+    --repo "${GITHUB_REPOSITORY}" \
+    --body-file "${tmp_dir}/release-pr-body-with-notes.md"
+elif [[ "${dry_run}" == "true" ]]; then
+  if [[ -n "${release_notes_output}" ]]; then
+    cp "${tmp_dir}/release-notes.md" "${release_notes_output}"
+    echo "Wrote release notes to ${release_notes_output}"
+  else
+    cat "${tmp_dir}/release-notes.md"
+  fi
   exit 0
 fi
 

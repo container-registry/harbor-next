@@ -7,8 +7,8 @@ if (!changelogPath || !version || !outputPath) {
 }
 
 const lines = readFileSync(changelogPath, 'utf8').split(/\r?\n/);
-const heading = new RegExp(`^## \\[(?:v)?${version.replaceAll('.', '\\.')}]`);
-const start = lines.findIndex(line => heading.test(line));
+const headings = [`## [${version}]`, `## [v${version}]`];
+const start = lines.findIndex(line => headings.some(heading => line.startsWith(heading)));
 
 if (start === -1) {
   throw new Error(`CHANGELOG.md has no release section for ${version}`);
