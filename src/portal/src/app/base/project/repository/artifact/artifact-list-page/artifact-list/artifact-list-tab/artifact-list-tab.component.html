@@ -326,6 +326,7 @@
                     <div *ngIf="artifact.tags" class="truncated width-p-100">
                         <clr-tooltip class="width-p-100">
                             <div clrTooltipTrigger class="center">
+<<<<<<< HEAD
                                 <div class="tag-cell-content">
                                     <span
                                         #tagsSpan
@@ -351,6 +352,18 @@
                                         [selectedTag]="
                                             artifact.tags[0].name
                                         "></app-pull-command>
+=======
+                                <div class="center width-p-100">
+                                    <span #tagsSpan class="tag-text">{{
+                                        tagsString(artifact?.tags)
+                                    }}</span>
+                                    @if (artifact?.tags?.length > 1 &&
+                                    isEllipsisActive(tagsSpan)) {
+                                    <span class="tag-count"
+                                        >({{ artifact?.tagNumber }})</span
+                                    >
+                                    }
+>>>>>>> 1cd644ca3 (fix: fix tags column text truncation and count badge overlap (#23607))
                                 </div>
                             </div>
                             <clr-tooltip-content
