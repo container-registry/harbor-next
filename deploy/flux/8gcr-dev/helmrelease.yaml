@@ -117,7 +117,7 @@ spec:
     exporter:
       enabled: true
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:126d4b4617ab5f0c09afbf0bd46c2fd2d746df9ce4a7595b728fdf9af07f8274" # {"$imagepolicy": "flux-system:harbor-exporter:digest"}
+        deploy.8gears.io/image-revision: "sha256:b575d6f708565cf32a59a0b2d6539f0c912fad392f8de3e4a6229fa7fefa67ba" # {"$imagepolicy": "flux-system:harbor-exporter:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-exporter
         tag: latest
