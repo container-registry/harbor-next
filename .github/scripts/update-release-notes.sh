@@ -124,12 +124,12 @@ fi
 
   echo
   echo "**Verify an image signature:**"
-  echo '\`\`\`sh'
+  echo '```sh'
   echo "cosign verify \\"
   echo "  --certificate-identity \"https://github.com/${GITHUB_REPOSITORY}/.github/workflows/publish-images.yml@refs/heads/${release_branch}\" \\"
-  echo '  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \\'
+  echo '  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \'
   echo "  ${registry}/harbor-core:${TAG_NAME}"
-  echo '\`\`\`'
+  echo '```'
 
   if [[ -s "${tmp_dir}/contributors.md" ]]; then
     echo
