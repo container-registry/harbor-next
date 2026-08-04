@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var testingMetaDataArray = []Item{
@@ -69,6 +70,20 @@ func TestConfigureValue_GetDuration(t *testing.T) {
 
 func TestConfigureValue_GetInt(t *testing.T) {
 	assert.Equal(t, createCfgValue("ldap_timeout", "5").GetInt(), 5)
+}
+
+func TestConfigureValue_GetOptionalInt32(t *testing.T) {
+	// A configured 0 must come back as a non-nil 0, not collapse into "unset".
+	zero := createCfgValue("postgresql_min_conns", "0").GetOptionalInt32()
+	require.NotNil(t, zero)
+	assert.Equal(t, int32(0), *zero)
+
+	five := createCfgValue("postgresql_min_conns", "5").GetOptionalInt32()
+	require.NotNil(t, five)
+	assert.Equal(t, int32(5), *five)
+
+	// CfgManager.Get hands back a bare ConfigureValue for an unknown key.
+	assert.Nil(t, (&ConfigureValue{}).GetOptionalInt32())
 }
 
 func TestConfigureValue_GetInt64(t *testing.T) {

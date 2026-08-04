@@ -80,6 +80,18 @@ func (c *ConfigureValue) GetInt() int {
 	return 0
 }
 
+// GetOptionalInt32 - return the int32 value of current value, or nil when the
+// value carries no metadata. CfgManager.Get hands back an empty ConfigureValue
+// for an unknown key, which GetInt reports as 0 — indistinguishable from a
+// configured 0. Callers that treat 0 as a meaningful setting use this instead.
+func (c *ConfigureValue) GetOptionalInt32() *int32 {
+	if _, ok := Instance().GetByName(c.Name); !ok {
+		return nil
+	}
+	v := int32(c.GetInt())
+	return &v
+}
+
 // GetInt64 - return the int64 value of current value
 func (c *ConfigureValue) GetInt64() int64 {
 	if item, ok := Instance().GetByName(c.Name); ok {

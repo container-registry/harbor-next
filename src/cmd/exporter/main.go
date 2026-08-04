@@ -55,7 +55,7 @@ func main() {
 			ConnMaxIdleTime:   getConnMaxIdleTime(viper.GetString("database.conn_max_idle_time")),
 			HealthCheckPeriod: viper.GetDuration("database.health_check_period"),
 			ConnectTimeout:    viper.GetDuration("database.connect_timeout"),
-			MinConns:          int32(viper.GetInt("database.min_conns")),
+			MinConns:          getMinConns(),
 		},
 	}
 	if err := dao.InitDatabase(dbCfg); err != nil {
@@ -123,6 +123,17 @@ func main() {
 
 	dao.ClosePool()
 	os.Exit(exitCode)
+}
+
+// getMinConns returns nil unless HARBOR_DATABASE_MIN_CONNS is set to a
+// non-empty value, so dbpool can tell an explicit 0 (no warm floor) from an
+// unset knob. viper.GetInt collapses both to 0; IsSet does not.
+func getMinConns() *int32 {
+	if !viper.IsSet("database.min_conns") {
+		return nil
+	}
+	v := int32(viper.GetInt("database.min_conns"))
+	return &v
 }
 
 func getConnMaxLifetime(duration string) time.Duration {
