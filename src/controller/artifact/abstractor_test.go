@@ -27,6 +27,7 @@ import (
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/goharbor/harbor/src/controller/artifact/manifest"
 	"github.com/goharbor/harbor/src/controller/artifact/processor"
 	"github.com/goharbor/harbor/src/pkg/artifact"
 	"github.com/goharbor/harbor/src/pkg/blob"
@@ -293,7 +294,7 @@ var (
      "com.example.key1": "value1"
    }
  }`
-	buildKitAttestationIndex = `{
+	attestationIndex = `{
   "schemaVersion": 2,
   "mediaType": "application/vnd.oci.image.index.v1+json",
   "manifests": [
@@ -324,7 +325,7 @@ var (
     "com.example.key1": "value1"
   }
 }`
-	buildKitAttestationManifest = `{
+	attestationManifestFixture = `{
   "schemaVersion": 2,
   "mediaType": "application/vnd.oci.image.manifest.v1+json",
   "config": {
@@ -340,7 +341,7 @@ var (
     }
   ]
 }`
-	buildKitAttestationStatement = `{
+	attestationStatement = `{
   "_type": "https://in-toto.io/Statement/v0.1",
   "subject": [
     {
@@ -354,7 +355,7 @@ var (
 }`
 	// Index where the attestation annotation digest points directly at the
 	// platform child so resolution works without in-toto subject loading.
-	buildKitAttestationIndexAnnotationOnly = `{
+	attestationIndexAnnotationOnly = `{
   "schemaVersion": 2,
   "mediaType": "application/vnd.oci.image.index.v1+json",
   "manifests": [
@@ -398,9 +399,10 @@ func (a *abstractorTestSuite) SetupTest() {
 	a.argMgr = &tart.Manager{}
 	a.blobMgr = &tblob.Manager{}
 	a.abstractor = &abstractor{
-		artMgr:  a.argMgr,
-		blobMgr: a.blobMgr,
-		regCli:  a.regCli,
+		artMgr:      a.argMgr,
+		blobMgr:     a.blobMgr,
+		regCli:      a.regCli,
+		attestation: manifest.NewInTotoAttestationClassifier(a.argMgr, a.regCli),
 	}
 	a.processor = &tpro.Processor{}
 	// clear all registered processors
@@ -555,18 +557,18 @@ func (a *abstractorTestSuite) TestAbstractMetadataOfIndexWithArtifactType() {
 	a.Len(artifact.References, 2)
 }
 
-func (a *abstractorTestSuite) TestAbstractMetadataOfIndexWithBuildKitAttestation() {
-	indexManifest, _, err := distribution.UnmarshalManifest(v1.MediaTypeImageIndex, []byte(buildKitAttestationIndex))
+func (a *abstractorTestSuite) TestAbstractMetadataOfIndexWithAttestation() {
+	indexManifest, _, err := distribution.UnmarshalManifest(v1.MediaTypeImageIndex, []byte(attestationIndex))
 	a.Require().Nil(err)
-	attestationManifest, _, err := distribution.UnmarshalManifest(v1.MediaTypeImageManifest, []byte(buildKitAttestationManifest))
+	attestationManifest, _, err := distribution.UnmarshalManifest(v1.MediaTypeImageManifest, []byte(attestationManifestFixture))
 	a.Require().Nil(err)
 
 	const repo = "library/test"
 	a.regCli.On("PullManifest", repo, mock.Anything).Return(indexManifest, "", nil).Once()
 	a.regCli.On("PullManifest", repo, "sha256:44401ce7f2bf39029d0d56f095374b7f344e1986c8b4970ef4f4fdb98e3f7220").Return(attestationManifest, "", nil).Once()
 	a.regCli.On("PullBlob", repo, "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb").Return(
-		int64(len(buildKitAttestationStatement)),
-		io.NopCloser(strings.NewReader(buildKitAttestationStatement)),
+		int64(len(attestationStatement)),
+		io.NopCloser(strings.NewReader(attestationStatement)),
 		nil,
 	).Once()
 	a.argMgr.On("GetByDigest", mock.Anything, repo, "sha256:cad250bb95ea402adf4f687cc7d6747ecf0de875e6d6117f74437893964903df").Return(&artifact.Artifact{
@@ -585,7 +587,7 @@ func (a *abstractorTestSuite) TestAbstractMetadataOfIndexWithBuildKitAttestation
 	a.Require().Nil(err)
 	a.Equal(v1.MediaTypeImageIndex, artifact.ManifestMediaType)
 	a.Equal(v1.MediaTypeImageIndex, artifact.MediaType)
-	a.Equal(int64(len([]byte(buildKitAttestationIndex))+13), artifact.Size)
+	a.Equal(int64(len([]byte(attestationIndex))+13), artifact.Size)
 	a.Len(artifact.References, 1)
 	a.Len(artifact.AccessoryCandidates, 1)
 	a.Equal(int64(3), artifact.AccessoryCandidates[0].ArtifactID)
@@ -594,11 +596,11 @@ func (a *abstractorTestSuite) TestAbstractMetadataOfIndexWithBuildKitAttestation
 	a.Equal("attestation.intoto", artifact.AccessoryCandidates[0].Type)
 }
 
-// TestAbstractMetadataOfIndexWithBuildKitAttestationAnnotationOnly verifies
+// TestAbstractMetadataOfIndexResolvesFromAnnotation verifies
 // that annotation-based subject resolution works when in-toto subject loading
 // fails (e.g. no in-toto layer in the attestation manifest).
-func (a *abstractorTestSuite) TestAbstractMetadataOfIndexWithBuildKitAttestationAnnotationOnly() {
-	indexManifest, _, err := distribution.UnmarshalManifest(v1.MediaTypeImageIndex, []byte(buildKitAttestationIndexAnnotationOnly))
+func (a *abstractorTestSuite) TestAbstractMetadataOfIndexResolvesFromAnnotation() {
+	indexManifest, _, err := distribution.UnmarshalManifest(v1.MediaTypeImageIndex, []byte(attestationIndexAnnotationOnly))
 	a.Require().Nil(err)
 
 	const repo = "library/test"

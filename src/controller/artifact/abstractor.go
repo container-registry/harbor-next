@@ -24,6 +24,7 @@ import (
 	"github.com/docker/distribution/manifest/schema2"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 
+	"github.com/goharbor/harbor/src/controller/artifact/manifest"
 	"github.com/goharbor/harbor/src/controller/artifact/processor"
 	"github.com/goharbor/harbor/src/controller/artifact/processor/wasm"
 	"github.com/goharbor/harbor/src/lib/log"
@@ -43,16 +44,18 @@ type Abstractor interface {
 // NewAbstractor creates a new abstractor
 func NewAbstractor() Abstractor {
 	return &abstractor{
-		artMgr:  pkg.ArtifactMgr,
-		blobMgr: blob.Mgr,
-		regCli:  registry.Cli,
+		artMgr:      pkg.ArtifactMgr,
+		blobMgr:     blob.Mgr,
+		regCli:      registry.Cli,
+		attestation: manifest.NewInTotoAttestationClassifier(pkg.ArtifactMgr, registry.Cli),
 	}
 }
 
 type abstractor struct {
-	artMgr  artifact.Manager
-	blobMgr blob.Manager
-	regCli  registry.Client
+	artMgr      artifact.Manager
+	blobMgr     blob.Manager
+	regCli      registry.Client
+	attestation *manifest.InTotoAttestationClassifier
 }
 
 func (a *abstractor) AbstractMetadata(ctx context.Context, artifact *artifact.Artifact) error {
@@ -175,18 +178,18 @@ func (a *abstractor) abstractIndexMetadata(ctx context.Context, art *artifact.Ar
 	art.Annotations = index.Annotations
 
 	art.Size += int64(len(content))
-	// populate the referenced artifacts
-	for _, mani := range index.Manifests {
-		candidate, err := a.toBuildKitAttestationCandidate(ctx, art.RepositoryName, mani, index.Manifests)
-		if err != nil {
-			return err
-		}
-		if candidate != nil {
-			art.Size += candidate.Size
-			art.AccessoryCandidates = append(art.AccessoryCandidates, candidate)
-			continue
-		}
 
+	references, candidates, err := a.attestation.Classify(ctx, art.RepositoryName, index.Manifests)
+	if err != nil {
+		return err
+	}
+	for _, candidate := range candidates {
+		art.Size += candidate.Size
+		art.AccessoryCandidates = append(art.AccessoryCandidates, candidate)
+	}
+
+	// populate the referenced artifacts
+	for _, mani := range references {
 		digest := mani.Digest.String()
 		// make sure the child artifact exist
 		ar, err := a.artMgr.GetByDigest(ctx, art.RepositoryName, digest)
