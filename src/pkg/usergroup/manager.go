@@ -53,6 +53,10 @@ type Manager interface {
 	Onboard(ctx context.Context, g *model.UserGroup) error
 	// SearchByName user groups by names with fuzzy search
 	SearchByName(ctx context.Context, name string, limitSize int) ([]*model.UserGroup, error)
+	// SyncUserGroupMembership persists group membership for a user
+	SyncUserGroupMembership(ctx context.Context, userID int, groupIDs []int) error
+	// ListUserGroupIDs returns the group IDs for a user
+	ListUserGroupIDs(ctx context.Context, userID int) ([]int, error)
 }
 
 type manager struct {
@@ -164,4 +168,12 @@ func (m *manager) Count(ctx context.Context, query *q.Query) (int64, error) {
 
 func (m *manager) SearchByName(ctx context.Context, name string, limitSize int) ([]*model.UserGroup, error) {
 	return m.dao.SearchByName(ctx, name, limitSize)
+}
+
+func (m *manager) SyncUserGroupMembership(ctx context.Context, userID int, groupIDs []int) error {
+	return m.dao.SyncUserGroupMembership(ctx, userID, groupIDs)
+}
+
+func (m *manager) ListUserGroupIDs(ctx context.Context, userID int) ([]int, error) {
+	return m.dao.ListUserGroupIDs(ctx, userID)
 }

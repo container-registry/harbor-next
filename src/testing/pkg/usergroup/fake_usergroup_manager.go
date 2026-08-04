@@ -149,6 +149,36 @@ func (_m *Manager) List(ctx context.Context, query *q.Query) ([]*model.UserGroup
 	return r0, r1
 }
 
+// ListUserGroupIDs provides a mock function with given fields: ctx, userID
+func (_m *Manager) ListUserGroupIDs(ctx context.Context, userID int) ([]int, error) {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListUserGroupIDs")
+	}
+
+	var r0 []int
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int) ([]int, error)); ok {
+		return rf(ctx, userID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int) []int); ok {
+		r0 = rf(ctx, userID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]int)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int) error); ok {
+		r1 = rf(ctx, userID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Onboard provides a mock function with given fields: ctx, g
 func (_m *Manager) Onboard(ctx context.Context, g *model.UserGroup) error {
 	ret := _m.Called(ctx, g)
@@ -225,6 +255,24 @@ func (_m *Manager) SearchByName(ctx context.Context, name string, limitSize int)
 	}
 
 	return r0, r1
+}
+
+// SyncUserGroupMembership provides a mock function with given fields: ctx, userID, groupIDs
+func (_m *Manager) SyncUserGroupMembership(ctx context.Context, userID int, groupIDs []int) error {
+	ret := _m.Called(ctx, userID, groupIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SyncUserGroupMembership")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int, []int) error); ok {
+		r0 = rf(ctx, userID, groupIDs)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // UpdateName provides a mock function with given fields: ctx, id, groupName

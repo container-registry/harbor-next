@@ -76,6 +76,7 @@ import (
 	"github.com/goharbor/harbor/src/pkg/notification"
 	_ "github.com/goharbor/harbor/src/pkg/notifier/topic"
 	"github.com/goharbor/harbor/src/pkg/oidc"
+	patmigration "github.com/goharbor/harbor/src/pkg/pat/migration"
 	"github.com/goharbor/harbor/src/pkg/scan"
 	"github.com/goharbor/harbor/src/pkg/scan/dao/scanner"
 	_ "github.com/goharbor/harbor/src/pkg/scan/sbom"
@@ -244,6 +245,13 @@ func main() {
 	if err := initSkipAuditDBbyEnv(ctx); err != nil {
 		log.Errorf("Failed to initialize SkipAuditDB by ENV: %v", err)
 	}
+
+	// Migrate existing OIDC CLI secrets to legacy personal access tokens.
+	// Safe to run on every startup: skips users that already have one.
+	if err := patmigration.MigrateCliSecretsToLegacyPATs(orm.Context()); err != nil {
+		log.Fatalf("failed to migrate OIDC CLI secrets to legacy personal access tokens: %v", err)
+	}
+
 	// Init API handler
 	if err := api.Init(); err != nil {
 		log.Fatalf("Failed to initialize API handlers with error: %s", err.Error())

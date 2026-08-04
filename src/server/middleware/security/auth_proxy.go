@@ -28,6 +28,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/pkg/authproxy"
 	pkguser "github.com/goharbor/harbor/src/pkg/user"
+	"github.com/goharbor/harbor/src/pkg/usergroup"
 )
 
 type authProxy struct{}
@@ -88,6 +89,12 @@ func (a *authProxy) Generate(req *http.Request) security.Context {
 	}
 	user.GroupIDs = u2.GroupIDs
 	user.AdminRoleInAuth = u2.AdminRoleInAuth
+	// Persist the group IDs so a later, non-live-session lookup (e.g. PAT
+	// authorization) can read them back. Fail closed: return error if sync fails.
+	if err := usergroup.Mgr.SyncUserGroupMembership(req.Context(), user.UserID, user.GroupIDs); err != nil {
+		log.Errorf("failed to sync group membership for user %d: %v", user.UserID, err)
+		return nil
+	}
 	log.Debugf("an auth proxy security context generated for request %s %s", req.Method, req.URL.Path)
 	return local.NewSecurityContext(user)
 }
