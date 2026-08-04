@@ -257,8 +257,12 @@ func main() {
 
 	// Must come after the database is up and the health checkers are registered:
 	// the collectors read both on the first scrape.
-	if metricCfg.Enabled && metricCfg.ExporterEnabled {
+	switch {
+	case metricCfg.Enabled && metricCfg.ExporterEnabled:
 		registerExporterCollectors(metricCfg)
+	case metricCfg.ExporterEnabled:
+		log.Warning("METRIC_EXPORTER_ENABLE is set but METRIC_ENABLE is not; " +
+			"no metrics endpoint is served, so the exporter collectors were not registered")
 	}
 
 	// start global task pool, do not stop in the gracefulShutdown because it may take long time to finish.
