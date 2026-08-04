@@ -15,7 +15,7 @@ import (
 
 func TestNewSystemInfoCollector(t *testing.T) {
 	type args struct {
-		hbrCli *HarborClient
+		backend Backend
 	}
 	tests := []struct {
 		name string
@@ -25,16 +25,16 @@ func TestNewSystemInfoCollector(t *testing.T) {
 		{
 			name: "test new system info collector",
 			args: args{
-				hbrCli: &HarborClient{},
+				backend: NewRESTBackend(),
 			},
 			want: &SystemInfoCollector{
-				HarborClient: &HarborClient{},
+				backend: NewRESTBackend(),
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewSystemInfoCollector(tt.args.hbrCli); !reflect.DeepEqual(got, tt.want) {
+			if got := NewSystemInfoCollector(tt.args.backend); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("NewSystemInfoCollector() = %v, want %v", got, tt.want)
 			}
 		})
@@ -67,8 +67,9 @@ func TestSystemInfoCollector_Describe(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			InitHarborClient(tt.fields.HarborClient)
 			hc := &SystemInfoCollector{
-				HarborClient: tt.fields.HarborClient,
+				backend: NewRESTBackend(),
 			}
 			go hc.Describe(tt.args.c)
 			desc := <-tt.args.c
@@ -112,7 +113,7 @@ func TestSystemInfoCollector_Collect(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			InitHarborClient(tt.fields.HarborClient)
 			hc := &SystemInfoCollector{
-				HarborClient: tt.fields.HarborClient,
+				backend: NewRESTBackend(),
 			}
 			go hc.Collect(tt.args.c)
 			metric := <-tt.args.c
@@ -165,7 +166,7 @@ func TestSystemInfoCollector_getSysInfo(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			InitHarborClient(tt.fields.HarborClient)
 			hc := &SystemInfoCollector{
-				HarborClient: tt.fields.HarborClient,
+				backend: NewRESTBackend(),
 			}
 			if got := hc.getSysInfo(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("SystemInfoCollector.getSysInfo() = %v, want %v", got, tt.want)

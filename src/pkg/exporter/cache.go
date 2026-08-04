@@ -16,6 +16,7 @@ package exporter
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -85,6 +86,13 @@ func CacheEnabled() bool {
 	return c != nil
 }
 
+// cleanerOnce keeps CacheInit from leaking a new cleaner goroutine on every
+// call; the ticker lives for the whole process either way.
+var (
+	cleanerOnce   sync.Once
+	cleanerStarts atomic.Int32
+)
+
 // CacheInit add cache to exporter
 func CacheInit(opt *Opt) {
 	c = &cache{
@@ -92,16 +100,19 @@ func CacheInit(opt *Opt) {
 		store:         make(map[string]cachedValue),
 		RWMutex:       &sync.RWMutex{},
 	}
-	go func() {
-		var cacheCleanInterval int64
-		if opt.CacheCleanInterval > 0 {
-			cacheCleanInterval = opt.CacheCleanInterval
-		} else {
-			cacheCleanInterval = defaultCacheCleanInterval
-		}
-		ticker := time.NewTicker(time.Duration(cacheCleanInterval) * time.Second)
-		for range ticker.C {
-			StartCacheCleaner()
-		}
-	}()
+	cleanerOnce.Do(func() {
+		cleanerStarts.Add(1)
+		go func() {
+			var cacheCleanInterval int64
+			if opt.CacheCleanInterval > 0 {
+				cacheCleanInterval = opt.CacheCleanInterval
+			} else {
+				cacheCleanInterval = defaultCacheCleanInterval
+			}
+			ticker := time.NewTicker(time.Duration(cacheCleanInterval) * time.Second)
+			for range ticker.C {
+				StartCacheCleaner()
+			}
+		}()
+	})
 }

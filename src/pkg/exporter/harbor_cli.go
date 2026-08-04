@@ -42,7 +42,13 @@ func (hc HarborClient) harborURL(p string) url.URL {
 // Get ...
 func (hc HarborClient) Get(p string) (*http.Response, error) {
 	hbrURL := hc.harborURL(p)
-	res, err := http.Get(hbrURL.String())
+	// Use the configured client so the internal-TLS transport and its timeout
+	// apply; http.DefaultClient has neither.
+	cli := hc.Client
+	if cli == nil {
+		cli = http.DefaultClient
+	}
+	res, err := cli.Get(hbrURL.String())
 	if err != nil {
 		return nil, err
 	}
