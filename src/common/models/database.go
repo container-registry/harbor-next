@@ -37,6 +37,6 @@ type PostGreSQL struct {
 	ConnMaxIdleTime   time.Duration `json:"conn_max_idle_time"`
 	HealthCheckPeriod time.Duration `json:"health_check_period"`
 	ConnectTimeout    time.Duration `json:"connect_timeout"`
-	MinConns          int32         `json:"min_conns"`
+	MinConns          *int32        `json:"min_conns,omitempty"` // nil = unset (dbpool.DefaultMinConns); 0 is a valid setting
 	URL               string        `json:"url"`
 }
