@@ -110,7 +110,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    uses: ./.github/workflows/release-notes.yml
+    uses: ./.github/workflows/release-notes-engine.yml
     with:
       tag_name: v${{ needs.release-please.outputs.version }}
       checkout_ref: ${{ fromJSON(needs.release-please.outputs.prs)[0].headBranchName }}
@@ -204,7 +204,7 @@ jobs:
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     permissions:
       contents: write
-    uses: ./.github/workflows/release-notes.yml
+    uses: ./.github/workflows/release-notes-engine.yml
     with:
       tag_name: ${{ needs.release-please.outputs.tag_name }}
     secrets:
