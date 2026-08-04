@@ -261,6 +261,10 @@ func (bc *basicController) Scan(ctx context.Context, artifact *ar.Artifact, opti
 		return errors.Wrap(err, "scan controller: scan")
 	}
 
+	if r.Metadata == nil {
+		return errors.ScannerUnreachableError(nil).WithMessagef("scanner %s is unreachable (metadata ping failed)", r.Name)
+	}
+
 	if !scannable {
 		if opts.FromEvent {
 			// skip to return err for event related scan
