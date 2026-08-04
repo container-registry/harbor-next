@@ -25,6 +25,7 @@ import (
 	"github.com/goharbor/harbor/src/common/job"
 	"github.com/goharbor/harbor/src/controller/health"
 	si "github.com/goharbor/harbor/src/controller/systeminfo"
+	"github.com/goharbor/harbor/src/lib/orm"
 	libRedis "github.com/goharbor/harbor/src/lib/redis"
 	"github.com/goharbor/harbor/src/pkg/jobmonitor"
 )
@@ -35,6 +36,9 @@ import (
 type localBackend struct {
 	healthCtl health.Controller
 	sysCtl    si.Controller
+	// newCtx builds the context the system info controller needs. Held as a
+	// field so tests can supply one that does not require a live database.
+	newCtx func() context.Context
 
 	mu        sync.RWMutex
 	resolving sync.Mutex
@@ -46,6 +50,7 @@ func NewLocalBackend() Backend {
 	return &localBackend{
 		healthCtl: health.Ctl,
 		sysCtl:    si.Ctl,
+		newCtx:    orm.Context,
 	}
 }
 
@@ -61,7 +66,11 @@ func (b *localBackend) Health(ctx context.Context) (*responseHealth, error) {
 	return out, nil
 }
 
-func (b *localBackend) SystemInfo(ctx context.Context) (*responseSysInfo, error) {
+func (b *localBackend) SystemInfo(_ context.Context) (*responseSysInfo, error) {
+	// The controller reads config from the database, so it needs an orm context.
+	// Built here rather than in the collector so the REST backend, which needs no
+	// database at all, does not inherit the dependency.
+	ctx := b.newCtx()
 	// Deliberately without WithProtectedInfo: the exporter only needs auth_mode
 	// and self_registration, both unprotected. The harbor_version label is
 	// filled from the version package at build time, not from here.

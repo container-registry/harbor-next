@@ -3,6 +3,7 @@
 package exporter
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -11,6 +12,8 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/goharbor/harbor/src/pkg/version"
 )
 
 func TestNewSystemInfoCollector(t *testing.T) {
@@ -128,8 +131,20 @@ func TestSystemInfoCollector_getSysInfo(t *testing.T) {
 	type fields struct {
 		HarborClient *HarborClient
 	}
+	// The cache is a package global and an earlier test seeds it under this same
+	// key, which would short-circuit getSysInfo and leave the REST path
+	// unexercised. Drop the entry so this test actually hits the backend.
+	if CacheEnabled() {
+		CacheDelete(systemInfoCollectorName)
+	}
+	// harbor_version is rendered from the version package (ldflags), not from
+	// the API response, so the expectation must follow that source.
+	wantVersion := version.ReleaseVersion
+	if version.GitCommit != "" {
+		wantVersion = fmt.Sprintf("%s-%s", version.ReleaseVersion, version.GitCommit)
+	}
 	data := []prometheus.Metric{
-		prometheus.MustNewConstMetric(harborSysInfo.Desc(), prometheus.GaugeValue, 1, "ldap_auth", "v2.0.0", "true"),
+		prometheus.MustNewConstMetric(harborSysInfo.Desc(), prometheus.GaugeValue, 1, "ldap_auth", wantVersion, "true"),
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/v2.0/systeminfo" {

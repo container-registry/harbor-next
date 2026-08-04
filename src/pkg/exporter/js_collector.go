@@ -15,11 +15,12 @@
 package exporter
 
 import (
+	"context"
+
 	"github.com/gomodule/redigo/redis"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/goharbor/harbor/src/lib/log"
-	"github.com/goharbor/harbor/src/lib/orm"
 )
 
 // JobServiceCollectorName ...
@@ -46,13 +47,12 @@ var (
 
 // NewJobServiceCollector ...
 func NewJobServiceCollector(backend Backend) *JobServiceCollector {
-	return &JobServiceCollector{Namespace: namespace, backend: backend}
+	return &JobServiceCollector{backend: backend}
 }
 
 // JobServiceCollector ...
 type JobServiceCollector struct {
-	Namespace string
-	backend   Backend
+	backend Backend
 }
 
 // Describe implements prometheus.Collector
@@ -91,7 +91,7 @@ func (hc *JobServiceCollector) getJobserviceInfo() []prometheus.Metric {
 		}
 	}
 
-	js, err := hc.backend.JobService(orm.Context())
+	js, err := hc.backend.JobService(context.Background())
 	if err != nil {
 		// In core the job service redis config is fetched from job service over
 		// HTTP, which may not be up yet. Skip this scrape rather than fail it.

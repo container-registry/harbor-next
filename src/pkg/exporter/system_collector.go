@@ -15,13 +15,13 @@
 package exporter
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/goharbor/harbor/src/lib/log"
-	"github.com/goharbor/harbor/src/lib/orm"
 	"github.com/goharbor/harbor/src/pkg/version"
 )
 
@@ -86,7 +86,7 @@ func (hc *SystemInfoCollector) getSysInfo() []prometheus.Metric {
 	}
 
 	// Still look up auth_mode and self_registration (dynamic config)
-	sysInfoResponse, err := hc.backend.SystemInfo(orm.Context())
+	sysInfoResponse, err := hc.backend.SystemInfo(context.Background())
 	if err != nil {
 		log.Errorf("request system info failed with err: %v", err)
 		return result

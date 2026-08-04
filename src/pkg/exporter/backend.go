@@ -17,6 +17,8 @@ package exporter
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net/http"
 
 	"github.com/gocraft/work"
 	"github.com/gomodule/redigo/redis"
@@ -50,29 +52,34 @@ func NewRESTBackend() Backend {
 }
 
 func (restBackend) Health(_ context.Context) (*responseHealth, error) {
-	res, err := hbrCli.Get(healthURL)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
 	out := &responseHealth{}
-	if err := json.NewDecoder(res.Body).Decode(out); err != nil {
+	if err := getJSON(healthURL, out); err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
 func (restBackend) SystemInfo(_ context.Context) (*responseSysInfo, error) {
-	res, err := hbrCli.Get(sysInfoURL)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
 	out := &responseSysInfo{}
-	if err := json.NewDecoder(res.Body).Decode(out); err != nil {
+	if err := getJSON(sysInfoURL, out); err != nil {
 		return nil, err
 	}
 	return out, nil
+}
+
+// getJSON fails closed on a non-2xx response. Decoding an error body would
+// yield a zero-valued struct and publish misleading labels, e.g. reporting
+// harbor_health 0 or an empty auth_mode because core answered 401.
+func getJSON(path string, out any) error {
+	res, err := hbrCli.Get(path)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("GET %s returned %s", path, res.Status)
+	}
+	return json.NewDecoder(res.Body).Decode(out)
 }
 
 func (restBackend) JobService(_ context.Context) (*JobServiceBackend, error) {

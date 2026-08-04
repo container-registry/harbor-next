@@ -15,10 +15,11 @@
 package exporter
 
 import (
+	"context"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/goharbor/harbor/src/lib/log"
-	"github.com/goharbor/harbor/src/lib/orm"
 )
 
 const (
@@ -75,7 +76,7 @@ func (hc *HealthCollector) getHealthStatus() []prometheus.Metric {
 		}
 	}
 	result := []prometheus.Metric{}
-	healthResponse, err := hc.backend.Health(orm.Context())
+	healthResponse, err := hc.backend.Health(context.Background())
 	if err != nil {
 		log.Errorf("request health info failed with err: %v", err)
 		return result
