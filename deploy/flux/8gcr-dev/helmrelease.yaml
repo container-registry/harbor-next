@@ -82,7 +82,7 @@ spec:
       replicas: 1
     jobservice:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:59e6bf38fbd3c141cf91761d0563d47a0fff7f88ffa1fb19833968f946d3b2bc" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
+        deploy.8gears.io/image-revision: "sha256:8f48186da493bdf5544fda84c20fb0b768f0835999940bdf9eecc21931016f31" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-jobservice
         tag: latest
@@ -93,7 +93,7 @@ spec:
         size: 1Gi
     registry:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:312ee467517b2a998a2c0ca4b82f3ed87b3497327467f7481eaaf8ff2478f14f" # {"$imagepolicy": "flux-system:harbor-registry:digest"}
+        deploy.8gears.io/image-revision: "sha256:48fbaa82a891778daecfebbe12038aa18459c86c9b4232904b079d04b126f913" # {"$imagepolicy": "flux-system:harbor-registry:digest"}
         deploy.8gears.io/registryctl-image-revision: "sha256:1581678243bfd88e317e69612ebf4fd3ac05afb8154d30d13962000bf30da285" # {"$imagepolicy": "flux-system:harbor-registryctl:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-registry
@@ -109,7 +109,7 @@ spec:
         size: 10Gi
     portal:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:23e194907d536616700d49ca3f45defb38166fc1e5ddab71661a86c33a488ed2" # {"$imagepolicy": "flux-system:harbor-portal:digest"}
+        deploy.8gears.io/image-revision: "sha256:01d5c265a0c89e9f994dea72d45619cf15d80f4f925afc3348483833be4de9fa" # {"$imagepolicy": "flux-system:harbor-portal:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-portal
         tag: latest
@@ -125,7 +125,7 @@ spec:
     trivy:
       enabled: true
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:92b3ed287215e49967df837101c43b8950b30546e21dae3026a0c420f5ec4311" # {"$imagepolicy": "flux-system:trivy-adapter:digest"}
+        deploy.8gears.io/image-revision: "sha256:e3abc2797349b2eaf9a7ba5ea52853c199e65e5f45b613c105d5551ad87a1f84" # {"$imagepolicy": "flux-system:trivy-adapter:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/trivy-adapter
         tag: latest
