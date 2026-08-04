@@ -374,3 +374,46 @@ tests:
       - equal:
           path: metadata.annotations.team
           value: platform
+
+  # ============================================================================
+  # database.minConns — 0 is a real setting, not "unset" (issue #564).
+  # ============================================================================
+
+  # Pins: an explicit 0 survives to POSTGRESQL_MIN_CONNS. `| default 2` used to
+  # swallow it, leaving no way to run pgxpool without a warm-connection floor.
+  - it: should render an explicit database.minConns of 0
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      database.minConns: 0
+    asserts:
+      - equal:
+          path: data.POSTGRESQL_MIN_CONNS
+          value: "0"
+
+  # Pins: null (and an absent key) still falls back to dbpool's DefaultMinConns.
+  - it: should fall back to 2 when database.minConns is null
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      database.minConns: null
+    asserts:
+      - equal:
+          path: data.POSTGRESQL_MIN_CONNS
+          value: "2"
+
+  - it: should render a non-default database.minConns verbatim
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      database.minConns: 8
+    asserts:
+      - equal:
+          path: data.POSTGRESQL_MIN_CONNS
+          value: "8"

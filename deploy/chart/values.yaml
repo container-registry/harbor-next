@@ -1321,13 +1321,27 @@ exporter:
   # -- Enable Harbor exporter for Prometheus metrics
   enabled: true
 
-  # -- Exporter config as env vars. Exporter is env-driven (HARBOR_EXPORTER_*);
-  # nested maps flatten to UPPER_SNAKE_CASE via toEnvVars and are injected
-  # via envFrom. Any exporter setting works without chart changes.
+  # -- Exporter config as env vars. Nested maps flatten to UPPER_SNAKE_CASE
+  # via toEnvVars and are injected via envFrom. Any exporter setting works
+  # without chart changes.
+  #
+  # Keys are used verbatim — the chart adds no prefix. The exporter reads env
+  # through viper with the `harbor` prefix, so keys must carry `HARBOR_`
+  # themselves (`HARBOR_EXPORTER_CACHE_TIME`, not `CACHE_TIME`). The nested
+  # form flattens to the same thing.
+  #
+  # A key set here wins over the chart's own env entry for that name,
+  # including the database pool knobs — that is how the exporter gets a
+  # different POSTGRESQL_MIN_CONNS from core.
   # @default -- {}
   config: {}
-    # cache_time: 23
-    # cache_clean_interval: 14400
+    # HARBOR_EXPORTER_CACHE_TIME: 23
+    # HARBOR_EXPORTER_CACHE_CLEAN_INTERVAL: 14400
+    # HARBOR_DATABASE_MIN_CONNS: 0
+    # or, equivalently, nested:
+    # harbor:
+    #   exporter:
+    #     cache_time: 23
 
   # -- Sensitive config for Exporter (converted to env vars in Secret)
   # @default -- {}
@@ -1493,6 +1507,13 @@ database:
   maxOpenConns: 100
   # -- Minimum idle connections kept warm per pool (POSTGRESQL_MIN_CONNS).
   # pgxpool floor; replaces the removed maxIdleConns.
+  #
+  # `0` is valid and meaningful — it is pgxpool's own default: no warm floor,
+  # connections opened on demand and left to age out via connMaxIdleTime, so
+  # an idle release drains to zero connections. The trade is that the first
+  # query after an idle gap pays TCP + TLS + auth + backend fork. Worth it
+  # when many releases share one PostgreSQL server, where the floor is
+  # multiplied by pools times tenants. `null` falls back to 2.
   minConns: 2
   # -- Max time a connection may sit idle before the pool closes it
   # (empty/0 keeps the pool's built-in default).

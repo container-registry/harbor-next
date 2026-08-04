@@ -44,6 +44,23 @@ Return the database password secret name
 {{- end }}
 
 {{/*
+Return the pgxpool minimum-connection floor (POSTGRESQL_MIN_CONNS /
+HARBOR_DATABASE_MIN_CONNS).
+
+Deliberately NOT `| default 2`: 0 is a valid setting (pgxpool's own default —
+keep no warm connections, open on demand) and `default` would swallow it.
+Only an absent or null value falls back to 2, matching dbpool.DefaultMinConns.
+Negative values are rejected by values.schema.json, and again by the app.
+*/}}
+{{- define "harbor.database.minConns" -}}
+{{- if kindIs "invalid" .Values.database.minConns -}}
+2
+{{- else -}}
+{{- .Values.database.minConns -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Return the database sslmode
 */}}
 {{- define "harbor.database.sslmode" -}}

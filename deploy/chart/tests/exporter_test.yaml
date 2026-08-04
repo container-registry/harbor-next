@@ -183,3 +183,142 @@ tests:
           path: spec.template.metadata.annotations["checksum/configmap-env"]
       - exists:
           path: spec.template.metadata.annotations["checksum/secret"]
+
+  # ============================================================================
+  # database.minConns + per-component override (issue #564).
+  #
+  # The exporter is the component that least needs a warm pool, but its
+  # explicit env beat the exporter.config envFrom ConfigMap, so it could not
+  # be tuned separately from core. Any name claimed in exporter.config /
+  # exporter.secret now suppresses the chart's own entry.
+  # ============================================================================
+
+  - it: should render an explicit database.minConns of 0
+    template: templates/exporter.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      exporter.enabled: true
+      database.minConns: 0
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_DATABASE_MIN_CONNS
+            value: "0"
+
+  - it: should fall back to 2 when database.minConns is null
+    template: templates/exporter.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      exporter.enabled: true
+      database.minConns: null
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_DATABASE_MIN_CONNS
+            value: "2"
+
+  # Flat spelling: keys carry the HARBOR_ prefix themselves, because
+  # toEnvVars adds none and the exporter's viper reads HARBOR_*.
+  - it: should let exporter.config override the chart-managed minConns
+    template: templates/exporter.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      exporter.enabled: true
+      database.minConns: 2
+      exporter.config:
+        HARBOR_DATABASE_MIN_CONNS: 0
+    asserts:
+      # The chart entry is gone entirely — otherwise it would shadow envFrom.
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_DATABASE_MIN_CONNS
+            value: "2"
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_DATABASE_MIN_CONNS
+            value: "0"
+
+  # Nested spelling flattens to the same env name, so it must be recognized too.
+  - it: should recognize the nested spelling of an exporter.config override
+    template: templates/exporter.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      exporter.enabled: true
+      exporter.config:
+        harbor:
+          database:
+            min_conns: 0
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_DATABASE_MIN_CONNS
+            value: "2"
+
+  # The override applies to every chart-managed name, not just the pool knobs.
+  - it: should let exporter.config override chart-managed wiring
+    template: templates/exporter.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      exporter.enabled: true
+      exporter.config:
+        HARBOR_DATABASE_HOST: other-pg.example.com
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_DATABASE_HOST
+            value: postgres.example.com
+
+  # exporter.secret is the other half of the passthrough and must suppress too.
+  - it: should let exporter.secret override a chart-managed env
+    template: templates/exporter.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      exporter.enabled: true
+      exporter.secret:
+        HARBOR_DATABASE_MIN_CONNS: 0
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_DATABASE_MIN_CONNS
+            value: "2"
+
+  # Env order is load-bearing: K8s only expands $(REDIS_PASSWORD) from entries
+  # earlier in the list. The filter must not reorder what it passes through.
+  # Indices are absolute — bump them when chart-managed env entries are added
+  # or removed ahead of these two.
+  - it: should keep REDIS_PASSWORD ahead of HARBOR_REDIS_URL
+    template: templates/exporter.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      exporter.enabled: true
+      valkey.enabled: false
+      externalRedis.host: redis.ext
+      externalRedis.password: secret123
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[19].name
+          value: REDIS_PASSWORD
+      - equal:
+          path: spec.template.spec.containers[0].env[20].name
+          value: HARBOR_REDIS_URL

@@ -41,7 +41,7 @@ INFO — mapped automatically (12)
       -> database.*
       Flattened one level; coreDatabase is now database.database and the port is numeric.
   * database.maxIdleConns
-      Removed. The pgxpool-based pool has no max-idle cap; it keeps a minimum idle floor instead. Set database.minConns (default 2) to tune it.
+      Removed. The pgxpool-based pool has no max-idle cap; it keeps a minimum idle floor instead. Set database.minConns (default 2, or 0 for no warm floor) to tune it.
   * redis.external.addr
       -> externalRedis.host/port
       addr split into separate host and port fields; valkey subchart disabled.
