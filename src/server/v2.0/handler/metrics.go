@@ -57,6 +57,6 @@ func (m *metricsAPI) GetMetrics(ctx context.Context, params operations.GetMetric
 	// Bypass the generated text/plain producer: promhttp already negotiates
 	// gzip, streams the body and sets the versioned Prometheus content type.
 	return middleware.ResponderFunc(func(w http.ResponseWriter, _ runtime.Producer) {
-		m.handler.ServeHTTP(w, params.HTTPRequest)
+		m.handler.ServeHTTP(w, params.HTTPRequest.WithContext(ctx))
 	})
 }

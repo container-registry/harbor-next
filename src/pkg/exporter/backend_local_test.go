@@ -19,6 +19,7 @@ import (
 	"errors"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -129,4 +130,25 @@ func TestCacheInitStartsSingleCleaner(t *testing.T) {
 	v, ok := CacheGet("k")
 	assert.True(t, ok)
 	assert.Equal(t, "v", v)
+}
+
+// StartCacheCleaner used to compare a seconds-based Expiration against
+// UnixNano, so every tick emptied the whole cache and the configured cache
+// duration was never actually reached.
+func TestStartCacheCleanerKeepsUnexpiredEntries(t *testing.T) {
+	CacheInit(&Opt{CacheDuration: 3600})
+
+	CachePut("fresh", "value")
+	c.Lock()
+	c.store["stale"] = cachedValue{Value: "old", Expiration: time.Now().Unix() - 1}
+	c.Unlock()
+
+	StartCacheCleaner()
+
+	v, ok := CacheGet("fresh")
+	assert.True(t, ok, "unexpired entry must survive the cleaner")
+	assert.Equal(t, "value", v)
+
+	_, ok = CacheGet("stale")
+	assert.False(t, ok, "expired entry must be evicted")
 }
