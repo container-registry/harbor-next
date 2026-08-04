@@ -1084,6 +1084,9 @@
         "NO_FILES": "此模型未提供檔案。",
         "MODEL_NO_README": "此模型未提供 README 檔案。",
         "FILE_TOO_LARGE": "檔案過大，無法處理。",
+        "DOCKERFILE": "Dockerfile",
+        "NO_DOCKERFILE_EXPLANATION": "在映像檔中未找到 Dockerfile。映像檔標籤中的 Dockerfile 內容不可用。",
+        "NO_DOCKERFILE_SUGGESTION": "查看",
         "ITEMS": "項",
         "SHOW_KV": "顯示鍵值對",
         "SHOW_YAML": "顯示 YAML 檔案"

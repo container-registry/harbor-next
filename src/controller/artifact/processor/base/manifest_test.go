@@ -165,6 +165,12 @@ func (m *manifestTestSuite) TestUnmarshalConfig() {
 	m.regCli.AssertExpectations(m.T())
 }
 
+func (m *manifestTestSuite) TestConfigSize() {
+	size, err := m.processor.ConfigSize([]byte(manifest))
+	m.Require().Nil(err)
+	m.EqualValues(1510, size)
+}
+
 func TestManifestSuite(t *testing.T) {
 	suite.Run(t, &manifestTestSuite{})
 }
