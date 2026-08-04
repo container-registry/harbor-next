@@ -233,11 +233,20 @@ for (const line of releaseNotesLines(releaseBody)) {
 
 const output = ['## What\'s Changed'];
 const emittedSections = new Set();
+const upstreamCommitShas = new Set(
+  sections.get('Upstream')
+    .map(commitShaFromEntry)
+    .filter(Boolean),
+);
 const emittedCommitShas = new Set();
 
 for (const section of sectionOrder) {
   const entries = (sections.get(section) ?? []).filter(entry => {
     const sha = commitShaFromEntry(entry);
+    if (section !== 'Upstream' && upstreamCommitShas.has(sha)) {
+      return false;
+    }
+
     if (!sha || emittedCommitShas.has(sha)) {
       return !sha;
     }
@@ -245,12 +254,12 @@ for (const section of sectionOrder) {
     emittedCommitShas.add(sha);
     return true;
   });
+  emittedSections.add(section);
   if (entries.length === 0) {
     continue;
   }
 
   output.push('', `### ${section}`, '', ...entries);
-  emittedSections.add(section);
 }
 
 for (const [section, entries] of sections) {
