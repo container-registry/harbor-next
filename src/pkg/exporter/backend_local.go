@@ -36,8 +36,9 @@ type localBackend struct {
 	healthCtl health.Controller
 	sysCtl    si.Controller
 
-	mu sync.Mutex
-	js *JobServiceBackend
+	mu        sync.RWMutex
+	resolving sync.Mutex
+	js        *JobServiceBackend
 }
 
 // NewLocalBackend returns the backend used when the collectors run inside core.
@@ -78,10 +79,22 @@ func (b *localBackend) SystemInfo(ctx context.Context) (*responseSysInfo, error)
 // core startup: the redis URL is fetched over HTTP from job service, which in
 // turn waits for core to become healthy before it starts.
 func (b *localBackend) JobService(_ context.Context) (*JobServiceBackend, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if b.js != nil {
-		return b.js, nil
+	if js := b.cached(); js != nil {
+		return js, nil
+	}
+
+	// GetJobServiceConfig is an HTTP call whose client has a transport but no
+	// timeout, so it can hang indefinitely. Serialise resolution so a slow job
+	// service is asked once, but never queue scrapes behind it: a concurrent
+	// scrape gives up here and skips the job service metrics for that round.
+	if !b.resolving.TryLock() {
+		return nil, fmt.Errorf("job service backend resolution already in progress")
+	}
+	defer b.resolving.Unlock()
+
+	// The holder of the lock may have finished while we were contending for it.
+	if js := b.cached(); js != nil {
+		return js, nil
 	}
 
 	cfg, err := job.GlobalClient.GetJobServiceConfig()
@@ -103,10 +116,20 @@ func (b *localBackend) JobService(_ context.Context) (*JobServiceBackend, error)
 	}
 
 	namespace := fmt.Sprintf("{%s}", poolCfg.Namespace)
-	b.js = &JobServiceBackend{
+	resolved := &JobServiceBackend{
 		Pool:      pool,
 		Client:    work.NewClient(namespace, pool),
 		Namespace: namespace,
 	}
-	return b.js, nil
+
+	b.mu.Lock()
+	b.js = resolved
+	b.mu.Unlock()
+	return resolved, nil
+}
+
+func (b *localBackend) cached() *JobServiceBackend {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return b.js
 }
