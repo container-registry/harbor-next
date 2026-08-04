@@ -15,6 +15,9 @@
 package migration
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/golang-migrate/migrate/v4"
 
 	"github.com/goharbor/harbor/src/common/dao"
@@ -35,5 +38,13 @@ func Migrate(database *models.Database) error {
 		return err
 	}
 	log.Debugf("current database schema version: %v", schemaVersion)
-	return dao.UpgradeSchema(database)
+	if err := dao.UpgradeSchema(database); err != nil {
+		return err
+	}
+
+	pool := dao.GetPool()
+	if pool == nil {
+		return fmt.Errorf("apply authoritative Harbor Next schema: database pool is not initialized")
+	}
+	return applyAuthoritativeSchema(context.Background(), sqlSchemaDB{db: pool.DB()}, authoritativeSchemaPath())
 }
