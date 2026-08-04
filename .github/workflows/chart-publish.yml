@@ -6,7 +6,6 @@ on:
       - main
     paths:
       - 'deploy/chart/**'
-      - 'deploy/flux/**'
       - '.github/workflows/chart-publish.yml'
   release:
     types: [published]
@@ -22,7 +21,7 @@ jobs:
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     env:
       REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
-      REGISTRY_PROJECT: 8gcr-dev
+      REGISTRY_PROJECT: 8gcr
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -49,11 +48,6 @@ jobs:
         uses: oras-project/setup-oras@5c0b487ce3fe0ce3ab0d034e63669e426e294e4d # v1.2.3
         with:
           version: 1.2.0
-
-      - name: Setup Flux CLI
-        uses: fluxcd/flux2/action@8d5f40dca5aa5d3c0fc3414457dda15a0ac92fa4 # v2.4.0
-        with:
-          version: 2.4.0
 
       - name: Registry login
         env:
@@ -86,7 +80,7 @@ jobs:
           FLOATING_TAG: ${{ steps.version.outputs.floating_tag }}
         run: |
           helm push "dist/harbor-next-${FLOATING_TAG}.tgz" \
-            "oci://${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/chart"
+            "oci://${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts"
 
       - name: Add immutable per-commit tag on chart
         # The per-push tag (3.0.0-main.<sha7>) is a stable audit-trail
@@ -97,29 +91,8 @@ jobs:
           FLOATING_TAG: ${{ steps.version.outputs.floating_tag }}
         run: |
           oras tag \
-            "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/chart/harbor-next:${FLOATING_TAG}" \
+            "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts/harbor-next:${FLOATING_TAG}" \
             "${VERSION}"
-
-      - name: Push Flux deploy bundle
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          flux push artifact \
-            "oci://${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/deploy:${VERSION}" \
-            --path=./deploy/flux/8gcr-dev \
-            --source="${{ github.server_url }}/${{ github.repository }}" \
-            --revision="${GITHUB_REF_NAME}@sha1:${GITHUB_SHA}"
-
-      - name: Move latest tag on deploy bundle
-        # Bundle artifacts are consumed by Flux's kustomize-controller, which
-        # does NOT impose a SemVer constraint on the revision (unlike
-        # helm-controller). Plain "latest" is fine here.
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          oras tag \
-            "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/deploy:${VERSION}" \
-            latest
 
   publish-release:
     name: Publish release
@@ -147,23 +120,11 @@ jobs:
         with:
           version: v3.16.4
 
-      - name: Setup ORAS
-        uses: oras-project/setup-oras@5c0b487ce3fe0ce3ab0d034e63669e426e294e4d # v1.2.3
-        with:
-          version: 1.2.0
-
-      - name: Setup Flux CLI
-        uses: fluxcd/flux2/action@8d5f40dca5aa5d3c0fc3414457dda15a0ac92fa4 # v2.4.0
-        with:
-          version: 2.4.0
-
       - name: Registry login
         env:
           REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
         run: |
           echo "${REGISTRY_PASSWORD}" | helm registry login "${REGISTRY_ADDRESS}" \
-            --username "${{ vars.REGISTRY_USERNAME }}" --password-stdin
-          echo "${REGISTRY_PASSWORD}" | oras login "${REGISTRY_ADDRESS}" \
             --username "${{ vars.REGISTRY_USERNAME }}" --password-stdin
 
       - name: Update chart dependencies
@@ -184,14 +145,4 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           helm push "dist/harbor-next-${VERSION}.tgz" \
-            "oci://${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/chart"
-
-      - name: Push Flux deploy bundle
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          flux push artifact \
-            "oci://${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/deploy:${VERSION}" \
-            --path=./deploy/flux/8gcr-dev \
-            --source="${{ github.server_url }}/${{ github.repository }}" \
-            --revision="${{ github.event.release.tag_name }}@sha1:${{ github.sha }}"
+            "oci://${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts"
