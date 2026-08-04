@@ -203,6 +203,7 @@
   width: 75%;
 }
 
+<<<<<<< HEAD
 .tag-cell-content {
   display: flex;
   align-items: center;
@@ -219,6 +220,21 @@
 .tag-copy-command {
   flex: 0 0 auto;
   margin-left: 4px;
+=======
+.tag-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.tag-count {
+  flex-shrink: 0;
+  white-space: nowrap;
+  margin-left: 2px;
+>>>>>>> 1cd644ca3 (fix: fix tags column text truncation and count badge overlap (#23607))
 }
 
 .action-bar {
