@@ -71,7 +71,10 @@ func CacheDelete(key string) {
 
 // StartCacheCleaner start a cache clean job
 func StartCacheCleaner() {
-	now := time.Now().UnixNano()
+	// Expiration is stored in Unix seconds by CachePut. Comparing it against
+	// UnixNano made every entry look expired, so each tick emptied the whole
+	// cache and the configured cache duration was never reached.
+	now := time.Now().Unix()
 	c.Lock()
 	defer c.Unlock()
 	for k, v := range c.store {
