@@ -15,11 +15,10 @@
 package exporter
 
 import (
-	"encoding/json"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/goharbor/harbor/src/lib/log"
+	"github.com/goharbor/harbor/src/lib/orm"
 )
 
 const (
@@ -39,15 +38,15 @@ var (
 )
 
 // NewHealthCollect ...
-func NewHealthCollect(cli *HarborClient) *HealthCollector {
+func NewHealthCollect(backend Backend) *HealthCollector {
 	return &HealthCollector{
-		HarborClient: cli,
+		backend: backend,
 	}
 }
 
 // HealthCollector is the Heartbeat
 type HealthCollector struct {
-	*HarborClient
+	backend Backend
 }
 
 // Describe implements prometheus.Collector
@@ -76,16 +75,9 @@ func (hc *HealthCollector) getHealthStatus() []prometheus.Metric {
 		}
 	}
 	result := []prometheus.Metric{}
-	res, err := hbrCli.Get(healthURL)
+	healthResponse, err := hc.backend.Health(orm.Context())
 	if err != nil {
 		log.Errorf("request health info failed with err: %v", err)
-		return result
-	}
-	defer res.Body.Close()
-	var healthResponse responseHealth
-	err = json.NewDecoder(res.Body).Decode(&healthResponse)
-	if err != nil {
-		log.Errorf("failed to decode res.Body into healthResponse, error: %v", err)
 		return result
 	}
 	result = append(result, harborHealth.MustNewConstMetric(healthy(healthResponse.Status)))

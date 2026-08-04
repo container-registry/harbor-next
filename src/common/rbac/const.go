@@ -81,6 +81,10 @@ const (
 	ResourceExportCVE          = Resource("export-cve")
 	ResourceJobServiceMonitor  = Resource("jobservice-monitor")
 	ResourceSecurityHub        = Resource("security-hub")
+	// ResourceMetric guards GET /metrics. Deliberately absent from the policy
+	// lists below: system admins pass via their wildcard, and robots must not be
+	// able to hold it. Adding it there would also change the /permissions API.
+	ResourceMetric = Resource("metric")
 )
 
 type scope string

@@ -44,7 +44,7 @@ type RedisPoolConfig struct {
 }
 
 // InitBackendWorker initiate backend worker
-func InitBackendWorker(redisPoolConfig *RedisPoolConfig) {
+func InitBackendWorker(redisPoolConfig *RedisPoolConfig) error {
 	pool, err := redislib.GetRedisPool("JobService", redisPoolConfig.URL, &redislib.PoolParam{
 		PoolMaxIdle:           6,
 		PoolIdleTimeout:       time.Duration(redisPoolConfig.IdleTimeoutSecond) * time.Second,
@@ -53,12 +53,13 @@ func InitBackendWorker(redisPoolConfig *RedisPoolConfig) {
 		DialWriteTimeout:      dialWriteTimeout,
 	})
 	if err != nil {
-		panic(err)
+		return err
 	}
 	redisPool = pool
 	jsNamespace = fmt.Sprintf("{%s}", redisPoolConfig.Namespace)
 	// Start the backend worker
 	jsClient = work.NewClient(jsNamespace, pool)
+	return nil
 }
 
 // GetBackendWorker ...

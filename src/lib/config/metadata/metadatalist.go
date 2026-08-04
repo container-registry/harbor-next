@@ -163,6 +163,8 @@ var (
 		{Name: common.MetricEnable, Scope: SystemScope, Group: BasicGroup, EnvKey: "METRIC_ENABLE", DefaultValue: "false", ItemType: &BoolType{}, Editable: true},
 		{Name: common.MetricPort, Scope: SystemScope, Group: BasicGroup, EnvKey: "METRIC_PORT", DefaultValue: "9090", ItemType: &PortType{}, Editable: true},
 		{Name: common.MetricPath, Scope: SystemScope, Group: BasicGroup, EnvKey: "METRIC_PATH", DefaultValue: "/metrics", ItemType: &StringType{}, Editable: true},
+		{Name: common.MetricExporterEnable, Scope: SystemScope, Group: BasicGroup, EnvKey: "METRIC_EXPORTER_ENABLE", DefaultValue: "false", ItemType: &BoolType{}, Editable: true},
+		{Name: common.MetricExporterCacheTime, Scope: SystemScope, Group: BasicGroup, EnvKey: "METRIC_EXPORTER_CACHE_TIME", DefaultValue: "30", ItemType: &IntType{}, Editable: true},
 
 		{Name: common.QuotaPerProjectEnable, Scope: UserScope, Group: QuotaGroup, EnvKey: "QUOTA_PER_PROJECT_ENABLE", DefaultValue: "true", ItemType: &BoolType{}, Editable: true, Description: `Enable quota per project`},
 		{Name: common.StoragePerProject, Scope: UserScope, Group: QuotaGroup, EnvKey: "STORAGE_PER_PROJECT", DefaultValue: "-1", ItemType: &QuotaType{}, Editable: true, Description: `The storage quota per project`},
