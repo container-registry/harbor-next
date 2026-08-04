@@ -89,6 +89,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ecr v1.58.4
 	github.com/aws/smithy-go v1.27.1
 	github.com/goccy/go-yaml v1.19.2
+	github.com/rabbitmq/amqp091-go v1.12.0
 	gopkg.in/h2non/gock.v1 v1.1.2
 )
 

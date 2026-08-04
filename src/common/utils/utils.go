@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -34,8 +35,11 @@ import (
 	"github.com/goharbor/harbor/src/lib/log"
 )
 
-// ParseEndpoint parses endpoint to a URL
-func ParseEndpoint(endpoint string) (*url.URL, error) {
+// ParseEndpoint parses endpoint to a URL. By default only http/https schemes
+// are accepted; extraSchemes allows a caller to permit additional schemes
+// (e.g. amqp/amqps for AMQP webhook targets) without loosening validation
+// for other callers of this shared helper.
+func ParseEndpoint(endpoint string, extraSchemes ...string) (*url.URL, error) {
 	endpoint = strings.Trim(endpoint, " ")
 	endpoint = strings.TrimRight(endpoint, "/")
 	if len(endpoint) == 0 {
@@ -44,7 +48,8 @@ func ParseEndpoint(endpoint string) (*url.URL, error) {
 	i := strings.Index(endpoint, "://")
 	if i >= 0 {
 		scheme := endpoint[:i]
-		if scheme != "http" && scheme != "https" {
+		allowed := scheme == "http" || scheme == "https" || slices.Contains(extraSchemes, scheme)
+		if !allowed {
 			return nil, fmt.Errorf("invalid scheme: %s", scheme)
 		}
 	} else {

@@ -51,6 +51,30 @@ func TestParseEndpoint(t *testing.T) {
 	}
 }
 
+func TestParseEndpointExtraSchemes(t *testing.T) {
+	// amqp is rejected without an explicit allowance
+	_, err := ParseEndpoint("amqp://broker:5672/vhost/queue")
+	require.Error(t, err)
+
+	// amqp is accepted once allowed
+	u, err := ParseEndpoint("amqp://broker:5672/vhost/queue", "amqp", "amqps")
+	require.NoError(t, err)
+	assert.Equal(t, "amqp://broker:5672/vhost/queue", u.String())
+
+	u, err = ParseEndpoint("amqps://broker:5671/vhost/queue", "amqp", "amqps")
+	require.NoError(t, err)
+	assert.Equal(t, "amqps://broker:5671/vhost/queue", u.String())
+
+	// http/https remain valid regardless of extraSchemes
+	u, err = ParseEndpoint("http://example.com", "amqp", "amqps")
+	require.NoError(t, err)
+	assert.Equal(t, "http://example.com", u.String())
+
+	// a scheme not in extraSchemes is still rejected
+	_, err = ParseEndpoint("ftp://example.com", "amqp", "amqps")
+	require.Error(t, err)
+}
+
 func TestParseRepository(t *testing.T) {
 	repository := "library/ubuntu"
 	project, rest := ParseRepository(repository)
