@@ -143,6 +143,7 @@ if [[ -n "${preview_pr_number}" ]]; then
   gh pr edit "${preview_pr_number}" \
     --repo "${GITHUB_REPOSITORY}" \
     --body-file "${tmp_dir}/release-pr-body-with-preview.md"
+  exit 0
 elif [[ "${dry_run}" == "true" ]]; then
   if [[ -n "${release_notes_output}" ]]; then
     cp "${tmp_dir}/release-notes.md" "${release_notes_output}"
