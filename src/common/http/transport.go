@@ -131,9 +131,20 @@ func newDefaultTransport() *http.Transport {
 			KeepAlive: 30 * time.Second,
 			DualStack: true,
 		}).DialContext,
+<<<<<<< HEAD
 		TLSClientConfig:       &tls.Config{},
 		MaxIdleConns:          100,
 		MaxIdleConnsPerHost:   defaultMaxIdleConnsPerHost,
+=======
+		TLSClientConfig: &tls.Config{},
+		MaxIdleConns:    1000,
+		// The default value of MaxIdleConnsPerHost is 2, which is too small for
+		// high-concurrency scenarios (e.g. core/jobservice talking to the registry,
+		// or replicating to a single remote endpoint). Idle connections beyond the
+		// need are reaped by IdleConnTimeout, so a generous value is safe. Keeping
+		// it low causes connection churn and ephemeral port exhaustion (EADDRNOTAVAIL).
+		MaxIdleConnsPerHost:   200,
+>>>>>>> c2c27ed2d (fix: set MaxIdleConnsPerHost on internal HTTP transports (#23591))
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
