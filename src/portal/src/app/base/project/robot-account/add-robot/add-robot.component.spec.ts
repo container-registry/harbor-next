@@ -28,6 +28,9 @@ describe('AddRobotComponent', () => {
         ListRobot() {
             return of([]).pipe(delay(0));
         },
+        CreateRobot() {
+            return of({});
+        },
     };
     const fakedMessageHandlerService = {
         showSuccess() {},
@@ -57,5 +60,86 @@ describe('AddRobotComponent', () => {
 
     it('should create', () => {
         expect(component).toBeTruthy();
+    });
+
+    describe('provided secret', () => {
+        it('should default to accepting no secret', () => {
+            expect(component.userProvidedSecret).toBe('');
+            expect(component.isProvidedSecretAcceptable).toBeTruthy();
+        });
+
+        it('should block creation when the shared secret input reports invalid', () => {
+            component.robot.name = 'testrobot';
+            component.robot.permissions[0].access = [
+                { resource: 'repository', action: 'pull' },
+            ];
+            component.isProvidedSecretAcceptable = false;
+            expect(component.canAdd()).toBeFalsy();
+        });
+
+        it('should allow creation when the shared secret input reports valid', () => {
+            component.robot.name = 'testrobot';
+            component.robot.permissions[0].access = [
+                { resource: 'repository', action: 'pull' },
+            ];
+            component.isProvidedSecretAcceptable = true;
+            expect(component.canAdd()).toBeTruthy();
+        });
+
+        it('should ignore secret acceptability while editing', () => {
+            component.isEditMode = true;
+            component.robot.name = 'testrobot';
+            component.robot.permissions[0].access = [
+                { resource: 'repository', action: 'pull' },
+            ];
+            component.originalRobotForEdit = component.robot;
+            component.isProvidedSecretAcceptable = false;
+            expect(component.canAdd()).toBeTruthy();
+        });
+
+        it('should send the provided secret in the create request', () => {
+            const robotService = TestBed.inject(RobotService);
+            const createSpy = spyOn(
+                robotService,
+                'CreateRobot'
+            ).and.callThrough();
+            component.projectId = 1;
+            component.projectName = 'library';
+            component.robot.name = 'testrobot';
+            component.robot.permissions[0].access = [
+                { resource: 'repository', action: 'pull' },
+            ];
+            component.userProvidedSecret = 'StrongPass123';
+            component.save();
+            expect(createSpy).toHaveBeenCalled();
+            const callArgs = createSpy.calls.mostRecent().args[0];
+            expect(callArgs.robot.secret).toBe('StrongPass123');
+        });
+
+        it('should not send a secret when none was provided', () => {
+            const robotService = TestBed.inject(RobotService);
+            const createSpy = spyOn(
+                robotService,
+                'CreateRobot'
+            ).and.callThrough();
+            component.projectId = 1;
+            component.projectName = 'library';
+            component.robot.name = 'testrobot';
+            component.robot.permissions[0].access = [
+                { resource: 'repository', action: 'pull' },
+            ];
+            component.save();
+            expect(createSpy).toHaveBeenCalled();
+            const callArgs = createSpy.calls.mostRecent().args[0];
+            expect(callArgs.robot.secret).toBeFalsy();
+        });
+
+        it('should reset secret state on reset()', () => {
+            component.userProvidedSecret = 'StrongPass123';
+            component.isProvidedSecretAcceptable = false;
+            component.reset();
+            expect(component.userProvidedSecret).toBe('');
+            expect(component.isProvidedSecretAcceptable).toBeTruthy();
+        });
     });
 });
