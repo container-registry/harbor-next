@@ -94,6 +94,10 @@ services:
       HARBOR_ADMIN_PASSWORD: Harbor12345
       CACHE_ENABLED: "false"
       LOG_LEVEL: debug
+      # Injected into the binary by air, so /systeminfo and harbor_system_info
+      # report something instead of an empty version.
+      HARBOR_VERSION: ${HARBOR_VERSION:-dev}
+      HARBOR_GIT_COMMIT: ${HARBOR_GIT_COMMIT:-unknown}
       # Token signing key
       TOKEN_PRIVATE_KEY_PATH: devenv/token_service_key.pem
       # JobService
@@ -155,6 +159,8 @@ services:
       LOG_LEVEL: debug
       HEALTHCHECK_PORT: "8888"
       HEALTHCHECK_ENDPOINT: /api/v1/stats
+      HARBOR_VERSION: ${HARBOR_VERSION:-dev}
+      HARBOR_GIT_COMMIT: ${HARBOR_GIT_COMMIT:-unknown}
     command: air -c devenv/air.jobservice.toml
     depends_on:
       - core
