@@ -2,6 +2,12 @@
 set -euo pipefail
 
 : "${GH_TOKEN:?GH_TOKEN is required}"
+
+preview_pr_number="${RELEASE_NOTES_PREVIEW_PR_NUMBER:-}"
+if [[ -n "${preview_pr_number}" && ! "${TAG_NAME:-}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  preview_version=$(node -e "const manifest = require('./.release-please-manifest.json'); const version = manifest['.']; if (!version) { throw new Error('missing root release version'); } console.log(version);")
+  TAG_NAME="v${preview_version}"
+fi
 : "${TAG_NAME:?TAG_NAME is required}"
 
 PATCHES_TOKEN="${PATCHES_TOKEN:-${GH_TOKEN}}"
@@ -22,7 +28,6 @@ registry_project="${REGISTRY_PROJECT:-8gcr}"
 registry="${registry_address}/${registry_project}"
 dry_run="${RELEASE_NOTES_DRY_RUN:-false}"
 release_notes_output="${RELEASE_NOTES_OUTPUT:-}"
-preview_pr_number="${RELEASE_NOTES_PREVIEW_PR_NUMBER:-}"
 images=(core jobservice registryctl exporter portal registry trivy-adapter)
 
 tmp_dir=$(mktemp -d)
@@ -38,13 +43,13 @@ node .github/scripts/extract-changelog-release.mjs \
   "${version}" \
   "${tmp_dir}/release-source.md"
 
+generated_notes_args=(-f "tag_name=${TAG_NAME}")
 if [[ -n "${preview_pr_number}" ]]; then
-  : > "${tmp_dir}/generated-notes.md"
-else
-  gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
-    -f "tag_name=${TAG_NAME}" \
-    --jq .body > "${tmp_dir}/generated-notes.md"
+  generated_notes_args+=(-f "target_commitish=$(git rev-parse HEAD)")
 fi
+gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+  "${generated_notes_args[@]}" \
+  --jq .body > "${tmp_dir}/generated-notes.md"
 
 node .github/scripts/format-release-notes.mjs \
   "${tmp_dir}/release-source.md" \

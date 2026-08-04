@@ -56,6 +56,21 @@ jobs:
           config-file: ${{ github.ref_name == 'main' && 'release-please-config.json' || 'release-please-config-maintenance.json' }}
           manifest-file: .release-please-manifest.json
 
+  preview-release-notes:
+    name: Preview Release Notes
+    needs: [release-please]
+    if: ${{ needs.release-please.outputs.prs_created == 'true' && needs.release-please.outputs.release_created != 'true' }}
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: ./.github/workflows/release-notes.yml
+    with:
+      tag_name: v${{ needs.release-please.outputs.version }}
+      checkout_ref: ${{ fromJSON(needs.release-please.outputs.prs)[0].headBranchName }}
+      preview_pr_number: ${{ fromJSON(needs.release-please.outputs.prs)[0].number }}
+    secrets:
+      SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+
   create-maintenance-branch:
     name: Create Maintenance Branch
     needs: [release-please]
