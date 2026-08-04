@@ -90,10 +90,11 @@ func CacheEnabled() bool {
 }
 
 // cleanerOnce keeps CacheInit from leaking a new cleaner goroutine on every
-// call; the ticker lives for the whole process either way.
+// call; the ticker lives for the whole process either way. The interval is held
+// separately so a later CacheInit still takes effect on the running cleaner.
 var (
-	cleanerOnce   sync.Once
-	cleanerStarts atomic.Int32
+	cleanerOnce      sync.Once
+	cleanIntervalSec atomic.Int64
 )
 
 // CacheInit add cache to exporter
@@ -103,17 +104,16 @@ func CacheInit(opt *Opt) {
 		store:         make(map[string]cachedValue),
 		RWMutex:       &sync.RWMutex{},
 	}
+	interval := opt.CacheCleanInterval
+	if interval <= 0 {
+		interval = defaultCacheCleanInterval
+	}
+	cleanIntervalSec.Store(interval)
+
 	cleanerOnce.Do(func() {
-		cleanerStarts.Add(1)
 		go func() {
-			var cacheCleanInterval int64
-			if opt.CacheCleanInterval > 0 {
-				cacheCleanInterval = opt.CacheCleanInterval
-			} else {
-				cacheCleanInterval = defaultCacheCleanInterval
-			}
-			ticker := time.NewTicker(time.Duration(cacheCleanInterval) * time.Second)
-			for range ticker.C {
+			for {
+				time.Sleep(time.Duration(cleanIntervalSec.Load()) * time.Second)
 				StartCacheCleaner()
 			}
 		}()

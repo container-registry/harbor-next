@@ -84,7 +84,7 @@ func TestLocalBackendSystemInfoDoesNotRequestProtectedInfo(t *testing.T) {
 		AuthMode:         "db_auth",
 		SelfRegistration: true,
 	}}
-	b := &localBackend{sysCtl: ctl}
+	b := &localBackend{sysCtl: ctl, newCtx: context.Background}
 
 	got, err := b.SystemInfo(context.Background())
 	require.NoError(t, err)
@@ -94,7 +94,7 @@ func TestLocalBackendSystemInfoDoesNotRequestProtectedInfo(t *testing.T) {
 }
 
 func TestLocalBackendSystemInfoError(t *testing.T) {
-	b := &localBackend{sysCtl: &fakeSysInfoCtl{err: errors.New("nope")}}
+	b := &localBackend{sysCtl: &fakeSysInfoCtl{err: errors.New("nope")}, newCtx: context.Background}
 
 	got, err := b.SystemInfo(context.Background())
 	assert.Error(t, err)
@@ -117,15 +117,19 @@ func TestNewCollectorRegistersAllCollectors(t *testing.T) {
 	}
 }
 
-// A second CacheInit must not leak another cleaner goroutine.
-func TestCacheInitStartsSingleCleaner(t *testing.T) {
-	CacheInit(&Opt{CacheDuration: 60})
-	CacheInit(&Opt{CacheDuration: 60})
-	CacheInit(&Opt{CacheDuration: 60})
+// Repeated CacheInit must stay usable, and a later call must be able to change
+// the cleaner cadence even though the goroutine is only started once.
+func TestCacheInitIsRepeatable(t *testing.T) {
+	CacheInit(&Opt{CacheDuration: 60, CacheCleanInterval: 7})
+	assert.Equal(t, int64(7), cleanIntervalSec.Load())
 
-	assert.Equal(t, int32(1), cleanerStarts.Load())
+	CacheInit(&Opt{CacheDuration: 60, CacheCleanInterval: 11})
+	assert.Equal(t, int64(11), cleanIntervalSec.Load(), "a later CacheInit must retune the running cleaner")
+
+	CacheInit(&Opt{CacheDuration: 60})
+	assert.Equal(t, int64(defaultCacheCleanInterval), cleanIntervalSec.Load())
+
 	assert.True(t, CacheEnabled())
-
 	CachePut("k", "v")
 	v, ok := CacheGet("k")
 	assert.True(t, ok)
