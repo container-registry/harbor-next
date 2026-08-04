@@ -94,7 +94,7 @@ spec:
     registry:
       podAnnotations:
         deploy.8gears.io/image-revision: "sha256:d88236fb65dbdeb57a84e2fd8841b7e0960eab03f425f572053bf34f04877ca9" # {"$imagepolicy": "flux-system:harbor-registry:digest"}
-        deploy.8gears.io/registryctl-image-revision: "sha256:bffb25052d978c0a63449b9a18bfa0477aa1b5857cc9febea2866876c544819e" # {"$imagepolicy": "flux-system:harbor-registryctl:digest"}
+        deploy.8gears.io/registryctl-image-revision: "sha256:9f95a91bef10c5b8d91a7734030f1d95eb981205f09017d67b6d84af0089844c" # {"$imagepolicy": "flux-system:harbor-registryctl:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-registry
         tag: latest
