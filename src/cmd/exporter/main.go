@@ -15,6 +15,7 @@
 package main
 
 import (
+	"math"
 	"net/http"
 	"os"
 	"os/signal"
@@ -132,8 +133,15 @@ func getMinConns() *int32 {
 	if !viper.IsSet("database.min_conns") {
 		return nil
 	}
-	v := int32(viper.GetInt("database.min_conns"))
-	return &v
+	v := viper.GetInt("database.min_conns")
+	// viper parses the full int range; a bare int32() would wrap — 1<<32
+	// becomes an explicit 0. Treat out-of-range as unset instead.
+	if v < math.MinInt32 || v > math.MaxInt32 {
+		log.Warningf("database.min_conns %d exceeds int32 range, using the pool default", v)
+		return nil
+	}
+	i := int32(v)
+	return &i
 }
 
 func getConnMaxLifetime(duration string) time.Duration {

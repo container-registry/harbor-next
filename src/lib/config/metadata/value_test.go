@@ -73,6 +73,11 @@ func TestConfigureValue_GetInt(t *testing.T) {
 }
 
 func TestConfigureValue_GetOptionalInt32(t *testing.T) {
+	// Neighbouring tests swap the global metadata for testingMetaDataArray,
+	// which lacks postgresql_min_conns — pin the real ConfigList so this test
+	// does not depend on execution order.
+	Instance().init()
+
 	// A configured 0 must come back as a non-nil 0, not collapse into "unset".
 	zero := createCfgValue("postgresql_min_conns", "0").GetOptionalInt32()
 	require.NotNil(t, zero)
@@ -84,6 +89,11 @@ func TestConfigureValue_GetOptionalInt32(t *testing.T) {
 
 	// CfgManager.Get hands back a bare ConfigureValue for an unknown key.
 	assert.Nil(t, (&ConfigureValue{}).GetOptionalInt32())
+
+	// parseInt's float fallback admits values beyond int32; a bare int32()
+	// would wrap 1<<32 to an explicit 0. Out-of-range reads as unset.
+	assert.Nil(t, createCfgValue("postgresql_min_conns", "4294967296").GetOptionalInt32())
+	assert.Nil(t, createCfgValue("postgresql_min_conns", "-4294967296").GetOptionalInt32())
 }
 
 func TestConfigureValue_GetInt64(t *testing.T) {

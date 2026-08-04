@@ -15,6 +15,7 @@
 package main
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -36,6 +37,10 @@ func TestGetMinConns(t *testing.T) {
 		{name: "empty reads as unset", set: true, env: "", want: nil},
 		{name: "explicit zero is honoured", set: true, env: "0", want: ptr(0)},
 		{name: "explicit value is honoured", set: true, env: "5", want: ptr(5)},
+		// A bare int32() would wrap 1<<32 to an explicit 0 — the opposite of
+		// the configured intent. Out-of-range reads as unset instead.
+		{name: "value above int32 range reads as unset", set: true, env: "4294967296", want: nil},
+		{name: "value below int32 range reads as unset", set: true, env: "-4294967296", want: nil},
 	}
 
 	for _, tt := range tests {
@@ -45,8 +50,11 @@ func TestGetMinConns(t *testing.T) {
 			viper.AutomaticEnv()
 			viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-			if tt.set {
-				t.Setenv("HARBOR_DATABASE_MIN_CONNS", tt.env)
+			// t.Setenv registers restoration of the pre-test value; the unset
+			// case then removes the variable so ambient CI env cannot leak in.
+			t.Setenv("HARBOR_DATABASE_MIN_CONNS", tt.env)
+			if !tt.set {
+				require.NoError(t, os.Unsetenv("HARBOR_DATABASE_MIN_CONNS"))
 			}
 
 			got := getMinConns()

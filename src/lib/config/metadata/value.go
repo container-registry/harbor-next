@@ -16,6 +16,7 @@ package metadata
 
 import (
 	"errors"
+	"math"
 	"time"
 
 	"github.com/goharbor/harbor/src/lib/log"
@@ -88,8 +89,16 @@ func (c *ConfigureValue) GetOptionalInt32() *int32 {
 	if _, ok := Instance().GetByName(c.Name); !ok {
 		return nil
 	}
-	v := int32(c.GetInt())
-	return &v
+	v := c.GetInt()
+	// parseInt's float fallback admits values beyond int32 (e.g. "4294967296"),
+	// which a bare int32() would wrap — 1<<32 becomes an explicit 0. Treat
+	// out-of-range as unset rather than smuggle a wrapped value downstream.
+	if v < math.MinInt32 || v > math.MaxInt32 {
+		log.Errorf("GetOptionalInt32 failed: value %d of %s exceeds int32 range, treating as unset", v, c.Name)
+		return nil
+	}
+	i := int32(v)
+	return &i
 }
 
 // GetInt64 - return the int64 value of current value
