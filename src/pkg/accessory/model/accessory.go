@@ -80,24 +80,33 @@ const (
 	// TypeHarborSBOM identifies sbom.harbor
 	TypeHarborSBOM = "sbom.harbor"
 
+<<<<<<< HEAD
 	// TypeInTotoAttestation identifies an attestation that carries an
 	// application/vnd.in-toto+json payload.
 	TypeInTotoAttestation = "attestation.intoto"
+=======
+	// TypeLocalReferrer identifies local referrer
+	TypeLocalReferrer = "local"
+
+	// TypeProxyReferrer identifies proxy referrer
+	TypeProxyReferrer = "proxy"
+>>>>>>> b2d985869 (Proxy the referrer API to upstream registry with paging and local merge (#23237))
 )
 
 // AccessoryData ...
 type AccessoryData struct {
-	ID                int64     `json:"id"`
-	ArtifactID        int64     `json:"artifact_id"`
-	SubArtifactID     int64     `json:"subject_artifact_id"`
-	SubArtifactRepo   string    `json:"subject_artifact_repo"`
-	SubArtifactDigest string    `json:"subject_artifact_digest"`
-	Type              string    `json:"type"`
-	Size              int64     `json:"size"`
-	Digest            string    `json:"digest"`
-	Source            string    `json:"source"`
-	CreatTime         time.Time `json:"creation_time"`
-	Icon              string    `json:"icon"`
+	ID                int64  `json:"id"`
+	ArtifactID        int64  `json:"artifact_id"`
+	SubArtifactID     int64  `json:"subject_artifact_id"`
+	SubArtifactRepo   string `json:"subject_artifact_repo"`
+	SubArtifactDigest string `json:"subject_artifact_digest"`
+	// Type identifies the type of the accessory, it can be TypeLocalReferrer, TypeProxyReferrer
+	Type      string    `json:"type"`
+	Size      int64     `json:"size"`
+	Digest    string    `json:"digest"`
+	Source    string    `json:"source"`
+	CreatTime time.Time `json:"creation_time"`
+	Icon      string    `json:"icon"`
 }
 
 // Accessory Independent, but linked to an existing subject artifact, which enabling the extensibility of an OCI artifact
