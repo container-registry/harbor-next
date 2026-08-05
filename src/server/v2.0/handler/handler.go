@@ -62,7 +62,6 @@ func New() http.Handler {
 		UsergroupAPI:          newUserGroupAPI(),
 		UserAPI:               newUsersAPI(),
 		HealthAPI:             newHealthAPI(),
-		MetricsAPI:            newMetricsAPI(),
 		StatisticAPI:          newStatisticAPI(),
 		ProjectMetadataAPI:    newProjectMetadataAPI(),
 		PurgeAPI:              newPurgeAPI(),
