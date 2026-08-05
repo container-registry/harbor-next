@@ -20,7 +20,11 @@ import (
 	"time"
 )
 
-var c *cache
+// c is replaced wholesale by CacheInit while the cleaner goroutine and
+// in-flight scrapes read it, so the pointer itself is atomic. Every operation
+// takes one stable snapshot up front and works on that; a concurrent CacheInit
+// then races only on which generation an entry lands in, never on the map.
+var c atomic.Pointer[cache]
 
 const defaultCacheCleanInterval = 10
 
@@ -37,16 +41,20 @@ type cache struct {
 
 // CacheGet get a value from cache
 func CacheGet(key string) (value any, ok bool) {
-	c.RLock()
-	v, ok := c.store[key]
-	c.RUnlock()
+	cc := c.Load()
+	if cc == nil {
+		return nil, false
+	}
+	cc.RLock()
+	v, ok := cc.store[key]
+	cc.RUnlock()
 	if !ok {
 		return nil, false
 	}
 	if time.Now().Unix() > v.Expiration {
-		c.Lock()
-		delete(c.store, key)
-		c.Unlock()
+		cc.Lock()
+		delete(cc.store, key)
+		cc.Unlock()
 		return nil, false
 	}
 	return v.Value, true
@@ -54,39 +62,51 @@ func CacheGet(key string) (value any, ok bool) {
 
 // CachePut put a value to cache with key
 func CachePut(key, value any) {
-	c.Lock()
-	defer c.Unlock()
-	c.store[key.(string)] = cachedValue{
+	cc := c.Load()
+	if cc == nil {
+		return
+	}
+	cc.Lock()
+	defer cc.Unlock()
+	cc.store[key.(string)] = cachedValue{
 		Value:      value,
-		Expiration: time.Now().Unix() + c.CacheDuration,
+		Expiration: time.Now().Unix() + cc.CacheDuration,
 	}
 }
 
 // CacheDelete delete a key from cache
 func CacheDelete(key string) {
-	c.Lock()
-	defer c.Unlock()
-	delete(c.store, key)
+	cc := c.Load()
+	if cc == nil {
+		return
+	}
+	cc.Lock()
+	defer cc.Unlock()
+	delete(cc.store, key)
 }
 
 // StartCacheCleaner start a cache clean job
 func StartCacheCleaner() {
+	cc := c.Load()
+	if cc == nil {
+		return
+	}
 	// Expiration is stored in Unix seconds by CachePut. Comparing it against
 	// UnixNano made every entry look expired, so each tick emptied the whole
 	// cache and the configured cache duration was never reached.
 	now := time.Now().Unix()
-	c.Lock()
-	defer c.Unlock()
-	for k, v := range c.store {
+	cc.Lock()
+	defer cc.Unlock()
+	for k, v := range cc.store {
 		if v.Expiration < now {
-			delete(c.store, k)
+			delete(cc.store, k)
 		}
 	}
 }
 
 // CacheEnabled returns if the cache in exporter enabled
 func CacheEnabled() bool {
-	return c != nil
+	return c.Load() != nil
 }
 
 // cleanerOnce keeps CacheInit from leaking a new cleaner goroutine on every
@@ -99,11 +119,11 @@ var (
 
 // CacheInit add cache to exporter
 func CacheInit(opt *Opt) {
-	c = &cache{
+	c.Store(&cache{
 		CacheDuration: opt.CacheDuration,
 		store:         make(map[string]cachedValue),
 		RWMutex:       &sync.RWMutex{},
-	}
+	})
 	interval := opt.CacheCleanInterval
 	if interval <= 0 {
 		interval = defaultCacheCleanInterval

@@ -25,10 +25,17 @@ import (
 	"github.com/goharbor/harbor/src/common/job"
 	"github.com/goharbor/harbor/src/controller/health"
 	si "github.com/goharbor/harbor/src/controller/systeminfo"
+	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/orm"
 	libRedis "github.com/goharbor/harbor/src/lib/redis"
 	"github.com/goharbor/harbor/src/pkg/jobmonitor"
 )
+
+// jsResolveTimeout bounds the one-off HTTP call that fetches the job service
+// redis config. The holder of the resolving lock waits at most this long, so a
+// hung job service costs one late scrape round, not a permanently poisoned
+// resolution (contenders fail fast and would otherwise never get a retry).
+const jsResolveTimeout = 10 * time.Second
 
 // localBackend serves the collectors from inside the core process: health and
 // system info come from the controllers core already owns instead of looping
@@ -39,6 +46,9 @@ type localBackend struct {
 	// newCtx builds the context the system info controller needs. Held as a
 	// field so tests can supply one that does not require a live database.
 	newCtx func() context.Context
+	// jsClient is a dedicated job service client with a request timeout —
+	// job.GlobalClient has none and would let JobService block forever.
+	jsClient job.Client
 
 	mu        sync.RWMutex
 	resolving sync.Mutex
@@ -51,6 +61,7 @@ func NewLocalBackend() Backend {
 		healthCtl: health.Ctl,
 		sysCtl:    si.Ctl,
 		newCtx:    orm.Context,
+		jsClient:  job.NewDefaultClientWithTimeout(config.InternalJobServiceURL(), config.CoreSecret(), jsResolveTimeout),
 	}
 }
 
@@ -92,10 +103,10 @@ func (b *localBackend) JobService(_ context.Context) (*JobServiceBackend, error)
 		return js, nil
 	}
 
-	// GetJobServiceConfig is an HTTP call whose client has a transport but no
-	// timeout, so it can hang indefinitely. Serialise resolution so a slow job
-	// service is asked once, but never queue scrapes behind it: a concurrent
-	// scrape gives up here and skips the job service metrics for that round.
+	// GetJobServiceConfig is an HTTP call, bounded by jsResolveTimeout on
+	// jsClient. Serialise resolution so a slow job service is asked once, but
+	// never queue scrapes behind it: a concurrent scrape gives up here and
+	// skips the job service metrics for that round.
 	if !b.resolving.TryLock() {
 		return nil, fmt.Errorf("job service backend resolution already in progress")
 	}
@@ -106,7 +117,7 @@ func (b *localBackend) JobService(_ context.Context) (*JobServiceBackend, error)
 		return js, nil
 	}
 
-	cfg, err := job.GlobalClient.GetJobServiceConfig()
+	cfg, err := b.jsClient.GetJobServiceConfig()
 	if err != nil {
 		return nil, err
 	}

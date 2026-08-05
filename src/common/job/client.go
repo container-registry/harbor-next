@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	commonhttp "github.com/goharbor/harbor/src/common/http"
 	"github.com/goharbor/harbor/src/common/http/modifier/auth"
@@ -76,9 +77,22 @@ type DefaultClient struct {
 
 // NewDefaultClient creates a default client based on endpoint and secret.
 func NewDefaultClient(endpoint, secret string) *DefaultClient {
+	return newDefaultClient(endpoint, secret, 0)
+}
+
+// NewDefaultClientWithTimeout is NewDefaultClient with a bound on each request:
+// timeout covers the whole exchange, connection through body. The default
+// client has none, so a job service that accepts the connection but never
+// answers blocks its caller forever.
+func NewDefaultClientWithTimeout(endpoint, secret string, timeout time.Duration) *DefaultClient {
+	return newDefaultClient(endpoint, secret, timeout)
+}
+
+func newDefaultClient(endpoint, secret string, timeout time.Duration) *DefaultClient {
 	var c *commonhttp.Client
 	httpCli := &http.Client{
 		Transport: commonhttp.GetHTTPTransport(),
+		Timeout:   timeout,
 	}
 	if len(secret) > 0 {
 		c = commonhttp.NewClient(httpCli, auth.NewSecretAuthorizer(secret))
