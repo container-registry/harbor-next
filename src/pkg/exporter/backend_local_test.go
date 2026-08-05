@@ -143,9 +143,10 @@ func TestStartCacheCleanerKeepsUnexpiredEntries(t *testing.T) {
 	CacheInit(&Opt{CacheDuration: 3600})
 
 	CachePut("fresh", "value")
-	c.Lock()
-	c.store["stale"] = cachedValue{Value: "old", Expiration: time.Now().Unix() - 1}
-	c.Unlock()
+	cc := c.Load()
+	cc.Lock()
+	cc.store["stale"] = cachedValue{Value: "old", Expiration: time.Now().Unix() - 1}
+	cc.Unlock()
 
 	StartCacheCleaner()
 
@@ -155,4 +156,30 @@ func TestStartCacheCleanerKeepsUnexpiredEntries(t *testing.T) {
 
 	_, ok = CacheGet("stale")
 	assert.False(t, ok, "expired entry must be evicted")
+}
+
+// CacheInit replaces the global cache while the permanent cleaner goroutine
+// and in-flight scrapes read it — the pointer swap must be synchronized. With
+// a plain global this fails under -race.
+func TestCacheReinitDoesNotRace(t *testing.T) {
+	CacheInit(&Opt{CacheDuration: 60})
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := range 200 {
+			CachePut("k", i)
+			CacheGet("k")
+			StartCacheCleaner()
+		}
+	}()
+	for range 200 {
+		CacheInit(&Opt{CacheDuration: 60})
+	}
+	<-done
+
+	v, ok := CacheGet("k")
+	if ok {
+		assert.Equal(t, 199, v, "surviving entry must come from the last generation writer")
+	}
 }
