@@ -333,6 +333,73 @@
                     </clr-control-error>
                 </div>
             </div>
+            <div
+                class="clr-form-control mt-05"
+                [style.visibility]="
+                    isSystemAdmin && enableProxyCache ? 'visible' : 'hidden'
+                ">
+                <label for="repositoryFilter" class="clr-control-label">
+                    {{ 'PROJECT.REPOSITORY_FILTER' | translate }}
+                    <clr-tooltip>
+                        <clr-icon
+                            clrTooltipTrigger
+                            shape="info-circle"
+                            size="24"></clr-icon>
+                        <clr-tooltip-content
+                            clrPosition="bottom-left"
+                            clrSize="lg"
+                            *clrIfOpen>
+                            <span>{{
+                                'PROJECT.REPOSITORY_FILTER_TOOLTIP' | translate
+                            }}</span>
+                        </clr-tooltip-content>
+                    </clr-tooltip>
+                </label>
+                <div
+                    class="clr-control-container"
+                    [class.clr-error]="repositoryFilterError">
+                    <input
+                        type="text"
+                        id="repositoryFilter"
+                        [(ngModel)]="
+                            project.metadata.proxy_cache_filter_pattern
+                        "
+                        name="repositoryFilter"
+                        class="clr-input width-164 mr-10"
+                        placeholder="{{
+                            'PROJECT.REPOSITORY_FILTER_PLACEHOLDER' | translate
+                        }}"
+                        autocomplete="off"
+                        (ngModelChange)="validateRepositoryFilter()" />
+                    <div class="clr-select-wrapper">
+                        <select
+                            id="repositoryFilterKind"
+                            name="repositoryFilterKind"
+                            [(ngModel)]="
+                                project.metadata.proxy_cache_filter_kind
+                            "
+                            (ngModelChange)="validateRepositoryFilter()">
+                            <option value="doublestar">
+                                {{
+                                    'PROJECT.FILTER_KIND_DOUBLESTAR' | translate
+                                }}
+                            </option>
+                            <option value="regex">
+                                {{ 'PROJECT.FILTER_KIND_REGEX' | translate }}
+                            </option>
+                        </select>
+                    </div>
+                    <clr-icon
+                        *ngIf="repositoryFilterError"
+                        class="clr-validate-icon"
+                        shape="exclamation-circle"></clr-icon>
+                    <clr-control-error
+                        *ngIf="repositoryFilterError"
+                        class="tooltip-content">
+                        {{ repositoryFilterError }}
+                    </clr-control-error>
+                </div>
+            </div>
             <clr-checkbox-container
                 [style.visibility]="
                     isSystemAdmin && enableProxyCache ? 'visible' : 'hidden'

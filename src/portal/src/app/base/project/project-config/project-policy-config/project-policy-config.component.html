@@ -106,7 +106,8 @@
                         name="max_upstream_conn"
                         [disabled]="!allowUpdateProxyCacheConfiguration"
                         class="clr-input width-164 mr-10 clr-input-underline"
-                        autocomplete="off" />
+                        autocomplete="off"
+                        (ngModelChange)="validateMaxUpstreamConnections()" />
                     <clr-icon
                         *ngIf="maxUpstreamConnError"
                         class="clr-validate-icon"
@@ -118,6 +119,67 @@
                             'PROJECT.PROXY_CACHE_MAX_UPSTREAM_CONN_INPUT_TIP'
                                 | translate
                         }}
+                    </clr-control-error>
+                </div>
+            </div>
+            <div class="row-inline ml-2" clrInline>
+                <label class="clr-control-label">
+                    {{ 'PROJECT.REPOSITORY_FILTER' | translate }}
+                    <clr-tooltip>
+                        <clr-icon
+                            clrTooltipTrigger
+                            shape="info-circle"
+                            size="24"></clr-icon>
+                        <clr-tooltip-content
+                            clrPosition="bottom-left"
+                            clrSize="lg"
+                            *clrIfOpen>
+                            <span>{{
+                                'PROJECT.REPOSITORY_FILTER_TOOLTIP' | translate
+                            }}</span>
+                        </clr-tooltip-content>
+                    </clr-tooltip>
+                </label>
+                <div
+                    class="clr-control-container ml-1"
+                    [class.clr-error]="repositoryFilterError">
+                    <input
+                        type="text"
+                        id="repositoryFilter"
+                        [(ngModel)]="projectPolicy.ProxyCacheFilterPattern"
+                        name="repositoryFilter"
+                        [disabled]="!allowUpdateProxyCacheConfiguration"
+                        class="clr-input width-164 mr-10 clr-input-underline"
+                        placeholder="{{
+                            'PROJECT.REPOSITORY_FILTER_PLACEHOLDER' | translate
+                        }}"
+                        autocomplete="off"
+                        (ngModelChange)="validateRepositoryFilter()" />
+                    <div class="clr-select-wrapper mr-10">
+                        <select
+                            id="repositoryFilterKind"
+                            name="repositoryFilterKind"
+                            [disabled]="!allowUpdateProxyCacheConfiguration"
+                            [(ngModel)]="projectPolicy.ProxyCacheFilterKind"
+                            (ngModelChange)="validateRepositoryFilter()">
+                            <option value="doublestar">
+                                {{
+                                    'PROJECT.FILTER_KIND_DOUBLESTAR' | translate
+                                }}
+                            </option>
+                            <option value="regex">
+                                {{ 'PROJECT.FILTER_KIND_REGEX' | translate }}
+                            </option>
+                        </select>
+                    </div>
+                    <clr-icon
+                        *ngIf="repositoryFilterError"
+                        class="clr-validate-icon"
+                        shape="exclamation-circle"></clr-icon>
+                    <clr-control-error
+                        *ngIf="repositoryFilterError"
+                        class="tooltip-content">
+                        {{ repositoryFilterError }}
                     </clr-control-error>
                 </div>
             </div>
@@ -146,6 +208,30 @@
                 }}
             </clr-control-helper>
         </clr-checkbox-container>
+        <div
+            *ngIf="
+                !hasChangeConfigRole &&
+                isProxyCacheProject &&
+                projectPolicy.ProxyCacheFilterPattern
+            "
+            class="clr-form-control">
+            <label class="clr-control-label"></label>
+            <div class="row-inline">
+                <label class="clr-control-label">
+                    {{ 'PROJECT.REPOSITORY_FILTER' | translate }}
+                </label>
+                <div class="clr-control-container ml-1">
+                    <input
+                        type="text"
+                        disabled
+                        [value]="projectPolicy.ProxyCacheFilterPattern"
+                        class="clr-input width-492 mr-10 clr-input-underline" />
+                    <span class="label label-info ml-05">{{
+                        projectPolicy.ProxyCacheFilterKind || 'doublestar'
+                    }}</span>
+                </div>
+            </div>
+        </div>
 
         <clr-checkbox-container *ngIf="!isProxyCacheProject" clrInline>
             <label
@@ -402,7 +488,9 @@
                             class="allowlist-window"
                             *ngIf="isUseSystemAllowlist()">
                             <li
-                                *ngIf="systemAllowlist?.items?.length < 1"
+                                *ngIf="
+                                    (systemAllowlist?.items?.length || 0) < 1
+                                "
                                 class="none">
                                 {{ 'CVE_ALLOWLIST.NONE' | translate }}
                             </li>
@@ -419,7 +507,9 @@
                             *ngIf="!isUseSystemAllowlist()">
                             <li
                                 class="none"
-                                *ngIf="projectAllowlist?.items?.length < 1">
+                                *ngIf="
+                                    (projectAllowlist?.items?.length || 0) < 1
+                                ">
                                 {{ 'CVE_ALLOWLIST.NONE' | translate }}
                             </li>
                             <li
