@@ -60,7 +60,7 @@ if (!subject) {
 
 bodyLines = trimBody(bodyLines);
 
-console.log(`- **${subject}**`);
+console.log(`- ${subject}`);
 
 if (bodyLines.length > 0) {
   console.log('');
