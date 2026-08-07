@@ -15,6 +15,7 @@
 package dbpool
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -62,6 +63,7 @@ func TestApplyPoolConfig_ExplicitValues(t *testing.T) {
 		SSLMode:           "disable",
 		MaxOpenConns:      50,
 		MinConns:          5,
+		MinConnsSet:       true,
 		ConnMaxLifetime:   30 * time.Minute,
 		ConnMaxIdleTime:   5 * time.Minute,
 		HealthCheckPeriod: 2 * time.Minute,
@@ -72,7 +74,7 @@ func TestApplyPoolConfig_ExplicitValues(t *testing.T) {
 	poolCfg, err := pgxpool.ParseConfig(dsn)
 	require.NoError(t, err)
 
-	applyPoolConfig(poolCfg, cfg)
+	require.NoError(t, applyPoolConfig(poolCfg, cfg))
 
 	assert.Equal(t, int32(50), poolCfg.MaxConns)
 	assert.Equal(t, int32(5), poolCfg.MinConns)
@@ -100,7 +102,7 @@ func TestApplyPoolConfig_ZeroFallbacks(t *testing.T) {
 
 	pgxDefault := poolCfg.MaxConns // pgxpool sets max(4, NumCPU) during ParseConfig
 
-	applyPoolConfig(poolCfg, cfg)
+	require.NoError(t, applyPoolConfig(poolCfg, cfg))
 
 	assert.Equal(t, pgxDefault, poolCfg.MaxConns, "zero MaxOpenConns should keep pgxpool default")
 	assert.Equal(t, int32(DefaultMinConns), poolCfg.MinConns)
@@ -126,7 +128,7 @@ func TestApplyPoolConfig_ZeroMaxConnsKeepsPgxDefault(t *testing.T) {
 
 	pgxDefault := poolCfg.MaxConns // max(4, NumCPU)
 
-	applyPoolConfig(poolCfg, cfg)
+	require.NoError(t, applyPoolConfig(poolCfg, cfg))
 
 	assert.Equal(t, pgxDefault, poolCfg.MaxConns, "zero MaxOpenConns must not override pgxpool default")
 }
@@ -164,13 +166,31 @@ func TestApplyPoolConfig_SimpleProtocolAlwaysSet(t *testing.T) {
 	poolCfg, err := pgxpool.ParseConfig(BuildDSN(cfg))
 	require.NoError(t, err)
 
-	applyPoolConfig(poolCfg, cfg)
+	require.NoError(t, applyPoolConfig(poolCfg, cfg))
 
 	assert.Equal(t, pgx.QueryExecModeSimpleProtocol, poolCfg.ConnConfig.DefaultQueryExecMode,
 		"SimpleProtocol must always be set — Beego ORM relies on it")
 }
 
-func TestApplyPoolConfig_NegativeValuesIgnored(t *testing.T) {
+func TestApplyPoolConfig_SetZeroMinConns(t *testing.T) {
+	cfg := &models.PostGreSQL{
+		Host:        "h",
+		Port:        5432,
+		Username:    "u",
+		Password:    "p",
+		Database:    "d",
+		SSLMode:     "disable",
+		MinConns:    0,
+		MinConnsSet: true,
+	}
+	poolCfg, err := pgxpool.ParseConfig(BuildDSN(cfg))
+	require.NoError(t, err)
+
+	require.NoError(t, applyPoolConfig(poolCfg, cfg))
+	assert.Equal(t, int32(0), poolCfg.MinConns)
+}
+
+func TestApplyPoolConfig_NegativeMinConnsReturnsError(t *testing.T) {
 	cfg := &models.PostGreSQL{
 		Host:              "h",
 		Port:              5432,
@@ -180,6 +200,7 @@ func TestApplyPoolConfig_NegativeValuesIgnored(t *testing.T) {
 		SSLMode:           "disable",
 		MaxOpenConns:      -1,
 		MinConns:          -5,
+		MinConnsSet:       true,
 		ConnMaxLifetime:   -1 * time.Minute,
 		ConnMaxIdleTime:   -1 * time.Minute,
 		HealthCheckPeriod: -1 * time.Minute,
@@ -188,18 +209,26 @@ func TestApplyPoolConfig_NegativeValuesIgnored(t *testing.T) {
 	poolCfg, err := pgxpool.ParseConfig(BuildDSN(cfg))
 	require.NoError(t, err)
 
-	pgxDefaultMax := poolCfg.MaxConns
+	err = applyPoolConfig(poolCfg, cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid min_conns -5")
+}
 
-	applyPoolConfig(poolCfg, cfg)
+func TestNew_NegativeMinConnsReturnsError(t *testing.T) {
+	cfg := &models.PostGreSQL{
+		Host:        "h",
+		Port:        5432,
+		Username:    "u",
+		Password:    "p",
+		Database:    "d",
+		SSLMode:     "disable",
+		MinConns:    -1,
+		MinConnsSet: true,
+	}
 
-	// Negative MaxOpenConns (-1 < 0) should not override pgxpool default
-	assert.Equal(t, pgxDefaultMax, poolCfg.MaxConns, "negative MaxOpenConns must not set MaxConns")
-	// Negative MinConns should fall back to default
-	assert.Equal(t, int32(DefaultMinConns), poolCfg.MinConns, "negative MinConns must fall back to default")
-	// Negative durations should fall back to defaults
-	assert.Equal(t, DefaultMaxConnIdleTime, poolCfg.MaxConnIdleTime)
-	assert.Equal(t, DefaultHealthCheckPeriod, poolCfg.HealthCheckPeriod)
-	assert.Equal(t, DefaultConnectTimeout, poolCfg.ConnConfig.ConnectTimeout)
+	_, err := New(context.Background(), cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid min_conns -1")
 }
 
 func TestBuildDSN_PasswordWithSpecialChars(t *testing.T) {

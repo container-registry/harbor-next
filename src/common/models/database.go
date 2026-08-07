@@ -38,5 +38,6 @@ type PostGreSQL struct {
 	HealthCheckPeriod time.Duration `json:"health_check_period"`
 	ConnectTimeout    time.Duration `json:"connect_timeout"`
 	MinConns          int32         `json:"min_conns"`
+	MinConnsSet       bool          `json:"-"`
 	URL               string        `json:"url"`
 }
