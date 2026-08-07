@@ -23,12 +23,12 @@ require (
 	github.com/go-asn1-ber/asn1-ber v1.5.8-0.20250403174932-29230038a667
 	github.com/go-ldap/ldap/v3 v3.4.13
 	github.com/go-openapi/errors v0.22.7
-	github.com/go-openapi/loads v0.23.3
+	github.com/go-openapi/loads v0.23.3 // indirect
 	github.com/go-openapi/runtime v0.32.2
-	github.com/go-openapi/spec v0.22.4
+	github.com/go-openapi/spec v0.22.4 // indirect
 	github.com/go-openapi/strfmt v0.26.3
 	github.com/go-openapi/swag v0.23.1
-	github.com/go-openapi/validate v0.25.3
+	github.com/go-openapi/validate v0.25.3 // indirect
 	github.com/gocarina/gocsv v0.0.0-20210516172204-ca9e8a8ddea8
 	github.com/gocraft/work v0.5.1
 	github.com/golang-jwt/jwt/v5 v5.3.1
