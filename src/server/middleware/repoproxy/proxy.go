@@ -34,6 +34,11 @@ import (
 	httpLib "github.com/goharbor/harbor/src/lib/http"
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/orm"
+<<<<<<< HEAD
+=======
+	"github.com/goharbor/harbor/src/lib/pattern"
+	"github.com/goharbor/harbor/src/lib/q"
+>>>>>>> 266aad1ec (feat(backend): implement proxy cache repository filter API (#23527))
 	"github.com/goharbor/harbor/src/lib/redis"
 	proModels "github.com/goharbor/harbor/src/pkg/project/models"
 	"github.com/goharbor/harbor/src/pkg/proxy/connection"
@@ -99,6 +104,17 @@ func handleBlob(w http.ResponseWriter, r *http.Request, next http.Handler) error
 		return nil
 	}
 
+<<<<<<< HEAD
+=======
+	// Apply repository filter: if proxy_cache_filter_pattern is set, the repository must match
+	if err := checkRepositoryFilter(p, art); err != nil {
+		return err
+	}
+
+	if p.IsProxy() && config.Metric().Enabled {
+		metric.TotalProxyReq.WithLabelValues(p.Name, r.Method).Inc()
+	}
+>>>>>>> 266aad1ec (feat(backend): implement proxy cache repository filter API (#23527))
 	if !canProxy(r.Context(), p) || proxyCtl.UseLocalBlob(ctx, art) {
 		next.ServeHTTP(w, r)
 		return nil
@@ -213,6 +229,44 @@ func defaultBlobURL(projectName string, name string, digest string) string {
 	return fmt.Sprintf("/v2/%s/library/%s/blobs/%s", projectName, name, digest)
 }
 
+// defaultTagURL return the real url for request with default project
+func defaultTagURL(projectName string, name string) string {
+	return fmt.Sprintf("/v2/%s/library/%s/tags/list", projectName, name)
+}
+
+// matchRepositoryFilter returns true if repository matches the filter.
+// filterPattern is the plain pattern string; filterKind is "doublestar" or "regex" (defaults to doublestar when empty).
+// If filterPattern is empty, all repositories are allowed.
+// An invalid pattern is treated as no match.
+func matchRepositoryFilter(repository, filterPattern, filterKind string) bool {
+	log.Debugf("matching repository %q against filter pattern: %q (kind: %s)", repository, filterPattern, filterKind)
+	matched, err := pattern.Match(repository, filterPattern, filterKind)
+	if err != nil {
+		log.Warningf("invalid proxy_cache_filter_pattern %q (kind: %s): %v", filterPattern, filterKind, err)
+		return false
+	}
+	log.Debugf("repository %q match result: %v (filter: %q, kind: %s)", repository, matched, filterPattern, filterKind)
+	return matched
+}
+
+// checkRepositoryFilter returns a NotFoundError if the project has a proxy_cache_filter_pattern
+// set and the artifact's repository does not match it. It is enforced for both manifest and
+// blob requests so the filter acts as an access boundary rather than a manifest-only convenience,
+// since a client that knows a blob digest out-of-band could otherwise bypass the filter.
+func checkRepositoryFilter(p *proModels.Project, art lib.ArtifactInfo) error {
+	filterPattern, ok := p.GetMetadata(proModels.ProMetaProxyCacheFilterPattern)
+	if !ok || filterPattern == "" {
+		return nil
+	}
+	filterKind, _ := p.GetMetadata(proModels.ProMetaProxyCacheFilterKind)
+	remoteRepo := strings.TrimPrefix(art.Repository, art.ProjectName+"/")
+	if !matchRepositoryFilter(remoteRepo, filterPattern, filterKind) {
+		log.Debugf("blocked proxy cache pull for project %q repository %q: repository does not match filter %q (kind: %s)", p.Name, remoteRepo, filterPattern, filterKind)
+		return errors.NotFoundError(fmt.Errorf("repository %q does not match project repository filter", remoteRepo))
+	}
+	return nil
+}
+
 // upstreamRegistryConnectionKey get upstream registry connection key
 func upstreamRegistryConnectionKey(art lib.ArtifactInfo) string {
 	limitOnProject := os.Getenv(upstreamRegistryLimitOnProject)
@@ -239,6 +293,17 @@ func handleManifest(w http.ResponseWriter, r *http.Request, next http.Handler) e
 		return nil
 	}
 
+<<<<<<< HEAD
+=======
+	// Apply repository filter: if proxy_cache_filter_pattern is set, the repository must match
+	if err := checkRepositoryFilter(p, art); err != nil {
+		return err
+	}
+
+	if p.IsProxy() && config.Metric().Enabled {
+		metric.TotalProxyReq.WithLabelValues(p.Name, r.Method).Inc()
+	}
+>>>>>>> 266aad1ec (feat(backend): implement proxy cache repository filter API (#23527))
 	if !canProxy(r.Context(), p) {
 		next.ServeHTTP(w, r)
 		return nil
@@ -405,6 +470,7 @@ func proxyManifestHead(ctx context.Context, w http.ResponseWriter, ctl proxy.Con
 	return nil
 }
 
+<<<<<<< HEAD
 // tagEnsurer is the subset of proxy.Controller used by ensureTagWithRetry.
 type tagEnsurer interface {
 	EnsureTag(ctx context.Context, art lib.ArtifactInfo, tagName string) error
@@ -422,6 +488,19 @@ func ensureTagWithRetry(ctx context.Context, te tagEnsurer, art lib.ArtifactInfo
 	bArt := lib.ArtifactInfo{ProjectName: art.ProjectName, Repository: art.Repository, Digest: digest}
 	for range ensureTagMaxRetry {
 		if ctx.Err() != nil {
+=======
+func ProxyReferrerMiddleware() func(http.Handler) http.Handler {
+	return middleware.New(func(w http.ResponseWriter, r *http.Request, next http.Handler) {
+		ctx := r.Context()
+		art := lib.GetArtifactInfo(ctx)
+		p, err := project.Ctl.GetByName(ctx, art.ProjectName, project.Metadata(true))
+		if err != nil {
+			httpLib.SendError(w, err)
+			return
+		}
+		if !p.IsProxy() {
+			next.ServeHTTP(w, r)
+>>>>>>> 266aad1ec (feat(backend): implement proxy cache repository filter API (#23527))
 			return
 		}
 
@@ -441,6 +520,45 @@ func ensureTagWithRetry(ctx context.Context, te tagEnsurer, art lib.ArtifactInfo
 		if err == nil {
 			return
 		}
+<<<<<<< HEAD
 		log.Debugf("Failed to ensure tag %+v , error %v", art, err)
+=======
+
+		// Apply repository filter: if proxy_cache_filter_pattern is set, the repository must match
+		if err := checkRepositoryFilter(p, art); err != nil {
+			httpLib.SendError(w, err)
+			return
+		}
+
+		log.Debug("current project is a harbor proxy cache project, will proxy the referrer API to the upstream")
+		remote, err := proxy.NewRemoteHelper(r.Context(), p.RegistryID, proxy.WithSpeed(p.ProxyCacheSpeed()))
+		if err != nil {
+			log.Errorf("failed to proxy the referrer API to upstream, error %v, fallback to local registry", err)
+			next.ServeHTTP(w, r)
+			return
+		}
+		// for any error, fallback to local registry
+		if proxyErr := proxyReferrerGet(r, w, art, remote, p.RegistryID); proxyErr != nil {
+			log.Errorf("failed to proxy the referrer API to upstream, error %v, fallback to local registry", proxyErr)
+			next.ServeHTTP(w, r)
+		}
+	})
+}
+
+// referrerCache defines the cache structure for referrer index
+type referrerCache struct {
+	Content []byte              `json:"content"`
+	Header  map[string][]string `json:"header"`
+}
+
+// writeProxyHeaders writes proxy-allowed headers from headerMap to response writer
+func writeProxyHeaders(w http.ResponseWriter, headerMap map[string][]string) {
+	for k, v := range headerMap {
+		if slices.Contains(proxyHeaderNames, k) {
+			for _, hv := range v {
+				w.Header().Add(k, hv)
+			}
+		}
+>>>>>>> 266aad1ec (feat(backend): implement proxy cache repository filter API (#23527))
 	}
 }
