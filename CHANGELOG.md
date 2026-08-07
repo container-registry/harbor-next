@@ -6,6 +6,28 @@ This changelog mirrors [GitHub Releases](https://github.com/container-registry/h
 
 ---
 
+## [2.15.5](https://github.com/container-registry/harbor-next/compare/v2.15.4...v2.15.5) (2026-08-07)
+
+
+### Bug Fixes
+
+* **scan:** Keep SBOM accessory push on the local registry when CORE_URL has no port ([#465](https://github.com/container-registry/harbor-next/issues/465)) ([85edefa](https://github.com/container-registry/harbor-next/commit/85edefac288b62f88ad3f774b6a8b72aa97cf8d8))
+* **security:** avoid audit event panic on nil user data ([#402](https://github.com/container-registry/harbor-next/issues/402)) ([1013a93](https://github.com/container-registry/harbor-next/commit/1013a93eabaf397e0a098089bc617663b53fffa2))
+
+
+### Upstream
+
+* Add a size limit for manifest uploads (goharbor/harbor[#23500](https://github.com/container-registry/harbor-next/issues/23500)) ([#440](https://github.com/container-registry/harbor-next/issues/440)) ([e4cf7d4](https://github.com/container-registry/harbor-next/commit/e4cf7d47a75973fc862629db046d902a8d0bde22))
+* fix: add registry component to proxy configuration support (goharbor/harbor[#23437](https://github.com/container-registry/harbor-next/issues/23437)) ([#472](https://github.com/container-registry/harbor-next/issues/472)) ([cfab275](https://github.com/container-registry/harbor-next/commit/cfab275b53df376c14f43a63dbaab3c9b9726af3))
+* fix: address unsafe type assertions causing potential panics across packages (goharbor/harbor[#23571](https://github.com/container-registry/harbor-next/issues/23571)) ([#475](https://github.com/container-registry/harbor-next/issues/475)) ([8b3577d](https://github.com/container-registry/harbor-next/commit/8b3577d97755bc0e92ba3121338a469c4a3e085f))
+* fix: guard against division by zero when merging scan report summaries (goharbor/harbor[#23572](https://github.com/container-registry/harbor-next/issues/23572)) ([#476](https://github.com/container-registry/harbor-next/issues/476)) ([d3526e9](https://github.com/container-registry/harbor-next/commit/d3526e9ea9ef08479e7084667feeb8b66b275782))
+* fix: validate max_upstream_conn values on the backend ([#508](https://github.com/container-registry/harbor-next/issues/508)) ([d05ac4c](https://github.com/container-registry/harbor-next/commit/d05ac4c74e80f4723cd6b47a6a095702d4774751))
+* fix(cache): replace keyMutex with singleflight and avoid canceling cache (goharbor/harbor[#23336](https://github.com/container-registry/harbor-next/issues/23336)) ([#377](https://github.com/container-registry/harbor-next/issues/377)) ([6db4cad](https://github.com/container-registry/harbor-next/commit/6db4cadfcf9d004c3ce2da1f7a03d6bad0d5eb7a))
+* fix(cnai-parser): enforce actual byte limit to prevent decompression (goharbor/harbor[#23497](https://github.com/container-registry/harbor-next/issues/23497)) ([#503](https://github.com/container-registry/harbor-next/issues/503)) ([95c7c5c](https://github.com/container-registry/harbor-next/commit/95c7c5c918f12597e7e20a0f1e643adad62d4f3a))
+* fix(replication): fix incorrect error propagation in getAccessoryArts (goharbor/harbor[#23569](https://github.com/container-registry/harbor-next/issues/23569)) ([#473](https://github.com/container-registry/harbor-next/issues/473)) ([ea25d3a](https://github.com/container-registry/harbor-next/commit/ea25d3a5c7ed8738ec60ca6d6d23c319bfee98ab))
+* fix(retention): avoid stripping repository path twice (goharbor/harbor[#23546](https://github.com/container-registry/harbor-next/issues/23546)) ([#470](https://github.com/container-registry/harbor-next/issues/470)) ([792c7f3](https://github.com/container-registry/harbor-next/commit/792c7f392f1ce938033cdab7d259e592e8891d58))
+* Set blob response headers before streaming the body (goharbor/harbor[#23374](https://github.com/container-registry/harbor-next/issues/23374)) ([#498](https://github.com/container-registry/harbor-next/issues/498)) ([cfc6f34](https://github.com/container-registry/harbor-next/commit/cfc6f342f5128d75f580f99561d9e9acf767439f))
+
 ## [2.15.4](https://github.com/container-registry/harbor-next/compare/v2.15.3...v2.15.4) (2026-07-30)
 
 
