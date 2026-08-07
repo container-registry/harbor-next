@@ -61,7 +61,9 @@ func New(ctx context.Context, cfg *models.PostGreSQL, opts ...Option) (*Pool, er
 		return nil, fmt.Errorf("dbpool: parse config: %w", err)
 	}
 
-	applyPoolConfig(poolCfg, cfg)
+	if err = applyPoolConfig(poolCfg, cfg); err != nil {
+		return nil, err
+	}
 
 	for _, opt := range opts {
 		opt(poolCfg)
@@ -95,16 +97,18 @@ func BuildDSN(cfg *models.PostGreSQL) string {
 		cfg.Host, cfg.Port, cfg.Username, escaped, cfg.Database, cfg.SSLMode)
 }
 
-func applyPoolConfig(poolCfg *pgxpool.Config, cfg *models.PostGreSQL) {
+func applyPoolConfig(poolCfg *pgxpool.Config, cfg *models.PostGreSQL) error {
 	// 0 means "not set" — leave pgxpool's default: max(4, runtime.NumCPU()).
 	if cfg.MaxOpenConns > 0 {
 		poolCfg.MaxConns = int32(cfg.MaxOpenConns)
 	}
 
-	if cfg.MinConns > 0 {
-		poolCfg.MinConns = cfg.MinConns
-	} else {
+	if !cfg.MinConnsSet {
 		poolCfg.MinConns = DefaultMinConns
+	} else if cfg.MinConns < 0 {
+		return fmt.Errorf("dbpool: invalid min_conns %d: must be greater than or equal to 0", cfg.MinConns)
+	} else {
+		poolCfg.MinConns = cfg.MinConns
 	}
 
 	if cfg.ConnMaxLifetime > 0 {
@@ -132,6 +136,7 @@ func applyPoolConfig(poolCfg *pgxpool.Config, cfg *models.PostGreSQL) {
 	// Beego ORM uses string interpolation, not prepared statements.
 	// Simple protocol avoids statement cache issues.
 	poolCfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+	return nil
 }
 
 // RegisterWithOrm registers the bridged *sql.DB with Beego ORM.

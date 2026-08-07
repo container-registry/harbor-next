@@ -18,6 +18,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
@@ -150,6 +151,17 @@ func (suite *GetItemFromDriverTestSuite) TestGetItemFromDriverEmptyKey() {
 
 func TestGetItemFromDriverTestSuite(t *testing.T) {
 	suite.Run(t, new(GetItemFromDriverTestSuite))
+}
+
+func TestGetDatabaseCfg_MinConnsMarkedAsSet(t *testing.T) {
+	manager := &CfgManager{
+		Store: store.NewConfigStore(&MockDriver{}),
+	}
+	manager.Set(context.Background(), common.PostGreSQLMinConns, 0)
+
+	dbCfg := manager.GetDatabaseCfg()
+	assert.Equal(t, int32(0), dbCfg.PostGreSQL.MinConns)
+	assert.True(t, dbCfg.PostGreSQL.MinConnsSet)
 }
 
 // ValidateCfgTestSuite tests the ValidateCfg method

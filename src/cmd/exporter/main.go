@@ -41,23 +41,7 @@ func main() {
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	dbCfg := &models.Database{
-		Type: "postgresql",
-		PostGreSQL: &models.PostGreSQL{
-			Host:              viper.GetString("database.host"),
-			Port:              viper.GetInt("database.port"),
-			Username:          viper.GetString("database.username"),
-			Password:          viper.GetString("database.password"),
-			Database:          viper.GetString("database.dbname"),
-			SSLMode:           viper.GetString("database.sslmode"),
-			MaxOpenConns:      viper.GetInt("database.max_open_conns"),
-			ConnMaxLifetime:   getConnMaxLifetime(viper.GetString("database.conn_max_lifetime")),
-			ConnMaxIdleTime:   getConnMaxIdleTime(viper.GetString("database.conn_max_idle_time")),
-			HealthCheckPeriod: viper.GetDuration("database.health_check_period"),
-			ConnectTimeout:    viper.GetDuration("database.connect_timeout"),
-			MinConns:          int32(viper.GetInt("database.min_conns")),
-		},
-	}
+	dbCfg := buildDatabaseCfg()
 	if err := dao.InitDatabase(dbCfg); err != nil {
 		log.Fatalf("failed to initialize database: %v", err)
 	}
@@ -123,6 +107,27 @@ func main() {
 
 	dao.ClosePool()
 	os.Exit(exitCode)
+}
+
+func buildDatabaseCfg() *models.Database {
+	return &models.Database{
+		Type: "postgresql",
+		PostGreSQL: &models.PostGreSQL{
+			Host:              viper.GetString("database.host"),
+			Port:              viper.GetInt("database.port"),
+			Username:          viper.GetString("database.username"),
+			Password:          viper.GetString("database.password"),
+			Database:          viper.GetString("database.dbname"),
+			SSLMode:           viper.GetString("database.sslmode"),
+			MaxOpenConns:      viper.GetInt("database.max_open_conns"),
+			ConnMaxLifetime:   getConnMaxLifetime(viper.GetString("database.conn_max_lifetime")),
+			ConnMaxIdleTime:   getConnMaxIdleTime(viper.GetString("database.conn_max_idle_time")),
+			HealthCheckPeriod: viper.GetDuration("database.health_check_period"),
+			ConnectTimeout:    viper.GetDuration("database.connect_timeout"),
+			MinConns:          int32(viper.GetInt("database.min_conns")),
+			MinConnsSet:       viper.IsSet("database.min_conns"),
+		},
+	}
 }
 
 func getConnMaxLifetime(duration string) time.Duration {
