@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"slices"
 	"strings"
 	"time"
 
@@ -42,7 +41,6 @@ import (
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/accessory"
-	accessorymodel "github.com/goharbor/harbor/src/pkg/accessory/model"
 	"github.com/goharbor/harbor/src/pkg/label"
 	"github.com/goharbor/harbor/src/pkg/notification"
 	"github.com/goharbor/harbor/src/pkg/scan/report"
@@ -106,7 +104,7 @@ func (a *artifactAPI) ListArtifacts(ctx context.Context, params operation.ListAr
 
 	// set option
 	option := option(params.WithTag, params.WithImmutableStatus,
-		params.WithLabel, params.WithAccessory, nil)
+		params.WithLabel, params.WithAccessory, nil, params.WithInheritedAccessory)
 
 	// get the total count of artifacts
 	total, err := a.artCtl.Count(ctx, query)
@@ -140,7 +138,7 @@ func (a *artifactAPI) GetArtifact(ctx context.Context, params operation.GetArtif
 	}
 	// set option
 	option := option(params.WithTag, params.WithImmutableStatus,
-		params.WithLabel, params.WithAccessory, nil)
+		params.WithLabel, params.WithAccessory, nil, params.WithInheritedAccessory)
 
 	// get the artifact
 	artifact, err := a.artCtl.GetByReference(ctx, fmt.Sprintf("%s/%s", params.ProjectName, params.RepositoryName), params.Reference, option)
@@ -381,14 +379,13 @@ func (a *artifactAPI) ListAccessories(ctx context.Context, params operation.List
 		return a.SendError(ctx, err)
 	}
 
-	// RENAMED from 'artifact' to 'art' to avoid shadowing the 'artifact' package
-	art, err := a.artCtl.GetByReference(ctx, fmt.Sprintf("%s/%s", params.ProjectName, params.RepositoryName), params.Reference, nil)
+	artifact, err := a.artCtl.GetByReference(ctx, fmt.Sprintf("%s/%s", params.ProjectName, params.RepositoryName), params.Reference, nil)
 	if err != nil {
 		return a.SendError(ctx, err)
 	}
-	query.Keywords["SubjectArtifactID"] = art.ID
+	query.Keywords["SubjectArtifactID"] = artifact.ID
 
-	// 1. Get the direct accessories
+	// list accessories according to the query
 	total, err := a.accMgr.Count(ctx, query)
 	if err != nil {
 		return a.SendError(ctx, err)
@@ -396,28 +393,6 @@ func (a *artifactAPI) ListAccessories(ctx context.Context, params operation.List
 	accs, err := a.accMgr.List(ctx, query)
 	if err != nil {
 		return a.SendError(ctx, err)
-	}
-
-	// If no direct Cosign signature found, check for inherited ones from a parent OCI index.
-	hasCosign := slices.ContainsFunc(accs, func(acc accessorymodel.Accessory) bool {
-		return acc.GetData().Type == accessorymodel.TypeCosignSignature
-	})
-	if !hasCosign {
-		if strings.Contains(lib.StringValue(params.Q), accessorymodel.TypeCosignSignature) {
-			artWithAccs, err := a.artCtl.Get(ctx, art.ID, &artifact.Option{WithAccessory: true})
-			if err != nil {
-				log.Warningf("failed to get artifact %d with accessories for inheritance check: %v", art.ID, err)
-			} else if artWithAccs != nil {
-				allAccs := append(artWithAccs.Accessories, artWithAccs.InheritedAccessories...)
-				for _, acc := range allAccs {
-					if acc.GetData().Type == accessorymodel.TypeCosignSignature {
-						accs = append(accs, acc)
-						total++
-						break
-					}
-				}
-			}
-		}
 	}
 
 	var res []*models.Accessory
@@ -539,12 +514,15 @@ func (a *artifactAPI) RequireLabelInProject(ctx context.Context, projectID, labe
 	return nil
 }
 
-func option(withTag, withImmutableStatus, withLabel, withAccessory *bool, latestInRepository *bool) *artifact.Option {
+func option(withTag, withImmutableStatus, withLabel, withAccessory *bool, latestInRepository *bool, withInheritedAccessory *bool) *artifact.Option {
 	option := &artifact.Option{
-		WithTag:            true, // return the tag by default
-		WithLabel:          lib.BoolValue(withLabel),
-		WithAccessory:      true, // return the accessory by default
-		LatestInRepository: lib.BoolValue(latestInRepository),
+		WithTag:       true, // return the tag by default
+		WithLabel:     lib.BoolValue(withLabel),
+		WithAccessory: true, // return the accessory by default
+		// the inherited accessories cost an extra reference lookup per artifact, so unlike
+		// the accessories they are opt-in rather than returned by default
+		WithInheritedAccessory: lib.BoolValue(withInheritedAccessory),
+		LatestInRepository:     lib.BoolValue(latestInRepository),
 	}
 
 	if withTag != nil {
