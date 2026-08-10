@@ -450,6 +450,36 @@ func (suite *OrmSuite) TestAfterCommit_OuterRollbackDropsNested() {
 	suite.False(ran, "hooks registered in nested scope must be discarded when outer rolls back")
 }
 
+// TestAfterCommit_InnerRollbackOuterCommit asserts that a nested scope
+// rolling back to its savepoint discards its own callbacks even when the
+// caller swallows the error and the outermost transaction commits —
+// the pattern exercised by TestNestedTransaction and TestNestedSavepoint.
+// Callbacks registered before and after the failed scope must survive.
+func (suite *OrmSuite) TestAfterCommit_InnerRollbackOuterCommit() {
+	ctx := NewContext(context.TODO(), orm.NewOrm())
+
+	var ranBefore, ranInner, ranAfter bool
+
+	err := WithTransaction(func(ctx context.Context) error {
+		AfterCommit(ctx, func() { ranBefore = true })
+
+		// The inner scope fails; the caller handles the error and carries on.
+		innerErr := WithTransaction(func(ctx context.Context) error {
+			AfterCommit(ctx, func() { ranInner = true })
+			return errors.New("oops")
+		})(ctx)
+		suite.Error(innerErr)
+
+		AfterCommit(ctx, func() { ranAfter = true })
+		return nil
+	})(ctx)
+
+	suite.NoError(err)
+	suite.False(ranInner, "hook registered in a rolled-back savepoint must not fire")
+	suite.True(ranBefore, "hooks registered before the failed scope must survive")
+	suite.True(ranAfter, "hooks registered after the failed scope must survive")
+}
+
 func (suite *OrmSuite) TestReadOrCreate() {
 	ctx := NewContext(context.TODO(), orm.NewOrm())
 

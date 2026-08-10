@@ -64,3 +64,46 @@ func TestAfterCommit_QueuesWhenHooksPresent(t *testing.T) {
 	cbs[0]()
 	assert.True(t, ran)
 }
+
+// TestTxHooks_TruncateToCheckpoint covers the savepoint-scoping primitive
+// used by WithTransaction: a scope records a checkpoint on entry and, if it
+// rolls back, drops exactly the callbacks queued after that point.
+func TestTxHooks_TruncateToCheckpoint(t *testing.T) {
+	h := &txHooks{}
+
+	var fired []string
+	queue := func(name string) { h.add(func() { fired = append(fired, name) }) }
+
+	queue("outer-before")
+	checkpoint := h.mark()
+	assert.Equal(t, 1, checkpoint)
+
+	queue("inner-1")
+	queue("inner-2")
+	h.truncate(checkpoint)
+
+	queue("outer-after")
+
+	for _, fn := range h.drain() {
+		fn()
+	}
+	assert.Equal(t, []string{"outer-before", "outer-after"}, fired)
+}
+
+// TestTxHooks_TruncateNoop asserts truncate is a no-op for a scope that
+// registered nothing, and that an out-of-range checkpoint cannot panic or
+// silently drop callbacks belonging to an enclosing scope.
+func TestTxHooks_TruncateNoop(t *testing.T) {
+	h := &txHooks{}
+	h.add(func() {})
+	h.add(func() {})
+
+	h.truncate(h.mark()) // scope registered nothing
+	assert.Len(t, h.afterCommit, 2)
+
+	assert.NotPanics(t, func() { h.truncate(99) })
+	assert.Len(t, h.afterCommit, 2)
+
+	assert.NotPanics(t, func() { h.truncate(-1) })
+	assert.Len(t, h.afterCommit, 2)
+}
