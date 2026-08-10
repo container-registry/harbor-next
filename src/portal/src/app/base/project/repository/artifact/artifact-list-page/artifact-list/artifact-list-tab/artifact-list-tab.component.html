@@ -429,6 +429,21 @@
                         *ngIf="artifact.signed === 'true'"
                         size="20"
                         class="signed"></clr-icon>
+                    <clr-tooltip *ngIf="artifact.signed === 'inherited'">
+                        <clr-icon
+                            clrTooltipTrigger
+                            shape="check-circle"
+                            size="20"
+                            class="signed-inherited"></clr-icon>
+                        <clr-tooltip-content
+                            clrPosition="top-right"
+                            clrSize="lg"
+                            *clrIfOpen>
+                            <span>{{
+                                'ARTIFACT.INHERITED_SIGNATURE' | translate
+                            }}</span>
+                        </clr-tooltip-content>
+                    </clr-tooltip>
                     <clr-icon
                         shape="times-circle"
                         *ngIf="artifact.signed === 'false'"
