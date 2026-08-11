@@ -65,45 +65,52 @@ func TestAfterCommit_QueuesWhenHooksPresent(t *testing.T) {
 	assert.True(t, ran)
 }
 
-// TestTxHooks_TruncateToCheckpoint covers the savepoint-scoping primitive
-// used by WithTransaction: a scope records a checkpoint on entry and, if it
-// rolls back, drops exactly the callbacks queued after that point.
-func TestTxHooks_TruncateToCheckpoint(t *testing.T) {
-	h := &txHooks{}
+// TestTxHooks_AdoptKeepsRegistrationOrder covers the savepoint-scoping
+// primitive used by WithTransaction: a released nested scope hands its
+// callbacks to the enclosing sink, which must keep them in registration
+// order relative to the enclosing scope's own.
+func TestTxHooks_AdoptKeepsRegistrationOrder(t *testing.T) {
+	outer, inner := &txHooks{}, &txHooks{}
 
 	var fired []string
-	queue := func(name string) { h.add(func() { fired = append(fired, name) }) }
+	queue := func(h *txHooks, name string) { h.add(func() { fired = append(fired, name) }) }
 
-	queue("outer-before")
-	checkpoint := h.mark()
-	assert.Equal(t, 1, checkpoint)
+	queue(outer, "outer-before")
+	queue(inner, "inner-1")
+	queue(inner, "inner-2")
+	outer.adopt(inner.drain()) // savepoint released
+	queue(outer, "outer-after")
 
-	queue("inner-1")
-	queue("inner-2")
-	h.truncate(checkpoint)
-
-	queue("outer-after")
-
-	for _, fn := range h.drain() {
+	for _, fn := range outer.drain() {
 		fn()
 	}
-	assert.Equal(t, []string{"outer-before", "outer-after"}, fired)
+	assert.Equal(t, []string{"outer-before", "inner-1", "inner-2", "outer-after"}, fired)
+	assert.Empty(t, inner.afterCommit, "a drained sink must not keep its callbacks")
 }
 
-// TestTxHooks_TruncateNoop asserts truncate is a no-op for a scope that
-// registered nothing, and that an out-of-range checkpoint cannot panic or
-// silently drop callbacks belonging to an enclosing scope.
-func TestTxHooks_TruncateNoop(t *testing.T) {
-	h := &txHooks{}
-	h.add(func() {})
-	h.add(func() {})
+// TestTxHooks_DroppedScopeLeavesParentIntact asserts that dropping a
+// rolled-back scope's sink cannot touch the enclosing scope's callbacks,
+// regardless of when they were registered.
+func TestTxHooks_DroppedScopeLeavesParentIntact(t *testing.T) {
+	outer, inner := &txHooks{}, &txHooks{}
 
-	h.truncate(h.mark()) // scope registered nothing
-	assert.Len(t, h.afterCommit, 2)
+	outer.add(func() {})
+	inner.add(func() {})
+	outer.add(func() {}) // registered while the nested scope was still open
 
-	assert.NotPanics(t, func() { h.truncate(99) })
-	assert.Len(t, h.afterCommit, 2)
+	inner.drain() // savepoint rolled back: sink discarded, never adopted
 
-	assert.NotPanics(t, func() { h.truncate(-1) })
-	assert.Len(t, h.afterCommit, 2)
+	assert.Len(t, outer.afterCommit, 2)
+}
+
+// TestTxHooks_AdoptEmpty is a no-op: a scope that registered nothing must
+// not disturb the enclosing sink.
+func TestTxHooks_AdoptEmpty(t *testing.T) {
+	outer := &txHooks{}
+	outer.add(func() {})
+
+	outer.adopt(nil)
+	outer.adopt((&txHooks{}).drain())
+
+	assert.Len(t, outer.afterCommit, 1)
 }

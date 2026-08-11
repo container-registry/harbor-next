@@ -126,19 +126,16 @@ func GetTransactionOpNameFromContext(ctx context.Context) string {
 	return opName
 }
 
-// hooksKey holds the post-commit hooks sink for the enclosing transaction.
+// hooksKey holds the post-commit hooks sink of the innermost transaction scope.
 type hooksKey struct{}
 
-// txHooks collects callbacks registered via AfterCommit. The sink is attached
-// to the context by the outermost WithTransaction call and is invoked only
-// after that outermost transaction commits successfully. Nested WithTransaction
-// calls inherit the same sink, so callbacks registered from any nesting level
-// are batched and fired together when the whole tx finally commits.
-//
-// The queue doubles as a savepoint stack: because scopes nest strictly, the
-// callbacks belonging to a scope are always the tail of the slice past the
-// checkpoint that scope recorded on entry, so a nested rollback can discard
-// exactly its own callbacks by truncating back to that checkpoint.
+// txHooks collects the callbacks registered via AfterCommit within one
+// WithTransaction scope. Every scope gets its own sink on its own context, so
+// a callback belongs to the scope whose context the caller registered it with,
+// no matter when it was registered. A nested scope maps to a savepoint: on
+// rollback its sink is dropped, and on savepoint release its callbacks are
+// adopted by the enclosing scope. Only the outermost scope fires them, after
+// its commit succeeds.
 type txHooks struct {
 	mu          sync.Mutex
 	afterCommit []func()
@@ -150,21 +147,15 @@ func (h *txHooks) add(fn func()) {
 	h.mu.Unlock()
 }
 
-// mark records a checkpoint for the scope that is about to run.
-func (h *txHooks) mark() int {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return len(h.afterCommit)
-}
-
-// truncate discards every callback registered after the given checkpoint.
-func (h *txHooks) truncate(n int) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if n < 0 || n >= len(h.afterCommit) {
+// adopt takes over the callbacks of a nested scope that released its savepoint,
+// so they fire together with this scope's own once the outermost tx commits.
+func (h *txHooks) adopt(cbs []func()) {
+	if len(cbs) == 0 {
 		return
 	}
-	h.afterCommit = h.afterCommit[:n]
+	h.mu.Lock()
+	h.afterCommit = append(h.afterCommit, cbs...)
+	h.mu.Unlock()
 }
 
 func (h *txHooks) drain() []func() {
@@ -229,29 +220,22 @@ func WithTransaction(f func(ctx context.Context) error) func(ctx context.Context
 			return err
 		}
 
-		// Attach a post-commit hooks sink so code inside the transaction can
-		// register callbacks (via AfterCommit) that must only run after a
-		// successful commit. Only the outermost WithTransaction (i.e. the one
-		// that does not inherit an existing sink) owns the sink and is
-		// responsible for firing it. Every scope, nested or not, records a
-		// checkpoint: a nested scope maps to a savepoint, so when it rolls back
-		// its callbacks must be discarded even though the outer transaction
-		// goes on to commit.
-		var ownsHooks bool
-		hooks, _ := cx.Value(hooksKey{}).(*txHooks)
-		if hooks == nil {
-			hooks = &txHooks{}
-			cx = context.WithValue(cx, hooksKey{}, hooks)
-			ownsHooks = true
-		}
-		checkpoint := hooks.mark()
+		// Attach this scope's own post-commit hooks sink so code inside the
+		// transaction can register callbacks (via AfterCommit) that must only
+		// run after a successful commit. A nested scope is a savepoint, so its
+		// sink is discarded when it rolls back and handed to the enclosing
+		// scope when it releases; the outermost scope, which has no enclosing
+		// sink to hand to, is the one that fires them.
+		parentHooks, _ := cx.Value(hooksKey{}).(*txHooks)
+		hooks := &txHooks{}
+		cx = context.WithValue(cx, hooksKey{}, hooks)
 
 		// When set multiple times, context.WithValue returns only the last ormer.
 		// To ensure that the rollback works, set TxOrmer as the ormer in the transaction.
 		cx = NewContext(cx, tx.TxOrmer)
 		if err := f(cx); err != nil {
 			span.AddEvent("rollback transaction")
-			hooks.truncate(checkpoint) // discard callbacks registered in this scope
+			hooks.drain() // discard this scope's unfired callbacks
 			if e := tx.Rollback(); e != nil {
 				tracelib.RecordError(span, e, "rollback transaction failed")
 				log.Errorf("rollback transaction failed: %v", e)
@@ -262,13 +246,15 @@ func WithTransaction(f func(ctx context.Context) error) func(ctx context.Context
 		}
 		span.AddEvent("commit transaction")
 		if err := tx.Commit(); err != nil {
-			hooks.truncate(checkpoint) // commit failed, do not run this scope's hooks
+			hooks.drain() // commit failed, do not run this scope's hooks
 			tracelib.RecordError(span, err, "commit transaction failed")
 			log.Errorf("commit transaction failed: %v", err)
 			return err
 		}
 
-		if ownsHooks {
+		if parentHooks != nil {
+			parentHooks.adopt(hooks.drain())
+		} else {
 			for _, fn := range hooks.drain() {
 				safeInvoke(fn)
 			}
