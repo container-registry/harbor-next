@@ -1,0 +1,22 @@
+diff --git a/.github/auto-assignees.yml b/.github/auto-assignees.yml
+new file mode 100644
+index 000000000..64c5ccac2
+--- /dev/null
++++ b/.github/auto-assignees.yml
+@@ -0,0 +1,16 @@
++---
++# This assigns a PR to its author
++addAssignees: true
++
++addReviewers: false
++
++assignees:
++  - wy65701436
++  - Vad1mo
++  - OrlinVasilev
++  - stonezdj
++  - chlins
++  - MinerYang
++  - bupd
++
++numberOfAssignees: 3
