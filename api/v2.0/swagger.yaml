@@ -4243,6 +4243,62 @@ paths:
             $ref: '#/definitions/GeneralInfo'
         '500':
           $ref: '#/responses/500'
+  /systeminfo/branding:
+    get:
+      summary: Get system branding configuration.
+      operationId: getBrandingInfo
+      description: |
+        Returns branding configuration such as product name,
+        logo, header colors, and login page metadata.
+        This endpoint is public and accessible without authentication.
+      tags:
+        - systeminfo
+      parameters:
+        - $ref: '#/parameters/requestId'
+      responses:
+        '200':
+          description: Branding configuration retrieved successfully.
+          schema:
+            $ref: '#/definitions/BrandingConfig'
+        '401':
+          $ref: '#/responses/401'
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          $ref: '#/responses/404'
+        '500':
+          $ref: '#/responses/500'
+
+    post:
+      summary: Update branding configuration.
+      operationId: updateBrandingInfo
+      description: |
+        Allows updating branding configuration. The request body must
+        contain the complete branding JSON object.
+      tags:
+        - systeminfo
+      parameters:
+        - $ref: '#/parameters/requestId'
+        - in: body
+          name: brandingConfig
+          required: true
+          schema:
+            $ref: '#/definitions/BrandingConfig'
+      responses:
+        '200':
+          description: Branding configuration updated successfully.
+          schema:
+            $ref: '#/definitions/BrandingConfig'
+        '400':
+          $ref: '#/responses/400'
+        '401':
+          $ref: '#/responses/401'
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          $ref: '#/responses/404'
+        '500':
+          $ref: '#/responses/500'
   /systeminfo/volumes:
     get:
       summary: Get system volume info (total/free size).
@@ -8269,6 +8325,63 @@ definitions:
         x-nullable: true
         x-omitempty: true
         description: 'The page unauthenticated users see before logging in. Valid values are "login" and "public_projects".'
+  BrandingConfig:
+    type: object
+    properties:
+      headerBgColor:
+        type: object
+        x-nullable: true
+        x-omitempty: true
+        description: Header background color configuration for light and dark mode.
+        properties:
+          darkMode:
+            type: string
+            x-nullable: true
+            x-omitempty: true
+            description: Background color used in dark mode theme.
+            example: "#0d1117"
+          lightMode:
+            type: string
+            x-nullable: true
+            x-omitempty: true
+            description: Background color used in light mode theme.
+            example: "#ffffff"
+      loginBgImg:
+        type: string
+        x-nullable: true
+        x-omitempty: true
+        description: URL or base64-encoded image used as background on the login page.
+        example: "https://example.com/bg.png"
+      loginTitle:
+        type: string
+        x-nullable: true
+        x-omitempty: true
+        description: Title displayed on the login page.
+        example: "Welcome to Harbor"
+      product:
+        type: object
+        x-nullable: true
+        x-omitempty: true
+        description: Product branding information including name, logo, and intro text.
+        properties:
+          name:
+            type: string
+            x-nullable: true
+            x-omitempty: true
+            description: Product name displayed in UI.
+            example: "Harbor Commercial"
+          logo:
+            type: string
+            x-nullable: true
+            x-omitempty: true
+            description: URL or base64-encoded product logo.
+            example: "https://example.com/logo.png"
+          introduction:
+            type: string
+            x-nullable: true
+            x-omitempty: true
+            description: Short introduction or description displayed in UI.
+            example: "Your trusted cloud-native registry"
   AuthproxySetting:
     type: object
     properties:

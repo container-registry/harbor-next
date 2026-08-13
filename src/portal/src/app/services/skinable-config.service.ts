@@ -13,16 +13,20 @@
 // limitations under the License.
 import { Inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { map, catchError } from 'rxjs/operators';
+import { map, catchError, shareReplay, tap } from 'rxjs/operators';
 import { Observable, throwError as observableThrowError } from 'rxjs';
 import { CustomStyle } from './theme';
 import { DOCUMENT } from '@angular/common';
 import { environment } from 'src/environments/environment';
+import { BrandingConfig } from 'ng-swagger-gen/models';
+import { SysteminfoService } from 'ng-swagger-gen/services';
 @Injectable()
 export class SkinableConfig {
     private customSkinData: CustomStyle;
+    private BrandingInfo: BrandingConfig;
     constructor(
         private http: HttpClient,
+        private systeminfoService: SysteminfoService,
         @Inject(DOCUMENT) private document: Document
     ) {}
 
@@ -40,19 +44,41 @@ export class SkinableConfig {
             );
     }
 
+    private brandingCache$: Observable<any> | null = null;
+    public getBrandingInfo(refetch: boolean): Observable<any> {
+        if (!refetch && this.brandingCache$) {
+            return this.brandingCache$;
+        }
+
+        this.brandingCache$ = this.systeminfoService.getBrandingInfo().pipe(
+            tap(branding => {
+                this.BrandingInfo = branding;
+            }),
+            shareReplay(1),
+            catchError(err => {
+                this.brandingCache$ = null;
+                return observableThrowError(err);
+            })
+        );
+        return this.brandingCache$;
+    }
+
     public getSkinConfig() {
         return this.customSkinData;
     }
 
-    public setTitleIcon() {
-        if (
-            this.customSkinData &&
-            this.customSkinData.product &&
-            this.customSkinData.product.logo
-        ) {
-            const titleIcon: HTMLLinkElement =
-                this.document.querySelector('link');
-            titleIcon.href = `images/${this.customSkinData.product.logo}`;
+    public getBrandingConfig() {
+        return this.BrandingInfo;
+    }
+
+    public setTitleIcon(logoUrl: string) {
+        if (!logoUrl) {
+            return;
+        }
+
+        const titleIcon: HTMLLinkElement = this.document.querySelector('link');
+        if (titleIcon) {
+            titleIcon.href = logoUrl;
         }
     }
 }

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import { NgModule } from '@angular/core';
+import { BrandingComponent } from './branding/branding.component';
 import { SharedModule } from '../../../shared/shared.module';
 import { ConfigurationComponent } from './config.component';
 import { ConfigurationAuthComponent } from './auth/config-auth.component';
@@ -29,6 +30,10 @@ const routes: Routes = [
             {
                 path: 'auth',
                 component: ConfigurationAuthComponent,
+            },
+            {
+                path: 'branding',
+                component: BrandingComponent,
             },
             {
                 path: 'security',
@@ -52,6 +57,7 @@ const routes: Routes = [
         ConfigurationComponent,
         ConfigurationAuthComponent,
         SystemSettingsComponent,
+        BrandingComponent,
         SecurityComponent,
     ],
     providers: [ConfigService],

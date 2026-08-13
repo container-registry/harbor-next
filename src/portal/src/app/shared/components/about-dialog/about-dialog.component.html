@@ -5,11 +5,7 @@
     <div class="modal-body dialog-body">
         <div class="harbor-logo-black">
             <img
-                [src]="
-                    customLogo
-                        ? 'images/' + customLogo
-                        : 'images/harbor-logo.svg'
-                "
+                [src]="customLogo || 'images/harbor-logo.svg'"
                 class="harbor-icon" />
         </div>
         <div class="content" tabindex="1">

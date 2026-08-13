@@ -89,16 +89,17 @@ export class SignInComponent implements AfterViewChecked, OnInit {
     ) {}
 
     ngOnInit(): void {
-        // custom skin
-        let customSkinObj = this.skinableConfig.getSkinConfig();
-        if (customSkinObj) {
-            if (customSkinObj.loginBgImg) {
-                this.customLoginBgImg = customSkinObj.loginBgImg;
-            }
-            if (customSkinObj.loginTitle) {
-                this.customAppTitle = customSkinObj.loginTitle;
-            }
-        }
+        this.skinableConfig.getBrandingInfo(false).subscribe({
+            next: branding => {
+                if (branding?.loginBgImg) {
+                    this.customLoginBgImg = branding.loginBgImg;
+                }
+                if (branding?.loginTitle) {
+                    this.customAppTitle = branding.loginTitle;
+                }
+            },
+        });
+
         this.route.queryParams.subscribe(params => {
             this.redirectUrl = params['redirect_url'] || '';
             let isSignUp = params['sign_up'] || '';

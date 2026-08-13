@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS branding (
+    id            INTEGER PRIMARY KEY NOT NULL,
+    config        TEXT NOT NULL,
+    update_time  TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);

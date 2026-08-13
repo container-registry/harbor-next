@@ -51,6 +51,24 @@ func (s *sysInfoAPI) GetSystemInfo(ctx context.Context, _ systeminfo.GetSystemIn
 	return systeminfo.NewGetSystemInfoOK().WithPayload(s.convertInfo(data))
 }
 
+func (s *sysInfoAPI) GetBrandingInfo(ctx context.Context, _ systeminfo.GetBrandingInfoParams) middleware.Responder {
+	data, err := s.ctl.GetBrandingConfig(ctx)
+	if err != nil {
+		return s.SendError(ctx, err)
+	}
+	return systeminfo.NewGetBrandingInfoOK().WithPayload(data)
+}
+
+func (s *sysInfoAPI) UpdateBrandingInfo(ctx context.Context, params systeminfo.UpdateBrandingInfoParams) middleware.Responder {
+	if err := s.RequireSystemAccess(ctx, rbac.ActionUpdate, rbac.ResourceConfiguration); err != nil {
+		return s.SendError(ctx, err)
+	}
+	if err := s.ctl.UpdateBrandingConfig(ctx, params.BrandingConfig); err != nil {
+		return s.SendError(ctx, err)
+	}
+	return systeminfo.NewUpdateBrandingInfoOK().WithPayload(params.BrandingConfig)
+}
+
 func (s *sysInfoAPI) GetCert(ctx context.Context, _ systeminfo.GetCertParams) middleware.Responder {
 	f, err := s.ctl.GetCA(ctx)
 	if err != nil {

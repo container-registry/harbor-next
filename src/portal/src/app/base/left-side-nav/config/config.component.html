@@ -17,6 +17,19 @@
                     {{ 'CONFIG.AUTH' | translate }}
                 </button>
             </li>
+            <li
+                *ngIf="commercialFeatureEnabled('enable_commercial_branding')"
+                role="presentation"
+                class="nav-item">
+                <button
+                    id="config-branding"
+                    class="btn btn-link nav-link"
+                    type="button"
+                    routerLink="branding"
+                    routerLinkActive="active">
+                    {{ 'CONFIG.BRANDING' | translate }}
+                </button>
+            </li>
             <li role="presentation" class="nav-item">
                 <button
                     id="config-security"

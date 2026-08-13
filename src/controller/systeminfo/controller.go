@@ -16,10 +16,13 @@ package systeminfo
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/goharbor/harbor/src/common"
@@ -28,9 +31,13 @@ import (
 	"github.com/goharbor/harbor/src/lib/config/models"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
+	"github.com/goharbor/harbor/src/pkg/branding"
+	"github.com/goharbor/harbor/src/pkg/branding/dao"
+	"github.com/goharbor/harbor/src/pkg/commercial"
 	"github.com/goharbor/harbor/src/pkg/systeminfo"
 	"github.com/goharbor/harbor/src/pkg/systeminfo/imagestorage"
 	"github.com/goharbor/harbor/src/pkg/version"
+	mdl "github.com/goharbor/harbor/src/server/v2.0/models"
 )
 
 const defaultRootCert = "/etc/core/ca/ca.crt"
@@ -54,7 +61,8 @@ type Data struct {
 }
 
 type protectedData struct {
-	CurrentTime                 time.Time
+	CurrentTime time.Time
+
 	RegistryURL                 string
 	HarborVersion               string
 	ExtURL                      string
@@ -71,6 +79,27 @@ type Options struct {
 	WithProtectedInfo bool
 }
 
+// BrandingConfig wraps the UI branding settings returned to the client.
+type BrandingConfig struct {
+	HeaderBgColor *HeaderBgColor `json:"headerBgColor,omitempty"` // Background colors for header in light/dark mode
+	LoginBgImg    string         `json:"loginBgImg,omitempty"`    // URL/base64 for login background image
+	LoginTitle    string         `json:"loginTitle,omitempty"`    // Login page title
+	Product       *ProductInfo   `json:"product,omitempty"`       // Product branding information
+}
+
+// HeaderBgColor defines background colors for light and dark mode.
+type HeaderBgColor struct {
+	DarkMode  string `json:"darkMode,omitempty"`  // Dark mode header background color
+	LightMode string `json:"lightMode,omitempty"` // Light mode header background color
+}
+
+// ProductInfo contains branding information about the product.
+type ProductInfo struct {
+	Name         string `json:"name,omitempty"`         // Product name shown in UI
+	Logo         string `json:"logo,omitempty"`         // URL/base64 of product logo
+	Introduction string `json:"introduction,omitempty"` // Short descriptive text
+}
+
 // Controller defines the methods needed for systeminfo API
 type Controller interface {
 
@@ -82,9 +111,191 @@ type Controller interface {
 
 	// GetCA returns a ReadCloser of Harbor's CA if it's configured and accessible from Harbor core
 	GetCA(ctx context.Context) (io.ReadCloser, error)
+
+	// GetBrandingConfig returns the branding config
+	GetBrandingConfig(ctx context.Context) (*mdl.BrandingConfig, error)
+
+	// UpdateBrandingConfig updates the branding config
+	UpdateBrandingConfig(ctx context.Context, config *mdl.BrandingConfig) error
 }
 
-type controller struct{}
+type controller struct {
+	brandMgr branding.Manager
+	// In-memory cache for branding config
+	brandingCache struct {
+		sync.RWMutex                     // Mutex for thread-safe access
+		config       *mdl.BrandingConfig // The actual branding data
+	}
+}
+
+func AssignFromJSON(jsonData string) (*BrandingConfig, error) {
+	if len(jsonData) == 0 {
+		return nil, errors.New("empty json data to parse")
+	}
+
+	// parse into temp struct that only contains allowed fields
+	var incoming BrandingConfig
+	if err := json.Unmarshal([]byte(jsonData), &incoming); err != nil {
+		return nil, err
+	}
+
+	// assign allowed fields
+	config := BrandingConfig{} // ← clean object (no extra fields)
+
+	// inline comments — show changes
+	if incoming.HeaderBgColor != nil { // changed: copy only whitelisted values
+		config.HeaderBgColor = incoming.HeaderBgColor
+	}
+	if len(incoming.LoginBgImg) > 0 {
+		config.LoginBgImg = incoming.LoginBgImg
+	}
+	if len(incoming.LoginTitle) > 0 {
+		config.LoginTitle = incoming.LoginTitle
+	}
+	if incoming.Product != nil && len(incoming.Product.Name) > 0 {
+		config.Product = incoming.Product
+	}
+
+	return &config, nil
+}
+
+// ConvertBrandingConfig converts sanitized BrandingConfig into model.BrandingConfig
+func ConvertBrandingConfigToSwagger(cfg string) (*mdl.BrandingConfig, error) {
+	// inline comments showing mapped fields
+	if len(cfg) == 0 {
+		return nil, errors.New("empty json data to parse")
+	}
+
+	// Step 1: Decode raw JSON into temp struct (loose)
+	var temp BrandingConfig
+	if err := json.Unmarshal([]byte(cfg), &temp); err != nil { // ← fixed: []byte()
+		return nil, fmt.Errorf("failed to unmarshal branding config: %v", err) // ← fixed formatting
+	}
+
+	// Step 2: Create target struct for Swagger type
+	result := &mdl.BrandingConfig{}
+
+	// Step 3: Map fields safely (nested fields allowed)
+	if temp.HeaderBgColor != nil {
+		result.HeaderBgColor = &mdl.BrandingConfigHeaderBgColor{
+			DarkMode:  &temp.HeaderBgColor.DarkMode,  // ← copy exact field
+			LightMode: &temp.HeaderBgColor.LightMode, // ← copy exact field
+		}
+	}
+
+	if len(temp.LoginBgImg) > 0 {
+		result.LoginBgImg = &temp.LoginBgImg
+	}
+
+	if len(temp.LoginTitle) > 0 {
+		result.LoginTitle = &temp.LoginTitle
+	}
+
+	if temp.Product != nil {
+		result.Product = &mdl.BrandingConfigProduct{
+			Name:         &temp.Product.Name,
+			Logo:         &temp.Product.Logo,
+			Introduction: &temp.Product.Introduction,
+		}
+	}
+
+	return result, nil
+}
+
+func defaultSwaggerBrandingConfig() *mdl.BrandingConfig {
+	cfg, _ := ConvertBrandingConfigToSwagger(dao.DefaultBrandingJSON)
+	return cfg
+}
+
+func (c *controller) GetBrandingConfig(ctx context.Context) (*mdl.BrandingConfig, error) {
+	if !commercial.Enabled(ctx, commercial.Branding) {
+		return &mdl.BrandingConfig{}, nil
+	}
+
+	logger := log.GetLogger(ctx)
+
+	c.brandingCache.RLock()
+	cfg := c.brandingCache.config
+	c.brandingCache.RUnlock()
+	if cfg != nil {
+		return cfg, nil
+	}
+
+	branding, err := c.brandMgr.Get(ctx)
+	if err != nil {
+		logger.Warningf("failed to get branding config, returning defaults: %v", err)
+		return defaultSwaggerBrandingConfig(), nil
+	}
+	swagbranding, err := ConvertBrandingConfigToSwagger(branding.Config)
+	if err != nil {
+		logger.Warningf("failed to convert branding config, returning defaults: %v", err)
+		return defaultSwaggerBrandingConfig(), nil
+	}
+
+	c.brandingCache.Lock()
+	defer c.brandingCache.Unlock()
+
+	if c.brandingCache.config != nil {
+		return c.brandingCache.config, nil
+	}
+
+	c.brandingCache.config = swagbranding
+	return swagbranding, nil
+}
+
+// UpdateBrandingConfig updates the branding config
+func (c *controller) UpdateBrandingConfig(ctx context.Context, config *mdl.BrandingConfig) error {
+	if !commercial.Enabled(ctx, commercial.Branding) {
+		return errors.ForbiddenError(nil).WithMessage("commercial branding is not enabled")
+	}
+
+	logger := log.GetLogger(ctx)
+	if config == nil { // added: prevent nil writes
+		return errors.New("config cannot be nil")
+	}
+	raw, err := BrandingConfigToString(config)
+	if err != nil {
+		return err
+	}
+
+	err = c.brandMgr.Update(ctx, raw)
+	if err != nil {
+		return err
+	}
+
+	// fetch and cache the branding config
+	branding, err := c.brandMgr.Get(ctx)
+	if err != nil {
+		logger.Errorf("Error occurred getting config: %v", err)
+		return err
+	}
+	swagbranding, err := ConvertBrandingConfigToSwagger(branding.Config)
+	if err != nil {
+		logger.Errorf("Error occurred converting config: %v", err)
+		return err
+	}
+
+	c.brandingCache.Lock()
+	defer c.brandingCache.Unlock()
+
+	c.brandingCache.config = swagbranding
+	logger.Infof("Successfully cached branding config on update")
+
+	return nil
+}
+
+func BrandingConfigToString(cfg *mdl.BrandingConfig) (string, error) {
+	if cfg == nil {
+		return "", errors.New("nil config passed")
+	}
+
+	data, err := json.Marshal(cfg) // marshals struct → []byte
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal branding config: %v", err)
+	}
+
+	return string(data), nil // convert to string
+}
 
 func (c *controller) GetInfo(ctx context.Context, opt Options) (*Data, error) {
 	logger := log.GetLogger(ctx)
@@ -173,5 +384,66 @@ func (c *controller) GetCA(ctx context.Context) (io.ReadCloser, error) {
 
 // NewController return an instance of controller
 func NewController() Controller {
-	return &controller{}
+	return &controller{
+		brandMgr: branding.Mgr,
+	}
+}
+
+var allowedURL = regexp.MustCompile(`^https?:\/\/`)
+var allowedText = regexp.MustCompile(`^[A-Za-z0-9\s.,:;!@#%&()_\-\/]*$`)
+
+// SanitizeBrandingJSON removes scripts, tags, and non-text/URL content
+func SanitizeBrandingJSON(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 {
+		return raw
+	}
+
+	var data interface{}
+	_ = json.Unmarshal(raw, &data)
+
+	sanitized := sanitizeValue(data)
+
+	out, _ := json.Marshal(sanitized)
+	return json.RawMessage(out)
+}
+
+func sanitizeValue(v interface{}) interface{} {
+	switch val := v.(type) {
+	case map[string]interface{}:
+		cleaned := map[string]interface{}{}
+		for k, v2 := range val {
+			cleaned[k] = sanitizeValue(v2) // recursive
+		}
+		return cleaned
+
+	case []interface{}:
+		for i, v2 := range val {
+			val[i] = sanitizeValue(v2)
+		}
+		return val
+
+	case string:
+		// Remove potential script tags and JS payloads
+		lower := strings.ToLower(val)
+		if strings.Contains(lower, "<script") || strings.Contains(lower, "javascript:") {
+			return "" // strip dangerous content
+		}
+
+		// Allow URLs
+		if allowedURL.MatchString(val) {
+			return val
+		}
+
+		// Allow only safe text
+		if allowedText.MatchString(val) {
+			return val
+		}
+
+		// otherwise drop it
+		return ""
+
+	default:
+		// For non-text values like numbers, bools — drop everything to be safe
+		return nil
+	}
 }

@@ -59,18 +59,20 @@ export class AppComponent implements OnInit, OnDestroy {
         // Override page title
         let key: string = 'APP_TITLE.HARBOR';
         translate.get(key).subscribe((res: string) => {
-            const customSkinData: CustomStyle =
-                this.skinableConfig.getSkinConfig();
-            if (
-                customSkinData &&
-                customSkinData.product &&
-                customSkinData.product.name
-            ) {
-                this.titleService.setTitle(customSkinData.product.name);
-                this.skinableConfig.setTitleIcon();
-            } else {
-                this.titleService.setTitle(res);
-            }
+            // Fetch branding from API
+            this.skinableConfig.getBrandingInfo(true).subscribe({
+                next: branding => {
+                    if (branding?.product?.name) {
+                        this.titleService.setTitle(branding.product.name);
+                        this.skinableConfig.setTitleIcon(branding.product.logo);
+                    } else {
+                        this.titleService.setTitle(res);
+                    }
+                },
+                error: () => {
+                    this.titleService.setTitle(res);
+                },
+            });
         });
         this.setTheme();
     }

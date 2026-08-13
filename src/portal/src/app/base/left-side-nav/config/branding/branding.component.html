@@ -1,0 +1,88 @@
+<form #brandingForm="ngForm" class="clr-form clr-form-horizontal">
+    <section>
+        <h4>{{ 'BRANDING.PRODUCT' | translate }}</h4>
+        <clr-input-container>
+            <label>{{ 'BRANDING.PRODUCT_NAME' | translate }}</label>
+            <input
+                clrInput
+                [(ngModel)]="productName"
+                name="productName"
+                size="36" />
+        </clr-input-container>
+        <clr-input-container>
+            <label>{{ 'BRANDING.PRODUCT_LOGO' | translate }}</label>
+            <input
+                clrInput
+                [(ngModel)]="productLogo"
+                name="productLogo"
+                size="36"
+                placeholder="https://example.com/logo.png" />
+        </clr-input-container>
+        <clr-textarea-container>
+            <label>{{ 'BRANDING.PRODUCT_INTRODUCTION' | translate }}</label>
+            <textarea
+                clrTextarea
+                [(ngModel)]="productIntroduction"
+                name="productIntroduction"
+                cols="36"
+                rows="3"></textarea>
+        </clr-textarea-container>
+
+        <h4>{{ 'BRANDING.LOGIN' | translate }}</h4>
+        <clr-input-container>
+            <label>{{ 'BRANDING.LOGIN_TITLE' | translate }}</label>
+            <input
+                clrInput
+                [(ngModel)]="loginTitle"
+                name="loginTitle"
+                size="36" />
+        </clr-input-container>
+        <clr-input-container>
+            <label>{{ 'BRANDING.LOGIN_BG_IMG' | translate }}</label>
+            <input
+                clrInput
+                [(ngModel)]="loginBgImg"
+                name="loginBgImg"
+                size="36"
+                placeholder="https://example.com/bg.png" />
+        </clr-input-container>
+
+        <h4>{{ 'BRANDING.HEADER_COLORS' | translate }}</h4>
+        <clr-input-container>
+            <label>{{ 'BRANDING.HEADER_BG_COLOR_LIGHT' | translate }}</label>
+            <input
+                clrInput
+                [(ngModel)]="headerBgColorLight"
+                name="headerBgColorLight"
+                size="36"
+                placeholder="#ffffff" />
+        </clr-input-container>
+        <clr-input-container>
+            <label>{{ 'BRANDING.HEADER_BG_COLOR_DARK' | translate }}</label>
+            <input
+                clrInput
+                [(ngModel)]="headerBgColorDark"
+                name="headerBgColorDark"
+                size="36"
+                placeholder="#0d1117" />
+        </clr-input-container>
+    </section>
+</form>
+<div>
+    <button
+        type="button"
+        id="config_system_save"
+        class="btn btn-primary"
+        (click)="save()"
+        [disabled]="!isValid() || !hasChanges() || inProgress">
+        {{ 'BUTTON.SAVE' | translate }}
+    </button>
+    <button
+        type="button"
+        id="config_system_cancel"
+        class="btn btn-outline"
+        (click)="cancel()"
+        [disabled]="!isValid() || !hasChanges() || inProgress">
+        {{ 'BUTTON.CANCEL' | translate }}
+    </button>
+</div>
