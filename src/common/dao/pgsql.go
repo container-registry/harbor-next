@@ -31,6 +31,7 @@ import (
 	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/lib/dbpool"
 	"github.com/goharbor/harbor/src/lib/log"
+	"github.com/goharbor/harbor/src/pkg/commercial"
 )
 
 const defaultMigrationPath = "migrations/postgresql/"
@@ -53,6 +54,16 @@ func NewPGSQL(cfg *models.PostGreSQL) Database {
 	if len(cfg.SSLMode) == 0 {
 		cfg.SSLMode = "disable"
 	}
+	if !commercial.Enabled(context.Background(), commercial.AWSRDSIAMAuth) {
+		cfg.UseIAMAuth = false
+	}
+	if !commercial.Enabled(context.Background(), commercial.PGXMonitoring) {
+		cfg.MetricsEnabled = false
+	}
+	if cfg.UseIAMAuth && cfg.SSLMode == "disable" {
+		cfg.SSLMode = "require"
+		log.Info("IAM Auth: Forcing sslmode=require")
+	}
 	return &pgsql{cfg: cfg}
 }
 
@@ -66,7 +77,16 @@ func (p *pgsql) Register(alias ...string) error {
 		}
 	}
 
-	pool, err := dbpool.New(context.Background(), p.cfg)
+	var opts []dbpool.Option
+	if p.cfg.UseIAMAuth {
+		opt, err := iamAuthOption(context.Background(), p.cfg)
+		if err != nil {
+			return err
+		}
+		opts = append(opts, opt)
+	}
+
+	pool, err := dbpool.New(context.Background(), p.cfg, opts...)
 	if err != nil {
 		return fmt.Errorf("dbpool: %w", err)
 	}
@@ -107,14 +127,29 @@ func (p *pgsql) UpgradeSchema() error {
 
 // NewMigrator creates a golang-migrate instance. The scheme is "pgx5" because
 // golang-migrate's pgx/v5 driver registers under that name (not "pgx", which
-// is the v4 driver).
+// is the v4 driver). When IAM auth is enabled, a fresh token is generated
+// for the migration connection.
 func NewMigrator(database *models.PostGreSQL) (*migrate.Migrate, error) {
+	password := database.Password
+	sslMode := database.SSLMode
+
+	if database.UseIAMAuth {
+		if sslMode == "" || sslMode == "disable" {
+			sslMode = "require"
+		}
+		token, err := iamMigrationToken(context.Background(), database)
+		if err != nil {
+			return nil, err
+		}
+		password = token
+	}
+
 	dbURL := url.URL{
 		Scheme:   "pgx5",
-		User:     url.UserPassword(database.Username, database.Password),
+		User:     url.UserPassword(database.Username, password),
 		Host:     net.JoinHostPort(database.Host, strconv.Itoa(database.Port)),
 		Path:     database.Database,
-		RawQuery: fmt.Sprintf("sslmode=%s", database.SSLMode),
+		RawQuery: fmt.Sprintf("sslmode=%s", sslMode),
 	}
 
 	// For UT

@@ -39,4 +39,6 @@ type PostGreSQL struct {
 	ConnectTimeout    time.Duration `json:"connect_timeout"`
 	MinConns          *int32        `json:"min_conns,omitempty"` // nil = unset (dbpool.DefaultMinConns); 0 is a valid setting
 	URL               string        `json:"url"`
+	UseIAMAuth        bool          `json:"use_iam_auth"`
+	AWSRegion         string        `json:"aws_region,omitempty"`
 }

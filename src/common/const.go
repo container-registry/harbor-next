@@ -64,6 +64,8 @@ const (
 	PostGreSQLConnectTimeout         = "postgresql_connect_timeout"
 	PostGreSQLMinConns               = "postgresql_min_conns"
 	PostGreSQLURL                    = "postgresql_url"
+	PostGreSQLUseIAMAuth             = "postgresql_use_iam_auth"
+	PostGreSQLAWSRegion              = "postgresql_aws_region"
 	SelfRegistration                 = "self_registration"
 	CoreURL                          = "core_url"
 	CoreLocalURL                     = "core_local_url"

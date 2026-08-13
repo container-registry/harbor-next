@@ -86,6 +86,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.42.0
 	github.com/aws/aws-sdk-go-v2/config v1.32.24
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.23
+	github.com/aws/aws-sdk-go-v2/feature/rds/auth v1.6.21
 	github.com/aws/aws-sdk-go-v2/service/ecr v1.58.4
 	github.com/aws/smithy-go v1.27.1
 	github.com/goccy/go-yaml v1.19.2

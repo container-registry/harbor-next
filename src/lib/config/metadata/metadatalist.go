@@ -117,6 +117,8 @@ var (
 		{Name: common.PostGreSQLConnectTimeout, Scope: SystemScope, Group: DatabaseGroup, EnvKey: "POSTGRESQL_CONNECT_TIMEOUT", DefaultValue: "10s", ItemType: &DurationType{}, Editable: false},
 		{Name: common.PostGreSQLMinConns, Scope: SystemScope, Group: DatabaseGroup, EnvKey: "POSTGRESQL_MIN_CONNS", DefaultValue: "2", ItemType: &IntType{}, Editable: false},
 		{Name: common.PostGreSQLURL, Scope: SystemScope, Group: DatabaseGroup, EnvKey: "POSTGRESQL_URL", DefaultValue: "", ItemType: &StringType{}, Editable: false},
+		{Name: common.PostGreSQLUseIAMAuth, Scope: SystemScope, Group: DatabaseGroup, EnvKey: "POSTGRESQL_USE_IAM_AUTH", DefaultValue: "false", ItemType: &BoolType{}, Editable: false, Description: "Enable AWS RDS IAM authentication"},
+		{Name: common.PostGreSQLAWSRegion, Scope: SystemScope, Group: DatabaseGroup, EnvKey: "POSTGRESQL_AWS_REGION", DefaultValue: "", ItemType: &StringType{}, Editable: false, Description: "AWS region for RDS IAM authentication"},
 
 		{Name: common.ProjectCreationRestriction, Scope: UserScope, Group: BasicGroup, EnvKey: "PROJECT_CREATION_RESTRICTION", DefaultValue: common.ProCrtRestrEveryone, ItemType: &ProjectCreationRestrictionType{}, Editable: false, Description: `Indicate who can create projects, it could be ''adminonly'' or ''everyone''.`},
 		{Name: common.ReadOnly, Scope: UserScope, Group: BasicGroup, EnvKey: "READ_ONLY", DefaultValue: "false", ItemType: &BoolType{}, Editable: false, Description: `The flag to indicate whether Harbor is in readonly mode.`},
