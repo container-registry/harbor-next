@@ -8,11 +8,13 @@ vars:
 
 tasks:
   check:
-    desc: "Verify commercial release patches apply cleanly"
+    desc: "Verify commercial branches merge cleanly onto the current worktree"
     dir: ..
     preconditions:
       - sh: command -v git >/dev/null 2>&1
         msg: "git is required"
+      - sh: command -v jj >/dev/null 2>&1
+        msg: "jj (Jujutsu) is required"
       - sh: command -v task >/dev/null 2>&1
         msg: "Task is required"
     cmds:
@@ -41,18 +43,18 @@ tasks:
           PATCHES_SERIES="{{.PATCHES_SERIES}}" \
           RELEASE_PATCHES_TMP_DIR="${patches_repo_dir}"
 
-        echo "Release-ready patch validation succeeded."
+        echo "Release-ready branch merge validation succeeded."
 
   apply-commercial-patches:
-    desc: "Apply commercial release patches to the current worktree"
+    desc: "Octopus-merge the commercial branches into the current worktree via jj"
     dir: ..
     preconditions:
       - sh: command -v git >/dev/null 2>&1
         msg: "git is required"
-      - sh: command -v stg >/dev/null 2>&1
-        msg: "StGit is required. Install the stg command before applying release patches."
+      - sh: command -v jj >/dev/null 2>&1
+        msg: "jj (Jujutsu) is required. Install the jj command before applying release branches."
       - sh: test -z "$(git -C '{{.RELEASE_PATCH_TARGET_DIR | default "."}}' status --porcelain)"
-        msg: "release patch application requires a clean worktree"
+        msg: "release branch merge requires a clean worktree"
     cmds:
       - |
         patch_target_dir="{{.RELEASE_PATCH_TARGET_DIR | default "."}}"
@@ -60,87 +62,78 @@ tasks:
           patch_target_dir="$(pwd -P)/${patch_target_dir}"
         fi
 
+        # The branch manifest ({{.PATCHES_SERIES}}) is sourced from the cloned
+        # PATCHES_REPO, not the local tree — this task also runs from repos
+        # (e.g. harbor-next) that don't carry 8gcr-ee/ at all. The manifest
+        # content itself isn't secret, only the branch content is, but it
+        # stays co-located with the branches for a single source of truth.
         patches_repo_dir="{{.RELEASE_PATCHES_TMP_DIR}}"
         if [ "${patches_repo_dir#/}" = "${patches_repo_dir}" ]; then
           patches_repo_dir="$(pwd -P)/${patches_repo_dir}"
         fi
         series_file="${patches_repo_dir}/{{.PATCHES_SERIES}}"
-        series_dir="$(dirname "${series_file}")"
-        base_commit=$(git -C "${patch_target_dir}" rev-parse HEAD)
-
-        git -C "${patch_target_dir}" config user.name "${GIT_AUTHOR_NAME:-Release Ready}"
-        git -C "${patch_target_dir}" config user.email "${GIT_AUTHOR_EMAIL:-release-ready@example.invalid}"
-
-        stg_in_target() {
-          (cd "${patch_target_dir}" && stg "$@")
-        }
 
         cleanup_patches_repo() {
           rm -rf "${patches_repo_dir}"
         }
-
         cleanup_patches_repo
         trap cleanup_patches_repo EXIT
-
         mkdir -p "$(dirname "${patches_repo_dir}")"
 
         if [ -n "${PATCHES_CLONE_URL:-}" ]; then
-          git clone --depth=1 "${PATCHES_CLONE_URL}" "${patches_repo_dir}"
+          remote_url="${PATCHES_CLONE_URL}"
         else
           if [ -z "${PATCHES_TOKEN:-}" ]; then
             echo "PATCHES_TOKEN is required unless PATCHES_CLONE_URL is set." >&2
             exit 1
           fi
-          git clone --depth=1 \
-            "https://x-access-token:${PATCHES_TOKEN}@{{.PATCHES_REPO}}" \
-            "${patches_repo_dir}"
+          remote_url="https://x-access-token:${PATCHES_TOKEN}@{{.PATCHES_REPO}}"
         fi
 
+        git clone --depth=1 "${remote_url}" "${patches_repo_dir}"
+
         if [ ! -f "${series_file}" ]; then
-          echo "Patch series file not found: ${series_file}" >&2
+          echo "Branch manifest not found: ${series_file}" >&2
           exit 1
         fi
 
-        current_branch=$(git -C "${patch_target_dir}" symbolic-ref --quiet --short HEAD || true)
-        if [ -z "${current_branch}" ]; then
-          current_branch="release-patches-${GITHUB_RUN_ID:-local-$$}"
-          git -C "${patch_target_dir}" switch -c "${current_branch}"
-        fi
-
-        if ! stg_in_target series --short >/dev/null 2>&1; then
-          stg_in_target init
-        fi
-
-        while IFS= read -r patch || [ -n "${patch}" ]; do
-          patch=$(printf '%s' "${patch}" | sed 's/#.*//' | xargs)
-          [ -z "${patch}" ] && continue
-
-          patch_file="${series_dir}/${patch}"
-          if [ ! -f "${patch_file}" ]; then
-            echo "Patch file not found: ${patch_file}" >&2
-            exit 1
-          fi
-
-          echo "Applying release patch: ${patch}"
-          apply_output="${patches_repo_dir}/stg-import-output.log"
-          if ! stg_in_target import "${patch_file}" >"${apply_output}" 2>&1; then
-            branch=$(git -C "${patch_target_dir}" symbolic-ref --quiet --short HEAD || echo "detached")
-            sha=$(git -C "${patch_target_dir}" rev-parse HEAD)
-            {
-              echo "::error::Failed to apply release patch: ${patch}"
-              echo "Failed to apply release patch: ${patch}"
-              echo "Branch: ${branch}"
-              echo "Commit: ${sha}"
-              echo "Patch file: ${patch_file}"
-              echo "StGit output:"
-              cat "${apply_output}"
-            } >&2
-            exit 1
-          fi
-          rm -f "${apply_output}"
+        branches=()
+        while IFS= read -r branch || [ -n "${branch}" ]; do
+          branch=$(printf '%s' "${branch}" | sed 's/#.*//' | xargs)
+          [ -z "${branch}" ] && continue
+          branches+=("${branch}")
         done < "${series_file}"
 
-        echo "Applied release patches:"
-        stg_in_target series --applied --description
+        if [ "${#branches[@]}" -eq 0 ]; then
+          echo "Branch manifest is empty: ${series_file}" >&2
+          exit 1
+        fi
 
-        git -C "${patch_target_dir}" reset --mixed "${base_commit}" >/dev/null
+        # Shallow-fetch each branch directly into the target worktree. depth=10
+        # comfortably covers a direct 8gcr-main child (depth 1) or a branch
+        # stacked one level deep (e.g. 0005 on 0004, depth 2) without pulling
+        # full history.
+        parent_refs=()
+        for branch in "${branches[@]}"; do
+          echo "Fetching commercial branch: ${branch}"
+          git -C "${patch_target_dir}" fetch --depth=10 "${remote_url}" \
+            "${branch}:refs/remotes/patches/${branch}"
+          parent_refs+=("refs/remotes/patches/${branch}")
+        done
+
+        if [ ! -d "${patch_target_dir}/.jj" ]; then
+          (cd "${patch_target_dir}" && jj git init --colocate >/dev/null)
+        fi
+
+        (cd "${patch_target_dir}" && jj new @ "${parent_refs[@]}" -m "release merge: ${branches[*]}")
+
+        if (cd "${patch_target_dir}" && jj log -r '@- & conflicts()' -T 'commit_id' --no-graph 2>/dev/null | grep -q .); then
+          echo "::error::Commercial branches did not merge cleanly" >&2
+          echo "Conflicted paths:" >&2
+          (cd "${patch_target_dir}" && jj resolve --list) >&2 || true
+          echo "Resolve locally with: task jj:restack (see .claude/skills/jj-megamerge/SKILL.md)" >&2
+          exit 1
+        fi
+
+        echo "Merged commercial branches:"
+        printf '  %s\n' "${branches[@]}"

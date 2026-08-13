@@ -71,29 +71,31 @@ jobs:
         with:
           version: 3.49.1
 
-      - name: Install StGit
+      - name: Install jj
+        env:
+          JJ_VERSION: "0.44.0"
         run: |
-          if command -v stg >/dev/null 2>&1; then
-            stg --version
+          if command -v jj >/dev/null 2>&1; then
+            jj --version
             exit 0
           fi
 
-          if command -v apt-get >/dev/null 2>&1; then
-            if command -v sudo >/dev/null 2>&1; then
-              sudo apt-get update
-              sudo apt-get install -y stgit
-            else
-              apt-get update
-              apt-get install -y stgit
-            fi
-          elif command -v brew >/dev/null 2>&1; then
-            brew install stgit
-          else
-            echo "::error::StGit is required but no supported package manager was found."
-            exit 1
-          fi
+          case "$(uname -m)" in
+            x86_64|amd64) arch="x86_64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+            *)
+              echo "::error::Unsupported architecture: $(uname -m)"
+              exit 1
+              ;;
+          esac
 
-          stg --version
+          curl -fsSL "https://github.com/jj-vcs/jj/releases/download/v${JJ_VERSION}/jj-v${JJ_VERSION}-${arch}-unknown-linux-musl.tar.gz" -o /tmp/jj.tar.gz
+          mkdir -p /tmp/jj-extract
+          tar -xzf /tmp/jj.tar.gz -C /tmp/jj-extract
+          sudo install -m 755 /tmp/jj-extract/jj /usr/local/bin/jj
+          rm -rf /tmp/jj.tar.gz /tmp/jj-extract
+
+          jj --version
 
       - name: Generate GitHub App token
         id: app-token

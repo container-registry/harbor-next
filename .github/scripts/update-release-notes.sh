@@ -78,20 +78,26 @@ GH_TOKEN="${PATCHES_TOKEN}" gh repo clone container-registry/8gcr \
 series="${tmp_dir}/patches-repo/8gcr-ee/patches/series"
 patch_notes="${tmp_dir}/commercial-patches.md"
 
+# 8gcr-ee/patches/series is now a manifest of commercial jj/git branch names
+# (see ADR-0006 in container-registry/8gcr), not a StGit patch-file series.
+# None of the branches carry a commit body, only a one-line subject, so a
+# direct `git log --format=%s` read replaces the old patch-file parsing.
 if [[ -f "${series}" ]]; then
-  while IFS= read -r patch; do
-    patch="${patch%%#*}"
-    patch="${patch#"${patch%%[![:space:]]*}"}"
-    patch="${patch%"${patch##*[![:space:]]}"}"
-    [[ -z "${patch}" ]] && continue
+  while IFS= read -r branch; do
+    branch="${branch%%#*}"
+    branch="${branch#"${branch%%[![:space:]]*}"}"
+    branch="${branch%"${branch##*[![:space:]]}"}"
+    [[ -z "${branch}" ]] && continue
 
-    if [[ "${patch}" == */* || "${patch}" == *..* ]]; then
-      echo "Invalid commercial patch name in series: ${patch}" >&2
+    if [[ "${branch}" == */* || "${branch}" == *..* ]]; then
+      echo "Invalid commercial branch name in series: ${branch}" >&2
       exit 1
     fi
 
-    node .github/scripts/format-commercial-patch.mjs \
-      "${tmp_dir}/patches-repo/8gcr-ee/patches/${patch}" >> "${patch_notes}"
+    git -C "${tmp_dir}/patches-repo" fetch --depth=1 origin \
+      "${branch}:refs/remotes/origin/${branch}"
+    echo "- $(git -C "${tmp_dir}/patches-repo" log -1 --format=%s "refs/remotes/origin/${branch}")" \
+      >> "${patch_notes}"
   done < "${series}"
 fi
 
