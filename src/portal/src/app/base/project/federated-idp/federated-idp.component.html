@@ -1,0 +1,139 @@
+<div class="content-top">
+    <div class="row endpoint-view">
+        <div>
+            <div class="row flex-items-xs-between rightPos">
+                <div class="flex-items-xs-middle option-right">
+                    <hbr-filter
+                        [withDivider]="true"
+                        filterPlaceholder="{{
+                            'FEDERATED_IDPS.FILTER_PLACEHOLDER' | translate
+                        }}"
+                        (filterEvt)="doSearchTargets($event)"
+                        [currentValue]="targetName"></hbr-filter>
+                    <span class="refresh-btn" (click)="refreshTargets()">
+                        <clr-icon shape="refresh"></clr-icon>
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
+            <clr-datagrid
+                (clrDgRefresh)="retrieve($event)"
+                [clrDgLoading]="loading"
+                [(clrDgSelected)]="selectedRow">
+                <clr-dg-action-bar>
+                    <button
+                        id="add"
+                        type="button"
+                        class="btn btn-secondary"
+                        [disabled]="!hasCreatePermission"
+                        (click)="openModal()">
+                        <clr-icon shape="plus" size="16"></clr-icon>&nbsp;{{
+                            'FEDERATED_IDPS.NEW_IDP' | translate
+                        }}
+                    </button>
+                    <button
+                        id="edit"
+                        type="button"
+                        class="btn btn-secondary"
+                        [disabled]="
+                            !hasUpdatePermission || !(selectedRow.length === 1)
+                        "
+                        (click)="editTargets(selectedRow)">
+                        <clr-icon shape="pencil" size="16"></clr-icon>&nbsp;{{
+                            'DESTINATION.EDIT' | translate
+                        }}
+                    </button>
+                    <button
+                        id="delete"
+                        type="button"
+                        class="btn btn-secondary"
+                        [disabled]="!hasDeletePermission || !selectedRow.length"
+                        (click)="deleteTargets(selectedRow)">
+                        <clr-icon shape="times" size="16"></clr-icon>&nbsp;{{
+                            'DESTINATION.DELETE' | translate
+                        }}
+                    </button>
+                </clr-dg-action-bar>
+                <clr-dg-column [clrDgSortBy]="'name'" class="flex-min-width">{{
+                    'FEDERATED_IDPS.NAME' | translate
+                }}</clr-dg-column>
+                <clr-dg-column [clrDgField]="'url'" class="flex-min-width">{{
+                    'FEDERATED_IDPS.ISSUER' | translate
+                }}</clr-dg-column>
+                <clr-dg-column>{{
+                    'FEDERATED_IDPS.OFFLINE_VALIDATION' | translate
+                }}</clr-dg-column>
+                <clr-dg-column>{{
+                    'FEDERATED_IDPS.SUPPORTED_ALGORITHMS' | translate
+                }}</clr-dg-column>
+                <clr-dg-column class="truncate">{{
+                    'FEDERATED_IDPS.CLAIMS_SUPPORTED' | translate
+                }}</clr-dg-column>
+                <clr-dg-column [clrDgSortBy]="'creation_time'">{{
+                    'DESTINATION.CREATION_TIME' | translate
+                }}</clr-dg-column>
+                <clr-dg-column [clrDgField]="'description'">{{
+                    'REPLICATION.DESCRIPTION' | translate
+                }}</clr-dg-column>
+                <clr-dg-placeholder>{{
+                    'FEDERATED_IDPS.PLACEHOLDER' | translate
+                }}</clr-dg-placeholder>
+                <clr-dg-row *ngFor="let t of targets" [clrDgItem]="t">
+                    <clr-dg-cell class="flex-min-width">{{
+                        t.name
+                    }}</clr-dg-cell>
+                    <clr-dg-cell class="flex-min-width">{{
+                        t.issuer
+                    }}</clr-dg-cell>
+                    <clr-dg-cell>
+                        {{ t.offline_validation ? 'Yes' : 'No' }}
+                    </clr-dg-cell>
+                    <clr-dg-cell>{{
+                        getSupportedAlgorithms(t.supported_algorithms)
+                    }}</clr-dg-cell>
+                    <clr-dg-cell>{{
+                        getSupportedClaims(t.claims_supported)
+                    }}</clr-dg-cell>
+                    <!-- <clr-dg-cell> -->
+                    <!--     <span class="margin-right-2px">{{ -->
+                    <!--         getAdapterText(t.type) -->
+                    <!--     }}</span> -->
+                    <!-- </clr-dg-cell> -->
+                    <!-- <clr-dg-cell> -->
+                    <!--     {{ !t.insecure }} -->
+                    <!-- </clr-dg-cell> -->
+                    <!-- <clr-dg-cell>{{ t.credential.type }}</clr-dg-cell> -->
+                    <clr-dg-cell>{{
+                        t.creation_time | harborDatetime : 'short'
+                    }}</clr-dg-cell>
+                    <clr-dg-cell>{{ t.description }}</clr-dg-cell>
+                </clr-dg-row>
+                <clr-dg-footer>
+                    <clr-dg-pagination
+                        #pagination
+                        [clrDgPageSize]="pageSize"
+                        [(clrDgPage)]="page"
+                        [clrDgTotalItems]="total">
+                        <clr-dg-page-size
+                            [clrPageSizeOptions]="clrPageSizeOptions"
+                            >{{
+                                'PAGINATION.PAGE_SIZE' | translate
+                            }}</clr-dg-page-size
+                        >
+                        <span *ngIf="total"
+                            >{{ pagination.firstItem + 1 }} -
+                            {{ pagination.lastItem + 1 }}
+                            {{ 'DESTINATION.OF' | translate }}</span
+                        >
+                        {{ total }} {{ 'DESTINATION.ITEMS' | translate }}
+                    </clr-dg-pagination>
+                </clr-dg-footer>
+            </clr-datagrid>
+        </div>
+    </div>
+    <confirmation-dialog
+        #confirmationDialog
+        (confirmAction)="confirmDeletion($event)"></confirmation-dialog>
+    <add-idp (reload)="refreshTargets()"></add-idp>
+</div>

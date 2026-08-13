@@ -17,8 +17,10 @@ package handler
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"strings"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/go-openapi/runtime/middleware"
 
 	"github.com/goharbor/harbor/src/common"
@@ -171,7 +173,16 @@ func (lAPI *labelAPI) UpdateLabel(ctx context.Context, params operation.UpdateLa
 }
 
 func (lAPI *labelAPI) DeleteLabel(ctx context.Context, params operation.DeleteLabelParams) middleware.Responder {
+	// 🔎 Print stack trace
+	fmt.Printf("==== Stack Trace ====\n%s\n", debug.Stack())
+
+	// 🔎 Dump arguments
+	fmt.Println("==== Function Variables ====")
+	spew.Dump(ctx)    // will show all context values if they are stored
+	spew.Dump(params) // show params
+	spew.Dump(lAPI)
 	label, err := lAPI.labelMgr.Get(ctx, params.LabelID)
+
 	if err != nil {
 		return lAPI.SendError(ctx, err)
 	}

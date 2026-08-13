@@ -3926,6 +3926,352 @@ paths:
           $ref: '#/responses/404'
         '500':
           $ref: '#/responses/500'
+
+  /federated-idps:
+    post:
+      summary: Create a federated identity provider
+      description: >-
+        Register a new federated identity provider to enable workload identity federation.
+        Federated IdPs allow Harbor to establish trust with external providers
+        (e.g., Kubernetes API server, cloud IdPs) and accept short-lived JWTs from workloads.
+        These tokens are validated and mapped to robot accounts based on claims,
+        eliminating the need for long-lived secrets and improving security.
+      tags:
+        - federated-idp
+      operationId: CreateFederatedIdp
+      parameters:
+        - $ref: '#/parameters/requestId'
+        - name: idp
+          in: body
+          description: The federated identity provider configuration
+          required: true
+          schema:
+            $ref: '#/definitions/FederatedIdp'
+      responses:
+        '201':
+          description: Success
+          schema:
+            type: object
+            $ref: '#/definitions/FederatedIdp'
+        '400':
+          $ref: '#/responses/400'
+        '401':
+          $ref: '#/responses/401'
+        '403':
+          $ref: '#/responses/403'
+        '409':
+          $ref: '#/responses/409'
+        '500':
+          $ref: '#/responses/500'
+    get:
+      summary: List federated identity providers
+      description: List all federated identity providers.
+      tags:
+        - federated-idp
+      operationId: ListFederatedIdps
+      parameters:
+        - $ref: '#/parameters/requestId'
+        - $ref: '#/parameters/query'
+        - $ref: '#/parameters/sort'
+        - $ref: '#/parameters/page'
+        - $ref: '#/parameters/pageSize'
+      responses:
+        '200':
+          description: Success
+          headers:
+            X-Total-Count:
+              description: The total count of the resources
+              type: integer
+            Link:
+              description: Link refers to the previous page and next page
+              type: string
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/FederatedIdp'
+        '401':
+          $ref: '#/responses/401'
+        '403':
+          $ref: '#/responses/403'
+        '500':
+          $ref: '#/responses/500'
+  /federated-idps/openid-config:
+    post:
+      summary: Fetch OpenID Connect configuration
+      description: >
+        Fetch the `.well-known/openid-configuration` document from the specified OIDC issuer URL.
+        This endpoint allows Harbor to verify connectivity and retrieve configuration metadata
+        from a federated identity provider before registration.
+      tags:
+        - federated-idp
+      operationId: PingFederatedIdpOpenIDConfig
+      parameters:
+        - $ref: '#/parameters/requestId'
+        - name: openid_config_url
+          in: body
+          description: The OIDC URL used to fetch configuration
+          required: true
+          schema:
+            $ref: '#/definitions/FederatedIdpOpenIDConfigPing'
+      responses:
+        '200':
+          description: Successfully fetched OIDC configuration
+          schema:
+            type: object
+            additionalProperties: true
+        '400':
+          $ref: '#/responses/400'
+        '401':
+          $ref: '#/responses/401'
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          $ref: '#/responses/404'
+        '500':
+          $ref: '#/responses/500'
+
+  /federated-idps/jwks:
+    post:
+      summary: Fetch JWKS (JSON Web Key Set)
+      description: >
+        Fetch the JWKS (public signing keys) from the specified JWKS URI.
+        This endpoint allows Harbor to verify the keys used by the identity
+        provider to sign tokens before registration or validation.
+      tags:
+        - federated-idp
+      operationId: PingFederatedIdpJWKS
+      parameters:
+        - $ref: '#/parameters/requestId'
+        - name: jwks
+          in: body
+          description: The JWKS URI of the identity provider
+          required: true
+          schema:
+            $ref: '#/definitions/FederatedIdpJWKSPing'
+      responses:
+        '200':
+          description: Successfully fetched JWKS
+          schema:
+            type: object
+            additionalProperties: true
+        '400':
+          $ref: '#/responses/400'
+        '401':
+          $ref: '#/responses/401'
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          $ref: '#/responses/404'
+        '500':
+          $ref: '#/responses/500'
+  /federated-idps/{id}:
+    get:
+      summary: Get the specific federated identity provider
+      description: Get the specific federated identity provider
+      tags:
+        - federated-idp
+      operationId: GetFederatedIdp
+      parameters:
+        - $ref: '#/parameters/requestId'
+        - $ref: '#/parameters/query'
+        - $ref: '#/parameters/sort'
+        - $ref: '#/parameters/page'
+        - $ref: '#/parameters/pageSize'
+        - name: id
+          in: path
+          type: integer
+          format: int64
+          required: true
+          description: Federated identity provider ID
+      responses:
+        '200':
+          description: Success
+          schema:
+            $ref: '#/definitions/FederatedIdp'
+        '401':
+          $ref: '#/responses/401'
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          $ref: '#/responses/404'
+        '500':
+          $ref: '#/responses/500'
+    delete:
+      summary: Delete the specific federated identity provider
+      description: Delete the specific federated identity provider
+      tags:
+        - federated-idp
+      operationId: DeleteFederatedIdp
+      parameters:
+        - $ref: '#/parameters/requestId'
+        - name: id
+          in: path
+          type: integer
+          format: int64
+          required: true
+          description: Federated identity provider ID
+      responses:
+        '200':
+          $ref: '#/responses/200'
+        '401':
+          $ref: '#/responses/401'
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          $ref: '#/responses/404'
+        '500':
+          $ref: '#/responses/500'
+    put:
+      summary: Update the specific federated identity provider
+      description: Update the specific federated identity provider
+      tags:
+        - federated-idp
+      operationId: UpdateFederatedIdp
+      parameters:
+        - $ref: '#/parameters/requestId'
+        - name: id
+          in: path
+          type: integer
+          format: int64
+          required: true
+          description: Federated identity provider ID
+        - name: idp
+          in: body
+          description: The updated federated identity provider
+          required: true
+          schema:
+            $ref: '#/definitions/FederatedIdpUpdate'
+      responses:
+        '200':
+          $ref: '#/responses/200'
+        '401':
+          $ref: '#/responses/401'
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          $ref: '#/responses/404'
+        '409':
+          $ref: '#/responses/409'
+        '500':
+          $ref: '#/responses/500'
+
+  /federated-idps/{id}/claims:
+    post:
+      summary: Add claim rules to a federated identity provider
+      description: Create one or more JWT claim rules for the specified IdP.
+      tags:
+        - federated-idp
+      operationId: CreateClaimRules
+      parameters:
+        - $ref: '#/parameters/requestId'
+        - name: id
+          in: path
+          required: true
+          description: Federated IdP ID
+          type: integer
+          format: int64
+        - name: claims
+          in: body
+          required: true
+          description: Claim rules payload
+          schema:
+            $ref: '#/definitions/ClaimRules'
+      responses:
+        '201':
+          $ref: '#/responses/201'
+        '400':
+          $ref: '#/responses/400'
+        '401':
+          $ref: '#/responses/401'
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          $ref: '#/responses/404'
+        '409':
+          description: One or more claim rules already exist
+        '500':
+          $ref: '#/responses/500'
+    get:
+      summary: List claim rules for a federated identity provider
+      description: List all claim rules for the specified IdP, or filter by a single claim rule if `claim_path` is provided.
+      tags:
+        - federated-idp
+      operationId: ListClaimRules
+      parameters:
+        - $ref: '#/parameters/requestId'
+        - name: id
+          in: path
+          type: integer
+          format: int64
+          required: true
+          description: Federated IdP ID
+        - name: claim_path
+          in: query
+          type: string
+          required: false
+          description: Optional claim path to filter rules; if omitted, all rules are returned.
+        - name: robot_id
+          in: query
+          type: integer
+          format: int64
+          required: false
+          description: Filter by robot ID. Use 0 for IdP-level claims only, positive value for specific robot claims, or omit for all claims.
+        - name: idp_only
+          in: query
+          type: boolean
+          required: false
+          description: If true, return only IdP-level claims (robot_id=0). Cannot be used with robot_id parameter.
+      responses:
+        '200':
+          description: Success
+          headers:
+            X-Total-Count:
+              description: The total count of the resources
+              type: integer
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/ClaimRule'
+        '401':
+          $ref: '#/responses/401'
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          $ref: '#/responses/404'
+        '500':
+          $ref: '#/responses/500'
+    delete:
+      summary: Delete a single claim rule from a federated identity provider and robot
+      description: Delete a single claim rule from a federated identity provider and robot
+      tags:
+        - federated-idp
+      operationId: DeleteClaimRules
+      parameters:
+        - $ref: '#/parameters/requestId'
+        - name: id
+          in: path
+          required: true
+          description: Federated IdP ID
+          type: integer
+          format: int64
+        - name: claims
+          in: body
+          required: true
+          description: Claim rules to delete
+          schema:
+            $ref: '#/definitions/ClaimRules'
+      responses:
+        '200':
+          $ref: '#/responses/200'
+        '401':
+          $ref: '#/responses/401'
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          $ref: '#/responses/404'
+        '500':
+          $ref: '#/responses/500'
+
   /replication/adapters:
     get:
       summary: List registry adapters
@@ -7726,6 +8072,185 @@ definitions:
       access_secret:
         type: string
         description: Access secret, e.g. password when credential type is 'basic'.
+  FederatedIdpOpenIDConfigPing:
+    type: object
+    properties:
+      openid_config_url:
+        type: string
+        description: The full URL to the OIDC configuration document (e.g., `.well-known/openid-configuration`)
+        example: https://kubernetes.cluster.com/.well-known/openid-configuration
+  FederatedIdpJWKSPing:
+    type: object
+    properties:
+      jwks_uri:
+        type: string
+        description: The JWKS URI endpoint from which to fetch public signing keys
+        example: https://kubernetes.cluster.com/.well-known/jwks
+  FederatedIdp:
+    type: object
+    description: >-
+      Federated Identity Provider configuration. Required fields depend on the validation mode:
+      - Online mode (offline_validation=false): Only `name` and `openid_config_url` are required.
+        All other fields (issuer, jwks_uri, supported_algorithms, claims_supported) are
+        automatically inferred from the OIDC discovery document.
+      - Offline mode (offline_validation=true): `name`, `issuer`, and `jwks_keys` are required.
+    properties:
+      id:
+        type: integer
+        format: int64
+        description: The federated IDP ID.
+        x-omitempty: false
+      name:
+        type: string
+        description: The federated IDP name. Required for both online and offline modes.
+      description:
+        type: string
+        description: Description of the federated IDP.
+      issuer:
+        type: string
+        description: >-
+          The OIDC issuer URL of the identity provider.
+          For online mode, this is auto-derived from the OIDC discovery document.
+          For offline mode, this is required.
+      supported_algorithms:
+        type: array
+        description: >-
+          Signing algorithms supported (from `id_token_signing_alg_values_supported`).
+          Auto-derived from OIDC discovery (online mode) or JWKS keys (offline mode).
+        items:
+          type: string
+      claims_supported:
+        type: array
+        description: Claims supported by the IdP. Auto-derived from OIDC discovery in online mode.
+        items:
+          type: string
+      offline_validation:
+        type: boolean
+        description: >-
+          Whether to perform offline validation.
+          - true: use jwks_keys (required), issuer (required) for offline validation.
+          - false: Only `name` and `openid_config_url` are required. All other fields
+            (issuer, jwks_uri, supported_algorithms, claims_supported) are auto-derived
+            from the OIDC discovery document.
+      openid_config_url:
+        type: string
+        description: >-
+          The URL to the OIDC discovery document (.well-known/openid-configuration).
+          Required for online mode (offline_validation=false).
+      jwks_uri:
+        type: string
+        description: >-
+          The URL to fetch signing keys (JWKS). Auto-derived from OIDC discovery in online mode.
+          If provided, must match the jwks_uri in the discovery document.
+      jwks_keys:
+        type: object
+        additionalProperties: true
+        description: Inline JWKS JSON for offline validation of tokens. Required for offline mode.
+      project_id:
+        type: integer
+        format: int64
+        description: Project scope of this identity provider.
+      creation_time:
+        type: string
+        format: date-time
+        description: The create time of identity provider.
+      update_time:
+        type: string
+        format: date-time
+        description: The update time of identity provider.
+  FederatedIdpUpdate:
+    type: object
+    properties:
+      name:
+        type: string
+        description: The federated IDP name.
+        x-nullable: true
+      description:
+        type: string
+        description: Description of the federated IDP.
+        x-nullable: true
+      issuer:
+        type: string
+        description: The OIDC issuer URL of the identity provider.
+        x-nullable: true
+      supported_algorithms:
+        type: array
+        description: Signing algorithms supported (from `id_token_signing_alg_values_supported`).
+        items:
+          type: string
+        # x-nullable: true
+      claims_supported:
+        type: array
+        description: Claims supported by the IdP (optional).
+        items:
+          type: string
+        # x-nullable: true
+      offline_validation:
+        type: boolean
+        description: >-
+          Whether to perform offline validation.
+          - true: Use only stored configuration and JWKS for offline validation.
+          - false: Fetch and validate against the remote IdP endpoints (JWKS, OIDC config).
+        x-nullable: true
+      openid_config_url:
+        type: string
+        description: The URL to the OIDC discovery document (.well-known/openid-configuration).
+        x-nullable: true
+      jwks_uri:
+        type: string
+        description: The URL to fetch signing keys (JWKS).
+        x-nullable: true
+      jwks_keys:
+        type: object
+        additionalProperties: true
+        description: Inline JWKS JSON for offline validation of tokens.
+        x-nullable: true
+  ClaimRule:
+    type: object
+    properties:
+      id:
+        type: integer
+        format: int64
+        description: The claim rule ID.
+        x-omitempty: false
+      claim_path:
+        type: string
+        description: The path/key of the JWT claim (dot notation allowed)
+      robot_id:
+        type: integer
+        format: int64
+        description: The robot account ID associated with this claim rule.
+        default: 0
+      value:
+        type: string
+        description: expected value for the claim
+      identity_provider_id:
+        type: integer
+        format: int64
+        description: Identity provider ID.
+      creation_time:
+        type: string
+        format: date-time
+        description: The create time of claim rule.
+  ClaimRules:
+    type: object
+    properties:
+      rules:
+        type: array
+        description: List of claim rules to add to the federated IdP
+        items:
+          $ref: '#/definitions/ClaimRule'
+    required:
+      - rules
+  ClaimRuleUpdate:
+    type: object
+    properties:
+      value:
+        type: string
+        description: The updated expected value for the claim.
+    required:
+      - value
+
   Registry:
     type: object
     properties:
@@ -8067,6 +8592,11 @@ definitions:
       creator_ref:
         type: integer
         description: The reference of the robot creator, like the id of harbor user.
+      federatedidp_id:
+        type: integer
+        format: int64
+        x-nullable: true
+        description: The ID of the federated IDP
       creation_time:
         type: string
         format: date-time
@@ -8098,6 +8628,11 @@ definitions:
         type: integer
         format: int64
         description: The duration of the robot in days, duration must be either -1(Never) or a positive integer
+      federatedidp_id:
+        type: integer
+        format: int64
+        x-nullable: true
+        description: The ID of the federated IDP
       permissions:
         type: array
         items:
@@ -8116,6 +8651,10 @@ definitions:
       secret:
         type: string
         description: The secret of the robot
+      federatedidp_id:
+        type: integer
+        format: int64
+        description: The ID of the federated IDP
       creation_time:
         type: string
         format: date-time
@@ -8254,6 +8793,11 @@ definitions:
         x-nullable: true
         x-omitempty: true
         description: The flag to indicate whether notification mechanism is enabled on Harbor instance.
+      enable_project_federated_idp:
+        type: boolean
+        x-nullable: true
+        x-omitempty: true
+        description: The flag to enable federated identity provider for project level. When true, projects can configure their own federated IDPs inheriting from system level. This field is only returned for authenticated users.
       authproxy_settings:
         description: The setting of auth proxy this is only available when Harbor relies on authproxy for authentication.
         x-nullable: true
@@ -9377,6 +9921,9 @@ definitions:
       disabled_audit_log_event_types:
         $ref: '#/definitions/StringConfigItem'
         description: The audit log event types to skip to log in database
+      enable_project_federated_idp:
+        $ref: '#/definitions/BoolConfigItem'
+        description: The flag to enable federated idp for project and inherit federated idp from system level
   Configurations:
     type: object
     properties:
@@ -9673,6 +10220,11 @@ definitions:
       disabled_audit_log_event_types:
         type: string
         description: the list to disable log audit event types.
+        x-omitempty: true
+        x-isnullable: true
+      enable_project_federated_idp:
+        type: boolean
+        description: The flag to enable federated idp for project and inherit federated idp from system level
         x-omitempty: true
         x-isnullable: true
   StringConfigItem:

@@ -161,6 +161,7 @@
             "USER": "사용자",
             "GROUP": "그룹",
             "REGISTRY": "레지스트리",
+            "IDP": "Federated IDPs",
             "REPLICATION": "복제",
             "CONFIG": "설정",
             "VULNERABILITY": "취약점",
@@ -503,6 +504,10 @@
         "RESOURCE": "리소스",
         "RESOURCE_TYPE": "리소스 종류",
         "DOWNLOAD": "다운로드"
+    },
+    "FEDERATED_IDPS": {
+        "FILTER_PLACEHOLDER": "Filter Federated IDPs",
+        "NAME_PATTERN_ERROR": "Name must be lowercase and can only contain letters, numbers, and separators (. _ -)"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "트리거",

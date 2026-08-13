@@ -1,0 +1,16 @@
+// More specific selector first to satisfy no-descending-specificity rule
+:host ::ng-deep clr-checkbox-container {
+  .clr-control-label {
+    width: 18rem;
+    min-width: 18rem;
+    margin-bottom: 1rem;
+  }
+}
+
+.clr-form-horizontal {
+  .clr-form-control {
+    & > .clr-control-label {
+      width: 18rem;
+    }
+  }
+}

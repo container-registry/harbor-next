@@ -175,6 +175,13 @@ export class HarborShellComponent implements OnInit, OnDestroy {
         );
     }
 
+    public get commercialIdentityProvidersEnabled(): boolean {
+        return (
+            this.appConfigService.getConfig()
+                ?.enable_commercial_identity_providers === true
+        );
+    }
+
     // Open modal dialog
     openModal(event: ModalEvent): void {
         switch (event.modalName) {

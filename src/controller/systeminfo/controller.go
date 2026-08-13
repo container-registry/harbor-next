@@ -63,6 +63,7 @@ type protectedData struct {
 	RegistryStorageProviderName string
 	ReadOnly                    bool
 	NotificationEnable          bool
+	EnableProjectFederatedIDP   bool
 }
 
 // Options provide a set of attributes to control what info should be returned
@@ -137,6 +138,7 @@ func (c *controller) GetInfo(ctx context.Context, opt Options) (*Data, error) {
 		ProjectCreationRestrict:     utils.SafeCastString(cfg[common.ProjectCreationRestriction]),
 		RegistryStorageProviderName: utils.SafeCastString(cfg[common.RegistryStorageProviderName]),
 		NotificationEnable:          utils.SafeCastBool(cfg[common.NotificationEnable]),
+		EnableProjectFederatedIDP:   config.EnableProjectFederatedIDP(ctx),
 	}
 	return res, nil
 }

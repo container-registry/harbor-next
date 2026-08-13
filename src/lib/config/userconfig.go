@@ -278,3 +278,8 @@ func AuditLogEventEnabled(ctx context.Context, eventType string) bool {
 	}
 	return true
 }
+
+// EnableProjectFederatedIDP indicates whether enable federated idp for project
+func EnableProjectFederatedIDP(ctx context.Context) bool {
+	return DefaultMgr().Get(ctx, common.EnableProjectFederatedIDP).GetBool()
+}

@@ -22,11 +22,13 @@ import { Action, PermissionsKinds, Resource } from '../system-robot-util';
 import { MessageHandlerService } from '../../../../shared/services/message-handler.service';
 import { OperationService } from '../../../../shared/components/operation/operation.service';
 import { RobotService } from '../../../../../../ng-swagger-gen/services/robot.service';
+import { FederatedIdpService } from '../../../../../../ng-swagger-gen/services/federated-idp.service';
 import { of } from 'rxjs';
 import { delay } from 'rxjs/operators';
 import { ConfigurationService } from '../../../../services/config.service';
 import { Configuration } from '../../config/config';
 import { FormsModule } from '@angular/forms';
+import { HttpClientTestingModule } from '@angular/common/http/testing';
 
 describe('NewRobotComponent', () => {
     let component: NewRobotComponent;
@@ -67,6 +69,14 @@ describe('NewRobotComponent', () => {
             return of(config).pipe(delay(0));
         },
     };
+    const fakedFederatedIdpService = {
+        ListFederatedIdps() {
+            return of([]).pipe(delay(0));
+        },
+        ListClaimRules() {
+            return of([]).pipe(delay(0));
+        },
+    };
     const fakedMessageHandlerService = {
         showSuccess() {},
         error() {},
@@ -78,6 +88,7 @@ describe('NewRobotComponent', () => {
                 ClarityModule,
                 TranslateModule.forRoot(),
                 FormsModule,
+                HttpClientTestingModule,
             ],
             declarations: [NewRobotComponent],
             providers: [
@@ -90,6 +101,10 @@ describe('NewRobotComponent', () => {
                 {
                     provide: ConfigurationService,
                     useValue: mockConfigurationService,
+                },
+                {
+                    provide: FederatedIdpService,
+                    useValue: fakedFederatedIdpService,
                 },
             ],
             schemas: [NO_ERRORS_SCHEMA],

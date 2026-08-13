@@ -161,6 +161,7 @@
             "USER": "用户管理",
             "GROUP": "组管理",
             "REGISTRY": "仓库管理",
+            "IDP": "Federated IDPs",
             "REPLICATION": "复制管理",
             "CONFIG": "配置管理",
             "VULNERABILITY": "漏洞",
@@ -503,6 +504,10 @@
         "RESOURCE": "资源",
         "RESOURCE_TYPE": "资源类型",
         "DOWNLOAD": "下载"
+    },
+    "FEDERATED_IDPS": {
+        "FILTER_PLACEHOLDER": "Filter Federated IDPs",
+        "NAME_PATTERN_ERROR": "Name must be lowercase and can only contain letters, numbers, and separators (. _ -)"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "触发器",

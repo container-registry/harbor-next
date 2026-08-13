@@ -120,6 +120,7 @@ export class Configuration {
     session_timeout: NumberValueItem;
     scanner_skip_update_pulltime: BoolValueItem;
     banner_message: StringValueItem;
+    enable_project_federated_idp?: BoolValueItem;
     public constructor() {
         this.auth_mode = new StringValueItem('db_auth', true);
         this.primary_auth_mode = new BoolValueItem(false, true);

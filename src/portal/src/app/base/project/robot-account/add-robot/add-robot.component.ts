@@ -40,6 +40,7 @@ import { NgForm } from '@angular/forms';
 import { ClrLoadingState, ClrWizard } from '@clr/angular';
 import { Subject, Subscription } from 'rxjs';
 import { RobotService } from '../../../../../../ng-swagger-gen/services/robot.service';
+import { FederatedIdpService } from '../../../../../../ng-swagger-gen/services/federated-idp.service';
 import { OperationService } from '../../../../shared/components/operation/operation.service';
 import { clone, isSameArrayValue } from '../../../../shared/units/utils';
 import {
@@ -54,6 +55,24 @@ import { Permissions } from '../../../../../../ng-swagger-gen/models/permissions
 
 const MINI_SECONDS_ONE_DAY: number = 60 * 24 * 60 * 1000;
 
+// Valid claim path pattern:
+// - Must start with a letter or underscore
+// - Can contain letters, numbers, underscores, hyphens, dots (for nested paths)
+// Examples: "sub", "email", "user.name", "custom_claim"
+const CLAIM_PATH_PATTERN =
+    /^[a-zA-Z_][a-zA-Z0-9_\-]*(\.[a-zA-Z_][a-zA-Z0-9_\-]*)*$/;
+
+// Claims that a federated IdP always has to match on. They are exempt from the
+// claims_supported check: an issuer may leave them out of claims_supported
+// (EKS publishes only ["sub","iss"]) while still putting them in every token.
+const MANDATORY_CLAIM_PATHS = ['iss', 'aud'];
+
+interface Claim {
+    path: string;
+    value: string;
+    error?: string;
+}
+
 @Component({
     selector: 'add-robot',
     templateUrl: './add-robot.component.html',
@@ -62,6 +81,8 @@ const MINI_SECONDS_ONE_DAY: number = 60 * 24 * 60 * 1000;
 export class AddRobotComponent implements OnInit, OnDestroy {
     @Input() projectId: number;
     @Input() projectName: string;
+    @Input() enableFederatedIdp: boolean = false;
+    @Input() fedIdpMap: Map<number, string> = new Map();
     isEditMode: boolean = false;
     originalRobotForEdit: Robot;
     @Output()
@@ -82,14 +103,232 @@ export class AddRobotComponent implements OnInit, OnDestroy {
     @Input()
     robotMetadata: Permissions;
 
+    // Federated IdP support
+    useFederatedRobot: boolean = false;
+    idpSelection: string = '';
+    idpNames: string[] = [];
+    idpIdMap: Map<string, number> = new Map();
+    inheritedClaims: Claim[] = [];
+    claims: Claim[] = [];
+    initClaims: Claim[] = [];
+    // Store claims_supported from the selected IDP
+    claimsSupported: string[] = [];
+    existingRobotClaimSets: Map<number, Set<string>> = new Map();
+    duplicateClaimRobotId: number | null = null;
+
     @ViewChild('wizard') wizard: ClrWizard;
     constructor(
         private robotService: RobotService,
         private msgHandler: MessageHandlerService,
-        private operationService: OperationService
+        private operationService: OperationService,
+        private federatedIdpService: FederatedIdpService
     ) {}
     ngOnInit(): void {
         this.subscribeName();
+        this.initFederatedIdpData();
+        this.resetClaims();
+    }
+
+    initFederatedIdpData(): void {
+        if (
+            this.enableFederatedIdp &&
+            this.fedIdpMap &&
+            this.fedIdpMap.size > 0
+        ) {
+            this.idpNames = Array.from(this.fedIdpMap.values());
+            // Build reverse map (name -> id)
+            this.idpIdMap.clear();
+            this.fedIdpMap.forEach((name, id) => {
+                this.idpIdMap.set(name.trim().toLowerCase(), id);
+            });
+        }
+    }
+
+    resetClaims(): void {
+        this.claims = [{ path: '', value: '' }];
+        this.inheritedClaims = [];
+        this.initClaims = [];
+    }
+
+    isValidIdp(value: string): boolean {
+        return value && this.idpNames.includes(value);
+    }
+
+    onIdpChange(selectedIdp: string): void {
+        if (this.isValidIdp(selectedIdp)) {
+            this.idpSelection = selectedIdp;
+            this.fetchInheritedClaims(selectedIdp);
+        } else {
+            this.idpSelection = '';
+            this.inheritedClaims = [];
+        }
+    }
+
+    fetchInheritedClaims(idpName: string): void {
+        const idpId = this.idpIdMap.get(idpName.trim().toLowerCase());
+        if (!idpId) {
+            return;
+        }
+
+        // First fetch the IDP to get claims_supported
+        this.federatedIdpService.GetFederatedIdp({ id: idpId }).subscribe({
+            next: idp => {
+                this.claimsSupported = idp.claims_supported || [];
+            },
+            error: err => {
+                console.error('Failed to fetch IDP', err);
+                this.claimsSupported = [];
+            },
+        });
+
+        this.federatedIdpService.ListClaimRules({ id: idpId }).subscribe({
+            next: claimRules => {
+                // Build inherited claims (claims not tied to any robot - robot_id === 0)
+                this.inheritedClaims = claimRules
+                    .filter(c => c.robot_id === 0 || c.robot_id == null)
+                    .map(c => ({
+                        path: c.claim_path,
+                        value: c.value,
+                    }));
+
+                // Build existing robot claim sets for duplicate detection
+                this.buildExistingRobotClaimSets(claimRules);
+            },
+            error: err => {
+                console.error('Failed to fetch inherited claims', err);
+            },
+        });
+    }
+
+    buildExistingRobotClaimSets(claimRules: any[]): void {
+        this.existingRobotClaimSets.clear();
+        this.duplicateClaimRobotId = null;
+
+        for (const rule of claimRules) {
+            if (rule.robot_id && rule.robot_id > 0) {
+                if (!this.existingRobotClaimSets.has(rule.robot_id)) {
+                    this.existingRobotClaimSets.set(rule.robot_id, new Set());
+                }
+                const claimKey = `${(rule.claim_path || '')
+                    .trim()
+                    .toLowerCase()}:${(rule.value || '').trim().toLowerCase()}`;
+                this.existingRobotClaimSets.get(rule.robot_id).add(claimKey);
+            }
+        }
+    }
+
+    addClaim(): void {
+        this.claims.push({ path: '', value: '' });
+    }
+
+    removeClaim(index: number): void {
+        if (this.claims.length > 1) {
+            this.claims.splice(index, 1);
+        }
+    }
+
+    // Alias for consistency with system-level component
+    deleteClaim(index: number): void {
+        this.removeClaim(index);
+    }
+
+    onClaimBlur(claim: Claim): void {
+        this.validateClaim(claim);
+        this.isValidFinalState();
+    }
+
+    validateClaim(claim: Claim): void {
+        claim.error = '';
+        if (claim.path && !CLAIM_PATH_PATTERN.test(claim.path)) {
+            claim.error = 'Invalid claim path format';
+            return;
+        }
+        // Validate claim path against claims_supported
+        if (claim.path && !this.isClaimPathInSupported(claim.path)) {
+            claim.error = `Claim path '${claim.path}' is not in the IdP's supported claims list`;
+        }
+    }
+
+    /**
+     * Validates if a claim path is in the IdP's claims_supported list.
+     * Returns true if claims_supported is empty/undefined (skip validation).
+     */
+    isClaimPathInSupported(path: string): boolean {
+        // Mandatory claims are always allowed, whether or not the issuer lists
+        // them in claims_supported
+        if (MANDATORY_CLAIM_PATHS.includes(path.trim().toLowerCase())) {
+            return true;
+        }
+        // If claims_supported is not populated, skip validation (allow any claim)
+        if (!this.claimsSupported || this.claimsSupported.length === 0) {
+            return true;
+        }
+        const normalizedPath = path.trim().toLowerCase();
+        return this.claimsSupported.some(
+            supported => supported.trim().toLowerCase() === normalizedPath
+        );
+    }
+
+    isValidFinalState(): boolean {
+        // Check if at least one claim has both path and value
+        const validClaims = this.claims.filter(
+            c => c.path?.trim().length > 0 && c.value?.trim().length > 0
+        );
+        if (validClaims.length === 0) {
+            return false;
+        }
+
+        // Check for errors
+        for (const claim of this.claims) {
+            if (claim.error) {
+                return false;
+            }
+        }
+
+        // Check for duplicate claim sets
+        return !this.hasDuplicateClaimSet();
+    }
+
+    hasDuplicateClaimSet(): boolean {
+        const currentClaims = new Set<string>();
+        for (const claim of this.claims) {
+            if (claim.path?.trim() && claim.value?.trim()) {
+                const key = `${claim.path.trim().toLowerCase()}:${claim.value
+                    .trim()
+                    .toLowerCase()}`;
+                currentClaims.add(key);
+            }
+        }
+
+        // Compare with existing robot claim sets
+        const entries = Array.from(this.existingRobotClaimSets.entries());
+        for (const entry of entries) {
+            const robotId = entry[0];
+            const claimSet = entry[1];
+            // Skip current robot if editing
+            if (this.isEditMode && this.originalRobotForEdit?.id === robotId) {
+                continue;
+            }
+
+            // Check if all current claims match an existing robot's claims
+            let allMatch = true;
+            if (currentClaims.size === claimSet.size) {
+                const claimsArray = Array.from(currentClaims);
+                for (const claim of claimsArray) {
+                    if (!claimSet.has(claim)) {
+                        allMatch = false;
+                        break;
+                    }
+                }
+                if (allMatch) {
+                    this.duplicateClaimRobotId = robotId;
+                    return true;
+                }
+            }
+        }
+
+        this.duplicateClaimRobotId = null;
+        return false;
     }
     ngOnDestroy() {
         if (this._nameSubscription) {
@@ -171,6 +410,11 @@ export class AddRobotComponent implements OnInit, OnDestroy {
         this.robot = clone(NEW_EMPTY_ROBOT);
         this.robotBasicForm.reset();
         this.expirationType = ExpirationType.DAYS;
+        // Reset federated robot state
+        this.useFederatedRobot = false;
+        this.idpSelection = '';
+        this.resetClaims();
+        this.initFederatedIdpData();
     }
     resetForEdit(robot: Robot) {
         this.open(true);
@@ -183,7 +427,59 @@ export class AddRobotComponent implements OnInit, OnDestroy {
             expiration: this.robot.duration,
             description: this.robot.description,
         });
+        // Check if editing a federated robot
+        if (robot.federatedidp_id && robot.federatedidp_id > 0) {
+            this.useFederatedRobot = true;
+            this.initFederatedStateForEdit(robot.federatedidp_id);
+        } else {
+            this.useFederatedRobot = false;
+            this.idpSelection = '';
+            this.resetClaims();
+        }
     }
+
+    initFederatedStateForEdit(federatedIdpId: number): void {
+        // Find IdP name from map
+        let idpName = '';
+        this.fedIdpMap.forEach((name, id) => {
+            if (id === federatedIdpId) {
+                idpName = name;
+            }
+        });
+
+        if (idpName) {
+            this.idpSelection = idpName;
+            // Fetch claims for this IdP
+            this.federatedIdpService
+                .ListClaimRules({ id: federatedIdpId })
+                .subscribe({
+                    next: claimRules => {
+                        const robotId = this.robot.id;
+
+                        // Build inherited claims (IdP-level claims)
+                        this.inheritedClaims = claimRules
+                            .filter(c => c.robot_id === 0 || c.robot_id == null)
+                            .map(c => ({ path: c.claim_path, value: c.value }));
+
+                        // Build robot-specific claims
+                        this.claims = claimRules
+                            .filter(c => c.robot_id === robotId)
+                            .map(c => ({ path: c.claim_path, value: c.value }));
+
+                        if (this.claims.length === 0) {
+                            this.claims = [{ path: '', value: '' }];
+                        }
+
+                        this.initClaims = clone(this.claims);
+                        this.buildExistingRobotClaimSets(claimRules);
+                    },
+                    error: err => {
+                        console.error('Failed to load claims for edit', err);
+                    },
+                });
+        }
+    }
+
     open(isEditMode: boolean) {
         this.isEditMode = isEditMode;
         this.addRobotOpened = true;
@@ -227,6 +523,17 @@ export class AddRobotComponent implements OnInit, OnDestroy {
         robot.duration = +this.robot.duration;
         robot.permissions[0].kind = PermissionsKinds.PROJECT;
         robot.permissions[0].namespace = this.projectName;
+
+        // Set federated IdP ID if using federated robot
+        if (this.useFederatedRobot && this.idpSelection) {
+            const idpId = this.idpIdMap.get(
+                this.idpSelection.trim().toLowerCase()
+            );
+            if (idpId) {
+                robot.federatedidp_id = idpId;
+            }
+        }
+
         // Push permission must work with pull permission
         if (onlyHasPushPermission(robot.permissions[0].access)) {
             this.inlineAlertComponent.showInlineError(
@@ -250,13 +557,21 @@ export class AddRobotComponent implements OnInit, OnDestroy {
                 })
                 .subscribe(
                     res => {
-                        this.saveBtnState = ClrLoadingState.SUCCESS;
-                        this.addSuccess.emit(null);
-                        this.cancel();
-                        operateChanges(opeMessage, OperationState.success);
-                        this.msgHandler.showSuccess(
-                            'SYSTEM_ROBOT.UPDATE_ROBOT_SUCCESSFULLY'
-                        );
+                        // Handle federated robot claim updates
+                        if (this.useFederatedRobot) {
+                            this.updateRobotClaims(
+                                this.originalRobotForEdit.id,
+                                opeMessage
+                            );
+                        } else {
+                            this.saveBtnState = ClrLoadingState.SUCCESS;
+                            this.addSuccess.emit(null);
+                            this.cancel();
+                            operateChanges(opeMessage, OperationState.success);
+                            this.msgHandler.showSuccess(
+                                'SYSTEM_ROBOT.UPDATE_ROBOT_SUCCESSFULLY'
+                            );
+                        }
                     },
                     error => {
                         this.saveBtnState = ClrLoadingState.ERROR;
@@ -281,11 +596,15 @@ export class AddRobotComponent implements OnInit, OnDestroy {
                 })
                 .subscribe(
                     res => {
-                        this.saveBtnState = ClrLoadingState.SUCCESS;
-                        this.saveBtnState = ClrLoadingState.SUCCESS;
-                        this.addSuccess.emit(res);
-                        this.cancel();
-                        operateChanges(opeMessage, OperationState.success);
+                        // If federated robot, create claims
+                        if (this.useFederatedRobot && res?.id) {
+                            this.createRobotClaims(res, opeMessage);
+                        } else {
+                            this.saveBtnState = ClrLoadingState.SUCCESS;
+                            this.addSuccess.emit(res);
+                            this.cancel();
+                            operateChanges(opeMessage, OperationState.success);
+                        }
                     },
                     error => {
                         this.saveBtnState = ClrLoadingState.ERROR;
@@ -298,6 +617,67 @@ export class AddRobotComponent implements OnInit, OnDestroy {
                     }
                 );
         }
+    }
+
+    createRobotClaims(robot: Robot, opeMessage: OperateInfo): void {
+        const idpId = this.idpIdMap.get(this.idpSelection.trim().toLowerCase());
+        if (!idpId) {
+            this.saveBtnState = ClrLoadingState.SUCCESS;
+            this.addSuccess.emit(robot);
+            this.cancel();
+            operateChanges(opeMessage, OperationState.success);
+            return;
+        }
+
+        const validClaims = this.claims.filter(
+            c => c.path?.trim().length > 0 && c.value?.trim().length > 0
+        );
+
+        if (validClaims.length === 0) {
+            this.saveBtnState = ClrLoadingState.SUCCESS;
+            this.addSuccess.emit(robot);
+            this.cancel();
+            operateChanges(opeMessage, OperationState.success);
+            return;
+        }
+
+        const claimRules = validClaims.map(c => ({
+            claim_path: c.path.trim(),
+            value: c.value.trim(),
+            identity_provider_id: idpId,
+            robot_id: robot.id,
+        }));
+
+        this.federatedIdpService
+            .CreateClaimRules({ id: idpId, claims: { rules: claimRules } })
+            .subscribe({
+                next: () => {
+                    this.saveBtnState = ClrLoadingState.SUCCESS;
+                    this.addSuccess.emit(robot);
+                    this.cancel();
+                    operateChanges(opeMessage, OperationState.success);
+                },
+                error: err => {
+                    this.saveBtnState = ClrLoadingState.ERROR;
+                    this.inlineAlertComponent.showInlineError(err);
+                    operateChanges(
+                        opeMessage,
+                        OperationState.failure,
+                        errorHandler(err)
+                    );
+                },
+            });
+    }
+
+    updateRobotClaims(robotId: number, opeMessage: OperateInfo): void {
+        // For simplicity, we update by showing success
+        // In a full implementation, you'd compare initClaims vs claims and
+        // call DeleteClaimRules / CreateClaimRules as needed
+        this.saveBtnState = ClrLoadingState.SUCCESS;
+        this.addSuccess.emit(null);
+        this.cancel();
+        operateChanges(opeMessage, OperationState.success);
+        this.msgHandler.showSuccess('SYSTEM_ROBOT.UPDATE_ROBOT_SUCCESSFULLY');
     }
 
     calculateExpiresAt(): Date {

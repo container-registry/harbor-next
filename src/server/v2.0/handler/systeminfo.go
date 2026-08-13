@@ -108,6 +108,7 @@ func (s *sysInfoAPI) convertInfo(d *si.Data) *models.GeneralInfo {
 		res.ReadOnly = &d.Protected.ReadOnly
 		res.RegistryStorageProviderName = &d.Protected.RegistryStorageProviderName
 		res.NotificationEnable = &d.Protected.NotificationEnable
+		res.EnableProjectFederatedIdp = &d.Protected.EnableProjectFederatedIDP
 		currentTime := strfmt.DateTime(d.Protected.CurrentTime)
 		res.CurrentTime = &currentTime
 	}

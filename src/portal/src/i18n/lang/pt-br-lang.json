@@ -161,6 +161,7 @@
             "USER": "Usuários",
             "GROUP": "Grupos",
             "REGISTRY": "Repositórios Remotos",
+            "IDP": "Federated IDPs",
             "REPLICATION": "Replicações",
             "CONFIG": "Configuração",
             "VULNERABILITY": "Vulnerabilidades",
@@ -503,6 +504,10 @@
         "RESOURCE": "Recurso",
         "RESOURCE_TYPE": "Tipo de Recurso",
         "DOWNLOAD": "Baixar"
+    },
+    "FEDERATED_IDPS": {
+        "FILTER_PLACEHOLDER": "Filter Federated IDPs",
+        "NAME_PATTERN_ERROR": "Name must be lowercase and can only contain letters, numbers, and separators (. _ -)"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Gatilho",

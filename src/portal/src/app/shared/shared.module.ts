@@ -32,6 +32,8 @@ import { SearchResultComponent } from './components/global-search/search-result.
 import { GlobalSearchComponent } from './components/global-search/global-search.component';
 import { AboutDialogComponent } from './components/about-dialog/about-dialog.component';
 import {
+    FederatedIdpDefaultService,
+    FederatedIdpService,
     LabelDefaultService,
     LabelService,
     ProjectDefaultService,
@@ -249,6 +251,7 @@ ClarityIcons.add({
         { provide: ReplicationService, useClass: ReplicationDefaultService },
         { provide: LabelService, useClass: LabelDefaultService },
         { provide: SystemInfoService, useClass: SystemInfoDefaultService },
+        { provide: FederatedIdpService, useClass: FederatedIdpDefaultService },
         {
             provide: ScanningResultService,
             useClass: ScanningResultDefaultService,

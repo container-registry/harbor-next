@@ -30,6 +30,7 @@ import {
 } from '../../../shared/services';
 import { ErrorHandler } from '../../../shared/units/error-handler';
 import { debounceTime } from 'rxjs/operators';
+import { SysteminfoService } from '../../../../../ng-swagger-gen/services/systeminfo.service';
 import { DOWN, SHOW_ELLIPSIS_WIDTH, UP } from './project-detail.const';
 import { ProjectService } from '../../../../../ng-swagger-gen/services/project.service';
 import { ProjectSummaryQuota } from '../../../../../ng-swagger-gen/models/project-summary-quota';
@@ -73,12 +74,14 @@ export class ProjectDetailComponent
     hasLogListPermission: boolean;
     hasConfigurationListPermission: boolean;
     hasRobotListPermission: boolean;
+    hasFederatedIdpListPermission: boolean;
     hasTagRetentionPermission: boolean;
     hasTagImmutablePermission: boolean;
     hasWebhookListPermission: boolean;
     hasScannerReadPermission: boolean;
     hasP2pProviderReadPermission: boolean;
     hasQuotaReadPermission: boolean = false;
+    enableProjectFederatedIdp: boolean = false;
     tabLinkNavList = [
         {
             linkName: 'summary',
@@ -132,6 +135,14 @@ export class ProjectDetailComponent
             permissions: () => this.hasRobotListPermission,
         },
         {
+            linkName: 'federated-idp',
+            tabLinkInOverflow: false,
+            showTabName: 'PROJECT_DETAIL.FEDERATED_IDP',
+            permissions: () =>
+                this.hasFederatedIdpListPermission &&
+                this.enableProjectFederatedIdp,
+        },
+        {
             linkName: 'webhook',
             tabLinkInOverflow: false,
             showTabName: 'PROJECT_DETAIL.WEBHOOKS',
@@ -168,7 +179,8 @@ export class ProjectDetailComponent
         private userPermissionService: UserPermissionService,
         private errorHandler: ErrorHandler,
         private cdf: ChangeDetectorRef,
-        private event: EventService
+        private event: EventService,
+        private systemInfoService: SysteminfoService
     ) {
         this.hasSignedIn = this.sessionService.getCurrentUser() !== null;
         this.route.data.subscribe(data => {
@@ -183,6 +195,7 @@ export class ProjectDetailComponent
     ngOnInit() {
         this.projectId = this.route.snapshot.params['id'];
         this.getPermissionsList(this.projectId);
+        this.loadProjectFederatedIdpConfig();
         if (!this._subscription) {
             this._subscription = this._subject
                 .pipe(debounceTime(100))
@@ -202,6 +215,23 @@ export class ProjectDetailComponent
                 }
             );
         }
+    }
+
+    loadProjectFederatedIdpConfig(): void {
+        this.systemInfoService.getSystemInfo().subscribe({
+            next: systemInfo => {
+                this.enableProjectFederatedIdp = Boolean(
+                    systemInfo?.enable_project_federated_idp &&
+                        systemInfo?.enable_commercial_identity_providers
+                );
+            },
+            error: error => {
+                console.error(
+                    'Error loading project federated IdP config:',
+                    error
+                );
+            },
+        });
     }
 
     ngAfterViewInit() {
@@ -280,6 +310,13 @@ export class ProjectDetailComponent
         permissionsList.push(
             this.userPermissionService.getPermission(
                 projectId,
+                USERSTATICPERMISSION.FEDERATED_IDP.KEY,
+                USERSTATICPERMISSION.FEDERATED_IDP.VALUE.LIST
+            )
+        );
+        permissionsList.push(
+            this.userPermissionService.getPermission(
+                projectId,
                 USERSTATICPERMISSION.LABEL.KEY,
                 USERSTATICPERMISSION.LABEL.VALUE.CREATE
             )
@@ -337,6 +374,7 @@ export class ProjectDetailComponent
                     this.hasLabelListPermission,
                     this.hasRepositoryListPermission,
                     this.hasRobotListPermission,
+                    this.hasFederatedIdpListPermission,
                     this.hasLabelCreatePermission,
                     this.hasTagRetentionPermission,
                     this.hasTagImmutablePermission,

@@ -132,6 +132,16 @@ export const USERSTATICPERMISSION = {
             DELETE: 'delete',
         },
     },
+    FEDERATED_IDP: {
+        KEY: 'federated-idp',
+        VALUE: {
+            CREATE: 'create',
+            UPDATE: 'update',
+            DELETE: 'delete',
+            LIST: 'list',
+            READ: 'read',
+        },
+    },
     ROBOT: {
         KEY: 'robot',
         VALUE: {

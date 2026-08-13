@@ -82,6 +82,7 @@ func (s *sysInfoCtlTestSuite) TestGetInfo() {
 					RegistryStorageProviderName: "filesystem",
 					ReadOnly:                    false,
 					NotificationEnable:          false,
+					EnableProjectFederatedIDP:   true,
 				},
 			},
 		},

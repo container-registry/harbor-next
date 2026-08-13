@@ -160,6 +160,7 @@
             "NAME": "Administración",
             "USER": "Usuarios",
             "REGISTRY": "Registries",
+            "IDP": "Federated IDPs",
             "GROUP": "Grupos",
             "REPLICATION": "Replicación",
             "CONFIG": "Configuración",
@@ -504,6 +505,10 @@
         "RESOURCE": "Recursos",
         "RESOURCE_TYPE": "Tipo de Recurso",
         "DOWNLOAD": "Descargar"
+    },
+    "FEDERATED_IDPS": {
+        "FILTER_PLACEHOLDER": "Filter Federated IDPs",
+        "NAME_PATTERN_ERROR": "Name must be lowercase and can only contain letters, numbers, and separators (. _ -)"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Disparador",

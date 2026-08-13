@@ -31,6 +31,7 @@ import (
 	"github.com/goharbor/harbor/src/common/security/local"
 	robotSec "github.com/goharbor/harbor/src/common/security/robot"
 	"github.com/goharbor/harbor/src/controller/artifact"
+	"github.com/goharbor/harbor/src/controller/federatedidp"
 	"github.com/goharbor/harbor/src/controller/p2p/preheat"
 	"github.com/goharbor/harbor/src/controller/project"
 	"github.com/goharbor/harbor/src/controller/quota"
@@ -76,6 +77,7 @@ func newProjectAPI() *projectAPI {
 		memberMgr:     member.Mgr,
 		quotaCtl:      quota.Ctl,
 		robotMgr:      robot.Mgr,
+		fedidpCtl:     federatedidp.Ctl,
 		preheatCtl:    preheat.Ctl,
 		retentionCtl:  retention.Ctl,
 		scannerCtl:    scanner.DefaultController,
@@ -94,6 +96,7 @@ type projectAPI struct {
 	memberMgr     member.Manager
 	quotaCtl      quota.Controller
 	robotMgr      robot.Manager
+	fedidpCtl     federatedidp.Controller
 	preheatCtl    preheat.Controller
 	retentionCtl  retention.Controller
 	scannerCtl    scanner.Controller
@@ -283,6 +286,11 @@ func (a *projectAPI) DeleteProject(ctx context.Context, params operation.DeleteP
 
 	// remove the robot associated with the project
 	if err := a.robotMgr.DeleteByProjectID(ctx, p.ProjectID); err != nil {
+		return a.SendError(ctx, err)
+	}
+
+	// remove the federated idps associated with the project
+	if err := a.fedidpCtl.DeleteByProjectID(ctx, p.ProjectID); err != nil {
 		return a.SendError(ctx, err)
 	}
 

@@ -161,6 +161,7 @@
             "USER": "使用者",
             "GROUP": "群組",
             "REGISTRY": "Registry",
+            "IDP": "Federated IDPs",
             "REPLICATION": "複製",
             "CONFIG": "組態設定",
             "VULNERABILITY": "弱點",
@@ -503,6 +504,10 @@
         "RESOURCE": "資源",
         "RESOURCE_TYPE": "資源類型",
         "DOWNLOAD": "下載"
+    },
+    "FEDERATED_IDPS": {
+        "FILTER_PLACEHOLDER": "Filter Federated IDPs",
+        "NAME_PATTERN_ERROR": "Name must be lowercase and can only contain letters, numbers, and separators (. _ -)"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "觸發器",

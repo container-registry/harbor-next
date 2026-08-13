@@ -40,19 +40,20 @@ func (r *Robot) ToSwagger() *models.Robot {
 	}
 
 	return &models.Robot{
-		ID:           r.ID,
-		Name:         r.Name,
-		Description:  r.Description,
-		ExpiresAt:    r.ExpiresAt,
-		Duration:     &r.Duration,
-		Level:        r.Level,
-		Disable:      r.Disabled,
-		Editable:     r.Editable,
-		CreatorType:  r.CreatorType,
-		CreatorRef:   r.CreatorRef,
-		CreationTime: strfmt.DateTime(r.CreationTime),
-		UpdateTime:   strfmt.DateTime(r.UpdateTime),
-		Permissions:  perms,
+		ID:             r.ID,
+		Name:           r.Name,
+		Description:    r.Description,
+		ExpiresAt:      r.ExpiresAt,
+		Duration:       &r.Duration,
+		Level:          r.Level,
+		Disable:        r.Disabled,
+		Editable:       r.Editable,
+		CreatorType:    r.CreatorType,
+		CreatorRef:     r.CreatorRef,
+		CreationTime:   strfmt.DateTime(r.CreationTime),
+		UpdateTime:     strfmt.DateTime(r.UpdateTime),
+		Permissions:    perms,
+		FederatedidpID: &r.FederatedIdpID,
 	}
 }
 

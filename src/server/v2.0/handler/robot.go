@@ -29,10 +29,13 @@ import (
 	"github.com/goharbor/harbor/src/common/security/local"
 	robotSc "github.com/goharbor/harbor/src/common/security/robot"
 	"github.com/goharbor/harbor/src/common/utils"
+	"github.com/goharbor/harbor/src/controller/federatedidp"
 	"github.com/goharbor/harbor/src/controller/robot"
 	"github.com/goharbor/harbor/src/lib"
+	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
+	"github.com/goharbor/harbor/src/pkg/commercial"
 	"github.com/goharbor/harbor/src/pkg/permission/types"
 	pkg "github.com/goharbor/harbor/src/pkg/robot/model"
 	"github.com/goharbor/harbor/src/server/v2.0/handler/model"
@@ -42,18 +45,24 @@ import (
 
 func newRobotAPI() *robotAPI {
 	return &robotAPI{
-		robotCtl: robot.Ctl,
+		robotCtl:  robot.Ctl,
+		fedidpCtl: federatedidp.Ctl,
 	}
 }
 
 type robotAPI struct {
 	BaseAPI
-	robotCtl robot.Controller
+	robotCtl  robot.Controller
+	fedidpCtl federatedidp.Controller
 }
 
 func (rAPI *robotAPI) CreateRobot(ctx context.Context, params operation.CreateRobotParams) middleware.Responder {
 	if err := validateName(params.Robot.Name); err != nil {
 		return rAPI.SendError(ctx, err)
+	}
+
+	if hasFederatedIDP(params.Robot.FederatedidpID) {
+		sanitizeFederatedRobotPermissions(params.Robot.Permissions)
 	}
 
 	if err := rAPI.validate(params.Robot.Duration, params.Robot.Level, params.Robot.Permissions); err != nil {
@@ -105,10 +114,63 @@ func (rAPI *robotAPI) CreateRobot(ctx context.Context, params operation.CreateRo
 	if err := robot.SetProject(ctx, r); err != nil {
 		return rAPI.SendError(ctx, err)
 	}
+	if hasFederatedIDP(params.Robot.FederatedidpID) && !commercial.Enabled(ctx, commercial.IdentityProviders) {
+		return rAPI.SendError(ctx, errors.ForbiddenError(nil).WithMessage("commercial feature identity_providers is not enabled"))
+	}
 
 	rid, pwd, err := rAPI.robotCtl.Create(ctx, r)
 	if err != nil {
 		return rAPI.SendError(ctx, err)
+	}
+
+	if params.Robot.FederatedidpID != nil {
+		idpID := *params.Robot.FederatedidpID
+		if idpID > 0 {
+			// Fetch the federated IDP to validate project scope and permissions
+			idp, err := rAPI.fedidpCtl.Get(ctx, idpID)
+			if err != nil {
+				return rAPI.SendError(ctx, err)
+			}
+
+			// Validate project scope:
+			// - System-level robot (project_id=0) can only link to system-level IDP (project_id=0)
+			// - Project-level robot can link to same-project IDP OR system-level IDP
+			if r.ProjectID == 0 {
+				// System-level robot can only use system-level IDP
+				if idp.ProjectID != 0 {
+					return rAPI.SendError(ctx, errors.ForbiddenError(nil).
+						WithMessage("system-level robot can only be linked to system-level federated IDP"))
+				}
+			} else {
+				// Project-level robot can use same-project IDP or system-level IDP
+				if idp.ProjectID != 0 && idp.ProjectID != r.ProjectID {
+					return rAPI.SendError(ctx, errors.ForbiddenError(nil).
+						WithMessage("robot can only be linked to federated IDP from the same project or system level"))
+				}
+			}
+
+			// Check user has permission to access the federated IDP
+			if idp.ProjectID > 0 {
+				// Project-level IDP: check project access
+				if err := rAPI.RequireProjectAccess(ctx, idp.ProjectID, rbac.ActionRead, rbac.ResourceFederatedIdp); err != nil {
+					return rAPI.SendError(ctx, err)
+				}
+			} else {
+				// System-level IDP: check system access
+				if err := rAPI.RequireSystemAccess(ctx, rbac.ActionRead, rbac.ResourceFederatedIdp); err != nil {
+					return rAPI.SendError(ctx, err)
+				}
+			}
+
+			// For project-level robots, check if project federated IDP feature is enabled
+			if r.Level == robot.LEVELPROJECT && !config.EnableProjectFederatedIDP(ctx) {
+				return rAPI.SendError(ctx, errors.ForbiddenError(nil).WithMessage("project-level federated identity provider feature is not enabled"))
+			}
+			_, err = rAPI.fedidpCtl.CreateRobotIdp(ctx, idpID, rid)
+			if err != nil {
+				return rAPI.SendError(ctx, err)
+			}
+		}
 	}
 
 	created, err := rAPI.robotCtl.Get(ctx, rid, nil)
@@ -116,14 +178,31 @@ func (rAPI *robotAPI) CreateRobot(ctx context.Context, params operation.CreateRo
 		return rAPI.SendError(ctx, err)
 	}
 
+	var fedIdpID int64
+	if params.Robot.FederatedidpID != nil {
+		fedIdpID = *params.Robot.FederatedidpID
+	}
+
 	location := fmt.Sprintf("%s/%d", strings.TrimSuffix(params.HTTPRequest.URL.Path, "/"), created.ID)
 	return operation.NewCreateRobotCreated().WithLocation(location).WithPayload(&models.RobotCreated{
-		ID:           created.ID,
-		Name:         created.Name,
-		Secret:       pwd,
-		CreationTime: strfmt.DateTime(created.CreationTime),
-		ExpiresAt:    created.ExpiresAt,
+		ID:             created.ID,
+		Name:           created.Name,
+		FederatedidpID: fedIdpID,
+		Secret:         robotCreatedSecret(fedIdpID, pwd),
+		CreationTime:   strfmt.DateTime(created.CreationTime),
+		ExpiresAt:      created.ExpiresAt,
 	})
+}
+
+func robotCreatedSecret(fedIdpID int64, secret string) string {
+	if fedIdpID > 0 {
+		return ""
+	}
+	return secret
+}
+
+func hasFederatedIDP(id *int64) bool {
+	return id != nil && *id > 0
 }
 
 func (rAPI *robotAPI) DeleteRobot(ctx context.Context, params operation.DeleteRobotParams) middleware.Responder {
@@ -147,6 +226,22 @@ func (rAPI *robotAPI) DeleteRobot(ctx context.Context, params operation.DeleteRo
 		}
 		return rAPI.SendError(ctx, err)
 	}
+
+	// delete all claim_rules records associated with the given robot_id
+	if err := rAPI.fedidpCtl.DeleteClaimRulesByRobotID(ctx, params.RobotID); err != nil {
+		if errors.IsNotFoundErr(err) {
+			return operation.NewDeleteRobotOK()
+		}
+		return rAPI.SendError(ctx, err)
+	}
+	// check if robotidp record exists if yes, delete it
+	if err := rAPI.fedidpCtl.DeleteRobotIdpByRobotID(ctx, params.RobotID); err != nil {
+		if errors.IsNotFoundErr(err) {
+			return operation.NewDeleteRobotOK()
+		}
+		return rAPI.SendError(ctx, err)
+	}
+
 	return operation.NewDeleteRobotOK()
 }
 
@@ -209,6 +304,13 @@ func (rAPI *robotAPI) ListRobot(ctx context.Context, params operation.ListRobotP
 
 	var results []*models.Robot
 	for _, r := range robots {
+		// Populate federatedidp_id for each robot
+		idpID, err := rAPI.fedidpCtl.GetIdpIDByRobotID(ctx, r.ID)
+		if err != nil {
+			log.Warningf("failed to get federated idp id for robot %d: %v", r.ID, err)
+		} else {
+			r.FederatedIdpID = idpID
+		}
 		results = append(results, model.NewRobot(r).ToSwagger())
 	}
 
@@ -231,6 +333,14 @@ func (rAPI *robotAPI) GetRobotByID(ctx context.Context, params operation.GetRobo
 	}
 	if err := rAPI.requireAccess(ctx, r, rbac.ActionRead); err != nil {
 		return rAPI.SendError(ctx, err)
+	}
+
+	// Populate federatedidp_id for the robot
+	idpID, err := rAPI.fedidpCtl.GetIdpIDByRobotID(ctx, r.ID)
+	if err != nil {
+		log.Warningf("failed to get federated idp id for robot %d: %v", r.ID, err)
+	} else {
+		r.FederatedIdpID = idpID
 	}
 
 	return operation.NewGetRobotByIDOK().WithPayload(model.NewRobot(r).ToSwagger())
@@ -268,6 +378,14 @@ func (rAPI *robotAPI) RefreshSec(ctx context.Context, params operation.RefreshSe
 	r, err := rAPI.robotCtl.Get(ctx, params.RobotID, nil)
 	if err != nil {
 		return rAPI.SendError(ctx, err)
+	}
+
+	hasIdp, err := rAPI.fedidpCtl.HasRobotIdpByRobotID(ctx, r.ID)
+	if err != nil {
+		return rAPI.SendError(ctx, err)
+	}
+	if hasIdp {
+		return rAPI.SendError(ctx, errors.New(nil).WithMessage("cannot refresh secret, robot has identity provider associated").WithCode(errors.BadRequestCode))
 	}
 
 	if err := rAPI.requireAccess(ctx, r, rbac.ActionUpdate); err != nil {
@@ -371,6 +489,13 @@ func (rAPI *robotAPI) updateV2Robot(ctx context.Context, params operation.Update
 	if params.Robot.Duration == nil {
 		params.Robot.Duration = &r.Duration
 	}
+	hasIdp, err := rAPI.fedidpCtl.HasRobotIdpByRobotID(ctx, r.ID)
+	if err != nil {
+		return err
+	}
+	if hasIdp {
+		sanitizeFederatedRobotPermissions(params.Robot.Permissions)
+	}
 	if err := rAPI.validate(*params.Robot.Duration, params.Robot.Level, params.Robot.Permissions); err != nil {
 		return err
 	}
@@ -441,6 +566,29 @@ func containsAccess(policies []*types.Policy, item *models.Access) bool {
 		}
 	}
 	return false
+}
+
+func sanitizeFederatedRobotPermissions(permissions []*models.RobotPermission) {
+	for _, perm := range permissions {
+		if perm == nil {
+			continue
+		}
+
+		accesses := perm.Access[:0]
+		for _, access := range perm.Access {
+			if !isFederatedRobotBlockedAccess(access) {
+				accesses = append(accesses, access)
+			}
+		}
+		perm.Access = accesses
+	}
+}
+
+func isFederatedRobotBlockedAccess(access *models.Access) bool {
+	if access == nil || access.Resource != rbac.ResourceRobot.String() {
+		return false
+	}
+	return access.Action == rbac.ActionCreate.String() || access.Action == rbac.ActionUpdate.String()
 }
 
 // isValidPermissionScope checks if permission slice A is a subset of permission slice B

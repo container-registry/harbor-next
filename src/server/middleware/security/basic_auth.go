@@ -17,6 +17,8 @@ package security
 import (
 	"net/http"
 	"os"
+	"slices"
+	"strings"
 
 	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/common/models"
@@ -24,6 +26,7 @@ import (
 	"github.com/goharbor/harbor/src/common/security/local"
 	"github.com/goharbor/harbor/src/core/auth"
 	"github.com/goharbor/harbor/src/lib"
+	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/log"
 )
 
@@ -59,13 +62,24 @@ func GetUserAgent(r *http.Request) string {
 	return r.Header.Get("user-agent")
 }
 
+func IsJWT(token string) bool {
+	token = strings.TrimSpace(token)
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return false
+	}
+	if slices.Contains(parts, "") {
+		return false
+	}
+	return true
+}
+
 func (b *basicAuth) Generate(req *http.Request) security.Context {
 	log := log.G(req.Context())
 	username, password, ok := req.BasicAuth()
 	if !ok {
 		return nil
 	}
-
 	// In OIDC/LDAP/UAA modes only the admin uses basic auth; other principals are
 	// handled by earlier generators (robot, OIDC CLI), so skipping them spares a
 	// useless auth-backend round-trip. Empty mode is treated as DB auth (as in
@@ -73,6 +87,10 @@ func (b *basicAuth) Generate(req *http.Request) security.Context {
 	authMode := lib.GetAuthMode(req.Context())
 	if authMode != "" && authMode != common.DBAuth && !auth.IsSuperUser(req.Context(), username) {
 		log.Debugf("basic auth skipped for user %s, auth mode is %s", username, authMode)
+		return nil
+	}
+
+	if strings.HasPrefix(username, config.RobotPrefix(req.Context())) && IsJWT(password) {
 		return nil
 	}
 

@@ -227,6 +227,9 @@ const (
 	// AuditLogEventsDisabled ...
 	AuditLogEventsDisabled = "disabled_audit_log_event_types"
 
+	// EnableProjectFederatedIDP indicates whether enable federated idp for project
+	EnableProjectFederatedIDP = "enable_project_federated_idp"
+
 	// SessionTimeout defines the web session timeout
 	SessionTimeout = "session_timeout"
 

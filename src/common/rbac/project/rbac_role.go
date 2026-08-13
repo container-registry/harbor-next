@@ -71,6 +71,12 @@ var (
 			{Resource: rbac.ResourceConfiguration, Action: rbac.ActionRead},
 			{Resource: rbac.ResourceConfiguration, Action: rbac.ActionUpdate},
 
+			{Resource: rbac.ResourceFederatedIdp, Action: rbac.ActionCreate},
+			{Resource: rbac.ResourceFederatedIdp, Action: rbac.ActionRead},
+			{Resource: rbac.ResourceFederatedIdp, Action: rbac.ActionUpdate},
+			{Resource: rbac.ResourceFederatedIdp, Action: rbac.ActionDelete},
+			{Resource: rbac.ResourceFederatedIdp, Action: rbac.ActionList},
+
 			{Resource: rbac.ResourceRobot, Action: rbac.ActionCreate},
 			{Resource: rbac.ResourceRobot, Action: rbac.ActionRead},
 			{Resource: rbac.ResourceRobot, Action: rbac.ActionUpdate},

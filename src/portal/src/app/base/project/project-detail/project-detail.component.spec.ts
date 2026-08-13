@@ -32,6 +32,7 @@ import {
     UserPermissionService,
 } from '../../../shared/services';
 import { ErrorHandler } from '../../../shared/units/error-handler';
+import { SysteminfoService } from '../../../../../ng-swagger-gen/services/systeminfo.service';
 
 describe('ProjectDetailComponent', () => {
     let component: ProjectDetailComponent;
@@ -59,6 +60,14 @@ describe('ProjectDetailComponent', () => {
     const mockProjectService = null;
     const mockErrorHandler = {
         error() {},
+    };
+    const mockSysteminfoService = {
+        getSystemInfo() {
+            return of({
+                enable_project_federated_idp: true,
+                enable_commercial_identity_providers: true,
+            });
+        },
     };
     const mockActivatedRoute = {
         RouterparamMap: of({ get: key => 'value' }),
@@ -105,6 +114,7 @@ describe('ProjectDetailComponent', () => {
                     provide: ActivatedRoute,
                     useValue: mockActivatedRoute,
                 },
+                { provide: SysteminfoService, useValue: mockSysteminfoService },
             ],
         }).compileComponents();
     });
@@ -117,5 +127,19 @@ describe('ProjectDetailComponent', () => {
 
     it('should create', () => {
         expect(component).toBeTruthy();
+    });
+
+    it('should hide project identity providers when the commercial feature is disabled', () => {
+        spyOn(mockSysteminfoService, 'getSystemInfo').and.returnValue(
+            of({
+                enable_project_federated_idp: true,
+                enable_commercial_identity_providers: false,
+            })
+        );
+        component.enableProjectFederatedIdp = true;
+
+        component.loadProjectFederatedIdpConfig();
+
+        expect(component.enableProjectFederatedIdp).toBeFalse();
     });
 });

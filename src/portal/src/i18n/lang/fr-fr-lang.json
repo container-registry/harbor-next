@@ -161,6 +161,7 @@
             "USER": "Utilisateurs",
             "GROUP": "Groupes",
             "REGISTRY": "Registres",
+            "IDP": "Federated IDPs",
             "REPLICATION": "Réplication",
             "CONFIG": "Configuration",
             "VULNERABILITY": "Vulnérabilités",
@@ -505,6 +506,10 @@
         "RESOURCE": "Ressource",
         "RESOURCE_TYPE": "Type de ressource",
         "DOWNLOAD": "Télécharger"
+    },
+    "FEDERATED_IDPS": {
+        "FILTER_PLACEHOLDER": "Filter Federated IDPs",
+        "NAME_PATTERN_ERROR": "Name must be lowercase and can only contain letters, numbers, and separators (. _ -)"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Déclencheur",

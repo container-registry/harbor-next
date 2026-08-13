@@ -161,6 +161,7 @@
             "USER": "Kullanıcılar",
             "GROUP": "Gruplar",
             "REGISTRY": "Kayıt",
+            "IDP": "Federated IDPs",
             "REPLICATION": "Kopyalama",
             "CONFIG": "Yapılandırma",
             "VULNERABILITY": "Güvenlik Açığı",
@@ -503,6 +504,10 @@
         "RESOURCE": "Resource",
         "RESOURCE_TYPE": "Resource Type",
         "DOWNLOAD": "İndir"
+    },
+    "FEDERATED_IDPS": {
+        "FILTER_PLACEHOLDER": "Filter Federated IdPs",
+        "NAME_PATTERN_ERROR": "Name must be lowercase and can only contain letters, numbers, and separators (. _ -)"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Tetikleyici",

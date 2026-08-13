@@ -136,6 +136,9 @@
             <clr-dg-column>{{
                 'ROBOT_ACCOUNT.ENABLED_STATE' | translate
             }}</clr-dg-column>
+            <clr-dg-column>{{
+                'SYSTEM_ROBOT.FEDERATED_IDP' | translate
+            }}</clr-dg-column>
             <clr-dg-column class="permission-col">{{
                 'ROBOT_ACCOUNT.SYSTEM_PERMISSIONS' | translate
             }}</clr-dg-column>
@@ -168,6 +171,7 @@
                         size="16"
                         class="color-red red-position"></clr-icon>
                 </clr-dg-cell>
+                <clr-dg-cell>{{ getFedIdpName(r) }}</clr-dg-cell>
                 <clr-dg-cell>
                     <span *ngIf="!getSystemAccess(r)?.length">
                         {{ 'SCHEDULE.NONE' | translate }}

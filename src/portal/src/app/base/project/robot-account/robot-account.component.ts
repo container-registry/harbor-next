@@ -39,6 +39,7 @@ import { FilterComponent } from '../../../shared/components/filter/filter.compon
 import { MessageHandlerService } from '../../../shared/services/message-handler.service';
 import { OperationService } from '../../../shared/components/operation/operation.service';
 import { RobotService } from '../../../../../ng-swagger-gen/services/robot.service';
+import { FederatedIdpService } from '../../../../../ng-swagger-gen/services/federated-idp.service';
 import { Robot } from '../../../../../ng-swagger-gen/models/robot';
 import { ActivatedRoute } from '@angular/router';
 import { Project } from '../../../../../ng-swagger-gen/models/project';
@@ -100,6 +101,14 @@ export class RobotAccountComponent implements OnInit, OnDestroy {
 
     loadingMetadata: boolean = false;
     robotMetadata: Permissions;
+
+    // Federated IdP support
+    enableProjectFederatedIdp: boolean = false;
+    fedIdpMap: Map<number, string> = new Map();
+    configLoaded: boolean = false;
+    hasFederatedIdpListPermission: boolean = false;
+    permissionsLoaded: boolean = false;
+
     constructor(
         private robotService: RobotService,
         private msgHandler: MessageHandlerService,
@@ -110,7 +119,8 @@ export class RobotAccountComponent implements OnInit, OnDestroy {
         private translate: TranslateService,
         private sanitizer: DomSanitizer,
         private systemInfoService: SysteminfoService,
-        private permissionService: PermissionsService
+        private permissionService: PermissionsService,
+        private federatedIdpService: FederatedIdpService
     ) {}
     ngOnInit() {
         this.getCurrentTime();
@@ -121,6 +131,7 @@ export class RobotAccountComponent implements OnInit, OnDestroy {
             this.projectName = project.name;
         }
         this.getPermissionsList();
+        this.loadProjectFederatedIdpConfig();
         if (!this.searchSub) {
             this.searchSub = this.filterComponent.filterTerms
                 .pipe(
@@ -209,6 +220,96 @@ export class RobotAccountComponent implements OnInit, OnDestroy {
             }
         });
     }
+
+    loadProjectFederatedIdpConfig() {
+        this.systemInfoService.getSystemInfo().subscribe({
+            next: systemInfo => {
+                if (systemInfo?.enable_project_federated_idp) {
+                    this.enableProjectFederatedIdp = true;
+                }
+                this.configLoaded = true;
+                this.maybeLoadFederatedIdps();
+            },
+            error: () => {
+                this.configLoaded = true;
+            },
+        });
+    }
+
+    maybeLoadFederatedIdps() {
+        // Only load FedIDPs if all conditions are met:
+        // 1. System config is loaded
+        // 2. Permissions are loaded
+        // 3. Feature is enabled
+        // 4. User has permission (only project admins have FederatedIdp permissions)
+        if (
+            this.configLoaded &&
+            this.permissionsLoaded &&
+            this.enableProjectFederatedIdp &&
+            this.hasFederatedIdpListPermission
+        ) {
+            this.loadFederatedIdps();
+        }
+    }
+
+    loadFederatedIdps() {
+        const projectQuery = `Level=project,ProjectID=${this.projectId}`;
+        const systemQuery = `Level=system`;
+
+        forkJoin([
+            this.federatedIdpService
+                .ListFederatedIdps({ q: encodeURIComponent(systemQuery) })
+                .pipe(
+                    catchError(err => {
+                        console.error(
+                            'Failed to load system federated IdPs',
+                            err
+                        );
+                        return of([]);
+                    })
+                ),
+            this.federatedIdpService
+                .ListFederatedIdps({ q: encodeURIComponent(projectQuery) })
+                .pipe(
+                    catchError(err => {
+                        console.error(
+                            'Failed to load project federated IdPs',
+                            err
+                        );
+                        return of([]);
+                    })
+                ),
+        ]).subscribe({
+            next: ([systemIdps, projectIdps]) => {
+                this.fedIdpMap.clear();
+                if (systemIdps?.length) {
+                    systemIdps.forEach(idp => {
+                        if (idp.id && idp.name) {
+                            this.fedIdpMap.set(idp.id, idp.name);
+                        }
+                    });
+                }
+                if (projectIdps?.length) {
+                    projectIdps.forEach(idp => {
+                        if (idp.id && idp.name) {
+                            this.fedIdpMap.set(idp.id, idp.name);
+                        }
+                    });
+                }
+            },
+            error: err => {
+                console.error('Failed to load federated IdPs', err);
+            },
+        });
+    }
+
+    getFedIdpName(r: Robot): string {
+        if (r?.federatedidp_id && this.fedIdpMap.has(r.federatedidp_id)) {
+            return this.fedIdpMap.get(r.federatedidp_id);
+        }
+        return '';
+    }
+
     getPermissionsList(): void {
         let permissionsList = [];
         permissionsList.push(
@@ -239,6 +340,13 @@ export class RobotAccountComponent implements OnInit, OnDestroy {
                 USERSTATICPERMISSION.ROBOT.VALUE.READ
             )
         );
+        permissionsList.push(
+            this.userPermissionService.getPermission(
+                this.projectId,
+                USERSTATICPERMISSION.FEDERATED_IDP.KEY,
+                USERSTATICPERMISSION.FEDERATED_IDP.VALUE.LIST
+            )
+        );
 
         forkJoin(...permissionsList).subscribe(
             Rules => {
@@ -249,6 +357,9 @@ export class RobotAccountComponent implements OnInit, OnDestroy {
                 this.hasRobotUpdatePermission = Rules[1] as boolean;
                 this.hasRobotDeletePermission = Rules[2] as boolean;
                 this.hasRobotReadPermission = Rules[3] as boolean;
+                this.hasFederatedIdpListPermission = Rules[4] as boolean;
+                this.permissionsLoaded = true;
+                this.maybeLoadFederatedIdps();
             },
             error => this.msgHandler.error(error)
         );

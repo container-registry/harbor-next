@@ -22,6 +22,7 @@ import (
 	"github.com/goharbor/harbor/src/common/security"
 	robotCtx "github.com/goharbor/harbor/src/common/security/robot"
 	"github.com/goharbor/harbor/src/common/utils"
+	"github.com/goharbor/harbor/src/controller/federatedidp"
 	robot_ctl "github.com/goharbor/harbor/src/controller/robot"
 	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/log"
@@ -54,6 +55,15 @@ func (r *robot) Generate(req *http.Request) security.Context {
 	}
 
 	robot := robots[0]
+	hasIdp, err := federatedidp.Ctl.HasRobotIdpByRobotID(req.Context(), robot.ID)
+	if err != nil {
+		log.Errorf("failed to check federated identity provider for robot account %s: %v", name, err)
+		return nil
+	}
+	if !canAuthenticateRobotWithStaticSecret(hasIdp) {
+		log.Errorf("static secret authentication is disabled for federated robot account: %s", name)
+		return nil
+	}
 	if utils.Encrypt(secret, robot.Salt, utils.SHA256) != robot.Secret {
 		log.Errorf("failed to authenticate robot account: %s", name)
 		return nil
@@ -70,4 +80,8 @@ func (r *robot) Generate(req *http.Request) security.Context {
 
 	log.Debugf("a robot security context generated for request %s %s", req.Method, req.URL.Path)
 	return robotCtx.NewSecurityContext(robot)
+}
+
+func canAuthenticateRobotWithStaticSecret(hasFederatedIDP bool) bool {
+	return !hasFederatedIDP
 }
