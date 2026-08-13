@@ -23,11 +23,8 @@ tasks:
         tmp_root="${repo_root}/{{.RELEASE_READY_TMP_DIR}}"
         worktree_dir="${tmp_root}/worktree"
         patches_repo_dir="${tmp_root}/patches-repo"
-        branch_name="release-ready-check-${GITHUB_RUN_ID:-local-$$}"
 
         cleanup() {
-          git -C "${repo_root}" worktree remove --force "${worktree_dir}" >/dev/null 2>&1 || true
-          git -C "${repo_root}" branch -D "${branch_name}" >/dev/null 2>&1 || true
           rm -rf "${tmp_root}"
         }
 
@@ -35,7 +32,13 @@ tasks:
         trap cleanup EXIT
 
         mkdir -p "${tmp_root}"
-        git worktree add -b "${branch_name}" "${worktree_dir}" HEAD
+        # A real clone, not `git worktree add` — jj refuses to colocate
+        # inside a linked git worktree ("Cannot create a colocated jj repo
+        # inside a Git worktree"), since worktrees share their main repo's
+        # .git and jj colocation is tied to that. A clone is an independent
+        # repo apply-commercial-patches can freely `jj git init --colocate`.
+        git clone --local "${repo_root}" "${worktree_dir}"
+        git -C "${worktree_dir}" checkout -B release-ready-check "$(git -C "${repo_root}" rev-parse HEAD)"
 
         task --taskfile "${repo_root}/taskfile/release-ready.yml" apply-commercial-patches \
           RELEASE_PATCH_TARGET_DIR="${worktree_dir}" \
@@ -112,13 +115,17 @@ tasks:
         # Shallow-fetch each branch directly into the target worktree. depth=10
         # comfortably covers a direct 8gcr-main child (depth 1) or a branch
         # stacked one level deep (e.g. 0005 on 0004, depth 2) without pulling
-        # full history.
+        # full history. Resolve to a raw SHA before handing off to jj — jj
+        # only exposes refs/remotes/<name>/* as revsets for remotes it has
+        # registered via `jj git remote`; "patches" is just a fetch-refspec
+        # destination, not a real remote, so jj can't resolve the ref path
+        # itself even though the commit is present. The SHA always works.
         parent_refs=()
         for branch in "${branches[@]}"; do
           echo "Fetching commercial branch: ${branch}"
           git -C "${patch_target_dir}" fetch --depth=10 "${remote_url}" \
             "${branch}:refs/remotes/patches/${branch}"
-          parent_refs+=("refs/remotes/patches/${branch}")
+          parent_refs+=("$(git -C "${patch_target_dir}" rev-parse "refs/remotes/patches/${branch}")")
         done
 
         if [ ! -d "${patch_target_dir}/.jj" ]; then
@@ -127,7 +134,11 @@ tasks:
 
         (cd "${patch_target_dir}" && jj new @ "${parent_refs[@]}" -m "release merge: ${branches[*]}")
 
-        if (cd "${patch_target_dir}" && jj log -r '@- & conflicts()' -T 'commit_id' --no-graph 2>/dev/null | grep -q .); then
+        # `jj new` moves the working copy TO the new merge commit — @ IS
+        # the merge itself here, not a child of it. Checking @- (the old
+        # parent) would never see a conflict since no single parent branch
+        # is conflicted on its own, only their combination is.
+        if (cd "${patch_target_dir}" && jj log -r '@ & conflicts()' -T 'commit_id' --no-graph 2>/dev/null | grep -q .); then
           echo "::error::Commercial branches did not merge cleanly" >&2
           echo "Conflicted paths:" >&2
           (cd "${patch_target_dir}" && jj resolve --list) >&2 || true
