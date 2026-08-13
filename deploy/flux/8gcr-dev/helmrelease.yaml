@@ -117,7 +117,7 @@ spec:
     exporter:
       enabled: true
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:f906fcbe391f4812e94bf2e7137898be865a730eea8393e8b80db8e70bcdf267" # {"$imagepolicy": "flux-system:harbor-exporter:digest"}
+        deploy.8gears.io/image-revision: "sha256:7adbd9cc8b678a033be65fbb03849d6fb408d04cc556bd836e3ae3943b47c4d9" # {"$imagepolicy": "flux-system:harbor-exporter:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-exporter
         tag: latest
@@ -125,7 +125,7 @@ spec:
     trivy:
       enabled: true
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:1b97fcbeac1264d9978ca3c682b793496bb46f06cebb1e0975abc78be13f07ef" # {"$imagepolicy": "flux-system:trivy-adapter:digest"}
+        deploy.8gears.io/image-revision: "sha256:8a63609a8bb166ef5c80aad238582b2d2dfade909233d057024f79f04c19bcec" # {"$imagepolicy": "flux-system:trivy-adapter:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/trivy-adapter
         tag: latest
