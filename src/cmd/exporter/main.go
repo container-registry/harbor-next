@@ -45,12 +45,17 @@ func main() {
 	dbCfg := &models.Database{
 		Type: "postgresql",
 		PostGreSQL: &models.PostGreSQL{
-			Host:              viper.GetString("database.host"),
-			Port:              viper.GetInt("database.port"),
-			Username:          viper.GetString("database.username"),
-			Password:          viper.GetString("database.password"),
-			Database:          viper.GetString("database.dbname"),
-			SSLMode:           viper.GetString("database.sslmode"),
+			Host:     viper.GetString("database.host"),
+			Port:     viper.GetInt("database.port"),
+			Username: viper.GetString("database.username"),
+			Password: viper.GetString("database.password"),
+			Database: viper.GetString("database.dbname"),
+			SSLMode:  viper.GetString("database.sslmode"),
+			// Exporter does not initialize an OTel MeterProvider and serves its
+			// own Prometheus registry (not the default one used by the OTel
+			// Prometheus exporter), so enabling pgx metrics here would attach
+			// them to a no-op meter and they'd never be scraped. Keep off.
+			MetricsEnabled:    false,
 			MaxOpenConns:      viper.GetInt("database.max_open_conns"),
 			ConnMaxLifetime:   getConnMaxLifetime(viper.GetString("database.conn_max_lifetime")),
 			ConnMaxIdleTime:   getConnMaxIdleTime(viper.GetString("database.conn_max_idle_time")),

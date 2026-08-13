@@ -271,6 +271,9 @@ func (bs *Bootstrap) LoadAndRun(ctx context.Context, cancel context.CancelFunc) 
 	// Wait everyone exits.
 	rootContext.WG.Wait()
 
+	if err := metric.ShutdownMeterProvider(context.Background()); err != nil {
+		logger.Warningf("shutdown meter provider: %v", err)
+	}
 	dao.ClosePool()
 
 	return

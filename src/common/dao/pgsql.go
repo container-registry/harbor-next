@@ -66,9 +66,25 @@ func (p *pgsql) Register(alias ...string) error {
 		}
 	}
 
-	pool, err := dbpool.New(context.Background(), p.cfg)
+	var opts []dbpool.Option
+	if p.cfg.MetricsEnabled {
+		tracer, err := dbpool.NewTracer(p.cfg.Database)
+		if err != nil {
+			return fmt.Errorf("dbpool: %w", err)
+		}
+		opts = append(opts, dbpool.WithTracer(tracer))
+	}
+
+	pool, err := dbpool.New(context.Background(), p.cfg, opts...)
 	if err != nil {
 		return fmt.Errorf("dbpool: %w", err)
+	}
+
+	if p.cfg.MetricsEnabled {
+		if err := dbpool.RegisterPoolMetrics(pool.PgxPool()); err != nil {
+			pool.Close()
+			return fmt.Errorf("dbpool: %w", err)
+		}
 	}
 
 	if err := pool.RegisterWithOrm(alias...); err != nil {

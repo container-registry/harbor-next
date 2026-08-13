@@ -186,6 +186,16 @@ func main() {
 	web.BConfig.MaxMemory = config.GetBeegoMaxMemoryBytes()
 	web.BConfig.MaxUploadSize = config.GetBeegoMaxUploadSizeBytes()
 
+	database, err := config.Database()
+	if err != nil {
+		log.Fatalf("failed to get database configuration: %v", err)
+	}
+	if database.PostGreSQL != nil && database.PostGreSQL.MetricsEnabled {
+		if err := metric.InitMeterProvider(); err != nil {
+			log.Fatalf("init meter provider: %v", err)
+		}
+	}
+
 	metricCfg := config.Metric()
 	if metricCfg.Enabled {
 		metric.RegisterCollectors()
@@ -195,10 +205,6 @@ func main() {
 	config.InitTraceConfig(ctx)
 	shutdownTracerProvider := tracelib.InitGlobalTracer(ctx)
 	token.InitCreators()
-	database, err := config.Database()
-	if err != nil {
-		log.Fatalf("failed to get database configuration: %v", err)
-	}
 	if err := dao.InitDatabase(database); err != nil {
 		log.Fatalf("failed to initialize database: %v", err)
 	}
@@ -257,7 +263,11 @@ func main() {
 
 	closing := make(chan struct{})
 	done := make(chan struct{})
-	go gracefulShutdown(closing, done, shutdownTracerProvider, dao.ClosePool)
+	go gracefulShutdown(closing, done, shutdownTracerProvider, func() {
+		if err := metric.ShutdownMeterProvider(context.Background()); err != nil {
+			log.Warningf("shutdown meter provider: %v", err)
+		}
+	}, dao.ClosePool)
 	// Start health checker for registries
 	go registry.Ctl.StartRegularHealthCheck(orm.Context(), closing, done)
 	// Init audit log
