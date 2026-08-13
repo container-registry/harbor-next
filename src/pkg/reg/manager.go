@@ -56,6 +56,8 @@ import (
 	_ "github.com/goharbor/harbor/src/pkg/reg/adapter/tencentcr"
 	// register the VolcEngine CR Registry adapter
 	_ "github.com/goharbor/harbor/src/pkg/reg/adapter/volcenginecr"
+	// register the storage adapter
+	_ "github.com/goharbor/harbor/src/pkg/reg/adapter/storage"
 )
 
 var (

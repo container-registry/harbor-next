@@ -494,12 +494,12 @@ func (t *transfer) pushManifest(manifest distribution.Manifest, repository, tag 
 	t.logger.Infof("pushing the manifest of artifact %s:%s ...", repository, tag)
 	mediaType, payload, err := manifest.Payload()
 	if err != nil {
-		t.logger.Errorf("failed to push manifest of artifact %s:%s: %v",
+		t.logger.Errorf("failed to push manifest of artifact on payload %s:%s: %v",
 			repository, tag, err)
 		return err
 	}
 	if _, err := t.dst.PushManifest(repository, tag, mediaType, payload); err != nil {
-		t.logger.Errorf("failed to push manifest of artifact %s:%s: %v",
+		t.logger.Errorf("failed to push manifest of artifact on push %s:%s: %v",
 			repository, tag, err)
 		return err
 	}

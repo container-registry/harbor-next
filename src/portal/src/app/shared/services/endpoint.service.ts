@@ -40,6 +40,7 @@ export const ADAPTERS_MAP = {
     'huawei-SWR': 'Huawei SWR',
     'jfrog-artifactory': 'JFrog Artifactory',
     quay: 'Quay',
+    sftp: 'SFTP',
     dtr: 'DTR',
     'tencent-tcr': 'Tencent TCR',
     'github-ghcr': 'Github GHCR',

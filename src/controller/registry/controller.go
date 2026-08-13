@@ -16,6 +16,7 @@ package registry
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"strings"
 	"time"
@@ -27,6 +28,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg"
+	"github.com/goharbor/harbor/src/pkg/commercial"
 	"github.com/goharbor/harbor/src/pkg/project"
 	"github.com/goharbor/harbor/src/pkg/reg"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
@@ -36,6 +38,30 @@ import (
 // Ctl is a global registry controller instance
 var Ctl = NewController()
 var regularHealthCheckInterval = 5 * time.Minute
+
+func init() {
+	commercial.RegisterRegistryTypes(commercial.SFTPReplication, model.RegistryTypeSFTP)
+	commercial.RegisterDisableGuard(commercial.SFTPReplication, sftpReplicationDisableGuard{regMgr: reg.Mgr}.Validate)
+}
+
+type sftpReplicationDisableGuard struct {
+	regMgr reg.Manager
+}
+
+func (g sftpReplicationDisableGuard) Validate(ctx context.Context) error {
+	count, err := g.regMgr.Count(ctx, &q.Query{
+		Keywords: map[string]any{
+			"Type": model.RegistryTypeSFTP,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("count SFTP registry endpoints: %w", err)
+	}
+	if count > 0 {
+		return fmt.Errorf("SFTP replication cannot be disabled while %d SFTP registry endpoint(s) exist", count)
+	}
+	return nil
+}
 
 // Controller defines the registry related operations
 type Controller interface {
@@ -86,13 +112,16 @@ func (c *controller) Create(ctx context.Context, registry *model.Registry) (int6
 }
 
 func (c *controller) validate(ctx context.Context, registry *model.Registry) error {
+	if err := validateCommercialRegistryType(ctx, registry.Type); err != nil {
+		return err
+	}
 	if len(registry.Name) == 0 {
 		return errors.New(nil).WithCode(errors.BadRequestCode).WithMessage("name cannot be empty")
 	}
 	if len(registry.Name) > 64 {
 		return errors.New(nil).WithCode(errors.BadRequestCode).WithMessage("the max length of name is 64")
 	}
-	url, err := lib.ValidateHTTPURL(registry.URL)
+	url, err := lib.ValidateURL(registry.URL)
 	if err != nil {
 		return err
 	}
@@ -170,6 +199,9 @@ func (c *controller) Delete(ctx context.Context, id int64) error {
 }
 
 func (c *controller) IsHealthy(ctx context.Context, registry *model.Registry) (bool, error) {
+	if err := validateCommercialRegistryType(ctx, registry.Type); err != nil {
+		return false, err
+	}
 	adapter, err := c.regMgr.CreateAdapter(ctx, registry)
 	if err != nil {
 		return false, err
@@ -190,6 +222,9 @@ func (c *controller) GetInfo(ctx context.Context, id int64) (*model.RegistryInfo
 	if err != nil {
 		return nil, err
 	}
+	if err := validateCommercialRegistryType(ctx, registry.Type); err != nil {
+		return nil, err
+	}
 
 	adapter, err := c.regMgr.CreateAdapter(ctx, registry)
 	if err != nil {
@@ -206,6 +241,13 @@ func (c *controller) GetInfo(ctx context.Context, id int64) (*model.RegistryInfo
 	}
 	info = process(info)
 	return info, nil
+}
+
+func validateCommercialRegistryType(ctx context.Context, registryType string) error {
+	if feature, gated := commercial.RegistryTypeFeature(registryType); gated && !commercial.Enabled(ctx, feature) {
+		return errors.ForbiddenError(nil).WithMessagef("commercial feature %s is not enabled", feature)
+	}
+	return nil
 }
 
 func getWhitelistedAdapters(ctx context.Context) map[string]struct{} {
@@ -231,6 +273,9 @@ func (c *controller) ListRegistryProviderTypes(ctx context.Context) ([]string, e
 	whitelistedAdapters := getWhitelistedAdapters(ctx)
 	var filtered []string
 	for _, t := range allAdapters {
+		if !commercial.RegistryTypeEnabled(ctx, t) {
+			continue
+		}
 		if _, ok := whitelistedAdapters[t]; ok {
 			filtered = append(filtered, t)
 		}
@@ -246,6 +291,9 @@ func (c *controller) ListRegistryProviderInfos(ctx context.Context) (map[string]
 	whitelistedAdapters := getWhitelistedAdapters(ctx)
 	filtered := make(map[string]*model.AdapterPattern)
 	for k, v := range allAdaptersInfo {
+		if !commercial.RegistryTypeEnabled(ctx, k) {
+			continue
+		}
 		if _, ok := whitelistedAdapters[k]; ok {
 			filtered[k] = v
 		}

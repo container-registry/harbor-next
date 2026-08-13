@@ -35,10 +35,11 @@ const (
 	RegistryTypeTencentTcr       = "tencent-tcr"
 	RegistryTypeGithubCR         = "github-ghcr"
 	RegistryTypeVolcCR           = "volcengine-cr"
-
-	RegistryTypeHelmHub     = "helm-hub"
-	RegistryTypeArtifactHub = "artifact-hub"
-	RegistryHarborSatellite = "harbor-satellite"
+	RegistryTypeSFTP             = "sftp"
+	RegistryTypeS3               = "s3"
+	RegistryTypeHelmHub          = "helm-hub"
+	RegistryTypeArtifactHub      = "artifact-hub"
+	RegistryHarborSatellite      = "harbor-satellite"
 
 	FilterStyleTypeText  = "input"
 	FilterStyleTypeRadio = "radio"
