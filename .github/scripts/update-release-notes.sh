@@ -71,9 +71,14 @@ if [[ -z "${release_branch}" ]]; then
   exit 1
 fi
 
-GH_TOKEN="${PATCHES_TOKEN}" gh repo clone container-registry/8gcr \
-  "${tmp_dir}/patches-repo" \
-  -- --depth=1 --branch main
+# `gh repo clone` shells out to git without reliably propagating GH_TOKEN as
+# a credential for the private container-registry/8gcr repo in this
+# non-interactive context ("could not read Username for 'https://github.com'").
+# Embed the token in the URL instead, same approach as
+# taskfile/release-ready.yml's apply-commercial-patches task.
+git clone --depth=1 --branch main \
+  "https://x-access-token:${PATCHES_TOKEN}@github.com/container-registry/8gcr" \
+  "${tmp_dir}/patches-repo"
 
 series="${tmp_dir}/patches-repo/8gcr-ee/patches/series"
 patch_notes="${tmp_dir}/commercial-patches.md"
