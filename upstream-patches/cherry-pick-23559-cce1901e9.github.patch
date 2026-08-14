@@ -1,0 +1,55 @@
+diff --git a/.github/ISSUE_TEMPLATE/bug_report.md b/.github/ISSUE_TEMPLATE/bug_report.md
+new file mode 100644
+index 000000000..4d07ed4c9
+--- /dev/null
++++ b/.github/ISSUE_TEMPLATE/bug_report.md
+@@ -0,0 +1,29 @@
++---
++name: Bug report
++about: Create a report to help us improve
++---
++
++> [!IMPORTANT]
++> If this is a security vulnerability, **do NOT** file a public issue.\
++> Report it privately via [GitHub private vulnerability reporting](https://github.com/goharbor/harbor/security/advisories/new).\ 
++> See [SECURITY.md](https://github.com/goharbor/harbor/blob/main/SECURITY.md) for the full disclosure policy.
++
++If you are reporting a problem, please make sure the following information is provided:
++
++**Expected behavior and actual behavior:**
++A clear and concise description of what you expected to happen and what's the actual behavior. If applicable, add screenshots to help explain your problem.
++
++**Steps to reproduce the problem:**
++Please provide the steps to reproduce this problem.
++
++**Versions:**
++Please specify the versions of following systems.
++
++- harbor version: [x.x.x]
++- docker engine version: [y.y.y]
++- docker-compose version: [z.z.z]
++
++**Additional context:**
++
++- **Harbor config files:** You can get them by packaging `harbor.yml` and files in the same directory, including subdirectory.
++- **Log files:** You can get them by package the `/var/log/harbor/` .
+diff --git a/.github/ISSUE_TEMPLATE/config.yml b/.github/ISSUE_TEMPLATE/config.yml
+index 21edc2d4c..8f80bd8e1 100644
+--- a/.github/ISSUE_TEMPLATE/config.yml
++++ b/.github/ISSUE_TEMPLATE/config.yml
+@@ -1,4 +1,5 @@
+ blank_issues_enabled: false
++<<<<<<< HEAD
+ 
+ contact_links:
+   - name: GitHub Discussions
+@@ -7,3 +8,9 @@ contact_links:
+   - name: Security Vulnerability
+     url: https://github.com/container-registry/harbor-next/security/advisories/new
+     about: Report Security Vulnerabilities privately
++=======
++contact_links:
++  - name: Report a security vulnerability
++    url: https://github.com/goharbor/harbor/security/advisories/new
++    about: Report a security vulnerability privately to the Harbor Security Team. Do not file a public issue. See SECURITY.md for the full disclosure policy.
++>>>>>>> cce1901e9 (docs: switch security reporting to GitHub private vulnerability reporting (#23559))
