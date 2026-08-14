@@ -79,14 +79,17 @@ fi
 # into the clone's `.git/config` and shows up in the process list (`ps`)
 # for the duration of the clone. The askpass script only ever reads the
 # token from its own environment, never as a command-line argument or URL.
+# Exported (not just prefixed on this one command) because the per-branch
+# `git fetch` loop below against the same private repo needs it too.
 askpass_script="${tmp_dir}/git-askpass.sh"
 cat > "${askpass_script}" <<'EOF'
 #!/usr/bin/env bash
 echo "${PATCHES_TOKEN}"
 EOF
 chmod 700 "${askpass_script}"
+export GIT_ASKPASS="${askpass_script}" PATCHES_TOKEN
 
-GIT_ASKPASS="${askpass_script}" PATCHES_TOKEN="${PATCHES_TOKEN}" git clone --depth=1 --branch main \
+git clone --depth=1 --branch main \
   "https://x-access-token@github.com/container-registry/8gcr" \
   "${tmp_dir}/patches-repo"
 
