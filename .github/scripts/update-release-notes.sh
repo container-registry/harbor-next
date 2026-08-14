@@ -74,10 +74,20 @@ fi
 # `gh repo clone` shells out to git without reliably propagating GH_TOKEN as
 # a credential for the private container-registry/8gcr repo in this
 # non-interactive context ("could not read Username for 'https://github.com'").
-# Embed the token in the URL instead, same approach as
-# taskfile/release-ready.yml's apply-commercial-patches task.
-git clone --depth=1 --branch main \
-  "https://x-access-token:${PATCHES_TOKEN}@github.com/container-registry/8gcr" \
+# Use a plain `git clone` instead, but via a one-shot GIT_ASKPASS helper
+# rather than embedding the token in the URL — an embedded token is written
+# into the clone's `.git/config` and shows up in the process list (`ps`)
+# for the duration of the clone. The askpass script only ever reads the
+# token from its own environment, never as a command-line argument or URL.
+askpass_script="${tmp_dir}/git-askpass.sh"
+cat > "${askpass_script}" <<'EOF'
+#!/usr/bin/env bash
+echo "${PATCHES_TOKEN}"
+EOF
+chmod 700 "${askpass_script}"
+
+GIT_ASKPASS="${askpass_script}" PATCHES_TOKEN="${PATCHES_TOKEN}" git clone --depth=1 --branch main \
+  "https://x-access-token@github.com/container-registry/8gcr" \
   "${tmp_dir}/patches-repo"
 
 series="${tmp_dir}/patches-repo/8gcr-ee/patches/series"
