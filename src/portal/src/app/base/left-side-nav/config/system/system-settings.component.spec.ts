@@ -19,7 +19,7 @@ import { Configuration } from '../config';
 import { SharedTestingModule } from '../../../../shared/shared.module';
 import { ConfigService } from '../config.service';
 import { AppConfigService } from '../../../../services/app-config.service';
-import { AuditlogService } from 'ng-swagger-gen/services';
+import { AuditlogService } from 'ng-swagger-gen/services/auditlog.service';
 import { HttpHeaders, HttpResponse } from '@angular/common/http';
 
 describe('SystemSettingsComponent', () => {

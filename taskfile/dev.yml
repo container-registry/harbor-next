@@ -26,15 +26,19 @@ vars:
   PORT_DEBUG_CORE:   '{{ add 2345  (mul (atoi .SLOT) 100) }}'
   PORT_DEBUG_JOB:    '{{ add 2346  (mul (atoi .SLOT) 100) }}'
   PORT_DEBUG_REGCTL: '{{ add 2347  (mul (atoi .SLOT) 100) }}'
+  PORT_METRIC_CORE:  '{{ add 9090  (mul (atoi .SLOT) 100) }}'
+  PORT_METRIC_JOB:   '{{ add 9091  (mul (atoi .SLOT) 100) }}'
 
-  PROJECT_PREFIX: 'harbor-{{.SLOT}}'
+  PROJECT_PREFIX: '{{.PROJECT_PREFIX | default (printf "harbor-%s" .SLOT)}}'
 
   # Base docker compose command with env-file for build args (GO_VERSION, BUN_VERSION, etc.)
   COMPOSE_CMD: 'docker compose -f {{.COMPOSE_FILE}} --env-file {{.VERSIONS_ENV}}'
+  COMPOSE_E2E_CMD: 'docker compose -f {{.COMPOSE_FILE}} -f devenv/docker-compose.e2e.yml --env-file {{.VERSIONS_ENV}}'
 
   # Docker Compose profile strings (reused across multiple tasks)
   ALL_PROFILES: "--profile portal --profile core --profile jobservice --profile registryctl --profile trivy"
   APP_PROFILES: "--profile portal --profile core --profile jobservice --profile registryctl"
+  E2E_PROFILES: "--profile core --profile jobservice --profile registryctl --profile e2e"
   BACKEND_PROFILES: "--profile core --profile jobservice --profile registryctl"
 
 env:
@@ -56,6 +60,8 @@ env:
   PORT_DEBUG_CORE:        '{{.PORT_DEBUG_CORE}}'
   PORT_DEBUG_JOBSERVICE:  '{{.PORT_DEBUG_JOB}}'
   PORT_DEBUG_REGISTRYCTL: '{{.PORT_DEBUG_REGCTL}}'
+  PORT_METRIC_CORE:       '{{.PORT_METRIC_CORE}}'
+  PORT_METRIC_JOBSERVICE: '{{.PORT_METRIC_JOB}}'
   CSRF_PLAINTEXT_HTTP:    '{{.CSRF_PLAINTEXT_HTTP | default "true"}}'
   DEV_UID:
     sh: id -u
@@ -122,6 +128,8 @@ tasks:
           "{{.PORT_PORTAL}}:Portal" \
           "{{.PORT_REGISTRY}}:Registry" \
           "{{.PORT_REGISTRYCTL}}:RegistryCtl" \
+          "{{.PORT_METRIC_CORE}}:CoreMetrics" \
+          "{{.PORT_METRIC_JOB}}:JobServiceMetrics" \
           "{{.PORT_TRIVY}}:Trivy"; do
           port="${pair%%:*}"
           name="${pair##*:}"
@@ -164,6 +172,8 @@ tasks:
       echo "  Registry:     localhost:{{.PORT_REGISTRY}}"
       echo "  RegistryCtl:  localhost:{{.PORT_REGISTRYCTL}}"
       echo "  Trivy:        localhost:{{.PORT_TRIVY}}"
+      echo "  Core Metrics: http://localhost:{{.PORT_METRIC_CORE}}/metrics"
+      echo "  Job Metrics:  http://localhost:{{.PORT_METRIC_JOB}}/metrics"
       echo "  Prefix:       {{.PROJECT_PREFIX}}"
       echo ""
 
@@ -190,6 +200,12 @@ tasks:
       - task: frontend:install
       - task: :build:gen-apis:frontend
 
+  _e2e-codegen:
+    internal: true
+    deps:
+      - :build:gen-apis
+      - _warm-caches
+
   up:
     desc: "Start backend containers and native Portal with hot reload (SKIP_TRIVY=true to exclude Trivy)"
     deps: [require-docker, require-ports, gen:private-key]
@@ -202,6 +218,16 @@ tasks:
       - '{{.COMPOSE_CMD}} {{.BACKEND_PROFILES}} {{.TRIVY_PROFILE}} up -d --build'
       - task: _wait-core
       - task: _frontend-serve
+
+  up:e2e:
+    desc: "Start all services for E2E in detached mode"
+    deps: [require-docker, require-ports, gen:private-key]
+    vars:
+      TRIVY_PROFILE: '{{if ne .SKIP_TRIVY "true"}}--profile trivy{{end}}'
+    cmds:
+      - task: _e2e-codegen
+      - task: info
+      - '{{.COMPOSE_E2E_CMD}} {{.E2E_PROFILES}} {{.TRIVY_PROFILE}} up -d --build'
 
   down:
     desc: Stop and remove all dev environment containers
@@ -270,7 +296,11 @@ tasks:
 
   infra:remove:
     desc: Stop all containers and delete all named volumes
-    cmd: '{{.COMPOSE_CMD}} {{.ALL_PROFILES}} down -v'
+    vars:
+      TRIVY_PROFILE: '{{if ne .SKIP_TRIVY "true"}}--profile trivy{{end}}'
+      REMOVE_COMPOSE_CMD: '{{if eq .E2E_ONLY "true"}}{{.COMPOSE_E2E_CMD}}{{else}}{{.COMPOSE_CMD}}{{end}}'
+      REMOVE_PROFILES: '{{if eq .E2E_ONLY "true"}}{{.E2E_PROFILES}} {{.TRIVY_PROFILE}}{{else}}{{.ALL_PROFILES}}{{end}}'
+    cmd: '{{.REMOVE_COMPOSE_CMD}} {{.REMOVE_PROFILES}} down -v'
 
   # ---------------------------------------------------------------------------
   # Backend Services (Containerized)
@@ -450,7 +480,20 @@ tasks:
     cmds:
       - '{{.COMPOSE_CMD}} {{.ALL_PROFILES}} down -v'
       - task: _frontend-stop
-      - rm -rf tmp/
+      - |
+        if [ -d tmp ]; then
+          if command -v podman >/dev/null 2>&1; then
+            podman unshare chown -R 0:0 tmp 2>/dev/null || true
+          fi
+          rm -rf tmp 2>/dev/null || true
+          if [ -d tmp ]; then
+            docker run --rm -v "$PWD/tmp:/cleanup" docker.io/library/alpine:{{.ALPINE_VERSION}} sh -c 'chmod -R u+rwX /cleanup 2>/dev/null || true; rm -rf /cleanup/* /cleanup/.[!.]* /cleanup/..?*'
+            rmdir tmp 2>/dev/null || true
+          fi
+          if [ -d tmp ]; then
+            rm -rf tmp
+          fi
+        fi
       - rm -rf src/portal/node_modules
       - rm -f build-errors.log
       - rm -f {{.TOKEN_KEY_FILE}}
@@ -464,3 +507,12 @@ tasks:
   logs:
     desc: Tail logs from all containers
     cmd: '{{.COMPOSE_CMD}} {{.ALL_PROFILES}} logs -f'
+
+  logs:snapshot:
+    desc: Print recent logs from all dev containers
+    vars:
+      TRIVY_PROFILE: '{{if ne .SKIP_TRIVY "true"}}--profile trivy{{end}}'
+      LOG_COMPOSE_CMD: '{{if eq .E2E_ONLY "true"}}{{.COMPOSE_E2E_CMD}}{{else}}{{.COMPOSE_CMD}}{{end}}'
+      LOG_PROFILES: '{{if eq .E2E_ONLY "true"}}{{.E2E_PROFILES}}{{else}}{{.APP_PROFILES}}{{end}}'
+      TAIL: '{{.TAIL | default "300"}}'
+    cmd: '{{.LOG_COMPOSE_CMD}} {{.LOG_PROFILES}} {{.TRIVY_PROFILE}} logs --tail={{.TAIL}}'

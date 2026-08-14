@@ -58,7 +58,6 @@ src/server/v2.0/restapi/
 harborclient/
 openapi-generator-cli.jar
 tests/e2e_setup/robotvars.py
-.task/checksum
 .task/
 deploy/chart/charts/
 devenv/token_service_key.pem
@@ -69,7 +68,23 @@ deploy/compose/config/certs/
 .env.local
 CLAUDE.md
 tmp/
+reports/
 bin
 .mcp.json
-.claude
+.claude/*
+!.claude/context/
+!.claude/skills/
 src/portal/src/swagger.json
+.playwright-mcp
+
+# 8gcr dev overlay — re-include tooling so a fresh dev checkout is complete
+!.claude/agents/
+!.claude/commands/
+!.claude/hooks/
+!.claude/get-shit-done/
+!.claude/get-shit-done/bin/
+!.claude/gsd-file-manifest.json
+!.claude/settings.json
+!.mcp.json
+!CLAUDE.md
+!src/e2e/internal/harborclient/

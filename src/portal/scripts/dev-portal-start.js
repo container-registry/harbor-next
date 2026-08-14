@@ -37,7 +37,7 @@ function buildOpenApiUi() {
 
 function startPortal() {
   const child = spawn(
-    'bun',
+    'node',
     [angularCli, 'serve', '--host', '0.0.0.0', '--hmr'],
     {
       env: process.env,

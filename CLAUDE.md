@@ -1,41 +1,28 @@
-# Harbor Next
+# Harbor (8gcr fork)
 
-Enhanced fork of [goharbor/harbor](https://github.com/goharbor/harbor). Go backend in `src/`, Angular frontend in `src/portal/`, build automation via Taskfile.
+Harbor is a CNCF graduated container registry. This repo is the **8gcr commercial fork** of [goharbor/harbor](https://github.com/goharbor/harbor), tracking upstream `harbor-next/main` with commercial modifications carried as standalone jj/git branches merged into a local megamerge (see `.claude/skills/jj-megamerge/SKILL.md` and ADR-0006).
 
-## Commands
+## Critical rules (don't violate)
 
-```bash
-task build        # Build Go binaries
-task test:quick   # API lint + unit tests
-task test:ci      # Full CI pipeline
-task images       # Build/push Docker images
-task dev:up       # Local dev with hot reload
-task apply-patches # Apply branches listed in taskfile/commercial-patches with jj
-task release-ready # Verify those patches against a clean clone
-```
+- **Build system is Taskfile, never Make.** Only `make/migrations/postgresql/` survives. `task --list-all` enumerates every entry point.
+- **OpenAPI is the source of truth for the REST API.** Edit `api/v2.0/swagger.yaml`, then `task build:gen-apis`. Never hand-edit `src/server/v2.0/restapi/` or `src/server/v2.0/handler/`.
+- **Logging:** `github.com/goharbor/harbor/src/lib/log` only. Never `log.Printf` / `fmt.Printf`.
+- **Commercial branches:** every 8gcr branch is a single commit parented directly on a `next/main` (harbor-next) commit — these branches, not files, are the artifact. Local `000N-*` bookmarks are discovered directly as commercial patches; `dev` is the development overlay (e2e suite, taskfiles, agent config, ADRs) and is never released. Never edit a branch directly — start from `task jj:setup-dev` (or `task jj:setup` for the patches-only production view), edit on top of the `megamerge` bookmark, and let `task jj:absorb` route hunks to the owning branch. Patch content must stay pure: no `8gcr-ee/`, `.claude/`, taskfiles, or `src/e2e` in a `000N-*` branch — that content belongs to `dev`; unit tests for patch code belong in the owning patch. See `.claude/skills/jj-megamerge/SKILL.md`.
+- **PRs:** Conventional Commits title (`feat: Capitalized Subject`), DCO sign-off (`git commit -s`), **squash-merge only** (release-please depends on it).
+- **No AI attribution trailers** in commits (no `Co-Authored-By: Claude`, no `Generated-By:`).
 
-Go test/build need generated API first: `task build:gen-apis`.
+## Context modules
 
-For an unsigned local release build and push, authenticate the container
-engine first, then run `task release-images-local RELEASE_VERSION=X.Y.Z
-IMAGE_TAG=<tag>`. It defaults to `8gears.container-registry.com/8gcr-pr` and
-builds both `linux/amd64` and `linux/arm64`.
+@.claude/context/stack.md
+@.claude/context/workflow.md
+@.claude/context/architecture.md
+@.claude/context/patches.md
+@.claude/context/contributing.md
+@.claude/context/gopls-mcp.md
 
-## PRs
+## Deeper references
 
-- Branch off `main`, never push direct.
-- Conventional Commits, capitalized subject: `feat: Add Foo`, `fix: Resolve Bar`, `upstream: Cherry-Pick Harbor Fix`.
-- DCO sign-off required: `git commit -s`.
-- **Squash and merge only** — other merge types break release-please.
-- No `Co-Authored-By` / AI attribution trailers.
-- **New features (`feat:`) must add a `## Release Notes` section to the PR description.** Its prose is extracted and rendered under `## Highlights` on the GitHub Release. See CONTRIBUTING.md → "Adding Release Notes to Your PR".
-
-## Release-please
-
-`main` uses `always-bump-minor`; `VERSION` on `main` tracks the next development release while `.release-please-manifest.json` tracks the published release. `release-X.Y` branches use patch-only versioning. `ci:`, `build:`, `chore:`, `test:` are hidden from release notes.
-
-**exclude-paths:** changes touching only `.github/`, `docs/`, `tests/`, or `taskfile/` don't bump version — use `ci:` for CI-only changes.
-
-## Registry
-
-Default: `8gears.container-registry.com/8gcr/`. Override with `REGISTRY_ADDRESS` / `REGISTRY_PROJECT`. Publishing needs `REGISTRY_USERNAME` / `REGISTRY_PASSWORD` secrets.
+- `QUICKSTART.md` — full dev setup
+- `PATCHES.md` — jj megamerge recipes (branch creation, restack, conflict resolution)
+- `versions.env` — single source of truth for Go, tools, base images, external deps
+- `https://gopls-mcp.org` — gopls-mcp tool docs

@@ -219,6 +219,8 @@ tasks:
         trap "rm -rf $TRIVY_DIR" EXIT
         git clone --branch {{.HARBOR_SCANNER_TRIVY_VERSION}} --depth 1 https://github.com/container-registry/harbor-scanner-trivy.git "$TRIVY_DIR"
         cd "$TRIVY_DIR"
+        go mod edit -require golang.org/x/net@v0.55.0
+        go mod tidy -e
         ADAPTER_COMMIT=$(git rev-parse --short=8 HEAD)
         VERSION_STR={{.HARBOR_SCANNER_TRIVY_VERSION}}
         LDFLAGS="-s -w -X main.version=${VERSION_STR#v} -X main.commit=${ADAPTER_COMMIT} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -277,8 +279,9 @@ tasks:
   # --- Utilities ---
 
   clean:
-    desc: "Remove binaries and generated API code (Go and TypeScript)"
+    desc: "Remove binaries, generated API code (Go and TypeScript), and task checksums"
     cmds:
       - rm -rf bin/ src/server/v2.0/models/ src/server/v2.0/restapi/
       - rm -rf src/portal/ng-swagger-gen/models/ src/portal/ng-swagger-gen/services/
       - rm -f src/portal/ng-swagger-gen/*.ts
+      - rm -rf .task/

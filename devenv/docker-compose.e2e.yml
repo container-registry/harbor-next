@@ -1,0 +1,93 @@
+services:
+  sftpgo:
+    image: drakkan/sftpgo:v2.7.0-alpine
+    profiles: [e2e]
+    command: >
+      sh -ec 'mkdir -p /srv/sftpgo/e2e &&
+      exec sftpgo portable
+      --directory /srv/sftpgo/e2e
+      --username harbor
+      --password Harbor12345
+      --permissions "*"
+      --sftpd-port 2022
+      --httpd-port -1
+      --ftpd-port -1
+      --webdav-port -1
+      --log-file-path ""'
+    volumes:
+      - harbor-sftpgo-data:/srv/sftpgo
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 2022"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+      start_period: 2s
+
+  core:
+    image: harbor-e2e-go
+    build:
+      context: ..
+      dockerfile: dockerfile/dev.e2e-go.dockerfile
+      args:
+        GO_VERSION: ${GO_VERSION}
+        DEV_UID: ${DEV_UID:-1000}
+        DEV_GID: ${DEV_GID:-1000}
+    environment:
+      ENABLE_PROJECT_FEDERATED_IDP: "true"
+      # Allow GC scenarios to collect freshly untagged test artifacts.
+      GC_TIME_WINDOW_HOURS: "0"
+      KEY_PATH: /var/lib/harbor-e2e/secretkey
+      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp
+    command: >
+      sh -ec 'mkdir -p /var/lib/harbor-e2e &&
+      printf "%s" harbor-e2e-key!! > /var/lib/harbor-e2e/secretkey &&
+      (cd src && CGO_ENABLED=0 GOMODCACHE=/go/pkg/mod GOCACHE=/home/harbor/.cache/go-build /usr/local/go/bin/go build -trimpath -o /var/lib/harbor-e2e/core ./core/main.go) &&
+      exec /var/lib/harbor-e2e/core'
+    volumes:
+      - e2e-go-module-cache:/go/pkg/mod
+      - e2e-go-build-cache:/home/harbor/.cache/go-build
+
+  jobservice:
+    image: harbor-e2e-go
+    build:
+      context: ..
+      dockerfile: dockerfile/dev.e2e-go.dockerfile
+      args:
+        GO_VERSION: ${GO_VERSION}
+        DEV_UID: ${DEV_UID:-1000}
+        DEV_GID: ${DEV_GID:-1000}
+    environment:
+      KEY_PATH: /var/lib/harbor-e2e/secretkey
+    command: >
+      sh -ec 'mkdir -p /var/lib/harbor-e2e &&
+      printf "%s" harbor-e2e-key!! > /var/lib/harbor-e2e/secretkey &&
+      (cd src && CGO_ENABLED=0 GOMODCACHE=/go/pkg/mod GOCACHE=/home/harbor/.cache/go-build /usr/local/go/bin/go build -trimpath -o /var/lib/harbor-e2e/jobservice ./jobservice/main.go) &&
+      exec /var/lib/harbor-e2e/jobservice -c config/jobservice.yml'
+    volumes:
+      - e2e-go-module-cache:/go/pkg/mod
+      - e2e-go-build-cache:/home/harbor/.cache/go-build
+
+  registryctl:
+    image: harbor-e2e-go
+    build:
+      context: ..
+      dockerfile: dockerfile/dev.e2e-go.dockerfile
+      args:
+        GO_VERSION: ${GO_VERSION}
+        DEV_UID: ${DEV_UID:-1000}
+        DEV_GID: ${DEV_GID:-1000}
+    command: >
+      sh -ec 'mkdir -p /var/lib/harbor-e2e &&
+      (cd src && CGO_ENABLED=0 GOMODCACHE=/go/pkg/mod GOCACHE=/home/harbor/.cache/go-build /usr/local/go/bin/go build -trimpath -o /var/lib/harbor-e2e/registryctl ./registryctl/main.go) &&
+      exec /var/lib/harbor-e2e/registryctl -c config/registryctl.yml'
+    volumes:
+      - e2e-go-module-cache:/go/pkg/mod
+      - e2e-go-build-cache:/home/harbor/.cache/go-build
+
+volumes:
+  harbor-sftpgo-data:
+    name: ${PROJECT_PREFIX:-harbor}-sftpgo-data
+  e2e-go-module-cache:
+    name: ${PROJECT_PREFIX:-harbor}-e2e-go-module-cache
+  e2e-go-build-cache:
+    name: ${PROJECT_PREFIX:-harbor}-e2e-go-build-cache

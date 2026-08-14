@@ -1,0 +1,104 @@
+FROM ubuntu:24.04
+
+ARG TARGETARCH
+ARG GO_VERSION=1.25.7
+ARG GH_VERSION=2.88.1
+ARG STGIT_VERSION=2.5.5
+ARG TASK_VERSION=v3.45.4
+ARG CODEX_VERSION=latest
+ARG KUBECTL_VERSION=v1.34.2
+ARG REGCLIENT_VERSION=v0.10.0
+ARG ORAS_VERSION=1.3.0
+ARG TRIVY_VERSION=0.69.3
+ARG CRANE_VERSION=latest
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PATH=/usr/local/go/bin:/root/go/bin:/home/agent/go/bin:${PATH}
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    bash \
+    build-essential \
+    ca-certificates \
+    conmon \
+    curl \
+    fuse-overlayfs \
+    git \
+    gnupg \
+    jq \
+    less \
+    libgpgme11 \
+    openssh-client \
+    openssl \
+    podman \
+    python3 \
+    python3-pip \
+    skopeo \
+    slirp4netns \
+    unzip \
+    uidmap \
+    xz-utils \
+    zstd \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+  && apt-get install -y --no-install-recommends nodejs \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN case "${TARGETARCH:-amd64}" in \
+      amd64) go_arch=amd64; deb_arch=amd64; task_arch=amd64; kubectl_arch=amd64; regclient_arch=amd64; oras_arch=amd64; trivy_arch=64bit ;; \
+      arm64) go_arch=arm64; deb_arch=arm64; task_arch=arm64; kubectl_arch=arm64; regclient_arch=arm64; oras_arch=arm64; trivy_arch=ARM64 ;; \
+      *) echo "unsupported TARGETARCH=${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+  && curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-${go_arch}.tar.gz" -o /tmp/go.tgz \
+  && rm -rf /usr/local/go \
+  && tar -C /usr/local -xzf /tmp/go.tgz \
+  && rm /tmp/go.tgz \
+  && curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${deb_arch}.deb" -o /tmp/gh.deb \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends /tmp/gh.deb \
+  && rm -rf /var/lib/apt/lists/* /tmp/gh.deb \
+  && curl -fsSL "https://github.com/stacked-git/stgit/releases/download/v${STGIT_VERSION}/stgit_${STGIT_VERSION}-1_${deb_arch}.deb" -o /tmp/stgit.deb \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends /tmp/stgit.deb \
+  && rm -rf /var/lib/apt/lists/* /tmp/stgit.deb \
+  && curl -fsSL "https://github.com/go-task/task/releases/download/${TASK_VERSION}/task_linux_${task_arch}.tar.gz" -o /tmp/task.tgz \
+  && tar -C /usr/local/bin -xzf /tmp/task.tgz task \
+  && rm /tmp/task.tgz \
+  && curl -fsSL "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${kubectl_arch}/kubectl" -o /usr/local/bin/kubectl \
+  && chmod +x /usr/local/bin/kubectl \
+  && curl -fsSL "https://github.com/regclient/regclient/releases/download/${REGCLIENT_VERSION}/regctl-linux-${regclient_arch}" -o /usr/local/bin/regctl \
+  && chmod +x /usr/local/bin/regctl \
+  && curl -fsSL "https://github.com/regclient/regclient/releases/download/${REGCLIENT_VERSION}/regsync-linux-${regclient_arch}" -o /usr/local/bin/regsync \
+  && chmod +x /usr/local/bin/regsync \
+  && curl -fsSL "https://github.com/regclient/regclient/releases/download/${REGCLIENT_VERSION}/regbot-linux-${regclient_arch}" -o /usr/local/bin/regbot \
+  && chmod +x /usr/local/bin/regbot \
+  && curl -fsSL "https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_linux_${oras_arch}.tar.gz" -o /tmp/oras.tgz \
+  && tar -C /usr/local/bin -xzf /tmp/oras.tgz oras \
+  && rm /tmp/oras.tgz \
+  && curl -fsSL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-${trivy_arch}.tar.gz" -o /tmp/trivy.tgz \
+  && tar -C /usr/local/bin -xzf /tmp/trivy.tgz trivy \
+  && rm /tmp/trivy.tgz
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends buildah \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN GOBIN=/usr/local/bin go install "github.com/google/go-containerregistry/cmd/crane@${CRANE_VERSION}"
+
+RUN npm install -g "@openai/codex@${CODEX_VERSION}" \
+  && npm cache clean --force
+
+RUN useradd --create-home --shell /bin/bash agent \
+  && mkdir -p /workspace /agent-run /codex-home \
+  && chown -R agent:agent /workspace /agent-run /codex-home /home/agent
+
+USER agent
+WORKDIR /workspace
+
+RUN git config --global --add safe.directory /workspace/repo \
+  && git config --global init.defaultBranch main
+
+CMD ["bash"]

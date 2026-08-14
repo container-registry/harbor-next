@@ -231,4 +231,13 @@ replace (
 	google.golang.org/api => google.golang.org/api v0.0.0-20160322025152-9bf6e6e569ff
 )
 
+require (
+	github.com/cucumber/gherkin/go/v42 v42.0.0 // indirect
+	github.com/cucumber/godog v0.16.0
+	github.com/cucumber/messages/go/v34 v34.2.0 // indirect
+	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
+	github.com/hashicorp/go-memdb v1.3.5 // indirect
+	golang.org/x/mod v0.37.0
+)
+
 ignore portal

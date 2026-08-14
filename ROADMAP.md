@@ -27,7 +27,6 @@ Legend: ✅ Delivered · 🚧 In progress · 🗓️ Planned · 💲 Commercial 
 - ✅ **Docker Distribution** — Use of Docker Distribution V3.
 - ✅ **Harbor Satellite** — Support for Harbor Satellite image replication to the edge.
 - ✅ **Customizable Branding** 💲 — system-wide white-label branding (logo, product name, login/about skinning) via REST API and Portal.
-- ✅ **Hybrid / multi-authentication** 💲 — local DB users alongside an external auth backend (LDAP/OIDC).
 - ✅ **SFTP replication adapter** 💲 — replication storage adapter targeting SFTP endpoints.
 - ✅ **Pluggable identity providers** 💲 — generalized identity-provider framework with Workload Identity Federation.
 - ✅ **Database observability (pgx monitoring)** 💲 — PostgreSQL connection-pool and query metrics exported via OpenTelemetry.
@@ -47,4 +46,3 @@ Legend: ✅ Delivered · 🚧 In progress · 🗓️ Planned · 💲 Commercial 
 - 🗓 **New Portal** — A portal without Node/Angular — a simple HTML multi-page app (MPA).
 - 🗓 **Drop Redis** — With an architectural redesign, Redis is no longer needed for caching.
 - 🗓 **Simplified Stack** — Collapse to a single application container plus a database.
-

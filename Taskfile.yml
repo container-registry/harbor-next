@@ -11,7 +11,7 @@ dotenv:
 
 vars:
   GIT_COMMIT:
-    sh: git rev-parse --short=8 HEAD || echo "unknown"
+    sh: git rev-parse --short=8 HEAD 2>/dev/null || echo "unknown"
   DEFAULT_VERSION:
     sh: cat VERSION 2>/dev/null | tr -d '\n' || echo "dev"
   VERSION: '{{.RELEASE_VERSION | default .DEFAULT_VERSION}}'
@@ -33,9 +33,9 @@ vars:
   IMAGE_PLATFORMS: '{{.IMAGE_PLATFORMS | default "linux/amd64,linux/arm64"}}'
   IMAGE_BUILDER: "harbor-multiarch"
 
-  # Container engine detection: prefer Docker buildx, fallback to Podman
+  # Container engine detection: prefer real Docker, fallback to Podman or podman-docker shims.
   CONTAINER_ENGINE:
-    sh: 'docker buildx version 2>&1 | grep -q "github.com/docker/buildx" && echo "docker" || (podman --version >/dev/null 2>&1 && echo "podman" || echo "unknown")'
+    sh: 'docker --version 2>/dev/null | grep -q "Docker" && echo "docker" || (podman --version >/dev/null 2>&1 && echo "podman" || echo "unknown")'
 
   # CI detection (shared by build.yml and image.yml)
   IS_CI:
@@ -46,6 +46,8 @@ includes:
   build:
     taskfile: ./taskfile/build.yml
     aliases: [b]
+  e2e:
+    taskfile: ./taskfile/e2e.yml
   image:
     taskfile: ./taskfile/image.yml
     aliases: [i]
@@ -62,6 +64,22 @@ includes:
     aliases: [h]
   compose:
     taskfile: ./taskfile/compose.yml
+  patches:
+    taskfile: ./taskfile/patches.yml
+  sync:
+    taskfile: ./taskfile/sync.yml
+    aliases: [s]
+  jj:
+    taskfile: ./taskfile/jj.yml
+  agent:
+    taskfile: ./8gcr-ee/agents/agent.yml
+    aliases: [a]
+    optional: true
+  next:
+    taskfile: ./taskfile/next-dev.yml
+  fedidp:
+    taskfile: ./taskfile/fedidp.yml
+    optional: true
   release-ready:
     taskfile: ./taskfile/release-ready.yml
   release-images-local:
@@ -118,8 +136,13 @@ tasks:
     cmds:
       - task: image:all-images
 
+  e2e:
+    desc: "Clone upstream, apply patches, and run all local E2E suites (~@k8s)"
+    cmds:
+      - task: e2e:run
+
   release-ready:
-    desc: "Verify release patches apply cleanly"
+    desc: "Verify commercial branches merge cleanly onto the current worktree"
     cmds:
       - task: release-ready:check
 

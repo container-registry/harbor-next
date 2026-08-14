@@ -15,11 +15,9 @@ permissions:
 jobs:
   pinned-actions:
     name: Check Pinned Action SHAs
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository || contains(fromJSON('["OWNER","MEMBER"]'), github.event.pull_request.author_association)) && vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Check all actions are pinned to full SHA
         run: |
@@ -42,7 +40,7 @@ jobs:
           if [ "$failed" -eq 1 ]; then
             echo ""
             echo "All 'uses:' references must be pinned to a full commit SHA."
-            echo "Example: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.0"
+            echo "Example: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4"
             exit 1
           fi
           echo "All actions are pinned."

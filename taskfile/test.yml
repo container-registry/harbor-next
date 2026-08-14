@@ -10,12 +10,17 @@ includes:
     internal: true
 
 vars:
+  GO_TEST_UPSTREAM_REPO: '{{.GO_TEST_UPSTREAM_REPO | default "https://github.com/container-registry/harbor-next.git"}}'
+  GO_TEST_UPSTREAM_REF: '{{.GO_TEST_UPSTREAM_REF | default "main"}}'
+  GO_TEST_TMP_ROOT: '{{.GO_TEST_TMP_ROOT | default "tmp"}}'
+  GO_TEST_TMP_CLONE: '{{.GO_TEST_TMP_CLONE | default (printf "%s/harbor-next-go-tests" .GO_TEST_TMP_ROOT)}}'
   # Packages we still exclude from CI by default because they need external
   # services or a full Harbor stack we do not provision in unit-test jobs.
-  DEFAULT_DB_EXCLUDE: '/controller/ldap$|/core/auth/ldap$|/pkg/ldap$|/core/api$|/core/controllers$|/server/middleware/security$|/controller/systeminfo$|/common/utils/email$|/jobservice/runner$|/jobservice/logger/getter$|/jobservice/logger/backend$|/jobservice/logger/sweeper$|/controller/usergroup/test$|/pkg/exporter$|/pkg/scan/dao/scan$|/pkg/scan/postprocessors$|/pkg/systemartifact$'
+  DEFAULT_DB_EXCLUDE: '/controller/ldap$|/core/auth/ldap$|/pkg/ldap$|/core/api$|/core/controllers$|/server/middleware/security$|/controller/systeminfo$|/common/utils/email$|/jobservice/runner$|/jobservice/logger/getter$|/jobservice/logger/backend$|/jobservice/logger/sweeper$|/controller/usergroup/test$|/pkg/exporter$|/pkg/scan/dao/scan$|/pkg/scan/postprocessors$|/pkg/systemartifact$|/pkg/federatedidp/dao$'
   # Packages excluded from the pure lane because they require Redis/Postgres
-  # setup or have db-tagged tests that should only run in the DB lane.
-  DEFAULT_PURE_EXCLUDE: '/controller/ldap$|/core/auth/ldap$|/pkg/ldap$|/core/api$|/core/controllers$|/server/middleware/security$|/controller/systeminfo$|/common/utils/email$|/jobservice/runner$|/jobservice/logger/getter$|/jobservice/logger/backend$|/jobservice/logger/sweeper$|/controller/usergroup/test$|/pkg/exporter$|/pkg/scan/dao/scan$|/pkg/scan/postprocessors$|/pkg/systemartifact$|/core/session$|/jobservice/job/impl/gc$|/lib/cache/redis$|/pkg/jobmonitor$|/pkg/proxy/connection$|/pkg/scan/dao/scanner$|/pkg/scan/export$|/server/middleware/blob$'
+  # setup, have db-tagged tests that should only run in the DB lane, or are
+  # timing-sensitive under shared CI runners.
+  DEFAULT_PURE_EXCLUDE: '/controller/ldap$|/core/auth/ldap$|/pkg/ldap$|/core/api$|/core/controllers$|/server/middleware/security$|/controller/systeminfo$|/common/utils/email$|/jobservice/runner$|/jobservice/logger/getter$|/jobservice/logger/backend$|/jobservice/logger/sweeper$|/controller/usergroup/test$|/pkg/exporter$|/pkg/scan/dao/scan$|/pkg/scan/postprocessors$|/pkg/systemartifact$|/core/session$|/jobservice/job/impl/gc$|/lib/cache/redis$|/pkg/jobmonitor$|/pkg/proxy/connection$|/pkg/proxy/secret$|/pkg/scan/dao/scanner$|/pkg/scan/export$|/server/middleware/blob$|/pkg/federatedidp/dao$'
   # These packages need Redis/Postgres-backed test setup but do not use
   # //go:build db test files, so we add them explicitly to the DB lane.
   DEFAULT_DB_EXTRA_PACKAGES: 'github.com/goharbor/harbor/src/core/session github.com/goharbor/harbor/src/jobservice/job/impl/gc github.com/goharbor/harbor/src/lib/cache/redis github.com/goharbor/harbor/src/pkg/jobmonitor github.com/goharbor/harbor/src/pkg/proxy/connection'
@@ -118,6 +123,51 @@ tasks:
           COVER_FLAGS: "-coverprofile=coverage.out -covermode=atomic"
       - cmd: cd src && go tool cover -html=coverage.out -o coverage.html
 
+  go:
+    desc: "Apply EE patches and run normal Go unit tests (no E2E)"
+    cmds:
+      - task: unit:patched
+        vars:
+          TEST_FLAGS: '{{.TEST_FLAGS | default "-count=1"}}'
+          PURE_PKG_EXCLUDE: '{{.PURE_PKG_EXCLUDE}}'
+
+  unit:patched:
+    desc: "Run pure Go unit tests from an applied EE patch workspace"
+    vars:
+      TEST_FLAGS: '{{.TEST_FLAGS | default "-count=1"}}'
+    cmds:
+      - task: _require-go-test-tools
+      - mkdir -p "{{.GO_TEST_TMP_ROOT}}"
+      - rm -rf "{{.GO_TEST_TMP_CLONE}}"
+      - git clone --branch "{{.GO_TEST_UPSTREAM_REF}}" --depth 200 "{{.GO_TEST_UPSTREAM_REPO}}" "{{.GO_TEST_TMP_CLONE}}"
+      - task: :patches:apply
+        vars: { TARGET_DIR: '{{.GO_TEST_TMP_CLONE}}' }
+      - mkdir -p "{{.GO_TEST_TMP_CLONE}}/taskfile" "{{.GO_TEST_TMP_CLONE}}/tools/ci"
+      - task: _copy-go-test-harness
+        vars:
+          GO_TEST_TMP_CLONE: '{{.GO_TEST_TMP_CLONE}}'
+      - task --dir "{{.GO_TEST_TMP_CLONE}}" test:unit:pure TEST_FLAGS="{{.TEST_FLAGS}}" PURE_PKG_EXCLUDE="{{.PURE_PKG_EXCLUDE | default .DEFAULT_PURE_EXCLUDE}}"
+
+  _copy-go-test-harness:
+    internal: true
+    cmds:
+      - cp Taskfile.yml "{{.GO_TEST_TMP_CLONE}}/Taskfile.yml"
+      - cp taskfile/*.yml "{{.GO_TEST_TMP_CLONE}}/taskfile/"
+      - cp tools/ci/list-go-test-packages.sh "{{.GO_TEST_TMP_CLONE}}/tools/ci/list-go-test-packages.sh"
+
+  _require-go-test-tools:
+    internal: true
+    cmds:
+      - |
+        missing=""
+        for tool in git go task; do
+          command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
+        done
+        if [ -n "$missing" ]; then
+          echo "[error] missing required Go test tools:$missing" >&2
+          exit 1
+        fi
+
   # ----------------------------------------------------------------------------
   # CI-hostile packages excluded from the DB lane by default.
   # Each entry is here because:
@@ -210,6 +260,156 @@ tasks:
     env:
       UTTEST: "true"
     cmd: watchexec -e go -r -- go test -v ./...
+
+  # ============================================================================
+  # End-to-End Tests (godog / Gherkin)
+  # ============================================================================
+  # `task e2e` and `task e2e:test` are the primary local entrypoints now. These
+  # aliases keep the older `test:e2e*` surface working while delegating to the
+  # new stack-owning flow.
+
+  e2e:
+    desc: "Compatibility alias for task e2e:test"
+    vars:
+      TAGS:        '{{.TAGS        | default ""}}'
+      E2E_TIMEOUT: '{{.E2E_TIMEOUT | default "30m"}}'
+      CONCURRENCY: '{{.CONCURRENCY | default "4"}}'
+    cmds:
+      - task: :e2e:test
+        vars: { TAGS: '{{.TAGS}}', E2E_TIMEOUT: '{{.E2E_TIMEOUT}}', CONCURRENCY: '{{.CONCURRENCY}}' }
+
+  e2e:smoke:
+    desc: "E2E @smoke scenarios only"
+    cmds:
+      - task: e2e
+        vars: { TAGS: '@smoke' }
+
+  e2e:tags:
+    desc: "E2E with custom tag expression (TAGS='@registry && ~@wip')"
+    cmds:
+      - task: e2e
+        vars: { TAGS: '{{.TAGS}}' }
+
+  e2e:fedidp:
+    desc: "E2E FedIDP API + offline JWT scenarios"
+    vars:
+      E2E_TIMEOUT: '{{.E2E_TIMEOUT | default "30m"}}'
+      SKIP_TRIVY:  '{{.SKIP_TRIVY  | default "false"}}'
+    cmds:
+      - task: :e2e:test
+        vars:
+          TAGS: '@fedidp && ~@k8s'
+          E2E_TIMEOUT: '{{.E2E_TIMEOUT}}'
+          SKIP_TRIVY: '{{.SKIP_TRIVY}}'
+
+  e2e:fedidp:k8s:
+    desc: "E2E FedIDP K8s SA-token scenarios (requires a prepared KIND cluster)"
+    vars:
+      E2E_TIMEOUT: '{{.E2E_TIMEOUT | default "30m"}}'
+      SKIP_TRIVY:  '{{.SKIP_TRIVY  | default "false"}}'
+    cmds:
+      - task: :e2e:test
+        vars:
+          TAGS: '@fedidp && @k8s'
+          E2E_TIMEOUT: '{{.E2E_TIMEOUT}}'
+          SKIP_TRIVY: '{{.SKIP_TRIVY}}'
+          CONCURRENCY: '1'
+
+  # ----------------------------------------------------------------------------
+  # Deployed / remote target
+  #
+  # Runs the same godog suite against a Harbor instance that is NOT the local
+  # dev stack — staging, a cluster, a hosted tenancy, etc. Takes URL and
+  # credentials as task variables instead of assuming localhost.
+  #
+  # Usage:
+  #   task test:e2e:deployed URL=https://harbor.example.com PASSWORD='…'
+  #   task test:e2e:deployed URL=https://harbor.example.com USERNAME=svc PASSWORD='…' TAGS='@smoke'
+  #
+  # Variables:
+  #   URL          required — Harbor base URL, e.g. https://harbor.example.com
+  #   USERNAME     default admin
+  #   PASSWORD     required — admin (or robot-like) password for the target
+  #   TAGS         default '@smoke && ~@gc && ~@k8s' — safer default for shared/remote
+  #                instances (@gc triggers a full garbage collection). Set
+  #                explicitly to broaden or narrow.
+  #   CONCURRENCY  default 1 — remote targets are often shared; parallel
+  #                scenarios can hammer them. Raise cautiously.
+  #   E2E_TIMEOUT  default 30m
+  #
+  # Credential note: passing PASSWORD on the command line lands it in your
+  # shell history. Prefer exporting HARBOR_PASSWORD in the parent shell and
+  # omitting PASSWORD from the task invocation — the task honours whichever
+  # is set (PASSWORD taking precedence).
+  #
+  # Safety note: the suite creates real projects, users, robots, webhooks,
+  # and policies under the admin account it authenticates as. Teardown is
+  # best-effort. Do not point this at production without a dedicated test
+  # admin account and a narrow tag expression.
+  e2e:deployed:
+    desc: "E2E against a deployed Harbor (URL=… USERNAME=… PASSWORD=…)"
+    vars:
+      URL:         '{{.URL}}'
+      USERNAME:    '{{.USERNAME    | default "admin"}}'
+      PASSWORD:    '{{.PASSWORD}}'
+      TAGS:        '{{.TAGS        | default "@smoke && ~@gc && ~@k8s"}}'
+      CONCURRENCY: '{{.CONCURRENCY | default "1"}}'
+      E2E_TIMEOUT: '{{.E2E_TIMEOUT | default "30m"}}'
+    preconditions:
+      - sh: '[ -n "{{.URL}}" ]'
+        msg: |
+          URL is required.
+          Usage: task test:e2e:deployed URL=https://harbor.example.com PASSWORD='…'
+      - sh: '[ -n "{{.PASSWORD}}" ] || [ -n "${HARBOR_PASSWORD:-}" ]'
+        msg: |
+          PASSWORD is required (or export HARBOR_PASSWORD before running).
+          Usage: task test:e2e:deployed URL=https://harbor.example.com PASSWORD='…'
+    cmds:
+      - task: _e2e:deployed:preflight
+        vars: { URL: '{{.URL}}' }
+      - task: _e2e:deployed:run
+        vars:
+          URL:         '{{.URL}}'
+          USERNAME:    '{{.USERNAME}}'
+          PASSWORD:    '{{.PASSWORD}}'
+          TAGS:        '{{.TAGS}}'
+          CONCURRENCY: '{{.CONCURRENCY}}'
+          E2E_TIMEOUT: '{{.E2E_TIMEOUT}}'
+
+  _e2e:deployed:preflight:
+    internal: true
+    silent: true
+    vars:
+      BASE: '{{.URL | trimSuffix "/"}}'
+    cmds:
+      - |
+        if ! curl -fsSk "{{.BASE}}/api/v2.0/health" > /dev/null 2>&1; then
+          echo "[error] Harbor not responding at {{.BASE}}" >&2
+          echo "[error] Check the URL, network, and that the target accepts basic auth." >&2
+          exit 1
+        fi
+      - |
+        missing=""
+        command -v docker     >/dev/null 2>&1 || missing="$missing docker"
+        command -v cosign     >/dev/null 2>&1 || missing="$missing cosign"
+        docker buildx version >/dev/null 2>&1 || missing="$missing docker-buildx"
+        if [ -n "$missing" ]; then
+          echo "[error] missing required e2e tools:$missing" >&2
+          exit 1
+        fi
+
+  _e2e:deployed:run:
+    internal: true
+    dir: src
+    env:
+      HARBOR_URL:      '{{.URL | trimSuffix "/"}}'
+      HARBOR_USERNAME: '{{.USERNAME}}'
+      # PASSWORD falls back to the caller's HARBOR_PASSWORD when the task var
+      # is empty — lets you keep secrets out of shell history.
+      HARBOR_PASSWORD: '{{if .PASSWORD}}{{.PASSWORD}}{{else}}{{env "HARBOR_PASSWORD"}}{{end}}'
+    # Tag expression is single-quoted so `&&` / `~` in 'TAGS' aren't
+    # interpreted by the shell before reaching godog.
+    cmd: go test -v -tags e2e -timeout {{.E2E_TIMEOUT}} -run TestFeatures ./e2e/... -args {{if .TAGS}}-godog.tags='{{.TAGS}}'{{end}} -godog.concurrency={{.CONCURRENCY}}
 
   # ============================================================================
   # Mock Validation
@@ -322,8 +522,9 @@ tasks:
   # ============================================================================
 
   clean:
-    desc: "Remove lint reports, SARIF files, and coverage output"
+    desc: "Remove lint reports, SARIF files, coverage output, and E2E artifacts"
     cmds:
       - rm -f golangci-lint.report
       - rm -f govulncheck.sarif
       - rm -f src/coverage.out src/coverage-pure.out src/coverage-db.out src/coverage.html
+      - rm -rf reports/

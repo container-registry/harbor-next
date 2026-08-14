@@ -1,0 +1,51 @@
+apiVersion: kind.x-k8s.io/v1alpha4
+kind: Cluster
+name: fedidp-test
+
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.34.0
+    extraMounts:
+      - hostPath: /tmp/fedidp/credential-provider-echo-token-silly
+        containerPath: /var/lib/kubelet/credential-provider/credential-provider-echo-token-silly
+      - hostPath: /tmp/fedidp/k8s_credential_provider_config.yaml
+        containerPath: /var/lib/kubelet/credential-provider-config.yaml
+      - hostPath: /tmp/fedidp/certs.d
+        containerPath: /etc/containerd/certs.d
+
+  - role: worker
+    image: kindest/node:v1.34.0
+    extraMounts:
+      - hostPath: /tmp/fedidp/credential-provider-echo-token-silly
+        containerPath: /var/lib/kubelet/credential-provider/credential-provider-echo-token-silly
+      - hostPath: /tmp/fedidp/k8s_credential_provider_config.yaml
+        containerPath: /var/lib/kubelet/credential-provider-config.yaml
+      - hostPath: /tmp/fedidp/certs.d
+        containerPath: /etc/containerd/certs.d
+
+containerdConfigPatches:
+  - |-
+    [plugins."io.containerd.cri.v1.images".registry]
+      config_path = "/etc/containerd/certs.d"
+
+kubeadmConfigPatches:
+  - |
+    kind: ClusterConfiguration
+    apiServer:
+      extraArgs:
+        api-audiences: "https://kubernetes.default.svc.cluster.local,HARBOR_HOST_PLACEHOLDER"
+        service-account-issuer: "https://k8s.test-cluster.com"
+
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        image-credential-provider-config: "/var/lib/kubelet/credential-provider-config.yaml"
+        image-credential-provider-bin-dir: "/var/lib/kubelet/credential-provider"
+
+  - |
+    kind: JoinConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        image-credential-provider-config: "/var/lib/kubelet/credential-provider-config.yaml"
+        image-credential-provider-bin-dir: "/var/lib/kubelet/credential-provider"

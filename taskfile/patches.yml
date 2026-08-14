@@ -1,0 +1,48 @@
+version: '3'
+
+tasks:
+  list:
+    desc: "List local commercial patch bookmarks"
+    silent: true
+    cmds:
+      - |
+        jj bookmark list --all --no-pager \
+          -T 'if(!remote, name ++ "\n", "")' \
+          | sort -u \
+          | grep -E '^000[0-9]-'
+
+  apply:
+    desc: "Merge all local 000N-* patch bookmarks into a target Git checkout"
+    requires:
+      vars: [TARGET_DIR]
+    preconditions:
+      - sh: command -v git >/dev/null 2>&1
+        msg: "git is required"
+      - sh: command -v jj >/dev/null 2>&1
+        msg: "jj (Jujutsu) is required"
+      - sh: test -d '{{.TARGET_DIR}}/.git'
+        msg: "TARGET_DIR must be a Git checkout: {{.TARGET_DIR}}"
+      - sh: test -z "$(git -C '{{.TARGET_DIR}}' status --porcelain)"
+        msg: "TARGET_DIR must have a clean worktree: {{.TARGET_DIR}}"
+    cmds:
+      - task: :jj:bootstrap
+      - |
+        set -euo pipefail
+        source_git_dir=$(jj git root)
+        patch_refs=()
+
+        while IFS= read -r branch; do
+          git -C '{{.TARGET_DIR}}' fetch --quiet --no-tags "${source_git_dir}" \
+            "+refs/heads/${branch}:refs/remotes/patches/${branch}"
+          patch_refs+=("refs/remotes/patches/${branch}")
+        done < <(task --output interleaved --silent patches:list)
+
+        if [ "${#patch_refs[@]}" -eq 0 ]; then
+          echo "No local 000N-* patch bookmarks found" >&2
+          exit 1
+        fi
+
+        git -C '{{.TARGET_DIR}}' \
+          -c user.name='8gcr patch materializer' \
+          -c user.email='noreply@8gears.com' \
+          merge --quiet --no-edit --no-ff "${patch_refs[@]}"

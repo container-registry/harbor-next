@@ -1,0 +1,153 @@
+name: Agent Upstream Sync Resolver
+
+on:
+  workflow_run:
+    workflows: ["Sync and Verify Patches"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run smoke checks or resolve a failed sync run"
+        required: true
+        default: smoke
+        type: choice
+        options:
+          - smoke
+          - resolve
+      failed_run_id:
+        description: "Failed sync workflow run ID to inspect"
+        required: false
+      target_branch:
+        description: "Private repo branch to base the agent PR on"
+        required: false
+        default: main
+      failed_head_sha:
+        description: "Failed sync head SHA, if known"
+        required: false
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: agent-upstream-sync-${{ github.event.workflow_run.id || inputs.failed_run_id || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'smoke'
+    runs-on: ${{ fromJSON(vars.AGENT_RUNNER_LABELS || '["container-registry"]') }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      AGENT_IMAGE: ${{ vars.AGENT_IMAGE || '8gears.container-registry.com/8gcr-dev/agent:latest' }}
+      AGENT_RUNTIME_BACKEND: ${{ vars.AGENT_RUNTIME_BACKEND || 'docker' }}
+
+    steps:
+      - name: Checkout automation scripts
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Task
+        uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
+        with:
+          version: 3.x
+
+      - name: Validate agent wiring
+        run: |
+          bash -n .github/agents/scripts/*.sh
+          task --summary agent:prepare-handoff-runtime >/dev/null
+          task --summary agent:run-local-runtime >/dev/null
+          task --summary agent:local-run-failed-sync >/dev/null
+
+      - name: Pull agent image
+        env:
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: |
+          : "${REGISTRY_USERNAME:?REGISTRY_USERNAME is required}"
+          : "${REGISTRY_PASSWORD:?REGISTRY_PASSWORD is required}"
+          printf '%s' "${REGISTRY_PASSWORD}" | \
+            "${AGENT_RUNTIME_BACKEND}" login \
+              --username "${REGISTRY_USERNAME}" \
+              --password-stdin \
+              8gears.container-registry.com
+          "${AGENT_RUNTIME_BACKEND}" pull "${AGENT_IMAGE}"
+
+  resolve:
+    if: (github.event_name == 'workflow_dispatch' && inputs.mode == 'resolve') || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure')
+    runs-on: ${{ fromJSON(vars.AGENT_RUNNER_LABELS || '["container-registry"]') }}
+    timeout-minutes: 180
+    permissions:
+      actions: read
+      contents: write
+      pull-requests: write
+    env:
+      FAILED_RUN_ID: ${{ github.event.workflow_run.id || inputs.failed_run_id }}
+      TARGET_BRANCH: ${{ github.event.workflow_run.head_branch || inputs.target_branch || 'main' }}
+      FAILED_HEAD_SHA: ${{ github.event.workflow_run.head_sha || inputs.failed_head_sha || '' }}
+      AGENT_IMAGE: ${{ vars.AGENT_IMAGE || '8gears.container-registry.com/8gcr-dev/agent:latest' }}
+      AGENT_RUNTIME_BACKEND: ${{ vars.AGENT_RUNTIME_BACKEND || 'docker' }}
+      AGENT_VALIDATION_COMMAND: ${{ vars.AGENT_VALIDATION_COMMAND || '' }}
+      AGENT_MEMORY: ${{ vars.AGENT_MEMORY || '8g' }}
+      AGENT_CPUS: ${{ vars.AGENT_CPUS || '4' }}
+      AGENT_PIDS_LIMIT: ${{ vars.AGENT_PIDS_LIMIT || '2048' }}
+      AGENT_PODMAN_NETWORK: ${{ vars.AGENT_PODMAN_NETWORK || 'slirp4netns' }}
+      AGENT_DOCKER_NETWORK: ${{ vars.AGENT_DOCKER_NETWORK || 'bridge' }}
+      AGENT_GIT_NAME: ${{ vars.AGENT_GIT_NAME || '8gcr-ai-agent[bot]' }}
+      AGENT_GIT_EMAIL: ${{ vars.AGENT_GIT_EMAIL || '8gcr-ai-agent[bot]@users.noreply.github.com' }}
+      AGENT_BRANCH_PREFIX: ${{ vars.AGENT_BRANCH_PREFIX || 'agent/upstream-sync-patches' }}
+      AGENT_CODEX_SANDBOX: ${{ vars.AGENT_CODEX_SANDBOX || 'danger-full-access' }}
+      CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
+      CODEX_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
+
+    steps:
+      - name: Checkout automation scripts
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Task
+        uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
+        with:
+          version: 3.x
+
+      - name: Login to agent registry
+        env:
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: |
+          : "${REGISTRY_USERNAME:?REGISTRY_USERNAME is required}"
+          : "${REGISTRY_PASSWORD:?REGISTRY_PASSWORD is required}"
+          printf '%s' "${REGISTRY_PASSWORD}" | \
+            "${AGENT_RUNTIME_BACKEND}" login \
+              --username "${REGISTRY_USERNAME}" \
+              --password-stdin \
+              8gears.container-registry.com
+
+      - name: Prepare handoff bundle
+        run: |
+          task agent:prepare-handoff-runtime \
+            AGENT_RUNTIME_BACKEND="${AGENT_RUNTIME_BACKEND}"
+        env:
+          AGENT_GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Run local agent runtime
+        id: agent
+        run: |
+          task agent:run-local-runtime \
+            AGENT_RUNTIME_BACKEND="${AGENT_RUNTIME_BACKEND}" \
+            AGENT_VALIDATION_COMMAND="${AGENT_VALIDATION_COMMAND}"
+        env:
+          AGENT_GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Upload agent artifacts
+        if: always() && env.AGENT_RUN_DIR != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: upstream-sync-agent-${{ env.FAILED_RUN_ID }}-${{ github.run_attempt }}
+          path: ${{ env.AGENT_RUN_DIR }}
+          if-no-files-found: warn
+          retention-days: 30

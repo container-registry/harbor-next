@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "gopls-mcp": {
+      "command": "gopls-mcp",
+      "args": [
+        "-workdir", "src/",
+        "-directory-filters", "-portal"
+      ]
+    }
+  }
+}

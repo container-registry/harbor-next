@@ -1,0 +1,5 @@
+services:
+  registry:
+    user: "0"
+  registryctl:
+    user: "0"

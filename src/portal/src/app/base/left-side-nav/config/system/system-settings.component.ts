@@ -41,8 +41,8 @@ import {
     HarborEvent,
 } from '../../../../services/event-service/event.service';
 import { Subscription } from 'rxjs';
-import { AuditlogService } from 'ng-swagger-gen/services';
-import { AuditLogEventType } from 'ng-swagger-gen/models';
+import { AuditlogService } from 'ng-swagger-gen/services/auditlog.service';
+import type { AuditLogEventType } from 'ng-swagger-gen/models/audit-log-event-type';
 
 @Component({
     selector: 'system-settings',

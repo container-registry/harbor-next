@@ -19,8 +19,11 @@ RUN bun run postinstall && \
 COPY LICENSE ./dist/LICENSE
 WORKDIR /harbor/src/portal/app-swagger-ui
 RUN bun install --ignore-scripts && bun run build
+RUN mkdir -p /tmp/portal-runtime/etc/nginx/proxy.d /tmp/portal-runtime/etc/nginx/ssl
 
 FROM 8gears.container-registry.com/dhi.io/nginx:${NGINX_VERSION}-debian13
+COPY --from=builder /tmp/portal-runtime/etc/nginx/proxy.d /etc/nginx/proxy.d
+COPY --from=builder /tmp/portal-runtime/etc/nginx/ssl /etc/nginx/ssl
 ARG TARGETARCH
 COPY bin/linux-${TARGETARCH}/lprobe /lprobe
 COPY --from=builder /harbor/src/portal/dist /usr/share/nginx/html

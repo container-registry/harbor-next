@@ -1,11 +1,13 @@
 ARG ALPINE_VERSION=MISSING-BUILD-ARG
 
 FROM alpine:${ALPINE_VERSION} AS certs
-RUN addgroup -S -g 10000 harbor && adduser -S -G harbor -u 10000 harbor
+RUN addgroup -S -g 10000 harbor && adduser -S -G harbor -u 10000 harbor && \
+    mkdir -p /etc/jobservice
 
 FROM scratch
 COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=certs /etc/passwd /etc/group /etc/
+COPY --from=certs /etc/jobservice /etc/jobservice
 ARG TARGETARCH
 COPY bin/linux-${TARGETARCH}/lprobe /lprobe
 COPY bin/linux-${TARGETARCH}/jobservice /jobservice

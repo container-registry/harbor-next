@@ -40,7 +40,7 @@ import {
 } from '../../../../services/event-service/event.service';
 import { forkJoin, Observable } from 'rxjs';
 import { MessageHandlerService } from 'src/app/shared/services/message-handler.service';
-import { RegistryService } from 'ng-swagger-gen/services';
+import { RegistryService } from 'ng-swagger-gen/services/registry.service';
 
 const ONE_THOUSAND: number = 1000;
 const LOW: string = 'low';

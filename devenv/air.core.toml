@@ -3,19 +3,19 @@
 
 root = "."
 testdata_dir = "src/testdata"
-tmp_dir = "tmp"
+tmp_dir = "/var/lib/harbor-air"
 
 [build]
   # Fast build by default. Set DEBUG=true to enable Delve step-through debugging:
   #   docker compose exec core env DEBUG=true air -c devenv/air.core.toml
-  cmd = "cd src && CGO_ENABLED=0 GOMODCACHE=/go/pkg/mod /usr/local/go/bin/go build ${DEBUG:+-gcflags=all='-N -l'} -trimpath -o ../tmp/core ./core/main.go"
+  cmd = "mkdir -p /var/lib/harbor-air && cd src && CGO_ENABLED=0 GOMODCACHE=/go/pkg/mod /usr/local/go/bin/go build ${DEBUG:+-gcflags=all='-N -l'} -trimpath -o /var/lib/harbor-air/core ./core/main.go"
 
-  bin = "tmp/core"
+  bin = "/var/lib/harbor-air/core"
   args_bin = []
 
   # Delve debugger on port 2345, starts immediately (--continue)
   # Attach anytime with: dlv connect localhost:2345
-  full_bin = "/go/bin/dlv exec ./tmp/core --listen=0.0.0.0:2345 --headless=true --api-version=2 --accept-multiclient --continue --"
+  full_bin = "/go/bin/dlv exec /var/lib/harbor-air/core --listen=0.0.0.0:2345 --headless=true --api-version=2 --accept-multiclient --continue --"
 
   # Watch src directory for Go files only
   include_dir = ["src"]
@@ -56,7 +56,7 @@ tmp_dir = "tmp"
 
   rerun = false
   rerun_delay = 500
-  log = "tmp/build-errors.log"
+  log = "/var/lib/harbor-air/build-errors.log"
 
   poll = false
   poll_interval = 0

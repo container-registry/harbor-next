@@ -1,0 +1,17 @@
+# Keep 8gcr-specific files during merges from harbor-next.
+# Requires: git config merge.ours.driver true
+
+# 8gcr CLAUDE.md is a maintained superset of harbor-next's
+CLAUDE.md merge=ours
+
+# 8gcr has its own CI workflows; GITHUB_TOKEN cannot push workflow
+# file changes, so we must prevent upstream workflows from merging in.
+.github/workflows/** merge=ours
+
+# The rerere cache is opaque per-branch resolution state, exclusive to
+# 8gcr-main. It never exists on next/main, but repeated syncs make it a
+# 3-way-merge candidate against stale common ancestors; git then tries to
+# treat preimage/postimage blobs as if THEY had textual conflict markers,
+# which corrupts (git rerere fails with "could not parse conflict hunks").
+# Always keep our side, matching the CLAUDE.md/workflows precedent above.
+8gcr-ee/.rr-cache/** merge=ours

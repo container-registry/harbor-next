@@ -2,6 +2,7 @@
 bin/
 !bin/linux-*/
 tmp/
+reports/
 dist/
 *.tgz
 

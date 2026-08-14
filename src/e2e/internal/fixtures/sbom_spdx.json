@@ -1,0 +1,30 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "harbor-e2e-fixture",
+  "documentNamespace": "https://harbor.local/e2e/sbom-fixture",
+  "creationInfo": {
+    "created": "2026-04-16T00:00:00Z",
+    "creators": ["Tool: harbor-e2e"]
+  },
+  "packages": [
+    {
+      "name": "harbor-e2e-test-package",
+      "SPDXID": "SPDXRef-Package-fixture",
+      "versionInfo": "0.0.0-e2e",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "supplier": "NOASSERTION"
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relatedSpdxElement": "SPDXRef-Package-fixture",
+      "relationshipType": "DESCRIBES"
+    }
+  ]
+}

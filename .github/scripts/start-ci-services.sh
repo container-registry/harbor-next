@@ -14,8 +14,12 @@ if [ -z "${pg_version}" ]; then
   exit 1
 fi
 
+# POSTGRESQL_PWD is set by the CI workflow env (build.yml / test.yml).
+# Default matches the value used in the workflow files and Go test configs.
+: "${POSTGRESQL_PWD:=root123}"
+
 sudo pg_ctlcluster "${pg_version}" main start
-sudo -u postgres psql -d postgres -c "ALTER USER postgres WITH PASSWORD 'root123';"
+sudo -u postgres psql -d postgres -c "ALTER USER postgres WITH PASSWORD '${POSTGRESQL_PWD}';"
 if ! sudo -u postgres psql -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = 'registry'" | grep -q 1; then
   sudo -u postgres createdb registry
 fi
@@ -23,13 +27,13 @@ sudo -u postgres psql -d postgres -c "ALTER SYSTEM SET max_connections = 300;"
 sudo pg_ctlcluster "${pg_version}" main restart
 
 for _ in $(seq 1 30); do
-  if PGPASSWORD=root123 pg_isready -h 127.0.0.1 -p 5432 -U postgres >/dev/null 2>&1; then
+  if PGPASSWORD="${POSTGRESQL_PWD}" pg_isready -h 127.0.0.1 -p 5432 -U postgres >/dev/null 2>&1; then
     break
   fi
   sleep 1
 done
 
-if ! PGPASSWORD=root123 pg_isready -h 127.0.0.1 -p 5432 -U postgres >/dev/null 2>&1; then
+if ! PGPASSWORD="${POSTGRESQL_PWD}" pg_isready -h 127.0.0.1 -p 5432 -U postgres >/dev/null 2>&1; then
   echo "PostgreSQL failed to become ready"
   exit 1
 fi

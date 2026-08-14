@@ -27,7 +27,6 @@ jobs:
             ci
             chore
             revert
-            upstream
           requireScope: false
           subjectPattern: ^.{1,100}$
           subjectPatternError: |

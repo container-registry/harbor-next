@@ -1,0 +1,293 @@
+version: '3'
+
+vars:
+  E2E_UPSTREAM_REPO: '{{.E2E_UPSTREAM_REPO | default "https://github.com/container-registry/harbor-next.git"}}'
+  E2E_UPSTREAM_REF: '{{.E2E_UPSTREAM_REF | default "main"}}'
+  E2E_TMP_ROOT: '{{.E2E_TMP_ROOT | default "tmp"}}'
+  E2E_TMP_CLONE: '{{.E2E_TMP_CLONE | default (printf "%s/harbor-next-e2e" .E2E_TMP_ROOT)}}'
+  E2E_SLOT: '{{.E2E_SLOT | default "0"}}'
+  E2E_PORT_HTTP: '{{ add 8080 (mul (atoi .E2E_SLOT) 100) }}'
+  E2E_PORT_PORTAL: '{{ add 4200 (mul (atoi .E2E_SLOT) 100) }}'
+  E2E_PORT_POSTGRES: '{{ add 5432 (mul (atoi .E2E_SLOT) 100) }}'
+  E2E_PORT_REDIS: '{{ add 6379 (mul (atoi .E2E_SLOT) 100) }}'
+  E2E_PORT_REGISTRY: '{{ add 18000 (mul (atoi .E2E_SLOT) 100) }}'
+  E2E_PORT_REGISTRYCTL: '{{ add 8085 (mul (atoi .E2E_SLOT) 100) }}'
+  E2E_PORT_TRIVY: '{{ add 8081 (mul (atoi .E2E_SLOT) 100) }}'
+  E2E_PORT_METRIC_CORE: '{{ add 9090 (mul (atoi .E2E_SLOT) 100) }}'
+  E2E_PORT_METRIC_JOBSERVICE: '{{ add 9091 (mul (atoi .E2E_SLOT) 100) }}'
+  E2E_PORT_DEBUG_CORE: '{{ add 2345 (mul (atoi .E2E_SLOT) 100) }}'
+  E2E_PORT_DEBUG_JOBSERVICE: '{{ add 2346 (mul (atoi .E2E_SLOT) 100) }}'
+  E2E_PORT_DEBUG_REGISTRYCTL: '{{ add 2347 (mul (atoi .E2E_SLOT) 100) }}'
+  E2E_DEV_ENV: >-
+    COMPOSE_PROJECT_NAME=harbor-{{.E2E_SLOT}}
+    PROJECT_PREFIX=harbor-{{.E2E_SLOT}}
+    PORT_CORE={{.E2E_PORT_HTTP}}
+    PORT_PORTAL={{.E2E_PORT_PORTAL}}
+    PORT_POSTGRES={{.E2E_PORT_POSTGRES}}
+    PORT_REDIS={{.E2E_PORT_REDIS}}
+    PORT_REGISTRY={{.E2E_PORT_REGISTRY}}
+    PORT_REGISTRYCTL={{.E2E_PORT_REGISTRYCTL}}
+    PORT_TRIVY={{.E2E_PORT_TRIVY}}
+    PORT_METRIC_CORE={{.E2E_PORT_METRIC_CORE}}
+    PORT_METRIC_JOBSERVICE={{.E2E_PORT_METRIC_JOBSERVICE}}
+    PORT_DEBUG_CORE={{.E2E_PORT_DEBUG_CORE}}
+    PORT_DEBUG_JOBSERVICE={{.E2E_PORT_DEBUG_JOBSERVICE}}
+    PORT_DEBUG_REGISTRYCTL={{.E2E_PORT_DEBUG_REGISTRYCTL}}
+
+tasks:
+  run:
+    desc: "Prepare a patched tmp workspace and run all local E2E suites (~@k8s by default)"
+    vars:
+      TAGS: '{{.TAGS | default "~@k8s"}}'
+      E2E_TIMEOUT: '{{.E2E_TIMEOUT | default "30m"}}'
+      SKIP_TRIVY: '{{.SKIP_TRIVY | default "false"}}'
+      CONCURRENCY: '{{.CONCURRENCY | default "4"}}'
+    cmds:
+      - task: _require-meta-tools
+      - mkdir -p "{{.E2E_TMP_ROOT}}"
+      - rm -rf "{{.E2E_TMP_CLONE}}"
+      - git clone --branch "{{.E2E_UPSTREAM_REF}}" --depth 200 "{{.E2E_UPSTREAM_REPO}}" "{{.E2E_TMP_CLONE}}"
+      - task: :patches:apply
+        vars: { TARGET_DIR: '{{.E2E_TMP_CLONE}}' }
+      - task: _copy-harness
+        vars:
+          E2E_TMP_CLONE: '{{.E2E_TMP_CLONE}}'
+      - task: _prepare-module
+        vars:
+          E2E_TMP_CLONE: '{{.E2E_TMP_CLONE}}'
+      - |
+        set +e
+        ignored_components="${E2E_IGNORE_HEALTH_COMPONENTS:-portal}"
+        if [ '{{.SKIP_TRIVY}}' = 'true' ]; then
+          ignored_components="$ignored_components,trivy"
+        fi
+        base_slot='{{.E2E_SLOT}}'
+        if [ "$base_slot" = '0' ]; then
+          if [ -n "${GITHUB_RUN_ID:-}" ]; then
+            base_slot=$((GITHUB_RUN_ID % 100 + 10))
+          else
+            host_seed=0
+            if [ -n "${HOSTNAME:-}" ]; then
+              set -- $(printf '%s' "$HOSTNAME" | cksum)
+              host_seed="$1"
+            fi
+            time_seed=$(date +%s)
+            base_slot=$(((time_seed + host_seed + $$) % 100 + 10))
+          fi
+        fi
+        copy_reports() {
+          rm -rf reports
+          mkdir -p reports
+          if [ -d "{{.E2E_TMP_CLONE}}/reports" ]; then
+            cp -R "{{.E2E_TMP_CLONE}}/reports/." reports/
+          fi
+        }
+        DEV_ROOT="$(pwd)/{{.E2E_TMP_CLONE}}" TAGS='{{.TAGS}}' E2E_TIMEOUT='{{.E2E_TIMEOUT}}' SKIP_TRIVY='{{.SKIP_TRIVY}}' E2E_SLOT="$base_slot" E2E_IGNORE_HEALTH_COMPONENTS="$ignored_components" CONCURRENCY='{{.CONCURRENCY}}' \
+          task --dir "{{.E2E_TMP_CLONE}}" e2e:test
+        run_status="$?"
+        if [ "$run_status" -ne 0 ]; then
+          copy_reports
+          exit "$run_status"
+        fi
+        copy_reports
+
+  test:
+    desc: "Start Harbor with the dev stack, run local godog suites, and tear down"
+    vars:
+      TAGS: '{{.TAGS | default "~@k8s"}}'
+      E2E_TIMEOUT: '{{.E2E_TIMEOUT | default "30m"}}'
+      SKIP_TRIVY: '{{.SKIP_TRIVY | default "false"}}'
+      CONCURRENCY: '{{.CONCURRENCY | default "4"}}'
+    cmds:
+      - task: _require-runtime-tools
+      - mkdir -p reports
+      - rm -rf reports/failures
+      - rm -f reports/e2e-harbor-url reports/e2e-test*.json reports/e2e-junit*.xml reports/e2e-dev.log reports/e2e-dockerd.log
+      - task: _dev-down
+      - defer: { task: _dev-down }
+      - |
+        if ! {{.E2E_DEV_ENV}} task dev:up:e2e SLOT='{{.E2E_SLOT}}' SKIP_TRIVY='{{.SKIP_TRIVY}}' > reports/e2e-dev.log 2>&1; then
+          {{.E2E_DEV_ENV}} task dev:logs:snapshot SLOT='{{.E2E_SLOT}}' SKIP_TRIVY='{{.SKIP_TRIVY}}' E2E_ONLY=true >> reports/e2e-dev.log 2>&1 || true
+          echo "[error] task dev:up:e2e failed; see reports/e2e-dev.log" >&2
+          exit 1
+        fi
+
+        key_ready=0
+        for _ in $(seq 1 12); do
+          for core_container in "harbor-{{.E2E_SLOT}}-core-1" "harbor-{{.E2E_SLOT}}_core_1"; do
+            if docker exec "$core_container" sh -ec 'mkdir -p /etc/core && umask 077 && printf %s 0123456789abcdef > /etc/core/key' >/dev/null 2>&1; then
+              key_ready=1
+              break 2
+            fi
+          done
+          sleep 1
+        done
+        if [ "$key_ready" -ne 1 ]; then
+          {{.E2E_DEV_ENV}} task dev:logs:snapshot SLOT='{{.E2E_SLOT}}' SKIP_TRIVY='{{.SKIP_TRIVY}}' E2E_ONLY=true >> reports/e2e-dev.log 2>&1 || true
+          echo "[error] failed to install e2e core encryption key" >&2
+          exit 1
+        fi
+
+        harbor_url="http://127.0.0.1:{{.E2E_PORT_HTTP}}"
+        ignored_components="${E2E_IGNORE_HEALTH_COMPONENTS:-portal}"
+        if [ '{{.SKIP_TRIVY}}' = 'true' ]; then
+          ignored_components="$ignored_components,trivy"
+        fi
+        export E2E_IGNORE_HEALTH_COMPONENTS="$ignored_components"
+        last_health_output=""
+        last_health_error=""
+        for _ in $(seq 1 36); do
+          if health_output=$(curl -fsS --connect-timeout 2 --max-time 5 "$harbor_url/api/v2.0/health" 2>&1); then
+            last_health_output="$health_output"
+            if printf '%s\n' "$health_output" | jq -e --arg ignored "$E2E_IGNORE_HEALTH_COMPONENTS" '
+              ($ignored | split(",") | map(ascii_downcase | gsub("^\\s+|\\s+$"; "")) | map(select(. != ""))) as $ignored |
+              ((.components // []) | length > 0) and
+              ([.components[]? |
+                select(((.name // "") | ascii_downcase) as $name | ($ignored | index($name) | not)) |
+                select(((.status // "") | ascii_downcase) != "healthy")
+              ] | length == 0)
+            ' >/dev/null 2>&1; then
+              printf '%s\n' "$harbor_url" > reports/e2e-harbor-url
+              break
+            fi
+          else
+            last_health_error="$health_output"
+          fi
+          sleep 5
+        done
+
+        if [ ! -s reports/e2e-harbor-url ]; then
+          echo "[error] Harbor did not become healthy within 180s; see reports/e2e-dev.log" >&2
+          if [ -n "$last_health_output" ]; then
+            printf '\n[health] last response:\n%s\n' "$last_health_output" >> reports/e2e-dev.log
+          fi
+          if [ -n "$last_health_error" ]; then
+            printf '\n[health] last curl error:\n%s\n' "$last_health_error" >> reports/e2e-dev.log
+          fi
+          {{.E2E_DEV_ENV}} task dev:logs:snapshot SLOT='{{.E2E_SLOT}}' SKIP_TRIVY='{{.SKIP_TRIVY}}' E2E_ONLY=true >> reports/e2e-dev.log 2>&1 || true
+          exit 1
+        fi
+
+        harbor_url=$(tr -d '\n' < reports/e2e-harbor-url)
+        export HARBOR_URL="$harbor_url"
+        export HARBOR_USERNAME=admin
+        export HARBOR_PASSWORD=Harbor12345
+        export E2E_SLOT='{{.E2E_SLOT}}'
+        export COMPOSE_PROJECT_NAME='harbor-{{.E2E_SLOT}}'
+        export PROJECT_PREFIX='harbor-{{.E2E_SLOT}}'
+        export CORE_METRICS_URL="http://127.0.0.1:{{.E2E_PORT_METRIC_CORE}}/metrics"
+        export JOBSERVICE_METRICS_URL="http://127.0.0.1:{{.E2E_PORT_METRIC_JOBSERVICE}}/metrics"
+
+        host_gateway=""
+        if docker --version 2>/dev/null | grep -qi 'podman'; then
+          host_gateway="host.containers.internal"
+        else
+          host_gateway=$(docker network inspect "harbor-{{.E2E_SLOT}}_default" 2>/dev/null | jq -r '.[0].IPAM.Config[0].Gateway // empty')
+        fi
+        if [ -n "$host_gateway" ]; then
+          export E2E_WEBHOOK_HOST="${E2E_WEBHOOK_HOST:-$host_gateway}"
+          export OIDC_HOST_IP="${OIDC_HOST_IP:-$host_gateway}"
+        fi
+        export DATABASE_URL="${DATABASE_URL:-postgres://postgres:root123@127.0.0.1:{{.E2E_PORT_POSTGRES}}/registry?sslmode=disable}"
+        if docker --version 2>/dev/null | grep -q 'Docker' && docker buildx version >/dev/null 2>&1; then
+          builder_name="e2e-buildx"
+          docker buildx create --name "$builder_name" --driver docker-container --use >/dev/null 2>&1 || docker buildx use "$builder_name"
+          docker buildx inspect "$builder_name" --bootstrap >/dev/null 2>&1 || true
+        fi
+
+        cd src
+        test_status=0
+        : > ../reports/e2e-test.json
+        run_suite() {
+          name="$1"
+          tags="$2"
+          concurrency="$3"
+          out="../reports/e2e-test-${name}.json"
+          suite_status=0
+
+          printf '[e2e] running %s suite (tags=%s concurrency=%s)\n' "$name" "$tags" "$concurrency"
+          if [ -n "$tags" ]; then
+            go test -count=1 -v -json -tags e2e -timeout '{{.E2E_TIMEOUT}}' -run TestFeatures ./e2e/... -args -godog.tags="$tags" -godog.concurrency="$concurrency" > "$out" 2>&1 || suite_status=$?
+          else
+            go test -count=1 -v -json -tags e2e -timeout '{{.E2E_TIMEOUT}}' -run TestFeatures ./e2e/... -args -godog.concurrency="$concurrency" > "$out" 2>&1 || suite_status=$?
+          fi
+          cat "$out" || true
+          cat "$out" >> ../reports/e2e-test.json
+          if [ -f ../reports/e2e-junit.xml ]; then
+            cp ../reports/e2e-junit.xml "../reports/e2e-junit-${name}.xml"
+          fi
+          return "$suite_status"
+        }
+
+        if [ '{{.TAGS}}' = '~@k8s' ]; then
+          run_suite main '~@k8s && ~@gc && ~@test-next-update-robot-account' '{{.CONCURRENCY}}' || test_status=$?
+          if [ "$test_status" -eq 0 ]; then
+            run_suite gc '@gc' '1' || test_status=$?
+          fi
+          if [ "$test_status" -eq 0 ]; then
+            run_suite next-update-robot-account '@test-next-update-robot-account' '1' || test_status=$?
+          fi
+        else
+          run_suite custom '{{.TAGS}}' '{{.CONCURRENCY}}' || test_status=$?
+        fi
+        cd ..
+        {{.E2E_DEV_ENV}} task dev:logs:snapshot SLOT='{{.E2E_SLOT}}' SKIP_TRIVY='{{.SKIP_TRIVY}}' E2E_ONLY=true >> reports/e2e-dev.log 2>&1 || true
+        exit "$test_status"
+
+  _dev-down:
+    internal: true
+    cmd: '{{.E2E_DEV_ENV}} task dev:infra:remove SLOT=''{{.E2E_SLOT}}'' SKIP_TRIVY=''{{.SKIP_TRIVY}}'' E2E_ONLY=true >/dev/null 2>&1 || true'
+
+  _copy-harness:
+    internal: true
+    cmds:
+      - mkdir -p "{{.E2E_TMP_CLONE}}/taskfile" "{{.E2E_TMP_CLONE}}/src" "{{.E2E_TMP_CLONE}}/dockerfile"
+      - cp Taskfile.yml "{{.E2E_TMP_CLONE}}/Taskfile.yml"
+      - cp taskfile/*.yml "{{.E2E_TMP_CLONE}}/taskfile/"
+      - rm -rf "{{.E2E_TMP_CLONE}}/devenv"
+      - cp -R devenv "{{.E2E_TMP_CLONE}}/devenv"
+      - cp dockerfile/*.dockerfile "{{.E2E_TMP_CLONE}}/dockerfile/"
+      - cp -Rf config/* "{{.E2E_TMP_CLONE}}/config/"
+      - rm -rf "{{.E2E_TMP_CLONE}}/src/e2e"
+      - cp -R src/e2e "{{.E2E_TMP_CLONE}}/src/e2e"
+
+  _prepare-module:
+    internal: true
+    dir: '{{.E2E_TMP_CLONE}}'
+    cmds:
+      - task build:gen-apis
+      - cd src && go mod tidy
+
+  _require-meta-tools:
+    internal: true
+    cmds:
+      - |
+        missing=""
+        for tool in git task go docker cosign curl openssl jq; do
+          command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
+        done
+        docker compose version >/dev/null 2>&1 || missing="$missing docker-compose"
+        if ! docker info >/dev/null 2>&1; then
+          missing="$missing docker-daemon"
+        fi
+        if [ -n "$missing" ]; then
+          echo "[error] missing required e2e tools:$missing" >&2
+          exit 1
+        fi
+
+  _require-runtime-tools:
+    internal: true
+    cmds:
+      - |
+        missing=""
+        for tool in task go docker cosign curl openssl jq; do
+          command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
+        done
+        docker compose version >/dev/null 2>&1 || missing="$missing docker-compose"
+        if ! docker info >/dev/null 2>&1; then
+          missing="$missing docker-daemon"
+        fi
+        if [ -n "$missing" ]; then
+          echo "[error] missing required e2e tools:$missing" >&2
+          exit 1
+        fi
