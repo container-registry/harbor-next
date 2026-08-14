@@ -20,6 +20,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # Full history: the jj merge in taskfile/release-ready.yml needs
+          # the merge base with the commercial branches; a shallow checkout
+          # hides it and every branch-touched file becomes a spurious conflict.
+          fetch-depth: 0
 
       - uses: ./.github/actions/setup-task
         with:

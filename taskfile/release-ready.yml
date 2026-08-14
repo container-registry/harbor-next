@@ -112,18 +112,16 @@ tasks:
           exit 1
         fi
 
-        # Shallow-fetch each branch directly into the target worktree. depth=10
-        # comfortably covers a direct 8gcr-main child (depth 1) or a branch
-        # stacked one level deep (e.g. 0005 on 0004, depth 2) without pulling
-        # full history. Resolve to a raw SHA before handing off to jj — jj
-        # only exposes refs/remotes/<name>/* as revsets for remotes it has
-        # registered via `jj git remote`; "patches" is just a fetch-refspec
-        # destination, not a real remote, so jj can't resolve the ref path
-        # itself even though the commit is present. The SHA always works.
+        # Full-history fetch: jj doesn't support shallow histories — graft
+        # boundaries break merge-base discovery and turn the merge into
+        # spurious conflicts. Cost is only the 8gcr-side commits since the
+        # branches share their history with this checkout. Resolve to a raw
+        # SHA for jj: "patches" is a fetch-refspec destination, not a
+        # registered remote, so jj can't resolve the ref path itself.
         parent_refs=()
         for branch in "${branches[@]}"; do
           echo "Fetching commercial branch: ${branch}"
-          git -C "${patch_target_dir}" fetch --depth=10 "${remote_url}" \
+          git -C "${patch_target_dir}" fetch "${remote_url}" \
             "${branch}:refs/remotes/patches/${branch}"
           parent_refs+=("$(git -C "${patch_target_dir}" rev-parse "refs/remotes/patches/${branch}")")
         done
