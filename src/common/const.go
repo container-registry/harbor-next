@@ -169,9 +169,11 @@ const (
 	DefaultGCTimeWindowHours = int64(2)
 
 	// Metric setting items
-	MetricEnable = "metric_enable"
-	MetricPort   = "metric_port"
-	MetricPath   = "metric_path"
+	MetricEnable            = "metric_enable"
+	MetricPort              = "metric_port"
+	MetricPath              = "metric_path"
+	MetricExporterEnable    = "metric_exporter_enable"
+	MetricExporterCacheTime = "metric_exporter_cache_time"
 
 	// Trace setting items
 	TraceEnabled         = "trace_enabled"

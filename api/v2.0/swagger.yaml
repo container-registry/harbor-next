@@ -1,7 +1,26 @@
 swagger: '2.0'
 info:
   title: Harbor API
-  description: These APIs provide services for manipulating Harbor project.
+  description: |
+    These APIs provide services for manipulating Harbor project.
+
+    ### Prometheus metrics
+
+    Harbor exposes Prometheus metrics, but **not** through this API. They are served on a
+    dedicated port on each component, outside `basePath`, so they are not reachable through
+    the public ingress and are not described by any path below:
+
+        http://<component>:<METRIC_PORT><METRIC_PATH>
+
+    `METRIC_PORT` defaults to `9090` (the Helm chart sets `8001`) and `METRIC_PATH` defaults
+    to `/metrics`. The endpoint is unauthenticated and intended to be reachable only from
+    inside the cluster or compose network. Set `METRIC_ENABLE=true` to serve it.
+
+    Core additionally serves the Harbor exporter collectors on that same endpoint when
+    `METRIC_EXPORTER_ENABLE=true`, which replaces the standalone `harbor-exporter` container.
+
+    The response is the Prometheus text exposition format
+    (`text/plain; version=0.0.4`), not JSON.
   version: '2.0'
 host: localhost
 schemes:

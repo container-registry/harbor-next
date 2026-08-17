@@ -12,6 +12,8 @@ task images       # Build/push Docker images
 task dev:up       # Local dev with hot reload
 ```
 
+Go test/build need generated API first: `task build:gen-apis`.
+
 ## PRs
 
 - Branch off `main`, never push direct.

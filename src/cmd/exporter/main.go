@@ -72,11 +72,13 @@ func main() {
 		},
 	})
 
-	exporter.InitBackendWorker(&exporter.RedisPoolConfig{
+	if err := exporter.InitBackendWorker(&exporter.RedisPoolConfig{
 		URL:               viper.GetString("redis.url"),
 		Namespace:         viper.GetString("redis.namespace"),
 		IdleTimeoutSecond: viper.GetInt("redis.timeout"),
-	})
+	}); err != nil {
+		log.Fatalf("failed to initialize job service backend worker: %v", err)
+	}
 
 	exporterOpt := &exporter.Opt{
 		Port:                   viper.GetInt("exporter.port"),

@@ -3,6 +3,7 @@
 package exporter
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -11,11 +12,13 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/goharbor/harbor/src/pkg/version"
 )
 
 func TestNewSystemInfoCollector(t *testing.T) {
 	type args struct {
-		hbrCli *HarborClient
+		backend Backend
 	}
 	tests := []struct {
 		name string
@@ -25,16 +28,16 @@ func TestNewSystemInfoCollector(t *testing.T) {
 		{
 			name: "test new system info collector",
 			args: args{
-				hbrCli: &HarborClient{},
+				backend: NewRESTBackend(),
 			},
 			want: &SystemInfoCollector{
-				HarborClient: &HarborClient{},
+				backend: NewRESTBackend(),
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewSystemInfoCollector(tt.args.hbrCli); !reflect.DeepEqual(got, tt.want) {
+			if got := NewSystemInfoCollector(tt.args.backend); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("NewSystemInfoCollector() = %v, want %v", got, tt.want)
 			}
 		})
@@ -67,8 +70,9 @@ func TestSystemInfoCollector_Describe(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			InitHarborClient(tt.fields.HarborClient)
 			hc := &SystemInfoCollector{
-				HarborClient: tt.fields.HarborClient,
+				backend: NewRESTBackend(),
 			}
 			go hc.Describe(tt.args.c)
 			desc := <-tt.args.c
@@ -112,7 +116,7 @@ func TestSystemInfoCollector_Collect(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			InitHarborClient(tt.fields.HarborClient)
 			hc := &SystemInfoCollector{
-				HarborClient: tt.fields.HarborClient,
+				backend: NewRESTBackend(),
 			}
 			go hc.Collect(tt.args.c)
 			metric := <-tt.args.c
@@ -127,8 +131,20 @@ func TestSystemInfoCollector_getSysInfo(t *testing.T) {
 	type fields struct {
 		HarborClient *HarborClient
 	}
+	// The cache is a package global and an earlier test seeds it under this same
+	// key, which would short-circuit getSysInfo and leave the REST path
+	// unexercised. Drop the entry so this test actually hits the backend.
+	if CacheEnabled() {
+		CacheDelete(systemInfoCollectorName)
+	}
+	// harbor_version is rendered from the version package (ldflags), not from
+	// the API response, so the expectation must follow that source.
+	wantVersion := version.ReleaseVersion
+	if version.GitCommit != "" {
+		wantVersion = fmt.Sprintf("%s-%s", version.ReleaseVersion, version.GitCommit)
+	}
 	data := []prometheus.Metric{
-		prometheus.MustNewConstMetric(harborSysInfo.Desc(), prometheus.GaugeValue, 1, "ldap_auth", "v2.0.0", "true"),
+		prometheus.MustNewConstMetric(harborSysInfo.Desc(), prometheus.GaugeValue, 1, "ldap_auth", wantVersion, "true"),
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/v2.0/systeminfo" {
@@ -165,7 +181,7 @@ func TestSystemInfoCollector_getSysInfo(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			InitHarborClient(tt.fields.HarborClient)
 			hc := &SystemInfoCollector{
-				HarborClient: tt.fields.HarborClient,
+				backend: NewRESTBackend(),
 			}
 			if got := hc.getSysInfo(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("SystemInfoCollector.getSysInfo() = %v, want %v", got, tt.want)
