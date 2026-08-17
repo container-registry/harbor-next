@@ -5,7 +5,7 @@ on:
     inputs:
       tag_name:
         description: Existing release tag to update
-        required: true
+        required: false
         type: string
       checkout_ref:
         description: Ref containing the changelog to render
@@ -30,7 +30,7 @@ concurrency:
 
 jobs:
   update:
-    name: Recreate ${{ inputs.tag_name || github.ref_name }} Release Notes
+    name: Recreate ${{ inputs.tag_name || 'Release Preview' }} Notes
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     env:

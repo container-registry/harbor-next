@@ -20,9 +20,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # Full history: the jj merge in taskfile/release-ready.yml needs
-          # the merge base with the commercial branches; a shallow checkout
-          # hides it and every branch-touched file becomes a spurious conflict.
+          # release-ready clones this checkout by commit to validate patches
+          # without mutating the workflow's source tree.
           fetch-depth: 0
 
       - uses: ./.github/actions/setup-task
@@ -55,6 +54,13 @@ jobs:
 
           jj --version
 
+      # Root Taskfile evaluation reads Go cache paths.
+      - name: Setup Go
+        uses: ./.github/actions/setup-go-cached
+        with:
+          go-version-file: src/go.mod
+          go-sum-path: src/go.sum
+
       - name: Generate GitHub App token
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
@@ -67,4 +73,4 @@ jobs:
       - name: Verify release patches apply
         env:
           PATCHES_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: task --taskfile taskfile/release-ready.yml check
+        run: task release-ready

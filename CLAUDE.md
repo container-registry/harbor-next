@@ -10,9 +10,16 @@ task test:quick   # API lint + unit tests
 task test:ci      # Full CI pipeline
 task images       # Build/push Docker images
 task dev:up       # Local dev with hot reload
+task apply-patches # Apply branches listed in taskfile/commercial-patches with jj
+task release-ready # Verify those patches against a clean clone
 ```
 
 Go test/build need generated API first: `task build:gen-apis`.
+
+For an unsigned local release build and push, authenticate the container
+engine first, then run `task release-images-local RELEASE_VERSION=X.Y.Z
+IMAGE_TAG=<tag>`. It defaults to `8gears.container-registry.com/8gcr-pr` and
+builds both `linux/amd64` and `linux/arm64`.
 
 ## PRs
 
@@ -27,7 +34,7 @@ Go test/build need generated API first: `task build:gen-apis`.
 
 `main` uses `always-bump-minor`; `VERSION` on `main` tracks the next development release while `.release-please-manifest.json` tracks the published release. `release-X.Y` branches use patch-only versioning. `ci:`, `build:`, `chore:`, `test:` are hidden from release notes.
 
-**exclude-paths:** changes touching only `.github/`, `docs/`, or `tests/` don't bump version — use `ci:` for CI-only changes.
+**exclude-paths:** changes touching only `.github/`, `docs/`, `tests/`, or `taskfile/` don't bump version — use `ci:` for CI-only changes.
 
 ## Registry
 
