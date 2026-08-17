@@ -20,7 +20,7 @@ jobs:
     if: >-
       ${{
         github.event.pull_request.head.repo.full_name == github.repository &&
-        github.head_ref == 'backport/release-2.15-jj-commercial-megamerge'
+        github.head_ref == 'chore/harbor-owned-release-images-2.15'
       }}
     permissions:
       contents: read
@@ -28,10 +28,12 @@ jobs:
     uses: ./.github/workflows/publish-images.yml
     with:
       checkout_ref: ${{ github.event.pull_request.head.sha }}
-      image_tag: v2.15.6-pr624
+      image_tag: v2.15.6-pr630
       version: 2.15.6
-      artifact_prefix: release-2.15-rehearsal-pr624
+      artifact_prefix: release-2.15-rehearsal-pr630
       registry_address: 8gears.container-registry.com
-      registry_project: 8gcr-dev
-      patches_series: 8gcr-ee/patches/series-release-2.15
-    secrets: inherit
+      registry_project: 8gcr-pr
+      registry_username: ${{ vars.PR_REGISTRY_USERNAME }}
+    secrets:
+      REGISTRY_PASSWORD: ${{ secrets.PR_REGISTRY_PASSWORD }}
+      SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}

@@ -3,6 +3,20 @@ set -euo pipefail
 
 : "${GH_TOKEN:?GH_TOKEN is required}"
 
+github_retry() {
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    if "$@"; then
+      return 0
+    fi
+    if [[ "${attempt}" -eq 5 ]]; then
+      return 1
+    fi
+    echo "GitHub request failed (attempt ${attempt}/5); retrying..." >&2
+    sleep $((attempt * 2))
+  done
+}
+
 preview_pr_number="${RELEASE_NOTES_PREVIEW_PR_NUMBER:-}"
 if [[ -n "${preview_pr_number}" && ! "${TAG_NAME:-}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   preview_version=$(node -e "const manifest = require('./.release-please-manifest.json'); const version = manifest['.']; if (!version) { throw new Error('missing root release version'); } console.log(version);")
@@ -11,7 +25,6 @@ fi
 : "${TAG_NAME:?TAG_NAME is required}"
 
 PATCHES_TOKEN="${PATCHES_TOKEN:-${GH_TOKEN}}"
-patches_branch_prefix="${PATCHES_BRANCH_PREFIX:-}"
 if [[ -z "${GITHUB_REPOSITORY:-}" ]]; then
   GITHUB_REPOSITORY=$(git remote get-url next 2>/dev/null \
     | sed -E 's#^(git@github\.com:|https://github\.com/)##; s#\.git$##' || true)
@@ -48,7 +61,7 @@ generated_notes_args=(-f "tag_name=${TAG_NAME}")
 if [[ -n "${preview_pr_number}" ]]; then
   generated_notes_args+=(-f "target_commitish=$(git rev-parse HEAD)")
 fi
-gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+github_retry gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
   "${generated_notes_args[@]}" \
   --jq .body > "${tmp_dir}/generated-notes.md"
 
@@ -61,7 +74,7 @@ node .github/scripts/format-release-notes.mjs \
 if [[ -n "${preview_pr_number}" ]]; then
   release_branch="${GITHUB_REF_NAME:?GITHUB_REF_NAME is required for a release PR preview}"
 else
-  release_branch=$(gh release view "${TAG_NAME}" \
+  release_branch=$(github_retry gh release view "${TAG_NAME}" \
     --repo "${GITHUB_REPOSITORY}" \
     --json targetCommitish \
     --jq .targetCommitish)
@@ -72,35 +85,28 @@ if [[ -z "${release_branch}" ]]; then
   exit 1
 fi
 
-# `gh repo clone` shells out to git without reliably propagating GH_TOKEN as
-# a credential for the private container-registry/8gcr repo in this
-# non-interactive context ("could not read Username for 'https://github.com'").
-# Use a plain `git clone` instead, but via a one-shot GIT_ASKPASS helper
-# rather than embedding the token in the URL — an embedded token is written
-# into the clone's `.git/config` and shows up in the process list (`ps`)
-# for the duration of the clone. The askpass script only ever reads the
-# token from its own environment, never as a command-line argument or URL.
-# Exported (not just prefixed on this one command) because the per-branch
-# `git fetch` loop below against the same private repo needs it too.
+# Fetch only the branches declared by this Harbor branch. The token remains
+# in the environment and never appears in a URL, process argument, or Git
+# config file.
 askpass_script="${tmp_dir}/git-askpass.sh"
 cat > "${askpass_script}" <<'EOF'
 #!/usr/bin/env bash
-echo "${PATCHES_TOKEN}"
+case "$1" in
+  *Username*) printf '%s\n' 'x-access-token' ;;
+  *Password*) printf '%s\n' "${PATCHES_TOKEN}" ;;
+  *) exit 1 ;;
+esac
 EOF
 chmod 700 "${askpass_script}"
-export GIT_ASKPASS="${askpass_script}" PATCHES_TOKEN
+export GIT_ASKPASS="${askpass_script}" GIT_TERMINAL_PROMPT=0 PATCHES_TOKEN
 
-git clone --depth=1 --branch main \
-  "https://x-access-token@github.com/container-registry/8gcr" \
-  "${tmp_dir}/patches-repo"
-
-series="${tmp_dir}/patches-repo/8gcr-ee/patches/series"
+git init --bare "${tmp_dir}/patches-repo"
+patches_remote="https://x-access-token@github.com/container-registry/8gcr"
+series="taskfile/commercial-patches"
 patch_notes="${tmp_dir}/commercial-patches.md"
 
-# 8gcr-ee/patches/series is now a manifest of commercial jj/git branch names
-# (see ADR-0006 in container-registry/8gcr), not a StGit patch-file series.
-# None of the branches carry a commit body, only a one-line subject, so a
-# direct `git log --format=%s` read replaces the old patch-file parsing.
+# The Harbor branch owns the ordered manifest. 8gcr only stores the branch
+# commits, so release notes and image builds always use the same exact list.
 if [[ -f "${series}" ]]; then
   while IFS= read -r branch; do
     branch="${branch%%#*}"
@@ -113,10 +119,15 @@ if [[ -f "${series}" ]]; then
       exit 1
     fi
 
-    git -C "${tmp_dir}/patches-repo" fetch --depth=1 origin \
-      "${patches_branch_prefix}${branch}:refs/remotes/origin/${branch}"
+    git -C "${tmp_dir}/patches-repo" fetch --depth=1 "${patches_remote}" \
+      "${branch}:refs/remotes/origin/${branch}"
     echo "- $(git -C "${tmp_dir}/patches-repo" log -1 --format=%s "refs/remotes/origin/${branch}")" \
       >> "${patch_notes}"
+
+    if git -C "${tmp_dir}/patches-repo" cat-file -e \
+      "refs/remotes/origin/${branch}:dockerfile/grype-scanner.dockerfile" 2>/dev/null; then
+      images+=(grype-scanner snyk-scanner)
+    fi
   done < "${series}"
 fi
 
@@ -144,6 +155,8 @@ fi
   for image in "${images[@]}"; do
     image_name="harbor-${image}"
     [[ "${image}" == "trivy-adapter" ]] && image_name="trivy-adapter"
+    [[ "${image}" == "grype-scanner" ]] && image_name="harbor-grype-adapter"
+    [[ "${image}" == "snyk-scanner" ]] && image_name="harbor-snyk-adapter"
     echo "| \`${image_name}\` | \`${registry}/${image_name}:${TAG_NAME}\` |"
   done
 
@@ -164,13 +177,13 @@ fi
   fi
 } > "${tmp_dir}/release-notes.md"
 
-if [[ -n "${preview_pr_number}" ]]; then
-  gh pr view "${preview_pr_number}" --repo "${GITHUB_REPOSITORY}" --json body --jq .body > "${tmp_dir}/release-pr-body.md"
+if [[ -n "${preview_pr_number}" && "${dry_run}" != "true" ]]; then
+  github_retry gh pr view "${preview_pr_number}" --repo "${GITHUB_REPOSITORY}" --json body --jq .body > "${tmp_dir}/release-pr-body.md"
   node .github/scripts/update-release-notes-preview.mjs \
     "${tmp_dir}/release-pr-body.md" \
     "${tmp_dir}/release-notes.md" \
     "${tmp_dir}/release-pr-body-with-preview.md"
-  gh pr edit "${preview_pr_number}" \
+  github_retry gh pr edit "${preview_pr_number}" \
     --repo "${GITHUB_REPOSITORY}" \
     --body-file "${tmp_dir}/release-pr-body-with-preview.md"
   exit 0
@@ -184,6 +197,6 @@ elif [[ "${dry_run}" == "true" ]]; then
   exit 0
 fi
 
-gh release edit "${TAG_NAME}" \
+github_retry gh release edit "${TAG_NAME}" \
   --repo "${GITHUB_REPOSITORY}" \
   --notes-file "${tmp_dir}/release-notes.md"

@@ -1,0 +1,6 @@
+# Ordered commercial patches for Harbor Next release-2.15.
+0001-branding
+0002-sftp-replication
+0003-identity-providers
+0004-pgx-monitoring
+0005-aws-rds-iam-auth

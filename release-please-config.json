@@ -5,7 +5,7 @@
   "pull-request-title-pattern": "chore: release ${version}",
   "release-type": "simple",
   "include-v-in-tag": true,
-  "exclude-paths": [".github", "docs", "tests"],
+  "exclude-paths": [".github", "docs", "tests", "taskfile"],
   "changelog-sections": [
     {"type": "feat",     "section": "Features"},
     {"type": "fix",      "section": "Bug Fixes"},
