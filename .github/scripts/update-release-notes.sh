@@ -11,6 +11,7 @@ fi
 : "${TAG_NAME:?TAG_NAME is required}"
 
 PATCHES_TOKEN="${PATCHES_TOKEN:-${GH_TOKEN}}"
+patches_branch_prefix="${PATCHES_BRANCH_PREFIX:-}"
 if [[ -z "${GITHUB_REPOSITORY:-}" ]]; then
   GITHUB_REPOSITORY=$(git remote get-url next 2>/dev/null \
     | sed -E 's#^(git@github\.com:|https://github\.com/)##; s#\.git$##' || true)
@@ -71,27 +72,51 @@ if [[ -z "${release_branch}" ]]; then
   exit 1
 fi
 
-GH_TOKEN="${PATCHES_TOKEN}" gh repo clone container-registry/8gcr \
-  "${tmp_dir}/patches-repo" \
-  -- --depth=1 --branch main
+# `gh repo clone` shells out to git without reliably propagating GH_TOKEN as
+# a credential for the private container-registry/8gcr repo in this
+# non-interactive context ("could not read Username for 'https://github.com'").
+# Use a plain `git clone` instead, but via a one-shot GIT_ASKPASS helper
+# rather than embedding the token in the URL — an embedded token is written
+# into the clone's `.git/config` and shows up in the process list (`ps`)
+# for the duration of the clone. The askpass script only ever reads the
+# token from its own environment, never as a command-line argument or URL.
+# Exported (not just prefixed on this one command) because the per-branch
+# `git fetch` loop below against the same private repo needs it too.
+askpass_script="${tmp_dir}/git-askpass.sh"
+cat > "${askpass_script}" <<'EOF'
+#!/usr/bin/env bash
+echo "${PATCHES_TOKEN}"
+EOF
+chmod 700 "${askpass_script}"
+export GIT_ASKPASS="${askpass_script}" PATCHES_TOKEN
+
+git clone --depth=1 --branch main \
+  "https://x-access-token@github.com/container-registry/8gcr" \
+  "${tmp_dir}/patches-repo"
 
 series="${tmp_dir}/patches-repo/8gcr-ee/patches/series"
 patch_notes="${tmp_dir}/commercial-patches.md"
 
+# 8gcr-ee/patches/series is now a manifest of commercial jj/git branch names
+# (see ADR-0006 in container-registry/8gcr), not a StGit patch-file series.
+# None of the branches carry a commit body, only a one-line subject, so a
+# direct `git log --format=%s` read replaces the old patch-file parsing.
 if [[ -f "${series}" ]]; then
-  while IFS= read -r patch; do
-    patch="${patch%%#*}"
-    patch="${patch#"${patch%%[![:space:]]*}"}"
-    patch="${patch%"${patch##*[![:space:]]}"}"
-    [[ -z "${patch}" ]] && continue
+  while IFS= read -r branch; do
+    branch="${branch%%#*}"
+    branch="${branch#"${branch%%[![:space:]]*}"}"
+    branch="${branch%"${branch##*[![:space:]]}"}"
+    [[ -z "${branch}" ]] && continue
 
-    if [[ "${patch}" == */* || "${patch}" == *..* ]]; then
-      echo "Invalid commercial patch name in series: ${patch}" >&2
+    if [[ "${branch}" == */* || "${branch}" == *..* ]]; then
+      echo "Invalid commercial branch name in series: ${branch}" >&2
       exit 1
     fi
 
-    node .github/scripts/format-commercial-patch.mjs \
-      "${tmp_dir}/patches-repo/8gcr-ee/patches/${patch}" >> "${patch_notes}"
+    git -C "${tmp_dir}/patches-repo" fetch --depth=1 origin \
+      "${patches_branch_prefix}${branch}:refs/remotes/origin/${branch}"
+    echo "- $(git -C "${tmp_dir}/patches-repo" log -1 --format=%s "refs/remotes/origin/${branch}")" \
+      >> "${patch_notes}"
   done < "${series}"
 fi
 

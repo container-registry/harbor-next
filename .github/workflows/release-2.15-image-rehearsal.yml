@@ -1,0 +1,37 @@
+name: Release 2.15 Image Rehearsal
+
+on:
+  pull_request:
+    branches: [release-2.15]
+    types: [opened, reopened, synchronize]
+    paths:
+      - ".github/workflows/release-2.15-image-rehearsal.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-2.15-image-rehearsal-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  publish-images:
+    name: Build, Push, and Sign 2.15 Rehearsal Images
+    if: >-
+      ${{
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.head_ref == 'backport/release-2.15-jj-commercial-megamerge'
+      }}
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/publish-images.yml
+    with:
+      checkout_ref: ${{ github.event.pull_request.head.sha }}
+      image_tag: v2.15.6-pr624
+      version: 2.15.6
+      artifact_prefix: release-2.15-rehearsal-pr624
+      registry_address: 8gears.container-registry.com
+      registry_project: 8gcr-dev
+      patches_series: 8gcr-ee/patches/series-release-2.15
+    secrets: inherit
