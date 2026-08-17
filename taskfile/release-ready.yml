@@ -152,16 +152,16 @@ tasks:
           for index in "${!branches[@]}"; do
             branch="${branches[$index]}"
             branch_ref="${parent_refs[$index]}"
-            IFS=' ' read -r -a branch_parents <<< "$(git -C "${patch_target_dir}" show -s --format='%P' "${branch_ref}")"
+            branch_parents=$(git -C "${patch_target_dir}" show -s --format='%P' "${branch_ref}")
 
-            if [ "${#branch_parents[@]}" -eq 0 ]; then
+            if [ -z "${branch_parents}" ]; then
               patches_ready=false
               invalid_branch="${branch}"
               invalid_parent="<none>"
               break
             fi
 
-            for branch_parent in "${branch_parents[@]}"; do
+            for branch_parent in ${branch_parents}; do
               if git -C "${patch_target_dir}" merge-base --is-ancestor "${branch_parent}" "${target_commit}"; then
                 continue
               fi
