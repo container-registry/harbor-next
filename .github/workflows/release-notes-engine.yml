@@ -22,7 +22,7 @@ on:
         type: boolean
     secrets:
       SYNC_APP_PRIVATE_KEY:
-        description: Private key for reading commercial patch metadata
+        description: Private key for reading commercial branch metadata
         required: true
 concurrency:
   group: release-notes-${{ inputs.tag_name || github.ref_name }}
