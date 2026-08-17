@@ -152,7 +152,10 @@ tasks:
           for index in "${!branches[@]}"; do
             branch="${branches[$index]}"
             branch_ref="${parent_refs[$index]}"
-            IFS=' ' read -r -a branch_parents <<< "$(git -C "${patch_target_dir}" show -s --format='%P' "${branch_ref}")"
+            branch_parents=()
+            for branch_parent in $(git -C "${patch_target_dir}" show -s --format='%P' "${branch_ref}"); do
+              branch_parents+=("${branch_parent}")
+            done
 
             if [ "${#branch_parents[@]}" -eq 0 ]; then
               patches_ready=false
