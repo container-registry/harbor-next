@@ -93,7 +93,7 @@ spec:
         size: 1Gi
     registry:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:de12b1fd47e6fd17404d4e3182101982103b069889fae12d61ea9d97ec564021" # {"$imagepolicy": "flux-system:harbor-registry:digest"}
+        deploy.8gears.io/image-revision: "sha256:1f852c4a066514cd699d9c0d5a532f13bad7d324c10727d338670b2095c61c8b" # {"$imagepolicy": "flux-system:harbor-registry:digest"}
         deploy.8gears.io/registryctl-image-revision: "sha256:cad9bae1ec0363dc808b6975bb249b9d9422f5728e438e118399b0a9bd9b76bc" # {"$imagepolicy": "flux-system:harbor-registryctl:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-registry
@@ -117,7 +117,7 @@ spec:
     exporter:
       enabled: true
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:a96d012f3c160385efebcbd5771d65171ead0fe6e201adac7e29ae35e5c08751" # {"$imagepolicy": "flux-system:harbor-exporter:digest"}
+        deploy.8gears.io/image-revision: "sha256:21d43d77beed92dc7b3a487fbaa861763b608bec8b7db2e41c7fd6ef0bad1ace" # {"$imagepolicy": "flux-system:harbor-exporter:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-exporter
         tag: latest
@@ -125,7 +125,7 @@ spec:
     trivy:
       enabled: true
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:d907af5a009d8301ed87c6e6b9a400335e99637203329fda82ba5dd378ce27cf" # {"$imagepolicy": "flux-system:trivy-adapter:digest"}
+        deploy.8gears.io/image-revision: "sha256:c749b8d53b4a2ed666f2fcebf33b502ecaa795569c3f374a8c1ec1120a2af7b9" # {"$imagepolicy": "flux-system:trivy-adapter:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/trivy-adapter
         tag: latest
