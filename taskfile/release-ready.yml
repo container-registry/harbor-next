@@ -20,6 +20,12 @@ tasks:
     cmds:
       - |
         repo_root=$(pwd -P)
+        git_repo_dir=$(git -C "${repo_root}" rev-parse --path-format=absolute --git-common-dir)
+        if [ -d "${repo_root}/.jj" ]; then
+          checkout_ref=$(jj -R "${repo_root}" log -r @ --no-graph -T commit_id)
+        else
+          checkout_ref=$(git -C "${repo_root}" rev-parse HEAD)
+        fi
         tmp_root="${repo_root}/{{.RELEASE_READY_TMP_DIR}}"
         worktree_dir="${tmp_root}/worktree"
         patches_repo_dir="${tmp_root}/patches-repo"
@@ -37,8 +43,8 @@ tasks:
         # inside a Git worktree"), since worktrees share their main repo's
         # .git and jj colocation is tied to that. A clone is an independent
         # repo apply-commercial-patches can freely `jj git init --colocate`.
-        git clone --local "${repo_root}" "${worktree_dir}"
-        git -C "${worktree_dir}" checkout -B release-ready-check "$(git -C "${repo_root}" rev-parse HEAD)"
+        git clone --local "${git_repo_dir}" "${worktree_dir}"
+        git -C "${worktree_dir}" checkout -B release-ready-check "${checkout_ref}"
 
         task --taskfile "${repo_root}/taskfile/release-ready.yml" apply-commercial-patches \
           RELEASE_PATCH_TARGET_DIR="${worktree_dir}" \
@@ -112,18 +118,87 @@ tasks:
           exit 1
         fi
 
-        # Full-history fetch: jj doesn't support shallow histories — graft
-        # boundaries break merge-base discovery and turn the merge into
-        # spurious conflicts. Cost is only the 8gcr-side commits since the
-        # branches share their history with this checkout. Resolve to a raw
-        # SHA for jj: "patches" is a fetch-refspec destination, not a
-        # registered remote, so jj can't resolve the ref path itself.
-        parent_refs=()
+        # Fetch the complete patch snapshot in one transaction. jj doesn't
+        # support shallow histories, and fetching branches one at a time can
+        # mix generations when the refs are force-rebased concurrently.
+        # "patches" is a fetch-refspec destination, not a registered jj
+        # remote, so resolve the imported refs to raw SHAs below.
+        refspecs=()
         for branch in "${branches[@]}"; do
-          echo "Fetching commercial branch: ${branch}"
-          git -C "${patch_target_dir}" fetch "${remote_url}" \
-            "${branch}:refs/remotes/patches/${branch}"
-          parent_refs+=("$(git -C "${patch_target_dir}" rev-parse "refs/remotes/patches/${branch}")")
+          refspecs+=("+${branch}:refs/remotes/patches/${branch}")
+        done
+
+        # A commercial branch is one patch commit based on the target's
+        # Harbor Next history, or on another branch in this declared series
+        # (0005 is intentionally stacked on 0004). Reject extra 8gcr/main lineage:
+        # jj can merge that history without a conflict when it is shallow,
+        # but the result silently imports unrelated repository changes. The
+        # producer sync runs in another repository, so briefly retry while a
+        # new patch generation is being force-pushed.
+        target_commit=$(git -C "${patch_target_dir}" rev-parse HEAD)
+        sync_attempts=${PATCH_SYNC_ATTEMPTS:-36}
+        sync_delay_seconds=${PATCH_SYNC_DELAY_SECONDS:-5}
+        for ((attempt = 1; attempt <= sync_attempts; attempt++)); do
+          git -C "${patch_target_dir}" fetch --no-tags "${remote_url}" "${refspecs[@]}"
+
+          parent_refs=()
+          for branch in "${branches[@]}"; do
+            parent_refs+=("$(git -C "${patch_target_dir}" rev-parse "refs/remotes/patches/${branch}")")
+          done
+
+          patches_ready=true
+          invalid_branch=""
+          invalid_parent=""
+          for index in "${!branches[@]}"; do
+            branch="${branches[$index]}"
+            branch_ref="${parent_refs[$index]}"
+            IFS=' ' read -r -a branch_parents <<< "$(git -C "${patch_target_dir}" show -s --format='%P' "${branch_ref}")"
+
+            if [ "${#branch_parents[@]}" -eq 0 ]; then
+              patches_ready=false
+              invalid_branch="${branch}"
+              invalid_parent="<none>"
+              break
+            fi
+
+            for branch_parent in "${branch_parents[@]}"; do
+              if git -C "${patch_target_dir}" merge-base --is-ancestor "${branch_parent}" "${target_commit}"; then
+                continue
+              fi
+
+              parent_is_patch=false
+              for patch_ref in "${parent_refs[@]}"; do
+                if [ "${branch_parent}" = "${patch_ref}" ]; then
+                  parent_is_patch=true
+                  break
+                fi
+              done
+              if [ "${parent_is_patch}" = true ]; then
+                continue
+              fi
+
+              patches_ready=false
+              invalid_branch="${branch}"
+              invalid_parent="${branch_parent}"
+              break
+            done
+            if [ "${patches_ready}" = false ]; then
+              break
+            fi
+          done
+
+          if [ "${patches_ready}" = true ]; then
+            break
+          fi
+          if [ "${attempt}" -eq "${sync_attempts}" ]; then
+            echo "::error::Commercial branch ${invalid_branch} is not based on the target Harbor Next history or another declared patch branch" >&2
+            echo "Unexpected parent: ${invalid_parent}" >&2
+            echo "Rebase the patch series onto the current next/main before publishing images." >&2
+            exit 1
+          fi
+
+          echo "Patch branches are still syncing to next/main (attempt ${attempt}/${sync_attempts}); retrying in ${sync_delay_seconds}s..."
+          sleep "${sync_delay_seconds}"
         done
 
         if [ ! -d "${patch_target_dir}/.jj" ]; then
