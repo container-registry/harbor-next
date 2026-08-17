@@ -75,14 +75,14 @@ spec:
     # Always so they pull the new digest behind latest.
     core:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:59bc44420868f9a886757003ddaf84e3930e73f4e23f9b9073316e299b5e8aa2" # {"$imagepolicy": "flux-system:harbor-core:digest"}
+        deploy.8gears.io/image-revision: "sha256:89592d3c7192668da10c565c6a413e0f1ca268c3930cd25b87eac874333a5c14" # {"$imagepolicy": "flux-system:harbor-core:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-core
         tag: latest
       replicas: 1
     jobservice:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:0681873ae19aa251e3d66b87065d17d11cac1289e050a4874e15d8a93208b993" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
+        deploy.8gears.io/image-revision: "sha256:29570cd891981998291f658c1069caf90b35a5ab96a791a22c59fc51f021013f" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-jobservice
         tag: latest
@@ -117,7 +117,7 @@ spec:
     exporter:
       enabled: true
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:0432342c14b088a3e537f1ccf74a04c39cda55b37544d7411fb50af3a253eb3b" # {"$imagepolicy": "flux-system:harbor-exporter:digest"}
+        deploy.8gears.io/image-revision: "sha256:a6aa0488cb9695dfe3eb0b16aeadb5354977d96392f65995ff4e2448b192c5df" # {"$imagepolicy": "flux-system:harbor-exporter:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-exporter
         tag: latest
@@ -125,7 +125,7 @@ spec:
     trivy:
       enabled: true
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:7a9aa02c59c908c3d42b1cfd5c668323d95262386d0256f4a1cfafd192860c34" # {"$imagepolicy": "flux-system:trivy-adapter:digest"}
+        deploy.8gears.io/image-revision: "sha256:6c24b4dc7bd4ba53bee59d82ee4ed9092068e568307a84d3ac3b8658b8b882e5" # {"$imagepolicy": "flux-system:trivy-adapter:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/trivy-adapter
         tag: latest
