@@ -5,7 +5,7 @@ on:
     inputs:
       tag_name:
         description: Existing release tag to update
-        required: true
+        required: false
         type: string
       checkout_ref:
         description: Ref containing the changelog to render
@@ -30,7 +30,7 @@ concurrency:
 
 jobs:
   update:
-    name: Recreate ${{ inputs.tag_name || github.ref_name }} Release Notes
+    name: Recreate ${{ inputs.tag_name || 'Release Preview' }} Notes
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     env:
@@ -38,7 +38,6 @@ jobs:
       GITHUB_REPOSITORY: ${{ github.repository }}
       REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
       REGISTRY_PROJECT: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
-      PATCHES_BRANCH_PREFIX: release-2.15/
       RELEASE_NOTES_DRY_RUN: ${{ inputs.dry_run || false }}
       TAG_NAME: ${{ inputs.tag_name || github.ref_name }}
       RELEASE_NOTES_PREVIEW_PR_NUMBER: ${{ inputs.preview_pr_number }}
