@@ -75,7 +75,7 @@ spec:
     # Always so they pull the new digest behind latest.
     core:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:b24b52f1e1ccb7bf7b1c15b165e477e138a6f4af96cb526e77274401b7ee90cc" # {"$imagepolicy": "flux-system:harbor-core:digest"}
+        deploy.8gears.io/image-revision: "sha256:9fb2924aa12b99aaef77c0812fb7f8b19405101901a6c876725648fcecb4c391" # {"$imagepolicy": "flux-system:harbor-core:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-core
         tag: latest
@@ -109,7 +109,7 @@ spec:
         size: 10Gi
     portal:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:c7462799682b8b06fa0b9cf9d18d7f982dfaecc18ac1cfa703af99f1c379e9ed" # {"$imagepolicy": "flux-system:harbor-portal:digest"}
+        deploy.8gears.io/image-revision: "sha256:0460d1393cc83b6f8a1711449b39883b7034d753e59c953d46f59a468ae4439e" # {"$imagepolicy": "flux-system:harbor-portal:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-portal
         tag: latest
