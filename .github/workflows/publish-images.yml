@@ -23,10 +23,10 @@ on:
         required: false
         type: string
         default: 8gcr
-      patches_series:
+      registry_username:
         required: false
         type: string
-        default: 8gcr-ee/patches/series
+        default: ""
     secrets:
       REGISTRY_PASSWORD:
         required: true
@@ -49,7 +49,7 @@ jobs:
     env:
       REGISTRY_ADDRESS: ${{ inputs.registry_address }}
       REGISTRY_PROJECT: ${{ inputs.registry_project }}
-      VERSION: ${{ inputs.version }}
+      RELEASE_VERSION: ${{ inputs.version }}
     steps:
       - name: Prepare
         id: prepare
@@ -103,6 +103,13 @@ jobs:
 
           jj --version
 
+      # Root Taskfile evaluation reads Go cache paths, even for apply-patches.
+      - name: Setup Go
+        uses: ./.github/actions/setup-go-cached
+        with:
+          go-version-file: src/go.mod
+          go-sum-path: src/go.sum
+
       - name: Generate GitHub App token
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
@@ -115,17 +122,10 @@ jobs:
       - name: Apply commercial patches
         env:
           PATCHES_TOKEN: ${{ steps.app-token.outputs.token }}
-          PATCHES_SERIES: ${{ inputs.patches_series }}
-        run: task --taskfile taskfile/release-ready.yml apply-commercial-patches
+        run: task apply-patches
 
       - name: Load versions
         run: grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
-
-      - name: Setup Go
-        uses: ./.github/actions/setup-go-cached
-        with:
-          go-version-file: src/go.mod
-          go-sum-path: src/go.sum
 
       - name: Generate API code
         if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
@@ -162,7 +162,7 @@ jobs:
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ${{ env.REGISTRY_ADDRESS }}
-          username: ${{ vars.REGISTRY_USERNAME }}
+          username: ${{ inputs.registry_username || vars.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
       - name: Build and push by digest
@@ -242,7 +242,7 @@ jobs:
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ${{ env.REGISTRY_ADDRESS }}
-          username: ${{ vars.REGISTRY_USERNAME }}
+          username: ${{ inputs.registry_username || vars.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -282,7 +282,7 @@ jobs:
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ${{ env.REGISTRY_ADDRESS }}
-          username: ${{ vars.REGISTRY_USERNAME }}
+          username: ${{ inputs.registry_username || vars.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
       - name: Sign images

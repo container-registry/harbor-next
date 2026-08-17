@@ -112,7 +112,6 @@ jobs:
       pull-requests: write
     uses: ./.github/workflows/release-notes-engine.yml
     with:
-      tag_name: v${{ needs.release-please.outputs.version }}
       checkout_ref: ${{ fromJSON(needs.release-please.outputs.prs)[0].headBranchName }}
       preview_pr_number: ${{ fromJSON(needs.release-please.outputs.prs)[0].number }}
     secrets:

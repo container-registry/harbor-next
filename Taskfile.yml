@@ -12,8 +12,9 @@ dotenv:
 vars:
   GIT_COMMIT:
     sh: git rev-parse --short=8 HEAD || echo "unknown"
-  VERSION:
+  DEFAULT_VERSION:
     sh: cat VERSION 2>/dev/null | tr -d '\n' || echo "dev"
+  VERSION: '{{.RELEASE_VERSION | default .DEFAULT_VERSION}}'
   TIMESTAMP:
     sh: date -u +%Y%m%d%H%M%S
 
@@ -56,6 +57,8 @@ includes:
     taskfile: ./taskfile/docs.yml
   release-ready:
     taskfile: ./taskfile/release-ready.yml
+  release-images-local:
+    taskfile: ./taskfile/release-images-local.yml
   release-notes:
     taskfile: ./taskfile/release-notes.yml
 
@@ -112,6 +115,16 @@ tasks:
     desc: "Verify release patches apply cleanly"
     cmds:
       - task: release-ready:check
+
+  apply-patches:
+    desc: "Apply the commercial patches declared by this Harbor branch"
+    cmds:
+      - task: release-ready:apply-patches
+
+  release-images-local:
+    desc: "Apply commercial patches, build multi-arch images, push them, and verify the manifests"
+    cmds:
+      - task: release-images-local:run
 
   release-notes:
     desc: "Recreate a GitHub release's notes from its tagged changelog"
