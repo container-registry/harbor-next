@@ -1,0 +1,13 @@
+ARG RUST_VERSION=1.84
+FROM rust:${RUST_VERSION}-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends bash ca-certificates curl git pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /work
+COPY run-compat.sh /usr/local/bin/run-cargo-compat
+RUN chmod +x /usr/local/bin/run-cargo-compat
+
+ENTRYPOINT ["/usr/local/bin/run-cargo-compat"]
+CMD ["all"]

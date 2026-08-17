@@ -78,6 +78,8 @@ type basicClient struct {
 	authorizer auth.Authorizer
 }
 
+const scannerAPITimeout = time.Minute
+
 // NewClient news a basic client
 func NewClient(url, authType, accessCredential string, skipCertVerify bool) (Client, error) {
 	transport := &http.Transport{
@@ -95,7 +97,7 @@ func NewClient(url, authType, accessCredential string, skipCertVerify bool) (Cli
 
 	return &basicClient{
 		httpClient: &http.Client{
-			Timeout:   time.Second * 5,
+			Timeout:   scannerAPITimeout,
 			Transport: transport,
 			CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
 				return http.ErrUseLastResponse

@@ -60,6 +60,7 @@ export class ProjectPolicy {
     ProxySpeedKb?: number | null;
     MaxUpstreamConn?: number | null;
     ProxyCacheLocalOnNotFound?: boolean;
+    ProxyCacheAllowPush?: boolean;
     ProxyReferrerAPI?: boolean;
 
     constructor() {
@@ -75,6 +76,7 @@ export class ProjectPolicy {
         this.ProxySpeedKb = -1;
         this.MaxUpstreamConn = -1;
         this.ProxyCacheLocalOnNotFound = false;
+        this.ProxyCacheAllowPush = false;
         this.ProxyReferrerAPI = false;
     }
 
@@ -99,6 +101,8 @@ export class ProjectPolicy {
             : -1;
         this.ProxyCacheLocalOnNotFound =
             pro.metadata.proxy_cache_local_on_not_found === 'true';
+        this.ProxyCacheAllowPush =
+            pro.metadata.proxy_cache_allow_push === 'true';
         this.ProxyReferrerAPI =
             pro.metadata.proxy_referrer_api === 'true' ? true : false;
     }
@@ -165,7 +169,7 @@ export class ProjectPolicyConfigComponent implements OnInit {
     maxUpstreamConnError: string | null = null;
     registries: Registry[] = [];
     supportedRegistryTypeQueryString: string =
-        'type={docker-hub harbor azure-acr aws-ecr google-gcr quay docker-registry github-ghcr jfrog-artifactory}';
+        'type={docker-hub harbor azure-acr aws-ecr google-gcr quay docker-registry github-ghcr jfrog-artifactory npmjs npm maven-central maven pypi pypi-registry crates-io cargo go go-registry go-sumdb homebrew homebrew-registry}';
 
     constructor(
         private errorHandler: ErrorHandler,

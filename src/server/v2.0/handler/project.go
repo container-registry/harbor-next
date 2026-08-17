@@ -167,6 +167,9 @@ func (a *projectAPI) CreateProject(ctx context.Context, params operation.CreateP
 	if req.RegistryID == nil {
 		req.Metadata.ProxySpeedKb = nil
 		req.Metadata.MaxUpstreamConn = nil
+		req.Metadata.ProxyCacheAllowPush = nil
+	} else if err := normalizeProxyCacheAllowPush(req.Metadata.ProxyCacheAllowPush); err != nil {
+		return a.SendError(ctx, err)
 	}
 
 	// ignore enable_content_trust metadata for proxy cache project
@@ -550,6 +553,9 @@ func (a *projectAPI) UpdateProject(ctx context.Context, params operation.UpdateP
 	if err != nil {
 		return a.SendError(ctx, err)
 	}
+	if err := validateImmutableRegistryID(p, params.Project.RegistryID); err != nil {
+		return a.SendError(ctx, err)
+	}
 
 	if params.Project.CVEAllowlist != nil {
 		if params.Project.CVEAllowlist.ProjectID == 0 {
@@ -576,6 +582,16 @@ func (a *projectAPI) UpdateProject(ctx context.Context, params operation.UpdateP
 	if params.Project.Metadata != nil && p.IsProxy() {
 		params.Project.Metadata.EnableContentTrust = nil
 	}
+	if params.Project.Metadata != nil && params.Project.Metadata.ProxyCacheAllowPush != nil {
+		metadata, err := a.metadataMgr.Get(ctx, p.ProjectID)
+		if err != nil {
+			return a.SendError(ctx, err)
+		}
+		persisted := &project.Project{Metadata: metadata}
+		if err := validateImmutableProxyCacheAllowPush(persisted, params.Project.Metadata.ProxyCacheAllowPush); err != nil {
+			return a.SendError(ctx, err)
+		}
+	}
 	if err := lib.JSONCopy(&p.Metadata, params.Project.Metadata); err != nil {
 		log.Warningf("failed to call JSONCopy on project metadata when UpdateProject, error: %v", err)
 	}
@@ -597,6 +613,40 @@ func (a *projectAPI) UpdateProject(ctx context.Context, params operation.UpdateP
 	}
 
 	return operation.NewUpdateProjectOK()
+}
+
+func normalizeProxyCacheAllowPush(value *string) error {
+	if value == nil {
+		return nil
+	}
+	allow, err := strconv.ParseBool(*value)
+	if err != nil {
+		return errors.BadRequestError(nil).WithMessagef("metadata.proxy_cache_allow_push should only be 'true' or 'false', but got: '%s'", *value)
+	}
+	*value = strconv.FormatBool(allow)
+	return nil
+}
+
+func validateImmutableRegistryID(project *project.Project, value *int64) error {
+	if value == nil || *value == project.RegistryID {
+		return nil
+	}
+	return errors.BadRequestError(nil).WithMessage("registry_id can only be set when the project is created")
+}
+
+func validateImmutableProxyCacheAllowPush(project *project.Project, value *string) error {
+	if value == nil {
+		return nil
+	}
+	if err := normalizeProxyCacheAllowPush(value); err != nil {
+		return err
+	}
+	persisted, exists := project.GetMetadata(pkgModels.ProMetaProxyCacheAllowPush)
+	persistedAllow, err := strconv.ParseBool(persisted)
+	if !exists || err != nil || persistedAllow != (*value == "true") {
+		return errors.BadRequestError(nil).WithMessage("metadata.proxy_cache_allow_push can only be set when the project is created")
+	}
+	return nil
 }
 
 func (a *projectAPI) GetScannerOfProject(ctx context.Context, params operation.GetScannerOfProjectParams) middleware.Responder {

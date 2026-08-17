@@ -19,7 +19,8 @@ ingress:
   enabled: false
 
 # Emit an HTTPRoute that attaches to the Airlock Gateway object named "harbor"
-# in this namespace. The chart routes /api/, /service/, /v2/, /c/, /chartrepo/
+# in this namespace. The chart routes /api/, /service/, /v2/, /npm/, /maven/,
+# /pypi/, /c/, /chartrepo/
 # and / to harbor-core, which proxies portal + registry.
 gateway:
   enabled: true

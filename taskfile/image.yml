@@ -35,6 +35,8 @@ tasks:
       - portal
       - registry
       - trivy-adapter
+      - grype-scanner
+      - snyk-scanner
 
   # --- Buildx (Docker only) ---
 
@@ -251,6 +253,24 @@ tasks:
           IMAGE_NAME: trivy-adapter
           DOCKERFILE: trivy-adapter.dockerfile
           BUILD_ARGS: '--build-arg HARBOR_SCANNER_TRIVY_VERSION={{.HARBOR_SCANNER_TRIVY_VERSION}} --build-arg TRIVY_BASE_IMAGE_VERSION={{.TRIVY_BASE_IMAGE_VERSION}} --build-arg TRIVY_VERSION={{.TRIVY_VERSION}} --build-arg TRIVY_COMMIT="$(cat "bin/$(echo "{{.PLATFORMS}}" | cut -d, -f1 | tr "/" "-")/.trivy-commit")"'
+
+  grype-scanner:
+    desc: "Build Grype scanner adapter image"
+    cmds:
+      - task: _build
+        vars:
+          IMAGE_NAME: harbor-grype-adapter
+          DOCKERFILE: grype-scanner.dockerfile
+          BUILD_ARGS: '--build-arg GO_VERSION={{.GO_VERSION}} --build-arg GRYPE_VERSION={{.GRYPE_VERSION}} --build-arg SYFT_VERSION={{.SYFT_VERSION}} --build-arg LPROBE_VERSION={{.LPROBE_VERSION}}'
+
+  snyk-scanner:
+    desc: "Build Snyk scanner adapter image"
+    cmds:
+      - task: _build
+        vars:
+          IMAGE_NAME: harbor-snyk-adapter
+          DOCKERFILE: snyk-scanner.dockerfile
+          BUILD_ARGS: '--build-arg GO_VERSION={{.GO_VERSION}} --build-arg NODE_VERSION={{.NODE_VERSION}} --build-arg SNYK_CLI_VERSION={{.SNYK_CLI_VERSION}}'
 
   # --- Utilities ---
 

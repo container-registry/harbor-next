@@ -68,6 +68,7 @@ const mockProjectPolicies: Project[] | any[] = [
     },
     {
         project_id: 2,
+        registry_id: 3,
         owner_id: 1,
         name: 'test',
         creation_time: '2017-11-03T02:37:24Z',
@@ -83,6 +84,7 @@ const mockProjectPolicies: Project[] | any[] = [
             enable_content_trust: 'true',
             prevent_vul: 'true',
             public: 'true',
+            proxy_cache_allow_push: 'true',
             severity: 'low',
         },
     },
@@ -168,6 +170,40 @@ describe('ProjectPolicyConfigComponent', () => {
             component.projectPolicyConfigComponent.projectPolicy
                 .GenerateSbomOnPush
         ).toBeTruthy();
+    });
+    it('should show proxy identity and push policy as immutable', async () => {
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+
+        const host: HTMLElement = fixture.nativeElement;
+        const proxyEnabled: HTMLInputElement = host.querySelector(
+            '#is-project-proxy-cache-enabled input'
+        );
+        const registry: HTMLSelectElement = host.querySelector('#registry');
+        const allowPush: HTMLInputElement = host.querySelector(
+            '#proxy-cache-allow-push-config'
+        );
+
+        expect(
+            component.projectPolicyConfigComponent.projectPolicy
+                .ProxyCacheAllowPush
+        ).toBeTrue();
+        expect(proxyEnabled.disabled).toBeTrue();
+        expect(registry.disabled).toBeTrue();
+        expect(allowPush.disabled).toBeTrue();
+    });
+    it('should lay out proxy cache settings in a responsive grid', async () => {
+        await fixture.whenStable();
+        fixture.detectChanges();
+
+        const layout: HTMLElement = fixture.nativeElement.querySelector(
+            '.proxy-cache-settings'
+        );
+
+        expect(layout).toBeTruthy();
+        expect(layout.querySelectorAll('.proxy-cache-setting').length).toBe(5);
+        expect(getComputedStyle(layout).display).toBe('grid');
     });
     it('should not allow empty and whitespace CVEs', async () => {
         // set cveIds with mix of empty and whitespace

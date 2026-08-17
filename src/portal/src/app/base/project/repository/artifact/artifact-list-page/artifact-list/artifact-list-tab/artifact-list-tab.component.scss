@@ -6,6 +6,11 @@
   color: #007cbb;
 }
 
+.deprecated {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
 .hidden-tag {
   display: block;
   height: 0;
@@ -260,4 +265,18 @@
   max-height: 200px;
   overflow-y: auto;
   margin-bottom: -10px;
+}
+
+.native-channel-badge {
+  margin-left: 4px;
+}
+
+.channel-chip {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+}
+
+.channel-drift {
+  color: #c92100;
 }

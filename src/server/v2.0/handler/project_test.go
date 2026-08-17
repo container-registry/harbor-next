@@ -211,3 +211,69 @@ func (suite *ProjectTestSuite) TestSetScannerOfProject() {
 func TestProjectTestSuite(t *testing.T) {
 	suite.Run(t, &ProjectTestSuite{})
 }
+
+func TestNormalizeProxyCacheAllowPush(t *testing.T) {
+	value := "TRUE"
+	if err := normalizeProxyCacheAllowPush(&value); err != nil {
+		t.Fatal(err)
+	}
+	if value != "true" {
+		t.Fatalf("normalized value = %q, want true", value)
+	}
+
+	invalid := "enabled"
+	if err := normalizeProxyCacheAllowPush(&invalid); err == nil {
+		t.Fatal("normalizeProxyCacheAllowPush() error = nil, want invalid boolean error")
+	}
+}
+
+func TestValidateImmutableProxyCacheAllowPush(t *testing.T) {
+	project := &models.Project{
+		RegistryID: 1,
+		Metadata: map[string]string{
+			models.ProMetaProxyCacheAllowPush: "true",
+		},
+	}
+
+	same := "true"
+	if err := validateImmutableProxyCacheAllowPush(project, &same); err != nil {
+		t.Fatalf("unchanged value rejected: %v", err)
+	}
+
+	changed := "false"
+	if err := validateImmutableProxyCacheAllowPush(project, &changed); err == nil {
+		t.Fatal("changed immutable value accepted")
+	}
+
+	missing := &models.Project{}
+	unset := "false"
+	if err := validateImmutableProxyCacheAllowPush(missing, &unset); err == nil {
+		t.Fatal("creation-only value accepted after creation")
+	}
+
+	disabled := &models.Project{
+		Metadata: map[string]string{
+			models.ProMetaProxyCacheAllowPush: "false",
+		},
+	}
+	if err := validateImmutableProxyCacheAllowPush(disabled, &unset); err != nil {
+		t.Fatalf("unchanged disabled value rejected: %v", err)
+	}
+}
+
+func TestValidateImmutableRegistryID(t *testing.T) {
+	project := &models.Project{RegistryID: 7}
+	same := int64(7)
+	if err := validateImmutableRegistryID(project, &same); err != nil {
+		t.Fatalf("unchanged registry rejected: %v", err)
+	}
+
+	changed := int64(8)
+	if err := validateImmutableRegistryID(project, &changed); err == nil {
+		t.Fatal("changed immutable registry accepted")
+	}
+
+	if err := validateImmutableRegistryID(project, nil); err != nil {
+		t.Fatalf("omitted registry rejected: %v", err)
+	}
+}

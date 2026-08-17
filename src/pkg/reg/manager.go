@@ -50,6 +50,8 @@ import (
 	_ "github.com/goharbor/harbor/src/pkg/reg/adapter/jfrog"
 	// register the Native adapter
 	_ "github.com/goharbor/harbor/src/pkg/reg/adapter/native"
+	// register the package registry adapters
+	_ "github.com/goharbor/harbor/src/pkg/reg/adapter/package"
 	// register the Quay.io adapter
 	_ "github.com/goharbor/harbor/src/pkg/reg/adapter/quay"
 	// register the TencentCloud TCR adapter

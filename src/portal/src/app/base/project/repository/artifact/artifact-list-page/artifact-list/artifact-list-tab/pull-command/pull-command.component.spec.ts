@@ -29,9 +29,6 @@ describe('PullCommandComponent', () => {
 
         fixture = TestBed.createComponent(PullCommandComponent);
         component = fixture.componentInstance;
-        component.registryUrl = 'demo.goharbor.io';
-        component.projectName = 'library';
-        component.repoName = 'hello-world';
 
         component.artifact = {
             type: ArtifactType.CHART,
@@ -39,6 +36,9 @@ describe('PullCommandComponent', () => {
             digest: 'sha256@digest',
             tags: [{ name: '1.0.0' }],
         };
+        component.registryUrl = 'demo.goharbor.io';
+        component.projectName = 'library';
+        component.repoName = 'hello-world';
 
         fixture.detectChanges();
     });
@@ -266,5 +266,128 @@ describe('PullCommandComponent', () => {
         });
 
         expect(pullCommand).toEqual('');
+    });
+
+    it('should build npm install command from extra_attrs', () => {
+        component.artifact = {
+            type: ArtifactType.NPM,
+            extra_attrs: { name: 'harbor-multi-format-demo', version: '1.0.0' },
+        };
+        expect(component.getNpmCommand(component.artifact)).toBe(
+            'npm install harbor-multi-format-demo@1.0.0'
+        );
+    });
+
+    it('should drop version when npm version is absent', () => {
+        component.artifact = {
+            type: ArtifactType.NPM,
+            extra_attrs: { name: '@scope/pkg' },
+        };
+        expect(component.getNpmCommand(component.artifact)).toBe(
+            'npm install @scope/pkg'
+        );
+    });
+
+    it('should return empty npm command when name is absent', () => {
+        component.artifact = { type: ArtifactType.NPM, extra_attrs: {} };
+        expect(component.getNpmCommand(component.artifact).length).toBe(0);
+    });
+
+    it('should build maven dependency one-liner from extra_attrs', () => {
+        component.artifact = {
+            type: ArtifactType.MAVEN,
+            extra_attrs: {
+                groupId: 'com.acme',
+                artifactId: 'widget2',
+                version: '1.0',
+            },
+        };
+        expect(component.getMavenSnippet(component.artifact)).toBe(
+            'mvn dependency:get -Dartifact=com.acme:widget2:1.0'
+        );
+    });
+
+    it('should return empty maven snippet when coordinates are absent', () => {
+        component.artifact = {
+            type: ArtifactType.MAVEN,
+            extra_attrs: { groupId: 'com.acme' },
+        };
+        expect(component.getMavenSnippet(component.artifact).length).toBe(0);
+    });
+
+    it('should return true for hasPullCommandForTag with NPM type', () => {
+        component.artifact = {
+            type: ArtifactType.NPM,
+            extra_attrs: { name: 'harbor-multi-format-demo', version: '1.0.0' },
+        };
+        expect(component.hasPullCommandForTag(component.artifact)).toBeTruthy();
+    });
+
+    it('should return true for hasPullCommandForTag with MAVEN type', () => {
+        component.artifact = {
+            type: ArtifactType.MAVEN,
+            extra_attrs: { groupId: 'com.acme', artifactId: 'widget2' },
+        };
+        expect(component.hasPullCommandForTag(component.artifact)).toBeTruthy();
+    });
+
+    it('should display npm command in tag mode', async () => {
+        component.isTagMode = true;
+        component.artifact = {
+            type: ArtifactType.NPM,
+            tagNumber: 1,
+            tags: [{ name: '1.0.0' }],
+            extra_attrs: { name: 'harbor-multi-format-demo', version: '1.0.0' },
+        };
+        fixture.detectChanges();
+        await fixture.whenStable();
+        const modal = fixture.nativeElement.querySelector('#pullCommandForNpm');
+        expect(modal).toBeTruthy();
+    });
+
+    it('should display maven command in tag mode', async () => {
+        component.isTagMode = true;
+        component.artifact = {
+            type: ArtifactType.MAVEN,
+            tagNumber: 1,
+            tags: [{ name: '1.0' }],
+            extra_attrs: {
+                groupId: 'com.acme',
+                artifactId: 'widget2',
+                version: '1.0',
+            },
+        };
+        fixture.detectChanges();
+        await fixture.whenStable();
+        const modal = fixture.nativeElement.querySelector(
+            '#pullCommandForMaven'
+        );
+        expect(modal).toBeTruthy();
+    });
+
+    it('top-model command is native for npm/maven repos, docker pull otherwise', () => {
+        component.isTopModel = true;
+        component.projectName = 'library';
+        component.registryUrl = 'myregistry.io';
+
+        component.repoName = 'npm/lodash';
+        expect(component.getPullCommandForTopModel()).toEqual(
+            'npm install lodash'
+        );
+
+        component.repoName = 'npm/types/node';
+        expect(component.getPullCommandForTopModel()).toEqual(
+            'npm install @types/node'
+        );
+
+        component.repoName = 'maven/org/springframework/spring-core';
+        expect(component.getPullCommandForTopModel()).toEqual(
+            'mvn dependency:get -Dartifact=org.springframework:spring-core:RELEASE'
+        );
+
+        component.repoName = 'nginx';
+        expect(component.getPullCommandForTopModel()).toContain(
+            'myregistry.io/library/nginx'
+        );
     });
 });

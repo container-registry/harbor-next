@@ -1,0 +1,15 @@
+ARG PYTHON_VERSION=3.12
+FROM python:${PYTHON_VERSION}-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends bash ca-certificates curl git \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python -m pip install --no-cache-dir --upgrade pip build twine uv
+
+WORKDIR /work
+COPY run-compat.sh /usr/local/bin/run-pypi-compat
+RUN chmod +x /usr/local/bin/run-pypi-compat
+
+ENTRYPOINT ["/usr/local/bin/run-pypi-compat"]
+CMD ["all"]

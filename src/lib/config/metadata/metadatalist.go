@@ -75,6 +75,8 @@ var (
 		{Name: common.UnauthenticatedLandingPage, Scope: UserScope, Group: BasicGroup, EnvKey: "UNAUTHENTICATED_LANDING_PAGE", DefaultValue: common.LandingPageLogin, ItemType: &LandingPageType{}, Editable: true, Description: `The default landing page for unauthenticated users. Valid values are "login" and "public_projects".`},
 
 		{Name: common.TrivyAdapterURL, Scope: SystemScope, Group: TrivyGroup, EnvKey: "TRIVY_ADAPTER_URL", DefaultValue: "http://trivy-adapter:8080", ItemType: &StringType{}, Editable: false},
+		{Name: common.SnykAdapterURL, Scope: SystemScope, Group: TrivyGroup, EnvKey: "SNYK_ADAPTER_URL", DefaultValue: "http://snyk-scanner:8080", ItemType: &StringType{}, Editable: false},
+		{Name: common.GrypeAdapterURL, Scope: SystemScope, Group: TrivyGroup, EnvKey: "GRYPE_ADAPTER_URL", DefaultValue: "http://grype-scanner:8080", ItemType: &StringType{}, Editable: false},
 
 		{Name: common.CoreURL, Scope: SystemScope, Group: BasicGroup, EnvKey: "CORE_URL", DefaultValue: "http://core:8080", ItemType: &StringType{}, Editable: false},
 		{Name: common.CoreLocalURL, Scope: SystemScope, Group: BasicGroup, EnvKey: "CORE_LOCAL_URL", DefaultValue: "http://127.0.0.1:8080", ItemType: &StringType{}, Editable: false},
@@ -156,6 +158,9 @@ var (
 		{Name: common.OIDCLogout, Scope: UserScope, Group: OIDCGroup, DefaultValue: "false", ItemType: &BoolType{}, Description: `Enable OIDC logout to log out user session from the identity provider.`},
 
 		{Name: common.WithTrivy, Scope: SystemScope, Group: BasicGroup, EnvKey: "WITH_TRIVY", DefaultValue: "false", ItemType: &BoolType{}, Editable: true},
+		{Name: common.WithSnyk, Scope: SystemScope, Group: BasicGroup, EnvKey: "WITH_SNYK", DefaultValue: "true", ItemType: &BoolType{}, Editable: true},
+		{Name: common.WithGrype, Scope: SystemScope, Group: BasicGroup, EnvKey: "WITH_GRYPE", DefaultValue: "false", ItemType: &BoolType{}, Editable: true},
+		{Name: common.DefaultScanner, Scope: SystemScope, Group: BasicGroup, EnvKey: "DEFAULT_SCANNER", DefaultValue: "", ItemType: &StringType{}, Editable: true},
 		// the unit of expiration is days
 		{Name: common.RobotTokenDuration, Scope: UserScope, Group: BasicGroup, EnvKey: "ROBOT_TOKEN_DURATION", DefaultValue: "30", ItemType: &IntType{}, Editable: true, Description: `The robot account token duration in days`},
 		{Name: common.RobotNamePrefix, Scope: UserScope, Group: BasicGroup, EnvKey: "ROBOT_NAME_PREFIX", DefaultValue: "robot$", ItemType: &NonEmptyStringType{}, Editable: true, Description: `The robot account name prefix`},

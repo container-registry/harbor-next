@@ -28,4 +28,5 @@ const (
 	ProMetaMaxUpstreamConn           = "max_upstream_conn"
 	ProMetaProxyReferrerAPI          = "proxy_referrer_api"
 	ProMetaProxyCacheLocalOnNotFound = "proxy_cache_local_on_not_found"
+	ProMetaProxyCacheAllowPush       = "proxy_cache_allow_push"
 )

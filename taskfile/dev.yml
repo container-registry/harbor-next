@@ -23,6 +23,8 @@ vars:
   PORT_REGISTRY:     '{{ add 50000 (mul (atoi .SLOT) 100) }}'
   PORT_REGISTRYCTL:  '{{ add 8085  (mul (atoi .SLOT) 100) }}'
   PORT_TRIVY:        '{{ add 8081  (mul (atoi .SLOT) 100) }}'
+  PORT_SNYK:         '{{ add 8082  (mul (atoi .SLOT) 100) }}'
+  PORT_GRYPE:        '{{ add 8083  (mul (atoi .SLOT) 100) }}'
   PORT_DEBUG_CORE:   '{{ add 2345  (mul (atoi .SLOT) 100) }}'
   PORT_DEBUG_JOB:    '{{ add 2346  (mul (atoi .SLOT) 100) }}'
   PORT_DEBUG_REGCTL: '{{ add 2347  (mul (atoi .SLOT) 100) }}'
@@ -33,7 +35,7 @@ vars:
   COMPOSE_CMD: 'docker compose -f {{.COMPOSE_FILE}} --env-file {{.VERSIONS_ENV}}'
 
   # Docker Compose profile strings (reused across multiple tasks)
-  ALL_PROFILES: "--profile portal --profile core --profile jobservice --profile registryctl --profile trivy"
+  ALL_PROFILES: "--profile portal --profile core --profile jobservice --profile registryctl --profile trivy --profile snyk --profile grype"
   APP_PROFILES: "--profile portal --profile core --profile jobservice --profile registryctl"
   BACKEND_PROFILES: "--profile core --profile jobservice --profile registryctl"
 
@@ -53,6 +55,10 @@ env:
   PORT_REGISTRY:          '{{.PORT_REGISTRY}}'
   PORT_REGISTRYCTL:       '{{.PORT_REGISTRYCTL}}'
   PORT_TRIVY:             '{{.PORT_TRIVY}}'
+  PORT_SNYK:              '{{.PORT_SNYK}}'
+  PORT_GRYPE:             '{{.PORT_GRYPE}}'
+  WITH_SNYK:              '{{.WITH_SNYK | default "true"}}'
+  WITH_GRYPE:             '{{.WITH_GRYPE | default "false"}}'
   PORT_DEBUG_CORE:        '{{.PORT_DEBUG_CORE}}'
   PORT_DEBUG_JOBSERVICE:  '{{.PORT_DEBUG_JOB}}'
   PORT_DEBUG_REGISTRYCTL: '{{.PORT_DEBUG_REGCTL}}'

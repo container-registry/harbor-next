@@ -89,7 +89,8 @@ tests:
           count: 0
 
   # Pins the chart-computed ingress path-routing table: for a single
-  # ingress.hosts[0] entry the chart emits 6 paths, with /api/ routed
+  # ingress.hosts[0] entry the chart emits 13 paths, with API and package routes
+  # routed to Core
   # to the core Service and / routed to the portal Service. Anyone
   # reordering or merging paths in ingress.yaml breaks this immediately.
   - it: should route API paths to core service
@@ -112,10 +113,40 @@ tests:
           path: spec.rules[0].http.paths[0].backend.service.name
           pattern: .*-core$
       - equal:
+          path: spec.rules[0].http.paths[3].path
+          value: /npm/
+      - matchRegex:
+          path: spec.rules[0].http.paths[3].backend.service.name
+          pattern: .*-core$
+      - equal:
+          path: spec.rules[0].http.paths[4].path
+          value: /maven/
+      - matchRegex:
+          path: spec.rules[0].http.paths[4].backend.service.name
+          pattern: .*-core$
+      - equal:
           path: spec.rules[0].http.paths[5].path
-          value: /
+          value: /pypi/
       - matchRegex:
           path: spec.rules[0].http.paths[5].backend.service.name
+          pattern: .*-core$
+      - equal:
+          path: spec.rules[0].http.paths[6].path
+          value: /cargo/
+      - equal:
+          path: spec.rules[0].http.paths[7].path
+          value: /go/
+      - equal:
+          path: spec.rules[0].http.paths[8].path
+          value: /go-sumdb/
+      - equal:
+          path: spec.rules[0].http.paths[9].path
+          value: /homebrew/
+      - equal:
+          path: spec.rules[0].http.paths[12].path
+          value: /
+      - matchRegex:
+          path: spec.rules[0].http.paths[12].backend.service.name
           pattern: .*-portal$
 
   # Portal optional: the `/` route falls back to core when portal is disabled,
@@ -130,10 +161,45 @@ tests:
       portal.enabled: false
     asserts:
       - equal:
-          path: spec.rules[0].http.paths[5].path
+          path: spec.rules[0].http.paths[12].path
           value: /
       - matchRegex:
-          path: spec.rules[0].http.paths[5].backend.service.name
+          path: spec.rules[0].http.paths[12].backend.service.name
+          pattern: .*-core$
+
+  - it: should route package paths to core in HTTPRoute
+    template: templates/gateway-httproute.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      gateway.enabled: true
+      gateway.parentRefs:
+        - name: my-gateway
+    asserts:
+      - equal:
+          path: spec.rules[0].matches[3].path.value
+          value: /npm/
+      - equal:
+          path: spec.rules[0].matches[4].path.value
+          value: /maven/
+      - equal:
+          path: spec.rules[0].matches[5].path.value
+          value: /pypi/
+      - equal:
+          path: spec.rules[0].matches[6].path.value
+          value: /cargo/
+      - equal:
+          path: spec.rules[0].matches[7].path.value
+          value: /go/
+      - equal:
+          path: spec.rules[0].matches[8].path.value
+          value: /go-sumdb/
+      - equal:
+          path: spec.rules[0].matches[9].path.value
+          value: /homebrew/
+      - matchRegex:
+          path: spec.rules[0].backendRefs[0].name
           pattern: .*-core$
 
   # Regression guard for fdbd99f5b (Fix #7). With autoGenCert=true and

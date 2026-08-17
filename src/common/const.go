@@ -97,6 +97,9 @@ const (
 	TokenExpiration                  = "token_expiration"
 	AdminInitialPassword             = "admin_initial_password"
 	WithTrivy                        = "with_trivy"
+	WithSnyk                         = "with_snyk"
+	WithGrype                        = "with_grype"
+	DefaultScanner                   = "default_scanner"
 	ScanAllPolicy                    = "scan_all_policy"
 	UAAEndpoint                      = "uaa_endpoint"
 	UAAClientID                      = "uaa_client_id"
@@ -131,6 +134,8 @@ const (
 	GroupMember                       = "g"
 	ReadOnly                          = "read_only"
 	TrivyAdapterURL                   = "trivy_adapter_url"
+	SnykAdapterURL                    = "snyk_adapter_url"
+	GrypeAdapterURL                   = "grype_adapter_url"
 	DefaultCoreEndpoint               = "http://core:8080"
 	LDAPGroupType                     = 1
 	HTTPGroupType                     = 2

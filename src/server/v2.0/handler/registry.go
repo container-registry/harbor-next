@@ -241,7 +241,9 @@ func (r *registryAPI) PingRegistry(ctx context.Context, params operation.PingReg
 		}
 		// for an existing registry (referenced by id) its saved connection settings are
 		// authoritative; ignore url/insecure/ca overrides so the ping (and the saved
-		// credentials it sends) can't be redirected to or MITM'd via an untrusted endpoint
+		// credentials it sends) can't be redirected to or MITM'd via an untrusted endpoint.
+		// ValidateURL (not ValidateHTTPURL) since proxy-cache registry types added for
+		// npm/pypi/maven/cargo/go/go-sumdb/homebrew are not all plain http(s) endpoints.
 		if params.Registry.URL != nil && params.Registry.ID == nil {
 			url, err := lib.ValidateHTTPURL(*params.Registry.URL)
 			if err != nil {

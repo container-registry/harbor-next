@@ -16,13 +16,28 @@ import { Artifact } from '../../../../../../ng-swagger-gen/models/artifact';
 import { Label } from '../../../../../../ng-swagger-gen/models/label';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Project } from '../../project';
-import { artifactDefault } from './artifact';
+import {
+    artifactBootc,
+    artifactCargo,
+    artifactDefault,
+    artifactHomebrew,
+    artifactMaven,
+    artifactNpm,
+    artifactPypi,
+    isBootcArtifact,
+    isCargoArtifact,
+    isHomebrewArtifact,
+    isMavenArtifact,
+    isNpmArtifact,
+    isPypiArtifact,
+} from './artifact';
 import { SafeUrl } from '@angular/platform-browser';
 import { ArtifactService } from './artifact.service';
 import {
     EventService,
     HarborEvent,
 } from '../../../../services/event-service/event.service';
+import { AppConfigService } from '../../../../services/app-config.service';
 
 @Component({
     selector: 'artifact-summary',
@@ -47,12 +62,14 @@ export class ArtifactSummaryComponent implements OnInit {
     projectName: string;
     isProxyCacheProject: boolean = false;
     loading: boolean = false;
+    registryUrl: string;
 
     constructor(
         private route: ActivatedRoute,
         private router: Router,
         private frontEndArtifactService: ArtifactService,
-        private event: EventService
+        private event: EventService,
+        private appConfigService: AppConfigService
     ) {}
 
     goBack(): void {
@@ -102,6 +119,7 @@ export class ArtifactSummaryComponent implements OnInit {
     }
 
     ngOnInit(): void {
+        this.registryUrl = this.appConfigService.getConfig()?.registry_url;
         let depth = this.route.snapshot.params['depth'];
         if (depth) {
             this.referArtifactNameArray = depth.split('-');
@@ -133,11 +151,95 @@ export class ArtifactSummaryComponent implements OnInit {
     }
     showDefaultIcon(event: any) {
         if (event && event.target) {
-            event.target.src = artifactDefault;
+            event.target.src = this.getFallbackIcon();
         }
     }
+
+    isNpmArtifact(): boolean {
+        return isNpmArtifact(this.artifact);
+    }
+
+    isMavenArtifact(): boolean {
+        return isMavenArtifact(this.artifact);
+    }
+
+    isHomebrewArtifact(): boolean {
+        return isHomebrewArtifact(this.artifact);
+    }
+
+    isPypiArtifact(): boolean {
+        return isPypiArtifact(this.artifact);
+    }
+
+    isCargoArtifact(): boolean {
+        return isCargoArtifact(this.artifact);
+    }
+
+    isBootcArtifact(): boolean {
+        return isBootcArtifact(this.artifact);
+    }
+
+    hasArtifactIcon(): boolean {
+        return (
+            this.isNpmArtifact() ||
+            this.isMavenArtifact() ||
+            this.isHomebrewArtifact() ||
+            this.isPypiArtifact() ||
+            this.isCargoArtifact() ||
+            this.isBootcArtifact() ||
+            !!this.artifact?.icon
+        );
+    }
+
+    getArtifactIcon(): SafeUrl | string {
+        if (this.isNpmArtifact()) {
+            return artifactNpm;
+        }
+        if (this.isMavenArtifact()) {
+            return artifactMaven;
+        }
+        if (this.isHomebrewArtifact()) {
+            return artifactHomebrew;
+        }
+        if (this.isPypiArtifact()) {
+            return artifactPypi;
+        }
+        if (this.isCargoArtifact()) {
+            return artifactCargo;
+        }
+        if (this.isBootcArtifact()) {
+            return artifactBootc;
+        }
+        return this.getIcon(this.artifact.icon);
+    }
+
+    getFallbackIcon(): string {
+        if (this.isNpmArtifact()) {
+            return artifactNpm;
+        }
+        if (this.isMavenArtifact()) {
+            return artifactMaven;
+        }
+        if (this.isHomebrewArtifact()) {
+            return artifactHomebrew;
+        }
+        if (this.isPypiArtifact()) {
+            return artifactPypi;
+        }
+        if (this.isCargoArtifact()) {
+            return artifactCargo;
+        }
+        if (this.isBootcArtifact()) {
+            return artifactBootc;
+        }
+        return artifactDefault;
+    }
+
     getIcon(icon: string): SafeUrl {
         return this.frontEndArtifactService.getIcon(icon);
+    }
+    isYanked(): boolean {
+        return this.artifact?.extra_attrs?.['yanked'] === true;
     }
     getIconFromBackEnd() {
         if (this.artifact && this.artifact.icon) {

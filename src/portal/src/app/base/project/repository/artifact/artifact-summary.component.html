@@ -20,12 +20,12 @@
         <h2 class="custom-h2 center-align-items">
             <div
                 class="artifact-icon clr-display-inline-block"
-                *ngIf="artifact.icon">
+                *ngIf="hasArtifactIcon()">
                 <img
-                    *ngIf="getIcon(artifact.icon)"
+                    *ngIf="getArtifactIcon()"
                     class="artifact-icon"
                     [title]="artifact.type"
-                    [src]="getIcon(artifact.icon)"
+                    [src]="getArtifactIcon()"
                     (error)="showDefaultIcon($event)" />
             </div>
             <span class="margin-left-10px">{{
@@ -40,6 +40,18 @@
     </div>
 </div>
 <ng-container *ngIf="!loading">
+    <!-- deprecation / yank banner -->
+    <clr-alert
+        *ngIf="isYanked()"
+        clrAlertType="warning"
+        [clrAlertClosable]="false">
+        <clr-alert-item>
+            <span class="alert-text">{{
+                'ARTIFACT.DEPRECATED_BANNER' | translate
+            }}</span>
+        </clr-alert-item>
+    </clr-alert>
+
     <!-- labels -->
     <artifact-label [artifactDetails]="artifact"></artifact-label>
 
@@ -64,6 +76,7 @@
         [digest]="artifactDigest"
         [sbomDigest]="sbomDigest"
         [tab]="activeTab"
+        [registryUrl]="registryUrl"
         [additionLinks]="artifact?.addition_links"></artifact-additions>
 </ng-container>
 <div *ngIf="loading" class="clr-row mt-3 center">

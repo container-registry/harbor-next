@@ -17,6 +17,7 @@ package model
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/goharbor/harbor/src/lib/orm"
@@ -54,6 +55,44 @@ func (r *RepoRecord) FilterByBlobDigest(_ context.Context, qs orm.QuerySeter, _ 
 				on a.digest = ab.digest_af
 				where ab.digest_blob = %s`, orm.QuoteLiteral(digest))
 	return qs.FilterRaw("repository_id", fmt.Sprintf("in (%s)", sql))
+}
+
+// FilterByName owns ALL repository name fuzzy searches (the q "Name" keyword
+// dispatches here). It preserves the existing image-repo substring match on the
+// raw value and additionally matches the readable multiformat storage tree: a native
+// coordinate typed with its native separators ("com.acme:widget2",
+// "org.springframework.boot") never substring-matches the stored slash-delimited
+// tree path ("maven/com/acme/widget2"), so a second LIKE is OR'd with the maven
+// group/artifact separators ('.' and ':') rewritten to '/'.
+func (r *RepoRecord) FilterByName(_ context.Context, qs orm.QuerySeter, _ string, value any) orm.QuerySeter {
+	// A "name=~<v>" query dispatches here with a *q.FuzzyMatchValue, while an exact
+	// "name=<v>" delivers a plain string; accept both.
+	var name string
+	switch v := value.(type) {
+	case *q.FuzzyMatchValue:
+		name = v.Value
+	case string:
+		name = v
+	}
+	if len(name) == 0 {
+		return qs
+	}
+
+	// Raw value preserves today's image-repo matches (e.g. "nginx").
+	raw := orm.QuoteLiteral("%" + orm.Escape(name) + "%")
+	cond := fmt.Sprintf("like %s", raw)
+
+	// Only attempt the readable-tree variant when the value carries a native
+	// separator; plain OCI searches skip the extra branch.
+	if strings.ContainsAny(name, ".:") {
+		tree := strings.NewReplacer(".", "/", ":", "/").Replace(name)
+		if tree != name {
+			treeLit := orm.QuoteLiteral("%" + orm.Escape(tree) + "%")
+			cond = fmt.Sprintf("%s or name like %s", cond, treeLit)
+		}
+	}
+
+	return qs.FilterRaw("name", cond)
 }
 
 // TableName is required by beego orm to map RepoRecord to table repository

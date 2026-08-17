@@ -63,7 +63,7 @@ const (
 	// base filter: both tagged and untagged artifacts
 	both = `=id AND (
 		EXISTS (SELECT 1 FROM tag WHERE tag.artifact_id = T0.id)
-		OR 
+		OR
 		NOT EXISTS (SELECT 1 FROM artifact_reference ref WHERE ref.child_id = T0.id)
 	)`
 	// tag filter: only untagged artifacts
@@ -383,6 +383,29 @@ func setTagQuery(ctx context.Context, qs beegoorm.QuerySeter, query *q.Query) (b
 	if query == nil || len(query.Keywords) == 0 {
 		return qs, nil
 	}
+	exclude, exist := query.Keywords["ExcludeTagArtifactType"]
+	if !exist {
+		exclude, exist = query.Keywords["exclude_tag_artifact_type"]
+	}
+	if exist {
+		typedExclude, ok := exclude.(*q.TagArtifactTypeExclusion)
+		if !ok {
+			return nil, errors.New(nil).WithCode(errors.BadRequestCode).
+				WithMessage(`the value of "ExcludeTagArtifactType" query must be a tag artifact type exclusion`)
+		}
+		if typedExclude.Tag == "" || typedExclude.ArtifactType == "" {
+			return nil, errors.New(nil).WithCode(errors.BadRequestCode).
+				WithMessage(`the tag and artifact type in "ExcludeTagArtifactType" query cannot be empty`)
+		}
+		inClause, err := orm.CreateInClause(ctx, `SELECT DISTINCT art.id FROM artifact art
+			JOIN tag ON art.id=tag.artifact_id
+			WHERE art.artifact_type = ? AND tag.name = ?`, typedExclude.ArtifactType, typedExclude.Tag)
+		if err != nil {
+			return nil, err
+		}
+		qs = qs.FilterRaw("id", "NOT "+inClause)
+	}
+
 	tags, exist := query.Keywords["tags"]
 	if !exist {
 		tags, exist = query.Keywords["Tags"]

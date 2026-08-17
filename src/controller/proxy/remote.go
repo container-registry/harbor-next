@@ -85,7 +85,11 @@ func (r *remoteHelper) init(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	r.registry = adp.(adapter.ArtifactRegistry)
+	registry, ok := adp.(adapter.ArtifactRegistry)
+	if !ok {
+		return fmt.Errorf("registry type %s does not support OCI artifact proxy cache", reg.Type)
+	}
+	r.registry = registry
 	return nil
 }
 

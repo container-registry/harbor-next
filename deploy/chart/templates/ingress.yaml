@@ -60,6 +60,55 @@ spec:
                 name: {{ include "harbor.fullname" $ }}-core
                 port:
                   number: 80
+          - path: /npm/
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "harbor.fullname" $ }}-core
+                port:
+                  number: 80
+          - path: /maven/
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "harbor.fullname" $ }}-core
+                port:
+                  number: 80
+          - path: /pypi/
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "harbor.fullname" $ }}-core
+                port:
+                  number: 80
+          - path: /cargo/
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "harbor.fullname" $ }}-core
+                port:
+                  number: 80
+          - path: /go/
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "harbor.fullname" $ }}-core
+                port:
+                  number: 80
+          - path: /go-sumdb/
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "harbor.fullname" $ }}-core
+                port:
+                  number: 80
+          - path: /homebrew/
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "harbor.fullname" $ }}-core
+                port:
+                  number: 80
           - path: /chartrepo/
             pathType: Prefix
             backend:

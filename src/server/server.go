@@ -16,12 +16,23 @@ package server
 
 import (
 	"github.com/goharbor/harbor/src/server/registry"
+	"github.com/goharbor/harbor/src/server/registry/cargo"
+	"github.com/goharbor/harbor/src/server/registry/gomod"
+	"github.com/goharbor/harbor/src/server/registry/gosum"
+	"github.com/goharbor/harbor/src/server/registry/homebrew"
+	"github.com/goharbor/harbor/src/server/registry/pypi"
 	v2 "github.com/goharbor/harbor/src/server/v2.0/route"
 )
 
 // RegisterRoutes register all routes
 func RegisterRoutes() {
-	registerRoutes()          // service/internal API/UI controller/etc.
-	registry.RegisterRoutes() // OCI registry APIs
-	v2.RegisterRoutes()       // v2.0 APIs
+	registerRoutes()            // service/internal API/UI controller/etc.
+	registry.RegisterRoutes()   // OCI registry APIs
+	registerMultiFormatRoutes() // native npm + maven (multiformat) APIs, with proxy-cache fallback
+	pypi.RegisterRoutes()       // PyPI package registry APIs
+	cargo.RegisterRoutes()      // Cargo package registry APIs
+	gomod.RegisterRoutes()      // Go module proxy APIs
+	gosum.RegisterRoutes()      // Go checksum database proxy APIs
+	homebrew.RegisterRoutes()   // Homebrew package registry APIs
+	v2.RegisterRoutes()         // v2.0 APIs
 }

@@ -1578,6 +1578,8 @@ paths:
             - sbom
             - license
             - files
+            - pom
+            - versions
           required: true
       responses:
         '200':
@@ -7537,6 +7539,10 @@ definitions:
       proxy_cache_local_on_not_found:
         type: string
         description: 'Whether to serve images from local cache when they are removed from the upstream registry. The valid values are "true", "false".'
+        x-nullable: true
+      proxy_cache_allow_push:
+        type: string
+        description: 'Whether clients may publish artifacts to the proxy cache project. This value can only be set when the project is created. The valid values are "true", "false".'
         x-nullable: true
       proxy_referrer_api:
         type: string

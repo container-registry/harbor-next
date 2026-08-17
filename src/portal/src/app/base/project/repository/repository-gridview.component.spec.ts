@@ -83,14 +83,19 @@ describe('RepositoryComponentGridview (inline template)', () => {
             return of(mockSystemInfo);
         },
     };
+    const headersWith = (total: number) =>
+        new Map<string, string>([['x-total-count', `${total}`]]);
     const fakedRepositoryService = {
         listRepositoriesResponse(
             params: NewRepositoryService.ListRepositoriesParams
         ) {
             if (params.q === encodeURIComponent(`name=~nginx`)) {
-                return of({ headers: new Map(), body: mockNginxRepo });
+                return of({ headers: headersWith(1), body: mockNginxRepo });
             }
-            return of({ headers: new Map(), body: mockRepo }).pipe(delay(0));
+            return of({
+                headers: headersWith(mockRepo.length),
+                body: mockRepo,
+            }).pipe(delay(0));
         },
     };
     const fakedUserPermissionService = {
@@ -100,6 +105,7 @@ describe('RepositoryComponentGridview (inline template)', () => {
     };
     const fakedActivatedRoute = {
         snapshot: {
+            queryParams: {},
             parent: {
                 parent: {
                     params: {
@@ -185,5 +191,33 @@ describe('RepositoryComponentGridview (inline template)', () => {
         const listView =
             fixtureRepo.nativeElement.querySelector('clr-datagrid');
         expect(listView).toBeTruthy();
+    });
+    it('buildQuery filters by repository name', () => {
+        compRepo.lastFilteredRepoName = '';
+        expect(compRepo.buildQuery()).toBe('');
+        compRepo.lastFilteredRepoName = 'widget';
+        expect(decodeURIComponent(compRepo.buildQuery())).toBe('name=~widget');
+    });
+    it('hides package storage prefixes without changing repository routes', () => {
+        compRepo.projectName = 'library';
+        const npmRepo = {
+            name: 'library/npm/acme/widget',
+            project_id: 1,
+        } as NewRepository;
+        const mavenRepo = {
+            name: 'library/maven/org/apache/commons/commons-lang3',
+            project_id: 1,
+        } as NewRepository;
+
+        expect(compRepo.getDisplayName(npmRepo)).toBe('@acme/widget');
+        expect(compRepo.getDisplayName(mavenRepo)).toBe(
+            'org/apache/commons/commons-lang3'
+        );
+        expect(compRepo.getLink(mavenRepo)).toEqual([
+            '/harbor/projects',
+            1,
+            'repositories',
+            'maven/org/apache/commons/commons-lang3',
+        ]);
     });
 });

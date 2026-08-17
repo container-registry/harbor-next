@@ -101,6 +101,12 @@ func plaintextHTTPEnabled() bool {
 // csrfSkipper makes sure only some of the uris accessed by non-UI client can skip the csrf check
 func csrfSkipper(req *http.Request) bool {
 	path := req.URL.Path
+	if strings.HasPrefix(path, "/npm/") ||
+		strings.HasPrefix(path, "/maven/") ||
+		strings.HasPrefix(path, "/pypi/") ||
+		strings.HasPrefix(path, "/cargo/") {
+		return true
+	}
 	if (strings.HasPrefix(path, "/v2/") ||
 		strings.HasPrefix(path, "/api/") ||
 		strings.HasPrefix(path, "/service/")) && !lib.GetCarrySession(req.Context()) {

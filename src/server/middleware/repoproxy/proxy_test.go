@@ -28,6 +28,8 @@ import (
 	"github.com/goharbor/harbor/src/common/security/local"
 	"github.com/goharbor/harbor/src/common/security/proxycachesecret"
 	securitySecret "github.com/goharbor/harbor/src/common/security/secret"
+	proModels "github.com/goharbor/harbor/src/pkg/project/models"
+	regModels "github.com/goharbor/harbor/src/pkg/reg/model"
 )
 
 func TestIsProxySession(t *testing.T) {
@@ -81,6 +83,46 @@ func TestIsProxySession(t *testing.T) {
 			got := isProxySession(tt.in, "library")
 			if got != tt.want {
 				t.Errorf(`(%v) = %v; want "%v"`, tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestValidateProjectPush(t *testing.T) {
+	tests := []struct {
+		name         string
+		project      *proModels.Project
+		registry     *regModels.Registry
+		proxySession bool
+		wantErr      bool
+	}{
+		{name: "hosted project", project: &proModels.Project{}},
+		{name: "read only proxy", project: &proModels.Project{RegistryID: 1}, wantErr: true},
+		{
+			name: "push enabled OCI proxy",
+			project: &proModels.Project{
+				RegistryID: 1,
+				Metadata:   map[string]string{proModels.ProMetaProxyCacheAllowPush: "true"},
+			},
+			registry: &regModels.Registry{Type: regModels.RegistryTypeDockerRegistry},
+		},
+		{
+			name: "push enabled npm proxy",
+			project: &proModels.Project{
+				RegistryID: 1,
+				Metadata:   map[string]string{proModels.ProMetaProxyCacheAllowPush: "true"},
+			},
+			registry: &regModels.Registry{Type: regModels.RegistryTypeNPM},
+			wantErr:  true,
+		},
+		{name: "internal proxy session", project: &proModels.Project{RegistryID: 1}, proxySession: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateProjectPush(tt.project, tt.registry, tt.proxySession)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateProjectPush() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

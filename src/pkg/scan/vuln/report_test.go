@@ -113,3 +113,30 @@ func TestGetSummarySeverity(t *testing.T) {
 	assert.Equal(1, sum.Fixable)
 	assert.Equal(s, sum.Summary)
 }
+
+func TestVulnerabilityItemListDeduplicatesByID(t *testing.T) {
+	l := VulnerabilityItemList{}
+	l.Add(
+		&VulnerabilityItem{
+			ID:              "CVE-2026-1234",
+			Package:         "kernel",
+			Version:         "6.12.0-248.el10",
+			ArtifactDigests: []string{"sha256:amd64"},
+		},
+		&VulnerabilityItem{
+			ID:              "CVE-2026-1234",
+			Package:         "kernel-modules",
+			Version:         "6.12.0-248.el10",
+			ArtifactDigests: []string{"sha256:arm64"},
+		},
+	)
+
+	if got := len(l.Items()); got != 1 {
+		t.Fatalf("items length = %d, want 1", got)
+	}
+	item, ok := l.GetItem("CVE-2026-1234")
+	if !ok {
+		t.Fatal("CVE-2026-1234 not indexed")
+	}
+	assert.ElementsMatch(t, []string{"sha256:amd64", "sha256:arm64"}, item.ArtifactDigests)
+}

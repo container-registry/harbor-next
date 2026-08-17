@@ -1,0 +1,19 @@
+FROM ghcr.io/homebrew/brew:latest
+
+USER root
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl jq skopeo \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY Formula /opt/homebrew-fixtures/Formula
+COPY scripts/run-homebrew-compat.sh /usr/local/bin/run-homebrew-compat
+
+RUN chmod +x /usr/local/bin/run-homebrew-compat \
+    && chown -R linuxbrew:linuxbrew /opt/homebrew-fixtures
+
+USER linuxbrew
+WORKDIR /home/linuxbrew
+
+ENTRYPOINT ["/usr/local/bin/run-homebrew-compat"]
+CMD ["all"]

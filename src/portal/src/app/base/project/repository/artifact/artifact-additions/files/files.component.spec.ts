@@ -30,64 +30,20 @@ describe('FilesComponent', () => {
     };
     const filesList: FilesItem[] = [
         {
-            name: 'model',
-            type: 'file',
-            size: 988099584,
+            path: 'src/index.js',
+            size: 2300,
         },
         {
-            name: 'README.md',
-            type: 'file',
+            path: 'README.md',
             size: 5632,
         },
         {
-            name: 'foo',
-            type: 'directory',
-            children: [
-                {
-                    name: 'bar',
-                    type: 'directory',
-                    children: [
-                        {
-                            name: '1.txt',
-                            type: 'file',
-                            children: [
-                                {
-                                    name: '2.txt',
-                                    type: 'file',
-                                    children: [
-                                        {
-                                            name: '3.txt',
-                                            type: 'file',
-                                            children: [
-                                                {
-                                                    name: '4.txt',
-                                                    type: 'file',
-                                                    size: 2048,
-                                                },
-                                                {
-                                                    name: '5.txt',
-                                                    type: 'file',
-                                                    size: 2048,
-                                                },
-                                            ],
-                                        },
-                                        {
-                                            name: '2.txt',
-                                            type: 'file',
-                                            size: 2048,
-                                        },
-                                    ],
-                                },
-                            ],
-                        },
-                        {
-                            name: '2.txt',
-                            type: 'file',
-                            size: 2048,
-                        },
-                    ],
-                },
-            ],
+            path: 'foo/bar/1.txt',
+            size: 2048,
+        },
+        {
+            path: '.npmignore',
+            size: 12,
         },
     ];
 
@@ -117,12 +73,104 @@ describe('FilesComponent', () => {
     it('should create', () => {
         expect(component).toBeTruthy();
     });
-    it('should get license  and render', async () => {
+    it('should get files and render explorer', async () => {
         component.filesLink = mockedLink;
         component.ngOnInit();
         fixture.detectChanges();
         await fixture.whenStable();
-        const tables = fixture.nativeElement.getElementsByTagName('clr-tree');
+        const tables = fixture.nativeElement.getElementsByTagName('table');
         expect(tables.length).toEqual(1);
+        expect(component.totalFiles).toEqual(4);
+        expect(component.totalFolders).toEqual(3);
+        expect(component.visibleRows.map(row => row.path)).toEqual([
+            'foo',
+            'src',
+            '.npmignore',
+            'README.md',
+        ]);
+    });
+
+    it('should expand folders', () => {
+        component.filesList = filesList;
+        component.refreshExplorer();
+
+        component.toggleNode(component.visibleRows[0]);
+
+        expect(component.visibleRows.map(row => row.path)).toEqual([
+            'foo',
+            'foo/bar',
+            'foo/bar/1.txt',
+            'src',
+            '.npmignore',
+            'README.md',
+        ]);
+    });
+
+    it('should use unpacked size when present', () => {
+        component.unpackedSize = 12345;
+        component.filesList = filesList;
+
+        expect(component.totalSize).toEqual(12345);
+    });
+
+    it('should filter files by type', () => {
+        component.filesList = filesList;
+        component.refreshExplorer();
+
+        component.onTypeChange('js');
+
+        expect(component.visibleRows.map(row => row.path)).toEqual([
+            'src',
+            'src/index.js',
+        ]);
+    });
+
+    it('should show hidden files by default', () => {
+        component.filesList = filesList;
+        component.refreshExplorer();
+
+        expect(component.visibleRows.map(row => row.path)).toContain(
+            '.npmignore'
+        );
+    });
+    it('should get files when link changes after init', async () => {
+        component.filesLink = null;
+        component.filesList = [];
+        component.ngOnInit();
+
+        component.filesLink = mockedLink;
+        component.ngOnChanges();
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        const tables = fixture.nativeElement.getElementsByTagName('table');
+        expect(tables.length).toEqual(1);
+        expect(component.isMaven).toBeFalse();
+    });
+    it('should render maven columnar files', async () => {
+        const mavenFiles = [
+            {
+                filename: 'widget2-1.0.jar',
+                extension: 'jar',
+                digest: 'sha256:abc',
+                size: 2048,
+            },
+            {
+                filename: 'widget2-1.0.pom',
+                extension: 'pom',
+                digest: 'sha256:def',
+                size: 512,
+            },
+        ];
+        spyOn(component['additionsService'], 'getDetailByLink').and.returnValue(
+            of(mavenFiles)
+        );
+        component.filesLink = mockedLink;
+        component.ngOnInit();
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(component.isMaven).toBeTrue();
+        expect(component.mavenFiles.length).toEqual(2);
+        expect(component.mavenFileType(mavenFiles[0])).toEqual('RELEASE');
     });
 });

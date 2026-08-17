@@ -157,7 +157,6 @@ export class ProjectDefaultService extends ProjectService {
             .put<any>(
                 `${baseUrl}/${projectId}`,
                 {
-                    registry_id: projectPolicy.RegistryId,
                     metadata: {
                         public: projectPolicy.Public ? 'true' : 'false',
                         enable_content_trust: projectPolicy.ContentTrust

@@ -40,7 +40,7 @@ export class ArtifactDetailRoutingResolverService {
         state: RouterStateSnapshot
     ): Observable<Artifact> | any {
         const projectId: string = route.params['id'];
-        const repositoryName: string = route.params['repo'];
+        const repositoryName: string = decodeURIComponent(route.params['repo']);
         const artifactDigest: string = route.params['digest'];
         return this.projectService.getProjectFromCache(projectId).pipe(
             mergeMap((project: Project) => {

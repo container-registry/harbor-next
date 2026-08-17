@@ -16,7 +16,6 @@ package vuln
 
 import (
 	"encoding/json"
-	"fmt"
 
 	v1 "github.com/goharbor/harbor/src/pkg/scan/rest/v1"
 )
@@ -230,9 +229,9 @@ type VulnerabilityItem struct {
 	VendorAttributes map[string]any `json:"vendor_attributes"`
 }
 
-// Key returns the uniq key for the item
+// Key returns the CVE identifier used to deduplicate findings across packages and artifacts.
 func (item *VulnerabilityItem) Key() string {
-	return fmt.Sprintf("%s-%s-%s", item.ID, item.Package, item.Version)
+	return item.ID
 }
 
 // CVSS holds the score and attack vector for the vulnerability based on the CVSS3 and CVSS2 standards

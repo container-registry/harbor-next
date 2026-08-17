@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, Input, OnChanges, OnInit } from '@angular/core';
 import { ArtifactDependency } from '../models';
 import { AdditionsService } from '../additions.service';
 import { AdditionLink } from '../../../../../../../../ng-swagger-gen/models/addition-link';
@@ -23,18 +23,30 @@ import { finalize } from 'rxjs/operators';
     templateUrl: './dependencies.component.html',
     styleUrls: ['./dependencies.component.scss'],
 })
-export class DependenciesComponent implements OnInit {
+export class DependenciesComponent implements OnChanges, OnInit {
     @Input()
     dependenciesLink: AdditionLink;
+    @Input()
     dependencyList: ArtifactDependency[] = [];
     loading: boolean = false;
+    private fetchedHref: string = '';
     constructor(
         private errorHandler: ErrorHandler,
         private additionsService: AdditionsService
     ) {}
 
     ngOnInit(): void {
-        this.getDependencyList();
+        this.loadDependencyList();
+    }
+
+    ngOnChanges(): void {
+        this.loadDependencyList();
+    }
+
+    loadDependencyList() {
+        if (!this.dependencyList?.length) {
+            this.getDependencyList();
+        }
     }
     getDependencyList() {
         if (
@@ -42,6 +54,10 @@ export class DependenciesComponent implements OnInit {
             !this.dependenciesLink.absolute &&
             this.dependenciesLink.href
         ) {
+            if (this.fetchedHref === this.dependenciesLink.href) {
+                return;
+            }
+            this.fetchedHref = this.dependenciesLink.href;
             this.loading = true;
             this.additionsService
                 .getDetailByLink(this.dependenciesLink.href, false, false)
@@ -51,6 +67,7 @@ export class DependenciesComponent implements OnInit {
                         this.dependencyList = res;
                     },
                     error => {
+                        this.fetchedHref = '';
                         this.errorHandler.error(error);
                     }
                 );

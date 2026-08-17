@@ -61,6 +61,12 @@ func (suite *ClientTestSuite) TestClientMetadata() {
 	assert.Equal(suite.T(), m.Capabilities[0].Type, "sbom")
 }
 
+func (suite *ClientTestSuite) TestClientTimeoutSupportsLargeReports() {
+	client, ok := suite.client.(*basicClient)
+	require.True(suite.T(), ok)
+	assert.Equal(suite.T(), scannerAPITimeout, client.httpClient.Timeout)
+}
+
 // TestClientSubmitScan tests the scan submission of client
 func (suite *ClientTestSuite) TestClientSubmitScan() {
 	res, err := suite.client.SubmitScan(&ScanRequest{})

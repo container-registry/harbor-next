@@ -44,6 +44,19 @@ export const ADAPTERS_MAP = {
     'tencent-tcr': 'Tencent TCR',
     'github-ghcr': 'Github GHCR',
     'volcengine-cr': 'VolcEngine CR',
+    npmjs: 'npmjs.org',
+    npm: 'npm Registry',
+    'maven-central': 'Maven Central',
+    maven: 'Maven Registry',
+    pypi: 'PyPI',
+    'pypi-registry': 'PyPI Registry',
+    'crates-io': 'crates.io',
+    cargo: 'Cargo Registry',
+    go: 'Go Proxy',
+    'go-registry': 'Go Registry',
+    'go-sumdb': 'Go Checksum Database',
+    homebrew: 'Homebrew',
+    'homebrew-registry': 'Homebrew Registry',
 };
 
 /**

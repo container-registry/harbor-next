@@ -107,7 +107,7 @@ export class CreateProjectComponent
 
     registries: Registry[] = [];
     supportedRegistryTypeQueryString: string =
-        'type={docker-hub harbor azure-acr ali-acr aws-ecr google-gcr quay docker-registry github-ghcr jfrog-artifactory}';
+        'type={docker-hub harbor azure-acr ali-acr aws-ecr google-gcr quay docker-registry github-ghcr jfrog-artifactory npmjs npm maven-central maven pypi pypi-registry crates-io cargo go go-registry go-sumdb homebrew homebrew-registry}';
 
     // **Added property for bandwidth error message**
     bandwidthError: string | null = null;
@@ -399,6 +399,10 @@ export class CreateProjectComponent
                             .proxy_cache_local_on_not_found
                             ? 'true'
                             : 'false',
+                        proxy_cache_allow_push: this.project.metadata
+                            .proxy_cache_allow_push
+                            ? 'true'
+                            : 'false',
                         proxy_referrer_api: this.project.metadata
                             .proxy_referrer_api
                             ? 'true'
@@ -449,6 +453,7 @@ export class CreateProjectComponent
         this.speedLimit = -1;
         this.project.metadata.max_upstream_conn = -1;
         this.project.metadata.proxy_cache_local_on_not_found = false;
+        this.project.metadata.proxy_cache_allow_push = false;
         this.project.metadata.proxy_referrer_api = false;
     }
 

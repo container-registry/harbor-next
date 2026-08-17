@@ -336,6 +336,8 @@ func main() {
 
 const (
 	trivyScanner = "Trivy"
+	snykScanner  = "Snyk"
+	grypeScanner = "Grype"
 )
 
 func registerScanners(ctx context.Context) {
@@ -356,6 +358,34 @@ func registerScanners(ctx context.Context) {
 		uninstallScannerNames = append(uninstallScannerNames, trivyScanner)
 	}
 
+	if config.WithSnyk() {
+		log.Info("Registering Snyk scanner")
+		wantedScanners = append(wantedScanners, scanner.Registration{
+			Name:            snykScanner,
+			Description:     "The Snyk scanner adapter",
+			URL:             config.SnykAdapterURL(),
+			UseInternalAddr: true,
+			Immutable:       true,
+		})
+	} else {
+		log.Info("Removing Snyk scanner")
+		uninstallScannerNames = append(uninstallScannerNames, snykScanner)
+	}
+
+	if config.WithGrype() {
+		log.Info("Registering Grype scanner")
+		wantedScanners = append(wantedScanners, scanner.Registration{
+			Name:            grypeScanner,
+			Description:     "The Grype scanner adapter",
+			URL:             config.GrypeAdapterURL(),
+			UseInternalAddr: true,
+			Immutable:       true,
+		})
+	} else {
+		log.Info("Removing Grype scanner")
+		uninstallScannerNames = append(uninstallScannerNames, grypeScanner)
+	}
+
 	if err := scan.RemoveImmutableScanners(ctx, uninstallScannerNames); err != nil {
 		log.Warningf("failed to remove scanners: %v", err)
 	}
@@ -366,17 +396,14 @@ func registerScanners(ctx context.Context) {
 
 	if defaultScannerName := getDefaultScannerName(); defaultScannerName != "" {
 		log.Infof("Setting %s as default scanner", defaultScannerName)
-		if err := scan.EnsureDefaultScanner(ctx, defaultScannerName); err != nil {
+		if err := scan.SetDefaultScanner(ctx, defaultScannerName); err != nil {
 			log.Fatalf("failed to set default scanner: %v", err)
 		}
 	}
 }
 
 func getDefaultScannerName() string {
-	if config.WithTrivy() {
-		return trivyScanner
-	}
-	return ""
+	return strings.TrimSpace(config.DefaultScanner())
 }
 
 func initSkipAuditDBbyEnv(ctx context.Context) error {

@@ -41,6 +41,28 @@
             (onCopySuccess)="onCpSuccess(getPullCommandForChart(artifact))"
             [defaultValue]="getPullCommandForChart(artifact)"></hbr-copy-input>
     </div>
+    <div
+        *ngIf="isNpm(artifact)"
+        class="flex"
+        id="pullCommandForNpm"
+        aria-label="Dropdown header Action">
+        <hbr-copy-input
+            [title]="getNpmCommand(artifact)"
+            [iconMode]="true"
+            (onCopySuccess)="onCpSuccess(getNpmCommand(artifact))"
+            [defaultValue]="getNpmCommand(artifact)"></hbr-copy-input>
+    </div>
+    <div
+        *ngIf="isMaven(artifact)"
+        class="flex"
+        id="pullCommandForMaven"
+        aria-label="Dropdown header Action">
+        <hbr-copy-input
+            [title]="getMavenSnippet(artifact)"
+            [iconMode]="true"
+            (onCopySuccess)="onCpSuccess(getMavenSnippet(artifact))"
+            [defaultValue]="getMavenSnippet(artifact)"></hbr-copy-input>
+    </div>
 </clr-dropdown>
 
 <clr-dropdown
@@ -77,4 +99,18 @@
         [iconMode]="true"
         (onCopySuccess)="onCpSuccess(getPullCommandForChartByTag(artifact))"
         [defaultValue]="getPullCommandForChartByTag(artifact)"></hbr-copy-input>
+    <hbr-copy-input
+        *ngIf="isNpm(artifact)"
+        id="pullCommandForNpm"
+        [title]="getNpmCommand(artifact)"
+        [iconMode]="true"
+        (onCopySuccess)="onCpSuccess(getNpmCommand(artifact))"
+        [defaultValue]="getNpmCommand(artifact)"></hbr-copy-input>
+    <hbr-copy-input
+        *ngIf="isMaven(artifact)"
+        id="pullCommandForMaven"
+        [title]="getMavenSnippet(artifact)"
+        [iconMode]="true"
+        (onCopySuccess)="onCpSuccess(getMavenSnippet(artifact))"
+        [defaultValue]="getMavenSnippet(artifact)"></hbr-copy-input>
 </clr-dropdown>

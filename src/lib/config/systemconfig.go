@@ -186,6 +186,21 @@ func WithTrivy() bool {
 	return DefaultMgr().Get(backgroundCtx, common.WithTrivy).GetBool()
 }
 
+// WithGrype returns a bool value to indicate if Harbor's deployed with Grype.
+func WithGrype() bool {
+	return DefaultMgr().Get(backgroundCtx, common.WithGrype).GetBool()
+}
+
+// WithSnyk returns a bool value to indicate if Harbor's deployed with Snyk.
+func WithSnyk() bool {
+	return DefaultMgr().Get(backgroundCtx, common.WithSnyk).GetBool()
+}
+
+// DefaultScanner returns the scanner name Harbor should set as default.
+func DefaultScanner() string {
+	return DefaultMgr().Get(backgroundCtx, common.DefaultScanner).GetString()
+}
+
 // ExtEndpoint returns the external URL of Harbor: protocol://host:port
 func ExtEndpoint() (string, error) {
 	return DefaultMgr().Get(backgroundCtx, common.ExtEndpoint).GetString(), nil
@@ -278,6 +293,16 @@ func InternalTokenServiceEndpoint() string {
 // TrivyAdapterURL returns the endpoint URL of a Trivy adapter instance, by default it's the one deployed within Harbor.
 func TrivyAdapterURL() string {
 	return DefaultMgr().Get(backgroundCtx, common.TrivyAdapterURL).GetString()
+}
+
+// SnykAdapterURL returns the endpoint URL of a Snyk adapter instance.
+func SnykAdapterURL() string {
+	return DefaultMgr().Get(backgroundCtx, common.SnykAdapterURL).GetString()
+}
+
+// GrypeAdapterURL returns the endpoint URL of a Grype adapter instance.
+func GrypeAdapterURL() string {
+	return DefaultMgr().Get(backgroundCtx, common.GrypeAdapterURL).GetString()
 }
 
 // Metric returns the overall metric settings

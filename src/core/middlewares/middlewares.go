@@ -56,6 +56,14 @@ var (
 		middleware.MethodAndPathSkipper(http.MethodPatch, distribution.BlobUploadURLRegexp),
 		middleware.MethodAndPathSkipper(http.MethodPut, distribution.BlobUploadURLRegexp),
 		middleware.MethodAndPathSkipper(http.MethodPost, match("^/service/token")),
+		// npm/maven publish manages its own transaction so the request-scoped tx does not pin a pooled
+		// connection across registry HTTP round-trips.
+		middleware.MethodAndPathSkipper(http.MethodPut, match("^/npm/")),
+		middleware.MethodAndPathSkipper(http.MethodPost, match("^/npm/")),
+		middleware.MethodAndPathSkipper(http.MethodDelete, match("^/npm/")),
+		middleware.MethodAndPathSkipper(http.MethodPut, match("^/maven/")),
+		middleware.MethodAndPathSkipper(http.MethodPost, match("^/maven/")),
+		middleware.MethodAndPathSkipper(http.MethodDelete, match("^/maven/")),
 		func(r *http.Request) bool { // skip tx for GET, HEAD and Options requests
 			m := r.Method
 			return m == http.MethodGet || m == http.MethodHead || m == http.MethodOptions

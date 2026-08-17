@@ -100,16 +100,23 @@ services:
       JOBSERVICE_URL: http://jobservice:8888
       CORE_SECRET: devenv-secret-do-not-use-in-production
       JOBSERVICE_SECRET: devenv-secret-do-not-use-in-production
+      CSRF_TRUSTED_ORIGINS: localhost:4200
       # Portal (dev server on port 4200, not Nginx on 8080)
       PORTAL_URL: http://portal:4200
       # Trivy scanner
       TRIVY_ADAPTER_URL: http://trivy-adapter:8080
       WITH_TRIVY: "true"
+      # Grype scanner
+      GRYPE_ADAPTER_URL: http://grype-scanner:8080
+      WITH_GRYPE: ${WITH_GRYPE:-false}
+      # Snyk scanner
+      SNYK_ADAPTER_URL: http://snyk-scanner:8080
+      WITH_SNYK: ${WITH_SNYK:-true}
       HEALTHCHECK_PORT: "8080"
       HEALTHCHECK_ENDPOINT: /api/v2.0/ping
       # Proxy cache and replication
-      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
-      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr
+      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory,npmjs,npm,maven-central,maven,pypi,pypi-registry,crates-io,cargo,go,go-registry,go-sumdb,homebrew,homebrew-registry
+      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,npmjs,npm,maven-central,maven,pypi,pypi-registry,crates-io,cargo,go,go-registry,go-sumdb,homebrew,homebrew-registry
     command: air -c devenv/air.core.toml
     depends_on:
       postgresql:
@@ -216,6 +223,49 @@ services:
       - "${PORT_TRIVY:-8081}:8080"
     depends_on:
       - redis
+
+  # Snyk scanner adapter - starts with: docker compose --profile snyk up
+  snyk-scanner:
+    build:
+      context: ..
+      dockerfile: dockerfile/snyk-scanner.dockerfile
+      args:
+        GO_VERSION: ${GO_VERSION}
+        NODE_VERSION: ${NODE_VERSION}
+        SNYK_CLI_VERSION: ${SNYK_CLI_VERSION}
+    profiles: [snyk]
+    environment:
+      SCANNER_API_SERVER_ADDR: ":8080"
+      SCANNER_SNYK_CACHE_DIR: /tmp
+      SNYK_TOKEN: ${SNYK_TOKEN:-}
+      SNYK_ORG: ${SNYK_ORG:-}
+    ports:
+      - "${PORT_SNYK:-8082}:8080"
+    tmpfs:
+      - /tmp:size=2G,mode=1777
+
+  # Grype scanner adapter - starts with: docker compose --profile grype up
+  grype-scanner:
+    build:
+      context: ..
+      dockerfile: dockerfile/grype-scanner.dockerfile
+      args:
+        GO_VERSION: ${GO_VERSION}
+        ALPINE_VERSION: ${ALPINE_VERSION}
+        GRYPE_VERSION: ${GRYPE_VERSION}
+        SYFT_VERSION: ${SYFT_VERSION}
+        LPROBE_VERSION: ${LPROBE_VERSION}
+    profiles: [grype]
+    environment:
+      SCANNER_API_SERVER_ADDR: ":8080"
+      SCANNER_GRYPE_CACHE_DIR: /home/scanner/cache
+      SCANNER_GRYPE_DB_CACHE_DIR: /home/scanner/cache/grype-db
+      SCANNER_GRYPE_SCOPE: squashed
+    ports:
+      - "${PORT_GRYPE:-8083}:8080"
+    tmpfs:
+      - /tmp:size=2G,mode=1777
+      - /home/scanner/cache:size=4G,mode=1777
 
 
   # Portal (Angular UI) - starts with: docker compose --profile portal up

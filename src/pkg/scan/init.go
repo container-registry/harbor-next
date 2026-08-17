@@ -68,7 +68,7 @@ func EnsureScanners(ctx context.Context, wantedScanners []scanner.Registration) 
 	return
 }
 
-// EnsureDefaultScanner ensures that the scanner with the specified URL is set as default in the system.
+// EnsureDefaultScanner ensures that the scanner with the specified name is set as default when no default exists.
 func EnsureDefaultScanner(ctx context.Context, scannerName string) (err error) {
 	defaultScanner, err := scannerManager.GetDefault(ctx)
 	if err != nil {
@@ -92,6 +92,21 @@ func EnsureDefaultScanner(ctx context.Context, scannerName string) (err error) {
 		err = errors.Errorf("setting %s as default scanner: %v", scannerName, err)
 	}
 	return
+}
+
+// SetDefaultScanner sets the scanner with the specified name as default.
+func SetDefaultScanner(ctx context.Context, scannerName string) (err error) {
+	scanners, err := scannerManager.List(ctx, q.New(q.KeyWords{"name": scannerName}))
+	if err != nil {
+		return errors.Errorf("listing scanners: %v", err)
+	}
+	if len(scanners) != 1 {
+		return errors.Errorf("expected only one scanner with name %v but got %d", scannerName, len(scanners))
+	}
+	if err := scannerManager.SetAsDefault(ctx, scanners[0].UUID); err != nil {
+		return errors.Errorf("setting %s as default scanner: %v", scannerName, err)
+	}
+	return nil
 }
 
 // RemoveImmutableScanners removes immutable scanner Registrations with the specified endpoint URLs.

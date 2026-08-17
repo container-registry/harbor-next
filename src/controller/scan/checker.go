@@ -20,6 +20,7 @@ import (
 
 	"github.com/goharbor/harbor/src/controller/artifact"
 	"github.com/goharbor/harbor/src/controller/artifact/processor/image"
+	"github.com/goharbor/harbor/src/controller/artifact/processor/npm"
 	"github.com/goharbor/harbor/src/controller/scanner"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/accessory"
@@ -153,7 +154,7 @@ func (c *checker) hasUnscannableLayer(ctx context.Context, digest string) (bool,
 func hasCapability(r *models.Registration, a *artifact.Artifact) bool {
 	// use allowlist here because currently only docker image is supported by the scanner
 	// https://github.com/goharbor/pluggable-scanner-spec/issues/2
-	allowlist := []string{image.ArtifactTypeImage}
+	allowlist := []string{image.ArtifactTypeImage, npm.ArtifactTypeNPM}
 	if slices.Contains(allowlist, a.Type) {
 		return r.HasCapability(a.ManifestMediaType)
 	}

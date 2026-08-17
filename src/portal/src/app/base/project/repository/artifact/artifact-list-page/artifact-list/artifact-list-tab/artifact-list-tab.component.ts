@@ -55,10 +55,25 @@ import {
 } from '../../../../../../../shared/components/operation/operate';
 import {
     AccessoryType,
+    artifactBootc,
+    artifactCargo,
     artifactDefault,
+    artifactHomebrew,
+    artifactMaven,
+    artifactNpm,
+    artifactPypi,
     ArtifactFilterEvent,
     ArtifactFront as Artifact,
     ArtifactFront,
+    isBootcArtifact,
+    isCargoArtifact,
+    isHomebrewArtifact,
+    isMavenArtifact,
+    isNpmArtifact,
+    isPypiArtifact,
+    ArtifactType,
+    getChannelBadges,
+    getNativeVersion,
 } from '../../../artifact';
 import { Project } from '../../../../../project';
 import { ArtifactService as NewArtifactService } from '../../../../../../../../../ng-swagger-gen/services/artifact.service';
@@ -955,6 +970,61 @@ export class ArtifactListTabComponent implements OnInit, OnDestroy {
         }
     }
 
+    // --- Native package (NPM/MAVEN) version-list identity (idea #4) ---
+    ArtifactType = ArtifactType;
+
+    isNativePackage(a: Artifact): boolean {
+        return a?.type === ArtifactType.NPM || a?.type === ArtifactType.MAVEN;
+    }
+
+    nativeVersion(a: Artifact): string {
+        return getNativeVersion(a);
+    }
+
+    channelBadges(a: Artifact): string[] {
+        return getChannelBadges(a);
+    }
+
+    // --- npm channel resolution + drift alert (idea #6) ---
+    getDistTags(a: Artifact): { channel: string; version: string }[] {
+        if (a?.type !== ArtifactType.NPM) {
+            return [];
+        }
+        const distTags = a?.extra_attrs?.['dist-tags'];
+        if (!distTags || typeof distTags !== 'object') {
+            return [];
+        }
+        return Object.entries(distTags).map(([channel, version]) => ({
+            channel,
+            version: String(version),
+        }));
+    }
+
+    private resolveChannelTarget(version: string): ArtifactFront | undefined {
+        return this.artifactList?.find(
+            item => String(item?.extra_attrs?.['version'] ?? '') === version
+        );
+    }
+
+    channelDrift(channel: {
+        channel: string;
+        version: string;
+    }): 'unsigned' | 'vulnerable' | null {
+        const target = this.resolveChannelTarget(channel.version);
+        if (!target) {
+            return null;
+        }
+        if (target.signed === 'false') {
+            return 'unsigned';
+        }
+        const summary = this.handleScanOverview(target.scan_overview)?.summary
+            ?.summary;
+        if (summary && (summary['Critical'] > 0 || summary['High'] > 0)) {
+            return 'vulnerable';
+        }
+        return null;
+    }
+
     handleScanOverview(scanOverview: any): any {
         if (scanOverview) {
             const keys = Object.keys(scanOverview) ?? [];
@@ -1062,6 +1132,40 @@ export class ArtifactListTabComponent implements OnInit, OnDestroy {
 
     getIcon(icon: string): SafeUrl {
         return this.artifactService.getIcon(icon);
+    }
+
+    hasArtifactIcon(artifact: ArtifactFront): boolean {
+        return (
+            isNpmArtifact(artifact) ||
+            isMavenArtifact(artifact) ||
+            isHomebrewArtifact(artifact) ||
+            isPypiArtifact(artifact) ||
+            isCargoArtifact(artifact) ||
+            isBootcArtifact(artifact) ||
+            !!artifact.icon
+        );
+    }
+
+    getArtifactIcon(artifact: ArtifactFront): SafeUrl | string {
+        if (isNpmArtifact(artifact)) {
+            return artifactNpm;
+        }
+        if (isMavenArtifact(artifact)) {
+            return artifactMaven;
+        }
+        if (isHomebrewArtifact(artifact)) {
+            return artifactHomebrew;
+        }
+        if (isPypiArtifact(artifact)) {
+            return artifactPypi;
+        }
+        if (isCargoArtifact(artifact)) {
+            return artifactCargo;
+        }
+        if (isBootcArtifact(artifact)) {
+            return artifactBootc;
+        }
+        return this.getIcon(artifact.icon);
     }
 
     // get Tags and display less than 9 tags(too many tags will make UI stuck)

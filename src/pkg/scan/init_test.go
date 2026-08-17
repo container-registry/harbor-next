@@ -205,6 +205,78 @@ func TestEnsureDefaultScanner(t *testing.T) {
 
 }
 
+func TestSetDefaultScanner(t *testing.T) {
+
+	t.Run("Should return error when listing scanners fails", func(t *testing.T) {
+		mgr := &mocks.Manager{}
+		scannerManager = mgr
+
+		mgr.On("List", mock.Anything, &q.Query{
+			Keywords: map[string]any{"name": "trivy"},
+		}).Return(nil, errors.New("DB error"))
+
+		err := SetDefaultScanner(context.TODO(), "trivy")
+		assert.EqualError(t, err, "listing scanners: DB error")
+		mgr.AssertExpectations(t)
+	})
+
+	t.Run("Should return error when listing scanners returns unexpected scanners count", func(t *testing.T) {
+		mgr := &mocks.Manager{}
+		scannerManager = mgr
+
+		mgr.On("List", mock.Anything, &q.Query{
+			Keywords: map[string]any{"name": "trivy"},
+		}).Return([]*scanner.Registration{
+			{Name: "trivy"},
+			{Name: "trivy"},
+		}, nil)
+
+		err := SetDefaultScanner(context.TODO(), "trivy")
+		assert.EqualError(t, err, "expected only one scanner with name trivy but got 2")
+		mgr.AssertExpectations(t)
+	})
+
+	t.Run("Should set the configured default scanner", func(t *testing.T) {
+		mgr := &mocks.Manager{}
+		scannerManager = mgr
+
+		mgr.On("List", mock.Anything, &q.Query{
+			Keywords: map[string]any{"name": "trivy"},
+		}).Return([]*scanner.Registration{
+			{
+				Name: "trivy",
+				UUID: "trivy-uuid",
+				URL:  "http://trivy:8080",
+			},
+		}, nil)
+		mgr.On("SetAsDefault", mock.Anything, "trivy-uuid").Return(nil)
+
+		err := SetDefaultScanner(context.TODO(), "trivy")
+		assert.NoError(t, err)
+		mgr.AssertExpectations(t)
+	})
+
+	t.Run("Should return error when setting the default scanner fails", func(t *testing.T) {
+		mgr := &mocks.Manager{}
+		scannerManager = mgr
+
+		mgr.On("List", mock.Anything, &q.Query{
+			Keywords: map[string]any{"name": "trivy"},
+		}).Return([]*scanner.Registration{
+			{
+				Name: "trivy",
+				UUID: "trivy-uuid",
+				URL:  "http://trivy:8080",
+			},
+		}, nil)
+		mgr.On("SetAsDefault", mock.Anything, "trivy-uuid").Return(errors.New("DB error"))
+
+		err := SetDefaultScanner(context.TODO(), "trivy")
+		assert.EqualError(t, err, "setting trivy as default scanner: DB error")
+		mgr.AssertExpectations(t)
+	})
+}
+
 func TestRemoveImmutableScanners(t *testing.T) {
 
 	t.Run("Should do nothing when list of names is empty", func(t *testing.T) {

@@ -13,6 +13,7 @@
 // limitations under the License.
 import { Component, Input, OnInit } from '@angular/core';
 import { Artifact } from 'ng-swagger-gen/models/artifact';
+import { isBootcArtifact } from '../artifact';
 
 @Component({
     selector: 'artifact-label',
@@ -27,9 +28,13 @@ export class ArtifactLabelComponent implements OnInit {
     constructor() {}
 
     ngOnInit(): void {
-        if (this.artifactDetails.extra_attrs && this.artifactDetails.type) {
+        if (this.artifactDetails?.extra_attrs && this.artifactDetails.type) {
             this.artifactExtraAttrs = this.artifactDetails.extra_attrs;
             this.type = this.artifactDetails.type;
         }
+    }
+
+    isBootcArtifact(): boolean {
+        return isBootcArtifact(this.artifactDetails);
     }
 }

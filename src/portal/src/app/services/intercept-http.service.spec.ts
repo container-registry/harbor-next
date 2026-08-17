@@ -13,7 +13,12 @@
 // limitations under the License.
 import { TestBed, inject } from '@angular/core/testing';
 import { InterceptHttpService } from './intercept-http.service';
-import { HttpRequest, HttpResponse } from '@angular/common/http';
+import {
+    HttpErrorResponse,
+    HttpHeaders,
+    HttpRequest,
+    HttpResponse,
+} from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 
 describe('InterceptHttpService', () => {
@@ -70,6 +75,47 @@ describe('InterceptHttpService', () => {
                     expect(res.status).toEqual(200);
                 }
             });
+        }
+    ));
+
+    it('should retry when csrf token is missing', inject(
+        [InterceptHttpService],
+        (service: InterceptHttpService) => {
+            let requestCount = 0;
+            const missingTokenHandle = {
+                handle: request => {
+                    requestCount++;
+                    if (requestCount === 1) {
+                        return throwError(
+                            new HttpErrorResponse({
+                                status: 403,
+                                headers: new HttpHeaders({
+                                    'X-Harbor-CSRF-Token': mockedCSRFToken,
+                                }),
+                                error: {
+                                    errors: [
+                                        {
+                                            message:
+                                                'CSRF token not found in request',
+                                        },
+                                    ],
+                                },
+                            })
+                        );
+                    }
+                    expect(request.headers.get('X-Harbor-CSRF-Token')).toEqual(
+                        mockedCSRFToken
+                    );
+                    return of(new HttpResponse({ status: 200 }));
+                },
+            };
+
+            service
+                .intercept(mockRequest, missingTokenHandle)
+                .subscribe(res => {
+                    expect(res.status).toEqual(200);
+                    expect(requestCount).toEqual(2);
+                });
         }
     ));
 });

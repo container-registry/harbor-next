@@ -166,6 +166,8 @@ tasks:
         echo "  Bun:            {{.BUN_VERSION}}"
         echo "  Spectral:       {{.SPECTRAL_VERSION}}"
         echo "  Trivy:          {{.TRIVY_VERSION}}"
+        echo "  Grype:          {{.GRYPE_VERSION}}"
+        echo "  Syft:           {{.SYFT_VERSION}}"
         echo ""
         echo "Base Images:"
         echo "  Alpine:         {{.ALPINE_VERSION}}"

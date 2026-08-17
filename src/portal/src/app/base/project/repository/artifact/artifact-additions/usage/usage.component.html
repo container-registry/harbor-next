@@ -1,0 +1,52 @@
+<div class="usage-wrapper">
+    <div *ngIf="isNpm">
+        <div class="usage-step">
+            <h5>{{ 'ARTIFACT.USAGE_NPM_CONFIGURE' | translate }}</h5>
+            <p class="usage-hint">
+                {{ 'ARTIFACT.USAGE_NPMRC_HINT' | translate }}
+            </p>
+            <hbr-copy-input
+                [headerTitle]="'.npmrc'"
+                [defaultValue]="npmrcSnippet"></hbr-copy-input>
+        </div>
+        <div class="usage-step">
+            <h5>{{ 'ARTIFACT.USAGE_NPM_INSTALL' | translate }}</h5>
+            <hbr-copy-input
+                [headerTitle]="'ARTIFACT.USAGE_INSTALL' | translate"
+                [defaultValue]="npmInstallSnippet"></hbr-copy-input>
+        </div>
+        <p class="usage-hint usage-token-hint">
+            {{ 'ARTIFACT.USAGE_TOKEN_HINT' | translate }}
+        </p>
+    </div>
+
+    <div *ngIf="isMaven">
+        <div class="usage-step">
+            <h5>{{ 'ARTIFACT.USAGE_MAVEN_SETTINGS' | translate }}</h5>
+            <p class="usage-hint">
+                {{ 'ARTIFACT.USAGE_SETTINGS_HINT' | translate }}
+            </p>
+            <hbr-copy-input
+                [headerTitle]="'settings.xml'"
+                [defaultValue]="serverXml"></hbr-copy-input>
+        </div>
+        <div class="usage-step">
+            <h5>{{ 'ARTIFACT.USAGE_MAVEN_REPO' | translate }}</h5>
+            <p class="usage-hint">
+                {{ 'ARTIFACT.USAGE_REPO_HINT' | translate }}
+            </p>
+            <hbr-copy-input
+                [headerTitle]="'pom.xml'"
+                [defaultValue]="repoXml"></hbr-copy-input>
+        </div>
+        <div class="usage-step">
+            <h5>{{ 'ARTIFACT.USAGE_MAVEN_DEPENDENCY' | translate }}</h5>
+            <hbr-copy-input
+                [headerTitle]="'pom.xml'"
+                [defaultValue]="dependencyXml"></hbr-copy-input>
+        </div>
+        <p class="usage-hint usage-token-hint">
+            {{ 'ARTIFACT.USAGE_TOKEN_HINT' | translate }}
+        </p>
+    </div>
+</div>

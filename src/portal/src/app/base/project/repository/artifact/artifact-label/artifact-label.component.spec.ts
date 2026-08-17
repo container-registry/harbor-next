@@ -80,4 +80,21 @@ describe('ArtifactLabelComponent', () => {
         const contentRows = fixture.nativeElement.getElementsByTagName('img');
         expect(contentRows.length).toBeGreaterThan(1);
     });
+
+    it('should render Bootc label for containers.bootc annotation', async () => {
+        component.artifactDetails = {
+            type: 'IMAGE',
+            annotations: {
+                'containers.bootc': '1',
+            },
+        };
+        component.ngOnInit();
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        const label = fixture.nativeElement.querySelector('.label span');
+        const icon = fixture.nativeElement.querySelector('img.artifact-icon');
+        expect(label.textContent).toContain('Bootc');
+        expect(icon.getAttribute('src')).toBe('images/artifact-bootc.svg');
+    });
 });

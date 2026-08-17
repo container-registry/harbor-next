@@ -158,7 +158,7 @@ func (bm *basicManager) GetBy(ctx context.Context, artifactID int64, registratio
 		kws["registration_uuid"] = registrationUUID
 	}
 	if len(mimeType) > 0 {
-		kws["mine_type"] = mimeType
+		kws["mime_type"] = mimeType
 	}
 	if len(mediaType) > 0 {
 		kws["media_type"] = mediaType

@@ -171,7 +171,7 @@
                         [(ngModel)]="project.registry_id">
                         <option class="display-none" value=""></option>
                         <option *ngFor="let r of registries" [value]="r.id">
-                            {{ r.name }}-{{ r.url }}
+                            [{{ r.type }}] {{ r.name }}-{{ r.url }}
                         </option>
                     </select>
                 </div>
@@ -223,6 +223,25 @@
                     </div>
                 </div>
             </div>
+            <clr-checkbox-container
+                *ngIf="isSystemAdmin && enableProxyCache"
+                clrInline>
+                <label></label>
+                <clr-checkbox-wrapper>
+                    <input
+                        id="proxy-cache-allow-push"
+                        type="checkbox"
+                        clrCheckbox
+                        [(ngModel)]="project.metadata.proxy_cache_allow_push"
+                        name="proxy-cache-allow-push" />
+                    <label for="proxy-cache-allow-push">{{
+                        'PROJECT.PROXY_CACHE_ALLOW_PUSH' | translate
+                    }}</label>
+                </clr-checkbox-wrapper>
+                <clr-control-helper class="config-subtext">
+                    {{ 'PROJECT.PROXY_CACHE_ALLOW_PUSH_TOOLTIP' | translate }}
+                </clr-control-helper>
+            </clr-checkbox-container>
             <div
                 class="clr-form-control mt-05"
                 [ngStyle]="{

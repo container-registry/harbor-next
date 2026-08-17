@@ -32,7 +32,7 @@ describe('CreateProjectComponent', () => {
                 return of([]).pipe(delay(10));
             }
         },
-        createProject: function () {
+        createProject: function (_params?: unknown) {
             return of(true);
         },
     };
@@ -126,5 +126,27 @@ describe('CreateProjectComponent', () => {
         const endpoint: HTMLDivElement =
             fixture.nativeElement.querySelector('#endpoint');
         expect(endpoint).toBeFalsy();
+    });
+
+    it('should set the creation-only push policy for a proxy project', () => {
+        const createProject = spyOn(
+            mockProjectService,
+            'createProject'
+        ).and.callThrough();
+        component.project.name = 'npm-proxy';
+        component.enableProxyCache = true;
+        component.project.registry_id = 7;
+        component.project.metadata.proxy_cache_allow_push = true;
+
+        component.onSubmit();
+
+        expect(createProject).toHaveBeenCalledWith({
+            project: jasmine.objectContaining({
+                registry_id: 7,
+                metadata: jasmine.objectContaining({
+                    proxy_cache_allow_push: 'true',
+                }),
+            }),
+        });
     });
 });

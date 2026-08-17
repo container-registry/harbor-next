@@ -27,10 +27,18 @@ import (
 
 	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/controller/artifact/processor"
+
+	// cargo self-registers its processor via init(); it exposes no symbols this package uses directly.
+	_ "github.com/goharbor/harbor/src/controller/artifact/processor/cargo"
 	"github.com/goharbor/harbor/src/controller/artifact/processor/chart"
 	"github.com/goharbor/harbor/src/controller/artifact/processor/cnab"
 	"github.com/goharbor/harbor/src/controller/artifact/processor/cnai"
 	"github.com/goharbor/harbor/src/controller/artifact/processor/image"
+	"github.com/goharbor/harbor/src/controller/artifact/processor/maven"
+	"github.com/goharbor/harbor/src/controller/artifact/processor/npm"
+
+	// pypi self-registers its processor via init(); it exposes no symbols this package uses directly.
+	_ "github.com/goharbor/harbor/src/controller/artifact/processor/pypi"
 	"github.com/goharbor/harbor/src/controller/artifact/processor/sbom"
 	"github.com/goharbor/harbor/src/controller/artifact/processor/wasm"
 	"github.com/goharbor/harbor/src/controller/event/metadata"
@@ -111,6 +119,8 @@ var (
 		wasm.ArtifactTypeWASM:   icon.DigestOfIconWASM,
 		sbom.ArtifactTypeSBOM:   icon.DigestOfIconAccSBOM,
 		cnai.ArtifactTypeCNAI:   icon.DigestOfIconCNAI,
+		npm.ArtifactTypeNPM:     icon.DigestOfIconNPM,
+		maven.ArtifactTypeMaven: icon.DigestOfIconMaven,
 	}
 )
 

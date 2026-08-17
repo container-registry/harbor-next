@@ -215,6 +215,10 @@ func (r *repositoryAPI) assembleRepository(ctx context.Context, repository *mode
 	total, err := r.artCtl.Count(ctx, &q.Query{
 		Keywords: map[string]any{
 			"RepositoryID": repo.ID,
+			"ExcludeTagArtifactType": &q.TagArtifactTypeExclusion{
+				Tag:          mavenMetadataTag,
+				ArtifactType: mavenArtifactMediaType,
+			},
 		},
 	})
 	if err != nil {

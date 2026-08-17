@@ -222,6 +222,15 @@ require (
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.2 // indirect
 )
 
+require (
+	github.com/cucumber/gherkin/go/v42 v42.0.0 // indirect
+	github.com/cucumber/godog v0.16.0
+	github.com/cucumber/messages/go/v34 v34.2.0 // indirect
+	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
+	github.com/hashicorp/go-memdb v1.3.5 // indirect
+	golang.org/x/mod v0.37.0
+)
+
 replace (
 	github.com/Azure/go-autorest => github.com/Azure/go-autorest v14.2.0+incompatible
 	github.com/docker/distribution => github.com/distribution/distribution v2.8.2+incompatible

@@ -26,7 +26,16 @@ import {
     ScanningResultDefaultService,
     ScanningResultService,
 } from '../../../../../../../shared/services';
-import { ArtifactFront as Artifact, ArtifactFront } from '../../../artifact';
+import {
+    artifactBootc,
+    artifactCargo,
+    artifactHomebrew,
+    artifactNpm,
+    artifactPypi,
+    ArtifactFront as Artifact,
+    ArtifactFront,
+    ArtifactType,
+} from '../../../artifact';
 import { ErrorHandler } from '../../../../../../../shared/units/error-handler';
 import { OperationService } from '../../../../../../../shared/components/operation/operation.service';
 import { ArtifactService as NewArtifactService } from '../../../../../../../../../ng-swagger-gen/services/artifact.service';
@@ -501,6 +510,81 @@ describe('ArtifactListTabComponent', () => {
         );
         expect(comp.handleScanOverview(mockArtifacts[0])).not.toBeNull();
     });
+    it('Should use NPM icon for NPM artifacts', async () => {
+        fixture = TestBed.createComponent(ArtifactListTabComponent);
+        comp = fixture.componentInstance;
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        const npmArtifact = {
+            ...mockArtifacts[0],
+            type: 'NPM',
+        };
+
+        expect(comp.hasArtifactIcon(npmArtifact)).toBeTruthy();
+        expect(comp.getArtifactIcon(npmArtifact)).toBe(artifactNpm);
+    });
+    it('Should use Homebrew icon for Homebrew bottle artifacts', async () => {
+        fixture = TestBed.createComponent(ArtifactListTabComponent);
+        comp = fixture.componentInstance;
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        const homebrewArtifact = {
+            ...mockArtifacts[0],
+            type: 'IMAGE',
+            annotations: {
+                'com.github.package.type': 'homebrew_bottle',
+            },
+        };
+
+        expect(comp.hasArtifactIcon(homebrewArtifact)).toBeTruthy();
+        expect(comp.getArtifactIcon(homebrewArtifact)).toBe(artifactHomebrew);
+    });
+    it('Should use PyPI icon for PyPI artifacts', async () => {
+        fixture = TestBed.createComponent(ArtifactListTabComponent);
+        comp = fixture.componentInstance;
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        const pypiArtifact = {
+            ...mockArtifacts[0],
+            type: 'PYPI',
+        };
+
+        expect(comp.hasArtifactIcon(pypiArtifact)).toBeTruthy();
+        expect(comp.getArtifactIcon(pypiArtifact)).toBe(artifactPypi);
+    });
+    it('Should use Cargo icon for Cargo artifacts', async () => {
+        fixture = TestBed.createComponent(ArtifactListTabComponent);
+        comp = fixture.componentInstance;
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        const cargoArtifact = {
+            ...mockArtifacts[0],
+            type: 'CARGO',
+        };
+
+        expect(comp.hasArtifactIcon(cargoArtifact)).toBeTruthy();
+        expect(comp.getArtifactIcon(cargoArtifact)).toBe(artifactCargo);
+    });
+    it('Should use Bootc icon for Bootc artifacts', async () => {
+        fixture = TestBed.createComponent(ArtifactListTabComponent);
+        comp = fixture.componentInstance;
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        const bootcArtifact = {
+            ...mockArtifacts[0],
+            annotations: {
+                'containers.bootc': '1',
+            },
+        };
+
+        expect(comp.hasArtifactIcon(bootcArtifact)).toBeTruthy();
+        expect(comp.getArtifactIcon(bootcArtifact)).toBe(artifactBootc);
+    });
     it('Should return true for artifacts with child references', async () => {
         const artifactWithChild = {
             ...mockArtifacts[0],
@@ -548,6 +632,88 @@ describe('ArtifactListTabComponent', () => {
         expect(comp.canScanNow()).toBeFalsy();
         expect(comp.hasEnabledSbom()).toBeTruthy();
         expect(comp.canAddLabel()).toBeFalsy();
+    });
+
+    it('renders native version + channel badges for NPM/MAVEN', () => {
+        const npm: ArtifactFront = {
+            type: ArtifactType.NPM,
+            extra_attrs: {
+                version: '1.0.0',
+                'dist-tags': { latest: '1.0.0' },
+            },
+        } as ArtifactFront;
+        const npmNoTags: ArtifactFront = {
+            type: ArtifactType.NPM,
+            extra_attrs: { version: '1.0.0' },
+        } as ArtifactFront;
+        const mavenSnapshot: ArtifactFront = {
+            type: ArtifactType.MAVEN,
+            extra_attrs: { version: '2.5.0-SNAPSHOT' },
+        } as ArtifactFront;
+        const mavenRelease: ArtifactFront = {
+            type: ArtifactType.MAVEN,
+            extra_attrs: { version: '1.0' },
+        } as ArtifactFront;
+        const image: ArtifactFront = {
+            type: ArtifactType.IMAGE,
+            digest: 'sha256:abc',
+        } as ArtifactFront;
+
+        expect(comp.isNativePackage(npm)).toBeTruthy();
+        expect(comp.isNativePackage(image)).toBeFalsy();
+        expect(comp.nativeVersion(npm)).toEqual('1.0.0');
+        expect(comp.channelBadges(npm)).toEqual(['latest']);
+        expect(comp.channelBadges(npmNoTags)).toEqual([]);
+        expect(comp.channelBadges(mavenSnapshot)).toEqual(['SNAPSHOT']);
+        expect(comp.channelBadges(mavenRelease)).toEqual(['RELEASE']);
+        expect(comp.channelBadges(image)).toEqual([]);
+    });
+
+    it('resolves npm dist-tags and detects channel drift', () => {
+        const unsigned: ArtifactFront = {
+            type: ArtifactType.NPM,
+            extra_attrs: { version: '2.0.0' },
+            signed: 'false',
+        } as ArtifactFront;
+        const vulnerable: ArtifactFront = {
+            type: ArtifactType.NPM,
+            extra_attrs: { version: '3.0.0' },
+            signed: 'true',
+            scan_overview: {
+                'application/vnd.security.vulnerability.report; version=1.1': {
+                    summary: { summary: { Critical: 1 } },
+                },
+            },
+        } as unknown as ArtifactFront;
+        const clean: ArtifactFront = {
+            type: ArtifactType.NPM,
+            extra_attrs: { version: '4.0.0' },
+            signed: 'true',
+        } as ArtifactFront;
+        comp.artifactList = [unsigned, vulnerable, clean];
+
+        const tagged: ArtifactFront = {
+            type: ArtifactType.NPM,
+            extra_attrs: { 'dist-tags': { latest: '2.0.0', beta: '3.0.0' } },
+        } as ArtifactFront;
+        expect(comp.getDistTags(tagged)).toEqual([
+            { channel: 'latest', version: '2.0.0' },
+            { channel: 'beta', version: '3.0.0' },
+        ]);
+        expect(comp.getDistTags(unsigned)).toEqual([]);
+        expect(
+            comp.channelDrift({ channel: 'latest', version: '2.0.0' })
+        ).toEqual('unsigned');
+        expect(
+            comp.channelDrift({ channel: 'next', version: '3.0.0' })
+        ).toEqual('vulnerable');
+        expect(
+            comp.channelDrift({ channel: 'stable', version: '4.0.0' })
+        ).toBeNull();
+        // off-page target -> no drift evaluation
+        expect(
+            comp.channelDrift({ channel: 'old', version: '9.9.9' })
+        ).toBeNull();
     });
 });
 

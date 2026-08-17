@@ -1,0 +1,14 @@
+version: 0.1
+storage:
+  cache:
+    blobdescriptor: inmemory
+  filesystem:
+    rootdirectory: /var/lib/registry
+  delete:
+    enabled: true
+http:
+  addr: :5000
+  secret: set-via-REGISTRY_HTTP_SECRET-env
+  relativeurls: true
+  debug:
+    addr: localhost:5001

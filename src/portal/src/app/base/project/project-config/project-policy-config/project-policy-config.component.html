@@ -24,7 +24,7 @@
                 <input
                     type="checkbox"
                     clrCheckbox
-                    [disabled]="!allowUpdateProxyCacheConfiguration"
+                    [disabled]="true"
                     [(ngModel)]="projectPolicy.ProxyCacheEnabled"
                     name="project-proxy-cache-enabled" />
             </clr-checkbox-wrapper>
@@ -34,30 +34,31 @@
         </clr-checkbox-container>
         <div
             *ngIf="hasChangeConfigRole && projectPolicy.ProxyCacheEnabled"
-            class="clr-form-control mt-0 mb-2">
-            <label class="clr-control-label"></label>
-            <div class="clr-select-wrapper row-inline">
+            class="clr-form-control mt-0 mb-2 proxy-cache-settings">
+            <div class="proxy-cache-settings-spacer" aria-hidden="true"></div>
+            <div class="proxy-cache-setting">
                 <label class="clr-control-label">
                     {{ 'PROJECT.ENDPOINT' | translate }}
                 </label>
-                <select
-                    class="width-164 ml-1"
-                    id="registry"
-                    name="registry"
-                    [disabled]="!allowUpdateProxyCacheConfiguration"
-                    [(ngModel)]="projectPolicy.RegistryId">
-                    <option class="display-none" value=""></option>
-                    <option *ngFor="let r of registries" [value]="r.id">
-                        {{ r.name }}-{{ r.url }}
-                    </option>
-                </select>
+                <div class="clr-select-wrapper proxy-cache-endpoint">
+                    <select
+                        id="registry"
+                        name="registry"
+                        [disabled]="true"
+                        [(ngModel)]="projectPolicy.RegistryId">
+                        <option class="display-none" value=""></option>
+                        <option *ngFor="let r of registries" [ngValue]="r.id">
+                            [{{ r.type }}] {{ r.name }}-{{ r.url }}
+                        </option>
+                    </select>
+                </div>
             </div>
-            <div class="row-inline ml-2" clrInline>
+            <div class="proxy-cache-setting" clrInline>
                 <label class="clr-control-label">
                     {{ 'PROJECT.BANDWIDTH' | translate }}
                 </label>
                 <div
-                    class="clr-control-container ml-1"
+                    class="clr-control-container"
                     [class.clr-error]="bandwidthError">
                     <input
                         type="number"
@@ -92,12 +93,12 @@
                     </clr-control-error>
                 </div>
             </div>
-            <div class="row-inline ml-2" clrInline>
+            <div class="proxy-cache-setting" clrInline>
                 <label class="clr-control-label">
                     {{ 'PROJECT.CONNECTION_LIMIT' | translate }}
                 </label>
                 <div
-                    class="clr-control-container ml-1"
+                    class="clr-control-container"
                     [class.clr-error]="maxUpstreamConnError">
                     <input
                         type="number"
@@ -121,8 +122,8 @@
                     </clr-control-error>
                 </div>
             </div>
-            <div class="row-inline ml-2" clrInline>
-                <clr-checkbox-wrapper class="ml-1">
+            <div class="proxy-cache-setting proxy-cache-checkbox" clrInline>
+                <clr-checkbox-wrapper>
                     <input
                         id="proxy_referrer_api"
                         type="checkbox"
@@ -148,6 +149,23 @@
                         </clr-tooltip>
                     </label>
                 </clr-checkbox-wrapper>
+            </div>
+            <div class="proxy-cache-setting proxy-cache-checkbox" clrInline>
+                <clr-checkbox-wrapper>
+                    <input
+                        id="proxy-cache-allow-push-config"
+                        type="checkbox"
+                        clrCheckbox
+                        [(ngModel)]="projectPolicy.ProxyCacheAllowPush"
+                        name="proxy-cache-allow-push-config"
+                        [disabled]="true" />
+                    <label for="proxy-cache-allow-push-config">{{
+                        'PROJECT.PROXY_CACHE_ALLOW_PUSH' | translate
+                    }}</label>
+                </clr-checkbox-wrapper>
+                <clr-control-helper class="config-subtext">
+                    {{ 'PROJECT.PROXY_CACHE_ALLOW_PUSH_IMMUTABLE' | translate }}
+                </clr-control-helper>
             </div>
         </div>
         <clr-checkbox-container
