@@ -79,8 +79,9 @@ function normalizeAuthor(value) {
 function parseUpstreamMetadata(message) {
   const pr = normalizeUpstreamPr(message.match(/^Upstream-PR:\s*(.+)$/im)?.[1]);
   const author = normalizeAuthor(message.match(/^Upstream-Author:\s*(.+)$/im)?.[1]);
+  const isUpstream = /^upstream(?:\([^)]*\))?!?:/im.test(message);
 
-  if (!pr && !author) {
+  if (!isUpstream && !pr && !author) {
     return undefined;
   }
 
@@ -205,7 +206,10 @@ for (const line of releaseNotesLines(releaseBody)) {
 
   if (line.startsWith('* ') || line.startsWith('- ')) {
     let entry = formatEntry(line);
-    const targetSection = entry.toLowerCase().includes('[upstream]') || currentSection === 'Upstream' ? 'Upstream' : currentSection;
+    const metadata = metadataForCommit(commitShaFromEntry(entry));
+    const targetSection = metadata || entry.toLowerCase().includes('[upstream]') || currentSection === 'Upstream'
+      ? 'Upstream'
+      : currentSection;
 
     if (targetSection === 'Upstream') {
       entry = formatUpstreamEntry(entry, commitShaFromEntry(entry));
@@ -229,15 +233,33 @@ for (const line of releaseNotesLines(releaseBody)) {
 
 const output = ['## What\'s Changed'];
 const emittedSections = new Set();
+const upstreamCommitShas = new Set(
+  sections.get('Upstream')
+    .map(commitShaFromEntry)
+    .filter(Boolean),
+);
+const emittedCommitShas = new Set();
 
 for (const section of sectionOrder) {
-  const entries = sections.get(section) ?? [];
+  const entries = (sections.get(section) ?? []).filter(entry => {
+    const sha = commitShaFromEntry(entry);
+    if (section !== 'Upstream' && upstreamCommitShas.has(sha)) {
+      return false;
+    }
+
+    if (!sha || emittedCommitShas.has(sha)) {
+      return !sha;
+    }
+
+    emittedCommitShas.add(sha);
+    return true;
+  });
+  emittedSections.add(section);
   if (entries.length === 0) {
     continue;
   }
 
   output.push('', `### ${section}`, '', ...entries);
-  emittedSections.add(section);
 }
 
 for (const [section, entries] of sections) {

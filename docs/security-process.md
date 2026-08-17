@@ -25,7 +25,7 @@ Within **3 business days** of a report arriving:
 2. Do a first sanity check:
    - **Spam or clearly invalid** → close the report with a short explanation. Anyone with a GitHub account can file, so expect noise; closing politely and quickly is part of the job.
    - **Already public** (existing CVE, public scanner finding, already-disclosed dependency issue) → ask the reporter to re-file as a public issue and close the report.
-   - **Dependency vulnerability, not exploitable in Harbor Next** → treat as a normal dependency update (Dependabot / `zero-cve` workflow), not a Harbor Next advisory. Explain and close.
+   - **Dependency vulnerability, not exploitable in Harbor Next** → treat as a normal dependency update through Renovate, not a Harbor Next advisory. Explain and close.
    - **Wrong repo** (e.g. an upstream `goharbor/harbor` issue that does not affect Harbor Next code) → point the reporter to the right project's security policy and close.
    - **Plausible product vulnerability** → continue to triage.
 

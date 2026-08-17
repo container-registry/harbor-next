@@ -2,10 +2,13 @@
 #
 # CI-aware: local builds native arch only, CI builds all platforms
 # PUSH=false forces native arch (--load requires single platform)
+# TAG defaults to VERSION; override to publish under a different tag
+# (e.g. a feature-branch build) without touching the VERSION file.
 #
 # Usage:
 #   task image:core                         # CI: multi-arch push, local: native push
 #   task image:core PUSH=false              # load locally (native arch)
+#   task image:core TAG=my-feature          # push under a custom tag
 #   task image:all-images                   # all images
 
 version: '3'
@@ -19,6 +22,7 @@ includes:
 vars:
   PUSH: '{{.PUSH | default "true"}}'
   PLATFORMS: '{{.PLATFORMS | default (ternary (printf "linux/%s" ARCH) .CI_PLATFORMS (eq .PUSH "false"))}}'
+  TAG: '{{.TAG | default .VERSION}}'
 
 tasks:
   all-images:
@@ -64,7 +68,7 @@ tasks:
     vars:
       OUTPUT: '{{ternary "--push" "--load" (eq .PUSH "true")}}'
       TAG_PREFIX: '{{ternary (printf "%s/%s/" .REGISTRY_ADDRESS .REGISTRY_PROJECT) "" (eq .PUSH "true")}}'
-      FULL_TAG: '{{.TAG_PREFIX}}{{.IMAGE_NAME}}:{{.VERSION}}'
+      FULL_TAG: '{{.TAG_PREFIX}}{{.IMAGE_NAME}}:{{.TAG}}'
     preconditions:
       - sh: '{{if and (ne .PUSH "true") (contains "," .PLATFORMS)}}exit 1{{end}}'
         msg: "PUSH=false requires single platform (--load limitation)"
@@ -218,4 +222,4 @@ tasks:
 
   inspect:*:
     desc: "Inspect multi-arch manifest in remote registry"
-    cmd: docker buildx imagetools inspect {{.REGISTRY_ADDRESS}}/{{.REGISTRY_PROJECT}}/{{index .MATCH 0}}:{{.VERSION}}
+    cmd: docker buildx imagetools inspect {{.REGISTRY_ADDRESS}}/{{.REGISTRY_PROJECT}}/{{index .MATCH 0}}:{{.TAG}}
