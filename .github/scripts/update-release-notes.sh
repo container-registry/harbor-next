@@ -11,6 +11,7 @@ fi
 : "${TAG_NAME:?TAG_NAME is required}"
 
 PATCHES_TOKEN="${PATCHES_TOKEN:-${GH_TOKEN}}"
+patches_branch_prefix="${PATCHES_BRANCH_PREFIX:-}"
 if [[ -z "${GITHUB_REPOSITORY:-}" ]]; then
   GITHUB_REPOSITORY=$(git remote get-url next 2>/dev/null \
     | sed -E 's#^(git@github\.com:|https://github\.com/)##; s#\.git$##' || true)
@@ -113,7 +114,7 @@ if [[ -f "${series}" ]]; then
     fi
 
     git -C "${tmp_dir}/patches-repo" fetch --depth=1 origin \
-      "${branch}:refs/remotes/origin/${branch}"
+      "${patches_branch_prefix}${branch}:refs/remotes/origin/${branch}"
     echo "- $(git -C "${tmp_dir}/patches-repo" log -1 --format=%s "refs/remotes/origin/${branch}")" \
       >> "${patch_notes}"
   done < "${series}"

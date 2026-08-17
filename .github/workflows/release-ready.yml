@@ -63,8 +63,10 @@ jobs:
           private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
           owner: container-registry
           repositories: 8gcr
+          permission-contents: read
 
       - name: Verify release patches apply
         env:
           PATCHES_TOKEN: ${{ steps.app-token.outputs.token }}
+          PATCHES_SERIES: 8gcr-ee/patches/series-release-2.15
         run: task --taskfile taskfile/release-ready.yml check

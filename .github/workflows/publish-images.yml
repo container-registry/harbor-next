@@ -23,6 +23,10 @@ on:
         required: false
         type: string
         default: 8gcr
+      patches_series:
+        required: false
+        type: string
+        default: 8gcr-ee/patches/series
     secrets:
       REGISTRY_PASSWORD:
         required: true
@@ -64,6 +68,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ inputs.checkout_ref }}
+          fetch-depth: 0
 
       - name: Install Task
         uses: ./.github/actions/setup-task
@@ -104,10 +109,12 @@ jobs:
           private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
           owner: container-registry
           repositories: 8gcr
+          permission-contents: read
 
       - name: Apply commercial patches
         env:
           PATCHES_TOKEN: ${{ steps.app-token.outputs.token }}
+          PATCHES_SERIES: ${{ inputs.patches_series }}
         run: task --taskfile taskfile/release-ready.yml apply-commercial-patches
 
       - name: Load versions
