@@ -260,7 +260,15 @@ jobs:
           persist-credentials: false
 
       - name: Load versions
-        run: grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
+        # Helm homes: self-hosted runner images may ship a root-owned
+        # ~/.cache; keep all helm state in the always-writable temp.
+        run: |
+          grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
+          {
+            echo "HELM_CACHE_HOME=${RUNNER_TEMP}/helm/cache"
+            echo "HELM_CONFIG_HOME=${RUNNER_TEMP}/helm/config"
+            echo "HELM_DATA_HOME=${RUNNER_TEMP}/helm/data"
+          } >> "$GITHUB_ENV"
 
       - name: Install Helm
         uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
@@ -297,10 +305,23 @@ jobs:
             done
           } >> deploy/chart/Chart.yaml
 
-      - name: Validate Artifact Hub metadata
+      - name: Install Artifact Hub CLI
+        # Binary, not `docker run -v`: the self-hosted runners talk to a
+        # remote DinD daemon, so a bind mount resolves on the DinD host and
+        # silently sees nothing from the runner workspace.
         run: |
-          docker run --rm -v "$(pwd)/deploy/chart:/chart" \
-            "artifacthub/ah:v${AH_VERSION}" ah lint --kind helm --path /chart
+          case "$(uname -m)" in
+            x86_64|amd64) goarch="amd64" ;;
+            aarch64|arm64) goarch="arm64" ;;
+            *) echo "unsupported arch: $(uname -m)" >&2; exit 1 ;;
+          esac
+          mkdir -p "${RUNNER_TEMP}/bin"
+          curl -fsSL "https://github.com/artifacthub/hub/releases/download/v${AH_VERSION}/ah_${AH_VERSION}_linux_${goarch}.tar.gz" \
+            | tar -xz -C "${RUNNER_TEMP}/bin" ah
+          echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
+
+      - name: Validate Artifact Hub metadata
+        run: ah lint --kind helm --path deploy/chart
 
       - name: Package chart
         # VERSION is the chart's own release-please version (release-please
@@ -315,7 +336,11 @@ jobs:
 
       - name: Push chart
         id: push
+        # pipefail: GitHub's default shell is `bash -e` without it, so a
+        # failing helm push would be masked by tee — and its error message
+        # contains a sha256 digest the capture below would happily match.
         run: |
+          set -euo pipefail
           helm push "dist/harbor-next-${VERSION}.tgz" \
             "oci://${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts" 2>&1 | tee push.log
           digest=$(grep -o 'sha256:[a-f0-9]\{64\}' push.log | head -1)
@@ -326,9 +351,11 @@ jobs:
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
       - name: Sign chart
+        env:
+          CHART_DIGEST: ${{ steps.push.outputs.digest }}
         run: |
           cosign sign --yes \
-            "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts/harbor-next@${{ steps.push.outputs.digest }}"
+            "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts/harbor-next@${CHART_DIGEST}"
 
       - name: Install oras
         uses: oras-project/setup-oras@38de303aac69abb66f3e6255b7198bff35f323e3 # v2.0.0
