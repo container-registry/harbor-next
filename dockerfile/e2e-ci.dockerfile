@@ -6,6 +6,8 @@ ARG COSIGN_VERSION=v3.0.6
 ARG COMPOSE_VERSION=v2.40.3
 ARG BUILDX_VERSION=v0.33.0
 
+# nodejs/npm and maven are the real ecosystem clients the package scenarios
+# drive; without them the suite's tool preflight fails before Harbor starts.
 RUN apk add --no-cache \
     bash \
     ca-certificates \
@@ -14,6 +16,9 @@ RUN apk add --no-cache \
     gzip \
     iproute2 \
     jq \
+    maven \
+    nodejs \
+    npm \
     openssl \
     tar \
     xz

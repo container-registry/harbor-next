@@ -562,6 +562,38 @@ Feature: Project webhook notifications
     Then the webhook delivery history lists at least one successful job
 ```
 
+### 7.7 `features/packages.feature` and `features/packages_known_issues.feature`
+
+Native package formats served by the multiformat adapters at `/npm/<project>/` and
+`/maven/<project>/`. These cover areas A (publishing and consuming) and B
+(version promises) of the multi-format package registry test plan, executed by
+hand against the branch before being written down here.
+
+Every scenario drives the ecosystem's own client — `npm`, `mvn` — with no
+registry-specific plugin, because that is the business claim under test: a team
+keeps its existing toolchain and changes only the registry it points at.
+
+Three controls keep a green result meaningful. Each one exists because a manual
+run produced a pass that proved nothing:
+
+| Control | The false pass it prevents |
+|---|---|
+| Package names carry the scenario suffix, and every install uses a fresh cache directory | A cached copy satisfying an install that the registry could no longer serve. |
+| Every client invocation names the registry explicitly | A missing `.npmrc` sending the request to the public registry, whose refusal reads exactly like ours. |
+| Where the client refuses locally, the step builds the request itself | `npm` declining to re-publish a version it already knows, without ever contacting the server, read as the server enforcing immutability. |
+
+`packages_known_issues.feature` holds scenarios written against behaviour the
+product does not have yet. Each describes the outcome a user expects, fails
+today, and turns green by itself when the matching fix lands. They carry
+`@known-issue` and the default lane excludes them, so a red default build is
+always a regression. Run them deliberately:
+
+```bash
+task e2e TAGS='@known-issue'
+```
+
+They are not to be deleted to make a build pass.
+
 ---
 
 ## 8. Step catalogue
@@ -690,6 +722,37 @@ The contract that step-definition files must satisfy. Each row is the regex the 
 ### 8.4 Duplicate-step discipline
 
 Any step registration whose regex overlaps an existing one must be rejected in code review. `task test:e2e:steps` regenerates `docs/e2e-step-catalogue.md`; a CI check diffs the committed catalogue against the regenerated output. Agents adding new scenarios search the catalogue first and reuse phrasing.
+
+### 8.5 Native package steps (`package_steps.go`)
+
+| Regex | Role | Parameters | Responsibility |
+|---|---|---|---|
+| `^an npm package "([^"]+)" at version "([^"]+)"$` | Given | name, version | Stage sources for `<name>-<suffix>` in a per-scenario temp dir. |
+| `^an npm package "([^"]+)" at version "([^"]+)" published to "([^"]+)"$` | Given | name, version, project | As above, then `npm publish`; fail the step if the publish did not succeed. |
+| `^version "([^"]+)" of "([^"]+)" published to "([^"]+)"$` | Given | version, name, project | Publish a further version of the package already staged. |
+| `^version "([^"]+)" of "([^"]+)" published to "([^"]+)" under tag "([^"]+)"$` | Given | version, name, project, tag | As above with `--tag`, for pre-release and out-of-order publishing. |
+| `^a Maven artifact "([^"]+)" at version "([^"]+)"$` | Given | groupId:artifactId, version | Stage a Maven project for `<artifactId>-<suffix>` and write `settings.xml`. |
+| `^the package is published to "([^"]+)"$` | When | project | `npm publish` as the admin; record the outcome without failing. |
+| `^the robot publishes the package to "([^"]+)"$` | When | project | `npm publish` authenticated as the most recently created robot. |
+| `^the same version is published again with different content$` | When | — | Build the publish request by hand and PUT it, because npm refuses client-side. |
+| `^a consumer installs "([^"]+)" from "([^"]+)"$` | When | name, project | `npm install <pkg>@<version>` in a throwaway consumer with a fresh cache. |
+| `^a consumer installs "([^"]+)" from "([^"]+)" without specifying a version$` | When | name, project | As above with no version, so the registry chooses. |
+| `^the robot installs "([^"]+)" from "([^"]+)"$` | When | name, project | Install with the robot's basic credentials. |
+| `^the robot installs "([^"]+)" from "([^"]+)" with token authentication$` | When | name, project | Install with the robot secret as `_authToken`, the shape the Portal hands out. |
+| `^the repositories under "([^"]+)" are listed$` | When | project | GET the project repositories and capture the response. |
+| `^the artifact is deployed to "([^"]+)"$` | When | project | Plain `mvn deploy`, install phase skipped so the local repo stays empty. |
+| `^a consumer project resolves "([^"]+)" from "([^"]+)"$` | When | coordinate, project | `mvn dependency:resolve` from a second project declaring the registry. |
+| `^the publish succeeds$` | Then | — | The publish client exited zero. |
+| `^the publish is refused$` | Then | — | The client failed *and* the registry answered 401 or 403. |
+| `^the publish is rejected as a conflict$` | Then | — | The hand-built publish returned 409. |
+| `^the install succeeds$` | Then | — | The install client exited zero. |
+| `^the deploy succeeds$` | Then | — | `mvn deploy` exited zero. |
+| `^the resolve succeeds$` | Then | — | `mvn dependency:resolve` exited zero. |
+| `^the installed package contains the published content$` | Then | — | The module in `node_modules` carries this scenario's published marker. |
+| `^the installed version is "([^"]+)"$` | Then | version | The version in `node_modules` is the expected one. |
+| `^the package is stored in "([^"]+)" with artifact type "([^"]+)"$` | Then | project, type | An artifact of that type exists — proof the native path ran, not the image path. |
+| `^the listed package name is "([^"]+)"$` | Then | name | A listed repository reads as the package coordinate, not the storage path. |
+| `^nothing is stored in "([^"]+)"$` | Then | project | The project holds no repositories — the registry side of a refused publish. |
 
 ---
 

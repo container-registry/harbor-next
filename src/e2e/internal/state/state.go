@@ -123,6 +123,24 @@ type Scenario struct {
 	LastBrandingConfig map[string]any
 	BrandingRestore    func() error
 
+	// Native package (npm / Maven) scenario state.
+	//
+	// PkgBaseName is the name as written in the feature file; PkgName is that
+	// name with the scenario suffix appended so concurrent runs — and repeat
+	// runs against a long-lived registry — never collide. Steps address the
+	// package by its base name and resolve through PkgName.
+	PkgBaseName     string
+	PkgName         string
+	PkgVersion      string
+	PkgProject      string // Harbor project name (already suffix-resolved)
+	PkgDir          string // working directory holding the package sources
+	PkgFormat       string // "npm" or "maven"
+	MavenGroupID    string
+	MavenArtifactID string
+
+	// Result of the most recent consume (npm install / Maven resolve).
+	InstalledVersion string
+	InstalledContent []byte
 }
 
 // NewSuffix returns a short random token suitable for resource-name suffixes.

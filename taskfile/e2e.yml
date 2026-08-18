@@ -220,7 +220,7 @@ tasks:
         }
 
         if [ '{{.TAGS}}' = '~@k8s' ]; then
-          run_suite main '~@k8s && ~@gc && ~@test-next-update-robot-account' '{{.CONCURRENCY}}' || test_status=$?
+          run_suite main '~@k8s && ~@gc && ~@test-next-update-robot-account && ~@known-issue' '{{.CONCURRENCY}}' || test_status=$?
           if [ "$test_status" -eq 0 ]; then
             run_suite gc '@gc' '1' || test_status=$?
           fi
@@ -263,7 +263,7 @@ tasks:
     cmds:
       - |
         missing=""
-        for tool in git task go docker cosign curl openssl jq; do
+        for tool in git task go docker cosign curl openssl jq npm mvn; do
           command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
         done
         docker compose version >/dev/null 2>&1 || missing="$missing docker-compose"
@@ -280,7 +280,7 @@ tasks:
     cmds:
       - |
         missing=""
-        for tool in task go docker cosign curl openssl jq; do
+        for tool in task go docker cosign curl openssl jq npm mvn; do
           command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
         done
         docker compose version >/dev/null 2>&1 || missing="$missing docker-compose"

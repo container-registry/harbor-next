@@ -14,7 +14,9 @@ task e2e
 - Docker with Buildx
 - `cosign`
 - `curl`, `jq`, and `openssl`
+- `npm` and `mvn` — the package scenarios drive the real ecosystem clients
 - Network access to clone `https://github.com/container-registry/harbor-next.git`
+- Network access to Maven Central, for the plugins `mvn deploy` resolves on a cold local repository
 
 ## What `task e2e` Does
 
