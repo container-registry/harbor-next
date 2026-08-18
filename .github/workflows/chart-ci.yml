@@ -8,6 +8,7 @@ on:
       - "versions.env"
       - ".github/workflows/chart-ci.yml"
       - ".github/actions/setup-task/**"
+      - ".github/scripts/chart-annotate-images.sh"
 
 permissions:
   contents: read
