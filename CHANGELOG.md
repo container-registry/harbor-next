@@ -6,6 +6,20 @@ This changelog mirrors [GitHub Releases](https://github.com/container-registry/h
 
 ---
 
+## [2.15.6](https://github.com/container-registry/harbor-next/compare/v2.15.5...v2.15.6) (2026-08-18)
+
+
+### Bug Fixes
+
+* **scan:** make vulnerability report persistence idempotent ([#259](https://github.com/container-registry/harbor-next/issues/259)) ([2783f46](https://github.com/container-registry/harbor-next/commit/2783f46e46cf74939b94e06ec53449fe573ea570))
+
+
+### Upstream
+
+* fix: use LEFT JOIN in projectBasicSQL to include projects without quota records (goharbor/harbor[#23520](https://github.com/container-registry/harbor-next/issues/23520)) ([#522](https://github.com/container-registry/harbor-next/issues/522)) ([4e7c513](https://github.com/container-registry/harbor-next/commit/4e7c5131b1a3b8b8517cfe3deabd9c4b2b75eb89))
+* refactor: remove deprecated io/ioutil usage (goharbor/harbor[#23611](https://github.com/container-registry/harbor-next/issues/23611)) ([210e54a](https://github.com/container-registry/harbor-next/commit/210e54a0a98c1190637f949735a34409cad5ca06))
+* refactor: replace deprecated golang.org/x/net/context (goharbor/harbor[#23630](https://github.com/container-registry/harbor-next/issues/23630)) ([9ab2392](https://github.com/container-registry/harbor-next/commit/9ab23927344c14b786e45a3c9e3b3df86c90249d))
+
 ## [2.15.5](https://github.com/container-registry/harbor-next/compare/v2.15.4...v2.15.5) (2026-08-07)
 
 
