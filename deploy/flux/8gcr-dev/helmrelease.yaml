@@ -82,7 +82,7 @@ spec:
       replicas: 1
     jobservice:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:6b75ec30bde2e56b3898a8444f1520c1410545d80c4343181d160ff599dfa068" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
+        deploy.8gears.io/image-revision: "sha256:b5c9413fd352a38076ba571fdfeeb4134c6b2a511791cbc2344ecf21031ecbc1" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-jobservice
         tag: latest
