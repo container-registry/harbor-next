@@ -323,6 +323,13 @@ jobs:
       - name: Validate Artifact Hub metadata
         run: ah lint --kind helm --path deploy/chart
 
+      - name: Build chart dependencies
+        # deploy/chart/charts/ is gitignored, so a fresh checkout has no
+        # subcharts and `helm package` would fail with "found in Chart.yaml,
+        # but missing in charts/ directory". Chart.lock is committed, so
+        # `dependency build` resolves the pinned versions, not the latest.
+        run: helm dependency build deploy/chart
+
       - name: Package chart
         # VERSION is the chart's own release-please version (release-please
         # also wrote it into Chart.yaml via the helm release-type). appVersion

@@ -130,6 +130,12 @@ jobs:
 
           echo "${bin}" >> "$GITHUB_PATH"
 
+      # deploy/chart/charts/ is gitignored. `ct lint` happens to run
+      # `helm dependency build` itself, but every later step would then
+      # silently depend on that side effect and on step ordering.
+      - name: Build chart dependencies
+        run: task helm:deps:build
+
       # helm lint + ct lint + kube-linter + ah lint (Artifact Hub metadata)
       - name: Lint
         run: task helm:lint
