@@ -171,3 +171,22 @@ jobs:
 
       - name: Trivy config scan
         run: task helm:trivy-chart
+
+      # Everything the release job does before it talks to the registry.
+      # Runs on a copy so the annotation append never touches the worktree.
+      - name: Release packaging dry run
+        env:
+          REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
+          REGISTRY_PROJECT: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
+        run: |
+          set -euo pipefail
+          work="${RUNNER_TEMP}/chart-release"
+          rm -rf "${work}"
+          mkdir -p "${work}"
+          cp -R deploy/chart "${work}/chart"
+          .github/scripts/chart-annotate-images.sh \
+            "${work}/chart" "${REGISTRY_ADDRESS}" "${REGISTRY_PROJECT}"
+          ah lint --kind helm --path "${work}/chart"
+          helm dependency build "${work}/chart"
+          helm package "${work}/chart" --version 0.0.0-ci --destination "${work}/dist"
+          ls -l "${work}/dist"

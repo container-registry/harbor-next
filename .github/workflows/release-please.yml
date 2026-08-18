@@ -286,24 +286,11 @@ jobs:
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
       - name: Add per-release Artifact Hub images annotation
-        # The artifacthub.io/images annotation is appended here instead of
-        # living in Chart.yaml (whose annotations block is deliberately the
-        # last top-level key). Image tags follow the chart's appVersion —
-        # the Harbor app version this chart targets — NOT the chart's own
-        # version/tag, since the chart releases on an independent line.
+        # Shared with the chart-ci dry run so the release-only packaging
+        # path is exercised on every chart PR, not first on release day.
         run: |
-          app_version="$(grep '^appVersion:' deploy/chart/Chart.yaml | awk '{print $2}' | tr -d '"')"
-          {
-            echo "  artifacthub.io/images: |"
-            for component in core jobservice registryctl exporter portal registry trivy-adapter; do
-              image_name="harbor-${component}"
-              if [ "${component}" = "trivy-adapter" ]; then
-                image_name="trivy-adapter"
-              fi
-              echo "    - name: ${image_name}"
-              echo "      image: ${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/${image_name}:${app_version}"
-            done
-          } >> deploy/chart/Chart.yaml
+          .github/scripts/chart-annotate-images.sh \
+            deploy/chart "${REGISTRY_ADDRESS}" "${REGISTRY_PROJECT}"
 
       - name: Install Artifact Hub CLI
         # Binary, not `docker run -v`: the self-hosted runners talk to a
