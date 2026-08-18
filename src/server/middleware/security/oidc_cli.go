@@ -27,6 +27,7 @@ import (
 	"github.com/goharbor/harbor/src/controller/user"
 	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/config"
+	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/pkg/oidc"
 )
@@ -65,7 +66,12 @@ func (o *oidcCli) Generate(req *http.Request) security.Context {
 
 	u, err := uctl.GetByName(ctx, username)
 	if err != nil {
-		logger.Errorf("failed to get user model, username: %s, error: %v", username, err)
+		// NotFound is expected probe traffic -> DEBUG; real DB/DAO errors stay ERROR.
+		if errors.IsNotFoundErr(err) {
+			logger.Debugf("failed to get user model, username: %s, error: %v", username, err)
+		} else {
+			logger.Errorf("failed to get user model, username: %s, error: %v", username, err)
+		}
 		return nil
 	}
 

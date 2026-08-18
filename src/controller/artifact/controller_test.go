@@ -297,8 +297,10 @@ func (c *controllerTestSuite) TestEnsureArtifact() {
 
 	// the artifact doesn't exist
 	c.repoMgr.On("GetByName", mock.Anything, mock.Anything).Return(&repomodel.RepoRecord{
-		ProjectID: 1,
+		RepositoryID: 1,
+		ProjectID:    1,
 	}, nil)
+	c.repoMgr.On("Touch", mock.Anything, int64(1)).Return(nil)
 	c.artMgr.On("GetByDigest", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.NotFoundError(nil))
 	c.artMgr.On("Create", mock.Anything, mock.Anything).Return(int64(1), nil)
 	c.abstractor.On("AbstractMetadata").Return(nil)
@@ -334,8 +336,10 @@ func (c *controllerTestSuite) TestEnsureArtifact() {
 
 	// the artifact doesn't exist and includes a pending attestation accessory candidate
 	c.repoMgr.On("GetByName", mock.Anything, mock.Anything).Return(&repomodel.RepoRecord{
-		ProjectID: 1,
+		RepositoryID: 1,
+		ProjectID:    1,
 	}, nil)
+	c.repoMgr.On("Touch", mock.Anything, int64(1)).Return(nil)
 	c.artMgr.On("GetByDigest", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.NotFoundError(nil))
 	c.artMgr.On("Create", mock.Anything, mock.Anything).Return(int64(1), nil)
 	c.accMgr.On("Ensure", mock.Anything,
@@ -380,8 +384,10 @@ func (c *controllerTestSuite) TestEnsure() {
 
 	// both the artifact and the tag don't exist
 	c.repoMgr.On("GetByName", mock.Anything, mock.Anything).Return(&repomodel.RepoRecord{
-		ProjectID: 1,
+		RepositoryID: 1,
+		ProjectID:    1,
 	}, nil)
+	c.repoMgr.On("Touch", mock.Anything, int64(1)).Return(nil)
 	c.artMgr.On("GetByDigest", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.NotFoundError(nil))
 	c.artMgr.On("Create", mock.Anything, mock.Anything).Return(int64(1), nil)
 	c.abstractor.On("AbstractMetadata").Return(nil)
@@ -743,7 +749,7 @@ func (c *controllerTestSuite) TestDeleteDeeply() {
 	c.setupArtrashMgr()
 
 	// accessory contains tag
-	c.artMgr.On("Get", mock.Anything, mock.Anything).Return(&artifact.Artifact{ID: 1}, nil)
+	c.artMgr.On("Get", mock.Anything, mock.Anything).Return(&artifact.Artifact{ID: 1, RepositoryID: 1}, nil)
 	c.artMgr.On("Delete", mock.Anything, mock.Anything).Return(nil)
 	c.tagCtl.On("List").Return([]*tag.Tag{
 		{
@@ -760,6 +766,7 @@ func (c *controllerTestSuite) TestDeleteDeeply() {
 	c.blobMgr.On("List", mock.Anything, mock.Anything).Return(nil, nil)
 	c.blobMgr.On("CleanupAssociationsForProject", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	c.repoMgr.On("Get", mock.Anything, mock.Anything).Return(&repomodel.RepoRecord{}, nil)
+	c.repoMgr.On("Touch", mock.Anything, int64(1)).Return(nil)
 	c.artrashMgr.On("Create", mock.Anything, mock.Anything).Return(int64(0), nil)
 	c.labelMgr.On("ListByArtifact", mock.Anything, mock.Anything).Return([]*model.Label{}, nil)
 	err = c.ctl.deleteDeeply(orm.NewContext(nil, &ormtesting.FakeOrmer{}), 1, true, true)
@@ -785,6 +792,7 @@ func (c *controllerTestSuite) TestCopy() {
 		RepositoryID: 1,
 		Name:         "library/hello-world",
 	}, nil)
+	c.repoMgr.On("Touch", mock.Anything, mock.Anything).Return(nil)
 	c.artMgr.On("Count", mock.Anything, mock.Anything).Return(int64(0), nil)
 	c.artMgr.On("GetByDigest", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.NotFoundError(nil))
 	c.tagCtl.On("List").Return([]*tag.Tag{
@@ -956,4 +964,117 @@ func (c *controllerTestSuite) TestIsInto() {
 
 func TestControllerTestSuite(t *testing.T) {
 	suite.Run(t, &controllerTestSuite{})
+}
+
+// candidateAbstractor stands in for the manifest abstractor, emitting accessory
+// candidates the way index abstraction does for attestations.
+type candidateAbstractor struct {
+	candidates []*artifact.AccessoryCandidate
+}
+
+func (a candidateAbstractor) AbstractMetadata(_ context.Context, art *artifact.Artifact) error {
+	art.AccessoryCandidates = a.candidates
+	return nil
+}
+
+func (c *controllerTestSuite) TestEnsurePersistsAccessoryCandidates() {
+	c.setupRepoMgr()
+	c.setupArtMgr()
+	c.setupAccMgr()
+	c.setupProCtl()
+
+	digest := "sha256:418fb88ec412e340cdbef913b8ca1bbe8f9e8dc705f9617414c1f2c8db980180"
+	c.ctl.abstractor = candidateAbstractor{candidates: []*artifact.AccessoryCandidate{{
+		ArtifactID:        3,
+		SubArtifactID:     2,
+		SubArtifactRepo:   "library/hello-world",
+		SubArtifactDigest: "sha256:subject",
+		Digest:            "sha256:accessory",
+		Size:              10,
+		Type:              accessorymodel.TypeInTotoAttestation,
+	}}}
+
+	c.repoMgr.On("GetByName", mock.Anything, mock.Anything).Return(&repomodel.RepoRecord{RepositoryID: 1, ProjectID: 1}, nil)
+	c.repoMgr.On("Touch", mock.Anything, int64(1)).Return(nil)
+	c.artMgr.On("GetByDigest", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.NotFoundError(nil))
+	c.artMgr.On("Create", mock.Anything, mock.Anything).Return(int64(1), nil)
+	c.proCtl.On("GetByName", mock.Anything, mock.Anything).Return(&projectModel.Project{ProjectID: 1, Name: "library", RegistryID: 0}, nil)
+	c.accMgr.On("Ensure", mock.Anything, "sha256:subject", "library/hello-world", int64(2), int64(3), int64(10), "sha256:accessory", accessorymodel.TypeInTotoAttestation).Return(nil).Once()
+
+	_, _, err := c.ctl.Ensure(orm.NewContext(nil, &ormtesting.FakeOrmer{}), "library/hello-world", digest, &ArtOption{})
+	c.Require().Nil(err)
+	c.accMgr.AssertExpectations(c.T())
+}
+
+// An accessory failure must surface as itself. The conflict recovery re-reads the
+// artifact by digest, which cannot succeed after the transaction rolled back.
+func (c *controllerTestSuite) TestEnsureReturnsAccessoryError() {
+	c.setupRepoMgr()
+	c.setupArtMgr()
+	c.setupAccMgr()
+	c.setupProCtl()
+
+	digest := "sha256:418fb88ec412e340cdbef913b8ca1bbe8f9e8dc705f9617414c1f2c8db980180"
+	c.ctl.abstractor = candidateAbstractor{candidates: []*artifact.AccessoryCandidate{{
+		SubArtifactDigest: "sha256:subject",
+		Digest:            "sha256:accessory",
+		Type:              accessorymodel.TypeInTotoAttestation,
+	}}}
+	accErr := errors.ConflictError(nil)
+
+	c.repoMgr.On("GetByName", mock.Anything, mock.Anything).Return(&repomodel.RepoRecord{RepositoryID: 1, ProjectID: 1}, nil)
+	c.artMgr.On("GetByDigest", mock.Anything, mock.Anything, mock.Anything).Return(nil, errors.NotFoundError(nil))
+	c.artMgr.On("Create", mock.Anything, mock.Anything).Return(int64(1), nil)
+	c.proCtl.On("GetByName", mock.Anything, mock.Anything).Return(&projectModel.Project{ProjectID: 1, Name: "library", RegistryID: 0}, nil)
+	c.accMgr.On("Ensure", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(accErr)
+
+	_, _, err := c.ctl.Ensure(orm.NewContext(nil, &ormtesting.FakeOrmer{}), "library/hello-world", digest, &ArtOption{})
+	c.Require().NotNil(err)
+	c.Assert().ErrorIs(err, accErr, "the accessory error must not be swallowed by the parent-conflict retry")
+}
+
+// A deleted attestation would leave its still-present index pointing at a
+// missing manifest after GC, the dangling child its artifact_reference row
+// used to prevent.
+func (c *controllerTestSuite) TestDeleteBlockedForAttestationAccessory() {
+	c.setupArtMgr()
+	c.setupAccMgr()
+
+	acc := &basemodel.Default{
+		Data: accessorymodel.AccessoryData{
+			ID:            1,
+			ArtifactID:    10,
+			SubArtifactID: 2,
+			Type:          accessorymodel.TypeInTotoAttestation,
+		},
+	}
+	c.accMgr.On("List", mock.Anything, mock.Anything).Return([]accessorymodel.Accessory{acc}, nil)
+	c.artMgr.On("Get", mock.Anything, int64(2)).Return(&artifact.Artifact{ID: 2}, nil)
+
+	err := c.ctl.Delete(context.TODO(), 10)
+	c.Require().NotNil(err)
+	c.Assert().True(errors.IsErr(err, errors.ViolateForeignKeyConstraintCode))
+	c.artMgr.AssertNotCalled(c.T(), "Delete", mock.Anything, mock.Anything)
+}
+
+// An orphaned accessory row must not make its artifact undeletable.
+func (c *controllerTestSuite) TestDeleteOrphanedAttestationAccessory() {
+	c.setupArtMgr()
+	c.setupAccMgr()
+
+	acc := &basemodel.Default{
+		Data: accessorymodel.AccessoryData{
+			ID:            1,
+			ArtifactID:    10,
+			SubArtifactID: 2,
+			Type:          accessorymodel.TypeInTotoAttestation,
+		},
+	}
+	c.accMgr.On("List", mock.Anything, mock.Anything).Return([]accessorymodel.Accessory{acc}, nil)
+	c.artMgr.On("Get", mock.Anything, mock.Anything).Return(nil, errors.NotFoundError(nil))
+
+	err := c.ctl.Delete(orm.NewContext(nil, &ormtesting.FakeOrmer{}), 10)
+	c.Require().NotNil(err)
+	c.Assert().True(errors.IsErr(err, errors.NotFoundCode),
+		"the guard must let an orphan through; deletion then fails on the missing artifact itself")
 }

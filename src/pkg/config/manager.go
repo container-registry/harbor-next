@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/common/models"
@@ -172,7 +173,7 @@ func (c *CfgManager) GetDatabaseCfg() *models.Database {
 			ConnMaxIdleTime:   c.Get(ctx, common.PostGreSQLConnMaxIdleTime).GetDuration(),
 			HealthCheckPeriod: c.Get(ctx, common.PostGreSQLHealthCheckPeriod).GetDuration(),
 			ConnectTimeout:    c.Get(ctx, common.PostGreSQLConnectTimeout).GetDuration(),
-			MinConns:          int32(c.Get(ctx, common.PostGreSQLMinConns).GetInt()),
+			MinConns:          c.Get(ctx, common.PostGreSQLMinConns).GetOptionalInt32(),
 			URL:               c.Get(ctx, common.PostGreSQLURL).GetString(),
 		},
 	}
@@ -200,6 +201,15 @@ func (c *CfgManager) ValidateCfg(ctx context.Context, cfgs map[string]any) error
 		}
 
 		strVal := utils.GetStrValueOfAnyType(value)
+
+		// Trim spaces from the robot_name_prefix before validation
+		if key == common.RobotNamePrefix {
+			strVal = strings.TrimSpace(strVal)
+			if len(strVal) == 0 {
+				return fmt.Errorf("robot_name_prefix cannot be empty or contain only spaces")
+			}
+			cfgs[key] = strVal
+		}
 
 		// check storage per project before setting it
 		if key == common.StoragePerProject {

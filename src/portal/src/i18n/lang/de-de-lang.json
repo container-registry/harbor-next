@@ -240,15 +240,18 @@
         "QUOTA_UNLIMIT_TIP": "The maximum logical space that can be used by the project. Für eine unbegrenzte Speicherbeschränkung '-1' eingeben.",
         "TYPE": "Typ",
         "PROXY_CACHE": "Proxy Cache",
-        "PROXY_CACHE_TOOLTIP": "Die Aktivierung der Funktion erlaubt es dem Projekt, als Cache für eine andere Registry Instanz zu dienen. Harbor unterstützt die Proxy Funktion nur für DockerHub, Docker Registry, Harbor, Aws ECR, Azure ACR, Alibaba Cloud ACR, Quay, Google GCR, JFrog Artifactory, und Github GHCR",
+        "PROXY_CACHE_TOOLTIP": "Die Aktivierung der Funktion erlaubt es dem Projekt, als Cache für eine andere Registry Instanz zu dienen.",
         "ENDPOINT": "Endpunkt",
         "PROXY_CACHE_ENDPOINT": "Proxy Cache Endpunkt",
         "CONNECTION_LIMIT": "Max. Verbindungen zur Upstream-Registry",
         "PROXY_CACHE_MAX_UPSTREAM_CONN_TIP": "Die maximale Anzahl der Verbindungen zur Upstream-Registry für dieses Proxy-Cache-Projekt. -1 bedeutet keine Begrenzung",
         "PROXY_CACHE_MAX_UPSTREAM_CONN_INPUT_TIP": "Bitte geben Sie -1 oder eine Ganzzahl größer als 0 ein.",
-        "PROXY_CACHE_LOCAL_ON_NOT_FOUND": "Veraltete Inhalte bereitstellen, wenn Upstream nicht verfügbar ist",
-        "PROXY_CACHE_LOCAL_ON_NOT_FOUND_TOOLTIP": "Aktivieren Sie diese Option, um zwischengespeicherte Inhalte auch dann bereitzustellen, wenn das Artefakt im Upstream-Registry nicht gefunden wird oder das Upstream-Registry nicht verfügbar ist. Dies kann dazu führen, dass veraltete Inhalte bereitgestellt werden.",
-        "NO_PROJECT": "Es konnte kein Projekt gefunden werden"
+        "PROXY_CACHE_MAX_UPSTREAM_CONN_PLACEHOLDER": "Bitte geben Sie -1 oder eine Ganzzahl größer als 0 ein.",
+        "PROXY_CACHE_LOCAL_ON_NOT_FOUND": "Veraltete Inhalte bereitstellen, wenn der Upstream nicht verfügbar ist",
+        "PROXY_CACHE_LOCAL_ON_NOT_FOUND_TOOLTIP": "Aktivieren Sie diese Option, damit dieses Projekt weiterhin zwischengespeicherte Inhalte bereitstellt, auch wenn das Artefakt im Upstream-Registry nicht gefunden wird oder das Upstream-Registry nicht verfügbar ist. Dies kann dazu führen, dass veraltete Inhalte bereitgestellt werden, wenn das Upstream-Registry nicht verfügbar ist.",
+        "NO_PROJECT": "Es konnte kein Projekt gefunden werden",
+        "PROXY_REFERRER_API_TIP": "Enable this to proxy OCI 1.1 referrer API requests to the upstream registry.",
+        "PROXY_REFERRER_API_LABEL": "Enable proxy for referrer API"
     },
     "PROJECT_DETAIL": {
         "SUMMARY": "Zusammenfassung",
@@ -1744,6 +1747,8 @@
         "PURGE_NOW": "JETZT SÄUBERN",
         "PURGE_NOW_SUCCESS": "Signal zur Bereinigung erfolgreich gesendet",
         "PURGE_SCHEDULE_RESET": "Bereinigungsplan wurde zurückgesetzt",
+        "ROTATION_POLICY": "Rotationsrichtlinie",
+        "EXECUTION": "Ausführung",
         "PURGE_HISTORY": "Bereinigungshistorie",
         "FORWARD_ENDPOINT": "Syslog Endpunkt für die Weiterleitung des Audit-Logs",
         "FORWARD_ENDPOINT_TOOLTIP": "Leite Audit-Logs an einen Syslog-Endpunkt, zum Beispiel: harbor-log:10514",
@@ -1755,7 +1760,9 @@
         "STOP_GC_SUCCESS": "Signal zum stoppen der Speicherbereinigungs-Aktion erfolgreich",
         "STOP_PURGE_SUCCESS": "Signal zum Anhalten der Bereinigung erfolgreich",
         "NO_GC_RECORDS": "Es konnte keine Speicherbereinigungs-Historie gefunden werden!",
-        "NO_PURGE_RECORDS": "Es konnte keine Bereinigungs-Historie gefunden werden!"
+        "NO_PURGE_RECORDS": "Es konnte keine Bereinigungs-Historie gefunden werden!",
+        "PURGE_PARAMS_SAVED": "Log-Rotation-Einstellungen erfolgreich gespeichert",
+        "NO_EVENT_TYPES_WARNING": "Dieser Zeitplan bereinigt nichts, da keine Event-Typen ausgewählt sind. Wähle mindestens einen Event-Typ aus und klicke auf SPEICHERN."
     },
     "CVE_EXPORT": {
         "EXPORT_SOME_PROJECTS": "Exportiere CVEs",

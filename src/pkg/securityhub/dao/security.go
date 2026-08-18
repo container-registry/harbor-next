@@ -121,8 +121,6 @@ var filterMap = map[string]*filterMetaData{
 	"digest":          &filterMetaData{DataType: stringType, ColumnName: "a.digest"},
 }
 
-var applyFilterFunc func(ctx context.Context, key string, query *q.Query) (sqlStr string, params []any)
-
 func exactMatchFilter(_ context.Context, key string, query *q.Query) (sqlStr string, params []any) {
 	if query == nil {
 		return
@@ -207,6 +205,7 @@ func (d *dao) TotalArtifactsCount(ctx context.Context, projectID int64) (int64, 
 	return count, err
 }
 
+//nolint:nilnil // No scanner or project-scoped dashboard data is represented by a nil result and nil error.
 func (d *dao) Summary(ctx context.Context, scannerUUID string, projectID int64, _ *q.Query) (*model.Summary, error) {
 	if len(scannerUUID) == 0 || projectID != 0 {
 		return nil, nil
@@ -225,6 +224,8 @@ func (d *dao) Summary(ctx context.Context, scannerUUID string, projectID int64, 
 		&sum.FixableCnt)
 	return &sum, err
 }
+
+//nolint:nilnil // No scanner or project-scoped dashboard data is represented by a nil result and nil error.
 func (d *dao) DangerousArtifacts(ctx context.Context, scannerUUID string, projectID int64, _ *q.Query) ([]*model.DangerousArtifact, error) {
 	if len(scannerUUID) == 0 || projectID != 0 {
 		return nil, nil
@@ -250,6 +251,8 @@ func (d *dao) ScannedArtifactsCount(ctx context.Context, scannerUUID string, pro
 	err = o.Raw(scannedArtifactCountSQL, scannerUUID).QueryRow(&cnt)
 	return cnt, err
 }
+
+//nolint:nilnil // No scanner or project-scoped dashboard data is represented by a nil result and nil error.
 func (d *dao) DangerousCVEs(ctx context.Context, scannerUUID string, projectID int64, _ *q.Query) ([]*scan.VulnerabilityRecord, error) {
 	if len(scannerUUID) == 0 || projectID != 0 {
 		return nil, nil

@@ -28,7 +28,7 @@ import (
 )
 
 // Client is a util for common HTTP operations, such Get, Head, Post, Put and Delete.
-// Use Do instead if  those methods can not meet your requirement
+// Use Do instead if those methods cannot meet your requirement
 type Client struct {
 	modifiers []modifier.Modifier
 	client    *http.Client
@@ -183,7 +183,7 @@ func (c *Client) GetAndIteratePagination(endpoint string, v any) error {
 	}
 
 	rv := reflect.ValueOf(v)
-	if rv.Kind() != reflect.Ptr {
+	if rv.Kind() != reflect.Pointer {
 		return errors.New("v should be a pointer to a slice")
 	}
 	elemType := rv.Elem().Type()

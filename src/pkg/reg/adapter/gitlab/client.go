@@ -24,6 +24,7 @@ import (
 	"reflect"
 
 	common_http "github.com/goharbor/harbor/src/common/http"
+	"github.com/goharbor/harbor/src/lib/config"
 	liberrors "github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
@@ -61,6 +62,7 @@ func NewClient(registry *model.Registry) (*Client, error) {
 					common_http.WithInsecure(registry.Insecure),
 					common_http.WithCACert(registry.CACertificate),
 				),
+				Timeout: config.RegistryHTTPClientTimeout(),
 			}),
 	}
 	return client, nil
@@ -120,7 +122,7 @@ func (c *Client) GetAndIteratePagination(endpoint string, v any) error {
 		return err
 	}
 	rv := reflect.ValueOf(v)
-	if rv.Kind() != reflect.Ptr {
+	if rv.Kind() != reflect.Pointer {
 		return errors.New("v should be a pointer to a slice")
 	}
 	elemType := rv.Elem().Type()

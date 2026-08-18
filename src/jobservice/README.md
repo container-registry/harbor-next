@@ -322,7 +322,7 @@ The job launched with `Periodic` kind is actually a scheduled job template which
 
 There are two loggers here. One is for job service itself and another one is for the running jobs. Each logger can configure multi logger backends.
 
-Each backend logger is identified by an unique name which will be used in the logger configurations to enable the corresponding loggers. Meanwhile, each backend logger MUST implement the `logger.Interface`. A logger can also support (optional):
+Each backend logger is identified by a unique name which will be used in the logger configurations to enable the corresponding loggers. Meanwhile, each backend logger MUST implement the `logger.Interface`. A logger can also support (optional):
 
 * _sweeper_: Sweep the outdated logs. A sweeper MUST implement `sweeper.Interface`
 * _getter_: Get the specified log data. A getter MUST implement `getter.Interface`
@@ -332,7 +332,7 @@ All the backend loggers SHOULD onboard via the static logger registry.
 ```go
 // knownLoggers is a static logger registry.
 // All the implemented loggers (w/ sweeper) should be registered
-// with an unique name in this registry. Then they can be used to
+// with a unique name in this registry. Then they can be used to
 // log info.
 var knownLoggers = map[string]*Declaration{
 	// File logger

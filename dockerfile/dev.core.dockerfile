@@ -16,10 +16,14 @@ RUN apk add --no-cache git
 RUN go install github.com/air-verse/air@${AIR_VERSION} && \
     go install github.com/go-delve/delve/cmd/dlv@${DELVE_VERSION}
 
-RUN addgroup -S -g ${DEV_GID} harbor && \
-    adduser -S -D -G harbor -u ${DEV_UID} harbor && \
+RUN group="$(getent group "${DEV_GID}" | cut -d: -f1)" && \
+    if [ -z "$group" ]; then \
+      addgroup -S -g "${DEV_GID}" harbor; \
+      group=harbor; \
+    fi && \
+    adduser -S -D -G "$group" -u "${DEV_UID}" harbor && \
     mkdir -p /home/harbor/.cache/go-build && \
-    chown -R harbor:harbor /home/harbor
+    chown -R harbor:"$group" /home/harbor
 
 ENV HOME=/home/harbor
 

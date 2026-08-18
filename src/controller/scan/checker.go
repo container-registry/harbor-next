@@ -35,10 +35,12 @@ type Checker interface {
 // NewChecker returns checker
 func NewChecker() Checker {
 	return &checker{
-		artifactCtl:   artifact.Ctl,
-		accMgr:        accessory.Mgr,
-		scannerCtl:    scanner.DefaultController,
-		registrations: map[int64]*models.Registration{},
+		artifactCtl:           artifact.Ctl,
+		accMgr:                accessory.Mgr,
+		scannerCtl:            scanner.DefaultController,
+		registrations:         map[int64]*models.Registration{},
+		accessoryCache:        map[int64]bool{},
+		unscannableLayerCache: map[string]bool{},
 	}
 }
 
@@ -47,6 +49,18 @@ type checker struct {
 	accMgr        accessory.Manager
 	scannerCtl    scanner.Controller
 	registrations map[int64]*models.Registration
+	// accessoryCache caches isAccessory results by artifact ID for the lifetime
+	// of this checker. The artifact list handler creates a fresh checker per
+	// request via assembler.NewScanReportAssembler, so the cache is implicitly
+	// request-scoped. Avoids requerying the same descendant across many
+	// IsScannable calls in a single response — the worst case is an artifact
+	// list where most rows are OCI image indexes whose child manifests are
+	// shared (so the same children would otherwise be looked up once per root).
+	accessoryCache map[int64]bool
+	// unscannableLayerCache caches HasUnscannableLayer results keyed by digest
+	// for the same reason: a single digest can appear under many parents in one
+	// list response.
+	unscannableLayerCache map[string]bool
 }
 
 func (c *checker) IsScannable(ctx context.Context, art *artifact.Artifact) (bool, error) {
@@ -91,7 +105,7 @@ func (c *checker) IsScannable(ctx context.Context, art *artifact.Artifact) (bool
 		// when scanning these type of sbom artifact, the scanner might assume it is image layer with tgz format, and if scanner read the layer with a stream of tgz,
 		// it fail and close the stream abruptly and cause the pannic in the harbor core log
 		// to avoid pannic, skip scan the in-toto sbom artifact sbom artifact
-		unscannable, err := c.artifactCtl.HasUnscannableLayer(ctx, a.Digest)
+		unscannable, err := c.hasUnscannableLayer(ctx, a.Digest)
 		if err != nil {
 			return err
 		}
@@ -110,14 +124,28 @@ func (c *checker) IsScannable(ctx context.Context, art *artifact.Artifact) (bool
 }
 
 func (c *checker) isAccessory(ctx context.Context, art *artifact.Artifact) (bool, error) {
+	if cached, ok := c.accessoryCache[art.Artifact.ID]; ok {
+		return cached, nil
+	}
 	ac, err := c.accMgr.List(ctx, q.New(q.KeyWords{"ArtifactID": art.Artifact.ID, "digest": art.Artifact.Digest}))
 	if err != nil {
 		return false, err
 	}
-	if len(ac) > 0 {
-		return true, nil
+	isAcc := len(ac) > 0
+	c.accessoryCache[art.Artifact.ID] = isAcc
+	return isAcc, nil
+}
+
+func (c *checker) hasUnscannableLayer(ctx context.Context, digest string) (bool, error) {
+	if cached, ok := c.unscannableLayerCache[digest]; ok {
+		return cached, nil
 	}
-	return false, nil
+	unscannable, err := c.artifactCtl.HasUnscannableLayer(ctx, digest)
+	if err != nil {
+		return false, err
+	}
+	c.unscannableLayerCache[digest] = unscannable
+	return unscannable, nil
 }
 
 // hasCapability returns true when scanner has capability for the artifact

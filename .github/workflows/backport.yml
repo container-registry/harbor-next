@@ -72,7 +72,7 @@ jobs:
           echo "url=${url}" >> "${GITHUB_OUTPUT}"
           echo "sha=${sha}" >> "${GITHUB_OUTPUT}"
 
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ steps.target.outputs.branch }}
           fetch-depth: 0
@@ -96,7 +96,9 @@ jobs:
           fi
           git switch -c "${backport_branch}"
 
-          if ! git cherry-pick -x "${SOURCE_SHA}"; then
+          # -s adds the committer (github-actions[bot]) sign-off so the backport passes
+          # DCO even when the squashed source commit on the base branch has none.
+          if ! git cherry-pick -x -s "${SOURCE_SHA}"; then
             git cherry-pick --abort || true
             gh pr comment "${PR_NUMBER}" --body "Backport to \`${TARGET_BRANCH}\` has conflicts. Please cherry-pick \`${SOURCE_SHA}\` manually."
             exit 1

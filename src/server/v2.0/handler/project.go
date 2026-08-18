@@ -409,8 +409,6 @@ func (a *projectAPI) GetProjectSummary(ctx context.Context, params operation.Get
 
 	var wg sync.WaitGroup
 	for _, fn := range fetchSummaries {
-		fn := fn
-
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -771,7 +769,7 @@ func (a *projectAPI) deletable(ctx context.Context, projectNameOrID any) (*proje
 	result := &models.ProjectDeletable{Deletable: true}
 	if p.RepoCount > 0 {
 		result.Deletable = false
-		result.Message = "the project contains repositories, can not be deleted"
+		result.Message = "the project contains repositories, cannot be deleted"
 	}
 
 	return p, result, nil
@@ -806,12 +804,12 @@ func (a *projectAPI) validateProjectReq(ctx context.Context, req *models.Project
 		}
 
 		permitted := false
-		if slices.Contains(config.GetPermittedRegistryTypesForProxyCache(), string(registry.Type)) {
+		if slices.Contains(config.GetPermittedRegistryTypesForProxyCache(), registry.Type) {
 			permitted = true
 		}
 
 		if !permitted {
-			return errors.BadRequestError(fmt.Errorf("unsupported registry type %s", string(registry.Type)))
+			return errors.BadRequestError(fmt.Errorf("unsupported registry type %s", registry.Type))
 		}
 
 		// validate metadata.proxy_speed_kb. It should be an int32

@@ -241,15 +241,18 @@
         "QUOTA_UNLIMIT_TIP": "El espacio lógico máximo que puede utilizar el proyecto. Para una cuota ilimitada, introduzca '-1'.",
         "TYPE": "Tipo",
         "PROXY_CACHE": "Proxy Cache",
-        "PROXY_CACHE_TOOLTIP": "Habilite esta opción para permitir que este proyecto actúe como caché proxy para una instancia de registro de destino en particular. Harbor solo puede actuar como proxy para los registros DockerHub, Docker Registry, Harbor, Aws ECR, Azure ACR, Alibaba Cloud ACR, Quay, Google GCR, Github GHCR y JFrog Artifactory.",
+        "PROXY_CACHE_TOOLTIP": "Habilite esta opción para permitir que este proyecto actúe como caché proxy para una instancia de registro de destino en particular.",
         "ENDPOINT": "Endpoint",
         "PROXY_CACHE_ENDPOINT": "Proxy Cache Endpoint",
         "CONNECTION_LIMIT": "Conexión máxima al registro de origen",
         "PROXY_CACHE_MAX_UPSTREAM_CONN_TIP": "La conexión máxima al registro de origen para este proyecto de caché de proxy, si es -1, entonces no hay límite",
         "PROXY_CACHE_MAX_UPSTREAM_CONN_INPUT_TIP": "Por favor, ingrese -1 o un número entero mayor que 0.",
+        "PROXY_CACHE_MAX_UPSTREAM_CONN_PLACEHOLDER": "Por favor, ingrese -1 o un número entero mayor que 0.",
         "PROXY_CACHE_LOCAL_ON_NOT_FOUND": "Servir contenido en caché cuando el registro de origen no está disponible",
-        "PROXY_CACHE_LOCAL_ON_NOT_FOUND_TOOLTIP": "Active esta opción para permitir que este proyecto siga sirviendo contenido en caché incluso si el artefacto no se encuentra en el registro de origen o el registro de origen no está disponible. Esto puede provocar que se sirva contenido obsoleto.",
-        "NO_PROJECT": "No pudimos encontrar ningún proyecto"
+        "PROXY_CACHE_LOCAL_ON_NOT_FOUND_TOOLTIP": "Habilite esta opción para permitir que este proyecto continúe sirviendo contenido en caché incluso si el artefacto no se encuentra en el registro de origen o si el registro de origen no está disponible. Esto puede provocar que se sirva contenido obsoleto si el registro de origen no está disponible.",
+        "NO_PROJECT": "No pudimos encontrar ningún proyecto",
+        "PROXY_REFERRER_API_TIP": "Enable this to proxy OCI 1.1 referrer API requests to the upstream registry.",
+        "PROXY_REFERRER_API_LABEL": "Enable proxy for referrer API"
     },
     "PROJECT_DETAIL": {
         "SUMMARY": "Resumen",
@@ -1750,6 +1753,8 @@
         "PURGE_NOW": "PURGAR AHORA",
         "PURGE_NOW_SUCCESS": "Purga activada exitosamente",
         "PURGE_SCHEDULE_RESET": "Se ha restablecido la programación de purga",
+        "ROTATION_POLICY": "Política de rotación",
+        "EXECUTION": "Ejecución",
         "PURGE_HISTORY": "Historial de purga",
         "FORWARD_ENDPOINT": "Audit Log Reenviar Syslog Endpoint",
         "FORWARD_ENDPOINT_TOOLTIP": "Reenviar audit logs al endpoint de syslog, por ejemplo: harbor-log:10514",
@@ -1761,7 +1766,9 @@
         "STOP_GC_SUCCESS": "El disparador detiene con éxito la operación GC",
         "STOP_PURGE_SUCCESS": "El disparador detiene con éxito la operación de purga",
         "NO_GC_RECORDS": "No pudimos encontrar ningún historial de GC!",
-        "NO_PURGE_RECORDS": "No pudimos encontrar ningún historial de purgas!"
+        "NO_PURGE_RECORDS": "No pudimos encontrar ningún historial de purgas!",
+        "PURGE_PARAMS_SAVED": "Configuración de rotación de logs guardada correctamente",
+        "NO_EVENT_TYPES_WARNING": "Esta programación no purgará nada porque no hay tipos de evento seleccionados. Seleccione al menos un tipo de evento y haga clic en GUARDAR."
     },
     "CVE_EXPORT": {
         "EXPORT_SOME_PROJECTS": "Exportar CVEs",

@@ -1,0 +1,65 @@
+name: UI Lint
+
+on:
+  pull_request:
+    branches: [main, "release-[0-9]*.[0-9]*"]
+    paths:
+      - "src/portal/**"
+      - "Taskfile.yml"
+      - "versions.env"
+      - "taskfile/test.yml"
+      - ".github/workflows/lint-ui.yml"
+  push:
+    branches: [main, "release-[0-9]*.[0-9]*"]
+    paths:
+      - "src/portal/**"
+      - "Taskfile.yml"
+      - "versions.env"
+      - "taskfile/test.yml"
+      - ".github/workflows/lint-ui.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-lint-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CYPRESS_CACHE_FOLDER: ${{ github.workspace }}/.cache/Cypress
+  XDG_CACHE_HOME: ${{ github.workspace }}/.cache
+
+jobs:
+  lint:
+    name: UI Lint
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository || contains(fromJSON('["OWNER","MEMBER"]'), github.event.pull_request.author_association)) && vars.RUNNER || 'ubuntu-latest' }}
+    env:
+      CYPRESS_CACHE_FOLDER: ${{ github.workspace }}/.ci-cache/cypress
+      CYPRESS_INSTALL_BINARY: "0"
+      XDG_CACHE_HOME: ${{ github.workspace }}/.ci-cache/xdg
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-task
+        with:
+          version: 3.49.1
+
+      - name: Load versions
+        run: grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+          no-cache: true
+
+      - name: Install UI dependencies
+        working-directory: src/portal
+        run: bun install --frozen-lockfile
+
+      - name: Run UI lint
+        working-directory: src/portal
+        run: |
+          bun run lint
+          bun ./node_modules/stylelint/bin/stylelint.js "**/*.scss"

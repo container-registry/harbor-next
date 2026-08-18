@@ -1,0 +1,213 @@
+version: '3'
+
+vars:
+  PATCHES_REPO: '{{.PATCHES_REPO | default "github.com/container-registry/8gcr"}}'
+  PATCHES_CLONE_URL: '{{.PATCHES_CLONE_URL | default "git@github.com:container-registry/8gcr.git"}}'
+  PATCHES_SERIES: '{{.PATCHES_SERIES | default (printf "%s/taskfile/commercial-patches" .ROOT_DIR)}}'
+  PATCH_AUTH_DIR: '{{.PATCH_AUTH_DIR | default ".opencode/tmp/patch-auth"}}'
+  RELEASE_READY_DIR: '{{.RELEASE_READY_DIR | default ".opencode/tmp/release-ready"}}'
+  PATCHES_REMOTE_URL:
+    sh: |
+      if [ -n "${PATCHES_TOKEN:-}" ]; then
+        printf '%s' 'https://x-access-token@{{.PATCHES_REPO}}'
+      else
+        printf '%s' '{{.PATCHES_CLONE_URL}}'
+      fi
+  PATCH_BRANCHES:
+    sh: |
+      awk '
+        { sub(/#.*/, ""); gsub(/^[[:space:]]+|[[:space:]]+$/, "") }
+        NF && seen[$0]++ { print "Duplicate commercial patch branch: " $0 > "/dev/stderr"; exit 1 }
+        NF { print }
+      ' '{{.PATCHES_SERIES}}'
+
+tasks:
+  apply-patches:
+    desc: "Apply Harbor's declared commercial patches via jj"
+    preconditions:
+      - sh: command -v git >/dev/null 2>&1
+        msg: "git is required"
+      - sh: command -v jj >/dev/null 2>&1
+        msg: "jj (Jujutsu) is required"
+      - sh: test -f '{{.PATCHES_SERIES}}'
+        msg: "commercial patch manifest not found: {{.PATCHES_SERIES}}"
+      - sh: test -z "$(if [ -d .jj ]; then jj diff --summary; else git status --porcelain; fi)"
+        msg: "applying release patches requires a clean worktree"
+    cmds:
+      - task: _validate-series
+      - task: _clean-auth
+      - defer: { task: _clean-auth }
+      - task: _configure-auth
+      - task: _fetch-patches
+      - task: _validate-patches
+      - task: _import-patches
+      - task: _duplicate-patches
+      - task: _verify-patches
+
+  check:
+    desc: "Verify the declared commercial patches apply to a clean clone"
+    vars:
+      REPO_ROOT:
+        sh: pwd -P
+      GIT_REPO_DIR:
+        sh: git rev-parse --path-format=absolute --git-common-dir
+      CHECKOUT_REF:
+        sh: jj log -r @ --no-graph -T commit_id 2>/dev/null || git rev-parse HEAD
+      CHECKOUT_DIR: '{{.REPO_ROOT}}/{{.RELEASE_READY_DIR}}/worktree'
+      CHECKOUT_AUTH_DIR: '{{.REPO_ROOT}}/{{.RELEASE_READY_DIR}}/auth'
+    cmds:
+      - task: _clean-checkout
+      - defer: { task: _clean-checkout }
+      - task: _clone-checkout
+        vars:
+          GIT_REPO_DIR: '{{.GIT_REPO_DIR}}'
+          CHECKOUT_DIR: '{{.CHECKOUT_DIR}}'
+          CHECKOUT_REF: '{{.CHECKOUT_REF}}'
+      - >-
+        task --dir '{{.CHECKOUT_DIR}}' apply-patches
+        PATCH_AUTH_DIR='{{.CHECKOUT_AUTH_DIR}}'
+        PATCHES_SERIES='{{.PATCHES_SERIES}}'
+      - echo "Release-ready patch validation succeeded."
+
+  _validate-series:
+    internal: true
+    requires:
+      vars: [PATCH_BRANCHES]
+    env:
+      DECLARED_PATCH_BRANCHES: '{{.PATCH_BRANCHES}}'
+    cmds:
+      - |
+        while IFS= read -r branch; do
+          git check-ref-format --branch "${branch}" >/dev/null
+        done <<< "${DECLARED_PATCH_BRANCHES}"
+
+  _clean-auth:
+    internal: true
+    cmd: rm -rf '{{.PATCH_AUTH_DIR}}'
+
+  _configure-auth:
+    internal: true
+    cmds:
+      - mkdir -p '{{.PATCH_AUTH_DIR}}'
+      - >-
+        printf '%s\n'
+        '#!/usr/bin/env bash'
+        'case "$1" in'
+        "  *Username*) printf '%s\\n' 'x-access-token' ;;"
+        "  *Password*) printf '%s\\n' \"\${PATCHES_TOKEN}\" ;;"
+        '  *) exit 1 ;;'
+        'esac'
+        > '{{.PATCH_AUTH_DIR}}/git-askpass'
+      - chmod 700 '{{.PATCH_AUTH_DIR}}/git-askpass'
+
+  _fetch-patches:
+    internal: true
+    env:
+      GIT_ASKPASS: '{{.PATCH_AUTH_DIR}}/git-askpass'
+      GIT_TERMINAL_PROMPT: '0'
+      PATCHES_FETCH_URL: '{{.PATCHES_REMOTE_URL}}'
+      DECLARED_PATCH_BRANCHES: '{{.PATCH_BRANCHES}}'
+    cmds:
+      - |
+        refspecs=()
+        while IFS= read -r branch; do
+          refspecs+=("+refs/heads/${branch}:refs/remotes/patches/${branch}")
+        done <<< "${DECLARED_PATCH_BRANCHES}"
+        git fetch --no-tags "${PATCHES_FETCH_URL}" "${refspecs[@]}"
+
+  _validate-patches:
+    internal: true
+    env:
+      DECLARED_PATCH_BRANCHES: '{{.PATCH_BRANCHES}}'
+    cmds:
+      - |
+        base=$(git rev-parse HEAD)
+        patch_commits=()
+        while IFS= read -r branch; do
+          patch_commits+=("$(git rev-parse "refs/remotes/patches/${branch}^{commit}")")
+        done <<< "${DECLARED_PATCH_BRANCHES}"
+
+        while IFS= read -r branch; do
+          ref="refs/remotes/patches/${branch}"
+          parents=$(git show -s --format='%P' "${ref}")
+          if [ "$(wc -w <<< "${parents}")" -ne 1 ]; then
+            echo "commercial patch branch must point to one non-merge commit: ${branch}" >&2
+            exit 1
+          fi
+
+          parent=${parents}
+          valid_parent=false
+          if git merge-base --is-ancestor "${parent}" "${base}"; then
+            valid_parent=true
+          else
+            for patch_commit in "${patch_commits[@]}"; do
+              if [ "${parent}" = "${patch_commit}" ]; then
+                valid_parent=true
+                break
+              fi
+            done
+          fi
+
+          if [ "${valid_parent}" != true ]; then
+            echo "commercial patch branch is not based on the target or another declared patch: ${branch}" >&2
+            exit 1
+          fi
+        done <<< "${DECLARED_PATCH_BRANCHES}"
+
+  _import-patches:
+    internal: true
+    cmds:
+      - task: _init-jj
+      - jj git import >/dev/null
+
+  _init-jj:
+    internal: true
+    status:
+      - test -d .jj
+    cmd: jj git init --colocate >/dev/null
+
+  _duplicate-patches:
+    internal: true
+    env:
+      DECLARED_PATCH_BRANCHES: '{{.PATCH_BRANCHES}}'
+    status:
+      - |
+        patch_revset=$(printf '%s\n' "${DECLARED_PATCH_BRANCHES}" | while IFS= read -r branch; do
+          git rev-parse "refs/remotes/patches/${branch}^{commit}"
+        done | paste -sd '|' -)
+        patchset_id=$(printf '%s' "${patch_revset}" | git hash-object --stdin)
+        test "$(jj log -r @ --no-graph -T 'description.first_line()')" = "release patches ${patchset_id}"
+    cmds:
+      - |
+        patch_revset=$(printf '%s\n' "${DECLARED_PATCH_BRANCHES}" | while IFS= read -r branch; do
+          git rev-parse "refs/remotes/patches/${branch}^{commit}"
+        done | paste -sd '|' -)
+        patchset_id=$(printf '%s' "${patch_revset}" | git hash-object --stdin)
+        base=$(jj log -r @ --no-graph -T commit_id)
+        jj duplicate "(${patch_revset})" --onto @
+        jj new "heads(${base}::) ~ ${base}" -m "release patches ${patchset_id}"
+
+  _verify-patches:
+    internal: true
+    env:
+      DECLARED_PATCH_BRANCHES: '{{.PATCH_BRANCHES}}'
+    preconditions:
+      - sh: test -z "$(jj log -r '::@ & conflicts()' --no-graph -T commit_id)"
+        msg: "commercial patches did not apply cleanly; run 'jj resolve --list'"
+    cmds:
+      - echo "Applied commercial patches from {{.PATCHES_SERIES}}:"
+      - |
+        while IFS= read -r branch; do
+          echo "  ${branch}"
+        done <<< "${DECLARED_PATCH_BRANCHES}"
+
+  _clean-checkout:
+    internal: true
+    cmd: rm -rf '{{.RELEASE_READY_DIR}}'
+
+  _clone-checkout:
+    internal: true
+    cmds:
+      - mkdir -p '{{.RELEASE_READY_DIR}}'
+      - git clone --local '{{.GIT_REPO_DIR}}' '{{.CHECKOUT_DIR}}'
+      - git -C '{{.CHECKOUT_DIR}}' checkout -B release-ready-check '{{.CHECKOUT_REF}}'

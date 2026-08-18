@@ -38,17 +38,18 @@ jobs:
       CGO_ENABLED: "1"
       RACE_FLAGS: -race
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: ./.github/actions/setup-go-cached
         with:
           go-version-file: src/go.mod
           go-sum-path: src/go.sum
 
-      - uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
+      - uses: ./.github/actions/setup-task
         with:
-          version: 3.x
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          version: 3.49.1
 
       - name: Ensure C toolchain for race detector
         if: env.RACE_FLAGS != ''
@@ -84,7 +85,9 @@ jobs:
       CGO_ENABLED: "1"
       RACE_FLAGS: -race
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Start test services
         run: |
@@ -146,10 +149,9 @@ jobs:
           go-version-file: src/go.mod
           go-sum-path: src/go.sum
 
-      - uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
+      - uses: ./.github/actions/setup-task
         with:
-          version: 3.x
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          version: 3.49.1
 
       - name: Ensure C toolchain for race detector
         if: env.RACE_FLAGS != ''

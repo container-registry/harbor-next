@@ -1,10 +1,10 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 
-const [releaseBodyPath, generatedNotesPath, outputPath] = process.argv.slice(2);
+const [releaseBodyPath, generatedNotesPath, outputPath, contributorsPath] = process.argv.slice(2);
 
 if (!releaseBodyPath || !generatedNotesPath || !outputPath) {
-  throw new Error('usage: format-release-notes.mjs <release-body> <generated-notes> <output>');
+  throw new Error('usage: format-release-notes.mjs <release-body> <generated-notes> <output> [contributors]');
 }
 
 const releaseBody = readFileSync(releaseBodyPath, 'utf8');
@@ -20,8 +20,8 @@ const sectionNames = new Map([
   ['Bug Fixes', 'Fixes'],
   ['Performance Improvements', 'Updates'],
   ['Code Refactoring', 'Updates'],
-  ['Documentation', 'Updates'],
 ]);
+const droppedSections = new Set(['Documentation']);
 const sectionOrder = ['Commercial Features', 'Features', 'Fixes', 'Updates', 'Upstream', 'Reverts'];
 const sections = new Map(sectionOrder.map(section => [section, []]));
 const trailing = [];
@@ -79,8 +79,9 @@ function normalizeAuthor(value) {
 function parseUpstreamMetadata(message) {
   const pr = normalizeUpstreamPr(message.match(/^Upstream-PR:\s*(.+)$/im)?.[1]);
   const author = normalizeAuthor(message.match(/^Upstream-Author:\s*(.+)$/im)?.[1]);
+  const isUpstream = /^upstream(?:\([^)]*\))?!?:/im.test(message);
 
-  if (!pr && !author) {
+  if (!isUpstream && !pr && !author) {
     return undefined;
   }
 
@@ -181,6 +182,10 @@ function releaseNotesLines(body) {
   return block;
 }
 
+function isReleasePleaseFooter(line) {
+  return line.trim() === '---' || line.startsWith('This PR was generated with [Release Please]');
+}
+
 for (const line of releaseNotesLines(releaseBody)) {
   if (line.startsWith('## ')) {
     continue;
@@ -189,15 +194,22 @@ for (const line of releaseNotesLines(releaseBody)) {
   if (line.startsWith('### ')) {
     sawSection = true;
     currentSection = sectionNames.get(line.slice(4)) ?? line.slice(4);
-    if (!sections.has(currentSection)) {
+    if (!droppedSections.has(currentSection) && !sections.has(currentSection)) {
       sections.set(currentSection, []);
     }
     continue;
   }
 
+  if (droppedSections.has(currentSection)) {
+    continue;
+  }
+
   if (line.startsWith('* ') || line.startsWith('- ')) {
     let entry = formatEntry(line);
-    const targetSection = entry.toLowerCase().includes('[upstream]') || currentSection === 'Upstream' ? 'Upstream' : currentSection;
+    const metadata = metadataForCommit(commitShaFromEntry(entry));
+    const targetSection = metadata || entry.toLowerCase().includes('[upstream]') || currentSection === 'Upstream'
+      ? 'Upstream'
+      : currentSection;
 
     if (targetSection === 'Upstream') {
       entry = formatUpstreamEntry(entry, commitShaFromEntry(entry));
@@ -214,22 +226,40 @@ for (const line of releaseNotesLines(releaseBody)) {
     continue;
   }
 
-  if (sawSection && line.trim()) {
+  if (sawSection && line.trim() && !isReleasePleaseFooter(line)) {
     trailing.push(line);
   }
 }
 
 const output = ['## What\'s Changed'];
 const emittedSections = new Set();
+const upstreamCommitShas = new Set(
+  sections.get('Upstream')
+    .map(commitShaFromEntry)
+    .filter(Boolean),
+);
+const emittedCommitShas = new Set();
 
 for (const section of sectionOrder) {
-  const entries = sections.get(section) ?? [];
+  const entries = (sections.get(section) ?? []).filter(entry => {
+    const sha = commitShaFromEntry(entry);
+    if (section !== 'Upstream' && upstreamCommitShas.has(sha)) {
+      return false;
+    }
+
+    if (!sha || emittedCommitShas.has(sha)) {
+      return !sha;
+    }
+
+    emittedCommitShas.add(sha);
+    return true;
+  });
+  emittedSections.add(section);
   if (entries.length === 0) {
     continue;
   }
 
   output.push('', `### ${section}`, '', ...entries);
-  emittedSections.add(section);
 }
 
 for (const [section, entries] of sections) {
@@ -244,9 +274,15 @@ if (trailing.length > 0) {
   output.push('', ...trailing);
 }
 
-const newContributors = generatedNotes.match(/## New Contributors[\s\S]*?(?=\n\n\*\*Full Changelog\*\*|$)/)?.[0];
-if (newContributors) {
-  output.push('', newContributors.replace('## New Contributors', '### New Contributors').replace(/^\*/gm, '-'));
-}
-
 writeFileSync(outputPath, `${output.join('\n').trim()}\n`);
+
+// New Contributors is emitted after the release metadata separator by the
+// workflow, so it is written to a separate file rather than nested under
+// `## What's Changed`.
+if (contributorsPath) {
+  const newContributors = generatedNotes.match(/## New Contributors[\s\S]*?(?=(?:\r?\n){2}\*\*Full Changelog\*\*|$)/)?.[0];
+  writeFileSync(
+    contributorsPath,
+    newContributors ? `${newContributors.replace(/^## New Contributors$/m, '### New Contributors').replace(/^\* /gm, '- ').trim()}\n` : '',
+  );
+}

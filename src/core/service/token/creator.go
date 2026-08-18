@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package token
+package token //nolint:revive
 
 import (
 	"context"
@@ -84,10 +84,12 @@ func (b basicParser) parse(s string) (*image, error) {
 	return parseImg(s)
 }
 
+//nolint:unused // covered by parser tests; lint excludes test-only usage
 type endpointParser struct {
 	endpoint string
 }
 
+//nolint:unused // covered by parser tests; lint excludes test-only usage
 func (e endpointParser) parse(s string) (*image, error) {
 	repo := strings.SplitN(s, "/", 2)
 	if len(repo) < 2 {

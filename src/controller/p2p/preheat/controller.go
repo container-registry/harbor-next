@@ -497,7 +497,7 @@ func (c *controller) ListPoliciesByProject(ctx context.Context, project int64, q
 // CheckHealth checks the instance health, for test connection
 func (c *controller) CheckHealth(_ context.Context, instance *providerModels.Instance) error {
 	if instance == nil {
-		return errors.New("instance can not be nil")
+		return errors.New("instance cannot be nil")
 	}
 
 	fac, ok := provider.GetProvider(instance.Vendor)

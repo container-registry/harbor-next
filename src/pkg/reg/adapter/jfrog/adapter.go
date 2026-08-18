@@ -295,7 +295,7 @@ func (a *adapter) listArtifacts(repository string, filters []*model.Filter) ([]*
 	return filter.DoFilterArtifacts(artifacts, filters)
 }
 
-// PushBlob can not use naive PushBlob due to MonolithicUpload, Jfrog now just support push by chunk
+// PushBlob cannot use naive PushBlob due to MonolithicUpload, Jfrog now just supports push by chunk
 // related issue: https://www.jfrog.com/jira/browse/RTFACT-19344
 func (a *adapter) PushBlob(repository, digest string, size int64, blob io.Reader) error {
 	location, err := a.preparePushBlob(repository)

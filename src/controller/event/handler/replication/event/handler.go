@@ -73,21 +73,12 @@ func getRelatedPolicies(ctx context.Context, resource *model.Resource) ([]*repct
 	}
 	result := []*repctlmodel.Policy{}
 	for _, policy := range policies {
-		// disabled
-		if !policy.Enabled {
+		if !policy.Enabled || policy.Trigger == nil || policy.Trigger.Type != model.TriggerTypeEventBased {
 			continue
 		}
 		// currently, the events are produced only by local Harbor,
 		// so they should only apply to the policies whose source registry is local Harbor
 		if !(policy.SrcRegistry == nil || policy.SrcRegistry.ID == 0) {
-			continue
-		}
-		// has no trigger
-		if policy.Trigger == nil {
-			continue
-		}
-		// trigger type isn't event based
-		if policy.Trigger.Type != model.TriggerTypeEventBased {
 			continue
 		}
 		// doesn't replicate deletion

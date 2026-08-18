@@ -60,7 +60,7 @@ func (l *Auth) Authenticate(ctx context.Context, m models.AuthModel) (*models.Us
 	}
 	ldapSession, err := ldapCtl.Ctl.Session(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("can not load system ldap config: %v", err)
+		return nil, fmt.Errorf("cannot load system ldap config: %v", err)
 	}
 
 	if err = ldapSession.Open(); err != nil {
@@ -276,7 +276,7 @@ func (l *Auth) SearchGroup(ctx context.Context, groupKey string) (*ugModel.UserG
 	s, err := ldapCtl.Ctl.Session(ctx)
 
 	if err != nil {
-		return nil, fmt.Errorf("can not load system ldap config: %v", err)
+		return nil, fmt.Errorf("cannot load system ldap config: %v", err)
 	}
 
 	if err = s.Open(); err != nil {

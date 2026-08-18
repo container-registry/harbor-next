@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -29,6 +30,19 @@ import (
 type Foobar struct {
 	Foo string
 	Bar int
+}
+
+type countingCodec struct {
+	Codec
+	leaderValue     atomic.Value
+	leaderEncodings atomic.Int32
+}
+
+func (c *countingCodec) Encode(v any) ([]byte, error) {
+	if leader, ok := c.leaderValue.Load().(*string); ok && v == leader {
+		c.leaderEncodings.Add(1)
+	}
+	return c.Codec.Encode(v)
 }
 
 type FetchOrSaveTestSuite struct {
@@ -111,6 +125,7 @@ func (suite *FetchOrSaveTestSuite) TestSaveCalledOnlyOneTime() {
 
 			var str string
 			FetchOrSave(suite.ctx, c, "key", &str, func() (any, error) {
+				time.Sleep(10 * time.Millisecond) // widen the singleflight window
 				return "str", nil
 			})
 		}()
@@ -119,6 +134,237 @@ func (suite *FetchOrSaveTestSuite) TestSaveCalledOnlyOneTime() {
 	wg.Wait()
 
 	c.AssertNumberOfCalls(suite.T(), "Save", 1)
+}
+
+func (suite *FetchOrSaveTestSuite) TestRefetchesAfterSingleflightGap() {
+	c := &mockCache{}
+
+	var builderCalls atomic.Int32
+	var saved atomic.Bool
+	var secondFetchOnce sync.Once
+	firstBuilderStarted := make(chan struct{})
+	secondFetchStarted := make(chan struct{})
+	firstDone := make(chan struct{})
+
+	mock.OnAnything(c, "Fetch").Return(func(ctx context.Context, key string, value any) error {
+		if saved.Load() {
+			*(value.(*string)) = "built"
+			return nil
+		}
+
+		select {
+		case <-firstBuilderStarted:
+			secondFetchOnce.Do(func() { close(secondFetchStarted) })
+			select {
+			case <-firstDone:
+				return ErrNotFound
+			case <-time.After(time.Second):
+				return fmt.Errorf("timed out waiting for first FetchOrSave call")
+			}
+		default:
+		}
+
+		return ErrNotFound
+	})
+	mock.OnAnything(c, "Save").Return(func(ctx context.Context, key string, value any, exp ...time.Duration) error {
+		saved.Store(true)
+		return nil
+	})
+
+	var first string
+	firstErr := make(chan error, 1)
+	go func() {
+		defer close(firstDone)
+		firstErr <- FetchOrSave(suite.ctx, c, "key", &first, func() (any, error) {
+			builderCalls.Add(1)
+			close(firstBuilderStarted)
+			<-secondFetchStarted
+			return "built", nil
+		})
+	}()
+
+	<-firstBuilderStarted
+	var second string
+	err := FetchOrSave(suite.ctx, c, "key", &second, func() (any, error) {
+		builderCalls.Add(1)
+		return "rebuilt", nil
+	})
+
+	suite.NoError(<-firstErr)
+	suite.NoError(err)
+	suite.Equal("built", first)
+	suite.Equal("built", second)
+	suite.Equal(int32(1), builderCalls.Load())
+	c.AssertNumberOfCalls(suite.T(), "Save", 1)
+}
+
+func (suite *FetchOrSaveTestSuite) TestRefetchSnapshotIsNotSharedByWaiters() {
+	c := &mockCache{}
+	oldCodec := codec
+	trackingCodec := &countingCodec{Codec: oldCodec}
+	codec = trackingCodec
+	suite.T().Cleanup(func() { codec = oldCodec })
+
+	const waiters = 8
+	var builderCalls atomic.Int32
+	var saved atomic.Bool
+	var staleMisses atomic.Int32
+	var innerFetchStarted atomic.Bool
+	firstBuilderStarted := make(chan struct{})
+	releaseFirstBuilder := make(chan struct{})
+	firstDone := make(chan struct{})
+	innerFetchReady := make(chan struct{})
+	releaseInnerFetch := make(chan struct{})
+
+	mock.OnAnything(c, "Fetch").Return(func(ctx context.Context, key string, value any) error {
+		if saved.Load() {
+			*(value.(*string)) = "built"
+			if innerFetchStarted.CompareAndSwap(false, true) {
+				trackingCodec.leaderValue.Store(value)
+				close(innerFetchReady)
+				<-releaseInnerFetch
+			}
+			return nil
+		}
+
+		select {
+		case <-firstBuilderStarted:
+			staleMisses.Add(1)
+			<-firstDone
+			return ErrNotFound
+		default:
+			return ErrNotFound
+		}
+	})
+	mock.OnAnything(c, "Save").Return(func(ctx context.Context, key string, value any, exp ...time.Duration) error {
+		saved.Store(true)
+		return nil
+	})
+
+	var first string
+	firstErr := make(chan error, 1)
+	go func() {
+		defer close(firstDone)
+		firstErr <- FetchOrSave(suite.ctx, c, "key", &first, func() (any, error) {
+			builderCalls.Add(1)
+			close(firstBuilderStarted)
+			<-releaseFirstBuilder
+			return "built", nil
+		})
+	}()
+
+	<-firstBuilderStarted
+	errs := make(chan error, waiters)
+	results := make([]string, waiters)
+	for i := range waiters {
+		go func(idx int) {
+			errs <- FetchOrSave(suite.ctx, c, "key", &results[idx], func() (any, error) {
+				builderCalls.Add(1)
+				return "rebuilt", nil
+			})
+		}(i)
+	}
+
+	suite.Eventually(func() bool {
+		return staleMisses.Load() == waiters
+	}, time.Second, time.Millisecond)
+	close(releaseFirstBuilder)
+	suite.NoError(<-firstErr)
+
+	<-innerFetchReady
+	close(releaseInnerFetch)
+	for range waiters {
+		suite.NoError(<-errs)
+	}
+
+	suite.Equal("built", first)
+	for _, result := range results {
+		suite.Equal("built", result)
+	}
+	suite.Equal(int32(1), builderCalls.Load())
+	suite.Equal(int32(1), trackingCodec.leaderEncodings.Load())
+	c.AssertNumberOfCalls(suite.T(), "Save", 1)
+}
+
+// Save must be called even if the HTTP request context is already canceled,
+// because helper.go uses context.WithoutCancel before calling Save.
+func (suite *FetchOrSaveTestSuite) TestSaveCalledEvenWhenContextCanceled() {
+	c := &mockCache{}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // simulate a canceled HTTP request context
+
+	mock.OnAnything(c, "Fetch").Return(ErrNotFound)
+	mock.OnAnything(c, "Save").Return(nil)
+
+	var str string
+	err := FetchOrSave(ctx, c, "key-canceled", &str, func() (any, error) {
+		return "str", nil
+	})
+
+	suite.Nil(err)
+	suite.Equal("str", str)
+	c.AssertNumberOfCalls(suite.T(), "Save", 1)
+}
+
+// The shared singleflight result is copied to each caller through the codec,
+// so a builder result the codec cannot encode must surface as an error.
+func (suite *FetchOrSaveTestSuite) TestBuildResultNotEncodable() {
+	c := &mockCache{}
+
+	mock.OnAnything(c, "Fetch").Return(ErrNotFound)
+	mock.OnAnything(c, "Save").Return(nil)
+
+	var ch chan struct{}
+	err := FetchOrSave(suite.ctx, c, "key-not-encodable", &ch, func() (any, error) {
+		return make(chan struct{}), nil
+	})
+
+	suite.Error(err)
+}
+
+// On a concurrent cold miss, builder runs exactly once (singleflight dedup)
+// and every concurrent caller receives the built value in its own pointer.
+func (suite *FetchOrSaveTestSuite) TestConcurrentCallersShareResult() {
+	c := &mockCache{}
+	var builderCalls atomic.Int32
+	var data sync.Map
+
+	const n = 100
+	mock.OnAnything(c, "Fetch").Return(func(ctx context.Context, key string, value any) error {
+		cached, ok := data.Load(key)
+		if !ok {
+			return ErrNotFound
+		}
+		*(value.(*string)) = cached.(string)
+		return nil
+	})
+	mock.OnAnything(c, "Save").Return(func(ctx context.Context, key string, value any, exp ...time.Duration) error {
+		data.Store(key, value)
+		return nil
+	})
+
+	var wg sync.WaitGroup
+	results := make([]string, n)
+
+	for i := range n {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			var str string
+			FetchOrSave(suite.ctx, c, "key", &str, func() (any, error) {
+				builderCalls.Add(1)
+				time.Sleep(10 * time.Millisecond) // widen the singleflight window
+				return "built", nil
+			})
+			results[idx] = str
+		}(i)
+	}
+	wg.Wait()
+
+	suite.Equal(int32(1), builderCalls.Load(), "builder must run exactly once for concurrent callers")
+	for _, r := range results {
+		suite.Equal("built", r, "every caller must receive the built value")
+	}
 }
 
 func TestFetchOrSaveTestSuite(t *testing.T) {

@@ -1,0 +1,76 @@
+name: Release Ready
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, "release-[0-9]*.[0-9]*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-ready-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-ready:
+    name: Validate Release Patches
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # release-ready clones this checkout by commit to validate patches
+          # without mutating the workflow's source tree.
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup-task
+        with:
+          version: 3.49.1
+
+      - name: Install jj
+        env:
+          JJ_VERSION: "0.44.0"
+        run: |
+          if command -v jj >/dev/null 2>&1; then
+            jj --version
+            exit 0
+          fi
+
+          case "$(uname -m)" in
+            x86_64|amd64) arch="x86_64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+            *)
+              echo "::error::Unsupported architecture: $(uname -m)"
+              exit 1
+              ;;
+          esac
+
+          curl -fsSL "https://github.com/jj-vcs/jj/releases/download/v${JJ_VERSION}/jj-v${JJ_VERSION}-${arch}-unknown-linux-musl.tar.gz" -o /tmp/jj.tar.gz
+          mkdir -p /tmp/jj-extract
+          tar -xzf /tmp/jj.tar.gz -C /tmp/jj-extract
+          sudo install -m 755 /tmp/jj-extract/jj /usr/local/bin/jj
+          rm -rf /tmp/jj.tar.gz /tmp/jj-extract
+
+          jj --version
+
+      # Root Taskfile evaluation reads Go cache paths.
+      - name: Setup Go
+        uses: ./.github/actions/setup-go-cached
+        with:
+          go-version-file: src/go.mod
+          go-sum-path: src/go.sum
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.SYNC_APP_ID }}
+          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+          owner: container-registry
+          repositories: 8gcr
+
+      - name: Verify release patches apply
+        env:
+          PATCHES_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: task release-ready

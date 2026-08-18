@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sync
+package sync //nolint:revive
 
 import (
 	"context"
@@ -196,7 +196,7 @@ func (w *Worker) Run(ctx context.Context) error {
 	// Use the default scheduler.
 	schedules, err := w.coreScheduler.ListSchedules(ctx, &q.Query{})
 	if err != nil {
-		// We can not proceed.
+		// We cannot proceed.
 		// A non-nil error will cause a follow-up retry later.
 		return errors.Wrap(err, "list all the schedules in the database")
 	}

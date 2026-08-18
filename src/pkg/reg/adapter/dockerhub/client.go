@@ -24,6 +24,7 @@ import (
 	"time"
 
 	commonhttp "github.com/goharbor/harbor/src/common/http"
+	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
 )
@@ -47,6 +48,7 @@ func NewClient(registry *model.Registry) (*Client, error) {
 				commonhttp.WithInsecure(registry.Insecure),
 				commonhttp.WithCACert(registry.CACertificate),
 			),
+			Timeout: config.RegistryHTTPClientTimeout(),
 		},
 	}
 
@@ -73,7 +75,7 @@ func NewClient(registry *model.Registry) (*Client, error) {
 // refreshToken authenticates with Docker Hub via POST /v2/auth/token and stores
 // the resulting bearer token. Callers must hold c.mu before calling this method.
 func (c *Client) refreshToken() error {
-	b, err := json.Marshal(c.credential)
+	b, err := json.Marshal(c.credential) // nolint:gosec // G117: Docker Hub authentication requires credentials in the request body
 	if err != nil {
 		return fmt.Errorf("marshal credential error: %v", err)
 	}

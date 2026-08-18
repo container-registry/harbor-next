@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package scanner
+package scanner //nolint:revive
 
 import (
 	"context"
@@ -131,6 +131,7 @@ func (bc *basicController) GetRegistration(ctx context.Context, registrationUUID
 		return nil, errors.Wrap(err, "api controller: get registration")
 	}
 	if r == nil {
+		// nolint:nilnil // registration not found
 		return nil, nil
 	}
 	if err := bc.RetrieveCap(ctx, r); err != nil {
@@ -165,7 +166,7 @@ func (bc *basicController) RegistrationExists(ctx context.Context, registrationU
 // UpdateRegistration ...
 func (bc *basicController) UpdateRegistration(ctx context.Context, registration *scanner.Registration) error {
 	if registration.IsDefault && registration.Disabled {
-		return errors.Errorf("default registration %s can not be marked to deactivated", registration.UUID)
+		return errors.Errorf("default registration %s cannot be marked as deactivated", registration.UUID)
 	}
 
 	if isReservedName(registration.Name) {
@@ -184,6 +185,7 @@ func (bc *basicController) DeleteRegistration(ctx context.Context, registrationU
 
 	if registration == nil {
 		// Not found
+		// nolint:nilnil // registration not found
 		return nil, nil
 	}
 
@@ -276,6 +278,7 @@ func (bc *basicController) GetRegistrationByProject(ctx context.Context, project
 
 	// No scanner configured
 	if registration == nil {
+		// nolint:nilnil // no scanner configured
 		return nil, nil
 	}
 
@@ -366,6 +369,7 @@ func (bc *basicController) getScannerAdapterMetadataWithCache(ctx context.Contex
 	err := cache.FetchOrSave(ctx, bc.Cache(), key, &result, func() (any, error) {
 		meta, err := bc.getScannerAdapterMetadata(registration)
 		if err != nil {
+			// nolint:nilerr // Error is captured in MetadataResult.Error for caching, not returned to caller
 			return &MetadataResult{Error: err.Error()}, nil
 		}
 

@@ -87,7 +87,7 @@ func (nw *NotificationWatcher) Handle(topic string, handler NotificationHandler)
 	}
 
 	if handler == nil {
-		return errors.New("nil handler can not be registered")
+		return errors.New("nil handler cannot be registered")
 	}
 
 	defer nw.Unlock()
@@ -177,7 +177,7 @@ func (nw *NotificationWatcher) UnHandle(topic string, handler string) error {
 // Notify that notification is coming.
 func (nw *NotificationWatcher) Notify(ctx context.Context, notification Notification) error {
 	if strings.TrimSpace(notification.Topic) == "" {
-		return errors.New("empty topic can not be notified")
+		return errors.New("empty topic cannot be notified")
 	}
 
 	defer nw.RUnlock()

@@ -60,6 +60,7 @@ services:
         DEV_UID: ${DEV_UID:-1000}
         DEV_GID: ${DEV_GID:-1000}
     profiles: [core]
+    user: "${DEV_CONTAINER_USER:-harbor}"
     volumes:
       - ..:/app
       - ${HOST_GOMODCACHE:?}:/go/pkg/mod
@@ -88,6 +89,7 @@ services:
       REGISTRY_CREDENTIAL_PASSWORD: ""
       # Core settings
       EXT_ENDPOINT: http://core:8080
+      CSRF_PLAINTEXT_HTTP: ${CSRF_PLAINTEXT_HTTP}
       CORE_URL: http://core:8080
       HARBOR_ADMIN_PASSWORD: Harbor12345
       CACHE_ENABLED: "false"
@@ -122,6 +124,7 @@ services:
   jobservice:
     image: harbor-dev-go
     profiles: [jobservice]
+    user: "${DEV_CONTAINER_USER:-harbor}"
     volumes:
       - ..:/app
       - ${HOST_GOMODCACHE:?}:/go/pkg/mod
@@ -160,6 +163,7 @@ services:
   registryctl:
     image: harbor-dev-go
     profiles: [registryctl]
+    user: "${DEV_CONTAINER_USER:-harbor}"
     volumes:
       - ..:/app
       - ${HOST_GOMODCACHE:?}:/go/pkg/mod
@@ -201,16 +205,15 @@ services:
       SCANNER_STORE_REDIS_NAMESPACE: harbor.scanner.trivy:store
       SCANNER_JOB_QUEUE_REDIS_URL: redis://redis:6379
       SCANNER_JOB_QUEUE_REDIS_NAMESPACE: harbor.scanner.trivy:job-queue
-      SCANNER_TRIVY_CACHE_DIR: /tmp/trivy
-      SCANNER_TRIVY_REPORTS_DIR: /tmp/reports
+      TMPDIR: /var/tmp
+      SCANNER_TRIVY_CACHE_DIR: /var/tmp/trivy
+      SCANNER_TRIVY_REPORTS_DIR: /var/tmp/reports
       SCANNER_TRIVY_VULN_TYPE: os,library
       SCANNER_TRIVY_SEVERITY: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
       SCANNER_TRIVY_INSECURE: "true"
       SCANNER_API_SERVER_ADDR: ":8080"
     ports:
       - "${PORT_TRIVY:-8081}:8080"
-    tmpfs:
-      - /tmp:size=2G,mode=1777
     depends_on:
       - redis
 

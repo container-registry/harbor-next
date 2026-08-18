@@ -22,6 +22,8 @@ intoto = "intoto"
 # Common Go abbreviations referenced in docs
 cfg  = "cfg"
 ctx  = "ctx"
+# Security terminology (CVE Numbering Authority)
+CNA = "CNA"
 
 [files]
 extend-exclude = [
@@ -31,9 +33,6 @@ extend-exclude = [
     # Upstream files with company names, non-English brands
     "ADOPTERS.md",
     "CONTRIBUTORS.md",
-
-    # Upstream test suite (robot framework, testcase filenames have typos)
-    "tests/",
 
     # Claude Code agent/plan files (auto-generated, not shipped)
     ".claude/",

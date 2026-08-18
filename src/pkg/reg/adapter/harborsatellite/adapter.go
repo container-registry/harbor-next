@@ -23,6 +23,7 @@ import (
 	"net/url"
 
 	"github.com/docker/distribution"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/goharbor/harbor/src/common/secret"
 	"github.com/goharbor/harbor/src/lib/config"
@@ -89,7 +90,7 @@ func (a adapter) RoundTrip(request *http.Request) (*http.Response, error) {
 	// adds auth headers
 	_ = secret.AddToRequest(request, config.JobserviceSecret())
 
-	return a.httpClient.Do(request)
+	return a.httpClient.Do(request) // nolint:gosec // G704: the request URL is rewritten above to Harbor's configured internal core URL
 }
 
 func (a adapter) Info() (*model.RegistryInfo, error) {
@@ -244,6 +245,10 @@ func (a adapter) DeleteTag(_, _ string) error {
 
 func (a adapter) ListTags(_ string) (tags []string, err error) {
 	return nil, nil
+}
+
+func (a adapter) ListReferrers(_, _, _ string) (*ocispec.Index, map[string][]string, error) {
+	return nil, nil, ErrNotImplemented
 }
 
 func newAdapter(_ *model.Registry) (regadapter.Adapter, error) {

@@ -25,6 +25,7 @@ import (
 
 	commonhttp "github.com/goharbor/harbor/src/common/http"
 	"github.com/goharbor/harbor/src/lib"
+	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
 	"github.com/goharbor/harbor/src/pkg/registry/auth"
@@ -61,10 +62,13 @@ func newAuthorizer(registry *model.Registry) *authorizer {
 	return &authorizer{
 		registry:        registry,
 		innerAuthorizer: auth.NewAuthorizer(username, password, registry.Insecure),
-		client: &http.Client{Transport: commonhttp.GetHTTPTransport(
-			commonhttp.WithInsecure(registry.Insecure),
-			commonhttp.WithCACert(registry.CACertificate),
-		)},
+		client: &http.Client{
+			Transport: commonhttp.GetHTTPTransport(
+				commonhttp.WithInsecure(registry.Insecure),
+				commonhttp.WithCACert(registry.CACertificate),
+			),
+			Timeout: config.RegistryHTTPClientTimeout(),
+		},
 	}
 }
 
@@ -80,7 +84,9 @@ func (a *authorizer) Modify(req *http.Request) error {
 		return err
 	}
 
-	tokenReq, err := http.NewRequest(http.MethodGet, url.String(), nil)
+	// The token endpoint comes from the administrator-configured registry's
+	// authentication challenge and may legitimately use a different host.
+	tokenReq, err := http.NewRequest(http.MethodGet, url.String(), nil) // nolint:gosec // G704: registry authentication requires calling its advertised token endpoint
 	if err != nil {
 		return nil
 	}
@@ -89,7 +95,7 @@ func (a *authorizer) Modify(req *http.Request) error {
 		tokenReq.SetBasicAuth(a.registry.Credential.AccessKey, a.registry.Credential.AccessSecret)
 	}
 
-	resp, err := a.client.Do(tokenReq)
+	resp, err := a.client.Do(tokenReq) // nolint:gosec // G704: tokenReq targets the registry's advertised authentication endpoint
 	if err != nil {
 		return err
 	}
@@ -119,7 +125,7 @@ func (a *authorizer) buildTokenAPI(u *url.URL) (*url.URL, error) {
 		return nil, err
 	}
 
-	resp, err := a.client.Get(v2URL.String())
+	resp, err := a.client.Get(v2URL.String()) // nolint:gosec // G704: v2URL is derived from the administrator-configured registry URL
 	if err != nil {
 		return nil, err
 	}

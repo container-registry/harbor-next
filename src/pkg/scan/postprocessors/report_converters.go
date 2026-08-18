@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/goharbor/harbor/src/jobservice/job"
 	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
@@ -58,6 +57,12 @@ func NewNativeToRelationalSchemaConverter() NativeScanReportConverter {
 func (c *nativeToRelationalSchemaConverter) ToRelationalSchema(ctx context.Context, reportUUID string, registrationUUID string, digest string, reportData string) (string, string, error) {
 	if len(reportData) == 0 {
 		log.G(ctx).Infof("There is no vulnerability report to toSchema for report UUID : %s", reportUUID)
+		// The scan_report row is now reused across re-scans (#23310), so an empty result must still
+		// clear any vulnerability associations left by a previous scan; reconcile to the empty set.
+		// (The structured "clean image" case is already handled by toSchema -> SyncForReport below.)
+		if err := c.dao.SyncForReport(ctx, reportUUID); err != nil {
+			return "", "", errors.Wrap(err, "Error when clearing vulnerability records for empty report")
+		}
 		return reportUUID, "", nil
 	}
 	// parse the raw report with the V1 schema of the report to the normalized structures
@@ -180,7 +185,11 @@ func (c *nativeToRelationalSchemaConverter) toSchema(ctx context.Context, report
 		recordIDs = append(recordIDs, recordID)
 	}
 
-	if err := c.dao.InsertForReport(ctx, reportUUID, recordIDs...); err != nil {
+	// Reconcile the report's vulnerability associations with a set-diff instead of a bulk insert so a
+	// re-scan of an unchanged artifact (the common ScanAll case) writes nothing. Combined with the
+	// stable report UUID kept by MakePlaceHolder, this stops report_vulnerability_record from growing
+	// on every scan. See #23310.
+	if err := c.dao.SyncForReport(ctx, reportUUID, recordIDs...); err != nil {
 		fields := log.Fields{
 			"error":  err,
 			"report": reportUUID,
@@ -224,17 +233,6 @@ func (c *nativeToRelationalSchemaConverter) fromSchema(_ context.Context, _ stri
 		return "", err
 	}
 	return string(data), nil
-}
-
-// GetNativeV1ReportFromResolvedData returns the native V1 scan report from the resolved
-// interface data.
-func (c *nativeToRelationalSchemaConverter) getNativeV1ReportFromResolvedData(ctx job.Context, rp any) (*vuln.Report, error) {
-	report, ok := rp.(*vuln.Report)
-	if !ok {
-		return nil, errors.New("Data cannot be converted to v1 report format")
-	}
-	ctx.GetLogger().Infof("Converted raw data to report. Count of Vulnerabilities in report : %d", len(report.Vulnerabilities))
-	return report, nil
 }
 
 func toVulnerabilityRecord(ctx context.Context, item *vuln.VulnerabilityItem, registrationUUID string) *scan.VulnerabilityRecord {
@@ -373,12 +371,16 @@ func parseScoreFromVendorAttribute(ctx context.Context, vendorAttribute string) 
 
 	// set the nvd as the first priority, if it's unavailable, return the first V3Score available.
 	if val, ok := data.CVSS["nvd"]["V3Score"]; ok {
-		return val.(float64)
+		if f, ok := val.(float64); ok {
+			return f
+		}
 	}
 
 	for vendor := range data.CVSS {
 		if val, ok := data.CVSS[vendor]["V3Score"]; ok {
-			return val.(float64)
+			if f, ok := val.(float64); ok {
+				return f
+			}
 		}
 	}
 	return 0

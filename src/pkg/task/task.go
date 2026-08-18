@@ -293,7 +293,7 @@ func (m *manager) RetrieveStatusFromTask(ctx context.Context, reportID string) s
 	}
 	tasks, err := m.dao.ListScanTasksByReportUUID(ctx, reportID)
 	if err != nil {
-		log.Warningf("can not find the task with report UUID %v, error %v", reportID, err)
+		log.Warningf("cannot find the task with report UUID %v, error %v", reportID, err)
 		return ""
 	}
 	if len(tasks) > 0 {

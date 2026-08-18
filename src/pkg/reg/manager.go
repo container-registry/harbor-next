@@ -34,7 +34,7 @@ import (
 	_ "github.com/goharbor/harbor/src/pkg/reg/adapter/dockerhub"
 	// register the DTR adapter
 	_ "github.com/goharbor/harbor/src/pkg/reg/adapter/dtr"
-	// register the Github Container Registry adapter
+	// register the GitHub Container Registry adapter
 	_ "github.com/goharbor/harbor/src/pkg/reg/adapter/githubcr"
 	// register the GitLab adapter
 	_ "github.com/goharbor/harbor/src/pkg/reg/adapter/gitlab"
@@ -223,7 +223,7 @@ func toDaoModel(registry *model.Registry) (*dao.Registry, error) {
 		ID:            registry.ID,
 		URL:           registry.URL,
 		Name:          registry.Name,
-		Type:          string(registry.Type),
+		Type:          registry.Type,
 		Insecure:      registry.Insecure,
 		CACertificate: registry.CACertificate,
 		Description:   registry.Description,
@@ -242,7 +242,7 @@ func toDaoModel(registry *model.Registry) (*dao.Registry, error) {
 			return nil, err
 		}
 
-		m.CredentialType = string(credentialType)
+		m.CredentialType = credentialType
 		m.AccessKey = registry.Credential.AccessKey
 		m.AccessSecret = encrypted
 	}

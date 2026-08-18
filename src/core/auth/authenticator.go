@@ -150,6 +150,7 @@ func Login(ctx context.Context, m models.AuthModel) (*models.User, error) {
 	}
 	if lock.IsLocked(m.Principal) {
 		log.Debugf("%s is locked due to login failure, login failed", m.Principal)
+		// nolint:nilnil // user is locked
 		return nil, nil
 	}
 	user, err := authenticator.Authenticate(ctx, m)
@@ -172,7 +173,7 @@ func getHelper(ctx context.Context) (AuthenticateHelper, error) {
 	}
 	AuthenticateHelper, ok := registry[authMode]
 	if !ok {
-		return nil, fmt.Errorf("can not get authenticator, authmode: %s", authMode)
+		return nil, fmt.Errorf("cannot get authenticator, authmode: %s", authMode)
 	}
 	return AuthenticateHelper, nil
 }

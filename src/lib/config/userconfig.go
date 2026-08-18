@@ -31,7 +31,7 @@ import (
 func GetSystemCfg(ctx context.Context) (map[string]any, error) {
 	sysCfg := DefaultMgr().GetAll(ctx)
 	if len(sysCfg) == 0 {
-		return nil, errors.New("can not load system config, the database might be down")
+		return nil, errors.New("cannot load system config, the database might be down")
 	}
 	return sysCfg, nil
 }

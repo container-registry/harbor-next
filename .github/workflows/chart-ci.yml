@@ -7,22 +7,19 @@ on:
       - "taskfile/helm.yml"
       - "versions.env"
       - ".github/workflows/chart-ci.yml"
+      - ".github/actions/setup-task/**"
 
 permissions:
   contents: read
-
-env:
-  # arduino/setup-task v2.0.0 (latest) still declares node20, which is
-  # deprecated and becomes node24-by-default on 2026-06-16. Opt in early
-  # so the forced switch can't surprise us.
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   chart-quality:
     name: Chart Quality Gate
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Load versions
         # Helm homes: self-hosted runner images may ship a root-owned
@@ -36,10 +33,7 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Install Task
-        uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
-        with:
-          version: 3.x
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+        uses: ./.github/actions/setup-task
 
       - name: Install Helm
         uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0

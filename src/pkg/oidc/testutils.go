@@ -43,6 +43,8 @@ func (fv *fakeVerifier) VerifySecret(_ context.Context, name string, secret stri
 func SetHardcodeVerifierForTest(s string) {
 	m = &fakeVerifier{s}
 }
+
+//nolint:unused // used by package tests; lint excludes test-only usage
 func mockPopulateGroups(groupNames []string) ([]int, error) {
 	res := make([]int, 0)
 	for _, g := range groupNames {

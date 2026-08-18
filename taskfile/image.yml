@@ -2,10 +2,13 @@
 #
 # CI-aware: local builds native arch only, CI builds all platforms
 # PUSH=false forces native arch (--load requires single platform)
+# IMAGE_TAG defaults to VERSION; override to publish under a different tag
+# (e.g. a feature-branch build) without touching the VERSION file.
 #
 # Usage:
 #   task image:core                         # CI: multi-arch push, local: native push
 #   task image:core PUSH=false              # load locally (native arch)
+#   task image:core IMAGE_TAG=my-feature    # push under a custom tag
 #   task image:all-images                   # all images
 
 version: '3'
@@ -19,6 +22,7 @@ includes:
 vars:
   PUSH: '{{.PUSH | default "true"}}'
   PLATFORMS: '{{.PLATFORMS | default (ternary (printf "linux/%s" ARCH) .CI_PLATFORMS (eq .PUSH "false"))}}'
+  IMAGE_TAG: '{{.IMAGE_TAG | default (.TAG | default .VERSION)}}'
 
 tasks:
   all-images:
@@ -64,13 +68,16 @@ tasks:
     vars:
       OUTPUT: '{{ternary "--push" "--load" (eq .PUSH "true")}}'
       TAG_PREFIX: '{{ternary (printf "%s/%s/" .REGISTRY_ADDRESS .REGISTRY_PROJECT) "" (eq .PUSH "true")}}'
-      FULL_TAG: '{{.TAG_PREFIX}}{{.IMAGE_NAME}}:{{.VERSION}}'
+      FULL_TAG: '{{.TAG_PREFIX}}{{.IMAGE_NAME}}:{{.IMAGE_TAG}}'
     preconditions:
       - sh: '{{if and (ne .PUSH "true") (contains "," .PLATFORMS)}}exit 1{{end}}'
         msg: "PUSH=false requires single platform (--load limitation)"
       - sh: '[ "{{.CONTAINER_ENGINE}}" != "unknown" ]'
         msg: "No container engine found. Install Docker or Podman."
     cmds:
+      - task: _build-binaries
+        vars:
+          SERVICE: lprobe
       - task: '{{if eq .CONTAINER_ENGINE "docker"}}_build:docker{{else}}_build:podman{{end}}'
         vars:
           IMAGE_NAME: '{{.IMAGE_NAME}}'
@@ -88,7 +95,6 @@ tasks:
       docker buildx build
       --builder {{.IMAGE_BUILDER}}
       --platform {{.PLATFORMS}}
-      --build-arg LPROBE_VERSION={{.LPROBE_VERSION}}
       --build-arg ALPINE_VERSION={{.ALPINE_VERSION}}
       {{.BUILD_ARGS}}
       -t {{.FULL_TAG}}
@@ -102,15 +108,61 @@ tasks:
       vars: [IMAGE_NAME, DOCKERFILE, FULL_TAG]
     cmds:
       - >-
+        {{if contains "," .PLATFORMS}}
         podman build
         --platform {{.PLATFORMS}}
-        --build-arg LPROBE_VERSION={{.LPROBE_VERSION}}
+        --manifest {{.FULL_TAG}}
+        --build-arg ALPINE_VERSION={{.ALPINE_VERSION}}
+        {{.BUILD_ARGS}}
+        -f dockerfile/{{.DOCKERFILE}}
+        .
+        {{else}}
+        podman build
+        --platform {{.PLATFORMS}}
         --build-arg ALPINE_VERSION={{.ALPINE_VERSION}}
         {{.BUILD_ARGS}}
         -t {{.FULL_TAG}}
         -f dockerfile/{{.DOCKERFILE}}
         .
-      - '{{if eq .PUSH "true"}}podman push {{.FULL_TAG}}{{end}}'
+        {{end}}
+      - >-
+        {{if and (eq .PUSH "true") (contains "," .PLATFORMS)}}
+        podman manifest push --all {{.FULL_TAG}} docker://{{.FULL_TAG}}
+        {{else if eq .PUSH "true"}}
+        podman push {{.FULL_TAG}}
+        {{end}}
+
+  verify-release-images:
+    desc: "Verify every pushed release image contains amd64 and arm64 manifests"
+    preconditions:
+      - sh: command -v skopeo >/dev/null 2>&1
+        msg: "skopeo is required to verify pushed image manifests"
+      - sh: command -v jq >/dev/null 2>&1
+        msg: "jq is required to verify pushed image manifests"
+    cmds:
+      - |
+        images="harbor-core harbor-jobservice harbor-registryctl harbor-exporter harbor-portal harbor-registry trivy-adapter"
+        if [ -f dockerfile/grype-scanner.dockerfile ]; then
+          images="${images} harbor-grype-adapter"
+        fi
+        if [ -f dockerfile/snyk-scanner.dockerfile ]; then
+          images="${images} harbor-snyk-adapter"
+        fi
+
+        for image in ${images}; do
+          reference="{{.REGISTRY_ADDRESS}}/{{.REGISTRY_PROJECT}}/${image}:{{.IMAGE_TAG}}"
+          platforms=$(skopeo inspect --raw "docker://${reference}" \
+            | jq -r '.manifests[]?.platform | "\(.os)/\(.architecture)"')
+          printf '%s\n' "${platforms}" | grep -Fqx 'linux/amd64' || {
+            echo "Missing linux/amd64 manifest: ${reference}" >&2
+            exit 1
+          }
+          printf '%s\n' "${platforms}" | grep -Fqx 'linux/arm64' || {
+            echo "Missing linux/arm64 manifest: ${reference}" >&2
+            exit 1
+          }
+          echo "Verified ${reference}"
+        done
 
   _build-binaries:
     internal: true
@@ -189,11 +241,16 @@ tasks:
       - task: _build-binaries
         vars:
           SERVICE: trivy-adapter
+      - task: _build-binaries
+        vars:
+          SERVICE: trivy
+      # The trivy commit stamp is identical across platforms (same pinned
+      # tag), so the first platform's .trivy-commit works as the source.
       - task: _build
         vars:
           IMAGE_NAME: trivy-adapter
           DOCKERFILE: trivy-adapter.dockerfile
-          BUILD_ARGS: '--build-arg HARBOR_SCANNER_TRIVY_VERSION={{.HARBOR_SCANNER_TRIVY_VERSION}} --build-arg TRIVY_VERSION={{.TRIVY_VERSION}} --build-arg TRIVY_BASE_IMAGE_VERSION={{.TRIVY_BASE_IMAGE_VERSION}}'
+          BUILD_ARGS: '--build-arg HARBOR_SCANNER_TRIVY_VERSION={{.HARBOR_SCANNER_TRIVY_VERSION}} --build-arg TRIVY_BASE_IMAGE_VERSION={{.TRIVY_BASE_IMAGE_VERSION}} --build-arg TRIVY_VERSION={{.TRIVY_VERSION}} --build-arg TRIVY_COMMIT="$(cat "bin/$(echo "{{.PLATFORMS}}" | cut -d, -f1 | tr "/" "-")/.trivy-commit")"'
 
   # --- Utilities ---
 
@@ -212,4 +269,4 @@ tasks:
 
   inspect:*:
     desc: "Inspect multi-arch manifest in remote registry"
-    cmd: docker buildx imagetools inspect {{.REGISTRY_ADDRESS}}/{{.REGISTRY_PROJECT}}/{{index .MATCH 0}}:{{.VERSION}}
+    cmd: docker buildx imagetools inspect {{.REGISTRY_ADDRESS}}/{{.REGISTRY_PROJECT}}/{{index .MATCH 0}}:{{.TAG}}

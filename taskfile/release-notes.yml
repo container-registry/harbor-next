@@ -1,0 +1,22 @@
+version: '3'
+
+tasks:
+  update:
+    desc: "Recreate release notes (TAG_NAME=vX.Y.Z)"
+    preconditions:
+      - sh: test -n "${TAG_NAME:-}"
+        msg: "TAG_NAME is required (for example, v2.15.4)"
+      - sh: test -n "${GH_TOKEN:-}"
+        msg: "GH_TOKEN is required"
+    cmds:
+      - .github/scripts/update-release-notes.sh
+
+  preview:
+    desc: "Render release notes locally without updating the GitHub Release (TAG_NAME=vX.Y.Z)"
+    preconditions:
+      - sh: test -n "${TAG_NAME:-}"
+        msg: "TAG_NAME is required (for example, v2.15.4)"
+      - sh: test -n "${GH_TOKEN:-}"
+        msg: "GH_TOKEN is required"
+    cmds:
+      - RELEASE_NOTES_DRY_RUN=true RELEASE_NOTES_OUTPUT="${RELEASE_NOTES_OUTPUT:-release-notes-${TAG_NAME}.md}" .github/scripts/update-release-notes.sh

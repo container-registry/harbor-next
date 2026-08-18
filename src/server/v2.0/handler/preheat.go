@@ -486,7 +486,7 @@ func (api *preheatAPI) PingInstances(ctx context.Context, params operation.PingI
 // convertPolicyToPayload converts model policy to swagger model
 func convertPolicyToPayload(policy *policy.Schema) (*models.PreheatPolicy, error) {
 	if policy == nil {
-		return nil, errors.New("policy can not be nil")
+		return nil, errors.New("policy cannot be nil")
 	}
 
 	return &models.PreheatPolicy{
@@ -507,7 +507,7 @@ func convertPolicyToPayload(policy *policy.Schema) (*models.PreheatPolicy, error
 // convertParamPolicyToModelPolicy converts params policy to pkg model policy
 func convertParamPolicyToModelPolicy(model *models.PreheatPolicy) (*policy.Schema, error) {
 	if model == nil {
-		return nil, errors.New("policy can not be nil")
+		return nil, errors.New("policy cannot be nil")
 	}
 
 	valid, err := regexp.MatchString(nameRegex, model.Name)
@@ -536,7 +536,7 @@ func convertParamPolicyToModelPolicy(model *models.PreheatPolicy) (*policy.Schem
 
 func convertInstanceToPayload(model *instanceModel.Instance) (*models.Instance, error) {
 	if model == nil {
-		return nil, errors.New("instance can not be nil")
+		return nil, errors.New("instance cannot be nil")
 	}
 
 	return &models.Instance{
@@ -580,7 +580,7 @@ func authInfoEmpty(m map[string]string) bool {
 
 func convertParamInstanceToModelInstance(model *models.Instance) (*instanceModel.Instance, error) {
 	if model == nil {
-		return nil, errors.New("instance can not be nil")
+		return nil, errors.New("instance cannot be nil")
 	}
 
 	valid, err := regexp.MatchString(nameRegex, model.Name)
@@ -617,7 +617,7 @@ func convertParamInstanceToModelInstance(model *models.Instance) (*instanceModel
 // convertExecutionToPayload converts model execution to swagger model.
 func convertExecutionToPayload(model *task.Execution) (*models.Execution, error) {
 	if model == nil {
-		return nil, errors.New("execution can not be nil")
+		return nil, errors.New("execution cannot be nil")
 	}
 
 	execution := &models.Execution{
@@ -743,7 +743,7 @@ func (api *preheatAPI) StopExecution(ctx context.Context, params operation.StopE
 // convertTaskToPayload converts task to swagger model.
 func convertTaskToPayload(model *task.Task) (*models.Task, error) {
 	if model == nil {
-		return nil, errors.New("task model can not be nil")
+		return nil, errors.New("task model cannot be nil")
 	}
 
 	return &models.Task{
