@@ -21,9 +21,11 @@ if [[ "${last_key}" != "annotations" ]]; then
   exit 1
 fi
 
-app_version="$(awk -F'[:[:space:]]+' '$1 == "appVersion" { gsub(/"/, "", $2); print $2; exit }' "${chart_yaml}")"
-if [[ -z "${app_version}" ]]; then
-  echo "Could not read appVersion from ${chart_yaml}" >&2
+# Both quote styles are valid YAML here, and a leftover quote would sail
+# through into every image tag, so validate the result rather than trust it.
+app_version="$(awk -F'[:[:space:]]+' '$1 == "appVersion" { gsub(/["'"'"']/, "", $2); print $2; exit }' "${chart_yaml}")"
+if [[ ! "${app_version}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+  echo "Unusable appVersion read from ${chart_yaml}: '${app_version}'" >&2
   exit 1
 fi
 

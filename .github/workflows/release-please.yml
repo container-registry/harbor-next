@@ -295,17 +295,25 @@ jobs:
       - name: Install Artifact Hub CLI
         # Binary, not `docker run -v`: the self-hosted runners talk to a
         # remote DinD daemon, so a bind mount resolves on the DinD host and
-        # silently sees nothing from the runner workspace.
+        # silently sees nothing from the runner workspace. Checksum-verified
+        # before it runs, because this job holds registry credentials and
+        # id-token: write.
         run: |
+          set -euo pipefail
           case "$(uname -m)" in
             x86_64|amd64) goarch="amd64" ;;
             aarch64|arm64) goarch="arm64" ;;
             *) echo "unsupported arch: $(uname -m)" >&2; exit 1 ;;
           esac
-          mkdir -p "${RUNNER_TEMP}/bin"
-          curl -fsSL "https://github.com/artifacthub/hub/releases/download/v${AH_VERSION}/ah_${AH_VERSION}_linux_${goarch}.tar.gz" \
-            | tar -xz -C "${RUNNER_TEMP}/bin" ah
-          echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
+          archive="ah_${AH_VERSION}_linux_${goarch}.tar.gz"
+          tool_dir="${RUNNER_TEMP}/ah"
+          base="https://github.com/artifacthub/hub/releases/download/v${AH_VERSION}"
+          mkdir -p "${tool_dir}/bin"
+          curl -fsSL "${base}/${archive}" -o "${tool_dir}/${archive}"
+          curl -fsSL "${base}/ah_${AH_VERSION}_checksums.txt" -o "${tool_dir}/ah_checksums.txt"
+          (cd "${tool_dir}" && grep "  ${archive}$" ah_checksums.txt | sha256sum -c -)
+          tar -xzf "${tool_dir}/${archive}" -C "${tool_dir}/bin" ah
+          echo "${tool_dir}/bin" >> "$GITHUB_PATH"
 
       - name: Validate Artifact Hub metadata
         run: ah lint --kind helm --path deploy/chart
