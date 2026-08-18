@@ -7,7 +7,7 @@ ARG ALPINE_VERSION=MISSING-BUILD-ARG
 
 FROM alpine:${ALPINE_VERSION} AS certs
 
-FROM aquasec/trivy:${TRIVY_BASE_IMAGE_VERSION}
+FROM docker.io/aquasec/trivy:${TRIVY_BASE_IMAGE_VERSION}
 COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 ARG TARGETARCH
 COPY bin/linux-${TARGETARCH}/lprobe /lprobe
