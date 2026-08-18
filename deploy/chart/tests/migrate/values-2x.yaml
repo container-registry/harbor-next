@@ -1,0 +1,82 @@
+# Test fixture: a typical goharbor/harbor-helm (2.x) production values file.
+# Mirrors the worked example in docs/MIGRATION.md, extended to exercise the
+# advisory paths of tools/harbor-migrate.ys.
+expose:
+  type: ingress
+  tls:
+    enabled: true
+    certSource: secret
+    secret:
+      secretName: harbor-tls
+  ingress:
+    hosts:
+      core: harbor.example.com
+    className: nginx
+
+externalURL: https://harbor.example.com
+harborAdminPassword: "changeme"
+secretKey: "0123456789abcdef"
+
+updateStrategy:
+  type: Recreate
+
+persistence:
+  enabled: true
+  imageChartStorage:
+    type: s3
+    disableredirect: true
+    s3:
+      region: eu-central-1
+      bucket: my-harbor
+      existingSecret: harbor-s3-creds
+
+nginx:
+  replicas: 2
+
+core:
+  secret: "0123456789abcdef"
+  startupProbe:
+    enabled: true
+    initialDelaySeconds: 30
+
+jobservice:
+  maxJobWorkers: 10
+  jobLoggers:
+    - file
+  loggerSweeperDuration: 30
+
+registry:
+  relativeurls: true
+  registry:
+    extraEnvVars:
+      - name: OTEL_TRACES_EXPORTER
+        value: none
+  credentials:
+    username: harbor_registry_user
+    password: harbor_registry_password
+
+database:
+  type: external
+  external:
+    host: pg.example.com
+    coreDatabase: registry
+    username: harbor
+    existingSecret: harbor-db        # key: password
+
+redis:
+  type: external
+  external:
+    addr: redis.example.com:6379
+    registryDatabaseIndex: "3"
+    existingSecret: harbor-redis     # key: REDIS_PASSWORD
+
+trivy:
+  enabled: true
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    relabelings:
+      - sourceLabels: [__meta_kubernetes_pod_node_name]
+        targetLabel: nodename

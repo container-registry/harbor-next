@@ -44,6 +44,16 @@ dry_run="${RELEASE_NOTES_DRY_RUN:-false}"
 release_notes_output="${RELEASE_NOTES_OUTPUT:-}"
 images=(core jobservice registryctl exporter portal registry trivy-adapter)
 
+# The Helm chart releases on its own release-please line, so its version is
+# unrelated to TAG_NAME. Read whatever chart version is committed at the app
+# release ref: that is the newest chart published at the time of this release.
+if [[ -n "${preview_pr_number}" ]]; then
+  chart_yaml_source="$(cat deploy/chart/Chart.yaml 2>/dev/null || true)"
+else
+  chart_yaml_source="$(git show "${TAG_NAME}:deploy/chart/Chart.yaml" 2>/dev/null || true)"
+fi
+chart_version="$(printf '%s\n' "${chart_yaml_source}" | awk -F'[:[:space:]]+' '$1 == "version" { gsub(/"/, "", $2); print $2; exit }')"
+
 tmp_dir=$(mktemp -d)
 trap 'rm -rf "${tmp_dir}"' EXIT
 
@@ -145,6 +155,18 @@ fi
   echo
   echo "---"
   echo
+  if [[ -n "${chart_version}" ]]; then
+    echo "## Helm Chart"
+    echo
+    echo '```sh'
+    echo "helm install harbor oci://${registry}/charts/harbor-next \\"
+    echo "  --version ${chart_version} -n harbor --create-namespace -f my-values.yaml"
+    echo '```'
+    echo
+    echo "---"
+    echo
+  fi
+
   echo "## Container Images"
   echo
   echo "Multi-arch images (\`linux/amd64\`, \`linux/arm64\`) signed with [cosign](https://github.com/sigstore/cosign)."

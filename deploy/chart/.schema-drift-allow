@@ -1,0 +1,3 @@
+# Baseline for tools/schema-drift.ys — acknowledged, intentional drift.
+# One finding ID per line (printed in the report as [kind] path).
+# Every entry MUST carry a trailing comment explaining why it is allowed.

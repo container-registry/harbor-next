@@ -7,7 +7,7 @@
   "versioning": "always-bump-minor",
   "always-update": true,
   "include-v-in-tag": true,
-  "exclude-paths": [".github", "docs", "tests", "taskfile"],
+  "exclude-paths": [".github", "docs", "tests", "taskfile", "deploy/chart"],
   "changelog-sections": [
     {"type": "feat",     "section": "Features"},
     {"type": "fix",      "section": "Bug Fixes"},

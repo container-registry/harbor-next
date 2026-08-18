@@ -1,0 +1,71 @@
+# All tests assert chart-computed output for known inputs. Pure Helm
+# pass-through tests (chart-label exists) were removed — they only
+# proved Helm's default labels were applied, not that the chart does
+# anything with the value. Full-render regression coverage for
+# extraManifests lives in snapshots_test.yaml.
+suite: extraManifests tests
+templates:
+  - templates/extraManifests.yaml
+tests:
+  # Pins: static extraManifests pass through untouched into the rendered stream
+  # (no template re-evaluation of the inner doc).
+  - it: should render static extra manifests as-is
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      extraManifests:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: my-custom-config
+          data:
+            key: value
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.name
+          value: my-custom-config
+      - equal:
+          path: data.key
+          value: value
+
+  # Pins: extraTemplateManifests entries are re-evaluated through tpl() so
+  # `{{ .Release.Name }}` and `{{ .Values.externalURL }}` resolve against the
+  # current release context.
+  - it: should interpolate Go templates in extraTemplateManifests
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      extraTemplateManifests:
+        - |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: {{ .Release.Name }}-templated
+          data:
+            externalURL: {{ .Values.externalURL }}
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-templated
+      - equal:
+          path: data.externalURL
+          value: https://harbor.example.com
+
+  # Pins: empty/missing extraManifests + extraTemplateManifests produces zero
+  # documents — guards against an accidental empty manifest leaking through.
+  - it: should render zero documents when both manifest lists are empty
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      extraManifests: []
+      extraTemplateManifests: []
+    asserts:
+      - hasDocuments:
+          count: 0
