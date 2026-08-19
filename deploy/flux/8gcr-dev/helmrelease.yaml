@@ -80,6 +80,18 @@ spec:
         repository: 8gears.container-registry.com/8gcr/harbor-core
         tag: latest
       replicas: 1
+      # The chart's core ConfigMap hardcodes this to the OCI providers only, so
+      # binding a project to an npm or Maven endpoint is rejected with
+      # "unsupported registry type npm" even though the adapters are registered
+      # and the endpoints report healthy. env overrides envFrom for a duplicate
+      # key, so this wins over the ConfigMap without a chart change.
+      #
+      # The list is the chart's own default plus the package formats the build
+      # supports; dropping any of the originals would break existing proxy
+      # projects.
+      extraEnv:
+        - name: PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE
+          value: "docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory,npm,pypi,maven,cargo,go,go-sumdb,homebrew"
     jobservice:
       podAnnotations:
         deploy.8gears.io/image-revision: "sha256:4feb41e3502ef1630e29412dc5a4aa13b32918a6de3614e246fdd594ea5e1230" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
