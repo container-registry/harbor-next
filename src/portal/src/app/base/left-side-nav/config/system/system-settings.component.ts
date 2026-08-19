@@ -41,8 +41,6 @@ import {
     HarborEvent,
 } from '../../../../services/event-service/event.service';
 import { Subscription } from 'rxjs';
-import { AuditlogService } from 'ng-swagger-gen/services';
-import { AuditLogEventType } from 'ng-swagger-gen/models';
 
 @Component({
     selector: 'system-settings',
@@ -54,7 +52,6 @@ export class SystemSettingsComponent
 {
     bannerMessageTypes: string[] = Object.values(BannerMessageType);
     onGoing = false;
-    loading = false;
     downloadLink: string;
     get currentConfig(): Configuration {
         return this.conf.getConfig();
@@ -77,14 +74,11 @@ export class SystemSettingsComponent
     messageToDateCopy: Date;
     bannerRefreshSub: Subscription;
     currentDate: Date = new Date();
-    logEventTypes: Record<string, string>[] = [];
-    selectedLogEventTypes: string[] = clone([]);
     @ViewChild('systemConfigFrom') systemSettingsForm: NgForm;
 
     constructor(
         private appConfigService: AppConfigService,
         private conf: ConfigService,
-        private logService: AuditlogService,
         private event: EventService,
         private errorHandler: MessageHandlerService,
         private changeDetectorRef: ChangeDetectorRef
@@ -99,15 +93,12 @@ export class SystemSettingsComponent
                 HarborEvent.REFRESH_BANNER_MESSAGE,
                 () => {
                     this.setValueForBannerMessage();
-                    this.setValueForEnabledAuditLogEventTypes();
                 }
             );
         }
         if (this.currentConfig.banner_message) {
             this.setValueForBannerMessage();
         }
-        this.initLogEventTypes();
-        this.setValueForEnabledAuditLogEventTypes();
     }
 
     ngAfterViewChecked() {
@@ -119,44 +110,6 @@ export class SystemSettingsComponent
             this.bannerRefreshSub.unsubscribe();
             this.bannerRefreshSub = null;
         }
-    }
-
-    initLogEventTypes() {
-        this.loading = true;
-        this.logService
-            .listAuditLogEventTypesResponse()
-            .pipe(finalize(() => (this.loading = false)))
-            .subscribe(
-                response => {
-                    const auditLogEventTypes =
-                        response.body as AuditLogEventType[];
-                    this.logEventTypes = auditLogEventTypes.map(event => ({
-                        label:
-                            event.event_type.charAt(0).toUpperCase() +
-                            event.event_type.slice(1).replace(/_/g, ' '),
-                        value: event.event_type,
-                        id: event.event_type,
-                    }));
-                    this.setValueForEnabledAuditLogEventTypes();
-                },
-                error => {
-                    this.errorHandler.error(error);
-                }
-            );
-    }
-
-    setValueForEnabledAuditLogEventTypes() {
-        const disabledEventTypes =
-            this.currentConfig?.disabled_audit_log_event_types?.value;
-        const disabledEvents =
-            disabledEventTypes?.split(',')?.filter(evt => evt !== '') ?? [];
-
-        const allEventTypes = this.logEventTypes.map(evt => evt.value);
-
-        // Enabled = All - Disabled
-        this.selectedLogEventTypes = allEventTypes.filter(
-            evt => !disabledEvents.includes(evt)
-        );
     }
 
     setValueForBannerMessage() {
@@ -240,30 +193,6 @@ export class SystemSettingsComponent
         );
     }
 
-    hasLogEventType(resourceType: string): boolean {
-        return this.selectedLogEventTypes?.includes(resourceType);
-    }
-
-    setLogEventType(resourceType: string) {
-        if (this.selectedLogEventTypes.includes(resourceType)) {
-            this.selectedLogEventTypes = this.selectedLogEventTypes.filter(
-                evt => evt !== resourceType
-            );
-        } else {
-            this.selectedLogEventTypes.push(resourceType);
-        }
-
-        const allEventTypes = this.logEventTypes.map(evt => evt.value);
-        // Disabled = All - Enabled
-        const disabled = allEventTypes.filter(
-            evt => !this.selectedLogEventTypes.includes(evt)
-        );
-
-        // Update backend config
-        this.currentConfig.disabled_audit_log_event_types.value =
-            disabled.join(',');
-    }
-
     public getChanges() {
         let allChanges = getChanges(
             this.conf.getOriginalConfig(),
@@ -285,11 +214,8 @@ export class SystemSettingsComponent
                 prop === 'robot_token_duration' ||
                 prop === 'notification_enable' ||
                 prop === 'robot_name_prefix' ||
-                prop === 'audit_log_forward_endpoint' ||
-                prop === 'skip_audit_log_database' ||
                 prop === 'session_timeout' ||
                 prop === 'scanner_skip_update_pulltime' ||
-                prop === 'disabled_audit_log_event_types' ||
                 prop === 'banner_message'
             ) {
                 changes[prop] = allChanges[prop];
@@ -383,12 +309,6 @@ export class SystemSettingsComponent
         } else {
             // Invalid situation, should not come here
             console.error('Nothing changed');
-        }
-    }
-
-    checkAuditLogForwardEndpoint(e: any) {
-        if (!e?.target?.value) {
-            this.currentConfig.skip_audit_log_database.value = false;
         }
     }
 

@@ -9,6 +9,16 @@
         <ul class="nav" role="tablist">
             <li role="presentation" class="nav-item">
                 <button
+                    id="config-audit-log"
+                    class="btn btn-link nav-link"
+                    type="button"
+                    routerLink="audit-log"
+                    routerLinkActive="active">
+                    {{ 'CONFIG.AUDIT_LOG' | translate }}
+                </button>
+            </li>
+            <li role="presentation" class="nav-item">
+                <button
                     id="config-auth"
                     class="btn btn-link nav-link"
                     type="button"

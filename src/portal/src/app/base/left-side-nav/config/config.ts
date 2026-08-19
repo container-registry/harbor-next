@@ -115,6 +115,10 @@ export class Configuration {
     oidc_admin_group: StringValueItem;
     oidc_group_filter: StringValueItem;
     audit_log_forward_endpoint: StringValueItem;
+    audit_log_forward_otlp_endpoint: StringValueItem;
+    audit_log_forward_otlp_authentication: StringValueItem;
+    audit_log_forward_otlp_username: StringValueItem;
+    audit_log_forward_otlp_password: StringValueItem;
     disabled_audit_log_event_types: StringValueItem;
     skip_audit_log_database: BoolValueItem;
     session_timeout: NumberValueItem;
@@ -196,6 +200,13 @@ export class Configuration {
         this.count_per_project = new NumberValueItem(-1, true);
         this.storage_per_project = new NumberValueItem(-1, true);
         this.audit_log_forward_endpoint = new StringValueItem('', true);
+        this.audit_log_forward_otlp_endpoint = new StringValueItem('', true);
+        this.audit_log_forward_otlp_authentication = new StringValueItem(
+            'none',
+            true
+        );
+        this.audit_log_forward_otlp_username = new StringValueItem('', true);
+        this.audit_log_forward_otlp_password = new StringValueItem('', true);
         this.disabled_audit_log_event_types = new StringValueItem('', true);
         this.skip_audit_log_database = new BoolValueItem(false, true);
         this.session_timeout = new NumberValueItem(60, true);

@@ -257,7 +257,14 @@ func main() {
 
 	closing := make(chan struct{})
 	done := make(chan struct{})
-	go gracefulShutdown(closing, done, shutdownTracerProvider, dao.ClosePool)
+	shutdownAuditLog := func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if err := audit.OTLPLogMgr.Shutdown(ctx); err != nil {
+			log.Errorf("failed to shut down OTLP audit log provider: %v", err)
+		}
+	}
+	go gracefulShutdown(closing, done, shutdownAuditLog, shutdownTracerProvider, dao.ClosePool)
 	// Start health checker for registries
 	go registry.Ctl.StartRegularHealthCheck(orm.Context(), closing, done)
 	// Init audit log

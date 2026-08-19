@@ -85,6 +85,7 @@ func (m *manager) Create(ctx context.Context, audit *model.AuditLogExt) (int64, 
 			WithField("time", audit.OpTime).WithField("resourceType", audit.ResourceType).
 			Infof("action:%s, resource:%s, operation_description:%s", audit.Operation, audit.Resource, audit.OperationDescription)
 	}
+	auditV1.OTLPLogMgr.Forward(ctx, audit)
 	if config.SkipAuditLogDatabase(ctx) {
 		return 0, nil
 	}

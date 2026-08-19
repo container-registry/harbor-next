@@ -217,6 +217,14 @@ const (
 	PurgeAuditRetentionHour     = "audit_retention_hour"
 	// AuditLogForwardEndpoint indicate to forward the audit log to an endpoint
 	AuditLogForwardEndpoint = "audit_log_forward_endpoint"
+	// AuditLogForwardOTLPEndpoint is the HTTP(S) URL of the OTLP/HTTP logs receiver.
+	AuditLogForwardOTLPEndpoint = "audit_log_forward_otlp_endpoint"
+	// AuditLogForwardOTLPAuthentication selects none or basic authentication.
+	AuditLogForwardOTLPAuthentication = "audit_log_forward_otlp_authentication"
+	// AuditLogForwardOTLPUsername is the basic authentication username.
+	AuditLogForwardOTLPUsername = "audit_log_forward_otlp_username"
+	// AuditLogForwardOTLPPassword is the write-only basic authentication password.
+	AuditLogForwardOTLPPassword = "audit_log_forward_otlp_password"
 	// SkipAuditLogDatabase skip to log audit log in database
 	SkipAuditLogDatabase = "skip_audit_log_database"
 	// MaxAuditRetentionHour allowed in audit log purge

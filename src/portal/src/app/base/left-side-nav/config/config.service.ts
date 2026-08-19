@@ -98,6 +98,8 @@ export class ConfigService {
                     );
                     this._currentConfig.oidc_client_secret =
                         new StringValueItem(fakePass, true);
+                    this._currentConfig.audit_log_forward_otlp_password =
+                        new StringValueItem(fakePass, true);
                     if (!this._currentConfig.disabled_audit_log_event_types) {
                         this._currentConfig.disabled_audit_log_event_types =
                             new StringValueItem('', true);

@@ -58,4 +58,17 @@ describe('ConfigService', () => {
             expect(service).toBeTruthy();
         }
     ));
+
+    it('should synthesize but not round-trip the OTLP password', inject(
+        [ConfigService],
+        (service: ConfigService) => {
+            service.updateConfig();
+            const current = service.getConfig();
+            const original = service.getOriginalConfig();
+            expect(current.audit_log_forward_otlp_password.value).toBeTruthy();
+            expect(current.audit_log_forward_otlp_password.value).toEqual(
+                original.audit_log_forward_otlp_password.value
+            );
+        }
+    ));
 });

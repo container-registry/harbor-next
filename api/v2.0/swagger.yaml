@@ -9349,6 +9349,18 @@ definitions:
       audit_log_forward_endpoint:
         $ref: '#/definitions/StringConfigItem'
         description: The endpoint of the audit log forwarder
+      audit_log_forward_otlp_endpoint:
+        $ref: '#/definitions/StringConfigItem'
+        description: The HTTP(S) URL of the OTLP/HTTP audit log receiver
+      audit_log_forward_otlp_authentication:
+        $ref: '#/definitions/StringConfigItem'
+        description: The OTLP audit log authentication type, none or basic
+      audit_log_forward_otlp_username:
+        $ref: '#/definitions/StringConfigItem'
+        description: The OTLP audit log basic authentication username
+      audit_log_forward_otlp_password:
+        $ref: '#/definitions/StringConfigItem'
+        description: The write-only OTLP audit log basic authentication password
       skip_audit_log_database:
         $ref: '#/definitions/BoolConfigItem'
         description: Whether skip the audit log in database
@@ -9648,6 +9660,26 @@ definitions:
       audit_log_forward_endpoint:
         type: string
         description: The audit log forward endpoint
+        x-omitempty: true
+        x-isnullable: true
+      audit_log_forward_otlp_endpoint:
+        type: string
+        description: The HTTP(S) URL of the OTLP/HTTP audit log receiver
+        x-omitempty: true
+        x-isnullable: true
+      audit_log_forward_otlp_authentication:
+        type: string
+        description: The OTLP audit log authentication type, none or basic
+        x-omitempty: true
+        x-isnullable: true
+      audit_log_forward_otlp_username:
+        type: string
+        description: The OTLP audit log basic authentication username
+        x-omitempty: true
+        x-isnullable: true
+      audit_log_forward_otlp_password:
+        type: string
+        description: The write-only OTLP audit log basic authentication password
         x-omitempty: true
         x-isnullable: true
       skip_audit_log_database:

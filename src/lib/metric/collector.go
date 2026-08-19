@@ -26,6 +26,7 @@ func RegisterCollectors() {
 		TotalInFlightGauge,
 		TotalReqCnt,
 		TotalReqDurSummary,
+		AuditLogOTLPDropped,
 	}...)
 }
 
@@ -61,4 +62,13 @@ var (
 			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 		},
 		[]string{"method", "operation"})
+
+	// AuditLogOTLPDropped counts audit records that could not be delivered by the OTLP pipeline.
+	AuditLogOTLPDropped = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "audit_log_otlp_dropped_total",
+			Help: "The total number of OTLP audit log records dropped.",
+		},
+		[]string{"reason"},
+	)
 )

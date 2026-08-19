@@ -35,6 +35,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/pkg"
 	"github.com/goharbor/harbor/src/pkg/notification"
+	"github.com/goharbor/harbor/src/server/middleware/security"
 	"github.com/goharbor/harbor/src/server/router"
 )
 
@@ -129,8 +130,10 @@ func getManifest(w http.ResponseWriter, req *http.Request) {
 	}
 
 	e := &metadata.PullArtifactEventMetadata{
-		Artifact: &art.Artifact,
-		Operator: operator.FromContext(req.Context()),
+		Artifact:      &art.Artifact,
+		Operator:      operator.FromContext(req.Context()),
+		ClientAddress: security.GetClientIP(req),
+		UserAgent:     security.GetUserAgent(req),
 	}
 	// the reference is tag
 	if _, err = digest.Parse(reference); err != nil {

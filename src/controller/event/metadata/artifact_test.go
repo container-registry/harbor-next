@@ -49,9 +49,11 @@ func (a *artifactEventTestSuite) TestResolveOfPushArtifactEventMetadata() {
 func (a *artifactEventTestSuite) TestResolveOfPullArtifactEventMetadata() {
 	e := &event.Event{}
 	metadata := &PullArtifactEventMetadata{
-		Artifact: &artifact.Artifact{ID: 1},
-		Tag:      "latest",
-		Operator: "admin",
+		Artifact:      &artifact.Artifact{ID: 1},
+		Tag:           "latest",
+		Operator:      "admin",
+		ClientAddress: "192.0.2.10",
+		UserAgent:     "containerd/2",
 	}
 	err := metadata.Resolve(e)
 	a.Require().Nil(err)
@@ -61,6 +63,8 @@ func (a *artifactEventTestSuite) TestResolveOfPullArtifactEventMetadata() {
 	a.Require().True(ok)
 	a.Equal(int64(1), data.Artifact.ID)
 	a.Equal("latest", data.Tags[0])
+	a.Equal("192.0.2.10", data.ClientAddress)
+	a.Equal("containerd/2", data.UserAgent)
 }
 
 func (a *artifactEventTestSuite) TestResolveOfDeleteArtifactEventMetadata() {
