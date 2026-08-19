@@ -75,7 +75,7 @@ spec:
     # Always so they pull the new digest behind latest.
     core:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:3789f3b13d86e1420c60fb517ba4b1b807c1a62c6d95ee393991940bcd9f867f" # {"$imagepolicy": "flux-system:harbor-core:digest"}
+        deploy.8gears.io/image-revision: "sha256:e279b10a11f861050ec56a6e8e370857c300c8421807545481865d0754216017" # {"$imagepolicy": "flux-system:harbor-core:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-core
         tag: latest
@@ -93,7 +93,7 @@ spec:
         size: 1Gi
     registry:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:8c8cd7201b110faf5bb276f4a507d7330d031787c9f48b1a40fda702924c68bd" # {"$imagepolicy": "flux-system:harbor-registry:digest"}
+        deploy.8gears.io/image-revision: "sha256:fcc53d09842713214885c4ed44dcc861425beab89bf7ef70186e8041a494e878" # {"$imagepolicy": "flux-system:harbor-registry:digest"}
         deploy.8gears.io/registryctl-image-revision: "sha256:ca54ec3dc4d1753f30c27ca55a3e2b34b19266caa8638dbf65df2e264dac5e79" # {"$imagepolicy": "flux-system:harbor-registryctl:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-registry
@@ -109,7 +109,7 @@ spec:
         size: 10Gi
     portal:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:9b26603acaaa0eeef6868490a78403c37d80ce1c39d359355d38651565fcbe89" # {"$imagepolicy": "flux-system:harbor-portal:digest"}
+        deploy.8gears.io/image-revision: "sha256:42d0e130f14908032fdebaaef8ebcf8c2287e55d618acb24e78118a23e6a74a5" # {"$imagepolicy": "flux-system:harbor-portal:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-portal
         tag: latest
@@ -117,7 +117,7 @@ spec:
     exporter:
       enabled: true
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:dd2c25f947726ba02a25f08450743935f06e118e2787e6faf740e9fb1e42cea3" # {"$imagepolicy": "flux-system:harbor-exporter:digest"}
+        deploy.8gears.io/image-revision: "sha256:98f33ef03be00bd0db4402f0d8c53b5e937c30992cab81d699f9d4c423e7df0d" # {"$imagepolicy": "flux-system:harbor-exporter:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-exporter
         tag: latest
