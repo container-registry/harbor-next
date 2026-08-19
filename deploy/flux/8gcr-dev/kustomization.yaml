@@ -11,3 +11,4 @@ resources:
   - ocirepository.yaml
   - image-automation.yaml
   - helmrelease.yaml
+  - ingress-packages.yaml
