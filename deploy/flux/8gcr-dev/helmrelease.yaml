@@ -93,7 +93,7 @@ spec:
         size: 1Gi
     registry:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:4b64863e0ad563b0fb4347ff9e212834e63a23098f17310eddec3c93f9597585" # {"$imagepolicy": "flux-system:harbor-registry:digest"}
+        deploy.8gears.io/image-revision: "sha256:482c181084cee8628f67e019880f6902db8cf6984a07fcfbb42719d0610dbe03" # {"$imagepolicy": "flux-system:harbor-registry:digest"}
         deploy.8gears.io/registryctl-image-revision: "sha256:83f6df6b75d1d00a1fbed75089b12a3e52c467b60fb902aceb9110f3549c8783" # {"$imagepolicy": "flux-system:harbor-registryctl:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-registry
