@@ -8254,6 +8254,11 @@ definitions:
         x-nullable: true
         x-omitempty: true
         description: The flag to indicate whether notification mechanism is enabled on Harbor instance.
+      enable_commercial_identity_providers:
+        type: boolean
+        x-nullable: true
+        x-omitempty: true
+        description: The flag to indicate whether commercial identity providers are enabled.
       authproxy_settings:
         description: The setting of auth proxy this is only available when Harbor relies on authproxy for authentication.
         x-nullable: true
@@ -9377,6 +9382,27 @@ definitions:
       disabled_audit_log_event_types:
         $ref: '#/definitions/StringConfigItem'
         description: The audit log event types to skip to log in database
+      enable_commercial_branding:
+        $ref: '#/definitions/BoolConfigItem'
+        description: Enable commercial branding customization
+      enable_commercial_sftp_replication:
+        $ref: '#/definitions/BoolConfigItem'
+        description: Enable commercial SFTP replication
+      enable_commercial_identity_providers:
+        $ref: '#/definitions/BoolConfigItem'
+        description: Enable commercial identity providers
+      enable_commercial_pgx_monitoring:
+        $ref: '#/definitions/BoolConfigItem'
+        description: Enable commercial PGX monitoring
+      enable_commercial_aws_rds_iam_auth:
+        $ref: '#/definitions/BoolConfigItem'
+        description: Enable commercial AWS RDS IAM authentication
+      enable_commercial_multi_format_artifacts:
+        $ref: '#/definitions/BoolConfigItem'
+        description: Enable commercial multi-format artifact repositories
+      enable_commercial_audit_log_otlp:
+        $ref: '#/definitions/BoolConfigItem'
+        description: Enable commercial OTLP audit-log forwarding
   Configurations:
     type: object
     properties:
@@ -9673,6 +9699,41 @@ definitions:
       disabled_audit_log_event_types:
         type: string
         description: the list to disable log audit event types.
+        x-omitempty: true
+        x-isnullable: true
+      enable_commercial_branding:
+        type: boolean
+        description: Enable commercial branding customization
+        x-omitempty: true
+        x-isnullable: true
+      enable_commercial_sftp_replication:
+        type: boolean
+        description: Enable commercial SFTP replication
+        x-omitempty: true
+        x-isnullable: true
+      enable_commercial_identity_providers:
+        type: boolean
+        description: Enable commercial identity providers
+        x-omitempty: true
+        x-isnullable: true
+      enable_commercial_pgx_monitoring:
+        type: boolean
+        description: Enable commercial PGX monitoring
+        x-omitempty: true
+        x-isnullable: true
+      enable_commercial_aws_rds_iam_auth:
+        type: boolean
+        description: Enable commercial AWS RDS IAM authentication
+        x-omitempty: true
+        x-isnullable: true
+      enable_commercial_multi_format_artifacts:
+        type: boolean
+        description: Enable commercial multi-format artifact repositories
+        x-omitempty: true
+        x-isnullable: true
+      enable_commercial_audit_log_otlp:
+        type: boolean
+        description: Enable commercial OTLP audit-log forwarding
         x-omitempty: true
         x-isnullable: true
   StringConfigItem:

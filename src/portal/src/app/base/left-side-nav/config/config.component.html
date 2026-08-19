@@ -19,6 +19,33 @@
             </li>
             <li role="presentation" class="nav-item">
                 <button
+                    id="config-commercial"
+                    class="btn btn-link nav-link"
+                    type="button"
+                    routerLink="commercial"
+                    routerLinkActive="active">
+                    {{ 'CONFIG.COMMERCIAL_FEATURES' | translate }}
+                </button>
+            </li>
+            <li
+                *ngIf="
+                    commercialFeatureEnabled(
+                        'enable_commercial_identity_providers'
+                    )
+                "
+                role="presentation"
+                class="nav-item">
+                <button
+                    id="config-identity-providers"
+                    class="btn btn-link nav-link"
+                    type="button"
+                    routerLink="identity-providers"
+                    routerLinkActive="active">
+                    {{ 'CONFIG.IDENTITY_PROVIDERS' | translate }}
+                </button>
+            </li>
+            <li role="presentation" class="nav-item">
+                <button
                     id="config-security"
                     class="btn btn-link nav-link"
                     type="button"

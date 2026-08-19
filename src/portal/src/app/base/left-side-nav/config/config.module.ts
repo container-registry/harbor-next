@@ -20,6 +20,7 @@ import { SystemSettingsComponent } from './system/system-settings.component';
 import { RouterModule, Routes } from '@angular/router';
 import { ConfigService } from './config.service';
 import { SecurityComponent } from './security/security.component';
+import { CommercialFeaturesComponent } from './commercial/commercial-features.component';
 
 const routes: Routes = [
     {
@@ -39,6 +40,10 @@ const routes: Routes = [
                 component: SystemSettingsComponent,
             },
             {
+                path: 'commercial',
+                component: CommercialFeaturesComponent,
+            },
+            {
                 path: '',
                 redirectTo: 'auth',
                 pathMatch: 'full',
@@ -53,6 +58,7 @@ const routes: Routes = [
         ConfigurationAuthComponent,
         SystemSettingsComponent,
         SecurityComponent,
+        CommercialFeaturesComponent,
     ],
     providers: [ConfigService],
 })

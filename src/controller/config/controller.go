@@ -28,6 +28,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/audit"
+	"github.com/goharbor/harbor/src/pkg/commercial"
 	"github.com/goharbor/harbor/src/pkg/user"
 )
 
@@ -114,6 +115,13 @@ func (c *controller) updateLogEndpoint(ctx context.Context, cfgs map[string]any)
 
 func (c *controller) validateCfg(ctx context.Context, cfgs map[string]any) error {
 	mgr := config.GetCfgManager(ctx)
+
+	if err := commercial.ValidateConfigUpdate(ctx, cfgs); err != nil {
+		return errors.BadRequestError(err)
+	}
+	if hasOTLPAuditConfig(cfgs) && !otlpAuditEnabledForUpdate(ctx, cfgs) {
+		return errors.BadRequestError(nil).WithMessage("commercial feature audit_log_otlp is not enabled")
+	}
 
 	// check if auth can be modified
 	if nv, ok := cfgs[common.AUTHMode]; ok {
@@ -250,7 +258,7 @@ func (c *controller) ConvertForGet(ctx context.Context, cfg map[string]any, inte
 		}
 		result[item.Name] = &models.Value{
 			Val:      val,
-			Editable: !readOnlyForAll,
+			Editable: !readOnlyForAll && commercial.ConfigEditable(item.Name),
 		}
 	}
 

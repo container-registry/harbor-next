@@ -120,6 +120,13 @@ export class Configuration {
     session_timeout: NumberValueItem;
     scanner_skip_update_pulltime: BoolValueItem;
     banner_message: StringValueItem;
+    enable_commercial_branding?: BoolValueItem;
+    enable_commercial_sftp_replication?: BoolValueItem;
+    enable_commercial_identity_providers?: BoolValueItem;
+    enable_commercial_pgx_monitoring?: BoolValueItem;
+    enable_commercial_aws_rds_iam_auth?: BoolValueItem;
+    enable_commercial_multi_format_artifacts?: BoolValueItem;
+    enable_commercial_audit_log_otlp?: BoolValueItem;
     public constructor() {
         this.auth_mode = new StringValueItem('db_auth', true);
         this.primary_auth_mode = new BoolValueItem(false, true);

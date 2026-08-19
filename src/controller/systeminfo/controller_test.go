@@ -26,15 +26,16 @@ func (s *sysInfoCtlTestSuite) SetupTest() {
 	version.GitCommit = "fakeid"
 
 	conf := map[string]any{
-		common.AUTHMode:                    "db_auth",
-		common.SelfRegistration:            true,
-		common.ExtEndpoint:                 "https://test.goharbor.io",
-		common.ProjectCreationRestriction:  "everyone",
-		common.RegistryStorageProviderName: "filesystem",
-		common.ReadOnly:                    false,
-		common.NotificationEnable:          false,
-		common.BannerMessage:               "{\"closable\":false,\"message\":\"Just for test\",\"type\":\" error\"}",
-		common.UnauthenticatedLandingPage:  common.LandingPageLogin,
+		common.AUTHMode:                          "db_auth",
+		common.SelfRegistration:                  true,
+		common.ExtEndpoint:                       "https://test.goharbor.io",
+		common.ProjectCreationRestriction:        "everyone",
+		common.RegistryStorageProviderName:       "filesystem",
+		common.ReadOnly:                          false,
+		common.NotificationEnable:                false,
+		common.EnableCommercialIdentityProviders: true,
+		common.BannerMessage:                     "{\"closable\":false,\"message\":\"Just for test\",\"type\":\" error\"}",
+		common.UnauthenticatedLandingPage:        common.LandingPageLogin,
 	}
 
 	config.InitWithSettings(conf)
@@ -82,6 +83,7 @@ func (s *sysInfoCtlTestSuite) TestGetInfo() {
 					RegistryStorageProviderName: "filesystem",
 					ReadOnly:                    false,
 					NotificationEnable:          false,
+					CommercialIdentityProviders: true,
 				},
 			},
 		},
