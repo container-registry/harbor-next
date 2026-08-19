@@ -75,14 +75,14 @@ spec:
     # Always so they pull the new digest behind latest.
     core:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:dd30a83abb5a29e796bbb96cdf065a8e0b8d1ce44845f01b72840921660ecc2d" # {"$imagepolicy": "flux-system:harbor-core:digest"}
+        deploy.8gears.io/image-revision: "sha256:4a15334727b2a3641260125eaceb940e52f9a17f6fa0290515db4ea9b2b3a634" # {"$imagepolicy": "flux-system:harbor-core:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-core
         tag: latest
       replicas: 1
     jobservice:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:b5c9413fd352a38076ba571fdfeeb4134c6b2a511791cbc2344ecf21031ecbc1" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
+        deploy.8gears.io/image-revision: "sha256:7431889acf1084e95fe49b944487cdf85cf27b3cb70f6312a1264909ebba0e5f" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-jobservice
         tag: latest
@@ -94,7 +94,7 @@ spec:
     registry:
       podAnnotations:
         deploy.8gears.io/image-revision: "sha256:482c181084cee8628f67e019880f6902db8cf6984a07fcfbb42719d0610dbe03" # {"$imagepolicy": "flux-system:harbor-registry:digest"}
-        deploy.8gears.io/registryctl-image-revision: "sha256:83f6df6b75d1d00a1fbed75089b12a3e52c467b60fb902aceb9110f3549c8783" # {"$imagepolicy": "flux-system:harbor-registryctl:digest"}
+        deploy.8gears.io/registryctl-image-revision: "sha256:803112f61b7e309b8177ee972749e07bdf00cc276176e0854b3621eca49c028f" # {"$imagepolicy": "flux-system:harbor-registryctl:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-registry
         tag: latest
