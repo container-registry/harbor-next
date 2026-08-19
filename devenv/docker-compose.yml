@@ -63,8 +63,8 @@ services:
     user: "${DEV_CONTAINER_USER:-harbor}"
     volumes:
       - ${DEV_ROOT:-..}:/app
-      - ${HOST_GOMODCACHE:?}:/go/pkg/mod
-      - ${HOST_GOCACHE:?}:/home/harbor/.cache/go-build
+      - go-module-cache:/go/pkg/mod
+      - go-build-cache:/home/harbor/.cache/go-build
       # Mount views directly to where beego expects them (avoids symlink leaking to host)
       - ${DEV_ROOT:-..}/src/core/views:/app/views:ro
     ports:
@@ -90,7 +90,9 @@ services:
       REGISTRY_CREDENTIAL_PASSWORD: ""
       # Core settings
       EXT_ENDPOINT: http://core:8080
-      CSRF_PLAINTEXT_HTTP: ${CSRF_PLAINTEXT_HTTP}
+      # Local development is served over HTTP. Tell gorilla/csrf to compare
+      # request origins using the http scheme instead of its secure default.
+      CSRF_PLAINTEXT_HTTP: ${CSRF_PLAINTEXT_HTTP:-true}
       CORE_URL: http://core:8080
       HARBOR_ADMIN_PASSWORD: Harbor12345
       CACHE_ENABLED: "false"
@@ -131,8 +133,8 @@ services:
     user: "${DEV_CONTAINER_USER:-harbor}"
     volumes:
       - ${DEV_ROOT:-..}:/app
-      - ${HOST_GOMODCACHE:?}:/go/pkg/mod
-      - ${HOST_GOCACHE:?}:/home/harbor/.cache/go-build
+      - go-module-cache:/go/pkg/mod
+      - go-build-cache:/home/harbor/.cache/go-build
     ports:
       - "${PORT_METRIC_JOBSERVICE:-9091}:9091"
     #   - "8888:8888"  # JobService API (uncomment if needed)
@@ -172,8 +174,8 @@ services:
     user: "${DEV_CONTAINER_USER:-harbor}"
     volumes:
       - ${DEV_ROOT:-..}:/app
-      - ${HOST_GOMODCACHE:?}:/go/pkg/mod
-      - ${HOST_GOCACHE:?}:/home/harbor/.cache/go-build
+      - go-module-cache:/go/pkg/mod
+      - go-build-cache:/home/harbor/.cache/go-build
       - harbor-registry-data:/var/lib/registry
       - ${DEV_ROOT:-..}/config/registry.yml:/etc/registry/config.yml:ro
     ports:
@@ -264,3 +266,9 @@ volumes:
     name: ${PROJECT_PREFIX:-harbor}-registry-data
   portal-openapi-ui:
     name: ${PROJECT_PREFIX:-harbor}-portal-openapi-ui
+  portal-angular-cache:
+    name: ${PROJECT_PREFIX:-harbor}-portal-angular-cache
+  go-module-cache:
+    name: ${PROJECT_PREFIX:-harbor}-go-module-cache
+  go-build-cache:
+    name: ${PROJECT_PREFIX:-harbor}-go-build-cache

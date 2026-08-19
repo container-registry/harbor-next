@@ -27,8 +27,7 @@ tasks:
       - |
         # prod tree has no jj tasks (dev owns them) — print the way back
         echo "Production view — jj tasks not in this tree. Back to dev view:"
-        echo "  jj new '{{.NEXT_BRANCH}}@{{.NEXT_REMOTE}}' '{{.DEV_BOOKMARK}}' 'bookmarks(glob:\"000?-*\")' -m megamerge"
-        echo "  jj bookmark set {{.MEGAMERGE_BOOKMARK}} -r @ --allow-backwards && jj new {{.MEGAMERGE_BOOKMARK}}"
+        echo "  from a dev workspace: task jj:setup-dev"
 
   setup-dev:
     desc: "Rebuild the development megamerge (main@next + dev + patches), land on a fresh working copy"
@@ -56,15 +55,12 @@ tasks:
         fi
         jj git fetch --remote {{.NEXT_REMOTE}}
         jj git fetch --remote {{.REMOTE_8GCR}}
-        # track patch + dev bookmarks — untracked = immutable + invisible to
-        # the megamerge glob (glob syntax in `bookmark track` is broken in
-        # jj 0.44, so loop names)
-        jj bookmark list --all --no-pager \
-          -T 'if(remote == "{{.REMOTE_8GCR}}", name ++ "\n", "")' \
-          | sort -u | grep -E '^(000|{{.DEV_BOOKMARK}}$)' \
-          | while IFS= read -r b; do
-              jj bookmark track "${b}@{{.REMOTE_8GCR}}" 2>/dev/null || true
-            done
+        # Track only the authoritative patch series. Obsolete renamed 000N
+        # bookmarks may still exist remotely and must not enter the megamerge.
+        while IFS= read -r branch; do
+          jj bookmark track "${branch}@{{.REMOTE_8GCR}}" 2>/dev/null || true
+        done < <(task --output interleaved --silent patches:list)
+        jj bookmark track '{{.DEV_BOOKMARK}}@{{.REMOTE_8GCR}}' 2>/dev/null || true
 
   # No `dir: ..` on jj tasks — from a ws/<name> workspace it lands outside
   # and jj hits the outer stale workspace. Scripts cd to workspace root.
@@ -82,7 +78,72 @@ tasks:
           # On a fresh clone it points to the same commit as dev@8gcr.
           parents+=("{{.DEV_BOOKMARK}}")
         fi
-        jj new "${parents[@]}" 'bookmarks(glob:"000?-*")' -m "megamerge"
+        while IFS= read -r branch; do
+          parents+=("${branch}")
+        done < <(task --output interleaved --silent patches:list)
+        jj new "${parents[@]}" -m "megamerge"
+
+        # jj does not consume Git's rerere cache for an octopus merge. Build
+        # the same tree sequentially with Git, then use that tree to resolve
+        # only the files that jj reports as conflicted. The jj commit keeps
+        # all original parents, so absorb can still route changes correctly.
+        if jj log -r '@ & conflicts()' -T 'commit_id' --no-graph 2>/dev/null | grep -q .; then
+          resolution_dir=$(mktemp -d)
+          cleanup_resolution() { rm -rf -- "${resolution_dir}"; }
+          trap cleanup_resolution EXIT
+
+          source_git_dir=$(jj git root)
+          base_commit=$(jj log --no-graph -r '{{.NEXT_BRANCH}}@{{.NEXT_REMOTE}}' -T commit_id)
+          git clone --quiet --no-checkout "${source_git_dir}" "${resolution_dir}"
+          git -C "${resolution_dir}" checkout --quiet "${base_commit}"
+          git -C "${resolution_dir}" config rerere.enabled true
+          git -C "${resolution_dir}" config rerere.autoupdate true
+
+          rr_cache_source="$(jj workspace root)/{{.RERERE_DIR}}"
+          resolution_git_dir=$(git -C "${resolution_dir}" rev-parse --absolute-git-dir)
+          if [ -d "${rr_cache_source}" ]; then
+            mkdir -p "${resolution_git_dir}/rr-cache"
+            cp -R "${rr_cache_source}/." "${resolution_git_dir}/rr-cache/"
+          fi
+
+          for parent in "${parents[@]:1}"; do
+            parent_commit=$(jj log --no-graph -r "${parent}" -T commit_id)
+            git -C "${resolution_dir}" fetch --quiet --no-tags "${source_git_dir}" \
+              "+${parent_commit}:refs/remotes/megamerge-input/${parent}"
+            if ! git -C "${resolution_dir}" \
+              -c user.name='8gcr megamerge materializer' \
+              -c user.email='noreply@8gears.com' \
+              merge --quiet --no-edit --no-ff "refs/remotes/megamerge-input/${parent}"; then
+              git -C "${resolution_dir}" rerere
+              if git -C "${resolution_dir}" diff --name-only --diff-filter=U | grep -q .; then
+                echo "Rerere could not resolve ${parent}; update {{.RERERE_DIR}} first." >&2
+                exit 1
+              fi
+              git -C "${resolution_dir}" \
+                -c user.name='8gcr megamerge materializer' \
+                -c user.email='noreply@8gears.com' \
+                commit --quiet --no-edit
+            fi
+          done
+
+          while read -r path _; do
+            if git -C "${resolution_dir}" cat-file -e "HEAD:${path}" 2>/dev/null; then
+              mkdir -p "$(dirname "${path}")"
+              git -C "${resolution_dir}" show "HEAD:${path}" > "${path}"
+            else
+              rm -f -- "${path}"
+            fi
+          done < <(jj resolve --list)
+          jj status >/dev/null
+
+          if jj log -r '@ & conflicts()' -T 'commit_id' --no-graph 2>/dev/null | grep -q .; then
+            echo "Sequential materialization did not resolve the jj megamerge." >&2
+            exit 1
+          fi
+          cleanup_resolution
+          trap - EXIT
+          echo "Resolved megamerge from the ordered Git materialization"
+        fi
 
         # go.sum is derived, line-independent — sole conflict? union all parents
         if [ "$(jj resolve --list 2>/dev/null | awk '{print $1}')" = "src/go.sum" ]; then
@@ -254,7 +315,18 @@ tasks:
           -s 'roots(({{.NEXT_BRANCH}}@{{.NEXT_REMOTE}}..{{.MEGAMERGE_BOOKMARK}}) ~ ::present({{.MAIN_BOOKMARK}}) ~ ::{{.NEXT_BRANCH}}@{{.REMOTE_8GCR}}) & mutable()' \
           --simplify-parents
 
-        if jj log -r '(bookmarks(glob:"000?-*") | {{.DEV_BOOKMARK}} | {{.MEGAMERGE_BOOKMARK}}) & conflicts()' -T 'commit_id' --no-graph 2>/dev/null | grep -q .; then
+        conflicted=false
+        while IFS= read -r branch; do
+          if jj log -r "${branch} & conflicts()" -T 'commit_id' --no-graph 2>/dev/null | grep -q .; then
+            conflicted=true
+          fi
+        done < <(task --output interleaved --silent patches:list)
+        for branch in '{{.DEV_BOOKMARK}}' '{{.MEGAMERGE_BOOKMARK}}'; do
+          if jj log -r "${branch} & conflicts()" -T 'commit_id' --no-graph 2>/dev/null | grep -q .; then
+            conflicted=true
+          fi
+        done
+        if [ "${conflicted}" = true ]; then
           echo "⚠ patch branches or megamerge conflicted after restack — resolve them:"
           echo "  jj new <conflicted rev>, edit, JJ_EDITOR=true jj squash --use-destination-message"
         fi
@@ -267,7 +339,18 @@ tasks:
         set -euo pipefail
         cd "$(jj workspace root)"
         # never push conflicted branches
-        if jj log -r '(bookmarks(glob:"000?-*") | {{.DEV_BOOKMARK}} | {{.MEGAMERGE_BOOKMARK}}) & conflicts()' -T 'commit_id' --no-graph 2>/dev/null | grep -q .; then
+        conflicted=false
+        while IFS= read -r branch; do
+          if jj log -r "${branch} & conflicts()" -T 'commit_id' --no-graph 2>/dev/null | grep -q .; then
+            conflicted=true
+          fi
+        done < <(task --output interleaved --silent patches:list)
+        for branch in '{{.DEV_BOOKMARK}}' '{{.MEGAMERGE_BOOKMARK}}'; do
+          if jj log -r "${branch} & conflicts()" -T 'commit_id' --no-graph 2>/dev/null | grep -q .; then
+            conflicted=true
+          fi
+        done
+        if [ "${conflicted}" = true ]; then
           echo "Branches are conflicted — resolve before pushing." >&2
           exit 1
         fi

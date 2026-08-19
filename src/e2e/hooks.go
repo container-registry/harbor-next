@@ -92,6 +92,12 @@ func teardown(s *state.Scenario) {
 	if s.HTTPMock != nil {
 		s.HTTPMock.Close()
 	}
+	if s.AuditOTLPRestore != nil {
+		_ = s.AuditOTLPRestore()
+	}
+	if s.OTLPReceiver != nil {
+		s.OTLPReceiver.Close()
+	}
 
 	// Branding: restore original branding configuration.
 	if s.BrandingRestore != nil {

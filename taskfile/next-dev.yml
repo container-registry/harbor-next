@@ -17,6 +17,22 @@ vars:
   NEXT_DEV_PORT_DEBUG_CORE: '{{ add 2345 (mul (atoi .NEXT_DEV_SLOT) 100) }}'
   NEXT_DEV_PORT_DEBUG_JOBSERVICE: '{{ add 2346 (mul (atoi .NEXT_DEV_SLOT) 100) }}'
   NEXT_DEV_PORT_DEBUG_REGISTRYCTL: '{{ add 2347 (mul (atoi .NEXT_DEV_SLOT) 100) }}'
+  NEXT_DEV_IGNORE_HEALTH_COMPONENTS: '{{.NEXT_DEV_IGNORE_HEALTH_COMPONENTS | default ""}}'
+  NEXT_DEV_UID:
+    sh: id -u
+  NEXT_DEV_GID:
+    sh: id -g
+  NEXT_DEV_CONTAINER_USER:
+    sh: |
+      if command -v podman >/dev/null 2>&1 && \
+        [ "$(podman info --format '{{"{{.Host.Security.Rootless}}"}}' 2>/dev/null)" = "true" ]; then
+        echo "0:0"
+      elif command -v docker >/dev/null 2>&1 && \
+        docker info --format '{{"{{.SecurityOptions}}"}}' 2>/dev/null | grep -q "name=rootless"; then
+        echo "0:0"
+      else
+        echo "harbor"
+      fi
   NEXT_DEV_ENV: >-
     COMPOSE_PROJECT_NAME={{.NEXT_DEV_PROJECT}}
     PROJECT_PREFIX={{.NEXT_DEV_PROJECT}}
@@ -30,6 +46,12 @@ vars:
     PORT_DEBUG_CORE={{.NEXT_DEV_PORT_DEBUG_CORE}}
     PORT_DEBUG_JOBSERVICE={{.NEXT_DEV_PORT_DEBUG_JOBSERVICE}}
     PORT_DEBUG_REGISTRYCTL={{.NEXT_DEV_PORT_DEBUG_REGISTRYCTL}}
+    GO_VERSION={{.GO_VERSION}}
+    WITH_SNYK={{.WITH_SNYK}}
+    NEXT_DEV_IGNORE_HEALTH_COMPONENTS={{.NEXT_DEV_IGNORE_HEALTH_COMPONENTS}}
+    DEV_UID={{.NEXT_DEV_UID}}
+    DEV_GID={{.NEXT_DEV_GID}}
+    DEV_CONTAINER_USER={{.NEXT_DEV_CONTAINER_USER}}
 
 tasks:
   dev:up:
@@ -59,7 +81,7 @@ tasks:
         mkdir -p reports
         harbor_url="http://127.0.0.1:{{.NEXT_DEV_PORT_HTTP}}"
         portal_url="http://127.0.0.1:{{.NEXT_DEV_PORT_PORTAL}}"
-        ignored_components="${NEXT_DEV_IGNORE_HEALTH_COMPONENTS:-}"
+        ignored_components='{{.NEXT_DEV_IGNORE_HEALTH_COMPONENTS}}'
         if [ '{{.SKIP_TRIVY}}' = 'true' ]; then
           ignored_components="$ignored_components,trivy"
         fi
@@ -81,8 +103,8 @@ tasks:
               printf '%s\n' "$harbor_url" > reports/next-dev-harbor-url
               printf '\nPatched harbor-next dev stack is running.\n'
               printf '  Workspace:  %s\n' "$workspace"
+              printf '  Harbor:     %s  (UI, OCI, and package clients)\n' "$portal_url"
               printf '  Core API:   %s/api/v2.0\n' "$harbor_url"
-              printf '  Portal:     %s\n' "$portal_url"
               printf '  Project:    {{.NEXT_DEV_PROJECT}}\n'
               printf '  Stop with:  task next:dev:down NEXT_DEV_SLOT={{.NEXT_DEV_SLOT}}\n\n'
               exit 0
@@ -160,7 +182,7 @@ tasks:
       printf '  Workspace:   %s/{{.NEXT_DEV_TMP_CLONE}}\n' "$(pwd)"
       printf '  Project:     {{.NEXT_DEV_PROJECT}}\n'
       printf '  Slot:        {{.NEXT_DEV_SLOT}}\n'
-      printf '  Portal:      http://127.0.0.1:{{.NEXT_DEV_PORT_PORTAL}}\n'
+      printf '  Harbor:      http://127.0.0.1:{{.NEXT_DEV_PORT_PORTAL}} (UI, OCI, and package clients)\n'
       printf '  Core API:    http://127.0.0.1:{{.NEXT_DEV_PORT_HTTP}}/api/v2.0\n'
       printf '  PostgreSQL:  127.0.0.1:{{.NEXT_DEV_PORT_POSTGRES}}\n'
       printf '  Redis:       127.0.0.1:{{.NEXT_DEV_PORT_REDIS}}\n'

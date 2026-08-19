@@ -220,7 +220,10 @@ tasks:
         }
 
         if [ '{{.TAGS}}' = '~@k8s' ]; then
-          run_suite main '~@k8s && ~@gc && ~@test-next-update-robot-account && ~@known-issue' '{{.CONCURRENCY}}' || test_status=$?
+          run_suite main '~@k8s && ~@gc && ~@test-next-update-robot-account && ~@known-issue && ~@audit-otlp' '{{.CONCURRENCY}}' || test_status=$?
+          if [ "$test_status" -eq 0 ]; then
+            run_suite audit-otlp '@audit-otlp' '1' || test_status=$?
+          fi
           if [ "$test_status" -eq 0 ]; then
             run_suite gc '@gc' '1' || test_status=$?
           fi

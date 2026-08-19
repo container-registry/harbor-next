@@ -13,6 +13,7 @@ import (
 
 	"github.com/goharbor/harbor/src/e2e/internal/fakeidp"
 	"github.com/goharbor/harbor/src/e2e/internal/harborclient"
+	"github.com/goharbor/harbor/src/e2e/internal/otlpreceiver"
 )
 
 type stateKey struct{}
@@ -67,6 +68,8 @@ type Scenario struct {
 	TempDirs              []string
 	HTTPMock              *httptest.Server
 	WebhookEvents         chan WebhookEvent
+	OTLPReceiver          *otlpreceiver.Receiver
+	AuditOTLPRestore      func() error
 
 	// FedIDP state.
 	CreatedIdPs          []int64                 // IDP IDs to delete in teardown (robots must be deleted first)

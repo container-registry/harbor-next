@@ -25,6 +25,7 @@ import (
 // Register wires every step definition into a single ScenarioContext.
 func Register(sc *godog.ScenarioContext) {
 	registerCommon(sc)
+	registerAuditOTLP(sc)
 	registerRegistry(sc)
 	registerSigning(sc)
 	registerReplication(sc)

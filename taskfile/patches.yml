@@ -1,15 +1,17 @@
 version: '3'
 
+vars:
+  NEXT_REMOTE: '{{.NEXT_REMOTE | default "next"}}'
+  NEXT_BRANCH: '{{.NEXT_BRANCH | default "main"}}'
+  RERERE_DIR: '{{.RERERE_DIR | default "8gcr-ee/.rr-cache"}}'
+
 tasks:
   list:
-    desc: "List local commercial patch bookmarks"
+    desc: "List ordered commercial patch bookmarks"
     silent: true
     cmds:
       - |
-        jj bookmark list --all --no-pager \
-          -T 'if(!remote, name ++ "\n", "")' \
-          | sort -u \
-          | grep -E '^000[0-9]-'
+        sed -n '/^000[0-9]-/p' taskfile/commercial-patches
 
   apply:
     desc: "Merge all local 000N-* patch bookmarks into a target Git checkout"
@@ -20,6 +22,8 @@ tasks:
         msg: "git is required"
       - sh: command -v jj >/dev/null 2>&1
         msg: "jj (Jujutsu) is required"
+      - sh: command -v go >/dev/null 2>&1
+        msg: "Go is required to derive go.sum from the merged go.mod"
       - sh: test -d '{{.TARGET_DIR}}/.git'
         msg: "TARGET_DIR must be a Git checkout: {{.TARGET_DIR}}"
       - sh: test -z "$(git -C '{{.TARGET_DIR}}' status --porcelain)"
@@ -29,9 +33,35 @@ tasks:
       - |
         set -euo pipefail
         source_git_dir=$(jj git root)
+        target_git_dir=$(git -C '{{.TARGET_DIR}}' rev-parse --git-dir)
+        if [[ "${target_git_dir}" != /* ]]; then
+          target_git_dir="{{.TARGET_DIR}}/${target_git_dir}"
+        fi
+
+        rr_cache_source="$(jj workspace root)/{{.RERERE_DIR}}"
+        if [ -d "${rr_cache_source}" ]; then
+          mkdir -p "${target_git_dir}/rr-cache"
+          cp -R "${rr_cache_source}/." "${target_git_dir}/rr-cache/"
+        fi
+        git -C '{{.TARGET_DIR}}' config rerere.enabled true
+        git -C '{{.TARGET_DIR}}' config rerere.autoupdate true
+
         patch_refs=()
+        base_commit=$(jj log --no-graph -r '{{.NEXT_BRANCH}}@{{.NEXT_REMOTE}}' -T 'commit_id')
 
         while IFS= read -r branch; do
+          branch_commit=$(jj log --no-graph -r "${branch}" -T 'commit_id')
+          if [[ ! "${branch_commit}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Could not resolve ${branch} to one Git commit: ${branch_commit}" >&2
+            exit 1
+          fi
+          if ! git --git-dir "${source_git_dir}" diff --quiet \
+            "${base_commit}" "${branch_commit}" -- src/go.sum; then
+            echo "${branch} tracks src/go.sum; patch branches must derive it from go.mod" >&2
+            exit 1
+          fi
+          git --git-dir "${source_git_dir}" update-ref \
+            "refs/heads/${branch}" "${branch_commit}"
           git -C '{{.TARGET_DIR}}' fetch --quiet --no-tags "${source_git_dir}" \
             "+refs/heads/${branch}:refs/remotes/patches/${branch}"
           patch_refs+=("refs/remotes/patches/${branch}")
@@ -42,7 +72,23 @@ tasks:
           exit 1
         fi
 
-        git -C '{{.TARGET_DIR}}' \
-          -c user.name='8gcr patch materializer' \
-          -c user.email='noreply@8gears.com' \
-          merge --quiet --no-edit --no-ff "${patch_refs[@]}"
+        for patch_ref in "${patch_refs[@]}"; do
+          if ! git -C '{{.TARGET_DIR}}' \
+            -c user.name='8gcr patch materializer' \
+            -c user.email='noreply@8gears.com' \
+            merge --quiet --no-edit --no-ff "${patch_ref}"; then
+            git -C '{{.TARGET_DIR}}' rerere
+            if git -C '{{.TARGET_DIR}}' diff --name-only --diff-filter=U | grep -q .; then
+              echo "Unresolved conflicts while merging ${patch_ref}" >&2
+              exit 1
+            fi
+            git -C '{{.TARGET_DIR}}' \
+              -c user.name='8gcr patch materializer' \
+              -c user.email='noreply@8gears.com' \
+            commit --quiet --no-edit
+          fi
+        done
+
+        # Patch commits intentionally do not track go.sum. Derive checksums
+        # from the combined go.mod in the disposable materialized checkout.
+        (cd '{{.TARGET_DIR}}/src' && GOWORK=off go mod download all)

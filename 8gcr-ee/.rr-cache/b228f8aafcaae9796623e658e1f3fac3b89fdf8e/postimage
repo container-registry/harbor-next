@@ -1,0 +1,81 @@
+<div class="row">
+    <div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
+        <h2 class="custom-h2 config-title">
+            {{ 'CONFIG.TITLE' | translate
+            }}<span
+                class="spinner spinner-inline ml-1 v-mid"
+                [hidden]="inProgress === false"></span>
+        </h2>
+        <ul class="nav" role="tablist">
+            @if (
+                commercialFeatureEnabled('enable_commercial_branding')
+            ) {
+                <li role="presentation" class="nav-item">
+                    <button
+                        id="config-branding"
+                        class="btn btn-link nav-link"
+                        type="button"
+                        routerLink="branding"
+                        routerLinkActive="active">
+                        {{ 'CONFIG.BRANDING' | translate }}
+                    </button>
+                </li>
+            }
+            <li role="presentation" class="nav-item">
+                <button
+                    id="config-auth"
+                    class="btn btn-link nav-link"
+                    type="button"
+                    routerLink="auth"
+                    routerLinkActive="active">
+                    {{ 'CONFIG.AUTH' | translate }}
+                </button>
+            </li>
+            <li role="presentation" class="nav-item">
+                <button
+                    id="config-security"
+                    class="btn btn-link nav-link"
+                    type="button"
+                    routerLink="security"
+                    routerLinkActive="active">
+                    {{ 'CONFIG.SECURITY' | translate }}
+                </button>
+            </li>
+            <li role="presentation" class="nav-item">
+                <button
+                    id="config-system"
+                    class="btn btn-link nav-link"
+                    type="button"
+                    routerLink="setting"
+                    routerLinkActive="active">
+                    {{ 'CONFIG.SYSTEM' | translate }}
+                </button>
+            </li>
+            <li role="presentation" class="nav-item">
+                <button
+                    id="config-commercial"
+                    class="btn btn-link nav-link"
+                    type="button"
+                    routerLink="commercial"
+                    routerLinkActive="active">
+                    {{ 'CONFIG.COMMERCIAL_FEATURES' | translate }}
+                </button>
+            </li>
+            @if (
+                commercialFeatureEnabled('enable_commercial_audit_log_otlp')
+            ) {
+                <li role="presentation" class="nav-item">
+                    <button
+                        id="config-audit-log"
+                        class="btn btn-link nav-link"
+                        type="button"
+                        routerLink="audit-log"
+                        routerLinkActive="active">
+                        {{ 'CONFIG.AUDIT_LOG' | translate }}
+                    </button>
+                </li>
+            }
+        </ul>
+    </div>
+</div>
+<router-outlet></router-outlet>

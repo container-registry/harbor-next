@@ -37,7 +37,7 @@ services:
       # Allow GC scenarios to collect freshly untagged test artifacts.
       GC_TIME_WINDOW_HOURS: "0"
       KEY_PATH: /var/lib/harbor-e2e/secretkey
-      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp
+      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,npmjs,npm,maven-central,maven,pypi,pypi-registry,crates-io,cargo,go,go-registry,go-sumdb,homebrew,homebrew-registry
     command: >
       sh -ec 'mkdir -p /var/lib/harbor-e2e &&
       printf "%s" harbor-e2e-key!! > /var/lib/harbor-e2e/secretkey &&
