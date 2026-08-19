@@ -69,6 +69,8 @@ deploy/compose/config/certs/
 CLAUDE.md
 tmp/
 reports/
+temp-pkg/
+src/go.sum
 bin
 .mcp.json
 .claude/*
