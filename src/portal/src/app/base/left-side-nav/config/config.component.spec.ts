@@ -16,14 +16,15 @@ import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { ConfigurationComponent } from './config.component';
 import { SharedTestingModule } from '../../../shared/shared.module';
 import { ConfigService } from './config.service';
-import { Configuration } from './config';
+import { BoolValueItem, Configuration } from './config';
 
 describe('ConfigurationComponent', () => {
     let component: ConfigurationComponent;
     let fixture: ComponentFixture<ConfigurationComponent>;
+    let currentConfig: Configuration;
     const fakeConfigService = {
         getConfig() {
-            return new Configuration();
+            return currentConfig;
         },
         getOriginalConfig() {
             return new Configuration();
@@ -46,6 +47,7 @@ describe('ConfigurationComponent', () => {
     });
 
     beforeEach(() => {
+        currentConfig = new Configuration();
         initSpy = spyOn(fakeConfigService, 'updateConfig').and.returnValue(
             undefined
         );
@@ -60,5 +62,67 @@ describe('ConfigurationComponent', () => {
     it('should init config', async () => {
         await fixture.whenStable();
         expect(initSpy.calls.count()).toEqual(1);
+    });
+    it('should expose only enabled commercial navigation', () => {
+        currentConfig.enable_commercial_branding = new BoolValueItem(
+            false,
+            true
+        );
+
+        expect(
+            component.commercialFeatureEnabled('enable_commercial_branding')
+        ).toBeFalse();
+
+        currentConfig.enable_commercial_branding.value = true;
+        expect(
+            component.commercialFeatureEnabled('enable_commercial_branding')
+        ).toBeTrue();
+    });
+    it('should show identity providers only when its commercial feature is enabled', () => {
+        currentConfig.enable_commercial_identity_providers = new BoolValueItem(
+            false,
+            true
+        );
+        fixture.detectChanges();
+
+        expect(
+            fixture.nativeElement.querySelector('#config-identity-providers')
+        ).toBeFalsy();
+
+        currentConfig.enable_commercial_identity_providers.value = true;
+        fixture.detectChanges();
+
+        expect(
+            fixture.nativeElement.querySelector('#config-identity-providers')
+        ).toBeTruthy();
+    });
+    it('should always expose the base audit log configuration tab', () => {
+        currentConfig.enable_commercial_audit_log_otlp = new BoolValueItem(
+            false,
+            true
+        );
+        fixture.detectChanges();
+
+        expect(
+            fixture.nativeElement.querySelector('#config-audit-log')
+        ).toBeTruthy();
+    });
+    it('should display configuration tabs alphabetically', () => {
+        currentConfig.enable_commercial_branding = new BoolValueItem(
+            true,
+            true
+        );
+        currentConfig.enable_commercial_identity_providers = new BoolValueItem(
+            true,
+            true
+        );
+        fixture.detectChanges();
+
+        const navItems = fixture.nativeElement.querySelectorAll(
+            '.nav .nav-link'
+        ) as NodeListOf<HTMLElement>;
+        const tabIDs = Array.from(navItems, item => item.id);
+
+        expect(tabIDs).toEqual([...tabIDs].sort());
     });
 });

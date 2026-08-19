@@ -31,8 +31,11 @@ import (
 // const definitions
 const (
 	// ArtifactTypeImage is the artifact type for image
-	ArtifactTypeImage        = "IMAGE"
-	AdditionTypeBuildHistory = "BUILD_HISTORY"
+	ArtifactTypeImage          = "IMAGE"
+	ArtifactTypeHomebrew       = "HOMEBREW"
+	AdditionTypeBuildHistory   = "BUILD_HISTORY"
+	homebrewPackageTypeKey     = "com.github.package.type"
+	homebrewPackageTypeBottles = "homebrew_bottle"
 )
 
 func init() {

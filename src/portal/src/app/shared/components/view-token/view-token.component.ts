@@ -29,6 +29,7 @@ import { TranslateService } from '@ngx-translate/core';
 import { InlineAlertComponent } from '../inline-alert/inline-alert.component';
 import { errorHandler } from '../../units/shared.utils';
 import { CopyInputComponent } from '../push-image/copy-input.component';
+import { FederatedIdpService } from 'ng-swagger-gen/services';
 
 @Component({
     selector: 'view-token',
@@ -39,7 +40,31 @@ export class ViewTokenComponent {
     showNewPwd: boolean = false;
     showConfirmPwd: boolean = false;
     tokenModalOpened: boolean = false;
-    robot: Robot;
+    private _robot: Robot;
+    inheritedClaims: { path: string; value: string }[];
+    claims: { path: string; value: string }[];
+
+    // Use getter/setter to trigger claims fetch when robot is set
+    get robot(): Robot {
+        return this._robot;
+    }
+
+    set robot(value: Robot) {
+        this._robot = value;
+        // Fetch claims when robot is set and has federatedidp_id
+        if (value?.federatedidp_id > 0) {
+            this.fetchClaimsForRobot(value.federatedidp_id, value.id);
+        } else {
+            // Clear claims if not a federated robot
+            this.inheritedClaims = [];
+            this.claims = [];
+        }
+    }
+
+    // Keep direct access to the robot property for backward compatibility
+    setRobotDirect(value: Robot) {
+        this._robot = value;
+    }
     newSecret: string;
     confirmSecret: string;
     btnState: ClrLoadingState = ClrLoadingState.DEFAULT;
@@ -55,8 +80,10 @@ export class ViewTokenComponent {
     downLoadFileName: string = '';
     downLoadHref: SafeUrl = '';
     enableNewSecret: boolean = false;
+
     constructor(
         private robotService: RobotService,
+        private idpService: FederatedIdpService,
         private operationService: OperationService,
         private msgHandler: MessageHandlerService,
         private sanitizer: DomSanitizer,
@@ -78,6 +105,7 @@ export class ViewTokenComponent {
         this.downLoadFileName = '';
         this.downLoadHref = '';
         this.secretForm.reset();
+        // Note: Claims fetch is now handled by the robot setter
     }
     refreshToken() {
         this.btnState = ClrLoadingState.LOADING;
@@ -105,7 +133,8 @@ export class ViewTokenComponent {
                     this.refreshSuccess.emit(true);
                     this.cancel();
                     if (res && res.secret) {
-                        this.robot.secret = res.secret;
+                        // Update secret directly without triggering the robot setter
+                        this._robot.secret = res.secret;
                         this.copyToken = true;
                         this.createSuccess =
                             'SYSTEM_ROBOT.REFRESH_SECRET_SUCCESS';
@@ -159,6 +188,30 @@ export class ViewTokenComponent {
             .subscribe((res: string) => {
                 this.msgHandler.showSuccess(res);
             });
+    }
+    /**
+     * Fetch claims for a robot - takes robotId as parameter to avoid timing issues
+     * with async callbacks where this.robot might not be set yet
+     */
+    fetchClaimsForRobot(idpID: number, robotId: number) {
+        if (robotId === undefined || robotId === null || isNaN(robotId)) {
+            return;
+        }
+        this.idpService.ListClaimRules({ id: idpID }).subscribe(
+            claimRules => {
+                // Inherited claims are IdP-scoped (robot_id is 0, null, or undefined).
+                this.inheritedClaims = claimRules
+                    .filter(c => !c.robot_id || c.robot_id === 0)
+                    .map(c => ({ path: c.claim_path, value: c.value }));
+                // Robot-scoped claims: coerce to number to tolerate string/number drift.
+                this.claims = claimRules
+                    .filter(c => c.robot_id && +c.robot_id === +robotId)
+                    .map(c => ({ path: c.claim_path, value: c.value }));
+            },
+            error => {
+                this.inlineAlertComponent.showInlineError(error);
+            }
+        );
     }
 
     closeModal() {

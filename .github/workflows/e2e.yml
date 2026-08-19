@@ -1,0 +1,106 @@
+name: E2E Tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      e2e_tags:
+        type: string
+        description: Optional godog tag expression
+        required: false
+        default: ""
+      e2e_timeout:
+        type: string
+        description: Go test timeout passed to task e2e
+        required: false
+        default: 30m
+      skip_trivy:
+        type: boolean
+        description: Skip Trivy in the dev stack
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: E2E
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Build E2E CI image
+        run: |
+          . ./versions.env
+          docker build \
+            --build-arg GO_VERSION="$GO_VERSION" \
+            --file dockerfile/e2e-ci.dockerfile \
+            --tag harbor-e2e-ci:${{ github.sha }} \
+            .
+
+      - name: Run E2E tests
+        id: e2e
+        env:
+          E2E_TAGS: ${{ github.event_name == 'workflow_dispatch' && inputs.e2e_tags || '' }}
+          E2E_TIMEOUT: ${{ github.event_name == 'workflow_dispatch' && inputs.e2e_timeout || '30m' }}
+          SKIP_TRIVY: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_trivy || false }}
+        run: |
+          set +e
+          container_name="harbor-e2e-ci-${{ github.run_id }}-${{ github.run_attempt }}"
+          docker rm -f "${container_name}" >/dev/null 2>&1 || true
+          docker create \
+            --name "${container_name}" \
+            --privileged \
+            -e E2E_TAGS="${E2E_TAGS}" \
+            -e E2E_TIMEOUT="${E2E_TIMEOUT}" \
+            -e SKIP_TRIVY="${SKIP_TRIVY}" \
+            harbor-e2e-ci:${{ github.sha }} \
+            bash -c '
+              set -euo pipefail
+              task_args=("E2E_TIMEOUT=${E2E_TIMEOUT:-30m}" "SKIP_TRIVY=${SKIP_TRIVY:-false}")
+              if [ -n "${E2E_TAGS:-}" ]; then
+                task_args+=("TAGS=${E2E_TAGS}")
+              fi
+              task e2e:run "${task_args[@]}"
+            '
+
+          docker start -a "${container_name}"
+          status=$?
+          mkdir -p reports
+          docker cp "${container_name}:/workspace/reports/." reports/ 2>/dev/null || true
+          docker rm -f "${container_name}" >/dev/null 2>&1 || true
+          echo "status=${status}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Test summary
+        if: ${{ always() && hashFiles('reports/e2e-test.json') != '' }}
+        uses: robherley/go-test-action@42a1975c97156330b5126c2f35ef0fb78c4c7154 # v0.7.1
+        with:
+          fromJSONFile: reports/e2e-test.json
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: e2e-report-${{ github.run_id }}
+          path: reports/
+          if-no-files-found: ignore
+
+      - name: Fail if E2E failed
+        if: always()
+        env:
+          E2E_STATUS: ${{ steps.e2e.outputs.status || '1' }}
+        run: exit "$E2E_STATUS"

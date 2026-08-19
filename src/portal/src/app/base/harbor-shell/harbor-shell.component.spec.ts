@@ -53,6 +53,9 @@ const mockMessageHandlerService = null;
 const mockPasswordSettingService = null;
 
 const mockSkinableConfig = {
+    getBrandingInfo: function () {
+        return of({});
+    },
     getSkinConfig: function () {
         return {
             headerBgColor: {
@@ -70,6 +73,7 @@ const mockSkinableConfig = {
     },
 };
 
+let commercialIdentityProvidersEnabled = false;
 const fakeAppConfigService = {
     isLdapMode: function () {
         return true;
@@ -84,6 +88,8 @@ const fakeAppConfigService = {
         return {
             with_trivy: true,
             harbor_version: 'v2.15.0',
+            enable_commercial_identity_providers:
+                commercialIdentityProvidersEnabled,
         };
     },
 };
@@ -143,6 +149,7 @@ describe('HarborShellComponent', () => {
     });
 
     beforeEach(() => {
+        commercialIdentityProvidersEnabled = false;
         fixture = TestBed.createComponent(HarborShellComponent);
         component = fixture.componentInstance;
         component.accountSettingsModal = TestBed.createComponent(
@@ -163,6 +170,14 @@ describe('HarborShellComponent', () => {
 
     it('should create', () => {
         expect(component).toBeTruthy();
+    });
+
+    it('should show identity providers only when the commercial feature is enabled', () => {
+        expect(component.commercialIdentityProvidersEnabled).toBeFalse();
+
+        commercialIdentityProvidersEnabled = true;
+
+        expect(component.commercialIdentityProvidersEnabled).toBeTrue();
     });
 
     it('should open users profile', async () => {

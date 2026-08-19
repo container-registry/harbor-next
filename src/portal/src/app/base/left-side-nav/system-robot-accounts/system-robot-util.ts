@@ -93,6 +93,7 @@ export const ACTION_RESOURCE_I18N_MAP = {
     quota: 'ROBOT_ACCOUNT.QUOTA',
     sbom: 'ROBOT_ACCOUNT.SBOM',
     robot: 'ROBOT_ACCOUNT.ROBOT',
+    'federated-idp': 'SYSTEM_ROBOT.FEDERATED_IDP',
     user: 'ROBOT_ACCOUNT.USER',
     'user-group': 'ROBOT_ACCOUNT.GROUP',
     'ldap-user': 'ROBOT_ACCOUNT.LDAPUSER',

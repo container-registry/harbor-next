@@ -147,6 +147,7 @@ func (bc *basicController) RetrieveCap(ctx context.Context, r *scanner.Registrat
 		logger.Errorf("Get registration error: %s", err)
 		return err
 	}
+	r.Metadata = mt
 	r.Capabilities = mt.ConvertCapability()
 	return nil
 }

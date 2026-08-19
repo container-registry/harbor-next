@@ -1,0 +1,391 @@
+version: '3'
+
+# jj megamerge workflow. Every branch = one commit on next/main:
+# 000N-* = patches, dev = tooling overlay (never released).
+# megamerge = local octopus, never pushed. Patch discovery is bookmark-based.
+# Daily: jj:setup-dev → edit → jj:absorb → jj:sync-patch-branches.
+# Full docs: PATCHES.md + .claude/skills/jj-megamerge/SKILL.md
+
+vars:
+  MEGAMERGE_BOOKMARK: '{{.MEGAMERGE_BOOKMARK | default "megamerge"}}'
+  MAIN_BOOKMARK: '{{.MAIN_BOOKMARK | default "8gcr-main"}}'
+  NEXT_REMOTE: '{{.NEXT_REMOTE | default "next"}}'
+  NEXT_BRANCH: '{{.NEXT_BRANCH | default "main"}}'
+  REMOTE_8GCR: '{{.REMOTE_8GCR | default "8gcr"}}'
+  DEV_BOOKMARK: '{{.DEV_BOOKMARK | default "dev"}}'
+  URL_8GCR: '{{.URL_8GCR | default "https://github.com/container-registry/8gcr.git"}}'
+  NEXT_URL: '{{.NEXT_URL | default "https://github.com/container-registry/harbor-next.git"}}'
+  RERERE_DIR: '{{.RERERE_DIR | default "8gcr-ee/.rr-cache"}}'
+  SYNC_TMP_DIR: '{{.SYNC_TMP_DIR | default ".opencode/tmp/jj-sync-main"}}'
+
+tasks:
+  setup:
+    desc: "Rebuild the production megamerge (main@next + patches), land on a fresh working copy"
+    cmds:
+      - task: rebuild-megamerge
+        vars: { INCLUDE_DEV: "no" }
+      - |
+        # prod tree has no jj tasks (dev owns them) — print the way back
+        echo "Production view — jj tasks not in this tree. Back to dev view:"
+        echo "  from a dev workspace: task jj:setup-dev"
+
+  setup-dev:
+    desc: "Rebuild the development megamerge (main@next + dev + patches), land on a fresh working copy"
+    cmds:
+      - task: rebuild-megamerge
+        vars: { INCLUDE_DEV: "yes" }
+
+  bootstrap:
+    desc: "Declarative repo setup: ensure 8gcr+next remotes, fetch, track patch+dev bookmarks"
+    cmds:
+      - |
+        set -euo pipefail
+        cd "$(jj workspace root)"
+        # want remotes named 8gcr + next — rename origin if it's the 8gcr repo
+        remotes=$(jj git remote list)
+        if ! printf '%s\n' "$remotes" | grep -q "^{{.REMOTE_8GCR}} "; then
+          if printf '%s\n' "$remotes" | grep "^origin " | grep -q "container-registry/8gcr"; then
+            jj git remote rename origin {{.REMOTE_8GCR}}
+          else
+            jj git remote add {{.REMOTE_8GCR}} {{.URL_8GCR}}
+          fi
+        fi
+        if ! jj git remote list | grep -q "^{{.NEXT_REMOTE}} "; then
+          jj git remote add {{.NEXT_REMOTE}} {{.NEXT_URL}}
+        fi
+        jj git fetch --remote {{.NEXT_REMOTE}}
+        jj git fetch --remote {{.REMOTE_8GCR}}
+        # Track only the authoritative patch series. Obsolete renamed 000N
+        # bookmarks may still exist remotely and must not enter the megamerge.
+        while IFS= read -r branch; do
+          jj bookmark track "${branch}@{{.REMOTE_8GCR}}" 2>/dev/null || true
+        done < <(task --output interleaved --silent patches:list)
+        jj bookmark track '{{.DEV_BOOKMARK}}@{{.REMOTE_8GCR}}' 2>/dev/null || true
+
+  # No `dir: ..` on jj tasks — from a ws/<name> workspace it lands outside
+  # and jj hits the outer stale workspace. Scripts cd to workspace root.
+  rebuild-megamerge:
+    internal: true
+    cmds:
+      - task: bootstrap
+      - |
+        set -euo pipefail
+        cd "$(jj workspace root)"
+        # fresh rebuild, never incremental restack (can silently drop content)
+        parents=("{{.NEXT_BRANCH}}@{{.NEXT_REMOTE}}")
+        if [ "{{.INCLUDE_DEV}}" = "yes" ]; then
+          # Use the tracked local bookmark so unpushed dev changes are included.
+          # On a fresh clone it points to the same commit as dev@8gcr.
+          parents+=("{{.DEV_BOOKMARK}}")
+        fi
+        while IFS= read -r branch; do
+          parents+=("${branch}")
+        done < <(task --output interleaved --silent patches:list)
+        jj new "${parents[@]}" -m "megamerge"
+
+        # jj does not consume Git's rerere cache for an octopus merge. Build
+        # the same tree sequentially with Git, then use that tree to resolve
+        # only the files that jj reports as conflicted. The jj commit keeps
+        # all original parents, so absorb can still route changes correctly.
+        if jj log -r '@ & conflicts()' -T 'commit_id' --no-graph 2>/dev/null | grep -q .; then
+          resolution_dir=$(mktemp -d)
+          cleanup_resolution() { rm -rf -- "${resolution_dir}"; }
+          trap cleanup_resolution EXIT
+
+          source_git_dir=$(jj git root)
+          base_commit=$(jj log --no-graph -r '{{.NEXT_BRANCH}}@{{.NEXT_REMOTE}}' -T commit_id)
+          git clone --quiet --no-checkout "${source_git_dir}" "${resolution_dir}"
+          git -C "${resolution_dir}" checkout --quiet "${base_commit}"
+          git -C "${resolution_dir}" config rerere.enabled true
+          git -C "${resolution_dir}" config rerere.autoupdate true
+
+          rr_cache_source="$(jj workspace root)/{{.RERERE_DIR}}"
+          resolution_git_dir=$(git -C "${resolution_dir}" rev-parse --absolute-git-dir)
+          if [ -d "${rr_cache_source}" ]; then
+            mkdir -p "${resolution_git_dir}/rr-cache"
+            cp -R "${rr_cache_source}/." "${resolution_git_dir}/rr-cache/"
+          fi
+
+          for parent in "${parents[@]:1}"; do
+            parent_commit=$(jj log --no-graph -r "${parent}" -T commit_id)
+            git -C "${resolution_dir}" fetch --quiet --no-tags "${source_git_dir}" \
+              "+${parent_commit}:refs/remotes/megamerge-input/${parent}"
+            if ! git -C "${resolution_dir}" \
+              -c user.name='8gcr megamerge materializer' \
+              -c user.email='noreply@8gears.com' \
+              merge --quiet --no-edit --no-ff "refs/remotes/megamerge-input/${parent}"; then
+              git -C "${resolution_dir}" rerere
+              if git -C "${resolution_dir}" diff --name-only --diff-filter=U | grep -q .; then
+                echo "Rerere could not resolve ${parent}; update {{.RERERE_DIR}} first." >&2
+                exit 1
+              fi
+              git -C "${resolution_dir}" \
+                -c user.name='8gcr megamerge materializer' \
+                -c user.email='noreply@8gears.com' \
+                commit --quiet --no-edit
+            fi
+          done
+
+          while read -r path _; do
+            if git -C "${resolution_dir}" cat-file -e "HEAD:${path}" 2>/dev/null; then
+              mkdir -p "$(dirname "${path}")"
+              git -C "${resolution_dir}" show "HEAD:${path}" > "${path}"
+            else
+              rm -f -- "${path}"
+            fi
+          done < <(jj resolve --list)
+          jj status >/dev/null
+
+          if jj log -r '@ & conflicts()' -T 'commit_id' --no-graph 2>/dev/null | grep -q .; then
+            echo "Sequential materialization did not resolve the jj megamerge." >&2
+            exit 1
+          fi
+          cleanup_resolution
+          trap - EXIT
+          echo "Resolved megamerge from the ordered Git materialization"
+        fi
+
+        # go.sum is derived, line-independent — sole conflict? union all parents
+        if [ "$(jj resolve --list 2>/dev/null | awk '{print $1}')" = "src/go.sum" ]; then
+          for p in $(jj log -r 'parents(@)' -T 'commit_id ++ " "' --no-graph); do
+            jj file show -r "$p" src/go.sum 2>/dev/null
+          done | sort -u > src/go.sum
+          jj status > /dev/null   # snapshot resolution
+          echo "auto-resolved src/go.sum (union of all parents)"
+        fi
+
+        jj bookmark set {{.MEGAMERGE_BOOKMARK}} -r @ --allow-backwards
+        if jj log -r '@ & conflicts()' -T 'commit_id' --no-graph 2>/dev/null | grep -q .; then
+          echo "⚠ megamerge has conflicts — resolve them in the working copy,"
+          echo "  then: JJ_EDITOR=true jj squash --use-destination-message"
+        fi
+        jj new {{.MEGAMERGE_BOOKMARK}}
+
+  sync-main:
+    desc: "Merge latest {{.NEXT_REMOTE}}/{{.NEXT_BRANCH}} into 8gcr-main via git+rerere, then push"
+    dir: ..
+    cmds:
+      - |
+        set -euo pipefail
+
+        # non-default workspaces: .jj/repo is a pointer file to the real repo
+        if [ -f .jj/repo ]; then
+          jj_repo_dir=$(cd .jj && cd "$(cat repo)" && pwd)
+          repo_root=$(dirname "$(dirname "$jj_repo_dir")")
+        else
+          repo_root=$(pwd -P)
+        fi
+
+        tmp_root="${repo_root}/{{.SYNC_TMP_DIR}}"
+        worktree_dir="${tmp_root}/worktree"
+        branch_name="jj-sync-main-${GITHUB_RUN_ID:-local-$$}"
+
+        cleanup() {
+          git -C "${repo_root}" worktree remove --force "${worktree_dir}" >/dev/null 2>&1 || true
+          git -C "${repo_root}" branch -D "${branch_name}" >/dev/null 2>&1 || true
+          rm -rf "${tmp_root}"
+        }
+        cleanup
+        trap cleanup EXIT
+
+        git -C "${repo_root}" fetch {{.NEXT_REMOTE}} {{.NEXT_BRANCH}}
+
+        mkdir -p "${tmp_root}"
+        git -C "${repo_root}" worktree add -b "${branch_name}" "${worktree_dir}" {{.MAIN_BOOKMARK}}
+
+        count=$(git -C "${worktree_dir}" rev-list HEAD.."{{.NEXT_REMOTE}}/{{.NEXT_BRANCH}}" --count)
+        if [ "${count}" -eq 0 ]; then
+          echo "{{.MAIN_BOOKMARK}} already contains the latest {{.NEXT_REMOTE}}/{{.NEXT_BRANCH}} — nothing to sync"
+          exit 0
+        fi
+        echo "${count} new commit(s) from {{.NEXT_REMOTE}}/{{.NEXT_BRANCH}}"
+
+        # rerere only understands git-merge markers, so merge stays git-native
+        git -C "${worktree_dir}" config merge.ours.driver true
+        git -C "${worktree_dir}" config rerere.enabled true
+        git -C "${worktree_dir}" config rerere.autoUpdate true
+        rr_cache_dir="$(git -C "${worktree_dir}" rev-parse --git-path rr-cache)"
+        if [ -d "${repo_root}/{{.RERERE_DIR}}" ]; then
+          mkdir -p "${rr_cache_dir}"
+          cp -r "${repo_root}/{{.RERERE_DIR}}"/* "${rr_cache_dir}"/ 2>/dev/null || true
+          echo "Restored rerere cache"
+        fi
+
+        pre_merge_sha=$(git -C "${worktree_dir}" rev-parse HEAD)
+        sync_subject="chore: sync {{.NEXT_REMOTE}}/{{.NEXT_BRANCH}}"
+
+        # GITHUB_TOKEN can't push workflow files — keep ours on conflict
+        is_preserved_conflict() {
+          case "$1" in
+            .github/scripts/*|.github/workflows/*|release-please-config.json|{{.RERERE_DIR}}/*)
+              return 0 ;;
+            *)
+              return 1 ;;
+          esac
+        }
+
+        restore_pre_merge_path() {
+          f="$1"
+          if git -C "${worktree_dir}" cat-file -e "${pre_merge_sha}:${f}" 2>/dev/null; then
+            git -C "${worktree_dir}" checkout "${pre_merge_sha}" -- "${f}"
+            git -C "${worktree_dir}" add "${f}"
+          else
+            git -C "${worktree_dir}" rm -f -- "${f}"
+          fi
+        }
+
+        if ! git -C "${worktree_dir}" merge -m "${sync_subject}" "{{.NEXT_REMOTE}}/{{.NEXT_BRANCH}}"; then
+          conflicts=$(git -C "${worktree_dir}" diff --name-only --diff-filter=U)
+          if [ -z "${conflicts}" ]; then
+            echo "All conflicts resolved by rerere"
+            git -C "${worktree_dir}" commit -m "${sync_subject}"
+          elif printf '%s\n' "${conflicts}" | while IFS= read -r f; do [ -z "$f" ] || is_preserved_conflict "$f" || exit 1; done; then
+            echo "Auto-resolving preserved-path conflicts"
+            printf '%s\n' "${conflicts}" | while IFS= read -r f; do
+              [ -n "$f" ] || continue
+              restore_pre_merge_path "$f"
+            done
+            if git -C "${worktree_dir}" diff --name-only --diff-filter=U | grep -q .; then
+              echo "::error::preserved-path conflict auto-resolution left unresolved files" >&2
+              git -C "${worktree_dir}" diff --name-only --diff-filter=U >&2
+              echo "Worktree kept at ${worktree_dir} for inspection — this indicates a script bug, not a normal merge conflict." >&2
+              trap - EXIT
+              exit 1
+            fi
+            git -C "${worktree_dir}" commit -m "${sync_subject}"
+          else
+            echo "::error::Merge conflict with {{.NEXT_REMOTE}}/{{.NEXT_BRANCH}}" >&2
+            printf '%s\n' "${conflicts}" >&2
+            echo "Resolve manually in ${worktree_dir}:" >&2
+            echo "  1. edit the conflicted files, git add them" >&2
+            echo "  2. git -C ${worktree_dir} commit -m \"${sync_subject}\"" >&2
+            echo "  3. git -C ${worktree_dir} push --force-with-lease {{.REMOTE_8GCR}} HEAD:{{.NEXT_BRANCH}}" >&2
+            echo "  4. jj bookmark set {{.MAIN_BOOKMARK}} -r \$(git -C ${worktree_dir} rev-parse HEAD)" >&2
+            echo "  5. task jj:restack" >&2
+            echo "Note: re-running 'task jj:sync-main' from scratch will delete this worktree (it always" >&2
+            echo "starts from a clean slate) — finish the manual steps above first, don't re-run it on top." >&2
+            trap - EXIT
+            exit 1
+          fi
+        fi
+
+        if ! git -C "${worktree_dir}" diff --quiet "${pre_merge_sha}" HEAD -- .github/workflows/ 2>/dev/null; then
+          echo "Reverting upstream workflow changes (GITHUB_TOKEN limitation)"
+          git -C "${worktree_dir}" checkout "${pre_merge_sha}" -- .github/workflows/ 2>/dev/null || true
+          git -C "${worktree_dir}" diff --name-only --diff-filter=A "${pre_merge_sha}" HEAD -- .github/workflows/ | while read -r f; do
+            git -C "${worktree_dir}" rm -f "$f" 2>/dev/null || true
+          done
+          git -C "${worktree_dir}" commit --amend --no-edit
+        fi
+
+        test -f "${worktree_dir}/PATCHES.md" || { echo "::error::PATCHES.md missing after merge" >&2; exit 1; }
+        test -d "${worktree_dir}/.github" || { echo "::error::.github directory missing after merge" >&2; exit 1; }
+
+        if [ -d "${rr_cache_dir}" ] && [ "$(ls -A "${rr_cache_dir}" 2>/dev/null)" ]; then
+          mkdir -p "${worktree_dir}/{{.RERERE_DIR}}"
+          cp -r "${rr_cache_dir}"/* "${worktree_dir}/{{.RERERE_DIR}}/"
+          git -C "${worktree_dir}" add "{{.RERERE_DIR}}/"
+          if ! git -C "${worktree_dir}" diff --cached --quiet "{{.RERERE_DIR}}/" 2>/dev/null; then
+            git -C "${worktree_dir}" commit --amend --no-edit
+            echo "Rerere cache updated"
+          fi
+        fi
+
+        new_sha=$(git -C "${worktree_dir}" rev-parse HEAD)
+        git -C "${worktree_dir}" push --force-with-lease {{.REMOTE_8GCR}} HEAD:{{.NEXT_BRANCH}}
+
+        cleanup
+        trap - EXIT
+
+        jj bookmark set {{.MAIN_BOOKMARK}} -r "${new_sha}"
+        echo "Synced {{.MAIN_BOOKMARK}} to ${new_sha}"
+    # direct push to main = deliberate pre-existing exception to PR-only rule
+
+  restack:
+    desc: "Rebase all patch branches onto the current next/main tip (megamerge follows)"
+    cmds:
+      - task: bootstrap
+      - |
+        set -euo pipefail
+        cd "$(jj workspace root)"
+
+        # Rebase only roots we own. Immutable third-party descendants remain
+        # on their existing history instead of blocking the whole megamerge.
+        jj rebase -o '{{.NEXT_BRANCH}}@{{.NEXT_REMOTE}}' \
+          -s 'roots(({{.NEXT_BRANCH}}@{{.NEXT_REMOTE}}..{{.MEGAMERGE_BOOKMARK}}) ~ ::present({{.MAIN_BOOKMARK}}) ~ ::{{.NEXT_BRANCH}}@{{.REMOTE_8GCR}}) & mutable()' \
+          --simplify-parents
+
+        conflicted=false
+        while IFS= read -r branch; do
+          if jj log -r "${branch} & conflicts()" -T 'commit_id' --no-graph 2>/dev/null | grep -q .; then
+            conflicted=true
+          fi
+        done < <(task --output interleaved --silent patches:list)
+        for branch in '{{.DEV_BOOKMARK}}' '{{.MEGAMERGE_BOOKMARK}}'; do
+          if jj log -r "${branch} & conflicts()" -T 'commit_id' --no-graph 2>/dev/null | grep -q .; then
+            conflicted=true
+          fi
+        done
+        if [ "${conflicted}" = true ]; then
+          echo "⚠ patch branches or megamerge conflicted after restack — resolve them:"
+          echo "  jj new <conflicted rev>, edit, JJ_EDITOR=true jj squash --use-destination-message"
+        fi
+
+  sync-patch-branches:
+    desc: "Rebase all branches (patches + dev) onto next/main and force-push them to 8gcr"
+    cmds:
+      - task: restack
+      - |
+        set -euo pipefail
+        cd "$(jj workspace root)"
+        # never push conflicted branches
+        conflicted=false
+        while IFS= read -r branch; do
+          if jj log -r "${branch} & conflicts()" -T 'commit_id' --no-graph 2>/dev/null | grep -q .; then
+            conflicted=true
+          fi
+        done < <(task --output interleaved --silent patches:list)
+        for branch in '{{.DEV_BOOKMARK}}' '{{.MEGAMERGE_BOOKMARK}}'; do
+          if jj log -r "${branch} & conflicts()" -T 'commit_id' --no-graph 2>/dev/null | grep -q .; then
+            conflicted=true
+          fi
+        done
+        if [ "${conflicted}" = true ]; then
+          echo "Branches are conflicted — resolve before pushing." >&2
+          exit 1
+        fi
+        while IFS= read -r branch; do
+          jj git push --bookmark "${branch}" --remote {{.REMOTE_8GCR}}
+        done < <(task --output interleaved --silent patches:list)
+        # push dev too when it's in the megamerge
+        if jj log -r '{{.DEV_BOOKMARK}} & ::{{.MEGAMERGE_BOOKMARK}}' -T 'commit_id' --no-graph 2>/dev/null | grep -q .; then
+          jj git push --bookmark {{.DEV_BOOKMARK}} --remote {{.REMOTE_8GCR}}
+        fi
+
+  absorb:
+    desc: "Absorb working-copy changes into the owning patch branch(es)"
+    cmds:
+      - |
+        set -euo pipefail
+        cd "$(jj workspace root)"
+        jj absorb
+        if jj log -r '{{.MEGAMERGE_BOOKMARK}} & conflicts()' -T 'commit_id' --no-graph 2>/dev/null | grep -q .; then
+          echo "⚠ an absorbed hunk landed on a previously-resolved overlap — megamerge re-conflicted:"
+          echo "  jj new {{.MEGAMERGE_BOOKMARK}}, edit, jj squash"
+        fi
+
+  new-branch:
+    desc: "Start a new commercial patch branch (usage: task jj:new-branch NAME=0006-foo)"
+    requires:
+      vars: [NAME]
+    cmds:
+      - |
+        set -euo pipefail
+        cd "$(jj workspace root)"
+        # parent on next/main — patch diff must be pure
+        jj new '{{.NEXT_BRANCH}}@{{.NEXT_REMOTE}}'
+        jj bookmark create {{.NAME}} -r @
+        echo "Created '{{.NAME}}' off {{.NEXT_BRANCH}}@{{.NEXT_REMOTE}}. Do the work, then:"
+        echo "  jj describe -m \"<subject>\""
+        echo "  task jj:setup-dev   # rebuild picks the new branch up automatically"
+        echo "  task jj:sync-patch-branches"

@@ -1,3 +1,9 @@
+<div class="artifact-label" *ngIf="isBootcArtifact()">
+    <div class="label">
+        <img [src]="'images/artifact-bootc.svg'" class="artifact-icon" />
+        <span>Bootc</span>
+    </div>
+</div>
 <div class="artifact-label" *ngIf="type === 'CNAI'">
     <div class="label" *ngIf="artifactExtraAttrs.config.architecture">
         <img

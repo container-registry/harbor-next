@@ -44,6 +44,7 @@ type Robot struct {
 	Level           string
 	Editable        bool          `json:"editable"`
 	Permissions     []*Permission `json:"permissions"`
+	FederatedIdpID  int64         `json:"federatedidp_id,omitempty"`
 }
 
 // IsSysLevel, true is a system level robot, others are project level.

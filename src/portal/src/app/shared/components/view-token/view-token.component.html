@@ -181,12 +181,17 @@
                             shape="info-circle"></clr-icon>
                     </div>
                     <span class="alert-text">{{
-                        'ROBOT_ACCOUNT.ALERT_TEXT' | translate
+                        (robot?.federatedidp_id
+                            ? 'ROBOT_ACCOUNT.FEDERATED_ALERT_TEXT'
+                            : 'ROBOT_ACCOUNT.ALERT_TEXT'
+                        ) | translate
                     }}</span>
                 </div>
             </div>
         </div>
-        <section class="form-block show-info">
+        <section
+            class="form-block show-info"
+            *ngIf="!robot?.federatedidp_id || robot?.federatedidp_id === 0">
             <div class="form-group robot-name">
                 <label class="form-group-label-override">{{
                     'ROBOT_ACCOUNT.NAME' | translate
@@ -208,6 +213,82 @@
             <a [href]="downLoadHref" [download]="downLoadFileName"
                 ><button class="btn mr-0" (click)="closeModal()">
                     {{ 'ROBOT_ACCOUNT.EXPORT_TO_FILE' | translate }}
+                </button></a
+            >
+        </section>
+        <section class="form-block show-info" *ngIf="robot?.federatedidp_id">
+            <div class="form-group robot-name">
+                <label class="form-group-label-override">{{
+                    'ROBOT_ACCOUNT.NAME' | translate
+                }}</label>
+                <span>{{ robot?.name }}</span>
+            </div>
+
+            <!-- Inherited Claims Section (from IDP) -->
+            <div class="form-group robot-name" *ngIf="inheritedClaims?.length">
+                <div class="form-group-label-override">
+                    <label class="clr-control-label mt-16">{{
+                        'ROBOT_ACCOUNT.INHERITED_CLAIMS' | translate
+                    }}</label>
+                </div>
+                <clr-input-container
+                    *ngFor="let claim of inheritedClaims; let i = index">
+                    <input
+                        class="mr-10"
+                        autocomplete="off"
+                        clrInput
+                        type="text"
+                        placeholder="Claim Path"
+                        [(ngModel)]="claim.path"
+                        disabled
+                        size="30"
+                        name="inherited_claim_path_{{ i }}" />
+                    <input
+                        autocomplete="off"
+                        clrInput
+                        type="text"
+                        placeholder="Claim Value"
+                        [(ngModel)]="claim.value"
+                        disabled
+                        size="30"
+                        name="inherited_claim_value_{{ i }}" />
+                </clr-input-container>
+            </div>
+
+            <!-- Robot Claims Section (robot-specific) -->
+            <div class="form-group robot-name" *ngIf="claims?.length">
+                <div class="form-group-label-override">
+                    <label class="clr-control-label mt-16">{{
+                        'ROBOT_ACCOUNT.ROBOT_CLAIMS' | translate
+                    }}</label>
+                </div>
+                <clr-input-container
+                    *ngFor="let claim of claims; let i = index">
+                    <input
+                        class="mr-10"
+                        autocomplete="off"
+                        clrInput
+                        type="text"
+                        placeholder="Claim Path"
+                        [(ngModel)]="claim.path"
+                        disabled
+                        size="30"
+                        name="robot_claim_path_{{ i }}" />
+                    <input
+                        autocomplete="off"
+                        clrInput
+                        type="text"
+                        placeholder="Claim Value"
+                        [(ngModel)]="claim.value"
+                        disabled
+                        size="30"
+                        name="robot_claim_value_{{ i }}" />
+                </clr-input-container>
+            </div>
+
+            <a
+                ><button class="btn mr-0" (click)="closeModal()">
+                    {{ 'ROBOT_ACCOUNT.CLOSE' | translate }}
                 </button></a
             >
         </section>

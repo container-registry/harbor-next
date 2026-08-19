@@ -1,33 +1,190 @@
-<div class="row content-wrapper" *ngIf="!loading">
-    <div class="col-md-8 md-container">
+<div class="row content-wrapper" *ngIf="!loading && isMaven">
+    <div class="col-md-12">
+        <clr-datagrid>
+            <clr-dg-column>{{
+                'ARTIFACT.MAVEN_FILE_FILENAME' | translate
+            }}</clr-dg-column>
+            <clr-dg-column>{{
+                'ARTIFACT.MAVEN_FILE_CLASSIFIER' | translate
+            }}</clr-dg-column>
+            <clr-dg-column>{{
+                'ARTIFACT.MAVEN_FILE_EXTENSION' | translate
+            }}</clr-dg-column>
+            <clr-dg-column>{{
+                'ARTIFACT.MAVEN_FILE_TYPE' | translate
+            }}</clr-dg-column>
+            <clr-dg-column>{{
+                'ARTIFACT.MAVEN_FILE_SIZE' | translate
+            }}</clr-dg-column>
+            <clr-dg-column>{{
+                'ARTIFACT.MAVEN_FILE_CHECKSUM' | translate
+            }}</clr-dg-column>
+            <clr-dg-row *ngFor="let file of mavenFiles">
+                <clr-dg-cell>{{ file.filename }}</clr-dg-cell>
+                <clr-dg-cell>{{ file.classifier || '-' }}</clr-dg-cell>
+                <clr-dg-cell>{{ file.extension }}</clr-dg-cell>
+                <clr-dg-cell>{{ mavenFileType(file) }}</clr-dg-cell>
+                <clr-dg-cell>{{ sizeTransform(file.size + '') }}</clr-dg-cell>
+                <clr-dg-cell class="checksum-cell">{{
+                    shortDigest(file.digest)
+                }}</clr-dg-cell>
+            </clr-dg-row>
+            <clr-dg-placeholder>{{
+                'ARTIFACT.NO_FILES' | translate
+            }}</clr-dg-placeholder>
+        </clr-datagrid>
+    </div>
+</div>
+<div class="row content-wrapper" *ngIf="!loading && !isMaven">
+    <div class="col-md-12 md-container">
         <div *ngIf="filesList && filesList.length > 0" class="md-div">
-            <clr-tree>
-                <clr-tree-node
-                    *clrRecursiveFor="
-                        let file of filesList;
-                        getChildren: getChildren
-                    "
-                    [(clrExpanded)]="file.expanded">
-                    <div class="file">
-                        <div>
-                            <clr-icon
-                                size="20"
-                                solid
-                                [attr.shape]="
-                                    file.children
-                                        ? file.expanded
-                                            ? 'folder-open'
-                                            : 'folder'
-                                        : 'file'
-                                "></clr-icon>
-                            {{ file.name }}
-                        </div>
-                        <div *ngIf="file.size === 0 || file.size">
-                            {{ sizeTransform(file.size + '') }}
-                        </div>
+            <ng-container *ngIf="isFlatFiles(); else fileTree">
+                <div class="file-summary">
+                    <div class="file-summary-item">
+                        <span class="file-summary-label">Total Files</span>
+                        <span class="file-summary-value">{{
+                            totalFiles
+                        }}</span>
+                        <span class="file-summary-hint">{{
+                            folderCountLabel()
+                        }}</span>
                     </div>
-                </clr-tree-node>
-            </clr-tree>
+                    <div class="file-summary-item">
+                        <span class="file-summary-label">Unpacked Size</span>
+                        <span class="file-summary-value">
+                            {{ sizeTransform(totalSize + '') }}
+                        </span>
+                    </div>
+                    <div class="file-summary-item">
+                        <span class="file-summary-label">File Types</span>
+                        <span class="file-summary-value">{{
+                            fileTypes.length
+                        }}</span>
+                        <span class="file-summary-hint">{{
+                            fileTypesLabel()
+                        }}</span>
+                    </div>
+                </div>
+                <div class="file-toolbar">
+                    <label class="file-search">
+                        <clr-icon shape="search"></clr-icon>
+                        <input
+                            class="clr-input"
+                            type="text"
+                            placeholder="Search files..."
+                            [ngModel]="searchText"
+                            (ngModelChange)="onSearch($event)" />
+                    </label>
+                    <select
+                        class="clr-select file-type-select"
+                        [ngModel]="selectedType"
+                        (ngModelChange)="onTypeChange($event)">
+                        <option value="all">All File Types</option>
+                        <option *ngFor="let type of fileTypes" [value]="type">
+                            {{ typeOptionLabel(type) }}
+                        </option>
+                    </select>
+                </div>
+                <div class="file-table-wrapper">
+                    <table class="table table-noborder file-table">
+                        <thead>
+                            <tr>
+                                <th>{{ 'ARTIFACT.NAME' | translate }}</th>
+                                <th>Type</th>
+                                <th>Size</th>
+                                <th>Path</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                *ngFor="let file of visibleRows"
+                                [class.file-row-folder]="
+                                    file.type === 'directory'
+                                "
+                                (click)="toggleDirectory(file)">
+                                <td>
+                                    <div
+                                        class="file-name"
+                                        [class.file-name-folder]="
+                                            file.type === 'directory'
+                                        "
+                                        [style.padding-left]="rowIndent(file)">
+                                        <span
+                                            *ngIf="file.type === 'directory'"
+                                            class="file-toggle">
+                                            <clr-icon
+                                                [attr.shape]="
+                                                    file.expanded
+                                                        ? 'angle down'
+                                                        : 'angle right'
+                                                "></clr-icon>
+                                        </span>
+                                        <span
+                                            *ngIf="file.type === 'file'"
+                                            class="file-spacer"></span>
+                                        <clr-icon
+                                            class="file-icon"
+                                            [attr.shape]="
+                                                file.type === 'directory'
+                                                    ? file.expanded
+                                                        ? 'folder-open'
+                                                        : 'folder'
+                                                    : 'file'
+                                            "></clr-icon>
+                                        <span>{{ file.name }}</span>
+                                    </div>
+                                </td>
+                                <td>{{ typeLabel(file) }}</td>
+                                <td>
+                                    <span
+                                        *ngIf="
+                                            file.type === 'file';
+                                            else folderSize
+                                        ">
+                                        {{ sizeTransform(file.size + '') }}
+                                    </span>
+                                    <ng-template #folderSize>-</ng-template>
+                                </td>
+                                <td>{{ displayPath(file) }}</td>
+                            </tr>
+                            <tr *ngIf="visibleRows.length === 0">
+                                <td colspan="4">
+                                    {{ 'ARTIFACT.NO_FILES' | translate }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </ng-container>
+            <ng-template #fileTree>
+                <clr-tree>
+                    <clr-tree-node
+                        *clrRecursiveFor="
+                            let file of filesList;
+                            getChildren: getChildren
+                        "
+                        [(clrExpanded)]="file.expanded">
+                        <div class="file">
+                            <div>
+                                <clr-icon
+                                    size="20"
+                                    solid
+                                    [attr.shape]="
+                                        file.children
+                                            ? file.expanded
+                                                ? 'folder-open'
+                                                : 'folder'
+                                            : 'file'
+                                    "></clr-icon>
+                                {{ file.name }}
+                            </div>
+                            <div *ngIf="file.size === 0 || file.size">
+                                {{ sizeTransform(file.size + '') }}
+                            </div>
+                        </div>
+                    </clr-tree-node>
+                </clr-tree>
+            </ng-template>
         </div>
         <div class="pl-1" *ngIf="filesList && filesList.length === 0">
             {{ 'ARTIFACT.NO_FILES' | translate }}

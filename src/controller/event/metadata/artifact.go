@@ -58,18 +58,22 @@ func (p *PushArtifactEventMetadata) Resolve(event *event.Event) error {
 
 // PullArtifactEventMetadata is the metadata from which the pull artifact event can be resolved
 type PullArtifactEventMetadata struct {
-	Artifact *artifact.Artifact
-	Tag      string
-	Operator string
+	Artifact      *artifact.Artifact
+	Tag           string
+	Operator      string
+	ClientAddress string
+	UserAgent     string
 }
 
 // Resolve to the event from the metadata
 func (p *PullArtifactEventMetadata) Resolve(event *event.Event) error {
 	ae := &event2.ArtifactEvent{
-		EventType:  event2.TopicPullArtifact,
-		Repository: p.Artifact.RepositoryName,
-		Artifact:   p.Artifact,
-		OccurAt:    time.Now(),
+		EventType:     event2.TopicPullArtifact,
+		Repository:    p.Artifact.RepositoryName,
+		Artifact:      p.Artifact,
+		OccurAt:       time.Now(),
+		ClientAddress: p.ClientAddress,
+		UserAgent:     p.UserAgent,
 	}
 	if p.Tag != "" {
 		ae.Tags = []string{p.Tag}

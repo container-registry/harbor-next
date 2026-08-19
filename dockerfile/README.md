@@ -13,6 +13,7 @@ All Dockerfiles support multi-architecture builds (linux/amd64, linux/arm64). Bu
 | portal | `portal.dockerfile` | [DHI](#docker-hardened-images-dhi) nginx (debian13) | Multi-stage: Bun/Node Angular build → nginx |
 | registry | `registry.dockerfile` | scratch | Multi-stage: Go build of distribution/distribution |
 | trivy-adapter | `trivy-adapter.dockerfile` | aquasec/trivy | Multi-stage: Go build of harbor-scanner-trivy |
+| grype-scanner | `grype-scanner.dockerfile` | Alpine | Multi-stage: Go adapter build + Syft/Grype binaries |
 
 Dev Dockerfiles (`dev.core.dockerfile`, `dev.portal.dockerfile`) are used by the dev environment for hot reload.
 
@@ -24,6 +25,9 @@ task image:core
 
 # All images
 task image:all-images
+
+# Grype scanner adapter
+task image:grype-scanner
 
 # Manual build (binary-based — build binary first)
 task build:binary:core:linux-amd64

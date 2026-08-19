@@ -1,7 +1,40 @@
-<ng-container *ngIf="additionLinks">
+<ng-container *ngIf="additionLinks || isNpmPackage() || isMultiFormat()">
     <h4 class="margin-bottom-025">{{ 'ARTIFACT.ADDITIONS' | translate }}</h4>
     <div class="min-15">
         <clr-tabs #additionsTab>
+            <clr-tab *ngIf="getSummary()">
+                <button
+                    clrTabLink
+                    id="summary-link"
+                    (click)="actionTab('summary-link')">
+                    {{ 'ARTIFACT.SUMMARY' | translate }}
+                </button>
+                <ng-template
+                    [clrIfActive]="currentTabLinkId === 'summary-link'">
+                    <clr-tab-content id="summary-content">
+                        <hbr-artifact-summary
+                            *ngIf="currentTabLinkId === 'summary-link'"
+                            [summaryLink]="getSummary()"
+                            [artifactDetails]="artifact"></hbr-artifact-summary>
+                    </clr-tab-content>
+                </ng-template>
+            </clr-tab>
+            <clr-tab *ngIf="getLicense()">
+                <button
+                    clrTabLink
+                    id="license-link"
+                    (click)="actionTab('license-link')">
+                    {{ 'ARTIFACT.LICENSE' | translate }}
+                </button>
+                <ng-template
+                    [clrIfActive]="currentTabLinkId === 'license-link'">
+                    <clr-tab-content id="license-content">
+                        <hbr-artifact-license
+                            *ngIf="currentTabLinkId === 'license-link'"
+                            [licenseLink]="getLicense()"></hbr-artifact-license>
+                    </clr-tab-content>
+                </ng-template>
+            </clr-tab>
             <clr-tab *ngIf="getVulnerability()">
                 <button
                     clrTabLink
@@ -62,55 +95,39 @@
                     </clr-tab-content>
                 </ng-template>
             </clr-tab>
-            <clr-tab *ngIf="getSummary()">
+            <clr-tab *ngIf="getVersions()">
                 <button
                     clrTabLink
-                    id="summary-link"
-                    (click)="actionTab('summary-link')">
-                    {{ 'ARTIFACT.SUMMARY' | translate }}
+                    id="versions-link"
+                    (click)="actionTab('versions-link')">
+                    {{ 'ARTIFACT.VERSIONS' | translate }}
                 </button>
                 <ng-template
-                    [clrIfActive]="currentTabLinkId === 'summary-link'">
-                    <clr-tab-content id="summary-content">
-                        <hbr-artifact-summary
-                            *ngIf="currentTabLinkId === 'summary-link'"
-                            [summaryLink]="getSummary()"
-                            [artifactDetails]="artifact"></hbr-artifact-summary>
+                    [clrIfActive]="currentTabLinkId === 'versions-link'">
+                    <clr-tab-content id="versions-content">
+                        <hbr-artifact-versions
+                            *ngIf="currentTabLinkId === 'versions-link'"
+                            [versionsLink]="
+                                getVersions()
+                            "></hbr-artifact-versions>
                     </clr-tab-content>
                 </ng-template>
             </clr-tab>
-            <clr-tab *ngIf="getLicense()">
-                <button
-                    clrTabLink
-                    id="license-link"
-                    (click)="actionTab('license-link')">
-                    {{ 'ARTIFACT.LICENSE' | translate }}
+            <clr-tab *ngIf="isMultiFormat()">
+                <button clrTabLink id="usage" (click)="actionTab('usage')">
+                    {{ 'ARTIFACT.USAGE' | translate }}
                 </button>
-                <ng-template
-                    [clrIfActive]="currentTabLinkId === 'license-link'">
-                    <clr-tab-content id="license-content">
-                        <hbr-artifact-license
-                            *ngIf="currentTabLinkId === 'license-link'"
-                            [licenseLink]="getLicense()"></hbr-artifact-license>
+                <ng-template [clrIfActive]="currentTabLinkId === 'usage'">
+                    <clr-tab-content id="usage-content">
+                        <hbr-artifact-usage
+                            *ngIf="currentTabLinkId === 'usage'"
+                            [artifact]="artifact"
+                            [registryUrl]="registryUrl"
+                            [projectName]="projectName"></hbr-artifact-usage>
                     </clr-tab-content>
                 </ng-template>
             </clr-tab>
-            <clr-tab *ngIf="getFile()">
-                <button
-                    clrTabLink
-                    id="files-link"
-                    (click)="actionTab('files-link')">
-                    {{ 'ARTIFACT.FILES' | translate }}
-                </button>
-                <ng-template [clrIfActive]="currentTabLinkId === 'files-link'">
-                    <clr-tab-content id="files-content">
-                        <hbr-artifact-files
-                            *ngIf="currentTabLinkId === 'files-link'"
-                            [filesLink]="getFile()"></hbr-artifact-files>
-                    </clr-tab-content>
-                </ng-template>
-            </clr-tab>
-            <clr-tab *ngIf="getDependencies()">
+            <clr-tab *ngIf="hasDependenciesTab()">
                 <button
                     clrTabLink
                     id="depend-link"
@@ -121,9 +138,29 @@
                     <clr-tab-content id="depend-content">
                         <hbr-artifact-dependencies
                             *ngIf="currentTabLinkId === 'depend-link'"
-                            [dependenciesLink]="
-                                getDependencies()
+                            [dependenciesLink]="getDependencies()"
+                            [dependencyList]="
+                                getMockDependencies()
                             "></hbr-artifact-dependencies>
+                    </clr-tab-content>
+                </ng-template>
+            </clr-tab>
+            <clr-tab *ngIf="hasFilesTab()">
+                <button
+                    clrTabLink
+                    id="files-link"
+                    (click)="actionTab('files-link')">
+                    {{ 'ARTIFACT.FILES' | translate }}
+                </button>
+                <ng-template [clrIfActive]="currentTabLinkId === 'files-link'">
+                    <clr-tab-content id="files-content">
+                        <hbr-artifact-files
+                            *ngIf="currentTabLinkId === 'files-link'"
+                            [filesLink]="getFile()"
+                            [filesList]="getMockFiles()"
+                            [unpackedSize]="
+                                getNpmUnpackedSize()
+                            "></hbr-artifact-files>
                     </clr-tab-content>
                 </ng-template>
             </clr-tab>

@@ -75,7 +75,8 @@ NO_PROXY=localhost,127.0.0.1,core,registry,registryctl
 
 ## Architecture
 
-Portal (nginx) serves the Angular UI and reverse-proxies `/v2/`, `/api/`, `/service/`, and `/c/` to Core.
+Portal (nginx) serves the Angular UI and reverse-proxies Harbor API and package
+routes—including `/npm/`, `/maven/`, and `/pypi/`—to Core.
 
 <!--
 ```SVGBob
@@ -119,7 +120,7 @@ Portal (nginx) serves the Angular UI and reverse-proxies `/v2/`, `/api/`, `/serv
 -->
 ![Diagram](https://kroki.io/svgbob/svg/eNpTUMAFlKxMTIwVNDxCQgKCNRUU9BUUrCwMIHxNJS4FosCjKU3Eqpy2h4uQWT2PpjSQiCYQNLQJ7NeA_KKSxBwl4twM06SRl56ZV6GpRKSmKTjcuAa382cMs3BWUHLOL0pVUiAtnIHpzsKAeE1TcAcsLhFs4UxiOMxA8Sfu2CY6-IAxhSMCCccr6XE4gY660DwMCjMlr_yk4NSissxkUOqAhCKYVApKTc8sLimqVFJAFocLO5fkKKEnC0S6AQIlBRSNYHFTAwMDbOK40hmJsQlNDaTn-Bm0LyeI8cgaCm0hr2QirZSieYmF5gmlImiC001JLElUItFfkBSmpFGWn1Oam0pkjUF6xGHE10AUCVgyYkhRZlkleoZTcq0oANa6qUVKCtgzsJJjSmIBQh6pdMWVvKidTwd1wALbLMUl6UWpwYE-SuglWVBqSmaxkoICzpLR1MTYCFsJaGZsbqk0gAELAEZlQZE=)
 
-- **Portal (nginx)** — serves the static Angular UI and reverse-proxies `/v2/*`, `/api/*`, `/service/*`, and `/c/*` to Core.
+- **Portal (nginx)** — serves the static Angular UI and reverse-proxies API and package routes (`/npm/*`, `/maven/*`, and `/pypi/*`) to Core.
 - **Core** (`:8080`) — API gateway, authentication, and business logic.
 - **JobService** (`:8888`) — asynchronous jobs (scan, replication, GC, retention).
 - **Registry** (`:5000`) — `docker/distribution`; blob/manifest storage.

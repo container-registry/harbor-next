@@ -31,6 +31,7 @@ import (
 	"github.com/goharbor/harbor/src/lib"
 	cfgLib "github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/log"
+	"github.com/goharbor/harbor/src/lib/metric"
 	"github.com/goharbor/harbor/src/lib/retry"
 	tracelib "github.com/goharbor/harbor/src/lib/trace"
 	_ "github.com/goharbor/harbor/src/pkg/accessory/model/attestation"
@@ -91,6 +92,16 @@ func main() {
 
 	cfgLib.InitTraceConfig(ctx)
 	defer tracelib.InitGlobalTracer(context.Background()).Shutdown()
+
+	db, err := cfgLib.Database()
+	if err != nil {
+		log.Fatalf("failed to get database configuration: %v", err)
+	}
+	if db.PostGreSQL != nil && db.PostGreSQL.MetricsEnabled {
+		if err := metric.InitMeterProvider(); err != nil {
+			log.Fatalf("init meter provider: %v", err)
+		}
+	}
 
 	// Set job context initializer
 	runtime.JobService.SetJobContextInitializer(func(ctx context.Context) (job.Context, error) {

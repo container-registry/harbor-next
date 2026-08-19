@@ -94,6 +94,12 @@ func (p *Project) IsProxy() bool {
 	return p.RegistryID > 0
 }
 
+// ProxyCacheAllowPush returns true when clients may publish to the proxy cache project.
+func (p *Project) ProxyCacheAllowPush() bool {
+	allow, exist := p.GetMetadata(ProMetaProxyCacheAllowPush)
+	return exist && isTrue(allow)
+}
+
 // ContentTrustEnabled ...
 func (p *Project) ContentTrustEnabled() bool {
 	enabled, exist := p.GetMetadata(ProMetaEnableContentTrust)

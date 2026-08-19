@@ -139,7 +139,7 @@ func Login(ctx context.Context, m models.AuthModel) (*models.User, error) {
 	if err != nil {
 		return nil, err
 	}
-	if authMode == "" || IsSuperUser(ctx, m.Principal) {
+	if authMode == "" || IsDBUser(ctx, m.Principal) {
 		authMode = common.DBAuth
 	}
 	log.Debug("Current AUTH_MODE is ", authMode)
@@ -254,6 +254,17 @@ func PostAuthenticate(ctx context.Context, u *models.User) error {
 		return err
 	}
 	return helper.PostAuthenticate(ctx, u)
+}
+
+// IsDBUser checks if the user is from DB of Harbor
+func IsDBUser(ctx context.Context, username string) bool {
+	u, err := user.Mgr.GetByName(ctx, username)
+	if err != nil {
+		// LDAP user can't be found before onboard to Harbor
+		log.Debugf("Failed to get user from DB, username: %s, error: %v", username, err)
+		return false
+	}
+	return u.UserID > 0
 }
 
 // IsSuperUser checks if the user is super user(conventionally id == 1) of Harbor

@@ -17,6 +17,7 @@ package main
 import (
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/goharbor/harbor/src/common/dao"
 	"github.com/goharbor/harbor/src/common/models"
@@ -26,12 +27,14 @@ import (
 
 // key: env var, value: default value
 var defaultAttrs = map[string]string{
-	"POSTGRESQL_HOST":     "localhost",
-	"POSTGRESQL_PORT":     "5432",
-	"POSTGRESQL_USERNAME": "postgres",
-	"POSTGRESQL_PASSWORD": "password",
-	"POSTGRESQL_DATABASE": "registry",
-	"POSTGRESQL_SSLMODE":  "disable",
+	"POSTGRESQL_HOST":         "localhost",
+	"POSTGRESQL_PORT":         "5432",
+	"POSTGRESQL_USERNAME":     "postgres",
+	"POSTGRESQL_PASSWORD":     "password",
+	"POSTGRESQL_DATABASE":     "registry",
+	"POSTGRESQL_SSLMODE":      "disable",
+	"POSTGRESQL_USE_IAM_AUTH": "false",
+	"POSTGRESQL_AWS_REGION":   "",
 }
 
 func main() {
@@ -46,6 +49,8 @@ func main() {
 			Database:     getAttr("POSTGRESQL_DATABASE"),
 			SSLMode:      getAttr("POSTGRESQL_SSLMODE"),
 			MaxOpenConns: 5,
+			UseIAMAuth:   strings.EqualFold(getAttr("POSTGRESQL_USE_IAM_AUTH"), "true"),
+			AWSRegion:    getAttr("POSTGRESQL_AWS_REGION"),
 		},
 	}
 

@@ -34,14 +34,15 @@ export class AboutDialogComponent implements OnInit {
 
     ngOnInit(): void {
         // custom skin
-        let customSkinObj = this.skinableConfig.getSkinConfig();
-        if (customSkinObj) {
-            if (customSkinObj.product) {
-                this.customLogo = customSkinObj.product.logo;
-                this.customName = customSkinObj.product.name;
-                this.customIntroduction = customSkinObj.product.introduction;
-            }
-        }
+        this.skinableConfig.getBrandingInfo(false).subscribe({
+            next: branding => {
+                if (branding?.product) {
+                    this.customLogo = branding.product.logo;
+                    this.customName = branding.product.name;
+                    this.customIntroduction = branding.product.introduction;
+                }
+            },
+        });
     }
 
     public get version(): string {

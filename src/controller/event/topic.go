@@ -145,13 +145,15 @@ func (d *DeleteRepositoryEvent) String() string {
 
 // ArtifactEvent is the pushing/pulling artifact event
 type ArtifactEvent struct {
-	EventType  string
-	Repository string
-	Artifact   *artifact.Artifact
-	Tags       []string // when the artifact is pushed by digest, the tag here will be null
-	Labels     []string
-	Operator   string
-	OccurAt    time.Time
+	EventType     string
+	Repository    string
+	Artifact      *artifact.Artifact
+	Tags          []string // when the artifact is pushed by digest, the tag here will be null
+	Labels        []string
+	Operator      string
+	OccurAt       time.Time
+	ClientAddress string
+	UserAgent     string
 }
 
 func (a *ArtifactEvent) String() string {
@@ -175,6 +177,7 @@ func (p *PushArtifactEvent) ResolveToAuditLog() (*model.AuditLogExt, error) {
 		IsSuccessful:         true,
 		OperationDescription: fmt.Sprintf("push artifact: %s@%s", p.Artifact.RepositoryName, p.Artifact.Digest),
 		ResourceType:         ResourceTypeArtifact}
+	populateArtifactAudit(auditLog, p.ArtifactEvent)
 
 	if len(p.Tags) == 0 {
 		auditLog.Resource = fmt.Sprintf("%s@%s",
@@ -206,6 +209,7 @@ func (p *PullArtifactEvent) ResolveToAuditLog() (*model.AuditLogExt, error) {
 		IsSuccessful:         true,
 		OperationDescription: fmt.Sprintf("pull artifact: %s@%s", p.Artifact.RepositoryName, p.Artifact.Digest),
 		ResourceType:         ResourceTypeArtifact}
+	populateArtifactAudit(auditLog, p.ArtifactEvent)
 
 	if len(p.Tags) == 0 {
 		auditLog.Resource = fmt.Sprintf("%s@%s",
@@ -245,7 +249,21 @@ func (d *DeleteArtifactEvent) ResolveToAuditLog() (*model.AuditLogExt, error) {
 		IsSuccessful:         true,
 		OperationDescription: fmt.Sprintf("delete artifact: %s@%s", d.Artifact.RepositoryName, d.Artifact.Digest),
 		Resource:             fmt.Sprintf("%s@%s", d.Artifact.RepositoryName, d.Artifact.Digest)}
+	populateArtifactAudit(auditLog, d.ArtifactEvent)
 	return auditLog, nil
+}
+
+func populateArtifactAudit(auditLog *model.AuditLogExt, event *ArtifactEvent) {
+	if auditLog == nil || event == nil || event.Artifact == nil {
+		return
+	}
+	auditLog.ClientAddress = event.ClientAddress
+	auditLog.UserAgent = event.UserAgent
+	auditLog.ArtifactRepository = event.Artifact.RepositoryName
+	auditLog.ArtifactDigest = event.Artifact.Digest
+	if len(event.Tags) > 0 {
+		auditLog.ArtifactTag = event.Tags[0]
+	}
 }
 
 func (d *DeleteArtifactEvent) String() string {

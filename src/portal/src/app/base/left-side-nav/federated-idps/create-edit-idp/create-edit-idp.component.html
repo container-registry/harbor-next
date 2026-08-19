@@ -1,0 +1,291 @@
+<clr-modal
+    [(clrModalOpen)]="createEditIdpOpened"
+    [clrModalStaticBackdrop]="staticBackdrop"
+    [clrModalClosable]="closable">
+    <h3 class="modal-title">{{ modalTitle }}</h3>
+    <div class="modal-body overflow-visible">
+        <inline-alert
+            class="modal-title"
+            (confirmEvt)="confirmCancel($event)"></inline-alert>
+        <form #targetForm="ngForm" class="clr-form clr-form-horizontal">
+            <!-- Federated IDP name -->
+            <clr-input-container>
+                <label class="required">{{
+                    'DESTINATION.NAME' | translate
+                }}</label>
+                <input
+                    autocomplete="off"
+                    clrInput
+                    type="text"
+                    id="idp_name"
+                    [disabled]="testOngoing || target.id !== undefined"
+                    [readonly]="!editable"
+                    [(ngModel)]="target.name"
+                    [required]="true"
+                    name="targetName"
+                    size="30"
+                    maxlength="64"
+                    pattern="[a-z0-9]+([._-][a-z0-9]+)*"
+                    #targetName="ngModel"
+                    required />
+                <clr-control-error
+                    *ngIf="
+                        targetName.errors &&
+                        targetName.errors.required &&
+                        (targetName.dirty || targetName.touched)
+                    ">
+                    {{ 'DESTINATION.NAME_IS_REQUIRED' | translate }}
+                </clr-control-error>
+                <clr-control-error
+                    *ngIf="
+                        targetName.errors &&
+                        targetName.errors.pattern &&
+                        (targetName.dirty || targetName.touched)
+                    ">
+                    {{ 'FEDERATED_IDPS.NAME_PATTERN_ERROR' | translate }}
+                </clr-control-error>
+            </clr-input-container>
+            <!--Description-->
+            <clr-textarea-container>
+                <label>{{ 'REPLICATION.DESCRIPTION' | translate }}</label>
+                <textarea
+                    clrTextarea
+                    type="text"
+                    class="inputWidth"
+                    row="3"
+                    name="description"
+                    [(ngModel)]="target.description"></textarea>
+            </clr-textarea-container>
+            <!-- OpenIDConfig URL -->
+            <div class="clr-form-control">
+                <label
+                    for="openidconfig_url"
+                    [class.disabled]="
+                        target.id !== undefined || target.offline_validation
+                    "
+                    [class.required]="!target.offline_validation"
+                    class="clr-control-label">
+                    {{ 'FEDERATED_IDPS.OPENIDCONFIG_URL' | translate }}
+                </label>
+                <div
+                    class="clr-control-container"
+                    [class.clr-error]="
+                        openidConfigUrl?.errors &&
+                        openidConfigUrl.errors.required &&
+                        (openidConfigUrl.dirty || openidConfigUrl.touched)
+                    ">
+                    <div class="clr-input-wrapper position-relative">
+                        <input
+                            autocomplete="off"
+                            (blur)="fetchOpenIDConfig()"
+                            class="clr-input endpoint-input"
+                            type="text"
+                            id="openidconfig_url"
+                            [readonly]="!editable"
+                            [disabled]="
+                                target.id !== undefined ||
+                                target.offline_validation
+                            "
+                            [(ngModel)]="target.openid_config_url"
+                            size="28"
+                            name="openidconfig_url"
+                            #openidConfigUrl="ngModel"
+                            [required]="!target.offline_validation"
+                            placeholder="https://kubernetes.cluster.com/.well-known/openid-configuration" />
+                        <clr-icon
+                            *ngIf="
+                                openidConfigUrl?.errors &&
+                                openidConfigUrl.errors.required &&
+                                (openidConfigUrl.dirty ||
+                                    openidConfigUrl.touched)
+                            "
+                            class="clr-validate-icon"
+                            shape="exclamation-circle">
+                        </clr-icon>
+                    </div>
+                    <clr-control-error
+                        *ngIf="
+                            openidConfigUrl?.errors &&
+                            openidConfigUrl.errors.required &&
+                            (openidConfigUrl.dirty || openidConfigUrl.touched)
+                        ">
+                        {{
+                            'FEDERATED_IDPS.OPENIDCONFIG_URL_REQUIRED'
+                                | translate
+                        }}
+                    </clr-control-error>
+                </div>
+            </div>
+            <!-- Offline Validation -->
+            <clr-checkbox-container>
+                <label
+                    class="destination-insecure-label"
+                    id="offline_validation_checkbox"
+                    for="offline_validation"
+                    ><span>{{
+                        'FEDERATED_IDPS.OFFLINE_VALIDATION' | translate
+                    }}</span>
+                    <clr-tooltip>
+                        <clr-icon
+                            clrTooltipTrigger
+                            shape="info-circle"
+                            size="24"></clr-icon>
+                        <clr-tooltip-content
+                            clrPosition="top-right"
+                            clrSize="md"
+                            *clrIfOpen>
+                            {{
+                                'FEDERATED_IDPS.OFFLINE_VALIDATION_TOOLTIP'
+                                    | translate
+                            }}
+                        </clr-tooltip-content>
+                    </clr-tooltip>
+                </label>
+                <clr-checkbox-wrapper>
+                    <input
+                        type="checkbox"
+                        clrCheckbox
+                        #offline_validation
+                        id="offline_validation"
+                        name="offline_validation"
+                        [disabled]="target.id !== undefined"
+                        [ngModel]="target.offline_validation"
+                        (ngModelChange)="setOfflineValidation($event)" />
+                </clr-checkbox-wrapper>
+            </clr-checkbox-container>
+            <!-- Issuer -->
+            <div class="clr-form-control">
+                <label class="clr-control-label" [class.disabled]="true">{{
+                    'FEDERATED_IDPS.ISSUER' | translate
+                }}</label>
+                <div class="clr-control-container">
+                    <div class="clr-readonly-text">
+                        {{ target.issuer }}
+                    </div>
+                </div>
+            </div>
+            <!-- JWKS URI -->
+            <div class="clr-form-control">
+                <label class="clr-control-label" [class.disabled]="true">{{
+                    'FEDERATED_IDPS.JWKS_URI' | translate
+                }}</label>
+                <div class="clr-control-container">
+                    <div class="clr-readonly-text">
+                        {{ target.jwks_uri }}
+                    </div>
+                </div>
+            </div>
+            <!-- Mannual OpenIDConfig -->
+            <clr-textarea-container>
+                <label [class.required]="target.offline_validation">{{
+                    'FEDERATED_IDPS.MANUAL_OPENIDCONFIG' | translate
+                }}</label>
+                <textarea
+                    clrTextarea
+                    type="text"
+                    class="inputWidth"
+                    row="3"
+                    name="openidconfig"
+                    [disabled]="
+                        !target.offline_validation || target.id !== undefined
+                    "
+                    (blur)="updateClaimsSupported()"
+                    [(ngModel)]="openIDConfigJSON"></textarea>
+            </clr-textarea-container>
+            <!-- Mannual JWKS Keys -->
+            <clr-textarea-container>
+                <label [class.required]="target.offline_validation">{{
+                    'FEDERATED_IDPS.JWKS_KEYS' | translate
+                }}</label>
+                <textarea
+                    clrTextarea
+                    type="text"
+                    class="inputWidth"
+                    row="3"
+                    name="jwks_keys"
+                    [disabled]="
+                        !target.offline_validation || target.id !== undefined
+                    "
+                    [(ngModel)]="jwksKeys"></textarea>
+            </clr-textarea-container>
+
+            <!-- Claims Supported -->
+            <div class="clr-form-control">
+                <label class="clr-control-label" [class.disabled]="true">{{
+                    'FEDERATED_IDPS.CLAIMS_SUPPORTED' | translate
+                }}</label>
+                <div class="clr-control-container">
+                    <div class="clr-readonly-text">
+                        {{ claimsSupported }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add Claims -->
+            <div class="form-group-label-override">
+                <label class="required clr-control-label mt-16"
+                    >Add Claims</label
+                >
+            </div>
+            <div class="claim-row" *ngFor="let claim of claims; let i = index">
+                <div class="claim-inputs">
+                    <clr-input-container [class.clr-error]="claim.error">
+                        <input
+                            class="mr-10"
+                            autocomplete="off"
+                            clrInput
+                            type="text"
+                            placeholder="Claim Path"
+                            [disabled]="checkIfMandotaryClaim(i)"
+                            [(ngModel)]="claim.path"
+                            (blur)="onClaimBlur(claim)"
+                            size="22"
+                            name="claim_path_{{ i }}" />
+                        <input
+                            autocomplete="off"
+                            clrInput
+                            type="text"
+                            placeholder="Claim Value"
+                            [disabled]="checkIfIssuerClaim(i)"
+                            [(ngModel)]="claim.value"
+                            (blur)="onClaimBlur(claim)"
+                            size="30"
+                            name="claim_value_{{ i }}" />
+                    </clr-input-container>
+                    <clr-icon
+                        class="mt-16"
+                        (click)="deleteClaim(i)"
+                        [hidden]="checkIfMandotaryClaim(i)"
+                        shape="window-close"
+                        size="20"></clr-icon>
+                </div>
+                <clr-control-error *ngIf="claim.error" class="claim-error">
+                    {{ claim.error }}
+                </clr-control-error>
+            </div>
+
+            <button type="button" class="btn btn-link" (click)="addClaim()">
+                <clr-icon shape="plus" size="16"></clr-icon>&nbsp;{{
+                    'BUTTON.ADD_MORE' | translate
+                }}
+            </button>
+        </form>
+    </div>
+    <div class="modal-footer">
+        <button
+            type="button"
+            class="btn btn-outline"
+            (click)="onCancel()"
+            [disabled]="inProgress">
+            {{ 'BUTTON.CANCEL' | translate }}
+        </button>
+        <button
+            [clrLoading]="okButtonState"
+            type="submit"
+            class="btn btn-primary"
+            (click)="onSubmit()"
+            [disabled]="!isValid">
+            {{ 'BUTTON.OK' | translate }}
+        </button>
+    </div>
+</clr-modal>

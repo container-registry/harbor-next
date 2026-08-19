@@ -1,0 +1,32 @@
+---
+protocol: "http"
+port: 8888
+
+worker_pool:
+  workers: 10
+  backend: "redis"
+  redis_pool:
+    redis_url: redis://redis:6379/2?idle_timeout_seconds=30
+    namespace: "harbor_job_service_namespace"
+
+job_loggers:
+  - name: "STD_OUTPUT"
+    level: "INFO"
+  - name: "FILE"
+    level: "INFO"
+    settings:
+      base_dir: "/tmp"
+    sweeper:
+      duration: 1
+      settings:
+        work_dir: "/tmp"
+
+loggers:
+  - name: "STD_OUTPUT"
+    level: "INFO"
+
+reaper:
+  max_update_hours: 24
+  max_dangling_hours: 168
+
+max_retrieve_size_mb: 10

@@ -132,6 +132,7 @@
             </clr-dropdown>
         </clr-dg-action-bar>
         <clr-datagrid
+            *ngIf="configLoaded"
             (clrDgRefresh)="clrLoad($event)"
             [clrDgLoading]="loading"
             [(clrDgSelected)]="selectedRows">
@@ -140,6 +141,9 @@
             }}</clr-dg-column>
             <clr-dg-column>{{
                 'ROBOT_ACCOUNT.ENABLED_STATE' | translate
+            }}</clr-dg-column>
+            <clr-dg-column *ngIf="enableProjectFederatedIdp">{{
+                'SYSTEM_ROBOT.FEDERATED_IDP' | translate
             }}</clr-dg-column>
             <clr-dg-column class="permission-col">{{
                 'SYSTEM_ROBOT.PERMISSION_COLUMN' | translate
@@ -177,6 +181,9 @@
                         size="16"
                         class="color-red red-position"></clr-icon>
                 </clr-dg-cell>
+                <clr-dg-cell *ngIf="enableProjectFederatedIdp">{{
+                    getFedIdpName(r)
+                }}</clr-dg-cell>
                 <clr-dg-cell>
                     <robot-permissions-panel
                         [mode]="PermissionSelectPanelModes.MODAL"
@@ -230,5 +237,7 @@
     [robotMetadata]="robotMetadata"
     [projectId]="projectId"
     [projectName]="projectName"
+    [enableFederatedIdp]="enableProjectFederatedIdp"
+    [fedIdpMap]="fedIdpMap"
     (addSuccess)="addSuccess($event)"></add-robot>
 <view-token (refreshSuccess)="refresh()"></view-token>

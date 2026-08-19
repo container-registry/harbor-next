@@ -25,6 +25,7 @@ import (
 	tracelib "github.com/goharbor/harbor/src/lib/trace"
 	"github.com/goharbor/harbor/src/pkg/notification"
 	"github.com/goharbor/harbor/src/server/middleware"
+	securitymiddleware "github.com/goharbor/harbor/src/server/middleware/security"
 )
 
 // Middleware middleware which add logger to context
@@ -50,6 +51,8 @@ func Middleware() func(http.Handler) http.Handler {
 			Username:      "unknown",
 			RequestMethod: r.Method,
 			RequestURL:    r.URL.String(),
+			IPAddress:     securitymiddleware.GetClientIP(r),
+			UserAgent:     securitymiddleware.GetUserAgent(r),
 		}
 		if matched, resName := e.PreCheckMetadata(); matched {
 			lib.NopCloseRequest(r)

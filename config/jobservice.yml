@@ -29,4 +29,9 @@ reaper:
   max_update_hours: 24
   max_dangling_hours: 168
 
+metric:
+  enabled: true
+  path: /metrics
+  port: 9091
+
 max_retrieve_size_mb: 10

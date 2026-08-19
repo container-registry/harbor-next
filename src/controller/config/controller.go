@@ -28,6 +28,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/audit"
+	"github.com/goharbor/harbor/src/pkg/commercial"
 	"github.com/goharbor/harbor/src/pkg/user"
 )
 
@@ -109,11 +110,47 @@ func (c *controller) updateLogEndpoint(ctx context.Context, cfgs map[string]any)
 		}
 		audit.LogMgr.Init(ctx, auditEP)
 	}
+	if value, updated := cfgs[common.EnableCommercialAuditLogOTLP]; updated {
+		if enabled, ok := value.(bool); ok && !enabled {
+			return audit.OTLPLogMgr.Shutdown(ctx)
+		}
+	}
+	if hasOTLPAuditConfig(cfgs) {
+		if err := audit.OTLPLogMgr.Reconfigure(ctx, audit.OTLPConfig{
+			Endpoint:       config.AuditLogForwardOTLPEndpoint(ctx),
+			Authentication: config.AuditLogForwardOTLPAuthentication(ctx),
+			Username:       config.AuditLogForwardOTLPUsername(ctx),
+			Password:       config.AuditLogForwardOTLPPassword(ctx),
+		}); err != nil {
+			return errors.BadRequestError(err)
+		}
+	}
 	return nil
+}
+
+func hasOTLPAuditConfig(cfgs map[string]any) bool {
+	for _, key := range []string{
+		common.AuditLogForwardOTLPEndpoint,
+		common.AuditLogForwardOTLPAuthentication,
+		common.AuditLogForwardOTLPUsername,
+		common.AuditLogForwardOTLPPassword,
+	} {
+		if _, ok := cfgs[key]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *controller) validateCfg(ctx context.Context, cfgs map[string]any) error {
 	mgr := config.GetCfgManager(ctx)
+
+	if err := commercial.ValidateConfigUpdate(ctx, cfgs); err != nil {
+		return errors.BadRequestError(err)
+	}
+	if hasOTLPAuditConfig(cfgs) && !otlpAuditEnabledForUpdate(ctx, cfgs) {
+		return errors.BadRequestError(nil).WithMessage("commercial feature audit_log_otlp is not enabled")
+	}
 
 	// check if auth can be modified
 	if nv, ok := cfgs[common.AUTHMode]; ok {
@@ -138,6 +175,9 @@ func (c *controller) validateCfg(ctx context.Context, cfgs map[string]any) error
 	if err = verifySkipAuditLogCfg(ctx, cfgs, mgr); err != nil {
 		return err
 	}
+	if err = verifyOTLPAuditLogCfg(ctx, cfgs, mgr); err != nil {
+		return err
+	}
 	// verify the value length related cfgs
 	if err = verifyValueLengthCfg(ctx, cfgs); err != nil {
 		return err
@@ -146,9 +186,18 @@ func (c *controller) validateCfg(ctx context.Context, cfgs map[string]any) error
 	return nil
 }
 
+func otlpAuditEnabledForUpdate(ctx context.Context, cfgs map[string]any) bool {
+	if enabled, updated := cfgs[common.EnableCommercialAuditLogOTLP]; updated {
+		value, ok := enabled.(bool)
+		return ok && value
+	}
+	return commercial.Enabled(ctx, commercial.AuditLogOTLP)
+}
+
 func verifySkipAuditLogCfg(ctx context.Context, cfgs map[string]any, mgr config.Manager) error {
 	updated := false
 	endPoint := mgr.Get(ctx, common.AuditLogForwardEndpoint).GetString()
+	otlpEndPoint := mgr.Get(ctx, common.AuditLogForwardOTLPEndpoint).GetString()
 	skipAuditDB := mgr.Get(ctx, common.SkipAuditLogDatabase).GetBool()
 
 	if skip, exist := cfgs[common.SkipAuditLogDatabase]; exist {
@@ -159,11 +208,36 @@ func verifySkipAuditLogCfg(ctx context.Context, cfgs map[string]any, mgr config.
 		endPoint = endpoint.(string)
 		updated = true
 	}
+	if endpoint, exist := cfgs[common.AuditLogForwardOTLPEndpoint]; exist {
+		otlpEndPoint = endpoint.(string)
+		updated = true
+	}
+	if !otlpAuditEnabledForUpdate(ctx, cfgs) {
+		otlpEndPoint = ""
+	}
 
 	if updated {
-		if skipAuditDB && len(endPoint) == 0 {
-			return errors.BadRequestError(errors.New("audit log forward endpoint should be configured before enable skip audit log in database"))
+		if skipAuditDB && len(endPoint) == 0 && len(otlpEndPoint) == 0 {
+			return errors.BadRequestError(errors.New("a syslog or OTLP audit log forward endpoint should be configured before enabling skip audit log in database"))
 		}
+	}
+	return nil
+}
+
+func verifyOTLPAuditLogCfg(ctx context.Context, cfgs map[string]any, mgr config.Manager) error {
+	value := func(key string) string {
+		if v, ok := cfgs[key]; ok {
+			return v.(string)
+		}
+		return mgr.Get(ctx, key).GetString()
+	}
+	if err := audit.ValidateOTLPConfig(audit.OTLPConfig{
+		Endpoint:       value(common.AuditLogForwardOTLPEndpoint),
+		Authentication: value(common.AuditLogForwardOTLPAuthentication),
+		Username:       value(common.AuditLogForwardOTLPUsername),
+		Password:       value(common.AuditLogForwardOTLPPassword),
+	}); err != nil {
+		return errors.BadRequestError(err)
 	}
 	return nil
 }
@@ -250,7 +324,7 @@ func (c *controller) ConvertForGet(ctx context.Context, cfg map[string]any, inte
 		}
 		result[item.Name] = &models.Value{
 			Val:      val,
-			Editable: !readOnlyForAll,
+			Editable: !readOnlyForAll && commercial.ConfigEditable(item.Name),
 		}
 	}
 

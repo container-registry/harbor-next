@@ -263,21 +263,81 @@
                     <div class="cell white-normal">
                         <div
                             class="artifact-icon clr-display-inline-block"
-                            *ngIf="artifact.icon">
+                            *ngIf="hasArtifactIcon(artifact)">
                             <img
-                                *ngIf="getIcon(artifact.icon)"
+                                *ngIf="getArtifactIcon(artifact)"
                                 class="artifact-icon"
                                 [title]="artifact.type"
-                                [src]="getIcon(artifact.icon)"
+                                [src]="getArtifactIcon(artifact)"
                                 (error)="showDefaultIcon($event)" />
                         </div>
                         <a
                             href="javascript:void(0)"
                             class="digest margin-left-5"
+                            [class.deprecated]="
+                                artifact?.extra_attrs?.['yanked']
+                            "
                             (click)="goIntoArtifactSummaryPage(artifact)"
                             title="{{ artifact.digest }}">
-                            {{ artifact.digest | slice : 0 : 15 }}</a
+                            <ng-container
+                                *ngIf="
+                                    isNativePackage(artifact) &&
+                                        nativeVersion(artifact);
+                                    else digestTitle
+                                ">
+                                {{ nativeVersion(artifact) }}
+                            </ng-container>
+                            <ng-template #digestTitle>{{
+                                artifact.digest | slice : 0 : 15
+                            }}</ng-template></a
                         >
+                        <span
+                            *ngIf="artifact?.extra_attrs?.['yanked']"
+                            class="label label-warning margin-left-5">
+                            {{ 'ARTIFACT.DEPRECATED_BADGE' | translate }}
+                        </span>
+                        <span
+                            class="label label-light-blue native-channel-badge"
+                            *ngFor="let badge of channelBadges(artifact)"
+                            >{{ badge }}</span
+                        >
+                        <ng-container
+                            *ngIf="
+                                artifact.type === 'NPM' &&
+                                getDistTags(artifact).length
+                            ">
+                            <span
+                                *ngFor="let c of getDistTags(artifact)"
+                                class="channel-chip">
+                                <clr-label
+                                    >{{ c.channel }}
+                                    {{
+                                        'REPOSITORY.CHANNEL_RESOLVES_TO'
+                                            | translate
+                                    }}
+                                    {{ c.version }}</clr-label
+                                >
+                                <clr-tooltip *ngIf="channelDrift(c) as drift">
+                                    <clr-icon
+                                        clrTooltipTrigger
+                                        shape="warning-standard"
+                                        class="channel-drift"
+                                        [attr.status]="
+                                            drift === 'vulnerable'
+                                                ? 'danger'
+                                                : 'warning'
+                                        "></clr-icon>
+                                    <clr-tooltip-content *clrIfOpen>
+                                        {{
+                                            (drift === 'vulnerable'
+                                                ? 'ARTIFACT.CHANNEL_DRIFT_VULNERABLE'
+                                                : 'ARTIFACT.CHANNEL_DRIFT_UNSIGNED'
+                                            ) | translate
+                                        }}
+                                    </clr-tooltip-content>
+                                </clr-tooltip>
+                            </span>
+                        </ng-container>
                         <clr-tooltip
                             class="fix-width"
                             *ngIf="

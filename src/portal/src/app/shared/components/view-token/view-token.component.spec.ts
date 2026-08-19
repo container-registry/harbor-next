@@ -14,6 +14,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ViewTokenComponent } from './view-token.component';
 import { RobotService } from '../../../../../ng-swagger-gen/services/robot.service';
+import { FederatedIdpService } from 'ng-swagger-gen/services';
 import { OperationService } from '../operation/operation.service';
 import { MessageHandlerService } from '../../services/message-handler.service';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
@@ -64,6 +65,11 @@ describe('ViewTokenComponent', () => {
             return of(null).pipe(delay(0));
         },
     };
+    const fakedFederatedIdpService = {
+        ListClaimRules() {
+            return of([]);
+        },
+    };
     beforeEach(async () => {
         await TestBed.configureTestingModule({
             imports: [
@@ -76,6 +82,10 @@ describe('ViewTokenComponent', () => {
             declarations: [ViewTokenComponent],
             providers: [
                 { provide: RobotService, useValue: fakedRobotService },
+                {
+                    provide: FederatedIdpService,
+                    useValue: fakedFederatedIdpService,
+                },
                 OperationService,
                 {
                     provide: MessageHandlerService,
@@ -128,5 +138,34 @@ describe('ViewTokenComponent', () => {
         await fixture.whenStable();
         const error = fixture.nativeElement.querySelector('clr-control-error');
         expect(error).toBeTruthy();
+    });
+    it('should show copy-secret warning for regular robot creation result', async () => {
+        await fixture.whenStable();
+        component.copyToken = true;
+        component.robot = robot1;
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        const alertText: HTMLElement =
+            fixture.nativeElement.querySelector('.alert-text');
+        expect(alertText.textContent).toContain('ROBOT_ACCOUNT.ALERT_TEXT');
+    });
+    it('should show federated robot JWT-claims message instead of copy-secret warning', async () => {
+        await fixture.whenStable();
+        component.copyToken = true;
+        component.robot = {
+            ...robot1,
+            federatedidp_id: 1,
+            secret: '',
+        };
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        const alertText: HTMLElement =
+            fixture.nativeElement.querySelector('.alert-text');
+        expect(alertText.textContent).toContain(
+            'ROBOT_ACCOUNT.FEDERATED_ALERT_TEXT'
+        );
+        expect(alertText.textContent).not.toContain('ROBOT_ACCOUNT.ALERT_TEXT');
     });
 });

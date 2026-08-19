@@ -249,6 +249,26 @@ func AuditLogForwardEndpoint(ctx context.Context) string {
 	return DefaultMgr().Get(ctx, common.AuditLogForwardEndpoint).GetString()
 }
 
+// AuditLogForwardOTLPEndpoint returns the OTLP/HTTP audit log endpoint.
+func AuditLogForwardOTLPEndpoint(ctx context.Context) string {
+	return DefaultMgr().Get(ctx, common.AuditLogForwardOTLPEndpoint).GetString()
+}
+
+// AuditLogForwardOTLPAuthentication returns the OTLP audit log authentication type.
+func AuditLogForwardOTLPAuthentication(ctx context.Context) string {
+	return DefaultMgr().Get(ctx, common.AuditLogForwardOTLPAuthentication).GetString()
+}
+
+// AuditLogForwardOTLPUsername returns the OTLP basic authentication username.
+func AuditLogForwardOTLPUsername(ctx context.Context) string {
+	return DefaultMgr().Get(ctx, common.AuditLogForwardOTLPUsername).GetString()
+}
+
+// AuditLogForwardOTLPPassword returns the OTLP basic authentication password.
+func AuditLogForwardOTLPPassword(ctx context.Context) string {
+	return DefaultMgr().Get(ctx, common.AuditLogForwardOTLPPassword).GetString()
+}
+
 // SkipAuditLogDatabase returns the audit log forward endpoint
 func SkipAuditLogDatabase(ctx context.Context) bool {
 	return DefaultMgr().Get(ctx, common.SkipAuditLogDatabase).GetBool()
@@ -277,4 +297,9 @@ func AuditLogEventEnabled(ctx context.Context, eventType string) bool {
 		}
 	}
 	return true
+}
+
+// EnableProjectFederatedIDP indicates whether enable federated idp for project
+func EnableProjectFederatedIDP(ctx context.Context) bool {
+	return DefaultMgr().Get(ctx, common.EnableProjectFederatedIDP).GetBool()
 }

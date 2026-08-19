@@ -1,0 +1,288 @@
+<form #auditConfigForm="ngForm" class="clr-form clr-form-horizontal">
+    <section>
+        <h3>{{ 'AUDIT_LOG_CONFIG.FORWARDING' | translate }}</h3>
+        <clr-input-container>
+            <label for="auditLogForwardEndpoint">
+                {{ 'AUDIT_LOG_CONFIG.SYSLOG_ENDPOINT' | translate }}
+                <clr-tooltip>
+                    <clr-icon
+                        clrTooltipTrigger
+                        shape="info-circle"
+                        size="24"></clr-icon>
+                    <clr-tooltip-content
+                        clrPosition="top-right"
+                        clrSize="lg"
+                        *clrIfOpen>
+                        <span>{{
+                            'AUDIT_LOG_CONFIG.SYSLOG_ENDPOINT_TOOLTIP'
+                                | translate
+                        }}</span>
+                    </clr-tooltip-content>
+                </clr-tooltip>
+            </label>
+            <input
+                clrInput
+                name="auditLogForwardEndpoint"
+                type="text"
+                [(ngModel)]="currentConfig.audit_log_forward_endpoint.value"
+                id="auditLogForwardEndpoint"
+                size="36"
+                (input)="onForwardEndpointInput()"
+                [disabled]="
+                    disabled(currentConfig.audit_log_forward_endpoint)
+                " />
+        </clr-input-container>
+
+        <clr-input-container *ngIf="otlpEnabled">
+            <label for="auditLogForwardOTLPEndpoint">
+                {{ 'AUDIT_LOG_CONFIG.OTLP_ENDPOINT' | translate }}
+                <clr-tooltip>
+                    <clr-icon
+                        clrTooltipTrigger
+                        shape="info-circle"
+                        size="24"></clr-icon>
+                    <clr-tooltip-content
+                        clrPosition="top-right"
+                        clrSize="lg"
+                        *clrIfOpen>
+                        <span>{{
+                            'AUDIT_LOG_CONFIG.OTLP_ENDPOINT_TOOLTIP' | translate
+                        }}</span>
+                    </clr-tooltip-content>
+                </clr-tooltip>
+            </label>
+            <input
+                clrInput
+                name="auditLogForwardOTLPEndpoint"
+                type="url"
+                pattern="https?://.+"
+                placeholder="https://otel-collector:4318"
+                [(ngModel)]="
+                    currentConfig.audit_log_forward_otlp_endpoint.value
+                "
+                id="auditLogForwardOTLPEndpoint"
+                size="36"
+                (input)="onForwardEndpointInput()"
+                [disabled]="
+                    otlpDisabled(currentConfig.audit_log_forward_otlp_endpoint)
+                " />
+            <clr-control-error>{{
+                'AUDIT_LOG_CONFIG.OTLP_ENDPOINT_ERROR' | translate
+            }}</clr-control-error>
+        </clr-input-container>
+
+        <h3 *ngIf="otlpEnabled">
+            {{ 'AUDIT_LOG_CONFIG.OTLP_AUTHENTICATION' | translate }}
+        </h3>
+        <clr-select-container *ngIf="otlpEnabled">
+            <label for="auditLogForwardOTLPAuthentication">{{
+                'AUDIT_LOG_CONFIG.AUTHENTICATION' | translate
+            }}</label>
+            <select
+                clrSelect
+                id="auditLogForwardOTLPAuthentication"
+                name="auditLogForwardOTLPAuthentication"
+                [(ngModel)]="
+                    currentConfig.audit_log_forward_otlp_authentication.value
+                "
+                (change)="onOTLPAuthenticationChange()"
+                [disabled]="
+                    otlpDisabled(
+                        currentConfig.audit_log_forward_otlp_authentication
+                    )
+                ">
+                <option value="none">
+                    {{ 'AUDIT_LOG_CONFIG.AUTH_NONE' | translate }}
+                </option>
+                <option value="basic">
+                    {{ 'AUDIT_LOG_CONFIG.AUTH_BASIC' | translate }}
+                </option>
+            </select>
+        </clr-select-container>
+
+        <ng-container
+            *ngIf="
+                otlpEnabled &&
+                currentConfig.audit_log_forward_otlp_authentication.value ===
+                    'basic'
+            ">
+            <clr-input-container>
+                <label for="auditLogForwardOTLPUsername">{{
+                    'AUDIT_LOG_CONFIG.OTLP_USERNAME' | translate
+                }}</label>
+                <input
+                    clrInput
+                    required
+                    type="text"
+                    id="auditLogForwardOTLPUsername"
+                    name="auditLogForwardOTLPUsername"
+                    [(ngModel)]="
+                        currentConfig.audit_log_forward_otlp_username.value
+                    "
+                    [disabled]="
+                        otlpDisabled(
+                            currentConfig.audit_log_forward_otlp_username
+                        )
+                    " />
+                <clr-control-error>{{
+                    'AUDIT_LOG_CONFIG.REQUIRED' | translate
+                }}</clr-control-error>
+            </clr-input-container>
+            <clr-password-container>
+                <label for="auditLogForwardOTLPPassword">{{
+                    'AUDIT_LOG_CONFIG.OTLP_PASSWORD' | translate
+                }}</label>
+                <input
+                    clrPassword
+                    required
+                    type="password"
+                    id="auditLogForwardOTLPPassword"
+                    name="auditLogForwardOTLPPassword"
+                    [(ngModel)]="
+                        currentConfig.audit_log_forward_otlp_password.value
+                    "
+                    [disabled]="
+                        otlpDisabled(
+                            currentConfig.audit_log_forward_otlp_password
+                        )
+                    " />
+                <clr-control-error>{{
+                    'AUDIT_LOG_CONFIG.REQUIRED' | translate
+                }}</clr-control-error>
+            </clr-password-container>
+        </ng-container>
+
+        <h3>{{ 'AUDIT_LOG_CONFIG.RECORDING' | translate }}</h3>
+        <div class="audit-log-recording">
+            <div class="audit-log-recording-header">
+                <p class="p7 mt-0 mb-0">
+                    {{
+                        'AUDIT_LOG_CONFIG.ENABLED_EVENT_TYPES_TOOLTIP'
+                            | translate
+                    }}
+                </p>
+            </div>
+
+            <clr-spinner
+                *ngIf="loading"
+                [clrMedium]="true"
+                [attr.aria-label]="'CLARITY.LOADING' | translate"></clr-spinner>
+
+            <clr-alert
+                *ngIf="!loading && categories.length === 0"
+                [clrAlertType]="'info'"
+                [clrAlertClosable]="false">
+                <clr-alert-item>
+                    <span class="alert-text">{{
+                        'AUDIT_LOG_CONFIG.NO_EVENT_TYPES' | translate
+                    }}</span>
+                </clr-alert-item>
+            </clr-alert>
+
+            <ng-container *ngIf="!loading && categories.length > 0">
+                <table class="table table-compact audit-log-matrix">
+                    <thead>
+                        <tr>
+                            <th class="left">
+                                {{ 'AUDIT_LOG.RESOURCE' | translate }}
+                            </th>
+                            <th
+                                *ngFor="let action of matrixActions"
+                                class="left">
+                                {{ action | titlecase }}
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr *ngFor="let category of categories">
+                            <td class="left audit-log-matrix-resource">
+                                <clr-icon
+                                    [attr.shape]="category.icon"
+                                    aria-hidden="true"></clr-icon>
+                                {{ category.labelKey | translate }}
+                            </td>
+                            <td *ngFor="let action of matrixActions">
+                                <ng-container
+                                    *ngIf="
+                                        getMatrixEvent(
+                                            category,
+                                            action
+                                        ) as event
+                                    ">
+                                    <input
+                                        type="checkbox"
+                                        clrCheckbox
+                                        [id]="
+                                            getMatrixEventId(category, action)
+                                        "
+                                        [name]="
+                                            getMatrixEventId(category, action)
+                                        "
+                                        [checked]="hasEventType(event.value)"
+                                        [disabled]="isEventSelectionDisabled()"
+                                        (change)="
+                                            toggleEventType(event.value)
+                                        " />
+                                </ng-container>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </ng-container>
+        </div>
+
+        <clr-checkbox-container>
+            <label for="skipAuditLogDatabase">
+                {{ 'AUDIT_LOG_CONFIG.SKIP_DATABASE' | translate }}
+                <clr-tooltip>
+                    <clr-icon
+                        clrTooltipTrigger
+                        shape="info-circle"
+                        size="24"></clr-icon>
+                    <clr-tooltip-content
+                        clrPosition="top-right"
+                        clrSize="lg"
+                        *clrIfOpen>
+                        <span>{{
+                            'AUDIT_LOG_CONFIG.SKIP_DATABASE_TOOLTIP' | translate
+                        }}</span>
+                    </clr-tooltip-content>
+                </clr-tooltip>
+            </label>
+            <clr-checkbox-wrapper>
+                <input
+                    type="checkbox"
+                    clrCheckbox
+                    name="skipAuditLogDatabase"
+                    id="skipAuditLogDatabase"
+                    [(ngModel)]="currentConfig.skip_audit_log_database.value"
+                    [disabled]="
+                        disabled(currentConfig.skip_audit_log_database) ||
+                        (!currentConfig.audit_log_forward_endpoint.value &&
+                            (!otlpEnabled ||
+                                !currentConfig.audit_log_forward_otlp_endpoint
+                                    .value))
+                    " />
+            </clr-checkbox-wrapper>
+        </clr-checkbox-container>
+    </section>
+</form>
+
+<div>
+    <button
+        type="button"
+        id="config_audit_log_save"
+        class="btn btn-primary"
+        (click)="save()"
+        [disabled]="!isValid() || !hasChanges() || inProgress">
+        {{ 'BUTTON.SAVE' | translate }}
+    </button>
+    <button
+        type="button"
+        id="config_audit_log_cancel"
+        class="btn btn-outline"
+        (click)="cancel()"
+        [disabled]="!isValid() || !hasChanges() || inProgress">
+        {{ 'BUTTON.CANCEL' | translate }}
+    </button>
+</div>

@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# pre-push hook — Invokes harbor-next-guard when pushing to the harbor-next remote.
+#
+# Git calls pre-push with: <remote-name> <remote-url>
+# and feeds lines on stdin:  <local-ref> <local-sha> <remote-ref> <remote-sha>
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+GUARD="$REPO_ROOT/8gcr-ee/hooks/harbor-next-guard.sh"
+
+remote_name="$1"
+remote_url="${2:-}"
+
+# Only guard pushes to harbor-next
+if [[ "$remote_name" != "harbor-next" && "$remote_url" != *"harbor-next"* ]]; then
+  exit 0
+fi
+
+if [[ ! -x "$GUARD" ]]; then
+  echo "ERROR: Guard script not found at $GUARD" >&2
+  echo "Are you on an 8gcr branch with 8gcr-ee/ checked out?" >&2
+  exit 1
+fi
+
+while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
+  # Skip delete pushes
+  if [[ "$local_sha" == "0000000000000000000000000000000000000000" ]]; then
+    continue
+  fi
+  echo "harbor-next guard: checking $local_ref ..."
+  "$GUARD" "$local_sha"
+done
+
+exit 0

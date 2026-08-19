@@ -55,6 +55,8 @@ var defaultConfig = map[string]any{
 	common.TokenExpiration:            30,
 	common.AdminInitialPassword:       "password",
 	common.WithTrivy:                  false,
+	common.WithGrype:                  false,
+	common.DefaultScanner:             "",
 	common.UAAClientID:                "testid",
 	common.UAAClientSecret:            "testsecret",
 	common.UAAEndpoint:                "10.192.168.5",

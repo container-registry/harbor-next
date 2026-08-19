@@ -84,6 +84,9 @@ func (p *projectMetadataAPI) DeleteProjectMetadata(ctx context.Context, params o
 	if err := p.RequireProjectAccess(ctx, projectNameOrID, rbac.ActionDelete, rbac.ResourceMetadata); err != nil {
 		return p.SendError(ctx, err)
 	}
+	if err := validateMetadataDelete(params.MetaName); err != nil {
+		return p.SendError(ctx, err)
+	}
 	project, err := p.proCtl.Get(ctx, projectNameOrID)
 	if err != nil {
 		return p.SendError(ctx, err)
@@ -92,6 +95,13 @@ func (p *projectMetadataAPI) DeleteProjectMetadata(ctx context.Context, params o
 		return p.SendError(ctx, err)
 	}
 	return operation.NewDeleteProjectMetadataOK()
+}
+
+func validateMetadataDelete(name string) error {
+	if name == proModels.ProMetaProxyCacheAllowPush {
+		return errors.BadRequestError(nil).WithMessage("metadata.proxy_cache_allow_push can only be set when the project is created")
+	}
+	return nil
 }
 
 func (p *projectMetadataAPI) GetProjectMetadata(ctx context.Context, params operation.GetProjectMetadataParams) middleware.Responder {

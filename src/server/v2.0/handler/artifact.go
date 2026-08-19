@@ -52,6 +52,11 @@ import (
 	operation "github.com/goharbor/harbor/src/server/v2.0/restapi/operations/artifact"
 )
 
+const (
+	mavenArtifactMediaType = "application/vnd.harbor.maven.package.v1"
+	mavenMetadataTag       = "_metadata"
+)
+
 func newArtifactAPI() *artifactAPI {
 	return &artifactAPI{
 		accMgr:   accessory.Mgr,
@@ -103,6 +108,10 @@ func (a *artifactAPI) ListArtifacts(ctx context.Context, params operation.ListAr
 		return a.SendError(ctx, err)
 	}
 	query.Keywords["RepositoryName"] = repositoryName
+	query.Keywords["ExcludeTagArtifactType"] = &q.TagArtifactTypeExclusion{
+		Tag:          mavenMetadataTag,
+		ArtifactType: mavenArtifactMediaType,
+	}
 
 	// set option
 	option := option(params.WithTag, params.WithImmutableStatus,

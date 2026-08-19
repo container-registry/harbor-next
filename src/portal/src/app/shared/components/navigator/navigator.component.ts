@@ -46,6 +46,9 @@ import { map } from 'rxjs/operators';
 import { forkJoin, Observable } from 'rxjs';
 import { ClrCommonStringsService } from '@clr/angular';
 import { signInStatusError } from '../../../account/sign-in/sign-in.component';
+import { UN_LOGGED_PARAM } from '../../../account/sign-in/sign-in.service';
+import { BrandingConfig } from 'ng-swagger-gen/models';
+import { delUrlParam } from '../../units/utils';
 
 @Component({
     selector: 'navigator',
@@ -61,7 +64,7 @@ export class NavigatorComponent implements OnInit {
     selectedLang: SupportedLanguage = DeFaultLang;
     selectedDatetimeRendering: DatetimeRendering = DefaultDatetimeRendering;
     appTitle: string = 'APP_TITLE.HARBOR';
-    customStyle: CustomStyle;
+    BrandingInfo: BrandingConfig;
     isCoreServiceAvailable: boolean = true;
     constructor(
         private session: SessionService,
@@ -76,8 +79,12 @@ export class NavigatorComponent implements OnInit {
     ) {}
 
     ngOnInit(): void {
-        // custom skin
-        this.customStyle = this.skinableConfig.getSkinConfig();
+        this.skinableConfig.getBrandingInfo(false).subscribe({
+            next: branding => {
+                this.BrandingInfo = branding;
+            },
+        });
+
         this.selectedLang = this.translate.currentLang as SupportedLanguage;
         if (this.selectedLang) {
             registerLocaleData(
@@ -208,8 +215,9 @@ export class NavigatorComponent implements OnInit {
 
     logIn(): void {
         let state = this.router.routerState.snapshot;
+        const redirectUrl = delUrlParam(state.url, UN_LOGGED_PARAM);
         let navigatorExtra: NavigationExtras = {
-            queryParams: { redirect_url: state.url },
+            queryParams: { redirect_url: redirectUrl },
         };
 
         const config = this.appConfigService.getConfig();
@@ -220,7 +228,7 @@ export class NavigatorComponent implements OnInit {
             config.primary_auth_mode
         ) {
             window.location.href =
-                '/c/oidc/login?redirect_url=' + encodeURIComponent(state.url);
+                '/c/oidc/login?redirect_url=' + encodeURIComponent(redirectUrl);
             return;
         }
 
@@ -308,15 +316,15 @@ export class NavigatorComponent implements OnInit {
 
     getBgColor(): string {
         if (
-            this.customStyle &&
-            this.customStyle.headerBgColor &&
+            this.BrandingInfo &&
+            this.BrandingInfo.headerBgColor &&
             localStorage
         ) {
             if (localStorage.getItem(HAS_STYLE_MODE) === StyleMode.LIGHT) {
-                return `background-color:${this.customStyle.headerBgColor.lightMode} !important`;
+                return `background-color:${this.BrandingInfo.headerBgColor.lightMode} !important`;
             }
             if (localStorage.getItem(HAS_STYLE_MODE) === StyleMode.DARK) {
-                return `background-color:${this.customStyle.headerBgColor.darkMode} !important`;
+                return `background-color:${this.BrandingInfo.headerBgColor.darkMode} !important`;
             }
         }
         return null;

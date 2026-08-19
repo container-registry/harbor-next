@@ -120,6 +120,20 @@ const routes: Routes = [
                     ),
             },
             {
+                path: 'federated-idp',
+                canActivate: [MemberPermissionGuard],
+                data: {
+                    permissionParam: {
+                        resource: USERSTATICPERMISSION.FEDERATED_IDP.KEY,
+                        action: USERSTATICPERMISSION.FEDERATED_IDP.VALUE.LIST,
+                    },
+                },
+                loadChildren: () =>
+                    import('./federated-idp/project-federated-idp.module').then(
+                        m => m.ProjectFederatedIdpModule
+                    ),
+            },
+            {
                 path: 'tag-strategy',
                 canActivate: [MemberPermissionGuard],
                 data: {

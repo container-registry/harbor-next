@@ -105,6 +105,23 @@ func (suite *CheckerTestSuite) TestIsScannable() {
 		suite.Nil(err)
 		suite.True(isScannable)
 	}
+
+	{
+		art := &artifact.Artifact{}
+		art.Type = "NPM"
+		art.ManifestMediaType = supportMimeType
+
+		mock.OnAnything(c.accMgr, "List").Return([]accessoryModel.Accessory{}, nil).Once()
+		mock.OnAnything(c.artifactCtl, "Walk").Return(nil).Once().Run(func(args mock.Arguments) {
+			walkFn := args.Get(2).(func(*artifact.Artifact) error)
+			walkFn(art)
+		})
+		mock.OnAnything(c.artifactCtl, "HasUnscannableLayer").Return(false, nil).Once()
+
+		isScannable, err := c.IsScannable(context.TODO(), art)
+		suite.Nil(err)
+		suite.True(isScannable)
+	}
 }
 
 func TestCheckerTestSuite(t *testing.T) {

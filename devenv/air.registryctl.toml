@@ -3,18 +3,18 @@
 
 root = "."
 testdata_dir = "src/testdata"
-tmp_dir = "tmp"
+tmp_dir = "/var/lib/harbor-air"
 
 [build]
   # Fast build by default. Set DEBUG=true to enable Delve step-through debugging.
-  cmd = "cd src && CGO_ENABLED=0 GOMODCACHE=/go/pkg/mod /usr/local/go/bin/go build ${DEBUG:+-gcflags=all='-N -l'} -trimpath -o ../tmp/registryctl ./registryctl/main.go"
+  cmd = "mkdir -p /var/lib/harbor-air && cd src && CGO_ENABLED=0 GOMODCACHE=/go/pkg/mod /usr/local/go/bin/go build ${DEBUG:+-gcflags=all='-N -l'} -trimpath -o /var/lib/harbor-air/registryctl ./registryctl/main.go"
 
-  bin = "tmp/registryctl"
+  bin = "/var/lib/harbor-air/registryctl"
   args_bin = ["-c", "config/registryctl.yml"]
 
   # Delve debugger on port 2347, starts immediately (--continue)
   # Attach anytime with: dlv connect localhost:2347
-  full_bin = "/go/bin/dlv exec ./tmp/registryctl --listen=0.0.0.0:2347 --headless=true --api-version=2 --accept-multiclient --continue --"
+  full_bin = "/go/bin/dlv exec /var/lib/harbor-air/registryctl --listen=0.0.0.0:2347 --headless=true --api-version=2 --accept-multiclient --continue --"
 
   # Watch src directory for Go files only
   include_dir = ["src"]
@@ -55,7 +55,7 @@ tmp_dir = "tmp"
 
   rerun = false
   rerun_delay = 500
-  log = "tmp/build-errors.log"
+  log = "/var/lib/harbor-air/build-errors.log"
 
   poll = false
   poll_interval = 0

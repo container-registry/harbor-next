@@ -1,0 +1,47 @@
+name: Go Tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: go-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go-tests:
+    name: Go Unit Tests
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Prepare Go version file
+        run: |
+          mkdir -p tmp
+          go_version="$(. ./versions.env && printf '%s' "$GO_VERSION")"
+          printf '%s\n' "$go_version" > tmp/go-version
+
+      - name: Setup Go
+        uses: ./.github/actions/setup-go-cached
+        with:
+          go-version-file: tmp/go-version
+          go-sum-path: src/go.sum
+
+      - name: Install Task
+        uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
+        with:
+          version: 3.x
+
+      - name: Run Go unit tests
+        run: task test:go

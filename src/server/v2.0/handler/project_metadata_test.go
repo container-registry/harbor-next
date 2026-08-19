@@ -79,3 +79,8 @@ func TestValidate(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateMetadataDelete(t *testing.T) {
+	assert.NoError(t, validateMetadataDelete(proModels.ProMetaPublic))
+	assert.Error(t, validateMetadataDelete(proModels.ProMetaProxyCacheAllowPush))
+}

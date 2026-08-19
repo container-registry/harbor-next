@@ -92,6 +92,13 @@ type OrList struct {
 	Values []any
 }
 
+// TagArtifactTypeExclusion excludes artifacts with a tag only when their
+// artifact type also matches.
+type TagArtifactTypeExclusion struct {
+	Tag          string
+	ArtifactType string
+}
+
 // FuzzyMatchValue query
 type FuzzyMatchValue struct {
 	Value string

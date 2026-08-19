@@ -44,6 +44,9 @@ type indexProcessor struct {
 	*base.IndexProcessor
 }
 
-func (i *indexProcessor) GetArtifactType(_ context.Context, _ *artifact.Artifact) string {
+func (i *indexProcessor) GetArtifactType(_ context.Context, art *artifact.Artifact) string {
+	if art != nil && art.Annotations[homebrewPackageTypeKey] == homebrewPackageTypeBottles {
+		return ArtifactTypeHomebrew
+	}
 	return ArtifactTypeImage
 }

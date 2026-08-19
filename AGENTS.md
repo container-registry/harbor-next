@@ -2,6 +2,22 @@
 
 Enhanced fork of [goharbor/harbor](https://github.com/goharbor/harbor). Go backend in `src/`, Angular frontend in `src/portal/`, build automation via Taskfile.
 
+## Branch model (jj megamerge)
+
+Every 8gcr branch is one commit parented directly on `next/main`: local `000N-*`
+bookmarks are the commercial patches; `dev` is the development overlay (e2e,
+taskfiles, agent config) and is never released. `8gcr/main` is the stable default
+branch. Work happens on top of the
+local `megamerge` octopus; `task jj:absorb` routes edits into the owning branch.
+
+```bash
+task jj:setup-dev            # megamerge = main@next + dev + patches (daily driver)
+task jj:setup                # patches-only production view (what CI validates)
+task jj:absorb               # route working-copy hunks to the owning branch
+task jj:sync-patch-branches  # rebase all branches onto next/main tip, force-push to 8gcr
+task jj:new-branch NAME=0006-x
+```
+
 ## Commands
 
 ```bash
@@ -14,7 +30,13 @@ task apply-patches # Apply branches listed in taskfile/commercial-patches with j
 task release-ready # Verify those patches against a clean clone
 ```
 
-Go test/build need generated API first: `task build:gen-apis`.
+Go tests, builds, and `go mod tidy` need generated server API bindings first:
+
+```bash
+task build:gen-apis
+```
+
+`task build:gen-apis` is also available as `task b:gen-apis`.
 
 ## PRs
 

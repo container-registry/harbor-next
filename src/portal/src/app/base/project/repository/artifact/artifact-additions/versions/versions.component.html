@@ -1,0 +1,36 @@
+<div class="versions-wrapper" *ngIf="!loading">
+    <div *ngIf="distTags && distTags.length" class="dist-tags">
+        <span class="dist-tags-label">{{
+            'ARTIFACT.DIST_TAGS' | translate
+        }}</span>
+        <span class="label label-info" *ngFor="let dt of distTags">
+            {{ dt.tag }}: {{ dt.version }}
+        </span>
+    </div>
+    <clr-datagrid>
+        <clr-dg-column>{{ 'ARTIFACT.VERSION' | translate }}</clr-dg-column>
+        <clr-dg-column>{{
+            'ARTIFACT.VERSION_CREATED' | translate
+        }}</clr-dg-column>
+        <clr-dg-column>{{ 'ARTIFACT.SIZE' | translate }}</clr-dg-column>
+        <clr-dg-column>{{
+            'ARTIFACT.VERSION_STATE' | translate
+        }}</clr-dg-column>
+        <clr-dg-row *ngFor="let v of versions">
+            <clr-dg-cell>{{ v.version }}</clr-dg-cell>
+            <clr-dg-cell>{{ v.created | date : 'short' }}</clr-dg-cell>
+            <clr-dg-cell>{{ sizeTransform(v.size) }}</clr-dg-cell>
+            <clr-dg-cell>
+                <span *ngIf="v.yanked" class="label label-warning">{{
+                    'ARTIFACT.VERSION_YANKED' | translate
+                }}</span>
+            </clr-dg-cell>
+        </clr-dg-row>
+        <clr-dg-placeholder>{{
+            'ARTIFACT.NO_VERSIONS' | translate
+        }}</clr-dg-placeholder>
+    </clr-datagrid>
+</div>
+<div *ngIf="loading" class="clr-row mt-3 center">
+    <span class="spinner spinner-md"></span>
+</div>

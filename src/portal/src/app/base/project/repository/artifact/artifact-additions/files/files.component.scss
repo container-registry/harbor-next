@@ -3,10 +3,11 @@
 
     .md-container {
         border: solid 1px #ddd;
+        padding: 0;
     }
 
     .md-div {
-        padding: 14px 14px 14px 0;
+        padding: 0;
 
         .file {
             width: 100%;
@@ -20,4 +21,162 @@
 .center {
     justify-content: center;
     align-items: center;
+}
+
+.file-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-bottom: 1px solid #314351;
+}
+
+.file-summary-item {
+    padding: 14px 20px;
+    border-right: 1px solid #314351;
+}
+
+.file-summary-item:last-child {
+    border-right: 0;
+}
+
+.file-summary-label,
+.file-summary-hint {
+    display: block;
+    color: #9fb3c2;
+    font-size: 12px;
+}
+
+.file-summary-value {
+    display: block;
+    margin: 4px 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.file-toolbar {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid #314351;
+}
+
+.file-search {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 6px;
+    min-width: 220px;
+}
+
+.file-search .clr-input {
+    width: 100%;
+}
+
+.file-type-select {
+    min-width: 150px;
+}
+
+.file-table {
+    display: table;
+    margin-top: 0;
+    min-width: 100%;
+    width: 100%;
+}
+
+.file-table thead,
+.file-table tbody,
+.file-table tr {
+    width: 100%;
+}
+
+.file-table-wrapper {
+    overflow-x: auto;
+    width: 100%;
+}
+
+.file-table th,
+.file-table td {
+    text-align: left;
+}
+
+.file-table th:first-child,
+.file-table td:first-child {
+    padding-left: 12px;
+    width: 35%;
+}
+
+.file-table th:nth-child(2),
+.file-table td:nth-child(2) {
+    width: 10%;
+}
+
+.file-table th:nth-child(3),
+.file-table td:nth-child(3) {
+    width: 10%;
+}
+
+.file-table th:nth-child(4),
+.file-table td:nth-child(4) {
+    min-width: 420px;
+    white-space: nowrap;
+    width: 45%;
+}
+
+.file-row-folder {
+    cursor: pointer;
+}
+
+.file-name {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    white-space: nowrap;
+}
+
+.file-name-folder {
+    cursor: pointer;
+}
+
+.file-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    margin: 0 4px 0 0;
+    color: inherit;
+}
+
+.file-spacer {
+    display: inline-block;
+    width: 22px;
+}
+
+.file-icon {
+    margin-right: 6px;
+}
+
+@media (max-width: 768px) {
+    .file-summary {
+        grid-template-columns: 1fr;
+    }
+
+    .file-summary-item {
+        border-right: 0;
+        border-bottom: 1px solid #314351;
+    }
+
+    .file-summary-item:last-child {
+        border-bottom: 0;
+    }
+
+    .file-toolbar {
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+
+    .file-search,
+    .file-type-select {
+        width: 100%;
+    }
 }

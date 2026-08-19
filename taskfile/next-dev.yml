@@ -1,0 +1,260 @@
+version: '3'
+
+vars:
+  NEXT_DEV_UPSTREAM_REPO: '{{.NEXT_DEV_UPSTREAM_REPO | default "https://github.com/container-registry/harbor-next.git"}}'
+  NEXT_DEV_UPSTREAM_REF: '{{.NEXT_DEV_UPSTREAM_REF | default "main"}}'
+  NEXT_DEV_TMP_ROOT: '{{.NEXT_DEV_TMP_ROOT | default "tmp"}}'
+  NEXT_DEV_TMP_CLONE: '{{.NEXT_DEV_TMP_CLONE | default (printf "%s/harbor-next-dev" .NEXT_DEV_TMP_ROOT)}}'
+  NEXT_DEV_SLOT: '{{.NEXT_DEV_SLOT | default "20"}}'
+  NEXT_DEV_PROJECT: '{{.NEXT_DEV_PROJECT | default (printf "harbor-next-%s" .NEXT_DEV_SLOT)}}'
+  NEXT_DEV_PORT_HTTP: '{{ add 8080 (mul (atoi .NEXT_DEV_SLOT) 100) }}'
+  NEXT_DEV_PORT_PORTAL: '{{ add 4200 (mul (atoi .NEXT_DEV_SLOT) 100) }}'
+  NEXT_DEV_PORT_POSTGRES: '{{ add 5432 (mul (atoi .NEXT_DEV_SLOT) 100) }}'
+  NEXT_DEV_PORT_REDIS: '{{ add 6379 (mul (atoi .NEXT_DEV_SLOT) 100) }}'
+  NEXT_DEV_PORT_REGISTRY: '{{ add 50000 (mul (atoi .NEXT_DEV_SLOT) 100) }}'
+  NEXT_DEV_PORT_REGISTRYCTL: '{{ add 8085 (mul (atoi .NEXT_DEV_SLOT) 100) }}'
+  NEXT_DEV_PORT_TRIVY: '{{ add 8081 (mul (atoi .NEXT_DEV_SLOT) 100) }}'
+  NEXT_DEV_PORT_DEBUG_CORE: '{{ add 2345 (mul (atoi .NEXT_DEV_SLOT) 100) }}'
+  NEXT_DEV_PORT_DEBUG_JOBSERVICE: '{{ add 2346 (mul (atoi .NEXT_DEV_SLOT) 100) }}'
+  NEXT_DEV_PORT_DEBUG_REGISTRYCTL: '{{ add 2347 (mul (atoi .NEXT_DEV_SLOT) 100) }}'
+  NEXT_DEV_IGNORE_HEALTH_COMPONENTS: '{{.NEXT_DEV_IGNORE_HEALTH_COMPONENTS | default ""}}'
+  NEXT_DEV_UID:
+    sh: id -u
+  NEXT_DEV_GID:
+    sh: id -g
+  NEXT_DEV_CONTAINER_USER:
+    sh: |
+      if command -v podman >/dev/null 2>&1 && \
+        [ "$(podman info --format '{{"{{.Host.Security.Rootless}}"}}' 2>/dev/null)" = "true" ]; then
+        echo "0:0"
+      elif command -v docker >/dev/null 2>&1 && \
+        docker info --format '{{"{{.SecurityOptions}}"}}' 2>/dev/null | grep -q "name=rootless"; then
+        echo "0:0"
+      else
+        echo "harbor"
+      fi
+  NEXT_DEV_ENV: >-
+    COMPOSE_PROJECT_NAME={{.NEXT_DEV_PROJECT}}
+    PROJECT_PREFIX={{.NEXT_DEV_PROJECT}}
+    PORT_CORE={{.NEXT_DEV_PORT_HTTP}}
+    PORT_PORTAL={{.NEXT_DEV_PORT_PORTAL}}
+    PORT_POSTGRES={{.NEXT_DEV_PORT_POSTGRES}}
+    PORT_REDIS={{.NEXT_DEV_PORT_REDIS}}
+    PORT_REGISTRY={{.NEXT_DEV_PORT_REGISTRY}}
+    PORT_REGISTRYCTL={{.NEXT_DEV_PORT_REGISTRYCTL}}
+    PORT_TRIVY={{.NEXT_DEV_PORT_TRIVY}}
+    PORT_DEBUG_CORE={{.NEXT_DEV_PORT_DEBUG_CORE}}
+    PORT_DEBUG_JOBSERVICE={{.NEXT_DEV_PORT_DEBUG_JOBSERVICE}}
+    PORT_DEBUG_REGISTRYCTL={{.NEXT_DEV_PORT_DEBUG_REGISTRYCTL}}
+    GO_VERSION={{.GO_VERSION}}
+    WITH_SNYK={{.WITH_SNYK}}
+    NEXT_DEV_IGNORE_HEALTH_COMPONENTS={{.NEXT_DEV_IGNORE_HEALTH_COMPONENTS}}
+    DEV_UID={{.NEXT_DEV_UID}}
+    DEV_GID={{.NEXT_DEV_GID}}
+    DEV_CONTAINER_USER={{.NEXT_DEV_CONTAINER_USER}}
+
+tasks:
+  dev:up:
+    desc: "Clone harbor-next, apply 8gcr patches, and keep the dev stack with portal running"
+    vars:
+      SKIP_TRIVY: '{{.SKIP_TRIVY | default "false"}}'
+      HEALTH_TIMEOUT_SECONDS: '{{.HEALTH_TIMEOUT_SECONDS | default "300"}}'
+    cmds:
+      - task: _require-tools
+      - task: _stop-existing
+        vars:
+          SKIP_TRIVY: '{{.SKIP_TRIVY}}'
+      - task: _prepare-workspace
+      - |
+        workspace="$(pwd)/{{.NEXT_DEV_TMP_CLONE}}"
+        DEV_ROOT="$workspace" {{.NEXT_DEV_ENV}} task --dir "{{.NEXT_DEV_TMP_CLONE}}" dev:up:e2e SLOT='{{.NEXT_DEV_SLOT}}' PROJECT_PREFIX='{{.NEXT_DEV_PROJECT}}' SKIP_TRIVY='{{.SKIP_TRIVY}}'
+
+        trivy_profile=""
+        if [ '{{.SKIP_TRIVY}}' != 'true' ]; then
+          trivy_profile="--profile trivy"
+        fi
+        (
+          cd "{{.NEXT_DEV_TMP_CLONE}}"
+          DEV_ROOT="$workspace" {{.NEXT_DEV_ENV}} docker compose -f devenv/docker-compose.yml -f devenv/docker-compose.next-dev.yml --env-file versions.env --profile portal --profile core --profile jobservice --profile registryctl $trivy_profile up -d --build --no-deps --force-recreate core jobservice registryctl portal
+        )
+
+        mkdir -p reports
+        harbor_url="http://127.0.0.1:{{.NEXT_DEV_PORT_HTTP}}"
+        portal_url="http://127.0.0.1:{{.NEXT_DEV_PORT_PORTAL}}"
+        ignored_components='{{.NEXT_DEV_IGNORE_HEALTH_COMPONENTS}}'
+        if [ '{{.SKIP_TRIVY}}' = 'true' ]; then
+          ignored_components="$ignored_components,trivy"
+        fi
+
+        deadline=$(($(date +%s) + {{.HEALTH_TIMEOUT_SECONDS}}))
+        last_health_output=""
+        last_health_error=""
+        while [ "$(date +%s)" -lt "$deadline" ]; do
+          if health_output=$(curl -fsS --connect-timeout 2 --max-time 5 "$harbor_url/api/v2.0/health" 2>&1); then
+            last_health_output="$health_output"
+            if printf '%s\n' "$health_output" | jq -e --arg ignored "$ignored_components" '
+              ($ignored | split(",") | map(ascii_downcase | gsub("^\\s+|\\s+$"; "")) | map(select(. != ""))) as $ignored |
+              ((.components // []) | length > 0) and
+              ([.components[]? |
+                select(((.name // "") | ascii_downcase) as $name | ($ignored | index($name) | not)) |
+                select(((.status // "") | ascii_downcase) != "healthy")
+              ] | length == 0)
+            ' >/dev/null 2>&1; then
+              printf '%s\n' "$harbor_url" > reports/next-dev-harbor-url
+              printf '\nPatched harbor-next dev stack is running.\n'
+              printf '  Workspace:  %s\n' "$workspace"
+              printf '  Harbor:     %s  (UI, OCI, and package clients)\n' "$portal_url"
+              printf '  Core API:   %s/api/v2.0\n' "$harbor_url"
+              printf '  Project:    {{.NEXT_DEV_PROJECT}}\n'
+              printf '  Stop with:  task next:dev:down NEXT_DEV_SLOT={{.NEXT_DEV_SLOT}}\n\n'
+              exit 0
+            fi
+          else
+            last_health_error="$health_output"
+          fi
+          sleep 5
+        done
+
+        DEV_ROOT="$workspace" {{.NEXT_DEV_ENV}} task --dir "{{.NEXT_DEV_TMP_CLONE}}" dev:logs:snapshot SLOT='{{.NEXT_DEV_SLOT}}' PROJECT_PREFIX='{{.NEXT_DEV_PROJECT}}' SKIP_TRIVY='{{.SKIP_TRIVY}}' E2E_ONLY=true TAIL=500 > reports/next-dev.log 2>&1 || true
+        if [ -n "$last_health_output" ]; then
+          printf '\n[health] last response:\n%s\n' "$last_health_output" >> reports/next-dev.log
+        fi
+        if [ -n "$last_health_error" ]; then
+          printf '\n[health] last curl error:\n%s\n' "$last_health_error" >> reports/next-dev.log
+        fi
+        printf '[error] Harbor did not become healthy within %ss; see reports/next-dev.log\n' '{{.HEALTH_TIMEOUT_SECONDS}}' >&2
+        exit 1
+
+  dev:down:
+    desc: "Stop the patched harbor-next dev stack and remove its volumes"
+    vars:
+      SKIP_TRIVY: '{{.SKIP_TRIVY | default "false"}}'
+    cmds:
+      - task: _stop-existing
+        vars:
+          SKIP_TRIVY: '{{.SKIP_TRIVY}}'
+
+  dev:status:
+    desc: "Show status for the patched harbor-next dev stack"
+    vars:
+      SKIP_TRIVY: '{{.SKIP_TRIVY | default "false"}}'
+    cmd: |
+      workspace="$(pwd)/{{.NEXT_DEV_TMP_CLONE}}"
+      if [ ! -f "{{.NEXT_DEV_TMP_CLONE}}/Taskfile.yml" ]; then
+        printf '[error] workspace not found: {{.NEXT_DEV_TMP_CLONE}}\n' >&2
+        exit 1
+      fi
+      DEV_ROOT="$workspace" {{.NEXT_DEV_ENV}} task --dir "{{.NEXT_DEV_TMP_CLONE}}" dev:status SLOT='{{.NEXT_DEV_SLOT}}' PROJECT_PREFIX='{{.NEXT_DEV_PROJECT}}' SKIP_TRIVY='{{.SKIP_TRIVY}}'
+
+  dev:logs:
+    desc: "Tail logs for the patched harbor-next dev stack"
+    vars:
+      SKIP_TRIVY: '{{.SKIP_TRIVY | default "false"}}'
+    cmd: |
+      workspace="$(pwd)/{{.NEXT_DEV_TMP_CLONE}}"
+      if [ ! -f "{{.NEXT_DEV_TMP_CLONE}}/Taskfile.yml" ]; then
+        printf '[error] workspace not found: {{.NEXT_DEV_TMP_CLONE}}\n' >&2
+        exit 1
+      fi
+      DEV_ROOT="$workspace" {{.NEXT_DEV_ENV}} task --dir "{{.NEXT_DEV_TMP_CLONE}}" dev:logs SLOT='{{.NEXT_DEV_SLOT}}' PROJECT_PREFIX='{{.NEXT_DEV_PROJECT}}' SKIP_TRIVY='{{.SKIP_TRIVY}}'
+
+  dev:logs:snapshot:
+    desc: "Write recent logs from the patched harbor-next dev stack"
+    vars:
+      SKIP_TRIVY: '{{.SKIP_TRIVY | default "false"}}'
+      TAIL: '{{.TAIL | default "300"}}'
+    cmd: |
+      workspace="$(pwd)/{{.NEXT_DEV_TMP_CLONE}}"
+      if [ ! -f "{{.NEXT_DEV_TMP_CLONE}}/Taskfile.yml" ]; then
+        printf '[error] workspace not found: {{.NEXT_DEV_TMP_CLONE}}\n' >&2
+        exit 1
+      fi
+      mkdir -p reports
+      DEV_ROOT="$workspace" {{.NEXT_DEV_ENV}} task --dir "{{.NEXT_DEV_TMP_CLONE}}" dev:logs:snapshot SLOT='{{.NEXT_DEV_SLOT}}' PROJECT_PREFIX='{{.NEXT_DEV_PROJECT}}' SKIP_TRIVY='{{.SKIP_TRIVY}}' E2E_ONLY=true TAIL='{{.TAIL}}' > reports/next-dev.log
+      printf 'Wrote reports/next-dev.log\n'
+
+  dev:info:
+    desc: "Print patched harbor-next dev workspace and port information"
+    silent: true
+    cmd: |
+      printf '\nPatched harbor-next dev environment\n'
+      printf '==================================\n'
+      printf '  Workspace:   %s/{{.NEXT_DEV_TMP_CLONE}}\n' "$(pwd)"
+      printf '  Project:     {{.NEXT_DEV_PROJECT}}\n'
+      printf '  Slot:        {{.NEXT_DEV_SLOT}}\n'
+      printf '  Harbor:      http://127.0.0.1:{{.NEXT_DEV_PORT_PORTAL}} (UI, OCI, and package clients)\n'
+      printf '  Core API:    http://127.0.0.1:{{.NEXT_DEV_PORT_HTTP}}/api/v2.0\n'
+      printf '  PostgreSQL:  127.0.0.1:{{.NEXT_DEV_PORT_POSTGRES}}\n'
+      printf '  Redis:       127.0.0.1:{{.NEXT_DEV_PORT_REDIS}}\n'
+      printf '  Registry:    127.0.0.1:{{.NEXT_DEV_PORT_REGISTRY}}\n'
+      printf '  RegistryCtl: 127.0.0.1:{{.NEXT_DEV_PORT_REGISTRYCTL}}\n'
+      printf '  Trivy:       127.0.0.1:{{.NEXT_DEV_PORT_TRIVY}}\n\n'
+
+  _prepare-workspace:
+    internal: true
+    cmds:
+      - mkdir -p "{{.NEXT_DEV_TMP_ROOT}}"
+      - rm -rf "{{.NEXT_DEV_TMP_CLONE}}"
+      - git clone --branch "{{.NEXT_DEV_UPSTREAM_REF}}" --depth 200 "{{.NEXT_DEV_UPSTREAM_REPO}}" "{{.NEXT_DEV_TMP_CLONE}}"
+      - task: :patches:apply
+        vars: { TARGET_DIR: '{{.NEXT_DEV_TMP_CLONE}}' }
+      - task: _copy-harness
+      - task: _prepare-module
+
+  _copy-harness:
+    internal: true
+    cmds:
+      - mkdir -p "{{.NEXT_DEV_TMP_CLONE}}/taskfile" "{{.NEXT_DEV_TMP_CLONE}}/src/e2e" "{{.NEXT_DEV_TMP_CLONE}}/src/portal/scripts" "{{.NEXT_DEV_TMP_CLONE}}/dockerfile"
+      - cp Taskfile.yml "{{.NEXT_DEV_TMP_CLONE}}/Taskfile.yml"
+      - cp taskfile/*.yml "{{.NEXT_DEV_TMP_CLONE}}/taskfile/"
+      - rm -rf "{{.NEXT_DEV_TMP_CLONE}}/devenv"
+      - cp -R devenv "{{.NEXT_DEV_TMP_CLONE}}/devenv"
+      - cp dockerfile/*.dockerfile "{{.NEXT_DEV_TMP_CLONE}}/dockerfile/"
+      - cp src/portal/scripts/dev-portal-start.js src/portal/scripts/streaming-dev-proxy.js src/portal/scripts/streaming-dev-proxy.test.js "{{.NEXT_DEV_TMP_CLONE}}/src/portal/scripts/"
+      - cp -Rf config/* "{{.NEXT_DEV_TMP_CLONE}}/config/"
+      - rm -rf "{{.NEXT_DEV_TMP_CLONE}}/src/e2e"
+      - cp -R src/e2e "{{.NEXT_DEV_TMP_CLONE}}/src/e2e"
+
+  _prepare-module:
+    internal: true
+    dir: '{{.NEXT_DEV_TMP_CLONE}}'
+    cmds:
+      - task build:gen-apis
+      - cd src && go mod tidy
+      - cd src/portal && bun install --ignore-scripts
+      - task build:gen-apis:frontend
+
+  _stop-existing:
+    internal: true
+    vars:
+      SKIP_TRIVY: '{{.SKIP_TRIVY | default "false"}}'
+    cmd: |
+      workspace="$(pwd)/{{.NEXT_DEV_TMP_CLONE}}"
+      if [ -f "{{.NEXT_DEV_TMP_CLONE}}/Taskfile.yml" ]; then
+        DEV_ROOT="$workspace" {{.NEXT_DEV_ENV}} task --dir "{{.NEXT_DEV_TMP_CLONE}}" dev:infra:remove SLOT='{{.NEXT_DEV_SLOT}}' PROJECT_PREFIX='{{.NEXT_DEV_PROJECT}}' SKIP_TRIVY='{{.SKIP_TRIVY}}' E2E_ONLY=true >/dev/null 2>&1 || true
+      fi
+      ids=$(docker ps -aq --filter "label=com.docker.compose.project={{.NEXT_DEV_PROJECT}}")
+      if [ -n "$ids" ]; then
+        docker rm -f $ids >/dev/null 2>&1 || true
+      fi
+      volumes=$(docker volume ls -q --filter "label=com.docker.compose.project={{.NEXT_DEV_PROJECT}}")
+      if [ -n "$volumes" ]; then
+        docker volume rm $volumes >/dev/null 2>&1 || true
+      fi
+
+  _require-tools:
+    internal: true
+    cmds:
+      - |
+        missing=""
+        for tool in git task go docker curl jq openssl bun; do
+          command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
+        done
+        docker compose version >/dev/null 2>&1 || missing="$missing docker-compose"
+        if ! docker info >/dev/null 2>&1; then
+          missing="$missing docker-daemon"
+        fi
+        if [ -n "$missing" ]; then
+          printf '[error] missing required next dev tools:%s\n' "$missing" >&2
+          exit 1
+        fi

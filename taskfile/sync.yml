@@ -1,0 +1,46 @@
+version: '3'
+
+vars:
+  VERIFY_DIR: '{{.VERIFY_DIR | default ".opencode/tmp/patch-verify"}}'
+  RERERE_DIR: '{{.RERERE_DIR | default "8gcr-ee/.rr-cache"}}'
+
+tasks:
+  sanity-check:
+    desc: "Verify bookmark-based patch tooling is available"
+    cmds:
+      - test -f PATCHES.md
+      - test -f taskfile/patches.yml
+      - test -d .github
+      - task --output interleaved --silent patches:list | grep -q .
+      - echo "Sanity check passed"
+
+  verify-patches:
+    desc: "Verify all local 000N-* bookmarks merge onto current main@next"
+    cmds:
+      - rm -rf '{{.VERIFY_DIR}}'
+      - defer: rm -rf '{{.VERIFY_DIR}}'
+      - mkdir -p '{{.VERIFY_DIR}}'
+      - git clone --quiet "$(jj git root)" '{{.VERIFY_DIR}}/checkout'
+      - git -C '{{.VERIFY_DIR}}/checkout' checkout --quiet "$(jj log -r main@next --no-graph -T commit_id)"
+      - task: :patches:apply
+        vars: { TARGET_DIR: '{{.VERIFY_DIR}}/checkout' }
+      - echo "All local commercial patch bookmarks merge cleanly"
+
+  save-rerere:
+    desc: "Save Git rerere cache if the caller recorded resolutions"
+    cmds:
+      - |
+        git_dir=$(jj git root)
+        rr_cache_dir="${git_dir}/rr-cache"
+        if [ -d "${rr_cache_dir}" ] && [ "$(ls -A "${rr_cache_dir}" 2>/dev/null)" ]; then
+          mkdir -p '{{.RERERE_DIR}}'
+          cp -r "${rr_cache_dir}"/* '{{.RERERE_DIR}}/'
+          echo "Rerere cache saved"
+        else
+          echo "No rerere cache to save"
+        fi
+
+  push:
+    desc: "Push patch bookmarks and dev to the private 8gcr remote"
+    cmds:
+      - task: :jj:sync-patch-branches

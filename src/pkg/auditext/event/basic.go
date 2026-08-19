@@ -80,6 +80,8 @@ func (e *Resolver) Resolve(ce *commonevent.Metadata, event *event.Event) error {
 		ResourceType: e.ResourceType,
 		OccurAt:      time.Now(),
 		IsSuccessful: true,
+		SourceIP:     ce.IPAddress,
+		UserAgent:    ce.UserAgent,
 	}
 	resourceName := ""
 	operation := MethodToOperation(ce.RequestMethod)

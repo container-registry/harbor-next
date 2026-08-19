@@ -6,7 +6,7 @@
         class="login-wrapper"
         [ngStyle]="{
             'background-image': customLoginBgImg
-                ? 'url(/images/' + customLoginBgImg + ')'
+                ? 'url(\'' + customLoginBgImg + '\')'
                 : ''
         }">
         <form #signInForm="ngForm" class="login">

@@ -2,15 +2,15 @@
     <div class="branding">
         <a href="javascript:void(0)" class="nav-link" (click)="homeAction()">
             <img
-                [attr.src]="'images/' + customStyle?.product?.logo"
-                *ngIf="customStyle?.product?.logo; else elseBlock"
+                [src]="BrandingInfo?.product?.logo"
+                *ngIf="BrandingInfo?.product?.logo; else elseBlock"
                 class="headerLogo" />
             <ng-template #elseBlock
                 ><img [src]="'images/harbor-logo.svg'" class="harbor-logo"
             /></ng-template>
             <span class="title">{{
-                customStyle?.product?.name
-                    ? customStyle?.product?.name
+                BrandingInfo?.product?.name
+                    ? BrandingInfo?.product?.name
                     : (appTitle | translate)
             }}</span>
         </a>

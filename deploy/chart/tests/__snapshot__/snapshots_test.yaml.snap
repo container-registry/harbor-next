@@ -16,7 +16,7 @@
       JOBSERVICE_URL: http://harbor-harbor-next-jobservice
       LOG_LEVEL: info
       NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
-      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
+      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory,npmjs,npm,maven-central,maven,pypi,pypi-registry,crates-io,cargo,go,go-registry,go-sumdb,homebrew,homebrew-registry
       PORT: "8080"
       PORTAL_URL: http://harbor-harbor-next-portal
       POSTGRESQL_CONN_MAX_IDLE_TIME: 300s
@@ -33,7 +33,7 @@
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
       REGISTRY_URL: http://harbor-harbor-next-registry:5000
-      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
+      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite,npmjs,npm,maven-central,maven,pypi,pypi-registry,crates-io,cargo,go,go-registry,go-sumdb,homebrew,homebrew-registry
       TOKEN_SERVICE_URL: http://harbor-harbor-next-core/service/token
       TRIVY_ADAPTER_URL: http://harbor-harbor-next-trivy:8080
       WITH_TRIVY: "false"
@@ -140,6 +140,55 @@
                     port:
                       number: 80
                 path: /v2/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /npm/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /maven/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /pypi/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /cargo/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /go/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /go-sumdb/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /homebrew/
                 pathType: Prefix
               - backend:
                   service:
@@ -509,7 +558,7 @@
       JOBSERVICE_URL: http://harbor-harbor-next-jobservice
       LOG_LEVEL: info
       NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
-      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
+      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory,npmjs,npm,maven-central,maven,pypi,pypi-registry,crates-io,cargo,go,go-registry,go-sumdb,homebrew,homebrew-registry
       PORT: "8080"
       PORTAL_URL: http://harbor-harbor-next-portal
       POSTGRESQL_CONN_MAX_IDLE_TIME: 300s
@@ -526,7 +575,7 @@
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
       REGISTRY_URL: http://harbor-harbor-next-registry:5000
-      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
+      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite,npmjs,npm,maven-central,maven,pypi,pypi-registry,crates-io,cargo,go,go-registry,go-sumdb,homebrew,homebrew-registry
       TOKEN_SERVICE_URL: http://harbor-harbor-next-core/service/token
       TRIVY_ADAPTER_URL: http://harbor-harbor-next-trivy:8080
       WITH_TRIVY: "false"
@@ -633,6 +682,55 @@
                     port:
                       number: 80
                 path: /v2/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /npm/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /maven/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /pypi/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /cargo/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /go/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /go-sumdb/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /homebrew/
                 pathType: Prefix
               - backend:
                   service:
@@ -1002,7 +1100,7 @@
       JOBSERVICE_URL: http://harbor-harbor-next-jobservice
       LOG_LEVEL: info
       NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
-      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
+      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory,npmjs,npm,maven-central,maven,pypi,pypi-registry,crates-io,cargo,go,go-registry,go-sumdb,homebrew,homebrew-registry
       PORT: "8080"
       PORTAL_URL: http://harbor-harbor-next-portal
       POSTGRESQL_CONN_MAX_IDLE_TIME: 300s
@@ -1019,7 +1117,7 @@
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
       REGISTRY_URL: http://harbor-harbor-next-registry:5000
-      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
+      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite,npmjs,npm,maven-central,maven,pypi,pypi-registry,crates-io,cargo,go,go-registry,go-sumdb,homebrew,homebrew-registry
       TOKEN_SERVICE_URL: http://harbor-harbor-next-core/service/token
       TRIVY_ADAPTER_URL: http://harbor-harbor-next-trivy:8080
       WITH_TRIVY: "false"
@@ -1126,6 +1224,55 @@
                     port:
                       number: 80
                 path: /v2/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /npm/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /maven/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /pypi/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /cargo/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /go/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /go-sumdb/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /homebrew/
                 pathType: Prefix
               - backend:
                   service:
@@ -1496,7 +1643,7 @@
       JOBSERVICE_URL: http://harbor-harbor-next-jobservice
       LOG_LEVEL: info
       NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
-      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
+      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory,npmjs,npm,maven-central,maven,pypi,pypi-registry,crates-io,cargo,go,go-registry,go-sumdb,homebrew,homebrew-registry
       PORT: "8080"
       PORTAL_URL: http://harbor-harbor-next-portal
       POSTGRESQL_CONN_MAX_IDLE_TIME: 300s
@@ -1513,7 +1660,7 @@
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
       REGISTRY_URL: http://harbor-harbor-next-registry:5000
-      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
+      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite,npmjs,npm,maven-central,maven,pypi,pypi-registry,crates-io,cargo,go,go-registry,go-sumdb,homebrew,homebrew-registry
       TOKEN_SERVICE_URL: http://harbor-harbor-next-core/service/token
       TRIVY_ADAPTER_URL: http://harbor-harbor-next-trivy:8080
       WITH_TRIVY: "false"
@@ -1620,6 +1767,55 @@
                     port:
                       number: 80
                 path: /v2/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /npm/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /maven/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /pypi/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /cargo/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /go/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /go-sumdb/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /homebrew/
                 pathType: Prefix
               - backend:
                   service:
@@ -1994,7 +2190,7 @@
       METRIC_PORT: "8001"
       METRIC_SUBSYSTEM: core
       NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
-      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
+      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory,npmjs,npm,maven-central,maven,pypi,pypi-registry,crates-io,cargo,go,go-registry,go-sumdb,homebrew,homebrew-registry
       PORT: "8080"
       PORTAL_URL: http://harbor-harbor-next-portal
       POSTGRESQL_CONN_MAX_IDLE_TIME: 300s
@@ -2011,7 +2207,7 @@
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
       REGISTRY_URL: http://harbor-harbor-next-registry:5000
-      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
+      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite,npmjs,npm,maven-central,maven,pypi,pypi-registry,crates-io,cargo,go,go-registry,go-sumdb,homebrew,homebrew-registry
       TOKEN_SERVICE_URL: http://harbor-harbor-next-core/service/token
       TRIVY_ADAPTER_URL: http://harbor-harbor-next-trivy:8080
       WITH_TRIVY: "false"
@@ -2118,6 +2314,55 @@
                     port:
                       number: 80
                 path: /v2/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /npm/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /maven/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /pypi/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /cargo/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /go/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /go-sumdb/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /homebrew/
                 pathType: Prefix
               - backend:
                   service:
@@ -2540,7 +2785,7 @@
       JOBSERVICE_URL: http://harbor-harbor-next-jobservice
       LOG_LEVEL: info
       NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
-      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
+      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory,npmjs,npm,maven-central,maven,pypi,pypi-registry,crates-io,cargo,go,go-registry,go-sumdb,homebrew,homebrew-registry
       PORT: "8080"
       PORTAL_URL: http://harbor-harbor-next-portal
       POSTGRESQL_CONN_MAX_IDLE_TIME: 300s
@@ -2557,7 +2802,7 @@
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
       REGISTRY_URL: http://harbor-harbor-next-registry:5000
-      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
+      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite,npmjs,npm,maven-central,maven,pypi,pypi-registry,crates-io,cargo,go,go-registry,go-sumdb,homebrew,homebrew-registry
       TOKEN_SERVICE_URL: http://harbor-harbor-next-core/service/token
       TRIVY_ADAPTER_URL: http://harbor-harbor-next-trivy:8080
       WITH_TRIVY: "false"
@@ -2670,6 +2915,55 @@
                     name: harbor-harbor-next-core
                     port:
                       number: 80
+                path: /npm/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /maven/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /pypi/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /cargo/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /go/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /go-sumdb/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /homebrew/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
                 path: /chartrepo/
                 pathType: Prefix
               - backend:
@@ -2715,6 +3009,55 @@
                     name: harbor-harbor-next-core
                     port:
                       number: 80
+                path: /npm/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /maven/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /pypi/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /cargo/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /go/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /go-sumdb/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /homebrew/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
                 path: /chartrepo/
                 pathType: Prefix
               - backend:
@@ -2754,6 +3097,55 @@
                     port:
                       number: 80
                 path: /v2/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /npm/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /maven/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /pypi/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /cargo/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /go/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /go-sumdb/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-harbor-next-core
+                    port:
+                      number: 80
+                path: /homebrew/
                 pathType: Prefix
               - backend:
                   service:

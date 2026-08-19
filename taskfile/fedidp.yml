@@ -1,0 +1,163 @@
+version: '3'
+
+vars:
+  FEDIDP_CLUSTER_NAME: fedidp-test
+  FEDIDP_CRED_PROVIDER_DIR: /tmp/fedidp
+  FEDIDP_CRED_PROVIDER_BIN: /tmp/fedidp/credential-provider-echo-token-silly
+  FEDIDP_CRED_PROVIDER_CFG: /tmp/fedidp/k8s_credential_provider_config.yaml
+  FEDIDP_CONTAINERD_CERTS_DIR: /tmp/fedidp/certs.d
+
+tasks:
+  dev:fedidp:cluster:up:
+    desc: "Create KIND cluster with credential-provider support for FedIDP k8s tests"
+    deps: [_fedidp:check-tools]
+    cmds:
+      - task: _fedidp:pull-cred-provider
+      - task: _fedidp:write-cred-provider-config
+      - task: _fedidp:write-containerd-hosts
+      - task: _fedidp:kind-create
+      - task: _fedidp:apply-rbac
+
+  dev:fedidp:cluster:down:
+    desc: "Destroy the FedIDP KIND cluster"
+    cmds:
+      - kind delete cluster --name {{.FEDIDP_CLUSTER_NAME}} || true
+
+  dev:fedidp:cluster:issuer:
+    desc: "Print the cluster OIDC issuer URL"
+    cmds:
+      - kubectl get --raw /.well-known/openid-configuration | jq -r '.issuer'
+
+  dev:fedidp:cluster:jwks:
+    desc: "Print the cluster JWKS JSON"
+    cmds:
+      - kubectl get --raw /openid/v1/jwks | jq .
+
+  _fedidp:pull-cred-provider:
+    internal: true
+    cmds:
+      - mkdir -p {{.FEDIDP_CRED_PROVIDER_DIR}}
+      - oras pull ttl.sh/pullafedidp:latest --output {{.FEDIDP_CRED_PROVIDER_DIR}}
+      - chmod +x {{.FEDIDP_CRED_PROVIDER_BIN}}
+    status:
+      - test -x {{.FEDIDP_CRED_PROVIDER_BIN}}
+
+  _fedidp:write-cred-provider-config:
+    internal: true
+    vars:
+      HARBOR_K8S_URL:
+        sh: |
+          url="${HARBOR_K8S_URL:-${HARBOR_URL:-}}"
+          if [ -z "$url" ]; then
+            case "$(docker --version 2>/dev/null)" in
+              *podman*) url="http://host.containers.internal:8080" ;;
+              *) url="http://host.docker.internal:8080" ;;
+            esac
+          fi
+          printf '%s' "$url"
+      HARBOR_HOST:
+        sh: |
+          url="${HARBOR_K8S_URL:-${HARBOR_URL:-}}"
+          if [ -z "$url" ]; then
+            case "$(docker --version 2>/dev/null)" in
+              *podman*) url="http://host.containers.internal:8080" ;;
+              *) url="http://host.docker.internal:8080" ;;
+            esac
+          fi
+          host="${url#http://}"
+          host="${host#https://}"
+          printf '%s' "${host%/}"
+    cmds:
+      - |
+        cat > {{.FEDIDP_CRED_PROVIDER_CFG}} <<'EOF'
+        apiVersion: kubelet.config.k8s.io/v1
+        kind: CredentialProviderConfig
+        providers:
+          - name: credential-provider-echo-token-silly
+            matchImages:
+              - "{{.HARBOR_HOST}}"
+            defaultCacheDuration: "0s"
+            apiVersion: credentialprovider.kubelet.k8s.io/v1
+            args: []
+            env:
+              - name: HARBOR_URL
+                value: "{{.HARBOR_K8S_URL}}"
+            tokenAttributes:
+              serviceAccountTokenAudience: "{{.HARBOR_HOST}}"
+              cacheType: Token
+              requireServiceAccount: true
+        EOF
+
+  _fedidp:kind-create:
+    internal: true
+    vars:
+      HARBOR_HOST:
+        sh: |
+          url="${HARBOR_K8S_URL:-${HARBOR_URL:-}}"
+          if [ -z "$url" ]; then
+            case "$(docker --version 2>/dev/null)" in
+              *podman*) url="http://host.containers.internal:8080" ;;
+              *) url="http://host.docker.internal:8080" ;;
+            esac
+          fi
+          host="${url#http://}"
+          host="${host#https://}"
+          printf '%s' "${host%/}"
+    cmds:
+      - sed "s|HARBOR_HOST_PLACEHOLDER|{{.HARBOR_HOST}}|g" taskfile/fedidp-kind-config.yml | kind create cluster --name {{.FEDIDP_CLUSTER_NAME}} --config - --wait 120s
+
+  _fedidp:write-containerd-hosts:
+    internal: true
+    vars:
+      HARBOR_HOST:
+        sh: |
+          url="${HARBOR_K8S_URL:-${HARBOR_URL:-}}"
+          if [ -z "$url" ]; then
+            case "$(docker --version 2>/dev/null)" in
+              *podman*) url="http://host.containers.internal:8080" ;;
+              *) url="http://host.docker.internal:8080" ;;
+            esac
+          fi
+          host="${url#http://}"
+          host="${host#https://}"
+          printf '%s' "${host%/}"
+    cmds:
+      - mkdir -p "{{.FEDIDP_CONTAINERD_CERTS_DIR}}/{{.HARBOR_HOST}}"
+      - |
+        cat > "{{.FEDIDP_CONTAINERD_CERTS_DIR}}/{{.HARBOR_HOST}}/hosts.toml" <<'EOF'
+        server = "http://{{.HARBOR_HOST}}"
+
+        [host."http://{{.HARBOR_HOST}}"]
+          capabilities = ["pull", "resolve"]
+        EOF
+
+  _fedidp:apply-rbac:
+    internal: true
+    vars:
+      HARBOR_HOST:
+        sh: |
+          url="${HARBOR_K8S_URL:-${HARBOR_URL:-}}"
+          if [ -z "$url" ]; then
+            case "$(docker --version 2>/dev/null)" in
+              *podman*) url="http://host.containers.internal:8080" ;;
+              *) url="http://host.docker.internal:8080" ;;
+            esac
+          fi
+          host="${url#http://}"
+          host="${host#https://}"
+          printf '%s' "${host%/}"
+    cmds:
+      - |
+        sed "s|HARBOR_HOST_PLACEHOLDER|{{.HARBOR_HOST}}|g" taskfile/fedidp-rbac.yaml | kubectl apply -f -
+
+  _fedidp:check-tools:
+    internal: true
+    preconditions:
+      - sh: "command -v kind"
+        msg: "kind not installed — brew install kind"
+      - sh: "command -v kubectl"
+        msg: "kubectl not installed — brew install kubectl"
+      - sh: "command -v oras"
+        msg: "oras not installed — brew install oras"
+      - sh: "command -v jq"
+        msg: "jq not installed — brew install jq"

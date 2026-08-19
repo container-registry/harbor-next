@@ -20,7 +20,7 @@ services:
       start_period: 5s
     volumes:
       - harbor-postgres-18-data:/var/lib/postgresql
-      - ../make/migrations:/migrations
+      - ${DEV_ROOT:-..}/make/migrations:/migrations
 
   redis:
     image: valkey/valkey:latest
@@ -45,7 +45,7 @@ services:
       - "${PORT_REGISTRY:-50000}:5000"
     volumes:
       - harbor-registry-data:/var/lib/registry
-      - ../config/registry.yml:/etc/registry/config.yml:ro
+      - ${DEV_ROOT:-..}/config/registry.yml:/etc/registry/config.yml:ro
 
   # Core API - starts with: docker compose --profile core up
   core:
@@ -62,13 +62,14 @@ services:
     profiles: [core]
     user: "${DEV_CONTAINER_USER:-harbor}"
     volumes:
-      - ..:/app
-      - ${HOST_GOMODCACHE:?}:/go/pkg/mod
-      - ${HOST_GOCACHE:?}:/home/harbor/.cache/go-build
+      - ${DEV_ROOT:-..}:/app
+      - go-module-cache:/go/pkg/mod
+      - go-build-cache:/home/harbor/.cache/go-build
       # Mount views directly to where beego expects them (avoids symlink leaking to host)
-      - ../src/core/views:/app/views:ro
+      - ${DEV_ROOT:-..}/src/core/views:/app/views:ro
     ports:
       - "${PORT_CORE:-8080}:8080"
+      - "${PORT_METRIC_CORE:-9090}:9090"
       # - "127.0.0.1:${PORT_DEBUG_CORE:-2345}:2345"  # Debug port (uncomment if needed)
     environment:
       # Database
@@ -89,10 +90,15 @@ services:
       REGISTRY_CREDENTIAL_PASSWORD: ""
       # Core settings
       EXT_ENDPOINT: http://core:8080
-      CSRF_PLAINTEXT_HTTP: ${CSRF_PLAINTEXT_HTTP}
+      # Local development is served over HTTP. Tell gorilla/csrf to compare
+      # request origins using the http scheme instead of its secure default.
+      CSRF_PLAINTEXT_HTTP: ${CSRF_PLAINTEXT_HTTP:-true}
       CORE_URL: http://core:8080
       HARBOR_ADMIN_PASSWORD: Harbor12345
       CACHE_ENABLED: "false"
+      METRIC_ENABLE: "true"
+      METRIC_PORT: "9090"
+      POSTGRESQL_METRICS_ENABLED: "true"
       LOG_LEVEL: debug
       # Token signing key
       TOKEN_PRIVATE_KEY_PATH: devenv/token_service_key.pem
@@ -100,16 +106,23 @@ services:
       JOBSERVICE_URL: http://jobservice:8888
       CORE_SECRET: devenv-secret-do-not-use-in-production
       JOBSERVICE_SECRET: devenv-secret-do-not-use-in-production
+      CSRF_TRUSTED_ORIGINS: localhost:4200
       # Portal (dev server on port 4200, not Nginx on 8080)
       PORTAL_URL: http://portal:4200
       # Trivy scanner
       TRIVY_ADAPTER_URL: http://trivy-adapter:8080
       WITH_TRIVY: "true"
+      # Grype scanner
+      GRYPE_ADAPTER_URL: http://grype-scanner:8080
+      WITH_GRYPE: ${WITH_GRYPE:-false}
+      # Snyk scanner
+      SNYK_ADAPTER_URL: http://snyk-scanner:8080
+      WITH_SNYK: ${WITH_SNYK:-true}
       HEALTHCHECK_PORT: "8080"
       HEALTHCHECK_ENDPOINT: /api/v2.0/ping
       # Proxy cache and replication
-      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
-      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr
+      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory,npmjs,npm,maven-central,maven,pypi,pypi-registry,crates-io,cargo,go,go-registry,go-sumdb,homebrew,homebrew-registry
+      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,npmjs,npm,maven-central,maven,pypi,pypi-registry,crates-io,cargo,go,go-registry,go-sumdb,homebrew,homebrew-registry
     command: air -c devenv/air.core.toml
     depends_on:
       postgresql:
@@ -126,10 +139,11 @@ services:
     profiles: [jobservice]
     user: "${DEV_CONTAINER_USER:-harbor}"
     volumes:
-      - ..:/app
-      - ${HOST_GOMODCACHE:?}:/go/pkg/mod
-      - ${HOST_GOCACHE:?}:/home/harbor/.cache/go-build
-    # ports:
+      - ${DEV_ROOT:-..}:/app
+      - go-module-cache:/go/pkg/mod
+      - go-build-cache:/home/harbor/.cache/go-build
+    ports:
+      - "${PORT_METRIC_JOBSERVICE:-9091}:9091"
     #   - "8888:8888"  # JobService API (uncomment if needed)
     #   - "127.0.0.1:2346:2346"  # Debug port (uncomment if needed)
     environment:
@@ -152,6 +166,7 @@ services:
       REGISTRY_CREDENTIAL_USERNAME: ""
       REGISTRY_CREDENTIAL_PASSWORD: ""
       TOKEN_SERVICE_URL: http://core:8080/service/token
+      POSTGRESQL_METRICS_ENABLED: "true"
       LOG_LEVEL: debug
       HEALTHCHECK_PORT: "8888"
       HEALTHCHECK_ENDPOINT: /api/v1/stats
@@ -165,11 +180,11 @@ services:
     profiles: [registryctl]
     user: "${DEV_CONTAINER_USER:-harbor}"
     volumes:
-      - ..:/app
-      - ${HOST_GOMODCACHE:?}:/go/pkg/mod
-      - ${HOST_GOCACHE:?}:/home/harbor/.cache/go-build
+      - ${DEV_ROOT:-..}:/app
+      - go-module-cache:/go/pkg/mod
+      - go-build-cache:/home/harbor/.cache/go-build
       - harbor-registry-data:/var/lib/registry
-      - ../config/registry.yml:/etc/registry/config.yml:ro
+      - ${DEV_ROOT:-..}/config/registry.yml:/etc/registry/config.yml:ro
     ports:
       - "${PORT_REGISTRYCTL:-8085}:8080"
       - "127.0.0.1:${PORT_DEBUG_REGISTRYCTL:-2347}:2347"
@@ -217,6 +232,49 @@ services:
     depends_on:
       - redis
 
+  # Snyk scanner adapter - starts with: docker compose --profile snyk up
+  snyk-scanner:
+    build:
+      context: ..
+      dockerfile: dockerfile/snyk-scanner.dockerfile
+      args:
+        GO_VERSION: ${GO_VERSION}
+        NODE_VERSION: ${NODE_VERSION}
+        SNYK_CLI_VERSION: ${SNYK_CLI_VERSION}
+    profiles: [snyk]
+    environment:
+      SCANNER_API_SERVER_ADDR: ":8080"
+      SCANNER_SNYK_CACHE_DIR: /tmp
+      SNYK_TOKEN: ${SNYK_TOKEN:-}
+      SNYK_ORG: ${SNYK_ORG:-}
+    ports:
+      - "${PORT_SNYK:-8082}:8080"
+    tmpfs:
+      - /tmp:size=2G,mode=1777
+
+  # Grype scanner adapter - starts with: docker compose --profile grype up
+  grype-scanner:
+    build:
+      context: ..
+      dockerfile: dockerfile/grype-scanner.dockerfile
+      args:
+        GO_VERSION: ${GO_VERSION}
+        ALPINE_VERSION: ${ALPINE_VERSION}
+        GRYPE_VERSION: ${GRYPE_VERSION}
+        SYFT_VERSION: ${SYFT_VERSION}
+        LPROBE_VERSION: ${LPROBE_VERSION}
+    profiles: [grype]
+    environment:
+      SCANNER_API_SERVER_ADDR: ":8080"
+      SCANNER_GRYPE_CACHE_DIR: /home/scanner/cache
+      SCANNER_GRYPE_DB_CACHE_DIR: /home/scanner/cache/grype-db
+      SCANNER_GRYPE_SCOPE: squashed
+    ports:
+      - "${PORT_GRYPE:-8083}:8080"
+    tmpfs:
+      - /tmp:size=2G,mode=1777
+      - /home/scanner/cache:size=4G,mode=1777
+
 
   # Portal (Angular UI) - starts with: docker compose --profile portal up
   portal:
@@ -228,19 +286,19 @@ services:
         BUN_VERSION: ${BUN_VERSION}
     profiles: [portal]
     volumes:
-      - ../src/portal/src:/app/src
-      - ../src/portal/angular.json:/app/angular.json:ro
-      - ../src/portal/tsconfig.json:/app/tsconfig.json:ro
-      - ../src/portal/tsconfig.app.json:/app/tsconfig.app.json:ro
-      - ../src/portal/proxy.config.mjs:/app/proxy.config.mjs:ro
-      - ../src/portal/ng-swagger-gen:/app/ng-swagger-gen:ro
-      - ../src/portal/app-swagger-ui/package.json:/swagger-ui/package.json:ro
-      - ../src/portal/app-swagger-ui/package-lock.json:/swagger-ui/package-lock.json:ro
-      - ../src/portal/app-swagger-ui/src:/swagger-ui/src
-      - ../src/portal/app-swagger-ui/index.html:/swagger-ui/index.html:ro
-      - ../src/portal/app-swagger-ui/favicon.ico:/swagger-ui/favicon.ico:ro
-      - ../src/portal/app-swagger-ui/webpack.config.js:/swagger-ui/webpack.config.js:ro
-      - ../src/portal/.angular:/app/.angular
+      - ${DEV_ROOT:-..}/src/portal/src:/app/src
+      - ${DEV_ROOT:-..}/src/portal/angular.json:/app/angular.json:ro
+      - ${DEV_ROOT:-..}/src/portal/tsconfig.json:/app/tsconfig.json:ro
+      - ${DEV_ROOT:-..}/src/portal/tsconfig.app.json:/app/tsconfig.app.json:ro
+      - ${DEV_ROOT:-..}/src/portal/proxy.config.mjs:/app/proxy.config.mjs:ro
+      - ${DEV_ROOT:-..}/src/portal/ng-swagger-gen:/app/ng-swagger-gen:ro
+      - ${DEV_ROOT:-..}/src/portal/app-swagger-ui/package.json:/swagger-ui/package.json:ro
+      - ${DEV_ROOT:-..}/src/portal/app-swagger-ui/package-lock.json:/swagger-ui/package-lock.json:ro
+      - ${DEV_ROOT:-..}/src/portal/app-swagger-ui/src:/swagger-ui/src
+      - ${DEV_ROOT:-..}/src/portal/app-swagger-ui/index.html:/swagger-ui/index.html:ro
+      - ${DEV_ROOT:-..}/src/portal/app-swagger-ui/favicon.ico:/swagger-ui/favicon.ico:ro
+      - ${DEV_ROOT:-..}/src/portal/app-swagger-ui/webpack.config.js:/swagger-ui/webpack.config.js:ro
+      - portal-angular-cache:/app/.angular
       - portal-openapi-ui:/app/src/openapi-ui
     ports:
       - "${PORT_PORTAL:-4200}:4200"
@@ -258,3 +316,9 @@ volumes:
     name: ${PROJECT_PREFIX:-harbor}-registry-data
   portal-openapi-ui:
     name: ${PROJECT_PREFIX:-harbor}-portal-openapi-ui
+  portal-angular-cache:
+    name: ${PROJECT_PREFIX:-harbor}-portal-angular-cache
+  go-module-cache:
+    name: ${PROJECT_PREFIX:-harbor}-go-module-cache
+  go-build-cache:
+    name: ${PROJECT_PREFIX:-harbor}-go-build-cache

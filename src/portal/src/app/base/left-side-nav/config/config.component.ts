@@ -14,6 +14,10 @@
 import { Component, OnInit } from '@angular/core';
 import { ConfigService } from './config.service';
 
+export type CommercialFeatureConfigKey =
+    | 'enable_commercial_branding'
+    | 'enable_commercial_identity_providers';
+
 @Component({
     selector: 'config',
     templateUrl: 'config.component.html',
@@ -25,6 +29,10 @@ export class ConfigurationComponent implements OnInit {
     }
 
     constructor(private conf: ConfigService) {}
+
+    commercialFeatureEnabled(configKey: CommercialFeatureConfigKey): boolean {
+        return this.conf.getConfig()[configKey]?.value === true;
+    }
 
     ngOnInit(): void {
         // Refresh config every time when entering the configuration page

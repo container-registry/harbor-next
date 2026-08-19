@@ -29,10 +29,10 @@ import {
 
 export const SAFE_METHODS: string[] = ['GET', 'HEAD', 'OPTIONS', 'TRACE'];
 
-enum INVALID_CSRF_TOKEN {
-    CODE = 403,
-    MESSAGE = 'CSRF token invalid',
-}
+const INVALID_CSRF_TOKEN = {
+    CODE: 403,
+    MESSAGES: ['CSRF token invalid', 'CSRF token not found in request'],
+};
 
 @Injectable({
     providedIn: 'root',
@@ -111,7 +111,9 @@ export class InterceptHttpService implements HttpInterceptor {
                     }
                     if (
                         error.status === INVALID_CSRF_TOKEN.CODE &&
-                        errorHandler(error) === INVALID_CSRF_TOKEN.MESSAGE
+                        INVALID_CSRF_TOKEN.MESSAGES.includes(
+                            errorHandler(error)
+                        )
                     ) {
                         const csrfToken = localStorage.getItem('__csrf');
                         if (csrfToken) {

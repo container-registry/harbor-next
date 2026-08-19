@@ -109,3 +109,63 @@
 .row-inline label {
   align-self: end;
 }
+
+.proxy-cache-settings {
+  display: grid;
+  grid-template-columns:
+    8rem minmax(18rem, 2fr) minmax(12rem, 1fr)
+    minmax(12rem, 1fr);
+  gap: 1rem 1.5rem;
+  width: 100%;
+}
+
+.proxy-cache-settings-spacer {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+
+.proxy-cache-setting {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  margin: 0;
+
+  > .clr-control-label {
+    align-self: flex-start;
+    width: auto;
+    margin: 0 0 0.25rem;
+  }
+
+  > .clr-control-container {
+    margin-left: 0;
+  }
+}
+
+.proxy-cache-endpoint {
+  width: 100%;
+
+  select {
+    width: 100%;
+  }
+}
+
+.proxy-cache-checkbox {
+  padding-top: 0.5rem;
+}
+
+@media (max-width: 1100px) {
+  .proxy-cache-settings {
+    grid-template-columns: 8rem repeat(2, minmax(12rem, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .proxy-cache-settings {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .proxy-cache-settings-spacer {
+    display: none;
+  }
+}

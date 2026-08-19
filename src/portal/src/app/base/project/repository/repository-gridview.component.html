@@ -107,7 +107,7 @@
                             [queryParams]="getQueryParams()">
                             <span *ngIf="withAdmiral" class="list-img"
                                 ><img [src]="getImgLink(r)" /></span
-                            >{{ r.name }}</a
+                            >{{ getDisplayName(r) }}</a
                         ></clr-dg-cell
                     >
                     <!-- to do -->
@@ -168,8 +168,8 @@
                         <div class="card-media-description">
                             <span
                                 class="card-media-title"
-                                [title]="item.name"
-                                >{{ item.name }}</span
+                                [title]="getDisplayName(item)"
+                                >{{ getDisplayName(item) }}</span
                             >
                             <p class="card-media-text">{{ registryUrl }}</p>
                         </div>

@@ -33,6 +33,7 @@ export class AppConfig {
     current_time: string;
     oidc_provider_name: string;
     unauthenticated_landing_page: string;
+    enable_commercial_identity_providers: boolean;
 
     constructor() {
         // Set default value
@@ -56,5 +57,6 @@ export class AppConfig {
         this.banner_message = '';
         this.oidc_provider_name = '';
         this.unauthenticated_landing_page = 'login';
+        this.enable_commercial_identity_providers = false;
     }
 }

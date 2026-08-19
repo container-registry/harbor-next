@@ -70,6 +70,7 @@ const (
 	ResourceUser               = Resource("user")
 	ResourceUserGroup          = Resource("user-group")
 	ResourceRegistry           = Resource("registry")
+	ResourceFederatedIdp       = Resource("federated-idp")
 	ResourceReplication        = Resource("replication")
 	ResourceDistribution       = Resource("distribution")
 	ResourceGarbageCollection  = Resource("garbage-collection")
@@ -192,6 +193,12 @@ var (
 			{Resource: ResourceRegistry, Action: ActionList},
 			{Resource: ResourceRegistry, Action: ActionUpdate},
 
+			{Resource: ResourceFederatedIdp, Action: ActionRead},
+			{Resource: ResourceFederatedIdp, Action: ActionCreate},
+			{Resource: ResourceFederatedIdp, Action: ActionDelete},
+			{Resource: ResourceFederatedIdp, Action: ActionList},
+			{Resource: ResourceFederatedIdp, Action: ActionUpdate},
+
 			{Resource: ResourceScanAll, Action: ActionRead},
 			{Resource: ResourceScanAll, Action: ActionUpdate},
 			{Resource: ResourceScanAll, Action: ActionStop},
@@ -235,6 +242,12 @@ var (
 		},
 		ScopeProject: {
 			{Resource: ResourceLog, Action: ActionList},
+
+			{Resource: ResourceFederatedIdp, Action: ActionRead},
+			{Resource: ResourceFederatedIdp, Action: ActionCreate},
+			{Resource: ResourceFederatedIdp, Action: ActionDelete},
+			{Resource: ResourceFederatedIdp, Action: ActionList},
+			{Resource: ResourceFederatedIdp, Action: ActionUpdate},
 
 			{Resource: ResourceProject, Action: ActionRead},
 			{Resource: ResourceProject, Action: ActionDelete},

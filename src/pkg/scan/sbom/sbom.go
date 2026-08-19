@@ -302,21 +302,45 @@ func (h *scanHandler) GetSummary(ctx context.Context, art *artifact.Artifact, mi
 	if art == nil {
 		return nil, errors.New("no way to get report summaries for nil artifact")
 	}
-	ds := h.ScannerControllerFunc()
-	r, err := ds.GetRegistrationByProject(ctx, art.ProjectID)
-	if err != nil {
-		return nil, errors.Wrap(err, "get sbom summary failed")
-	}
-	reports, err := h.SBOMMgrFunc().GetBy(ctx, art.ID, r.UUID, mimeTypes[0], sbomMediaTypeSpdx)
+	reports, err := h.SBOMMgrFunc().GetBy(ctx, art.ID, "", mimeTypes[0], sbomMediaTypeSpdx)
 	if err != nil {
 		return nil, err
 	}
 	if len(reports) == 0 {
 		return map[string]any{}, nil
 	}
-	reportContent := reports[0].ReportSummary
+	var fallback map[string]any
+	for _, report := range reports {
+		reportContent := report.ReportSummary
+		result := map[string]any{}
+		if len(reportContent) == 0 {
+			status := h.TaskMgrFunc().RetrieveStatusFromTask(ctx, report.UUID)
+			if len(status) == 0 || fallback != nil {
+				continue
+			}
+			result[sbom.ReportID] = report.UUID
+			result[sbom.ScanStatus] = status
+			fallback = result
+			continue
+		}
+		if err := json.Unmarshal([]byte(reportContent), &result); err != nil {
+			return nil, err
+		}
+		if _, ok := result[sbom.ReportID]; !ok {
+			result[sbom.ReportID] = report.UUID
+		}
+		if result[sbom.ScanStatus] == "Success" {
+			return result, nil
+		}
+		if fallback == nil {
+			fallback = result
+		}
+	}
+	if fallback != nil {
+		return fallback, nil
+	}
 	result := map[string]any{}
-	if len(reportContent) == 0 {
+	if len(reports) > 0 {
 		status := h.TaskMgrFunc().RetrieveStatusFromTask(ctx, reports[0].UUID)
 		if len(status) > 0 {
 			result[sbom.ReportID] = reports[0].UUID
@@ -325,8 +349,7 @@ func (h *scanHandler) GetSummary(ctx context.Context, art *artifact.Artifact, mi
 		log.Debug("no content for current report")
 		return result, nil
 	}
-	err = json.Unmarshal([]byte(reportContent), &result)
-	return result, err
+	return result, nil
 }
 
 func (h *scanHandler) JobVendorType() string {

@@ -41,6 +41,7 @@ import { ErrorHandler } from './shared/units/error-handler';
 import { MessageHandlerService } from './shared/services/message-handler.service';
 import { HarborTranslateLoaderService } from './services/harbor-translate-loader.service';
 import { SharedModule } from './shared/shared.module';
+import { SysteminfoService } from 'ng-swagger-gen/services';
 
 function initConfig(
     configService: AppConfigService,
@@ -81,10 +82,11 @@ class MyMissingTranslationHandler implements MissingTranslationHandler {
     providers: [
         AppConfigService,
         SkinableConfig,
+        SysteminfoService,
         {
             provide: APP_INITIALIZER,
             useFactory: initConfig,
-            deps: [AppConfigService, SkinableConfig],
+            deps: [AppConfigService, SkinableConfig, SysteminfoService],
             multi: true,
         },
         {

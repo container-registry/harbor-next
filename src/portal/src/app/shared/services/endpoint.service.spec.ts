@@ -35,4 +35,28 @@ describe('EndpointService', () => {
             expect(service).toBeTruthy();
         }
     ));
+
+    it('should distinguish well-known package providers from generic registries', inject(
+        [EndpointDefaultService],
+        (service: EndpointService) => {
+            expect(service.getAdapterText('npmjs')).toBe('npmjs.org');
+            expect(service.getAdapterText('npm')).toBe('npm Registry');
+            expect(service.getAdapterText('maven-central')).toBe(
+                'Maven Central'
+            );
+            expect(service.getAdapterText('maven')).toBe('Maven Registry');
+            expect(service.getAdapterText('pypi')).toBe('PyPI');
+            expect(service.getAdapterText('pypi-registry')).toBe(
+                'PyPI Registry'
+            );
+            expect(service.getAdapterText('crates-io')).toBe('crates.io');
+            expect(service.getAdapterText('cargo')).toBe('Cargo Registry');
+            expect(service.getAdapterText('go')).toBe('Go Proxy');
+            expect(service.getAdapterText('go-registry')).toBe('Go Registry');
+            expect(service.getAdapterText('homebrew')).toBe('Homebrew');
+            expect(service.getAdapterText('homebrew-registry')).toBe(
+                'Homebrew Registry'
+            );
+        }
+    ));
 });

@@ -37,8 +37,10 @@ func TestDatabaseConfigDefaults(t *testing.T) {
 		common.PostGreSQLURL:               "",
 		common.PostGreSQLHOST:              "postgresql",
 		common.PostGreSQLPort:              "5432",
-		common.PostGreSQLUsername:           "postgres",
+		common.PostGreSQLUsername:          "postgres",
 		common.PostGreSQLSSLMode:           "disable",
+		common.PostGreSQLUseIAMAuth:        "false",
+		common.PostGreSQLAWSRegion:         "",
 	}
 
 	meta := Instance()

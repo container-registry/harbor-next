@@ -35,10 +35,11 @@ const (
 	RegistryTypeTencentTcr       = "tencent-tcr"
 	RegistryTypeGithubCR         = "github-ghcr"
 	RegistryTypeVolcCR           = "volcengine-cr"
-
-	RegistryTypeHelmHub     = "helm-hub"
-	RegistryTypeArtifactHub = "artifact-hub"
-	RegistryHarborSatellite = "harbor-satellite"
+	RegistryTypeSFTP             = "sftp"
+	RegistryTypeS3               = "s3"
+	RegistryTypeHelmHub          = "helm-hub"
+	RegistryTypeArtifactHub      = "artifact-hub"
+	RegistryHarborSatellite      = "harbor-satellite"
 
 	FilterStyleTypeText  = "input"
 	FilterStyleTypeRadio = "radio"
@@ -76,6 +77,66 @@ const (
 	RepositoryPathComponentTypeOnlyTwo    = "ONLY_TWO"
 	RepositoryPathComponentTypeAtLeastTwo = "AT_LEAST_TWO"
 )
+
+const (
+	RegistryTypeNPM              = "npm"
+	RegistryTypeNPMJS            = "npmjs"
+	RegistryTypePyPI             = "pypi"
+	RegistryTypePyPIRegistry     = "pypi-registry"
+	RegistryTypeMaven            = "maven"
+	RegistryTypeMavenCentral     = "maven-central"
+	RegistryTypeCargo            = "cargo"
+	RegistryTypeCratesIO         = "crates-io"
+	RegistryTypeGo               = "go"
+	RegistryTypeGoRegistry       = "go-registry"
+	RegistryTypeGoSumDB          = "go-sumdb"
+	RegistryTypeHomebrew         = "homebrew"
+	RegistryTypeHomebrewRegistry = "homebrew-registry"
+)
+
+// CanonicalRegistryType maps well-known and generic package providers to the
+// native protocol handler that serves them.
+func CanonicalRegistryType(registryType string) string {
+	switch registryType {
+	case RegistryTypeNPMJS:
+		return RegistryTypeNPM
+	case RegistryTypePyPIRegistry:
+		return RegistryTypePyPI
+	case RegistryTypeMavenCentral:
+		return RegistryTypeMaven
+	case RegistryTypeCratesIO:
+		return RegistryTypeCargo
+	case RegistryTypeGoRegistry:
+		return RegistryTypeGo
+	case RegistryTypeHomebrewRegistry:
+		return RegistryTypeHomebrew
+	default:
+		return registryType
+	}
+}
+
+// RegistryTypesCompatible reports whether two provider types use the same
+// native package protocol.
+func RegistryTypesCompatible(left, right string) bool {
+	return CanonicalRegistryType(left) == CanonicalRegistryType(right)
+}
+
+// IsPackageRegistryType reports whether registryType is a native package
+// registry or package proxy-cache provider.
+func IsPackageRegistryType(registryType string) bool {
+	switch CanonicalRegistryType(registryType) {
+	case RegistryTypeNPM,
+		RegistryTypePyPI,
+		RegistryTypeMaven,
+		RegistryTypeCargo,
+		RegistryTypeGo,
+		RegistryTypeGoSumDB,
+		RegistryTypeHomebrew:
+		return true
+	default:
+		return false
+	}
+}
 
 // Credential keeps the access key and/or secret for the related registry
 type Credential struct {

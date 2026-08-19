@@ -18,6 +18,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+
+	"github.com/goharbor/harbor/src/pkg/artifact"
 )
 
 type indexProcessTestSuite struct {
@@ -31,6 +33,15 @@ func (i *indexProcessTestSuite) SetupTest() {
 
 func (i *indexProcessTestSuite) TestGetArtifactType() {
 	i.Assert().Equal(ArtifactTypeImage, i.processor.GetArtifactType(nil, nil))
+}
+
+func (i *indexProcessTestSuite) TestGetArtifactTypeHomebrew() {
+	art := &artifact.Artifact{
+		Annotations: map[string]string{
+			homebrewPackageTypeKey: homebrewPackageTypeBottles,
+		},
+	}
+	i.Assert().Equal(ArtifactTypeHomebrew, i.processor.GetArtifactType(nil, art))
 }
 
 func TestIndexProcessTestSuite(t *testing.T) {

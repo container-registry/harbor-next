@@ -1,0 +1,6 @@
+services:
+  core:
+    environment:
+      ENABLE_PROJECT_FEDERATED_IDP: "true"
+      GC_TIME_WINDOW_HOURS: "0"
+      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,npmjs,npm,maven-central,maven,pypi,pypi-registry,crates-io,cargo,go,go-registry,go-sumdb,homebrew,homebrew-registry

@@ -22,8 +22,8 @@ RUN group="$(getent group "${DEV_GID}" | cut -d: -f1)" && \
       group=harbor; \
     fi && \
     adduser -S -D -G "$group" -u "${DEV_UID}" harbor && \
-    mkdir -p /home/harbor/.cache/go-build && \
-    chown -R harbor:"$group" /home/harbor
+    mkdir -p /home/harbor/.cache/go-build /go/pkg/mod /var/lib/harbor-air && \
+    chown -R harbor:"$group" /home/harbor /go/pkg/mod /var/lib/harbor-air
 
 ENV HOME=/home/harbor
 

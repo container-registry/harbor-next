@@ -1,0 +1,103 @@
+# Harbor on AWS: RDS IAM Auth + S3 IRSA
+# Validated against the harbor-next chart 3.0.0:
+#   oci://8gears.container-registry.com/8gcr/charts/harbor-next --version 3.0.0
+#
+# Replace the five placeholders before `helm upgrade`:
+#   <YOUR_DB_ENDPOINT>     RDS endpoint hostname (e.g. harbor-db.XXX.us-east-1.rds.amazonaws.com)
+#   <YOUR_AWS_REGION>      e.g. us-east-1
+#   <YOUR_BUCKET_NAME>     S3 bucket for registry storage
+#   <YOUR_IMAGE_REGISTRY>  where Harbor images are pulled from (e.g. 8gears.container-registry.com/8gcr)
+#   <YOUR_IMAGE_TAG>       image tag (e.g. v2.15.0)
+
+externalURL: "https://harbor.example.com"
+
+# Demo password. For production, use `existingSecretAdminPassword` with a
+# Secret from AWS Secrets Manager, external-secrets, or SOPS.
+harborAdminPassword: "Harbor12345"
+
+# Ingress is off by default so the chart installs cleanly without DNS.
+# Enable it in real deployments and point an Ingress controller (ALB, nginx, etc.)
+# at the same DNS name as externalURL above.
+ingress:
+  enabled: false
+  # className: "alb"
+  # hosts:
+  #   - host: harbor.example.com
+  # tls:
+  #   - secretName: harbor-tls
+  #     hosts: [harbor.example.com]
+
+database:
+  host: "<YOUR_DB_ENDPOINT>"
+  port: 5432
+  username: "harbor_iam_user"
+  # Required by the chart schema but ignored at runtime when IAM auth is on:
+  # the BeforeConnect hook in pgsql_iam.go replaces this with an ephemeral token.
+  password: "placeholder"
+  database: "registry"
+  sslmode: "require"
+
+core:
+  replicas: 1
+  image:
+    repository: <YOUR_IMAGE_REGISTRY>/harbor-core
+    tag: <YOUR_IMAGE_TAG>
+  # Point core at the IRSA-annotated ServiceAccount created by eksctl.
+  serviceAccount:
+    create: false
+    name: "harbor-sa"
+  # harbor-next uses `core.extraEnv` (not `core.config`) to inject env vars
+  # onto the core container. The IAM code reads these two variables.
+  extraEnv:
+    - name: POSTGRESQL_USE_IAM_AUTH
+      value: "true"
+    - name: POSTGRESQL_AWS_REGION
+      value: "<YOUR_AWS_REGION>"
+
+jobservice:
+  replicas: 1
+  image:
+    repository: <YOUR_IMAGE_REGISTRY>/harbor-jobservice
+    tag: <YOUR_IMAGE_TAG>
+  serviceAccount:
+    create: false
+    name: "harbor-sa"
+  extraEnv:
+    - name: POSTGRESQL_USE_IAM_AUTH
+      value: "true"
+    - name: POSTGRESQL_AWS_REGION
+      value: "<YOUR_AWS_REGION>"
+
+registry:
+  replicas: 1
+  image:
+    repository: <YOUR_IMAGE_REGISTRY>/harbor-registry
+    tag: <YOUR_IMAGE_TAG>
+  serviceAccount:
+    create: false
+    name: "harbor-sa"
+  relativeurls: true
+  # S3 storage via IRSA. Do NOT set accesskey / secretkey: leaving them unset
+  # makes the AWS SDK fall back to the web-identity token provider.
+  storage:
+    type: s3
+    s3:
+      region: "<YOUR_AWS_REGION>"
+      bucket: "<YOUR_BUCKET_NAME>"
+      secure: true
+      v4auth: true
+
+portal:
+  image:
+    repository: <YOUR_IMAGE_REGISTRY>/harbor-portal
+    tag: <YOUR_IMAGE_TAG>
+
+valkey:
+  enabled: true
+
+# Scanner and exporter are off in this profile to keep the IAM test minimal.
+# Re-enable them in production deployments.
+trivy:
+  enabled: false
+exporter:
+  enabled: false

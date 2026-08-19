@@ -21,6 +21,8 @@ import { AppConfigService } from '../../../services/app-config.service';
 import { MessageHandlerService } from '../../services/message-handler.service';
 import { SearchTriggerService } from '../global-search/search-trigger.service';
 import { SkinableConfig } from '../../../services/skinable-config.service';
+import { of } from 'rxjs';
+import { CommonRoutes } from '../../entities/shared.const';
 import { SharedTestingModule } from '../../shared.module';
 
 describe('NavigatorComponent', () => {
@@ -52,6 +54,9 @@ describe('NavigatorComponent', () => {
     let fakeSkinableConfig = {
         getSkinConfig: function () {
             return { projects: 'abc' };
+        },
+        getBrandingInfo: function () {
+            return of({});
         },
     };
     let fakeSearchTriggerService = {
@@ -93,6 +98,45 @@ describe('NavigatorComponent', () => {
 
     it('should create', () => {
         expect(component).toBeTruthy();
+    });
+
+    it('removes public projects auth marker from login redirect', () => {
+        const router = {
+            routerState: {
+                snapshot: {
+                    url: '/harbor/projects?publicAndNotLogged=yes',
+                },
+            },
+            navigate: jasmine.createSpy('navigate'),
+        };
+        const appConfigService = {
+            getConfig: function () {
+                return {
+                    auth_mode: 'db_auth',
+                    primary_auth_mode: false,
+                };
+            },
+        };
+        const navigator = new NavigatorComponent(
+            fakeSessionService as any,
+            router as any,
+            fakePlatformLocation as any,
+            null,
+            appConfigService as any,
+            fakeMessageHandlerService as any,
+            fakeSearchTriggerService as any,
+            fakeSkinableConfig as any,
+            null
+        );
+
+        navigator.logIn();
+
+        expect(router.navigate).toHaveBeenCalledWith(
+            [CommonRoutes.EMBEDDED_SIGN_IN],
+            {
+                queryParams: { redirect_url: '/harbor/projects' },
+            }
+        );
     });
 });
 

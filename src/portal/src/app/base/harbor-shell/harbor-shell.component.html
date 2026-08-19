@@ -83,6 +83,16 @@
                             {{ 'SIDE_NAV.SYSTEM_MGMT.REGISTRY' | translate }}
                         </a>
                         <a
+                            *ngIf="commercialIdentityProvidersEnabled"
+                            clrVerticalNavLink
+                            routerLink="/harbor/idps"
+                            routerLinkActive="active">
+                            <clr-icon
+                                shape="organization"
+                                clrVerticalNavIcon></clr-icon>
+                            {{ 'SIDE_NAV.SYSTEM_MGMT.IDP' | translate }}
+                        </a>
+                        <a
                             clrVerticalNavLink
                             routerLink="/harbor/replications"
                             routerLinkActive="active">

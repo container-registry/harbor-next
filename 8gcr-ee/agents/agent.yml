@@ -1,0 +1,144 @@
+version: '3'
+
+set:
+  - errexit
+  - pipefail
+
+vars:
+  AGENT_IMAGE: '{{.AGENT_IMAGE | default "8gears.container-registry.com/8gcr-dev/agent:latest"}}'
+  AGENT_CONTAINERFILE: '{{.AGENT_CONTAINERFILE | default ".github/agents/image/Containerfile"}}'
+  AGENT_RUNTIME_BACKEND: '{{.AGENT_RUNTIME_BACKEND | default "docker"}}'
+  AGENT_VALIDATION_COMMAND: '{{.AGENT_VALIDATION_COMMAND | default ""}}'
+  AGENT_BRANCH_PREFIX: '{{.AGENT_BRANCH_PREFIX | default "agent/upstream-sync-patches"}}'
+  AGENT_CODEX_SANDBOX: '{{.AGENT_CODEX_SANDBOX | default "danger-full-access"}}'
+  AGENT_LOCAL_FAILED_RUN_ID: '{{.AGENT_LOCAL_FAILED_RUN_ID | default "26220417019"}}'
+  AGENT_LOCAL_REPOSITORY: '{{.AGENT_LOCAL_REPOSITORY | default "container-registry/8gcr"}}'
+  AGENT_LOCAL_TARGET_BRANCH: '{{.AGENT_LOCAL_TARGET_BRANCH | default "main"}}'
+
+tasks:
+  build-image:
+    desc: "Build the upstream sync agent OCI image"
+    cmds:
+      - |
+        engine="${CONTAINER_ENGINE:-}"
+        if [ -z "$engine" ]; then
+          if command -v podman >/dev/null 2>&1; then
+            engine=podman
+          elif command -v docker >/dev/null 2>&1; then
+            engine=docker
+          else
+            echo "ERROR: podman or docker is required" >&2
+            exit 1
+          fi
+        fi
+
+        "$engine" build \
+          -f "{{.AGENT_CONTAINERFILE}}" \
+          -t "{{.AGENT_IMAGE}}" \
+          .
+
+  push-image:
+    desc: "Push the upstream sync agent OCI image"
+    preconditions:
+      - sh: test -n "{{.AGENT_IMAGE}}"
+        msg: "AGENT_IMAGE is required"
+    cmds:
+      - |
+        engine="${CONTAINER_ENGINE:-}"
+        if [ -z "$engine" ]; then
+          if command -v podman >/dev/null 2>&1; then
+            engine=podman
+          elif command -v docker >/dev/null 2>&1; then
+            engine=docker
+          else
+            echo "ERROR: podman or docker is required" >&2
+            exit 1
+          fi
+        fi
+
+        "$engine" push "{{.AGENT_IMAGE}}"
+
+  prepare-handoff:
+    desc: "Prepare the failed upstream sync handoff bundle"
+    cmds:
+      - |
+        : "${RUNNER_TEMP:?RUNNER_TEMP is required}"
+        : "${FAILED_RUN_ID:?FAILED_RUN_ID is required}"
+        : "${GITHUB_RUN_ATTEMPT:?GITHUB_RUN_ATTEMPT is required}"
+        : "${GITHUB_ENV:?GITHUB_ENV is required}"
+
+        run_dir="${RUNNER_TEMP}/agent-runs/agent-${FAILED_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+        echo "AGENT_RUN_DIR=${run_dir}" >> "${GITHUB_ENV}"
+        .github/agents/scripts/prepare-agent-handoff.sh "${run_dir}"
+
+  prepare-handoff-runtime:
+    desc: "Prepare the failed upstream sync handoff bundle in the agent runtime image"
+    cmds:
+      - |
+        : "${RUNNER_TEMP:?RUNNER_TEMP is required}"
+        : "${FAILED_RUN_ID:?FAILED_RUN_ID is required}"
+        : "${GITHUB_RUN_ATTEMPT:?GITHUB_RUN_ATTEMPT is required}"
+        : "${GITHUB_ENV:?GITHUB_ENV is required}"
+        : "${AGENT_GITHUB_TOKEN:?AGENT_GITHUB_TOKEN is required}"
+
+        run_dir="${RUNNER_TEMP}/agent-runs/agent-${FAILED_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+        echo "AGENT_RUN_DIR=${run_dir}" >> "${GITHUB_ENV}"
+        AGENT_RUN_DIR="${run_dir}" \
+        AGENT_RUNTIME_BACKEND="{{.AGENT_RUNTIME_BACKEND}}" \
+          .github/agents/scripts/prepare-agent-handoff-runtime.sh
+
+  run-local-runtime:
+    desc: "Run the agent in a local Podman/Docker runtime"
+    cmds:
+      - |
+        : "${AGENT_GITHUB_TOKEN:?AGENT_GITHUB_TOKEN is required}"
+        AGENT_RUNTIME_BACKEND="{{.AGENT_RUNTIME_BACKEND}}" \
+        AGENT_VALIDATION_COMMAND="{{.AGENT_VALIDATION_COMMAND}}" \
+        AGENT_BRANCH_PREFIX="{{.AGENT_BRANCH_PREFIX}}" \
+        AGENT_CODEX_SANDBOX="{{.AGENT_CODEX_SANDBOX}}" \
+          .github/agents/scripts/run-local-agent-runtime.sh
+
+  local-run-failed-sync:
+    desc: "Run the agent locally against a failed sync run and create a draft PR"
+    cmds:
+      - |
+        if [ -z "${CODEX_AUTH_JSON:-}" ] && [ -z "${CODEX_API_KEY:-}" ]; then
+          if [ -f "${HOME}/.codex/auth.json" ]; then
+            export CODEX_AUTH_JSON
+            CODEX_AUTH_JSON=$(cat "${HOME}/.codex/auth.json")
+          else
+            echo "ERROR: CODEX_AUTH_JSON, CODEX_API_KEY, or ${HOME}/.codex/auth.json is required" >&2
+            exit 1
+          fi
+        fi
+
+        export GITHUB_REPOSITORY="{{.AGENT_LOCAL_REPOSITORY}}"
+        export GITHUB_SERVER_URL="${GITHUB_SERVER_URL:-https://github.com}"
+        export FAILED_RUN_ID="{{.AGENT_LOCAL_FAILED_RUN_ID}}"
+        export TARGET_BRANCH="{{.AGENT_LOCAL_TARGET_BRANCH}}"
+        export FAILED_HEAD_SHA="${FAILED_HEAD_SHA:-}"
+        export GITHUB_RUN_ID="${GITHUB_RUN_ID:-local-${FAILED_RUN_ID}}"
+        export GITHUB_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT:-1}"
+        export RUNNER_TEMP="${RUNNER_TEMP:-$(pwd)/.opencode/tmp}"
+
+        mkdir -p "${RUNNER_TEMP}/agent-runs"
+        export AGENT_RUN_DIR="${RUNNER_TEMP}/agent-runs/agent-${FAILED_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+        export GITHUB_ENV="${AGENT_RUN_DIR}/github.env"
+        mkdir -p "${AGENT_RUN_DIR}"
+        : > "${GITHUB_ENV}"
+
+        .github/agents/scripts/prepare-agent-handoff.sh "${AGENT_RUN_DIR}"
+
+        export AGENT_GITHUB_TOKEN
+        if [ -n "${AGENT_GITHUB_TOKEN:-}" ]; then
+          :
+        else
+          AGENT_GITHUB_TOKEN=$(gh auth token)
+        fi
+        export AGENT_IMAGE="{{.AGENT_IMAGE}}"
+        export AGENT_RUNTIME_BACKEND="{{.AGENT_RUNTIME_BACKEND}}"
+        export AGENT_VALIDATION_COMMAND="{{.AGENT_VALIDATION_COMMAND}}"
+        export AGENT_BRANCH_PREFIX="{{.AGENT_BRANCH_PREFIX}}"
+        export AGENT_CODEX_SANDBOX="{{.AGENT_CODEX_SANDBOX}}"
+        export AGENT_PODMAN_NETWORK="${AGENT_PODMAN_NETWORK:-host}"
+        .github/agents/scripts/run-local-agent-runtime.sh

@@ -78,4 +78,17 @@ describe('DependenciesComponent', () => {
         const rows = fixture.nativeElement.getElementsByTagName('clr-dg-row');
         expect(rows.length).toEqual(2);
     });
+    it('should get dependencies when link changes after init', async () => {
+        component.dependenciesLink = null;
+        component.dependencyList = [];
+        component.ngOnInit();
+
+        component.dependenciesLink = mockedLink;
+        component.ngOnChanges();
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        const rows = fixture.nativeElement.getElementsByTagName('clr-dg-row');
+        expect(rows.length).toEqual(2);
+    });
 });

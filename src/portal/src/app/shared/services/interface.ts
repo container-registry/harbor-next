@@ -216,8 +216,9 @@ export interface VulnerabilityItem extends VulnerabilityBase {
 }
 
 export interface FilesItem {
-    name: string;
-    type: 'file' | 'directory';
+    name?: string;
+    path?: string;
+    type?: 'file' | 'directory';
     size?: number;
     children?: FilesItem[];
 }

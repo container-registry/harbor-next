@@ -1,0 +1,401 @@
+name: Harbor upstream-to-8gcr migration E2E smoke test
+#
+# End-to-end smoke test for migrating a running Harbor instance from
+# the upstream `goharbor/*` images to the 8gcr-dev images, and
+# verifying that all user-visible state (users, projects, artifacts,
+# auth, blob storage) survives the swap.
+#
+# "Smoke test" here is used in the old electronics sense —
+# power it on and see if smoke comes out: one happy-path run,
+# broad but shallow. If this goes green, the basic migration
+# works; if it goes red, something is clearly broken end-to-end.
+#
+# High-level flow (single job, single ubuntu-latest runner):
+#
+#   1. Pull + boot a bootc-frozen upstream Harbor image as a nested
+#      container (k3s + Helm install baked in, pinned to the old
+#      version, currently Harbor v2.14.3).
+#   2. Wait for k3s + the old Harbor API to be ready, record the
+#      pre-upgrade version.
+#   3. Pre-upgrade setup against the old Harbor:
+#        - create a test user (migtester) + project (migproj)
+#        - grant the user maintainer on the project
+#        - push busybox / nginx / alpine as <repo>:old using the
+#          test user's creds (insecure registry on 127.0.0.1:30080).
+#   4. Pre-pull the 8gcr-dev images at TARGET_TAG into k3s's
+#      containerd using the REGISTRY_USERNAME / REGISTRY_PASSWORD
+#      repo secrets, so the helm upgrade doesn't need to reach the
+#      internet per-pod.
+#   5. `helm upgrade --reuse-values` flips these component images to
+#      the 8gcr-dev images at TARGET_TAG:
+#        core, portal, jobservice, registryctl, exporter
+#      (registry/distribution and trivy-adapter are intentionally
+#      left on upstream — they're out of scope for 8gcr-dev.)
+#   6. Wait for rollouts + the new Harbor API, and assert the
+#      reported harbor_version starts with TARGET_TAG.
+#   7. Post-upgrade data + auth survival checks:
+#        - pull the pre-upgrade <repo>:old images back
+#          (blob storage + auth data survived)
+#        - change the test user's password + profile via API
+#        - podman logout, re-login with the new password, pull again
+#        - push <repo>:new with the updated creds and verify the
+#          new tag shows up via the Harbor API
+#   8. Delete the test user.
+#
+# Anything past step 5 failing is an interesting migration finding
+# and should be triaged, not papered over.
+#
+# Renaming note: the upstream Harbor version is baked into the
+# filename (v2.14.3) so the "old" side of the migration is obvious.
+# When the frozen image is rebuilt against a newer upstream Harbor,
+# rename this file + the two path filters below to match the new
+# version (e.g. harbor-upstream-v2.15.3-to-8gcr-migration-e2e.yaml).
+#
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/harbor-upstream-v2.14.3-to-8gcr-migration-e2e.yaml
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/harbor-upstream-v2.14.3-to-8gcr-migration-e2e.yaml
+  workflow_dispatch:
+    inputs:
+      image:
+        description: >-
+          Frozen upstream Harbor image to boot as the "old" side of
+          the migration (bootc container with k3s + Helm-installed
+          Harbor baked in, pinned to an old goharbor version).
+        type: string
+        default: 8gears.container-registry.com/8gcr-dev/harbor-frozen:latest
+      target_tag:
+        description: >-
+          8gcr-dev image tag to migrate the Harbor components
+          to (e.g. v2.15.0). Applied to core, portal, jobservice,
+          registryctl, and exporter via `helm upgrade --reuse-values`.
+        type: string
+        default: v2.15.0
+
+env:
+  REGISTRY: 8gears.container-registry.com
+  FROZEN_IMAGE: ${{ inputs.image || '8gears.container-registry.com/8gcr-dev/harbor-frozen:latest' }}
+  TARGET_TAG: ${{ inputs.target_tag || 'v2.15.0' }}
+  CONTAINER_NAME: harbor-e2e
+  HARBOR_URL: http://127.0.0.1:30080
+  ADMIN_AUTH: admin:Harbor12345
+  TEST_USER: migtester
+  TEST_PASSWORD: MigTester12345!
+  NEW_PASSWORD: PostMigrate67890!
+  TEST_PROJECT: migproj
+  # Space-separated list of <srcRef>|<repoInHarbor>
+  TEST_IMAGES: "docker.io/library/busybox:1.36|busybox docker.io/library/nginx:1.25|nginx docker.io/library/alpine:3.19|alpine"
+
+jobs:
+  e2e:
+    name: Harbor upstream-to-8gcr migration smoke test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Free disk space
+        run: |
+          # The 16GB frozen image + unpack temp peak ~35GB; ubuntu-latest
+          # only has ~18GB free by default.
+          sudo rm -rf /usr/share/dotnet \
+                      /opt/ghc \
+                      /opt/hostedtoolcache \
+                      /usr/local/lib/android \
+                      /usr/local/share/boost \
+                      /usr/local/graalvm \
+                      /usr/share/swift \
+                      /opt/az \
+                      /opt/microsoft
+          sudo docker image prune -af 2>/dev/null || true
+          sudo apt-get clean
+          df -h /
+
+      - name: Ensure podman
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq podman
+
+      - name: Log in to 8gears registry
+        run: |
+          echo "${{ secrets.REGISTRY_PASSWORD }}" | sudo podman login \
+            "$REGISTRY" \
+            --username "${{ secrets.REGISTRY_USERNAME }}" \
+            --password-stdin
+
+      - name: Pull frozen Harbor image
+        run: sudo podman pull "$FROZEN_IMAGE"
+
+      - name: Start frozen Harbor container
+        run: |
+          sudo podman run -d \
+            --name "$CONTAINER_NAME" \
+            --privileged \
+            --systemd=always \
+            --device /dev/null:/dev/kmsg \
+            -p 30080:30080 \
+            "$FROZEN_IMAGE" \
+            /sbin/init
+
+      - name: Wait for k3s node Ready
+        timeout-minutes: 5
+        run: |
+          until sudo podman exec "$CONTAINER_NAME" /usr/bin/kubectl get nodes 2>/dev/null | grep -q " Ready"; do
+            sleep 2
+          done
+          sudo podman exec "$CONTAINER_NAME" /usr/bin/kubectl get nodes
+
+      - name: Wait for Harbor API (old version)
+        timeout-minutes: 8
+        run: |
+          until curl -sf "$HARBOR_URL/api/v2.0/ping" >/dev/null 2>&1; do
+            sleep 3
+          done
+          echo "Harbor API is UP"
+
+      - name: Record pre-upgrade Harbor version
+        run: |
+          info=$(curl -sf -u "$ADMIN_AUTH" "$HARBOR_URL/api/v2.0/systeminfo")
+          version=$(echo "$info" | python3 -c "import sys,json; print(json.load(sys.stdin)['harbor_version'])")
+          echo "Pre-upgrade version: $version"
+          echo "PRE_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Pre-upgrade — create test user
+        run: |
+          set -e
+          body=$(python3 -c "
+          import json, os
+          print(json.dumps({
+              'username': os.environ['TEST_USER'],
+              'realname': 'Migration Tester',
+              'password': os.environ['TEST_PASSWORD'],
+              'email': f\"{os.environ['TEST_USER']}@example.com\",
+          }))")
+          curl -sf -u "$ADMIN_AUTH" -H 'Content-Type: application/json' \
+            -X POST "$HARBOR_URL/api/v2.0/users" \
+            -d "$body"
+          user_id=$(curl -sf -u "$ADMIN_AUTH" \
+            "$HARBOR_URL/api/v2.0/users?username=$TEST_USER" \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['user_id'])")
+          echo "Created user $TEST_USER (id=$user_id)"
+          echo "USER_ID=$user_id" >> "$GITHUB_ENV"
+
+      - name: Pre-upgrade — create project + add user as maintainer
+        run: |
+          set -e
+          curl -sf -u "$ADMIN_AUTH" -H 'Content-Type: application/json' \
+            -X POST "$HARBOR_URL/api/v2.0/projects" \
+            -d "{\"project_name\":\"$TEST_PROJECT\",\"metadata\":{\"public\":\"false\"}}"
+          curl -sf -u "$ADMIN_AUTH" -H 'Content-Type: application/json' \
+            -X POST "$HARBOR_URL/api/v2.0/projects/$TEST_PROJECT/members" \
+            -d "{\"role_id\":4,\"member_user\":{\"username\":\"$TEST_USER\"}}"
+          echo "Project $TEST_PROJECT created; $TEST_USER added as maintainer (role_id=4)"
+
+      - name: Pre-upgrade — push test images as test user
+        run: |
+          set -e
+          echo "$TEST_PASSWORD" | sudo podman login --tls-verify=false \
+            -u "$TEST_USER" --password-stdin 127.0.0.1:30080
+          for pair in $TEST_IMAGES; do
+            src="${pair%|*}"
+            repo="${pair#*|}"
+            dst="127.0.0.1:30080/$TEST_PROJECT/$repo:old"
+            sudo podman pull "$src"
+            sudo podman tag "$src" "$dst"
+            sudo podman push --tls-verify=false "$dst"
+            sudo podman rmi -f "$dst"
+            sudo podman pull --tls-verify=false "$dst"
+            echo "OK: $src -> $dst"
+          done
+
+      - name: Pre-pull v${{ env.TARGET_TAG }} images into k3s containerd
+        env:
+          REG_USER: ${{ secrets.REGISTRY_USERNAME }}
+          REG_PASS: ${{ secrets.REGISTRY_PASSWORD }}
+        run: |
+          set -e
+          for comp in core portal jobservice registryctl exporter; do
+            img="${REGISTRY}/8gcr-dev/harbor-${comp}:${TARGET_TAG}"
+            echo "-> pulling $img into containerd"
+            sudo podman exec "$CONTAINER_NAME" k3s ctr images pull \
+              --user "${REG_USER}:${REG_PASS}" \
+              "$img"
+          done
+
+      - name: Helm upgrade Harbor to ${{ env.TARGET_TAG }}
+        timeout-minutes: 15
+        run: |
+          set -e
+          sudo podman exec \
+            -e REGISTRY="$REGISTRY" \
+            -e TARGET_TAG="$TARGET_TAG" \
+            "$CONTAINER_NAME" bash -c '
+              set -e
+              export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+              # The frozen image kicks off the initial helm install in the
+              # background; if we race it, the release is still in
+              # pending-install and our upgrade errors with
+              # "another operation (install/upgrade/rollback) is in progress".
+              # Wait for the release to settle into "deployed" first.
+              for i in $(seq 1 60); do
+                status=$(helm status harbor -n harbor -o json 2>/dev/null \
+                  | python3 -c "import sys,json; print(json.load(sys.stdin).get(\"info\",{}).get(\"status\",\"unknown\"))" \
+                  2>/dev/null || echo "none")
+                echo "helm release status: $status (attempt $i)"
+                if [ "$status" = "deployed" ]; then break; fi
+                sleep 5
+              done
+              helm status harbor -n harbor | head -20 || true
+              CHART=$(find /usr/share/harbor/charts/ -name "harbor-*.tgz" | head -1)
+              helm upgrade harbor "$CHART" \
+                --namespace harbor \
+                --reuse-values \
+                --set core.image.repository="${REGISTRY}/8gcr-dev/harbor-core" \
+                --set core.image.tag="${TARGET_TAG}" \
+                --set portal.image.repository="${REGISTRY}/8gcr-dev/harbor-portal" \
+                --set portal.image.tag="${TARGET_TAG}" \
+                --set jobservice.image.repository="${REGISTRY}/8gcr-dev/harbor-jobservice" \
+                --set jobservice.image.tag="${TARGET_TAG}" \
+                --set registry.controller.image.repository="${REGISTRY}/8gcr-dev/harbor-registryctl" \
+                --set registry.controller.image.tag="${TARGET_TAG}" \
+                --set exporter.image.repository="${REGISTRY}/8gcr-dev/harbor-exporter" \
+                --set exporter.image.tag="${TARGET_TAG}" \
+                --wait --timeout 12m
+            '
+
+      - name: Wait for deployments to roll out
+        timeout-minutes: 10
+        run: |
+          set -e
+          sudo podman exec "$CONTAINER_NAME" bash -c '
+            export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+            for d in $(kubectl get deploy -n harbor -o name); do
+              kubectl rollout status -n harbor "$d" --timeout=8m
+            done
+            kubectl get pods -n harbor
+          '
+
+      - name: Wait for Harbor API (new version)
+        timeout-minutes: 5
+        run: |
+          until curl -sf "$HARBOR_URL/api/v2.0/ping" >/dev/null 2>&1; do
+            sleep 3
+          done
+          echo "Harbor API back UP after upgrade"
+
+      - name: Verify Harbor version bumped
+        run: |
+          set -e
+          info=$(curl -sf -u "$ADMIN_AUTH" "$HARBOR_URL/api/v2.0/systeminfo")
+          echo "$info" | python3 -m json.tool
+          version=$(echo "$info" | python3 -c "import sys,json; print(json.load(sys.stdin)['harbor_version'])")
+          echo "Post-upgrade version: $version"
+          # Must have changed from pre-upgrade
+          [ "$version" != "$PRE_VERSION" ]
+          # Must start with the target tag (ignore any build suffix)
+          echo "$version" | grep -qE "^${TARGET_TAG}([-.+].*)?$" \
+            || { echo "Expected version to start with $TARGET_TAG, got $version"; exit 1; }
+
+      - name: Post-upgrade — pull pre-upgrade images as test user (data survived?)
+        run: |
+          set -e
+          for pair in $TEST_IMAGES; do
+            repo="${pair#*|}"
+            dst="127.0.0.1:30080/$TEST_PROJECT/$repo:old"
+            sudo podman rmi -f "$dst" 2>/dev/null || true
+            sudo podman pull --tls-verify=false "$dst"
+            echo "OK pull: $dst"
+          done
+          echo "All pre-upgrade images still pullable — blob + auth data survived"
+
+      - name: Post-upgrade — update test user (change password)
+        run: |
+          set -e
+          body=$(python3 -c "
+          import json, os
+          print(json.dumps({
+              'old_password': os.environ['TEST_PASSWORD'],
+              'new_password': os.environ['NEW_PASSWORD'],
+          }))")
+          curl -sf -u "$ADMIN_AUTH" -H 'Content-Type: application/json' \
+            -X PUT "$HARBOR_URL/api/v2.0/users/$USER_ID/password" \
+            -d "$body"
+          # Also update profile (realname + email) to exercise the UPDATE path
+          profile=$(python3 -c "
+          import json, os
+          print(json.dumps({
+              'realname': 'Migration Tester (post-upgrade)',
+              'email': f\"{os.environ['TEST_USER']}+updated@example.com\",
+          }))")
+          curl -sf -u "$ADMIN_AUTH" -H 'Content-Type: application/json' \
+            -X PUT "$HARBOR_URL/api/v2.0/users/$USER_ID" \
+            -d "$profile"
+          echo "User $TEST_USER updated (new password + profile)"
+
+      - name: Post-upgrade — re-login + pull with updated creds
+        run: |
+          set -e
+          sudo podman logout 127.0.0.1:30080 2>/dev/null || true
+          echo "$NEW_PASSWORD" | sudo podman login --tls-verify=false \
+            -u "$TEST_USER" --password-stdin 127.0.0.1:30080
+          for pair in $TEST_IMAGES; do
+            repo="${pair#*|}"
+            dst="127.0.0.1:30080/$TEST_PROJECT/$repo:old"
+            sudo podman rmi -f "$dst" 2>/dev/null || true
+            sudo podman pull --tls-verify=false "$dst"
+          done
+          echo "Pull with updated password: OK for all images"
+
+      - name: Post-upgrade — push new tag with updated creds
+        run: |
+          set -e
+          for pair in $TEST_IMAGES; do
+            repo="${pair#*|}"
+            old="127.0.0.1:30080/$TEST_PROJECT/$repo:old"
+            new="127.0.0.1:30080/$TEST_PROJECT/$repo:new"
+            sudo podman tag "$old" "$new"
+            sudo podman push --tls-verify=false "$new"
+            # Verify :new lists via Harbor API
+            tags=$(curl -sf -u "$ADMIN_AUTH" \
+              "$HARBOR_URL/api/v2.0/projects/$TEST_PROJECT/repositories/$repo/artifacts?with_tag=true")
+            echo "$tags" | grep -Eq '"name":[[:space:]]*"new"' \
+              || { echo "Missing :new tag on $repo"; echo "$tags" | python3 -m json.tool; exit 1; }
+            echo "Push + verify :new OK: $repo"
+          done
+
+      - name: Post-upgrade — delete test user
+        if: always()
+        run: |
+          set -e
+          [ -n "${USER_ID:-}" ] || { echo "USER_ID unset, skipping"; exit 0; }
+          curl -sf -u "$ADMIN_AUTH" \
+            -X DELETE "$HARBOR_URL/api/v2.0/users/$USER_ID"
+          echo "Deleted user $TEST_USER (id=$USER_ID)"
+
+      - name: Show Harbor pod status
+        if: always()
+        run: sudo podman exec "$CONTAINER_NAME" /usr/bin/kubectl get pods -A || true
+
+      - name: Debug on failure
+        if: failure()
+        run: |
+          echo "=== k3s status ==="
+          sudo podman exec "$CONTAINER_NAME" systemctl status k3s --no-pager || true
+          echo "=== pods ==="
+          sudo podman exec "$CONTAINER_NAME" /usr/bin/kubectl get pods -A || true
+          echo "=== harbor ns events ==="
+          sudo podman exec "$CONTAINER_NAME" /usr/bin/kubectl get events -n harbor --sort-by=.lastTimestamp || true
+          echo "=== k3s logs (last 100) ==="
+          sudo podman exec "$CONTAINER_NAME" journalctl -u k3s -n 100 --no-pager || true
+          echo "=== core logs ==="
+          sudo podman exec "$CONTAINER_NAME" /usr/bin/kubectl logs -n harbor -l component=core --tail=100 || true
+
+      - name: Cleanup container
+        if: always()
+        run: sudo podman rm -f "$CONTAINER_NAME" 2>/dev/null || true

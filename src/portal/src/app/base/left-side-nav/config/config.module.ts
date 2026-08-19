@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import { NgModule } from '@angular/core';
+import { BrandingComponent } from './branding/branding.component';
 import { SharedModule } from '../../../shared/shared.module';
 import { ConfigurationComponent } from './config.component';
 import { ConfigurationAuthComponent } from './auth/config-auth.component';
@@ -20,6 +21,9 @@ import { SystemSettingsComponent } from './system/system-settings.component';
 import { RouterModule, Routes } from '@angular/router';
 import { ConfigService } from './config.service';
 import { SecurityComponent } from './security/security.component';
+import { CommercialFeaturesComponent } from './commercial/commercial-features.component';
+import { AuditLogConfigurationComponent } from './audit-log/audit-log.component';
+import { IdentityProviderConfigurationComponent } from './identity-provider/identity-provider.component';
 
 const routes: Routes = [
     {
@@ -31,12 +35,28 @@ const routes: Routes = [
                 component: ConfigurationAuthComponent,
             },
             {
+                path: 'branding',
+                component: BrandingComponent,
+            },
+            {
                 path: 'security',
                 component: SecurityComponent,
             },
             {
                 path: 'setting',
                 component: SystemSettingsComponent,
+            },
+            {
+                path: 'commercial',
+                component: CommercialFeaturesComponent,
+            },
+            {
+                path: 'identity-providers',
+                component: IdentityProviderConfigurationComponent,
+            },
+            {
+                path: 'audit-log',
+                component: AuditLogConfigurationComponent,
             },
             {
                 path: '',
@@ -52,7 +72,11 @@ const routes: Routes = [
         ConfigurationComponent,
         ConfigurationAuthComponent,
         SystemSettingsComponent,
+        BrandingComponent,
         SecurityComponent,
+        CommercialFeaturesComponent,
+        IdentityProviderConfigurationComponent,
+        AuditLogConfigurationComponent,
     ],
     providers: [ConfigService],
 })

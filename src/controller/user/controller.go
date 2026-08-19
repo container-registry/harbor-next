@@ -163,7 +163,8 @@ func (c *controller) Get(ctx context.Context, id int, opt *Option) (*commonmodel
 	if ok && lsc.User() != nil && lsc.User().UserID == id {
 		u.AdminRoleInAuth = lsc.User().AdminRoleInAuth
 	}
-	if opt != nil && opt.WithOIDCInfo {
+	// check if comment is `admin user` to skip OIDCmeta for user
+	if opt != nil && opt.WithOIDCInfo && u.Comment != "admin user" {
 		oidcMeta, err := c.oidcMetaMgr.GetByUserID(ctx, id)
 		if err != nil {
 			return nil, errors.UnknownError(err)

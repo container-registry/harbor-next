@@ -242,6 +242,216 @@
                         </clr-control-helper>
                     </div>
                 </div>
+                <div class="clr-form-control mt-2">
+                    <clr-checkbox-wrapper>
+                        <label>
+                            {{
+                                'SYSTEM_ROBOT.USE_FEDERATED_ROBOT_ACCOUNT'
+                                    | translate
+                            }}
+                            <clr-tooltip>
+                                <clr-icon
+                                    clrTooltipTrigger
+                                    shape="info-circle"
+                                    size="24"></clr-icon>
+                                <clr-tooltip-content
+                                    clrPosition="top-right"
+                                    clrSize="lg"
+                                    *clrIfOpen>
+                                    <span>
+                                        {{
+                                            'SYSTEM_ROBOT.USE_FEDERATED_ROBOT_ACCOUNT_TIP'
+                                                | translate
+                                        }}
+                                    </span>
+                                </clr-tooltip-content>
+                            </clr-tooltip>
+                        </label>
+                        <input
+                            type="checkbox"
+                            clrCheckbox
+                            [(ngModel)]="useFederatedRobot"
+                            name="useFederatedRobotAccount"
+                            [disabled]="loading"
+                            [readonly]="isEditMode"
+                            (click)="
+                                isEditMode ? $event.preventDefault() : null
+                            " />
+                    </clr-checkbox-wrapper>
+                </div>
+            </section>
+        </form>
+    </clr-wizard-page>
+    <clr-wizard-page
+        class="pb-0"
+        *ngIf="useFederatedRobot"
+        [clrWizardPageNextDisabled]="
+            !isValidIdp(idpSelection) || !isValidFinalState()
+        ">
+        <ng-template clrPageTitle>
+            {{ 'SYSTEM_ROBOT.SELECT_FEDERATED_IDP' | translate }}
+        </ng-template>
+
+        <form class="clr-form clr-form-horizontal">
+            <section class="form-block">
+                <!-- Select IdP -->
+                <clr-combobox-container>
+                    <label class="required clr-control-label" for="fedidp">
+                        {{ 'SYSTEM_ROBOT.SELECT_FEDERATED_IDP' | translate }}
+                    </label>
+
+                    <clr-combobox
+                        name="fedidp"
+                        required
+                        [(ngModel)]="idpSelection"
+                        (ngModelChange)="onIdpChange($event)"
+                        #fedidpControl="ngModel"
+                        [disabled]="isEditMode"
+                        [class.clr-error]="
+                            (fedidpControl.dirty || fedidpControl.touched) &&
+                            (fedidpControl.dirty || !isValidIdp(idpSelection))
+                        ">
+                        <clr-options>
+                            <clr-option
+                                *clrOptionItems="let idp of idpNames"
+                                [clrValue]="idp">
+                                {{ idp }}
+                            </clr-option>
+                        </clr-options>
+                    </clr-combobox>
+                    <clr-control-error
+                        *ngIf="
+                            (fedidpControl.dirty || fedidpControl.touched) &&
+                            fedidpControl.hasError('required')
+                        ">
+                        Federated IDP selection is required.
+                    </clr-control-error>
+                    <clr-control-error
+                        *ngIf="
+                            (fedidpControl.dirty || fedidpControl.touched) &&
+                            !fedidpControl.hasError('required') &&
+                            !isValidIdp(idpSelection)
+                        ">
+                        Please select a valid federated IDP from the list.
+                    </clr-control-error>
+                </clr-combobox-container>
+
+                <!-- Inherited Claims Section -->
+                <div class="form-group-label-override">
+                    <label class="clr-control-label mt-16">{{
+                        'ROBOT_ACCOUNT.INHERITED_CLAIMS' | translate
+                    }}</label>
+                </div>
+
+                <clr-input-container
+                    *ngFor="let claim of inheritedClaims; let i = index">
+                    <input
+                        class="mr-10"
+                        autocomplete="off"
+                        clrInput
+                        type="text"
+                        placeholder="Claim Path"
+                        [(ngModel)]="claim.path"
+                        disabled
+                        size="30"
+                        name="inheritclaim_path_{{ i }}" />
+                    <input
+                        autocomplete="off"
+                        clrInput
+                        type="text"
+                        placeholder="Claim Value"
+                        [(ngModel)]="claim.value"
+                        disabled
+                        size="30"
+                        name="inheritclaim_value_{{ i }}" />
+                </clr-input-container>
+
+                <!-- Add Claims Section -->
+                <div class="form-group-label-override">
+                    <label class="required clr-control-label mt-16"
+                        >Add Claims</label
+                    >
+                </div>
+
+                <div
+                    *ngFor="let claim of claims; let i = index"
+                    class="claim-row"
+                    [class.clr-error]="
+                        (claim.path.trim().length > 0 ||
+                            claim.value.trim().length > 0) &&
+                        claim.error?.trim()
+                    ">
+                    <clr-input-container>
+                        <input
+                            class="mr-10"
+                            autocomplete="off"
+                            clrInput
+                            type="text"
+                            placeholder="Claim Path"
+                            [(ngModel)]="claim.path"
+                            (ngModelChange)="isValidFinalState()"
+                            (blur)="onClaimBlur(claim)"
+                            size="30"
+                            [id]="'claim_path_' + i"
+                            [name]="'claim_path_' + i" />
+                        <input
+                            autocomplete="off"
+                            clrInput
+                            type="text"
+                            placeholder="Claim Value"
+                            [(ngModel)]="claim.value"
+                            (ngModelChange)="isValidFinalState()"
+                            (blur)="onClaimBlur(claim)"
+                            size="30"
+                            [id]="'claim_value_' + i"
+                            [name]="'claim_value_' + i" />
+                    </clr-input-container>
+                    <clr-icon
+                        class="mt-16"
+                        (click)="deleteClaim(i)"
+                        shape="window-close"
+                        size="20"></clr-icon>
+
+                    <clr-control-error
+                        *ngIf="
+                            (claim.path.trim().length > 0 ||
+                                claim.value.trim().length > 0) &&
+                            claim.error?.trim()
+                        ">
+                        {{ claim?.error?.trim() }}
+                    </clr-control-error>
+                </div>
+
+                <button
+                    type="button"
+                    class="btn btn-link pl-0"
+                    (click)="addClaim()">
+                    <clr-icon shape="plus" size="16"></clr-icon>&nbsp;{{
+                        'BUTTON.ADD_MORE' | translate
+                    }}
+                </button>
+
+                <!-- Duplicate claim set error -->
+                <div
+                    *ngIf="duplicateClaimRobotId !== null"
+                    class="alert alert-danger mt-1"
+                    role="alert">
+                    <div class="alert-items">
+                        <div class="alert-item static">
+                            <div class="alert-icon-wrapper">
+                                <clr-icon
+                                    class="alert-icon"
+                                    shape="exclamation-circle"></clr-icon>
+                            </div>
+                            <span class="alert-text">
+                                {{
+                                    'SYSTEM_ROBOT.DUPLICATE_CLAIMS_ERROR'
+                                        | translate
+                                }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
             </section>
         </form>
     </clr-wizard-page>

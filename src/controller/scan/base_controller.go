@@ -26,6 +26,7 @@ import (
 	"github.com/google/uuid"
 
 	ar "github.com/goharbor/harbor/src/controller/artifact"
+	"github.com/goharbor/harbor/src/controller/artifact/processor/npm"
 	"github.com/goharbor/harbor/src/controller/event/operator"
 	"github.com/goharbor/harbor/src/controller/robot"
 	sc "github.com/goharbor/harbor/src/controller/scanner"
@@ -198,12 +199,14 @@ func (bc *basicController) collectScanningArtifacts(ctx context.Context, r *scan
 		// when scanning these type of sbom artifact, the scanner might assume it is image layer with tgz format, and if scanner read the layer with a stream of tgz,
 		// it fail and close the stream abruptly and cause the pannic in the harbor core log
 		// to avoid pannic, skip scan the in-toto sbom artifact sbom artifact
-		unscannable, err := bc.ar.HasUnscannableLayer(ctx, a.Digest)
-		if err != nil {
-			return err
-		}
-		if unscannable {
-			return nil
+		if a.Type != npm.ArtifactTypeNPM {
+			unscannable, err := bc.ar.HasUnscannableLayer(ctx, a.Digest)
+			if err != nil {
+				return err
+			}
+			if unscannable {
+				return nil
+			}
 		}
 
 		supported := hasCapability(r, a)
@@ -235,6 +238,11 @@ func (bc *basicController) Scan(ctx context.Context, artifact *ar.Artifact, opti
 	if artifact == nil {
 		return errors.New("nil artifact to scan")
 	}
+	// Parse options
+	opts, err := parseOptions(options...)
+	if err != nil {
+		return errors.Wrap(err, "scan controller: scan")
+	}
 
 	r, err := bc.sc.GetRegistrationByProject(ctx, artifact.ProjectID)
 	if err != nil {
@@ -254,11 +262,6 @@ func (bc *basicController) Scan(ctx context.Context, artifact *ar.Artifact, opti
 	artifacts, scannable, err := bc.collectScanningArtifacts(ctx, r, artifact)
 	if err != nil {
 		return err
-	}
-	// Parse options
-	opts, err := parseOptions(options...)
-	if err != nil {
-		return errors.Wrap(err, "scan controller: scan")
 	}
 
 	if !scannable {

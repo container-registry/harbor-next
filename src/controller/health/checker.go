@@ -174,6 +174,22 @@ func trivyHealthChecker() health.Checker {
 	return PeriodicHealthChecker(checker, period)
 }
 
+func snykHealthChecker() health.Checker {
+	url := strings.TrimSuffix(config.SnykAdapterURL(), "/") + "/probe/healthy"
+	timeout := 60 * time.Second
+	period := 10 * time.Second
+	checker := HTTPStatusCodeHealthChecker(http.MethodGet, url, nil, timeout, http.StatusOK)
+	return PeriodicHealthChecker(checker, period)
+}
+
+func grypeHealthChecker() health.Checker {
+	url := strings.TrimSuffix(config.GrypeAdapterURL(), "/") + "/probe/healthy"
+	timeout := 60 * time.Second
+	period := 10 * time.Second
+	checker := HTTPStatusCodeHealthChecker(http.MethodGet, url, nil, timeout, http.StatusOK)
+	return PeriodicHealthChecker(checker, period)
+}
+
 // RegisterHealthCheckers ...
 func RegisterHealthCheckers() {
 	registry["core"] = coreHealthChecker()
@@ -185,6 +201,12 @@ func RegisterHealthCheckers() {
 	registry["redis"] = redisHealthChecker()
 	if config.WithTrivy() {
 		registry["trivy"] = trivyHealthChecker()
+	}
+	if config.WithSnyk() {
+		registry["snyk"] = snykHealthChecker()
+	}
+	if config.WithGrype() {
+		registry["grype"] = grypeHealthChecker()
 	}
 }
 

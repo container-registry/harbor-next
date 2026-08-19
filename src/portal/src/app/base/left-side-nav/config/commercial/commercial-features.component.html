@@ -1,0 +1,52 @@
+<form class="clr-form clr-form-horizontal">
+    <section>
+        <clr-toggle-container *ngFor="let feature of features">
+            <label [for]="feature.configKey">
+                {{ feature.name }}
+                <clr-tooltip>
+                    <clr-icon
+                        clrTooltipTrigger
+                        shape="info-circle"
+                        size="24"></clr-icon>
+                    <clr-tooltip-content
+                        clrPosition="top-right"
+                        clrSize="lg"
+                        *clrIfOpen>
+                        <span>{{ feature.description }}</span>
+                    </clr-tooltip-content>
+                </clr-tooltip>
+            </label>
+            <clr-toggle-wrapper>
+                <input
+                    clrToggle
+                    type="checkbox"
+                    [id]="feature.configKey"
+                    [name]="feature.configKey"
+                    [disabled]="disabled(feature)"
+                    [ngModel]="featureConfig(feature)?.value"
+                    (ngModelChange)="setEnabled(feature, $event)" />
+                <label [for]="feature.configKey">{{
+                    'BUTTON.ENABLE' | translate
+                }}</label>
+            </clr-toggle-wrapper>
+        </clr-toggle-container>
+    </section>
+</form>
+
+<div>
+    <button
+        id="commercial-features-save"
+        type="button"
+        class="btn btn-primary"
+        [disabled]="inProgress || !hasChanges()"
+        (click)="save()">
+        {{ 'BUTTON.SAVE' | translate }}
+    </button>
+    <button
+        type="button"
+        class="btn btn-outline"
+        [disabled]="inProgress || !hasChanges()"
+        (click)="cancel()">
+        {{ 'BUTTON.CANCEL' | translate }}
+    </button>
+</div>

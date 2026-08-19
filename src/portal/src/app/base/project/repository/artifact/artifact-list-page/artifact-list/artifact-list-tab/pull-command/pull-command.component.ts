@@ -17,10 +17,15 @@ import {
     ArtifactFront as Artifact,
     ArtifactType,
     Clients,
+    getMavenDependencySnippet,
+    getMavenGetForRepo,
+    getNpmInstallCommand,
+    getNpmInstallForRepo,
     getPullCommandByDigest,
     getPullCommandByTag,
     getPullCommandForTop,
     hasPullCommand,
+    repoEcosystem,
 } from '../../../../artifact';
 import { getContainerRuntime } from 'src/app/shared/units/shared.utils';
 import { MessageHandlerService } from 'src/app/shared/services/message-handler.service';
@@ -74,6 +79,24 @@ export class PullCommandComponent {
         return artifact.type === ArtifactType.CHART;
     }
 
+    isNpm(artifact: Artifact): boolean {
+        return artifact.type === ArtifactType.NPM;
+    }
+
+    isMaven(artifact: Artifact): boolean {
+        return artifact.type === ArtifactType.MAVEN;
+    }
+
+    // npm/maven snippets read native identity from extra_attrs; no url/registry
+    // args (the repo name is a storage tree, not the package name).
+    getNpmCommand(artifact: Artifact): string {
+        return getNpmInstallCommand(artifact);
+    }
+
+    getMavenSnippet(artifact: Artifact): string {
+        return getMavenDependencySnippet(artifact);
+    }
+
     // get client based on the selected container runtime
     getSelectedClient(): Clients {
         const runtime = getContainerRuntime();
@@ -83,6 +106,17 @@ export class PullCommandComponent {
     }
 
     getPullCommandForTopModel(): string {
+        // npm/maven repos are package protocols, not OCI images: emit the native
+        // repo-level usage command (reconstructed from the storage-tree repo name)
+        // instead of a "docker pull". No host is needed — the client resolves by
+        // name against its configured registry.
+        const eco = repoEcosystem(this.repoName);
+        if (eco === ArtifactType.NPM) {
+            return getNpmInstallForRepo(this.repoName);
+        }
+        if (eco === ArtifactType.MAVEN) {
+            return getMavenGetForRepo(this.repoName);
+        }
         return (
             getPullCommandForTop(
                 `${this.registryUrl ? this.registryUrl : location.hostname}/${
@@ -135,7 +169,9 @@ export class PullCommandComponent {
         return (
             (artifact?.type === ArtifactType.IMAGE ||
                 artifact?.type === ArtifactType.CHART ||
-                artifact?.type === ArtifactType.CNAB) &&
+                artifact?.type === ArtifactType.CNAB ||
+                artifact?.type === ArtifactType.NPM ||
+                artifact?.type === ArtifactType.MAVEN) &&
             this.accessoryType !== AccessoryType.COSIGN &&
             this.accessoryType !== AccessoryType.NOTATION &&
             this.accessoryType !== AccessoryType.NYDUS

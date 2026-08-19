@@ -1,0 +1,38 @@
+h3 {
+    margin-top: 1.5rem;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.clr-form-horizontal .clr-form-control > .clr-control-label {
+    width: 15rem;
+}
+
+.audit-log-recording {
+    width: min(64rem, 100%);
+}
+
+.audit-log-recording-header {
+    margin-bottom: 0.75rem;
+}
+
+.audit-log-matrix-resource clr-icon {
+    margin-right: 0.25rem;
+}
+
+.audit-log-matrix {
+    width: auto;
+    min-width: min(34rem, 100%);
+}
+
+.audit-log-matrix th,
+.audit-log-matrix td {
+    height: 1.5rem;
+    padding-top: 0;
+    padding-bottom: 0;
+    vertical-align: middle;
+}
+
+.audit-log-matrix-resource {
+    white-space: nowrap;
+}

@@ -99,9 +99,119 @@ export enum ArtifactType {
     CHART = 'CHART',
     CNAB = 'CNAB',
     OPENPOLICYAGENT = 'OPENPOLICYAGENT',
+    NPM = 'NPM',
+    MAVEN = 'MAVEN',
+    HOMEBREW = 'HOMEBREW',
+    PYPI = 'PYPI',
+    CARGO = 'CARGO',
+    BOOTC = 'BOOTC',
 }
 
 export const artifactDefault = 'images/artifact-default.svg';
+export const artifactNpm = 'images/artifact-npm.svg';
+export const artifactMaven = 'images/artifact-maven.svg';
+export const artifactHomebrew = 'images/artifact-homebrew.svg';
+export const artifactPypi = 'images/artifact-pypi.svg';
+export const artifactCargo = 'images/artifact-cargo.svg';
+export const artifactBootc = 'images/artifact-bootc.svg';
+export const npmArtifactMediaType = 'application/vnd.harbor.npm.package.v1';
+export const npmConfigMediaType = 'application/vnd.harbor.npm.config.v1+json';
+export const mavenArtifactMediaType = 'application/vnd.harbor.maven.package.v1';
+export const mavenConfigMediaType =
+    'application/vnd.harbor.maven.config.v1+json';
+export const pypiArtifactMediaType = 'application/vnd.harbor.pypi.package.v1';
+export const cargoArtifactMediaType = 'application/vnd.harbor.cargo.crate.v1';
+export const homebrewPackageTypeAnnotation = 'com.github.package.type';
+export const homebrewPackageType = 'homebrew_bottle';
+export const bootcPackageTypeAnnotation = 'containers.bootc';
+export const bootcPackageType = '1';
+
+export function isNpmArtifact(artifact: Artifact): boolean {
+    if (!artifact) {
+        return false;
+    }
+    const artifactType = artifact['artifact_type'] || artifact['artifactType'];
+    return (
+        artifact.type === ArtifactType.NPM ||
+        artifact.media_type === npmConfigMediaType ||
+        artifactType === npmArtifactMediaType
+    );
+}
+
+export function isMavenArtifact(artifact: Artifact): boolean {
+    if (!artifact) {
+        return false;
+    }
+    const artifactType = artifact['artifact_type'] || artifact['artifactType'];
+    return (
+        artifact.type === ArtifactType.MAVEN ||
+        artifact.media_type === mavenConfigMediaType ||
+        artifactType === mavenArtifactMediaType
+    );
+}
+
+export function isHomebrewArtifact(artifact: Artifact): boolean {
+    if (!artifact) {
+        return false;
+    }
+    return (
+        artifact.type === ArtifactType.HOMEBREW ||
+        artifact.annotations?.[homebrewPackageTypeAnnotation] ===
+            homebrewPackageType
+    );
+}
+
+export function isPypiArtifact(artifact: Artifact): boolean {
+    if (!artifact) {
+        return false;
+    }
+    const artifactType = artifact['artifact_type'] || artifact['artifactType'];
+    return (
+        artifact.type === ArtifactType.PYPI ||
+        artifactType === pypiArtifactMediaType
+    );
+}
+
+export function isCargoArtifact(artifact: Artifact): boolean {
+    if (!artifact) {
+        return false;
+    }
+    const artifactType = artifact['artifact_type'] || artifact['artifactType'];
+    return (
+        artifact.type === ArtifactType.CARGO ||
+        artifactType === cargoArtifactMediaType
+    );
+}
+
+export function isBootcArtifact(artifact: Artifact): boolean {
+    if (!artifact) {
+        return false;
+    }
+    const artifactType = artifact['artifact_type'] || artifact['artifactType'];
+    const extraAttrs = artifact['extra_attrs'] || artifact['extraAttrs'];
+    const config = extraAttrs?.config || {};
+    const labels =
+        config.Labels ||
+        config.labels ||
+        extraAttrs?.Labels ||
+        extraAttrs?.labels ||
+        {};
+    return (
+        artifact.type === ArtifactType.BOOTC ||
+        artifactType === ArtifactType.BOOTC ||
+        isBootcValue(artifact.annotations?.[bootcPackageTypeAnnotation]) ||
+        isBootcValue(labels?.[bootcPackageTypeAnnotation])
+    );
+}
+
+function isBootcValue(value: any): boolean {
+    return (
+        value === bootcPackageType ||
+        value === 1 ||
+        value === true ||
+        value === 'true'
+    );
+}
 
 export enum AccessoryQueryParams {
     ACCESSORY_TYPE = 'accessoryType',
@@ -111,8 +221,102 @@ export function hasPullCommand(artifact: Artifact): boolean {
     return (
         artifact.type === ArtifactType.IMAGE ||
         artifact.type === ArtifactType.CNAB ||
-        artifact.type === ArtifactType.CHART
+        artifact.type === ArtifactType.CHART ||
+        artifact.type === ArtifactType.NPM ||
+        artifact.type === ArtifactType.MAVEN
     );
+}
+
+// npm/maven carry native identity in extra_attrs (the repo name is a storage
+// tree, not the package name), so usage snippets are built from extra_attrs only.
+export function getNpmInstallCommand(artifact: Artifact): string {
+    const attrs = artifact?.extra_attrs;
+    const name = attrs?.['name'] as unknown as string;
+    if (!name) {
+        return '';
+    }
+    const version = attrs?.['version'] as unknown as string;
+    return version ? `npm install ${name}@${version}` : `npm install ${name}`;
+}
+
+// One-liner for the pull widget; the full <dependency>/settings.xml setup
+// lives in the Usage additions tab.
+export function getMavenDependencySnippet(artifact: Artifact): string {
+    const attrs = artifact?.extra_attrs;
+    const groupId = attrs?.['groupId'] as unknown as string;
+    const artifactId = attrs?.['artifactId'] as unknown as string;
+    if (!groupId || !artifactId) {
+        return '';
+    }
+    const version = attrs?.['version'] as unknown as string;
+    const coordinate = version
+        ? `${groupId}:${artifactId}:${version}`
+        : `${groupId}:${artifactId}`;
+    return `mvn dependency:get -Dartifact=${coordinate}`;
+}
+
+// Native package version-list identity helpers. The row title for NPM/MAVEN is
+// the human-readable extra_attrs.version, not the digest slice.
+export function getNativeVersion(artifact: Artifact): string {
+    return String(artifact?.extra_attrs?.['version'] ?? '');
+}
+
+export function getChannelBadges(artifact: Artifact): string[] {
+    if (artifact?.type === ArtifactType.NPM) {
+        const distTags = artifact?.extra_attrs?.[
+            'dist-tags'
+        ] as unknown as Record<string, string>;
+        return Object.keys(distTags ?? {});
+    }
+    if (artifact?.type === ArtifactType.MAVEN) {
+        const version = getNativeVersion(artifact);
+        if (!version) {
+            return [];
+        }
+        return [version.endsWith('-SNAPSHOT') ? 'SNAPSHOT' : 'RELEASE'];
+    }
+    return [];
+}
+
+// At the repository (top) level there is no single artifact, so the native
+// repo-level usage command is reconstructed from the readable storage-tree repo
+// name (the part after the project), e.g. "npm/lodash", "npm/types/node",
+// "maven/org/springframework/spring-core". Returns the ecosystem so callers can
+// emit the right command instead of a "docker pull".
+export function repoEcosystem(repoName: string): ArtifactType | null {
+    if (!repoName) {
+        return null;
+    }
+    if (repoName.startsWith('npm/')) {
+        return ArtifactType.NPM;
+    }
+    if (repoName.startsWith('maven/')) {
+        return ArtifactType.MAVEN;
+    }
+    return null;
+}
+
+export function getNpmInstallForRepo(repoName: string): string {
+    const rest = repoName.replace(/^npm\//, '');
+    if (!rest) {
+        return '';
+    }
+    // Scoped names are stored as "<scope>/<name>" (the '@' is dropped on push).
+    const name = rest.includes('/') ? `@${rest}` : rest;
+    return `npm install ${name}`;
+}
+
+export function getMavenGetForRepo(repoName: string): string {
+    const segs = repoName
+        .replace(/^maven\//, '')
+        .split('/')
+        .filter(s => s.length > 0);
+    if (segs.length < 2) {
+        return '';
+    }
+    const artifactId = segs[segs.length - 1];
+    const groupId = segs.slice(0, -1).join('.');
+    return `mvn dependency:get -Dartifact=${groupId}:${artifactId}:RELEASE`;
 }
 
 export function getPullCommandForTop(

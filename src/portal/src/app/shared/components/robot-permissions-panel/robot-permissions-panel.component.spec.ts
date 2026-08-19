@@ -56,6 +56,12 @@ describe('RobotPermissionsPanelComponent', () => {
         const modal = fixture.nativeElement.querySelector('clr-modal');
         expect(modal).toBeTruthy();
     });
+
+    it('should translate federated IDP resource key', () => {
+        expect(
+            component.robotPermissionsPanelComponent.convertKey('federated-idp')
+        ).toBe('SYSTEM_ROBOT.FEDERATED_IDP');
+    });
 });
 
 // mock a TestHostComponent for RobotPermissionsPanelComponent

@@ -68,13 +68,15 @@ func (r *registryTestSuite) TestValidate() {
 	err = r.ctl.validate(nil, registry)
 	r.NotNil(err)
 
-	// invalid HTTP URL
+	// URL with FTP scheme
 	registry = &model.Registry{
 		Name: "endpoint01",
 		URL:  "ftp://example.com",
 	}
+	mock.OnAnything(r.regMgr, "CreateAdapter").Return(r.adapter, nil)
+	mock.OnAnything(r.adapter, "HealthCheck").Return(model.Healthy, nil)
 	err = r.ctl.validate(nil, registry)
-	r.NotNil(err)
+	r.Nil(err)
 
 	// URL without scheme
 	registry = &model.Registry{
@@ -234,6 +236,70 @@ func (r *registryTestSuite) TestGetWhitelistedAdapters() {
 			r.Equal(tt.expected, result)
 		})
 	}
+}
+
+func (r *registryTestSuite) TestSFTPRegistryRejectedWhenFeatureDisabled() {
+	r.T().Setenv("HARBOR_ENABLE_COMMERCIAL_SFTP_REPLICATION", "false")
+
+	err := r.ctl.validate(context.Background(), &model.Registry{
+		Name: "sftp-endpoint",
+		Type: model.RegistryTypeSFTP,
+		URL:  "sftp://example.com",
+	})
+
+	r.Error(err)
+	r.Contains(err.Error(), "commercial feature sftp_replication is not enabled")
+	r.regMgr.AssertNotCalled(r.T(), "CreateAdapter")
+}
+
+func (r *registryTestSuite) TestSFTPProviderHiddenWhenFeatureDisabled() {
+	r.T().Setenv("HARBOR_ENABLE_COMMERCIAL_SFTP_REPLICATION", "false")
+	config.InitWithSettings(map[string]any{
+		common.ReplicationAdapterWhiteList: "harbor,sftp",
+	})
+	mock.OnAnything(r.regMgr, "ListRegistryProviderTypes").Return([]string{"harbor", "sftp"}, nil)
+	mock.OnAnything(r.regMgr, "ListRegistryProviderInfos").Return(map[string]*model.AdapterPattern{
+		"harbor": {},
+		"sftp":   {},
+	}, nil)
+
+	types, err := r.ctl.ListRegistryProviderTypes(context.Background())
+	r.NoError(err)
+	r.Equal([]string{"harbor"}, types)
+
+	infos, err := r.ctl.ListRegistryProviderInfos(context.Background())
+	r.NoError(err)
+	r.Contains(infos, "harbor")
+	r.NotContains(infos, "sftp")
+}
+
+func (r *registryTestSuite) TestSFTPProviderVisibleWhenFeatureEnabled() {
+	r.T().Setenv("HARBOR_ENABLE_COMMERCIAL_SFTP_REPLICATION", "true")
+	config.InitWithSettings(map[string]any{
+		common.ReplicationAdapterWhiteList: "harbor,sftp",
+	})
+	mock.OnAnything(r.regMgr, "ListRegistryProviderTypes").Return([]string{"harbor", "sftp"}, nil)
+
+	types, err := r.ctl.ListRegistryProviderTypes(context.Background())
+	r.NoError(err)
+	r.Equal([]string{"harbor", "sftp"}, types)
+}
+
+func (r *registryTestSuite) TestSFTPDisableGuardRejectsExistingEndpoints() {
+	mock.OnAnything(r.regMgr, "Count").Return(int64(2), nil)
+
+	err := (sftpReplicationDisableGuard{regMgr: r.regMgr}).Validate(context.Background())
+
+	r.Error(err)
+	r.Contains(err.Error(), "cannot be disabled while 2 SFTP registry endpoint(s) exist")
+}
+
+func (r *registryTestSuite) TestSFTPDisableGuardAllowsNoEndpoints() {
+	mock.OnAnything(r.regMgr, "Count").Return(int64(0), nil)
+
+	err := (sftpReplicationDisableGuard{regMgr: r.regMgr}).Validate(context.Background())
+
+	r.NoError(err)
 }
 
 func TestRegistryTestSuite(t *testing.T) {

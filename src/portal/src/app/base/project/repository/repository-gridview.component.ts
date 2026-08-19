@@ -176,6 +176,26 @@ export class RepositoryGridviewComponent
         ];
     }
 
+    getDisplayName(repo: NewRepository): string {
+        const projectPrefix = `${this.projectName}/`;
+        const repositoryName = repo.name.startsWith(projectPrefix)
+            ? repo.name.slice(projectPrefix.length)
+            : repo.name;
+        const separator = repositoryName.indexOf('/');
+        if (separator < 0) {
+            return repositoryName;
+        }
+        const format = repositoryName.slice(0, separator);
+        const nativePath = repositoryName.slice(separator + 1);
+        if (!['npm', 'maven', 'pypi', 'cargo'].includes(format)) {
+            return repositoryName;
+        }
+        if (format === 'npm' && nativePath.includes('/')) {
+            return `@${nativePath}`;
+        }
+        return nativePath;
+    }
+
     getQueryParams() {
         if (this.session.getCurrentUser()) {
             return null;
@@ -223,10 +243,9 @@ export class RepositoryGridviewComponent
                                 page: this.currentPage,
                                 pageSize: this.pageSize,
                             };
-                        if (this.lastFilteredRepoName) {
-                            params.q = encodeURIComponent(
-                                `name=~${this.lastFilteredRepoName}`
-                            );
+                        const q = this.buildQuery();
+                        if (q) {
+                            params.q = q;
                         }
                         this.loading = true;
                         return this.newRepoService
@@ -421,8 +440,9 @@ export class RepositoryGridviewComponent
             page: this.currentPage,
             pageSize: this.pageSize,
         };
-        if (this.lastFilteredRepoName) {
-            params.q = encodeURIComponent(`name=~${this.lastFilteredRepoName}`);
+        const q = this.buildQuery();
+        if (q) {
+            params.q = q;
         }
         this.loading = true;
         this.newRepoService
@@ -469,8 +489,9 @@ export class RepositoryGridviewComponent
             page: pageNumber,
             pageSize: this.pageSize,
         };
-        if (this.lastFilteredRepoName) {
-            params.q = encodeURIComponent(`name=~${this.lastFilteredRepoName}`);
+        const q = this.buildQuery();
+        if (q) {
+            params.q = q;
         }
         if (state.filters && state.filters.length) {
             state.filters.forEach(item => {
@@ -507,6 +528,12 @@ export class RepositoryGridviewComponent
                     this.errorHandlerService.error(error);
                 }
             );
+    }
+
+    buildQuery(): string {
+        return this.lastFilteredRepoName
+            ? encodeURIComponent(`name=~${this.lastFilteredRepoName}`)
+            : '';
     }
 
     getStateAfterDeletion(): ClrDatagridStateInterface {

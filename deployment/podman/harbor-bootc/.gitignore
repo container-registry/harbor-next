@@ -1,0 +1,4 @@
+/.env
+/runtime/
+/config/token_service_key.pem
+/config/certs/

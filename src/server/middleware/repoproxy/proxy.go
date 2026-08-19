@@ -39,6 +39,7 @@ import (
 	"github.com/goharbor/harbor/src/pkg/proxy/connection"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
 	"github.com/goharbor/harbor/src/server/middleware"
+	"github.com/goharbor/harbor/src/server/registry/pkgpolicy"
 )
 
 const (
@@ -369,14 +370,28 @@ func DisableBlobAndManifestUploadMiddleware() func(http.Handler) http.Handler {
 			httpLib.SendError(w, err)
 			return
 		}
-		if p.IsProxy() && !isProxySession(ctx, art.ProjectName) {
-			httpLib.SendError(w,
-				errors.DeniedError(
-					errors.Errorf("cannot push artifact to a proxy project: %v", p.Name)))
+		proxySession := isProxySession(ctx, art.ProjectName)
+		var reg *model.Registry
+		if p.IsProxy() && p.ProxyCacheAllowPush() && !proxySession {
+			reg, err = registry.Ctl.Get(ctx, p.RegistryID)
+			if err != nil {
+				httpLib.SendError(w, err)
+				return
+			}
+		}
+		if err := validateProjectPush(p, reg, proxySession); err != nil {
+			httpLib.SendError(w, err)
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func validateProjectPush(project *proModels.Project, registry *model.Registry, proxySession bool) error {
+	if proxySession {
+		return nil
+	}
+	return pkgpolicy.ValidateOCIPush(project, registry)
 }
 
 func proxyManifestHead(ctx context.Context, w http.ResponseWriter, ctl proxy.Controller, _ *proModels.Project, art lib.ArtifactInfo, remote proxy.RemoteInterface) error {

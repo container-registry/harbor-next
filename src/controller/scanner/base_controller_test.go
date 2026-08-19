@@ -263,6 +263,14 @@ func (suite *ControllerTestSuite) TestPing() {
 	suite.NotNil(meta)
 }
 
+func (suite *ControllerTestSuite) TestRetrieveCapPopulatesMetadata() {
+	err := suite.c.RetrieveCap(context.TODO(), suite.sample)
+	require.NoError(suite.T(), err)
+	require.NotNil(suite.T(), suite.sample.Metadata)
+	assert.True(suite.T(), suite.sample.Metadata.HasCapability(v1.MimeTypeDockerArtifact))
+	assert.Equal(suite.T(), true, suite.sample.Capabilities["support_vulnerability"])
+}
+
 // TestPingWithGenericMimeType tests ping for scanners supporting MIME type MimeTypeGenericVulnerabilityReport
 func (suite *ControllerTestSuite) TestPingWithGenericMimeType() {
 	m := &v1.ScannerAdapterMetadata{

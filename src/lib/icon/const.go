@@ -22,6 +22,8 @@ const (
 	DigestOfIconDefault = "sha256:da834479c923584f4cbcdecc0dac61f32bef1d51e8aae598cf16bd154efab49f"
 	DigestOfIconWASM    = "sha256:badd7693bcaf115be202748241dd0ea6ee3b0524bfab9ac22d1e1c43721afec6"
 	DigestOfIconCNAI    = "sha256:1e1e5c5fdaf0931ec8655e835d1182f723a0c322a6760211622e1270f0193717"
+	DigestOfIconNPM     = "sha256:500d192a798fa90c3a4ddf3c7497d38c94a23912677d80ce81ad3251c16567ff"
+	DigestOfIconMaven   = "sha256:676ed2dfca2100d84b410bd7a331b38996ebe3719ca8d41acb1ea5662507762e"
 
 	// ToDo add the accessories images
 	DigestOfIconAccDefault  = ""

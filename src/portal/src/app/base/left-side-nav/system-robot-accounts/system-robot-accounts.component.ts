@@ -15,6 +15,7 @@ import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { NewRobotComponent } from './new-robot/new-robot.component';
 import { ViewTokenComponent } from '../../../shared/components/view-token/view-token.component';
 import { RobotService } from '../../../../../ng-swagger-gen/services/robot.service';
+import { FederatedIdpService } from '../../../../../ng-swagger-gen/services/federated-idp.service';
 import { Robot } from '../../../../../ng-swagger-gen/models/robot';
 import {
     clone,
@@ -100,6 +101,7 @@ export class SystemRobotAccountsComponent implements OnInit, OnDestroy {
 
     robotMetadata: Permissions;
     loadingMetadata: boolean = false;
+    fedIdpMap: Map<number, string> = new Map();
     constructor(
         private robotService: RobotService,
         private msgHandler: MessageHandlerService,
@@ -108,11 +110,13 @@ export class SystemRobotAccountsComponent implements OnInit, OnDestroy {
         private sanitizer: DomSanitizer,
         private translate: TranslateService,
         private systemInfoService: SysteminfoService,
-        private permissionService: PermissionsService
+        private permissionService: PermissionsService,
+        private federatedIdpService: FederatedIdpService
     ) {}
     ngOnInit() {
         this.getRobotPermissions();
         this.getCurrentTime();
+        this.loadFederatedIdps();
         if (!this.searchSub) {
             this.searchSub = this.filterComponent.filterTerms
                 .pipe(
@@ -206,6 +210,26 @@ export class SystemRobotAccountsComponent implements OnInit, OnDestroy {
                     new Date(res?.current_time).getTime();
             }
         });
+    }
+
+    loadFederatedIdps() {
+        this.federatedIdpService.ListFederatedIdps({}).subscribe(idps => {
+            this.fedIdpMap.clear();
+            if (idps && idps.length) {
+                idps.forEach(idp => {
+                    if (idp.id && idp.name) {
+                        this.fedIdpMap.set(idp.id, idp.name);
+                    }
+                });
+            }
+        });
+    }
+
+    getFedIdpName(r: Robot): string {
+        if (r?.federatedidp_id && this.fedIdpMap.has(r.federatedidp_id)) {
+            return this.fedIdpMap.get(r.federatedidp_id);
+        }
+        return '';
     }
 
     clrLoad(state?: ClrDatagridStateInterface) {

@@ -1,0 +1,218 @@
+version: '3'
+
+output: prefixed
+
+set:
+  - errexit
+  - pipefail
+
+dotenv:
+  - versions.env
+
+vars:
+  GIT_COMMIT:
+    sh: git rev-parse --short=8 HEAD 2>/dev/null || echo "unknown"
+  DEFAULT_VERSION:
+    sh: cat VERSION 2>/dev/null | tr -d '\n' || echo "dev"
+  VERSION: '{{.RELEASE_VERSION | default .DEFAULT_VERSION}}'
+  TIMESTAMP:
+    sh: date -u +%Y%m%d%H%M%S
+
+  GOPATH_BIN:
+<<<<<<<
+    # Falls back when Go is absent (e.g. chart-only CI runners) — global
+    # vars are evaluated eagerly for EVERY task invocation.
+    sh: command -v go >/dev/null 2>&1 && echo "${GOBIN:-$(go env GOPATH)/bin}" || echo "${GOBIN:-$HOME/go/bin}"
+=======
+    sh: 'if command -v go >/dev/null 2>&1; then echo "${GOBIN:-$(go env GOPATH)/bin}"; else echo "${GOBIN:-/tmp/go/bin}"; fi'
+>>>>>>>
+  GOBUILD_FLAGS: "-buildvcs=false -trimpath"
+  DISTRIBUTION_SRC: "https://github.com/distribution/distribution.git"
+  NPM_REGISTRY: "https://registry.npmjs.org/"
+
+  # Multi-arch image build configuration
+  # Registry: 8gears.container-registry.com/8gcr/<image>:<version>
+  REGISTRY_ADDRESS: '{{.REGISTRY_ADDRESS | default "8gears.container-registry.com"}}'
+  REGISTRY_PROJECT: '{{.REGISTRY_PROJECT | default "8gcr"}}'
+  IMAGE_PLATFORMS: '{{.IMAGE_PLATFORMS | default "linux/amd64,linux/arm64"}}'
+  IMAGE_BUILDER: "harbor-multiarch"
+
+  # Container engine detection: prefer real Docker, fallback to Podman or podman-docker shims.
+  CONTAINER_ENGINE:
+    sh: 'docker --version 2>/dev/null | grep -q "Docker" && echo "docker" || (podman --version >/dev/null 2>&1 && echo "podman" || echo "unknown")'
+
+  # CI detection (shared by build.yml and image.yml)
+  IS_CI:
+    sh: '[ -n "${CI:-}${GITHUB_ACTIONS:-}${GITLAB_CI:-}${JENKINS_URL:-}" ] && echo "true" || echo "false"'
+  CI_PLATFORMS: '{{ternary .IMAGE_PLATFORMS (printf "linux/%s" ARCH) (eq .IS_CI "true")}}'
+
+includes:
+  build:
+    taskfile: ./taskfile/build.yml
+    aliases: [b]
+  e2e:
+    taskfile: ./taskfile/e2e.yml
+  image:
+    taskfile: ./taskfile/image.yml
+    aliases: [i]
+  test:
+    taskfile: ./taskfile/test.yml
+    aliases: [t]
+  dev:
+    taskfile: ./taskfile/dev.yml
+    aliases: [d]
+  docs:
+    taskfile: ./taskfile/docs.yml
+<<<<<<<
+  helm:
+    taskfile: ./taskfile/helm.yml
+    aliases: [h]
+  compose:
+    taskfile: ./taskfile/compose.yml
+=======
+  patches:
+    taskfile: ./taskfile/patches.yml
+  sync:
+    taskfile: ./taskfile/sync.yml
+    aliases: [s]
+  jj:
+    taskfile: ./taskfile/jj.yml
+  agent:
+    taskfile: ./8gcr-ee/agents/agent.yml
+    aliases: [a]
+    optional: true
+  next:
+    taskfile: ./taskfile/next-dev.yml
+  fedidp:
+    taskfile: ./taskfile/fedidp.yml
+    optional: true
+>>>>>>>
+  release-ready:
+    taskfile: ./taskfile/release-ready.yml
+  release-images-local:
+    taskfile: ./taskfile/release-images-local.yml
+  release-notes:
+    taskfile: ./taskfile/release-notes.yml
+
+tasks:
+  default:
+    desc: "Start all services with hot reload (foreground, stops on exit)"
+    cmds:
+      - task: dev:up
+
+  build:
+    desc: "Build all binaries"
+    cmds:
+      - task: build:all-binaries
+
+  test:
+    desc: "Run all tests"
+    cmds:
+      - task: test:all
+
+  lint:
+    desc: "Run API lint, Go lint, and dependency vulnerability checks"
+    cmds:
+      - task: test:lint:api
+      - task: test:lint
+      - task: test:vuln-check
+
+  lint:go:
+    desc: "Run Go lint"
+    cmds:
+      - task: test:lint:local
+
+  lint:ui:
+    desc: "Run UI lint"
+    cmds:
+      - task: test:frontend:lint
+      - task: test:frontend:lint:style
+
+  lint:api:
+    desc: "Run API lint"
+    cmds:
+      - task: test:lint:api
+
+  vuln-check:
+    desc: "Run Go dependency vulnerability checks"
+    cmds:
+      - task: test:vuln-check
+
+  images:
+    desc: "Build all container images (PUSH=false for local, PLATFORMS=linux/arm64 for single arch)"
+    cmds:
+      - task: image:all-images
+
+  e2e:
+    desc: "Clone upstream, apply patches, and run all local E2E suites (~@k8s)"
+    cmds:
+      - task: e2e:run
+
+  release-ready:
+    desc: "Verify commercial branches merge cleanly onto the current worktree"
+    cmds:
+      - task: release-ready:check
+
+  apply-patches:
+    desc: "Apply the commercial patches declared by this Harbor branch"
+    cmds:
+      - task: release-ready:apply-patches
+
+  release-images-local:
+    desc: "Apply commercial patches, build multi-arch images, push them, and verify the manifests"
+    cmds:
+      - task: release-images-local:run
+
+  release-notes:
+    desc: "Recreate a GitHub release's notes from its tagged changelog"
+    cmds:
+      - task: release-notes:update
+
+  clean:
+    desc: "Remove all build artifacts, images, test output, and dev environment"
+    deps: [build:clean, image:clean, test:clean, dev:clean]
+
+  info:
+    desc: "Print version, tool versions, and build configuration"
+    silent: true
+    cmds:
+      - |
+        echo ""
+        echo "═══════════════════════════════════════════════════════════"
+        echo "  Harbor Build Information"
+        echo "═══════════════════════════════════════════════════════════"
+        echo ""
+        echo "Build Metadata:"
+        echo "  Version:        {{.VERSION}}"
+        echo "  Git Commit:     {{.GIT_COMMIT}}"
+        echo "  Build Time:     {{.TIMESTAMP}}"
+        echo ""
+        echo "Tool Versions:"
+        echo "  Go:             {{.GO_VERSION}}"
+        echo "  Swagger:        {{.SWAGGER_VERSION}}"
+        echo "  GolangCI-Lint:  {{.GOLANGCILINT_VERSION}}"
+        echo "  Delve:          {{.DELVE_VERSION}}"
+        echo "  Air:            {{.AIR_VERSION}}"
+        echo "  Bun:            {{.BUN_VERSION}}"
+        echo "  Spectral:       {{.SPECTRAL_VERSION}}"
+        echo "  Trivy:          {{.TRIVY_VERSION}}"
+        echo ""
+        echo "Base Images:"
+        echo "  Alpine:         {{.ALPINE_VERSION}}"
+        echo "  Nginx:          {{.NGINX_VERSION}}"
+        echo ""
+        echo "Build Configuration:"
+        echo "  Go Build Flags: {{.GOBUILD_FLAGS}}"
+        echo ""
+        echo "External Dependencies:"
+        echo "  Distribution:   {{.DISTRIBUTION_SRC}}"
+        echo "  Distribution:   {{.DISTRIBUTION_VERSION}}"
+        echo "  NPM Registry:   {{.NPM_REGISTRY}}"
+        echo ""
+        echo "═══════════════════════════════════════════════════════════"
+        echo ""
+
+  setup:
+    desc: "Install Go development tools (air, dlv, govulncheck)"
+    cmds:
+      - task: dev:setup
