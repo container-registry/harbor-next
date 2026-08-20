@@ -91,7 +91,7 @@ spec:
       # projects.
       extraEnv:
         - name: PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE
-          value: "docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory,npm,pypi,maven,cargo,go,go-sumdb,homebrew"
+          value: "docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory,npm,npmjs,pypi,pypi-registry,maven,maven-central,cargo,crates-io,go,go-registry,go-sumdb,homebrew,homebrew-registry"
         - name: WITH_SNYK
           value: "true"
         - name: SNYK_ADAPTER_URL
