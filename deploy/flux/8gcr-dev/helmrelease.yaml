@@ -131,7 +131,7 @@ spec:
         size: 10Gi
     portal:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:2e3a0289a009a1d157c620cc081af619346d0f1a4e9a08eb8896546ef84260ec" # {"$imagepolicy": "flux-system:harbor-portal:digest"}
+        deploy.8gears.io/image-revision: "sha256:3e810bf0c14632ba7d239aa713d4bdf22a53990347214946c584ffdf9a6ef95f" # {"$imagepolicy": "flux-system:harbor-portal:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-portal
         tag: latest
@@ -147,7 +147,7 @@ spec:
     trivy:
       enabled: true
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:ee03509cb2e8af5ecf08aeb373dee3742b0dc36dc6f70d6040e00eb5e8be005c" # {"$imagepolicy": "flux-system:trivy-adapter:digest"}
+        deploy.8gears.io/image-revision: "sha256:cfac1d3ce2255f01c546e12494396b58ac329ebce8edd1d6b562e618230b2529" # {"$imagepolicy": "flux-system:trivy-adapter:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/trivy-adapter
         tag: latest
