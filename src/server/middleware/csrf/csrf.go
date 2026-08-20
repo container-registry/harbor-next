@@ -87,8 +87,11 @@ func Middleware() func(handler http.Handler) http.Handler {
 			csrf.Path("/"))
 	})
 	return middleware.New(func(rw http.ResponseWriter, req *http.Request, next http.Handler) {
+		req = req.Clone(req.Context())
+		req.URL.Scheme = "https"
+		req.URL.Host = req.Host
 		if plaintextHTTPEnabled() {
-			req = csrf.PlaintextHTTPRequest(req)
+			req.URL.Scheme = "http"
 		}
 		protect(attach(next)).ServeHTTP(rw, req)
 	}, csrfSkipper)
