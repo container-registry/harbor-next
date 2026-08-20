@@ -4,7 +4,7 @@
 # to core, and everything else to the portal. Core serves the package registries
 # on their own prefixes, so without these rules an `npm install` or a `mvn` build
 # lands on the Angular app and gets 200 text/html back, which npm reports as a
-# JSON parse error and Maven as an unparseable POM.
+# JSON parse error and Maven as an unparsable POM.
 #
 # A separate Ingress rather than a chart change, so it ships with this bundle.
 # ingress-nginx merges rules per host and prefers the longer path, so the chart's
