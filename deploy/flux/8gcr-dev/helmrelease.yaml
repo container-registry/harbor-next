@@ -75,7 +75,7 @@ spec:
     # Always so they pull the new digest behind latest.
     core:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:81ffae02a85b205608734bf663f0b56ec67ea4ab38e7e16daac92d6ab64934c0" # {"$imagepolicy": "flux-system:harbor-core:digest"}
+        deploy.8gears.io/image-revision: "sha256:71bd3a7eba64a5185b92387cbb911f806865138a18db82841a63550893cde7b9" # {"$imagepolicy": "flux-system:harbor-core:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-core
         tag: latest
@@ -139,7 +139,7 @@ spec:
     exporter:
       enabled: true
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:907513a025db9118dfb81a40a696f165f4101cb722b37a560a16b6537a9f12d2" # {"$imagepolicy": "flux-system:harbor-exporter:digest"}
+        deploy.8gears.io/image-revision: "sha256:80f9f212a460ad880709fe2a7912455c507967cff241257a392f16aec4ea8bc7" # {"$imagepolicy": "flux-system:harbor-exporter:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-exporter
         tag: latest
