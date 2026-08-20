@@ -196,6 +196,11 @@ spec:
               imagePullSecrets:
                 - name: harbor-system-pull
               securityContext:
+                fsGroup: 101
+                fsGroupChangePolicy: OnRootMismatch
+                runAsGroup: 101
+                runAsNonRoot: true
+                runAsUser: 100
                 seccompProfile:
                   type: RuntimeDefault
               containers:
@@ -286,6 +291,11 @@ spec:
               imagePullSecrets:
                 - name: harbor-system-pull
               securityContext:
+                fsGroup: 101
+                fsGroupChangePolicy: OnRootMismatch
+                runAsGroup: 101
+                runAsNonRoot: true
+                runAsUser: 100
                 seccompProfile:
                   type: RuntimeDefault
               containers:
