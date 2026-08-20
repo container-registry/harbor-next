@@ -187,7 +187,7 @@ spec:
           template:
             metadata:
               annotations:
-                deploy.8gears.io/image-revision: "sha256:6fd25e3b44ecb3c03f8e68444d50ec1fc3f6b1bc2137744be5b9c5a1d4cfee57" # {"$imagepolicy": "flux-system:harbor-grype-adapter:digest"}
+                deploy.8gears.io/image-revision: "sha256:a8df49760cab2dea86c7f0bb2976f06f072846a4d86ba82ee18943a9c8704104" # {"$imagepolicy": "flux-system:harbor-grype-adapter:digest"}
               labels:
                 app.kubernetes.io/name: grype-scanner
                 app.kubernetes.io/component: scanner
