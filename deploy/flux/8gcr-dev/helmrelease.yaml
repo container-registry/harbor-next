@@ -92,6 +92,16 @@ spec:
       extraEnv:
         - name: PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE
           value: "docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory,npm,pypi,maven,cargo,go,go-sumdb,homebrew"
+        - name: WITH_SNYK
+          value: "true"
+        - name: SNYK_ADAPTER_URL
+          value: http://snyk-scanner:8080
+        - name: WITH_GRYPE
+          value: "true"
+        - name: GRYPE_ADAPTER_URL
+          value: http://grype-scanner:8080
+        - name: DEFAULT_SCANNER
+          value: Trivy
     jobservice:
       podAnnotations:
         deploy.8gears.io/image-revision: "sha256:d95c02f381bb6a7e370412c1870c7386f28f95f8a6707003c85afe1e4744feae" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
@@ -161,3 +171,185 @@ spec:
               owner: harbor
               secret:
                 name: harbor-db-password
+      - apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: grype-scanner
+          labels:
+            app.kubernetes.io/name: grype-scanner
+            app.kubernetes.io/component: scanner
+            app.kubernetes.io/part-of: harbor
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app.kubernetes.io/name: grype-scanner
+          template:
+            metadata:
+              annotations:
+                deploy.8gears.io/image-revision: "sha256:6fd25e3b44ecb3c03f8e68444d50ec1fc3f6b1bc2137744be5b9c5a1d4cfee57" # {"$imagepolicy": "flux-system:harbor-grype-adapter:digest"}
+              labels:
+                app.kubernetes.io/name: grype-scanner
+                app.kubernetes.io/component: scanner
+                app.kubernetes.io/part-of: harbor
+            spec:
+              imagePullSecrets:
+                - name: harbor-system-pull
+              securityContext:
+                seccompProfile:
+                  type: RuntimeDefault
+              containers:
+                - name: scanner
+                  image: 8gears.container-registry.com/8gcr/harbor-grype-adapter:latest
+                  imagePullPolicy: Always
+                  securityContext:
+                    allowPrivilegeEscalation: false
+                    capabilities:
+                      drop:
+                        - ALL
+                    runAsNonRoot: true
+                  env:
+                    - name: SCANNER_API_SERVER_ADDR
+                      value: ":8080"
+                    - name: SCANNER_GRYPE_CACHE_DIR
+                      value: /home/scanner/cache
+                    - name: SCANNER_GRYPE_DB_CACHE_DIR
+                      value: /home/scanner/cache/grype-db
+                    - name: SCANNER_GRYPE_SCOPE
+                      value: squashed
+                  ports:
+                    - name: http
+                      containerPort: 8080
+                  readinessProbe:
+                    httpGet:
+                      path: /probe/ready
+                      port: http
+                  livenessProbe:
+                    httpGet:
+                      path: /probe/healthy
+                      port: http
+                  resources:
+                    requests:
+                      cpu: 100m
+                      memory: 256Mi
+                    limits:
+                      memory: 2Gi
+                  volumeMounts:
+                    - name: cache
+                      mountPath: /home/scanner/cache
+                    - name: tmp
+                      mountPath: /tmp
+              volumes:
+                - name: cache
+                  emptyDir:
+                    sizeLimit: 4Gi
+                - name: tmp
+                  emptyDir:
+                    sizeLimit: 2Gi
+      - apiVersion: v1
+        kind: Service
+        metadata:
+          name: grype-scanner
+          labels:
+            app.kubernetes.io/name: grype-scanner
+            app.kubernetes.io/component: scanner
+            app.kubernetes.io/part-of: harbor
+        spec:
+          selector:
+            app.kubernetes.io/name: grype-scanner
+          ports:
+            - name: http
+              port: 8080
+              targetPort: http
+      - apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: snyk-scanner
+          labels:
+            app.kubernetes.io/name: snyk-scanner
+            app.kubernetes.io/component: scanner
+            app.kubernetes.io/part-of: harbor
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app.kubernetes.io/name: snyk-scanner
+          template:
+            metadata:
+              annotations:
+                deploy.8gears.io/image-revision: "sha256:1298f9307fc7b73964ccbb0eefbeb7f8255be56b2a06d32fe3515ff28e1595ad" # {"$imagepolicy": "flux-system:harbor-snyk-adapter:digest"}
+              labels:
+                app.kubernetes.io/name: snyk-scanner
+                app.kubernetes.io/component: scanner
+                app.kubernetes.io/part-of: harbor
+            spec:
+              imagePullSecrets:
+                - name: harbor-system-pull
+              securityContext:
+                seccompProfile:
+                  type: RuntimeDefault
+              containers:
+                - name: scanner
+                  image: 8gears.container-registry.com/8gcr/harbor-snyk-adapter:latest
+                  imagePullPolicy: Always
+                  securityContext:
+                    allowPrivilegeEscalation: false
+                    capabilities:
+                      drop:
+                        - ALL
+                    runAsNonRoot: true
+                  env:
+                    - name: SCANNER_API_SERVER_ADDR
+                      value: ":8080"
+                    - name: SCANNER_SNYK_CACHE_DIR
+                      value: /tmp
+                    - name: SNYK_TOKEN
+                      valueFrom:
+                        secretKeyRef:
+                          name: harbor-snyk
+                          key: token
+                    - name: SNYK_ORG
+                      valueFrom:
+                        secretKeyRef:
+                          name: harbor-snyk
+                          key: org
+                          optional: true
+                  ports:
+                    - name: http
+                      containerPort: 8080
+                  readinessProbe:
+                    httpGet:
+                      path: /probe/ready
+                      port: http
+                  livenessProbe:
+                    httpGet:
+                      path: /probe/healthy
+                      port: http
+                  resources:
+                    requests:
+                      cpu: 100m
+                      memory: 256Mi
+                    limits:
+                      memory: 2Gi
+                  volumeMounts:
+                    - name: tmp
+                      mountPath: /tmp
+              volumes:
+                - name: tmp
+                  emptyDir:
+                    sizeLimit: 2Gi
+      - apiVersion: v1
+        kind: Service
+        metadata:
+          name: snyk-scanner
+          labels:
+            app.kubernetes.io/name: snyk-scanner
+            app.kubernetes.io/component: scanner
+            app.kubernetes.io/part-of: harbor
+        spec:
+          selector:
+            app.kubernetes.io/name: snyk-scanner
+          ports:
+            - name: http
+              port: 8080
+              targetPort: http
