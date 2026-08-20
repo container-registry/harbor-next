@@ -6,6 +6,18 @@ This changelog mirrors [GitHub Releases](https://github.com/container-registry/h
 
 ---
 
+## [2.15.7](https://github.com/container-registry/harbor-next/compare/v2.15.6...v2.15.7) (2026-08-20)
+
+
+### Bug Fixes
+
+* Harden Proxy Cache Repository Filter Validation ([#654](https://github.com/container-registry/harbor-next/issues/654)) ([debbe35](https://github.com/container-registry/harbor-next/commit/debbe350af0a7f4b6e5457f70b8eedd099a8491c))
+
+
+### Upstream
+
+* feat(backend): Implement Proxy Cache Repository Filter API (goharbor/harbor[#23527](https://github.com/container-registry/harbor-next/issues/23527)) ([#653](https://github.com/container-registry/harbor-next/issues/653)) ([3a144ff](https://github.com/container-registry/harbor-next/commit/3a144ffb24bd632533f9c50b4f0e8de1164759fc))
+
 ## [2.15.6](https://github.com/container-registry/harbor-next/compare/v2.15.5...v2.15.6) (2026-08-18)
 
 
