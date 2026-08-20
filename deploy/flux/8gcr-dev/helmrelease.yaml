@@ -94,7 +94,7 @@ spec:
           value: "docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory,npm,pypi,maven,cargo,go,go-sumdb,homebrew"
     jobservice:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:e5ea4808882b07ff99cd17216be133c351e89aee342565f35e4f135addf8ff43" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
+        deploy.8gears.io/image-revision: "sha256:d95c02f381bb6a7e370412c1870c7386f28f95f8a6707003c85afe1e4744feae" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-jobservice
         tag: latest
