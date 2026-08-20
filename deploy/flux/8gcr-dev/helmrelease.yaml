@@ -47,6 +47,66 @@ spec:
         nginx.ingress.kubernetes.io/proxy-body-size: "0"
         nginx.ingress.kubernetes.io/ssl-redirect: "true"
         cert-manager.io/cluster-issuer: letsencrypt-prod
+        # Demo-only config lock: every user on this tenant is a system admin
+        # (see the CNPG postInitApplicationSQL trigger below), so the built-in
+        # role check can no longer gate configuration writes. This guard pins
+        # write access to /api/v2.0/configurations to the *username* `admin`.
+        # It asks Harbor who the caller is (works for Basic auth and portal
+        # session cookies alike) and 403s everyone else. Reads are untouched.
+        # kube-dns (10.96.0.10) is the cluster's fixed DNS Service IP; the core
+        # Service is addressed by name so its ClusterIP can change freely.
+        nginx.ingress.kubernetes.io/server-snippet: |
+          location = /api/v2.0/configurations {
+              resolver 10.96.0.10 valid=30s ipv6=off;
+              set $cfg_upstream harbor-harbor-next-core.8gcr-dev-main.svc.cluster.local;
+              access_by_lua_block {
+                  local m = ngx.req.get_method()
+                  if m == "PUT" or m == "POST" or m == "DELETE" or m == "PATCH" then
+                      local http = require "resty.http"
+                      local httpc = http.new()
+                      httpc:set_timeout(3000)
+                      local ok, cerr = httpc:connect("harbor-harbor-next-core.8gcr-dev-main.svc.cluster.local", 80)
+                      if not ok then
+                          ngx.log(ngx.ERR, "cfg-guard connect: ", cerr)
+                          return ngx.exit(403)
+                      end
+                      local res, rerr = httpc:request({
+                          method = "GET",
+                          path = "/api/v2.0/users/current",
+                          headers = {
+                              ["Authorization"] = ngx.var.http_authorization,
+                              ["Cookie"] = ngx.var.http_cookie,
+                              ["Host"] = ngx.var.host,
+                              ["Accept"] = "application/json",
+                          },
+                      })
+                      if not res then
+                          ngx.log(ngx.ERR, "cfg-guard request: ", rerr)
+                          httpc:close()
+                          return ngx.exit(403)
+                      end
+                      local body = res:read_body() or ""
+                      httpc:set_keepalive()
+                      local uname
+                      if res.status == 200 then
+                          uname = string.match(body, '"username"%s*:%s*"([^"]*)"')
+                      end
+                      if uname ~= "admin" then
+                          ngx.status = 403
+                          ngx.header["Content-Type"] = "application/json"
+                          ngx.say('{"errors":[{"code":"FORBIDDEN","message":"configuration changes are restricted to the admin account on this demo"}]}')
+                          return ngx.exit(403)
+                      end
+                  end
+              }
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+              proxy_set_header X-Forwarded-Host $host;
+              proxy_http_version 1.1;
+              proxy_pass http://$cfg_upstream:80$request_uri;
+          }
     # ---- Database ----
     # Both CNPG bootstrap (extraManifests below) and Harbor's runtime DB client
     # read the SAME Secret/harbor-db-password. CNPG requires basic-auth type
@@ -171,6 +231,41 @@ spec:
               owner: harbor
               secret:
                 name: harbor-db-password
+              # Demo-only: auto-promote every newly registered user to system
+              # admin (mirrors demo.goharbor.io). Harbor owns the schema and
+              # creates `harbor_user` during its own migrations, which run long
+              # after initdb — so we cannot CREATE TRIGGER here directly. Instead
+              # we install a one-shot DDL event trigger (superuser context) that
+              # fires when Harbor first creates `harbor_user`, then installs the
+              # BEFORE INSERT row trigger. `anonymous` (Harbor's internal
+              # unauthenticated principal) is excluded. Config writes are still
+              # fenced to the real `admin` account by the ingress server-snippet
+              # above. Scope is this tenant's CNPG cluster only — NOT baked into
+              # the shared 8gcr/harbor-core image, which other tenants also pull.
+              postInitApplicationSQL:
+                - |
+                  CREATE OR REPLACE FUNCTION demo_install_promote_admin() RETURNS event_trigger
+                  LANGUAGE plpgsql AS $$
+                  BEGIN
+                    IF to_regclass('public.harbor_user') IS NOT NULL
+                       AND NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_demo_promote_new_user_to_admin') THEN
+                      CREATE OR REPLACE FUNCTION demo_promote_new_user_to_admin() RETURNS trigger
+                      LANGUAGE plpgsql AS $body$
+                      BEGIN
+                        IF NEW.username IS DISTINCT FROM 'anonymous' THEN
+                          NEW.sysadmin_flag := true;
+                        END IF;
+                        RETURN NEW;
+                      END;
+                      $body$;
+                      EXECUTE 'CREATE TRIGGER trg_demo_promote_new_user_to_admin BEFORE INSERT ON harbor_user FOR EACH ROW EXECUTE FUNCTION demo_promote_new_user_to_admin()';
+                    END IF;
+                  END;
+                  $$;
+                - |
+                  CREATE EVENT TRIGGER demo_install_promote_admin_evt
+                    ON ddl_command_end WHEN TAG IN ('CREATE TABLE')
+                    EXECUTE FUNCTION demo_install_promote_admin();
       - apiVersion: apps/v1
         kind: Deployment
         metadata:
