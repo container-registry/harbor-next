@@ -17,6 +17,7 @@ package log //nolint:revive
 import (
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/goharbor/harbor/src/common/security"
 	"github.com/goharbor/harbor/src/controller/event/metadata/commonevent"
@@ -45,11 +46,13 @@ func Middleware() func(http.Handler) http.Handler {
 			r = r.WithContext(ctx)
 		}
 
+		isResourceName, _ := strconv.ParseBool(r.Header.Get("X-Is-Resource-Name"))
 		e := &commonevent.Metadata{
-			Ctx:           r.Context(),
-			Username:      "unknown",
-			RequestMethod: r.Method,
-			RequestURL:    r.URL.String(),
+			Ctx:            r.Context(),
+			Username:       "unknown",
+			RequestMethod:  r.Method,
+			RequestURL:     r.URL.String(),
+			IsResourceName: isResourceName,
 		}
 		if matched, resName := e.PreCheckMetadata(); matched {
 			lib.NopCloseRequest(r)
