@@ -178,9 +178,7 @@ fi
 } > "${tmp_dir}/release-notes.md"
 
 if [[ -n "${preview_pr_number}" && "${dry_run}" != "true" ]]; then
-  github_retry gh pr view "${preview_pr_number}" --repo "${GITHUB_REPOSITORY}" --json body --jq .body > "${tmp_dir}/release-pr-body.md"
   node .github/scripts/update-release-notes-preview.mjs \
-    "${tmp_dir}/release-pr-body.md" \
     "${tmp_dir}/release-notes.md" \
     "${tmp_dir}/release-pr-body-with-preview.md"
   github_retry gh pr edit "${preview_pr_number}" \
