@@ -6,8 +6,9 @@ on:
     # Allowlist: only build preview images when an input that actually reaches
     # one of the images changes. Each entry below is consumed by a dockerfile
     # COPY/build-arg or by the task build steps (gen-apis / build:binary).
-    # Anything not listed (docs, tests, 8gcr-ee patches, lint config, dev
-    # taskfiles, other workflows) cannot change an image, so it is skipped.
+    # Anything not listed (docs, tests, lint config, dev taskfiles, other
+    # workflows) cannot change an image, so it is skipped. Commercial code
+    # from 8gcr isn't applied for PR previews at all — see publish-images.yml.
     paths:
       - "src/**"                             # Go components + portal sources
       - "api/v2.0/swagger.yaml"              # gen-apis (core) + portal API client

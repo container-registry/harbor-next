@@ -1,0 +1,30 @@
+{{/*
+Extra manifests - escape hatch for any additional resources
+*/}}
+
+{{- $labels := include "harbor.labels" . | fromYaml }}
+
+{{/* Static manifests - merged with chart labels */}}
+{{- range .Values.extraManifests }}
+---
+{{- $manifest := deepCopy . }}
+{{- $userMeta := default dict $manifest.metadata }}
+{{- $userLabels := default dict $userMeta.labels }}
+{{- $mergedLabels := merge $userLabels $labels }}
+{{- $_ := set $userMeta "labels" $mergedLabels }}
+{{- $_ := set $manifest "metadata" $userMeta }}
+{{- toYaml $manifest }}
+{{- end }}
+
+{{/* Templated manifests - can use .Values, .Release, etc. */}}
+{{- range .Values.extraTemplateManifests }}
+---
+{{- $rendered := tpl . $ | fromYaml }}
+{{- $manifest := deepCopy $rendered }}
+{{- $userMeta := default dict $manifest.metadata }}
+{{- $userLabels := default dict $userMeta.labels }}
+{{- $mergedLabels := merge $userLabels $labels }}
+{{- $_ := set $userMeta "labels" $mergedLabels }}
+{{- $_ := set $manifest "metadata" $userMeta }}
+{{- toYaml $manifest }}
+{{- end }}

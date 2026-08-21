@@ -1,0 +1,33 @@
+# GitOps-safe rendering scenario: autoGenSecrets=false with every
+# identity secret pinned to an externally-owned Secret. The determinism
+# CI task renders this twice and requires byte-identical output; ct lint
+# picks it up as an additional render scenario.
+externalURL: https://harbor.example.com
+autoGenSecrets: false
+
+existingSecretAdminPassword: harbor-admin
+existingSecretSecretKey: harbor-encryption
+
+database:
+  host: db.example.com
+  existingSecret: harbor-database
+
+core:
+  existingSecret: harbor-core-identity
+  existingXsrfSecret: harbor-core-identity
+  tokenSecretName: harbor-token-cert
+
+registry:
+  existingSecret: harbor-registry-identity
+  credentials:
+    existingSecret: harbor-registry-credentials
+
+jobservice:
+  existingSecret: harbor-jobservice-identity
+
+ingress:
+  autoGenCert: false
+  tls:
+    - secretName: harbor-tls
+      hosts:
+        - harbor.example.com

@@ -9,6 +9,10 @@
 extend-ignore-identifiers-re = [
     # Hex strings and base64 blobs
     "[A-Za-z0-9+/]{20,}",
+    # Abbreviated git SHAs referenced from comments (`ba7cfeeac` reads as a
+    # typo for `by`/`be`). Costs the handful of real words spelled entirely
+    # from a-f0-9 and at least 7 long — none are plausible typos.
+    "\\b[0-9a-f]{7,40}\\b",
 ]
 
 [default.extend-words]

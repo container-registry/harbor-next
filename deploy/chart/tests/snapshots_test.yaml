@@ -1,0 +1,158 @@
+suite: full-chart snapshots
+# Each test pins the FULL rendered output of every DETERMINISTIC template
+# for one values combination. Snapshots live in
+# tests/__snapshot__/snapshots_test.yaml.snap.
+#
+# When the chart changes output for any of these inputs, the snapshot
+# diff fails and a human must either accept the change
+# (`helm unittest --update-snapshot .`) or fix the regression.
+#
+# What's snapshotted: ConfigMaps, Services, Ingresses, PDBs,
+# ServiceMonitor, Routes, ServiceAccounts, PVCs, Certificates,
+# extraManifests — anything where the same values.yaml input must
+# produce byte-identical output every render.
+#
+# What's NOT snapshotted (and why): Deployments + StatefulSets have
+# `checksum/secret` annotations that hash the Secret render; Secrets
+# contain `randAlphaNum` / `genCA` output that's freshly generated per
+# render. Snapshotting either would churn every run. Those templates
+# are covered by targeted assertion tests in core_test.yaml,
+# registry_test.yaml, redis_test.yaml, etc., which assert specific
+# load-bearing fields (env wiring, secretKeyRef name/key, volume
+# mounts) — fields whose values ARE deterministic.
+#
+# Scenarios:
+#   1. Minimal — required-only baseline, valkey enabled (default)
+#   2. Valkey auth — REDIS_PASSWORD wiring + valkey-auth Secret refs
+#   3. External Redis with TLS + sentinel + password
+#   4. BYO secrets matrix — every existingSecret path set
+#   5. Trace + observability — jaeger + metrics + ServiceMonitor
+#   6. Ingress + cert-manager + multiple hosts (including wildcard)
+
+templates:
+  - templates/core.configmap.yaml
+  - templates/core.service.yaml
+  - templates/exporter.service.yaml
+  - templates/expose-route.yaml
+  - templates/expose-service.yaml
+  - templates/extraManifests.yaml
+  - templates/gateway-httproute.yaml
+  - templates/ingress.yaml
+  - templates/jobservice.configmap-env.yaml
+  - templates/jobservice.configmap.yaml
+  - templates/jobservice.pvc.yaml
+  - templates/jobservice.service.yaml
+  - templates/pdbs.yaml
+  - templates/portal.configmap.yaml
+  - templates/portal.service.yaml
+  - templates/registry.configmap.yaml
+  - templates/registry.pvc.yaml
+  - templates/registry.service.yaml
+  - templates/registryctl.configmap.yaml
+  - templates/serviceaccounts.yaml
+  - templates/servicemonitor.yaml
+  - templates/tls-certificates.yaml
+  - templates/trivy.service.yaml
+
+release:
+  name: harbor
+  namespace: harbor
+
+tests:
+  - it: 1. minimal — required-only baseline
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: changeme-snapshot-baseline
+    asserts:
+      - matchSnapshot: {}
+
+  - it: 2. valkey with auth enabled
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: changeme-snapshot-baseline
+      valkey.auth.enabled: true
+      valkey.auth.aclUsers.default.password: snapshot-valkey-pw
+      valkey.auth.aclUsers.default.permissions: "~* &* +@all"
+    asserts:
+      - matchSnapshot: {}
+
+  - it: 3. external Redis with TLS + sentinel + password
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: changeme-snapshot-baseline
+      valkey.enabled: false
+      externalRedis.host: sentinel.example.com
+      externalRedis.password: snapshot-redis-pw
+      externalRedis.sentinelMasterSet: mymaster
+      externalRedis.tlsOptions.enable: true
+    asserts:
+      - matchSnapshot: {}
+
+  - it: 4. BYO secrets matrix — every existingSecret path
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      existingSecretAdminPassword: my-admin-secret
+      existingSecretSecretKey: my-encryption-secret
+      existingSecretSecretKeyKey: enc-key
+      core.existingSecret: my-core-secret
+      core.existingSecretKey: core-key
+      jobservice.existingSecret: my-jobservice-secret
+      jobservice.existingSecretKey: js-key
+      registry.existingSecret: my-registry-secret
+      registry.existingSecretKey: reg-key
+      database.existingSecret: my-database-secret
+      database.existingSecretKey: db-key
+      valkey.enabled: false
+      externalRedis.host: redis.example.com
+      externalRedis.existingSecret: my-redis-secret
+      externalRedis.existingSecretKey: redis-key
+    asserts:
+      - matchSnapshot: {}
+
+  - it: 5. trace (jaeger) + metrics + ServiceMonitor
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: changeme-snapshot-baseline
+      trace.enabled: true
+      trace.provider: jaeger
+      trace.sample_rate: 0.5
+      trace.namespace: harbor-traces
+      trace.jaeger.endpoint: http://jaeger-collector.observability:14268/api/traces
+      metrics.enabled: true
+      metrics.serviceMonitor.enabled: true
+      metrics.serviceMonitor.labels:
+        release: prometheus
+    asserts:
+      - matchSnapshot: {}
+
+  - it: 6. ingress with cert-manager + multiple hosts (including wildcard)
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: changeme-snapshot-baseline
+      ingress.enabled: true
+      ingress.autoGenCert: false  # autoGen produces non-deterministic certs; ingress.secret.yaml is covered by ingress_test.yaml
+      tls.certManager.enabled: true
+      tls.certManager.issuerRef:
+        name: letsencrypt-prod
+        kind: ClusterIssuer
+      ingress.hosts:
+        - host: harbor.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+        - host: notary.example.com
+          paths:
+            - path: /
+              pathType: Prefix
+        - host: "*.harbor.example.com"
+          paths:
+            - path: /
+              pathType: Prefix
+    asserts:
+      - matchSnapshot: {}

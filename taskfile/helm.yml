@@ -1,0 +1,437 @@
+# Helm Chart Quality Tasks
+# Linting, security scanning, and validation for CI/CD
+# ct, kube-linter, trivy run via Docker; kubescape uses local binary
+
+version: '3'
+
+vars:
+  CHART_DIR: deploy/chart
+  CHART_NAME: harbor-next
+
+  # Tool versions come from versions.env (single source of truth,
+  # loaded via the root Taskfile dotenv; CI installs the same pins).
+  # Minimum required values for schema validation
+  HELM_SET: >-
+    --set externalURL=https://harbor.example.com
+    --set database.host=db.example.com
+    --set harborAdminPassword=changeme123
+
+tasks:
+  # ============================================================================
+  # Individual Checks
+  # ============================================================================
+
+  helm-lint:
+    desc: "Lint chart with helm lint"
+    cmd: helm lint {{.CHART_DIR}} {{.HELM_SET}}
+
+  helm-template:
+    desc: "Render templates and check for errors"
+    cmd: helm template test {{.CHART_DIR}} {{.HELM_SET}} > /dev/null
+
+  # Tool tasks prefer a local binary and fall back to docker. CI runs on
+  # self-hosted runners with a REMOTE DinD daemon: `docker run -v $(pwd)`
+  # mounts a path on the DinD host, not the runner workspace, so bind
+  # mounts silently see nothing there. CI installs the binaries
+  # (chart-ci.yml); local dev works either way.
+  ct-lint:
+    desc: "Lint chart with chart-testing (ct)"
+    cmd: |
+      if command -v ct >/dev/null 2>&1; then
+        ct lint --charts {{.CHART_DIR}} --validate-maintainers=false
+      else
+        docker run --rm \
+          -v $(pwd):/workdir -w /workdir \
+          quay.io/helmpack/chart-testing:v{{.CT_VERSION}} \
+          ct lint --charts {{.CHART_DIR}} --validate-maintainers=false
+      fi
+
+  ah-lint:
+    desc: "Validate Artifact Hub annotations/metadata with the ah CLI"
+    cmd: |
+      if command -v ah >/dev/null 2>&1; then
+        ah lint --kind helm --path {{.CHART_DIR}}
+      else
+        docker run --rm \
+          -v $(pwd)/{{.CHART_DIR}}:/chart \
+          artifacthub/ah:v{{.AH_VERSION}} \
+          ah lint --kind helm --path /chart
+      fi
+
+  schema-check:
+    desc: "Validate values.schema.json itself (strict compile + values drift)"
+    deps: [_require-ys]
+    cmds:
+      # 1. ajv strict compile: catches invalid or typo'd JSON-Schema
+      #    keywords, which JSON Schema otherwise ignores SILENTLY
+      #    ("min" instead of "minimum" validates nothing). Union types
+      #    are legitimate draft-2020 and explicitly allowed.
+      - |
+        if command -v npx >/dev/null 2>&1; then
+          npx -y ajv-cli@{{.AJV_CLI_VERSION}} compile \
+            -s {{.CHART_DIR}}/values.schema.json --spec=draft2020 \
+            --strict=true --allowUnionTypes=true
+        else
+          docker run --rm \
+            -v $(pwd)/{{.CHART_DIR}}:/chart -w /chart \
+            node:{{.NODE_IMAGE_VERSION}}-alpine \
+            npx -y ajv-cli@{{.AJV_CLI_VERSION}} compile \
+            -s values.schema.json --spec=draft2020 \
+            --strict=true --allowUnionTypes=true
+        fi
+      # 2. Two-way nested drift (tools/schema-drift.ys): values keys the
+      #    schema is silent about (no validation, no IDE completion; at
+      #    the closed root they break every render) and schema properties
+      #    with no values.yaml counterpart (advertised-but-dead).
+      #    helm lint covers type/enum errors wherever properties ARE
+      #    declared — this catches what it cannot see. Baseline file:
+      #    {{.CHART_DIR}}/.schema-drift-allow.
+      - cmd: cd {{.CHART_DIR}} && ys tools/schema-drift.ys values.yaml values.schema.json strict
+
+  values-lint:
+    desc: "Run the values doctor (tools/values-lint.ys) over every example and CI values file"
+    deps: [_require-ys]
+    cmds:
+      # ERROR findings (config that cannot render/work) fail the task;
+      # WARN findings (inline credentials, consistency advisories) are
+      # informational.
+      - for:
+          - example/aws-eks-irsa/values-aws-irsa.yaml
+          - example/k3d-local/values.yaml
+          - example/openshift/values.yaml
+          - example/private-ca/values.yaml
+          - example/rke2-rancher/values.yaml
+          - ci/default-values.yaml
+          - ci/expose-values.yaml
+          - ci/gitops-values.yaml
+        cmd: cd {{.CHART_DIR}} && ys tools/values-lint.ys {{.ITEM}}
+
+  values-lint:test:
+    desc: "Golden tests for tools/values-lint.ys"
+    deps: [_require-ys]
+    dir: deploy/chart
+    cmds:
+      - ys tools/values-lint.ys tests/lint/values-clean.yaml 2> tests/lint/.report-clean.gen.txt
+      - cmd: ys tools/values-lint.ys tests/lint/values-tripwire.yaml 2> tests/lint/.report-tripwire.gen.txt
+        ignore_error: true
+      - defer: rm -f tests/lint/.report-*.gen.txt
+      - diff -u tests/lint/report-clean.txt tests/lint/.report-clean.gen.txt
+      - diff -u tests/lint/report-tripwire.txt tests/lint/.report-tripwire.gen.txt
+      # the tripwire fixture must exit non-zero (it contains ERROR findings)
+      - cmd: ys tools/values-lint.ys tests/lint/values-tripwire.yaml > /dev/null 2>&1 && exit 1 || echo "tripwire fixture correctly exits non-zero"
+      - echo "values-lint golden tests PASS"
+
+  rendered-config:
+    desc: "Semantic checks on the registry/jobservice config.yml the chart renders"
+    deps: [_require-ys]
+    cmds:
+      # helm unittest asserts the ConfigMap strings; this parses the
+      # embedded YAML and checks boot-blocking invariants (exactly one
+      # storage driver, sane jobservice worker pool / loggers / metric
+      # port) for the default render and every example/CI values file.
+      - defer: rm -f {{.CHART_DIR}}/.rendered-config.yaml
+      - cmd: helm template test {{.CHART_DIR}} {{.HELM_SET}} > {{.CHART_DIR}}/.rendered-config.yaml && cd {{.CHART_DIR}} && ys tools/rendered-config-check.ys .rendered-config.yaml
+      - for:
+          - example/aws-eks-irsa/values-aws-irsa.yaml
+          - example/k3d-local/values.yaml
+          - example/openshift/values.yaml
+          - example/private-ca/values.yaml
+          - example/rke2-rancher/values.yaml
+          - ci/default-values.yaml
+          - ci/expose-values.yaml
+          - ci/gitops-values.yaml
+        cmd: helm template harbor {{.CHART_DIR}} -f {{.CHART_DIR}}/{{.ITEM}} > {{.CHART_DIR}}/.rendered-config.yaml && cd {{.CHART_DIR}} && ys tools/rendered-config-check.ys .rendered-config.yaml
+
+  kube-linter:
+    desc: "Lint rendered manifests with kube-linter"
+    cmds:
+      # Deliberately docker-only (unlike the other tool tasks): stdin
+      # piping works even against a remote DinD daemon, and a local
+      # binary of a different version would apply a different check set.
+      - >-
+        helm template test {{.CHART_DIR}} {{.HELM_SET}}
+        | docker run --rm -i
+        stackrox/kube-linter:v{{.KUBE_LINTER_VERSION}}
+        lint --format=plain -
+
+  trivy-chart:
+    desc: "Scan chart for misconfigurations with Trivy"
+    cmds:
+      - >-
+        helm template test {{.CHART_DIR}} {{.HELM_SET}}
+        > {{.CHART_DIR}}/.trivy-manifests.yaml
+      - defer: rm -f {{.CHART_DIR}}/.trivy-manifests.yaml
+      - |
+        if command -v trivy >/dev/null 2>&1; then
+          trivy config {{.CHART_DIR}}/.trivy-manifests.yaml \
+            --ignorefile {{.CHART_DIR}}/.trivyignore \
+            --severity HIGH,CRITICAL --exit-code 1
+        else
+          docker run --rm \
+            -v $(pwd)/{{.CHART_DIR}}:/chart \
+            aquasec/trivy:{{.TRIVY_VERSION}} \
+            config /chart/.trivy-manifests.yaml \
+            --ignorefile /chart/.trivyignore \
+            --severity HIGH,CRITICAL --exit-code 1
+        fi
+
+  trivy-chart:report:
+    desc: "Scan chart with Trivy and output SARIF report"
+    cmds:
+      - >-
+        helm template test {{.CHART_DIR}} {{.HELM_SET}}
+        > {{.CHART_DIR}}/.trivy-manifests.yaml
+      - defer: rm -f {{.CHART_DIR}}/.trivy-manifests.yaml
+      - |
+        if command -v trivy >/dev/null 2>&1; then
+          trivy config {{.CHART_DIR}}/.trivy-manifests.yaml \
+            --ignorefile {{.CHART_DIR}}/.trivyignore \
+            --severity HIGH,CRITICAL --format sarif --output trivy-chart.sarif
+        else
+          docker run --rm \
+            -v $(pwd)/{{.CHART_DIR}}:/chart \
+            -v $(pwd):/out \
+            aquasec/trivy:{{.TRIVY_VERSION}} \
+            config /chart/.trivy-manifests.yaml \
+            --ignorefile /chart/.trivyignore \
+            --severity HIGH,CRITICAL --format sarif --output /out/trivy-chart.sarif
+        fi
+
+  _require-kubescape:
+    internal: true
+    run: once
+    preconditions:
+      - sh: command -v kubescape
+        msg: "kubescape not found. Install: brew install kubescape"
+
+  kubescape:
+    desc: "Scan rendered manifests with Kubescape (NSA + MITRE frameworks)"
+    deps: [_require-kubescape]
+    cmd: >-
+      helm template test {{.CHART_DIR}} {{.HELM_SET}}
+      | kubescape scan framework nsa,mitre -
+      --compliance-threshold 0
+
+  kubescape:report:
+    desc: "Scan with Kubescape and output SARIF report"
+    deps: [_require-kubescape]
+    cmd: >-
+      helm template test {{.CHART_DIR}} {{.HELM_SET}}
+      | kubescape scan framework nsa,mitre -
+      --format sarif
+      --output kubescape.sarif
+
+  unittest:
+    desc: "Run helm unittest"
+    cmd: helm unittest {{.CHART_DIR}}
+
+  examples:
+    desc: "Render every example values file standalone"
+    vars:
+      # One directory per example; any values*.yaml inside is a render
+      # scenario. New example dirs are picked up automatically.
+      EXAMPLE_VALUES:
+        sh: find {{.CHART_DIR}}/example -mindepth 2 -maxdepth 2 -name 'values*.yaml' | sort
+    cmds:
+      - for: { var: EXAMPLE_VALUES }
+        cmd: helm template harbor {{.CHART_DIR}} -f {{.ITEM}} > /dev/null && echo "{{.ITEM}} OK"
+
+  gitops-determinism:
+    desc: "Render GitOps values twice and require byte-identical output"
+    cmds:
+      # Two client-side renders must match exactly — this is what Argo CD
+      # does on every sync. Any diff means generated secret material
+      # leaked past the autoGenSecrets pinning surface.
+      - helm template harbor {{.CHART_DIR}} --namespace harbor -f {{.CHART_DIR}}/ci/gitops-values.yaml > /tmp/gitops-render-1.yaml
+      - helm template harbor {{.CHART_DIR}} --namespace harbor -f {{.CHART_DIR}}/ci/gitops-values.yaml > /tmp/gitops-render-2.yaml
+      - defer: rm -f /tmp/gitops-render-1.yaml /tmp/gitops-render-2.yaml
+      - diff -u /tmp/gitops-render-1.yaml /tmp/gitops-render-2.yaml || (echo "Chart rendering is not deterministic — GitOps engines would see perpetual drift." && exit 1)
+
+  helm-docs:
+    desc: "Check that chart README is up-to-date with helm-docs"
+    preconditions:
+      - sh: command -v helm-docs
+        msg: |
+          helm-docs not found. Install:
+            macOS:  brew install norwoodj/tap/helm-docs
+            Linux:  go install github.com/norwoodj/helm-docs/cmd/helm-docs@latest
+    cmds:
+      # --chart-to-generate isolates the harbor-next chart so helm-docs
+      # doesn't also process the extracted valkey subchart in charts/.
+      - helm-docs --chart-search-root={{.CHART_DIR}} --chart-to-generate={{.CHART_DIR}} --dry-run > /tmp/helm-docs-expected.md
+      - defer: rm -f /tmp/helm-docs-expected.md /tmp/helm-docs-actual.md
+      - grep -v 'kroki\.io/svgbob' {{.CHART_DIR}}/README.md > /tmp/helm-docs-actual.md
+      - diff -q /tmp/helm-docs-expected.md /tmp/helm-docs-actual.md || (echo "README.md is out of date. Run{{":"}} task helm:docs" && exit 1)
+
+  # ============================================================================
+  # Development (inner loop)
+  # ============================================================================
+
+  _require-helm-docs:
+    internal: true
+    run: once
+    preconditions:
+      - sh: command -v helm-docs
+        msg: |
+          helm-docs not found. Install:
+            macOS:  brew install norwoodj/tap/helm-docs
+            Linux:  go install github.com/norwoodj/helm-docs/cmd/helm-docs@latest
+
+  docs:
+    desc: "Generate chart README.md from values.yaml + README.md.gotmpl"
+    deps: [_require-helm-docs]
+    cmds:
+      # --chart-to-generate isolates the harbor-next chart so helm-docs
+      # doesn't also process the extracted valkey subchart in charts/.
+      - helm-docs --chart-search-root={{.CHART_DIR}} --chart-to-generate={{.CHART_DIR}}
+    sources:
+      - '{{.CHART_DIR}}/Chart.yaml'
+      - '{{.CHART_DIR}}/values.yaml'
+      - '{{.CHART_DIR}}/README.md.gotmpl'
+    generates:
+      - '{{.CHART_DIR}}/README.md'
+
+  unittest:update:
+    desc: "Run helm unittest and update snapshots"
+    cmd: helm unittest {{.CHART_DIR}} --update-snapshot
+
+  validate:
+    desc: "Validate rendered templates against the Kubernetes API (client dry-run)"
+    cmd: helm template test {{.CHART_DIR}} {{.HELM_SET}} | kubectl apply --dry-run=client -f -
+
+  deps:
+    desc: "Update chart dependencies"
+    cmd: helm dependency update {{.CHART_DIR}}
+
+  deps:build:
+    desc: "Build chart dependencies"
+    cmd: helm dependency build {{.CHART_DIR}}
+
+  package:
+    desc: "Package the chart (release pipeline overrides --version/--app-version)"
+    deps: [helm-lint]
+    cmd: helm package {{.CHART_DIR}}
+
+  install:
+    desc: "Install chart to current cluster (requires VALUES_FILE)"
+    requires:
+      vars: [VALUES_FILE]
+    cmd: helm install {{.CHART_NAME}} {{.CHART_DIR}} -f {{.VALUES_FILE}}
+
+  install:dry-run:
+    desc: "Dry-run install to current cluster (requires VALUES_FILE)"
+    requires:
+      vars: [VALUES_FILE]
+    cmd: helm install {{.CHART_NAME}} {{.CHART_DIR}} -f {{.VALUES_FILE}} --dry-run
+
+  upgrade:
+    desc: "Upgrade chart in current cluster (requires VALUES_FILE)"
+    requires:
+      vars: [VALUES_FILE]
+    cmd: helm upgrade {{.CHART_NAME}} {{.CHART_DIR}} -f {{.VALUES_FILE}}
+
+  uninstall:
+    desc: "Uninstall chart from current cluster"
+    cmd: helm uninstall {{.CHART_NAME}}
+
+  # ============================================================================
+  # Migration (goharbor/harbor-helm -> this chart)
+  # ============================================================================
+
+  _require-ys:
+    internal: true
+    run: once
+    preconditions:
+      - sh: command -v ys
+        msg: |
+          ys (YAMLScript) not found. Install:
+            macOS:  brew install yamlscript
+            other:  curl -s https://yamlscript.org/install | bash
+          (https://yamlscript.org)
+
+  migrate:
+    desc: 'Translate a goharbor/harbor-helm values file (usage: task helm:migrate -- old-values.yaml [new-values.yaml])'
+    deps: [_require-ys]
+    cmd: ys {{.CHART_DIR}}/tools/harbor-migrate.ys {{.CLI_ARGS}}
+
+  migrate:test:
+    desc: "Golden tests for tools/harbor-migrate.ys, then helm-template the results"
+    deps: [_require-ys]
+    # Chart-relative cwd: the generated reports embed the input path, so
+    # the golden files only match when run from the chart directory.
+    dir: deploy/chart
+    cmds:
+      - for: ['', '-dedicated']
+        cmd: ys tools/harbor-migrate.ys tests/migrate/values{{.ITEM}}-2x.yaml > tests/migrate/.values{{.ITEM}}-next.gen.yaml 2> tests/migrate/.report{{.ITEM}}.gen.txt
+      - defer: rm -f tests/migrate/.*.gen.*
+      - for: ['', '-dedicated']
+        cmd: diff -u tests/migrate/values{{.ITEM}}-next.yaml tests/migrate/.values{{.ITEM}}-next.gen.yaml
+      - for: ['', '-dedicated']
+        cmd: diff -u tests/migrate/report{{.ITEM}}.txt tests/migrate/.report{{.ITEM}}.gen.txt
+      - for: ['', '-dedicated']
+        cmd: helm template migrate-test . -f tests/migrate/.values{{.ITEM}}-next.gen.yaml > /dev/null
+      - echo "migration golden tests PASS"
+
+  migrate:update:
+    desc: "Regenerate the migration golden files from the current script"
+    deps: [_require-ys]
+    dir: deploy/chart
+    cmds:
+      - for: ['', '-dedicated']
+        cmd: ys tools/harbor-migrate.ys tests/migrate/values{{.ITEM}}-2x.yaml > tests/migrate/values{{.ITEM}}-next.yaml 2> tests/migrate/report{{.ITEM}}.txt
+
+  # ============================================================================
+  # Aggregate Tasks
+  # ============================================================================
+
+  lint:
+    desc: "Run all linters (helm lint, ct lint, kube-linter, ah lint, schema check)"
+    cmds:
+      - task: helm-lint
+      - task: ct-lint
+      - task: kube-linter
+      - task: ah-lint
+      - task: schema-check
+
+  security:
+    desc: "Run all security scanners (Trivy, Kubescape)"
+    cmds:
+      - task: trivy-chart
+      - task: kubescape
+
+  ci:
+    desc: "Full CI quality gate (lint + security + unittest)"
+    cmds:
+      - task: helm-lint
+      - task: helm-template
+      - task: ct-lint
+      - task: kube-linter
+      - task: unittest
+      - task: gitops-determinism
+      - task: examples
+      - task: ah-lint
+      - task: schema-check
+      - task: migrate:test
+      - task: trivy-chart
+      - task: kubescape
+
+  ci:report:
+    desc: "CI with SARIF reports for GitHub/GitLab integration"
+    cmds:
+      - task: helm-lint
+      - task: helm-template
+      - task: ct-lint
+      - task: kube-linter
+      - task: unittest
+      - task: gitops-determinism
+      - task: ah-lint
+      - task: schema-check
+      - task: migrate:test
+      - task: trivy-chart:report
+      - task: kubescape:report
+
+  clean:
+    desc: "Remove generated reports and packaged charts"
+    cmds:
+      - rm -f trivy-chart.sarif kubescape.sarif
+      - rm -f ./*.tgz {{.CHART_DIR}}/*.tgz

@@ -1,0 +1,20 @@
+# Docker Compose deployment checks
+version: '3'
+
+tasks:
+  _require-ys:
+    internal: true
+    preconditions:
+      - sh: command -v ys
+        msg: |
+          ys (YAMLScript) not found. Install:
+            macOS:  brew install yamlscript
+            other:  curl -s https://yamlscript.org/install | bash
+          (https://yamlscript.org)
+
+  check-env:
+    desc: "Drift check: docker-compose.yaml ${VAR} references vs .env.example docs"
+    deps: [_require-ys]
+    dir: deploy/compose
+    cmds:
+      - ys check-env.ys

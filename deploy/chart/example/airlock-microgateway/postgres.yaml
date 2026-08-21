@@ -1,0 +1,53 @@
+# Throwaway PostgreSQL for the example. NOT for production - use a managed DB or
+# CloudNativePG (see docs/guide/k3s.md) for anything real.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+  namespace: harbor
+stringData:
+  POSTGRES_PASSWORD: harbordbpass
+  POSTGRES_USER: postgres
+  POSTGRES_DB: registry
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: harbor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          envFrom:
+            - secretRef:
+                name: postgres-secret
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: harbor
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432

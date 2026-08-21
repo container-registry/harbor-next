@@ -24,8 +24,8 @@ flowchart LR
   harborMain["container-registry/harbor-next\nharbor-next/main"]
   harborRelease["container-registry/harbor-next\nharbor-next/release-X.Y"]
   harborTag["container-registry/harbor-next\nvX.Y.Z tag + GitHub Release"]
-  gcrMain["container-registry/8gcr\n8gcr/main"]
-  gcrPatches["container-registry/8gcr\ncommercial patches"]
+  patchManifest["harbor-next branch\ntaskfile/commercial-patches"]
+  gcrPatches["container-registry/8gcr\ndeclared patch branches"]
   images["8gears.container-registry.com/8gcr\nrelease images"]
 
   upstream -->|selected fixes as upstream: commits| harborMain
@@ -33,8 +33,8 @@ flowchart LR
   harborTag -->|new vX.Y.0 creates| harborRelease
   harborMain -->|/backport vX.Y| harborRelease
   harborRelease -->|maintenance release-please PR merged| harborTag
-  harborMain -->|upstream-sync dispatch| gcrMain
-  gcrMain --> gcrPatches
+  harborMain -->|owns ordered patch list| patchManifest
+  patchManifest -->|selects exact branches| gcrPatches
   harborTag -->|release workflow source| images
   gcrPatches -->|applied at release runtime| images
 ```
@@ -44,7 +44,8 @@ Rules:
 - `upstream/main` is the upstream Harbor source.
 - `harbor-next/main` is active Harbor Next development.
 - `harbor-next/release-X.Y` is a maintenance branch for patch releases.
-- `8gcr/main` provides the commercial patch series used at release runtime.
+- Each Harbor Next branch owns its ordered commercial patch list in `taskfile/commercial-patches`.
+- The release fetches only those named branches from `8gcr`; it never reads or imports `8gcr/main`.
 - Release images are built by checking out the Harbor Next release source, applying 8gcr patches during the workflow run, and building images from that patched working tree.
 
 ## Branch Movement
@@ -93,7 +94,7 @@ sequenceDiagram
   Maintainer->>GitHub: Squash-merge release PR
   GitHub->>Actions: Push starts Release Please workflow again
   RP->>GitHub: Create vX.Y.Z tag and GitHub Release
-  Actions->>GCR: Clone 8gcr patch series
+  Actions->>GCR: Fetch Harbor-declared patch branches
   Actions->>Actions: Apply patches to Harbor Next release source
   Actions->>Registry: Build and push release images
   Actions->>Cosign: Sign release images
@@ -131,6 +132,7 @@ Release-please ignores changes that only touch:
 - `.github/`
 - `docs/`
 - `tests/`
+- `taskfile/`
 
 Use `ci:` for workflow-only changes.
 
@@ -198,7 +200,9 @@ Each release publishes `linux/amd64` and `linux/arm64` images:
 
 Default registry path: `8gears.container-registry.com/8gcr`.
 
-At release runtime, the workflow clones `container-registry/8gcr`, reads the patch list from `8gcr-ee/patches/series`, applies those patches on top of the checked-out Harbor Next release source, and builds the images. Those images contain the commercial features from the patch series.
+At release runtime, the workflow reads `taskfile/commercial-patches` from the checked-out Harbor Next branch, fetches only those branches from `container-registry/8gcr`, applies their declared commit deltas, and builds the images. The workflow never fetches `8gcr/main` or an 8gcr-owned series file.
+
+Use `task apply-patches` to apply that manifest to a clean checkout and `task release-ready` to validate it against a disposable clean clone. For a local unsigned build and push to the PR registry project (`8gcr-pr` by default), authenticate the container engine and run `task release-images-local RELEASE_VERSION=X.Y.Z IMAGE_TAG=<tag>`; the local task verifies both published architectures after pushing. Main and maintenance-release workflows publish to `8gcr`.
 
 ## Release Notes
 

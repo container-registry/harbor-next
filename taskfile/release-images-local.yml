@@ -1,0 +1,39 @@
+version: '3'
+
+vars:
+  PATCHES_CLONE_URL: '{{.PATCHES_CLONE_URL | default "git@github.com:container-registry/8gcr.git"}}'
+  LOCAL_REGISTRY_ADDRESS: '{{.LOCAL_REGISTRY_ADDRESS | default "8gears.container-registry.com"}}'
+  LOCAL_REGISTRY_PROJECT: '{{.LOCAL_REGISTRY_PROJECT | default "8gcr-pr"}}'
+  LOCAL_PLATFORMS: '{{.LOCAL_PLATFORMS | default "linux/amd64,linux/arm64"}}'
+
+tasks:
+  run:
+    desc: "Build and push unsigned local release images, then verify both architectures"
+    requires:
+      vars: [RELEASE_VERSION, IMAGE_TAG]
+    preconditions:
+      - sh: command -v task >/dev/null 2>&1
+        msg: "Task is required"
+      - sh: command -v jj >/dev/null 2>&1
+        msg: "jj (Jujutsu) is required"
+      - sh: command -v skopeo >/dev/null 2>&1
+        msg: "skopeo is required for final manifest verification"
+      - sh: command -v jq >/dev/null 2>&1
+        msg: "jq is required for final manifest verification"
+    cmds:
+      - task apply-patches PATCHES_CLONE_URL="{{.PATCHES_CLONE_URL}}"
+      # Start a new Task process after patching so patch-provided image tasks
+      # (such as commercial scanner images) are loaded from the patched tree.
+      - >-
+        task image:all-images
+        RELEASE_VERSION="{{.RELEASE_VERSION}}"
+        IMAGE_TAG="{{.IMAGE_TAG}}"
+        REGISTRY_ADDRESS="{{.LOCAL_REGISTRY_ADDRESS}}"
+        REGISTRY_PROJECT="{{.LOCAL_REGISTRY_PROJECT}}"
+        PLATFORMS="{{.LOCAL_PLATFORMS}}"
+        PUSH=true
+      - >-
+        task image:verify-release-images
+        IMAGE_TAG="{{.IMAGE_TAG}}"
+        REGISTRY_ADDRESS="{{.LOCAL_REGISTRY_ADDRESS}}"
+        REGISTRY_PROJECT="{{.LOCAL_REGISTRY_PROJECT}}"

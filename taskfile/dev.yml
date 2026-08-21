@@ -40,10 +40,12 @@ vars:
 env:
   COMPOSE_PROJECT_NAME:   '{{.PROJECT_PREFIX}}'
   PROJECT_PREFIX:         '{{.PROJECT_PREFIX}}'
+  # Empty when Go is absent (e.g. chart-only CI runners) — included
+  # taskfiles' env is evaluated eagerly for EVERY task invocation.
   HOST_GOMODCACHE:
-    sh: go env GOMODCACHE
+    sh: go env GOMODCACHE 2>/dev/null || true
   HOST_GOCACHE:
-    sh: go env GOCACHE
+    sh: go env GOCACHE 2>/dev/null || true
   PORT_CORE:              '{{.PORT_CORE}}'
   PORT_PORTAL:            '{{.PORT_PORTAL}}'
   PORT_POSTGRES:          '{{.PORT_POSTGRES}}'

@@ -1,0 +1,291 @@
+#!/usr/bin/env ys-0
+
+# schema-drift.ys — two-way nested key drift between values.yaml and the
+# hand-maintained values.schema.json.
+#
+# Usage (from the chart directory):
+#   ys tools/schema-drift.ys [values.yaml] [values.schema.json] [strict]
+#
+# Detects exactly the class of drift nothing else covers:
+#   - undocumented-key: a values.yaml path the schema is silent about
+#     (helm lint passes it through unvalidated, IDEs get no completion)
+#   - unknown-key: a values.yaml path a CLOSED schema object rejects
+#     (additionalProperties: false -> install-time failure)
+#   - stale-property: a schema property with no values.yaml counterpart
+#     (advertised-but-dead documentation surface)
+#
+# Deliberately out of scope: type/enum/pattern checks — helm lint already
+# validates values against the schema wherever properties ARE declared,
+# and `ajv compile --strict` (the other half of task helm:schema-check)
+# lints the schema file itself.
+#
+# Exit 1 on any non-baselined ERROR; pass `strict` to also fail on WARN.
+# Baseline file: .schema-drift-allow (one finding ID per line, comments
+# with #). Finding IDs are printed in the report.
+#
+# NOTE for maintainers: YS dot access (m.key) returns nil for a stored
+# boolean false — schema reads like additionalProperties MUST use get.
+
+findings =: atom([])
+skipped =: atom([])
+applied =: atom({})
+stale-cands =: atom([])
+
+# values subtrees that are open by design but not marked so in the schema
+# (valkey is a subchart boundary — upstream accepts dozens of keys the
+# schema deliberately does not document)
+open-by-config =: vector('.valkey')
+
+# stale-property origin PREFIXES that are intentional documentation of
+# optional / mutually-exclusive keys (commented out in values.yaml by
+# design, or partial views of full Kubernetes specs offered for IDE
+# completion)
+stale-exempt =:
+  vector('#/$defs/pdb/properties/minAvailable'
+         '#/$defs/pdb/properties/maxUnavailable'
+         '#/$defs/persistence/properties/storageClass'
+         '#/$defs/securityContext'
+         '#/$defs/podSecurityContext'
+         '#/$defs/harborComponent/properties/priorityClassName'
+         '#/$defs/harborComponent/properties/revisionHistoryLimit'
+         '#/$defs/harborComponent/properties/autoscaling/properties/maxReplicas'
+         '#/$defs/harborComponent/properties/autoscaling/properties/targetMemoryUtilizationPercentage'
+         '#/$defs/harborComponent/properties/autoscaling/properties/metrics'
+         '#/$defs/harborComponent/properties/autoscaling/properties/behavior')
+
+defn exempt?(origin):
+  n =: stale-exempt.filter(\(str/starts-with? origin %1)).count()
+  =>: n > 0
+
+defn add-finding(sev kind path detail):
+  swap! findings conj::
+    sev:: sev
+    kind:: kind
+    path:: path
+    detail:: detail
+    id:: str(kind ':' path)
+
+defn present?(v):
+  cond:
+    v.nil?(): false
+    v == '': false
+    (coll? v): not(empty?(v))
+    else: true
+
+defn in?(coll x):
+  n =: coll.filter(\(%1 == x)).count()
+  =>: n > 0
+
+#------------------------------------------------------------------------------
+# Schema node resolution: constituents + effective view
+#------------------------------------------------------------------------------
+
+defn deref-name(ref):
+  str/replace(ref '#/$defs/' '')
+
+# Flatten a schema node into its constituent plain maps, tagging each with
+# the JSON-pointer-ish source it came from ($ref targets keep their own
+# pointer so per-definition stale aggregation works).
+defn constituents(node src root seen):
+  base =: node.dissoc('$ref' 'allOf')
+  out0 =: vector(hash-map('n' base 'src' src))
+  ref =: get(node '$ref')
+  out1 =:
+    if present?(ref) && (not (in? seen ref)):
+      then:
+        target =: get-in(root vector('$defs' deref-name(ref)))
+        =>: concat(out0 constituents(target ref root seen.conj(ref))).vec()
+      else: out0
+  branches =: get(node 'allOf') || []
+  =>: reduce(\(concat(%1 (constituents %2 src root seen)).vec()) out1 branches)
+
+# props: key -> {sub, src} from declared properties (first declaration wins,
+# inline before $ref). alt: same shape from anyOf/oneOf branches — accepted
+# for key lookup, excluded from stale enumeration.
+defn add-prop-entry(a k ps src):
+  if contains?(a k):
+    then: a
+    else:
+      entry =: hash-map('sub' get(ps k) 'src' str(src '/properties/' k))
+      =>: a.assoc(k entry)
+
+defn add-constituent-props(acc c):
+  n =: get(c 'n')
+  src =: get(c 'src')
+  ps =: get(n 'properties') || hash-map()
+  =>: reduce(\(add-prop-entry %1 %2 ps src) acc ps.keys().sort())
+
+defn collect-props(cs root):
+  reduce(add-constituent-props hash-map() cs)
+
+defn alt-of-constituent(acc c root):
+  n =: get(c 'n')
+  src =: get(c 'src')
+  any-b =: get(n 'anyOf') || []
+  one-b =: get(n 'oneOf') || []
+  branches =: concat(any-b one-b).vec()
+  =>: reduce(\(concat(%1 (constituents %2 src root [])).vec()) acc branches)
+
+defn alt-branch-nodes(cs root):
+  reduce(\(alt-of-constituent %1 %2 root) [] cs)
+
+defn view-of(node src root):
+  cs =: constituents(node src root [])
+  alt-cs =: alt-branch-nodes(cs root)
+  aps =: cs.map(\(get (get %1 'n') 'additionalProperties')).vec()
+  =>::
+    props:: collect-props(cs root)
+    alt-props:: collect-props(alt-cs root)
+    closed:: in?(aps false)
+    open:: in?(aps true)
+    ap-schema:: aps.filter(\(map? %1)).first()
+    srcs:: cs.map(\(get %1 'src')).distinct().vec()
+    items:: cs.map(\(get (get %1 'n') 'items')).filter(some?).first()
+
+#------------------------------------------------------------------------------
+# Walk
+#------------------------------------------------------------------------------
+
+defn record-skip(path why):
+  swap! skipped conj: str(path '  (' why ')')
+
+defn record-applied(srcs path):
+  each src srcs:
+    when str/starts-with?(src '#/'):
+      swap! applied update src: \(conj (or %1 []) path)
+
+defn check-array(path v view root):
+  items =: get(view 'items')
+  when present?(items) && (sequential? v):
+    pairs =: map-indexed(\(vector %1 %2) v).vec()
+    each pair pairs:
+      i =: pair.first()
+      elem =: pair.second()
+      when map?(elem):
+        check-node(str(path '[' i ']') elem items str(path '/items') root)
+
+defn check-key(path k vk entry view root):
+  cond:
+    some?(entry):
+      sub =: get(entry 'sub')
+      src =: get(entry 'src')
+      cond:
+        (map? vk): check-node(str(path '.' k) vk sub src root)
+        (sequential? vk): check-array(str(path '.' k) vk view-of(sub src root) root)
+        else: nil
+    get(view 'closed'):
+      add-finding 'ERROR' 'unknown-key' str(path '.' k):
+        'rejected at install time — the schema object is additionalProperties:false'
+    some?(get(view 'ap-schema')): nil
+    get(view 'open'): nil
+    else:
+      add-finding 'WARN' 'undocumented-key' str(path '.' k):
+        'present in values.yaml but not declared by the schema — no validation, no IDE completion'
+
+defn walk-keys(path v view props alt src root):
+  when-not empty?(v):
+    record-applied get(view 'srcs'): path
+  each k v.keys().sort():
+    vk =: get(v k)
+    entry =: get(props k) || get(alt k)
+    check-key path k vk entry view: root
+  when-not empty?(v):
+    each k props.keys().sort():
+      entry =: get(props k)
+      origin =: get(entry 'src')
+      absent =: not(contains?(v k))
+      allowed =: exempt?(origin)
+      when absent && (not allowed):
+        parent =: get(view 'srcs').filter(\(str/starts-with? origin %1)).first() || src
+        swap! stale-cands conj::
+          origin:: origin
+          parent:: parent
+          path:: path
+          key:: k
+
+defn check-node(path v node src root):
+  when map?(v):
+    view =: view-of(node src root)
+    props =: get(view 'props')
+    alt =: get(view 'alt-props')
+    closed =: get(view 'closed')
+    open-obj =: (empty? props) && (empty? alt) && (closed != true)
+    cond:
+      in?(open-by-config path):
+        record-skip path: 'open by config — subchart boundary'
+      open-obj:
+        record-skip path: 'open object — no declared properties'
+      else:
+        walk-keys(path v view props alt src root)
+
+defn finalize-stale():
+  apps =: applied.deref()
+  groups =: group-by(\(get %1 'origin') stale-cands.deref())
+  each origin groups.keys().sort():
+    cands =: get(groups origin)
+    parent =: get(cands.first() 'parent')
+    insts =: get(apps parent) || []
+    total =: insts.distinct().count()
+    n =: cands.map(\(get %1 'path')).distinct().count()
+    when (total > 0) && (n >= total):
+      paths =: cands.map(\(get %1 'path')).distinct().sort().vec()
+      plist =: str/join(' ' paths)
+      add-finding 'WARN' 'stale-property' origin:
+        "declared in the schema, absent in values.yaml at: $plist"
+
+#------------------------------------------------------------------------------
+# Baseline + report
+#------------------------------------------------------------------------------
+
+defn load-baseline(file):
+  text =: file:read
+  lines =: text.str/split-lines()
+  =>: lines.map(\(first (str/split %1 /\s*#/))).map(str/trim).filter(present?).vec()
+
+defn print-findings(fs sev label):
+  group =: fs.filter(\(get(%1 'sev') == sev)).vec()
+  when present?(group):
+    cnt =: group.count()
+    warn: ''
+    warn: "$label ($cnt)"
+    each f group:
+      kind =: get(f 'kind')
+      path =: get(f 'path')
+      detail =: get(f 'detail')
+      warn: "  * [$kind] $path"
+      warn: "      $detail"
+
+defn main(values-file='values.yaml' schema-file='values.schema.json' mode=''):
+  vals =: values-file:read:yaml/load
+  schema =: schema-file:read:yaml/load
+  baseline =: load-baseline('.schema-drift-allow')
+
+  check-node '' vals schema '#': schema
+  finalize-stale:
+
+  all =: findings.deref()
+  kept =: all.filter(\(not (in? baseline (get %1 'id')))).vec()
+  n-baselined =: all.count() - kept.count()
+
+  warn: '============================================================'
+  warn: "  schema drift: $values-file <-> $schema-file"
+  warn: '============================================================'
+  print-findings kept 'ERROR': 'ERROR — schema rejects these values at install time'
+  print-findings kept 'WARN': 'WARN — schema/values drift'
+  sk =: skipped.deref().distinct().sort().vec()
+  when present?(sk):
+    cnt =: sk.count()
+    warn: ''
+    warn: "INFO — $cnt open-by-design subtrees not key-checked:"
+    each s sk:
+      warn: "  . $s"
+
+  errors =: kept.filter(\(get(%1 'sev') == 'ERROR')).count()
+  warns =: kept.filter(\(get(%1 'sev') == 'WARN')).count()
+  warn: ''
+  warn: "$errors error(s), $warns warning(s), $n-baselined baselined."
+  cond:
+    errors > 0: exit(1)
+    (mode == 'strict') && (warns > 0): exit(1)
+    else:
+      warn: 'schema and values.yaml are in sync.'

@@ -12,13 +12,16 @@ dotenv:
 vars:
   GIT_COMMIT:
     sh: git rev-parse --short=8 HEAD || echo "unknown"
-  VERSION:
+  DEFAULT_VERSION:
     sh: cat VERSION 2>/dev/null | tr -d '\n' || echo "dev"
+  VERSION: '{{.RELEASE_VERSION | default .DEFAULT_VERSION}}'
   TIMESTAMP:
     sh: date -u +%Y%m%d%H%M%S
 
   GOPATH_BIN:
-    sh: echo "${GOBIN:-$(go env GOPATH)/bin}"
+    # Falls back when Go is absent (e.g. chart-only CI runners) — global
+    # vars are evaluated eagerly for EVERY task invocation.
+    sh: command -v go >/dev/null 2>&1 && echo "${GOBIN:-$(go env GOPATH)/bin}" || echo "${GOBIN:-$HOME/go/bin}"
   GOBUILD_FLAGS: "-buildvcs=false -trimpath"
   DISTRIBUTION_SRC: "https://github.com/distribution/distribution.git"
   NPM_REGISTRY: "https://registry.npmjs.org/"
@@ -54,8 +57,15 @@ includes:
     aliases: [d]
   docs:
     taskfile: ./taskfile/docs.yml
+  helm:
+    taskfile: ./taskfile/helm.yml
+    aliases: [h]
+  compose:
+    taskfile: ./taskfile/compose.yml
   release-ready:
     taskfile: ./taskfile/release-ready.yml
+  release-images-local:
+    taskfile: ./taskfile/release-images-local.yml
   release-notes:
     taskfile: ./taskfile/release-notes.yml
 
@@ -112,6 +122,16 @@ tasks:
     desc: "Verify release patches apply cleanly"
     cmds:
       - task: release-ready:check
+
+  apply-patches:
+    desc: "Apply the commercial patches declared by this Harbor branch"
+    cmds:
+      - task: release-ready:apply-patches
+
+  release-images-local:
+    desc: "Apply commercial patches, build multi-arch images, push them, and verify the manifests"
+    cmds:
+      - task: release-images-local:run
 
   release-notes:
     desc: "Recreate a GitHub release's notes from its tagged changelog"

@@ -112,11 +112,37 @@ jobs:
       pull-requests: write
     uses: ./.github/workflows/release-notes-engine.yml
     with:
-      tag_name: v${{ needs.release-please.outputs.version }}
       checkout_ref: ${{ fromJSON(needs.release-please.outputs.prs)[0].headBranchName }}
       preview_pr_number: ${{ fromJSON(needs.release-please.outputs.prs)[0].number }}
     secrets:
       SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+
+  release-please-chart:
+    name: Release Please (chart)
+    # Independent release line for the Helm chart, scoped to deploy/chart
+    # via its own config + manifest. Kept as a SEPARATE release-please
+    # instance (not a second package in the app manifest) on purpose:
+    # adding a package to a manifest switches every output to the
+    # "<path>--<name>" form, which would break the app jobs that read the
+    # unprefixed release-please outputs. Chart releases run on main only.
+    needs: [validate-release-ref]
+    if: ${{ github.ref_name == 'main' }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs['deploy/chart--release_created'] }}
+      tag_name: ${{ steps.release.outputs['deploy/chart--tag_name'] }}
+      version: ${{ steps.release.outputs['deploy/chart--version'] }}
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          target-branch: ${{ github.ref_name }}
+          config-file: release-please-config-chart.json
+          manifest-file: .release-please-manifest-chart.json
 
   create-maintenance-branch:
     name: Create Maintenance Branch
@@ -209,3 +235,20 @@ jobs:
       tag_name: ${{ needs.release-please.outputs.tag_name }}
     secrets:
       SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+
+  chart:
+    name: Publish Helm Chart
+    # Driven by the chart's own release-please line (release-please-chart),
+    # not the app release. The chart references Harbor images by its
+    # appVersion (Chart.yaml), which a prior app release must already have
+    # published — so this job does NOT depend on the image build/merge.
+    needs: [release-please-chart]
+    if: ${{ needs.release-please-chart.outputs.release_created == 'true' }}
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/publish-chart.yml
+    with:
+      tag_name: ${{ needs.release-please-chart.outputs.tag_name }}
+    secrets:
+      REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}

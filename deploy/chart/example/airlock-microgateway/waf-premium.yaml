@@ -1,0 +1,30 @@
+# OPTIONAL - PREMIUM LICENSE REQUIRED.
+#
+# The WAF (ContentSecurityPolicy) needs an Airlock Microgateway Premium license. In the
+# Community Edition you do not attach one - the Gateway + HTTPRoute alone front Harbor.
+# This manifest enables the WAF on the Harbor route with unrestricted uploads
+# (bodySize: 0) so image layers push through unaffected.
+apiVersion: microgateway.airlock.com/v1alpha1
+kind: Limits
+metadata:
+  name: harbor-registry-limits
+  namespace: harbor
+spec:
+  request:
+    limited:
+      general:
+        bodySize: 0        # do not restrict image uploads
+---
+apiVersion: microgateway.airlock.com/v1alpha1
+kind: ContentSecurityPolicy
+metadata:
+  name: harbor
+  namespace: harbor
+spec:
+  secured:
+    limitsRef:
+      name: harbor-registry-limits
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: harbor-harbor-next   # the HTTPRoute emitted by the chart (release-name-core route)

@@ -1,0 +1,172 @@
+# Harbor Next — AWS EKS with IRSA (S3 + RDS IAM Auth)
+#
+# Prerequisites:
+#   - EKS cluster with OIDC provider (see cluster.yaml)
+#   - S3 bucket for registry storage
+#   - Aurora PostgreSQL with IAM authentication enabled
+#   - IRSA role with S3 + rds-db:connect permissions
+#
+# Usage:
+#   helm install harbor-next oci://8gears.container-registry.com/8gcr/charts/harbor-next \
+#     --version 2.0.0 -n harbor --create-namespace \
+#     -f values-aws-irsa.yaml \
+#     --set database.host=<AURORA_ENDPOINT> \
+#     --set-json 'registry.config.storage.s3={"region":"eu-central-1","bucket":"<BUCKET_NAME>"}' \
+#     --set core.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=<ROLE_ARN> \
+#     --set jobservice.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=<ROLE_ARN> \
+#     --set registry.serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=<ROLE_ARN>
+#
+# Or skip --set-json by editing the `registry.config.storage.s3.bucket` field
+# directly in this file before installing.
+
+# Access via kubectl port-forward svc/harbor-next-core 8443:443 -n harbor
+externalURL: "https://localhost:8443"
+# Demo password. For production, use `existingSecretAdminPassword` with a
+# Secret from AWS Secrets Manager, external-secrets, or SOPS.
+harborAdminPassword: "Harbor12345"
+
+# --- Exposure: ClusterIP only (port-forward access) ---
+expose:
+  clusterIP:
+    enabled: true
+
+# Ingress disabled — access via port-forward
+ingress:
+  enabled: false
+
+# Auto-generated self-signed TLS
+tls:
+  enabled: true
+  certSource: auto
+
+# --- External Database: Aurora PostgreSQL with RDS IAM Auth ---
+database:
+  # Placeholder — override via --set database.host=<AURORA_ENDPOINT>
+  host: "CHANGEME.cluster-abc123.eu-central-1.rds.amazonaws.com"
+  port: 5432
+  username: harbor_iam_user
+  password: "placeholder"  # ignored when IAM auth is active
+  database: registry
+  sslmode: require
+  # Cap connection lifetime below RDS IAM token expiry (15 min)
+  connMaxLifetime: "840s"
+
+# --- Valkey (in-cluster) ---
+valkey:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: false
+
+# --- Trivy: disabled for this example ---
+trivy:
+  enabled: false
+
+# --- Exporter / Metrics: disabled ---
+exporter:
+  enabled: false
+metrics:
+  enabled: false
+
+# --- Core ---
+core:
+  replicas: 1
+  # IAM auth env vars (picked up by core's BeforeConnect hook)
+  config:
+    POSTGRESQL_USE_IAM_AUTH: "true"
+    POSTGRESQL_AWS_REGION: "eu-central-1"
+  serviceAccount:
+    create: true
+    annotations: {}
+    # eks.amazonaws.com/role-arn: <ROLE_ARN>  — set via --set
+    automountServiceAccountToken: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+# --- Job Service ---
+jobservice:
+  replicas: 1
+  # Override the default worker count via YAML passthrough.
+  config:
+    worker_pool:
+      workers: 2
+  # IAM-auth env vars go via .env (env passthrough), not .config (YAML config).
+  env:
+    POSTGRESQL_USE_IAM_AUTH: "true"
+    POSTGRESQL_AWS_REGION: "eu-central-1"
+  serviceAccount:
+    create: true
+    annotations: {}
+    # eks.amazonaws.com/role-arn: <ROLE_ARN>  — set via --set
+    automountServiceAccountToken: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+# --- Registry: S3 storage via IRSA ---
+registry:
+  replicas: 1
+  # Full distribution config.yml passed through verbatim. IRSA provides
+  # credentials via the AWS SDK default chain (projected service account
+  # token) — no access/secret key needed in this block.
+  config:
+    version: 0.1
+    log:
+      fields:
+        service: registry
+    storage:
+      # The chart default carries no driver — setting `s3:` here makes it the
+      # active driver (filesystem is only injected when no driver is set).
+      s3:
+        region: eu-central-1
+        bucket: ""  # set via --set-json or edit here before installing
+      cache:
+        layerinfo: redis
+      maintenance:
+        uploadpurging:
+          enabled: true
+          age: 168h
+          interval: 24h
+          dryrun: false
+      delete:
+        enabled: true
+      redirect:
+        disable: false
+    auth:
+      htpasswd:
+        realm: harbor-registry-basic-realm
+        path: /etc/registry/passwd
+    validation:
+      disabled: true
+    compatibility:
+      schema1:
+        enabled: true
+  serviceAccount:
+    create: true
+    annotations: {}
+    # eks.amazonaws.com/role-arn: <ROLE_ARN>  — set via --set
+    automountServiceAccountToken: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+# --- Portal ---
+portal:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
