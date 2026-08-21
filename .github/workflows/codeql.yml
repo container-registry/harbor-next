@@ -54,3 +54,28 @@ jobs:
         uses: github/codeql-action/analyze@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
         with:
           category: "/language:${{ matrix.language }}"
+          output: sarif-results
+          # The go results are filtered below before upload; failure-only keeps
+          # diagnostics visible on the tool status page if the analysis fails.
+          upload: ${{ matrix.language == 'go' && 'failure-only' || 'always' }}
+
+      # go/reflected-xss at src/lib/response_recorder.go is a false positive:
+      # CodeQL over-approximates the logger's io.Writer dispatch and assumes
+      # log output can reach the HTTP response recorder, but core loggers only
+      # ever write to stdout, log files, or syslog. Drop that single result
+      # before upload; all other alerts pass through unchanged.
+      - name: Filter false positives
+        if: matrix.language == 'go'
+        uses: advanced-security/filter-sarif@2da736ff05ef065cb2894ac6892e47b5eac2c3c0 # v1.1
+        with:
+          patterns: |
+            -src/lib/response_recorder.go:go/reflected-xss
+          input: sarif-results/go.sarif
+          output: sarif-results/go.sarif
+
+      - name: Upload filtered SARIF
+        if: matrix.language == 'go'
+        uses: github/codeql-action/upload-sarif@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
+        with:
+          sarif_file: sarif-results/go.sarif
+          category: "/language:go"
