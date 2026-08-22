@@ -450,6 +450,125 @@ func (suite *OrmSuite) TestAfterCommit_OuterRollbackDropsNested() {
 	suite.False(ran, "hooks registered in nested scope must be discarded when outer rolls back")
 }
 
+// TestAfterCommit_InnerRollbackOuterCommit asserts that a nested scope
+// rolling back to its savepoint discards its own callbacks even when the
+// caller swallows the error and the outermost transaction commits —
+// the pattern exercised by TestNestedTransaction and TestNestedSavepoint.
+// Callbacks registered before and after the failed scope must survive.
+func (suite *OrmSuite) TestAfterCommit_InnerRollbackOuterCommit() {
+	ctx := NewContext(context.TODO(), orm.NewOrm())
+
+	var ranBefore, ranInner, ranAfter bool
+
+	err := WithTransaction(func(ctx context.Context) error {
+		AfterCommit(ctx, func() { ranBefore = true })
+
+		// The inner scope fails; the caller handles the error and carries on.
+		innerErr := WithTransaction(func(ctx context.Context) error {
+			AfterCommit(ctx, func() { ranInner = true })
+			return errors.New("oops")
+		})(ctx)
+		suite.Error(innerErr)
+
+		AfterCommit(ctx, func() { ranAfter = true })
+		return nil
+	})(ctx)
+
+	suite.NoError(err)
+	suite.False(ranInner, "hook registered in a rolled-back savepoint must not fire")
+	suite.True(ranBefore, "hooks registered before the failed scope must survive")
+	suite.True(ranAfter, "hooks registered after the failed scope must survive")
+}
+
+// TestAfterCommit_OuterRegistrationSurvivesInnerRollback asserts that a
+// callback belongs to the scope whose context registered it, not to whichever
+// scope happened to be open at the time: a hook registered against the outer
+// context while a nested savepoint is still active must survive that
+// savepoint's rollback. Both scopes are on the stack throughout, so both
+// contexts are valid where they are used.
+func (suite *OrmSuite) TestAfterCommit_OuterRegistrationSurvivesInnerRollback() {
+	ctx := NewContext(context.TODO(), orm.NewOrm())
+
+	var ranOuter, ranInner bool
+
+	err := WithTransaction(func(outerCtx context.Context) error {
+		innerErr := WithTransaction(func(innerCtx context.Context) error {
+			AfterCommit(innerCtx, func() { ranInner = true })
+			AfterCommit(outerCtx, func() { ranOuter = true })
+
+			return errors.New("oops")
+		})(outerCtx)
+		suite.Error(innerErr)
+
+		return nil
+	})(ctx)
+
+	suite.NoError(err)
+	suite.False(ranInner, "hook registered in a rolled-back savepoint must not fire")
+	suite.True(ranOuter, "hook registered against the outer scope must survive a nested rollback")
+}
+
+// TestAfterCommit_OrderWithinAndAcrossScopes asserts the ordering AfterCommit
+// documents: registration order within a scope, and the callbacks of a
+// released nested scope inserted at the point its savepoint was released.
+func (suite *OrmSuite) TestAfterCommit_OrderWithinAndAcrossScopes() {
+	ctx := NewContext(context.TODO(), orm.NewOrm())
+
+	var fired []string
+	record := func(ctx context.Context, name string) {
+		AfterCommit(ctx, func() { fired = append(fired, name) })
+	}
+
+	err := WithTransaction(func(outerCtx context.Context) error {
+		record(outerCtx, "outer-before")
+
+		if err := WithTransaction(func(innerCtx context.Context) error {
+			record(innerCtx, "inner-1")
+			record(innerCtx, "inner-2")
+			return nil
+		})(outerCtx); err != nil {
+			return err
+		}
+		suite.Empty(fired, "nested hooks must wait for the outermost commit")
+
+		record(outerCtx, "outer-after")
+		suite.Empty(fired, "outer hooks must wait for the outermost commit")
+		return nil
+	})(ctx)
+
+	suite.NoError(err)
+	suite.Equal([]string{"outer-before", "inner-1", "inner-2", "outer-after"}, fired)
+}
+
+// TestAfterCommit_RejectsCompletedNestedContext asserts that a context from a
+// completed savepoint cannot start more DB work whose hooks have no live parent.
+func (suite *OrmSuite) TestAfterCommit_RejectsCompletedNestedContext() {
+	ctx := NewContext(context.TODO(), orm.NewOrm())
+
+	var completedCtx context.Context
+	secondScopeRan := false
+
+	err := WithTransaction(func(outerCtx context.Context) error {
+		if err := WithTransaction(func(innerCtx context.Context) error {
+			completedCtx = innerCtx
+			return nil
+		})(outerCtx); err != nil {
+			return err
+		}
+
+		err := WithTransaction(func(ctx context.Context) error {
+			secondScopeRan = true
+			AfterCommit(ctx, func() {})
+			return nil
+		})(completedCtx)
+		suite.EqualError(err, "transaction context belongs to a completed scope")
+		return nil
+	})(ctx)
+
+	suite.NoError(err)
+	suite.False(secondScopeRan, "a completed transaction context must be rejected before starting DB work")
+}
+
 func (suite *OrmSuite) TestReadOrCreate() {
 	ctx := NewContext(context.TODO(), orm.NewOrm())
 
