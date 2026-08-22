@@ -377,7 +377,7 @@ spec:
           template:
             metadata:
               annotations:
-                deploy.8gears.io/image-revision: "sha256:3e5c95eb47e65b4d2a2cef51012c53f9d2cfb12f07ea4fa65ed1debc74adf8da" # {"$imagepolicy": "flux-system:harbor-snyk-adapter:digest"}
+                deploy.8gears.io/image-revision: "sha256:0a138cb54ec95e60c76f1cbd074f866cfec9254744fca6c9fe7ac848ae3289b6" # {"$imagepolicy": "flux-system:harbor-snyk-adapter:digest"}
               labels:
                 app.kubernetes.io/name: snyk-scanner
                 app.kubernetes.io/component: scanner
