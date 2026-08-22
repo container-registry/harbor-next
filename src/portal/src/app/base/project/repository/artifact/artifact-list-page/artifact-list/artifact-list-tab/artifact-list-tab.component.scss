@@ -214,6 +214,7 @@
   flex: 1 1 auto;
   width: auto;
   min-width: 0;
+
   // .truncated makes the span a flex container, where text-overflow has no
   // effect; block restores the ellipsis.
   display: block;
