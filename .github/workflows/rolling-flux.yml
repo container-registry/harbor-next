@@ -1,0 +1,70 @@
+name: Publish Rolling Flux Bundle
+
+on:
+  push:
+    branches:
+      - 8gcr-rolling
+    paths:
+      - "deploy/flux/8gcr-dev/**"
+      - ".github/workflows/rolling-flux.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rolling-flux-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
+  OPS_REGISTRY_PROJECT: ops
+  OPS_ARTIFACT_REPOSITORY: hz-hopper/8gcr-rolling
+  OPS_REGISTRY_USERNAME: ${{ vars.OPS_REGISTRY_USERNAME || 'robot_8gears.container-registry.dev' }}
+
+jobs:
+  publish:
+    name: Publish hz-hopper 8gcr-rolling config
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Prepare
+        run: echo "ROLLING_TAG=${GITHUB_REF_NAME}-${GITHUB_SHA:0:7}" >> "$GITHUB_ENV"
+
+      - name: Setup ORAS
+        uses: oras-project/setup-oras@5c0b487ce3fe0ce3ab0d034e63669e426e294e4d # v1.2.3
+        with:
+          version: 1.2.0
+
+      - name: Setup Flux CLI
+        uses: fluxcd/flux2/action@8d5f40dca5aa5d3c0fc3414457dda15a0ac92fa4 # v2.4.0
+        with:
+          version: 2.4.0
+
+      - name: Registry login
+        env:
+          OPS_REGISTRY_PASSWORD: ${{ secrets.OPS_REGISTRY_PASSWORD }}
+        run: |
+          test -n "${OPS_REGISTRY_USERNAME}"
+          test -n "${OPS_REGISTRY_PASSWORD}"
+          echo "${OPS_REGISTRY_PASSWORD}" | oras login "${REGISTRY_ADDRESS}" \
+            --username "${OPS_REGISTRY_USERNAME}" --password-stdin
+
+      - name: Publish Flux deploy bundle
+        run: |
+          BUNDLE_PATH="${RUNNER_TEMP}/8gcr-rolling-flux"
+          ARTIFACT="oci://${REGISTRY_ADDRESS}/${OPS_REGISTRY_PROJECT}/${OPS_ARTIFACT_REPOSITORY}"
+
+          rm -rf "${BUNDLE_PATH}"
+          cp -R deploy/flux/8gcr-dev "${BUNDLE_PATH}"
+
+          flux push artifact \
+            "${ARTIFACT}:${ROLLING_TAG}" \
+            --path="${BUNDLE_PATH}" \
+            --source="${{ github.server_url }}/${{ github.repository }}" \
+            --revision="${GITHUB_REF_NAME}@sha1:${GITHUB_SHA}"
+
+          oras tag \
+            "${REGISTRY_ADDRESS}/${OPS_REGISTRY_PROJECT}/${OPS_ARTIFACT_REPOSITORY}:${ROLLING_TAG}" \
+            latest
