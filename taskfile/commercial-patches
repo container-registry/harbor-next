@@ -1,7 +1,9 @@
 # Ordered commercial patches for Harbor Next main.
-0001-branding
-0002-sftp-replication
-0003-identity-providers
-0004-pgx-monitoring
-0005-aws-rds-iam-auth
-0006-multi-format-artifacts
+0001-commercial-feature-gate
+0002-branding
+0003-sftp-replication
+0004-identity-providers
+0005-pgx-monitoring
+0006-aws-rds-iam-auth
+0007-multi-format-artifacts
+0008-audit-log-otel
