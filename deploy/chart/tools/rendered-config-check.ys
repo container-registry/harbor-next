@@ -24,7 +24,7 @@
 problems =: atom([])
 
 storage-drivers =: qw(filesystem s3 azure gcs oss swift inmemory)
-logger-names =:: ['FILE', 'DB', 'STD_OUTPUT']
+logger-names =:: [FILE, DB, STD_OUTPUT]
 
 defn main(rendered-file):
   docs =: rendered-file:read:yaml/load-all.filter(map?)
@@ -54,7 +54,7 @@ defn check-configmap(doc):
       contains?(cfg 'worker_pool'): check-jobservice(name cfg)
 
 defn check-registry(name cfg):
-  storage =: get(cfg 'storage') || {}
+  storage =: cfg.storage || {}
   drivers =: storage:keys.filter(\(_.in?(storage-drivers))):sort:V
   n =: drivers.#
   when n != 1:
@@ -62,7 +62,7 @@ defn check-registry(name cfg):
     add-problem "$name storage":
       "expected exactly one storage driver, found $n ($names) —
        distribution refuses to start otherwise"
-  when-not present?(get(cfg 'version')):
+  when-not present?(cfg.version):
     add-problem "$name version": 'distribution config.yml needs a version key'
   when-not present?(get-in(cfg ['auth' 'htpasswd' 'path'])):
     add-problem "$name auth.htpasswd.path":
@@ -74,16 +74,16 @@ defn check-jobservice(name cfg):
     add-problem "$name worker_pool.backend":
       "must be redis (got $backend) — the chart wires a redis pool URL"
   workers =: get-in(cfg ['worker_pool' 'workers'])
-  ok-workers =: (int? workers) && (workers >= 1)
+  ok-workers =: int?(workers) && (workers >= 1)
   when-not ok-workers:
     add-problem "$name worker_pool.workers":
       "must be an integer >= 1 (got $workers)"
-  loggers =: get(cfg 'job_loggers') || []
+  loggers =: cfg.job_loggers || []
   when empty?(loggers):
     add-problem "$name job_loggers":
       'must not be empty — jobservice refuses to start without a job logger'
   each lg loggers:
-    lname =: get(lg 'name')
+    lname =: lg.name
     when-not lname.in?(logger-names):
       add-problem "$name job_loggers":
         "unknown logger name $lname (expected FILE, DB, or STD_OUTPUT)"
@@ -95,9 +95,9 @@ defn check-jobservice(name cfg):
        target that port"
 
 defn add-problem(where note):
-  swap problems conj::
-    where:: where
-    note:: note
+  swap problems conj:::
+    where: where
+    note: note
 
 defn present?(v):
   cond:

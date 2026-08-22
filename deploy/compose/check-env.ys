@@ -27,10 +27,12 @@ default-env2 =: 'example/local/.env.example'
 defn main(compose-file=default-compose env1=default-env1 env2=default-env2):
   compose =: compose-file:read:yaml/load
   refs =: compose:collect-strings:extract-refs
-  documented =: +[env1 env2].map(env-keys).flatten():distinct:V
+  documented =: +[env1 env2].map(env-keys):flatten:distinct:V
 
   ref-names =: refs.map(\(_.name)):distinct:sort:V
-  with-default =: refs.filter(\(_.has-default)).map(\(_.name)):distinct:V
+  with-default =: refs
+    .filter(\(_.has-default))
+    .map(\(_.name)):distinct:V
 
   each name ref-names:
     known =: name.in?(documented)
@@ -71,10 +73,10 @@ defn main(compose-file=default-compose env1=default-env1 env2=default-env2):
 
 # All string scalars anywhere in a YAML structure.
 defn collect-strings(v):
-  cond:
-    string?(v): +[v]
-    map?(v): v:vals.map(collect-strings):flatten:V
-    sequential?(v): v.map(collect-strings):flatten:V
+  condf v:
+    string?: +[v]
+    map?: v:vals.map(collect-strings):flatten:V
+    sequential?: v.map(collect-strings):flatten:V
     else: +[]
 
 var-rx =: qr('\$\{([A-Za-z_][A-Za-z0-9_]*)((:?[-?])([^}]*))?\}')
@@ -89,19 +91,19 @@ defn flatten1(colls):
   reduce: \(concat(_1 (_2 || [])):V) [] colls
 
 defn ref-of(m):
-  =>::
-    name:: m.1
-    has-default:: m.3.in?(default-ops)
+  =>:::
+    name: m.1
+    has-default: m.3.in?(default-ops)
 
 env-key-rx =: qr('^#?\s*([A-Z_][A-Z0-9_]*)=')
 
 defn env-keys(file):
-  file: .read().lines()
+  file:read:lines
     .map(\(second(re-find(env-key-rx _))))
     .filter(some?):distinct:V
 
 defn add-problem(level what note):
-  swap problems conj::
-    level:: level
-    what:: what
-    note:: note
+  swap problems conj:::
+    level: level
+    what: what
+    note: note
