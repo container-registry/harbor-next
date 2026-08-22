@@ -22,6 +22,7 @@ import (
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/manifest/schema2"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/goharbor/harbor/src/controller/artifact/processor/base"
@@ -170,13 +171,117 @@ func (m *manifestV2ProcessorTestSuite) TestAbstractAddition() {
 	m.Equal(`[{"created":"2019-01-01T01:29:27.416803627Z","created_by":"/bin/sh -c #(nop) COPY file:f77490f70ce51da25bd21bfc30cb5e1a24b2b65eb37d4af0c327ddc24f0986a6 in / "},{"created":"2019-01-01T01:29:27.650294696Z","created_by":"/bin/sh -c #(nop)  CMD [\"/hello\"]","empty_layer":true}]`, string(addition.Content))
 }
 
+func (m *manifestV2ProcessorTestSuite) TestAbstractAdditionDockerfileFromLabels() {
+	configWithDockerfile := strings.Replace(config, `"maintainer": "tester@vmware.com"`,
+		`"maintainer": "tester@vmware.com",
+		"dockerfile": "FROM alpine\nCMD [\"/hello\"]"`, 1)
+
+	artifact := &artifact.Artifact{}
+	mani, _, err := distribution.UnmarshalManifest(schema2.MediaTypeManifest, []byte(manifest))
+	m.Require().Nil(err)
+	m.regCli.On("PullManifest", mock.Anything, mock.Anything).Return(mani, "", nil).Once()
+	m.regCli.On("PullBlob", mock.Anything, mock.Anything).Return(int64(0), io.NopCloser(strings.NewReader(configWithDockerfile)), nil).Once()
+
+	addition, err := m.processor.AbstractAddition(nil, artifact, AdditionTypeDockerfile)
+	m.Require().Nil(err)
+	m.Equal("text/plain; charset=utf-8", addition.ContentType)
+	m.Equal("FROM alpine\nCMD [\"/hello\"]", string(addition.Content))
+}
+
+func (m *manifestV2ProcessorTestSuite) TestAbstractAdditionDockerfileTooLarge() {
+	oversizedDockerfile := strings.Repeat("A", maxDockerfileSize+1)
+	configWithDockerfile := strings.Replace(config, `"maintainer": "tester@vmware.com"`,
+		`"maintainer": "tester@vmware.com",
+		"dockerfile": "`+oversizedDockerfile+`"`, 1)
+
+	artifact := &artifact.Artifact{}
+	mani, _, err := distribution.UnmarshalManifest(schema2.MediaTypeManifest, []byte(manifest))
+	m.Require().Nil(err)
+	m.regCli.On("PullManifest", mock.Anything, mock.Anything).Return(mani, "", nil).Once()
+	m.regCli.On("PullBlob", mock.Anything, mock.Anything).Return(int64(0), io.NopCloser(strings.NewReader(configWithDockerfile)), nil).Once()
+
+	_, err = m.processor.AbstractAddition(nil, artifact, AdditionTypeDockerfile)
+	m.True(errors.IsErr(err, errors.RequestEntityTooLargeCode))
+}
+
+func (m *manifestV2ProcessorTestSuite) TestAbstractAdditionDockerfileOversizedConfigBlob() {
+	oversizedManifest := strings.Replace(manifest, `"size": 1510,`,
+		`"size": 8388609,`, 1)
+
+	artifact := &artifact.Artifact{}
+	mani, _, err := distribution.UnmarshalManifest(schema2.MediaTypeManifest, []byte(oversizedManifest))
+	m.Require().Nil(err)
+	m.regCli.On("PullManifest", mock.Anything, mock.Anything).Return(mani, "", nil).Once()
+
+	_, err = m.processor.AbstractAddition(nil, artifact, AdditionTypeDockerfile)
+	m.True(errors.IsErr(err, errors.RequestEntityTooLargeCode))
+	// PullBlob must not be called when the declared config size already exceeds the limit
+	m.regCli.AssertNotCalled(m.T(), "PullBlob", mock.Anything, mock.Anything)
+}
+
+func (m *manifestV2ProcessorTestSuite) TestAbstractAdditionDockerfileNotFound() {
+	artifact := &artifact.Artifact{}
+	mani, _, err := distribution.UnmarshalManifest(schema2.MediaTypeManifest, []byte(manifest))
+	m.Require().Nil(err)
+	m.regCli.On("PullManifest", mock.Anything, mock.Anything).Return(mani, "", nil).Once()
+	m.regCli.On("PullBlob", mock.Anything, mock.Anything).Return(int64(0), io.NopCloser(strings.NewReader(config)), nil).Once()
+
+	_, err = m.processor.AbstractAddition(nil, artifact, AdditionTypeDockerfile)
+	m.True(errors.IsErr(err, errors.NotFoundCode))
+}
+
+func (m *manifestV2ProcessorTestSuite) TestGetDockerfileFromLabels() {
+	// nil config / nil / empty labels
+	m.Equal("", m.processor.getDockerfileFromLabels(nil))
+	m.Equal("", m.processor.getDockerfileFromLabels(&v1.Image{}))
+	m.Equal("", m.processor.getDockerfileFromLabels(&v1.Image{
+		Config: v1.ImageConfig{Labels: map[string]string{}},
+	}))
+
+	// no matching key
+	m.Equal("", m.processor.getDockerfileFromLabels(&v1.Image{
+		Config: v1.ImageConfig{Labels: map[string]string{
+			"maintainer": "tester@vmware.com",
+		}},
+	}))
+
+	// matching key with an empty value is treated as not present
+	m.Equal("", m.processor.getDockerfileFromLabels(&v1.Image{
+		Config: v1.ImageConfig{Labels: map[string]string{
+			"dockerfile": "",
+		}},
+	}))
+
+	// matching "dockerfile" key
+	m.Equal("FROM alpine", m.processor.getDockerfileFromLabels(&v1.Image{
+		Config: v1.ImageConfig{Labels: map[string]string{
+			"dockerfile": "FROM alpine",
+		}},
+	}))
+
+	// matching "com.example.dockerfile" key
+	m.Equal("FROM alpine", m.processor.getDockerfileFromLabels(&v1.Image{
+		Config: v1.ImageConfig{Labels: map[string]string{
+			"com.example.dockerfile": "FROM alpine",
+		}},
+	}))
+
+	// "com.example.dockerfile" takes priority over "dockerfile" when both are present
+	m.Equal("FROM ubuntu", m.processor.getDockerfileFromLabels(&v1.Image{
+		Config: v1.ImageConfig{Labels: map[string]string{
+			"com.example.dockerfile": "FROM ubuntu",
+			"dockerfile":             "FROM alpine",
+		}},
+	}))
+}
+
 func (m *manifestV2ProcessorTestSuite) TestGetArtifactType() {
 	m.Assert().Equal(ArtifactTypeImage, m.processor.GetArtifactType(nil, nil))
 }
 
 func (m *manifestV2ProcessorTestSuite) TestListAdditionTypes() {
 	additions := m.processor.ListAdditionTypes(nil, nil)
-	m.EqualValues([]string{AdditionTypeBuildHistory}, additions)
+	m.EqualValues([]string{AdditionTypeBuildHistory, AdditionTypeDockerfile}, additions)
 }
 
 func TestManifestV2ProcessorTestSuite(t *testing.T) {

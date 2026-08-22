@@ -1082,6 +1082,9 @@
         "NO_FILES": "이 모델에 대해 제공된 파일이 없습니다.",
         "MODEL_NO_README": "이 모델에는 README 파일이 제공되지 않습니다.",
         "FILE_TOO_LARGE": "파일이 너무 커서 처리할 수 없습니다.",
+        "DOCKERFILE": "Dockerfile",
+        "NO_DOCKERFILE_EXPLANATION": "이미지에서 Dockerfile을 찾을 수 없습니다. 이미지 레이블의 Dockerfile 콘텐츠를 사용할 수 없습니다.",
+        "NO_DOCKERFILE_SUGGESTION": "보기",
         "ITEMS": "아이템",
         "SHOW_KV": "키-값 쌍",
         "SHOW_YAML": "YAML 파일"
