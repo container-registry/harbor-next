@@ -23,33 +23,42 @@
 
 problems =: atom([])
 
-defn add-problem(where note):
-  swap! problems conj::
-    where:: where
-    note:: note
+storage-drivers =: qw(filesystem s3 azure gcs oss swift inmemory)
+logger-names =:: ['FILE', 'DB', 'STD_OUTPUT']
 
-defn present?(v):
-  cond:
-    v.nil?(): false
-    v == '': false
-    (coll? v): not(empty?(v))
-    else: true
+defn main(rendered-file):
+  docs =: rendered-file:read:yaml/load-all.filter(map?)
+  cms =: docs.filter(\(_.kind == 'ConfigMap')):V
+  checked =: cms.filter(\(get-in(_ ['data' 'config.yml']):present?))
+  each cm cms:
+    check-configmap: cm
+  ps =: problems:deref
+  n =: checked.#
+  if ps:seq:
+    then:
+      warn: 'rendered-config-check FAILURES:'
+      each p ps:
+        warn: "  * $(p.where)"
+        warn: "      $(p.note)"
+      exit: 1
+    else:
+      say: "rendered-config-check: $n embedded config.yml documents OK"
 
-defn in?(coll x):
-  c =: coll.filter(\(%1 == x)).count()
-  =>: c > 0
-
-storage-drivers =:
-  vector('filesystem' 's3' 'azure' 'gcs' 'oss' 'swift' 'inmemory')
-
-logger-names =: vector('FILE' 'DB' 'STD_OUTPUT')
+defn check-configmap(doc):
+  name =: get-in(doc ['metadata' 'name'])
+  text =: get-in(doc ['data' 'config.yml'])
+  when present?(text):
+    cfg =: yaml/load(text)
+    cond:
+      contains?(cfg 'storage'): check-registry(name cfg)
+      contains?(cfg 'worker_pool'): check-jobservice(name cfg)
 
 defn check-registry(name cfg):
-  storage =: get(cfg 'storage') || hash-map()
-  drivers =: storage.keys().filter(\(in? storage-drivers %1)).sort().vec()
-  n =: drivers.count()
+  storage =: get(cfg 'storage') || {}
+  drivers =: storage:keys.filter(\(_.in?(storage-drivers))):sort:V
+  n =: drivers.#
   when n != 1:
-    names =: str/join(', ' drivers)
+    names =: drivers.join(', ')
     add-problem "$name storage":
       "expected exactly one storage driver, found $n ($names) —
        distribution refuses to start otherwise"
@@ -75,7 +84,7 @@ defn check-jobservice(name cfg):
       'must not be empty — jobservice refuses to start without a job logger'
   each lg loggers:
     lname =: get(lg 'name')
-    when-not in?(logger-names lname):
+    when-not lname.in?(logger-names):
       add-problem "$name job_loggers":
         "unknown logger name $lname (expected FILE, DB, or STD_OUTPUT)"
   metric-on =: get-in(cfg ['metric' 'enabled'])
@@ -85,33 +94,14 @@ defn check-jobservice(name cfg):
       "must be 8001 (got $mport) — the metrics Service and ServiceMonitor
        target that port"
 
-defn check-configmap(doc):
-  name =: get-in(doc ['metadata' 'name'])
-  text =: get-in(doc ['data' 'config.yml'])
-  when present?(text):
-    cfg =: yaml/load(text)
-    cond:
-      contains?(cfg 'storage'): check-registry(name cfg)
-      contains?(cfg 'worker_pool'): check-jobservice(name cfg)
-      else: nil
+defn add-problem(where note):
+  swap problems conj::
+    where:: where
+    note:: note
 
-defn main(rendered-file):
-  text =: rendered-file:read
-  docs =: yaml/load-all(text).filter(map?).vec()
-  cms =: docs.filter(\(get(%1 'kind') == 'ConfigMap')).vec()
-  checked =: cms.filter(\(present? (get-in %1 ['data' 'config.yml']))).vec()
-  each cm cms:
-    check-configmap: cm
-  ps =: problems.deref()
-  n =: checked.count()
-  if empty?(ps):
-    then:
-      say: "rendered-config-check: $n embedded config.yml documents OK"
-    else:
-      warn: 'rendered-config-check FAILURES:'
-      each p ps:
-        where =: get(p 'where')
-        note =: get(p 'note')
-        warn: "  * $where"
-        warn: "      $note"
-      exit: 1
+defn present?(v):
+  cond:
+    v:nil?: false
+    v == '': false
+    coll?(v): not(empty?(v))
+    else: true
