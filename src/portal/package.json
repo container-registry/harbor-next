@@ -28,6 +28,7 @@
   },
   "private": true,
   "dependencies": {
+<<<<<<< HEAD
     "@angular/animations": "^16.2.12",
     "@angular/common": "^16.2.12",
     "@angular/compiler": "^16.2.12",
@@ -39,6 +40,20 @@
     "@angular/router": "^16.2.12",
     "@cds/core": "6.4.2",
     "@clr/angular": "15.4.0",
+=======
+    "@angular/animations": "21.2.20",
+    "@angular/cdk": "21.2.11",
+    "@angular/common": "21.2.20",
+    "@angular/compiler": "21.2.20",
+    "@angular/core": "21.2.20",
+    "@angular/forms": "21.2.20",
+    "@angular/localize": "21.2.20",
+    "@angular/platform-browser": "21.2.20",
+    "@angular/platform-browser-dynamic": "21.2.20",
+    "@angular/router": "21.2.20",
+    "@clr/addons": "18.0.0",
+    "@clr/angular": "18.0.0",
+>>>>>>> a7745aad4 (chore(deps): bump Angular packages to fix known vulnerabilities (#23724))
     "@clr/icons": "13.0.2",
     "@clr/ui": "15.4.0",
     "@ngx-translate/core": "15.0.0",
@@ -54,6 +69,7 @@
     "zone.js": "^0.13.3"
   },
   "devDependencies": {
+<<<<<<< HEAD
     "@angular-devkit/build-angular": "^16.2.16",
     "@angular-eslint/builder": "16.1.2",
     "@angular-eslint/eslint-plugin": "16.1.2",
@@ -77,6 +93,31 @@
     "https-proxy-agent": "^5.0.1",
     "jasmine-core": "~4.5.0",
     "jasmine-spec-reporter": "~7.0.0",
+=======
+    "@angular-devkit/build-angular": "21.2.21",
+    "@angular-eslint/builder": "21.4.0",
+    "@angular-eslint/eslint-plugin": "21.4.0",
+    "@angular-eslint/eslint-plugin-template": "21.4.0",
+    "@angular-eslint/schematics": "21.4.0",
+    "@angular-eslint/template-parser": "21.4.0",
+    "@angular/cli": "21.2.11",
+    "@angular/compiler-cli": "21.2.20",
+    "@cypress/schematic": "2.5.2",
+    "@types/express": "4.17.25",
+    "@types/jasmine": "5.1.15",
+    "@types/node": "22.19.19",
+    "@typescript-eslint/eslint-plugin": "8.59.3",
+    "@typescript-eslint/parser": "8.59.3",
+    "cypress": "15.20.1",
+    "eslint": "9.39.4",
+    "eslint-config-prettier": "9.1.2",
+    "eslint-plugin-header": "3.1.1",
+    "eslint-plugin-prettier": "4.2.5",
+    "express": "4.22.2",
+    "https-proxy-agent": "5.0.1",
+    "jasmine-core": "5.13.0",
+    "jasmine-spec-reporter": "7.0.0",
+>>>>>>> a7745aad4 (chore(deps): bump Angular packages to fix known vulnerabilities (#23724))
     "karma": "6.4.2",
     "karma-chrome-launcher": "~3.1.0",
     "karma-coverage": "^2.2.1",
