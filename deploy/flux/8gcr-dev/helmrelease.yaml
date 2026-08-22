@@ -191,7 +191,7 @@ spec:
         size: 10Gi
     portal:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:3e810bf0c14632ba7d239aa713d4bdf22a53990347214946c584ffdf9a6ef95f" # {"$imagepolicy": "flux-system:harbor-portal:digest"}
+        deploy.8gears.io/image-revision: "sha256:1d0f93164eb39e409504576d4c685b91a63df7ab66d6775facfb5fbef312df58" # {"$imagepolicy": "flux-system:harbor-portal:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-portal
         tag: latest
