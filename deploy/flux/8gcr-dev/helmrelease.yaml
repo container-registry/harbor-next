@@ -164,7 +164,7 @@ spec:
           value: Trivy
     jobservice:
       podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:5c3e09cdf1bef7a388637620a533a2813aba92c41212bd85235ef08789a59d79" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
+        deploy.8gears.io/image-revision: "sha256:4d310a201df3c72c058d4fcad45123ce9fcd8bc272784a779105718115d95704" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-jobservice
         tag: latest
