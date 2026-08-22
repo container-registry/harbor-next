@@ -216,8 +216,10 @@
   min-width: 0;
 
   // .truncated makes the span a flex container, where text-overflow has no
-  // effect; block restores the ellipsis.
+  // effect; block restores the ellipsis. height: auto drops .truncated's
+  // fixed 25px box so the parent flexbox recenters the 20px line box.
   display: block;
+  height: auto;
 }
 
 .tag-cell-count {
