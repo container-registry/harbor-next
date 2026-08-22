@@ -51,6 +51,10 @@ type Controller interface {
 	Count(ctx context.Context, q *q.Query) (int64, error)
 	// SearchByName user groups by names with fuzzy search
 	SearchByName(ctx context.Context, name string, limitSize int) ([]*model.UserGroup, error)
+	// SyncUserGroupMembership persists group membership for a user
+	SyncUserGroupMembership(ctx context.Context, userID int, groupIDs []int) error
+	// ListUserGroupIDs returns the group IDs for a user
+	ListUserGroupIDs(ctx context.Context, userID int) ([]int, error)
 }
 
 type controller struct {
@@ -121,4 +125,12 @@ func (c *controller) Count(ctx context.Context, query *q.Query) (int64, error) {
 
 func (c *controller) SearchByName(ctx context.Context, name string, limitSize int) ([]*model.UserGroup, error) {
 	return c.mgr.SearchByName(ctx, name, limitSize)
+}
+
+func (c *controller) SyncUserGroupMembership(ctx context.Context, userID int, groupIDs []int) error {
+	return c.mgr.SyncUserGroupMembership(ctx, userID, groupIDs)
+}
+
+func (c *controller) ListUserGroupIDs(ctx context.Context, userID int) ([]int, error) {
+	return c.mgr.ListUserGroupIDs(ctx, userID)
 }

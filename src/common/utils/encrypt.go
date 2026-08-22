@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"strconv"
 	"strings"
 )
 
@@ -52,6 +53,41 @@ const (
 	// (PasswordVersion == PBKDF2SHA256).
 	pbkdf2Iterations = 600000
 )
+
+const (
+	patHashVersion   = "v1"
+	patHashAlgorithm = "sha256"
+	patHashPrefix    = patHashVersion + ":" + patHashAlgorithm + ":"
+)
+
+// HashPATSecret hashes a personal access token secret with PBKDF2-HMAC-SHA256
+// at the strong iteration count (pbkdf2Iterations), independently of Encrypt.
+// The self-describing "v1:sha256:<iterations>:<salt>:<hash>" output lets
+// VerifyPATSecret validate it without needing a separate stored iteration
+// count, and allows the scheme to evolve without touching stored records.
+func HashPATSecret(plaintext, salt string) string {
+	key, _ := pbkdf2.Key(sha256.New, plaintext, []byte(salt), pbkdf2Iterations, 16)
+	return fmt.Sprintf("%s%d:%s:%x", patHashPrefix, pbkdf2Iterations, salt, key)
+}
+
+// VerifyPATSecret verifies a PAT secret against a hash produced by HashPATSecret.
+func VerifyPATSecret(plaintext, storedHash string) bool {
+	if !strings.HasPrefix(storedHash, patHashPrefix) {
+		return false
+	}
+	parts := strings.Split(storedHash, ":")
+	if len(parts) != 5 {
+		return false
+	}
+	iterations, err := strconv.Atoi(parts[2])
+	if err != nil || iterations <= 0 {
+		return false
+	}
+	salt := parts[3]
+	key, _ := pbkdf2.Key(sha256.New, plaintext, []byte(salt), iterations, 16)
+	expected := fmt.Sprintf("%s%d:%s:%x", patHashPrefix, iterations, salt, key)
+	return expected == storedHash
+}
 
 // HashAlg maps a password version to the hash function we use for it.
 //
