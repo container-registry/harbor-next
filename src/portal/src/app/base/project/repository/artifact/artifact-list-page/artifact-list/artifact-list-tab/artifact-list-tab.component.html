@@ -334,11 +334,12 @@
                                     </span>
 
                                     <span
+                                        class="tag-cell-count"
                                         *ngIf="
                                             artifact?.tags?.length > 1 &&
                                             isEllipsisActive(tagsSpan)
                                         "
-                                        >({{ artifact?.tagNumber }} )</span
+                                        >({{ artifact?.tagNumber }})</span
                                     >
                                     <app-pull-command
                                         *ngIf="artifact?.tags?.length > 0"
