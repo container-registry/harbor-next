@@ -14,7 +14,7 @@ This changelog mirrors [GitHub Releases](https://github.com/container-registry/h
 * Harden Proxy Cache Repository Filter Validation ([#654](https://github.com/container-registry/harbor-next/issues/654)) ([debbe35](https://github.com/container-registry/harbor-next/commit/debbe350af0a7f4b6e5457f70b8eedd099a8491c))
 * Prevent 500 on invalid query input ([766a4eb](https://github.com/container-registry/harbor-next/commit/766a4ebbe650bbd26ab60cd0f9233dbf50642b73))
 * **registry:** prevent JobserviceSecret and stored credential exfiltration ([1e2dae4](https://github.com/container-registry/harbor-next/commit/1e2dae4b216ec635c8b937e5526b68e597100843))
-* Removed redis URL from error logs exposing potentional redis password ([0da7ccc](https://github.com/container-registry/harbor-next/commit/0da7cccc2ccc7fe3544ebe2561290b344d8ae5ed))
+* Removed redis URL from error logs exposing potential redis password ([0da7ccc](https://github.com/container-registry/harbor-next/commit/0da7cccc2ccc7fe3544ebe2561290b344d8ae5ed))
 * Show Ellipsis For Truncated Tags In Artifact List ([#666](https://github.com/container-registry/harbor-next/issues/666)) ([3d9e1f7](https://github.com/container-registry/harbor-next/commit/3d9e1f7aa676dfce47c101cb5e53551a248b827b))
 
 
