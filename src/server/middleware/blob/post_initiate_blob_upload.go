@@ -15,9 +15,11 @@
 package blob
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/goharbor/harbor/src/lib/log"
+	"github.com/goharbor/harbor/src/lib/orm"
 	"github.com/goharbor/harbor/src/pkg/distribution"
 	"github.com/goharbor/harbor/src/server/middleware"
 )
@@ -38,19 +40,25 @@ func PostInitiateBlobUploadMiddleware() func(http.Handler) http.Handler {
 
 		ctx := r.Context()
 
-		logger := log.G(ctx).WithFields(log.Fields{"middleware": "blob"})
+		h := func(ctx context.Context) error {
+			logger := log.G(ctx).WithFields(log.Fields{"middleware": "blob"})
 
-		project, err := projectController.GetByName(ctx, distribution.ParseProjectName(r.URL.Path))
-		if err != nil {
-			logger.Errorf("get project failed, error: %v", err)
-			return err
+			project, err := projectController.GetByName(ctx, distribution.ParseProjectName(r.URL.Path))
+			if err != nil {
+				logger.Errorf("get project failed, error: %v", err)
+				return err
+			}
+
+			if err := blobController.AssociateWithProjectByDigest(ctx, mount, project.ProjectID); err != nil {
+				logger.Errorf("mount blob %s to project %s failed, error: %v", mount, project.Name, err)
+				return err
+			}
+
+			return nil
 		}
 
-		if err := blobController.AssociateWithProjectByDigest(ctx, mount, project.ProjectID); err != nil {
-			logger.Errorf("mount blob %s to project %s failed, error: %v", mount, project.Name, err)
-			return err
-		}
-
-		return nil
+		// the route skips the request-wide transaction middleware, so make a short transaction
+		// manually for the mount-case writes, same as the PUT blob upload middleware does
+		return orm.WithTransaction(h)(orm.SetTransactionOpNameToContext(ctx, "tx-post-initiate-blob-mw"))
 	})
 }
