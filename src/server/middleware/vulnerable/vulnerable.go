@@ -50,7 +50,11 @@ func Middleware() func(http.Handler) http.Handler {
 			return errors.New("artifactinfo middleware required before this middleware").WithCode(errors.NotFoundCode)
 		}
 
-		proj, err := projectController.Get(ctx, info.ProjectName, project.WithEffectCVEAllowlist())
+		// fetch the project without the CVE allowlist first, the allowlist is
+		// only needed when the vulnerability prevention is actually enforced,
+		// which spares 1-2 allowlist queries on every manifest GET/HEAD for
+		// projects with the prevention deactivated (the common case)
+		proj, err := projectController.Get(ctx, info.ProjectName)
 		if err != nil {
 			logger.Errorf("get the project %s failed, error: %v", info.ProjectName, err)
 			return err
@@ -76,6 +80,12 @@ func Middleware() func(http.Handler) http.Handler {
 		if ok {
 			logger.Debugf("artifact %s@%s is pulling by the scanner/cosign, skip the checking", info.Repository, info.Digest)
 			return nil
+		}
+
+		proj, err = projectController.Get(ctx, info.ProjectName, project.WithEffectCVEAllowlist())
+		if err != nil {
+			logger.Errorf("get the project %s with effect CVE allowlist failed, error: %v", info.ProjectName, err)
+			return err
 		}
 		allowlist := proj.CVEAllowlist.CVESet()
 
