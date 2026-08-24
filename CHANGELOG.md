@@ -6,6 +6,34 @@ This changelog mirrors [GitHub Releases](https://github.com/container-registry/h
 
 ---
 
+## [2.15.7](https://github.com/container-registry/harbor-next/compare/v2.15.6...v2.15.7) (2026-08-24)
+
+
+### Bug Fixes
+
+* Harden Proxy Cache Repository Filter Validation ([#654](https://github.com/container-registry/harbor-next/issues/654)) ([debbe35](https://github.com/container-registry/harbor-next/commit/debbe350af0a7f4b6e5457f70b8eedd099a8491c))
+* Prevent 500 on invalid query input ([766a4eb](https://github.com/container-registry/harbor-next/commit/766a4ebbe650bbd26ab60cd0f9233dbf50642b73))
+* **registry:** prevent JobserviceSecret and stored credential exfiltration ([1e2dae4](https://github.com/container-registry/harbor-next/commit/1e2dae4b216ec635c8b937e5526b68e597100843))
+* Removed redis URL from error logs exposing potentional redis password ([0da7ccc](https://github.com/container-registry/harbor-next/commit/0da7cccc2ccc7fe3544ebe2561290b344d8ae5ed))
+* Show Ellipsis For Truncated Tags In Artifact List ([#666](https://github.com/container-registry/harbor-next/issues/666)) ([3d9e1f7](https://github.com/container-registry/harbor-next/commit/3d9e1f7aa676dfce47c101cb5e53551a248b827b))
+
+
+### Upstream
+
+* feat(backend): Implement Proxy Cache Repository Filter API (goharbor/harbor[#23527](https://github.com/container-registry/harbor-next/issues/23527)) ([#653](https://github.com/container-registry/harbor-next/issues/653)) ([3a144ff](https://github.com/container-registry/harbor-next/commit/3a144ffb24bd632533f9c50b4f0e8de1164759fc))
+* fix: Add \n to the escape pattern (goharbor/harbor[#23697](https://github.com/container-registry/harbor-next/issues/23697)) ([43f6c53](https://github.com/container-registry/harbor-next/commit/43f6c535b5b604b7b567371de6dd5aee85bb83f2))
+* fix: Add missing validation when creating a rb account (goharbor/harbor[#23691](https://github.com/container-registry/harbor-next/issues/23691)) ([10cc1ba](https://github.com/container-registry/harbor-next/commit/10cc1ba073e19362ad107cae83c2fd872fec1a49))
+* fix: allow resizing of the SBOM column in artifact table (goharbor/harbor[#23646](https://github.com/container-registry/harbor-next/issues/23646)) ([a8695e5](https://github.com/container-registry/harbor-next/commit/a8695e57af8432196185a8eedc41050c4ff245f5))
+* fix: convert setup_timestamp, status_revision, and revision columns to bigint to avoid Y2K38 overflow ([#23711](https://github.com/container-registry/harbor-next/issues/23711)) (goharbor/harbor[#23718](https://github.com/container-registry/harbor-next/issues/23718)) ([9b2a0ab](https://github.com/container-registry/harbor-next/commit/9b2a0aba20278ced8ddec476efb7af36dc81906e))
+* fix: neutralize CSV formula in scan export (goharbor/harbor[#23677](https://github.com/container-registry/harbor-next/issues/23677)) ([6089668](https://github.com/container-registry/harbor-next/commit/6089668b8569156eb0d22201260cc89dffd622d9))
+* fix: Prevent 500 on invalid query input for robot accounts (goharbor/harbor[#23670](https://github.com/container-registry/harbor-next/issues/23670)) ([766a4eb](https://github.com/container-registry/harbor-next/commit/766a4ebbe650bbd26ab60cd0f9233dbf50642b73))
+* fix: Prevent redis pw exposure in error logs (goharbor/harbor[#23657](https://github.com/container-registry/harbor-next/issues/23657)) ([0da7ccc](https://github.com/container-registry/harbor-next/commit/0da7cccc2ccc7fe3544ebe2561290b344d8ae5ed))
+* fix: use errors.Is for sentinel error checks in usergroup controller (goharbor/harbor[#23636](https://github.com/container-registry/harbor-next/issues/23636)) ([da547b4](https://github.com/container-registry/harbor-next/commit/da547b4eb18e96d4eaf7badd53b5db8478180885))
+* fix(registry): Refactor registry update handling to improve URL validation (goharbor/harbor[#23671](https://github.com/container-registry/harbor-next/issues/23671)) ([1e2dae4](https://github.com/container-registry/harbor-next/commit/1e2dae4b216ec635c8b937e5526b68e597100843))
+* fix(repoproxy): prevent proxy-cache poisoning via robot-name prefix (goharbor/harbor[#23675](https://github.com/container-registry/harbor-next/issues/23675)) ([7897002](https://github.com/container-registry/harbor-next/commit/78970025f0f476a067a083ae4d8ae388860c9737))
+* test: accelerate flaky tests by removing time.Sleep (goharbor/harbor[#23692](https://github.com/container-registry/harbor-next/issues/23692)) ([9530feb](https://github.com/container-registry/harbor-next/commit/9530feb5671611bf38eae842e7374ea41736b01f))
+* test: reduce arbitrary sleep delays in core auth and awsecr tests (goharbor/harbor[#23722](https://github.com/container-registry/harbor-next/issues/23722)) ([c13ca29](https://github.com/container-registry/harbor-next/commit/c13ca2931a74021045bd9ce5ff83efe5e449676d))
+
 ## [2.15.6](https://github.com/container-registry/harbor-next/compare/v2.15.5...v2.15.6) (2026-08-18)
 
 
