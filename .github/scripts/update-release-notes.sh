@@ -73,6 +73,10 @@ node .github/scripts/format-release-notes.mjs \
 
 if [[ -n "${preview_pr_number}" ]]; then
   release_branch="${GITHUB_REF_NAME:?GITHUB_REF_NAME is required for a release PR preview}"
+elif [[ "${GITHUB_REF_TYPE:-}" == "branch" && -n "${GITHUB_REF_NAME:-}" ]]; then
+  # push-triggered path only. Tag-triggered runs (manual recreate on a
+  # tag ref) have GITHUB_REF_NAME=<tag>, not a branch, so fall through.
+  release_branch="${GITHUB_REF_NAME}"
 else
   release_branch=$(github_retry gh release view "${TAG_NAME}" \
     --repo "${GITHUB_REPOSITORY}" \
@@ -114,7 +118,7 @@ if [[ -f "${series}" ]]; then
     branch="${branch%"${branch##*[![:space:]]}"}"
     [[ -z "${branch}" ]] && continue
 
-    if [[ "${branch}" == */* || "${branch}" == *..* ]]; then
+    if ! git check-ref-format --branch "${branch}" >/dev/null 2>&1; then
       echo "Invalid commercial branch name in series: ${branch}" >&2
       exit 1
     fi
@@ -164,7 +168,7 @@ fi
   echo "**Verify an image signature:**"
   echo '```sh'
   echo "cosign verify \\"
-  echo "  --certificate-identity \"https://github.com/${GITHUB_REPOSITORY}/.github/workflows/publish-images.yml@refs/heads/${release_branch}\" \\"
+  echo "  --certificate-identity \"https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release-please.yml@refs/heads/${release_branch}\" \\"
   echo '  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \'
   echo "  ${registry}/harbor-core:${TAG_NAME}"
   echo '```'
