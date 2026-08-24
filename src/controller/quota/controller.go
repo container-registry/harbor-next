@@ -388,7 +388,24 @@ func (c *controller) Request(ctx context.Context, reference, referenceID string,
 	}
 
 	provider := updateQuotaProviderType(config.GetQuotaUpdateProvider())
-	if err := c.updateUsageWithRetry(ctx, reference, referenceID, reserveResources(resources), provider); err != nil {
+
+	// When called inside the request-wide transaction (transaction middleware),
+	// the reserve UPDATE would keep the quota_usage row lock until that
+	// transaction commits, i.e. across the proxied registry round-trip, which
+	// serializes all concurrent pushes to the same project. Detach the
+	// reserve/rollback onto fresh autocommit ormers so the row lock is released
+	// right after the single CAS UPDATE. The rollback additionally drops the
+	// request cancellation because the compensation must still run when the
+	// client has gone away. The residual exposure — a crash between the
+	// committed reserve and the rollback over-counts usage until the next
+	// refresh — matches what the redis update provider already accepts.
+	reserveCtx, rollbackCtx := ctx, ctx
+	if provider != updateQuotaProviderRedis && orm.InTransaction(ctx) {
+		reserveCtx = orm.Clone(ctx)
+		rollbackCtx = orm.Copy(ctx)
+	}
+
+	if err := c.updateUsageWithRetry(reserveCtx, reference, referenceID, reserveResources(resources), provider); err != nil {
 		log.G(ctx).Errorf("reserve resources %s for %s %s failed, error: %v", resources.String(), reference, referenceID, err)
 		return err
 	}
@@ -396,7 +413,7 @@ func (c *controller) Request(ctx context.Context, reference, referenceID string,
 	err := f()
 
 	if err != nil {
-		if er := c.updateUsageWithRetry(ctx, reference, referenceID, rollbackResources(resources), provider); er != nil {
+		if er := c.updateUsageWithRetry(rollbackCtx, reference, referenceID, rollbackResources(resources), provider); er != nil {
 			// ignore this error, the quota usage will be correct when users do operations which will call refresh quota
 			log.G(ctx).Warningf("rollback resources %s for %s %s failed, error: %v", resources.String(), reference, referenceID, er)
 		}
