@@ -64,12 +64,12 @@ require (
 	go.opentelemetry.io/otel v1.44.0
 	go.opentelemetry.io/otel/exporters/jaeger v1.17.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.43.0
-	go.opentelemetry.io/otel/sdk v1.43.0
+	go.opentelemetry.io/otel/sdk v1.44.0
 	go.opentelemetry.io/otel/trace v1.44.0
 	go.pinniped.dev v0.37.0
 	go.uber.org/ratelimit v0.3.1
 	golang.org/x/crypto v0.54.0 // indirect
-	golang.org/x/net v0.57.0
+	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.22.0
 	golang.org/x/text v0.40.0
