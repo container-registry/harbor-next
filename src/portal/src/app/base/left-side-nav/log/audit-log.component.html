@@ -68,6 +68,12 @@
                 'AUDIT_LOG.OPERATION_DESCRIPTION' | translate
             }}</clr-dg-column>
             <clr-dg-column>{{ 'AUDIT_LOG.RESULT' | translate }}</clr-dg-column>
+            <clr-dg-column>{{
+                'AUDIT_LOG.IP_ADDRESS' | translate
+            }}</clr-dg-column>
+            <clr-dg-column>{{
+                'AUDIT_LOG.USER_AGENT' | translate
+            }}</clr-dg-column>
             <clr-dg-placeholder>{{
                 'AUDIT_LOG.NOT_FOUND' | translate
             }}</clr-dg-placeholder>
@@ -81,6 +87,10 @@
                 <clr-dg-cell>{{ l.operation }}</clr-dg-cell>
                 <clr-dg-cell>{{ l.operation_description }}</clr-dg-cell>
                 <clr-dg-cell>{{ l.operation_result }}</clr-dg-cell>
+                <clr-dg-cell>{{ l.client_address }}</clr-dg-cell>
+                <clr-dg-cell class="truncate-cell" [title]="l.user_agent">{{
+                    l.user_agent
+                }}</clr-dg-cell>
             </clr-dg-row>
             <clr-dg-footer>
                 <clr-dg-pagination

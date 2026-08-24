@@ -509,7 +509,9 @@
         "NOT_FOUND": "We couldn't find any logs!",
         "RESOURCE": "Resource",
         "RESOURCE_TYPE": "Resource Type",
-        "DOWNLOAD": "İndir"
+        "DOWNLOAD": "İndir",
+        "IP_ADDRESS": "IP Adresi",
+        "USER_AGENT": "Kullanıcı Aracısı"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Tetikleyici",

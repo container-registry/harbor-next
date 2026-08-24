@@ -47,3 +47,10 @@
 .width-140 {
     width: 140px;
 }
+
+.truncate-cell {
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

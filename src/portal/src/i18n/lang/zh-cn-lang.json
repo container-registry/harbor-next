@@ -509,7 +509,9 @@
         "NOT_FOUND": "未发现任何日志!",
         "RESOURCE": "资源",
         "RESOURCE_TYPE": "资源类型",
-        "DOWNLOAD": "下载"
+        "DOWNLOAD": "下载",
+        "IP_ADDRESS": "IP 地址",
+        "USER_AGENT": "用户代理"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "触发器",

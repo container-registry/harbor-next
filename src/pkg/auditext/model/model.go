@@ -38,6 +38,8 @@ type AuditLogExt struct {
 	Username             string    `orm:"column(username)"  json:"username"`
 	OpTime               time.Time `orm:"column(op_time)" json:"op_time" sort:"default:desc"`
 	Payload              string    `orm:"-" json:"payload"`
+	ClientAddress        string    `orm:"column(client_address)" json:"client_address"`
+	UserAgent            string    `orm:"column(user_agent)" json:"user_agent"`
 }
 
 // TableName for audit log

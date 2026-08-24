@@ -510,7 +510,9 @@
         "NOT_FOUND": "No pudimos encontrar ningún registro!",
         "RESOURCE": "Recursos",
         "RESOURCE_TYPE": "Tipo de Recurso",
-        "DOWNLOAD": "Descargar"
+        "DOWNLOAD": "Descargar",
+        "IP_ADDRESS": "Dirección IP",
+        "USER_AGENT": "Agente de Usuario"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Disparador",

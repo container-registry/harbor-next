@@ -511,7 +511,9 @@
         "NOT_FOUND": "Nous n'avons trouvé aucun log !",
         "RESOURCE": "Ressource",
         "RESOURCE_TYPE": "Type de ressource",
-        "DOWNLOAD": "Télécharger"
+        "DOWNLOAD": "Télécharger",
+        "IP_ADDRESS": "Adresse IP",
+        "USER_AGENT": "Agent utilisateur"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Déclencheur",

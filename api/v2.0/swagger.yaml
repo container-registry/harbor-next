@@ -7168,6 +7168,12 @@ definitions:
         format: date-time
         example: '2006-01-02T15:04:05Z'
         description: The time when this operation is triggered.
+      client_address:
+        type: string
+        description: The source IP address of the client that triggered this operation.
+      user_agent:
+        type: string
+        description: The User-Agent header of the client that triggered this operation.
   AuditLogEventType:
     type: object
     properties:
