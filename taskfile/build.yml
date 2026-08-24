@@ -77,7 +77,7 @@ tasks:
       - task: _go-build
         vars:
           PLATFORM: '{{index .MATCH 0}}'
-          MAIN_PATH: ./core/main.go
+          MAIN_PATH: ./core/
           OUTPUT_NAME: core
 
   binary:jobservice:*:
