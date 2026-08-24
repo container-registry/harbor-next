@@ -114,7 +114,7 @@ if [[ -f "${series}" ]]; then
     branch="${branch%"${branch##*[![:space:]]}"}"
     [[ -z "${branch}" ]] && continue
 
-    if [[ "${branch}" == */* || "${branch}" == *..* ]]; then
+    if ! git check-ref-format --branch "${branch}" >/dev/null 2>&1; then
       echo "Invalid commercial branch name in series: ${branch}" >&2
       exit 1
     fi
