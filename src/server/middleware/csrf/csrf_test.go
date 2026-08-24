@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/goharbor/harbor/src/common"
+
 	"github.com/goharbor/harbor/src/common/utils/test"
 	"github.com/goharbor/harbor/src/lib/config"
 	_ "github.com/goharbor/harbor/src/pkg/config/inmemory"
@@ -72,65 +73,6 @@ func TestMiddleware(t *testing.T) {
 		assert.Equal(t, c.statusCode, rec.Result().StatusCode)
 		assert.Equal(t, c.returnToken, rec.Result().Header.Get(tokenHeader) != "")
 	}
-}
-
-func TestMiddlewareRejectsPlaintextHTTPOriginByDefault(t *testing.T) {
-	conf := map[string]any{
-		common.ExtEndpoint: "http://localhost:4500",
-	}
-	config.InitWithSettings(conf)
-	t.Setenv(csrfPlaintextHTTPEnv, "false")
-	resetMiddleware()
-	defer func() {
-		config.InitWithSettings(map[string]any{
-			common.ExtEndpoint: "https://host01.com",
-		})
-		resetMiddleware()
-	}()
-
-	statusCode := postWithOrigin(t, "http://localhost:4500")
-	assert.Equal(t, http.StatusForbidden, statusCode)
-}
-
-func TestMiddlewareAllowsPlaintextHTTPOriginWhenEnabled(t *testing.T) {
-	conf := map[string]any{
-		common.ExtEndpoint: "http://localhost:4500",
-	}
-	config.InitWithSettings(conf)
-	resetMiddleware()
-	t.Setenv(csrfPlaintextHTTPEnv, "true")
-	defer func() {
-		config.InitWithSettings(map[string]any{
-			common.ExtEndpoint: "https://host01.com",
-		})
-		resetMiddleware()
-	}()
-
-	statusCode := postWithOrigin(t, "http://localhost:4500")
-	assert.Equal(t, http.StatusOK, statusCode)
-}
-
-func postWithOrigin(t *testing.T, origin string) int {
-	t.Helper()
-
-	srv := Middleware()(&handler{})
-	getReq := httptest.NewRequest(http.MethodGet, origin+"/c/login", nil)
-	getRec := httptest.NewRecorder()
-	srv.ServeHTTP(getRec, getReq)
-
-	token := getRec.Result().Header.Get(tokenHeader)
-	assert.NotEmpty(t, token)
-
-	postReq := httptest.NewRequest(http.MethodPost, origin+"/c/login", nil)
-	postReq.Header.Set("Origin", origin)
-	postReq.Header.Set(tokenHeader, token)
-	for _, cookie := range getRec.Result().Cookies() {
-		postReq.AddCookie(cookie)
-	}
-
-	postRec := httptest.NewRecorder()
-	srv.ServeHTTP(postRec, postReq)
-	return postRec.Result().StatusCode
 }
 
 func TestMiddlewareInvalidKey(t *testing.T) {

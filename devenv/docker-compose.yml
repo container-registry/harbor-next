@@ -89,7 +89,6 @@ services:
       REGISTRY_CREDENTIAL_PASSWORD: ""
       # Core settings
       EXT_ENDPOINT: http://core:8080
-      CSRF_PLAINTEXT_HTTP: ${CSRF_PLAINTEXT_HTTP}
       CORE_URL: http://core:8080
       HARBOR_ADMIN_PASSWORD: Harbor12345
       CACHE_ENABLED: "false"
