@@ -15,8 +15,10 @@
 package security
 
 import (
+	"net"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/common/models"
@@ -29,6 +31,12 @@ import (
 
 type basicAuth struct{}
 
+// mirror audit_log_ext.client_address/user_agent column widths
+const (
+	maxClientIPLen  = 255
+	maxUserAgentLen = 1024
+)
+
 func trueClientIPHeaderName() string {
 	// because the true client IP header varies based on the foreground proxy/lb settings,
 	// make it configurable by env
@@ -39,16 +47,29 @@ func trueClientIPHeaderName() string {
 	return name
 }
 
-// GetClientIP get client ip from request
+// GetClientIP get client ip from request, taking only the first hop of a
+// comma-separated header and falling back to RemoteAddr if it's not an IP
 func GetClientIP(r *http.Request) string {
 	if r == nil {
 		return ""
 	}
-	ip := r.Header.Get(trueClientIPHeaderName())
-	if len(ip) > 0 {
-		return ip
+	if raw := r.Header.Get(trueClientIPHeaderName()); raw != "" {
+		first := strings.TrimSpace(strings.SplitN(raw, ",", 2)[0])
+		if ip := parseIP(first); ip != nil {
+			return truncateRunes(ip.String(), maxClientIPLen)
+		}
 	}
-	return r.RemoteAddr
+	return truncateRunes(r.RemoteAddr, maxClientIPLen)
+}
+
+// parseIP parses s as an IP address, stripping a "host:port" (or
+// "[host]:port") wrapper first if present, since some proxies/LBs
+// port-qualify the client-IP header entry.
+func parseIP(s string) net.IP {
+	if host, _, err := net.SplitHostPort(s); err == nil {
+		s = host
+	}
+	return net.ParseIP(s)
 }
 
 // GetUserAgent get the user agent of current request
@@ -56,7 +77,19 @@ func GetUserAgent(r *http.Request) string {
 	if r == nil {
 		return ""
 	}
-	return r.Header.Get("user-agent")
+	return truncateRunes(r.Header.Get("user-agent"), maxUserAgentLen)
+}
+
+// truncateRunes caps s at maxLen runes, matching Postgres varchar(n) semantics
+func truncateRunes(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s // byte count is always >= rune count
+	}
+	runes := []rune(s)
+	if len(runes) <= maxLen {
+		return s
+	}
+	return string(runes[:maxLen])
 }
 
 func (b *basicAuth) Generate(req *http.Request) security.Context {
