@@ -26,6 +26,7 @@ func RegisterCollectors() {
 		TotalInFlightGauge,
 		TotalReqCnt,
 		TotalReqDurSummary,
+		MigrationPhaseDuration,
 	}...)
 }
 
@@ -61,4 +62,15 @@ var (
 			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 		},
 		[]string{"method", "operation"})
+
+	// MigrationPhaseDuration collects how long each DB migration phase takes at core startup
+	MigrationPhaseDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: os.Getenv(NamespaceEnvKey),
+			Subsystem: os.Getenv(SubsystemEnvKey),
+			Name:      "migration_phase_duration_seconds",
+			Help:      "Duration of each database migration phase at core startup",
+			Buckets:   []float64{.01, .05, .1, .25, .5, 1, 2.5, 5, 10, 30, 60},
+		},
+		[]string{"phase"})
 )
