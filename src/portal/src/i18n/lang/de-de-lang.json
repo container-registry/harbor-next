@@ -509,7 +509,9 @@
         "NOT_FOUND": "Es konnten keine Logdaten gefunden werden!",
         "RESOURCE": "Ressource",
         "RESOURCE_TYPE": "Ressourcen-Typ",
-        "DOWNLOAD": "Herunterladen"
+        "DOWNLOAD": "Herunterladen",
+        "IP_ADDRESS": "IP-Adresse",
+        "USER_AGENT": "User-Agent"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Trigger",

@@ -509,7 +509,9 @@
         "NOT_FOUND": "We couldn't find any logs!",
         "RESOURCE": "Resource",
         "RESOURCE_TYPE": "Resource Type",
-        "DOWNLOAD": "Download"
+        "DOWNLOAD": "Download",
+        "IP_ADDRESS": "IP Address",
+        "USER_AGENT": "User Agent"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Trigger",

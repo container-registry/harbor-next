@@ -509,7 +509,9 @@
         "NOT_FOUND": "找不到任何日誌！",
         "RESOURCE": "資源",
         "RESOURCE_TYPE": "資源類型",
-        "DOWNLOAD": "下載"
+        "DOWNLOAD": "下載",
+        "IP_ADDRESS": "IP 位址",
+        "USER_AGENT": "使用者代理"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "觸發器",

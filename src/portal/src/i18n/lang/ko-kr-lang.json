@@ -509,7 +509,9 @@
         "NOT_FOUND": "로그를 찾을 수 없습니다!",
         "RESOURCE": "리소스",
         "RESOURCE_TYPE": "리소스 종류",
-        "DOWNLOAD": "다운로드"
+        "DOWNLOAD": "다운로드",
+        "IP_ADDRESS": "IP 주소",
+        "USER_AGENT": "사용자 에이전트"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "트리거",

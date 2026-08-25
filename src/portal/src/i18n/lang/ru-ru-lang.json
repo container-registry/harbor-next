@@ -652,7 +652,9 @@
         "OF": "из",
         "NOT_FOUND": "Мы не смогли найти никаких логов!",
         "RESOURCE": "Ресурс",
-        "RESOURCE_TYPE": "Тип ресурса"
+        "RESOURCE_TYPE": "Тип ресурса",
+        "IP_ADDRESS": "IP-адрес",
+        "USER_AGENT": "User-Agent"
     },
     "REPLICATION": {
         "YES": "Да",
@@ -1751,7 +1753,9 @@
     "OF": "из",
     "NOT_FOUND": "Мы не смогли найти никаких логов!",
     "RESOURCE": "Ресурс",
-    "RESOURCE_TYPE": "Тип Ресурса"
+    "RESOURCE_TYPE": "Тип Ресурса",
+    "IP_ADDRESS": "IP-адрес",
+    "USER_AGENT": "User-Agent"
   },
   "REPLICATION": {
     "REPLICATION_TRIGGER": "Триггер",

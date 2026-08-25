@@ -509,7 +509,9 @@
         "NOT_FOUND": "Não encontramos nenhum registro!",
         "RESOURCE": "Recurso",
         "RESOURCE_TYPE": "Tipo de Recurso",
-        "DOWNLOAD": "Baixar"
+        "DOWNLOAD": "Baixar",
+        "IP_ADDRESS": "Endereço IP",
+        "USER_AGENT": "Agente do Usuário"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Gatilho",
