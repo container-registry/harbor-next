@@ -7,6 +7,6 @@ spec:
   interval: 5m
   url: oci://8gears.container-registry.com/8gcr/charts/harbor-next
   ref:
-    tag: 2.0.0
+    semver: ">=2.0.0"
   secretRef:
     name: harbor-system-pull

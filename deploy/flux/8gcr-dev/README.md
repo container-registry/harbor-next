@@ -7,9 +7,10 @@ Continuous-deploy bundle for `https://8gcr.container-registry.dev` on the **hz-h
 | File | Purpose |
 |------|---------|
 | `namespace.yaml` | Namespace `8gcr-dev-main` (the cluster runs multiple Harbor instances; namespace is deployment-specific). |
-| `ocirepository.yaml` | Authenticated pull of the chart from `oci://8gears.container-registry.com/8gcr/charts/harbor-next:2.0.0`, 5-min interval. |
+| `ocirepository.yaml` | Authenticated pull of the chart from `oci://8gears.container-registry.com/8gcr/charts/harbor-next`, tracking released versions via semver `>=2.0.0`, 5-min interval. |
 | `helmrelease.yaml` | Renders the chart with the 8gcr environment values; references the secrets below; provisions a CloudNativePG `Cluster` via the chart's `extraManifests` escape hatch. |
-| `image-automation.yaml` | Flux image-reflector/image-automation resources that track the digest behind each `8gcr/harbor-*:latest` tag and commit annotation updates back to the `8gcr-rolling` branch. |
+| `image-tracking.yaml` | Flux image-reflector resources (`ImageRepository` + `ImagePolicy`) that resolve the digest behind each `8gcr/harbor-*:latest` tag in-cluster. No git write-back. |
+| `rollout-sync.yaml` | CronJob (+ ServiceAccount/RBAC) that copies each reflected digest into the workload's pod-template annotation, rolling the pods when a `latest` digest moves. Registry to cluster directly — no fluxcdbot commits, no bundle republish per image update. |
 | `pull-secret-flux-system.sops.yaml` | SOPS-encrypted `Secret` for `flux-system/harbor-system-pull`, used by Flux to pull `ops/hz-hopper/8gcr-rolling` and inspect `8gcr` images. |
 | `pull-secret-8gcr-dev-main.sops.yaml` | SOPS-encrypted `Secret` for `8gcr-dev-main/harbor-system-pull`, used by Flux and Harbor pods to pull the chart and component images from `8gcr`. |
 | `secrets.sops.yaml` | SOPS-encrypted `Secret` resources for the admin password, the Harbor↔Postgres password, and the CNPG bootstrap credentials. It does not contain registry pull credentials. Decrypted on the cluster by Flux using the existing `flux-system/sops-age` key. |
@@ -18,20 +19,20 @@ Continuous-deploy bundle for `https://8gcr.container-registry.dev` on the **hz-h
 
 ## How it gets to the cluster
 
-1. **Component image publish** (`.github/workflows/dev-images.yml`, every non-doc push to `main`):
-   - Builds all Harbor component images for `linux/amd64` and `linux/arm64`.
-   - Pushes immutable `main-<sha7>` tags and moves `latest` for `8gears.container-registry.com/8gcr/harbor-<component>` (`trivy-adapter` keeps its existing `8gcr/trivy-adapter` repository name).
-   - Signs the moved multi-arch image manifests with keyless cosign and publishes build provenance/SBOM metadata from BuildKit.
+1. **Component image publish** (`.github/workflows/main-images.yml`, runs after `Release Ready` succeeds on `main`, via the reusable `publish-images.yml`):
+   - Applies the commercial patches, then builds all Harbor component images for `linux/amd64` and `linux/arm64`.
+   - Moves `latest` for `8gears.container-registry.com/8gcr/harbor-<component>` (`trivy-adapter` keeps its existing `8gcr/trivy-adapter` repository name).
    - It does not publish Flux deployment configuration.
-2. **Chart publish** (`.github/workflows/chart-publish.yml`, chart changes on `main`):
+2. **Chart publish** (`.github/workflows/publish-chart.yml`, dispatched for a published `chart-v<semver>` release tag):
    - Packages `deploy/chart/` and pushes to `oci://8gears.container-registry.com/8gcr/charts/harbor-next:<version>`.
+   - This bundle's chart `OCIRepository` follows those releases with a `>=2.0.0` semver range, so a new chart release rolls out without editing this directory.
    - It does not publish Flux deployment configuration.
 3. **Rolling Flux config publish** (`.github/workflows/rolling-flux.yml`, every push to `8gcr-rolling` that touches this directory):
    - Bundles this directory and pushes it to `oci://8gears.container-registry.com/ops/hz-hopper/8gcr-rolling:<branch>-<sha7>`.
    - Moves the `latest` tag on that OCI artifact.
    - Authenticates to the `ops` project with `secrets.OPS_REGISTRY_PASSWORD`.
-4. **Latest image tracking** — Flux image automation on hz-hopper watches each `8gcr/harbor-*:latest` tag by digest. When a digest changes, Flux commits the new digest annotation into the `8gcr-rolling` branch. That branch push runs `rolling-flux.yml`, publishes a new config bundle to `ops`, and the cluster reconciles it.
-5. **Reconcile** — Flux on hz-hopper pulls the published `ops/hz-hopper/8gcr-rolling:latest` bundle every 5 min, decrypts SOPS secrets, applies everything, and Helm rolls pods when an image digest annotation changes.
+4. **Latest image tracking (gitless)** — image-reflector on hz-hopper watches each `8gcr/harbor-*:latest` tag by digest (`image-tracking.yaml`). The `rollout-sync` CronJob compares each `ImagePolicy` digest with the workload's pod-template annotation and patches it on change, restarting the pods (`imagePullPolicy: Always` re-pulls `latest`). Image updates never touch git or republish the bundle.
+5. **Reconcile** — Flux on hz-hopper pulls the published `ops/hz-hopper/8gcr-rolling:latest` bundle every 5 min, decrypts SOPS secrets, and applies everything. Chart releases roll out via the OCIRepository semver range; image updates roll out via `rollout-sync`.
 
 The manifests intentionally do not store plaintext registry credentials. Pull access is provided by SOPS-managed cluster secrets:
 
@@ -73,8 +74,7 @@ Everything else this bundle needs is satisfied by hz-hopper's standing infrastru
 
 | Requirement | Source |
 |---|---|
-| FluxCD v2 (`source-controller`, `kustomize-controller`, `helm-controller`, `image-reflector-controller`, `image-automation-controller`) | Pre-installed on hz-hopper. Image controllers are required for mutable `latest` digest tracking. |
-| `flux-system/flux-git-auth` | Pre-existing Git credential that lets Flux image automation commit digest updates to `container-registry/harbor-next:8gcr-rolling`. |
+| FluxCD v2 (`source-controller`, `kustomize-controller`, `helm-controller`, `image-reflector-controller`) | Pre-installed on hz-hopper. image-reflector is required for mutable `latest` digest tracking; image-automation-controller is NOT used (no git write-back). |
 | `flux-system/harbor-system-pull` | SOPS-managed dockerconfigjson for pulling `ops/hz-hopper/8gcr-rolling` and scanning `8gcr/harbor-*` images. |
 | `8gcr-dev-main/harbor-system-pull` | SOPS-managed dockerconfigjson for pulling the chart and component images from `8gcr`. |
 | SOPS decryption key | `Secret/sops-age` in `flux-system` (already present; same key used by other Flux Kustomizations). Public key: `age18jfefmcak9zk6jrh7j59ap0rg3zxg577suvmlyrgm3sn0l28zq4slcu94r`. |
@@ -113,7 +113,7 @@ One DB Secret, one source of truth: rotating `harbor-db-password.password` updat
 
 | Trigger | Registry project | Tag | Consumer |
 |---------|------------------|-----|----------|
-| push to `main` (component images) | `8gcr` | `latest`, `main-<sha7>` | Flux image automation tracks `latest` digest |
+| push to `main` (component images) | `8gcr` | `latest`, `main-<sha7>` | image-reflector + `rollout-sync` CronJob track the `latest` digest in-cluster |
 | push to `main` (chart) | `8gcr` | `2.0.0`, `<base>-dev`, `<base>-main.<sha7>` | this bundle's chart source |
 | push to `8gcr-rolling` (Flux config) | `ops` | `latest`, `<branch>-<sha7>` | hz-hopper root Flux `OCIRepository` |
 | release-please tag | `8gcr` | `<semver>` | future production overlays (pin to semver) |

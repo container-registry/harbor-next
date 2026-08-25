@@ -10,6 +10,7 @@ resources:
   - pull-secret-flux-system.sops.yaml
   - pull-secret-8gcr-dev-main.sops.yaml
   - ocirepository.yaml
-  - image-automation.yaml
+  - image-tracking.yaml
+  - rollout-sync.yaml
   - helmrelease.yaml
   - ingress-packages.yaml

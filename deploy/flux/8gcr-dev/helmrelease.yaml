@@ -127,15 +127,14 @@ spec:
       architecture: standalone
       auth:
         enabled: false
-    # ---- Component image pins (continuous deploy via 8gcr/:latest) ----
-    # Flux image automation follows each mutable latest tag by digest and
-    # rewrites these pod-template annotations in this branch. The branch push
-    # then publishes the bundle to ops/hz-hopper/8gcr-rolling, Flux applies the
-    # changed HelmRelease, and Kubernetes restarts pods with imagePullPolicy:
-    # Always so they pull the new digest behind latest.
+    # ---- Component images (continuous deploy via 8gcr/:latest) ----
+    # Rollouts are gitless: image-reflector (image-tracking.yaml) follows each
+    # mutable latest tag by digest, and the rollout-sync CronJob
+    # (rollout-sync.yaml) writes that digest into the workloads' pod-template
+    # annotations in-cluster; imagePullPolicy: Always re-pulls latest. The
+    # chart intentionally does NOT render those annotations — Helm never
+    # manages the key, so upgrades neither reset nor churn it.
     core:
-      podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:0d32004af2097aad5a5c12fc836b3bc4cdaa279ea61a599054ac7137b0444755" # {"$imagepolicy": "flux-system:harbor-core:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-core
         tag: latest
@@ -163,8 +162,6 @@ spec:
         - name: DEFAULT_SCANNER
           value: Trivy
     jobservice:
-      podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:4d310a201df3c72c058d4fcad45123ce9fcd8bc272784a779105718115d95704" # {"$imagepolicy": "flux-system:harbor-jobservice:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-jobservice
         tag: latest
@@ -174,9 +171,6 @@ spec:
         storageClass: local-path
         size: 1Gi
     registry:
-      podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:b16fe68696f4bddca3ce9c5150acdf092d4af651b74a84a9d9828d9fbd12e43d" # {"$imagepolicy": "flux-system:harbor-registry:digest"}
-        deploy.8gears.io/registryctl-image-revision: "sha256:5923b36b2373b11f698a77df9086777d27f72a014183805295c679aef11a0b1f" # {"$imagepolicy": "flux-system:harbor-registryctl:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-registry
         tag: latest
@@ -190,24 +184,18 @@ spec:
         storageClass: local-path
         size: 10Gi
     portal:
-      podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:1d0f93164eb39e409504576d4c685b91a63df7ab66d6775facfb5fbef312df58" # {"$imagepolicy": "flux-system:harbor-portal:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-portal
         tag: latest
       replicas: 1
     exporter:
       enabled: true
-      podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:7fb4e3a94508a8354ce41a09f84b699772082f6f7fa5a39106c584c00717f648" # {"$imagepolicy": "flux-system:harbor-exporter:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-exporter
         tag: latest
       replicas: 1
     trivy:
       enabled: true
-      podAnnotations:
-        deploy.8gears.io/image-revision: "sha256:0bad0dba5134ae3f56d506094827a128a294d720b93576367b3b0adf4fcb89ad" # {"$imagepolicy": "flux-system:trivy-adapter:digest"}
       image:
         repository: 8gears.container-registry.com/8gcr/trivy-adapter
         tag: latest
@@ -281,8 +269,6 @@ spec:
               app.kubernetes.io/name: grype-scanner
           template:
             metadata:
-              annotations:
-                deploy.8gears.io/image-revision: "sha256:403a54fe05943c8dc2d0de5f9c8d02ac213c1182d8e4b0eee8f612fe47385eb7" # {"$imagepolicy": "flux-system:harbor-grype-adapter:digest"}
               labels:
                 app.kubernetes.io/name: grype-scanner
                 app.kubernetes.io/component: scanner
@@ -376,8 +362,6 @@ spec:
               app.kubernetes.io/name: snyk-scanner
           template:
             metadata:
-              annotations:
-                deploy.8gears.io/image-revision: "sha256:0a138cb54ec95e60c76f1cbd074f866cfec9254744fca6c9fe7ac848ae3289b6" # {"$imagepolicy": "flux-system:harbor-snyk-adapter:digest"}
               labels:
                 app.kubernetes.io/name: snyk-scanner
                 app.kubernetes.io/component: scanner

@@ -1,16 +1,3 @@
-apiVersion: source.toolkit.fluxcd.io/v1
-kind: GitRepository
-metadata:
-  name: harbor-next-rolling
-  namespace: flux-system
-spec:
-  interval: 1m
-  url: https://github.com/container-registry/harbor-next.git
-  ref:
-    branch: 8gcr-rolling
-  secretRef:
-    name: flux-git-auth
----
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
 metadata:
@@ -262,28 +249,3 @@ spec:
       order: asc
   digestReflectionPolicy: Always
   interval: 1m
----
-apiVersion: image.toolkit.fluxcd.io/v1
-kind: ImageUpdateAutomation
-metadata:
-  name: harbor-next-rolling
-  namespace: flux-system
-spec:
-  interval: 1m
-  sourceRef:
-    kind: GitRepository
-    name: harbor-next-rolling
-  git:
-    checkout:
-      ref:
-        branch: 8gcr-rolling
-    commit:
-      author:
-        name: fluxcdbot
-        email: fluxcdbot@users.noreply.github.com
-      messageTemplate: "chore(rolling): update 8gcr image digests"
-    push:
-      branch: 8gcr-rolling
-  update:
-    path: ./deploy/flux/8gcr-dev
-    strategy: Setters
