@@ -1,0 +1,19 @@
+version: '3'
+
+vars:
+  VERSION:
+    sh: cat '{{.ROOT_DIR}}/VERSION'
+  TEMPLATE: '{{.ROOT_DIR}}/make/migrations/postgresql/harbor_next.sql.template'
+  STAMPED: '{{.ROOT_DIR}}/make/migrations/postgresql/harbor_next_{{.VERSION}}.sql'
+
+tasks:
+  stamp:
+    desc: "Stamp harbor_next.sql.template into harbor_next_<VERSION>.sql for the current /VERSION"
+    preconditions:
+      - sh: test -f '{{.TEMPLATE}}'
+        msg: "template not found: {{.TEMPLATE}}"
+      # only the DDL matters here; header comments legitimately differ between the template and a stamped copy
+      - sh: '! test -f "{{.STAMPED}}" || diff -q <(grep -v "^--" "{{.TEMPLATE}}") <(grep -v "^--" "{{.STAMPED}}") >/dev/null 2>&1 || (echo "{{.STAMPED}} already exists with different content" >&2 && false)'
+    cmds:
+      - cp '{{.TEMPLATE}}' '{{.STAMPED}}'
+      - echo "Stamped {{.STAMPED}}"

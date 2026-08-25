@@ -68,6 +68,8 @@ includes:
     taskfile: ./taskfile/release-images-local.yml
   release-notes:
     taskfile: ./taskfile/release-notes.yml
+  schema:
+    taskfile: ./taskfile/schema-versioning.yml
 
 tasks:
   default:
