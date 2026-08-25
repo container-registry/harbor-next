@@ -59,7 +59,7 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 	}
 	t.Cleanup(schemaPool.Close)
 
-	if _, err := schemaPool.DB().ExecContext(ctx, "CREATE TABLE robot (id SERIAL PRIMARY KEY)"); err != nil {
+	if _, err := schemaPool.DB().ExecContext(ctx, "CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)"); err != nil {
 		t.Fatalf("create robot dependency: %v", err)
 	}
 

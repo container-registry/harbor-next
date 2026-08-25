@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS identity_providers (
 CREATE TABLE IF NOT EXISTS robot_identity_providers (
     id                   SERIAL PRIMARY KEY,
     identity_provider_id INT NOT NULL REFERENCES identity_providers(id) ON DELETE CASCADE,
-    robot_id             INT NOT NULL REFERENCES robot(id) ON DELETE CASCADE,
+    robot_id             BIGINT NOT NULL REFERENCES robot(id) ON DELETE CASCADE,
     creation_time        TIMESTAMP DEFAULT NOW(),
     UNIQUE (identity_provider_id, robot_id)
 );
@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS robot_identity_providers (
 CREATE TABLE IF NOT EXISTS claim_rules (
     id                   SERIAL PRIMARY KEY,
     identity_provider_id INT NOT NULL REFERENCES identity_providers(id) ON DELETE CASCADE,
-    robot_id             INT NOT NULL DEFAULT 0,
+    robot_id             BIGINT NOT NULL DEFAULT 0,
     claim_path           TEXT NOT NULL,
     value                TEXT,
     creation_time        TIMESTAMP DEFAULT NOW()
