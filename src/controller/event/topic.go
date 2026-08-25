@@ -152,6 +152,13 @@ type ArtifactEvent struct {
 	Labels     []string
 	Operator   string
 	OccurAt    time.Time
+	// ClientAddress is the source IP address of the request that triggered
+	// the event. Empty when the event originates outside an HTTP request
+	// (e.g. replication, retention).
+	ClientAddress string
+	// UserAgent is the User-Agent header of the request that triggered the
+	// event.
+	UserAgent string
 }
 
 func (a *ArtifactEvent) String() string {
@@ -174,7 +181,9 @@ func (p *PushArtifactEvent) ResolveToAuditLog() (*model.AuditLogExt, error) {
 		Username:             p.Operator,
 		IsSuccessful:         true,
 		OperationDescription: fmt.Sprintf("push artifact: %s@%s", p.Artifact.RepositoryName, p.Artifact.Digest),
-		ResourceType:         ResourceTypeArtifact}
+		ResourceType:         ResourceTypeArtifact,
+		ClientAddress:        p.ClientAddress,
+		UserAgent:            p.UserAgent}
 
 	if len(p.Tags) == 0 {
 		auditLog.Resource = fmt.Sprintf("%s@%s",
@@ -205,7 +214,9 @@ func (p *PullArtifactEvent) ResolveToAuditLog() (*model.AuditLogExt, error) {
 		Username:             p.Operator,
 		IsSuccessful:         true,
 		OperationDescription: fmt.Sprintf("pull artifact: %s@%s", p.Artifact.RepositoryName, p.Artifact.Digest),
-		ResourceType:         ResourceTypeArtifact}
+		ResourceType:         ResourceTypeArtifact,
+		ClientAddress:        p.ClientAddress,
+		UserAgent:            p.UserAgent}
 
 	if len(p.Tags) == 0 {
 		auditLog.Resource = fmt.Sprintf("%s@%s",
@@ -244,7 +255,9 @@ func (d *DeleteArtifactEvent) ResolveToAuditLog() (*model.AuditLogExt, error) {
 		ResourceType:         ResourceTypeArtifact,
 		IsSuccessful:         true,
 		OperationDescription: fmt.Sprintf("delete artifact: %s@%s", d.Artifact.RepositoryName, d.Artifact.Digest),
-		Resource:             fmt.Sprintf("%s@%s", d.Artifact.RepositoryName, d.Artifact.Digest)}
+		Resource:             fmt.Sprintf("%s@%s", d.Artifact.RepositoryName, d.Artifact.Digest),
+		ClientAddress:        d.ClientAddress,
+		UserAgent:            d.UserAgent}
 	return auditLog, nil
 }
 

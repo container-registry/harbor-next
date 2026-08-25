@@ -192,11 +192,13 @@ func (l *localHelper) UpdatePullTime(ctx context.Context, art lib.ArtifactInfo) 
 }
 
 // SendPullEvent send a pull image event
-func SendPullEvent(ctx context.Context, a *artifact.Artifact, tag, operator string) {
+func SendPullEvent(ctx context.Context, a *artifact.Artifact, tag, operator, clientAddress, userAgent string) {
 	e := &metadata.PullArtifactEventMetadata{
-		Artifact: &a.Artifact,
-		Tag:      tag,
-		Operator: operator,
+		Artifact:      &a.Artifact,
+		Tag:           tag,
+		Operator:      operator,
+		ClientAddress: clientAddress,
+		UserAgent:     userAgent,
 	}
 	event.BuildAndPublish(ctx, e)
 }

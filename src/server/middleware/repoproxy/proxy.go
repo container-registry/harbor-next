@@ -34,6 +34,7 @@ import (
 	"github.com/goharbor/harbor/src/common/security"
 	"github.com/goharbor/harbor/src/common/security/proxycachesecret"
 	robotSc "github.com/goharbor/harbor/src/common/security/robot"
+	"github.com/goharbor/harbor/src/controller/event/metadata/requestinfo"
 	"github.com/goharbor/harbor/src/controller/project"
 	"github.com/goharbor/harbor/src/controller/proxy"
 	"github.com/goharbor/harbor/src/controller/registry"
@@ -55,6 +56,7 @@ import (
 	"github.com/goharbor/harbor/src/pkg/proxy/connection"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
 	"github.com/goharbor/harbor/src/server/middleware"
+	securitymiddleware "github.com/goharbor/harbor/src/server/middleware/security"
 )
 
 const (
@@ -296,7 +298,10 @@ func upstreamRegistryConnectionKey(art lib.ArtifactInfo) string {
 }
 
 func handleManifest(w http.ResponseWriter, r *http.Request, next http.Handler) error {
-	ctx := r.Context()
+	// carry the client address/user agent down into the (possibly async,
+	// proxy-cache background) pull event so the eventual audit log entry
+	// still records who triggered it.
+	ctx := requestinfo.NewContext(r.Context(), securitymiddleware.GetClientIP(r), securitymiddleware.GetUserAgent(r))
 	art, p, proxyCtl, err := preCheck(ctx, true)
 	if err != nil {
 		return err
