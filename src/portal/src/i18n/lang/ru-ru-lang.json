@@ -656,6 +656,16 @@
         "IP_ADDRESS": "IP-адрес",
         "USER_AGENT": "User-Agent"
     },
+    "AUDIT_LOG_CONFIG": {
+        "RECORDING": "Запись событий",
+        "USERS": "Пользователи",
+        "MEMBERS": "Участники проекта",
+        "ROBOTS": "Роботы",
+        "ARTIFACTS": "Артефакты",
+        "PROJECTS": "Проекты",
+        "CONFIGURATION": "Конфигурация",
+        "REPOSITORIES": "Репозитории"
+    },
     "REPLICATION": {
         "YES": "Да",
         "SECONDS": "Секунды",
@@ -1032,6 +1042,7 @@
         "REPO_READ_ONLY": "Репозиторий только для чтения",
         "WEBHOOK_NOTIFICATION_ENABLED": "Вебхуки включены",
         "SYSTEM": "Настройки системы",
+        "AUDIT_LOG": "Журнал аудита",
         "PROJECT_QUOTAS": "Квоты проектов",
         "VULNERABILITY": "Уязвимость",
         "GC": "Сборка мусора",
@@ -1757,6 +1768,16 @@
     "IP_ADDRESS": "IP-адрес",
     "USER_AGENT": "User-Agent"
   },
+  "AUDIT_LOG_CONFIG": {
+    "RECORDING": "Запись событий",
+    "USERS": "Пользователи",
+    "MEMBERS": "Участники проекта",
+    "ROBOTS": "Роботы",
+    "ARTIFACTS": "Артефакты",
+    "PROJECTS": "Проекты",
+    "CONFIGURATION": "Конфигурация",
+    "REPOSITORIES": "Репозитории"
+  },
   "REPLICATION": {
     "REPLICATION_TRIGGER": "Триггер",
     "PUSH_BASED_ONLY": "Только для репликации на основе отправки",
@@ -2030,6 +2051,7 @@
     "REPOSITORY": "Репозиторий",
     "REPO_READ_ONLY": "Репозиторий только для чтения",
     "SYSTEM": "Настройки системы",
+    "AUDIT_LOG": "Журнал аудита",
     "PROJECT_QUOTAS": "Квоты",
     "VULNERABILITY": "Уязвимость",
     "GC": "Сборщик мусора",

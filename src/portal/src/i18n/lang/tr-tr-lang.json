@@ -513,6 +513,16 @@
         "IP_ADDRESS": "IP Adresi",
         "USER_AGENT": "Kullanıcı Aracısı"
     },
+    "AUDIT_LOG_CONFIG": {
+        "RECORDING": "Olay Kaydı",
+        "USERS": "Kullanıcılar",
+        "MEMBERS": "Proje Üyeleri",
+        "ROBOTS": "Robotlar",
+        "ARTIFACTS": "Artifacts",
+        "PROJECTS": "Projeler",
+        "CONFIGURATION": "Configuration",
+        "REPOSITORIES": "Depolar"
+    },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Tetikleyici",
         "PUSH_BASED_ONLY": "Only for the push-based replication",
@@ -786,6 +796,7 @@
         "REPOSITORY": "Depo",
         "REPO_READ_ONLY": "Depo Salt Okunur",
         "SYSTEM": "Sistem Ayarları",
+        "AUDIT_LOG": "Audit Log",
         "PROJECT_QUOTAS": "Proje Kotaları",
         "VULNERABILITY": "Güvenlik Açığı",
         "GC": "Çöp toplama",

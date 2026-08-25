@@ -513,6 +513,16 @@
         "IP_ADDRESS": "IP 位址",
         "USER_AGENT": "使用者代理"
     },
+    "AUDIT_LOG_CONFIG": {
+        "RECORDING": "事件記錄",
+        "USERS": "使用者",
+        "MEMBERS": "專案成員",
+        "ROBOTS": "機器人",
+        "ARTIFACTS": "Artifact",
+        "PROJECTS": "專案",
+        "CONFIGURATION": "組態設定",
+        "REPOSITORIES": "儲存庫"
+    },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "觸發器",
         "PUSH_BASED_ONLY": "僅適用於推送模式的複製",
@@ -788,6 +798,7 @@
         "REPOSITORY": "儲存庫",
         "REPO_READ_ONLY": "儲存庫唯讀",
         "SYSTEM": "系統設定",
+        "AUDIT_LOG": "稽核日誌",
         "PROJECT_QUOTAS": "專案配額",
         "VULNERABILITY": "弱點",
         "GC": "垃圾回收",

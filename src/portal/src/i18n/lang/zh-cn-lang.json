@@ -513,6 +513,16 @@
         "IP_ADDRESS": "IP 地址",
         "USER_AGENT": "用户代理"
     },
+    "AUDIT_LOG_CONFIG": {
+        "RECORDING": "事件记录",
+        "USERS": "用户",
+        "MEMBERS": "项目成员",
+        "ROBOTS": "机器人",
+        "ARTIFACTS": "Artifacts",
+        "PROJECTS": "项目",
+        "CONFIGURATION": "Configuration",
+        "REPOSITORIES": "仓库"
+    },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "触发器",
         "PUSH_BASED_ONLY": "仅针对于 Push-Based 模式下的复制操作",
@@ -788,6 +798,7 @@
         "REPOSITORY": "仓库",
         "REPO_READ_ONLY": "仓库只读",
         "SYSTEM": "系统设置",
+        "AUDIT_LOG": "审核日志",
         "PROJECT_QUOTAS": "项目定额",
         "VULNERABILITY": "漏洞",
         "GC": "垃圾清理",

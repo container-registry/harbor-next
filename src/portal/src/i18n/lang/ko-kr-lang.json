@@ -513,6 +513,16 @@
         "IP_ADDRESS": "IP 주소",
         "USER_AGENT": "사용자 에이전트"
     },
+    "AUDIT_LOG_CONFIG": {
+        "RECORDING": "이벤트 기록",
+        "USERS": "사용자",
+        "MEMBERS": "프로젝트 멤버",
+        "ROBOTS": "로봇",
+        "ARTIFACTS": "아티팩트",
+        "PROJECTS": "프로젝트",
+        "CONFIGURATION": "Configuration",
+        "REPOSITORIES": "저장소"
+    },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "트리거",
         "PUSH_BASED_ONLY": "푸시 기반 복제에만 해당됩니다",
@@ -786,6 +796,7 @@
         "REPOSITORY": "저장소",
         "REPO_READ_ONLY": "읽기 전용 저장소",
         "SYSTEM": "시스템 셋팅",
+        "AUDIT_LOG": "감사 로그",
         "PROJECT_QUOTAS": "프로젝트 할당량",
         "VULNERABILITY": "취약점",
         "GC": "가비지 컬랙션",
