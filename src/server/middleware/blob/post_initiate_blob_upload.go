@@ -57,8 +57,7 @@ func PostInitiateBlobUploadMiddleware() func(http.Handler) http.Handler {
 			return nil
 		}
 
-		// the route skips the request-wide transaction middleware, so make a short transaction
-		// manually for the mount-case writes, same as the PUT blob upload middleware does
+		// the route skips the request-wide transaction middleware
 		return orm.WithTransaction(h)(orm.SetTransactionOpNameToContext(ctx, "tx-post-initiate-blob-mw"))
 	})
 }

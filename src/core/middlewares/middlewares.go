@@ -52,8 +52,7 @@ var (
 	// until the API finished, this behavior may eat all the database connections.
 	// There are no database writing operations in the PATCH Blob APIs, so skip the transaction middleware is all ok.
 	// For the PUT Blob Upload API, we will make a transaction manually to write blob info to the database when put blob upload successfully.
-	// For the POST Initiate Blob Upload API, the only database writes happen on the cross-repo mount case,
-	// which makes a transaction manually in the blob middleware, so the request-wide transaction is not needed either.
+	// The POST Initiate Blob Upload API only writes on the cross-repo mount case, covered by a manual transaction in the blob middleware.
 	dbTxSkippers = []middleware.Skipper{
 		middleware.MethodAndPathSkipper(http.MethodPatch, distribution.BlobUploadURLRegexp),
 		middleware.MethodAndPathSkipper(http.MethodPut, distribution.BlobUploadURLRegexp),
