@@ -375,9 +375,7 @@ func (c *controller) Refresh(ctx context.Context, reference, referenceID string,
 			return nil, err
 		}
 
-		// Reservations whose rows are not yet committed are invisible to
-		// CalculateUsage; without this the refresh would overwrite them (see
-		// inflight.go).
+		// uncommitted in-flight reservations are invisible to CalculateUsage (see inflight.go)
 		if inflight := c.inflightSum(ctx, reference, referenceID); len(inflight) > 0 {
 			newUsed = types.Add(newUsed, inflight)
 		}
@@ -396,16 +394,11 @@ func (c *controller) Request(ctx context.Context, reference, referenceID string,
 
 	provider := updateQuotaProviderType(config.GetQuotaUpdateProvider())
 
-	// When called inside the request-wide transaction (transaction middleware),
-	// the reserve UPDATE would keep the quota_usage row lock until that
-	// transaction commits, i.e. across the proxied registry round-trip, which
-	// serializes all concurrent pushes to the same project. Detach the
-	// reserve/rollback onto fresh autocommit ormers so the row lock is released
-	// right after the single CAS UPDATE. The rollback additionally drops the
-	// request cancellation because the compensation must still run when the
-	// client has gone away. The residual exposure — a crash between the
-	// committed reserve and the rollback over-counts usage until the next
-	// refresh — matches what the redis update provider already accepts.
+	// Inside the request-wide tx the reserve UPDATE would hold the quota_usage
+	// row lock across the proxied registry round-trip, serializing all pushes
+	// to the project — detach it onto autocommit ormers (the version CAS gives
+	// atomicity). Rollback uses orm.Copy: compensation must still run after
+	// the client disconnected.
 	reserveCtx, rollbackCtx := ctx, ctx
 	detached := provider != updateQuotaProviderRedis && orm.InTransaction(ctx)
 	if detached {
@@ -413,10 +406,8 @@ func (c *controller) Request(ctx context.Context, reference, referenceID string,
 		rollbackCtx = orm.Copy(ctx)
 	}
 
-	// The ledger entry must exist before the reserve commits so a concurrent
-	// Refresh never observes the committed reservation without it (see
-	// inflight.go). Only the DB provider needs it: the redis provider's usage
-	// lives in redis and is flushed asynchronously anyway.
+	// track before the reserve commits — no ordering may let a concurrent
+	// Refresh see the reservation without the ledger entry (see inflight.go)
 	cleanup := func() {}
 	if provider == updateQuotaProviderDB {
 		if token, err := c.trackInflight(ctx, reference, referenceID, resources); err != nil {
@@ -443,8 +434,7 @@ func (c *controller) Request(ctx context.Context, reference, referenceID string,
 		return err
 	}
 
-	// On success the reserved rows become countable only once the enclosing
-	// transaction commits; AfterCommit runs immediately when there is none.
+	// the reserved rows only become countable by Refresh at commit
 	orm.AfterCommit(ctx, cleanup)
 
 	return nil

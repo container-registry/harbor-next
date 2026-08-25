@@ -27,22 +27,15 @@ import (
 	"github.com/goharbor/harbor/src/pkg/quota/types"
 )
 
-// A reserve that committed on its own short transaction (see Request) is
-// visible in quota_usage before the artifact/blob rows of the request it
-// belongs to are committed. A concurrent Refresh recalculating usage from
-// those tables would not see the in-flight rows and would CAS-overwrite the
-// reservation. The in-flight ledger closes that gap: every detached reserve
-// is recorded here first, and Refresh adds the ledger sum on top of the
-// recalculated usage. Entries are removed once the owning transaction has
-// committed (the rows are then counted by the recalculation itself) or after
-// the reservation has been rolled back; the per-entry deadline reclaims
-// entries orphaned by a crash, erring on the side of over-counting until it
-// expires.
+// A detached reserve (see Request) commits before the artifact/blob rows it
+// pays for; a concurrent Refresh recalculating from those tables would
+// CAS-overwrite it. This ledger closes the gap: reserves are recorded before
+// they commit, Refresh adds the ledger sum, entries are removed on tx commit
+// or rollback. Deadlines reclaim crash orphans, erring toward over-counting.
 
 const (
-	// inflightEntryTTL must outlive the longest request that can sit between
-	// a committed reserve and its transaction commit (manifest PUT incl.
-	// abstractor fetches). Key-level TTL doubles it as idle-project GC.
+	// must outlive the longest request between reserve and tx commit
+	// (manifest PUT incl. abstractor fetches)
 	inflightEntryTTL = 10 * time.Minute
 )
 
@@ -56,9 +49,6 @@ func inflightKey(reference, referenceID string) string {
 	return fmt.Sprintf("cache:quota:inflight:%s:%s", reference, referenceID)
 }
 
-// trackInflight records resources in the ledger and returns the token to
-// remove them with. A failure only degrades Refresh accuracy back to the
-// pre-ledger behavior, so it is logged and the reservation proceeds.
 func (c *controller) trackInflight(ctx context.Context, reference, referenceID string, resources types.ResourceList) (string, error) {
 	client, err := libredis.GetHarborClient()
 	if err != nil {
@@ -78,15 +68,13 @@ func (c *controller) trackInflight(ctx context.Context, reference, referenceID s
 	if err := client.HSet(ctx, key, token, payload).Err(); err != nil {
 		return "", err
 	}
-	// best effort: bounds the key when a busy project never drains to zero entries
+	// key-level TTL alone is not enough: a busy project keeps refreshing it,
+	// so expired fields are additionally reaped in inflightSum
 	client.Expire(ctx, key, 2*inflightEntryTTL)
 
 	return token, nil
 }
 
-// untrackInflight removes one ledger entry. Runs after the owning transaction
-// committed or after the reservation was rolled back, so it must not be tied
-// to the request's cancellation.
 func (c *controller) untrackInflight(ctx context.Context, reference, referenceID, token string) {
 	client, err := libredis.GetHarborClient()
 	if err != nil {
@@ -98,9 +86,7 @@ func (c *controller) untrackInflight(ctx context.Context, reference, referenceID
 	}
 }
 
-// inflightSum returns the total of live ledger entries for the reference.
-// Expired entries are skipped and opportunistically deleted. Any error means
-// "no adjustment" so Refresh still converges the way it did before the ledger.
+// Errors degrade to "no adjustment": Refresh then behaves as before the ledger.
 func (c *controller) inflightSum(ctx context.Context, reference, referenceID string) types.ResourceList {
 	client, err := libredis.GetHarborClient()
 	if err != nil {
