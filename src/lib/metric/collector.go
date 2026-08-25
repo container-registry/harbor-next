@@ -28,6 +28,7 @@ func RegisterCollectors() {
 		TotalReqDurSummary,
 		TotalProxyReq,
 		TotalProxyUpstreamReq,
+		MigrationPhaseDuration,
 	}...)
 }
 
@@ -83,4 +84,15 @@ var (
 			Help:      "The total number of proxy cache requests that fetched from the upstream registry (cache miss)",
 		},
 		[]string{"project", "method"})
+
+	// MigrationPhaseDuration collects how long each DB migration phase takes at core startup
+	MigrationPhaseDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: os.Getenv(NamespaceEnvKey),
+			Subsystem: os.Getenv(SubsystemEnvKey),
+			Name:      "migration_phase_duration_seconds",
+			Help:      "Duration of each database migration phase at core startup",
+			Buckets:   []float64{.01, .05, .1, .25, .5, 1, 2.5, 5, 10, 30, 60},
+		},
+		[]string{"phase"})
 )

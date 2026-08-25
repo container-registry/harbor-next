@@ -17,12 +17,14 @@ package migration
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 
 	"github.com/goharbor/harbor/src/common/dao"
 	"github.com/goharbor/harbor/src/common/models"
 	"github.com/goharbor/harbor/src/lib/log"
+	"github.com/goharbor/harbor/src/lib/metric"
 )
 
 // Migrate upgrades DB schema and do necessary transformation of the data in DB
@@ -38,13 +40,27 @@ func Migrate(database *models.Database) error {
 		return err
 	}
 	log.Debugf("current database schema version: %v", schemaVersion)
+	start := time.Now()
 	if err := dao.UpgradeSchema(database); err != nil {
 		return err
 	}
+	observeMigrationPhase("numbered", start)
 
 	pool := dao.GetPool()
 	if pool == nil {
 		return fmt.Errorf("apply authoritative Harbor Next schema: database pool is not initialized")
 	}
-	return applyAuthoritativeSchema(context.Background(), sqlSchemaDB{db: pool.DB()}, authoritativeSchemaPath())
+	start = time.Now()
+	if err := applyAuthoritativeSchema(context.Background(), sqlSchemaDB{db: pool.DB()}, authoritativeSchemaPath()); err != nil {
+		return err
+	}
+	observeMigrationPhase("authoritative", start)
+	return nil
+}
+
+// observeMigrationPhase logs and records how long a migration phase took
+func observeMigrationPhase(phase string, start time.Time) {
+	elapsed := time.Since(start)
+	log.Infof("migration phase %q took %s", phase, elapsed)
+	metric.MigrationPhaseDuration.WithLabelValues(phase).Observe(elapsed.Seconds())
 }
