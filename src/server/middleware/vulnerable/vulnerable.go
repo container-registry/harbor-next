@@ -50,10 +50,8 @@ func Middleware() func(http.Handler) http.Handler {
 			return errors.New("artifactinfo middleware required before this middleware").WithCode(errors.NotFoundCode)
 		}
 
-		// fetch the project without the CVE allowlist first, the allowlist is
-		// only needed when the vulnerability prevention is actually enforced,
-		// which spares 1-2 allowlist queries on every manifest GET/HEAD for
-		// projects with the prevention deactivated (the common case)
+		// the CVE allowlist is fetched later, only on the enforced path — this
+		// middleware runs on every manifest GET/HEAD and prevention is off by default
 		proj, err := projectController.Get(ctx, info.ProjectName)
 		if err != nil {
 			logger.Errorf("get the project %s failed, error: %v", info.ProjectName, err)
