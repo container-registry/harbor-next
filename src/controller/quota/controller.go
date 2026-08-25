@@ -375,6 +375,13 @@ func (c *controller) Refresh(ctx context.Context, reference, referenceID string,
 			return nil, err
 		}
 
+		// Reservations whose rows are not yet committed are invisible to
+		// CalculateUsage; without this the refresh would overwrite them (see
+		// inflight.go).
+		if inflight := c.inflightSum(ctx, reference, referenceID); len(inflight) > 0 {
+			newUsed = types.Add(newUsed, inflight)
+		}
+
 		return newUsed, err
 	}
 
@@ -400,13 +407,28 @@ func (c *controller) Request(ctx context.Context, reference, referenceID string,
 	// committed reserve and the rollback over-counts usage until the next
 	// refresh — matches what the redis update provider already accepts.
 	reserveCtx, rollbackCtx := ctx, ctx
-	if provider != updateQuotaProviderRedis && orm.InTransaction(ctx) {
+	detached := provider != updateQuotaProviderRedis && orm.InTransaction(ctx)
+	if detached {
 		reserveCtx = orm.Clone(ctx)
 		rollbackCtx = orm.Copy(ctx)
 	}
 
+	// The ledger entry must exist before the reserve commits so a concurrent
+	// Refresh never observes the committed reservation without it (see
+	// inflight.go). Only the DB provider needs it: the redis provider's usage
+	// lives in redis and is flushed asynchronously anyway.
+	cleanup := func() {}
+	if provider == updateQuotaProviderDB {
+		if token, err := c.trackInflight(ctx, reference, referenceID, resources); err != nil {
+			log.G(ctx).Warningf("failed to track in-flight quota reservation for %s %s, refresh may transiently under-count: %v", reference, referenceID, err)
+		} else {
+			cleanup = func() { c.untrackInflight(ctx, reference, referenceID, token) }
+		}
+	}
+
 	if err := c.updateUsageWithRetry(reserveCtx, reference, referenceID, reserveResources(resources), provider); err != nil {
 		log.G(ctx).Errorf("reserve resources %s for %s %s failed, error: %v", resources.String(), reference, referenceID, err)
+		cleanup()
 		return err
 	}
 
@@ -417,9 +439,15 @@ func (c *controller) Request(ctx context.Context, reference, referenceID string,
 			// ignore this error, the quota usage will be correct when users do operations which will call refresh quota
 			log.G(ctx).Warningf("rollback resources %s for %s %s failed, error: %v", resources.String(), reference, referenceID, er)
 		}
+		cleanup()
+		return err
 	}
 
-	return err
+	// On success the reserved rows become countable only once the enclosing
+	// transaction commits; AfterCommit runs immediately when there is none.
+	orm.AfterCommit(ctx, cleanup)
+
+	return nil
 }
 
 // calcQuota calculates the quota and usage in real time.

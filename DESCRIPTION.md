@@ -30,20 +30,62 @@ reserve-before-proxy, compensate-on-failure via the pre-existing
   + one CAS `UPDATE`, and the version CAS already provides the atomicity, so
   autocommit is strictly better than a BEGIN/COMMIT pair (fewer statements,
   shortest possible lock hold).
-- The redis update provider path is untouched (it does not touch the DB in the
-  request path). `Refresh` is untouched: its recalculation reads uncommitted
-  rows of the request tx, so detaching it would persist usage derived from data
-  that may roll back.
+- The redis update provider path is untouched (its request-path usage lives in
+  redis; the DB is only read on a cache miss via `calcQuota`, and usage is
+  flushed to the DB asynchronously).
 - Unit tests: `InTransaction` table test; `Request` tests asserting the reserve
   is persisted before `f()` runs and that the rollback compensates (usage back
-  to the pre-reserve value) when `f()` fails.
+  to the pre-reserve value) when `f()` fails; `TestInflightLedger` covering the
+  ledger round-trip and expiry reaping (skips when redis is unreachable).
+
+## Refresh reconcile (in-flight reservation ledger)
+
+Detaching the reserve opens a window the request-wide transaction used to
+close implicitly: the committed reservation is visible in `quota_usage` while
+the push's artifact/blob rows are still uncommitted. A concurrent `Refresh`
+(artifact delete, GC, retention, manual) recalculates usage from those tables,
+cannot see the in-flight rows, and would CAS-overwrite the reservation
+(baseline avoided this only because Refresh's UPDATE blocked on the row lock
+until the push committed, then CAS-failed and recalculated against committed
+rows).
+
+`src/controller/quota/inflight.go` closes the window with a redis ledger:
+
+- `Request` (DB provider only) records the reserved delta under a unique token
+  **before** the reserve commits, so no ordering lets Refresh observe the
+  reservation without the ledger entry.
+- `Refresh`'s `calculateUsage` adds the sum of live ledger entries on top of
+  `driver.CalculateUsage`, so in-flight reservations survive a concurrent
+  recalculation.
+- The entry is removed after the enclosing request transaction commits
+  (`orm.AfterCommit`; runs immediately when there is no tx, e.g. the blob PUT
+  route) — at that point the rows are countable by the recalculation itself —
+  or right after a failed `f()` has been compensated by `rollbackResources`.
+- Crash safety: each entry carries a 10-minute deadline; readers skip and reap
+  expired entries, and the key has a 2× TTL as idle GC. An orphaned entry
+  therefore over-counts refreshes for at most 10 minutes, after which the next
+  Refresh converges — deliberately erring toward blocking pushes rather than
+  breaching quota.
+- Redis unavailability degrades gracefully: track/read failures are logged and
+  behavior falls back to the pre-ledger semantics (reserve still happens; the
+  race window returns until redis is back). This also means the ledger adds
+  zero SQL statements; it is 1–2 redis round-trips per reserving request.
+
+Known residual (documented, judged acceptable): between the request-tx commit
+and the `AfterCommit` HDEL, a Refresh counts the rows *and* the ledger entry —
+a transient over-count that the same Refresh path corrects on its next run.
+If the request tx rolls back after a successful `f()` (commit failure), the
+`AfterCommit` hook never fires and the entry lives until its deadline; usage
+is over-counted for that window, consistent with the crash exposure below.
 
 ## Files changed
 
-- `src/lib/orm/orm.go` (+12)
+- `src/lib/orm/orm.go` (`InTransaction` helper)
 - `src/lib/orm/in_transaction_test.go` (new)
-- `src/controller/quota/controller.go` (+18, -2)
-- `src/controller/quota/controller_test.go` (+38)
+- `src/controller/quota/controller.go` (`Request` detach + ledger wiring,
+  `Refresh` in-flight adjustment)
+- `src/controller/quota/inflight.go` (new: in-flight reservation ledger)
+- `src/controller/quota/controller_test.go`, `inflight_test.go` (tests)
 
 ## Measurements
 
@@ -88,9 +130,14 @@ observed fleet bottleneck).
 - The reservation is durable independently of the request tx. A core crash (or
   request-tx commit failure) between the committed reserve and the rollback
   leaves the quota over-counted until the next `Refresh` (any subsequent
-  successful push/delete of the project, or a manual refresh). This matches
-  the exposure already accepted by the redis update provider, which flushes
-  usage to the DB asynchronously.
+  successful push/delete of the project, or a manual refresh); the matching
+  ledger entry additionally makes refreshes over-count until its 10-minute
+  deadline. This matches the direction of the exposure already accepted by the
+  redis update provider (asynchronous flush): quota errs toward over-counting,
+  never toward breaching the limit.
+- Concurrent `Refresh` vs in-flight reserve is reconciled by the ledger (see
+  above); with redis down the pre-ledger race window returns, bounded by redis
+  availability.
 - Each in-flight push briefly takes one extra pooled connection for the
   reserve (2 SELECTs + 1 UPDATE). In the theoretical case of ≥ max_open_conns
   concurrent in-tx requests all reserving at once, requests could wait on the
