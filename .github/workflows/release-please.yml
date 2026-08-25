@@ -14,7 +14,7 @@ permissions:
 jobs:
   validate-release-ref:
     name: Validate Release Ref
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-26.04
     steps:
       - name: Allow only release refs
         run: |
@@ -27,7 +27,7 @@ jobs:
 
   release-please:
     needs: [validate-release-ref]
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-26.04
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
@@ -127,7 +127,7 @@ jobs:
     # unprefixed release-please outputs. Chart releases run on main only.
     needs: [validate-release-ref]
     if: ${{ github.ref_name == 'main' }}
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
       pull-requests: write
@@ -153,7 +153,7 @@ jobs:
         needs.release-please.outputs.release_created == 'true' &&
         needs.release-please.outputs.patch == '0'
       }}
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
     env:
