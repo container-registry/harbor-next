@@ -226,7 +226,6 @@ Upstream-Author: @original-author
 
 | Name | Type | Required | Purpose |
 |------|------|----------|---------|
-| `RUNNER` | Variable | No | Custom runner label |
 | `REGISTRY_ADDRESS` | Variable | No | Registry host, defaults to `8gears.container-registry.com` |
 | `REGISTRY_PROJECT` | Variable | No | Registry project, defaults to `8gcr` |
 | `REGISTRY_USERNAME` | Variable | Yes | Registry push username |

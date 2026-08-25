@@ -49,7 +49,7 @@ jobs:
         platform:
           - linux/amd64
           - linux/arm64
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
@@ -163,7 +163,7 @@ jobs:
       fail-fast: false
       matrix:
         component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter]
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
@@ -212,7 +212,7 @@ jobs:
     name: Sign preview images
     if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'renovate[bot]' }}
     needs: [merge]
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       id-token: write
@@ -269,7 +269,7 @@ jobs:
     name: Comment preview image refs
     if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'renovate[bot]' }}
     needs: [sign]
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-26.04
     permissions:
       issues: write
       pull-requests: write

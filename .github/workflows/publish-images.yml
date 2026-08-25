@@ -43,7 +43,7 @@ jobs:
         platform:
           - linux/amd64
           - linux/arm64
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     env:
@@ -210,7 +210,7 @@ jobs:
     strategy:
       matrix:
         component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter, grype-scanner, snyk-scanner]
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     env:
@@ -263,7 +263,7 @@ jobs:
   sign:
     name: Sign images
     needs: [merge]
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       id-token: write

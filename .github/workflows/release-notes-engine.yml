@@ -31,7 +31,7 @@ concurrency:
 jobs:
   update:
     name: Recreate ${{ inputs.tag_name || 'Release Preview' }} Notes
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     env:
       GH_TOKEN: ${{ github.token }}
