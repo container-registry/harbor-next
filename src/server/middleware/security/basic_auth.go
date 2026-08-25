@@ -31,7 +31,7 @@ import (
 
 type basicAuth struct{}
 
-// mirror audit_log_ext.client_address/user_agent column widths
+// mirror audit_log_ext.client_address/user_agent column widths in db
 const (
 	maxClientIPLen  = 255
 	maxUserAgentLen = 1024
