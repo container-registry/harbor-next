@@ -513,6 +513,16 @@
         "IP_ADDRESS": "Endereço IP",
         "USER_AGENT": "Agente do Usuário"
     },
+    "AUDIT_LOG_CONFIG": {
+        "RECORDING": "Registro de Eventos",
+        "USERS": "Usuários",
+        "MEMBERS": "Membros do Projeto",
+        "ROBOTS": "Robôs",
+        "ARTIFACTS": "Artifacts",
+        "PROJECTS": "Projetos",
+        "CONFIGURATION": "Configuration",
+        "REPOSITORIES": "Repositórios"
+    },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Gatilho",
         "PUSH_BASED_ONLY": "Only for the push-based replication",
@@ -789,6 +799,7 @@
         "REPOSITORY": "Repositório",
         "REPO_READ_ONLY": "Repositório somente leitura",
         "SYSTEM": "Configurações do Sistema",
+        "AUDIT_LOG": "Audit Log",
         "PROJECT_QUOTAS": "Cotas de Projeto",
         "VULNERABILITY": "Vulnerabilidade",
         "GC": "Limpeza (GC)",

@@ -513,6 +513,16 @@
         "IP_ADDRESS": "IP Address",
         "USER_AGENT": "User Agent"
     },
+    "AUDIT_LOG_CONFIG": {
+        "RECORDING": "Event Recording",
+        "USERS": "Users",
+        "MEMBERS": "Project Members",
+        "ROBOTS": "Robots",
+        "ARTIFACTS": "Artifacts",
+        "PROJECTS": "Projects",
+        "CONFIGURATION": "Configuration",
+        "REPOSITORIES": "Repositories"
+    },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Trigger",
         "PUSH_BASED_ONLY": "Only for the push-based replication",
@@ -786,6 +796,7 @@
         "REPOSITORY": "Repository",
         "REPO_READ_ONLY": "Repository Read Only",
         "SYSTEM": "System Settings",
+        "AUDIT_LOG": "Audit Log",
         "PROJECT_QUOTAS": "Project Quotas",
         "VULNERABILITY": "Vulnerability",
         "GC": "Garbage Collection",
