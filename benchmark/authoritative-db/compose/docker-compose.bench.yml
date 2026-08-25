@@ -1,0 +1,90 @@
+# Minimal 3-replica core stack for authoritative-DB migration benchmarking.
+# Not the production compose stack: no portal/registry/jobservice, since core
+# doesn't need them to boot — only postgres and redis are dialed at startup.
+services:
+  postgresql:
+    image: docker.io/library/postgres:18-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root123
+      POSTGRES_DB: registry
+    ports:
+      - "${PORT_POSTGRES:-15432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  redis:
+    image: docker.io/valkey/valkey:latest
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli ping | grep -q PONG"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+      start_period: 2s
+
+  core-0: &core
+    image: localhost/harbor-core:${CORE_TAG:?CORE_TAG required}
+    ports:
+      - "${PORT_CORE_0:-18080}:8080"
+    volumes:
+      - ./token_service_key.pem:/etc/core/token_service_key.pem:ro
+    environment: &core-env
+      POSTGRESQL_HOST: postgresql
+      POSTGRESQL_PORT: "5432"
+      POSTGRESQL_USERNAME: postgres
+      POSTGRESQL_PASSWORD: root123
+      POSTGRESQL_DATABASE: registry
+      POSTGRESQL_SSLMODE: disable
+      _REDIS_URL_CORE: redis://redis:6379/1
+      _REDIS_URL_REG: redis://redis:6379/2
+      REGISTRY_URL: http://127.0.0.1:0
+      REGISTRY_CONTROLLER_URL: http://127.0.0.1:0
+      REGISTRY_CREDENTIAL_USERNAME: ""
+      REGISTRY_CREDENTIAL_PASSWORD: ""
+      EXT_ENDPOINT: http://core-0:8080
+      CORE_URL: http://core-0:8080
+      HARBOR_ADMIN_PASSWORD: Harbor12345
+      CACHE_ENABLED: "false"
+      LOG_LEVEL: info
+      TOKEN_PRIVATE_KEY_PATH: /etc/core/token_service_key.pem
+      JOBSERVICE_URL: http://127.0.0.1:0
+      CORE_SECRET: bench-secret-do-not-use-in-production
+      JOBSERVICE_SECRET: bench-secret-do-not-use-in-production
+      WITH_TRIVY: "false"
+      METRIC_ENABLE: "true"
+      METRIC_PORT: "9090"
+      METRIC_PATH: /metrics
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/lprobe", "-port", "8080", "-endpoint", "/api/v2.0/ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  core-1:
+    <<: *core
+    ports:
+      - "${PORT_CORE_1:-18081}:8080"
+    environment:
+      <<: *core-env
+      EXT_ENDPOINT: http://core-1:8080
+      CORE_URL: http://core-1:8080
+
+  core-2:
+    <<: *core
+    ports:
+      - "${PORT_CORE_2:-18082}:8080"
+    environment:
+      <<: *core-env
+      EXT_ENDPOINT: http://core-2:8080
+      CORE_URL: http://core-2:8080
