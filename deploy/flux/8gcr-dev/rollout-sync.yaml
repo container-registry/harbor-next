@@ -1,0 +1,150 @@
+# Gitless last mile of the image pipeline: image-reflector (image-tracking.yaml)
+# resolves the digest behind each 8gcr/harbor-*:latest tag; this CronJob copies
+# that digest into the workload's pod-template annotation, which is what makes
+# Kubernetes roll the pods (imagePullPolicy: Always re-pulls latest). No git
+# write-back, no bundle republish — registry to cluster directly.
+#
+# The annotation is intentionally NOT rendered by the Helm chart: Helm's
+# three-way merge leaves keys it never managed alone, so upgrades neither reset
+# nor churn it. Patching is idempotent — the merge patch is a no-op while the
+# annotation already carries the current digest.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rollout-sync
+  namespace: 8gcr-dev-main
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: rollout-sync-imagepolicies
+  namespace: flux-system
+rules:
+  - apiGroups: [image.toolkit.fluxcd.io]
+    resources: [imagepolicies]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: rollout-sync-imagepolicies
+  namespace: flux-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: rollout-sync-imagepolicies
+subjects:
+  - kind: ServiceAccount
+    name: rollout-sync
+    namespace: 8gcr-dev-main
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: rollout-sync-workloads
+  namespace: 8gcr-dev-main
+rules:
+  - apiGroups: [apps]
+    resources: [deployments, statefulsets]
+    verbs: [get, list, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: rollout-sync-workloads
+  namespace: 8gcr-dev-main
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: rollout-sync-workloads
+subjects:
+  - kind: ServiceAccount
+    name: rollout-sync
+    namespace: 8gcr-dev-main
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: rollout-sync
+  namespace: 8gcr-dev-main
+  labels:
+    app.kubernetes.io/name: rollout-sync
+    app.kubernetes.io/part-of: harbor
+spec:
+  schedule: "*/2 * * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 120
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 120
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: rollout-sync
+            app.kubernetes.io/part-of: harbor
+        spec:
+          serviceAccountName: rollout-sync
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: sync
+              image: docker.io/alpine/kubectl:1.33.4
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+                readOnlyRootFilesystem: true
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  memory: 64Mi
+              command:
+                - /bin/sh
+                - -eu
+                - -c
+                - |
+                  ns_app=8gcr-dev-main
+                  ns_flux=flux-system
+                  fail=0
+                  sync() {
+                    kind=$1 workload=$2 policy=$3 anno=$4
+                    want=$(kubectl get imagepolicies.image.toolkit.fluxcd.io "$policy" -n "$ns_flux" \
+                      -o jsonpath='{.status.latestRef.digest}') || {
+                      echo "ERROR: cannot read ImagePolicy $policy" >&2; fail=1; return 0; }
+                    if [ -z "$want" ]; then
+                      echo "$policy: no digest reflected yet, skipping"; return 0
+                    fi
+                    esc=$(printf '%s' "$anno" | sed 's/\./\\./g')
+                    have=$(kubectl get "$kind" "$workload" -n "$ns_app" \
+                      -o jsonpath="{.spec.template.metadata.annotations['$esc']}") || {
+                      echo "ERROR: cannot read $kind/$workload" >&2; fail=1; return 0; }
+                    if [ "$have" = "$want" ]; then
+                      echo "$kind/$workload ($anno) up to date at $want"; return 0
+                    fi
+                    echo "$kind/$workload ($anno): $have -> $want"
+                    kubectl patch "$kind" "$workload" -n "$ns_app" --type merge \
+                      -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"$anno\":\"$want\"}}}}}" || {
+                      echo "ERROR: cannot patch $kind/$workload" >&2; fail=1; return 0; }
+                  }
+                  rev=deploy.8gears.io/image-revision
+                  sync deployment  harbor-harbor-next-core       harbor-core          "$rev"
+                  sync deployment  harbor-harbor-next-jobservice harbor-jobservice    "$rev"
+                  sync deployment  harbor-harbor-next-registry   harbor-registry      "$rev"
+                  sync deployment  harbor-harbor-next-registry   harbor-registryctl   deploy.8gears.io/registryctl-image-revision
+                  sync deployment  harbor-harbor-next-portal     harbor-portal        "$rev"
+                  sync deployment  harbor-harbor-next-exporter   harbor-exporter      "$rev"
+                  sync statefulset harbor-harbor-next-trivy      trivy-adapter        "$rev"
+                  sync deployment  grype-scanner                 harbor-grype-adapter "$rev"
+                  sync deployment  snyk-scanner                  harbor-snyk-adapter  "$rev"
+                  exit "$fail"

@@ -6,5 +6,11 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - secrets.sops.yaml
+  - harbor-snyk.sops.yaml
+  - pull-secret-flux-system.sops.yaml
+  - pull-secret-8gcr-dev-main.sops.yaml
   - ocirepository.yaml
+  - image-tracking.yaml
+  - rollout-sync.yaml
   - helmrelease.yaml
+  - ingress-packages.yaml
