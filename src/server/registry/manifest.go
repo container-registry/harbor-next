@@ -26,6 +26,7 @@ import (
 	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/controller/artifact"
 	"github.com/goharbor/harbor/src/controller/event/metadata"
+	"github.com/goharbor/harbor/src/controller/event/metadata/requestinfo"
 	"github.com/goharbor/harbor/src/controller/event/operator"
 	"github.com/goharbor/harbor/src/controller/repository"
 	"github.com/goharbor/harbor/src/lib"
@@ -35,6 +36,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/pkg"
 	"github.com/goharbor/harbor/src/pkg/notification"
+	securitymiddleware "github.com/goharbor/harbor/src/server/middleware/security"
 	"github.com/goharbor/harbor/src/server/router"
 )
 
@@ -129,8 +131,10 @@ func getManifest(w http.ResponseWriter, req *http.Request) {
 	}
 
 	e := &metadata.PullArtifactEventMetadata{
-		Artifact: &art.Artifact,
-		Operator: operator.FromContext(req.Context()),
+		Artifact:      &art.Artifact,
+		Operator:      operator.FromContext(req.Context()),
+		ClientAddress: securitymiddleware.GetClientIP(req),
+		UserAgent:     securitymiddleware.GetUserAgent(req),
 	}
 	// the reference is tag
 	if _, err = digest.Parse(reference); err != nil {
@@ -158,7 +162,8 @@ func deleteManifest(w http.ResponseWriter, req *http.Request) {
 		lib_http.SendError(w, err)
 		return
 	}
-	if err = artifact.Ctl.Delete(req.Context(), art.ID); err != nil {
+	ctx := requestinfo.NewContext(req.Context(), securitymiddleware.GetClientIP(req), securitymiddleware.GetUserAgent(req))
+	if err = artifact.Ctl.Delete(ctx, art.ID); err != nil {
 		lib_http.SendError(w, err)
 		return
 	}
@@ -225,7 +230,8 @@ func putManifest(w http.ResponseWriter, req *http.Request) {
 		tags = append(tags, reference)
 	}
 
-	if _, _, err := artifact.Ctl.Ensure(req.Context(), repo, dgt, &artifact.ArtOption{
+	ctx := requestinfo.NewContext(req.Context(), securitymiddleware.GetClientIP(req), securitymiddleware.GetUserAgent(req))
+	if _, _, err := artifact.Ctl.Ensure(ctx, repo, dgt, &artifact.ArtOption{
 		Tags: tags,
 	}); err != nil {
 		lib_http.SendError(w, err)

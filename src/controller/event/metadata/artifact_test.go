@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	event2 "github.com/goharbor/harbor/src/controller/event"
+	"github.com/goharbor/harbor/src/controller/event/metadata/requestinfo"
 	"github.com/goharbor/harbor/src/pkg/artifact"
 	"github.com/goharbor/harbor/src/pkg/notifier/event"
 )
@@ -31,8 +32,9 @@ type artifactEventTestSuite struct {
 
 func (a *artifactEventTestSuite) TestResolveOfPushArtifactEventMetadata() {
 	e := &event.Event{}
+	ctx := requestinfo.NewContext(context.Background(), "203.0.113.10", "docker/24.0.0")
 	metadata := &PushArtifactEventMetadata{
-		Ctx:      context.Background(),
+		Ctx:      ctx,
 		Artifact: &artifact.Artifact{ID: 1},
 		Tag:      "latest",
 	}
@@ -44,14 +46,18 @@ func (a *artifactEventTestSuite) TestResolveOfPushArtifactEventMetadata() {
 	a.Require().True(ok)
 	a.Equal(int64(1), data.Artifact.ID)
 	a.Equal("latest", data.Tags[0])
+	a.Equal("203.0.113.10", data.ClientAddress)
+	a.Equal("docker/24.0.0", data.UserAgent)
 }
 
 func (a *artifactEventTestSuite) TestResolveOfPullArtifactEventMetadata() {
 	e := &event.Event{}
 	metadata := &PullArtifactEventMetadata{
-		Artifact: &artifact.Artifact{ID: 1},
-		Tag:      "latest",
-		Operator: "admin",
+		Artifact:      &artifact.Artifact{ID: 1},
+		Tag:           "latest",
+		Operator:      "admin",
+		ClientAddress: "203.0.113.10",
+		UserAgent:     "docker/24.0.0",
 	}
 	err := metadata.Resolve(e)
 	a.Require().Nil(err)
@@ -61,12 +67,15 @@ func (a *artifactEventTestSuite) TestResolveOfPullArtifactEventMetadata() {
 	a.Require().True(ok)
 	a.Equal(int64(1), data.Artifact.ID)
 	a.Equal("latest", data.Tags[0])
+	a.Equal("203.0.113.10", data.ClientAddress)
+	a.Equal("docker/24.0.0", data.UserAgent)
 }
 
 func (a *artifactEventTestSuite) TestResolveOfDeleteArtifactEventMetadata() {
 	e := &event.Event{}
+	ctx := requestinfo.NewContext(context.Background(), "203.0.113.10", "docker/24.0.0")
 	metadata := &DeleteArtifactEventMetadata{
-		Ctx:      context.Background(),
+		Ctx:      ctx,
 		Artifact: &artifact.Artifact{ID: 1},
 		Tags:     []string{"latest"},
 	}
@@ -79,6 +88,8 @@ func (a *artifactEventTestSuite) TestResolveOfDeleteArtifactEventMetadata() {
 	a.Equal(int64(1), data.Artifact.ID)
 	a.Require().Len(data.Tags, 1)
 	a.Equal("latest", data.Tags[0])
+	a.Equal("203.0.113.10", data.ClientAddress)
+	a.Equal("docker/24.0.0", data.UserAgent)
 }
 
 func TestArtifactEventTestSuite(t *testing.T) {
