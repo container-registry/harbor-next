@@ -7,6 +7,10 @@
 --
 -- Only additive, data-preserving changes belong here. Destructive changes and
 -- large data backfills require a separately reviewed operational procedure.
+--
+-- branding and identity_providers/robot_identity_providers/claim_rules were
+-- formerly release-2.15 migrations 0181/0182; both numbers were later reused
+-- by real upstream migrations, so they moved here instead of being renumbered.
 
 -- Branding customization
 CREATE TABLE IF NOT EXISTS branding (
