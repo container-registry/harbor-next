@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	beego_orm "github.com/beego/beego/v2/client/orm"
 	"github.com/stretchr/testify/suite"
@@ -58,6 +59,75 @@ func (suite *HeadBlobUploadMiddlewareTestSuite) TestHeadBlobStatusNone() {
 		suite.Nil(err)
 		suite.Equal(digest, blob.Digest)
 		suite.Equal(blob_models.StatusNone, blob.Status)
+	})
+}
+
+func (suite *HeadBlobUploadMiddlewareTestSuite) TestHeadBlobStatusNoneFreshSkipsTouch() {
+	suite.WithProject(func(projectID int64, projectName string) {
+		suite.T().Setenv("GC_TIME_WINDOW_HOURS", "2")
+		digest := suite.DigestString()
+
+		_, err := blob.Ctl.Ensure(suite.Context(), digest, "application/octet-stream", 512)
+		suite.Nil(err)
+		before, err := blob.Ctl.Get(suite.Context(), digest)
+		suite.Nil(err)
+
+		req := suite.makeRequest(projectName, digest)
+		res := httptest.NewRecorder()
+		next := suite.NextHandler(http.StatusOK, map[string]string{"Docker-Content-Digest": digest})
+		HeadBlobMiddleware()(next).ServeHTTP(res, req)
+		suite.Equal(http.StatusOK, res.Code)
+
+		after, err := blob.Ctl.Get(suite.Context(), digest)
+		suite.Nil(err)
+		suite.Equal(blob_models.StatusNone, after.Status)
+		suite.Equal(before.Version, after.Version, "fresh StatusNone blob must not be touched")
+	})
+}
+
+func (suite *HeadBlobUploadMiddlewareTestSuite) TestHeadBlobStatusNoneStaleTouches() {
+	suite.WithProject(func(projectID int64, projectName string) {
+		suite.T().Setenv("GC_TIME_WINDOW_HOURS", "2")
+		digest := suite.DigestString()
+
+		id, err := blob.Ctl.Ensure(suite.Context(), digest, "application/octet-stream", 512)
+		suite.Nil(err)
+		before, err := blob.Ctl.Get(suite.Context(), digest)
+		suite.Nil(err)
+		suite.Nil(backdateBlob(suite.Context(), id, 2*time.Hour))
+
+		req := suite.makeRequest(projectName, digest)
+		res := httptest.NewRecorder()
+		next := suite.NextHandler(http.StatusOK, map[string]string{"Docker-Content-Digest": digest})
+		HeadBlobMiddleware()(next).ServeHTTP(res, req)
+		suite.Equal(http.StatusOK, res.Code)
+
+		after, err := blob.Ctl.Get(suite.Context(), digest)
+		suite.Nil(err)
+		suite.Equal(blob_models.StatusNone, after.Status)
+		suite.Equal(before.Version+1, after.Version, "stale StatusNone blob must be touched to stay out of the GC window")
+	})
+}
+
+func (suite *HeadBlobUploadMiddlewareTestSuite) TestHeadBlobStatusDeleteRescued() {
+	suite.WithProject(func(projectID int64, projectName string) {
+		digest := suite.DigestString()
+
+		id, err := blob.Ctl.Ensure(suite.Context(), digest, "application/octet-stream", 512)
+		suite.Nil(err)
+
+		_, err = pkg_blob.Mgr.UpdateBlobStatus(suite.Context(), &blob_models.Blob{ID: id, Status: blob_models.StatusDelete})
+		suite.Nil(err)
+
+		req := suite.makeRequest(projectName, digest)
+		res := httptest.NewRecorder()
+		next := suite.NextHandler(http.StatusOK, map[string]string{"Docker-Content-Digest": digest})
+		HeadBlobMiddleware()(next).ServeHTTP(res, req)
+		suite.Equal(http.StatusOK, res.Code)
+
+		after, err := blob.Ctl.Get(suite.Context(), digest)
+		suite.Nil(err)
+		suite.Equal(blob_models.StatusNone, after.Status, "GC candidate must be rescued back to StatusNone")
 	})
 }
 
