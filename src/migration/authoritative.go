@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/goharbor/harbor/src/lib/log"
 )
@@ -33,6 +34,10 @@ const (
 	// serializes reconciliation when multiple core replicas start together.
 	authoritativeSchemaLockID int64 = 0x484e455854534348
 )
+
+// authoritativeSchemaLockTimeout bounds the wait for a peer holding the advisory
+// lock; the schema apply itself is not bounded. A var so tests can shorten it.
+var authoritativeSchemaLockTimeout = 10 * time.Minute
 
 type schemaDB interface {
 	Begin(context.Context) (schemaTx, error)
@@ -106,7 +111,9 @@ func applyAuthoritativeSchema(ctx context.Context, db schemaDB, path string) err
 		}
 	}()
 
-	if err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", authoritativeSchemaLockID); err != nil {
+	lockCtx, cancel := context.WithTimeout(ctx, authoritativeSchemaLockTimeout)
+	defer cancel()
+	if err := tx.Exec(lockCtx, "SELECT pg_advisory_xact_lock($1)", authoritativeSchemaLockID); err != nil {
 		return fmt.Errorf("lock authoritative Harbor Next schema: %w", err)
 	}
 	if err := tx.Exec(ctx, string(schema)); err != nil {

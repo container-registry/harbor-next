@@ -19,6 +19,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -204,6 +205,67 @@ func TestApplyAuthoritativeSchemaErrors(t *testing.T) {
 			}
 		})
 	}
+}
+
+// lockWaitSchemaTx simulates a peer holding the advisory lock when blockLock
+// is set, and records whether the schema statement ran with a deadline.
+type lockWaitSchemaTx struct {
+	blockLock         bool
+	schemaHadDeadline bool
+	schemaRan         bool
+	rolledBack        bool
+}
+
+func (tx *lockWaitSchemaTx) Exec(ctx context.Context, query string, _ ...any) error {
+	if strings.Contains(query, "pg_advisory_xact_lock") {
+		if tx.blockLock {
+			<-ctx.Done()
+			return ctx.Err()
+		}
+		return nil
+	}
+	tx.schemaRan = true
+	_, tx.schemaHadDeadline = ctx.Deadline()
+	return nil
+}
+
+func (tx *lockWaitSchemaTx) Commit() error {
+	return nil
+}
+
+func (tx *lockWaitSchemaTx) Rollback() error {
+	tx.rolledBack = true
+	return nil
+}
+
+func TestApplyAuthoritativeSchemaBoundsOnlyTheLockWait(t *testing.T) {
+	saved := authoritativeSchemaLockTimeout
+	authoritativeSchemaLockTimeout = 50 * time.Millisecond
+	t.Cleanup(func() { authoritativeSchemaLockTimeout = saved })
+	path := writeSchema(t, "SELECT 1;")
+
+	t.Run("lock held by a peer", func(t *testing.T) {
+		tx := &lockWaitSchemaTx{blockLock: true}
+		db := fakeSchemaDB{begin: func(context.Context) (schemaTx, error) { return tx, nil }}
+		err := applyAuthoritativeSchema(context.Background(), db, path)
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("applyAuthoritativeSchema() error = %v, want error wrapping %v", err, context.DeadlineExceeded)
+		}
+		if tx.schemaRan || !tx.rolledBack {
+			t.Errorf("schemaRan = %t, rolledBack = %t, want false, true", tx.schemaRan, tx.rolledBack)
+		}
+	})
+
+	t.Run("schema apply runs unbounded", func(t *testing.T) {
+		tx := &lockWaitSchemaTx{}
+		db := fakeSchemaDB{begin: func(context.Context) (schemaTx, error) { return tx, nil }}
+		if err := applyAuthoritativeSchema(context.Background(), db, path); err != nil {
+			t.Fatalf("applyAuthoritativeSchema() error = %v", err)
+		}
+		if !tx.schemaRan || tx.schemaHadDeadline {
+			t.Errorf("schemaRan = %t, schemaHadDeadline = %t, want true, false", tx.schemaRan, tx.schemaHadDeadline)
+		}
+	})
 }
 
 func writeSchema(t *testing.T, contents string) string {
