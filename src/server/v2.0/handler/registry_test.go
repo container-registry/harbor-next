@@ -102,6 +102,21 @@ func (suite *RegistryTestSuite) TestPingRegistryInlineUsesSuppliedURL() {
 	suite.Equal("https://inline.example.com", pinged.URL)
 }
 
+// TestPingRegistryInlineInvalidSchemeRejected guards the inline ping path against
+// URLs outside the scheme allowlist reaching the health check.
+func (suite *RegistryTestSuite) TestPingRegistryInlineInvalidSchemeRejected() {
+	suite.Security.On("IsAuthenticated").Return(true).Once()
+	suite.Security.On("Can", mock.Anything, mock.Anything, mock.Anything).Return(true).Once()
+
+	res, err := suite.PostJSON("/registries/ping", &models.RegistryPing{
+		Type: suite.ptrStr("harbor"),
+		URL:  suite.ptrStr("gopher://attacker.example.com"),
+	})
+	suite.NoError(err)
+	suite.Equal(400, res.StatusCode)
+	suite.regCtl.AssertNotCalled(suite.T(), "IsHealthy", testifymock.Anything, testifymock.Anything)
+}
+
 // TestUpdateRegistryID0ReturnsNotFound guards against updating synthetic local registry ID 0,
 // asserting the NotFound response and that controller's Get and Update methods are not called.
 func (suite *RegistryTestSuite) TestUpdateRegistryID0ReturnsNotFound() {
@@ -149,23 +164,65 @@ func (suite *RegistryTestSuite) TestUpdateRegistryClearsAccessSecretOnURLChange(
 // TestUpdateRegistryInvalidURLReturnsError tests that updating a registry with an invalid
 // URL returns BadRequest error and does not update the registry.
 func (suite *RegistryTestSuite) TestUpdateRegistryInvalidURLReturnsError() {
-	suite.Security.On("IsAuthenticated").Return(true).Once()
-	suite.Security.On("Can", mock.Anything, mock.Anything, mock.Anything).Return(true).Once()
+	for _, invalidURL := range []string{
+		"gopher://invalid.example.com",
+		"file:///etc/passwd",
+		"http://127.0.0.%31/",
+	} {
+		suite.SetupTest()
+		suite.Security.On("IsAuthenticated").Return(true).Once()
+		suite.Security.On("Can", mock.Anything, mock.Anything, mock.Anything).Return(true).Once()
 
-	saved := &model.Registry{
-		ID:         1,
-		Type:       "harbor",
-		URL:        "https://registry.example.com",
-		Credential: &model.Credential{Type: "basic", AccessKey: "admin", AccessSecret: "secret123"},
+		saved := &model.Registry{
+			ID:         1,
+			Type:       "harbor",
+			URL:        "https://registry.example.com",
+			Credential: &model.Credential{Type: "basic", AccessKey: "admin", AccessSecret: "secret123"},
+		}
+		mock.OnAnything(suite.regCtl, "Get").Return(saved, nil).Once()
+
+		res, err := suite.PutJSON("/registries/1", &models.RegistryUpdate{
+			URL: suite.ptrStr(invalidURL),
+		})
+		suite.NoError(err)
+		suite.Equal(400, res.StatusCode, "URL %q must be rejected", invalidURL)
+		suite.regCtl.AssertNotCalled(suite.T(), "Update", testifymock.Anything, testifymock.Anything)
 	}
-	mock.OnAnything(suite.regCtl, "Get").Return(saved, nil).Once()
+}
 
-	res, err := suite.PutJSON("/registries/1", &models.RegistryUpdate{
-		URL: suite.ptrStr("ftp://invalid.example.com"),
-	})
-	suite.NoError(err)
-	suite.Equal(400, res.StatusCode)
-	suite.regCtl.AssertNotCalled(suite.T(), "Update", testifymock.Anything, testifymock.Anything)
+// TestUpdateRegistryStorageSchemeURLAccepted documents that schema-aware validation
+// accepts storage-backed registry URLs (sftp/s3) on update, and that changing to one
+// still clears the stored AccessSecret like any other URL change.
+func (suite *RegistryTestSuite) TestUpdateRegistryStorageSchemeURLAccepted() {
+	for _, newURL := range []string{
+		"sftp://storage.example.com",
+		"s3://bucket.example.com",
+	} {
+		suite.SetupTest()
+		suite.Security.On("IsAuthenticated").Return(true).Once()
+		suite.Security.On("Can", mock.Anything, mock.Anything, mock.Anything).Return(true).Once()
+
+		saved := &model.Registry{
+			ID:         1,
+			Type:       "harbor",
+			URL:        "https://registry.example.com",
+			Credential: &model.Credential{Type: "basic", AccessKey: "admin", AccessSecret: "secret123"},
+		}
+		mock.OnAnything(suite.regCtl, "Get").Return(saved, nil).Once()
+
+		var updated *model.Registry
+		suite.regCtl.On("Update", mock.Anything, mock.Anything).Return(nil).Once().
+			Run(func(args testifymock.Arguments) { updated = args.Get(1).(*model.Registry) })
+
+		res, err := suite.PutJSON("/registries/1", &models.RegistryUpdate{
+			URL: suite.ptrStr(newURL),
+		})
+		suite.NoError(err)
+		suite.Equal(200, res.StatusCode, "URL %q must be accepted", newURL)
+		suite.Require().NotNil(updated)
+		suite.Equal(newURL, updated.URL)
+		suite.Empty(updated.Credential.AccessSecret)
+	}
 }
 
 func TestRegistryTestSuite(t *testing.T) {
