@@ -43,7 +43,7 @@ env:
 jobs:
   scan-remediate:
     name: Scan, Remediate, and Report
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-26.04
     env:
       GH_TOKEN: ${{ github.token }}
       TRIVY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD || secrets.HARBOR_PASSWORD }}

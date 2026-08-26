@@ -27,7 +27,7 @@ jobs:
   # --------------------------------------------------------------------------
   test-unit:
     name: Unit Tests (pure)
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository || contains(fromJSON('["OWNER","MEMBER"]'), github.event.pull_request.author_association)) && vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-26.04
     env:
       CGO_ENABLED: "1"
       RACE_FLAGS: -race
@@ -58,7 +58,7 @@ jobs:
   # --------------------------------------------------------------------------
   test-db:
     name: Unit Tests (DB ${{ matrix.shard_name }})
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository || contains(fromJSON('["OWNER","MEMBER"]'), github.event.pull_request.author_association)) && vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-26.04
     strategy:
       fail-fast: false
       matrix:
