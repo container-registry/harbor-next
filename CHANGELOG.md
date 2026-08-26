@@ -6,6 +6,28 @@ This changelog mirrors [GitHub Releases](https://github.com/container-registry/h
 
 ---
 
+## [2.15.8](https://github.com/container-registry/harbor-next/compare/v2.15.7...v2.15.8) (2026-08-26)
+
+
+### Features
+
+* Replace ValidateHTTPURL with schema-aware ValidateURL ([#744](https://github.com/container-registry/harbor-next/issues/744)) ([e7e4729](https://github.com/container-registry/harbor-next/commit/e7e4729d3580f9c4072820b0dfa8aeaca66364d3))
+
+
+### Bug Fixes
+
+* Backport Authoritative Harbor Next Schema Reconciliation ([#711](https://github.com/container-registry/harbor-next/issues/711), [#722](https://github.com/container-registry/harbor-next/issues/722)) ([#733](https://github.com/container-registry/harbor-next/issues/733)) ([5cce3a3](https://github.com/container-registry/harbor-next/commit/5cce3a3e1e02867177f0ba47176b360d7dbc70d3))
+* **orm:** Discard AfterCommit hooks of a rolled-back savepoint ([#598](https://github.com/container-registry/harbor-next/issues/598)) ([d9d76de](https://github.com/container-registry/harbor-next/commit/d9d76de3c88d67105e37a80d2b5427c98d16946e))
+* Reset retired commercial schema version 182 before migration ([#748](https://github.com/container-registry/harbor-next/issues/748)) ([070426e](https://github.com/container-registry/harbor-next/commit/070426ea4972776c13f4c8073e0b26fab6b1dfa2))
+
+
+### Upstream
+
+* chore(deps): bump Go modules to fix known vulnerabilities (goharbor/harbor[#23720](https://github.com/container-registry/harbor-next/issues/23720)) ([442b6df](https://github.com/container-registry/harbor-next/commit/442b6df1d77e29a7ddc939d5aa3c932ffec24907))
+* chore(deps): revert github.com/gorilla/csrf to v1.7.2 (goharbor/harbor[#23759](https://github.com/container-registry/harbor-next/issues/23759)) ([18decf5](https://github.com/container-registry/harbor-next/commit/18decf52f69d6fc7b5e4622975d8b35dac369fe6))
+* chore(deps): update go.mod dependencies to patch versions (goharbor/harbor[#23751](https://github.com/container-registry/harbor-next/issues/23751)) ([6cfcba3](https://github.com/container-registry/harbor-next/commit/6cfcba34d2ea9bfad63b7a6eb789359ccba83eaa))
+* feat(ui): support advanced proxy cache configurations in UI (goharbor/harbor[#23536](https://github.com/container-registry/harbor-next/issues/23536)) ([7bbcbd4](https://github.com/container-registry/harbor-next/commit/7bbcbd47a7097f8bcc02474e9df70506785a5339))
+
 ## [2.15.7](https://github.com/container-registry/harbor-next/compare/v2.15.6...v2.15.7) (2026-08-24)
 
 
