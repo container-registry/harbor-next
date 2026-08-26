@@ -26,6 +26,20 @@ import (
 	"github.com/goharbor/harbor/src/server/middleware/requestid"
 )
 
+// shouldTouchNone decides whether a blob that is already StatusNone still needs
+// a Touch. In that state Touch only bumps version/update_time to coordinate
+// with GC - a redundant single-row UPDATE that, under concurrent re-pushes of
+// the same digest, becomes a row-lock contention hot spot (the lock is held for
+// the whole request transaction on PUT manifest). Skip it while update_time is
+// fresh: GC only considers blobs older than the full time window, so anything
+// younger than half the window cannot become a candidate before this request
+// associates the blob. A non-positive window leaves no such safety margin, so
+// always touch then.
+func shouldTouchNone(bb *models.Blob) bool {
+	window := time.Duration(config.GetGCTimeWindow()) * time.Hour
+	return window <= 0 || time.Since(bb.UpdateTime) > window/2
+}
+
 // probeBlob handles config/layer and manifest status in the PUT Blob & Manifest middleware, and update the status before it passed into proxy(distribution).
 func probeBlob(r *http.Request, digest string) error {
 	logger := log.G(r.Context())
@@ -39,12 +53,26 @@ func probeBlob(r *http.Request, digest string) error {
 		return err
 	}
 
-	switch bb.Status {
-	case models.StatusNone, models.StatusDelete, models.StatusDeleteFailed:
+	// touch resets the blob to StatusNone, bumping version/update_time. Its only
+	// purpose is to coordinate with GC, so it is called only when it actually
+	// matters (see the switch below).
+	touch := func() error {
 		if err := blobController.Touch(r.Context(), bb); err != nil {
 			logger.Errorf("failed to update blob: %s status to StatusNone, error:%v", bb.Digest, err)
 			return errors.Wrapf(err, "the request id is: %s", r.Header.Get(requestid.HeaderXRequestID))
 		}
+		return nil
+	}
+
+	switch bb.Status {
+	case models.StatusNone:
+		if shouldTouchNone(bb) {
+			return touch()
+		}
+	case models.StatusDelete, models.StatusDeleteFailed:
+		// GC marked this blob for deletion but an incoming push needs it: pull it
+		// back to StatusNone (the version bump defeats GC's compare-and-swap).
+		return touch()
 	case models.StatusDeleting:
 		now := time.Now().UTC()
 		// if the deleting exceed 2 hours, marks the blob as StatusDeleteFailed
