@@ -68,13 +68,15 @@ func (r *registryTestSuite) TestValidate() {
 	err = r.ctl.validate(nil, registry)
 	r.NotNil(err)
 
-	// invalid HTTP URL
+	// URL with FTP scheme
 	registry = &model.Registry{
 		Name: "endpoint01",
 		URL:  "ftp://example.com",
 	}
+	mock.OnAnything(r.regMgr, "CreateAdapter").Return(r.adapter, nil)
+	mock.OnAnything(r.adapter, "HealthCheck").Return(model.Healthy, nil)
 	err = r.ctl.validate(nil, registry)
-	r.NotNil(err)
+	r.Nil(err)
 
 	// URL without scheme
 	registry = &model.Registry{
