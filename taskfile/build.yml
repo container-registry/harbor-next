@@ -39,6 +39,17 @@ tasks:
 
   # --- Internal Go Build ---
 
+  tidy:
+    desc: "Sync src/go.sum with the source tree before compiling"
+    # Commercial patch branches add go.mod requirements without go.sum
+    # entries (patches carry no go.sum by policy), so the megamerged tree
+    # only builds after a tidy. No-op on an already-tidy tree.
+    run: once
+    deps: [gen-apis]
+    dir: src
+    cmds:
+      - go mod tidy
+
   _go-build:
     internal: true
     run: when_changed
@@ -76,7 +87,7 @@ tasks:
       - src/go.sum
     generates:
       - bin/{{index .MATCH 0}}/core
-    deps: [gen-apis]
+    deps: [gen-apis, tidy]
     cmds:
       - task: _go-build
         vars:
@@ -94,6 +105,7 @@ tasks:
       - src/go.sum
     generates:
       - bin/{{index .MATCH 0}}/jobservice
+    deps: [tidy]
     cmds:
       - task: _go-build
         vars:
@@ -111,6 +123,7 @@ tasks:
       - src/go.sum
     generates:
       - bin/{{index .MATCH 0}}/registryctl
+    deps: [tidy]
     cmds:
       - task: _go-build
         vars:
@@ -128,6 +141,7 @@ tasks:
       - src/go.sum
     generates:
       - bin/{{index .MATCH 0}}/harbor-exporter
+    deps: [tidy]
     cmds:
       - task: _go-build
         vars:
