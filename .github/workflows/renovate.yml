@@ -1,0 +1,44 @@
+name: Renovate
+
+on:
+  schedule:
+    # 01:00 UTC on odd days of month (~every 2 days), inside the 0-3 UTC
+    # windows in renovate.json; consecutive runs at 31st -> 1st are fine
+    - cron: "0 1 */2 * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: renovate
+  cancel-in-progress: false
+
+jobs:
+  renovate:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.SYNC_APP_ID }}
+          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+          owner: container-registry
+          repositories: harbor-next
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+          permission-statuses: write
+          permission-checks: read
+          permission-workflows: write
+          permission-vulnerability-alerts: read
+
+      - name: Run Renovate
+        uses: renovatebot/github-action@5402b206248e5a8c8427a15102702eb9c1793efc # v46.2.4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          renovate-version: 44.46.5
+        env:
+          RENOVATE_REPOSITORIES: container-registry/harbor-next
+          LOG_LEVEL: info
