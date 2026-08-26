@@ -51,7 +51,9 @@ func Migrate(database *models.Database) error {
 		return fmt.Errorf("apply authoritative Harbor Next schema: database pool is not initialized")
 	}
 	start = time.Now()
-	if err := applyAuthoritativeSchema(context.Background(), sqlSchemaDB{db: pool.DB()}, authoritativeSchemaPath()); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), authoritativeSchemaTimeout)
+	defer cancel()
+	if err := applyAuthoritativeSchema(ctx, sqlSchemaDB{db: pool.DB()}, authoritativeSchemaPath()); err != nil {
 		return err
 	}
 	observeMigrationPhase("authoritative", start)

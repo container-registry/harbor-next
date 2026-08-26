@@ -20,7 +20,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"os"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -35,39 +34,12 @@ import (
 
 	"github.com/goharbor/harbor/src/common/models"
 	harborORM "github.com/goharbor/harbor/src/lib/orm"
+	"github.com/goharbor/harbor/src/testing/dbenv"
 )
 
-// testCfg returns a PostGreSQL config from environment.
-// Accepts both the existing test convention (POSTGRESQL_USR / POSTGRESQL_PWD)
-// and the Harbor config convention (POSTGRESQL_USERNAME / POSTGRESQL_PASSWORD),
-// with devenv defaults as fallback.
+// testCfg returns the shared PostGreSQL test-environment config.
 func testCfg() *models.PostGreSQL {
-	host := envOr("POSTGRESQL_HOST", "localhost")
-	port := 5432
-	if p := os.Getenv("POSTGRESQL_PORT"); p != "" {
-		if v, err := strconv.Atoi(p); err == nil {
-			port = v
-		}
-	}
-	user := envOr("POSTGRESQL_USR", envOr("POSTGRESQL_USERNAME", "postgres"))
-	pwd := envOr("POSTGRESQL_PWD", envOr("POSTGRESQL_PASSWORD", "root123"))
-	db := envOr("POSTGRESQL_DATABASE", "registry")
-
-	return &models.PostGreSQL{
-		Host:     host,
-		Port:     port,
-		Username: user,
-		Password: pwd,
-		Database: db,
-		SSLMode:  "disable",
-	}
-}
-
-func envOr(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
+	return dbenv.PostgreSQLConfig()
 }
 
 // mustPool creates a pool or fails the test.
