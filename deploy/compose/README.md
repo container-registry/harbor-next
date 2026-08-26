@@ -61,6 +61,18 @@ To use locally built images instead, set `IMAGE_REPO=` (empty) in `.env`.
 
 Images resolve to `${IMAGE_REPO}harbor-core:${HARBOR_TAG}`, so the value must end with `/`.
 
+## Registry Proxy
+
+Set `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` in `.env` when the Registry
+service must reach upstream registries through a proxy. Include Harbor's
+internal service names in `NO_PROXY`, for example:
+
+```env
+HTTP_PROXY=http://proxy.example.com:8080
+HTTPS_PROXY=http://proxy.example.com:8080
+NO_PROXY=localhost,127.0.0.1,core,registry,registryctl
+```
+
 ## Architecture
 
 Portal (nginx) serves the Angular UI and reverse-proxies `/v2/`, `/api/`, `/service/`, and `/c/` to Core.

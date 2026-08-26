@@ -8,14 +8,15 @@ tmp_dir = "tmp"
 [build]
   # Fast build by default. Set DEBUG=true to enable Delve step-through debugging:
   #   docker compose exec core env DEBUG=true air -c devenv/air.core.toml
-  cmd = "cd src && CGO_ENABLED=0 GOMODCACHE=/go/pkg/mod /usr/local/go/bin/go build ${DEBUG:+-gcflags=all='-N -l'} -trimpath -o ../tmp/core ./core/main.go"
+  cmd = "cd src && CGO_ENABLED=0 GOMODCACHE=/go/pkg/mod /usr/local/go/bin/go build ${DEBUG:+-gcflags=all='-N -l'} -trimpath -o ../tmp/core ./core/"
 
   bin = "tmp/core"
   args_bin = []
 
   # Delve debugger on port 2345, starts immediately (--continue)
   # Attach anytime with: dlv connect localhost:2345
-  full_bin = "/go/bin/dlv exec ./tmp/core --listen=0.0.0.0:2345 --headless=true --api-version=2 --accept-multiclient --continue --"
+  # Falls back to the plain binary when dlv can't run; run() keeps Air-appended args working.
+  full_bin = "run() { if /go/bin/dlv version >/dev/null 2>&1; then exec /go/bin/dlv exec ./tmp/core --listen=0.0.0.0:2345 --headless=true --api-version=2 --accept-multiclient --continue -- \"$@\"; else echo 'air: dlv unavailable - running plain binary (no debugger on :2345)' >&2; exec ./tmp/core \"$@\"; fi; }; run"
 
   # Watch src directory for Go files only
   include_dir = ["src"]

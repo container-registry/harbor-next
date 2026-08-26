@@ -114,7 +114,7 @@ func NewManager(ctx context.Context, ns string, pool *redis.Pool) Manager {
 }
 
 // GetJobs is implementation of Manager.GetJobs
-// Because of the hash set used to keep the job stats, we can not support a standard pagination.
+// Because of the hash set used to keep the job stats, we cannot support a standard pagination.
 // A cursor is used to fetch the jobs with several batches.
 func (bm *basicManager) GetJobs(q *query.Parameter) ([]*job.Stats, int64, error) {
 	cursor, count := int64(0), query.DefaultPageSize

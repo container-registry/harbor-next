@@ -1,10 +1,9 @@
-.cron-selection {
-    display: flex;
-    align-items: center;
+.mt-02 {
+    margin-top: 0.2rem;
 }
 
 .gc-start-btn {
-    width:150px;
+    width: 150px;
     margin-top: 35px;
 }
 
@@ -48,11 +47,46 @@
 }
 
 .p-06 {
-    padding-left: .6rem;
-    padding-right: .6rem;
+    padding-left: 0.6rem;
+    padding-right: 0.6rem;
 }
 
 .float-left {
-    float:left;
+    float: left;
     margin-right: 1rem;
+}
+
+.noop-warning {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+    max-width: 44rem;
+}
+
+.form-save-btn {
+    width: 150px;
+    margin-top: 1rem;
+}
+
+.execution-status {
+    margin-top: 2rem;
+
+    // max-content column, not a fixed width: longer translated labels
+    // (e.g. German) must not wrap or break the timestamp alignment
+    .status-grid {
+        display: grid;
+        grid-template-columns: max-content auto;
+        justify-content: start;
+        column-gap: 1rem;
+        row-gap: 0.25rem;
+        margin-top: 0.25rem;
+    }
+}
+
+.manual-actions {
+    margin-top: 0.5rem;
+
+    .gc-start-btn {
+        margin-top: 0;
+        margin-right: 1rem;
+    }
 }

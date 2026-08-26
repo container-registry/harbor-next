@@ -40,10 +40,12 @@ func (suite *CheckerTestSuite) new() *checker {
 	accessoryMgr := &accessorytesting.Manager{}
 
 	return &checker{
-		artifactCtl:   artifactCtl,
-		scannerCtl:    scannerCtl,
-		accMgr:        accessoryMgr,
-		registrations: map[int64]*scanner.Registration{},
+		artifactCtl:           artifactCtl,
+		scannerCtl:            scannerCtl,
+		accMgr:                accessoryMgr,
+		registrations:         map[int64]*scanner.Registration{},
+		accessoryCache:        map[int64]bool{},
+		unscannableLayerCache: map[string]bool{},
 	}
 }
 

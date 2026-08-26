@@ -212,7 +212,7 @@ func (w *basicWorker) Enqueue(jobName string, params job.Parameters, isUnique bo
 
 	// avoid backend worker bug
 	if j == nil {
-		return nil, fmt.Errorf("job '%s' can not be enqueued, please check the job metadata", jobName)
+		return nil, fmt.Errorf("job '%s' cannot be enqueued, please check the job metadata", jobName)
 	}
 
 	return generateResult(j, job.KindGeneric, isUnique, params, webHook), nil
@@ -242,7 +242,7 @@ func (w *basicWorker) Schedule(jobName string, params job.Parameters, runAfterSe
 
 	// avoid backend worker bug
 	if j == nil {
-		return nil, fmt.Errorf("job '%s' can not be enqueued, please check the job metadata", jobName)
+		return nil, fmt.Errorf("job '%s' cannot be enqueued, please check the job metadata", jobName)
 	}
 
 	res := generateResult(j.Job, job.KindScheduled, isUnique, params, webHook)
@@ -394,7 +394,7 @@ func (w *basicWorker) ValidateJobParameters(jobType any, params job.Parameters) 
 // j is the type of job
 func (w *basicWorker) registerJob(name string, j any) (err error) {
 	if utils.IsEmptyStr(name) || j == nil {
-		return errors.New("job can not be registered with empty name or nil interface")
+		return errors.New("job cannot be registered with empty name or nil interface")
 	}
 
 	// j must be job.Interface

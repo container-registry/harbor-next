@@ -1,0 +1,120 @@
+#!/usr/bin/env ys-0
+
+# check-env.ys — drift check between docker-compose.yaml's ${VAR}
+# references and the documented variables in .env.example files.
+#
+# Usage (from deploy/compose):
+#   ys check-env.ys docker-compose.yaml .env.example example/local/.env.example
+#
+# Verdicts:
+#   ERROR — variable referenced WITHOUT a default (${VAR} or ${VAR:?...})
+#           and documented in no .env.example: compose interpolates an
+#           empty string / aborts, and nobody can discover the knob
+#   WARN  — variable referenced with a default (${VAR:-...}) but not
+#           documented: works, but the knob is invisible
+#   WARN  — .env.example key never referenced by the compose file (stale)
+#
+# Commented keys (# KEY=...) in .env.example count as documented — that
+# is the convention for optional overrides.
+# Exit 1 on ERROR only.
+
+problems =: atom([])
+
+defn add-problem(level what note):
+  swap! problems conj::
+    level:: level
+    what:: what
+    note:: note
+
+defn present?(v):
+  cond:
+    v.nil?(): false
+    v == '': false
+    (coll? v): not(empty?(v))
+    else: true
+
+defn in?(coll x):
+  c =: coll.filter(\(%1 == x)).count()
+  =>: c > 0
+
+# all string scalars anywhere in a YAML structure
+defn collect-strings(v):
+  cond:
+    (string? v): vector(v)
+    (map? v): v.vals().map(collect-strings).flatten().vec()
+    (sequential? v): v.map(collect-strings).flatten().vec()
+    else: vector()
+
+var-rx =:
+  re-pattern('\$\{([A-Za-z_][A-Za-z0-9_]*)((:?[-?])([^}]*))?\}')
+
+default-ops =: vector('-' ':-')
+
+defn ref-of(m):
+  hash-map('name' nth(m 1) 'has-default' in?(default-ops nth(m 3)))
+
+# -> vector of {name, has-default}
+defn extract-refs(strings):
+  matches =: strings.map(\(re-seq var-rx %1)).flatten1().filter(some?).vec()
+  =>: matches.map(ref-of).vec()
+
+defn flatten1(colls):
+  reduce(\(concat(%1 (or %2 [])).vec()) [] colls)
+
+env-key-rx =:
+  re-pattern('^#?\s*([A-Z_][A-Z0-9_]*)=')
+
+defn env-keys(file):
+  text =: file:read
+  lines =: text.str/split-lines()
+  =>: lines.map(\(second (re-find env-key-rx %1))).filter(some?).distinct().vec()
+
+defn main(compose-file='docker-compose.yaml' env1='.env.example' env2='example/local/.env.example'):
+  compose =: compose-file:read:yaml/load
+  refs =: extract-refs(collect-strings(compose))
+  env-files =: vector(env1 env2)
+  documented =: env-files.map(env-keys).flatten().distinct().vec()
+
+  ref-names =: refs.map(\(get %1 'name')).distinct().sort().vec()
+  with-default =:
+    refs.filter(\(get %1 'has-default')).map(\(get %1 'name')).distinct().vec()
+
+  each name ref-names:
+    has-def =: in?(with-default name)
+    known =: in?(documented name)
+    cond:
+      known: nil
+      has-def:
+        add-problem 'WARN' name:
+          'referenced with a default in docker-compose.yaml but documented
+           in no .env.example — the knob is invisible to operators'
+      else:
+        add-problem 'ERROR' name:
+          'referenced WITHOUT a default in docker-compose.yaml and
+           documented in no .env.example — interpolates to empty (or
+           aborts) and nobody can discover it'
+
+  each key documented.sort().vec():
+    when-not in?(ref-names key):
+      when key != 'COMPOSE_PROJECT_NAME':
+        add-problem 'WARN' key:
+          'documented in .env.example but never referenced by
+           docker-compose.yaml — stale documentation'
+
+  ps =: problems.deref()
+  n-refs =: ref-names.count()
+  n-doc =: documented.count()
+  if empty?(ps):
+    then:
+      say: "check-env: $n-refs referenced vars, $n-doc documented keys — in sync"
+    else:
+      warn: "check-env: $compose-file vs .env.example drift:"
+      each p ps:
+        level =: get(p 'level')
+        what =: get(p 'what')
+        note =: get(p 'note')
+        warn: "  [$level] $what"
+        warn: "      $note"
+      errors =: ps.filter(\(get(%1 'level') == 'ERROR')).count()
+      when errors > 0:
+        exit: 1

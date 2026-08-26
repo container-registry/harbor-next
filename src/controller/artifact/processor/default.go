@@ -54,7 +54,7 @@ func (d *defaultProcessor) GetArtifactType(_ context.Context, artifact *artifact
 	if len(strs) == 2 {
 		return strings.ToUpper(strs[1])
 	}
-	// can not get the artifact type from the media type, return unknown
+	// cannot get the artifact type from the media type, return unknown
 	return ArtifactTypeUnknown
 }
 func (d *defaultProcessor) ListAdditionTypes(_ context.Context, _ *artifact.Artifact) []string {

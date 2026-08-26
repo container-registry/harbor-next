@@ -154,7 +154,7 @@ var (
 	_ adp.ArtifactRegistry = (*adapter)(nil)
 )
 
-// adapter for to aliyun docker registry
+// adapter for aliyun docker registry
 type adapter struct {
 	*native.Adapter
 	acrAPI   openapi

@@ -145,7 +145,7 @@ func ConvertMapToStruct(object any, values any) error {
 		return errors.New("nil struct is not supported")
 	}
 
-	if reflect.TypeOf(object).Kind() != reflect.Ptr {
+	if reflect.TypeOf(object).Kind() != reflect.Pointer {
 		return errors.New("object should be referred by pointer")
 	}
 
@@ -224,7 +224,7 @@ func GetStrValueOfAnyType(value any) string {
 	if _, ok := value.(map[string]any); ok {
 		b, err := json.Marshal(value)
 		if err != nil {
-			log.Errorf("can not marshal json object, error %v", err)
+			log.Errorf("cannot marshal json object, error %v", err)
 			return ""
 		}
 		strVal = string(b)

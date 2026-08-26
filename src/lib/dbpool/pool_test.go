@@ -26,6 +26,8 @@ import (
 	"github.com/goharbor/harbor/src/common/models"
 )
 
+func minConns(v int32) *int32 { return &v }
+
 func TestBuildDSN_FromFields(t *testing.T) {
 	cfg := &models.PostGreSQL{
 		Host:     "db.example.com",
@@ -61,7 +63,7 @@ func TestApplyPoolConfig_ExplicitValues(t *testing.T) {
 		Database:          "test",
 		SSLMode:           "disable",
 		MaxOpenConns:      50,
-		MinConns:          5,
+		MinConns:          minConns(5),
 		ConnMaxLifetime:   30 * time.Minute,
 		ConnMaxIdleTime:   5 * time.Minute,
 		HealthCheckPeriod: 2 * time.Minute,
@@ -72,7 +74,7 @@ func TestApplyPoolConfig_ExplicitValues(t *testing.T) {
 	poolCfg, err := pgxpool.ParseConfig(dsn)
 	require.NoError(t, err)
 
-	applyPoolConfig(poolCfg, cfg)
+	require.NoError(t, applyPoolConfig(poolCfg, cfg))
 
 	assert.Equal(t, int32(50), poolCfg.MaxConns)
 	assert.Equal(t, int32(5), poolCfg.MinConns)
@@ -100,13 +102,62 @@ func TestApplyPoolConfig_ZeroFallbacks(t *testing.T) {
 
 	pgxDefault := poolCfg.MaxConns // pgxpool sets max(4, NumCPU) during ParseConfig
 
-	applyPoolConfig(poolCfg, cfg)
+	require.NoError(t, applyPoolConfig(poolCfg, cfg))
 
 	assert.Equal(t, pgxDefault, poolCfg.MaxConns, "zero MaxOpenConns should keep pgxpool default")
 	assert.Equal(t, int32(DefaultMinConns), poolCfg.MinConns)
 	assert.Equal(t, DefaultMaxConnIdleTime, poolCfg.MaxConnIdleTime)
 	assert.Equal(t, DefaultHealthCheckPeriod, poolCfg.HealthCheckPeriod)
 	assert.Equal(t, DefaultConnectTimeout, poolCfg.ConnConfig.ConnectTimeout)
+}
+
+// An explicitly configured 0 must survive to pgxpool — it is pgxpool's own
+// default and means "keep no warm connections", which is what dense
+// multi-tenant deployments want. Only nil falls back to DefaultMinConns.
+func TestApplyPoolConfig_ExplicitZeroMinConnsHonored(t *testing.T) {
+	cfg := &models.PostGreSQL{
+		Host: "localhost", Port: 5432, Username: "test",
+		Password: "test", Database: "test", SSLMode: "disable",
+		MinConns: minConns(0),
+	}
+
+	poolCfg, err := pgxpool.ParseConfig(BuildDSN(cfg))
+	require.NoError(t, err)
+
+	require.NoError(t, applyPoolConfig(poolCfg, cfg))
+
+	assert.Equal(t, int32(0), poolCfg.MinConns, "explicit 0 must not be coerced to DefaultMinConns")
+}
+
+func TestApplyPoolConfig_NilMinConnsUsesDefault(t *testing.T) {
+	cfg := &models.PostGreSQL{
+		Host: "localhost", Port: 5432, Username: "test",
+		Password: "test", Database: "test", SSLMode: "disable",
+		MinConns: nil,
+	}
+
+	poolCfg, err := pgxpool.ParseConfig(BuildDSN(cfg))
+	require.NoError(t, err)
+
+	require.NoError(t, applyPoolConfig(poolCfg, cfg))
+
+	assert.Equal(t, int32(DefaultMinConns), poolCfg.MinConns)
+}
+
+func TestApplyPoolConfig_NegativeMinConnsRejected(t *testing.T) {
+	cfg := &models.PostGreSQL{
+		Host: "localhost", Port: 5432, Username: "test",
+		Password: "test", Database: "test", SSLMode: "disable",
+		MinConns: minConns(-5),
+	}
+
+	poolCfg, err := pgxpool.ParseConfig(BuildDSN(cfg))
+	require.NoError(t, err)
+
+	err = applyPoolConfig(poolCfg, cfg)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "min_conns must be >= 0")
 }
 
 func TestApplyPoolConfig_ZeroMaxConnsKeepsPgxDefault(t *testing.T) {
@@ -126,7 +177,7 @@ func TestApplyPoolConfig_ZeroMaxConnsKeepsPgxDefault(t *testing.T) {
 
 	pgxDefault := poolCfg.MaxConns // max(4, NumCPU)
 
-	applyPoolConfig(poolCfg, cfg)
+	require.NoError(t, applyPoolConfig(poolCfg, cfg))
 
 	assert.Equal(t, pgxDefault, poolCfg.MaxConns, "zero MaxOpenConns must not override pgxpool default")
 }
@@ -164,12 +215,14 @@ func TestApplyPoolConfig_SimpleProtocolAlwaysSet(t *testing.T) {
 	poolCfg, err := pgxpool.ParseConfig(BuildDSN(cfg))
 	require.NoError(t, err)
 
-	applyPoolConfig(poolCfg, cfg)
+	require.NoError(t, applyPoolConfig(poolCfg, cfg))
 
 	assert.Equal(t, pgx.QueryExecModeSimpleProtocol, poolCfg.ConnConfig.DefaultQueryExecMode,
 		"SimpleProtocol must always be set — Beego ORM relies on it")
 }
 
+// MinConns is excluded here: unlike the others it now fails loudly rather than
+// silently falling back. See TestApplyPoolConfig_NegativeMinConnsRejected.
 func TestApplyPoolConfig_NegativeValuesIgnored(t *testing.T) {
 	cfg := &models.PostGreSQL{
 		Host:              "h",
@@ -179,7 +232,6 @@ func TestApplyPoolConfig_NegativeValuesIgnored(t *testing.T) {
 		Database:          "d",
 		SSLMode:           "disable",
 		MaxOpenConns:      -1,
-		MinConns:          -5,
 		ConnMaxLifetime:   -1 * time.Minute,
 		ConnMaxIdleTime:   -1 * time.Minute,
 		HealthCheckPeriod: -1 * time.Minute,
@@ -190,12 +242,10 @@ func TestApplyPoolConfig_NegativeValuesIgnored(t *testing.T) {
 
 	pgxDefaultMax := poolCfg.MaxConns
 
-	applyPoolConfig(poolCfg, cfg)
+	require.NoError(t, applyPoolConfig(poolCfg, cfg))
 
 	// Negative MaxOpenConns (-1 < 0) should not override pgxpool default
 	assert.Equal(t, pgxDefaultMax, poolCfg.MaxConns, "negative MaxOpenConns must not set MaxConns")
-	// Negative MinConns should fall back to default
-	assert.Equal(t, int32(DefaultMinConns), poolCfg.MinConns, "negative MinConns must fall back to default")
 	// Negative durations should fall back to defaults
 	assert.Equal(t, DefaultMaxConnIdleTime, poolCfg.MaxConnIdleTime)
 	assert.Equal(t, DefaultHealthCheckPeriod, poolCfg.HealthCheckPeriod)

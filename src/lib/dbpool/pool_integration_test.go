@@ -122,7 +122,7 @@ func TestPool_URLOverridesFields(t *testing.T) {
 func TestPool_MaxConnsEnforced(t *testing.T) {
 	cfg := testCfg()
 	cfg.MaxOpenConns = 2
-	cfg.MinConns = 0 // don't pre-create
+	cfg.MinConns = minConns(0) // don't pre-create
 
 	p := mustPool(t, cfg)
 
@@ -146,7 +146,7 @@ func TestPool_MaxConnsEnforced(t *testing.T) {
 
 func TestPool_MinConnsPreWarmed(t *testing.T) {
 	cfg := testCfg()
-	cfg.MinConns = 3
+	cfg.MinConns = minConns(3)
 	cfg.MaxOpenConns = 10
 
 	p := mustPool(t, cfg)
@@ -169,7 +169,7 @@ func TestPool_ConnectTimeoutApplied(t *testing.T) {
 		SSLMode:        "disable",
 		ConnectTimeout: 1 * time.Second,
 		MaxOpenConns:   1,
-		MinConns:       0,
+		MinConns:       minConns(0),
 	}
 
 	// pgxpool is lazy — creation succeeds, first query triggers connect.
@@ -246,7 +246,7 @@ func TestPool_SelfTestCleanup(t *testing.T) {
 func TestPool_ConcurrentQueries(t *testing.T) {
 	cfg := testCfg()
 	cfg.MaxOpenConns = 5
-	cfg.MinConns = 2
+	cfg.MinConns = minConns(2)
 
 	p := mustPool(t, cfg)
 
@@ -279,7 +279,6 @@ func TestPool_ConcurrentQueries(t *testing.T) {
 	assert.LessOrEqual(t, stat.TotalConns(), int32(cfg.MaxOpenConns),
 		"pool should never exceed MaxConns")
 }
-
 
 // ---------------------------------------------------------------------------
 // Option extensibility
@@ -317,7 +316,7 @@ func TestPool_MultipleOptions(t *testing.T) {
 func TestPool_WrongPassword(t *testing.T) {
 	cfg := testCfg()
 	cfg.Password = "definitely-wrong-password"
-	cfg.MinConns = 0
+	cfg.MinConns = minConns(0)
 
 	// pgxpool is lazy — creation succeeds, first query fails.
 	p, err := New(context.Background(), cfg)
@@ -332,7 +331,7 @@ func TestPool_WrongPassword(t *testing.T) {
 func TestPool_WrongDatabase(t *testing.T) {
 	cfg := testCfg()
 	cfg.Database = "nonexistent_db_" + strconv.FormatInt(time.Now().UnixNano(), 36)
-	cfg.MinConns = 0
+	cfg.MinConns = minConns(0)
 
 	p, err := New(context.Background(), cfg)
 	require.NoError(t, err)
@@ -347,7 +346,7 @@ func TestPool_WrongHost(t *testing.T) {
 	cfg := testCfg()
 	cfg.Host = "192.0.2.1" // TEST-NET, unreachable
 	cfg.ConnectTimeout = 1 * time.Second
-	cfg.MinConns = 0
+	cfg.MinConns = minConns(0)
 
 	p, err := New(context.Background(), cfg)
 	require.NoError(t, err)
@@ -485,7 +484,7 @@ func TestPool_RecoveryAfterConnectionKill(t *testing.T) {
 
 	cfg := testCfg()
 	cfg.MaxOpenConns = 2
-	cfg.MinConns = 1
+	cfg.MinConns = minConns(1)
 	cfg.HealthCheckPeriod = 500 * time.Millisecond
 
 	setAppName := func(c *pgxpool.Config) {
@@ -524,7 +523,7 @@ func TestPool_RecoveryAfterConnectionKill(t *testing.T) {
 func TestPool_MaxConnLifetimeEviction(t *testing.T) {
 	cfg := testCfg()
 	cfg.MaxOpenConns = 5
-	cfg.MinConns = 0
+	cfg.MinConns = minConns(0)
 	cfg.ConnMaxLifetime = 1 * time.Second
 	cfg.HealthCheckPeriod = 500 * time.Millisecond
 
@@ -562,7 +561,7 @@ func TestPool_MaxConnLifetimeEviction(t *testing.T) {
 func TestPool_MaxConnIdleTimeEviction(t *testing.T) {
 	cfg := testCfg()
 	cfg.MaxOpenConns = 10
-	cfg.MinConns = 1
+	cfg.MinConns = minConns(1)
 	cfg.ConnMaxIdleTime = 500 * time.Millisecond
 	cfg.HealthCheckPeriod = 500 * time.Millisecond
 
@@ -591,7 +590,7 @@ func TestPool_MaxConnIdleTimeEviction(t *testing.T) {
 	stat2 := p.PgxPool().Stat()
 	assert.LessOrEqual(t, stat2.IdleConns(), stat1.IdleConns(),
 		"idle connections should be reaped after MaxConnIdleTime")
-	assert.GreaterOrEqual(t, stat2.TotalConns(), int32(cfg.MinConns),
+	assert.GreaterOrEqual(t, stat2.TotalConns(), *cfg.MinConns,
 		"pool should never drop below MinConns")
 }
 

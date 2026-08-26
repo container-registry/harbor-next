@@ -1,0 +1,25 @@
+name: Recreate Release Notes
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: Existing release tag; defaults to the selected ref when it is a tag
+        required: false
+        type: string
+      dry_run:
+        description: Generate and print the notes without updating the release
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  recreate:
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release-notes-engine.yml
+    with:
+      tag_name: ${{ inputs.tag_name || github.ref_name }}
+      dry_run: ${{ inputs.dry_run }}
+    secrets:
+      SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}

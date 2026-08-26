@@ -1,0 +1,147 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "baseBranches": [
+    "main",
+    "release-2.15"
+  ],
+  "timezone": "Etc/UTC",
+  "dependencyDashboard": true,
+  "configMigration": true,
+  "semanticCommits": "enabled",
+  "semanticCommitType": "chore",
+  "labels": [
+    "dependencies"
+  ],
+  "enabledManagers": [
+    "custom.regex",
+    "docker-compose",
+    "dockerfile",
+    "github-actions",
+    "gomod"
+  ],
+  "vulnerabilityAlerts": {
+    "labels": [
+      "security"
+    ]
+  },
+  "packageRules": [
+    {
+      "description": "Update Go dependencies daily for non-major releases",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "Go minor and patch updates",
+      "schedule": [
+        "* 0-3 * * *"
+      ],
+      "addLabels": [
+        "go",
+        "security"
+      ]
+    },
+    {
+      "description": "Update Go dependencies weekly for major releases",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "groupName": "Go major updates",
+      "schedule": [
+        "* 0-3 * * 1"
+      ],
+      "addLabels": [
+        "go",
+        "security"
+      ]
+    },
+    {
+      "description": "Update Taskfile version pins daily for non-major releases",
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchFileNames": [
+        "versions.env"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest",
+        "pin"
+      ],
+      "groupName": "Taskfile version pin minor and patch updates",
+      "schedule": [
+        "* 0-3 * * *"
+      ],
+      "addLabels": [
+        "versions"
+      ]
+    },
+    {
+      "description": "Update Taskfile version pins weekly for major releases",
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchFileNames": [
+        "versions.env"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "groupName": "Taskfile version pin major updates",
+      "schedule": [
+        "* 0-3 * * 1"
+      ],
+      "addLabels": [
+        "versions"
+      ]
+    },
+    {
+      "description": "Group GitHub Actions updates weekly",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "GitHub Actions updates",
+      "schedule": [
+        "* 0-3 * * 1"
+      ],
+      "addLabels": [
+        "ci"
+      ]
+    },
+    {
+      "description": "Group Docker dependency updates weekly",
+      "matchManagers": [
+        "docker-compose",
+        "dockerfile"
+      ],
+      "groupName": "Docker dependency updates",
+      "schedule": [
+        "* 0-3 * * 1"
+      ],
+      "addLabels": [
+        "docker"
+      ]
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update versions.env Taskfile pins annotated with Renovate metadata",
+      "fileMatch": [
+        "/(^|/)versions\\.env$/"
+      ],
+      "matchStrings": [
+        "#\\s*renovate:\\s+datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(?:\\s+versioning=(?<versioning>\\S+))?(?:\\s+extractVersion=(?<extractVersion>\\S+))?\\s*\\n[A-Z_]+=(?<currentValue>\\S+)"
+      ]
+    }
+  ]
+}

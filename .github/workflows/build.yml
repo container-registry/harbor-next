@@ -7,12 +7,18 @@ on:
       - "**.md"
       - "docs/**"
       - "CLAUDE.md"
+      # Covered by their own path-filtered workflows (chart-ci, compose-ci);
+      # nothing in the image build consumes deploy/.
+      - "deploy/chart/**"
+      - "deploy/compose/**"
   push:
     branches: [main, "release-[0-9]*.[0-9]*"]
     paths-ignore:
       - "**.md"
       - "docs/**"
       - "CLAUDE.md"
+      - "deploy/chart/**"
+      - "deploy/compose/**"
 
 permissions:
   contents: read
@@ -24,9 +30,11 @@ concurrency:
 jobs:
   build:
     name: Build Binaries
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository || contains(fromJSON('["OWNER","MEMBER"]'), github.event.pull_request.author_association)) && vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: ./.github/actions/setup-go-cached
         with:

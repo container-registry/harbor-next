@@ -60,6 +60,20 @@ func TestMergeNativeReportSummary(t *testing.T) {
 	}
 
 	{
+		// zero total count
+		n1 := &NativeReportSummary{
+			ScanStatus: runningStatus,
+		}
+
+		r := n1.Merge(&NativeReportSummary{
+			ScanStatus: runningStatus,
+		})
+
+		assert.Zero(r.TotalCount)
+		assert.Zero(r.CompletePercent)
+	}
+
+	{
 		// running && success
 		n1 := NativeReportSummary{
 			ScanStatus: runningStatus,

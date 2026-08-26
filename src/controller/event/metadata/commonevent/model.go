@@ -19,6 +19,7 @@ import (
 	"regexp"
 	"sync"
 
+	eventmodel "github.com/goharbor/harbor/src/controller/event/model"
 	"github.com/goharbor/harbor/src/pkg/notifier/event"
 )
 
@@ -58,8 +59,13 @@ type Metadata struct {
 	ResponseCode int
 	// RequestURL request URL
 	RequestURL string
+	// IsResourceName indicates the request declared, via the X-Is-Resource-Name
+	// header, that name/ID path parameters are resource names
+	IsResourceName bool
 	// IPAddress IP address of the request
 	IPAddress string
+	// UserAgent is the User-Agent header of the request
+	UserAgent string
 	// ResponseLocation response location
 	ResponseLocation string
 	// ResourceName resource name
@@ -73,7 +79,16 @@ func (c *Metadata) Resolve(event *event.Event) error {
 	for url, r := range Resolvers() {
 		p := regexp.MustCompile(url)
 		if p.MatchString(c.RequestURL) {
-			return r.Resolve(c, event)
+			if err := r.Resolve(c, event); err != nil {
+				return err
+			}
+			// stamp the request's client IP/User-Agent onto the resolved event
+			// here rather than in every resolver, so it's captured uniformly
+			if common, ok := event.Data.(*eventmodel.CommonEvent); ok {
+				common.SourceIP = c.IPAddress
+				common.UserAgent = c.UserAgent
+			}
+			return nil
 		}
 	}
 	return nil

@@ -250,9 +250,16 @@
         "PROXY_CACHE_MAX_UPSTREAM_CONN_PLACEHOLDER": "Por favor, ingrese -1 o un número entero mayor que 0.",
         "PROXY_CACHE_LOCAL_ON_NOT_FOUND": "Servir contenido en caché cuando el registro de origen no está disponible",
         "PROXY_CACHE_LOCAL_ON_NOT_FOUND_TOOLTIP": "Habilite esta opción para permitir que este proyecto continúe sirviendo contenido en caché incluso si el artefacto no se encuentra en el registro de origen o si el registro de origen no está disponible. Esto puede provocar que se sirva contenido obsoleto si el registro de origen no está disponible.",
-        "NO_PROJECT": "No pudimos encontrar ningún proyecto",
         "PROXY_REFERRER_API_TIP": "Enable this to proxy OCI 1.1 referrer API requests to the upstream registry.",
-        "PROXY_REFERRER_API_LABEL": "Enable proxy for referrer API"
+        "PROXY_REFERRER_API_LABEL": "Enable proxy for referrer API",
+        "REPOSITORY_FILTER": "Filtro de repositorio",
+        "REPOSITORY_FILTER_TOOLTIP": "Filtro opcional para limitar qué repositorios se almacenan en caché del registro de origen. 'Doublestar' (predeterminado) usa patrones glob con soporte ** (ej. library/**). 'Regex' usa expresiones regulares, el patrón debe coincidir con la ruta completa del repositorio (ej. ^library/.*). Solo se aplica a proyectos de caché proxy actuales.",
+        "REPOSITORY_FILTER_PLACEHOLDER": "ej. library/**",
+        "FILTER_KIND_REGEX": "Regex",
+        "FILTER_KIND_DOUBLESTAR": "Doublestar",
+        "REPOSITORY_FILTER_REGEX_INVALID": "El patrón de expresión regular no es válido.",
+        "REPOSITORY_FILTER_DOUBLESTAR_INVALID": "El patrón doublestar tiene corchetes o llaves no balanceados.",
+        "NO_PROJECT": "No pudimos encontrar ningún proyecto"
     },
     "PROJECT_DETAIL": {
         "SUMMARY": "Resumen",
@@ -503,7 +510,19 @@
         "NOT_FOUND": "No pudimos encontrar ningún registro!",
         "RESOURCE": "Recursos",
         "RESOURCE_TYPE": "Tipo de Recurso",
-        "DOWNLOAD": "Descargar"
+        "DOWNLOAD": "Descargar",
+        "IP_ADDRESS": "Dirección IP",
+        "USER_AGENT": "Agente de Usuario"
+    },
+    "AUDIT_LOG_CONFIG": {
+        "RECORDING": "Registro de Eventos",
+        "USERS": "Usuarios",
+        "MEMBERS": "Miembros del Proyecto",
+        "ROBOTS": "Robots",
+        "ARTIFACTS": "Artefactos",
+        "PROJECTS": "Proyectos",
+        "CONFIGURATION": "Configuration",
+        "REPOSITORIES": "Repositories"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Disparador",
@@ -780,6 +799,7 @@
         "REPOSITORY": "Repository",
         "REPO_READ_ONLY": "Repositorio Read Only",
         "SYSTEM": "Opciones del Sistema",
+        "AUDIT_LOG": "Log de Auditoría",
         "PROJECT_QUOTAS": "Proyecto Cuotas",
         "VULNERABILITY": "Vulnerabilidad",
         "GC": "Garbage Collection",
@@ -1753,6 +1773,8 @@
         "PURGE_NOW": "PURGAR AHORA",
         "PURGE_NOW_SUCCESS": "Purga activada exitosamente",
         "PURGE_SCHEDULE_RESET": "Se ha restablecido la programación de purga",
+        "ROTATION_POLICY": "Política de rotación",
+        "EXECUTION": "Ejecución",
         "PURGE_HISTORY": "Historial de purga",
         "FORWARD_ENDPOINT": "Audit Log Reenviar Syslog Endpoint",
         "FORWARD_ENDPOINT_TOOLTIP": "Reenviar audit logs al endpoint de syslog, por ejemplo: harbor-log:10514",
@@ -1764,7 +1786,9 @@
         "STOP_GC_SUCCESS": "El disparador detiene con éxito la operación GC",
         "STOP_PURGE_SUCCESS": "El disparador detiene con éxito la operación de purga",
         "NO_GC_RECORDS": "No pudimos encontrar ningún historial de GC!",
-        "NO_PURGE_RECORDS": "No pudimos encontrar ningún historial de purgas!"
+        "NO_PURGE_RECORDS": "No pudimos encontrar ningún historial de purgas!",
+        "PURGE_PARAMS_SAVED": "Configuración de rotación de logs guardada correctamente",
+        "NO_EVENT_TYPES_WARNING": "Esta programación no purgará nada porque no hay tipos de evento seleccionados. Seleccione al menos un tipo de evento y haga clic en GUARDAR."
     },
     "CVE_EXPORT": {
         "EXPORT_SOME_PROJECTS": "Exportar CVEs",

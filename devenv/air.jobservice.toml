@@ -17,7 +17,8 @@ tmp_dir = "tmp"
 
   # Run via Delve debugger - allows attaching debugger at any time
   # Port 2346 for Jobservice (Core uses 2345), --continue starts immediately without waiting for debugger
-  full_bin = "/go/bin/dlv exec ./tmp/jobservice --listen=0.0.0.0:2346 --headless=true --api-version=2 --accept-multiclient --continue -- -c config/jobservice.yml"
+  # Falls back to the plain binary when dlv can't run; run() keeps Air-appended args working.
+  full_bin = "run() { if /go/bin/dlv version >/dev/null 2>&1; then exec /go/bin/dlv exec ./tmp/jobservice --listen=0.0.0.0:2346 --headless=true --api-version=2 --accept-multiclient --continue -- \"$@\"; else echo 'air: dlv unavailable - running plain binary (no debugger on :2346)' >&2; exec ./tmp/jobservice \"$@\"; fi; }; run -c config/jobservice.yml"
 
   # Watch these directories
   include_dir = ["src"]

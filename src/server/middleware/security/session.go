@@ -41,7 +41,7 @@ func (s *session) Generate(req *http.Request) security.Context {
 	}
 	user, ok := userInterface.(models.User)
 	if !ok {
-		log.Warning("can not convert the user in session to user model")
+		log.Warning("cannot convert the user in session to user model")
 		return nil
 	}
 	log.Debugf("a session security context generated for request %s %s", req.Method, req.URL.Path)

@@ -14,7 +14,7 @@ permissions:
 jobs:
   validate-release-ref:
     name: Validate Release Ref
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-26.04
     steps:
       - name: Allow only release refs
         run: |
@@ -27,7 +27,7 @@ jobs:
 
   release-please:
     needs: [validate-release-ref]
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-26.04
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
@@ -35,6 +35,10 @@ jobs:
       major: ${{ steps.release.outputs.major }}
       minor: ${{ steps.release.outputs.minor }}
       patch: ${{ steps.release.outputs.patch }}
+      prs_created: ${{ steps.release.outputs.prs_created }}
+      prs: ${{ steps.release.outputs.prs }}
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
@@ -46,9 +50,26 @@ jobs:
 
       - name: Check out release PR branch
         if: ${{ github.ref_name == 'main' && steps.release.outputs.prs_created == 'true' && steps.release.outputs.release_created != 'true' }}
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ fromJSON(steps.release.outputs.prs)[0].headBranchName }}
+          persist-credentials: false
+
+      - name: Configure ephemeral Git authentication
+        if: ${{ github.ref_name == 'main' && steps.release.outputs.prs_created == 'true' && steps.release.outputs.release_created != 'true' }}
+        run: |
+          askpass="${RUNNER_TEMP}/git-askpass"
+          cat > "${askpass}" <<'EOF'
+          #!/usr/bin/env bash
+          case "$1" in
+            *Username*) printf '%s\n' 'x-access-token' ;;
+            *Password*) printf '%s\n' "${GH_TOKEN}" ;;
+            *) exit 1 ;;
+          esac
+          EOF
+          chmod 700 "${askpass}"
+          echo "GIT_ASKPASS=${askpass}" >> "${GITHUB_ENV}"
+          echo "GIT_TERMINAL_PROMPT=0" >> "${GITHUB_ENV}"
 
       - name: Setup Node
         if: ${{ github.ref_name == 'main' && steps.release.outputs.prs_created == 'true' && steps.release.outputs.release_created != 'true' }}
@@ -82,6 +103,47 @@ jobs:
           git commit -s -m "chore: target next development version ${next_version}"
           git push
 
+  preview-release-notes:
+    name: Preview Release Notes
+    needs: [release-please]
+    if: ${{ needs.release-please.outputs.prs_created == 'true' && needs.release-please.outputs.release_created != 'true' }}
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: ./.github/workflows/release-notes-engine.yml
+    with:
+      checkout_ref: ${{ fromJSON(needs.release-please.outputs.prs)[0].headBranchName }}
+      preview_pr_number: ${{ fromJSON(needs.release-please.outputs.prs)[0].number }}
+    secrets:
+      SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+
+  release-please-chart:
+    name: Release Please (chart)
+    # Independent release line for the Helm chart, scoped to deploy/chart
+    # via its own config + manifest. Kept as a SEPARATE release-please
+    # instance (not a second package in the app manifest) on purpose:
+    # adding a package to a manifest switches every output to the
+    # "<path>--<name>" form, which would break the app jobs that read the
+    # unprefixed release-please outputs. Chart releases run on main only.
+    needs: [validate-release-ref]
+    if: ${{ github.ref_name == 'main' }}
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs['deploy/chart--release_created'] }}
+      tag_name: ${{ steps.release.outputs['deploy/chart--tag_name'] }}
+      version: ${{ steps.release.outputs['deploy/chart--version'] }}
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          target-branch: ${{ github.ref_name }}
+          config-file: release-please-config-chart.json
+          manifest-file: .release-please-manifest-chart.json
+
   create-maintenance-branch:
     name: Create Maintenance Branch
     needs: [release-please]
@@ -91,7 +153,7 @@ jobs:
         needs.release-please.outputs.release_created == 'true' &&
         needs.release-please.outputs.patch == '0'
       }}
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
     env:
@@ -99,10 +161,27 @@ jobs:
       VERSION: ${{ needs.release-please.outputs.version }}
       MAJOR: ${{ needs.release-please.outputs.major }}
       MINOR: ${{ needs.release-please.outputs.minor }}
+      GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
+
+      - name: Configure ephemeral Git authentication
+        run: |
+          askpass="${RUNNER_TEMP}/git-askpass"
+          cat > "${askpass}" <<'EOF'
+          #!/usr/bin/env bash
+          case "$1" in
+            *Username*) printf '%s\n' 'x-access-token' ;;
+            *Password*) printf '%s\n' "${GH_TOKEN}" ;;
+            *) exit 1 ;;
+          esac
+          EOF
+          chmod 700 "${askpass}"
+          echo "GIT_ASKPASS=${askpass}" >> "${GITHUB_ENV}"
+          echo "GIT_TERMINAL_PROMPT=0" >> "${GITHUB_ENV}"
 
       - name: Create branch for patch releases
         run: |
@@ -149,174 +228,27 @@ jobs:
     name: Update Release Notes
     needs: [release-please, publish-images]
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: write
-    env:
-      REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
-      REGISTRY_PROJECT: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
-      VERSION: ${{ needs.release-please.outputs.version }}
-      TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
-      RELEASE_BRANCH: ${{ github.ref_name }}
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          fetch-depth: 0
+    uses: ./.github/workflows/release-notes-engine.yml
+    with:
+      tag_name: ${{ needs.release-please.outputs.tag_name }}
+    secrets:
+      SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
 
-      - name: Install envsubst
-        run: command -v envsubst || (sudo apt-get update && sudo apt-get install -y gettext-base)
-
-      - name: Setup Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: 24
-          package-manager-cache: false
-
-      - name: Install gh CLI
-        run: |
-          case "$(uname -m)" in
-            x86_64|amd64) arch="amd64" ;;
-            aarch64|arm64) arch="arm64" ;;
-            *) echo "Unsupported architecture for gh: $(uname -m)" >&2; exit 1 ;;
-          esac
-
-          version=$(awk -F= '$1 == "GH_CLI_VERSION" { print $2 }' versions.env)
-          if ! [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "GH_CLI_VERSION must be X.Y.Z" >&2
-            exit 1
-          fi
-
-          archive="gh_${version}_linux_${arch}.tar.gz"
-          tool_dir="${RUNNER_TEMP:-${PWD}/.tools}/gh-cli"
-          mkdir -p "${tool_dir}/bin"
-          curl -fsSL "https://github.com/cli/cli/releases/download/v${version}/${archive}" -o "${tool_dir}/${archive}"
-          curl -fsSL "https://github.com/cli/cli/releases/download/v${version}/gh_${version}_checksums.txt" -o "${tool_dir}/gh_checksums.txt"
-          (cd "${tool_dir}" && grep "  ${archive}$" gh_checksums.txt | sha256sum -c -)
-          tar -xzf "${tool_dir}/${archive}" -C "${tool_dir}"
-          install -m 0755 "${tool_dir}/gh_${version}_linux_${arch}/bin/gh" "${tool_dir}/bin/gh"
-          echo "${tool_dir}/bin" >> "${GITHUB_PATH}"
-
-      - name: Generate GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ vars.SYNC_APP_ID }}
-          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
-          owner: container-registry
-          repositories: 8gcr
-
-      - name: Collect commercial patch descriptions
-        id: patches
-        env:
-          PATCHES_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          git clone --depth=1 \
-            "https://x-access-token:${PATCHES_TOKEN}@github.com/container-registry/8gcr" \
-            /tmp/patches-repo
-          if [ -f /tmp/patches-repo/8gcr-ee/patches/series ]; then
-            while IFS= read -r patch; do
-              patch=$(echo "$patch" | sed 's/#.*//' | xargs)
-              [ -z "$patch" ] && continue
-              node .github/scripts/format-commercial-patch.mjs "/tmp/patches-repo/8gcr-ee/patches/$patch" >> applied-patches.txt
-            done < /tmp/patches-repo/8gcr-ee/patches/series
-            echo "has_patches=true" >> "$GITHUB_OUTPUT"
-          fi
-          rm -rf /tmp/patches-repo
-
-      - name: Update release notes
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          REGISTRY="${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}"
-          IMAGES="core jobservice registryctl exporter portal registry trivy-adapter"
-          GENERATED_NOTES="$(mktemp)"
-          RELEASE_BODY="$(mktemp)"
-          FORMATTED_BODY="$(mktemp)"
-          CONTRIBUTORS="$(mktemp)"
-
-          gh api "repos/${{ github.repository }}/releases/generate-notes" \
-            -f "tag_name=${TAG_NAME}" \
-            --jq .body > "${GENERATED_NOTES}"
-          gh release view "${TAG_NAME}" --json body -q .body > "${RELEASE_BODY}"
-          node .github/scripts/format-release-notes.mjs \
-            "${RELEASE_BODY}" \
-            "${GENERATED_NOTES}" \
-            "${FORMATTED_BODY}" \
-            "${CONTRIBUTORS}"
-
-          HIGHLIGHTS=""
-          git fetch --tags --force
-          PREV_TAG=$(git tag --merged HEAD --sort=-creatordate \
-            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
-            | grep -v "^${TAG_NAME}$" \
-            | head -n 1 || true)
-          if [ -n "${PREV_TAG}" ]; then
-            SINCE=$(gh release view "${PREV_TAG}" --json createdAt -q '.createdAt')
-            SINCE_DATE="${SINCE%T*}"
-            HIGHLIGHTS=$(gh pr list \
-              --state merged \
-              --base "${RELEASE_BRANCH}" \
-              --search "merged:>=${SINCE_DATE}" \
-              --json number,title,url,body \
-              --limit 100 \
-              --jq '
-                [.[] | select(.body | test("(?m)^## Release Notes"))] |
-                if length == 0 then ""
-                else
-                  "## Highlights\n\n" +
-                  (map(
-                    "### [#\(.number)](\(.url)) \(.title)\n" +
-                    (.body |
-                      gsub("(?s).*\n## Release Notes\n"; "") |
-                      gsub("(?s)\n## .*"; "") |
-                      gsub("<!--[\\s\\S]*?-->"; "") |
-                      ltrimstr("\n") | rtrimstr("\n")
-                    ) + "\n"
-                  ) | join("\n"))
-                end
-              ')
-          fi
-
-          {
-            if [ -n "${HIGHLIGHTS}" ]; then
-              printf '%s\n\n' "${HIGHLIGHTS}"
-            fi
-            cat "${FORMATTED_BODY}"
-            echo ""
-            echo "---"
-            echo ""
-            if [ -f applied-patches.txt ] && [ -s applied-patches.txt ]; then
-              echo "## Commercial Features"
-              echo ""
-              echo "This release includes the following commercial enhancements:"
-              cat applied-patches.txt
-              echo ""
-            fi
-            echo "## Container Images"
-            echo ""
-            echo "Multi-arch images (\`linux/amd64\`, \`linux/arm64\`) signed with [cosign](https://github.com/sigstore/cosign)."
-            echo ""
-            echo "| Image | Reference |"
-            echo "|-------|-----------|"
-            for image in $IMAGES; do
-              image_name="harbor-${image}"
-              if [ "${image}" = "trivy-adapter" ]; then
-                image_name="trivy-adapter"
-              fi
-              echo "| \`${image_name}\` | \`${REGISTRY}/${image_name}:${TAG_NAME}\` |"
-            done
-            echo ""
-            echo "**Verify an image signature:**"
-            echo "\`\`\`sh"
-            echo "cosign verify \\"
-            echo "  --certificate-identity \"https://github.com/${{ github.repository }}/.github/workflows/publish-images.yml@refs/heads/${RELEASE_BRANCH}\" \\"
-            echo "  --certificate-oidc-issuer \"https://token.actions.githubusercontent.com\" \\"
-            echo "  ${REGISTRY}/harbor-core:${TAG_NAME}"
-            echo "\`\`\`"
-            if [ -s "${CONTRIBUTORS}" ]; then
-              echo ""
-              echo "---"
-              echo ""
-              cat "${CONTRIBUTORS}"
-            fi
-          } | gh release edit "${TAG_NAME}" --notes-file -
+  chart:
+    name: Publish Helm Chart
+    # Driven by the chart's own release-please line (release-please-chart),
+    # not the app release. The chart references Harbor images by its
+    # appVersion (Chart.yaml), which a prior app release must already have
+    # published — so this job does NOT depend on the image build/merge.
+    needs: [release-please-chart]
+    if: ${{ needs.release-please-chart.outputs.release_created == 'true' }}
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/publish-chart.yml
+    with:
+      tag_name: ${{ needs.release-please-chart.outputs.tag_name }}
+    secrets:
+      REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}

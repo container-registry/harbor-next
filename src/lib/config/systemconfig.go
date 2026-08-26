@@ -342,7 +342,7 @@ func Database() (*models.Database, error) {
 		ConnMaxIdleTime:   DefaultMgr().Get(backgroundCtx, common.PostGreSQLConnMaxIdleTime).GetDuration(),
 		HealthCheckPeriod: DefaultMgr().Get(backgroundCtx, common.PostGreSQLHealthCheckPeriod).GetDuration(),
 		ConnectTimeout:    DefaultMgr().Get(backgroundCtx, common.PostGreSQLConnectTimeout).GetDuration(),
-		MinConns:          int32(DefaultMgr().Get(backgroundCtx, common.PostGreSQLMinConns).GetInt()),
+		MinConns:          DefaultMgr().Get(backgroundCtx, common.PostGreSQLMinConns).GetOptionalInt32(),
 		URL:               DefaultMgr().Get(backgroundCtx, common.PostGreSQLURL).GetString(),
 	}
 	database.PostGreSQL = postgresql

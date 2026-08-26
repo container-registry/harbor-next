@@ -35,6 +35,12 @@ import (
 // Defaults are chosen for backward compatibility with the pre-pgxpool Harbor
 // configuration. PostgreSQL server's own max_connections defaults to 100;
 // the metadata default for MaxOpenConns is 100 to match.
+//
+// DefaultMinConns is inherited from the removed POSTGRESQL_MAX_IDLE_CONNS,
+// whose default was also 2 — but that was a cap on idle connections, whereas
+// MinConns is a floor pgxpool keeps warm. pgxpool's own default is 0, and an
+// explicitly configured 0 is honoured (see applyPoolConfig); only an unset
+// value falls back to this constant.
 const (
 	DefaultMinConns          = 2
 	DefaultMaxConnIdleTime   = 10 * time.Minute
@@ -61,7 +67,9 @@ func New(ctx context.Context, cfg *models.PostGreSQL, opts ...Option) (*Pool, er
 		return nil, fmt.Errorf("dbpool: parse config: %w", err)
 	}
 
-	applyPoolConfig(poolCfg, cfg)
+	if err := applyPoolConfig(poolCfg, cfg); err != nil {
+		return nil, err
+	}
 
 	for _, opt := range opts {
 		opt(poolCfg)
@@ -95,14 +103,19 @@ func BuildDSN(cfg *models.PostGreSQL) string {
 		cfg.Host, cfg.Port, cfg.Username, escaped, cfg.Database, cfg.SSLMode)
 }
 
-func applyPoolConfig(poolCfg *pgxpool.Config, cfg *models.PostGreSQL) {
+func applyPoolConfig(poolCfg *pgxpool.Config, cfg *models.PostGreSQL) error {
 	// 0 means "not set" — leave pgxpool's default: max(4, runtime.NumCPU()).
 	if cfg.MaxOpenConns > 0 {
 		poolCfg.MaxConns = int32(cfg.MaxOpenConns)
 	}
 
-	if cfg.MinConns > 0 {
-		poolCfg.MinConns = cfg.MinConns
+	// nil means "not set". 0 is a valid setting (pgxpool's own default): no
+	// warm floor, connections opened on demand and left to age out.
+	if cfg.MinConns != nil {
+		if *cfg.MinConns < 0 {
+			return fmt.Errorf("dbpool: min_conns must be >= 0, got %d", *cfg.MinConns)
+		}
+		poolCfg.MinConns = *cfg.MinConns
 	} else {
 		poolCfg.MinConns = DefaultMinConns
 	}
@@ -132,6 +145,8 @@ func applyPoolConfig(poolCfg *pgxpool.Config, cfg *models.PostGreSQL) {
 	// Beego ORM uses string interpolation, not prepared statements.
 	// Simple protocol avoids statement cache issues.
 	poolCfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+
+	return nil
 }
 
 // RegisterWithOrm registers the bridged *sql.DB with Beego ORM.

@@ -90,7 +90,7 @@ func (a adapter) RoundTrip(request *http.Request) (*http.Response, error) {
 	// adds auth headers
 	_ = secret.AddToRequest(request, config.JobserviceSecret())
 
-	return a.httpClient.Do(request)
+	return a.httpClient.Do(request) // nolint:gosec // G704: the request URL is rewritten above to Harbor's configured internal core URL
 }
 
 func (a adapter) Info() (*model.RegistryInfo, error) {

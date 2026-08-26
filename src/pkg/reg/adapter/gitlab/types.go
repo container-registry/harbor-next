@@ -19,7 +19,7 @@ type TokenResp struct {
 	Token string `json:"token"`
 }
 
-// Project describes a project in Gitlab
+// Project describes a project in GitLab
 type Project struct {
 	ID              int64  `json:"id"`
 	Name            string `json:"name"`
@@ -28,7 +28,7 @@ type Project struct {
 	RegistryEnabled bool   `json:"container_registry_enabled"`
 }
 
-// Repository describes a repository in Gitlab
+// Repository describes a repository in GitLab
 type Repository struct {
 	ID       int64  `json:"id"`
 	Name     string `json:"name"`
@@ -36,7 +36,7 @@ type Repository struct {
 	Location string `json:"location"`
 }
 
-// Tag describes a tag in Gitlab
+// Tag describes a tag in GitLab
 type Tag struct {
 	Name     string `json:"name"`
 	Path     string `json:"path"`

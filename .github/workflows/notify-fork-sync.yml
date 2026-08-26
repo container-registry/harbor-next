@@ -8,7 +8,7 @@ permissions: {}
 
 jobs:
   dispatch:
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-26.04
     steps:
       - name: Generate GitHub App token
         id: app-token

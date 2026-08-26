@@ -1,0 +1,140 @@
+# Regression guards for the database.existingTlsSecret feature.
+# Tracks upstream goharbor/harbor-helm#1859. When set, the chart mounts
+# the cert Secret at /etc/harbor/db-tls and injects POSTGRESQL_URL env
+# (which Harbor's lib/dbpool BuildDSN returns verbatim when set) so the
+# runtime DB pool can verify the server cert / present a client cert.
+suite: database TLS (existingTlsSecret)
+templates:
+  - templates/core.deployment.yaml
+  - templates/core.configmap.yaml
+  - templates/core.secret.yaml
+  - templates/jobservice.deployment.yaml
+  - templates/jobservice.configmap.yaml
+  - templates/jobservice.configmap-env.yaml
+  - templates/jobservice.secret.yaml
+set:
+  externalURL: https://harbor.example.com
+  database.host: pg.example.com
+  harborAdminPassword: Harbor12345
+  database.existingTlsSecret: my-pg-tls
+  database.sslmode: verify-full
+tests:
+  - it: should mount db-tls Secret on core
+    template: templates/core.deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: db-tls
+            mountPath: /etc/harbor/db-tls
+            readOnly: true
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: db-tls
+            secret:
+              secretName: my-pg-tls
+              defaultMode: 0400
+
+  - it: should inject POSTGRESQL_URL with sslrootcert path on core (verify-full)
+    template: templates/core.deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRESQL_URL
+            value: "host=pg.example.com port=5432 user=postgres password='$(POSTGRESQL_PASSWORD)' dbname=registry sslmode=verify-full sslrootcert=/etc/harbor/db-tls/ca.crt"
+
+  - it: should include client cert + key when clientCertEnabled=true
+    template: templates/core.deployment.yaml
+    set:
+      database.clientCertEnabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRESQL_URL
+            value: "host=pg.example.com port=5432 user=postgres password='$(POSTGRESQL_PASSWORD)' dbname=registry sslmode=verify-full sslrootcert=/etc/harbor/db-tls/ca.crt sslcert=/etc/harbor/db-tls/tls.crt sslkey=/etc/harbor/db-tls/tls.key"
+
+  # POSTGRESQL_URL references $(POSTGRESQL_PASSWORD) — K8s only does
+  # variable substitution when the referenced var is defined BEFORE in
+  # the env list. Pins the ordering: PASSWORD must come before URL.
+  - it: should order POSTGRESQL_PASSWORD before POSTGRESQL_URL on core
+    template: templates/core.deployment.yaml
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name == "POSTGRESQL_PASSWORD")].name
+          pattern: "^POSTGRESQL_PASSWORD$"
+      - matchRegex:
+          path: spec.template.spec.containers[0].env[?(@.name == "POSTGRESQL_URL")].name
+          pattern: "^POSTGRESQL_URL$"
+
+  - it: should mount db-tls Secret on jobservice
+    template: templates/jobservice.deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: db-tls
+            mountPath: /etc/harbor/db-tls
+            readOnly: true
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: db-tls
+            secret:
+              secretName: my-pg-tls
+              defaultMode: 0400
+
+  - it: should inject POSTGRESQL_URL + PASSWORD on jobservice
+    template: templates/jobservice.deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRESQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: RELEASE-NAME-harbor-next-database
+                key: POSTGRESQL_PASSWORD
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRESQL_URL
+            value: "host=pg.example.com port=5432 user=postgres password='$(POSTGRESQL_PASSWORD)' dbname=registry sslmode=verify-full sslrootcert=/etc/harbor/db-tls/ca.crt"
+
+  # Custom username + database name propagate into the DSN.
+  - it: should honor custom username and database name
+    template: templates/core.deployment.yaml
+    set:
+      database.username: myharbor
+      database.database: harbor_prod
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRESQL_URL
+            value: "host=pg.example.com port=5432 user=myharbor password='$(POSTGRESQL_PASSWORD)' dbname=harbor_prod sslmode=verify-full sslrootcert=/etc/harbor/db-tls/ca.crt"
+
+  # When existingTlsSecret is unset: no mount, no URL env. Guard against
+  # the helper leaking into vanilla installs.
+  - it: should NOT mount or inject URL when existingTlsSecret is unset
+    template: templates/core.deployment.yaml
+    set:
+      database.existingTlsSecret: ""
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRESQL_URL
+          any: true
+      - notContains:
+          path: spec.template.spec.volumes
+          content:
+            name: db-tls
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: db-tls
+          any: true
