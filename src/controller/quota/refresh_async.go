@@ -16,6 +16,9 @@ package quota
 
 import (
 	"context"
+	"math"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -40,7 +43,14 @@ import (
 // process restart, or a concurrent flush from another core replica, can
 // only delay convergence - never corrupt the stored value. A failed flush
 // re-marks the project and is retried on the next interval.
-const deferredRefreshInterval = 10 * time.Second
+// defaultDeferredRefreshInterval is the flush cadence; override with the
+// QUOTA_ASYNC_REFRESH_DURATION env var (seconds). Setting the env var also
+// switches RefreshMiddleware to the coalesced path (see AsyncRefreshEnabled).
+const defaultDeferredRefreshInterval = 10 * time.Second
+
+const asyncRefreshDurationEnv = "QUOTA_ASYNC_REFRESH_DURATION"
+
+var asyncRefreshConfigured bool
 
 // perRefreshTimeout bounds a single project's recompute inside the flush
 // loop; see refreshDirty.
@@ -57,7 +67,34 @@ type refKey struct {
 }
 
 func init() {
-	gtask.DefaultPool().AddTask(flushDirtyQuota, deferredRefreshInterval)
+	interval, configured := parseRefreshInterval(os.Getenv(asyncRefreshDurationEnv))
+	asyncRefreshConfigured = configured
+	gtask.DefaultPool().AddTask(flushDirtyQuota, interval)
+}
+
+// parseRefreshInterval turns the QUOTA_ASYNC_REFRESH_DURATION value into the
+// flush interval. It returns the default interval and configured=false for
+// an empty or invalid value; an invalid value is additionally logged.
+func parseRefreshInterval(env string) (time.Duration, bool) {
+	if len(env) == 0 {
+		return defaultDeferredRefreshInterval, false
+	}
+	seconds, err := strconv.ParseInt(env, 10, 64)
+	// the upper bound keeps seconds*time.Second representable in a
+	// time.Duration; beyond it the multiplication overflows negative
+	// and the flush loop would spin without sleeping
+	if err != nil || seconds <= 0 || seconds > math.MaxInt64/int64(time.Second) {
+		log.Warningf("invalid %s %q, using default flush interval %s", asyncRefreshDurationEnv, env, defaultDeferredRefreshInterval)
+		return defaultDeferredRefreshInterval, false
+	}
+	return time.Duration(seconds) * time.Second, true
+}
+
+// AsyncRefreshEnabled returns true when QUOTA_ASYNC_REFRESH_DURATION is set
+// to a positive number of seconds; RefreshMiddleware then coalesces its
+// per-request full recomputes through the deferred flush as well.
+func AsyncRefreshEnabled() bool {
+	return asyncRefreshConfigured
 }
 
 // MarkRefresh records that the usage of the reference object changed and
