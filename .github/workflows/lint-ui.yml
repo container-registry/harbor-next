@@ -32,7 +32,7 @@ env:
 jobs:
   lint:
     name: UI Lint
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository || contains(fromJSON('["OWNER","MEMBER"]'), github.event.pull_request.author_association)) && vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-26.04
     env:
       CYPRESS_CACHE_FOLDER: ${{ github.workspace }}/.ci-cache/cypress
       CYPRESS_INSTALL_BINARY: "0"

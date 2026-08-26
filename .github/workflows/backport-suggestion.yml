@@ -16,7 +16,7 @@ jobs:
         github.event.pull_request.merged == true &&
         github.event.pull_request.base.ref == 'main'
       }}
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-26.04
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
