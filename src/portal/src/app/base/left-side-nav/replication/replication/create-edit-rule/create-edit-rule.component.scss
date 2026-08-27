@@ -25,11 +25,11 @@ h4 {
     margin-right: 10px;
 }
 
-// the widest row (decoration + engine + value + tooltip) measures 531px, and the
-// large modal leaves about 624px next to the label column
+// the widest row (decoration + engine + value + tooltip) measures 611px, and the
+// large modal leaves 642px next to the label column
 .filterSelect {
     position: relative;
-    width: 560px;
+    width: 620px;
     margin-bottom:0.25rem;
 }
 
@@ -267,8 +267,10 @@ h4 {
     width: 5rem;
 }
 
+// a regular expression needs more room than a glob, and the tag and label rows
+// can spare it: at 10rem the widest row is 611px against the 642px available
 .width-tag-label {
-    width: 6rem;
+    width: 10rem;
 }
 
 .width-engine {
