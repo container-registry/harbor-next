@@ -23,8 +23,8 @@ import (
 
 	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/lib/log"
+	"github.com/goharbor/harbor/src/lib/pattern"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
-	"github.com/goharbor/harbor/src/pkg/reg/util"
 )
 
 // DeleteManifest VolcCR will use our own openAPI to delete Manifest
@@ -111,8 +111,8 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 		}
 	}
 	namespacePattern := strings.Split(repoPattern, "/")[0]
-	repoMatcher := util.NewMatcher(repoKind, repoPattern)
-	tagsMatcher := util.NewMatcher(tagsKind, tagsPattern)
+	repoMatcher := pattern.NewMatcher(repoKind, repoPattern)
+	tagsMatcher := pattern.NewMatcher(tagsKind, tagsPattern)
 
 	log.Debug("read in filter patterns", "repoPattern", repoPattern, "tagsPattern", tagsPattern)
 

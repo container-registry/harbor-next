@@ -20,6 +20,7 @@ import (
 
 	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/lib/log"
+	"github.com/goharbor/harbor/src/lib/pattern"
 	adp "github.com/goharbor/harbor/src/pkg/reg/adapter"
 	"github.com/goharbor/harbor/src/pkg/reg/filter"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
@@ -54,7 +55,7 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) (resources []*model.Re
 	// get filter pattern
 	var namespacePattern, repoPattern, repoKind, tagsPattern, tagsKind = filterToPatterns(filters)
 	log.Debugf("[tencent-tcr.FetchArtifacts] namespacePattern=%s repoPattern=%s tagsPattern=%s", namespacePattern, repoPattern, tagsPattern)
-	tagsMatcher := util.NewMatcher(tagsKind, tagsPattern)
+	tagsMatcher := pattern.NewMatcher(tagsKind, tagsPattern)
 
 	// 1. list namespaces
 	var namespaces []string

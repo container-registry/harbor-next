@@ -25,6 +25,7 @@ import (
 
 	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/lib/log"
+	"github.com/goharbor/harbor/src/lib/pattern"
 	adp "github.com/goharbor/harbor/src/pkg/reg/adapter"
 	"github.com/goharbor/harbor/src/pkg/reg/adapter/native"
 	"github.com/goharbor/harbor/src/pkg/reg/filter"
@@ -261,7 +262,7 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 	if err != nil {
 		return nil, err
 	}
-	nameMatcher := util.NewMatcher(nameKind, nameFilter)
+	nameMatcher := pattern.NewMatcher(nameKind, nameFilter)
 
 	namespaces, err := a.listCandidateNamespaces(nameKind, nameFilter)
 	if err != nil {

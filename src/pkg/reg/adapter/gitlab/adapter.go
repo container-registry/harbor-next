@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/goharbor/harbor/src/lib/log"
+	"github.com/goharbor/harbor/src/lib/pattern"
 	adp "github.com/goharbor/harbor/src/pkg/reg/adapter"
 	"github.com/goharbor/harbor/src/pkg/reg/adapter/native"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
@@ -193,16 +194,16 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 	return resources, nil
 }
 
-func (a *adapter) getProjectsByPattern(kind, pattern string) ([]*Project, error) {
+func (a *adapter) getProjectsByPattern(kind, expr string) ([]*Project, error) {
 	var projects []*Project
 	var err error
 	// the fallback below derives a project name from the glob syntax of the pattern,
 	// which says nothing about a regex: list all projects and let the filters decide
-	if util.IsRegex(kind) {
+	if kind == pattern.KindRegex {
 		return nil, nil
 	}
-	if len(pattern) > 0 {
-		names, ok := util.IsSpecificPathForKind(kind, pattern)
+	if len(expr) > 0 {
+		names, ok := util.IsSpecificPathForKind(kind, expr)
 		if ok {
 			for _, name := range names {
 				var projectsByName, err = a.clientGitlabAPI.getProjectsByName(url.QueryEscape(name))
@@ -216,7 +217,7 @@ func (a *adapter) getProjectsByPattern(kind, pattern string) ([]*Project, error)
 			}
 		} else {
 			projectName := ""
-			for i, substring := range strings.Split(pattern, "/") {
+			for i, substring := range strings.Split(expr, "/") {
 				if strings.Contains(substring, "*") {
 					if i != 0 {
 						break
@@ -256,17 +257,17 @@ func existPatterns(path string, matchers []*caseFoldingMatcher) bool {
 // compares case insensitively. Only doublestar patterns are folded: lowercasing a
 // regex would rewrite classes such as \D or [A-Z], the user has (?i) for that.
 type caseFoldingMatcher struct {
-	matcher *util.Matcher
+	matcher *pattern.Matcher
 	fold    bool
 }
 
-func newCaseFoldingMatcher(kind, pattern string) *caseFoldingMatcher {
-	fold := !util.IsRegex(kind)
+func newCaseFoldingMatcher(kind, expr string) *caseFoldingMatcher {
+	fold := kind != pattern.KindRegex
 	if fold {
-		pattern = strings.ToLower(pattern)
+		expr = strings.ToLower(expr)
 	}
 	return &caseFoldingMatcher{
-		matcher: util.NewMatcher(kind, pattern),
+		matcher: pattern.NewMatcher(kind, expr),
 		fold:    fold,
 	}
 }

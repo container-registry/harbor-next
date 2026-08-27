@@ -28,6 +28,7 @@ import (
 	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/log"
+	"github.com/goharbor/harbor/src/lib/pattern"
 	adp "github.com/goharbor/harbor/src/pkg/reg/adapter"
 	"github.com/goharbor/harbor/src/pkg/reg/adapter/native"
 	"github.com/goharbor/harbor/src/pkg/reg/filter"
@@ -287,7 +288,7 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 		}
 	}
 	var namespacePattern = strings.Split(repoPattern, "/")[0]
-	repoMatcher := util.NewMatcher(repoKind, repoPattern)
+	repoMatcher := pattern.NewMatcher(repoKind, repoPattern)
 
 	log.Debugf("\nrepoPattern=%s tagsPattern=%s\n\n", repoPattern, tagsPattern)
 

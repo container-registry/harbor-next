@@ -17,8 +17,8 @@ package filter
 import (
 	"fmt"
 
+	"github.com/goharbor/harbor/src/lib/pattern"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
-	"github.com/goharbor/harbor/src/pkg/reg/util"
 )
 
 // DoFilterArtifacts filter the artifacts according to the filters
@@ -43,9 +43,9 @@ func BuildArtifactFilters(filters []*model.Filter) (ArtifactFilters, error) {
 					kind:       filter.Kind,
 					decoration: filter.Decoration,
 				}
-				if util.IsRegex(filter.Kind) {
+				if filter.Kind == pattern.KindRegex {
 					for _, label := range labels {
-						lf.matchers = append(lf.matchers, util.NewMatcher(filter.Kind, label))
+						lf.matchers = append(lf.matchers, pattern.NewMatcher(filter.Kind, label))
 					}
 				}
 				f = lf
@@ -53,11 +53,11 @@ func BuildArtifactFilters(filters []*model.Filter) (ArtifactFilters, error) {
 				return nil, fmt.Errorf("invalid filter value type for label filter, expecting []string")
 			}
 		case model.FilterTypeTag:
-			if pattern, ok := filter.Value.(string); ok {
+			if p, ok := filter.Value.(string); ok {
 				f = &artifactTagFilter{
-					pattern:    pattern,
+					pattern:    p,
 					kind:       filter.Kind,
-					matcher:    util.NewMatcher(filter.Kind, pattern),
+					matcher:    pattern.NewMatcher(filter.Kind, p),
 					decoration: filter.Decoration,
 				}
 			} else {
@@ -98,7 +98,7 @@ type artifactLabelFilter struct {
 	// "", "doublestar" or "regex"
 	kind string
 	// only populated for the regex kind, one matcher per configured label
-	matchers []*util.Matcher
+	matchers []*pattern.Matcher
 	// "matches", "excludes"
 	decoration string
 }
@@ -131,7 +131,7 @@ func (a *artifactLabelFilter) Filter(artifacts []*model.Artifact) ([]*model.Arti
 // an exact match for a doublestar filter, a match against any of the artifact labels for
 // a regex one
 func (a *artifactLabelFilter) matchAll(artifactLabels []string) (bool, error) {
-	if !util.IsRegex(a.kind) {
+	if a.kind != pattern.KindRegex {
 		labels := make(map[string]struct{}, len(artifactLabels))
 		for _, label := range artifactLabels {
 			labels[label] = struct{}{}
@@ -167,7 +167,7 @@ type artifactTagFilter struct {
 	pattern string
 	// "", "doublestar" or "regex"
 	kind    string
-	matcher *util.Matcher
+	matcher *pattern.Matcher
 	// "matches", "excludes"
 	decoration string
 }
@@ -176,7 +176,7 @@ type artifactTagFilter struct {
 // A doublestar pattern is matched against the empty tag, keeping the behavior of "**".
 // A regex is never run against the empty string, an untagged artifact just doesn't match.
 func (a *artifactTagFilter) matchUntagged() (bool, error) {
-	if util.IsRegex(a.kind) {
+	if a.kind == pattern.KindRegex {
 		return false, nil
 	}
 	return a.matcher.Match("")

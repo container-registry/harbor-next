@@ -16,7 +16,7 @@ package model
 
 import (
 	"github.com/goharbor/harbor/src/lib/errors"
-	regexpselector "github.com/goharbor/harbor/src/lib/selector/selectors/regexp"
+	"github.com/goharbor/harbor/src/lib/pattern"
 )
 
 // const definition
@@ -36,10 +36,10 @@ const (
 	Excludes = "excludes"
 
 	// FilterKindDoublestar interprets the filter value as a doublestar pattern, the default
-	FilterKindDoublestar = "doublestar"
+	FilterKindDoublestar = pattern.KindDoublestar
 	// FilterKindRegex interprets the filter value as a regular expression matching the whole
-	// value, the same engine and literal the retention and immutability selectors use
-	FilterKindRegex = regexpselector.Kind
+	// value, the same engine the retention, immutability and proxy cache filters use
+	FilterKindRegex = pattern.KindRegex
 )
 
 // Filter holds the info of the filter
@@ -118,7 +118,7 @@ func (f *Filter) validatePattern(value string) error {
 	if f.Kind != FilterKindRegex {
 		return nil
 	}
-	if err := regexpselector.Validate(value); err != nil {
+	if err := pattern.ValidateRegex(value); err != nil {
 		return errors.New(nil).WithCode(errors.BadRequestCode).
 			WithMessagef("invalid regex filter value %q: %v", value, err)
 	}
