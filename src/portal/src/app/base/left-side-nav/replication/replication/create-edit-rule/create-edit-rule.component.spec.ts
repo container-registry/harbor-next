@@ -342,6 +342,28 @@ describe('CreateEditRuleComponent (inline template)', () => {
         );
     });
 
+    it('Should keep whitespace in a regex pattern only', () => {
+        comp.setFilter([
+            { type: 'name', style: 'input', kind: 'regex', value: '' },
+            { type: 'tag', style: 'input', value: '' },
+        ] as any);
+
+        // a space is a literal character in a regex, the strip would corrupt it
+        const regexEvent: any = { target: { value: '^(v1|v2) rc$' } };
+        comp.trimText(regexEvent, 0);
+        expect(regexEvent.target.value).toEqual('^(v1|v2) rc$');
+
+        // a doublestar pattern still loses it, which forgives a pasted "a, b"
+        const doublestarEvent: any = { target: { value: 'lib, app' } };
+        comp.trimText(doublestarEvent, 1);
+        expect(doublestarEvent.target.value).toEqual('lib,app');
+
+        // and an unknown row falls back to stripping
+        const noIndexEvent: any = { target: { value: 'a b' } };
+        comp.trimText(noIndexEvent);
+        expect(noIndexEvent.target.value).toEqual('ab');
+    });
+
     it('Should send the engine only when it is not the default', fakeAsync(() => {
         fixture.detectChanges();
         comp.openCreateEditRule();

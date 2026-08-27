@@ -245,10 +245,16 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
             });
         this.initMaxJobWorkers();
     }
-    trimText(event) {
-        if (event.target.value) {
-            event.target.value = event.target.value.replace(/\s+/g, '');
+    // whitespace carries no meaning in a doublestar pattern and the strip forgives a
+    // pasted list like "a, b", but a space is a literal character in a regex
+    trimText(event, index?: number) {
+        if (!event.target.value) {
+            return;
         }
+        if (index !== undefined && this.isRegex(index)) {
+            return;
+        }
+        event.target.value = event.target.value.replace(/\s+/g, '');
     }
     equals(c1: any, c2: any): boolean {
         return c1 && c2 ? c1.id === c2.id : c1 === c2;
