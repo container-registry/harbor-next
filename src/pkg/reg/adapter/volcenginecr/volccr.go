@@ -98,14 +98,14 @@ func (a *adapter) deleteTags(namespace, repository string, tags []*string) error
 	return err
 }
 
-func (a *adapter) listCandidateNamespaces(namespacePattern string) ([]string, error) {
+func (a *adapter) listCandidateNamespaces(kind, namespacePattern string) ([]string, error) {
 	if a.volcCrClient == nil {
 		return []string{}, errNilVolcCrClient
 	}
 	namespaces := make([]string, 0)
 	// filter namespaces
 	if len(namespacePattern) > 0 {
-		if nms, ok := util.IsSpecificPathComponent(namespacePattern); ok {
+		if nms, ok := util.IsSpecificPathComponentForKind(kind, namespacePattern); ok {
 			// Check if namespace exist
 			for _, ns := range nms {
 				exist, err := a.namespaceExist(ns)

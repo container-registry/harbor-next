@@ -35,13 +35,15 @@ const (
 **/
 var _ adp.ArtifactRegistry = &adapter{}
 
-func filterToPatterns(filters []*model.Filter) (namespacePattern, repoPattern, tagsPattern string) {
+func filterToPatterns(filters []*model.Filter) (namespacePattern, repoPattern, repoKind, tagsPattern, tagsKind string) {
 	for _, filter := range filters {
 		if filter.Type == model.FilterTypeName {
 			repoPattern = filter.Value.(string)
+			repoKind = filter.Kind
 		}
 		if filter.Type == model.FilterTypeTag {
 			tagsPattern = filter.Value.(string)
+			tagsKind = filter.Kind
 		}
 	}
 	namespacePattern = strings.Split(repoPattern, "/")[0]
@@ -50,12 +52,13 @@ func filterToPatterns(filters []*model.Filter) (namespacePattern, repoPattern, t
 
 func (a *adapter) FetchArtifacts(filters []*model.Filter) (resources []*model.Resource, err error) {
 	// get filter pattern
-	var namespacePattern, repoPattern, tagsPattern = filterToPatterns(filters)
+	var namespacePattern, repoPattern, repoKind, tagsPattern, tagsKind = filterToPatterns(filters)
 	log.Debugf("[tencent-tcr.FetchArtifacts] namespacePattern=%s repoPattern=%s tagsPattern=%s", namespacePattern, repoPattern, tagsPattern)
+	tagsMatcher := util.NewMatcher(tagsKind, tagsPattern)
 
 	// 1. list namespaces
 	var namespaces []string
-	namespaces, err = a.listCandidateNamespaces(namespacePattern)
+	namespaces, err = a.listCandidateNamespaces(repoKind, namespacePattern)
 	if err != nil {
 		return
 	}
@@ -104,7 +107,7 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) (resources []*model.Re
 			if tagsPattern != "" {
 				for _, image := range images {
 					var ok bool
-					ok, err = util.Match(tagsPattern, image)
+					ok, err = tagsMatcher.Match(image)
 					if err != nil {
 						return fmt.Errorf("[tencent-tcr.FetchArtifacts.matchImage] image='%s', error=%v", image, err)
 					}
@@ -148,10 +151,10 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) (resources []*model.Re
 	return
 }
 
-func (a *adapter) listCandidateNamespaces(namespacePattern string) (namespaces []string, err error) {
+func (a *adapter) listCandidateNamespaces(kind, namespacePattern string) (namespaces []string, err error) {
 	// filter namespaces
 	if len(namespacePattern) > 0 {
-		if nms, ok := util.IsSpecificPathComponent(namespacePattern); ok {
+		if nms, ok := util.IsSpecificPathComponentForKind(kind, namespacePattern); ok {
 			// Check is exist
 			var exist bool
 			for _, ns := range nms {

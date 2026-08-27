@@ -137,16 +137,18 @@ func (a *adapter) Info() (info *model.RegistryInfo, err error) {
 
 func (a *adapter) FetchArtifacts(filters []*model.Filter) (resources []*model.Resource, err error) {
 	pattern := ""
+	kind := ""
 	for _, filter := range filters {
 		if filter.Type == model.FilterTypeName {
 			pattern = filter.Value.(string)
+			kind = filter.Kind
 			break
 		}
 	}
 	var repositories []string
 	// if the pattern of repository name filter is a specific repository name, just returns
 	// the parsed repositories and will check the existence later when filtering the tags
-	if paths, ok := util.IsSpecificPath(pattern); ok {
+	if paths, ok := util.IsSpecificPathForKind(kind, pattern); ok {
 		repositories = paths
 	} else {
 		err = errors.New("only support specific repository name")

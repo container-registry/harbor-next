@@ -257,12 +257,13 @@ func (a *adapter) getNamespace(namespace string) (*model.Namespace, error) {
 // FetchArtifacts fetches images
 func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, error) {
 	var repos []Repo
-	nameFilter, err := a.getStringFilterValue(model.FilterTypeName, filters)
+	nameFilter, nameKind, err := a.getStringFilterValue(model.FilterTypeName, filters)
 	if err != nil {
 		return nil, err
 	}
+	nameMatcher := util.NewMatcher(nameKind, nameFilter)
 
-	namespaces, err := a.listCandidateNamespaces(nameFilter)
+	namespaces, err := a.listCandidateNamespaces(nameKind, nameFilter)
 	if err != nil {
 		return nil, err
 	}
@@ -299,7 +300,7 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 
 			// If name filter set, skip repos that don't match the filter pattern.
 			if len(nameFilter) != 0 {
-				m, err := util.Match(nameFilter, name)
+				m, err := nameMatcher.Match(name)
 				if err != nil {
 					return fmt.Errorf("match repo name '%s' against pattern '%s' error: %v", name, nameFilter, err)
 				}
@@ -366,12 +367,12 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 	return resources, nil
 }
 
-func (a *adapter) listCandidateNamespaces(pattern string) ([]string, error) {
+func (a *adapter) listCandidateNamespaces(kind, pattern string) ([]string, error) {
 	namespaces := []string{}
 	if len(pattern) > 0 {
 		substrings := strings.Split(pattern, "/")
 		namespacePattern := substrings[0]
-		if nms, ok := util.IsSpecificPathComponent(namespacePattern); ok {
+		if nms, ok := util.IsSpecificPathComponentForKind(kind, namespacePattern); ok {
 			namespaces = append(namespaces, nms...)
 		}
 	}
@@ -463,18 +464,18 @@ func (a *adapter) getTags(namespace, repo string, page, pageSize int) (*TagsResp
 	return tags, nil
 }
 
-// getStringFilterValue gets specific type filter value from filters list.
-func (a *adapter) getStringFilterValue(filterType string, filters []*model.Filter) (string, error) {
+// getStringFilterValue gets specific type filter value and pattern kind from filters list.
+func (a *adapter) getStringFilterValue(filterType string, filters []*model.Filter) (string, string, error) {
 	for _, f := range filters {
 		if f.Type == filterType {
 			v, ok := f.Value.(string)
 			if !ok {
 				msg := fmt.Sprintf("expect filter value to be string, but got: %v", f.Value)
 				log.Error(msg)
-				return "", errors.New(msg)
+				return "", "", errors.New(msg)
 			}
-			return v, nil
+			return v, f.Kind, nil
 		}
 	}
-	return "", nil
+	return "", "", nil
 }

@@ -100,16 +100,20 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 	var projects []*Project
 	var err error
 	nameFilter := ""
+	nameKind := ""
 	tagFilter := ""
+	tagKind := ""
 	for _, filter := range filters {
 		if filter.Type == model.FilterTypeName {
 			nameFilter = filter.Value.(string)
+			nameKind = filter.Kind
 		} else if filter.Type == model.FilterTypeTag {
 			tagFilter = filter.Value.(string)
+			tagKind = filter.Kind
 		}
 	}
 
-	projects, err = a.getProjectsByPattern(nameFilter)
+	projects, err = a.getProjectsByPattern(nameKind, nameFilter)
 	if err != nil {
 		return nil, err
 	}
@@ -121,12 +125,18 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 	}
 	var pathPatterns []string
 
-	if paths, ok := util.IsSpecificPath(nameFilter); ok {
+	if paths, ok := util.IsSpecificPathForKind(nameKind, nameFilter); ok {
 		pathPatterns = paths
 	} else {
 		pathPatterns = append(pathPatterns, nameFilter)
 	}
 	log.Debugf("Patterns: %v", pathPatterns)
+
+	pathMatchers := make([]*caseFoldingMatcher, 0, len(pathPatterns))
+	for _, pathPattern := range pathPatterns {
+		pathMatchers = append(pathMatchers, newCaseFoldingMatcher(nameKind, pathPattern))
+	}
+	tagMatcher := newCaseFoldingMatcher(tagKind, tagFilter)
 
 	for _, project := range projects {
 		if !project.RegistryEnabled {
@@ -142,7 +152,7 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 			continue
 		}
 		for _, repository := range repositories {
-			if !existPatterns(repository.Path, pathPatterns) {
+			if !existPatterns(repository.Path, pathMatchers) {
 				log.Debugf("Skipping repository path=%s and id=%d", repository.Path, repository.ID)
 				continue
 			}
@@ -157,7 +167,7 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 			tags := []string{}
 			for _, vTag := range vTags {
 				if len(tagFilter) > 0 {
-					if ok, _ := util.Match(strings.ToLower(tagFilter), strings.ToLower(vTag.Name)); !ok {
+					if ok, _ := tagMatcher.Match(vTag.Name); !ok {
 						continue
 					}
 				}
@@ -183,11 +193,16 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 	return resources, nil
 }
 
-func (a *adapter) getProjectsByPattern(pattern string) ([]*Project, error) {
+func (a *adapter) getProjectsByPattern(kind, pattern string) ([]*Project, error) {
 	var projects []*Project
 	var err error
+	// the fallback below derives a project name from the glob syntax of the pattern,
+	// which says nothing about a regex: list all projects and let the filters decide
+	if util.IsRegex(kind) {
+		return nil, nil
+	}
 	if len(pattern) > 0 {
-		names, ok := util.IsSpecificPath(pattern)
+		names, ok := util.IsSpecificPathForKind(kind, pattern)
 		if ok {
 			for _, name := range names {
 				var projectsByName, err = a.clientGitlabAPI.getProjectsByName(url.QueryEscape(name))
@@ -222,11 +237,11 @@ func (a *adapter) getProjectsByPattern(pattern string) ([]*Project, error) {
 	return projects, nil
 }
 
-func existPatterns(path string, patterns []string) bool {
+func existPatterns(path string, matchers []*caseFoldingMatcher) bool {
 	correct := false
-	if len(patterns) > 0 {
-		for _, pathPattern := range patterns {
-			if ok, _ := util.Match(strings.ToLower(pathPattern), strings.ToLower(path)); ok {
+	if len(matchers) > 0 {
+		for _, matcher := range matchers {
+			if ok, _ := matcher.Match(path); ok {
 				correct = true
 				break
 			}
@@ -235,4 +250,30 @@ func existPatterns(path string, patterns []string) bool {
 		correct = true
 	}
 	return correct
+}
+
+// caseFoldingMatcher matches gitlab repository paths and tags, which the adapter
+// compares case insensitively. Only doublestar patterns are folded: lowercasing a
+// regex would rewrite classes such as \D or [A-Z], the user has (?i) for that.
+type caseFoldingMatcher struct {
+	matcher *util.Matcher
+	fold    bool
+}
+
+func newCaseFoldingMatcher(kind, pattern string) *caseFoldingMatcher {
+	fold := !util.IsRegex(kind)
+	if fold {
+		pattern = strings.ToLower(pattern)
+	}
+	return &caseFoldingMatcher{
+		matcher: util.NewMatcher(kind, pattern),
+		fold:    fold,
+	}
+}
+
+func (c *caseFoldingMatcher) Match(value string) (bool, error) {
+	if c.fold {
+		value = strings.ToLower(value)
+	}
+	return c.matcher.Match(value)
 }

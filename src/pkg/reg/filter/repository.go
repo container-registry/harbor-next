@@ -40,6 +40,7 @@ func BuildRepositoryFilters(filters []*model.Filter) (RepositoryFilters, error) 
 			if pattern, ok := filter.Value.(string); ok {
 				f = &repositoryNameFilter{
 					pattern: pattern,
+					matcher: util.NewMatcher(filter.Kind, pattern),
 				}
 			} else {
 				return nil, fmt.Errorf("invalid filter value type for repository name filter, expecting string")
@@ -74,6 +75,7 @@ func (r RepositoryFilters) Filter(repositories []*model.Repository) ([]*model.Re
 
 type repositoryNameFilter struct {
 	pattern string
+	matcher *util.Matcher
 }
 
 func (r *repositoryNameFilter) Filter(repositories []*model.Repository) ([]*model.Repository, error) {
@@ -82,7 +84,7 @@ func (r *repositoryNameFilter) Filter(repositories []*model.Repository) ([]*mode
 	}
 	var result []*model.Repository
 	for _, repository := range repositories {
-		match, err := util.Match(r.pattern, repository.Name)
+		match, err := r.matcher.Match(repository.Name)
 		if err != nil {
 			return nil, err
 		}

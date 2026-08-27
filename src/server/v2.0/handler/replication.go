@@ -27,6 +27,7 @@ import (
 	"github.com/goharbor/harbor/src/controller/replication"
 	repctlmodel "github.com/goharbor/harbor/src/controller/replication/model"
 	"github.com/goharbor/harbor/src/jobservice/job"
+	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
@@ -89,6 +90,7 @@ func (r *replicationAPI) CreateReplicationPolicy(ctx context.Context, params ope
 				Type:       filter.Type,
 				Value:      filter.Value,
 				Decoration: filter.Decoration,
+				Kind:       lib.StringValue(filter.Kind),
 			})
 		}
 	}
@@ -165,6 +167,7 @@ func (r *replicationAPI) UpdateReplicationPolicy(ctx context.Context, params ope
 				Type:       filter.Type,
 				Value:      filter.Value,
 				Decoration: filter.Decoration,
+				Kind:       lib.StringValue(filter.Kind),
 			})
 		}
 	}
@@ -472,11 +475,16 @@ func convertReplicationPolicy(policy *repctlmodel.Policy) *models.ReplicationPol
 	}
 	if len(policy.Filters) > 0 {
 		for _, filter := range policy.Filters {
-			p.Filters = append(p.Filters, &models.ReplicationFilter{
+			f := &models.ReplicationFilter{
 				Type:       filter.Type,
 				Value:      filter.Value,
 				Decoration: filter.Decoration,
-			})
+			}
+			// keep the field absent for the policies that don't set a kind
+			if filter.Kind != "" {
+				f.Kind = &filter.Kind
+			}
+			p.Filters = append(p.Filters, f)
 		}
 	}
 	if policy.Trigger != nil {

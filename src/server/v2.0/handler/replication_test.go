@@ -20,6 +20,7 @@ import (
 
 	"github.com/go-openapi/strfmt"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/goharbor/harbor/src/controller/replication"
 	repctlmodel "github.com/goharbor/harbor/src/controller/replication/model"
@@ -32,29 +33,29 @@ import (
 
 func TestConvertReplicationPolicy(t *testing.T) {
 	testTime := time.Now()
-	
+
 	tests := []struct {
-		name     string
-		policy   *repctlmodel.Policy
-		expected *models.ReplicationPolicy
+		name        string
+		policy      *repctlmodel.Policy
+		expected    *models.ReplicationPolicy
 		shouldPanic bool
 	}{
 		{
 			name: "policy with string filter values",
 			policy: &repctlmodel.Policy{
-				ID:          1,
-				Name:        "test-policy",
-				Description: "test description",
-				CreationTime: testTime,
-				UpdateTime:   testTime,
-				Enabled:     true,
-				Override:    true,
-				ReplicateDeletion: false,
-				DestNamespace: "test-namespace",
+				ID:                        1,
+				Name:                      "test-policy",
+				Description:               "test description",
+				CreationTime:              testTime,
+				UpdateTime:                testTime,
+				Enabled:                   true,
+				Override:                  true,
+				ReplicateDeletion:         false,
+				DestNamespace:             "test-namespace",
 				DestNamespaceReplaceCount: 2,
-				Speed: 1024,
-				CopyByChunk: true,
-				SingleActiveReplication: false,
+				Speed:                     1024,
+				CopyByChunk:               true,
+				SingleActiveReplication:   false,
 				SrcRegistry: &model.Registry{
 					ID:   1,
 					Name: "src-registry",
@@ -140,17 +141,17 @@ func TestConvertReplicationPolicy(t *testing.T) {
 		{
 			name: "policy with empty filters",
 			policy: &repctlmodel.Policy{
-				ID:          2,
-				Name:        "empty-filter-policy",
-				Description: "policy with no filters",
-				CreationTime: testTime,
-				UpdateTime:   testTime,
-				Enabled:     true,
+				ID:                        2,
+				Name:                      "empty-filter-policy",
+				Description:               "policy with no filters",
+				CreationTime:              testTime,
+				UpdateTime:                testTime,
+				Enabled:                   true,
 				DestNamespaceReplaceCount: -1,
-				Speed: 0,
-				CopyByChunk: false,
-				SingleActiveReplication: true,
-				Filters: []*model.Filter{},
+				Speed:                     0,
+				CopyByChunk:               false,
+				SingleActiveReplication:   true,
+				Filters:                   []*model.Filter{},
 			},
 			expected: &models.ReplicationPolicy{
 				ID:                        2,
@@ -169,16 +170,16 @@ func TestConvertReplicationPolicy(t *testing.T) {
 		{
 			name: "policy with nil registries and trigger",
 			policy: &repctlmodel.Policy{
-				ID:          3,
-				Name:        "minimal-policy",
-				Description: "minimal policy configuration",
-				CreationTime: testTime,
-				UpdateTime:   testTime,
-				Enabled:     false,
+				ID:                        3,
+				Name:                      "minimal-policy",
+				Description:               "minimal policy configuration",
+				CreationTime:              testTime,
+				UpdateTime:                testTime,
+				Enabled:                   false,
 				DestNamespaceReplaceCount: -1,
-				Speed: 0,
-				CopyByChunk: false,
-				SingleActiveReplication: false,
+				Speed:                     0,
+				CopyByChunk:               false,
+				SingleActiveReplication:   false,
 			},
 			expected: &models.ReplicationPolicy{
 				ID:                        3,
@@ -194,7 +195,7 @@ func TestConvertReplicationPolicy(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.shouldPanic {
@@ -211,7 +212,7 @@ func TestConvertReplicationPolicy(t *testing.T) {
 				assert.Equal(t, tt.expected.Deletion, result.Deletion)
 				assert.Equal(t, tt.expected.ReplicateDeletion, result.ReplicateDeletion)
 				assert.Equal(t, tt.expected.DestNamespace, result.DestNamespace)
-				
+
 				if tt.expected.DestNamespaceReplaceCount != nil {
 					assert.Equal(t, *tt.expected.DestNamespaceReplaceCount, *result.DestNamespaceReplaceCount)
 				}
@@ -224,7 +225,7 @@ func TestConvertReplicationPolicy(t *testing.T) {
 				if tt.expected.SingleActiveReplication != nil {
 					assert.Equal(t, *tt.expected.SingleActiveReplication, *result.SingleActiveReplication)
 				}
-				
+
 				// Check filters
 				if len(tt.expected.Filters) > 0 {
 					assert.Len(t, result.Filters, len(tt.expected.Filters))
@@ -234,7 +235,7 @@ func TestConvertReplicationPolicy(t *testing.T) {
 						assert.Equal(t, expectedFilter.Decoration, result.Filters[i].Decoration)
 					}
 				}
-				
+
 				// Check registries
 				if tt.expected.SrcRegistry != nil {
 					assert.Equal(t, tt.expected.SrcRegistry.ID, result.SrcRegistry.ID)
@@ -246,7 +247,7 @@ func TestConvertReplicationPolicy(t *testing.T) {
 					assert.Equal(t, tt.expected.DestRegistry.Name, result.DestRegistry.Name)
 					assert.Equal(t, tt.expected.DestRegistry.URL, result.DestRegistry.URL)
 				}
-				
+
 				// Check trigger
 				if tt.expected.Trigger != nil {
 					assert.Equal(t, tt.expected.Trigger.Type, result.Trigger.Type)
@@ -261,18 +262,18 @@ func TestConvertReplicationPolicy(t *testing.T) {
 
 func TestConvertReplicationPolicyFilterTypeAssertion(t *testing.T) {
 	testTime := time.Now()
-	
+
 	// Test case where filter.Value is not a string but should be handled gracefully
 	policy := &repctlmodel.Policy{
-		ID:          1,
-		Name:        "test-policy",
-		CreationTime: testTime,
-		UpdateTime:   testTime,
-		Enabled:     true,
+		ID:                        1,
+		Name:                      "test-policy",
+		CreationTime:              testTime,
+		UpdateTime:                testTime,
+		Enabled:                   true,
 		DestNamespaceReplaceCount: -1,
-		Speed: 0,
-		CopyByChunk: false,
-		SingleActiveReplication: false,
+		Speed:                     0,
+		CopyByChunk:               false,
+		SingleActiveReplication:   false,
 		Filters: []*model.Filter{
 			{
 				Type:  model.FilterTypeTag,
@@ -280,7 +281,7 @@ func TestConvertReplicationPolicyFilterTypeAssertion(t *testing.T) {
 			},
 		},
 	}
-	
+
 	// The function should handle non-string values by preserving their types
 	result := convertReplicationPolicy(policy)
 	assert.NotNil(t, result)
@@ -291,12 +292,12 @@ func TestConvertReplicationPolicyFilterTypeAssertion(t *testing.T) {
 // Test helper functions
 func TestConvertExecution(t *testing.T) {
 	execution := &replication.Execution{
-		ID:       1,
-		PolicyID: 2,
-		Status:   job.RunningStatus.String(),
-		Trigger:  task.ExecutionTriggerManual,
-		StartTime: time.Now(),
-		EndTime:   time.Now(),
+		ID:            1,
+		PolicyID:      2,
+		Status:        job.RunningStatus.String(),
+		Trigger:       task.ExecutionTriggerManual,
+		StartTime:     time.Now(),
+		EndTime:       time.Now(),
 		StatusMessage: "test execution",
 		Metrics: &taskdao.Metrics{
 			TaskCount:        10,
@@ -305,9 +306,9 @@ func TestConvertExecution(t *testing.T) {
 			PendingTaskCount: 1,
 		},
 	}
-	
+
 	result := convertExecution(execution)
-	
+
 	assert.Equal(t, int64(1), result.ID)
 	assert.Equal(t, int64(2), result.PolicyID)
 	assert.Equal(t, "InProgress", result.Status)
@@ -320,20 +321,20 @@ func TestConvertExecution(t *testing.T) {
 
 func TestConvertTask(t *testing.T) {
 	task := &replication.Task{
-		ID:                1,
-		ExecutionID:       2,
-		JobID:             "job-123",
-		Status:            job.SuccessStatus.String(),
-		Operation:         "copy",
-		ResourceType:      "image",
-		SourceResource:    "source/repo:tag",
+		ID:                  1,
+		ExecutionID:         2,
+		JobID:               "job-123",
+		Status:              job.SuccessStatus.String(),
+		Operation:           "copy",
+		ResourceType:        "image",
+		SourceResource:      "source/repo:tag",
 		DestinationResource: "dest/repo:tag",
-		StartTime:         time.Now(),
-		EndTime:           time.Now(),
+		StartTime:           time.Now(),
+		EndTime:             time.Now(),
 	}
-	
+
 	result := convertTask(task)
-	
+
 	assert.Equal(t, int64(1), result.ID)
 	assert.Equal(t, int64(2), result.ExecutionID)
 	assert.Equal(t, "job-123", result.JobID)
@@ -342,4 +343,28 @@ func TestConvertTask(t *testing.T) {
 	assert.Equal(t, "image", result.ResourceType)
 	assert.Equal(t, "source/repo:tag", result.SrcResource)
 	assert.Equal(t, "dest/repo:tag", result.DstResource)
+}
+func TestConvertReplicationPolicyFilterKind(t *testing.T) {
+	policy := &repctlmodel.Policy{
+		ID:   1,
+		Name: "test-policy",
+		Filters: []*model.Filter{
+			{
+				Type:  model.FilterTypeName,
+				Value: "library/.*",
+				Kind:  model.FilterKindRegex,
+			},
+			{
+				Type:  model.FilterTypeTag,
+				Value: "v1.*",
+			},
+		},
+	}
+
+	result := convertReplicationPolicy(policy)
+	assert.Len(t, result.Filters, 2)
+	require.NotNil(t, result.Filters[0].Kind)
+	assert.Equal(t, model.FilterKindRegex, *result.Filters[0].Kind)
+	// a policy that doesn't set a kind keeps the field out of the response
+	assert.Nil(t, result.Filters[1].Kind)
 }

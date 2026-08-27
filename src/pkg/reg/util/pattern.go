@@ -16,17 +16,76 @@ package util
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/bmatcuk/doublestar"
+
+	regexpselector "github.com/goharbor/harbor/src/lib/selector/selectors/regexp"
+	"github.com/goharbor/harbor/src/pkg/reg/model"
 )
 
-// Match returns whether the str matches the pattern
+// Match returns whether the str matches the doublestar pattern
 func Match(pattern, str string) (bool, error) {
 	if len(pattern) == 0 {
 		return true, nil
 	}
 	return doublestar.Match(pattern, str)
+}
+
+// MatchPattern returns whether the str matches the pattern under the given filter kind.
+// An empty kind is the doublestar default. Prefer NewMatcher when the same pattern is
+// applied to many values, it keeps a compiled expression instead of compiling per value.
+func MatchPattern(kind, pattern, str string) (bool, error) {
+	return NewMatcher(kind, pattern).Match(str)
+}
+
+// Matcher matches values against one filter pattern
+type Matcher struct {
+	kind    string
+	pattern string
+
+	// a regex pattern is compiled on first use and the outcome kept, so that a
+	// filter applied to thousands of artifacts compiles only once
+	once       sync.Once
+	expression *regexp.Regexp
+	compileErr error
+}
+
+// NewMatcher returns a matcher for the pattern under the given filter kind
+func NewMatcher(kind, pattern string) *Matcher {
+	return &Matcher{
+		kind:    kind,
+		pattern: pattern,
+	}
+}
+
+// Match returns whether the str matches the pattern of the matcher
+func (m *Matcher) Match(str string) (bool, error) {
+	if len(m.pattern) == 0 {
+		return true, nil
+	}
+
+	if m.kind != model.FilterKindRegex {
+		return doublestar.Match(m.pattern, str)
+	}
+
+	m.once.Do(func() {
+		// the anchoring is done by the selector package, so that the replication
+		// filters and the retention/immutability selectors share one implementation
+		m.expression, m.compileErr = regexpselector.Compile(m.pattern)
+	})
+	if m.compileErr != nil {
+		return false, m.compileErr
+	}
+
+	return m.expression.MatchString(str), nil
+}
+
+// IsRegex returns whether the kind selects the regular expression engine
+func IsRegex(kind string) bool {
+	return kind == model.FilterKindRegex
 }
 
 // IsSpecificPath checks whether the input path is a specified string
@@ -53,6 +112,16 @@ func IsSpecificPath(path string) ([]string, bool) {
 		result = combinationPathComponents(result, component)
 	}
 	return result, true
+}
+
+// IsSpecificPathForKind is IsSpecificPath for a filter of the given kind
+// A regex pattern is never reversed into a repository list, so the caller falls back to
+// listing the catalog, the same as it does for a "**" doublestar pattern
+func IsSpecificPathForKind(kind, path string) ([]string, bool) {
+	if IsRegex(kind) {
+		return nil, false
+	}
+	return IsSpecificPath(path)
 }
 
 func combinationPathComponents(components1, components2 []string) []string {
@@ -117,4 +186,14 @@ func IsSpecificPathComponent(component string) ([]string, bool) {
 		components = append(components, prefix+str+suffix)
 	}
 	return components, true
+}
+
+// IsSpecificPathComponentForKind is IsSpecificPathComponent for a filter of the given kind
+// A regex pattern is never reversed into a namespace list, so the caller falls back to
+// listing all namespaces
+func IsSpecificPathComponentForKind(kind, component string) ([]string, bool) {
+	if IsRegex(kind) {
+		return nil, false
+	}
+	return IsSpecificPathComponent(component)
 }

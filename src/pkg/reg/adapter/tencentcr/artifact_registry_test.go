@@ -1,10 +1,10 @@
 package tencentcr
 
 import (
-	"reflect"
-	"testing"
 	"fmt"
+	"reflect"
 	"strings"
+	"testing"
 
 	tcr "github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/tcr/v20190924"
 
@@ -59,7 +59,7 @@ func Test_filterToPatterns(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotNamespacePattern, gotRepoPattern, gotTagsPattern := filterToPatterns(tt.args.filters)
+			gotNamespacePattern, gotRepoPattern, _, gotTagsPattern, _ := filterToPatterns(tt.args.filters)
 			if gotNamespacePattern != tt.wantNamespacePattern {
 				t.Errorf("filterToPatterns() gotNamespacePattern = %v, want %v", gotNamespacePattern, tt.wantNamespacePattern)
 			}
@@ -151,7 +151,7 @@ func Test_adapter_listCandidateNamespaces(t *testing.T) {
 				client:     tt.fields.client,
 				registry:   tt.fields.registry,
 			}
-			gotNamespaces, err := a.listCandidateNamespaces(tt.args.namespacePattern)
+			gotNamespaces, err := a.listCandidateNamespaces("", tt.args.namespacePattern)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("adapter.listCandidateNamespaces() error = %v, wantErr %v", err, tt.wantErr)
 				return

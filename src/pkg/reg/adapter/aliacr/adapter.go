@@ -248,10 +248,10 @@ func getAdapterInfo() *model.AdapterPattern {
 	return info
 }
 
-func (a *adapter) listCandidateNamespaces(namespacePattern string) ([]string, error) {
+func (a *adapter) listCandidateNamespaces(kind, namespacePattern string) ([]string, error) {
 	var namespaces []string
 	if len(namespacePattern) > 0 {
-		if nms, ok := util.IsSpecificPathComponent(namespacePattern); ok {
+		if nms, ok := util.IsSpecificPathComponentForKind(kind, namespacePattern); ok {
 			namespaces = append(namespaces, nms...)
 		}
 		if len(namespaces) > 0 {
@@ -278,18 +278,21 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 	var resources []*model.Resource
 	// get filter pattern
 	var repoPattern string
+	var repoKind string
 	var tagsPattern string
 	for _, f := range filters {
 		if f.Type == model.FilterTypeName {
 			repoPattern = f.Value.(string)
+			repoKind = f.Kind
 		}
 	}
 	var namespacePattern = strings.Split(repoPattern, "/")[0]
+	repoMatcher := util.NewMatcher(repoKind, repoPattern)
 
 	log.Debugf("\nrepoPattern=%s tagsPattern=%s\n\n", repoPattern, tagsPattern)
 
 	// get namespaces
-	namespaces, err := a.listCandidateNamespaces(namespacePattern)
+	namespaces, err := a.listCandidateNamespaces(repoKind, namespacePattern)
 	if err != nil {
 		return nil, err
 	}
@@ -308,7 +311,7 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 		for _, repo := range repos {
 			var ok bool
 			var repoName = filepath.Join(repo.Namespace, repo.Name)
-			ok, err = util.Match(repoPattern, repoName)
+			ok, err = repoMatcher.Match(repoName)
 			log.Debugf("\n Repository: %s\t repoPattern: %s\t Match: %v\n", repoName, repoPattern, ok)
 			if err != nil {
 				return nil, err

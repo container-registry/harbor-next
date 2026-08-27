@@ -14,7 +14,10 @@
 
 package model
 
-import "github.com/goharbor/harbor/src/lib/errors"
+import (
+	"github.com/goharbor/harbor/src/lib/errors"
+	regexpselector "github.com/goharbor/harbor/src/lib/selector/selectors/regexp"
+)
 
 // const definition
 const (
@@ -31,6 +34,12 @@ const (
 	Matches = "matches"
 	// Excludes [pattern] for tag
 	Excludes = "excludes"
+
+	// FilterKindDoublestar interprets the filter value as a doublestar pattern, the default
+	FilterKindDoublestar = "doublestar"
+	// FilterKindRegex interprets the filter value as a regular expression matching the whole
+	// value, the same engine and literal the retention and immutability selectors use
+	FilterKindRegex = regexpselector.Kind
 )
 
 // Filter holds the info of the filter
@@ -38,9 +47,16 @@ type Filter struct {
 	Type       string `json:"type"`
 	Value      any    `json:"value"`
 	Decoration string `json:"decoration,omitempty"`
+	// Kind selects the pattern engine used for Value, empty means FilterKindDoublestar
+	Kind string `json:"kind,omitempty"`
 }
 
 func (f *Filter) Validate() error {
+	if f.Kind != "" && f.Kind != FilterKindDoublestar && f.Kind != FilterKindRegex {
+		return errors.New(nil).WithCode(errors.BadRequestCode).
+			WithMessagef("invalid filter kind: %s", f.Kind)
+	}
+
 	switch f.Type {
 	case FilterTypeResource, FilterTypeName, FilterTypeTag:
 		value, ok := f.Value.(string)
@@ -54,12 +70,19 @@ func (f *Filter) Validate() error {
 				return errors.New(nil).WithCode(errors.BadRequestCode).
 					WithMessagef("invalid resource filter: %s", value)
 			}
+			if f.Kind != "" {
+				return errors.New(nil).WithCode(errors.BadRequestCode).
+					WithMessage("only name, tag and label filter support kind")
+			}
 		}
 		if f.Type == FilterTypeName || f.Type == FilterTypeResource {
 			if f.Decoration != "" {
 				return errors.New(nil).WithCode(errors.BadRequestCode).
 					WithMessage("only tag and label filter support decoration")
 			}
+		}
+		if err := f.validatePattern(value); err != nil {
+			return err
 		}
 	case FilterTypeLabel:
 		labels, ok := f.Value.([]any)
@@ -68,10 +91,13 @@ func (f *Filter) Validate() error {
 				WithMessage("the type of label filter value isn't string slice")
 		}
 		for _, label := range labels {
-			_, ok := label.(string)
+			value, ok := label.(string)
 			if !ok {
 				return errors.New(nil).WithCode(errors.BadRequestCode).
 					WithMessage("the type of label filter value isn't string slice")
+			}
+			if err := f.validatePattern(value); err != nil {
+				return err
 			}
 		}
 	default:
@@ -84,6 +110,18 @@ func (f *Filter) Validate() error {
 			WithMessagef("invalid filter decoration, :%s", f.Decoration)
 	}
 
+	return nil
+}
+
+// validatePattern checks a single filter value against the pattern engine selected by the kind
+func (f *Filter) validatePattern(value string) error {
+	if f.Kind != FilterKindRegex {
+		return nil
+	}
+	if err := regexpselector.Validate(value); err != nil {
+		return errors.New(nil).WithCode(errors.BadRequestCode).
+			WithMessagef("invalid regex filter value %q: %v", value, err)
+	}
 	return nil
 }
 
