@@ -56,7 +56,7 @@
         "TAG_FILTER": "Filter den tag/version Anteil der Ressourcen. Ein leerer Filter oder '**' stimmt mit allem überein. '1.0*' stimmt nur mit Ressourcen überein, die mit '1.0' beginnen. Weitere Muster befinden sich in der Nutzeranleitung (user guide).",
         "LABEL_FILTER": "Filtern nach Label.",
         "NAME_FILTER_REGEX": "Filtert den Namen der Ressource mit einem regulären Ausdruck, der auf den vollständigen Namen passen muss. Ein leerer Filter stimmt mit allem überein. 'library/.*' trifft nur auf Ressourcen unter 'library' zu.",
-        "TAG_FILTER_REGEX": "Filtert den Tag-/Versionsteil der Ressourcen mit einem regulären Ausdruck, der auf den vollständigen Tag passen muss. Ein leerer Filter stimmt mit allem überein. 'v\\d+\\.\\d+' trifft nur auf Tags wie 'v1.0' zu. Artefakte ohne Tag stimmen mit keinem regulären Ausdruck überein.",
+        "TAG_FILTER_REGEX": "Filtert den Tag-/Versionsteil der Ressourcen mit einem regulären Ausdruck, der auf den vollständigen Tag passen muss. Ein leerer Filter stimmt mit allem überein. 'v\\d+\\.\\d+' trifft nur auf Tags wie 'v1.0' zu. Ein Artefakt ohne Tag wird nur behalten, wenn der Ausdruck auf den leeren Tag passt, wie es '.*' tut.",
         "LABEL_FILTER_REGEX": "Filtert die Ressourcen nach Labels, jeder Ausdruck muss auf einen vollständigen Labelnamen passen.",
         "RESOURCE_FILTER": "Filter die Art der Ressourcen.",
         "PUSH_BASED": "Lade die Ressourcen vom lokalen Harbor zur entfernten Registry hoch.",

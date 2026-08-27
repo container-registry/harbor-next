@@ -56,7 +56,7 @@
         "TAG_FILTER": "篩選資源的標籤/版本。不填寫、或使用「**」可選取所有標籤/版本。「1.0*」僅選取以「1.0」開頭的標籤。更多模式請參考使用者手冊。",
         "LABEL_FILTER": "根據標籤篩選資源。",
         "NAME_FILTER_REGEX": "Filter the name of the resource with a regular expression that has to match the full name. Leave empty to match all. 'library/.*' only matches resources under 'library'.",
-        "TAG_FILTER_REGEX": "Filter the tag/version part of the resources with a regular expression that has to match the full tag. Leave empty to match all. 'v\\d+\\.\\d+' only matches tags such as 'v1.0'. Untagged artifacts never match a regular expression.",
+        "TAG_FILTER_REGEX": "Filter the tag/version part of the resources with a regular expression that has to match the full tag. Leave empty to match all. 'v\\d+\\.\\d+' only matches tags such as 'v1.0'. An untagged artifact is kept only when the expression matches the empty tag, as '.*' does.",
         "LABEL_FILTER_REGEX": "Filter the resources according to labels, every expression has to match a full label name.",
         "RESOURCE_FILTER": "篩選資源的類型。",
         "PUSH_BASED": "將資源從本機 Harbor 推送到遠端 Registry。",

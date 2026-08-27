@@ -56,7 +56,6 @@ func BuildArtifactFilters(filters []*model.Filter) (ArtifactFilters, error) {
 			if p, ok := filter.Value.(string); ok {
 				f = &artifactTagFilter{
 					pattern:    p,
-					kind:       filter.Kind,
 					matcher:    pattern.NewMatcher(filter.Kind, p),
 					decoration: filter.Decoration,
 				}
@@ -165,21 +164,9 @@ func (a *artifactLabelFilter) matchAll(artifactLabels []string) (bool, error) {
 
 type artifactTagFilter struct {
 	pattern string
-	// "", "doublestar" or "regex"
-	kind    string
 	matcher *pattern.Matcher
 	// "matches", "excludes"
 	decoration string
-}
-
-// matchUntagged returns whether an artifact without tags matches the pattern.
-// A doublestar pattern is matched against the empty tag, keeping the behavior of "**".
-// A regex is never run against the empty string, an untagged artifact just doesn't match.
-func (a *artifactTagFilter) matchUntagged() (bool, error) {
-	if a.kind == pattern.KindRegex {
-		return false, nil
-	}
-	return a.matcher.Match("")
 }
 
 func (a *artifactTagFilter) Filter(artifacts []*model.Artifact) ([]*model.Artifact, error) {
@@ -197,9 +184,10 @@ func (a *artifactTagFilter) Filter(artifacts []*model.Artifact) ([]*model.Artifa
 			tagsForMatching = append(tagsForMatching, artifact.Tags...)
 		}
 
-		// untagged artifact
+		// untagged artifact: it is kept when the pattern matches the empty tag,
+		// which "**" does and "v*" does not, and an anchored ".*" and "v.*" alike
 		if len(tagsForMatching) == 0 {
-			match, err := a.matchUntagged()
+			match, err := a.matcher.Match("")
 			if err != nil {
 				return nil, err
 			}

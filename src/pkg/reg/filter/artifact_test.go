@@ -73,17 +73,29 @@ func TestDoFilterArtifactsByTagKind(t *testing.T) {
 			want: [][]string{{"v1.0-rc1"}, {"latest"}, nil},
 		},
 		{
-			// the pattern is never run against the empty tag, an untagged artifact
-			// isn't a match even for a regex that would accept an empty string
-			name:    "untagged artifact never matches a regex",
+			// the untagged artifact is kept exactly when the pattern matches the
+			// empty tag, the rule "**" and "v*" already follow for doublestar
+			name:    "regex matching the empty tag keeps the untagged artifact",
 			kind:    model.FilterKindRegex,
 			pattern: ".*",
-			want:    [][]string{{"v1.0", "v1.0-rc1"}, {"latest"}},
+			want:    [][]string{{"v1.0", "v1.0-rc1"}, {"latest"}, nil},
 		},
 		{
-			name:    "doublestar still matches the untagged artifact",
+			name:    "regex not matching the empty tag drops the untagged artifact",
+			kind:    model.FilterKindRegex,
+			pattern: "v.*",
+			want:    [][]string{{"v1.0", "v1.0-rc1"}},
+		},
+		{
+			// the doublestar counterparts of the two cases above, the engines agree
+			name:    "doublestar ** keeps the untagged artifact",
 			pattern: "**",
 			want:    [][]string{{"v1.0", "v1.0-rc1"}, {"latest"}, nil},
+		},
+		{
+			name:    "doublestar v* drops the untagged artifact",
+			pattern: "v*",
+			want:    [][]string{{"v1.0", "v1.0-rc1"}},
 		},
 		{
 			name:    "invalid regex is reported",

@@ -56,7 +56,7 @@
         "TAG_FILTER": "Kaynakların etiket / sürüm bölümünü filtreleyin. Boş bırakın veya hepsine uyacak şekilde '**' kullanın. '1.0 *' sadece '1.0' ile başlayan etiketlerle eşleşir. Daha fazla desen için lütfen kullanım kılavuzuna bakın.",
         "LABEL_FILTER": "Kaynakları etiketlere göre filtreleyin.",
         "NAME_FILTER_REGEX": "Filter the name of the resource with a regular expression that has to match the full name. Leave empty to match all. 'library/.*' only matches resources under 'library'.",
-        "TAG_FILTER_REGEX": "Filter the tag/version part of the resources with a regular expression that has to match the full tag. Leave empty to match all. 'v\\d+\\.\\d+' only matches tags such as 'v1.0'. Untagged artifacts never match a regular expression.",
+        "TAG_FILTER_REGEX": "Filter the tag/version part of the resources with a regular expression that has to match the full tag. Leave empty to match all. 'v\\d+\\.\\d+' only matches tags such as 'v1.0'. An untagged artifact is kept only when the expression matches the empty tag, as '.*' does.",
         "LABEL_FILTER_REGEX": "Filter the resources according to labels, every expression has to match a full label name.",
         "RESOURCE_FILTER": "Kaynak türünü filtreleyin.",
         "PUSH_BASED": "Kaynakları yerel Harbordan uzak kayıt defterine yükleyin.",
