@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import { Injectable } from '@angular/core';
+import { PatternKind } from '../../left-side-nav/replication/replication';
 
 const ONE_MINUTE_SECONDS: number = 60;
 
@@ -114,3 +115,13 @@ export enum FILTER_TYPE {
     LABEL = 'label',
     VULNERABILITY = 'vulnerability',
 }
+
+export const PATTERN_KIND_I18N_MAP = {
+    [PatternKind.DOUBLESTAR]: 'P2P_PROVIDER.ENGINE_DOUBLESTAR',
+    [PatternKind.REGEX]: 'P2P_PROVIDER.ENGINE_REGEX',
+};
+
+export const PATTERN_KINDS: string[] = [
+    PatternKind.DOUBLESTAR,
+    PatternKind.REGEX,
+];

@@ -39,6 +39,7 @@ import {
     TRIGGER,
     TRIGGER_I18N_MAP,
 } from '../p2p-provider.service';
+import { PatternKind } from '../../../left-side-nav/replication/replication';
 import { PreheatPolicy } from '../../../../../../ng-swagger-gen/models/preheat-policy';
 import { PreheatService } from '../../../../../../ng-swagger-gen/services/preheat.service';
 import { AddP2pPolicyComponent } from '../add-p2p-policy/add-p2p-policy.component';
@@ -450,7 +451,9 @@ export class PolicyComponent implements OnInit, OnDestroy {
     editPolicy() {
         if (this.selectedRow) {
             this.addP2pPolicyComponent.repos = null;
+            this.addP2pPolicyComponent.reposKind = PatternKind.DOUBLESTAR;
             this.addP2pPolicyComponent.tags = null;
+            this.addP2pPolicyComponent.tagsKind = PatternKind.DOUBLESTAR;
             this.addP2pPolicyComponent.labels = null;
             this.addP2pPolicyComponent.isOpen = true;
             this.addP2pPolicyComponent.isEdit = true;
@@ -462,14 +465,20 @@ export class PolicyComponent implements OnInit, OnDestroy {
                 filter.forEach(item => {
                     if (item.type === FILTER_TYPE.REPOS && item.value) {
                         let str: string = item.value;
-                        if (/^{\S+}$/.test(str)) {
+                        const kind = item.kind || PatternKind.DOUBLESTAR;
+                        this.addP2pPolicyComponent.reposKind = kind;
+                        // a regex is stored verbatim: braces in it are quantifiers,
+                        // not the doublestar spelling of a comma separated list
+                        if (kind !== PatternKind.REGEX && /^{\S+}$/.test(str)) {
                             return str.slice(1, str.length - 1);
                         }
                         this.addP2pPolicyComponent.repos = str;
                     }
                     if (item.type === FILTER_TYPE.TAG && item.value) {
                         let str: string = item.value;
-                        if (/^{\S+}$/.test(str)) {
+                        const kind = item.kind || PatternKind.DOUBLESTAR;
+                        this.addP2pPolicyComponent.tagsKind = kind;
+                        if (kind !== PatternKind.REGEX && /^{\S+}$/.test(str)) {
                             return str.slice(1, str.length - 1);
                         }
                         this.addP2pPolicyComponent.tags = str;
@@ -500,7 +509,9 @@ export class PolicyComponent implements OnInit, OnDestroy {
                 name: this.addP2pPolicyComponent.policy.name,
                 description: this.addP2pPolicyComponent.policy.description,
                 repo: this.addP2pPolicyComponent.repos,
+                repoKind: this.addP2pPolicyComponent.reposKind,
                 tag: this.addP2pPolicyComponent.tags,
+                tagKind: this.addP2pPolicyComponent.tagsKind,
                 onlySignedImages: this.addP2pPolicyComponent.enableContentTrust,
                 severity: this.addP2pPolicyComponent.severity,
                 label: this.addP2pPolicyComponent.labels,
@@ -513,8 +524,12 @@ export class PolicyComponent implements OnInit, OnDestroy {
             );
             this.addP2pPolicyComponent.originReposForEdit =
                 this.addP2pPolicyComponent.repos;
+            this.addP2pPolicyComponent.originReposKindForEdit =
+                this.addP2pPolicyComponent.reposKind;
             this.addP2pPolicyComponent.originTagsForEdit =
                 this.addP2pPolicyComponent.tags;
+            this.addP2pPolicyComponent.originTagsKindForEdit =
+                this.addP2pPolicyComponent.tagsKind;
             this.addP2pPolicyComponent.originOnlySignedImagesForEdit =
                 this.addP2pPolicyComponent.onlySignedImages;
             this.addP2pPolicyComponent.originSeverityForEdit =
