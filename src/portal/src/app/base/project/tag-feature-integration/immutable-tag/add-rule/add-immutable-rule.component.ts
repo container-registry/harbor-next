@@ -25,6 +25,7 @@ import {
     SELECTOR_KIND_DOUBLESTAR,
     SELECTOR_KIND_REGEX,
     Template,
+    normalizePattern,
     selectorDecorations,
     selectorKinds,
     unwrapPattern,
@@ -118,7 +119,7 @@ export class AddImmutableRuleComponent {
         return '';
     }
 
-    private get repoSelector(): Selector {
+    private get repoSelector(): Selector | null {
         if (
             this.rule &&
             this.rule.scope_selectors &&
@@ -129,7 +130,7 @@ export class AddImmutableRuleComponent {
         return null;
     }
 
-    private get tagSelector(): Selector {
+    private get tagSelector(): Selector | null {
         if (this.rule && this.rule.tag_selectors) {
             return this.rule.tag_selectors[0];
         }
@@ -220,7 +221,7 @@ export class AddImmutableRuleComponent {
     }
 
     // braces carry no content for doublestar, but are quantifier syntax for a regex
-    hasPattern(selector: Selector): boolean {
+    hasPattern(selector: Selector | null): boolean {
         if (!selector || !selector.pattern) {
             return false;
         }
@@ -244,11 +245,15 @@ export class AddImmutableRuleComponent {
     }
 
     add() {
-        // remove whitespaces
-        this.rule.scope_selectors.repository[0].pattern =
-            this.rule.scope_selectors.repository[0].pattern.replace(/\s+/g, '');
-        this.rule.tag_selectors[0].pattern =
-            this.rule.tag_selectors[0].pattern.replace(/\s+/g, '');
+        // remove whitespaces, unless the pattern is a regex that may contain them
+        this.rule.scope_selectors.repository[0].pattern = normalizePattern(
+            this.rule.scope_selectors.repository[0].pattern,
+            this.repoKind
+        );
+        this.rule.tag_selectors[0].pattern = normalizePattern(
+            this.rule.tag_selectors[0].pattern,
+            this.tagsKind
+        );
         if (
             this.rule.scope_selectors.repository[0].kind ===
                 SELECTOR_KIND_DOUBLESTAR &&

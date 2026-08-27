@@ -198,6 +198,17 @@ export function wrapPattern(pattern: string, kind: string): string {
     return pattern;
 }
 
+// Whitespace carries no meaning in a doublestar repository or tag pattern, so it
+// is stripped on save to forgive a pasted comma list like "a, b". In a regex a
+// space is a literal character — inside a character class or an alternation it is
+// part of the expression — so the pattern is stored exactly as it was typed.
+export function normalizePattern(pattern: string, kind: string): string {
+    if (kind === SELECTOR_KIND_REGEX) {
+        return pattern;
+    }
+    return pattern.replace(/\s+/g, '');
+}
+
 export function unwrapPattern(pattern: string, kind: string): string {
     if (kind === SELECTOR_KIND_REGEX) {
         return pattern;

@@ -186,6 +186,34 @@ describe('AddRuleComponent', () => {
         );
     });
 
+    it('should keep whitespace in a regex pattern on save', () => {
+        component.rules = [];
+        component.repoKind = SELECTOR_KIND_REGEX;
+        component.tagsKind = SELECTOR_KIND_REGEX;
+        component.repositories = 'library/(a|b) c';
+        component.tagsInput = '[a-z ]+';
+
+        component.add();
+
+        expect(component.rule.scope_selectors.repository[0].pattern).toEqual(
+            'library/(a|b) c'
+        );
+        expect(component.rule.tag_selectors[0].pattern).toEqual('[a-z ]+');
+    });
+
+    it('should strip whitespace from a doublestar pattern on save', () => {
+        component.rules = [];
+        component.repositories = 'redis, harbor';
+        component.tagsInput = 'v1, v2';
+
+        component.add();
+
+        expect(component.rule.scope_selectors.repository[0].pattern).toEqual(
+            '{redis,harbor}'
+        );
+        expect(component.rule.tag_selectors[0].pattern).toEqual('{v1,v2}');
+    });
+
     it('should treat rules differing only by engine as different', () => {
         component.rules = [mockRules[0]];
         expect(component.isExistingRule()).toBeTruthy();

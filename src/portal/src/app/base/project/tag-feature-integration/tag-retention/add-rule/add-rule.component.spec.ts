@@ -123,6 +123,35 @@ describe('AddRuleComponent', () => {
         expect(component.canNotAdd()).toBeFalsy();
     });
 
+    it('should strip whitespace from a doublestar pattern on save', () => {
+        component.rule.template = 'always';
+        component.repositories = 'redis, harbor';
+        component.tagsInput = 'v1, v2';
+
+        component.add();
+
+        expect(component.rule.scope_selectors.repository[0].pattern).toEqual(
+            '{redis,harbor}'
+        );
+        expect(component.rule.tag_selectors[0].pattern).toEqual('{v1,v2}');
+    });
+
+    it('should keep whitespace in a regex pattern on save', () => {
+        component.rule.template = 'always';
+        component.repoKind = SELECTOR_KIND_REGEX;
+        component.tagsKind = SELECTOR_KIND_REGEX;
+        // a space is a literal character in a regex, so saving must not rewrite it
+        component.repositories = 'library/(a|b) c';
+        component.tagsInput = '[a-z ]+';
+
+        component.add();
+
+        expect(component.rule.scope_selectors.repository[0].pattern).toEqual(
+            'library/(a|b) c'
+        );
+        expect(component.rule.tag_selectors[0].pattern).toEqual('[a-z ]+');
+    });
+
     it('should drive the engine and decoration options from the metadata', () => {
         component.metadata = new RuleMetadate();
         component.metadata.scope_selectors = [
