@@ -51,6 +51,8 @@ import {
     Decoration,
     Flatten_I18n_MAP,
     Flatten_Level,
+    PATTERN_KIND_I18N_MAP,
+    PatternKind,
 } from '../../replication';
 import { errorHandler as errorHandlerFn } from '../../../../../shared/units/shared.utils';
 import { ReplicationPolicy } from '../../../../../../../ng-swagger-gen/models/replication-policy';
@@ -439,6 +441,7 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
                 let fbLabel = this.fb.group({
                     type: FilterType.LABEL,
                     decoration: filter.decoration || Decoration.MATCHES,
+                    kind: filter.kind || PatternKind.DOUBLESTAR,
                 });
                 let filterLabel = this.fb.array(filter.value);
                 fbLabel.setControl('value', filterLabel);
@@ -448,6 +451,14 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
                 return this.fb.group({
                     type: FilterType.TAG,
                     decoration: filter.decoration || Decoration.MATCHES,
+                    kind: filter.kind || PatternKind.DOUBLESTAR,
+                    value: filter.value,
+                });
+            }
+            if (filter.type === FilterType.NAME) {
+                return this.fb.group({
+                    type: FilterType.NAME,
+                    kind: filter.kind || PatternKind.DOUBLESTAR,
                     value: filter.value,
                 });
             }
@@ -463,6 +474,7 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
             const labelControl = this.fb.group({
                 type: name,
                 decoration: Decoration.MATCHES,
+                kind: PatternKind.DOUBLESTAR,
             });
             labelControl.setControl('value', labelArray);
             return labelControl;
@@ -471,6 +483,14 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
             return this.fb.group({
                 type: name,
                 decoration: Decoration.MATCHES,
+                kind: PatternKind.DOUBLESTAR,
+                value: '',
+            });
+        }
+        if (name === FilterType.NAME) {
+            return this.fb.group({
+                type: name,
+                kind: PatternKind.DOUBLESTAR,
                 value: '',
             });
         }
@@ -478,6 +498,30 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
             type: name,
             value: '',
         });
+    }
+
+    // the resource filter has no pattern to evaluate, it picks a resource type
+    supportsPatternKind(type: string): boolean {
+        return (
+            type === FilterType.NAME ||
+            type === FilterType.TAG ||
+            type === FilterType.LABEL
+        );
+    }
+
+    isRegex(index: number): boolean {
+        return this.filters.at(index)?.get('kind')?.value === PatternKind.REGEX;
+    }
+
+    patternKinds(): string[] {
+        return [PatternKind.DOUBLESTAR, PatternKind.REGEX];
+    }
+
+    engineI18nKey(kind: string): string {
+        return (
+            PATTERN_KIND_I18N_MAP[kind] ??
+            PATTERN_KIND_I18N_MAP[PatternKind.DOUBLESTAR]
+        );
     }
 
     targetChange($event: any) {
@@ -563,6 +607,12 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
                 copyRuleForm.filters.splice(i, 1);
             }
         }
+        // doublestar is the default engine, sending it would only add noise to the policy
+        copyRuleForm.filters.forEach((item: any) => {
+            if (!item.kind || item.kind === PatternKind.DOUBLESTAR) {
+                delete item.kind;
+            }
+        });
         if (!this.showChunkOption) {
             delete copyRuleForm?.copy_by_chunk;
             delete this.ruleForm?.value?.copy_by_chunk;
