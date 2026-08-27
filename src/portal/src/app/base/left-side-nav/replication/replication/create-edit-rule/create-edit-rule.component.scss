@@ -25,9 +25,11 @@ h4 {
     margin-right: 10px;
 }
 
+// the widest row (decoration + engine + value + tooltip) measures 531px, and the
+// large modal leaves about 624px next to the label column
 .filterSelect {
     position: relative;
-    width: 430px;
+    width: 560px;
     margin-bottom:0.25rem;
 }
 
@@ -136,12 +138,6 @@ h4 {
     right: 50px;
     top: 8px;
     transform: rotate(180deg);
-}
-
-clr-modal {
-    ::ng-deep div.modal-dialog {
-        width: 32rem;
-    }
 }
 
 .deletedDiv {
