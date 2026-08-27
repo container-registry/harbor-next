@@ -195,10 +195,27 @@ func (suite *RegexpSelectorTestSuite) TestValidate() {
 		// RE2 exclusions
 		`(?=foo)`,
 		`(foo)\1`,
+		// would compile once wrapped and escape the anchoring
+		`foo)|(?:bar`,
+		`a)\z|\A(?:b`,
 	}
 	for _, p := range invalid {
 		suite.Error(Validate(p), "pattern %q", p)
 	}
+}
+
+// TestAnchoringCannotBeEscaped covers a pattern that is invalid on its own but
+// would compile as an alternation once wrapped, turning the full string match
+// into a prefix or suffix match
+func (suite *RegexpSelectorTestSuite) TestAnchoringCannotBeEscaped() {
+	s := New(Matches, `foo)|(?:bar`, "")
+
+	selected, err := s.Select([]*iselector.Candidate{
+		{Repository: "redis", Tags: []string{"fooXXX"}},
+		{Repository: "redis", Tags: []string{"XXXbar"}},
+	})
+	suite.Require().Error(err)
+	suite.Nil(selected)
 }
 
 // TestTagMatches covers the matches decoration
@@ -275,13 +292,14 @@ func (suite *RegexpSelectorTestSuite) TestUntagged() {
 		suite.Require().NoError(err)
 		suite.Empty(selected, "pattern %q", pattern)
 
-		// excludes: default drops untagged
+		// excludes: the default extras leave the untagged artifact in, since
+		// tagSelectExclude returns the negation of the flag
 		s = New(Excludes, pattern, "")
 		selected, err = s.Select(untaggedArtifacts)
 		suite.Require().NoError(err)
 		suite.Len(selected, 1, "pattern %q", pattern)
 
-		// excludes: explicitly keeping untagged
+		// excludes: setting the flag takes the untagged artifact out again
 		s = New(Excludes, pattern, `{"untagged": true}`)
 		selected, err = s.Select(untaggedArtifacts)
 		suite.Require().NoError(err)

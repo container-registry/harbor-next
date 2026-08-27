@@ -68,6 +68,14 @@ func Compile(pattern string) (*regexp.Regexp, error) {
 		return nil, errors.Errorf("regexp pattern is limited to %d characters, got %d", MaxPatternLength, l)
 	}
 
+	// The pattern has to hold up on its own before it is wrapped: an unbalanced
+	// group such as `foo)|(?:bar` is rejected here but would compile once
+	// wrapped, as an alternation of `\A(?:foo)` and `(?:bar)\z`, and would then
+	// match on a prefix or a suffix instead of the full string.
+	if _, err := regexp.Compile(pattern); err != nil {
+		return nil, errors.Wrapf(err, "invalid regexp pattern %q", pattern)
+	}
+
 	expression, err := regexp.Compile(`\A(?:` + pattern + `)\z`)
 	if err != nil {
 		return nil, errors.Wrapf(err, "invalid regexp pattern %q", pattern)
