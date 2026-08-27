@@ -65,11 +65,11 @@ func (m *Metadata) Valid(v *validation.Validation) {
 // Selector to narrow down the list
 type Selector struct {
 	// Kind of the selector
-	// "doublestar" or "regexp"
-	Kind string `json:"kind" valid:"Required;Match(/^(doublestar|regexp)$/)"`
+	// "doublestar" or "regex"
+	Kind string `json:"kind" valid:"Required;Match(/^(doublestar|regex)$/)"`
 
 	// Decorated the selector
-	// for "doublestar" and "regexp" : "matching" and "excluding"
+	// for "doublestar" and "regex" : "matching" and "excluding"
 	Decoration string `json:"decoration" valid:"Required"`
 
 	// Param for the selector

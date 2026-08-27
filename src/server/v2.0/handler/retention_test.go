@@ -33,7 +33,7 @@ func TestRetentionMetadataSelectors(t *testing.T) {
 	} {
 		require.Len(t, selectors, 2)
 		assert.Equal(t, "doublestar", selectors[0].Kind)
-		assert.Equal(t, "regexp", selectors[1].Kind)
+		assert.Equal(t, "regex", selectors[1].Kind)
 		assert.Equal(t, selectors[0].DisplayText, selectors[1].DisplayText)
 		assert.Equal(t, selectors[0].Decorations, selectors[1].Decorations)
 	}

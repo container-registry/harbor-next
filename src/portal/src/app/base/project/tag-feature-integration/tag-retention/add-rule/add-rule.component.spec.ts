@@ -30,7 +30,7 @@ import { CallbackPipe } from '../../../../../shared/pipes/callback.pipe';
 import {
     RuleMetadate,
     SELECTOR_KIND_DOUBLESTAR,
-    SELECTOR_KIND_REGEXP,
+    SELECTOR_KIND_REGEX,
 } from '../retention';
 
 describe('AddRuleComponent', () => {
@@ -95,7 +95,7 @@ describe('AddRuleComponent', () => {
     });
 
     it('should store a regex pattern verbatim', () => {
-        component.tagsKind = SELECTOR_KIND_REGEXP;
+        component.tagsKind = SELECTOR_KIND_REGEX;
 
         component.tagsInput = 'v\\d{2,3}';
         expect(component.rule.tag_selectors[0].pattern).toEqual('v\\d{2,3}');
@@ -118,7 +118,7 @@ describe('AddRuleComponent', () => {
         component.tagsInput = '{}';
         expect(component.canNotAdd()).toBeTruthy();
 
-        component.tagsKind = SELECTOR_KIND_REGEXP;
+        component.tagsKind = SELECTOR_KIND_REGEX;
         component.tagsInput = 'v\\d{2}';
         expect(component.canNotAdd()).toBeFalsy();
     });
@@ -133,7 +133,7 @@ describe('AddRuleComponent', () => {
             },
             {
                 display_text: 'Repositories',
-                kind: SELECTOR_KIND_REGEXP,
+                kind: SELECTOR_KIND_REGEX,
                 decorations: ['repoMatches', 'repoExcludes'],
             },
         ];
@@ -145,19 +145,19 @@ describe('AddRuleComponent', () => {
             },
             {
                 display_text: 'Tags',
-                kind: SELECTOR_KIND_REGEXP,
+                kind: SELECTOR_KIND_REGEX,
                 decorations: ['matches'],
             },
         ];
 
         expect(component.repoKinds).toEqual([
             SELECTOR_KIND_DOUBLESTAR,
-            SELECTOR_KIND_REGEXP,
+            SELECTOR_KIND_REGEX,
         ]);
         expect(component.tagDecorations).toEqual(['matches', 'excludes']);
 
         component.tagsSelect = 'excludes';
-        component.tagsKind = SELECTOR_KIND_REGEXP;
+        component.tagsKind = SELECTOR_KIND_REGEX;
         expect(component.tagDecorations).toEqual(['matches']);
         // the decoration falls back when the new engine does not support it
         expect(component.tagsSelect).toEqual('matches');

@@ -35,7 +35,7 @@ func init() {
 		doublestar.NSExcludes,
 	}, doublestar.New)
 
-	// Register regexp selector
+	// Register regex selector
 	Register(regexpselector.Kind, []string{
 		regexpselector.Matches,
 		regexpselector.Excludes,

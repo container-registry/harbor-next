@@ -74,7 +74,7 @@ func TestValidateRetentionPolicySelectors(t *testing.T) {
 			},
 		},
 		{
-			name: "doublestar pattern that is not a valid regexp stays valid",
+			name: "doublestar pattern that is not a valid regex stays valid",
 			tag: &rule.Selector{
 				Kind:       doublestar.Kind,
 				Decoration: doublestar.Matches,
@@ -82,7 +82,7 @@ func TestValidateRetentionPolicySelectors(t *testing.T) {
 			},
 		},
 		{
-			name: "valid regexp is accepted",
+			name: "valid regex is accepted",
 			tag: &rule.Selector{
 				Kind:       regexpselector.Kind,
 				Decoration: regexpselector.Matches,
@@ -91,7 +91,7 @@ func TestValidateRetentionPolicySelectors(t *testing.T) {
 			},
 		},
 		{
-			name: "empty regexp pattern is accepted",
+			name: "empty regex pattern is accepted",
 			tag: &rule.Selector{
 				Kind:       regexpselector.Kind,
 				Decoration: regexpselector.Matches,
@@ -99,16 +99,16 @@ func TestValidateRetentionPolicySelectors(t *testing.T) {
 			},
 		},
 		{
-			name: "invalid regexp is rejected",
+			name: "invalid regex is rejected",
 			tag: &rule.Selector{
 				Kind:       regexpselector.Kind,
 				Decoration: regexpselector.Matches,
 				Pattern:    "v(",
 			},
-			wantErr: "invalid regexp pattern",
+			wantErr: "invalid regex pattern",
 		},
 		{
-			name: "over long regexp is rejected",
+			name: "over long regex is rejected",
 			tag: &rule.Selector{
 				Kind:       regexpselector.Kind,
 				Decoration: regexpselector.Matches,
@@ -164,7 +164,7 @@ func TestValidateRetentionPolicyScopeSelectors(t *testing.T) {
 	})
 	err := p.ValidateRetentionPolicy()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid regexp pattern")
+	assert.Contains(t, err.Error(), "invalid regex pattern")
 }
 
 // TestValidateRetentionPolicyCronStillValidated guards the pre-existing cron

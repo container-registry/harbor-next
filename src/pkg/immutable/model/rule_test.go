@@ -72,7 +72,7 @@ func TestValidateImmutableRule(t *testing.T) {
 			},
 		},
 		{
-			name: "valid regexp is accepted",
+			name: "valid regex is accepted",
 			tag: &Selector{
 				Kind:       regexpselector.Kind,
 				Decoration: regexpselector.Matches,
@@ -80,16 +80,16 @@ func TestValidateImmutableRule(t *testing.T) {
 			},
 		},
 		{
-			name: "invalid regexp is rejected",
+			name: "invalid regex is rejected",
 			tag: &Selector{
 				Kind:       regexpselector.Kind,
 				Decoration: regexpselector.Matches,
 				Pattern:    `v\d+(`,
 			},
-			wantErr: "invalid regexp pattern",
+			wantErr: "invalid regex pattern",
 		},
 		{
-			name: "over long regexp is rejected",
+			name: "over long regex is rejected",
 			tag: &Selector{
 				Kind:       regexpselector.Kind,
 				Decoration: regexpselector.Matches,
@@ -100,7 +100,7 @@ func TestValidateImmutableRule(t *testing.T) {
 		{
 			name: "unknown kind is rejected",
 			tag: &Selector{
-				Kind:       "regex",
+				Kind:       "pcre",
 				Decoration: regexpselector.Matches,
 				Pattern:    `v\d+`,
 			},

@@ -26,7 +26,7 @@ import (
 
 const (
 	// Kind ...
-	Kind = "regexp"
+	Kind = "regex"
 	// Matches [pattern] for tag (default)
 	Matches = "matches"
 	// Excludes [pattern] for tag (default)
@@ -65,7 +65,7 @@ type selector struct {
 // doublestar.Match: the whole candidate value has to be matched, not a substring.
 func Compile(pattern string) (*regexp.Regexp, error) {
 	if l := utf8.RuneCountInString(pattern); l > MaxPatternLength {
-		return nil, errors.Errorf("regexp pattern is limited to %d characters, got %d", MaxPatternLength, l)
+		return nil, errors.Errorf("regex pattern is limited to %d characters, got %d", MaxPatternLength, l)
 	}
 
 	// The pattern has to hold up on its own before it is wrapped: an unbalanced
@@ -73,18 +73,18 @@ func Compile(pattern string) (*regexp.Regexp, error) {
 	// wrapped, as an alternation of `\A(?:foo)` and `(?:bar)\z`, and would then
 	// match on a prefix or a suffix instead of the full string.
 	if _, err := regexp.Compile(pattern); err != nil {
-		return nil, errors.Wrapf(err, "invalid regexp pattern %q", pattern)
+		return nil, errors.Wrapf(err, "invalid regex pattern %q", pattern)
 	}
 
 	expression, err := regexp.Compile(`\A(?:` + pattern + `)\z`)
 	if err != nil {
-		return nil, errors.Wrapf(err, "invalid regexp pattern %q", pattern)
+		return nil, errors.Wrapf(err, "invalid regex pattern %q", pattern)
 	}
 
 	return expression, nil
 }
 
-// Validate checks whether the pattern is usable as a regexp selector pattern
+// Validate checks whether the pattern is usable as a regex selector pattern
 func Validate(pattern string) error {
 	// an empty pattern matches everything and is never compiled
 	if len(pattern) == 0 {
@@ -196,7 +196,7 @@ func (s *selector) match(str string) (bool, error) {
 	return s.expression.MatchString(str), nil
 }
 
-// New is factory method for regexp selector
+// New is factory method for regex selector
 func New(decoration string, pattern any, extras string) iselector.Selector {
 	untagged := true // default behavior for upgrade, active keep the untagged images
 	if decoration == Excludes {

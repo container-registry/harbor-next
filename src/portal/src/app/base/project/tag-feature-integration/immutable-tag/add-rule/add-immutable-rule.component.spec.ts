@@ -17,7 +17,7 @@ import { ImmutableTagService } from '../immutable-tag.service';
 import {
     ImmutableRetentionRule,
     SELECTOR_KIND_DOUBLESTAR,
-    SELECTOR_KIND_REGEXP,
+    SELECTOR_KIND_REGEX,
 } from '../../tag-retention/retention';
 import { ErrorHandler } from '../../../../../shared/units/error-handler';
 import { InlineAlertComponent } from '../../../../../shared/components/inline-alert/inline-alert.component';
@@ -174,12 +174,12 @@ describe('AddRuleComponent', () => {
     });
 
     it('should store a regex pattern verbatim', () => {
-        component.tagsKind = SELECTOR_KIND_REGEXP;
+        component.tagsKind = SELECTOR_KIND_REGEX;
         component.tagsInput = 'v\\d{2,3}';
         expect(component.rule.tag_selectors[0].pattern).toEqual('v\\d{2,3}');
         expect(component.tagsInput).toEqual('v\\d{2,3}');
 
-        component.repoKind = SELECTOR_KIND_REGEXP;
+        component.repoKind = SELECTOR_KIND_REGEX;
         component.repositories = 'library/(redis|harbor)';
         expect(component.rule.scope_selectors.repository[0].pattern).toEqual(
             'library/(redis|harbor)'
@@ -190,7 +190,7 @@ describe('AddRuleComponent', () => {
         component.rules = [mockRules[0]];
         expect(component.isExistingRule()).toBeTruthy();
 
-        component.tagsKind = SELECTOR_KIND_REGEXP;
+        component.tagsKind = SELECTOR_KIND_REGEX;
         expect(component.isExistingRule()).toBeFalsy();
     });
 

@@ -176,7 +176,7 @@ var (
 			},
 			{
 				DisplayText: "Repositories",
-				Kind:        "regexp",
+				Kind:        "regex",
 				Decorations: []string{
 					"repoMatches",
 					"repoExcludes",
@@ -194,7 +194,7 @@ var (
 			},
 			{
 				DisplayText: "Tags",
-				Kind:        "regexp",
+				Kind:        "regex",
 				Decorations: []string{
 					"matches",
 					"excludes",

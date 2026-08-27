@@ -120,7 +120,7 @@ func (suite *RegexpSelectorTestSuite) TestInvalidPatternSurfacesAtSelect() {
 	selected, err := s.Select(suite.artifacts)
 	suite.Require().Error(err)
 	suite.Nil(selected)
-	suite.Contains(err.Error(), "invalid regexp pattern")
+	suite.Contains(err.Error(), "invalid regex pattern")
 
 	// the cached error is returned on every subsequent call as well
 	_, err = s.Select(suite.artifacts)

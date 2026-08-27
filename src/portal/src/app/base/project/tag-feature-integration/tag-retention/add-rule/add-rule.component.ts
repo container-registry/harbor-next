@@ -24,7 +24,7 @@ import {
     RuleMetadate,
     Selector,
     SELECTOR_KIND_DOUBLESTAR,
-    SELECTOR_KIND_REGEXP,
+    SELECTOR_KIND_REGEX,
     Template,
     selectorDecorations,
     selectorKinds,
@@ -168,12 +168,12 @@ export class AddRuleComponent {
     }
 
     isRegexp(kind: string): boolean {
-        return kind === SELECTOR_KIND_REGEXP;
+        return kind === SELECTOR_KIND_REGEX;
     }
 
     engineI18nKey(kind: string): string {
-        return kind === SELECTOR_KIND_REGEXP
-            ? 'TAG_RETENTION.ENGINE_REGEXP'
+        return kind === SELECTOR_KIND_REGEX
+            ? 'TAG_RETENTION.ENGINE_REGEX'
             : 'TAG_RETENTION.ENGINE_DOUBLESTAR';
     }
 

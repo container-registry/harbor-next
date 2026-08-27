@@ -69,10 +69,10 @@ func TestValidate(t *testing.T) {
 		wantErr    string
 	}{
 		{"doublestar untouched", doublestar.Kind, doublestar.Matches, "v*.*.*", ""},
-		{"doublestar keeps regexp meaningless patterns", doublestar.Kind, doublestar.Matches, "v(", ""},
+		{"doublestar keeps regex meaningless patterns", doublestar.Kind, doublestar.Matches, "v(", ""},
 		{"regexp valid", regexpselector.Kind, regexpselector.Matches, `v\d+`, ""},
 		{"regexp empty pattern", regexpselector.Kind, regexpselector.RepoMatches, "", ""},
-		{"regexp invalid", regexpselector.Kind, regexpselector.Matches, "v(", "invalid regexp pattern"},
+		{"regexp invalid", regexpselector.Kind, regexpselector.Matches, "v(", "invalid regex pattern"},
 		{"regexp too long", regexpselector.Kind, regexpselector.Matches, longPattern(513), "limited to 512 characters"},
 		{"unknown kind", "pcre", regexpselector.Matches, `v\d+`, "is not registered"},
 		{"unknown decoration", regexpselector.Kind, "labelMatches", `v\d+`, "is not supported"},

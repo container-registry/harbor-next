@@ -49,7 +49,7 @@ export class Retention extends BaseRetention {
 // pattern engines a selector can be evaluated with, as advertised by
 // GET /retentions/metadatas
 export const SELECTOR_KIND_DOUBLESTAR: string = 'doublestar';
-export const SELECTOR_KIND_REGEXP: string = 'regexp';
+export const SELECTOR_KIND_REGEX: string = 'regex';
 
 export class BaseRule {
     disabled: boolean;
@@ -185,7 +185,7 @@ export function selectorDecorations(
 // syntax for alternation. A regex expresses alternation natively and uses
 // braces for quantifiers such as {2,3}, so the pattern is stored verbatim.
 export function wrapPattern(pattern: string, kind: string): string {
-    if (kind === SELECTOR_KIND_REGEXP) {
+    if (kind === SELECTOR_KIND_REGEX) {
         return pattern;
     }
     if (
@@ -199,7 +199,7 @@ export function wrapPattern(pattern: string, kind: string): string {
 }
 
 export function unwrapPattern(pattern: string, kind: string): string {
-    if (kind === SELECTOR_KIND_REGEXP) {
+    if (kind === SELECTOR_KIND_REGEX) {
         return pattern;
     }
     if (/^{\S+}$/.test(pattern)) {
