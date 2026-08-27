@@ -27,6 +27,11 @@ import { TagRetentionService } from '../tag-retention.service';
 import { ErrorHandler } from '../../../../../shared/units/error-handler';
 import { InlineAlertComponent } from '../../../../../shared/components/inline-alert/inline-alert.component';
 import { CallbackPipe } from '../../../../../shared/pipes/callback.pipe';
+import {
+    RuleMetadate,
+    SELECTOR_KIND_DOUBLESTAR,
+    SELECTOR_KIND_REGEXP,
+} from '../retention';
 
 describe('AddRuleComponent', () => {
     let component: AddRuleComponent;
@@ -69,5 +74,92 @@ describe('AddRuleComponent', () => {
 
     it('should create', () => {
         expect(component).toBeTruthy();
+    });
+
+    it('should default to the doublestar engine', () => {
+        expect(component.tagsKind).toEqual(SELECTOR_KIND_DOUBLESTAR);
+        expect(component.repoKind).toEqual(SELECTOR_KIND_DOUBLESTAR);
+        expect(component.isRegexp(component.tagsKind)).toBeFalsy();
+    });
+
+    it('should wrap a comma list in braces for doublestar', () => {
+        component.tagsInput = 'v1,v2';
+        expect(component.rule.tag_selectors[0].pattern).toEqual('{v1,v2}');
+        expect(component.tagsInput).toEqual('v1,v2');
+
+        component.repositories = 'redis,harbor';
+        expect(component.rule.scope_selectors.repository[0].pattern).toEqual(
+            '{redis,harbor}'
+        );
+        expect(component.repositories).toEqual('redis,harbor');
+    });
+
+    it('should store a regex pattern verbatim', () => {
+        component.tagsKind = SELECTOR_KIND_REGEXP;
+
+        component.tagsInput = 'v\\d{2,3}';
+        expect(component.rule.tag_selectors[0].pattern).toEqual('v\\d{2,3}');
+        expect(component.tagsInput).toEqual('v\\d{2,3}');
+
+        // a regex expresses alternation natively, so a comma is content
+        component.tagsInput = '(v1|v2),beta';
+        expect(component.rule.tag_selectors[0].pattern).toEqual('(v1|v2),beta');
+
+        // and a brace wrapped pattern is not unwrapped on read
+        component.tagsInput = '{2,3}';
+        expect(component.tagsInput).toEqual('{2,3}');
+    });
+
+    it('should keep a brace only regex pattern addable', () => {
+        component.rule.template = 'always';
+        component.repositories = '**';
+
+        component.tagsKind = SELECTOR_KIND_DOUBLESTAR;
+        component.tagsInput = '{}';
+        expect(component.canNotAdd()).toBeTruthy();
+
+        component.tagsKind = SELECTOR_KIND_REGEXP;
+        component.tagsInput = 'v\\d{2}';
+        expect(component.canNotAdd()).toBeFalsy();
+    });
+
+    it('should drive the engine and decoration options from the metadata', () => {
+        component.metadata = new RuleMetadate();
+        component.metadata.scope_selectors = [
+            {
+                display_text: 'Repositories',
+                kind: SELECTOR_KIND_DOUBLESTAR,
+                decorations: ['repoMatches', 'repoExcludes'],
+            },
+            {
+                display_text: 'Repositories',
+                kind: SELECTOR_KIND_REGEXP,
+                decorations: ['repoMatches', 'repoExcludes'],
+            },
+        ];
+        component.metadata.tag_selectors = [
+            {
+                display_text: 'Tags',
+                kind: SELECTOR_KIND_DOUBLESTAR,
+                decorations: ['matches', 'excludes'],
+            },
+            {
+                display_text: 'Tags',
+                kind: SELECTOR_KIND_REGEXP,
+                decorations: ['matches'],
+            },
+        ];
+
+        expect(component.repoKinds).toEqual([
+            SELECTOR_KIND_DOUBLESTAR,
+            SELECTOR_KIND_REGEXP,
+        ]);
+        expect(component.tagDecorations).toEqual(['matches', 'excludes']);
+
+        component.tagsSelect = 'excludes';
+        component.tagsKind = SELECTOR_KIND_REGEXP;
+        expect(component.tagDecorations).toEqual(['matches']);
+        // the decoration falls back when the new engine does not support it
+        expect(component.tagsSelect).toEqual('matches');
     });
 });

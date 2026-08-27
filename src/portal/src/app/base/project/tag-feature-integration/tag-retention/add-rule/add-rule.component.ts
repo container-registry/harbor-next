@@ -18,7 +18,19 @@ import {
     ViewChild,
     Input,
 } from '@angular/core';
-import { Retention, Rule, RuleMetadate, Template } from '../retention';
+import {
+    Retention,
+    Rule,
+    RuleMetadate,
+    Selector,
+    SELECTOR_KIND_DOUBLESTAR,
+    SELECTOR_KIND_REGEXP,
+    Template,
+    selectorDecorations,
+    selectorKinds,
+    unwrapPattern,
+    wrapPattern,
+} from '../retention';
 import { TagRetentionService } from '../tag-retention.service';
 import { compareValue } from '../../../../../shared/units/utils';
 import { InlineAlertComponent } from '../../../../../shared/components/inline-alert/inline-alert.component';
@@ -90,25 +102,41 @@ export class AddRuleComponent {
         this.rule.scope_selectors.repository[0].decoration = repoSelect;
     }
 
-    set repositories(repositories) {
-        if (
-            repositories.indexOf(',') !== -1 &&
-            repositories.indexOf('{') === -1 &&
-            repositories.indexOf('}') === -1
-        ) {
-            this.rule.scope_selectors.repository[0].pattern =
-                '{' + repositories + '}';
-        } else {
-            this.rule.scope_selectors.repository[0].pattern = repositories;
+    get repoKinds(): Array<string> {
+        return selectorKinds(this.metadata?.scope_selectors);
+    }
+
+    get repoDecorations(): Array<string> {
+        return selectorDecorations(
+            this.metadata?.scope_selectors,
+            this.repoKind
+        );
+    }
+
+    get repoKind() {
+        return this.rule.scope_selectors.repository[0].kind;
+    }
+
+    set repoKind(repoKind) {
+        this.rule.scope_selectors.repository[0].kind = repoKind;
+        const decorations = this.repoDecorations;
+        if (decorations.length && !decorations.includes(this.repoSelect)) {
+            this.repoSelect = decorations[0];
         }
     }
 
+    set repositories(repositories) {
+        this.rule.scope_selectors.repository[0].pattern = wrapPattern(
+            repositories,
+            this.repoKind
+        );
+    }
+
     get repositories() {
-        let str: string = this.rule.scope_selectors.repository[0].pattern;
-        if (/^{\S+}$/.test(str)) {
-            return str.slice(1, str.length - 1);
-        }
-        return str;
+        return unwrapPattern(
+            this.rule.scope_selectors.repository[0].pattern,
+            this.repoKind
+        );
     }
 
     get tagsSelect() {
@@ -119,24 +147,45 @@ export class AddRuleComponent {
         this.rule.tag_selectors[0].decoration = tagsSelect;
     }
 
-    set tagsInput(tagsInput) {
-        if (
-            tagsInput.indexOf(',') !== -1 &&
-            tagsInput.indexOf('{') === -1 &&
-            tagsInput.indexOf('}') === -1
-        ) {
-            this.rule.tag_selectors[0].pattern = '{' + tagsInput + '}';
-        } else {
-            this.rule.tag_selectors[0].pattern = tagsInput;
+    get tagKinds(): Array<string> {
+        return selectorKinds(this.metadata?.tag_selectors);
+    }
+
+    get tagDecorations(): Array<string> {
+        return selectorDecorations(this.metadata?.tag_selectors, this.tagsKind);
+    }
+
+    get tagsKind() {
+        return this.rule.tag_selectors[0].kind;
+    }
+
+    set tagsKind(tagsKind) {
+        this.rule.tag_selectors[0].kind = tagsKind;
+        const decorations = this.tagDecorations;
+        if (decorations.length && !decorations.includes(this.tagsSelect)) {
+            this.tagsSelect = decorations[0];
         }
     }
 
+    isRegexp(kind: string): boolean {
+        return kind === SELECTOR_KIND_REGEXP;
+    }
+
+    engineI18nKey(kind: string): string {
+        return kind === SELECTOR_KIND_REGEXP
+            ? 'TAG_RETENTION.ENGINE_REGEXP'
+            : 'TAG_RETENTION.ENGINE_DOUBLESTAR';
+    }
+
+    set tagsInput(tagsInput) {
+        this.rule.tag_selectors[0].pattern = wrapPattern(
+            tagsInput,
+            this.tagsKind
+        );
+    }
+
     get tagsInput() {
-        let str: string = this.rule.tag_selectors[0].pattern;
-        if (/^{\S+}$/.test(str)) {
-            return str.slice(1, str.length - 1);
-        }
-        return str;
+        return unwrapPattern(this.rule.tag_selectors[0].pattern, this.tagsKind);
     }
     set untagged(untagged) {
         let extras = JSON.parse(this.rule.tag_selectors[0].extras);
@@ -182,13 +231,8 @@ export class AddRuleComponent {
         if (!this.hasParam()) {
             return !(
                 this.rule.template &&
-                this.rule.scope_selectors.repository[0].pattern &&
-                this.rule.scope_selectors.repository[0].pattern.replace(
-                    /[{}]/g,
-                    ''
-                ) &&
-                this.rule.tag_selectors[0].pattern &&
-                this.rule.tag_selectors[0].pattern.replace(/[{}]/g, '')
+                this.hasPattern(this.rule.scope_selectors.repository[0]) &&
+                this.hasPattern(this.rule.tag_selectors[0])
             );
         } else {
             return !(
@@ -196,15 +240,20 @@ export class AddRuleComponent {
                 this.rule.params[this.template] &&
                 parseInt(this.rule.params[this.template], 10) >= 0 &&
                 parseInt(this.rule.params[this.template], 10) < MAX &&
-                this.rule.scope_selectors.repository[0].pattern &&
-                this.rule.scope_selectors.repository[0].pattern.replace(
-                    /[{}]/g,
-                    ''
-                ) &&
-                this.rule.tag_selectors[0].pattern &&
-                this.rule.tag_selectors[0].pattern.replace(/[{}]/g, '')
+                this.hasPattern(this.rule.scope_selectors.repository[0]) &&
+                this.hasPattern(this.rule.tag_selectors[0])
             );
         }
+    }
+
+    // braces carry no content for doublestar, but are quantifier syntax for a regex
+    hasPattern(selector: Selector): boolean {
+        if (!selector || !selector.pattern) {
+            return false;
+        }
+        return this.isRegexp(selector.kind)
+            ? true
+            : !!selector.pattern.replace(/[{}]/g, '');
     }
 
     open() {
@@ -232,6 +281,8 @@ export class AddRuleComponent {
         this.rule.tag_selectors[0].pattern =
             this.rule.tag_selectors[0].pattern.replace(/\s+/g, '');
         if (
+            this.rule.scope_selectors.repository[0].kind ===
+                SELECTOR_KIND_DOUBLESTAR &&
             this.rule.scope_selectors.repository[0].decoration !==
                 'repoMatches' &&
             this.rule.scope_selectors.repository[0].pattern
@@ -267,6 +318,15 @@ export class AddRuleComponent {
         return false;
     }
     isSameRule(rule: Rule): boolean {
+        if (
+            this.rule.scope_selectors.repository[0].kind !==
+            rule.scope_selectors.repository[0].kind
+        ) {
+            return false;
+        }
+        if (this.rule.tag_selectors[0].kind !== rule.tag_selectors[0].kind) {
+            return false;
+        }
         if (
             this.rule.scope_selectors.repository[0].decoration !==
             rule.scope_selectors.repository[0].decoration

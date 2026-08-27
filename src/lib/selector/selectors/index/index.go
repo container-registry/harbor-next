@@ -21,6 +21,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/selector"
 	"github.com/goharbor/harbor/src/lib/selector/selectors/doublestar"
+	regexpselector "github.com/goharbor/harbor/src/lib/selector/selectors/regexp"
 )
 
 func init() {
@@ -33,6 +34,16 @@ func init() {
 		doublestar.NSMatches,
 		doublestar.NSExcludes,
 	}, doublestar.New)
+
+	// Register regexp selector
+	Register(regexpselector.Kind, []string{
+		regexpselector.Matches,
+		regexpselector.Excludes,
+		regexpselector.RepoMatches,
+		regexpselector.RepoExcludes,
+		regexpselector.NSMatches,
+		regexpselector.NSExcludes,
+	}, regexpselector.New)
 
 	// Register label selector
 	// Register(label.Kind, []string{label.With, label.Without}, label.New)
@@ -87,6 +98,31 @@ func Get(kind, decoration, pattern, extras string) (selector.Selector, error) {
 	}
 
 	return nil, errors.Errorf("decoration %s of selector %s is not supported", decoration, kind)
+}
+
+// Validate checks whether the given selector definition can be used, without
+// building the selector. Policies call it at write time so that a broken
+// pattern is rejected when the rule is saved instead of when the job runs.
+func Validate(kind, decoration, pattern string) error {
+	if len(kind) == 0 || len(decoration) == 0 {
+		return errors.New("empty selector kind or decoration")
+	}
+
+	v, ok := index.Load(kind)
+	if !ok {
+		return errors.Errorf("selector %s is not registered", kind)
+	}
+
+	item := v.(*indexedItem)
+	if !slices.Contains(item.Meta.Decorations, decoration) {
+		return errors.Errorf("decoration %s of selector %s is not supported", decoration, kind)
+	}
+
+	if kind == regexpselector.Kind {
+		return regexpselector.Validate(pattern)
+	}
+
+	return nil
 }
 
 // Index returns all the declarative selectors

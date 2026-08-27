@@ -14,7 +14,7 @@
         <p class="color-97">{{ 'TAG_RETENTION.ADD_SUBTITLE' | translate }}</p>
         <div class="height-72">
             <div class="clr-row mt-1">
-                <div class="clr-col-4">
+                <div class="clr-col-3">
                     <span>{{
                         'TAG_RETENTION.IN_REPOSITORIES' | translate
                     }}</span>
@@ -25,17 +25,29 @@
                             [(ngModel)]="repoSelect"
                             class="clr-select w-100">
                             <option
-                                *ngFor="
-                                    let d of metadata?.scope_selectors[0]
-                                        ?.decorations
-                                "
+                                *ngFor="let d of repoDecorations"
                                 value="{{ d }}">
                                 {{ getI18nKey(d) | translate }}
                             </option>
                         </select>
                     </div>
                 </div>
-                <div class="clr-col-6">
+                <div class="clr-col-2">
+                    <div class="clr-select-wrapper w-100">
+                        <select
+                            id="repo-engine"
+                            [attr.title]="
+                                'TAG_RETENTION.PATTERN_ENGINE' | translate
+                            "
+                            [(ngModel)]="repoKind"
+                            class="clr-select w-100">
+                            <option *ngFor="let k of repoKinds" value="{{ k }}">
+                                {{ engineI18nKey(k) | translate }}
+                            </option>
+                        </select>
+                    </div>
+                </div>
+                <div class="clr-col-5">
                     <div class="w-100">
                         <input
                             id="repos"
@@ -46,21 +58,24 @@
                 </div>
             </div>
             <div class="clr-row">
-                <div class="clr-col-4"></div>
-                <div class="clr-col-8 margin-top-5px">
-                    <span class="tooltip">{{
+                <div class="clr-col-3"></div>
+                <div class="clr-col-9 margin-top-5px">
+                    <span class="tooltip" *ngIf="!isRegexp(repoKind)">{{
                         'TAG_RETENTION.REP_SEPARATOR' | translate
+                    }}</span>
+                    <span class="tooltip" *ngIf="isRegexp(repoKind)">{{
+                        'TAG_RETENTION.REGEXP_REP_SEPARATOR' | translate
                     }}</span>
                 </div>
             </div>
         </div>
         <div class="height-72">
             <div class="clr-row">
-                <div class="clr-col-4">
+                <div class="clr-col-3">
                     <div class="over-line"></div>
                     <label>{{ 'TAG_RETENTION.BY_WHAT' | translate }}</label>
                 </div>
-                <div class="clr-col-5">
+                <div class="clr-col-6">
                     <div class="over-line"></div>
                     <div class="clr-select-wrapper w-100">
                         <select
@@ -98,7 +113,7 @@
         </div>
         <div class="height-95">
             <div class="clr-row">
-                <div class="clr-col-4">
+                <div class="clr-col-3">
                     <label>{{ 'TAG_RETENTION.TAGS' | translate }}</label>
                 </div>
                 <div class="clr-col-2">
@@ -107,17 +122,29 @@
                             [(ngModel)]="tagsSelect"
                             class="clr-select w-100">
                             <option
-                                *ngFor="
-                                    let d of metadata?.tag_selectors[0]
-                                        ?.decorations
-                                "
+                                *ngFor="let d of tagDecorations"
                                 value="{{ d }}">
                                 {{ getI18nKey(d) | translate }}
                             </option>
                         </select>
                     </div>
                 </div>
-                <div class="clr-col-3">
+                <div class="clr-col-2">
+                    <div class="clr-select-wrapper w-100">
+                        <select
+                            id="tag-engine"
+                            [attr.title]="
+                                'TAG_RETENTION.PATTERN_ENGINE' | translate
+                            "
+                            [(ngModel)]="tagsKind"
+                            class="clr-select w-100">
+                            <option *ngFor="let k of tagKinds" value="{{ k }}">
+                                {{ engineI18nKey(k) | translate }}
+                            </option>
+                        </select>
+                    </div>
+                </div>
+                <div class="clr-col-2">
                     <div class="w-100">
                         <input
                             id="tags"
@@ -142,10 +169,13 @@
                 </div>
             </div>
             <div class="clr-row">
-                <div class="clr-col-4"></div>
-                <div class="clr-col-8 margin-top-5px">
-                    <span class="tooltip">{{
+                <div class="clr-col-3"></div>
+                <div class="clr-col-9 margin-top-5px">
+                    <span class="tooltip" *ngIf="!isRegexp(tagsKind)">{{
                         'TAG_RETENTION.TAG_SEPARATOR' | translate
+                    }}</span>
+                    <span class="tooltip" *ngIf="isRegexp(tagsKind)">{{
+                        'TAG_RETENTION.REGEXP_TAG_SEPARATOR' | translate
                     }}</span>
                 </div>
             </div>

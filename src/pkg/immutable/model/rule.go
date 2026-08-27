@@ -16,6 +16,9 @@ package model
 
 import (
 	"github.com/beego/beego/v2/core/validation"
+
+	"github.com/goharbor/harbor/src/lib/errors"
+	selectorindex "github.com/goharbor/harbor/src/lib/selector/selectors/index"
 )
 
 // Metadata of the immutable rule
@@ -49,6 +52,38 @@ type Metadata struct {
 	ScopeSelectors map[string][]*Selector `json:"scope_selectors" valid:"Required"`
 }
 
+// ValidateImmutableRule rejects a rule carrying a selector that could not be
+// built when the rule is evaluated
+func (m *Metadata) ValidateImmutableRule() error {
+	for _, ts := range m.TagSelectors {
+		if err := validateSelector(ts); err != nil {
+			return err
+		}
+	}
+	for _, ss := range m.ScopeSelectors {
+		for _, s := range ss {
+			if err := validateSelector(s); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func validateSelector(s *Selector) error {
+	if s == nil {
+		return nil
+	}
+
+	if err := selectorindex.Validate(s.Kind, s.Decoration, s.Pattern); err != nil {
+		return errors.New(nil).WithCode(errors.BadRequestCode).
+			WithMessagef("invalid immutable rule selector: %v", err)
+	}
+
+	return nil
+}
+
 // Valid Valid
 func (m *Metadata) Valid(v *validation.Validation) {
 	for _, ts := range m.TagSelectors {
@@ -68,11 +103,11 @@ func (m *Metadata) Valid(v *validation.Validation) {
 // Selector to narrow down the list
 type Selector struct {
 	// Kind of the selector
-	// "doublestar" or "label"
-	Kind string `json:"kind" valid:"Required;Match(doublestar)"`
+	// "doublestar", "regexp" or "label"
+	Kind string `json:"kind" valid:"Required;Match(/^(doublestar|regexp)$/)"`
 
 	// Decorated the selector
-	// for "doublestar" : "matching" and "excluding"
+	// for "doublestar" and "regexp" : "matching" and "excluding"
 	// for "label" : "with" and "without"
 	Decoration string `json:"decoration" valid:"Required"`
 
