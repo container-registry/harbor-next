@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/goharbor/harbor/src/lib/config"
+	harborerrors "github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/orm"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/p2p/preheat/models/policy"
@@ -251,6 +252,73 @@ func (s *preheatSuite) TestCreatePolicy() {
 	s.Equal(int64(1), id)
 	s.False(policy.CreatedAt.IsZero())
 	s.False(policy.UpdatedTime.IsZero())
+}
+
+func (s *preheatSuite) TestPolicyFilterKindValidation() {
+	cases := []struct {
+		name       string
+		filtersStr string
+		wantErr    bool
+	}{
+		{
+			name:       "no kind",
+			filtersStr: `[{"type":"repository","value":"harbor*"},{"type":"tag","value":"2*"}]`,
+		},
+		{
+			name:       "regex kind",
+			filtersStr: `[{"type":"repository","value":"harbor.*","kind":"regex"},{"type":"tag","value":"2.*","kind":"regex"}]`,
+		},
+		{
+			name:       "unknown kind",
+			filtersStr: `[{"type":"repository","value":"harbor*","kind":"glob"}]`,
+			wantErr:    true,
+		},
+		{
+			name:       "invalid regex",
+			filtersStr: `[{"type":"repository","value":"foo)|(?:bar","kind":"regex"}]`,
+			wantErr:    true,
+		},
+		{
+			name:       "kind on a label filter",
+			filtersStr: `[{"type":"label","value":"prod","kind":"regex"}]`,
+			wantErr:    true,
+		},
+	}
+
+	stored := &policy.Schema{ID: 99, Name: "test-filter-kind", Trigger: &policy.Trigger{Type: policy.TriggerTypeManual}}
+	s.fakePolicyMgr.On("Get", s.ctx, int64(99)).Return(stored, nil)
+
+	for _, c := range cases {
+		s.Run(c.name, func() {
+			p := &policy.Schema{
+				ID:         99,
+				Name:       "test-filter-kind",
+				FiltersStr: c.filtersStr,
+				TriggerStr: fmt.Sprintf(`{"type":"%s", "trigger_setting":{}}`, policy.TriggerTypeManual),
+			}
+			s.fakePolicyMgr.On("Create", s.ctx, p).Return(int64(99), nil).Maybe()
+			s.fakePolicyMgr.On("Update", s.ctx, p, mock.Anything).Return(nil).Maybe()
+
+			_, createErr := s.controller.CreatePolicy(s.ctx, p)
+			updateErr := s.controller.UpdatePolicy(s.ctx, p, "")
+			if !c.wantErr {
+				s.NoError(createErr)
+				s.NoError(updateErr)
+				// the policy of this case is a distinct pointer, so the recorded calls
+				// of the other tests in the suite never satisfy these
+				s.fakePolicyMgr.AssertCalled(s.T(), "Create", s.ctx, p)
+				s.fakePolicyMgr.AssertCalled(s.T(), "Update", s.ctx, p, mock.Anything)
+				return
+			}
+			s.Error(createErr)
+			s.True(harborerrors.IsErr(createErr, harborerrors.BadRequestCode), "create error is a bad request: %v", createErr)
+			s.Error(updateErr)
+			s.True(harborerrors.IsErr(updateErr, harborerrors.BadRequestCode), "update error is a bad request: %v", updateErr)
+			// validation runs before persistence, so a rejected policy is never stored
+			s.fakePolicyMgr.AssertNotCalled(s.T(), "Create", s.ctx, p)
+			s.fakePolicyMgr.AssertNotCalled(s.T(), "Update", s.ctx, p, mock.Anything)
+		})
+	}
 }
 
 func (s *preheatSuite) TestGetPolicy() {

@@ -33,6 +33,7 @@ import { of } from 'rxjs';
 import { delay } from 'rxjs/operators';
 import { ProjectService } from '../../../../shared/services';
 import { InlineAlertComponent } from '../../../../shared/components/inline-alert/inline-alert.component';
+import { PatternKind } from '../../../left-side-nav/replication/replication';
 describe('AddP2pPolicyComponent', () => {
     let component: AddP2pPolicyComponent;
     let fixture: ComponentFixture<AddP2pPolicyComponent>;
@@ -155,6 +156,81 @@ describe('AddP2pPolicyComponent', () => {
             fixture.nativeElement.querySelector('clr-control-error');
         expect(errorEle.innerText).toEqual('P2P_PROVIDER.NAME_TOOLTIP');
     });
+    it('should send the pattern engine only for a regex filter', async () => {
+        fixture.autoDetectChanges(true);
+        component.isOpen = true;
+        await fixture.whenStable();
+        const spy: jasmine.Spy = spyOn(
+            TestBed.inject(PreheatService),
+            'CreatePolicy'
+        ).and.returnValue(of(null));
+        component.policy = { provider_id: 1, name: 'policy1' };
+        component.repos = 'library/.*';
+        component.reposKind = PatternKind.REGEX;
+        component.tags = 'v1,v2';
+        component.tagsKind = PatternKind.DOUBLESTAR;
+        component.addOrSave(true);
+        await fixture.whenStable();
+
+        const filters = JSON.parse(
+            spy.calls.mostRecent().args[0].policy.filters
+        );
+        expect(filters).toEqual([
+            { type: 'repository', value: 'library/.*', kind: 'regex' },
+            // a comma separated doublestar list is still wrapped in braces
+            { type: 'tag', value: '{v1,v2}' },
+        ]);
+    });
+
+    it('should keep a regex pattern verbatim', async () => {
+        fixture.autoDetectChanges(true);
+        component.isOpen = true;
+        await fixture.whenStable();
+        const spy: jasmine.Spy = spyOn(
+            TestBed.inject(PreheatService),
+            'CreatePolicy'
+        ).and.returnValue(of(null));
+        component.policy = { provider_id: 1, name: 'policy1' };
+        component.repos = 'library/(a|b)';
+        component.reposKind = PatternKind.REGEX;
+        component.tags = 'v\\d{2,3}';
+        component.tagsKind = PatternKind.REGEX;
+        component.addOrSave(true);
+        await fixture.whenStable();
+
+        const filters = JSON.parse(
+            spy.calls.mostRecent().args[0].policy.filters
+        );
+        expect(filters).toEqual([
+            { type: 'repository', value: 'library/(a|b)', kind: 'regex' },
+            { type: 'tag', value: 'v\\d{2,3}', kind: 'regex' },
+        ]);
+    });
+
+    it('should track a changed pattern engine as a change', () => {
+        component.originPolicyForEdit = { provider_id: 1, name: 'policy1' };
+        component.policy = { provider_id: 1, name: 'policy1' };
+        component.repos = 'library/.*';
+        component.tags = '**';
+        component.reposKind = PatternKind.DOUBLESTAR;
+        component.tagsKind = PatternKind.DOUBLESTAR;
+        component.originReposForEdit = component.repos;
+        component.originReposKindForEdit = component.reposKind;
+        component.originTagsForEdit = component.tags;
+        component.originTagsKindForEdit = component.tagsKind;
+        component.originOnlySignedImagesForEdit = component.onlySignedImages;
+        component.originSeverityForEdit = component.severity;
+        component.originLabelsForEdit = component.labels;
+        component.originTriggerTypeForEdit = component.triggerType;
+        component.originCronForEdit = component.cron;
+        component.originScopeForEdit = component.scope;
+        component.originClusterIDsForEdit = component.clusterIDs;
+        expect(component.hasChange()).toBeFalsy();
+
+        component.reposKind = PatternKind.REGEX;
+        expect(component.hasChange()).toBeTruthy();
+    });
+
     it('save button should work', async () => {
         fixture.autoDetectChanges(true);
         component.isOpen = true;

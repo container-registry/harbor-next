@@ -225,4 +225,37 @@ describe('PolicyComponent', () => {
             fixture.nativeElement.querySelector('#name');
         expect(nameInput.value).toEqual('policy1');
     });
+    it('should read the pattern engine of the edited policy', async () => {
+        await fixture.whenStable();
+        component.selectedRow = {
+            ...policy1,
+            filters:
+                '[{"type":"repository","value":"library/.*","kind":"regex"},{"type":"tag","value":"**"}]',
+        };
+        component.editPolicy();
+        await fixture.whenStable();
+        expect(component.addP2pPolicyComponent.reposKind).toEqual('regex');
+        expect(component.addP2pPolicyComponent.tagsKind).toEqual('doublestar');
+    });
+    it('should keep a brace enclosed regex on edit', async () => {
+        await fixture.whenStable();
+        component.selectedRow = {
+            ...policy1,
+            filters:
+                '[{"type":"repository","value":"{2,3}","kind":"regex"},{"type":"tag","value":"{v1,v2}"}]',
+        };
+        component.editPolicy();
+        await fixture.whenStable();
+        // the braces are a quantifier, not a doublestar list, so the value survives
+        expect(component.addP2pPolicyComponent.repos).toEqual('{2,3}');
+        expect(component.addP2pPolicyComponent.reposKind).toEqual('regex');
+    });
+    it('should default the pattern engine of a policy stored without a kind', async () => {
+        await fixture.whenStable();
+        component.selectedRow = policy1;
+        component.editPolicy();
+        await fixture.whenStable();
+        expect(component.addP2pPolicyComponent.reposKind).toEqual('doublestar');
+        expect(component.addP2pPolicyComponent.tagsKind).toEqual('doublestar');
+    });
 });

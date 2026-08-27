@@ -15,9 +15,12 @@
 package policy
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+
+	"github.com/goharbor/harbor/src/lib/errors"
 )
 
 // PolicyTestSuite is a test suite for policy schema.
@@ -64,6 +67,124 @@ func (p *PolicyTestSuite) TestValidatePreheatPolicy() {
 	// valid cron string
 	p.schema.Trigger.Settings.Cron = "0 0 0 1 1 *"
 	p.NoError(p.schema.ValidatePreheatPolicy())
+}
+
+// TestValidateFilterKind tests the pattern engine validation of the policy filters
+func (p *PolicyTestSuite) TestValidateFilterKind() {
+	cases := []struct {
+		name    string
+		filter  *Filter
+		wantErr bool
+	}{
+		{
+			name:   "absent kind",
+			filter: &Filter{Type: FilterTypeRepository, Value: "**"},
+		},
+		{
+			name:   "explicit doublestar kind",
+			filter: &Filter{Type: FilterTypeTag, Value: "prod*", Kind: FilterKindDoublestar},
+		},
+		{
+			name:   "regex repository",
+			filter: &Filter{Type: FilterTypeRepository, Value: "library/.*", Kind: FilterKindRegex},
+		},
+		{
+			name:   "regex tag",
+			filter: &Filter{Type: FilterTypeTag, Value: `v\d+\.\d+`, Kind: FilterKindRegex},
+		},
+		{
+			name:   "empty regex pattern",
+			filter: &Filter{Type: FilterTypeTag, Value: "", Kind: FilterKindRegex},
+		},
+		{
+			name:    "unknown kind",
+			filter:  &Filter{Type: FilterTypeTag, Value: "**", Kind: "glob"},
+			wantErr: true,
+		},
+		{
+			name:    "kind on a label filter",
+			filter:  &Filter{Type: FilterTypeLabel, Value: "prod", Kind: FilterKindRegex},
+			wantErr: true,
+		},
+		{
+			name:    "kind on a signature filter",
+			filter:  &Filter{Type: FilterTypeSignature, Value: true, Kind: FilterKindDoublestar},
+			wantErr: true,
+		},
+		{
+			name:    "kind on a vulnerability filter",
+			filter:  &Filter{Type: FilterTypeVulnerability, Value: 3, Kind: FilterKindRegex},
+			wantErr: true,
+		},
+		{
+			name:    "invalid regex",
+			filter:  &Filter{Type: FilterTypeTag, Value: "[", Kind: FilterKindRegex},
+			wantErr: true,
+		},
+		{
+			name:    "regex escaping the anchoring",
+			filter:  &Filter{Type: FilterTypeTag, Value: "foo)|(?:bar", Kind: FilterKindRegex},
+			wantErr: true,
+		},
+		{
+			name:    "regex longer than the pattern limit",
+			filter:  &Filter{Type: FilterTypeTag, Value: strings.Repeat("a", 513), Kind: FilterKindRegex},
+			wantErr: true,
+		},
+		{
+			name:   "regex at the pattern limit",
+			filter: &Filter{Type: FilterTypeTag, Value: strings.Repeat("a", 512), Kind: FilterKindRegex},
+		},
+		{
+			name:    "regex value that isn't a string",
+			filter:  &Filter{Type: FilterTypeTag, Value: 100, Kind: FilterKindRegex},
+			wantErr: true,
+		},
+	}
+
+	for _, c := range cases {
+		p.Run(c.name, func() {
+			s := &Schema{Filters: []*Filter{c.filter}, Trigger: &Trigger{Type: TriggerTypeManual}}
+			err := s.ValidatePreheatPolicy()
+			if !c.wantErr {
+				p.NoError(err)
+				return
+			}
+			p.Error(err)
+			p.True(errors.IsErr(err, errors.BadRequestCode), "error is a bad request: %v", err)
+		})
+	}
+}
+
+// TestFilterKindRoundTrip tests that the kind survives an encode/decode cycle and that a
+// policy stored without a kind keeps decoding
+func (p *PolicyTestSuite) TestFilterKindRoundTrip() {
+	s := &Schema{
+		Filters: []*Filter{
+			{Type: FilterTypeRepository, Value: "library/.*", Kind: FilterKindRegex},
+			{Type: FilterTypeTag, Value: "**"},
+		},
+		Trigger: &Trigger{Type: TriggerTypeManual},
+	}
+	p.NoError(s.Encode())
+	p.Equal(`[{"type":"repository","value":"library/.*","kind":"regex"},{"type":"tag","value":"**"}]`, s.FiltersStr)
+
+	// a policy stored before the kind existed decodes into the doublestar default
+	stored := &Schema{
+		FiltersStr: `[{"type":"repository","value":"**"},{"type":"tag","value":"**"},{"type":"label","value":"test"}]`,
+		TriggerStr: `{"type":"manual","trigger_setting":{"cron":""}}`,
+	}
+	p.NoError(stored.Decode())
+	p.Len(stored.Filters, 3)
+	for _, f := range stored.Filters {
+		p.Empty(f.Kind)
+	}
+	p.NoError(stored.ValidatePreheatPolicy())
+
+	decoded := &Schema{FiltersStr: s.FiltersStr, TriggerStr: `{"type":"manual","trigger_setting":{"cron":""}}`}
+	p.NoError(decoded.Decode())
+	p.Equal(FilterKindRegex, decoded.Filters[0].Kind)
+	p.Empty(decoded.Filters[1].Kind)
 }
 
 // TestDecode tests decode.

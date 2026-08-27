@@ -22,6 +22,7 @@ import (
 
 	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/lib/errors"
+	"github.com/goharbor/harbor/src/lib/pattern"
 	"github.com/goharbor/harbor/src/lib/q"
 )
 
@@ -47,6 +48,12 @@ const (
 	FilterTypeVulnerability FilterType = "vulnerability"
 	// FilterTypeLabel represents the label filter type
 	FilterTypeLabel FilterType = "label"
+
+	// FilterKindDoublestar interprets the filter value as a doublestar pattern, the default
+	FilterKindDoublestar = pattern.KindDoublestar
+	// FilterKindRegex interprets the filter value as a regular expression matching the whole
+	// value, the same engine the retention, immutability and replication filters use
+	FilterKindRegex = pattern.KindRegex
 
 	// TriggerTypeManual represents the manual trigger type
 	TriggerTypeManual TriggerType = "manual"
@@ -103,6 +110,50 @@ type FilterType = string
 type Filter struct {
 	Type  FilterType `json:"type"`
 	Value any        `json:"value"`
+	// Kind selects the pattern engine used for Value, empty means FilterKindDoublestar.
+	// Only the repository and tag filters carry a pattern, the others are exact or numeric.
+	Kind string `json:"kind,omitempty"`
+}
+
+// supportsKind reports whether the filter type evaluates its value as a pattern
+func (f *Filter) supportsKind() bool {
+	return f.Type == FilterTypeRepository || f.Type == FilterTypeTag
+}
+
+// Validate checks the pattern engine selection of the filter. The value type checks stay
+// in the filter builder, which is also reached by the policies stored before this existed.
+func (f *Filter) Validate() error {
+	if f.Kind == "" {
+		return nil
+	}
+
+	if f.Kind != FilterKindDoublestar && f.Kind != FilterKindRegex {
+		return errors.New(nil).WithCode(errors.BadRequestCode).
+			WithMessagef("invalid filter kind: %s", f.Kind)
+	}
+
+	if !f.supportsKind() {
+		return errors.New(nil).WithCode(errors.BadRequestCode).
+			WithMessagef("only the %s and %s filters support kind, got: %s",
+				FilterTypeRepository, FilterTypeTag, f.Type)
+	}
+
+	if f.Kind != FilterKindRegex {
+		return nil
+	}
+
+	value, ok := f.Value.(string)
+	if !ok {
+		return errors.New(nil).WithCode(errors.BadRequestCode).
+			WithMessagef("the value of the %s filter isn't a string", f.Type)
+	}
+
+	if err := pattern.ValidateRegex(value); err != nil {
+		return errors.New(nil).WithCode(errors.BadRequestCode).
+			WithMessagef("invalid regex filter value %q: %v", value, err)
+	}
+
+	return nil
 }
 
 // TriggerType represents the type of trigger.
@@ -120,6 +171,15 @@ type Trigger struct {
 
 // ValidatePreheatPolicy validate preheat policy
 func (s *Schema) ValidatePreheatPolicy() error {
+	for _, filter := range s.Filters {
+		if filter == nil {
+			continue
+		}
+		if err := filter.Validate(); err != nil {
+			return err
+		}
+	}
+
 	// currently only validate cron string of preheat policy
 	if s.Trigger != nil && s.Trigger.Type == TriggerTypeScheduled && len(s.Trigger.Settings.Cron) > 0 {
 		if err := utils.ValidateCronString(s.Trigger.Settings.Cron); err != nil {
