@@ -151,8 +151,7 @@ defn check-key(path k vk entry view root):
       add-finding 'ERROR' 'unknown-key' str(path '.' k):
         "rejected at install time — the schema object is \
          additionalProperties:false"
-    some?(view.ap-schema):
-    view.open:
+    some?(view.ap-schema) || view.open: nil
     else:
       add-finding 'WARN' 'undocumented-key' str(path '.' k):
         "present in values.yaml but not declared by the schema — no \
