@@ -184,9 +184,11 @@ func (a *Adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 
 func (a *Adapter) listRepositories(filters []*model.Filter) ([]*model.Repository, error) {
 	pattern := ""
+	kind := ""
 	for _, filter := range filters {
 		if filter.Type == model.FilterTypeName {
 			pattern = filter.Value.(string)
+			kind = filter.Kind
 			break
 		}
 	}
@@ -194,7 +196,7 @@ func (a *Adapter) listRepositories(filters []*model.Filter) ([]*model.Repository
 	var err error
 	// if the pattern of repository name filter is a specific repository name, just returns
 	// the parsed repositories and will check the existence later when filtering the tags
-	if paths, ok := util.IsSpecificPath(pattern); ok {
+	if paths, ok := util.IsSpecificPathForKind(kind, pattern); ok {
 		repositories = paths
 	} else {
 		// search repositories from catalog API

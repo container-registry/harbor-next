@@ -253,6 +253,12 @@ func parseFilters(str string) ([]*model.Filter, error) {
 			Value:      item.Value,
 			Decoration: item.Decoration,
 		}
+		// "kind" is overloaded in the stored filters: on a legacy entry, one without a
+		// type, it names the old repository/tag/label filter, only a typed entry carries
+		// the pattern engine
+		if len(item.Type) > 0 {
+			filter.Kind = item.Kind
+		}
 		// keep backwards compatibility
 		if len(filter.Type) == 0 {
 			if filter.Value == nil {

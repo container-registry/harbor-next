@@ -191,3 +191,35 @@ func TestIsSpecificPath(t *testing.T) {
 		}
 	}
 }
+
+func TestIsSpecificPathForKind(t *testing.T) {
+	// a doublestar pattern is still reversed into the repositories it can match
+	paths, ok := IsSpecificPathForKind("", "library/{hello-world,busybox}")
+	require.True(t, ok)
+	assert.Equal(t, []string{"library/hello-world", "library/busybox"}, paths)
+
+	paths, ok = IsSpecificPathForKind("doublestar", "library/hello-world")
+	require.True(t, ok)
+	assert.Equal(t, []string{"library/hello-world"}, paths)
+
+	// a regex never is, even when it looks like a literal path
+	paths, ok = IsSpecificPathForKind("regex", "library/hello-world")
+	assert.False(t, ok)
+	assert.Nil(t, paths)
+
+	paths, ok = IsSpecificPathForKind("regex", "library/.*")
+	assert.False(t, ok)
+	assert.Nil(t, paths)
+}
+
+func TestIsSpecificPathComponentForKind(t *testing.T) {
+	components, ok := IsSpecificPathComponentForKind("doublestar", "library")
+	require.True(t, ok)
+	assert.Equal(t, []string{"library"}, components)
+
+	// "lib(a|b)" holds no doublestar metacharacter, so it must be the kind that
+	// keeps it from being taken for a literal namespace
+	components, ok = IsSpecificPathComponentForKind("regex", "lib(a|b)")
+	assert.False(t, ok)
+	assert.Nil(t, components)
+}

@@ -227,9 +227,11 @@ func (a *Adapter) PrepareForPush(resources []*model.Resource) error {
 // ListProjects lists projects
 func (a *Adapter) ListProjects(filters []*model.Filter) ([]*Project, error) {
 	pattern := ""
+	kind := ""
 	for _, filter := range filters {
 		if filter.Type == model.FilterTypeName {
 			pattern = filter.Value.(string)
+			kind = filter.Kind
 			break
 		}
 	}
@@ -237,7 +239,7 @@ func (a *Adapter) ListProjects(filters []*model.Filter) ([]*Project, error) {
 	if len(pattern) > 0 {
 		substrings := strings.Split(pattern, "/")
 		projectPattern := substrings[0]
-		names, ok := util.IsSpecificPathComponent(projectPattern)
+		names, ok := util.IsSpecificPathComponentForKind(kind, projectPattern)
 		if ok {
 			for _, name := range names {
 				// trim white space in project name

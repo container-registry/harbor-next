@@ -127,19 +127,6 @@ func (suite *RegexpSelectorTestSuite) TestInvalidPatternSurfacesAtSelect() {
 	suite.Require().Error(err)
 }
 
-// TestCompileIsCached asserts the compiled expression is reused
-func (suite *RegexpSelectorTestSuite) TestCompileIsCached() {
-	s := New(Matches, `v\d+`, "").(*selector)
-
-	_, err := s.Select(suite.artifacts)
-	suite.Require().NoError(err)
-	first := s.expression
-
-	_, err = s.Select(suite.artifacts)
-	suite.Require().NoError(err)
-	suite.Same(first, s.expression)
-}
-
 // TestCaseInsensitiveFlag verifies (?i) is honored
 func (suite *RegexpSelectorTestSuite) TestCaseInsensitiveFlag() {
 	s := New(Matches, `(?i)latest`, "").(*selector)

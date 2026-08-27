@@ -194,8 +194,10 @@ describe('CreateEditRuleComponent (inline template)', () => {
     };
     let fixture: ComponentFixture<CreateEditRuleComponent>;
     let comp: CreateEditRuleComponent;
+    let createdPolicy: ReplicationPolicy;
     const fakedErrorHandler = {
         error() {},
+        info() {},
     };
     const fakedReplicationService = {
         getReplicationRule() {
@@ -219,6 +221,10 @@ describe('CreateEditRuleComponent (inline template)', () => {
         },
         getRegistryInfo() {
             return of(mockRegistryInfo).pipe(delay(0));
+        },
+        createReplicationRule(policy: ReplicationPolicy) {
+            createdPolicy = policy;
+            return of(null).pipe(delay(0));
         },
     };
     const fakedEndpointService = {
@@ -302,5 +308,80 @@ describe('CreateEditRuleComponent (inline template)', () => {
         fixture.whenStable();
         tick(5000);
         expect(comp.targetList.length).toBe(4);
+    }));
+    it('Should offer the pattern engine on the pattern filters only', () => {
+        comp.setFilter([
+            { type: 'name', style: 'input', value: '' },
+            { type: 'tag', style: 'input', value: '' },
+            { type: 'label', style: 'list', value: [] },
+            { type: 'resource', style: 'radio', value: '' },
+        ] as any);
+        expect(comp.filters.at(0).get('kind')?.value).toEqual('doublestar');
+        expect(comp.filters.at(1).get('kind')?.value).toEqual('doublestar');
+        expect(comp.filters.at(2).get('kind')?.value).toEqual('doublestar');
+        expect(comp.filters.at(3).get('kind')).toBeNull();
+        expect(comp.supportsPatternKind('resource')).toBeFalsy();
+        expect(comp.supportsPatternKind('name')).toBeTruthy();
+    });
+
+    it('Should load the engine of an existing filter', () => {
+        comp.setFilter([
+            {
+                type: 'name',
+                style: 'input',
+                kind: 'regex',
+                value: 'library/.*',
+            },
+            { type: 'tag', style: 'input', value: 'v1.*' },
+        ] as any);
+        expect(comp.isRegex(0)).toBeTruthy();
+        expect(comp.isRegex(1)).toBeFalsy();
+        expect(comp.engineI18nKey('regex')).toEqual('REPLICATION.ENGINE_REGEX');
+        expect(comp.engineI18nKey('doublestar')).toEqual(
+            'REPLICATION.ENGINE_DOUBLESTAR'
+        );
+    });
+
+    it('Should keep whitespace in a regex pattern only', () => {
+        comp.setFilter([
+            { type: 'name', style: 'input', kind: 'regex', value: '' },
+            { type: 'tag', style: 'input', value: '' },
+        ] as any);
+
+        // a space is a literal character in a regex, the strip would corrupt it
+        const regexEvent: any = { target: { value: '^(v1|v2) rc$' } };
+        comp.trimText(regexEvent, 0);
+        expect(regexEvent.target.value).toEqual('^(v1|v2) rc$');
+
+        // a doublestar pattern still loses it, which forgives a pasted "a, b"
+        const doublestarEvent: any = { target: { value: 'lib, app' } };
+        comp.trimText(doublestarEvent, 1);
+        expect(doublestarEvent.target.value).toEqual('lib,app');
+
+        // and an unknown row falls back to stripping
+        const noIndexEvent: any = { target: { value: 'a b' } };
+        comp.trimText(noIndexEvent);
+        expect(noIndexEvent.target.value).toEqual('ab');
+    });
+
+    it('Should send the engine only when it is not the default', fakeAsync(() => {
+        fixture.detectChanges();
+        comp.openCreateEditRule();
+        tick(5000);
+        comp.setFilter([
+            {
+                type: 'name',
+                style: 'input',
+                kind: 'regex',
+                value: 'library/.*',
+            },
+            { type: 'tag', style: 'input', value: 'v1.*' },
+        ] as any);
+        comp.ruleForm.get('name').setValue('rule_01');
+        comp.onSubmit();
+        tick(5000);
+        expect(createdPolicy.filters.length).toEqual(2);
+        expect(createdPolicy.filters[0].kind).toEqual('regex');
+        expect('kind' in createdPolicy.filters[1]).toBeFalsy();
     }));
 });

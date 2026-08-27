@@ -7748,6 +7748,12 @@ definitions:
       decoration:
         type: string
         description: 'matches or excludes the result'
+      kind:
+        type: string
+        description: |-
+          The pattern engine used for the filter value, either "doublestar" or "regex".
+          Only valid for the name, tag and label filters. Defaults to "doublestar".
+        x-isnullable: true # make this field optional to keep backward compatibility
   RegistryCredential:
     type: object
     properties:

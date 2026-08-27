@@ -23,8 +23,8 @@ import (
 
 	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/lib/log"
+	"github.com/goharbor/harbor/src/lib/pattern"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
-	"github.com/goharbor/harbor/src/pkg/reg/util"
 )
 
 // DeleteManifest VolcCR will use our own openAPI to delete Manifest
@@ -97,21 +97,27 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 	log.Debug("FetchArtifacts filters", "filters", filters)
 	// 1. get filter pattern
 	var repoPattern string
+	var repoKind string
 	var tagsPattern string
+	var tagsKind string
 	for _, filter := range filters {
 		if filter.Type == model.FilterTypeName {
 			repoPattern = filter.Value.(string)
+			repoKind = filter.Kind
 		}
 		if filter.Type == model.FilterTypeTag {
 			tagsPattern = filter.Value.(string)
+			tagsKind = filter.Kind
 		}
 	}
 	namespacePattern := strings.Split(repoPattern, "/")[0]
+	repoMatcher := pattern.NewMatcher(repoKind, repoPattern)
+	tagsMatcher := pattern.NewMatcher(tagsKind, tagsPattern)
 
 	log.Debug("read in filter patterns", "repoPattern", repoPattern, "tagsPattern", tagsPattern)
 
 	// 2. list namespace candidtes
-	namespaces, err := a.listCandidateNamespaces(namespacePattern)
+	namespaces, err := a.listCandidateNamespaces(repoKind, namespacePattern)
 	if err != nil {
 		log.Errorf("FetchArtifacts error: %v", err)
 		return nil, err
@@ -129,7 +135,7 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 		log.Debug(" FetchArtifacts list repo", "repos: ", repoCandidates)
 		for _, r := range repoCandidates {
 			nsRepoCandidate := fmt.Sprintf("%s/%s", ns, r)
-			ok, err := util.Match(repoPattern, nsRepoCandidate)
+			ok, err := repoMatcher.Match(nsRepoCandidate)
 			if err != nil {
 				log.Error("FetchArtifacts error", "error", err)
 				return nil, err
@@ -162,7 +168,7 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 			tags := make([]string, 0)
 			if tagsPattern != "" {
 				for _, candidateTag := range candidateTags {
-					ok, err := util.Match(tagsPattern, candidateTag)
+					ok, err := tagsMatcher.Match(candidateTag)
 					if err != nil {
 						return fmt.Errorf("fail to match tag pattern, error=%w", err)
 					}

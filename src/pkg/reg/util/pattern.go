@@ -19,14 +19,16 @@ import (
 	"strings"
 
 	"github.com/bmatcuk/doublestar"
+
+	"github.com/goharbor/harbor/src/lib/pattern"
 )
 
-// Match returns whether the str matches the pattern
-func Match(pattern, str string) (bool, error) {
-	if len(pattern) == 0 {
+// Match returns whether the str matches the doublestar pattern
+func Match(expr, str string) (bool, error) {
+	if len(expr) == 0 {
 		return true, nil
 	}
-	return doublestar.Match(pattern, str)
+	return doublestar.Match(expr, str)
 }
 
 // IsSpecificPath checks whether the input path is a specified string
@@ -53,6 +55,16 @@ func IsSpecificPath(path string) ([]string, bool) {
 		result = combinationPathComponents(result, component)
 	}
 	return result, true
+}
+
+// IsSpecificPathForKind is IsSpecificPath for a filter of the given kind
+// A regex pattern is never reversed into a repository list, so the caller falls back to
+// listing the catalog, the same as it does for a "**" doublestar pattern
+func IsSpecificPathForKind(kind, path string) ([]string, bool) {
+	if kind == pattern.KindRegex {
+		return nil, false
+	}
+	return IsSpecificPath(path)
 }
 
 func combinationPathComponents(components1, components2 []string) []string {
@@ -117,4 +129,14 @@ func IsSpecificPathComponent(component string) ([]string, bool) {
 		components = append(components, prefix+str+suffix)
 	}
 	return components, true
+}
+
+// IsSpecificPathComponentForKind is IsSpecificPathComponent for a filter of the given kind
+// A regex pattern is never reversed into a namespace list, so the caller falls back to
+// listing all namespaces
+func IsSpecificPathComponentForKind(kind, component string) ([]string, bool) {
+	if kind == pattern.KindRegex {
+		return nil, false
+	}
+	return IsSpecificPathComponent(component)
 }

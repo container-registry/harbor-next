@@ -50,7 +50,7 @@ func TestInfo(t *testing.T) {
 
 func TestListCandidateNamespaces(t *testing.T) {
 	adapter := &adapter{}
-	namespaces, err := adapter.listCandidateNamespaces("library/*")
+	namespaces, err := adapter.listCandidateNamespaces("", "library/*")
 	require.Nil(t, err)
 	require.Equal(t, 1, len(namespaces))
 	assert.Equal(t, "library", namespaces[0])
