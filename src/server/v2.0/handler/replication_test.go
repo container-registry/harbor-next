@@ -358,13 +358,20 @@ func TestConvertReplicationPolicyFilterKind(t *testing.T) {
 				Type:  model.FilterTypeTag,
 				Value: "v1.*",
 			},
+			{
+				Type:  model.FilterTypeLabel,
+				Value: []string{"prod"},
+				Kind:  model.FilterKindDoublestar,
+			},
 		},
 	}
 
 	result := convertReplicationPolicy(policy)
-	assert.Len(t, result.Filters, 2)
+	assert.Len(t, result.Filters, 3)
 	require.NotNil(t, result.Filters[0].Kind)
 	assert.Equal(t, model.FilterKindRegex, *result.Filters[0].Kind)
 	// a policy that doesn't set a kind keeps the field out of the response
 	assert.Nil(t, result.Filters[1].Kind)
+	// and so does one that spells out the default, the two are the same filter
+	assert.Nil(t, result.Filters[2].Kind)
 }

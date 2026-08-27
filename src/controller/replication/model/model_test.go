@@ -307,6 +307,10 @@ func TestFilterKindRoundTrip(t *testing.T) {
 	assert.Equal(2, len(loaded.Filters))
 	assert.Equal(model.FilterKindRegex, loaded.Filters[0].Kind)
 	assert.Equal("", loaded.Filters[1].Kind)
+	// the pattern has to come back untouched, an escaped or mangled one would
+	// quietly change which artifacts the policy selects
+	assert.Equal("library/.*", loaded.Filters[0].Value)
+	assert.Equal("v1.*", loaded.Filters[1].Value)
 }
 
 func TestParseFiltersLegacyKind(t *testing.T) {

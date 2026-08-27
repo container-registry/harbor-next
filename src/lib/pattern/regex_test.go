@@ -106,6 +106,8 @@ func TestMatcher(t *testing.T) {
 		{kind: KindRegex, expr: "library/.*", value: "library/hello-world", match: true},
 		{kind: KindRegex, expr: "library/**", value: "library/hello-world", wantErr: true},
 		{kind: KindRegex, expr: "foo)|(?:bar", value: "foo", wantErr: true},
+		// an unknown kind is refused instead of quietly falling back to doublestar
+		{kind: "glob", expr: "library/**", value: "library/hello-world", wantErr: true},
 	}
 
 	for _, c := range cases {
@@ -119,6 +121,17 @@ func TestMatcher(t *testing.T) {
 			assert.Equal(t, c.match, match)
 		})
 	}
+}
+
+func TestMatcherUnsupportedKind(t *testing.T) {
+	_, err := NewMatcher("glob", "library/**").Match("library/hello-world")
+	require.NotNil(t, err)
+	assert.Contains(t, err.Error(), "unsupported pattern kind")
+
+	// an empty pattern still matches everything, it never reaches the kind
+	match, err := NewMatcher("glob", "").Match("library/hello-world")
+	require.Nil(t, err)
+	assert.True(t, match)
 }
 
 func TestMatcherCompilesOnce(t *testing.T) {

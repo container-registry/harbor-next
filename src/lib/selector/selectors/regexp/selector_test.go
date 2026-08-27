@@ -127,20 +127,6 @@ func (suite *RegexpSelectorTestSuite) TestInvalidPatternSurfacesAtSelect() {
 	suite.Require().Error(err)
 }
 
-// TestCompileIsCached asserts the selector keeps one matcher, which is where the
-// compiled expression is cached, see TestMatcherCompilesOnce in lib/pattern
-func (suite *RegexpSelectorTestSuite) TestCompileIsCached() {
-	s := New(Matches, `v\d+`, "").(*selector)
-
-	_, err := s.Select(suite.artifacts)
-	suite.Require().NoError(err)
-	first := s.matcher
-
-	_, err = s.Select(suite.artifacts)
-	suite.Require().NoError(err)
-	suite.Same(first, s.matcher)
-}
-
 // TestCaseInsensitiveFlag verifies (?i) is honored
 func (suite *RegexpSelectorTestSuite) TestCaseInsensitiveFlag() {
 	s := New(Matches, `(?i)latest`, "").(*selector)

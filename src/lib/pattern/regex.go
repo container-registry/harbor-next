@@ -95,22 +95,26 @@ func NewMatcher(kind, expr string) *Matcher {
 }
 
 // Match returns whether the value matches the pattern of the matcher. An empty
-// pattern matches everything.
+// pattern matches everything, and a kind that is neither of the two known ones
+// is an error rather than a silent fallback to doublestar: a pattern written for
+// some other engine would otherwise select the wrong repositories or artifacts.
 func (m *Matcher) Match(value string) (bool, error) {
 	if len(m.pattern) == 0 {
 		return true, nil
 	}
 
-	if m.kind != KindRegex {
+	switch m.kind {
+	case "", KindDoublestar:
 		return doublestar.Match(m.pattern, value)
+	case KindRegex:
+		m.once.Do(func() {
+			m.expression, m.compileErr = CompileRegex(m.pattern)
+		})
+		if m.compileErr != nil {
+			return false, m.compileErr
+		}
+		return m.expression.MatchString(value), nil
+	default:
+		return false, errors.Errorf("unsupported pattern kind %q", m.kind)
 	}
-
-	m.once.Do(func() {
-		m.expression, m.compileErr = CompileRegex(m.pattern)
-	})
-	if m.compileErr != nil {
-		return false, m.compileErr
-	}
-
-	return m.expression.MatchString(value), nil
 }

@@ -480,8 +480,9 @@ func convertReplicationPolicy(policy *repctlmodel.Policy) *models.ReplicationPol
 				Value:      filter.Value,
 				Decoration: filter.Decoration,
 			}
-			// keep the field absent for the policies that don't set a kind
-			if filter.Kind != "" {
+			// the default engine is implied, so both spellings of it, an empty kind
+			// and an explicit "doublestar", come back as the same absent field
+			if filter.Kind != "" && filter.Kind != model.FilterKindDoublestar {
 				f.Kind = &filter.Kind
 			}
 			p.Filters = append(p.Filters, f)
