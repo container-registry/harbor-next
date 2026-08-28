@@ -60,10 +60,13 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 	t.Cleanup(schemaPool.Close)
 
 	// Legacy tables created by the numbered migrations that harbor_next.sql
-	// declares foreign keys against.
+	// declares foreign keys against. The robot and role_permission stubs keep
+	// the pre-amendment 0190 shapes so the reconciliation blocks run.
 	legacyDependencies := []string{
-		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
+		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY, creator_ref integer NOT NULL DEFAULT 0)",
 		"CREATE TABLE project (project_id SERIAL PRIMARY KEY)",
+		"CREATE TABLE role_permission (id SERIAL PRIMARY KEY, role_id integer NOT NULL)",
+		"CREATE TABLE audit_log_ext (id BIGSERIAL PRIMARY KEY)",
 	}
 	for _, statement := range legacyDependencies {
 		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
@@ -130,6 +133,9 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 		"claim_rules": {
 			"id", "identity_provider_id", "robot_id", "claim_path", "value", "creation_time",
 		},
+		"audit_log_ext": {
+			"client_address", "user_agent",
+		},
 	}
 	for table, tableColumns := range columns {
 		for _, column := range tableColumns {
@@ -149,6 +155,28 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 			if !exists {
 				t.Errorf("authoritative schema column %q does not exist", table+"."+column)
 			}
+		}
+	}
+
+	bigintColumns := [][2]string{
+		{"robot", "id"},
+		{"robot", "creator_ref"},
+		{"role_permission", "role_id"},
+	}
+	for _, tableColumn := range bigintColumns {
+		var dataType string
+		err := schemaPool.DB().QueryRowContext(ctx, `
+			SELECT data_type
+			FROM information_schema.columns
+			WHERE table_schema = current_schema()
+			  AND table_name = $1
+			  AND column_name = $2`, tableColumn[0], tableColumn[1]).Scan(&dataType)
+		if err != nil {
+			t.Errorf("look up column type %s.%s: %v", tableColumn[0], tableColumn[1], err)
+			continue
+		}
+		if dataType != "bigint" {
+			t.Errorf("column %s.%s is %q, want bigint", tableColumn[0], tableColumn[1], dataType)
 		}
 	}
 }
