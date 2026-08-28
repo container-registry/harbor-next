@@ -6,7 +6,6 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - secrets.sops.yaml
-  - harbor-snyk.sops.yaml
   - pull-secret-flux-system.sops.yaml
   - pull-secret-8gcr-dev-main.sops.yaml
   - ocirepository.yaml
@@ -14,3 +13,5 @@ resources:
   - rollout-sync.yaml
   - helmrelease.yaml
   - ingress-packages.yaml
+  # One-shot tenant wipe — remove after the 2026-08-29 redeploy converges.
+  - reset-2026-08-29.yaml

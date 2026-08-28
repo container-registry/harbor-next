@@ -95,18 +95,6 @@ spec:
     name: harbor-system-pull
 ---
 apiVersion: image.toolkit.fluxcd.io/v1
-kind: ImageRepository
-metadata:
-  name: harbor-snyk-adapter
-  namespace: flux-system
-spec:
-  image: 8gears.container-registry.com/8gcr/harbor-snyk-adapter
-  interval: 1m
-  provider: generic
-  secretRef:
-    name: harbor-system-pull
----
-apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImagePolicy
 metadata:
   name: harbor-core
@@ -226,22 +214,6 @@ metadata:
 spec:
   imageRepositoryRef:
     name: harbor-grype-adapter
-  filterTags:
-    pattern: ^latest$
-  policy:
-    alphabetical:
-      order: asc
-  digestReflectionPolicy: Always
-  interval: 1m
----
-apiVersion: image.toolkit.fluxcd.io/v1
-kind: ImagePolicy
-metadata:
-  name: harbor-snyk-adapter
-  namespace: flux-system
-spec:
-  imageRepositoryRef:
-    name: harbor-snyk-adapter
   filterTags:
     pattern: ^latest$
   policy:

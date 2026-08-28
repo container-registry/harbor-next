@@ -146,5 +146,4 @@ spec:
                   sync deployment  harbor-harbor-next-exporter   harbor-exporter      "$rev"
                   sync statefulset harbor-harbor-next-trivy      trivy-adapter        "$rev"
                   sync deployment  grype-scanner                 harbor-grype-adapter "$rev"
-                  sync deployment  snyk-scanner                  harbor-snyk-adapter  "$rev"
                   exit "$fail"

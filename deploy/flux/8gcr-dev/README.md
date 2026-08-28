@@ -105,7 +105,6 @@ The two `Secret` resources in the file:
 |---|---|---|---|
 | `harbor-admin` | `Opaque` | `HARBOR_ADMIN_PASSWORD` | Harbor Core (`existingSecretAdminPassword`). |
 | `harbor-db-password` | `kubernetes.io/basic-auth` | `username` (`harbor`), `password` | (1) CNPG bootstrap — `Cluster.spec.bootstrap.initdb.secret.name`; (2) Harbor's chart — `database.existingSecret` + `existingSecretKey: password`. Same Secret, both consumers. |
-| `harbor-snyk` | `Opaque` | `token` (required), `org` (optional) | Snyk scanner adapter authentication. The deployment intentionally fails to start without `token` so missing credentials cannot masquerade as a healthy scanner. |
 
 One DB Secret, one source of truth: rotating `harbor-db-password.password` updates both CNPG-initdb (on a fresh Cluster) and Harbor's runtime client in one place. No risk of the runtime password drifting away from what was seeded into Postgres.
 
