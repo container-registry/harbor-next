@@ -62,9 +62,12 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 	// Legacy tables created by the numbered migrations that harbor_next.sql
 	// declares foreign keys against or reconciles in place.
 	legacyDependencies := []string{
-		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
+		// pre-amendment 0190 shapes, so the bigint reconciliation runs
+		"CREATE TABLE robot (id SERIAL PRIMARY KEY, creator_ref integer NOT NULL DEFAULT 0)",
 		"CREATE TABLE project (project_id SERIAL PRIMARY KEY)",
 		"CREATE TABLE execution (id SERIAL PRIMARY KEY, revision INTEGER)",
+		"CREATE TABLE role_permission (id SERIAL PRIMARY KEY, role_id integer NOT NULL)",
+		"CREATE TABLE audit_log_ext (id BIGSERIAL PRIMARY KEY)",
 	}
 	for _, statement := range legacyDependencies {
 		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
@@ -131,6 +134,9 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 		"claim_rules": {
 			"id", "identity_provider_id", "robot_id", "claim_path", "value", "creation_time",
 		},
+		"audit_log_ext": {
+			"client_address", "user_agent",
+		},
 	}
 	for table, tableColumns := range columns {
 		for _, column := range tableColumns {
@@ -153,18 +159,30 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 		}
 	}
 
-	// reconciled in place on a table the numbered migrations own
-	var revisionType string
+	// reconciled in place on tables the numbered migrations own
+	for _, column := range [][2]string{
+		{"execution", "revision"}, {"robot", "id"}, {"robot", "creator_ref"}, {"role_permission", "role_id"},
+	} {
+		var dataType string
+		err := schemaPool.DB().QueryRowContext(ctx, `
+			SELECT data_type
+			FROM information_schema.columns
+			WHERE table_schema = current_schema()
+			  AND table_name = $1
+			  AND column_name = $2`, column[0], column[1]).Scan(&dataType)
+		if err != nil || dataType != "bigint" {
+			t.Errorf("%s.%s is %q (%v), want bigint", column[0], column[1], dataType, err)
+		}
+	}
+
+	var robotSeq string
 	err = schemaPool.DB().QueryRowContext(ctx, `
-		SELECT data_type
-		FROM information_schema.columns
-		WHERE table_schema = current_schema()
-		  AND table_name = 'execution'
-		  AND column_name = 'revision'`).Scan(&revisionType)
-	if err != nil {
-		t.Errorf("look up execution.revision type: %v", err)
-	} else if revisionType != "bigint" {
-		t.Errorf("execution.revision is %q, want bigint", revisionType)
+		SELECT data_type || ' ' || maximum_value
+		FROM information_schema.sequences
+		WHERE sequence_schema = current_schema()
+		  AND sequence_name = 'robot_id_seq'`).Scan(&robotSeq)
+	if err != nil || robotSeq != "bigint 9007199254740991" {
+		t.Errorf("robot_id_seq is %q (%v), want bigint 9007199254740991", robotSeq, err)
 	}
 }
 

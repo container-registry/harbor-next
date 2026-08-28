@@ -168,3 +168,24 @@ BEGIN
     END IF;
 END
 $$;
+
+-- 0190 was amended in place after deployed databases had recorded it; replay the amendments.
+-- The type checks keep repeat runs from taking ACCESS EXCLUSIVE on robot and role_permission.
+DO $$
+BEGIN
+    IF (SELECT data_type FROM information_schema.columns WHERE table_schema = current_schema()
+          AND table_name = 'robot' AND column_name = 'creator_ref') = 'integer' THEN
+        ALTER TABLE robot ALTER COLUMN id TYPE bigint;
+        ALTER TABLE robot ALTER COLUMN creator_ref TYPE bigint;
+        ALTER SEQUENCE robot_id_seq AS bigint MAXVALUE 9007199254740991;
+    END IF;
+    IF (SELECT data_type FROM information_schema.columns WHERE table_schema = current_schema()
+          AND table_name = 'role_permission' AND column_name = 'role_id') = 'integer' THEN
+        ALTER TABLE role_permission ALTER COLUMN role_id TYPE bigint;
+    END IF;
+    IF to_regclass('audit_log_ext') IS NOT NULL THEN
+        ALTER TABLE audit_log_ext ADD COLUMN IF NOT EXISTS client_address varchar(255) DEFAULT '';
+        ALTER TABLE audit_log_ext ADD COLUMN IF NOT EXISTS user_agent varchar(1024) DEFAULT '';
+    END IF;
+END
+$$;
