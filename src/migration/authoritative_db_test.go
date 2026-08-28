@@ -60,11 +60,17 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 	t.Cleanup(schemaPool.Close)
 
 	// Legacy tables created by the numbered migrations that harbor_next.sql
-	// declares foreign keys against or reconciles in place.
+	// declares foreign keys against or reconciles in place. The robot and
+	// role_permission stubs keep the pre-amendment 0190 shapes so the
+	// reconciliation blocks run.
 	legacyDependencies := []string{
-		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
+		// SERIAL, not BIGSERIAL: 0004 created robot.id as integer and 0190 widened
+		// it, so the stub has to start narrow for the reconciliation to be exercised.
+		"CREATE TABLE robot (id SERIAL PRIMARY KEY, creator_ref integer NOT NULL DEFAULT 0)",
 		"CREATE TABLE project (project_id SERIAL PRIMARY KEY)",
 		"CREATE TABLE execution (id SERIAL PRIMARY KEY, revision INTEGER)",
+		"CREATE TABLE role_permission (id SERIAL PRIMARY KEY, role_id integer NOT NULL)",
+		"CREATE TABLE audit_log_ext (id BIGSERIAL PRIMARY KEY)",
 	}
 	for _, statement := range legacyDependencies {
 		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
@@ -131,6 +137,9 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 		"claim_rules": {
 			"id", "identity_provider_id", "robot_id", "claim_path", "value", "creation_time",
 		},
+		"audit_log_ext": {
+			"client_address", "user_agent",
+		},
 	}
 	for table, tableColumns := range columns {
 		for _, column := range tableColumns {
@@ -165,6 +174,45 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 		t.Errorf("look up execution.revision type: %v", err)
 	} else if revisionType != "bigint" {
 		t.Errorf("execution.revision is %q, want bigint", revisionType)
+	}
+
+	bigintColumns := [][2]string{
+		{"robot", "id"},
+		{"robot", "creator_ref"},
+		{"role_permission", "role_id"},
+	}
+	for _, tableColumn := range bigintColumns {
+		var dataType string
+		err := schemaPool.DB().QueryRowContext(ctx, `
+			SELECT data_type
+			FROM information_schema.columns
+			WHERE table_schema = current_schema()
+			  AND table_name = $1
+			  AND column_name = $2`, tableColumn[0], tableColumn[1]).Scan(&dataType)
+		if err != nil {
+			t.Errorf("look up column type %s.%s: %v", tableColumn[0], tableColumn[1], err)
+			continue
+		}
+		if dataType != "bigint" {
+			t.Errorf("column %s.%s is %q, want bigint", tableColumn[0], tableColumn[1], dataType)
+		}
+	}
+
+	var seqType, seqMax string
+	err = schemaPool.DB().QueryRowContext(ctx, `
+		SELECT data_type, maximum_value
+		FROM information_schema.sequences
+		WHERE sequence_schema = current_schema()
+		  AND sequence_name = 'robot_id_seq'`).Scan(&seqType, &seqMax)
+	if err != nil {
+		t.Errorf("look up robot_id_seq: %v", err)
+	} else {
+		if seqType != "bigint" {
+			t.Errorf("robot_id_seq is %q, want bigint", seqType)
+		}
+		if seqMax != "9007199254740991" {
+			t.Errorf("robot_id_seq maximum_value is %q, want 9007199254740991", seqMax)
+		}
 	}
 }
 
