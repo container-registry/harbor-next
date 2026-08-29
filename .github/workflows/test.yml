@@ -168,3 +168,39 @@ jobs:
         run: |
           redis-cli -h localhost -p 6379 shutdown nosave 2>/dev/null || true
           docker rm -f "${SVC_PREFIX}-postgres" 2>/dev/null || true
+
+  # --------------------------------------------------------------------------
+  # go.mod / go.sum drift — the build path runs `task build:tidy` before
+  # compiling, so a stale go.sum is silently repaired on the runner and never
+  # committed. Without this gate a go.mod bump with no matching go.sum entry
+  # produces green image builds.
+  # --------------------------------------------------------------------------
+  go-mod-tidy:
+    name: go.mod / go.sum tidy
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-go-cached
+        with:
+          go-version-file: src/go.mod
+          go-sum-path: src/go.sum
+
+      - uses: ./.github/actions/setup-task
+        with:
+          version: 3.49.1
+
+      # build:tidy depends on gen-apis. The generated swagger packages are
+      # gitignored, and without them `go mod tidy` demotes the go-openapi
+      # direct requirements to // indirect, which would fail this gate falsely.
+      - name: Run task build:tidy
+        run: task build:tidy
+
+      - name: Check go.mod and go.sum are tidy
+        run: |
+          if ! git diff --exit-code -- src/go.mod src/go.sum; then
+            echo "::error::src/go.mod or src/go.sum is not tidy. Run 'task build:tidy' and commit the result."
+            exit 1
+          fi
