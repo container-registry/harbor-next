@@ -350,3 +350,14 @@ BEGIN
   END LOOP;
 END
 $$;
+
+-- Upstream goharbor/harbor#23773 added this index to migration 0190 in place;
+-- mirror it here so databases that already applied 0190 also get it.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_class WHERE oid = to_regclass('sbom_report') AND relkind IN ('r', 'p')) THEN
+    CREATE INDEX IF NOT EXISTS idx_sbom_report_sbom_digest
+      ON sbom_report (mime_type, ((report::jsonb ->> 'sbom_digest')));
+  END IF;
+END
+$$;
