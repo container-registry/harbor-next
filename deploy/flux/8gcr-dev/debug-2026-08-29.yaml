@@ -52,7 +52,7 @@ subjects:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: harbor-debug-20260829c
+  name: harbor-debug-20260829d
   namespace: flux-system
   labels:
     app.kubernetes.io/name: harbor-debug
@@ -89,6 +89,9 @@ spec:
               memory: 64Mi
             limits:
               memory: 128Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           command:
             - /bin/sh
             - -u
@@ -100,9 +103,15 @@ spec:
               }
               pod=$(kubectl get pods -n "$ns" -o name 2>/dev/null | grep initdb | head -1)
               if [ -n "$pod" ]; then
-                kubectl logs -n "$ns" "$pod" 2>&1 | grep -i -E 'error|fatal|syntax|permission|exception|failed' | tail -20 | send "initdb-errors"
-                kubectl logs -n "$ns" "$pod" 2>&1 | tail -c 3400 | send "initdb-tail"
+                kubectl logs -n "$ns" "$pod" 2>/dev/null > /tmp/l || true
+                grep -E '"error_severity":"(ERROR|FATAL|PANIC)"' /tmp/l | grep -o '"message":"[^"]*"' | tail -25 | send "pg-errors"
+                grep '"level":"error"' /tmp/l | tail -3 | send "mgr-errors"
+                tail -1 /tmp/l | send "last-line"
               else
-                echo "no initdb pod found" | send "initdb-errors"
+                echo "no initdb pod found" | send "pg-errors"
               fi
               echo done
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
