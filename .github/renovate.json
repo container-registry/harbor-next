@@ -8,6 +8,7 @@
   ],
   "timezone": "Etc/UTC",
   "minimumReleaseAge": "7 days",
+  "minimumReleaseAgeBehaviour": "timestamp-optional",
   "dependencyDashboard": true,
   "configMigration": true,
   "semanticCommits": "enabled",

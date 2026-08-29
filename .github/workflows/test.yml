@@ -200,7 +200,7 @@ jobs:
 
       - name: Check go.mod and go.sum are tidy
         run: |
-          if ! git diff --exit-code src/go.mod src/go.sum; then
+          if ! git diff --exit-code -- src/go.mod src/go.sum; then
             echo "::error::src/go.mod or src/go.sum is not tidy. Run 'task build:tidy' and commit the result."
             exit 1
           fi
