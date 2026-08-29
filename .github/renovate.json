@@ -139,7 +139,7 @@
       "customType": "regex",
       "description": "Update versions.env Taskfile pins annotated with Renovate metadata",
       "managerFilePatterns": [
-        "//(^|/)versions\\.env$//"
+        "/(^|/)versions\\.env$/"
       ],
       "matchStrings": [
         "#\\s*renovate:\\s+datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(?:\\s+versioning=(?<versioning>\\S+))?(?:\\s+extractVersion=(?<extractVersion>\\S+))?\\s*\\n[A-Z_]+=(?<currentValue>\\S+)"
