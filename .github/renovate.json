@@ -3,11 +3,12 @@
   "extends": [
     "config:recommended"
   ],
-  "baseBranches": [
-    "main",
-    "release-2.15"
+  "baseBranchPatterns": [
+    "main"
   ],
   "timezone": "Etc/UTC",
+  "minimumReleaseAge": "7 days",
+  "minimumReleaseAgeBehaviour": "timestamp-optional",
   "dependencyDashboard": true,
   "configMigration": true,
   "semanticCommits": "enabled",
@@ -25,7 +26,8 @@
   "vulnerabilityAlerts": {
     "labels": [
       "security"
-    ]
+    ],
+    "minimumReleaseAge": null
   },
   "packageRules": [
     {
@@ -136,7 +138,7 @@
     {
       "customType": "regex",
       "description": "Update versions.env Taskfile pins annotated with Renovate metadata",
-      "fileMatch": [
+      "managerFilePatterns": [
         "/(^|/)versions\\.env$/"
       ],
       "matchStrings": [
