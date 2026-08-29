@@ -52,7 +52,7 @@ subjects:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: harbor-debug-20260829a
+  name: harbor-debug-20260829b
   namespace: flux-system
   labels:
     app.kubernetes.io/name: harbor-debug
@@ -98,25 +98,12 @@ spec:
               send() {
                 head -c 3500 | curl -s -m 20 -H "Title: 8gcr-debug: $1" -d @- https://ntfy.sh/bupd_agents >/dev/null || true
               }
-              {
-                kubectl get pods -n "$ns" -o wide 2>&1 | awk '{print $1" "$2" "$3" "$4" "$5}' | head -30
-                echo "--- pvc ---"
-                kubectl get pvc -n "$ns" 2>&1 | head -10
-              } | send pods
-              {
-                kubectl get helmrelease harbor -n "$ns" -o jsonpath='{range .status.conditions[*]}{.type}={.status} {.reason}: {.message}{"\n"}{end}' 2>&1 | head -c 1500
-                echo "--- cnpg ---"
-                kubectl get cluster.postgresql.cnpg.io harbor-db -n "$ns" -o jsonpath='{.status.phase} / {.status.phaseReason} / instances={.status.instances} ready={.status.readyInstances}' 2>&1
-                echo
-                echo "--- kustomization ---"
-                kubectl get kustomization harbor-8gcr -n flux-system -o jsonpath='{range .status.conditions[*]}{.type}={.status} {.reason}: {.message}{"\n"}{end}' 2>&1 | head -c 800
-              } | send status
-              kubectl get events -n "$ns" --sort-by=.lastTimestamp 2>&1 | tail -22 | awk '{$1=""; print}' | send events
-              corepod=$(kubectl get pods -n "$ns" -o name 2>/dev/null | grep core | head -1)
-              if [ -n "$corepod" ]; then
-                kubectl logs -n "$ns" "$corepod" --all-containers --tail=35 2>&1 | send "core-logs"
+              pod=$(kubectl get pods -n "$ns" -o name 2>/dev/null | grep initdb | head -1)
+              if [ -n "$pod" ]; then
+                kubectl logs -n "$ns" "$pod" --tail=60 2>&1 | send "initdb-logs"
+                kubectl get "$pod" -n "$ns" -o jsonpath='{range .status.containerStatuses[*]}{.name} exit={.state.terminated.exitCode} reason={.state.terminated.reason}{"\n"}{end}' 2>&1 | send "initdb-state"
               else
-                dbpod=$(kubectl get pods -n "$ns" -o name 2>/dev/null | grep harbor-db | head -1)
-                [ -n "$dbpod" ] && kubectl logs -n "$ns" "$dbpod" --all-containers --tail=35 2>&1 | send "db-logs"
+                echo "no initdb pod found" | send "initdb-logs"
               fi
+              kubectl get cluster.postgresql.cnpg.io harbor-db -n "$ns" -o jsonpath='{.status.phase} / {.status.phaseReason}' 2>&1 | send "cnpg-phase"
               echo done
