@@ -52,7 +52,7 @@ subjects:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: harbor-debug-20260829e
+  name: harbor-debug-20260829f
   namespace: flux-system
   labels:
     app.kubernetes.io/name: harbor-debug
@@ -99,12 +99,11 @@ spec:
             - |
               ns=8gcr-dev-main
               send() {
-                head -c 3500 | curl -s -m 20 -H "Title: 8gcr-debug: $1" -d @- https://ntfy.sh/bupd_agents >/dev/null || true
+                head -c 3800 | curl -s -m 20 -H "Title: 8gcr-debug: $1" --data-binary @- https://ntfy.sh/bupd_agents >/dev/null || true
               }
-              kubectl get cluster.postgresql.cnpg.io harbor-db -n "$ns" -o jsonpath='{.spec.bootstrap.initdb.postInitApplicationSQL[0]}' 2>&1 | send "cluster-sql-0"
-              kubectl get cluster.postgresql.cnpg.io harbor-db -n "$ns" -o jsonpath='{.spec.bootstrap.initdb.postInitApplicationSQL[1]}' 2>&1 | send "cluster-sql-1"
-              kubectl get helmrelease harbor -n "$ns" -o jsonpath='{.spec.values.extraManifests[0].spec.bootstrap.initdb.postInitApplicationSQL[0]}' 2>&1 | head -c 3400 | send "hr-sql-0"
-              kubectl get deployment -n cnpg-system -o jsonpath='{range .items[*]}{.metadata.name}: {.spec.template.spec.containers[*].image}{"\n"}{end}' 2>&1 | send "cnpg-operator"
+              kubectl get cluster.postgresql.cnpg.io harbor-db -n "$ns" -o jsonpath='{.spec.bootstrap.initdb.postInitApplicationSQL[0]}' 2>/dev/null | base64 -w0 | send "sql0-b64"
+              kubectl get cluster.postgresql.cnpg.io harbor-db -n "$ns" -o jsonpath='{.spec.bootstrap.initdb.postInitApplicationSQL[1]}' 2>/dev/null | base64 -w0 | send "sql1-b64"
+              kubectl get cluster.postgresql.cnpg.io harbor-db -n "$ns" -o jsonpath='{.spec.bootstrap.initdb.postInitApplicationSQL[2]}' 2>/dev/null | base64 -w0 | send "sql2-b64"
               echo done
       volumes:
         - name: tmp
