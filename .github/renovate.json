@@ -31,6 +31,16 @@
   },
   "packageRules": [
     {
+      "description": "gorilla/csrf 1.7.3 tightens Referer validation and breaks logins over plain HTTP (goharbor/harbor#22010). Upstream shipped it in 2.12.3 and reverted to 1.7.2 in 2.13.0; src/go.mod carries the pin. Hold the pin until the deployment story for HTTP-only installs is settled.",
+      "matchDatasources": [
+        "go"
+      ],
+      "matchPackageNames": [
+        "github.com/gorilla/csrf"
+      ],
+      "allowedVersions": "<=1.7.2"
+    },
+    {
       "description": "Update Go dependencies daily for non-major releases",
       "matchManagers": [
         "gomod"
