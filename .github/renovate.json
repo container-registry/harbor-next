@@ -4,10 +4,10 @@
     "config:recommended"
   ],
   "baseBranchPatterns": [
-    "main",
-    "release-2.15"
+    "main"
   ],
   "timezone": "Etc/UTC",
+  "minimumReleaseAge": "7 days",
   "dependencyDashboard": true,
   "configMigration": true,
   "semanticCommits": "enabled",
@@ -25,7 +25,8 @@
   "vulnerabilityAlerts": {
     "labels": [
       "security"
-    ]
+    ],
+    "minimumReleaseAge": null
   },
   "packageRules": [
     {
