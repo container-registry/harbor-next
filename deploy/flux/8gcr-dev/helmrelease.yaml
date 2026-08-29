@@ -226,26 +226,33 @@ spec:
               # fenced to the real `admin` account by the ingress server-snippet
               # above. Scope is this tenant's CNPG cluster only — NOT baked into
               # the shared 8gcr/harbor-core image, which other tenants also pull.
+              # Written without dollar quoting: the nested $$/$body$ variant
+              # died at first real initdb with `syntax error at or near "$"`
+              # (2026-08-29 factory reset; the original cluster predated this
+              # SQL, so the initdb path had never run). Single-quoted plpgsql
+              # bodies with doubled inner quotes survive every layer verbatim.
               postInitApplicationSQL:
                 - |
-                  CREATE OR REPLACE FUNCTION demo_install_promote_admin() RETURNS event_trigger
-                  LANGUAGE plpgsql AS $$
+                  CREATE OR REPLACE FUNCTION public.demo_promote_new_user_to_admin() RETURNS trigger
+                  LANGUAGE plpgsql AS '
                   BEGIN
-                    IF to_regclass('public.harbor_user') IS NOT NULL
-                       AND NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_demo_promote_new_user_to_admin') THEN
-                      CREATE OR REPLACE FUNCTION demo_promote_new_user_to_admin() RETURNS trigger
-                      LANGUAGE plpgsql AS $body$
-                      BEGIN
-                        IF NEW.username IS DISTINCT FROM 'anonymous' THEN
-                          NEW.sysadmin_flag := true;
-                        END IF;
-                        RETURN NEW;
-                      END;
-                      $body$;
-                      EXECUTE 'CREATE TRIGGER trg_demo_promote_new_user_to_admin BEFORE INSERT ON harbor_user FOR EACH ROW EXECUTE FUNCTION demo_promote_new_user_to_admin()';
+                    IF NEW.username IS DISTINCT FROM ''anonymous'' THEN
+                      NEW.sysadmin_flag := true;
+                    END IF;
+                    RETURN NEW;
+                  END;
+                  ';
+                - |
+                  CREATE OR REPLACE FUNCTION public.demo_install_promote_admin() RETURNS event_trigger
+                  LANGUAGE plpgsql AS '
+                  BEGIN
+                    IF to_regclass(''public.harbor_user'') IS NOT NULL
+                       AND NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = ''trg_demo_promote_new_user_to_admin'') THEN
+                      CREATE TRIGGER trg_demo_promote_new_user_to_admin BEFORE INSERT ON harbor_user
+                        FOR EACH ROW EXECUTE FUNCTION public.demo_promote_new_user_to_admin();
                     END IF;
                   END;
-                  $$;
+                  ';
                 - |
                   CREATE EVENT TRIGGER demo_install_promote_admin_evt
                     ON ddl_command_end WHEN TAG IN ('CREATE TABLE')
