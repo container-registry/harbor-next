@@ -41,7 +41,7 @@ env:
 jobs:
   build:
     name: "${{ matrix.component }} (${{ matrix.platform }})"
-    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && !contains(fromJSON('["8gcr-renovate[bot]", "8gcr-sync[bot]"]'), github.actor) }}
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && !contains(fromJSON('["8gcr-renovate[bot]", "renovate[bot]", "8gcr-sync[bot]"]'), github.actor) }}
     strategy:
       fail-fast: false
       matrix:
@@ -157,7 +157,7 @@ jobs:
 
   merge:
     name: "Merge ${{ matrix.component }}"
-    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && !contains(fromJSON('["8gcr-renovate[bot]", "8gcr-sync[bot]"]'), github.actor) }}
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && !contains(fromJSON('["8gcr-renovate[bot]", "renovate[bot]", "8gcr-sync[bot]"]'), github.actor) }}
     needs: [build]
     strategy:
       fail-fast: false
@@ -210,7 +210,7 @@ jobs:
 
   sign:
     name: Sign preview images
-    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && !contains(fromJSON('["8gcr-renovate[bot]", "8gcr-sync[bot]"]'), github.actor) }}
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && !contains(fromJSON('["8gcr-renovate[bot]", "renovate[bot]", "8gcr-sync[bot]"]'), github.actor) }}
     needs: [merge]
     runs-on: ubuntu-26.04
     permissions:
@@ -267,7 +267,7 @@ jobs:
 
   pr-comment:
     name: Comment preview image refs
-    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && !contains(fromJSON('["8gcr-renovate[bot]", "8gcr-sync[bot]"]'), github.actor) }}
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && !contains(fromJSON('["8gcr-renovate[bot]", "renovate[bot]", "8gcr-sync[bot]"]'), github.actor) }}
     needs: [sign]
     runs-on: ubuntu-26.04
     permissions:
