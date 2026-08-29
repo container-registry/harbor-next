@@ -18,21 +18,27 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 60
     steps:
+      # Dedicated Renovate app, not 8gcr-sync: the sync app declares only
+      # actions/checks/statuses read + contents/pull-requests write, so the
+      # downscope below can never be satisfied by it. The app installed for
+      # this workflow must grant every permission requested here, or the
+      # mint fails with 422 "permissions requested are not granted".
       - name: Generate GitHub App token
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          app-id: ${{ vars.SYNC_APP_ID }}
-          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+          client-id: ${{ vars.RENOVATE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RENOVATE_APP_PRIVATE_KEY }}
           owner: container-registry
           repositories: harbor-next
           permission-contents: write
           permission-pull-requests: write
-          permission-issues: write
+          permission-issues: write # dependencyDashboard
           permission-statuses: write
           permission-checks: read
-          permission-workflows: write
-          permission-vulnerability-alerts: read
+          permission-administration: read # GET /branches/{b}/protection
+          permission-workflows: write # github-actions manager edits .github/workflows/
+          permission-vulnerability-alerts: read # GET /dependabot/alerts
 
       - name: Run Renovate
         uses: renovatebot/github-action@5402b206248e5a8c8427a15102702eb9c1793efc # v46.2.4
