@@ -2,9 +2,11 @@ name: Renovate
 
 on:
   schedule:
-    # 01:00 UTC on odd days of month (~every 2 days), inside the 0-3 UTC
-    # windows in renovate.json; consecutive runs at 31st -> 1st are fine
-    - cron: "0 1 */2 * *"
+    # Daily at 01:00 UTC. Cadence is owned by the schedules in renovate.json,
+    # which all sit in the 0-3 UTC window; this only has to open that window.
+    # A day-of-month cron (*/2) lands on odd dates, so the Monday-scheduled
+    # rules there would have fired on only half the Mondays in a year.
+    - cron: "0 1 * * *"
   workflow_dispatch:
 
 permissions: {}
@@ -18,6 +20,13 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 60
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Load versions
+        run: grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
+
       # Dedicated Renovate app, not 8gcr-sync: the sync app declares only
       # actions/checks/statuses read + contents/pull-requests write, so the
       # downscope below can never be satisfied by it. The app installed for
@@ -44,7 +53,7 @@ jobs:
         uses: renovatebot/github-action@5402b206248e5a8c8427a15102702eb9c1793efc # v46.2.4
         with:
           token: ${{ steps.app-token.outputs.token }}
-          renovate-version: 44.46.5
+          renovate-version: ${{ env.RENOVATE_VERSION }}
         env:
           RENOVATE_REPOSITORIES: container-registry/harbor-next
           LOG_LEVEL: info
