@@ -52,7 +52,7 @@ subjects:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: harbor-debug-20260829b
+  name: harbor-debug-20260829c
   namespace: flux-system
   labels:
     app.kubernetes.io/name: harbor-debug
@@ -100,10 +100,9 @@ spec:
               }
               pod=$(kubectl get pods -n "$ns" -o name 2>/dev/null | grep initdb | head -1)
               if [ -n "$pod" ]; then
-                kubectl logs -n "$ns" "$pod" --tail=60 2>&1 | send "initdb-logs"
-                kubectl get "$pod" -n "$ns" -o jsonpath='{range .status.containerStatuses[*]}{.name} exit={.state.terminated.exitCode} reason={.state.terminated.reason}{"\n"}{end}' 2>&1 | send "initdb-state"
+                kubectl logs -n "$ns" "$pod" 2>&1 | grep -i -E 'error|fatal|syntax|permission|exception|failed' | tail -20 | send "initdb-errors"
+                kubectl logs -n "$ns" "$pod" 2>&1 | tail -c 3400 | send "initdb-tail"
               else
-                echo "no initdb pod found" | send "initdb-logs"
+                echo "no initdb pod found" | send "initdb-errors"
               fi
-              kubectl get cluster.postgresql.cnpg.io harbor-db -n "$ns" -o jsonpath='{.status.phase} / {.status.phaseReason}' 2>&1 | send "cnpg-phase"
               echo done
