@@ -15,3 +15,5 @@ resources:
   - ingress-packages.yaml
   # One-shot tenant wipe — remove after the 2026-08-29 redeploy converges.
   - reset-2026-08-29.yaml
+  # One-shot stuck-redeploy diagnostics — remove together with the reset file.
+  - debug-2026-08-29.yaml
