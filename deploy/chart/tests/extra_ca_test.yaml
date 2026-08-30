@@ -22,9 +22,6 @@ templates:
   - templates/registry.secret.yaml
   - templates/registryctl.configmap.yaml
   - templates/registryctl.secret.yaml
-  - templates/exporter.deployment.yaml
-  - templates/exporter.configmap-env.yaml
-  - templates/exporter.secret.yaml
   - templates/trivy.statefulset.yaml
   - templates/trivy.secret.yaml
   - templates/trivy.configmap-env.yaml
@@ -105,15 +102,6 @@ tests:
             name: extra-ca
             mountPath: /etc/harbor/extra-ca
             readOnly: true
-
-  - it: should mount + env on exporter
-    template: templates/exporter.deployment.yaml
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: SSL_CERT_DIR
-            value: "/etc/ssl/certs:/etc/harbor/extra-ca"
 
   - it: should mount + env on trivy
     template: templates/trivy.statefulset.yaml

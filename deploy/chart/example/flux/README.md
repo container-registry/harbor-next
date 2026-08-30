@@ -35,7 +35,7 @@ enforces this — `task helm:gitops-determinism`).
 | `registry.existingSecret` | `harbor-registry-identity` (`REGISTRY_HTTP_SECRET`) | registry |
 | `registry.credentials.existingSecret` | `harbor-registry-credentials` (`REGISTRY_CREDENTIAL_PASSWORD` + `REGISTRY_HTPASSWD`) | core/jobservice ↔ registry |
 | `jobservice.existingSecret` | `harbor-jobservice-identity` (`JOBSERVICE_SECRET`) | jobservice |
-| `database.existingSecret` | `harbor-database` (`POSTGRESQL_PASSWORD`) | core/jobservice/exporter |
+| `database.existingSecret` | `harbor-database` (`POSTGRESQL_PASSWORD`) | core/jobservice |
 | `ingress.autoGenCert: false` + `ingress.tls` | `harbor-tls` (cert-manager) | ingress |
 
 ## Usage

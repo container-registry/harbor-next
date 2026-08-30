@@ -107,12 +107,12 @@ Built-in `values.schema.json` provides:
    │   "(UI)"    │       │   "(API)"   │       │  "(Images)" │
    └─────────────┘       └──────┬──────┘       └──────┬──────┘
                                 │                     │
-                       ┌────────┴────────┐            │
-                       ▼                 ▼            │
-                ┌─────────────┐   ┌─────────────┐     │
-                │ Jobservice  │   │  Exporter   │     │
-                │  "(Tasks)"  │   │ "(Metrics)" │     │
-                └──────┬──────┘   └─────────────┘     │
+                       ┌────────┘                     │
+                       ▼                              │
+                ┌─────────────┐                       │
+                │ Jobservice  │                       │
+                │  "(Tasks)"  │                       │
+                └──────┬──────┘                       │
                        │                              │
           ┌────────────┴────────────┬─────────────────┘
           ▼                         ▼
@@ -193,7 +193,7 @@ path and wins over `image.source`. See
 
 ### Component Configuration
 
-Each Harbor component (core, portal, registry, jobservice, exporter) supports:
+Each Harbor component (core, portal, registry, jobservice) supports:
 
 | Key | Description |
 |-----|-------------|
@@ -223,7 +223,6 @@ Each Harbor component (core, portal, registry, jobservice, exporter) supports:
 | Registry | 100m | 256Mi | 512Mi |
 | Portal | 100m | 128Mi | 256Mi |
 | Jobservice | 100m | 256Mi | 512Mi |
-| Exporter | 100m | 128Mi | 256Mi |
 
 ## Example Values Files
 
@@ -587,7 +586,6 @@ Expected keys in `existingTlsSecret` follow cert-manager convention:
 | `tls.key` | When `clientCertEnabled: true` |
 
 **Caveats:**
-- **Exporter** does not yet plumb `POSTGRESQL_URL` through its viper config, so its DB connection ignores the URL env. Works fine for `sslmode=verify-ca` with a publicly-trusted CA; for mTLS the exporter will fail until a backend-side patch lands.
 - **Schema migrations** use Harbor's `NewMigrator`, which builds its own DSN from individual fields and ignores `cfg.URL`. Servers that **require** client certificates will reject the migrator. Use `sslmode=verify-ca` (CA-only verification) or coordinate the initial migration via an external trusted client until the migrator honors `URL`.
 
 A combined example covering DB TLS + private Redis CA + cert-manager-managed ingress lives at [`example/private-ca/`](example/private-ca/).
@@ -777,9 +775,9 @@ Kubernetes: `>=1.28.0-0`
 | database.database | string | `"registry"` | Database name |
 | database.existingSecret | string | `""` | Existing secret containing database credentials Default secret key: POSTGRESQL_PASSWORD |
 | database.existingSecretKey | string | `""` |  |
-| database.existingTlsSecret | string | `""` | Secret holding the PEM-encoded CA bundle (and optionally client cert + key) for verifying / authenticating to PostgreSQL. Required for `verify-ca` / `verify-full` sslmode against managed PG with a private CA (RDS-with-custom-CA, GCP CloudSQL, on-prem with internal PKI). Tracks upstream goharbor/harbor-helm#1859.  Expected keys (cert-manager convention):   ca.crt   — CA bundle (always required when this Secret is set)   tls.crt  — client cert (only when clientCertEnabled=true)   tls.key  — client key  (only when clientCertEnabled=true)  When set, the chart mounts the Secret at /etc/harbor/db-tls and injects POSTGRESQL_URL env on core + jobservice. The runtime DB pool honors that env over the individual fields.  Caveats:   - Exporter does not yet plumb POSTGRESQL_URL into its viper config,     so its DB connection ignores client certs (it'll work fine for     sslmode=verify-ca with a publicly-trusted CA).   - Harbor's migration tool (NewMigrator) does not honor cfg.URL     either, so schema migrations against a server that REQUIRES     mTLS will fail. Use sslmode=verify-ca or migrate via an external     trusted client until that's fixed upstream. |
+| database.existingTlsSecret | string | `""` | Secret holding the PEM-encoded CA bundle (and optionally client cert + key) for verifying / authenticating to PostgreSQL. Required for `verify-ca` / `verify-full` sslmode against managed PG with a private CA (RDS-with-custom-CA, GCP CloudSQL, on-prem with internal PKI). Tracks upstream goharbor/harbor-helm#1859.  Expected keys (cert-manager convention):   ca.crt   — CA bundle (always required when this Secret is set)   tls.crt  — client cert (only when clientCertEnabled=true)   tls.key  — client key  (only when clientCertEnabled=true)  When set, the chart mounts the Secret at /etc/harbor/db-tls and injects POSTGRESQL_URL env on core + jobservice. The runtime DB pool honors that env over the individual fields.  Caveats:   - Harbor's migration tool (NewMigrator) does not honor cfg.URL     either, so schema migrations against a server that REQUIRES     mTLS will fail. Use sslmode=verify-ca or migrate via an external     trusted client until that's fixed upstream. |
 | database.host | string | `""` | Database host (required) |
-| database.maxOpenConns | int | `100` | Hard cap on open connections per pool (POSTGRESQL_MAX_OPEN_CONNS). Core, jobservice (via core's config), and the exporter each open their own pool, so the per-release total is roughly this times the number of pooled components. Lower it on small/shared PostgreSQL. |
+| database.maxOpenConns | int | `100` | Hard cap on open connections per pool (POSTGRESQL_MAX_OPEN_CONNS). Core and jobservice (via core's config) each open their own pool, so the per-release total is roughly this times the number of pooled components. Lower it on small/shared PostgreSQL. |
 | database.minConns | int | `2` | Minimum idle connections kept warm per pool (POSTGRESQL_MIN_CONNS). pgxpool floor; replaces the removed maxIdleConns.  `0` is valid and meaningful — it is pgxpool's own default: no warm floor, connections opened on demand and left to age out via connMaxIdleTime, so an idle release drains to zero connections. The trade is that the first query after an idle gap pays TCP + TLS + auth + backend fork. Worth it when many releases share one PostgreSQL server, where the floor is multiplied by pools times tenants. `null` falls back to 2. |
 | database.password | string | `""` | Database password (ignored if existingSecret is set) |
 | database.port | int | `5432` | Database port |
@@ -789,35 +787,6 @@ Kubernetes: `>=1.28.0-0`
 | existingSecretAdminPasswordKey | string | `"HARBOR_ADMIN_PASSWORD"` | Key in the existing secret for admin password |
 | existingSecretSecretKey | string | `""` | Existing secret containing the encryption key (overrides secretKey). The secret must hold the 16-char key under `SECRET_KEY` and `secretKey` (or override the key name via `existingSecretSecretKeyKey`). |
 | existingSecretSecretKeyKey | string | `"secretKey"` | Key in `existingSecretSecretKey` that holds the encryption key. Used both for the `SECRET_KEY` env on core and the `secret-key` volume mount (which Harbor reads as `/etc/core/key`). |
-| exporter.affinity | object | `{}` | Affinity rules for Exporter pods |
-| exporter.annotations | object | `{}` | Annotations for the Exporter workload object (Deployment) |
-| exporter.config | object | {} | Exporter config as env vars. Nested maps flatten to UPPER_SNAKE_CASE via toEnvVars and are injected via envFrom. Any exporter setting works without chart changes.  Keys are used verbatim — the chart adds no prefix. The exporter reads env through viper with the `harbor` prefix, so keys must carry `HARBOR_` themselves (`HARBOR_EXPORTER_CACHE_TIME`, not `CACHE_TIME`). The nested form flattens to the same thing.  A key set here wins over the chart's own env entry for that name, including the database pool knobs — that is how the exporter gets a different POSTGRESQL_MIN_CONNS from core. |
-| exporter.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
-| exporter.enabled | bool | `true` | Enable Harbor exporter for Prometheus metrics |
-| exporter.extraEnv | list | [] | Extra environment variables with valueFrom support |
-| exporter.hostAliases | list | [] | Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for private DNS that does not exist in cluster DNS — service-mesh sidecars, legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the Kubernetes PodSpec: a list of `{ip, hostnames}` entries. |
-| exporter.image | object | `{"digest":"","registry":"","repository":"","tag":""}` | Exporter image settings |
-| exporter.image.digest | string | `""` | Pin by digest (sha256:...); used instead of tag when set |
-| exporter.image.registry | string | `""` | Registry host override; empty uses `image.source` (`global.imageRegistry` wins over both) |
-| exporter.image.repository | string | `""` | Repository override (path WITHOUT registry host); empty uses `image.source` |
-| exporter.image.tag | string | `""` | Exporter image tag (defaults to appVersion) |
-| exporter.initContainers | list | `[]` | Init containers (run before main containers) |
-| exporter.lifecycle | object | {} | Container `lifecycle` hook spec (preStop / postStart). Common use: preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`, `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all closed without merge, the gap was never closed there. |
-| exporter.nodeSelector | object | `{}` | Node selector for Exporter pods |
-| exporter.pdb | object | `{"enabled":false}` | PodDisruptionBudget for Exporter |
-| exporter.pdb.enabled | bool | `false` | Enable PodDisruptionBudget. When true, exactly one of `minAvailable` or `maxUnavailable` must be set (Kubernetes rejects PDBs with both fields). |
-| exporter.podAnnotations | object | `{}` | Additional pod annotations for Exporter |
-| exporter.podLabels | object | `{}` | Additional pod labels for Exporter |
-| exporter.podSecurityContext | object | `{"fsGroup":10000}` | Pod security context for Exporter |
-| exporter.probes | object | See [values.yaml](values.yaml) | Container probes, rendered verbatim. See `core.probes` for the tuning rationale. |
-| exporter.replicas | int | `1` | Number of Exporter replicas |
-| exporter.resources | object | `{"limits":{"memory":"256Mi"},"requests":{"cpu":"100m","memory":"128Mi"}}` | Exporter resource requests and limits |
-| exporter.secret | object | {} | Sensitive config for Exporter (converted to env vars in Secret) |
-| exporter.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsGroup":10000,"runAsNonRoot":true,"runAsUser":10000,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for Exporter container |
-| exporter.serviceAccount | object | `{"annotations":{},"automountServiceAccountToken":false,"create":true,"name":""}` | Service account settings for Exporter |
-| exporter.serviceAccount.automountServiceAccountToken | bool | `false` | Automount service account token |
-| exporter.tolerations | list | `[]` | Tolerations for Exporter pods |
-| exporter.topologySpreadConstraints | list | `[]` | Topology spread constraints for pod scheduling |
 | expose | object | `{"clusterIP":{"annotations":{},"enabled":false,"labels":{},"name":"","ports":{"http":80,"https":443},"staticClusterIP":""},"loadBalancer":{"IP":"","annotations":{},"enabled":false,"labels":{},"name":"","ports":{"http":80,"https":443},"sourceRanges":[]},"nodePort":{"annotations":{},"enabled":false,"labels":{},"name":"","ports":{"http":{"nodePort":30002,"port":80},"https":{"nodePort":30003,"port":443}}},"route":{"annotations":{},"enabled":false,"host":"","labels":{},"tls":{"insecureEdgeTerminationPolicy":"Redirect","termination":"edge"}}}` | Direct service exposure (ClusterIP / NodePort / LoadBalancer) Creates a front-door service pointing to core (which proxies portal requests). Internal per-component services are always created regardless of this setting. |
 | expose.clusterIP | object | `{"annotations":{},"enabled":false,"labels":{},"name":"","ports":{"http":80,"https":443},"staticClusterIP":""}` | ClusterIP service for direct exposure |
 | expose.clusterIP.annotations | object | `{}` | Service annotations |
@@ -936,7 +905,8 @@ Kubernetes: `>=1.28.0-0`
 | jobservice.tolerations | list | `[]` | Tolerations for Jobservice pods |
 | jobservice.topologySpreadConstraints | list | `[]` | Topology spread constraints for pod scheduling |
 | logLevel | string | `"info"` | Log level for all components (debug, info, warning, error, fatal) |
-| metrics.enabled | bool | `false` | Enable metrics endpoints on all components |
+| metrics.enabled | bool | `false` | Enable metrics endpoints on all components. Core additionally runs the Harbor exporter collectors in-process (`METRIC_EXPORTER_ENABLE`) and serves the `harbor_*` business metrics from its own metrics endpoint — there is no separate exporter Deployment. |
+| metrics.exporterCacheTime | int | `30` | Seconds core caches the exporter collector results between scrapes (`METRIC_EXPORTER_CACHE_TIME`) |
 | metrics.serviceMonitor | object | `{"enabled":false,"honorLabels":true,"interval":"30s","labels":{},"namespace":"","scrapeTimeout":"10s"}` | Enable Prometheus ServiceMonitor |
 | metrics.serviceMonitor.enabled | bool | `false` | Create ServiceMonitor resource |
 | metrics.serviceMonitor.honorLabels | bool | `true` | Honor labels |
@@ -949,7 +919,7 @@ Kubernetes: `>=1.28.0-0`
 | portal.annotations | object | `{}` | Annotations for the Portal workload object (Deployment) |
 | portal.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler. See `core.autoscaling` for full docs. |
 | portal.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
-| portal.enabled | bool | `true` | Deploy the portal (Harbor UI). Set `false` for API-only installs — core serves the API, and the Ingress / Gateway route `/` to core instead of the portal. Mirrors `trivy.enabled` / `exporter.enabled`. |
+| portal.enabled | bool | `true` | Deploy the portal (Harbor UI). Set `false` for API-only installs — core serves the API, and the Ingress / Gateway route `/` to core instead of the portal. Mirrors `trivy.enabled`. |
 | portal.existingConfigMap | string | `""` | Use an externally-managed ConfigMap containing `nginx.conf` instead of the chart-generated one. When set, the chart skips ConfigMap generation and the Deployment mounts the named ConfigMap. Use for custom nginx configuration (TLS termination, custom headers, extra locations) without forking the chart. Semantics match `registry.existingConfigMap`. Portal serves static Angular assets via nginx and has no env/key config surface — to customize nginx.conf, point existingConfigMap at your own ConfigMap (there is no `config`/`secret` passthrough here). |
 | portal.extraEnv | list | [] | Extra environment variables with valueFrom support |
 | portal.hostAliases | list | [] | Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for private DNS that does not exist in cluster DNS — service-mesh sidecars, legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the Kubernetes PodSpec: a list of `{ip, hostnames}` entries. |

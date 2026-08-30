@@ -353,9 +353,8 @@ const (
 )
 
 // registerExporterCollectors runs the Harbor exporter collectors in-process and
-// exposes them on core's metrics endpoint, so a separate harbor-exporter
-// container is not required. The collectors read the database and the health
-// checkers, so this must run after both are ready.
+// exposes them on core's metrics endpoint. The collectors read the database and
+// the health checkers, so this must run after both are ready.
 func registerExporterCollectors(cfg *models.Metric) {
 	opt := &exporter.Opt{CacheDuration: cfg.ExporterCacheTime}
 	// prometheus.Register rather than MustRegister: a duplicate registration

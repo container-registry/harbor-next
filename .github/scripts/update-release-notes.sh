@@ -42,7 +42,7 @@ registry_project="${REGISTRY_PROJECT:-8gcr}"
 registry="${registry_address}/${registry_project}"
 dry_run="${RELEASE_NOTES_DRY_RUN:-false}"
 release_notes_output="${RELEASE_NOTES_OUTPUT:-}"
-images=(core jobservice registryctl exporter portal registry trivy-adapter)
+images=(core jobservice registryctl portal registry trivy-adapter)
 
 # The Helm chart releases on its own release-please line, so its version is
 # unrelated to TAG_NAME. Read whatever chart version is committed at the app

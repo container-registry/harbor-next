@@ -31,7 +31,6 @@ tasks:
       - core
       - jobservice
       - registryctl
-      - exporter
       - portal
       - registry
       - trivy-adapter
@@ -141,7 +140,7 @@ tasks:
         msg: "jq is required to verify pushed image manifests"
     cmds:
       - |
-        images="harbor-core harbor-jobservice harbor-registryctl harbor-exporter harbor-portal harbor-registry trivy-adapter"
+        images="harbor-core harbor-jobservice harbor-registryctl harbor-portal harbor-registry trivy-adapter"
         if [ -f dockerfile/grype-scanner.dockerfile ]; then
           images="${images} harbor-grype-adapter"
         fi
@@ -208,14 +207,6 @@ tasks:
       - task: _binary-image
         vars:
           SERVICE: registryctl
-
-  exporter:
-    desc: "Build Exporter image (compiles binary, then builds container)"
-    cmds:
-      - task: _binary-image
-        vars:
-          SERVICE: exporter
-          BUILD_ARGS: '--build-arg harbor_version={{.VERSION}} --build-arg git_commit={{.GIT_COMMIT}}'
 
   # --- Standalone Images ---
 

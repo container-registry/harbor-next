@@ -377,7 +377,6 @@ swap — keep it in sync with goharbor/harbor-helm on appVersion bumps.
     registryctl: 8gcr/harbor-registryctl
     portal: 8gcr/harbor-portal
     trivy: 8gcr/trivy-adapter
-    exporter: 8gcr/harbor-exporter
 upstream:
   registry: docker.io
   repos:
@@ -387,7 +386,6 @@ upstream:
     registryctl: goharbor/harbor-registryctl
     portal: goharbor/harbor-portal
     trivy: goharbor/trivy-adapter-photon
-    exporter: goharbor/harbor-exporter
 {{- end -}}
 
 {{/*

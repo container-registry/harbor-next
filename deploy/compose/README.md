@@ -106,10 +106,10 @@ Portal (nginx) serves the Angular UI and reverse-proxies `/v2/`, `/api/`, `/serv
                                           │   "(volume)"   │
                                           └────────────────┘
 
-          ┌───────────────┐   ┌───────────────┐
-          │    "Trivy"    │   │  "Exporter"   │
-          │   "Adapter"   │   │               │
-          └───────────────┘   └───────────────┘
+          ┌───────────────┐
+          │    "Trivy"    │
+          │   "Adapter"   │
+          └───────────────┘
 
           ┌───────────────┐   ┌───────────────┐
           │ "PostgreSQL"  │   │    "Redis"    │
@@ -117,7 +117,7 @@ Portal (nginx) serves the Angular UI and reverse-proxies `/v2/`, `/api/`, `/serv
           └───────────────┘   └───────────────┘
 ```
 -->
-![Diagram](https://kroki.io/svgbob/svg/eNpTUMAFlKxMTIwVNDxCQgKCNRUU9BUUrCwMIHxNJS4FosCjKU3Eqpy2h4uQWT2PpjSQiCYQNLQJ7NeA_KKSxBwl4twM06SRl56ZV6GpRKSmKTjcuAa382cMs3BWUHLOL0pVUiAtnIHpzsKAeE1TcAcsLhFs4UxiOMxA8Sfu2CY6-IAxhSMCCccr6XE4gY660DwMCjMlr_yk4NSissxkUOqAhCKYVApKTc8sLimqVFJAFocLO5fkKKEnC0S6AQIlBRSNYHFTAwMDbOK40hmJsQlNDaTn-Bm0LyeI8cgaCm0hr2QirZSieYmF5gmlImiC001JLElUItFfkBSmpFGWn1Oam0pkjUF6xGHE10AUCVgyYkhRZlkleoZTcq0oANa6qUVKCtgzsJJjSmIBQh6pdMWVvKidTwd1wALbLMUl6UWpwYE-SuglWVBqSmaxkoICzpLR1MTYCFsJaGZsbqk0gAELAEZlQZE=)
+![Diagram](https://kroki.io/svgbob/svg/eNrdVU1Og0AU3nOKl7eChZEIau3OdGOMCyxcAGVCSLBjhpHYnenaRRfEcIgewdP0JPJTqx2ZMGNFEyeEhBfeMN_P-wCQLRy7rgPmRRB4vgVwCDAe2e2zhQYorXWxUH3z5dXo2-t5XTxpXsveTRcNVo8yHqaodub3JnMWJ7NHCxWbCskZV_Ljl_-MZ8AJZQRBj-fKdyNbvamQEyurdPGsyUO5g1OutjJ9lVISAft11ddw-YtdAuCaM7ykNz5heXJbu6NlsbnjlMRJxtkc4XN9W57wFEVbfPimWgg7jU392LbtrrrMZ5pqbtygP_Hl8DmhAmS151e-l0x6KTV4YgkgkG0MdxCFPERNXK3D0Mxp-nBHFP8Y-sJ90Wu_SOgYqYAl-Ry7JqQBeB6F95ww_IkJMv4iz8RY8mjGY0b86ysU02JKoiSTUlGnjOscdaXMiXN6hsOHjLTrDVDY7xE=)
 
 - **Portal (nginx)** — serves the static Angular UI and reverse-proxies `/v2/*`, `/api/*`, `/service/*`, and `/c/*` to Core.
 - **Core** (`:8080`) — API gateway, authentication, and business logic.
@@ -125,8 +125,9 @@ Portal (nginx) serves the Angular UI and reverse-proxies `/v2/`, `/api/`, `/serv
 - **Registry** (`:5000`) — `docker/distribution`; blob/manifest storage.
 - **RegistryCtl** (`:8080`) — direct storage operations (used by GC).
 - **registry-data** — Docker volume mounted at `/var/lib/registry`, shared by Registry and RegistryCtl.
-- **Trivy Adapter** — vulnerability scanner. **Exporter** — Prometheus `/metrics`.
-- **Infrastructure** — PostgreSQL (`:5432`) and Redis/Valkey (`:6379`) are shared by Core, JobService, Trivy, and Exporter.
+- **Trivy Adapter** — vulnerability scanner.
+- **Metrics** — Core serves Prometheus metrics, including the Harbor exporter collectors, on `core:9090/metrics` (compose-network internal; disable with `METRIC_ENABLE=false`).
+- **Infrastructure** — PostgreSQL (`:5432`) and Redis/Valkey (`:6379`) are shared by Core, JobService, and Trivy.
 
 ## Verify Push/Pull
 
