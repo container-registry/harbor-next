@@ -34,7 +34,7 @@ INFO — mapped automatically (16)
       TLS terminates at the ingress controller with your existing certificate Secret. Pod-level TLS (tls.enabled) stays off — the 2.x-equivalent behavior for ingress exposure.
   * updateStrategy.type
       -> <component>.deploymentStrategy.type
-      Now a full per-component Deployment strategy spec — applied to core, portal, registry, jobservice, and exporter.
+      Now a full per-component Deployment strategy spec — applied to core, portal, registry, and jobservice.
   * registry.relativeurls
       -> registry.config.http.relativeurls
       Now plain distribution config syntax.
@@ -70,4 +70,4 @@ INFO — mapped automatically (16)
       addr split into separate host and port fields; valkey subchart disabled.
   * metrics.enabled
       -> metrics.enabled
-      Carried over. This chart auto-enables the jobservice metric endpoint from metrics.enabled (chart-managed config.yml) — no explicit jobservice.config.metric block is needed.
+      Carried over. This chart auto-enables the jobservice metric endpoint and the in-core exporter collectors from metrics.enabled — no explicit jobservice.config.metric or exporter block is needed.

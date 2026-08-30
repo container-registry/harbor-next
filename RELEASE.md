@@ -193,7 +193,6 @@ Each release publishes `linux/amd64` and `linux/arm64` images:
 - `harbor-core`
 - `harbor-jobservice`
 - `harbor-registryctl`
-- `harbor-exporter`
 - `harbor-portal`
 - `harbor-registry`
 - `trivy-adapter`

@@ -46,9 +46,6 @@ Harbor has been installed!
    - Portal: {{ include "harbor.fullname" . }}-portal
 {{- end }}
    - Jobservice: {{ include "harbor.fullname" . }}-jobservice
-{{- if .Values.exporter.enabled }}
-   - Exporter: {{ include "harbor.fullname" . }}-exporter
-{{- end }}
 {{- if .Values.valkey.enabled }}
    - Valkey (Redis): {{ include "harbor.fullname" . }}-valkey-master
 {{- end }}
