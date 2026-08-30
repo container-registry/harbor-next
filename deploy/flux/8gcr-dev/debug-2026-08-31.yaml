@@ -1,21 +1,20 @@
-# One-shot read-only diagnostics for the stuck 2026-08-29 redeploy.
+# One-shot read-only diagnostics for the 2026-08-31 outage.
 # Publishes condensed pod/HelmRelease/CNPG/event/log state to ntfy.sh/bupd_agents
 # (the operator's existing notification topic) since there is no kubeconfig
-# off-cluster. Remove together with reset-2026-08-29.yaml once the tenant
-# converges.
+# off-cluster. Remove together with any reset job once the tenant converges.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: harbor-debug
+  name: harbor-debug-0831
   namespace: flux-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: harbor-debug-readonly
+  name: harbor-debug-readonly-0831
 rules:
   - apiGroups: [""]
-    resources: [pods, pods/log, events, persistentvolumeclaims]
+    resources: [pods, pods/log, events, persistentvolumeclaims, namespaces]
     verbs: [get, list]
   - apiGroups: [apps]
     resources: [deployments, statefulsets, replicasets]
@@ -39,20 +38,20 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: harbor-debug-readonly
+  name: harbor-debug-readonly-0831
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: harbor-debug-readonly
+  name: harbor-debug-readonly-0831
 subjects:
   - kind: ServiceAccount
-    name: harbor-debug
+    name: harbor-debug-0831
     namespace: flux-system
 ---
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: harbor-debug-20260829f
+  name: harbor-debug-20260831
   namespace: flux-system
   labels:
     app.kubernetes.io/name: harbor-debug
@@ -66,7 +65,7 @@ spec:
         app.kubernetes.io/name: harbor-debug
         app.kubernetes.io/part-of: harbor
     spec:
-      serviceAccountName: harbor-debug
+      serviceAccountName: harbor-debug-0831
       restartPolicy: Never
       securityContext:
         runAsNonRoot: true
@@ -88,7 +87,7 @@ spec:
               cpu: 10m
               memory: 64Mi
             limits:
-              memory: 128Mi
+              memory: 192Mi
           volumeMounts:
             - name: tmp
               mountPath: /tmp
@@ -99,11 +98,17 @@ spec:
             - |
               ns=8gcr-dev-main
               send() {
-                head -c 3800 | curl -s -m 20 -H "Title: 8gcr-debug: $1" --data-binary @- https://ntfy.sh/bupd_agents >/dev/null || true
+                head -c 3800 | curl -s -m 20 -H "Title: 8gcr-debug-0831: $1" --data-binary @- https://ntfy.sh/bupd_agents >/dev/null || true
               }
-              kubectl get cluster.postgresql.cnpg.io harbor-db -n "$ns" -o jsonpath='{.spec.bootstrap.initdb.postInitApplicationSQL[0]}' 2>/dev/null | base64 -w0 | send "sql0-b64"
-              kubectl get cluster.postgresql.cnpg.io harbor-db -n "$ns" -o jsonpath='{.spec.bootstrap.initdb.postInitApplicationSQL[1]}' 2>/dev/null | base64 -w0 | send "sql1-b64"
-              kubectl get cluster.postgresql.cnpg.io harbor-db -n "$ns" -o jsonpath='{.spec.bootstrap.initdb.postInitApplicationSQL[2]}' 2>/dev/null | base64 -w0 | send "sql2-b64"
+              { echo "--- namespace ---"; kubectl get ns "$ns" -o wide 2>&1; } | send "namespace"
+              { echo "--- pods ---"; kubectl get pods -n "$ns" -o wide 2>&1; } | send "pods"
+              { echo "--- pvcs ---"; kubectl get pvc -n "$ns" 2>&1; } | send "pvcs"
+              { echo "--- helmrelease ---"; kubectl get helmrelease -n "$ns" -o yaml 2>&1 | grep -A5 "status:\|conditions:\|message:\|reason:"; } | send "helmrelease"
+              { echo "--- kustomization ---"; kubectl get kustomization harbor-8gcr -n flux-system -o yaml 2>&1 | grep -A5 "status:\|conditions:\|message:\|reason:"; } | send "kustomization"
+              { echo "--- cnpg cluster ---"; kubectl get cluster.postgresql.cnpg.io -n "$ns" -o wide 2>&1; kubectl get cluster.postgresql.cnpg.io harbor-db -n "$ns" -o jsonpath='{.status.phase}{"\n"}{.status.conditions}' 2>&1; } | send "cnpg"
+              { echo "--- recent events (warnings) ---"; kubectl get events -n "$ns" --field-selector type=Warning --sort-by='.lastTimestamp' 2>&1 | tail -40; } | send "events"
+              { echo "--- core logs (tail) ---"; pod=$(kubectl get pods -n "$ns" -l app.kubernetes.io/component=core -o jsonpath='{.items[0].metadata.name}' 2>/dev/null); kubectl logs -n "$ns" "$pod" --tail=60 2>&1; } | send "core-logs"
+              { echo "--- non-running pods describe ---"; for p in $(kubectl get pods -n "$ns" --field-selector=status.phase!=Running -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do echo "== $p =="; kubectl describe pod "$p" -n "$ns" 2>&1 | tail -25; done; } | send "bad-pods-describe"
               echo done
       volumes:
         - name: tmp
