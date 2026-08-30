@@ -106,16 +106,19 @@ func TestApplyAuthoritativeSchemaIsRepeatable(t *testing.T) {
 		if tx.rolledBack {
 			t.Errorf("transaction %d was rolled back", i+1)
 		}
-		if got, want := len(tx.queries), 2; got != want {
+		if got, want := len(tx.queries), 3; got != want {
 			t.Fatalf("transaction %d query count = %d, want %d", i+1, got, want)
 		}
-		if got, want := tx.queries[0], "SELECT pg_advisory_xact_lock($1)"; got != want {
+		if got, want := tx.queries[0], "SET LOCAL statement_timeout = 0"; got != want {
+			t.Errorf("transaction %d timeout query = %q, want %q", i+1, got, want)
+		}
+		if got, want := tx.queries[1], "SELECT pg_advisory_xact_lock($1)"; got != want {
 			t.Errorf("transaction %d lock query = %q, want %q", i+1, got, want)
 		}
-		if got, want := tx.args[0][0], any(authoritativeSchemaLockID); got != want {
+		if got, want := tx.args[1][0], any(authoritativeSchemaLockID); got != want {
 			t.Errorf("transaction %d lock ID = %v, want %v", i+1, got, want)
 		}
-		if got := tx.queries[1]; got != schema {
+		if got := tx.queries[2]; got != schema {
 			t.Errorf("transaction %d schema query = %q, want %q", i+1, got, schema)
 		}
 	}
@@ -124,6 +127,7 @@ func TestApplyAuthoritativeSchemaIsRepeatable(t *testing.T) {
 func TestApplyAuthoritativeSchemaErrors(t *testing.T) {
 	errBegin := errors.New("begin")
 	errLock := errors.New("lock")
+	errTimeout := errors.New("timeout")
 	errApply := errors.New("apply")
 	errCommit := errors.New("commit")
 
@@ -157,14 +161,21 @@ func TestApplyAuthoritativeSchemaErrors(t *testing.T) {
 		{
 			name:         "acquire advisory lock",
 			path:         func(t *testing.T) string { return writeSchema(t, "SELECT 1;") },
-			execErrors:   map[int]error{1: errLock},
+			execErrors:   map[int]error{2: errLock},
 			wantErr:      errLock,
+			wantRollback: true,
+		},
+		{
+			name:         "disable statement timeout",
+			path:         func(t *testing.T) string { return writeSchema(t, "SELECT 1;") },
+			execErrors:   map[int]error{1: errTimeout},
+			wantErr:      errTimeout,
 			wantRollback: true,
 		},
 		{
 			name:         "execute schema",
 			path:         func(t *testing.T) string { return writeSchema(t, "SELECT 1;") },
-			execErrors:   map[int]error{2: errApply},
+			execErrors:   map[int]error{3: errApply},
 			wantErr:      errApply,
 			wantRollback: true,
 		},
@@ -282,9 +293,12 @@ type serializingTx struct {
 }
 
 func (tx *serializingTx) Exec(_ context.Context, query string, _ ...any) error {
-	if query == "SELECT pg_advisory_xact_lock($1)" {
+	switch query {
+	case "SELECT pg_advisory_xact_lock($1)":
 		tx.lock.Lock()
 		tx.held = true
+		return nil
+	case "SET LOCAL statement_timeout = 0":
 		return nil
 	}
 	tx.onSchema()
