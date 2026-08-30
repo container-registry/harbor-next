@@ -62,3 +62,44 @@ CREATE INDEX IF NOT EXISTS idx_claim_rules_lookup
 
 CREATE INDEX IF NOT EXISTS idx_identity_providers_jwks_cache
     ON identity_providers (id, jwks_expires_at, jwks_last_fetch_attempt);
+
+-- 0190_2.16.0 was amended in place (robot bigint IDs, audit client columns)
+-- after deployed databases had already recorded schema_migrations >= 190, so
+-- golang-migrate never replays it for them. Reconcile those amendments here;
+-- fresh installs run the same statements in 0190 and these no-op. The
+-- existence guards keep the file applicable to a bare schema (see
+-- authoritative_db_test.go).
+
+-- Robot account ID columns to bigint (upstream goharbor/harbor#23633)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'robot' AND column_name = 'creator_ref'
+          AND data_type <> 'bigint'
+    ) THEN
+        ALTER TABLE robot ALTER COLUMN id TYPE bigint;
+        ALTER TABLE robot ALTER COLUMN creator_ref TYPE bigint;
+        ALTER SEQUENCE robot_id_seq AS bigint MAXVALUE 9007199254740991;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'role_permission' AND column_name = 'role_id'
+          AND data_type <> 'bigint'
+    ) THEN
+        ALTER TABLE role_permission ALTER COLUMN role_id TYPE bigint;
+    END IF;
+END
+$$;
+
+-- Audit log client IP address / User-Agent columns
+DO $$
+BEGIN
+    IF to_regclass('audit_log_ext') IS NOT NULL THEN
+        ALTER TABLE audit_log_ext ADD COLUMN IF NOT EXISTS client_address varchar(255) DEFAULT '';
+        ALTER TABLE audit_log_ext ADD COLUMN IF NOT EXISTS user_agent varchar(1024) DEFAULT '';
+    END IF;
+END
+$$;
