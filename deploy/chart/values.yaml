@@ -910,7 +910,7 @@ registry:
 portal:
   # -- Deploy the portal (Harbor UI). Set `false` for API-only installs — core
   # serves the API, and the Ingress / Gateway route `/` to core instead of the
-  # portal. Mirrors `trivy.enabled` / `exporter.enabled`.
+  # portal. Mirrors `trivy.enabled`.
   enabled: true
   # -- URL core uses to reach the portal (`PORTAL_URL`). Empty auto-derives the
   # in-cluster portal service. Set this when `enabled: false` but the UI is
@@ -1316,172 +1316,6 @@ jobservice:
     # -- Annotations for PVC
     annotations: {}
 
-# --- Exporter ---
-exporter:
-  # -- Enable Harbor exporter for Prometheus metrics
-  enabled: true
-
-  # -- Exporter config as env vars. Nested maps flatten to UPPER_SNAKE_CASE
-  # via toEnvVars and are injected via envFrom. Any exporter setting works
-  # without chart changes.
-  #
-  # Keys are used verbatim — the chart adds no prefix. The exporter reads env
-  # through viper with the `harbor` prefix, so keys must carry `HARBOR_`
-  # themselves (`HARBOR_EXPORTER_CACHE_TIME`, not `CACHE_TIME`). The nested
-  # form flattens to the same thing.
-  #
-  # A key set here wins over the chart's own env entry for that name,
-  # including the database pool knobs — that is how the exporter gets a
-  # different POSTGRESQL_MIN_CONNS from core.
-  # @default -- {}
-  config: {}
-    # HARBOR_EXPORTER_CACHE_TIME: 23
-    # HARBOR_EXPORTER_CACHE_CLEAN_INTERVAL: 14400
-    # HARBOR_DATABASE_MIN_CONNS: 0
-    # or, equivalently, nested:
-    # harbor:
-    #   exporter:
-    #     cache_time: 23
-
-  # -- Sensitive config for Exporter (converted to env vars in Secret)
-  # @default -- {}
-  secret: {}
-
-  # -- Extra environment variables with valueFrom support
-  # @default -- []
-  extraEnv: []
-
-  # -- Init containers (run before main containers)
-  initContainers: []
-  # -- Topology spread constraints for pod scheduling
-  topologySpreadConstraints: []
-  # -- Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for
-  # private DNS that does not exist in cluster DNS — service-mesh sidecars,
-  # legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the
-  # Kubernetes PodSpec: a list of `{ip, hostnames}` entries.
-  # @default -- []
-  hostAliases: []
-    # - ip: "10.0.0.10"
-    #   hostnames:
-    #     - "ldap.internal"
-    #     - "smtp.internal"
-  # -- Container `lifecycle` hook spec (preStop / postStart). Common use:
-  # preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding
-  # 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`,
-  # `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all
-  # closed without merge, the gap was never closed there.
-  # @default -- {}
-  lifecycle: {}
-    # preStop:
-    #   exec:
-    #     command: ["/bin/sh", "-c", "sleep 15"]
-  # -- Deployment strategy (empty = K8s default RollingUpdate)
-  # @default -- {}
-  deploymentStrategy: {}
-
-  # -- Container probes, rendered verbatim. See `core.probes` for the
-  # tuning rationale.
-  # @default -- See [values.yaml](values.yaml)
-  probes:
-    startup:
-      httpGet:
-        path: /metrics
-        port: 8001
-      periodSeconds: 2
-      failureThreshold: 30
-      timeoutSeconds: 2
-    readiness:
-      httpGet:
-        path: /metrics
-        port: 8001
-      periodSeconds: 5
-      failureThreshold: 2
-      timeoutSeconds: 2
-    liveness:
-      httpGet:
-        path: /metrics
-        port: 8001
-      periodSeconds: 10
-      failureThreshold: 3
-      timeoutSeconds: 3
-
-  # -- Exporter image settings
-  image:
-    # -- Registry host override; empty uses `image.source` (`global.imageRegistry` wins over both)
-    registry: ""
-    # -- Repository override (path WITHOUT registry host); empty uses `image.source`
-    repository: ""
-    # -- Exporter image tag (defaults to appVersion)
-    tag: ""
-    # -- Pin by digest (sha256:...); used instead of tag when set
-    digest: ""
-
-  # -- Number of Exporter replicas
-  replicas: 1
-
-  # -- Exporter resource requests and limits
-  resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      memory: 256Mi
-
-  # -- Node selector for Exporter pods
-  nodeSelector: {}
-
-  # -- Tolerations for Exporter pods
-  tolerations: []
-
-  # -- Affinity rules for Exporter pods
-  affinity: {}
-
-  # -- Annotations for the Exporter workload object (Deployment)
-  annotations: {}
-  # -- Additional pod annotations for Exporter
-  podAnnotations: {}
-
-  # -- Additional pod labels for Exporter
-  podLabels: {}
-
-  # -- Service account settings for Exporter
-  serviceAccount:
-    create: true
-    name: ""
-    annotations: {}
-    # -- Automount service account token
-    automountServiceAccountToken: false
-
-  # -- PodDisruptionBudget for Exporter
-  pdb:
-    # -- Enable PodDisruptionBudget. When true, exactly one of
-    # `minAvailable` or `maxUnavailable` must be set (Kubernetes
-    # rejects PDBs with both fields).
-    enabled: false
-    # -- Minimum available pods (integer or percentage). Mutually
-    # exclusive with maxUnavailable.
-    # minAvailable: 1
-    # -- Maximum unavailable pods (integer or percentage). Mutually
-    # exclusive with minAvailable.
-    # maxUnavailable: 1
-
-  # -- Security context for Exporter container
-  securityContext:
-    runAsNonRoot: true
-    runAsUser: 10000
-    runAsGroup: 10000
-    readOnlyRootFilesystem: true
-    allowPrivilegeEscalation: false
-    capabilities:
-      drop:
-        - ALL
-    seccompProfile:
-      type: RuntimeDefault
-
-  # -- Pod security context for Exporter
-  podSecurityContext:
-    fsGroup: 10000
-
 # ============================================================================
 # 4. DEPENDENCIES
 # ============================================================================
@@ -1501,9 +1335,9 @@ database:
   # -- SSL mode for database connection
   sslmode: disable
   # -- Hard cap on open connections per pool (POSTGRESQL_MAX_OPEN_CONNS).
-  # Core, jobservice (via core's config), and the exporter each open their
-  # own pool, so the per-release total is roughly this times the number of
-  # pooled components. Lower it on small/shared PostgreSQL.
+  # Core and jobservice (via core's config) each open their own pool, so the
+  # per-release total is roughly this times the number of pooled components.
+  # Lower it on small/shared PostgreSQL.
   maxOpenConns: 100
   # -- Minimum idle connections kept warm per pool (POSTGRESQL_MIN_CONNS).
   # pgxpool floor; replaces the removed maxIdleConns.
@@ -1541,9 +1375,6 @@ database:
   # pool honors that env over the individual fields.
   #
   # Caveats:
-  #   - Exporter does not yet plumb POSTGRESQL_URL into its viper config,
-  #     so its DB connection ignores client certs (it'll work fine for
-  #     sslmode=verify-ca with a publicly-trusted CA).
   #   - Harbor's migration tool (NewMigrator) does not honor cfg.URL
   #     either, so schema migrations against a server that REQUIRES
   #     mTLS will fail. Use sslmode=verify-ca or migrate via an external
@@ -1856,8 +1687,14 @@ tls:
 # ============================================================================
 
 metrics:
-  # -- Enable metrics endpoints on all components
+  # -- Enable metrics endpoints on all components. Core additionally runs the
+  # Harbor exporter collectors in-process (`METRIC_EXPORTER_ENABLE`) and serves
+  # the `harbor_*` business metrics from its own metrics endpoint — there is no
+  # separate exporter Deployment.
   enabled: false
+  # -- Seconds core caches the exporter collector results between scrapes
+  # (`METRIC_EXPORTER_CACHE_TIME`)
+  exporterCacheTime: 30
   # -- Enable Prometheus ServiceMonitor
   serviceMonitor:
     # -- Create ServiceMonitor resource

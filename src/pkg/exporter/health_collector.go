@@ -22,10 +22,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/log"
 )
 
-const (
-	healthURL           string = "/api/v2.0/health"
-	healthCollectorName string = "HealthCollector"
-)
+const healthCollectorName string = "HealthCollector"
 
 var (
 	harborHealth = typedDesc{

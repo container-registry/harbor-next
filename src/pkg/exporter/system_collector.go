@@ -25,11 +25,7 @@ import (
 	"github.com/goharbor/harbor/src/pkg/version"
 )
 
-// SystemInfoCollectorName ...
-const (
-	systemInfoCollectorName = "SystemInfoCollector"
-	sysInfoURL              = "/api/v2.0/systeminfo"
-)
+const systemInfoCollectorName = "SystemInfoCollector"
 
 var (
 	harborSysInfo = typedDesc{

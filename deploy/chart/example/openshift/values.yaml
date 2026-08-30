@@ -153,15 +153,6 @@ jobservice:
   podSecurityContext:
     fsGroup: null
 
-exporter:
-  image:
-    repository: ttl.sh/harbor-next/harbor-exporter
-    tag: "v2.15.0"
-  securityContext:
-    runAsNonRoot: null
-    runAsUser: null
-    runAsGroup: null
-    readOnlyRootFilesystem: null
     allowPrivilegeEscalation: null
     capabilities: null
     seccompProfile: null
