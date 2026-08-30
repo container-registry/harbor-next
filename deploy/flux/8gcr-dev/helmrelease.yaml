@@ -195,12 +195,6 @@ spec:
         repository: 8gears.container-registry.com/8gcr/harbor-portal
         tag: latest
       replicas: 1
-    exporter:
-      enabled: true
-      image:
-        repository: 8gears.container-registry.com/8gcr/harbor-exporter
-        tag: latest
-      replicas: 1
     trivy:
       enabled: true
       image:

@@ -1,7 +1,7 @@
 # Harbor metrics and Grafana dashboard
 
-[values.yaml](values.yaml) enables Harbor metrics, the exporter, a ServiceMonitor,
-and the dashboard ConfigMap. It also enables PostgreSQL/pgx monitoring for 8gcr
+[values.yaml](values.yaml) enables Harbor metrics, a ServiceMonitor, and the
+dashboard ConfigMap. It also enables PostgreSQL/pgx monitoring for 8gcr
 builds that support it; standard Harbor does not expose those database metrics.
 
 ## Prerequisites
