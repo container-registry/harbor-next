@@ -13,5 +13,7 @@ resources:
   - rollout-sync.yaml
   - helmrelease.yaml
   - ingress-packages.yaml
-  # One-shot 2026-08-31 outage diagnostics — remove once the tenant converges.
+  # One-shot 2026-08-31 outage diagnostics + factory reset — remove once the
+  # tenant converges.
   - debug-2026-08-31.yaml
+  - reset-2026-08-31.yaml
