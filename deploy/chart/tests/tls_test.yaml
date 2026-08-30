@@ -41,7 +41,7 @@ tests:
     asserts:
       - matchRegex:
           path: metadata.name
-          pattern: "^RELEASE-NAME-harbor-ne-harbor-example-com-[0-9a-f]{8}$"
+          pattern: "^RELEASE-NAME-harbor-harbor-example-com-[0-9a-f]{8}$"
 
   # Pins the chart-computed secretName: same shape as metadata.name
   # plus a `-tls` suffix, so the Ingress/HTTPRoute can reference the
@@ -63,7 +63,7 @@ tests:
     asserts:
       - matchRegex:
           path: spec.secretName
-          pattern: "^RELEASE-NAME-harbor-ne-harbor-example-com-[0-9a-f]{8}-tls$"
+          pattern: "^RELEASE-NAME-harbor-harbor-example-com-[0-9a-f]{8}-tls$"
 
   # Pins the conditional emission of spec.duration and spec.renewBefore
   # — these keys are only rendered when set in values, and cert-manager
@@ -186,10 +186,10 @@ tests:
     asserts:
       - matchRegex:
           path: metadata.name
-          pattern: "^RELEASE-NAME-harbor-ne-wildcard-example-com-[0-9a-f]{8}$"
+          pattern: "^RELEASE-NAME-harbor-wildcard-example-com-[0-9a-f]{8}$"
       - matchRegex:
           path: spec.secretName
-          pattern: "^RELEASE-NAME-harbor-ne-wildcard-example-com-[0-9a-f]{8}-tls$"
+          pattern: "^RELEASE-NAME-harbor-wildcard-example-com-[0-9a-f]{8}-tls$"
       # dnsNames keeps the original wildcard — the cert covers *.example.com
       - equal:
           path: spec.dnsNames[0]

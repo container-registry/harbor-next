@@ -4,12 +4,12 @@
 # NOT part of the chart package (.helmignore). The release pipeline
 # pushes it as a separate OCI artifact next to the chart:
 #
-#   oras push <registry>/8gcr/charts/harbor-next:artifacthub.io \
+#   oras push <registry>/8gcr/charts/harbor:artifacthub.io \
 #     --config /dev/null:application/vnd.cncf.artifacthub.config.v1+yaml \
 #     artifacthub-repo.yml:application/vnd.cncf.artifacthub.repository-metadata.layer.v1.yaml
 #
 # After adding the repository on artifacthub.io (kind: Helm, URL:
-# oci://8gears.container-registry.com/8gcr/charts/harbor-next) under the
+# oci://8gears.container-registry.com/8gcr/charts/harbor) under the
 # container-registry organization, set repositoryID to the ID Artifact
 # Hub assigns to enable ownership metadata / the verified publisher badge.
 #

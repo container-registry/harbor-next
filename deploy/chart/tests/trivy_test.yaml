@@ -280,7 +280,7 @@ tests:
             name: REDIS_PASSWORD
             valueFrom:
               secretKeyRef:
-                name: RELEASE-NAME-harbor-next-redis
+                name: RELEASE-NAME-harbor-redis
                 key: REDIS_PASSWORD
 
   - it: should expose service port named http-trivy
@@ -331,7 +331,7 @@ tests:
           path: spec.template.spec.containers[0].envFrom
           content:
             configMapRef:
-              name: RELEASE-NAME-harbor-next-trivy-env
+              name: RELEASE-NAME-harbor-trivy-env
 
   - it: should not render trivy env ConfigMap when config is empty
     template: templates/trivy.configmap-env.yaml
@@ -361,7 +361,7 @@ tests:
           of: Secret
       - equal:
           path: metadata.name
-          value: RELEASE-NAME-harbor-next-trivy-env
+          value: RELEASE-NAME-harbor-trivy-env
       - equal:
           path: data.MY_SCANNER_TOKEN
           value: "czNjcjN0"

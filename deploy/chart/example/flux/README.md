@@ -1,6 +1,6 @@
 # FluxCD (GitOps)
 
-End-to-end Flux setup for the `harbor-next` chart: `GitRepository` source,
+End-to-end Flux setup for the `harbor` chart: `GitRepository` source,
 `HelmRelease` with drift detection, and the secret-pinning values that make
 rendering **byte-for-byte deterministic** — the property GitOps engines
 need to avoid perpetual drift and surprise rollouts.

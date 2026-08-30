@@ -50,7 +50,7 @@ tests:
   - it: should support maxUnavailable instead of minAvailable
     documentSelector:
       path: metadata.name
-      value: RELEASE-NAME-harbor-next-core
+      value: RELEASE-NAME-harbor-core
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
@@ -70,7 +70,7 @@ tests:
   - it: should support percentage values for minAvailable
     documentSelector:
       path: metadata.name
-      value: RELEASE-NAME-harbor-next-core
+      value: RELEASE-NAME-harbor-core
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com

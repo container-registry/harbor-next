@@ -95,7 +95,7 @@ tests:
             name: POSTGRESQL_PASSWORD
             valueFrom:
               secretKeyRef:
-                name: RELEASE-NAME-harbor-next-database
+                name: RELEASE-NAME-harbor-database
                 key: POSTGRESQL_PASSWORD
       - contains:
           path: spec.template.spec.containers[0].env
