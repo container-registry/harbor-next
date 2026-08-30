@@ -95,7 +95,7 @@ jobs:
         env:
           COMPONENT: ${{ matrix.component }}
           PLATFORM_PAIR: ${{ env.PLATFORM_PAIR }}
-        run: task build:binary:${COMPONENT}:${PLATFORM_PAIR} GIT_COMMIT="${GITHUB_SHA:0:8}"
+        run: task build:binary:${COMPONENT}:${PLATFORM_PAIR} BASE_GIT_COMMIT="${GITHUB_SHA:0:8}"
 
       - name: Compile image helper binaries
         env:
