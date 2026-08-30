@@ -19,6 +19,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -47,6 +49,12 @@ const (
 	DefaultHealthCheckPeriod = 1 * time.Minute
 	DefaultConnectTimeout    = 10 * time.Second
 	healthyTimeout           = 5 * time.Second
+
+	// DefaultStatementTimeout bounds how long a single statement may run on the
+	// server before PostgreSQL kills it and its connection becomes reusable.
+	// Without it a stuck query holds its pooled connection forever, which under
+	// load exhausts the pool and hangs every request behind it.
+	DefaultStatementTimeout = 5 * time.Minute
 )
 
 // Pool wraps a pgxpool.Pool and the bridged *sql.DB for Beego ORM compatibility.
@@ -146,6 +154,38 @@ func applyPoolConfig(poolCfg *pgxpool.Config, cfg *models.PostGreSQL) error {
 	// Simple protocol avoids statement cache issues.
 	poolCfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 
+	return applyStatementTimeout(poolCfg, cfg.StatementTimeout)
+}
+
+// MaxStatementTimeout is PostgreSQL's ceiling for statement_timeout, which the
+// server stores as int32 milliseconds (~24.8 days). Larger values would make
+// every new connection fail at startup.
+const MaxStatementTimeout = time.Duration(math.MaxInt32) * time.Millisecond
+
+// applyStatementTimeout sets the server-side statement_timeout runtime parameter
+// on every pooled connection. Beego ORM issues queries with context.Background(),
+// so a client-side deadline can never fire — the server-side timeout is the only
+// reliable way to kill stuck queries and free their connections.
+//
+// 0 means "not set" and falls back to DefaultStatementTimeout; a negative value
+// disables the timeout. A statement_timeout already present in a URL-style DSN
+// takes precedence over the config value.
+func applyStatementTimeout(poolCfg *pgxpool.Config, timeout time.Duration) error {
+	if timeout < 0 {
+		return nil
+	}
+	if _, ok := poolCfg.ConnConfig.RuntimeParams["statement_timeout"]; ok {
+		return nil
+	}
+	if timeout == 0 {
+		timeout = DefaultStatementTimeout
+	}
+	if timeout > MaxStatementTimeout {
+		return fmt.Errorf("dbpool: statement_timeout %v exceeds PostgreSQL's maximum %v", timeout, MaxStatementTimeout)
+	}
+	// PostgreSQL takes milliseconds; round a positive sub-millisecond value up
+	// to 1ms — truncating to 0 would disable the timeout instead.
+	poolCfg.ConnConfig.RuntimeParams["statement_timeout"] = strconv.FormatInt(max(1, timeout.Milliseconds()), 10)
 	return nil
 }
 

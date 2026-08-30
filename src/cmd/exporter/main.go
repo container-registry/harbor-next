@@ -57,6 +57,7 @@ func main() {
 			HealthCheckPeriod: viper.GetDuration("database.health_check_period"),
 			ConnectTimeout:    viper.GetDuration("database.connect_timeout"),
 			MinConns:          getMinConns(),
+			StatementTimeout:  viper.GetDuration("database.statement_timeout"),
 		},
 	}
 	if err := dao.InitDatabase(dbCfg); err != nil {
