@@ -167,7 +167,7 @@ jobs:
         # contains a sha256 digest the capture below would happily match.
         run: |
           set -euo pipefail
-          helm push "dist/harbor-next-${VERSION}.tgz" \
+          helm push "dist/harbor-${VERSION}.tgz" \
             "oci://${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts" 2>&1 | tee push.log
           digest=$(grep -o 'sha256:[a-f0-9]\{64\}' push.log | head -1)
           if [ -z "$digest" ]; then
@@ -181,7 +181,7 @@ jobs:
           CHART_DIGEST: ${{ steps.push.outputs.digest }}
         run: |
           cosign sign --yes \
-            "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts/harbor-next@${CHART_DIGEST}"
+            "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts/harbor@${CHART_DIGEST}"
 
       - name: Install oras
         uses: oras-project/setup-oras@1d808f7d7f6995cc68b7bf507bfe5c5446e1dc9d # v2.0.1
@@ -195,6 +195,6 @@ jobs:
         # verified publisher. See deploy/chart/artifacthub-repo.yml.
         working-directory: deploy/chart
         run: |
-          oras push "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts/harbor-next:artifacthub.io" \
+          oras push "${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/charts/harbor:artifacthub.io" \
             --config /dev/null:application/vnd.cncf.artifacthub.config.v1+yaml \
             artifacthub-repo.yml:application/vnd.cncf.artifacthub.repository-metadata.layer.v1.yaml

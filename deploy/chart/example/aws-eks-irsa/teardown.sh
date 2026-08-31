@@ -11,7 +11,7 @@ set -euo pipefail
 AWS_REGION="${AWS_REGION:-eu-central-1}"
 CLUSTER_NAME="${CLUSTER_NAME:-harbor-next-irsa}"
 NAMESPACE="${NAMESPACE:-harbor}"
-RELEASE_NAME="${RELEASE_NAME:-harbor-next}"
+RELEASE_NAME="${RELEASE_NAME:-harbor}"
 DB_CLUSTER_ID="${DB_CLUSTER_ID:-harbor-next-aurora}"
 DB_INSTANCE_ID="${DB_INSTANCE_ID:-harbor-next-aurora-1}"
 IAM_POLICY_NAME="${IAM_POLICY_NAME:-harbor-next-irsa}"

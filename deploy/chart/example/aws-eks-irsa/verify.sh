@@ -10,7 +10,7 @@ set -euo pipefail
 AWS_REGION="${AWS_REGION:-eu-central-1}"
 CLUSTER_NAME="${CLUSTER_NAME:-harbor-next-irsa}"
 NAMESPACE="${NAMESPACE:-harbor}"
-RELEASE_NAME="${RELEASE_NAME:-harbor-next}"
+RELEASE_NAME="${RELEASE_NAME:-harbor}"
 LOCAL_PORT="${LOCAL_PORT:-8443}"
 
 KUBECONFIG_PATH="${KUBECONFIG_PATH:-${HOME}/.kube/${CLUSTER_NAME}.yaml}"

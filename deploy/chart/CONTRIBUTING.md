@@ -309,7 +309,7 @@ The chart releases on its own line, independent of the app (repo)
 version. A dedicated release-please instance, configured by
 `release-please-config-chart.json` and `.release-please-manifest-chart.json`,
 watches commits scoped to `deploy/chart/` and opens a
-`chore: release harbor-next chart X.Y.Z` PR (labelled `chart-release:
+`chore: release harbor chart X.Y.Z` PR (labelled `chart-release:
 pending`). Merging that PR tags `chart-vX.Y.Z`, writes the new `version`
 into `Chart.yaml`, updates `deploy/chart/CHANGELOG.md`, and triggers the
 `chart` job in `release-please.yml`, which packages, pushes, cosign-signs,

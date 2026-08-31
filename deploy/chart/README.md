@@ -1,4 +1,4 @@
-# harbor-next
+# harbor
 
 ![Version: 2.0.0](https://img.shields.io/badge/Version-2.0.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: v2.15.0](https://img.shields.io/badge/AppVersion-v2.15.0-informational?style=flat-square)
 
@@ -11,7 +11,7 @@ A modern, production-ready Helm chart for [Harbor Next](https://github.com/conta
 kubectl create secret generic my-harbor-db \
   --from-literal=POSTGRESQL_PASSWORD='your-strong-password'
 
-helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-next \
+helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor \
   --set externalURL=https://harbor.example.com \
   --set database.host=my-postgres.example.com \
   --set database.existingSecret=my-harbor-db
@@ -147,7 +147,7 @@ kubectl -n harbor create secret generic my-harbor-db \
 kubectl -n harbor create secret generic my-harbor-admin \
   --from-literal=HARBOR_ADMIN_PASSWORD='your-strong-admin-password'
 
-helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-next \
+helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor \
   --namespace harbor \
   --set externalURL=https://harbor.example.com \
   --set database.host=postgres.example.com \
@@ -158,7 +158,7 @@ helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-ne
 ### With Values File
 
 ```bash
-helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-next \
+helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor \
   --namespace harbor \
   --create-namespace \
   -f values-production.yaml

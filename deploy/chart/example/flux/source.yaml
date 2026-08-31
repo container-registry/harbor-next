@@ -22,10 +22,10 @@ spec:
 # apiVersion: source.toolkit.fluxcd.io/v1
 # kind: OCIRepository
 # metadata:
-#   name: harbor-next
+#   name: harbor
 #   namespace: harbor
 # spec:
 #   interval: 10m
-#   url: oci://8gears.container-registry.com/8gcr/charts/harbor-next
+#   url: oci://8gears.container-registry.com/8gcr/charts/harbor
 #   ref:
-#     semver: ">=2.0.0 <3.0.0"
+#     semver: ">=3.0.0 <4.0.0"

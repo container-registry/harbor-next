@@ -133,4 +133,4 @@ tests:
           value: Service
       - equal:
           path: spec.to.name
-          value: RELEASE-NAME-harbor-next-core
+          value: RELEASE-NAME-harbor-core
