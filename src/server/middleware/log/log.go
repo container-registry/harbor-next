@@ -55,8 +55,11 @@ func Middleware() func(http.Handler) http.Handler {
 			RequestMethod:  r.Method,
 			RequestURL:     r.URL.String(),
 			IsResourceName: isResourceName,
+<<<<<<< HEAD
 			IPAddress:      securitymiddleware.GetClientIP(r),
 			UserAgent:      securitymiddleware.GetUserAgent(r),
+=======
+>>>>>>> 5d19f2625 (fix: Harden proxy cache repository filter validation (#23762))
 		}
 		if matched, resName := e.PreCheckMetadata(); matched {
 			body, err := lib.ReadRequestBody(r, common.MaxAuditLogPayloadSize)
