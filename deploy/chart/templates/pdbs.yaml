@@ -9,7 +9,6 @@ Components are listed in alphabetical order.
   (dict "name" "jobservice" "values" .Values.jobservice "needsEnabled" false)
   (dict "name" "portal"     "values" .Values.portal     "needsEnabled" true)
   (dict "name" "registry"   "values" .Values.registry   "needsEnabled" false)
-  (dict "name" "trivy"      "values" .Values.trivy      "needsEnabled" true)
 -}}
 {{- range $components }}
 {{- $enabled := ternary (and (index .values "enabled") .values.pdb.enabled) .values.pdb.enabled .needsEnabled }}

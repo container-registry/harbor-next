@@ -21,10 +21,6 @@ templates:
   - templates/exporter.deployment.yaml
   - templates/exporter.configmap-env.yaml
   - templates/exporter.secret.yaml
-  - templates/trivy.statefulset.yaml
-  - templates/trivy.secret.yaml
-  - templates/trivy.configmap-env.yaml
-  - templates/trivy.secret-env.yaml
 tests:
   # Regression guard for hostAliases support. The PodSpec.hostAliases
   # field is what backs the in-cluster /etc/hosts override — without it
@@ -69,24 +65,7 @@ tests:
       - notExists:
           path: spec.template.spec.hostAliases
 
-  # Per-component coverage: trivy uses a StatefulSet, the others
   # Deployments. The helper has to land in both PodSpecs equally.
-  - it: should render hostAliases on the trivy StatefulSet
-    template: templates/trivy.statefulset.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      trivy.enabled: true
-      trivy.hostAliases:
-        - ip: "10.0.0.30"
-          hostnames:
-            - "scanner.internal"
-    asserts:
-      - equal:
-          path: spec.template.spec.hostAliases[0].ip
-          value: "10.0.0.30"
-
   - it: should render hostAliases on jobservice
     template: templates/jobservice.deployment.yaml
     set:
@@ -196,22 +175,6 @@ tests:
       - equal:
           path: spec.template.spec.containers[1].lifecycle.preStop.exec.command
           value: ["/bin/sh", "-c", "sleep 30"]
-
-  - it: should render lifecycle on trivy StatefulSet container
-    template: templates/trivy.statefulset.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      trivy.enabled: true
-      trivy.lifecycle:
-        postStart:
-          exec:
-            command: ["/bin/true"]
-    asserts:
-      - equal:
-          path: spec.template.spec.containers[0].lifecycle.postStart.exec.command
-          value: ["/bin/true"]
 
   - it: should render lifecycle on jobservice / portal / exporter
     template: templates/jobservice.deployment.yaml

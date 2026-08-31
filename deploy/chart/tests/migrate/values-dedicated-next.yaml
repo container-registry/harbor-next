@@ -60,6 +60,7 @@ jobservice:
 exporter:
   enabled: true
 trivy:
+  enabled: true
   resources:
     requests:
       cpu: 10m
@@ -67,7 +68,6 @@ trivy:
     limits:
       cpu: 1
       memory: 1Gi
-  enabled: true
 database:
   host: pg.tenant-infra.example.com
   port: 5432
