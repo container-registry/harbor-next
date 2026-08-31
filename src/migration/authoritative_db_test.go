@@ -21,19 +21,18 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/goharbor/harbor/src/common/models"
 	"github.com/goharbor/harbor/src/lib/dbpool"
+	"github.com/goharbor/harbor/src/testing/dbenv"
 )
 
 func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 	ctx := context.Background()
-	cfg := authoritativeTestDatabaseConfig()
+	cfg := dbenv.PostgreSQLConfig()
 	adminPool, err := dbpool.New(ctx, cfg)
 	if err != nil {
 		t.Fatalf("create admin database pool: %v", err)
@@ -138,33 +137,9 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 	}
 }
 
-func authoritativeTestDatabaseConfig() *models.PostGreSQL {
-	port := 5432
-	if value := os.Getenv("POSTGRESQL_PORT"); value != "" {
-		if configuredPort, err := strconv.Atoi(value); err == nil {
-			port = configuredPort
-		}
-	}
-	return &models.PostGreSQL{
-		Host:     environmentOr("POSTGRESQL_HOST", "localhost"),
-		Port:     port,
-		Username: environmentOr("POSTGRESQL_USR", environmentOr("POSTGRESQL_USERNAME", "postgres")),
-		Password: environmentOr("POSTGRESQL_PWD", environmentOr("POSTGRESQL_PASSWORD", "root123")),
-		Database: environmentOr("POSTGRESQL_DATABASE", "registry"),
-		SSLMode:  "disable",
-	}
-}
-
 func authoritativeTestSchemaPath() string {
 	if dir := os.Getenv("POSTGRES_MIGRATION_SCRIPTS_PATH"); dir != "" {
 		return filepath.Join(dir, authoritativeSchemaFile)
 	}
 	return filepath.Join("..", "..", "make", "migrations", "postgresql", authoritativeSchemaFile)
-}
-
-func environmentOr(key, fallback string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return fallback
 }
