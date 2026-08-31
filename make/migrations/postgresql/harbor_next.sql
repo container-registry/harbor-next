@@ -62,3 +62,67 @@ CREATE INDEX IF NOT EXISTS idx_claim_rules_lookup
 
 CREATE INDEX IF NOT EXISTS idx_identity_providers_jwks_cache
     ON identity_providers (id, jwks_expires_at, jwks_last_fetch_attempt);
+
+-- Multi-format artifact repositories (npm, Maven): rebuildable Postgres
+-- projection over the OCI `_index` control artifact. Authoritative mutable
+-- state lives in OCI annotations; these tables are a derived view
+-- (reconcilable from `_index`). Formerly numbered migration 0191.
+CREATE TABLE IF NOT EXISTS multi_format_package (
+  id BIGSERIAL PRIMARY KEY,
+  project_id BIGINT NOT NULL,
+  format VARCHAR(32) NOT NULL,
+  native_name VARCHAR(512) NOT NULL,
+  proj_version BIGINT NOT NULL DEFAULT 0,
+  mutable_state JSONB NOT NULL DEFAULT '{}'::jsonb,
+  last_index_digest VARCHAR(255) NOT NULL DEFAULT '',
+  creation_time TIMESTAMP DEFAULT now(),
+  update_time TIMESTAMP DEFAULT now(),
+  UNIQUE (project_id, format, native_name)
+);
+
+CREATE TABLE IF NOT EXISTS multi_format_version (
+  id BIGSERIAL PRIMARY KEY,
+  package_id BIGINT NOT NULL REFERENCES multi_format_package(id) ON DELETE CASCADE,
+  version VARCHAR(255) NOT NULL,
+  payload_digest VARCHAR(255) NOT NULL DEFAULT '',
+  payload_size BIGINT NOT NULL DEFAULT 0,
+  yanked BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMP NOT NULL DEFAULT now(),
+  meta JSONB NOT NULL DEFAULT '{}'::jsonb,
+  UNIQUE (package_id, version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_multi_format_package_proj_fmt ON multi_format_package(project_id, format);
+CREATE INDEX IF NOT EXISTS idx_multi_format_version_pkg ON multi_format_version(package_id);
+
+-- Multi-project (project of projects): ordered sub-project references of a
+-- multi-project. A project is marked as a multi-project by the
+-- project_metadata key "multi_project" = "true"; this table holds which
+-- projects it aggregates and the ranked order used for pull resolution
+-- (lower rank resolves first). Sub-projects must not themselves be
+-- multi-projects (enforced at the API layer, not by schema).
+CREATE TABLE IF NOT EXISTS multi_project_reference (
+  id BIGSERIAL PRIMARY KEY,
+  multi_project_id BIGINT NOT NULL REFERENCES project(project_id),
+  sub_project_id BIGINT NOT NULL REFERENCES project(project_id),
+  rank BIGINT NOT NULL DEFAULT 0,
+  creation_time TIMESTAMP DEFAULT now(),
+  update_time TIMESTAMP DEFAULT now(),
+  UNIQUE (multi_project_id, sub_project_id),
+  CHECK (multi_project_id <> sub_project_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_multi_project_reference_multi ON multi_project_reference(multi_project_id, rank);
+CREATE INDEX IF NOT EXISTS idx_multi_project_reference_sub ON multi_project_reference(sub_project_id);
+
+-- Ranks are dense positions (1..N per multi-project), maintained by the
+-- application on every insert/move/delete. Renormalize here so rows written
+-- before that invariant existed (or drifted) are compacted; idempotent.
+WITH ranked AS (
+  SELECT id, ROW_NUMBER() OVER (PARTITION BY multi_project_id ORDER BY rank, id) AS rn
+  FROM multi_project_reference
+)
+UPDATE multi_project_reference m
+SET rank = ranked.rn
+FROM ranked
+WHERE m.id = ranked.id AND m.rank <> ranked.rn;
