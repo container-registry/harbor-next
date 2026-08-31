@@ -47,7 +47,8 @@ image:
   # every component. Per-component `image.registry`/`image.repository` override
   # it; `global.imageRegistry` overrides the registry on top. See the
   # `harbor.image.sourceMap` helper for the exact map (upstream renames the
-  # registry image to `registry-photon` and trivy to `trivy-adapter-photon`).
+  # registry image to `registry-photon`). The Trivy adapter is not covered:
+  # its image comes from the harbor-scanner-trivy subchart (`trivy.image.*`).
   source: 8gcr
   # -- Image pull policy for all Harbor components
   pullPolicy: IfNotPresent
@@ -114,8 +115,9 @@ cache:
   # -- Cache expiration in hours
   expireHours: 24
 
-# The proxy settings for updating trivy vulnerabilities from the Internet and replicating
-# artifacts from/to the registries that cannot be reached directly
+# The proxy settings for replicating artifacts from/to registries that cannot
+# be reached directly. For the Trivy scanner (vulnerability DB downloads) set
+# `trivy.proxy.*` instead - the subchart carries its own proxy settings.
 proxy:
   httpProxy:
   httpsProxy:
@@ -123,7 +125,6 @@ proxy:
   components:
     - core
     - jobservice
-    - trivy
 
 # ============================================================================
 # 2. EXPOSE / INGRESS / GATEWAY
@@ -1634,198 +1635,45 @@ externalRedis:
     # bundle. Default `ca.crt` is the convention cert-manager uses.
     existingCaSecretKey: "ca.crt"
 
-# --- Trivy Scanner ---
+# --- Trivy Scanner (harbor-scanner-trivy subchart) ---
+# The Trivy adapter is no longer templated in this chart: it is the standalone
+# harbor-scanner-trivy chart, consumed as a dependency under the alias
+# `trivy`. Everything under this key is handed to that chart verbatim, so its
+# full values surface applies here — see
+# https://github.com/container-registry/harbor-scanner-trivy/tree/main/deploy/chart
+# Only harbor-next's defaults that differ from the subchart's own are listed.
+# Scanner tuning that used to live directly under `trivy.*` (severity,
+# vulnType, skipUpdate, ...) now sits one level down under `trivy.trivy.*` —
+# the subchart groups Trivy-the-CLI settings under its own `trivy` key. See
+# docs/MIGRATION-REFERENCE.md for the old-to-new key map.
 trivy:
-  # -- Enable Trivy scanner
+  # -- Deploy the Trivy scanner adapter (harbor-scanner-trivy subchart)
   enabled: false
 
-  # -- Trivy adapter config as env vars. Trivy is env-driven (SCANNER_*);
-  # nested maps flatten to UPPER_SNAKE_CASE via toEnvVars and are injected
-  # via envFrom. Any adapter setting works without chart changes.
-  # @default -- {}
-  config: {}
+  # Redis for the adapter's job queue, result store and cache. Defaults to
+  # the bundled Valkey on db 5 (DB-index convention: core=0, registry=1,
+  # jobservice=2, trivy=5). Helm passes subchart values statically, so the
+  # subchart cannot inherit `externalRedis` — with external Redis (or Valkey
+  # auth) set `trivy.redis.url` yourself, or point
+  # `trivy.redis.existingSecret` at a Secret holding the full URL when it
+  # carries a password.
+  # @default -- bundled Valkey, db 5
+  redis:
+    url: redis://valkey:6379/5
 
-  # -- Sensitive Trivy adapter config (converted to env vars in a Secret).
-  # @default -- {}
-  secret: {}
-
-  # -- Extra environment variables with valueFrom support
-  # @default -- []
-  extraEnv: []
-
-  # -- Container probes, rendered verbatim. See `core.probes` for the
-  # tuning rationale. Startup budget 60s covers adapter init.
-  # @default -- See [values.yaml](values.yaml)
-  probes:
-    startup:
-      httpGet:
-        path: /probe/ready
-        port: api-server
-      periodSeconds: 2
-      failureThreshold: 30
-      timeoutSeconds: 2
-    readiness:
-      httpGet:
-        path: /probe/ready
-        port: api-server
-      periodSeconds: 5
-      failureThreshold: 2
-      timeoutSeconds: 2
-    liveness:
-      httpGet:
-        path: /probe/healthy
-        port: api-server
-      periodSeconds: 10
-      failureThreshold: 3
-      timeoutSeconds: 3
-
-  image:
-    # -- Registry host override; empty uses `image.source` (`global.imageRegistry` wins over both)
-    registry: ""
-    # -- Repository override (path WITHOUT registry host); empty uses `image.source`
-    repository: ""
-    # -- Trivy adapter image tag (defaults to appVersion)
-    tag: ""
-    # -- Pin by digest (sha256:...); used instead of tag when set
-    digest: ""
-  # -- Number of Trivy replicas (ignored when autoscaling.enabled=true)
-  replicas: 1
-
-  # -- HorizontalPodAutoscaler for the Trivy StatefulSet. See
-  # `core.autoscaling` for full docs.
-  # @default -- See [values.yaml](values.yaml)
-  autoscaling:
-    enabled: false
-    minReplicas: 1
-    # maxReplicas: 5
-    targetCPUUtilizationPercentage: 80
-    # targetMemoryUtilizationPercentage: 80
-    # metrics: []
-    # behavior: {}
-
-  # -- Trivy resource requests and limits
-  resources:
-    requests:
-      cpu: 200m
-      memory: 512Mi
-    limits:
-      cpu: 1
-      memory: 1Gi
-  # -- Debug mode for more verbose scanning log
-  debugMode: false
-  dbRepository:
-    - mirror.gcr.io/aquasec/trivy-db
-    - ghcr.io/aquasecurity/trivy-db
-  javaDBRepository:
-    - mirror.gcr.io/aquasec/trivy-java-db
-    - ghcr.io/aquasecurity/trivy-java-db
-  securityCheck: "vuln"
-  # -- Vulnerability types to scan (os,library)
-  vulnType: "os,library"
-  # -- Severity levels to check
-  severity: "UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL"
-  # -- Skip unfixed vulnerabilities
-  ignoreUnfixed: false
-  # -- Skip verifying registry certificate
-  insecure: false
-  # -- GitHub token to download Trivy DB (optional)
-  gitHubToken: ""
-  # -- Skip Java DB updates
-  skipJavaDBUpdate: false
-  # -- Enable offline scan mode
-  offlineScan: false
-  # -- Skip Trivy DB updates
-  skipUpdate: false
-  # -- Timeout for scanning
-  timeout: "5m0s"
-
-  # -- Init containers (run before main containers)
-  initContainers: []
-  # -- Topology spread constraints for pod scheduling
-  topologySpreadConstraints: []
-  # -- Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for
-  # private DNS that does not exist in cluster DNS — service-mesh sidecars,
-  # legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the
-  # Kubernetes PodSpec: a list of `{ip, hostnames}` entries.
-  # @default -- []
-  hostAliases: []
-    # - ip: "10.0.0.10"
-    #   hostnames:
-    #     - "ldap.internal"
-    #     - "smtp.internal"
-  # -- Container `lifecycle` hook spec (preStop / postStart). Common use:
-  # preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding
-  # 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`,
-  # `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all
-  # closed without merge, the gap was never closed there.
-  # @default -- {}
-  lifecycle: {}
-    # preStop:
-    #   exec:
-    #     command: ["/bin/sh", "-c", "sleep 15"]
-
-  # -- Service account settings for Trivy
-  serviceAccount:
-    create: false
-    name: ""
-    annotations: {}
-    # -- Automount service account token
-    automountServiceAccountToken: false
-
-  # -- PodDisruptionBudget for Trivy
-  pdb:
-    # -- Enable PodDisruptionBudget. When true, exactly one of
-    # `minAvailable` or `maxUnavailable` must be set (Kubernetes
-    # rejects PDBs with both fields).
-    enabled: false
-    # -- Minimum available pods (integer or percentage). Mutually
-    # exclusive with maxUnavailable.
-    # minAvailable: 1
-    # -- Maximum unavailable pods (integer or percentage). Mutually
-    # exclusive with minAvailable.
-    # maxUnavailable: 1
-
-  # -- Node selector for Trivy pods
-  nodeSelector: {}
-  # -- Tolerations for Trivy pods
-  tolerations: []
-  # -- Affinity rules for Trivy pods
-  affinity: {}
-  # -- Annotations for the Trivy workload object (StatefulSet)
-  annotations: {}
-  # -- Additional pod annotations for Trivy
-  podAnnotations: {}
-  # -- Additional pod labels for Trivy
-  podLabels: {}
-  # -- Security context for Trivy container
-  securityContext:
-    runAsNonRoot: true
-    runAsUser: 10000
-    runAsGroup: 10000
-  # -- Pod security context for Trivy
-  podSecurityContext:
-    fsGroup: 10000
-
-  # -- Trivy persistence settings - used for cache
+  # Trivy cache persistence. Off to match previous harbor-next behaviour
+  # (the vulnerability DB is re-downloaded after a pod restart); the
+  # subchart's own default is `enabled: true`.
+  # @default -- disabled
   persistence:
-    # -- Enable persistence for registry
     enabled: false
-    # -- Storage class for PVC. Omit to use the cluster default StorageClass;
-    # set to "" to opt out of any StorageClass (binds only to PVs with no class).
-    # storageClass: gp3
-    # -- PVC access modes
-    accessModes:
-      - ReadWriteOnce
-    # -- PVC size
-    size: 5Gi
-    # -- Existing PVC name (disables dynamic provisioning)
-    existingClaim: ""
-    # -- Annotations for PVC
-    annotations: {}
 
-# ============================================================================
-# 5. TLS CONFIGURATION
-# ============================================================================
+  # Trivy CLI tuning (subchart `trivy.*` key). Defaults here keep
+  # harbor-next's mirror-first DB download order.
+  # @default -- mirror-first DB repositories
+  trivy:
+    dbRepository: mirror.gcr.io/aquasec/trivy-db,ghcr.io/aquasecurity/trivy-db
+    javaDBRepository: mirror.gcr.io/aquasec/trivy-java-db,ghcr.io/aquasecurity/trivy-java-db
 
 tls:
   # -- Enable TLS (set to false if terminating TLS at ingress/load balancer)

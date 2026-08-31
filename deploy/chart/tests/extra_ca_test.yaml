@@ -25,10 +25,6 @@ templates:
   - templates/exporter.deployment.yaml
   - templates/exporter.configmap-env.yaml
   - templates/exporter.secret.yaml
-  - templates/trivy.statefulset.yaml
-  - templates/trivy.secret.yaml
-  - templates/trivy.configmap-env.yaml
-  - templates/trivy.secret-env.yaml
 set:
   externalURL: https://harbor.example.com
   database.host: postgres.example.com
@@ -37,7 +33,6 @@ set:
   externalRedis.host: redis.example.com
   externalRedis.tlsOptions.enable: true
   externalRedis.tlsOptions.existingCaSecret: my-redis-ca
-  trivy.enabled: true
   metrics.enabled: true
 tests:
   - it: should mount + env SSL_CERT_DIR on core
@@ -114,21 +109,6 @@ tests:
           content:
             name: SSL_CERT_DIR
             value: "/etc/ssl/certs:/etc/harbor/extra-ca"
-
-  - it: should mount + env on trivy
-    template: templates/trivy.statefulset.yaml
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: SSL_CERT_DIR
-            value: "/etc/ssl/certs:/etc/harbor/extra-ca"
-      - contains:
-          path: spec.template.spec.containers[0].volumeMounts
-          content:
-            name: extra-ca
-            mountPath: /etc/harbor/extra-ca
-            readOnly: true
 
   # Custom key name resolves correctly.
   - it: should honor a custom existingCaSecretKey

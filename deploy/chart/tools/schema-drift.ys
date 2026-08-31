@@ -32,9 +32,10 @@ applied =: atom({})
 stale-cands =: atom([])
 
 # values subtrees that are open by design but not marked so in the schema
-# (valkey is a subchart boundary — upstream accepts dozens of keys the
-# schema deliberately does not document)
-open-by-config =:: ['.valkey']
+# (valkey and trivy are subchart boundaries — the subcharts accept many
+# keys this schema deliberately does not document; each validates its own
+# values with its own schema)
+open-by-config =:: ['.valkey', '.trivy']
 
 # stale-property origin PREFIXES that are intentional documentation of
 # optional / mutually-exclusive keys (commented out in values.yaml by
@@ -44,6 +45,11 @@ stale-exempt =::
 - '#/$defs/pdb/properties/minAvailable'
 - '#/$defs/pdb/properties/maxUnavailable'
 - '#/$defs/persistence/properties/storageClass'
+# CPU limits are deliberately unset in every component's default values
+# (memory-only limits); the schema documents the key for users who add one.
+# The trivy component, whose defaults did set it, moved to the
+# harbor-scanner-trivy subchart.
+- '#/$defs/resources/properties/limits/properties/cpu'
 - '#/$defs/securityContext'
 - '#/$defs/podSecurityContext'
 - '#/$defs/harborComponent/properties/priorityClassName'

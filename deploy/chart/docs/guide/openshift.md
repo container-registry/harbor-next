@@ -43,9 +43,10 @@ pods that hardcode UIDs outside it. The chart's defaults pin
 fields must be nulled out to let the SCC inject its own values.
 
 There is **no chart-wide `securityContext` value** — the settings live per
-component (`core`, `registry`, `portal`, `jobservice`, `exporter`,
-`trivy`), and `values.schema.json` rejects unknown top-level keys at
-install time. The pattern, repeated for each component:
+component (`core`, `registry`, `portal`, `jobservice`, `exporter`, and
+the `trivy` subchart, whose keys happen to follow the same shape), and
+`values.schema.json` rejects unknown top-level keys at install time. The
+pattern, repeated for each component:
 
 ```yaml
 core:
