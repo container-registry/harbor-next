@@ -240,10 +240,10 @@ Jobservice config moved into a verbatim `config.yml` passthrough
 
 | 2.x | This chart | Notes |
 |---|---|---|
-| (exporter deployed when `metrics.enabled`) | `exporter.enabled` | Explicit toggle, default `true` |
-| `exporter.cacheDuration` | `exporter.config.cache_time` | |
-| `exporter.cacheCleanInterval` | `exporter.config.cache_clean_interval` | |
-| `exporter.image`, `replicas`, `podDisruptionBudget`→`pdb`, `extraEnvVars`→`extraEnv`, scheduling fields | same pattern as core | |
+| (exporter deployed when `metrics.enabled`) | *N/A* — no exporter component | Core runs the exporter collectors in-process and serves the `harbor_*` metrics from its own metrics endpoint when `metrics.enabled` is true |
+| `exporter.cacheDuration` | `metrics.exporterCacheTime` | Seconds core caches the collector results between scrapes |
+| `exporter.cacheCleanInterval` | *N/A* | |
+| `exporter.image`, `replicas`, `podDisruptionBudget`→`pdb`, `extraEnvVars`→`extraEnv`, scheduling fields | *N/A* — dropped | No separate Deployment to configure |
 | `metrics.enabled` | `metrics.enabled` | Auto-propagates to jobservice (chart-managed `config.yml` adds the `metric` block) — no `jobservice.config.metric` needed |
 | `metrics.{core,registry,jobservice,exporter}.path` / `port` | *N/A* — fixed | Always `/metrics` on port `8001` |
 | `metrics.serviceMonitor.enabled` | same | Requires `metrics.enabled: true` (validated at template time) |

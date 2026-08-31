@@ -32,7 +32,6 @@ suite: full-chart snapshots
 templates:
   - templates/core.configmap.yaml
   - templates/core.service.yaml
-  - templates/exporter.service.yaml
   - templates/expose-route.yaml
   - templates/expose-service.yaml
   - templates/extraManifests.yaml

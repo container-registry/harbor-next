@@ -78,7 +78,7 @@ surface", but its shape follows what the process consumes:
 
 | Components | Consume | `config` shape |
 |---|---|---|
-| core, exporter, trivy | env vars | nested map flattened by the `harbor.toEnvVars` helper into `UPPER_SNAKE_CASE` env vars, delivered via `envFrom`; `<component>.secret` is the same idea for sensitive keys |
+| core, trivy | env vars | nested map flattened by the `harbor.toEnvVars` helper into `UPPER_SNAKE_CASE` env vars, delivered via `envFrom`; `<component>.secret` is the same idea for sensitive keys |
 | registry, jobservice | a config file | the **verbatim config-file body** (YAML passthrough); `jobservice.env` carries supplementary env vars |
 | portal | nginx.conf | none — not key-value-driven, so `portal.existingConfigMap` is its only customization |
 

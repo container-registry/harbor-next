@@ -19,8 +19,8 @@ type Metric struct {
 	Enabled bool
 	Port    int
 	Path    string
-	// ExporterEnabled runs the Harbor exporter collectors inside core instead of
-	// requiring the standalone harbor-exporter container.
+	// ExporterEnabled runs the Harbor exporter collectors inside core, served
+	// from core's metrics endpoint.
 	ExporterEnabled bool
 	// ExporterCacheTime is how long, in seconds, collector results are cached.
 	ExporterCacheTime int64
