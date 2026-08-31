@@ -1,0 +1,352 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: harbor
+  namespace: 8gcr-dev-main
+spec:
+  interval: 10m
+  releaseName: harbor
+  chartRef:
+    kind: OCIRepository
+    name: harbor-next-chart
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+    cleanupOnFail: true
+  values:
+    externalURL: https://8gcr.container-registry.dev
+    logLevel: info
+    image:
+      pullPolicy: Always
+    imagePullSecrets:
+      - name: harbor-system-pull
+    # Admin password provisioned by secrets.sops.yaml in this bundle.
+    existingSecretAdminPassword: harbor-admin
+    existingSecretAdminPasswordKey: HARBOR_ADMIN_PASSWORD
+    expose:
+      clusterIP: {enabled: false}
+      nodePort: {enabled: false}
+      loadBalancer: {enabled: false}
+      route: {enabled: false}
+    ingress:
+      enabled: true
+      className: nginx
+      autoGenCert: false
+      core: 8gcr.container-registry.dev
+      hosts:
+        - host: 8gcr.container-registry.dev
+      tls:
+        - secretName: harbor-tls
+          hosts:
+            - 8gcr.container-registry.dev
+      annotations:
+        nginx.ingress.kubernetes.io/proxy-body-size: "0"
+        nginx.ingress.kubernetes.io/ssl-redirect: "true"
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+        # Demo-only config lock: every user on this tenant is a system admin
+        # (see the CNPG postInitApplicationSQL trigger below), so the built-in
+        # role check can no longer gate configuration writes. This guard pins
+        # write access to /api/v2.0/configurations to the *username* `admin`.
+        # It asks Harbor who the caller is (works for Basic auth and portal
+        # session cookies alike) and 403s everyone else. Reads are untouched.
+        # kube-dns (10.96.0.10) is the cluster's fixed DNS Service IP; the core
+        # Service is addressed by name so its ClusterIP can change freely.
+        nginx.ingress.kubernetes.io/server-snippet: |
+          location = /api/v2.0/configurations {
+              resolver 10.96.0.10 valid=30s ipv6=off;
+              set $cfg_upstream harbor-harbor-next-core.8gcr-dev-main.svc.cluster.local;
+              access_by_lua_block {
+                  local m = ngx.req.get_method()
+                  if m == "PUT" or m == "POST" or m == "DELETE" or m == "PATCH" then
+                      local http = require "resty.http"
+                      local httpc = http.new()
+                      httpc:set_timeout(3000)
+                      local ok, cerr = httpc:connect("harbor-harbor-next-core.8gcr-dev-main.svc.cluster.local", 80)
+                      if not ok then
+                          ngx.log(ngx.ERR, "cfg-guard connect: ", cerr)
+                          return ngx.exit(403)
+                      end
+                      local res, rerr = httpc:request({
+                          method = "GET",
+                          path = "/api/v2.0/users/current",
+                          headers = {
+                              ["Authorization"] = ngx.var.http_authorization,
+                              ["Cookie"] = ngx.var.http_cookie,
+                              ["Host"] = ngx.var.host,
+                              ["Accept"] = "application/json",
+                          },
+                      })
+                      if not res then
+                          ngx.log(ngx.ERR, "cfg-guard request: ", rerr)
+                          httpc:close()
+                          return ngx.exit(403)
+                      end
+                      local body = res:read_body() or ""
+                      httpc:set_keepalive()
+                      local uname
+                      if res.status == 200 then
+                          uname = string.match(body, '"username"%s*:%s*"([^"]*)"')
+                      end
+                      if uname ~= "admin" then
+                          ngx.status = 403
+                          ngx.header["Content-Type"] = "application/json"
+                          ngx.say('{"errors":[{"code":"FORBIDDEN","message":"configuration changes are restricted to the admin account on this demo"}]}')
+                          return ngx.exit(403)
+                      end
+                  end
+              }
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+              proxy_set_header X-Forwarded-Host $host;
+              proxy_http_version 1.1;
+              proxy_pass http://$cfg_upstream:80$request_uri;
+          }
+    # ---- Database ----
+    # Both CNPG bootstrap (extraManifests below) and Harbor's runtime DB client
+    # read the SAME Secret/harbor-db-password. CNPG requires basic-auth type
+    # (keys: username, password); Harbor's chart reads .password via
+    # existingSecretKey. One secret, one source of truth — no drift between
+    # bootstrap and runtime.
+    database:
+      host: harbor-db-rw.8gcr-dev-main.svc.cluster.local
+      port: 5432
+      username: harbor
+      database: registry
+      sslmode: disable
+      existingSecret: harbor-db-password
+      existingSecretKey: password
+    # ---- Valkey (in-chart, default standalone) ----
+    valkey:
+      enabled: true
+      architecture: standalone
+      auth:
+        enabled: false
+    # ---- Component images (continuous deploy via 8gcr/:latest) ----
+    # Rollouts are gitless: image-reflector (image-tracking.yaml) follows each
+    # mutable latest tag by digest, and the rollout-sync CronJob
+    # (rollout-sync.yaml) writes that digest into the workloads' pod-template
+    # annotations in-cluster; imagePullPolicy: Always re-pulls latest. The
+    # chart intentionally does NOT render those annotations — Helm never
+    # manages the key, so upgrades neither reset nor churn it.
+    core:
+      image:
+        repository: 8gears.container-registry.com/8gcr/harbor-core
+        tag: latest
+      replicas: 1
+      # The chart's core ConfigMap hardcodes this to the OCI providers only, so
+      # binding a project to an npm or Maven endpoint is rejected with
+      # "unsupported registry type npm" even though the adapters are registered
+      # and the endpoints report healthy. env overrides envFrom for a duplicate
+      # key, so this wins over the ConfigMap without a chart change.
+      #
+      # The list is the chart's own default plus the package formats the build
+      # supports; dropping any of the originals would break existing proxy
+      # projects.
+      extraEnv:
+        - name: PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE
+          value: "docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory,npm,npmjs,pypi,pypi-registry,maven,maven-central,cargo,crates-io,go,go-registry,go-sumdb,homebrew,homebrew-registry"
+        - name: WITH_GRYPE
+          value: "true"
+        - name: GRYPE_ADAPTER_URL
+          value: http://grype-scanner:8080
+        - name: DEFAULT_SCANNER
+          value: Trivy
+    jobservice:
+      image:
+        repository: 8gears.container-registry.com/8gcr/harbor-jobservice
+        tag: latest
+      replicas: 1
+      persistence:
+        enabled: true
+        storageClass: local-path
+        size: 1Gi
+    registry:
+      image:
+        repository: 8gears.container-registry.com/8gcr/harbor-registry
+        tag: latest
+      controller:
+        image:
+          repository: 8gears.container-registry.com/8gcr/harbor-registryctl
+          tag: latest
+      replicas: 1
+      persistence:
+        enabled: true
+        storageClass: local-path
+        size: 10Gi
+    portal:
+      image:
+        repository: 8gears.container-registry.com/8gcr/harbor-portal
+        tag: latest
+      replicas: 1
+    exporter:
+      enabled: true
+      image:
+        repository: 8gears.container-registry.com/8gcr/harbor-exporter
+        tag: latest
+      replicas: 1
+    trivy:
+      enabled: true
+      image:
+        repository: 8gears.container-registry.com/8gcr/trivy-adapter
+        tag: latest
+      replicas: 1
+    # ---- CNPG Postgres provisioned via the chart's extraManifests escape hatch ----
+    # The harbor-db-password Secret it references is provisioned out-of-band
+    # (SOPS-encrypted in k8s/apps); must contain keys: username, password.
+    extraManifests:
+      - apiVersion: postgresql.cnpg.io/v1
+        kind: Cluster
+        metadata:
+          name: harbor-db
+        spec:
+          imageName: ghcr.io/cloudnative-pg/postgresql:17
+          instances: 1
+          storage:
+            size: 5Gi
+          bootstrap:
+            initdb:
+              database: registry
+              owner: harbor
+              secret:
+                name: harbor-db-password
+              # Demo-only: auto-promote every newly registered user to system
+              # admin (mirrors demo.goharbor.io). Harbor owns the schema and
+              # creates `harbor_user` during its own migrations, which run long
+              # after initdb — so we cannot CREATE TRIGGER here directly. Instead
+              # we install a one-shot DDL event trigger (superuser context) that
+              # fires when Harbor first creates `harbor_user`, then installs the
+              # BEFORE INSERT row trigger. `anonymous` (Harbor's internal
+              # unauthenticated principal) is excluded. Config writes are still
+              # fenced to the real `admin` account by the ingress server-snippet
+              # above. Scope is this tenant's CNPG cluster only — NOT baked into
+              # the shared 8gcr/harbor-core image, which other tenants also pull.
+              # Written without dollar quoting: the nested $$/$body$ variant
+              # died at first real initdb with `syntax error at or near "$"`
+              # (2026-08-29 factory reset; the original cluster predated this
+              # SQL, so the initdb path had never run). Single-quoted plpgsql
+              # bodies with doubled inner quotes survive every layer verbatim.
+              postInitApplicationSQL:
+                - |
+                  CREATE OR REPLACE FUNCTION public.demo_promote_new_user_to_admin() RETURNS trigger
+                  LANGUAGE plpgsql AS '
+                  BEGIN
+                    IF NEW.username IS DISTINCT FROM ''anonymous'' THEN
+                      NEW.sysadmin_flag := true;
+                    END IF;
+                    RETURN NEW;
+                  END;
+                  ';
+                - |
+                  CREATE OR REPLACE FUNCTION public.demo_install_promote_admin() RETURNS event_trigger
+                  LANGUAGE plpgsql AS '
+                  BEGIN
+                    IF to_regclass(''public.harbor_user'') IS NOT NULL
+                       AND NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = ''trg_demo_promote_new_user_to_admin'') THEN
+                      CREATE TRIGGER trg_demo_promote_new_user_to_admin BEFORE INSERT ON harbor_user
+                        FOR EACH ROW EXECUTE FUNCTION public.demo_promote_new_user_to_admin();
+                    END IF;
+                  END;
+                  ';
+                - |
+                  CREATE EVENT TRIGGER demo_install_promote_admin_evt
+                    ON ddl_command_end WHEN TAG IN ('CREATE TABLE')
+                    EXECUTE FUNCTION demo_install_promote_admin();
+      - apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: grype-scanner
+          labels:
+            app.kubernetes.io/name: grype-scanner
+            app.kubernetes.io/component: scanner
+            app.kubernetes.io/part-of: harbor
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app.kubernetes.io/name: grype-scanner
+          template:
+            metadata:
+              labels:
+                app.kubernetes.io/name: grype-scanner
+                app.kubernetes.io/component: scanner
+                app.kubernetes.io/part-of: harbor
+            spec:
+              imagePullSecrets:
+                - name: harbor-system-pull
+              securityContext:
+                fsGroup: 101
+                fsGroupChangePolicy: OnRootMismatch
+                runAsGroup: 101
+                runAsNonRoot: true
+                runAsUser: 100
+                seccompProfile:
+                  type: RuntimeDefault
+              containers:
+                - name: scanner
+                  image: 8gears.container-registry.com/8gcr/harbor-grype-adapter:latest
+                  imagePullPolicy: Always
+                  securityContext:
+                    allowPrivilegeEscalation: false
+                    capabilities:
+                      drop:
+                        - ALL
+                    runAsNonRoot: true
+                  env:
+                    - name: SCANNER_API_SERVER_ADDR
+                      value: ":8080"
+                    - name: SCANNER_GRYPE_CACHE_DIR
+                      value: /home/scanner/cache
+                    - name: SCANNER_GRYPE_DB_CACHE_DIR
+                      value: /home/scanner/cache/grype-db
+                    - name: SCANNER_GRYPE_SCOPE
+                      value: squashed
+                  ports:
+                    - name: http
+                      containerPort: 8080
+                  readinessProbe:
+                    httpGet:
+                      path: /probe/ready
+                      port: http
+                  livenessProbe:
+                    httpGet:
+                      path: /probe/healthy
+                      port: http
+                  resources:
+                    requests:
+                      cpu: 100m
+                      memory: 256Mi
+                    limits:
+                      memory: 2Gi
+                  volumeMounts:
+                    - name: cache
+                      mountPath: /home/scanner/cache
+                    - name: tmp
+                      mountPath: /tmp
+              volumes:
+                - name: cache
+                  emptyDir:
+                    sizeLimit: 4Gi
+                - name: tmp
+                  emptyDir:
+                    sizeLimit: 2Gi
+      - apiVersion: v1
+        kind: Service
+        metadata:
+          name: grype-scanner
+          labels:
+            app.kubernetes.io/name: grype-scanner
+            app.kubernetes.io/component: scanner
+            app.kubernetes.io/part-of: harbor
+        spec:
+          selector:
+            app.kubernetes.io/name: grype-scanner
+          ports:
+            - name: http
+              port: 8080
+              targetPort: http
