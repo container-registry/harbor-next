@@ -376,8 +376,11 @@ swap — keep it in sync with goharbor/harbor-helm on appVersion bumps.
     registry: 8gcr/harbor-registry
     registryctl: 8gcr/harbor-registryctl
     portal: 8gcr/harbor-portal
-    trivy: 8gcr/trivy-adapter
+    trivy: 8gcr/harbor-scanner-trivy
     exporter: 8gcr/harbor-exporter
+  tags:
+    # renovate: datasource=github-tags depName=container-registry/harbor-scanner-trivy
+    trivy: v0.42.1
 upstream:
   registry: docker.io
   repos:
@@ -429,7 +432,7 @@ style, e.g. ttl.sh/foo/harbor-core) is NOT double-prefixed by the source map.
 {{- if $img.digest -}}
 {{- printf "%s@%s" $ref $img.digest -}}
 {{- else -}}
-{{- $tag := $img.tag | default $root.Chart.AppVersion -}}
+{{- $tag := $img.tag | default (index ($cfg.tags | default dict) .component) | default $root.Chart.AppVersion -}}
 {{- printf "%s:%s" $ref $tag -}}
 {{- end -}}
 {{- end }}
@@ -611,6 +614,10 @@ Validate required values
 {{- end }}
 {{- if and .Values.metrics.serviceMonitor.enabled (not .Values.metrics.enabled) }}
 {{- fail "metrics.serviceMonitor.enabled requires metrics.enabled=true. Without metrics enabled, Harbor pods do not expose the /metrics endpoint the ServiceMonitor would scrape." }}
+{{- end }}
+{{- $sub := index .Values "harbor-scanner-trivy" }}
+{{- if and $sub.enabled (eq (($sub.redis).url | default "") "redis://valkey:6379/5") (not ($sub.redis).existingSecret) (or (not .Values.valkey.enabled) (.Values.valkey.auth).enabled (ne (include "harbor.redis.host" .) "valkey")) }}
+{{- fail "harbor-scanner-trivy cannot inherit this chart's Redis settings: set harbor-scanner-trivy.redis.url (or redis.existingSecret) unless the bundled passwordless Valkey named valkey is used." }}
 {{- end }}
 {{- /* HPA min/max sanity — fail fast at template time rather than letting K8s reject. */}}
 {{- range $name, $cfg := dict "core" .Values.core "registry" .Values.registry "jobservice" .Values.jobservice "portal" .Values.portal "trivy" .Values.trivy }}

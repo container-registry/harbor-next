@@ -90,15 +90,25 @@ Registryctl container port
 8080
 {{- end }}
 
+{{/* The harbor-scanner-trivy subchart wins when both modes are enabled. TODO(2.17): drop built-in mode. */}}
+{{- define "harbor.trivy.builtin" -}}
+{{ and .Values.trivy.enabled (not (index .Values "harbor-scanner-trivy").enabled) }}
+{{- end }}
+
 {{/*
 Return the Trivy adapter URL (if enabled)
 */}}
 {{- define "harbor.trivy.url" -}}
-http://{{ include "harbor.fullname" . }}-trivy:8080
+{{- $sub := index .Values "harbor-scanner-trivy" -}}
+{{- if $sub.enabled -}}
+{{ ternary "https" "http" ((($sub.api).tls).enabled | toString | eq "true") }}://{{ include "harbor.trivy" . }}:{{ ($sub.service).port | default 8080 }}
+{{- else -}}
+http://{{ include "harbor.trivy" . }}:8080
+{{- end -}}
 {{- end }}
 
 {{- define "harbor.trivy.enabled" -}}
-{{ .Values.trivy.enabled }}
+{{ or .Values.trivy.enabled (index .Values "harbor-scanner-trivy").enabled }}
 {{- end }}
 
 {{/*
@@ -131,8 +141,17 @@ Component name helpers (used by noProxy and other cross-component references)
   {{- printf "%s-database" (include "harbor.fullname" .) -}}
 {{- end -}}
 
+{{/* Subchart mode mirrors harbor-scanner-trivy's fullname helper. */}}
 {{- define "harbor.trivy" -}}
-  {{- printf "%s-trivy" (include "harbor.fullname" .) -}}
+  {{- $sub := index .Values "harbor-scanner-trivy" -}}
+  {{- $name := default "harbor-scanner-trivy" $sub.nameOverride -}}
+  {{- if not $sub.enabled -}}
+    {{- printf "%s-trivy" (include "harbor.fullname" .) -}}
+  {{- else if $sub.fullnameOverride -}}
+    {{- $sub.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+  {{- else -}}
+    {{- ternary .Release.Name (printf "%s-%s" .Release.Name $name) (contains $name .Release.Name) | trunc 63 | trimSuffix "-" -}}
+  {{- end -}}
 {{- end -}}
 
 {{- define "harbor.nginx" -}}

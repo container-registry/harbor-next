@@ -504,6 +504,10 @@ tls:
     renewBefore: 360h  # 15 days
 ```
 
+### Trivy Scanner Subchart Mode
+
+`harbor-scanner-trivy.enabled: true` deploys the Trivy adapter from the [harbor-scanner-trivy](https://github.com/container-registry/harbor-scanner-trivy/tree/main/deploy/chart) subchart instead of the built-in `trivy.*` templates; it wins when both are enabled. Its values follow that chart's shape, and its Redis URL defaults to the bundled Valkey, so set `harbor-scanner-trivy.redis.url` for external Redis or Valkey auth. Key map: [MIGRATION-REFERENCE](docs/MIGRATION-REFERENCE.md).
+
 ### HPA / Autoscaling
 
 Per-component HPAs target the matching Deployment (or the trivy StatefulSet) and the controller template OMITS `replicas:` whenever `autoscaling.enabled=true` — otherwise each `helm upgrade` would reset the count and fight the HPA. Available on `core`, `jobservice`, `registry`, `portal`, and `trivy`.

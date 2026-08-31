@@ -42,6 +42,10 @@ dependencies:
     version: "0.21.2"
     repository: "oci://registry-1.docker.io/cloudpirates"
     condition: postgresql.enabled
+  - name: harbor-scanner-trivy
+    version: "1.0.1"
+    repository: "oci://8gears.container-registry.com/8gcr/charts"
+    condition: harbor-scanner-trivy.enabled
 
 # Artifact Hub metadata (https://artifacthub.io/docs/topics/annotations/helm/).
 # Keep this the LAST top-level key: the release pipeline appends the

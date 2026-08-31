@@ -851,6 +851,16 @@
         }
       }
     },
+    "harbor-scanner-trivy": {
+      "type": "object",
+      "description": "harbor-scanner-trivy subchart values, validated by the subchart's own schema",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
     "tls": {
       "type": "object",
       "description": "TLS configuration",
