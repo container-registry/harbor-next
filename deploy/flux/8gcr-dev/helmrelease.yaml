@@ -155,6 +155,11 @@ spec:
           value: "true"
         - name: GRYPE_ADAPTER_URL
           value: http://grype-scanner:8080
+        # 0007 patch defaults WITH_SNYK=true but no deployment runs a
+        # snyk-scanner (needs Snyk API creds) — kills the phantom unhealthy
+        # snyk entry in /api/v2.0/health
+        - name: WITH_SNYK
+          value: "false"
         - name: DEFAULT_SCANNER
           value: Trivy
     jobservice:
