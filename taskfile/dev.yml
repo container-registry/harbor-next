@@ -396,6 +396,35 @@ tasks:
     desc: Open interactive psql session on the dev database
     cmd: '{{.COMPOSE_CMD}} exec postgresql psql -U {{.POSTGRES_USER}} -d {{.POSTGRES_DB}}'
 
+  db:snapshot:
+    desc: >-
+      Dump the dev database to backups/ before an upgrade/migration test —
+      the only lossless way back to this point, since Harbor's migrations
+      are up-only (there is no schema downgrade). SNAPSHOT_NAME picks the
+      file name; defaults to a timestamp.
+    vars:
+      SNAPSHOT_NAME: '{{.SNAPSHOT_NAME | default (now | date "20060102-150405")}}'
+      SNAPSHOT_FILE: 'backups/{{.SNAPSHOT_NAME}}.dump'
+    cmds:
+      - mkdir -p backups
+      - '{{.COMPOSE_CMD}} exec -T postgresql pg_dump -U {{.POSTGRES_USER}} -Fc {{.POSTGRES_DB}} > {{.SNAPSHOT_FILE}}'
+      - echo "Snapshot written to {{.SNAPSHOT_FILE}}"
+
+  db:restore:
+    desc: >-
+      Restore the dev database from a snapshot taken by db:snapshot. This
+      is a full replace — anything written since the snapshot is lost.
+      Pass SNAPSHOT_FILE=backups/<name>.dump.
+    requires:
+      vars: [SNAPSHOT_FILE]
+    prompt: "This replaces all data in {{.POSTGRES_DB}} with {{.SNAPSHOT_FILE}}. Continue?"
+    cmds:
+      - test -f '{{.SNAPSHOT_FILE}}'
+      - '{{.COMPOSE_CMD}} exec -T postgresql dropdb -U {{.POSTGRES_USER}} {{.POSTGRES_DB}} --if-exists'
+      - '{{.COMPOSE_CMD}} exec -T postgresql createdb -U {{.POSTGRES_USER}} {{.POSTGRES_DB}}'
+      - '{{.COMPOSE_CMD}} exec -T postgresql pg_restore -U {{.POSTGRES_USER}} -d {{.POSTGRES_DB}} < {{.SNAPSHOT_FILE}}'
+      - echo "Restored {{.POSTGRES_DB}} from {{.SNAPSHOT_FILE}}"
+
   # ---------------------------------------------------------------------------
   # Release Test (deploy/compose)
   # ---------------------------------------------------------------------------
