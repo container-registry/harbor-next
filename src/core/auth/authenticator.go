@@ -150,8 +150,7 @@ func Login(ctx context.Context, m models.AuthModel) (*models.User, error) {
 	}
 	if lock.IsLocked(m.Principal) {
 		log.Debugf("%s is locked due to login failure, login failed", m.Principal)
-		// nolint:nilnil // user is locked
-		return nil, nil
+		return nil, NewErrAuth("user is locked due to repeated login failures")
 	}
 	user, err := authenticator.Authenticate(ctx, m)
 	if err != nil {
