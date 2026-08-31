@@ -31,7 +31,6 @@ tasks:
       - task: 'binary:registryctl:{{.PLATFORM}}'
       - task: 'binary:exporter:{{.PLATFORM}}'
       - task: 'binary:registry:{{.PLATFORM}}'
-      - task: 'binary:trivy-adapter:{{.PLATFORM}}'
 
   # --- Internal Go Build ---
 
@@ -192,55 +191,6 @@ tasks:
         go mod edit -require golang.org/x/net@v0.55.0
         go mod tidy -e
         CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/lprobe" .
-
-  binary:trivy:*:
-    desc: "Build Trivy CLI binary"
-    run: once
-    generates:
-      - bin/{{index .MATCH 0}}/trivy
-    vars:
-      PLATFORM: '{{index .MATCH 0}}'
-      GOOS: '{{index (splitList "-" (index .MATCH 0)) 0}}'
-      GOARCH: '{{index (splitList "-" (index .MATCH 0)) 1}}'
-    cmds:
-      - cmd: mkdir -p bin/{{.PLATFORM}}
-        silent: true
-      - |
-        TRIVY_DIR=$(mktemp -d)
-        trap "rm -rf $TRIVY_DIR" EXIT
-        git clone --branch v{{.TRIVY_VERSION}} --depth 1 https://github.com/aquasecurity/trivy.git "$TRIVY_DIR"
-        cd "$TRIVY_DIR"
-        go mod edit -require github.com/containerd/containerd/v2@v2.3.2
-        go mod tidy -e
-        GOEXPERIMENT=jsonv2 CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath \
-          -ldflags "-s -w -X github.com/aquasecurity/trivy/pkg/version/app.ver={{.TRIVY_VERSION}}" \
-          -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/trivy" ./cmd/trivy
-        git rev-parse --short=8 HEAD > "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/.trivy-commit"
-
-  binary:trivy-adapter:*:
-    desc: "Build harbor-scanner-trivy binary (cross-compiled from source)"
-    generates:
-      - bin/{{index .MATCH 0}}/scanner-trivy
-    vars:
-      PLATFORM: '{{index .MATCH 0}}'
-      GOOS: '{{index (splitList "-" (index .MATCH 0)) 0}}'
-      GOARCH: '{{index (splitList "-" (index .MATCH 0)) 1}}'
-    cmds:
-      - cmd: mkdir -p bin/{{.PLATFORM}}
-        silent: true
-      - |
-        TRIVY_DIR=$(mktemp -d)
-        trap "rm -rf $TRIVY_DIR" EXIT
-        git clone --branch {{.HARBOR_SCANNER_TRIVY_VERSION}} --depth 1 https://github.com/container-registry/harbor-scanner-trivy.git "$TRIVY_DIR"
-        cd "$TRIVY_DIR"
-        ADAPTER_COMMIT=$(git rev-parse --short=8 HEAD)
-        VERSION_STR={{.HARBOR_SCANNER_TRIVY_VERSION}}
-        LDFLAGS="-s -w -X main.version=${VERSION_STR#v} -X main.commit=${ADAPTER_COMMIT} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-        # GOTOOLCHAIN=auto: the adapter's go.mod may require a newer patch
-        # toolchain than Harbor's pinned Go (CI runs GOTOOLCHAIN=local).
-        GOTOOLCHAIN=auto CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath -ldflags "${LDFLAGS}" -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/scanner-trivy" cmd/scanner-trivy/main.go
-
-  # --- API Generation ---
 
   require-swagger:
     internal: true

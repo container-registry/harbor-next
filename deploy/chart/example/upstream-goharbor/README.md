@@ -12,10 +12,12 @@ image:
 ```
 
 `image.source` selects the registry and the per-component repository for every
-component. Upstream renames two images — the registry container is
-`registry-photon` and the trivy adapter is `trivy-adapter-photon` — which the
-preset handles for you (see the `harbor.image.sourceMap` helper for the map).
-The image tag defaults to the chart `appVersion`.
+component. Upstream renames one image — the registry container is
+`registry-photon` — which the preset handles for you (see the
+`harbor.image.sourceMap` helper for the map). The image tag defaults to the
+chart `appVersion`. The Trivy adapter is the harbor-scanner-trivy subchart
+and keeps its own image regardless of the preset; set `trivy.image.*` to
+point it elsewhere (e.g. at `goharbor/harbor-scanner-trivy`).
 
 ## Deploy
 

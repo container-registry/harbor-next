@@ -7,8 +7,10 @@
 #
 # The single switch is `image.source: upstream`. It selects docker.io and the
 # goharbor repositories for every component (including the renamed
-# registry-photon and trivy-adapter-photon). No per-component image config is
-# needed — see the harbor.image.sourceMap helper for the exact map.
+# registry-photon). No per-component image config is needed — see the
+# harbor.image.sourceMap helper for the exact map. The Trivy adapter is the
+# harbor-scanner-trivy subchart and keeps its own image regardless of the
+# preset; set trivy.image.* to point it elsewhere.
 
 externalURL: "https://harbor.example.com"
 # REQUIRED — change this (or point existingSecretAdminPassword at a Secret).
