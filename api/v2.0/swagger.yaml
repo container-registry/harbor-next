@@ -9412,6 +9412,9 @@ definitions:
       disabled_audit_log_event_types:
         $ref: '#/definitions/StringConfigItem'
         description: The audit log event types to skip to log in database
+      default_project_name:
+        $ref: '#/definitions/StringConfigItem'
+        description: The project that catches repositories pushed or pulled without a project segment. Empty disables the fallback.
   Configurations:
     type: object
     properties:
@@ -9708,6 +9711,11 @@ definitions:
       disabled_audit_log_event_types:
         type: string
         description: the list to disable log audit event types.
+        x-omitempty: true
+        x-isnullable: true
+      default_project_name:
+        type: string
+        description: The project that catches repositories pushed or pulled without a project segment. Empty disables the fallback.
         x-omitempty: true
         x-isnullable: true
   StringConfigItem:
