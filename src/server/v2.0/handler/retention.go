@@ -174,11 +174,27 @@ var (
 					"repoExcludes",
 				},
 			},
+			{
+				DisplayText: "Repositories",
+				Kind:        "regex",
+				Decorations: []string{
+					"repoMatches",
+					"repoExcludes",
+				},
+			},
 		},
 		TagSelectors: []*models.RetentionSelectorMetadata{
 			{
 				DisplayText: "Tags",
 				Kind:        "doublestar",
+				Decorations: []string{
+					"matches",
+					"excludes",
+				},
+			},
+			{
+				DisplayText: "Tags",
+				Kind:        "regex",
 				Decorations: []string{
 					"matches",
 					"excludes",
