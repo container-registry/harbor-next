@@ -363,9 +363,11 @@ Image helpers
 
 {{/*
 Per-source image defaults. `image.source` (8gcr | upstream) picks a registry and
-the per-component repository path. Upstream goharbor renames two images
-(`registry-photon`, `trivy-adapter-photon`), so this is a real map, not a host
-swap — keep it in sync with goharbor/harbor-helm on appVersion bumps.
+the per-component repository path. Upstream goharbor renames one image
+(`registry-photon`), so this is a real map, not a host swap — keep it in
+sync with goharbor/harbor-helm on appVersion bumps. The Trivy adapter is
+not listed: it comes from the harbor-scanner-trivy subchart, which carries
+its own image reference.
 */}}
 {{- define "harbor.image.sourceMap" -}}
 8gcr:
@@ -376,7 +378,6 @@ swap — keep it in sync with goharbor/harbor-helm on appVersion bumps.
     registry: 8gcr/harbor-registry
     registryctl: 8gcr/harbor-registryctl
     portal: 8gcr/harbor-portal
-    trivy: 8gcr/trivy-adapter
     exporter: 8gcr/harbor-exporter
 upstream:
   registry: docker.io
@@ -386,7 +387,6 @@ upstream:
     registry: goharbor/registry-photon
     registryctl: goharbor/harbor-registryctl
     portal: goharbor/harbor-portal
-    trivy: goharbor/trivy-adapter-photon
     exporter: goharbor/harbor-exporter
 {{- end -}}
 
@@ -555,7 +555,7 @@ Validate required values
 {{- fail "metrics.serviceMonitor.enabled requires metrics.enabled=true. Without metrics enabled, Harbor pods do not expose the /metrics endpoint the ServiceMonitor would scrape." }}
 {{- end }}
 {{- /* HPA min/max sanity — fail fast at template time rather than letting K8s reject. */}}
-{{- range $name, $cfg := dict "core" .Values.core "registry" .Values.registry "jobservice" .Values.jobservice "portal" .Values.portal "trivy" .Values.trivy }}
+{{- range $name, $cfg := dict "core" .Values.core "registry" .Values.registry "jobservice" .Values.jobservice "portal" .Values.portal }}
 {{- if and $cfg.autoscaling $cfg.autoscaling.enabled }}
 {{- if not $cfg.autoscaling.maxReplicas }}
 {{- fail (printf "%s.autoscaling.enabled=true requires %s.autoscaling.maxReplicas to be set." $name $name) }}

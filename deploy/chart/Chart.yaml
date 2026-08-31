@@ -35,6 +35,16 @@ dependencies:
     version: "0.9.3"
     repository: "oci://ghcr.io/valkey-io/valkey-helm"
     condition: valkey.enabled
+  # The Trivy adapter is no longer built or templated in-tree: it is consumed
+  # as the standalone harbor-scanner-trivy chart (its own release line in
+  # github.com/container-registry/harbor-scanner-trivy). The alias keeps the
+  # familiar `trivy.*` values namespace and names its resources
+  # `<release>-trivy`.
+  - name: harbor-scanner-trivy
+    version: "1.0.1"
+    repository: "oci://8gears.container-registry.com/8gcr/charts"
+    alias: trivy
+    condition: trivy.enabled
 
 # Artifact Hub metadata (https://artifacthub.io/docs/topics/annotations/helm/).
 # Keep this the LAST top-level key: the release pipeline appends the

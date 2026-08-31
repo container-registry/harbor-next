@@ -17,7 +17,10 @@
 
 advice =: atom([])
 
-components =: qw(core portal registry jobservice exporter trivy)
+# trivy is absent: it is the harbor-scanner-trivy subchart, which validates
+# its own autoscaling/PDB shapes (its keys differ - podDisruptionBudget,
+# replicaCount) via its values.schema.json and validate-values template.
+components =: qw(core portal registry jobservice exporter)
 storage-drivers =: qw(filesystem s3 azure gcs oss swift inmemory)
 
 defn main(values-file):
@@ -130,8 +133,8 @@ defn check-secret-hygiene(vals):
       'externalRedis.existingSecret'
   when-not present?(vals.existingSecretSecretKey):
     warn-inline vals ['secretKey']: 'existingSecretSecretKey'
-  warn-inline vals ['trivy' 'gitHubToken']:
-    'trivy.secret via an extraEnv valueFrom'
+  warn-inline vals ['trivy' 'trivy' 'gitHubToken']:
+    'trivy.trivy.existingSecret (subchart Secret for the GitHub token)'
   warn-inline vals ['imageCredentials' 'password']:
     'imagePullSecrets with a pre-created Secret'
   warn-inline vals ['valkey' 'auth' 'password']:

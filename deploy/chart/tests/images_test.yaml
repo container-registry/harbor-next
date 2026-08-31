@@ -1,7 +1,7 @@
 # Image resolution: image.source preset, per-component overrides,
 # global.imageRegistry, and digest pinning, exercised through the
 # harbor.image helper. Per-component registry/repository/tag override
-# composition is covered in the component suites (core/portal/jobservice/trivy).
+# composition is covered in the component suites (core/portal/jobservice).
 suite: image resolution (source / global registry / digest)
 # checksum includes on the rendered workloads require their referenced
 # configmap/secret templates to be present in this suite (helm-unittest only
@@ -15,10 +15,6 @@ templates:
   - templates/registry.secret.yaml
   - templates/registryctl.configmap.yaml
   - templates/registryctl.secret.yaml
-  - templates/trivy.statefulset.yaml
-  - templates/trivy.secret.yaml
-  - templates/trivy.configmap-env.yaml
-  - templates/trivy.secret-env.yaml
 set:
   externalURL: https://harbor.example.com
   database.host: postgres.example.com
@@ -45,17 +41,6 @@ tests:
       - matchRegex:
           path: spec.template.spec.containers[1].image
           pattern: '^docker\.io/goharbor/harbor-registryctl:'
-
-  # source=upstream renames trivy-adapter-photon.
-  - it: should resolve upstream trivy-adapter-photon when source=upstream
-    template: templates/trivy.statefulset.yaml
-    set:
-      trivy.enabled: true
-      image.source: upstream
-    asserts:
-      - matchRegex:
-          path: spec.template.spec.containers[0].image
-          pattern: '^docker\.io/goharbor/trivy-adapter-photon:'
 
   # global.imageRegistry overrides the host for all images (air-gap/mirror),
   # preserving the source repository path. Wins over image.source registry.

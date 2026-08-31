@@ -20,14 +20,10 @@ The Chart.yaml minimum kubeVersion (`>=1.28.0-0`) covers it.
   (dict "name" "jobservice" "kind" "Deployment" "values" .Values.jobservice)
   (dict "name" "registry" "kind" "Deployment" "values" .Values.registry)
   (dict "name" "portal" "kind" "Deployment" "values" .Values.portal)
-  (dict "name" "trivy" "kind" "StatefulSet" "values" .Values.trivy)
 -}}
 {{- range $c := $components }}
 {{- $vals := $c.values }}
 {{- if and $vals.autoscaling $vals.autoscaling.enabled }}
-{{- /* Skip trivy HPA when trivy itself is disabled — otherwise the HPA
-       targets a controller that doesn't exist. */}}
-{{- if not (and (eq $c.name "trivy") (not $.Values.trivy.enabled)) }}
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -70,6 +66,5 @@ spec:
   behavior:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-{{- end }}
 {{- end }}
 {{- end }}

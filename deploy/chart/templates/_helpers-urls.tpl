@@ -94,7 +94,7 @@ Registryctl container port
 Return the Trivy adapter URL (if enabled)
 */}}
 {{- define "harbor.trivy.url" -}}
-http://{{ include "harbor.fullname" . }}-trivy:8080
+http://{{ include "harbor.trivy" . }}:{{ ((.Values.trivy.service).port) | default 8080 }}
 {{- end }}
 
 {{- define "harbor.trivy.enabled" -}}
@@ -131,8 +131,23 @@ Component name helpers (used by noProxy and other cross-component references)
   {{- printf "%s-database" (include "harbor.fullname" .) -}}
 {{- end -}}
 
+{{/*
+Trivy is a subchart (harbor-scanner-trivy, alias "trivy"), so its resource
+names come from THAT chart's fullname helper evaluated with the alias as
+.Chart.Name. Replicate it exactly: keep in sync with harbor-scanner-trivy's
+_helpers.tpl on dependency bumps.
+*/}}
 {{- define "harbor.trivy" -}}
-  {{- printf "%s-trivy" (include "harbor.fullname" .) -}}
+  {{- if .Values.trivy.fullnameOverride -}}
+    {{- .Values.trivy.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+  {{- else -}}
+    {{- $name := default "trivy" .Values.trivy.nameOverride -}}
+    {{- if contains $name .Release.Name -}}
+      {{- .Release.Name | trunc 63 | trimSuffix "-" -}}
+    {{- else -}}
+      {{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+    {{- end -}}
+  {{- end -}}
 {{- end -}}
 
 {{- define "harbor.nginx" -}}

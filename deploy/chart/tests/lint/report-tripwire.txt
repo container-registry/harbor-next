@@ -23,8 +23,8 @@ WARN — review recommended (10)
       Plaintext credential in the values file — anyone with read access to the file or the release manifest can read it. Prefer externalRedis.existingSecret.
   * secretKey
       Plaintext credential in the values file — anyone with read access to the file or the release manifest can read it. Prefer existingSecretSecretKey.
-  * trivy.gitHubToken
-      Plaintext credential in the values file — anyone with read access to the file or the release manifest can read it. Prefer trivy.secret via an extraEnv valueFrom.
+  * trivy.trivy.gitHubToken
+      Plaintext credential in the values file — anyone with read access to the file or the release manifest can read it. Prefer trivy.trivy.existingSecret (subchart Secret for the GitHub token).
   * registry.secret.REGISTRY_STORAGE_S3_ACCESSKEY
       Inline storage credential — prefer a pre-created Secret via registry.storageCredentials.<backend>.existingSecret.
   * registry.secret.REGISTRY_STORAGE_S3_SECRETKEY
