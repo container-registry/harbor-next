@@ -33,14 +33,25 @@ const (
 	ArtifactTypeSBOM = "SBOM"
 	// processorMediaType is the media type for SBOM, it's scope is only used to register the processor
 	processorMediaType = "application/vnd.goharbor.harbor.sbom.v1"
+	// MediaTypeSPDX is the SPDX SBOM media type
+	MediaTypeSPDX = "application/spdx+json"
+	// MediaTypeCycloneDX is the CycloneDX SBOM media type
+	MediaTypeCycloneDX = "application/vnd.cyclonedx+json"
 )
+
+var SupportedMediaTypes = []string{
+	processorMediaType,
+	MediaTypeSPDX,
+	MediaTypeCycloneDX,
+}
 
 func init() {
 	pc := &Processor{}
 	pc.ManifestProcessor = base.NewManifestProcessor()
-	if err := processor.Register(pc, processorMediaType); err != nil {
-		log.Errorf("failed to register processor for media type %s: %v", processorMediaType, err)
-		return
+	for _, mt := range SupportedMediaTypes {
+		if err := processor.Register(pc, mt); err != nil {
+			log.Errorf("failed to register processor for media type %s: %v", mt, err)
+		}
 	}
 }
 
@@ -77,9 +88,17 @@ func (m *Processor) AbstractAddition(_ context.Context, art *artifact.Artifact, 
 	if err != nil {
 		return nil, err
 	}
+	contentType := art.ResolveArtifactType()
+	switch contentType {
+	case MediaTypeSPDX, MediaTypeCycloneDX:
+		// use dynamically resolved type
+	default:
+		contentType = processorMediaType
+	}
+
 	return &processor.Addition{
 		Content:     content,
-		ContentType: processorMediaType,
+		ContentType: contentType,
 	}, nil
 }
 
