@@ -13,4 +13,3 @@ resources:
   - rollout-sync.yaml
   - helmrelease.yaml
   - ingress-packages.yaml
-  - observe-np16.yaml
