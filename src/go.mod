@@ -34,7 +34,11 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/gomodule/redigo v2.0.0+incompatible
+<<<<<<< HEAD
 	github.com/google/go-containerregistry v0.20.7
+=======
+	github.com/google/go-containerregistry v0.21.3
+>>>>>>> e289b8f7f (chore(deps): upgrade Go dependencies to fix CVEs (#23801))
 	github.com/google/uuid v1.6.0
 	// pin the github.com/gorilla/csrf to v1.7.2 because of issue https://github.com/goharbor/harbor/issues/22010
 	github.com/gorilla/csrf v1.7.2
@@ -121,7 +125,11 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.2.0 // indirect
+<<<<<<< HEAD
 	github.com/containerd/stargz-snapshotter/estargz v0.18.1 // indirect
+=======
+	github.com/containerd/stargz-snapshotter/estargz v0.18.2 // indirect
+>>>>>>> e289b8f7f (chore(deps): upgrade Go dependencies to fix CVEs (#23801))
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/denverdino/aliyungo v0.0.0-20191227032621-df38c6fa730c // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
@@ -183,7 +191,7 @@ require (
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/shiena/ansicolor v0.0.0-20230509054315-a9deabde6e02 // indirect
-	github.com/sirupsen/logrus v1.9.3 // indirect
+	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/smartystreets/goconvey v1.8.1 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.15.0 // indirect
@@ -216,6 +224,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.3 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gotest.tools/v3 v3.5.2 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20260317180543-43fb72c5454a // indirect
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2 // indirect
