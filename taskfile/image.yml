@@ -34,7 +34,6 @@ tasks:
       - exporter
       - portal
       - registry
-      - trivy-adapter
 
   # --- Buildx (Docker only) ---
 
@@ -141,7 +140,7 @@ tasks:
         msg: "jq is required to verify pushed image manifests"
     cmds:
       - |
-        images="harbor-core harbor-jobservice harbor-registryctl harbor-exporter harbor-portal harbor-registry trivy-adapter"
+        images="harbor-core harbor-jobservice harbor-registryctl harbor-exporter harbor-portal harbor-registry"
         if [ -f dockerfile/grype-scanner.dockerfile ]; then
           images="${images} harbor-grype-adapter"
         fi
@@ -234,23 +233,6 @@ tasks:
       - task: _binary-image
         vars:
           SERVICE: registry
-
-  trivy-adapter:
-    desc: "Build Trivy scanner adapter image (compiles binary, then builds container)"
-    cmds:
-      - task: _build-binaries
-        vars:
-          SERVICE: trivy-adapter
-      - task: _build-binaries
-        vars:
-          SERVICE: trivy
-      # The trivy commit stamp is identical across platforms (same pinned
-      # tag), so the first platform's .trivy-commit works as the source.
-      - task: _build
-        vars:
-          IMAGE_NAME: trivy-adapter
-          DOCKERFILE: trivy-adapter.dockerfile
-          BUILD_ARGS: '--build-arg HARBOR_SCANNER_TRIVY_VERSION={{.HARBOR_SCANNER_TRIVY_VERSION}} --build-arg TRIVY_BASE_IMAGE_VERSION={{.TRIVY_BASE_IMAGE_VERSION}} --build-arg TRIVY_VERSION={{.TRIVY_VERSION}} --build-arg TRIVY_COMMIT="$(cat "bin/$(echo "{{.PLATFORMS}}" | cut -d, -f1 | tr "/" "-")/.trivy-commit")"'
 
   # --- Utilities ---
 

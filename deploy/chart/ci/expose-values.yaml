@@ -15,9 +15,9 @@ trivy:
   enabled: true
   serviceAccount:
     create: true
-  pdb:
+  podDisruptionBudget:
     enabled: true
-    # Chart fails fast when a PDB is enabled without a disruption bound.
+    # The subchart fails fast when a PDB is enabled without a disruption bound.
     maxUnavailable: 1
 cache:
   enabled: true

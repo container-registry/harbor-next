@@ -52,7 +52,6 @@ templates:
   - templates/serviceaccounts.yaml
   - templates/servicemonitor.yaml
   - templates/tls-certificates.yaml
-  - templates/trivy.service.yaml
 
 release:
   name: harbor

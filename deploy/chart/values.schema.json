@@ -205,7 +205,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["core", "jobservice", "registry", "trivy"]
+            "enum": ["core", "jobservice", "registry"]
           }
         }
       }
@@ -763,71 +763,12 @@
     },
     "trivy": {
       "type": "object",
-      "description": "Trivy scanner subchart configuration",
-      "allOf": [
-        { "$ref": "#/$defs/harborComponent" }
-      ],
+      "description": "harbor-scanner-trivy subchart values, passed through verbatim (dependency alias `trivy`). The subchart's own values.schema.json validates the full surface at install time; only the condition flag is typed here.",
       "properties": {
         "enabled": {
           "type": "boolean",
-          "default": false
-        },
-        "persistence": {
-          "$ref": "#/$defs/persistence"
-        },
-        "debugMode": {
-          "type": "boolean",
-          "description": "Verbose scanning log."
-        },
-        "vulnType": {
-          "type": "string",
-          "description": "Comma-separated vulnerability types (os,library)."
-        },
-        "severity": {
-          "type": "string",
-          "description": "Comma-separated severities to check."
-        },
-        "ignoreUnfixed": {
-          "type": "boolean",
-          "description": "Display only fixed vulnerabilities."
-        },
-        "insecure": {
-          "type": "boolean",
-          "description": "Skip verifying the registry certificate."
-        },
-        "gitHubToken": {
-          "type": "string",
-          "description": "GitHub token for Trivy DB downloads (raises the anonymous rate limit)."
-        },
-        "skipUpdate": {
-          "type": "boolean",
-          "description": "Disable Trivy DB downloads."
-        },
-        "skipJavaDBUpdate": {
-          "type": "boolean",
-          "description": "Disable Trivy Java DB downloads."
-        },
-        "offlineScan": {
-          "type": "boolean",
-          "description": "Do not resolve dependencies over the network during scans."
-        },
-        "securityCheck": {
-          "type": "string",
-          "description": "Comma-separated security issue kinds to detect (defaults to vuln)."
-        },
-        "timeout": {
-          "type": "string",
-          "description": "Scan timeout (Go duration, e.g. 5m0s)."
-        },
-        "dbRepository": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "OCI repositories for the Trivy vulnerability DB, in priority order."
-        },
-        "javaDBRepository": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "OCI repositories for the Trivy Java DB, in priority order."
+          "default": false,
+          "description": "Deploy the Trivy scanner adapter (harbor-scanner-trivy subchart)."
         }
       }
     },

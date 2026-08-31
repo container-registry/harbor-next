@@ -15,7 +15,7 @@
       HTTPS_PROXY: ""
       JOBSERVICE_URL: http://harbor-harbor-next-jobservice
       LOG_LEVEL: info
-      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       PORT: "8080"
       PORTAL_URL: http://harbor-harbor-next-portal
@@ -35,7 +35,7 @@
       REGISTRY_URL: http://harbor-harbor-next-registry:5000
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
       TOKEN_SERVICE_URL: http://harbor-harbor-next-core/service/token
-      TRIVY_ADAPTER_URL: http://harbor-harbor-next-trivy:8080
+      TRIVY_ADAPTER_URL: http://harbor-trivy:8080
       WITH_TRIVY: "false"
       app.conf: |
         appname = Harbor
@@ -170,7 +170,7 @@
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
-      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
       REGISTRY_CONTROLLER_URL: http://harbor-harbor-next-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_URL: http://harbor-harbor-next-registry:5000
@@ -508,7 +508,7 @@
       HTTPS_PROXY: ""
       JOBSERVICE_URL: http://harbor-harbor-next-jobservice
       LOG_LEVEL: info
-      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       PORT: "8080"
       PORTAL_URL: http://harbor-harbor-next-portal
@@ -528,7 +528,7 @@
       REGISTRY_URL: http://harbor-harbor-next-registry:5000
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
       TOKEN_SERVICE_URL: http://harbor-harbor-next-core/service/token
-      TRIVY_ADAPTER_URL: http://harbor-harbor-next-trivy:8080
+      TRIVY_ADAPTER_URL: http://harbor-trivy:8080
       WITH_TRIVY: "false"
       app.conf: |
         appname = Harbor
@@ -663,7 +663,7 @@
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
-      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
       REGISTRY_CONTROLLER_URL: http://harbor-harbor-next-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_URL: http://harbor-harbor-next-registry:5000
@@ -1001,7 +1001,7 @@
       HTTPS_PROXY: ""
       JOBSERVICE_URL: http://harbor-harbor-next-jobservice
       LOG_LEVEL: info
-      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       PORT: "8080"
       PORTAL_URL: http://harbor-harbor-next-portal
@@ -1021,7 +1021,7 @@
       REGISTRY_URL: http://harbor-harbor-next-registry:5000
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
       TOKEN_SERVICE_URL: http://harbor-harbor-next-core/service/token
-      TRIVY_ADAPTER_URL: http://harbor-harbor-next-trivy:8080
+      TRIVY_ADAPTER_URL: http://harbor-trivy:8080
       WITH_TRIVY: "false"
       app.conf: |
         appname = Harbor
@@ -1156,7 +1156,7 @@
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
-      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
       REGISTRY_CONTROLLER_URL: http://harbor-harbor-next-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_URL: http://harbor-harbor-next-registry:5000
@@ -1495,7 +1495,7 @@
       HTTPS_PROXY: ""
       JOBSERVICE_URL: http://harbor-harbor-next-jobservice
       LOG_LEVEL: info
-      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       PORT: "8080"
       PORTAL_URL: http://harbor-harbor-next-portal
@@ -1515,7 +1515,7 @@
       REGISTRY_URL: http://harbor-harbor-next-registry:5000
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
       TOKEN_SERVICE_URL: http://harbor-harbor-next-core/service/token
-      TRIVY_ADAPTER_URL: http://harbor-harbor-next-trivy:8080
+      TRIVY_ADAPTER_URL: http://harbor-trivy:8080
       WITH_TRIVY: "false"
       app.conf: |
         appname = Harbor
@@ -1650,7 +1650,7 @@
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
-      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
       REGISTRY_CONTROLLER_URL: http://harbor-harbor-next-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_URL: http://harbor-harbor-next-registry:5000
@@ -1993,7 +1993,7 @@
       METRIC_PATH: /metrics
       METRIC_PORT: "8001"
       METRIC_SUBSYSTEM: core
-      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       PORT: "8080"
       PORTAL_URL: http://harbor-harbor-next-portal
@@ -2013,7 +2013,7 @@
       REGISTRY_URL: http://harbor-harbor-next-registry:5000
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
       TOKEN_SERVICE_URL: http://harbor-harbor-next-core/service/token
-      TRIVY_ADAPTER_URL: http://harbor-harbor-next-trivy:8080
+      TRIVY_ADAPTER_URL: http://harbor-trivy:8080
       WITH_TRIVY: "false"
       app.conf: |
         appname = Harbor
@@ -2150,7 +2150,7 @@
       LOG_LEVEL: info
       METRIC_NAMESPACE: harbor
       METRIC_SUBSYSTEM: jobservice
-      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
       REGISTRY_CONTROLLER_URL: http://harbor-harbor-next-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_URL: http://harbor-harbor-next-registry:5000
@@ -2539,7 +2539,7 @@
       HTTPS_PROXY: ""
       JOBSERVICE_URL: http://harbor-harbor-next-jobservice
       LOG_LEVEL: info
-      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       PORT: "8080"
       PORTAL_URL: http://harbor-harbor-next-portal
@@ -2559,7 +2559,7 @@
       REGISTRY_URL: http://harbor-harbor-next-registry:5000
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
       TOKEN_SERVICE_URL: http://harbor-harbor-next-core/service/token
-      TRIVY_ADAPTER_URL: http://harbor-harbor-next-trivy:8080
+      TRIVY_ADAPTER_URL: http://harbor-trivy:8080
       WITH_TRIVY: "false"
       app.conf: |
         appname = Harbor
@@ -2784,7 +2784,7 @@
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
-      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
       REGISTRY_CONTROLLER_URL: http://harbor-harbor-next-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_URL: http://harbor-harbor-next-registry:5000

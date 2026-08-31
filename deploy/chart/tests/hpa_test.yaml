@@ -24,10 +24,6 @@ templates:
   - templates/registryctl.secret.yaml
   - templates/portal.deployment.yaml
   - templates/portal.configmap.yaml
-  - templates/trivy.statefulset.yaml
-  - templates/trivy.secret.yaml
-  - templates/trivy.configmap-env.yaml
-  - templates/trivy.secret-env.yaml
   - templates/validate-values.yaml
 tests:
   # Default: no HPA exists for any component.
@@ -134,41 +130,6 @@ tests:
       - equal:
           path: spec.behavior.scaleDown.stabilizationWindowSeconds
           value: 300
-
-  # Trivy is a StatefulSet — HPA scaleTargetRef.kind must reflect that.
-  - it: should render HPA targeting StatefulSet for trivy
-    template: templates/hpa.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      trivy.enabled: true
-      trivy.autoscaling.enabled: true
-      trivy.autoscaling.maxReplicas: 4
-    asserts:
-      - hasDocuments:
-          count: 1
-      - equal:
-          path: spec.scaleTargetRef.kind
-          value: StatefulSet
-      - equal:
-          path: spec.scaleTargetRef.name
-          value: RELEASE-NAME-harbor-next-trivy
-
-  # Trivy HPA must NOT render when trivy itself is disabled — otherwise
-  # the HPA targets a non-existent StatefulSet and K8s warns.
-  - it: should skip trivy HPA when trivy.enabled=false
-    template: templates/hpa.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      trivy.enabled: false
-      trivy.autoscaling.enabled: true
-      trivy.autoscaling.maxReplicas: 4
-    asserts:
-      - hasDocuments:
-          count: 0
 
   - it: should render one HPA per opted-in component
     template: templates/hpa.yaml

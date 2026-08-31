@@ -672,6 +672,12 @@ trivy-java-db-repo-default =: +[
   'mirror.gcr.io/aquasec/trivy-java-db'
   'ghcr.io/aquasecurity/trivy-java-db']
 
+# The Trivy adapter is the harbor-scanner-trivy subchart (alias `trivy`):
+# scanner tuning sits one level down under trivy.trivy.*, `replicas` became
+# `replicaCount`, `pdb` became `podDisruptionBudget`, and `securityCheck`
+# was renamed `securityChecks`. Emitted keys must match THAT chart's
+# values.schema.json, not this chart's component shape — which is why this
+# does not reuse base-component.
 defn map-trivy(legacy):
   trivy =: legacy.trivy
   when present?(trivy):
@@ -680,26 +686,59 @@ defn map-trivy(legacy):
       add-info 'trivy.enabled' 'trivy.enabled':
         'Default flipped to false in this chart — kept enabled because
          your 2.x values had it on.'
-    severity =:
-      keep-if-not trivy.severity: 'UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL'
-    java-db-repo =:
-      keep-if-not trivy.javaDBRepository: trivy-java-db-repo-default
+      add-info 'trivy.*' 'trivy.* (harbor-scanner-trivy subchart)':
+        'The Trivy adapter is a subchart now. Scanner tuning moved one
+         level down (trivy.trivy.*), replicas became trivy.replicaCount,
+         pdb became trivy.podDisruptionBudget. Redis is NOT inherited
+         from this chart: the default targets the bundled Valkey
+         (redis://valkey:6379/5) — with external Redis set
+         trivy.redis.url (or trivy.redis.existingSecret when the URL
+         carries a password).'
+    probe-advice trivy: 'trivy'
+    pdb =: trivy.podDisruptionBudget
+    pdb-out =:
+      when present?(pdb):
+        mn =: pdb.minAvailable
+        mx =: pdb.maxUnavailable
+        both =: some?(mn) && some?(mx)
+        when both:
+          add-warn 'trivy.podDisruptionBudget' 'trivy.podDisruptionBudget':
+            'Both minAvailable and maxUnavailable were set — kept
+             minAvailable only; the subchart enforces exactly one.'
+        =>:::
+          enabled: bool-of(pdb.enabled true)
+          minAvailable: mn
+          :when not(both):::
+            maxUnavailable: mx
     scanner =:::
-      enabled: enabled
       debugMode: keep-if-not(trivy.debugMode false)
       vulnType: keep-if-not(trivy.vulnType 'os,library')
-      severity: severity
+      severity: keep-if-not(trivy.severity 'UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL')
       ignoreUnfixed: keep-if-not(trivy.ignoreUnfixed false)
       insecure: keep-if-not(trivy.insecure false)
       gitHubToken: presence(trivy.gitHubToken)
       skipUpdate: keep-if-not(trivy.skipUpdate false)
       skipJavaDBUpdate: keep-if-not(trivy.skipJavaDBUpdate false)
       offlineScan: keep-if-not(trivy.offlineScan false)
-      securityCheck: keep-if-not(trivy.securityCheck 'vuln')
+      securityChecks: keep-if-not(trivy.securityCheck 'vuln')
       timeout: keep-if-not(trivy.timeout '5m0s')
       dbRepository: keep-if-not(trivy.dbRepository trivy-db-repo-default)
-      javaDBRepository: java-db-repo
-    deep-merge base-component(trivy 'trivy'): scanner
+      javaDBRepository: keep-if-not(trivy.javaDBRepository trivy-java-db-repo-default)
+    =>:::
+      enabled: enabled
+      image: image-block(trivy 'trivy')
+      replicaCount: int-at(trivy.replicas 'trivy.replicas')
+      resources: trivy.resources
+      nodeSelector: trivy.nodeSelector
+      tolerations: trivy.tolerations
+      affinity: trivy.affinity
+      topologySpreadConstraints: trivy.topologySpreadConstraints
+      podAnnotations: trivy.podAnnotations
+      podLabels: trivy.podLabels
+      extraEnv: trivy.extraEnvVars
+      serviceAccount: sa-block(trivy 'trivy')
+      podDisruptionBudget: pdb-out
+      trivy: scanner
 
 defn base-component(comp name):
   probe-advice comp: name

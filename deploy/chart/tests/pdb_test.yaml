@@ -31,7 +31,6 @@ tests:
       - hasDocuments:
           count: 0
 
-  # Pins the cross-component gating: trivy.pdb.enabled=true is a no-op
   # when trivy.enabled=false.
   - it: should not create trivy PDB when trivy is disabled
     set:
