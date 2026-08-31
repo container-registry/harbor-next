@@ -784,6 +784,7 @@ Kubernetes: `>=1.28.0-0`
 | database.password | string | `""` | Database password (ignored if existingSecret is set) |
 | database.port | int | `5432` | Database port |
 | database.sslmode | string | `"disable"` | SSL mode for database connection |
+| database.statementTimeout | string | `"5m"` | Server-side statement_timeout applied to every pooled connection (POSTGRESQL_STATEMENT_TIMEOUT). Statements running longer are killed by PostgreSQL so their connections return to the pool instead of being held forever by a stuck query. Schema migrations are exempt. A negative value (e.g. "-1s") disables it; empty keeps the built-in 5m default. |
 | database.username | string | `""` | Database username |
 | existingSecretAdminPassword | string | `""` | Existing secret containing the admin password (overrides harborAdminPassword) |
 | existingSecretAdminPasswordKey | string | `"HARBOR_ADMIN_PASSWORD"` | Key in the existing secret for admin password |

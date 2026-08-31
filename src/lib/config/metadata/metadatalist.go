@@ -116,6 +116,7 @@ var (
 		{Name: common.PostGreSQLHealthCheckPeriod, Scope: SystemScope, Group: DatabaseGroup, EnvKey: "POSTGRESQL_HEALTH_CHECK_PERIOD", DefaultValue: "1m", ItemType: &DurationType{}, Editable: false},
 		{Name: common.PostGreSQLConnectTimeout, Scope: SystemScope, Group: DatabaseGroup, EnvKey: "POSTGRESQL_CONNECT_TIMEOUT", DefaultValue: "10s", ItemType: &DurationType{}, Editable: false},
 		{Name: common.PostGreSQLMinConns, Scope: SystemScope, Group: DatabaseGroup, EnvKey: "POSTGRESQL_MIN_CONNS", DefaultValue: "2", ItemType: &IntType{}, Editable: false},
+		{Name: common.PostGreSQLStatementTimeout, Scope: SystemScope, Group: DatabaseGroup, EnvKey: "POSTGRESQL_STATEMENT_TIMEOUT", DefaultValue: "5m", ItemType: &DurationType{}, Editable: false, Description: `Server-side statement_timeout applied to every pooled connection; queries running longer are killed by PostgreSQL so their connections are freed. Negative value disables it.`},
 		{Name: common.PostGreSQLURL, Scope: SystemScope, Group: DatabaseGroup, EnvKey: "POSTGRESQL_URL", DefaultValue: "", ItemType: &StringType{}, Editable: false},
 
 		{Name: common.ProjectCreationRestriction, Scope: UserScope, Group: BasicGroup, EnvKey: "PROJECT_CREATION_RESTRICTION", DefaultValue: common.ProCrtRestrEveryone, ItemType: &ProjectCreationRestrictionType{}, Editable: false, Description: `Indicate who can create projects, it could be ''adminonly'' or ''everyone''.`},

@@ -24,6 +24,7 @@ import (
 	"github.com/goharbor/harbor/src/server/middleware"
 	"github.com/goharbor/harbor/src/server/middleware/artifactinfo"
 	"github.com/goharbor/harbor/src/server/middleware/csrf"
+	"github.com/goharbor/harbor/src/server/middleware/dbadmission"
 	"github.com/goharbor/harbor/src/server/middleware/log"
 	"github.com/goharbor/harbor/src/server/middleware/mergeslash"
 	"github.com/goharbor/harbor/src/server/middleware/metric"
@@ -46,6 +47,21 @@ var (
 	// The ping endpoint will be blocked when DB conns reach the max open conns of the sql.DB
 	// which will make ping request timeout, so skip the middlewares which will require DB conn.
 	pingSkipper = middleware.MethodAndPathSkipper(http.MethodGet, match("^/api/v2.0/ping"))
+
+	// dbAdmissionGated is the opt-in allowlist of routes covered by the DB
+	// admission gate. Only interactive user-facing requests belong here:
+	// internal machine-to-machine callers (jobservice status callbacks under
+	// /service/notifications, GC and scan hooks, registry token auth, the
+	// /v2/ data plane) do not all handle an unexpected 429 safely, and a
+	// mishandled response in a flow like GC can be destructive. Grow this
+	// list one route at a time, only after verifying every caller of the
+	// route backs off correctly on 429.
+	dbAdmissionGated = []middleware.Skipper{
+		middleware.MethodAndPathSkipper(http.MethodPost, match(`^/c/login$`)),
+		middleware.MethodAndPathSkipper(http.MethodPost, match(`^/api/v2.0/projects$`)),
+		middleware.MethodAndPathSkipper(http.MethodPost, match(`^/api/v2.0/users$`)),
+		middleware.MethodAndPathSkipper(http.MethodPost, match(`^/api/v2.0/robots$`)),
+	}
 
 	// dbTxSkippers skip the transaction middleware for PATCH Blob Upload, PUT Blob Upload and `Read` APIs
 	// because the APIs may take a long time to run, enable the transaction middleware in them will hold the database connections
@@ -82,6 +98,17 @@ var (
 	}
 )
 
+// dbAdmissionSkipper skips the DB admission gate for every request that is
+// not explicitly listed in dbAdmissionGated.
+func dbAdmissionSkipper(r *http.Request) bool {
+	for _, gated := range dbAdmissionGated {
+		if gated(r) {
+			return false
+		}
+	}
+	return true
+}
+
 // MiddleWares returns global middlewares
 func MiddleWares() []web.MiddleWare {
 	return []web.MiddleWare{
@@ -92,6 +119,10 @@ func MiddleWares() []web.MiddleWare {
 		requestid.Middleware(),
 		session.Middleware(),
 		csrf.Middleware(),
+		// reject with 429 instead of queueing forever when the DB pool is
+		// exhausted; must be ahead of every middleware that acquires a DB
+		// conn, and applies only to the dbAdmissionGated allowlist
+		dbadmission.Middleware(dbAdmissionSkipper),
 		orm.Middleware(pingSkipper),
 		notification.Middleware(pingSkipper), // notification must ahead of transaction ensure the DB transaction execution complete
 		transaction.Middleware(dbTxSkippers...),

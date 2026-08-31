@@ -57,6 +57,7 @@ data:
   POSTGRESQL_MIN_CONNS: {{ include "harbor.database.minConns" . | quote }}
   POSTGRESQL_CONN_MAX_IDLE_TIME: {{ .Values.database.connMaxIdleTime | quote }}
   POSTGRESQL_CONN_MAX_LIFETIME: {{ .Values.database.connMaxLifetime | quote }}
+  POSTGRESQL_STATEMENT_TIMEOUT: {{ .Values.database.statementTimeout | quote }}
   # Redis configuration. The _REDIS_URL_* values live as explicit env on
   # the Deployment, NOT here: they embed $(REDIS_PASSWORD) when Redis
   # auth is on, and Kubernetes never expands $(VAR) in envFrom values.

@@ -703,3 +703,52 @@ func TestPool_HarborOrmErrorWrappers(t *testing.T) {
 		assert.Nil(t, harborORM.AsForeignKeyError(err, ""), "syntax error is not a FK error")
 	})
 }
+
+// ---------------------------------------------------------------------------
+// statement_timeout
+// ---------------------------------------------------------------------------
+
+func TestPool_StatementTimeoutKillsSlowQuery(t *testing.T) {
+	cfg := testCfg()
+	cfg.StatementTimeout = 500 * time.Millisecond
+	p := mustPool(t, cfg)
+
+	start := time.Now()
+	_, err := p.DB().ExecContext(context.Background(), "SELECT pg_sleep(10)")
+	require.Error(t, err, "server must cancel the statement")
+	assert.Less(t, time.Since(start), 5*time.Second,
+		"cancellation must come from statement_timeout, not from waiting out the sleep")
+
+	var pgErr *pgconn.PgError
+	require.ErrorAs(t, err, &pgErr)
+	assert.Equal(t, "57014", pgErr.Code, "expected query_canceled from statement_timeout")
+
+	// the connection must be reusable afterwards — that is the whole point
+	var n int
+	require.NoError(t, p.DB().QueryRowContext(context.Background(), "SELECT 1").Scan(&n))
+	assert.Equal(t, 1, n)
+}
+
+func TestPool_StatementTimeoutDefaultApplied(t *testing.T) {
+	p := mustPool(t, testCfg()) // StatementTimeout unset → 5m default
+
+	var v string
+	require.NoError(t, p.DB().QueryRowContext(context.Background(),
+		"SELECT current_setting('statement_timeout')").Scan(&v))
+	assert.Equal(t, "5min", v)
+}
+
+func TestPool_StatementTimeoutDisabled(t *testing.T) {
+	cfg := testCfg()
+	cfg.StatementTimeout = -1 * time.Second
+	p := mustPool(t, cfg)
+
+	var v string
+	require.NoError(t, p.DB().QueryRowContext(context.Background(),
+		"SELECT current_setting('statement_timeout')").Scan(&v))
+	assert.Equal(t, "0", v, "negative config must leave the server default (disabled)")
+
+	// a query longer than the (unset) timeout runs to completion
+	_, err := p.DB().ExecContext(context.Background(), "SELECT pg_sleep(0.2)")
+	require.NoError(t, err)
+}
