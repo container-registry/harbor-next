@@ -361,11 +361,12 @@ func userInfoFromRemote(ctx context.Context, token *Token, setting cfgModels.OID
 	return userInfoFromClaims(u, setting)
 }
 
+var errNoIDToken = errors.New("no ID token provided")
+
 // UserInfoFromIDToken extract user info from ID token
 func UserInfoFromIDToken(ctx context.Context, token *Token, setting cfgModels.OIDCSetting) (*UserInfo, error) {
 	if token.RawIDToken == "" {
-		// nolint:nilnil // no ID token present
-		return nil, nil
+		return nil, errNoIDToken
 	}
 	idt, err := parseIDToken(ctx, token.RawIDToken)
 	if err != nil {
@@ -480,11 +481,13 @@ func filterGroup(groupNames []string, filter string) []string {
 }
 
 // InjectGroupsToUser populates the group to DB and inject the group IDs to user model.
-// The third optional param is for UT only.
-func InjectGroupsToUser(info *UserInfo, user *models.User, f ...populate) {
+// The third optional param is for UT only. Returns an error if persisting the
+// group membership fails, so callers can fail the login closed rather than
+// let a user keep stale PAT/live-RBAC group access after a sync failure.
+func InjectGroupsToUser(info *UserInfo, user *models.User, f ...populate) error {
 	if info == nil || user == nil {
 		log.Warningf("user info or user model is nil, skip the func")
-		return
+		return nil
 	}
 	var populateGroups populate
 	if len(f) == 0 {
@@ -496,8 +499,19 @@ func InjectGroupsToUser(info *UserInfo, user *models.User, f ...populate) {
 		log.Warningf("failed to get group ID, error: %v, skip populating groups", err)
 	} else {
 		user.GroupIDs = gids
+		// Persist the group IDs so a later, non-live-session lookup (e.g.
+		// PAT authorization) can read them back. Fail closed: return error
+		// if sync fails, so the caller can reject the login rather than
+		// leave stale membership rows in place.
+		if user.UserID > 0 {
+			if err := usergroup.Mgr.SyncUserGroupMembership(orm.Context(), user.UserID, gids); err != nil {
+				log.Errorf("failed to sync group membership for user %d: %v", user.UserID, err)
+				return err
+			}
+		}
 	}
 	user.AdminRoleInAuth = info.AdminGroupMember
+	return nil
 }
 
 // Conn wraps connection info of an OIDC endpoint
