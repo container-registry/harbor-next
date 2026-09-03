@@ -440,3 +440,10 @@ func BenchmarkCompileRegexpEveryTime(b *testing.B) {
 		}
 	}
 }
+
+func TestParseAccountRegionMixedCase(t *testing.T) {
+	id, region, err := parseAccountRegion("https://123456789012.DKR.ECR.US-EAST-1.AMAZONAWS.COM/v2/")
+	assert.NoError(t, err)
+	assert.Equal(t, "123456789012", id)
+	assert.Equal(t, "us-east-1", region)
+}
