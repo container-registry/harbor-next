@@ -113,6 +113,10 @@ export class NewRobotComponent implements OnInit, OnDestroy {
 
     permissionForSystemForEdit: RobotPermission;
     showPage3: boolean = false;
+
+    userProvidedSecret: string = '';
+    isProvidedSecretAcceptable: boolean = true;
+
     @ViewChild('wizard') wizard: ClrWizard;
     constructor(
         private configService: ConfigurationService,
@@ -232,6 +236,8 @@ export class NewRobotComponent implements OnInit, OnDestroy {
         this.robotForm.reset();
         this.expirationType = ExpirationType.DAYS;
         this.getSystemRobotExpiration();
+        this.userProvidedSecret = '';
+        this.isProvidedSecretAcceptable = true;
     }
     resetForEdit(robot: Robot) {
         this.open(true);
@@ -282,6 +288,9 @@ export class NewRobotComponent implements OnInit, OnDestroy {
     }
     canAdd(): boolean {
         if (this.robotForm.invalid) {
+            return false;
+        }
+        if (!this.isEditMode && !this.isProvidedSecretAcceptable) {
             return false;
         }
         if (this.coverAll) {
@@ -391,6 +400,9 @@ export class NewRobotComponent implements OnInit, OnDestroy {
         robot.level = PermissionsKinds.SYSTEM;
         robot.duration = +this.systemRobot.duration;
         robot.permissions = [];
+        if (!this.isEditMode && this.userProvidedSecret) {
+            robot.secret = this.userProvidedSecret;
+        }
         if (this.permissionForSystem?.access?.length) {
             robot.permissions.push(this.permissionForSystem);
         }
