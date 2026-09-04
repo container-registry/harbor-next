@@ -386,6 +386,11 @@ func (c *controller) Refresh(ctx context.Context, reference, referenceID string,
 			return nil, err
 		}
 
+		// uncommitted in-flight reservations are invisible to CalculateUsage (see inflight.go)
+		if inflight := c.inflightSum(ctx, reference, referenceID); len(inflight) > 0 {
+			newUsed = types.Add(newUsed, inflight)
+		}
+
 		return newUsed, err
 	}
 
@@ -419,21 +424,51 @@ func (c *controller) Request(ctx context.Context, reference, referenceID string,
 	}
 
 	provider := updateQuotaProviderType(config.GetQuotaUpdateProvider())
-	if err := c.updateUsageWithRetry(ctx, reference, referenceID, reserveResources(resources), provider); err != nil {
+
+	// Inside the request-wide tx the reserve UPDATE would hold the quota_usage
+	// row lock across the proxied registry round-trip, serializing all pushes
+	// to the project — detach it onto autocommit ormers (the version CAS gives
+	// atomicity). Rollback uses orm.Copy: compensation must still run after
+	// the client disconnected.
+	reserveCtx, rollbackCtx := ctx, ctx
+	detached := provider != updateQuotaProviderRedis && orm.InTransaction(ctx)
+	if detached {
+		reserveCtx = orm.Clone(ctx)
+		rollbackCtx = orm.Copy(ctx)
+	}
+
+	// track before the reserve commits — no ordering may let a concurrent
+	// Refresh see the reservation without the ledger entry (see inflight.go)
+	cleanup := func() {}
+	if provider == updateQuotaProviderDB {
+		if token, err := c.trackInflight(ctx, reference, referenceID, resources); err != nil {
+			log.G(ctx).Warningf("failed to track in-flight quota reservation for %s %s, refresh may transiently under-count: %v", reference, referenceID, err)
+		} else {
+			cleanup = func() { c.untrackInflight(ctx, reference, referenceID, token) }
+		}
+	}
+
+	if err := c.updateUsageWithRetry(reserveCtx, reference, referenceID, reserveResources(resources), provider); err != nil {
 		log.G(ctx).Errorf("reserve resources %s for %s %s failed, error: %v", resources.String(), reference, referenceID, err)
+		cleanup()
 		return err
 	}
 
 	err := f()
 
 	if err != nil {
-		if er := c.updateUsageWithRetry(ctx, reference, referenceID, rollbackResources(resources), provider); er != nil {
+		if er := c.updateUsageWithRetry(rollbackCtx, reference, referenceID, rollbackResources(resources), provider); er != nil {
 			// ignore this error, the quota usage will be correct when users do operations which will call refresh quota
 			log.G(ctx).Warningf("rollback resources %s for %s %s failed, error: %v", resources.String(), reference, referenceID, er)
 		}
+		cleanup()
+		return err
 	}
 
-	return err
+	// the reserved rows only become countable by Refresh at commit
+	orm.AfterCommit(ctx, cleanup)
+
+	return nil
 }
 
 // isUnlimited reports whether every resource in the request has an

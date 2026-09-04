@@ -171,6 +171,43 @@ func (suite *ControllerTestSuite) TestRequestFunctionFailed() {
 	suite.Error(suite.ctl.Request(ctx, suite.reference, referenceID, resources, func() error { return fmt.Errorf("error") }))
 }
 
+func (suite *ControllerTestSuite) TestRequestReservePersistedBeforeF() {
+	mock.OnAnything(suite.quotaMgr, "GetByRef").Return(suite.quota, nil)
+
+	updates := 0
+	mock.OnAnything(suite.quotaMgr, "Update").Run(func(mock.Arguments) { updates++ }).Return(nil)
+
+	ctx := orm.NewContext(context.TODO(), &ormtesting.FakeOrmer{})
+	referenceID := uuid.New().String()
+	resources := types.ResourceList{types.ResourceStorage: 10}
+
+	suite.Nil(suite.ctl.Request(ctx, suite.reference, referenceID, resources, func() error {
+		suite.Equal(1, updates, "the reserve must be persisted before f runs")
+		return nil
+	}))
+	suite.Equal(1, updates, "no rollback expected when f succeeds")
+}
+
+func (suite *ControllerTestSuite) TestRequestRollbackCompensatesOnFError() {
+	mock.OnAnything(suite.quotaMgr, "GetByRef").Return(suite.quota, nil)
+
+	updates := 0
+	mock.OnAnything(suite.quotaMgr, "Update").Run(func(mock.Arguments) { updates++ }).Return(nil)
+
+	ctx := orm.NewContext(context.TODO(), &ormtesting.FakeOrmer{})
+	referenceID := uuid.New().String()
+	resources := types.ResourceList{types.ResourceStorage: 10}
+
+	suite.Error(suite.ctl.Request(ctx, suite.reference, referenceID, resources, func() error {
+		return fmt.Errorf("error")
+	}))
+	suite.Equal(2, updates, "the rollback must compensate the reserve when f fails")
+
+	used, err := suite.quota.GetUsed()
+	suite.Nil(err)
+	suite.Equal(int64(0), used[types.ResourceStorage], "usage must be back to the pre-reserve value")
+}
+
 func (suite *ControllerTestSuite) TestRequestResourceIsZero() {
 	suite.PrepareForUpdate(suite.quota, nil)
 
