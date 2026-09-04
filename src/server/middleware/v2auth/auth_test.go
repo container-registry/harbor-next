@@ -273,6 +273,15 @@ func TestGetChallenge(t *testing.T) {
 			challenge: `Basic realm="harbor"`,
 		},
 		{
+			name: "Request to '/v2' carrying a Bearer auth header should still get a token service challenge, not Basic",
+			request: func() *http.Request {
+				req, _ := http.NewRequest(http.MethodGet, "https://registry.test/v2/", nil)
+				req.Header.Set("Authorization", "Bearer xx")
+				return req
+			}(),
+			challenge: `Bearer realm="https://registry.test/service/token",service="harbor-registry"`,
+		},
+		{
 			name: "Request to mount a blob from one repo to another should return challenge with scope according to the artifact info in the context of the request",
 			request: func() *http.Request {
 				req, _ := http.NewRequest(http.MethodPost, "https://harbor.test/v2/project_1/ubuntu/blobs/uploads/mount=?mount=sha256:08e4a417ff4e3913d8723a05cc34055db01c2fd165b588e049c5bad16ce6094f&from=project_2/ubuntu", nil)
