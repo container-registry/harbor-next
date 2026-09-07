@@ -1,0 +1,223 @@
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: harbor-core
+  namespace: flux-system
+spec:
+  image: 8gears.container-registry.com/8gcr/harbor-core
+  interval: 1m
+  provider: generic
+  secretRef:
+    name: harbor-system-pull
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: harbor-jobservice
+  namespace: flux-system
+spec:
+  image: 8gears.container-registry.com/8gcr/harbor-jobservice
+  interval: 1m
+  provider: generic
+  secretRef:
+    name: harbor-system-pull
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: harbor-registry
+  namespace: flux-system
+spec:
+  image: 8gears.container-registry.com/8gcr/harbor-registry
+  interval: 1m
+  provider: generic
+  secretRef:
+    name: harbor-system-pull
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: harbor-registryctl
+  namespace: flux-system
+spec:
+  image: 8gears.container-registry.com/8gcr/harbor-registryctl
+  interval: 1m
+  provider: generic
+  secretRef:
+    name: harbor-system-pull
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: harbor-portal
+  namespace: flux-system
+spec:
+  image: 8gears.container-registry.com/8gcr/harbor-portal
+  interval: 1m
+  provider: generic
+  secretRef:
+    name: harbor-system-pull
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: harbor-exporter
+  namespace: flux-system
+spec:
+  image: 8gears.container-registry.com/8gcr/harbor-exporter
+  interval: 1m
+  provider: generic
+  secretRef:
+    name: harbor-system-pull
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: trivy-adapter
+  namespace: flux-system
+spec:
+  image: 8gears.container-registry.com/8gcr/trivy-adapter
+  interval: 1m
+  provider: generic
+  secretRef:
+    name: harbor-system-pull
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: harbor-grype-adapter
+  namespace: flux-system
+spec:
+  image: 8gears.container-registry.com/8gcr/harbor-grype-adapter
+  interval: 1m
+  provider: generic
+  secretRef:
+    name: harbor-system-pull
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: harbor-core
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: harbor-core
+  filterTags:
+    pattern: ^latest$
+  policy:
+    alphabetical:
+      order: asc
+  digestReflectionPolicy: Always
+  interval: 1m
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: harbor-jobservice
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: harbor-jobservice
+  filterTags:
+    pattern: ^latest$
+  policy:
+    alphabetical:
+      order: asc
+  digestReflectionPolicy: Always
+  interval: 1m
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: harbor-registry
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: harbor-registry
+  filterTags:
+    pattern: ^latest$
+  policy:
+    alphabetical:
+      order: asc
+  digestReflectionPolicy: Always
+  interval: 1m
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: harbor-registryctl
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: harbor-registryctl
+  filterTags:
+    pattern: ^latest$
+  policy:
+    alphabetical:
+      order: asc
+  digestReflectionPolicy: Always
+  interval: 1m
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: harbor-portal
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: harbor-portal
+  filterTags:
+    pattern: ^latest$
+  policy:
+    alphabetical:
+      order: asc
+  digestReflectionPolicy: Always
+  interval: 1m
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: harbor-exporter
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: harbor-exporter
+  filterTags:
+    pattern: ^latest$
+  policy:
+    alphabetical:
+      order: asc
+  digestReflectionPolicy: Always
+  interval: 1m
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: trivy-adapter
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: trivy-adapter
+  filterTags:
+    pattern: ^latest$
+  policy:
+    alphabetical:
+      order: asc
+  digestReflectionPolicy: Always
+  interval: 1m
+---
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: harbor-grype-adapter
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: harbor-grype-adapter
+  filterTags:
+    pattern: ^latest$
+  policy:
+    alphabetical:
+      order: asc
+  digestReflectionPolicy: Always
+  interval: 1m

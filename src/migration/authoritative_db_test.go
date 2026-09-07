@@ -59,8 +59,16 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 	}
 	t.Cleanup(schemaPool.Close)
 
-	if _, err := schemaPool.DB().ExecContext(ctx, "CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)"); err != nil {
-		t.Fatalf("create robot dependency: %v", err)
+	// Legacy tables created by the numbered migrations that harbor_next.sql
+	// declares foreign keys against.
+	legacyDependencies := []string{
+		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
+		"CREATE TABLE project (project_id SERIAL PRIMARY KEY)",
+	}
+	for _, statement := range legacyDependencies {
+		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
+			t.Fatalf("create legacy dependency: %v", err)
+		}
 	}
 
 	path := authoritativeTestSchemaPath()
@@ -87,6 +95,13 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 		"claim_rules",
 		"idx_claim_rules_lookup",
 		"idx_identity_providers_jwks_cache",
+		"multi_format_package",
+		"multi_format_version",
+		"multi_project_reference",
+		"idx_multi_format_package_proj_fmt",
+		"idx_multi_format_version_pkg",
+		"idx_multi_project_reference_multi",
+		"idx_multi_project_reference_sub",
 	}
 	for _, object := range objects {
 		var exists bool
