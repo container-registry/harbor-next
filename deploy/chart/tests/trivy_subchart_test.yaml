@@ -1,0 +1,155 @@
+# Dual-mode Trivy. The chart deploys the Trivy adapter one of two ways:
+#   - built-in (default): the chart's own trivy.* templates, gated on
+#     trivy.enabled
+#   - subchart (opt-in):  the harbor-scanner-trivy dependency, gated on
+#     harbor-scanner-trivy.enabled
+# The modes are mutually exclusive — the subchart wins when both flags are
+# set — and core's WITH_TRIVY / TRIVY_ADAPTER_URL follow the active mode.
+# The subchart's own resources are covered by harbor-scanner-trivy's test
+# suite; here we assert the parent-side wiring and suppression.
+suite: trivy subchart mode (built-in vs harbor-scanner-trivy)
+templates:
+  - templates/trivy.statefulset.yaml
+  - templates/trivy.service.yaml
+  - templates/trivy.secret.yaml
+  - templates/trivy.configmap-env.yaml
+  - templates/trivy.secret-env.yaml
+  - templates/core.configmap.yaml
+  - templates/core.secret.yaml
+  - templates/pdbs.yaml
+  - templates/serviceaccounts.yaml
+  - templates/hpa.yaml
+release:
+  name: harbor
+set:
+  externalURL: https://harbor.example.com
+  database.host: postgres.example.com
+  harborAdminPassword: Harbor12345
+tests:
+  - it: built-in mode should render the built-in StatefulSet and point core at it
+    set:
+      trivy.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: templates/trivy.statefulset.yaml
+      - hasDocuments:
+          count: 1
+        template: templates/trivy.service.yaml
+      - equal:
+          path: data.WITH_TRIVY
+          value: "true"
+        template: templates/core.configmap.yaml
+      - equal:
+          path: data.TRIVY_ADAPTER_URL
+          value: "http://harbor-harbor-next-trivy:8080"
+        template: templates/core.configmap.yaml
+
+  - it: subchart mode should render no built-in trivy resources
+    set:
+      harbor-scanner-trivy.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/trivy.statefulset.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/trivy.service.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/trivy.secret.yaml
+
+  - it: subchart mode should point core at the subchart's fullname (nameOverride trivy)
+    set:
+      harbor-scanner-trivy.enabled: true
+    asserts:
+      - equal:
+          path: data.WITH_TRIVY
+          value: "true"
+        template: templates/core.configmap.yaml
+      - equal:
+          path: data.TRIVY_ADAPTER_URL
+          value: "http://harbor-trivy:8080"
+        template: templates/core.configmap.yaml
+
+  - it: subchart mode should follow a custom subchart fullnameOverride
+    set:
+      harbor-scanner-trivy.enabled: true
+      harbor-scanner-trivy.fullnameOverride: my-scanner
+    asserts:
+      - equal:
+          path: data.TRIVY_ADAPTER_URL
+          value: "http://my-scanner:8080"
+        template: templates/core.configmap.yaml
+
+  - it: subchart should win when both mode flags are set (no built-in resources)
+    set:
+      trivy.enabled: true
+      harbor-scanner-trivy.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/trivy.statefulset.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/trivy.service.yaml
+      - equal:
+          path: data.WITH_TRIVY
+          value: "true"
+        template: templates/core.configmap.yaml
+      - equal:
+          path: data.TRIVY_ADAPTER_URL
+          value: "http://harbor-trivy:8080"
+        template: templates/core.configmap.yaml
+
+  - it: subchart mode should suppress the built-in trivy PDB, ServiceAccount and HPA
+    set:
+      trivy.enabled: true
+      trivy.pdb.enabled: true
+      trivy.pdb.maxUnavailable: 1
+      trivy.serviceAccount.create: true
+      trivy.autoscaling.enabled: true
+      trivy.autoscaling.maxReplicas: 3
+      harbor-scanner-trivy.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/pdbs.yaml
+      - containsDocument:
+          kind: ServiceAccount
+          apiVersion: v1
+          name: harbor-harbor-next-trivy
+        template: templates/serviceaccounts.yaml
+        not: true
+      - hasDocuments:
+          count: 0
+        template: templates/hpa.yaml
+
+  - it: built-in mode should still render the trivy PDB, ServiceAccount and HPA
+    set:
+      trivy.enabled: true
+      trivy.pdb.enabled: true
+      trivy.pdb.maxUnavailable: 1
+      trivy.serviceAccount.create: true
+      trivy.autoscaling.enabled: true
+      trivy.autoscaling.maxReplicas: 3
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: templates/pdbs.yaml
+      - isKind:
+          of: ServiceAccount
+        template: templates/serviceaccounts.yaml
+        documentSelector:
+          path: metadata.name
+          value: harbor-harbor-next-trivy
+      - hasDocuments:
+          count: 1
+        template: templates/hpa.yaml
+
+  - it: neither mode should leave WITH_TRIVY off
+    asserts:
+      - equal:
+          path: data.WITH_TRIVY
+          value: "false"
+        template: templates/core.configmap.yaml

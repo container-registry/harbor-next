@@ -47,7 +47,10 @@ image:
   # every component. Per-component `image.registry`/`image.repository` override
   # it; `global.imageRegistry` overrides the registry on top. See the
   # `harbor.image.sourceMap` helper for the exact map (upstream renames the
-  # registry image to `registry-photon` and trivy to `trivy-adapter-photon`).
+  # registry image to `registry-photon` and trivy to `trivy-adapter-photon`;
+  # the 8gcr trivy image is the released harbor-scanner-trivy adapter with
+  # its own pinned tag). In harbor-scanner-trivy subchart mode the adapter
+  # image comes from the subchart instead (`harbor-scanner-trivy.image.*`).
   source: 8gcr
   # -- Image pull policy for all Harbor components
   pullPolicy: IfNotPresent
@@ -114,8 +117,9 @@ cache:
   # -- Cache expiration in hours
   expireHours: 24
 
-# The proxy settings for updating trivy vulnerabilities from the Internet and replicating
-# artifacts from/to the registries that cannot be reached directly
+# The proxy settings for replicating artifacts from/to registries that cannot
+# be reached directly. For the Trivy scanner (vulnerability DB downloads) set
+# `trivy.proxy.*` instead - the subchart carries its own proxy settings.
 proxy:
   httpProxy:
   httpsProxy:
@@ -123,7 +127,6 @@ proxy:
   components:
     - core
     - jobservice
-    - trivy
 
 # ============================================================================
 # 2. EXPOSE / INGRESS / GATEWAY
@@ -1684,7 +1687,10 @@ trivy:
     registry: ""
     # -- Repository override (path WITHOUT registry host); empty uses `image.source`
     repository: ""
-    # -- Trivy adapter image tag (defaults to appVersion)
+    # -- Trivy adapter image tag. The adapter is no longer built in-tree:
+    # the default (8gcr source) is the pinned harbor-scanner-trivy release
+    # from the image source map, NOT the chart appVersion; the upstream
+    # source keeps goharbor's appVersion-tagged trivy-adapter-photon.
     tag: ""
     # -- Pin by digest (sha256:...); used instead of tag when set
     digest: ""
@@ -1822,6 +1828,61 @@ trivy:
     existingClaim: ""
     # -- Annotations for PVC
     annotations: {}
+
+# --- Trivy Scanner: harbor-scanner-trivy subchart mode (OPT-IN) ---
+# Alternative to the built-in `trivy.*` templates above: consume the Trivy
+# adapter as the standalone harbor-scanner-trivy chart (its own release line
+# in github.com/container-registry/harbor-scanner-trivy).
+#
+# One-line switch: `harbor-scanner-trivy.enabled: true`. The two modes are
+# mutually exclusive — enabling the subchart disables the built-in templates,
+# even when `trivy.enabled` is also true. Core points WITH_TRIVY /
+# TRIVY_ADAPTER_URL at whichever mode is active.
+#
+# Everything under this key is handed to the subchart verbatim, so its full
+# values surface applies here — see
+# https://github.com/container-registry/harbor-scanner-trivy/tree/main/deploy/chart
+# Only harbor-next defaults that differ from the subchart's own are listed.
+# Scanner tuning that lives directly under `trivy.*` in built-in mode
+# (severity, vulnType, skipUpdate, ...) sits one level down here under
+# `harbor-scanner-trivy.trivy.*` — the subchart groups Trivy-the-CLI settings
+# under its own `trivy` key. See docs/MIGRATION-REFERENCE.md for the key map.
+# TODO(2.17): subchart mode becomes the default and the built-in `trivy.*`
+# templates are removed.
+harbor-scanner-trivy:
+  # -- Deploy the Trivy adapter via the harbor-scanner-trivy subchart
+  # instead of the built-in `trivy.*` templates
+  enabled: false
+
+  # Names the subchart's resources `<release>-trivy` (matching the built-in
+  # templates) instead of `<release>-harbor-scanner-trivy`, so core's
+  # TRIVY_ADAPTER_URL stays stable when switching modes.
+  nameOverride: trivy
+
+  # Redis for the adapter's job queue, result store and cache. Defaults to
+  # the bundled Valkey on db 5 (DB-index convention: core=0, registry=1,
+  # jobservice=2, trivy=5). Helm passes subchart values statically, so the
+  # subchart cannot inherit `externalRedis` — with external Redis (or Valkey
+  # auth) set `harbor-scanner-trivy.redis.url` yourself, or point
+  # `harbor-scanner-trivy.redis.existingSecret` at a Secret holding the full
+  # URL when it carries a password.
+  # @default -- bundled Valkey, db 5
+  redis:
+    url: redis://valkey:6379/5
+
+  # Trivy cache persistence. Off to match the built-in templates' default
+  # (the vulnerability DB is re-downloaded after a pod restart); the
+  # subchart's own default is `enabled: true`.
+  # @default -- disabled
+  persistence:
+    enabled: false
+
+  # Trivy CLI tuning (subchart `trivy.*` key). Defaults here keep
+  # harbor-next's mirror-first DB download order.
+  # @default -- mirror-first DB repositories
+  trivy:
+    dbRepository: mirror.gcr.io/aquasec/trivy-db,ghcr.io/aquasecurity/trivy-db
+    javaDBRepository: mirror.gcr.io/aquasec/trivy-java-db,ghcr.io/aquasecurity/trivy-java-db
 
 # ============================================================================
 # 5. TLS CONFIGURATION

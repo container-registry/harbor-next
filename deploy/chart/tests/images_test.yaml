@@ -57,6 +57,18 @@ tests:
           path: spec.template.spec.containers[0].image
           pattern: '^docker\.io/goharbor/trivy-adapter-photon:'
 
+  # The adapter is no longer built in-tree: the 8gcr source uses the released
+  # harbor-scanner-trivy image with its own pinned tag (source-map `tags`
+  # override), NOT the chart appVersion.
+  - it: should resolve the pinned harbor-scanner-trivy image for built-in trivy (8gcr)
+    template: templates/trivy.statefulset.yaml
+    set:
+      trivy.enabled: true
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: '^8gears\.container-registry\.com/8gcr/harbor-scanner-trivy:v[0-9]+\.[0-9]+\.[0-9]+$'
+
   # global.imageRegistry overrides the host for all images (air-gap/mirror),
   # preserving the source repository path. Wins over image.source registry.
   - it: should let global.imageRegistry override the host (8gcr path preserved)

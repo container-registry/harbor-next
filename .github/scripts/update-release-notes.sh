@@ -42,7 +42,9 @@ registry_project="${REGISTRY_PROJECT:-8gcr}"
 registry="${registry_address}/${registry_project}"
 dry_run="${RELEASE_NOTES_DRY_RUN:-false}"
 release_notes_output="${RELEASE_NOTES_OUTPUT:-}"
-images=(core jobservice registryctl exporter portal registry trivy-adapter)
+# trivy-adapter is absent: the Trivy adapter ships prebuilt from the
+# harbor-scanner-trivy release line, not from this repo's image builds.
+images=(core jobservice registryctl exporter portal registry)
 
 # The Helm chart releases on its own release-please line, so its version is
 # unrelated to TAG_NAME. Read whatever chart version is committed at the app
@@ -180,7 +182,6 @@ fi
 
   for image in "${images[@]}"; do
     image_name="harbor-${image}"
-    [[ "${image}" == "trivy-adapter" ]] && image_name="trivy-adapter"
     [[ "${image}" == "grype-scanner" ]] && image_name="harbor-grype-adapter"
     [[ "${image}" == "snyk-scanner" ]] && image_name="harbor-snyk-adapter"
     echo "| \`${image_name}\` | \`${registry}/${image_name}:${TAG_NAME}\` |"

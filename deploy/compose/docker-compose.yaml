@@ -147,7 +147,10 @@ services:
     restart: unless-stopped
 
   trivy-adapter:
-    image: ${IMAGE_REPO:-}trivy-adapter:${HARBOR_TAG}
+    # Prebuilt adapter from the harbor-scanner-trivy release line; versioned
+    # independently of the Harbor images above (default tracks
+    # HARBOR_SCANNER_TRIVY_VERSION in versions.env — update both together).
+    image: ${IMAGE_REPO:-}harbor-scanner-trivy:${TRIVY_ADAPTER_TAG:-v0.40.1}
     environment:
       SCANNER_LOG_LEVEL: ${LOG_LEVEL:-info}
       SCANNER_REDIS_URL: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}/5

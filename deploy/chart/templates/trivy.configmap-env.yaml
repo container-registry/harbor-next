@@ -1,4 +1,4 @@
-{{- if and .Values.trivy.enabled .Values.trivy.config }}
+{{- if and (eq (include "harbor.trivy.builtin" .) "true") .Values.trivy.config }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
