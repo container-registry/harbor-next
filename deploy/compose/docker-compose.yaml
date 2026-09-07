@@ -148,8 +148,9 @@ services:
 
   trivy-adapter:
     # Prebuilt adapter from the harbor-scanner-trivy release line; versioned
-    # independently of the Harbor images above.
-    image: ${TRIVY_ADAPTER_IMAGE:-8gears.container-registry.com/8gcr/harbor-scanner-trivy:v0.40.1}
+    # independently of the Harbor images above (default tracks
+    # HARBOR_SCANNER_TRIVY_VERSION in versions.env — update both together).
+    image: ${IMAGE_REPO:-}harbor-scanner-trivy:${TRIVY_ADAPTER_TAG:-v0.40.1}
     environment:
       SCANNER_LOG_LEVEL: ${LOG_LEVEL:-info}
       SCANNER_REDIS_URL: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}/5

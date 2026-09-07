@@ -91,14 +91,36 @@ Registryctl container port
 {{- end }}
 
 {{/*
+Trivy runs in one of two mutually exclusive modes:
+  - built-in (2.16 default): this chart's own trivy.* templates, gated on
+    trivy.enabled
+  - subchart: the harbor-scanner-trivy dependency, gated on
+    harbor-scanner-trivy.enabled (the Chart.yaml condition)
+The subchart wins when both flags are set — the built-in templates disable
+themselves so the two modes can never deploy side by side.
+TODO(2.17): drop the built-in templates and make the subchart the only mode.
+*/}}
+{{- define "harbor.trivy.subchart" -}}
+{{- if (index .Values "harbor-scanner-trivy").enabled }}true{{- else }}false{{- end }}
+{{- end }}
+
+{{- define "harbor.trivy.builtin" -}}
+{{- if and .Values.trivy.enabled (not (index .Values "harbor-scanner-trivy").enabled) }}true{{- else }}false{{- end }}
+{{- end }}
+
+{{/*
 Return the Trivy adapter URL (if enabled)
 */}}
 {{- define "harbor.trivy.url" -}}
-http://{{ include "harbor.trivy" . }}:{{ ((.Values.trivy.service).port) | default 8080 }}
+{{- if eq (include "harbor.trivy.subchart" .) "true" -}}
+http://{{ include "harbor.trivy" . }}:{{ (((index .Values "harbor-scanner-trivy").service).port) | default 8080 }}
+{{- else -}}
+http://{{ include "harbor.trivy" . }}:8080
+{{- end -}}
 {{- end }}
 
 {{- define "harbor.trivy.enabled" -}}
-{{ .Values.trivy.enabled }}
+{{ or .Values.trivy.enabled (index .Values "harbor-scanner-trivy").enabled }}
 {{- end }}
 
 {{/*
@@ -132,21 +154,28 @@ Component name helpers (used by noProxy and other cross-component references)
 {{- end -}}
 
 {{/*
-Trivy is a subchart (harbor-scanner-trivy, alias "trivy"), so its resource
-names come from THAT chart's fullname helper evaluated with the alias as
-.Chart.Name. Replicate it exactly: keep in sync with harbor-scanner-trivy's
-_helpers.tpl on dependency bumps.
+In subchart mode the Trivy resource names come from harbor-scanner-trivy's
+own fullname helper (its .Chart.Name plus any nameOverride/fullnameOverride
+set under the harbor-scanner-trivy key). Replicate that helper exactly so
+core's TRIVY_ADAPTER_URL and noProxy stay correct: keep in sync with
+harbor-scanner-trivy's _helpers.tpl on dependency bumps. The shipped
+default (nameOverride: trivy) names resources `<release>-trivy`.
 */}}
 {{- define "harbor.trivy" -}}
-  {{- if .Values.trivy.fullnameOverride -}}
-    {{- .Values.trivy.fullnameOverride | trunc 63 | trimSuffix "-" -}}
-  {{- else -}}
-    {{- $name := default "trivy" .Values.trivy.nameOverride -}}
-    {{- if contains $name .Release.Name -}}
-      {{- .Release.Name | trunc 63 | trimSuffix "-" -}}
+  {{- if eq (include "harbor.trivy.subchart" .) "true" -}}
+    {{- $sub := index .Values "harbor-scanner-trivy" -}}
+    {{- if $sub.fullnameOverride -}}
+      {{- $sub.fullnameOverride | trunc 63 | trimSuffix "-" -}}
     {{- else -}}
-      {{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+      {{- $name := default "harbor-scanner-trivy" $sub.nameOverride -}}
+      {{- if contains $name .Release.Name -}}
+        {{- .Release.Name | trunc 63 | trimSuffix "-" -}}
+      {{- else -}}
+        {{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+      {{- end -}}
     {{- end -}}
+  {{- else -}}
+    {{- printf "%s-trivy" (include "harbor.fullname" .) -}}
   {{- end -}}
 {{- end -}}
 
