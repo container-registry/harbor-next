@@ -142,11 +142,6 @@ if [[ -f "${series}" ]]; then
       "${branch}:refs/remotes/origin/${branch}"
     echo "- $(git -C "${tmp_dir}/patches-repo" log -1 --format=%s "refs/remotes/origin/${branch}")" \
       >> "${patch_notes}"
-
-    if git -C "${tmp_dir}/patches-repo" cat-file -e \
-      "refs/remotes/origin/${branch}:dockerfile/grype-scanner.dockerfile" 2>/dev/null; then
-      images+=(grype-scanner snyk-scanner)
-    fi
   done < "${series}"
 fi
 
@@ -191,8 +186,6 @@ fi
   for image in "${images[@]}"; do
     image_name="harbor-${image}"
     [[ "${image}" == "trivy-adapter" ]] && image_name="trivy-adapter"
-    [[ "${image}" == "grype-scanner" ]] && image_name="harbor-grype-adapter"
-    [[ "${image}" == "snyk-scanner" ]] && image_name="harbor-snyk-adapter"
     echo "| \`${image_name}\` | \`${registry}/${image_name}:${TAG_NAME}\` |"
   done
 
