@@ -249,12 +249,7 @@ tasks:
 
   helm-docs:
     desc: "Check that chart README is up-to-date with helm-docs"
-    preconditions:
-      - sh: command -v helm-docs
-        msg: |
-          helm-docs not found. Install:
-            macOS:  brew install norwoodj/tap/helm-docs
-            Linux:  go install github.com/norwoodj/helm-docs/cmd/helm-docs@latest
+    deps: [_require-helm-docs]
     cmds:
       # --chart-to-generate isolates the harbor chart so helm-docs
       # doesn't also process the extracted valkey subchart in charts/.
@@ -271,11 +266,14 @@ tasks:
     internal: true
     run: once
     preconditions:
-      - sh: command -v helm-docs
+      # Enforces the exact pinned release binary — a `go install` build
+      # passes `command -v` but drops the version footer and fails Chart CI.
+      - sh: test "$(helm-docs --version 2>/dev/null | awk '{print $3}')" = '{{.HELM_DOCS_VERSION}}'
         msg: |
-          helm-docs not found. Install:
+          helm-docs {{.HELM_DOCS_VERSION}} (versions.env) not found. Use the
+          release binary, not `go install`:
             macOS:  brew install norwoodj/tap/helm-docs
-            Linux:  go install github.com/norwoodj/helm-docs/cmd/helm-docs@latest
+            Linux:  https://github.com/norwoodj/helm-docs/releases/tag/v{{.HELM_DOCS_VERSION}}
 
   docs:
     desc: "Generate chart README.md from values.yaml + README.md.gotmpl"
@@ -294,6 +292,29 @@ tasks:
   unittest:update:
     desc: "Run helm unittest and update snapshots"
     cmd: helm unittest {{.CHART_DIR}} --update-snapshot
+
+  bump-app-version:
+    desc: "Bump chart appVersion forward-only, regenerate README + snapshots (usage: task helm:bump-app-version NEW_APP_VERSION=v2.16.0)"
+    requires:
+      vars: [NEW_APP_VERSION]
+    vars:
+      CURRENT:
+        sh: "helm show chart {{.CHART_DIR}} | sed -n 's/^appVersion: //p'"
+    preconditions:
+      - sh: echo '{{.NEW_APP_VERSION}}' | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'
+        msg: "NEW_APP_VERSION must match vX.Y.Z"
+      - sh: test -n '{{.CURRENT}}'
+        msg: "could not read appVersion from {{.CHART_DIR}}/Chart.yaml"
+    status:
+      # up to date unless NEW_APP_VERSION is strictly ahead of CURRENT
+      - test "$(printf '%s\n%s\n' '{{.CURRENT}}' '{{.NEW_APP_VERSION}}' | sort -V | tail -n1)" = '{{.CURRENT}}'
+    cmds:
+      - "sed -i 's/^appVersion:.*/appVersion: \"{{.NEW_APP_VERSION}}\"/' {{.CHART_DIR}}/Chart.yaml"
+      - task: docs
+      # deps as a cmd, not deps: — deps run before status, and a no-op
+      # bump must not touch the network.
+      - task: deps:build
+      - task: unittest:update
 
   validate:
     desc: "Validate rendered templates against the Kubernetes API (client dry-run)"
