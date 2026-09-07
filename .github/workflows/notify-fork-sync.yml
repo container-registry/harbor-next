@@ -33,10 +33,13 @@ jobs:
           SHA: ${{ github.sha }}
           LINE: ${{ github.ref_name }}
         run: |
-          curl -f -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Content-Type: application/json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            -H "Authorization: Bearer ${TOKEN}" \
-            "https://api.github.com/repos/container-registry/8gcr/dispatches" \
-            -d "{\"event_type\":\"upstream-sync\",\"client_payload\":{\"sha\":\"${SHA}\",\"line\":\"${LINE}\"}}"
+          # jq --arg: branch names must be JSON-escaped, not interpolated.
+          jq -cn --arg sha "${SHA}" --arg line "${LINE}" \
+            '{event_type: "upstream-sync", client_payload: {sha: $sha, line: $line}}' \
+            | curl -f -X POST \
+                -H "Accept: application/vnd.github+json" \
+                -H "Content-Type: application/json" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                -H "Authorization: Bearer ${TOKEN}" \
+                "https://api.github.com/repos/container-registry/8gcr/dispatches" \
+                --data-binary @-

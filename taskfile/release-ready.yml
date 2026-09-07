@@ -122,12 +122,8 @@ tasks:
       DECLARED_PATCH_BRANCHES: '{{.PATCH_BRANCHES}}'
       PATCHES_STACKS_FILE: '{{.PATCHES_STACKS}}'
     cmds:
-      # Each branch is a linear chain of non-merge commits (Patch Stream:
-      # one commit per squash-merged PR; single-commit branches are just a
-      # chain of one). The chain root's parent must sit on the target, or —
-      # for a branch declared in commercial-patch-stacks — anywhere on its
-      # parent branch's chain (the parent's tip moves on every landed PR).
-      # Chain-shape gates on the 8gcr side reject undeclared stacking.
+      # Branch = linear chain of non-merge commits. Its root must parent on
+      # the target, or on its declared parent's chain (commercial-patch-stacks).
       - |
         base=$(git rev-parse HEAD)
         stacks=""
@@ -206,11 +202,8 @@ tasks:
         patchset_id=$(printf '%s' "${patch_revset}" | git hash-object --stdin)
         test "$(jj log -r @ --no-graph -T 'description.first_line()')" = "release patches ${patchset_id}"
     cmds:
-      # Duplicate every branch's FULL chain (Patch Stream: one commit per
-      # squash-merged PR) as one connected set: `~ ::@` strips everything
-      # already on the target, chain roots re-parent onto @, and declared
-      # stacking survives because a stacked root's parent is inside the
-      # duplicated set. Single-commit branches behave exactly as before.
+      # Duplicate each branch's full chain as one set: `~ ::@` drops what
+      # the target already has; stacked roots keep their in-set parents.
       - |
         patch_revset=$(printf '%s\n' "${DECLARED_PATCH_BRANCHES}" | while IFS= read -r branch; do
           git rev-parse "refs/remotes/patches/${branch}^{commit}"

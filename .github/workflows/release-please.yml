@@ -286,8 +286,7 @@ jobs:
     secrets:
       SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
 
-  # Patch Stream: after the notes are rendered (windows read "PRs since the
-  # last record", so render first, stamp second), tell 8gcr to bump the
+  # After notes render (render first, stamp second), tell 8gcr to bump
   # patch baselines onto the released commit and stamp patch-record/<tag>.
   dispatch-release-cut:
     name: Dispatch Release Cut
@@ -318,13 +317,16 @@ jobs:
           TARGET_SHA: ${{ github.sha }}
           LINE: ${{ github.ref_name }}
         run: |
-          curl -f -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Content-Type: application/json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            -H "Authorization: Bearer ${TOKEN}" \
-            "https://api.github.com/repos/container-registry/8gcr/dispatches" \
-            -d "{\"event_type\":\"release-cut\",\"client_payload\":{\"tag\":\"${TAG}\",\"target_sha\":\"${TARGET_SHA}\",\"line\":\"${LINE}\"}}"
+          # jq --arg: tag/branch values must be JSON-escaped, not interpolated.
+          jq -cn --arg tag "${TAG}" --arg sha "${TARGET_SHA}" --arg line "${LINE}" \
+            '{event_type: "release-cut", client_payload: {tag: $tag, target_sha: $sha, line: $line}}' \
+            | curl -f -X POST \
+                -H "Accept: application/vnd.github+json" \
+                -H "Content-Type: application/json" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                -H "Authorization: Bearer ${TOKEN}" \
+                "https://api.github.com/repos/container-registry/8gcr/dispatches" \
+                --data-binary @-
 
   chart:
     name: Publish Helm Chart

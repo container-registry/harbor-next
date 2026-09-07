@@ -176,12 +176,8 @@ prepo() { git -C "${tmp_dir}/patches-repo" "$@"; }
 # The Harbor branch owns the ordered manifest. 8gcr only stores the branch
 # commits, so release notes and image builds always use the same exact list.
 #
-# Patch Stream: each branch is a chain of squash-merged PRs on the pinned
-# patch-base/<line> baseline. The per-feature delta of this release is every
-# chain PR that is NOT in the previous patch-record tag's PR set (recorded
-# per branch as "prs=…" lines in the tag message) — a rebase-proof set
-# difference. Before the stream is seeded (no patch-base ref), fall back to
-# the old flat tip-subject list.
+# Patch Stream: this release's delta per branch = chain PRs not in the previous
+# patch-record tag's "prs=" set. No patch-base ref yet -> flat tip-subject list.
 if [[ "${chart_mode}" == false && -f "${series}" ]]; then
   branches=()
   while IFS= read -r branch; do
