@@ -306,6 +306,10 @@ jobs:
           private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
           owner: container-registry
           repositories: 8gcr
+          # Explicit scope (zizmor github-app): repository_dispatch needs
+          # contents write; without this the token inherits every
+          # permission of the app installation.
+          permission-contents: write
 
       - name: Trigger patch-bump + record
         env:
