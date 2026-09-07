@@ -156,6 +156,8 @@ jobs:
       release_created: ${{ steps.release.outputs['deploy/chart--release_created'] }}
       tag_name: ${{ steps.release.outputs['deploy/chart--tag_name'] }}
       version: ${{ steps.release.outputs['deploy/chart--version'] }}
+      prs_created: ${{ steps.release.outputs.prs_created }}
+      prs: ${{ steps.release.outputs.prs }}
     steps:
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
@@ -273,3 +275,32 @@ jobs:
       tag_name: ${{ needs.release-please-chart.outputs.tag_name }}
     secrets:
       REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+
+  preview-chart-release-notes:
+    name: Preview Chart Release Notes
+    needs: [release-please-chart]
+    if: ${{ needs.release-please-chart.outputs.prs_created == 'true' && needs.release-please-chart.outputs.release_created != 'true' }}
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: ./.github/workflows/release-notes-engine.yml
+    with:
+      checkout_ref: ${{ fromJSON(needs.release-please-chart.outputs.prs)[0].headBranchName }}
+      preview_pr_number: ${{ fromJSON(needs.release-please-chart.outputs.prs)[0].number }}
+      component: chart
+    secrets:
+      SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+
+  update-chart-release-notes:
+    name: Update Chart Release Notes
+    # After publish, so the install snippet points at a pullable chart.
+    needs: [release-please-chart, chart]
+    if: ${{ needs.release-please-chart.outputs.release_created == 'true' }}
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release-notes-engine.yml
+    with:
+      tag_name: ${{ needs.release-please-chart.outputs.tag_name }}
+      component: chart
+    secrets:
+      SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}

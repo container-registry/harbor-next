@@ -20,6 +20,11 @@ on:
         required: false
         default: false
         type: boolean
+      component:
+        description: Release line to render ('' = app, 'chart' = Helm chart)
+        required: false
+        default: ''
+        type: string
     secrets:
       SYNC_APP_PRIVATE_KEY:
         description: Private key for reading commercial branch metadata
@@ -41,6 +46,7 @@ jobs:
       RELEASE_NOTES_DRY_RUN: ${{ inputs.dry_run || false }}
       TAG_NAME: ${{ inputs.tag_name || github.ref_name }}
       RELEASE_NOTES_PREVIEW_PR_NUMBER: ${{ inputs.preview_pr_number }}
+      RELEASE_NOTES_COMPONENT: ${{ inputs.component }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

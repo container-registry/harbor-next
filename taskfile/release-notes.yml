@@ -5,7 +5,7 @@ tasks:
     desc: "Recreate release notes (TAG_NAME=vX.Y.Z)"
     preconditions:
       - sh: test -n "${TAG_NAME:-}"
-        msg: "TAG_NAME is required (for example, v2.15.4)"
+        msg: "TAG_NAME is required (for example, v2.15.4 or chart-v2.0.0)"
       - sh: test -n "${GH_TOKEN:-}"
         msg: "GH_TOKEN is required"
     cmds:
@@ -15,7 +15,7 @@ tasks:
     desc: "Render release notes locally without updating the GitHub Release (TAG_NAME=vX.Y.Z)"
     preconditions:
       - sh: test -n "${TAG_NAME:-}"
-        msg: "TAG_NAME is required (for example, v2.15.4)"
+        msg: "TAG_NAME is required (for example, v2.15.4 or chart-v2.0.0)"
       - sh: test -n "${GH_TOKEN:-}"
         msg: "GH_TOKEN is required"
     cmds:
