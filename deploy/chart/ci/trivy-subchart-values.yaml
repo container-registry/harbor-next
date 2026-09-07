@@ -1,0 +1,11 @@
+# Trivy in harbor-scanner-trivy SUBCHART mode (built-in templates off).
+# trivy.enabled is deliberately left true to exercise the precedence rule:
+# the subchart wins and the built-in trivy.* templates must not render.
+externalURL: https://harbor.example.com
+database:
+  host: db.example.com
+harborAdminPassword: Harbor12345
+trivy:
+  enabled: true
+harbor-scanner-trivy:
+  enabled: true

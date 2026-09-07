@@ -5,5 +5,5 @@ dependencies:
 - name: harbor-scanner-trivy
   repository: oci://8gears.container-registry.com/8gcr/charts
   version: 1.0.1
-digest: sha256:4d32d5e0eedd4e5440977fe8132cf138f87e0919ee1165a13028bb2e15779a1e
-generated: "2026-11-05T14:52:52.519771406+05:30"
+digest: sha256:7ec073aeeb4f231f6f0c02ea2bc1c6f16d5e8bbc36d0d4f3b0bf74428cdbf2aa
+generated: "2026-11-05T14:53:52.943307795+05:30"
