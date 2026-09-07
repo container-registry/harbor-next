@@ -126,6 +126,12 @@ patch_notes="${tmp_dir}/commercial-patches.md"
 
 # The Harbor branch owns the ordered manifest. 8gcr only stores the branch
 # commits, so release notes and image builds always use the same exact list.
+# Each patch commit's message carries an append-only changelog ledger (see
+# 8gcr's COMMERCIAL-PATCH-FLOW.md): entries after the last release marker
+# are this release's delta; when re-rendering an old tag, the window before
+# that tag's marker is used instead.
+commercial_count=0
+unchanged_features=()
 if [[ -f "${series}" ]]; then
   while IFS= read -r branch; do
     branch="${branch%%#*}"
@@ -140,8 +146,48 @@ if [[ -f "${series}" ]]; then
 
     git -C "${tmp_dir}/patches-repo" fetch --depth=1 "${patches_remote}" \
       "${branch}:refs/remotes/origin/${branch}"
-    echo "- $(git -C "${tmp_dir}/patches-repo" log -1 --format=%s "refs/remotes/origin/${branch}")" \
-      >> "${patch_notes}"
+    commercial_count=$((commercial_count + 1))
+    feature_title=$(git -C "${tmp_dir}/patches-repo" log -1 --format=%s "refs/remotes/origin/${branch}")
+    # No early exit inside the awk: the whole ledger is always consumed, so
+    # a long message can never SIGPIPE `git log` under pipefail.
+    feature_entries=$(git -C "${tmp_dir}/patches-repo" log -1 --format=%B "refs/remotes/origin/${branch}" \
+      | awk -v tag="${TAG_NAME}" '
+          function newer(a, b,   x, y, i) {
+            sub(/^v/, "", a); sub(/^v/, "", b)
+            split(a, x, "."); split(b, y, ".")
+            for (i = 1; i <= 3; i++) {
+              if (x[i] + 0 > y[i] + 0) return 1
+              if (x[i] + 0 < y[i] + 0) return 0
+            }
+            return 0
+          }
+          /^Changelog:$/ { inledger = 1; buf = ""; next }
+          !inledger { next }
+          /^--- release / {
+            if ($3 == tag) { found = 1; out = buf }
+            if (newer($3, tag)) sawnewer = 1
+            buf = ""; next
+          }
+          /^- / || /^  / { buf = buf $0 "\n" }
+          END {
+            if (found) { printf "%s", out }
+            # No marker for the tag: the trailing entries are the unreleased
+            # delta — correct for the current release (notes render before
+            # the marker is stamped), but a marker NEWER than the tag means
+            # this is a historical re-render of a pre-ledger tag: no entries.
+            else if (!sawnewer) { printf "%s", buf }
+          }
+        ')
+    if [[ -n "${feature_entries}" ]]; then
+      {
+        echo "### ${feature_title}"
+        echo
+        printf '%s' "${feature_entries}"
+        echo
+      } >> "${patch_notes}"
+    else
+      unchanged_features+=("${feature_title}")
+    fi
   done < "${series}"
 fi
 
@@ -151,13 +197,19 @@ fi
     echo
   fi
 
-  if [[ -s "${patch_notes}" ]]; then
+  if [[ "${commercial_count}" -gt 0 ]]; then
     echo "## Commercial Features"
     echo
-    echo "This release includes the following commercial enhancements:"
-    echo
-    cat "${patch_notes}"
-    echo
+    if [[ -s "${patch_notes}" ]]; then
+      echo "Changes to commercial features in this release:"
+      echo
+      cat "${patch_notes}"
+    fi
+    if [[ "${#unchanged_features[@]}" -gt 0 ]]; then
+      printf -v unchanged_list '%s, ' "${unchanged_features[@]}"
+      echo "_No changes this release: ${unchanged_list%, }._"
+      echo
+    fi
   fi
 
   cat "${tmp_dir}/formatted-notes.md"
