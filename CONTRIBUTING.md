@@ -271,7 +271,7 @@ This renders in the release notes as:
 
 ## Adding Release Notes to Your PR
 
-**New features (`feat:`) must add a `## Release Notes` section to the PR description.** It is also expected for other user-facing changes (breaking changes, deprecations). The prose appears on the GitHub Release page under a `## Highlights` section.
+**New features (`feat:`) must add a `## Release Notes` section to the PR description.** It is also expected for other user-facing changes (breaking changes, deprecations). The content appears on the GitHub Release page under a `## Summary` section — verbatim, so screenshots and links carry over.
 
 Fill in the `## Release Notes` section in the PR description:
 
