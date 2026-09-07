@@ -24,8 +24,7 @@
       "package-name": "harbor-next",
       "component": "chart",
       "include-component-in-tag": true,
-      "changelog-path": "CHANGELOG.md",
-      "release-as": "2.0.0"
+      "changelog-path": "CHANGELOG.md"
     }
   }
 }
