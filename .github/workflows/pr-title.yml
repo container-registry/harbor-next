@@ -28,6 +28,7 @@ jobs:
             chore
             revert
             upstream
+            deps
           requireScope: false
           subjectPattern: ^.{1,100}$
           subjectPatternError: |
