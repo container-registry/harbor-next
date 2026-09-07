@@ -14,7 +14,7 @@ ERROR — will not render / cannot work (5)
   * registry.config.storage
       2 storage drivers configured (azure, s3) — distribution requires exactly one. helm template fails on this.
 
-WARN — review recommended (10)
+WARN — review recommended (11)
   * harborAdminPassword
       Plaintext credential in the values file — anyone with read access to the file or the release manifest can read it. Prefer existingSecretAdminPassword.
   * database.password
@@ -23,8 +23,10 @@ WARN — review recommended (10)
       Plaintext credential in the values file — anyone with read access to the file or the release manifest can read it. Prefer externalRedis.existingSecret.
   * secretKey
       Plaintext credential in the values file — anyone with read access to the file or the release manifest can read it. Prefer existingSecretSecretKey.
-  * trivy.trivy.gitHubToken
-      Plaintext credential in the values file — anyone with read access to the file or the release manifest can read it. Prefer trivy.trivy.existingSecret (subchart Secret for the GitHub token).
+  * trivy.gitHubToken
+      Plaintext credential in the values file — anyone with read access to the file or the release manifest can read it. Prefer trivy.secret via an extraEnv valueFrom.
+  * harbor-scanner-trivy.trivy.gitHubToken
+      Plaintext credential in the values file — anyone with read access to the file or the release manifest can read it. Prefer harbor-scanner-trivy.trivy.existingSecret (subchart Secret for the GitHub token).
   * registry.secret.REGISTRY_STORAGE_S3_ACCESSKEY
       Inline storage credential — prefer a pre-created Secret via registry.storageCredentials.<backend>.existingSecret.
   * registry.secret.REGISTRY_STORAGE_S3_SECRETKEY
@@ -36,4 +38,4 @@ WARN — review recommended (10)
   * database.existingTlsSecret
       sslmode verify-ca/verify-full usually needs the CA bundle Secret (database.existingTlsSecret) unless the PG certificate chains to a public CA.
 
-5 error(s), 10 warning(s).
+5 error(s), 11 warning(s).

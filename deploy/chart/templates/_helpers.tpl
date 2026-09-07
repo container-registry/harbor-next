@@ -363,11 +363,15 @@ Image helpers
 
 {{/*
 Per-source image defaults. `image.source` (8gcr | upstream) picks a registry and
-the per-component repository path. Upstream goharbor renames one image
-(`registry-photon`), so this is a real map, not a host swap — keep it in
-sync with goharbor/harbor-helm on appVersion bumps. The Trivy adapter is
-not listed: it comes from the harbor-scanner-trivy subchart, which carries
-its own image reference.
+the per-component repository path. Upstream goharbor renames two images
+(`registry-photon`, `trivy-adapter-photon`), so this is a real map, not a host
+swap — keep it in sync with goharbor/harbor-helm on appVersion bumps.
+
+The built-in trivy adapter is no longer built in-tree: the 8gcr source uses
+the released harbor-scanner-trivy image, whose versions are its own release
+line (not the chart appVersion) — hence the per-component `tags` override.
+The optional harbor-scanner-trivy SUBCHART carries its own image reference
+and ignores this map entirely.
 */}}
 {{- define "harbor.image.sourceMap" -}}
 8gcr:
@@ -378,7 +382,11 @@ its own image reference.
     registry: 8gcr/harbor-registry
     registryctl: 8gcr/harbor-registryctl
     portal: 8gcr/harbor-portal
+    trivy: 8gcr/harbor-scanner-trivy
     exporter: 8gcr/harbor-exporter
+  tags:
+    # renovate: datasource=docker depName=8gears.container-registry.com/8gcr/harbor-scanner-trivy versioning=docker
+    trivy: v0.40.1
 upstream:
   registry: docker.io
   repos:
@@ -387,6 +395,7 @@ upstream:
     registry: goharbor/registry-photon
     registryctl: goharbor/harbor-registryctl
     portal: goharbor/harbor-portal
+    trivy: goharbor/trivy-adapter-photon
     exporter: goharbor/harbor-exporter
 {{- end -}}
 
@@ -429,7 +438,7 @@ style, e.g. ttl.sh/foo/harbor-core) is NOT double-prefixed by the source map.
 {{- if $img.digest -}}
 {{- printf "%s@%s" $ref $img.digest -}}
 {{- else -}}
-{{- $tag := $img.tag | default $root.Chart.AppVersion -}}
+{{- $tag := $img.tag | default (index ($cfg.tags | default dict) .component) | default $root.Chart.AppVersion -}}
 {{- printf "%s:%s" $ref $tag -}}
 {{- end -}}
 {{- end }}
@@ -554,8 +563,15 @@ Validate required values
 {{- if and .Values.metrics.serviceMonitor.enabled (not .Values.metrics.enabled) }}
 {{- fail "metrics.serviceMonitor.enabled requires metrics.enabled=true. Without metrics enabled, Harbor pods do not expose the /metrics endpoint the ServiceMonitor would scrape." }}
 {{- end }}
+{{- /* Subchart-mode Trivy cannot inherit this chart's Redis settings. When the
+       bundled Valkey is off, the shipped default redis URL points at a Service
+       that will not exist — catch it at template time, not at scan time. */}}
+{{- $scannerTrivy := index .Values "harbor-scanner-trivy" }}
+{{- if and $scannerTrivy.enabled (not .Values.valkey.enabled) (eq (default "" (($scannerTrivy.redis).url)) "redis://valkey:6379/5") (not (($scannerTrivy.redis).existingSecret)) }}
+{{- fail "harbor-scanner-trivy.enabled=true with valkey.enabled=false, but harbor-scanner-trivy.redis.url still points at the bundled Valkey (redis://valkey:6379/5). The subchart cannot inherit externalRedis — set harbor-scanner-trivy.redis.url (or harbor-scanner-trivy.redis.existingSecret when the URL carries a password)." }}
+{{- end }}
 {{- /* HPA min/max sanity — fail fast at template time rather than letting K8s reject. */}}
-{{- range $name, $cfg := dict "core" .Values.core "registry" .Values.registry "jobservice" .Values.jobservice "portal" .Values.portal }}
+{{- range $name, $cfg := dict "core" .Values.core "registry" .Values.registry "jobservice" .Values.jobservice "portal" .Values.portal "trivy" .Values.trivy }}
 {{- if and $cfg.autoscaling $cfg.autoscaling.enabled }}
 {{- if not $cfg.autoscaling.maxReplicas }}
 {{- fail (printf "%s.autoscaling.enabled=true requires %s.autoscaling.maxReplicas to be set." $name $name) }}

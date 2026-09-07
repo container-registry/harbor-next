@@ -196,9 +196,12 @@ Each release publishes `linux/amd64` and `linux/arm64` images:
 - `harbor-exporter`
 - `harbor-portal`
 - `harbor-registry`
-- `trivy-adapter`
 
 Default registry path: `8gears.container-registry.com/8gcr`.
+
+The Trivy scanner adapter is no longer built here: it ships prebuilt from the
+[harbor-scanner-trivy](https://github.com/container-registry/harbor-scanner-trivy)
+release line (`harbor-scanner-trivy:vX.Y.Z`), independently of Harbor releases.
 
 At release runtime, the workflow reads `taskfile/commercial-patches` from the checked-out Harbor Next branch, fetches only those branches from `container-registry/8gcr`, applies their declared commit deltas, and builds the images. The workflow never fetches `8gcr/main` or an 8gcr-owned series file.
 

@@ -203,14 +203,31 @@ Jobservice config moved into a verbatim `config.yml` passthrough
 
 | 2.x | This chart | Notes |
 |---|---|---|
-| `trivy.enabled` | `trivy.enabled` | Default flipped: now `false`. Everything under `trivy.*` goes verbatim to the [harbor-scanner-trivy](https://github.com/container-registry/harbor-scanner-trivy) subchart |
-| `trivy.image`, `resources`, `podDisruptionBudget` | same names | StatefulSet in both charts; new: `trivy.autoscaling` |
-| `trivy.replicas` | `trivy.replicaCount` | |
-| `trivy.{debugMode,vulnType,severity,ignoreUnfixed,insecure,gitHubToken,skipUpdate,skipJavaDBUpdate,dbRepository,javaDBRepository,offlineScan,timeout}` | `trivy.trivy.*` (one level down) | Subchart groups Trivy-CLI tuning under its own `trivy` key |
-| `trivy.securityCheck` | `trivy.trivy.securityChecks` | Renamed (plural) |
+| `trivy.enabled` | `trivy.enabled` | Default flipped: now `false` |
+| `trivy.image`, `replicas`, `resources`, `podDisruptionBudget`→`pdb` | same pattern | StatefulSet in both charts; new: `trivy.autoscaling` |
+| `trivy.{debugMode,vulnType,severity,ignoreUnfixed,insecure,gitHubToken,skipUpdate,skipJavaDBUpdate,dbRepository,javaDBRepository,offlineScan,securityCheck,timeout}` | identical | |
 | `persistence.persistentVolumeClaim.trivy.*` | `trivy.persistence.*` | |
-| — | `trivy.config` / `trivy.secret` | Any `SCANNER_*` adapter env without chart changes |
-| — | `trivy.redis.url` | NOT inherited from this chart's Redis settings; defaults to the bundled Valkey (`redis://valkey:6379/5`). Set it (or `trivy.redis.existingSecret`) for external Redis |
+| — | `trivy.config` / `trivy.secret` | New: any `SCANNER_*` adapter env without chart changes |
+
+#### Optional: harbor-scanner-trivy subchart mode
+
+The table above covers the default **built-in** mode. Alternatively, the
+Trivy adapter can be consumed as the standalone
+[harbor-scanner-trivy](https://github.com/container-registry/harbor-scanner-trivy)
+subchart: set `harbor-scanner-trivy.enabled: true` (the built-in `trivy.*`
+templates then disable themselves; this mode becomes the default in 2.17).
+Its configuration lives under the `harbor-scanner-trivy.*` key and follows
+THAT chart's values shape, not the table above:
+
+| Built-in (`trivy.*`) | Subchart (`harbor-scanner-trivy.*`) | Notes |
+|---|---|---|
+| `trivy.enabled` | `harbor-scanner-trivy.enabled` | The mode switch itself |
+| `trivy.{debugMode,vulnType,severity,ignoreUnfixed,insecure,gitHubToken,skipUpdate,skipJavaDBUpdate,offlineScan,timeout}` | `harbor-scanner-trivy.trivy.*` (one level down) | Subchart groups Trivy-CLI tuning under its own `trivy` key |
+| `trivy.securityCheck` | `harbor-scanner-trivy.trivy.securityChecks` | Renamed (plural) |
+| `trivy.dbRepository` / `javaDBRepository` (list) | comma-joined string | |
+| `trivy.replicas` | `harbor-scanner-trivy.replicaCount` | |
+| `trivy.pdb` | `harbor-scanner-trivy.podDisruptionBudget` | |
+| — | `harbor-scanner-trivy.redis.url` | NOT inherited from this chart's Redis settings; defaults to the bundled Valkey (`redis://valkey:6379/5`). Set it (or `harbor-scanner-trivy.redis.existingSecret`) for external Redis |
 
 ### Database
 

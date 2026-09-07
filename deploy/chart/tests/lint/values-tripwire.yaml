@@ -49,6 +49,10 @@ jobservice:
 
 trivy:
   enabled: true
+  gitHubToken: ghp_inline
+
+harbor-scanner-trivy:
+  enabled: true
   trivy:
     gitHubToken: ghp_inline
 
