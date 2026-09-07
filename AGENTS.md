@@ -23,7 +23,7 @@ Go test/build need generated API first: `task build:gen-apis`.
 - DCO sign-off required: `git commit -s`.
 - Squash and merge only; other merge types break release-please.
 - No `Co-Authored-By` or AI attribution trailers.
-- New features (`feat:`) must add a `## Release Notes` section to the PR description. Its prose is extracted and rendered under `## Highlights` on the GitHub Release.
+- New features (`feat:`) must add a `## Release Notes` section to the PR description. Its content is extracted and rendered under `## Summary` on the GitHub Release.
 
 ## GitHub Actions
 
