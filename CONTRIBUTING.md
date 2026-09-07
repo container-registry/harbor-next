@@ -58,6 +58,7 @@ Common types:
 | `fix` | Bug fix | Patch version bump |
 | `upstream` | Cherry-picked upstream Harbor change | Patch version bump |
 | `feat!` / `fix!` | Breaking change | Major version bump |
+| `chart` | Helm chart change outside `deploy/chart` (release plumbing, chart workflows) | Chart release line only; hidden from app release notes. Never use `chart!:` or a `BREAKING CHANGE:` footer — breaking commits always render in app release notes (the pr-title check rejects `chart!:`) |
 | `refactor` | Code change, no behaviour change | No release |
 | `docs` | Documentation only | No release |
 | `ci` | CI/CD pipeline changes | No release |

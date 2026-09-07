@@ -29,7 +29,22 @@ jobs:
             revert
             upstream
             deps
+            chart
           requireScope: false
           subjectPattern: ^.{1,100}$
           subjectPatternError: |
             Subject must be 100 characters or less.
+
+      - name: Forbid breaking chart commits
+        # chart commits must never carry the breaking marker: release-please
+        # renders BREAKING CHANGE commits in app release notes even for
+        # hidden types, defeating the chart/app segregation.
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          case "${TITLE}" in
+            chart!*|"chart("*")!:"*)
+              echo "::error::chart commits must not be breaking (chart!:). Breaking commits always surface in app release notes. Use a plain chart: commit; chart majors are driven by feat!/fix! under deploy/chart or a one-shot release-as."
+              exit 1
+              ;;
+          esac

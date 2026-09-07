@@ -20,7 +20,8 @@
     {"type": "test",     "section": "Tests", "hidden": true},
     {"type": "chore",    "section": "Miscellaneous", "hidden": true},
     {"type": "ci",       "section": "CI/CD",          "hidden": true},
-    {"type": "build",    "section": "Build System",   "hidden": true}
+    {"type": "build",    "section": "Build System",   "hidden": true},
+    {"type": "chart",    "section": "Chart",          "hidden": true}
   ],
   "packages": {
     ".": {}

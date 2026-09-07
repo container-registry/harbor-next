@@ -15,6 +15,8 @@ jobs:
   validate-release-ref:
     name: Validate Release Ref
     runs-on: ubuntu-26.04
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Allow only release refs
         run: |
@@ -24,6 +26,25 @@ jobs:
 
           echo "::error::Release Please can only run on main or release-X.Y branches. Current ref: ${GITHUB_REF_NAME}"
           exit 1
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Reject leftover chart release-as
+        # release-as is a one-shot override that must be removed once its
+        # version ships; leaving it pins every future chart release to the
+        # same version (the #728 bug). Hard-fail the release pipeline the
+        # moment the pinned version's tag exists.
+        run: |
+          release_as=$(jq -r '.packages["deploy/chart"]["release-as"] // empty' release-please-config-chart.json)
+          if [ -z "${release_as}" ]; then
+            exit 0
+          fi
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/chart-v${release_as}" >/dev/null 2>&1; then
+            echo "::error file=release-please-config-chart.json::chart-v${release_as} is already published — remove the one-shot \"release-as\" from release-please-config-chart.json or every future chart release stays pinned to ${release_as}."
+            exit 1
+          fi
 
   release-please:
     needs: [validate-release-ref]
