@@ -104,6 +104,7 @@ tasks:
           - ci/default-values.yaml
           - ci/expose-values.yaml
           - ci/gitops-values.yaml
+          - ci/trivy-subchart-values.yaml
         cmd: cd {{.CHART_DIR}} && ys tools/values-lint.ys {{.ITEM}}
 
   values-lint:test:
@@ -140,6 +141,7 @@ tasks:
           - ci/default-values.yaml
           - ci/expose-values.yaml
           - ci/gitops-values.yaml
+          - ci/trivy-subchart-values.yaml
         cmd: helm template harbor {{.CHART_DIR}} -f {{.CHART_DIR}}/{{.ITEM}} > {{.CHART_DIR}}/.rendered-config.yaml && cd {{.CHART_DIR}} && ys tools/rendered-config-check.ys .rendered-config.yaml
 
   kube-linter:

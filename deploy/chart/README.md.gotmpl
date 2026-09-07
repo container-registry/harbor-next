@@ -505,9 +505,29 @@ tls:
     renewBefore: 360h  # 15 days
 ```
 
+### Trivy Scanner: Built-in vs Subchart Mode
+
+The Trivy adapter deploys one of two mutually exclusive ways. Both run the same released [harbor-scanner-trivy](https://github.com/container-registry/harbor-scanner-trivy) adapter image (it is no longer built in-tree), and core's `WITH_TRIVY` / `TRIVY_ADAPTER_URL` follow whichever mode is active.
+
+**Built-in (default in 2.16):** the chart's own `trivy.*` templates — the familiar configuration surface, unchanged:
+
+```yaml
+trivy:
+  enabled: true
+```
+
+**Subchart (opt-in, becomes the default in 2.17):** the standalone harbor-scanner-trivy chart, consumed as a dependency. One line switches modes — when both flags are set, the subchart wins and the built-in templates disable themselves:
+
+```yaml
+harbor-scanner-trivy:
+  enabled: true
+```
+
+Subchart configuration lives under the `harbor-scanner-trivy.*` key and follows THAT chart's values shape ([full surface](https://github.com/container-registry/harbor-scanner-trivy/tree/main/deploy/chart)) — scanner tuning sits one level down (`harbor-scanner-trivy.trivy.severity`, ...), and Redis is NOT inherited from this chart: the default targets the bundled Valkey (`redis://valkey:6379/5`); set `harbor-scanner-trivy.redis.url` for external Redis. See [MIGRATION-REFERENCE](docs/MIGRATION-REFERENCE.md) for the built-in-to-subchart key map.
+
 ### HPA / Autoscaling
 
-Per-component HPAs target the matching Deployment (or the trivy StatefulSet) and the controller template OMITS `replicas:` whenever `autoscaling.enabled=true` — otherwise each `helm upgrade` would reset the count and fight the HPA. Available on `core`, `jobservice`, `registry`, `portal`, and `trivy`.
+Per-component HPAs target the matching Deployment (or the trivy StatefulSet) and the controller template OMITS `replicas:` whenever `autoscaling.enabled=true` — otherwise each `helm upgrade` would reset the count and fight the HPA. Available on `core`, `jobservice`, `registry`, `portal`, and `trivy` (built-in mode; in subchart mode the harbor-scanner-trivy chart brings its own HPA).
 
 ```yaml
 core:

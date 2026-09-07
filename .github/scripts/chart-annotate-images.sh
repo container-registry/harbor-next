@@ -29,16 +29,25 @@ if [[ ! "${app_version}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
   exit 1
 fi
 
+# The Trivy adapter is not built in this repo and does not follow appVersion:
+# built-in mode deploys the released harbor-scanner-trivy image pinned in the
+# harbor.image.sourceMap helper (tags.trivy, kept current by Renovate). Read
+# that pin so the annotation matches what the chart actually deploys.
+scanner_tag="$(awk '/^[[:space:]]*trivy: v[0-9]/ { print $2; exit }' "${chart_dir}/templates/_helpers.tpl")"
+if [[ ! "${scanner_tag}" =~ ^v[0-9][A-Za-z0-9._-]*$ ]]; then
+  echo "Unusable harbor-scanner-trivy tag read from ${chart_dir}/templates/_helpers.tpl: '${scanner_tag}'" >&2
+  exit 1
+fi
+
 {
   echo "  artifacthub.io/images: |"
-  for component in core jobservice registryctl exporter portal registry trivy-adapter; do
+  for component in core jobservice registryctl exporter portal registry; do
     image_name="harbor-${component}"
-    if [[ "${component}" == "trivy-adapter" ]]; then
-      image_name="trivy-adapter"
-    fi
     echo "    - name: ${image_name}"
     echo "      image: ${registry_address}/${registry_project}/${image_name}:${app_version}"
   done
+  echo "    - name: harbor-scanner-trivy"
+  echo "      image: ${registry_address}/${registry_project}/harbor-scanner-trivy:${scanner_tag}"
 } >> "${chart_yaml}"
 
 echo "Annotated ${chart_yaml} with images for appVersion ${app_version}"

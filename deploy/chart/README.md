@@ -504,9 +504,29 @@ tls:
     renewBefore: 360h  # 15 days
 ```
 
+### Trivy Scanner: Built-in vs Subchart Mode
+
+The Trivy adapter deploys one of two mutually exclusive ways. Both run the same released [harbor-scanner-trivy](https://github.com/container-registry/harbor-scanner-trivy) adapter image (it is no longer built in-tree), and core's `WITH_TRIVY` / `TRIVY_ADAPTER_URL` follow whichever mode is active.
+
+**Built-in (default in 2.16):** the chart's own `trivy.*` templates — the familiar configuration surface, unchanged:
+
+```yaml
+trivy:
+  enabled: true
+```
+
+**Subchart (opt-in, becomes the default in 2.17):** the standalone harbor-scanner-trivy chart, consumed as a dependency. One line switches modes — when both flags are set, the subchart wins and the built-in templates disable themselves:
+
+```yaml
+harbor-scanner-trivy:
+  enabled: true
+```
+
+Subchart configuration lives under the `harbor-scanner-trivy.*` key and follows THAT chart's values shape ([full surface](https://github.com/container-registry/harbor-scanner-trivy/tree/main/deploy/chart)) — scanner tuning sits one level down (`harbor-scanner-trivy.trivy.severity`, ...), and Redis is NOT inherited from this chart: the default targets the bundled Valkey (`redis://valkey:6379/5`); set `harbor-scanner-trivy.redis.url` for external Redis. See [MIGRATION-REFERENCE](docs/MIGRATION-REFERENCE.md) for the built-in-to-subchart key map.
+
 ### HPA / Autoscaling
 
-Per-component HPAs target the matching Deployment (or the trivy StatefulSet) and the controller template OMITS `replicas:` whenever `autoscaling.enabled=true` — otherwise each `helm upgrade` would reset the count and fight the HPA. Available on `core`, `jobservice`, `registry`, `portal`, and `trivy`.
+Per-component HPAs target the matching Deployment (or the trivy StatefulSet) and the controller template OMITS `replicas:` whenever `autoscaling.enabled=true` — otherwise each `helm upgrade` would reset the count and fight the HPA. Available on `core`, `jobservice`, `registry`, `portal`, and `trivy` (built-in mode; in subchart mode the harbor-scanner-trivy chart brings its own HPA).
 
 ```yaml
 core:
@@ -712,7 +732,7 @@ Kubernetes: `>=1.28.0-0`
 
 | Repository | Name | Version |
 |------------|------|---------|
-| oci://8gears.container-registry.com/8gcr/charts | trivy(harbor-scanner-trivy) | 1.0.1 |
+| oci://8gears.container-registry.com/8gcr/charts | harbor-scanner-trivy | 1.0.1 |
 | oci://ghcr.io/valkey-io/valkey-helm | valkey | 0.9.3 |
 
 ## Values
@@ -880,10 +900,16 @@ Kubernetes: `>=1.28.0-0`
 | global.imageRegistry | string | `""` | Override the registry host for ALL component images at once (air-gap / mirror). When set it wins over per-component `image.registry` and `image.source`. Repository paths are preserved, so a flat mirror works (`global.imageRegistry=mirror.io` -> `mirror.io/8gcr/harbor-core`). Propagated to subcharts; the valkey subchart image must be mirrored/overridden separately (it may not honor this). |
 | global.priorityClassName | string | `""` | Priority class name for all component pods |
 | global.revisionHistoryLimit | int | `3` | Number of old ReplicaSets to retain (K8s default is 10) |
+| harbor-scanner-trivy.enabled | bool | `false` | Deploy the Trivy adapter via the harbor-scanner-trivy subchart instead of the built-in `trivy.*` templates |
+| harbor-scanner-trivy.nameOverride | string | `"trivy"` |  |
+| harbor-scanner-trivy.persistence.enabled | bool | `false` |  |
+| harbor-scanner-trivy.redis.url | string | `"redis://valkey:6379/5"` |  |
+| harbor-scanner-trivy.trivy.dbRepository | string | `"mirror.gcr.io/aquasec/trivy-db,ghcr.io/aquasecurity/trivy-db"` |  |
+| harbor-scanner-trivy.trivy.javaDBRepository | string | `"mirror.gcr.io/aquasec/trivy-java-db,ghcr.io/aquasecurity/trivy-java-db"` |  |
 | harborAdminPassword | string | `""` | Harbor admin password (initial setup). **REQUIRED** unless `existingSecretAdminPassword` is set. Do not use the legacy default `Harbor12345` — it is publicly known. For production reference a pre-created Secret via `existingSecretAdminPassword` rather than passing the value here. Rotate from the Harbor UI after first login. |
 | image | object | `{"pullPolicy":"IfNotPresent","source":"8gcr"}` | Global image settings |
 | image.pullPolicy | string | `"IfNotPresent"` | Image pull policy for all Harbor components |
-| image.source | string | `"8gcr"` | Image source preset: `8gcr` (Harbor Next builds, default) or `upstream` (docker.io/goharbor/*). Selects the registry + per-component repository for every component. Per-component `image.registry`/`image.repository` override it; `global.imageRegistry` overrides the registry on top. See the `harbor.image.sourceMap` helper for the exact map (upstream renames the registry image to `registry-photon`). The Trivy adapter is not covered: its image comes from the harbor-scanner-trivy subchart (`trivy.image.*`). |
+| image.source | string | `"8gcr"` | Image source preset: `8gcr` (Harbor Next builds, default) or `upstream` (docker.io/goharbor/*). Selects the registry + per-component repository for every component. Per-component `image.registry`/`image.repository` override it; `global.imageRegistry` overrides the registry on top. See the `harbor.image.sourceMap` helper for the exact map (upstream renames the registry image to `registry-photon` and trivy to `trivy-adapter-photon`; the 8gcr trivy image is the released harbor-scanner-trivy adapter with its own pinned tag). In harbor-scanner-trivy subchart mode the adapter image comes from the subchart instead (`harbor-scanner-trivy.image.*`). |
 | imageCredentials | object | `{}` | Credentials to pull images imageCredentials:   registry: xyz.com   username: xxx   password: yyy   email: zzz@xyz.com |
 | imagePullSecrets | list | [] | List of image pull secrets |
 | ingress | object | `{"annotations":{},"autoGenCert":true,"className":"","core":"","enabled":true,"hosts":[],"labels":{},"tls":[]}` | Ingress configuration |
@@ -1061,11 +1087,55 @@ Kubernetes: `>=1.28.0-0`
 | trace.otel.url_path | string | `"/v1/traces"` |  |
 | trace.provider | string | `"jaeger"` |  |
 | trace.sample_rate | int | `1` |  |
-| trivy.enabled | bool | `false` | Deploy the Trivy scanner adapter (harbor-scanner-trivy subchart) |
-| trivy.persistence.enabled | bool | `false` |  |
-| trivy.redis.url | string | `"redis://valkey:6379/5"` |  |
-| trivy.trivy.dbRepository | string | `"mirror.gcr.io/aquasec/trivy-db,ghcr.io/aquasecurity/trivy-db"` |  |
-| trivy.trivy.javaDBRepository | string | `"mirror.gcr.io/aquasec/trivy-java-db,ghcr.io/aquasecurity/trivy-java-db"` |  |
+| trivy.affinity | object | `{}` | Affinity rules for Trivy pods |
+| trivy.annotations | object | `{}` | Annotations for the Trivy workload object (StatefulSet) |
+| trivy.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler for the Trivy StatefulSet. See `core.autoscaling` for full docs. |
+| trivy.config | object | {} | Trivy adapter config as env vars. Trivy is env-driven (SCANNER_*); nested maps flatten to UPPER_SNAKE_CASE via toEnvVars and are injected via envFrom. Any adapter setting works without chart changes. |
+| trivy.dbRepository[0] | string | `"mirror.gcr.io/aquasec/trivy-db"` |  |
+| trivy.dbRepository[1] | string | `"ghcr.io/aquasecurity/trivy-db"` |  |
+| trivy.debugMode | bool | `false` | Debug mode for more verbose scanning log |
+| trivy.enabled | bool | `false` | Enable Trivy scanner |
+| trivy.extraEnv | list | [] | Extra environment variables with valueFrom support |
+| trivy.gitHubToken | string | `""` | GitHub token to download Trivy DB (optional) |
+| trivy.hostAliases | list | [] | Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for private DNS that does not exist in cluster DNS — service-mesh sidecars, legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the Kubernetes PodSpec: a list of `{ip, hostnames}` entries. |
+| trivy.ignoreUnfixed | bool | `false` | Skip unfixed vulnerabilities |
+| trivy.image.digest | string | `""` | Pin by digest (sha256:...); used instead of tag when set |
+| trivy.image.registry | string | `""` | Registry host override; empty uses `image.source` (`global.imageRegistry` wins over both) |
+| trivy.image.repository | string | `""` | Repository override (path WITHOUT registry host); empty uses `image.source` |
+| trivy.image.tag | string | `""` | Trivy adapter image tag. The adapter is no longer built in-tree: the default (8gcr source) is the pinned harbor-scanner-trivy release from the image source map, NOT the chart appVersion; the upstream source keeps goharbor's appVersion-tagged trivy-adapter-photon. |
+| trivy.initContainers | list | `[]` | Init containers (run before main containers) |
+| trivy.insecure | bool | `false` | Skip verifying registry certificate |
+| trivy.javaDBRepository[0] | string | `"mirror.gcr.io/aquasec/trivy-java-db"` |  |
+| trivy.javaDBRepository[1] | string | `"ghcr.io/aquasecurity/trivy-java-db"` |  |
+| trivy.lifecycle | object | {} | Container `lifecycle` hook spec (preStop / postStart). Common use: preStop `sleep` so AWS/GCP LBs deregister the pod before SIGTERM, avoiding 504s on rolling upgrades. Both hook handler shapes are accepted (`exec`, `httpGet`, `tcpSocket`). Tracks upstream #1722/#1739/#2156/#2157 — all closed without merge, the gap was never closed there. |
+| trivy.nodeSelector | object | `{}` | Node selector for Trivy pods |
+| trivy.offlineScan | bool | `false` | Enable offline scan mode |
+| trivy.pdb | object | `{"enabled":false}` | PodDisruptionBudget for Trivy |
+| trivy.pdb.enabled | bool | `false` | Enable PodDisruptionBudget. When true, exactly one of `minAvailable` or `maxUnavailable` must be set (Kubernetes rejects PDBs with both fields). |
+| trivy.persistence | object | `{"accessModes":["ReadWriteOnce"],"annotations":{},"enabled":false,"existingClaim":"","size":"5Gi"}` | Trivy persistence settings - used for cache |
+| trivy.persistence.accessModes | list | `["ReadWriteOnce"]` | PVC access modes |
+| trivy.persistence.annotations | object | `{}` | Annotations for PVC |
+| trivy.persistence.enabled | bool | `false` | Enable persistence for registry |
+| trivy.persistence.existingClaim | string | `""` | Existing PVC name (disables dynamic provisioning) |
+| trivy.persistence.size | string | `"5Gi"` | PVC size |
+| trivy.podAnnotations | object | `{}` | Additional pod annotations for Trivy |
+| trivy.podLabels | object | `{}` | Additional pod labels for Trivy |
+| trivy.podSecurityContext | object | `{"fsGroup":10000}` | Pod security context for Trivy |
+| trivy.probes | object | See [values.yaml](values.yaml) | Container probes, rendered verbatim. See `core.probes` for the tuning rationale. Startup budget 60s covers adapter init. |
+| trivy.replicas | int | `1` | Number of Trivy replicas (ignored when autoscaling.enabled=true) |
+| trivy.resources | object | `{"limits":{"cpu":1,"memory":"1Gi"},"requests":{"cpu":"200m","memory":"512Mi"}}` | Trivy resource requests and limits |
+| trivy.secret | object | {} | Sensitive Trivy adapter config (converted to env vars in a Secret). |
+| trivy.securityCheck | string | `"vuln"` |  |
+| trivy.securityContext | object | `{"runAsGroup":10000,"runAsNonRoot":true,"runAsUser":10000}` | Security context for Trivy container |
+| trivy.serviceAccount | object | `{"annotations":{},"automountServiceAccountToken":false,"create":false,"name":""}` | Service account settings for Trivy |
+| trivy.serviceAccount.automountServiceAccountToken | bool | `false` | Automount service account token |
+| trivy.severity | string | `"UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL"` | Severity levels to check |
+| trivy.skipJavaDBUpdate | bool | `false` | Skip Java DB updates |
+| trivy.skipUpdate | bool | `false` | Skip Trivy DB updates |
+| trivy.timeout | string | `"5m0s"` | Timeout for scanning |
+| trivy.tolerations | list | `[]` | Tolerations for Trivy pods |
+| trivy.topologySpreadConstraints | list | `[]` | Topology spread constraints for pod scheduling |
+| trivy.vulnType | string | `"os,library"` | Vulnerability types to scan (os,library) |
 | valkey.architecture | string | `"standalone"` | Valkey architecture: standalone or replication |
 | valkey.auth | object | `{"enabled":false,"password":""}` | Valkey authentication settings |
 | valkey.dataStorage | object | `{"enabled":false}` | Valkey persistence configuration |
