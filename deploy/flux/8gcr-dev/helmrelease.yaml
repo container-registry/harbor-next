@@ -151,14 +151,14 @@ spec:
       extraEnv:
         - name: PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE
           value: "docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory,npm,npmjs,pypi,pypi-registry,maven,maven-central,cargo,crates-io,go,go-registry,go-sumdb,homebrew,homebrew-registry"
-        - name: WITH_GRYPE
-          value: "true"
-        - name: GRYPE_ADAPTER_URL
-          value: http://grype-scanner:8080
-        # 0007 patch defaults WITH_SNYK=true but no deployment runs a
-        # snyk-scanner (needs Snyk API creds) — kills the phantom unhealthy
-        # snyk entry in /api/v2.0/health
+        # Transitional: core images built before the 0007 grype/snyk strip
+        # still know these config keys (WITH_SNYK defaults to true there,
+        # which resurrects the phantom unhealthy snyk entry from #781).
+        # Harmless once rebuilt images land; drop after the fleet is on
+        # scanner-free images.
         - name: WITH_SNYK
+          value: "false"
+        - name: WITH_GRYPE
           value: "false"
         - name: DEFAULT_SCANNER
           value: Trivy
@@ -262,96 +262,3 @@ spec:
                   CREATE EVENT TRIGGER demo_install_promote_admin_evt
                     ON ddl_command_end WHEN TAG IN ('CREATE TABLE')
                     EXECUTE FUNCTION demo_install_promote_admin();
-      - apiVersion: apps/v1
-        kind: Deployment
-        metadata:
-          name: grype-scanner
-          labels:
-            app.kubernetes.io/name: grype-scanner
-            app.kubernetes.io/component: scanner
-            app.kubernetes.io/part-of: harbor
-        spec:
-          replicas: 1
-          selector:
-            matchLabels:
-              app.kubernetes.io/name: grype-scanner
-          template:
-            metadata:
-              labels:
-                app.kubernetes.io/name: grype-scanner
-                app.kubernetes.io/component: scanner
-                app.kubernetes.io/part-of: harbor
-            spec:
-              imagePullSecrets:
-                - name: harbor-system-pull
-              securityContext:
-                fsGroup: 101
-                fsGroupChangePolicy: OnRootMismatch
-                runAsGroup: 101
-                runAsNonRoot: true
-                runAsUser: 100
-                seccompProfile:
-                  type: RuntimeDefault
-              containers:
-                - name: scanner
-                  image: 8gears.container-registry.com/8gcr/harbor-grype-adapter:latest
-                  imagePullPolicy: Always
-                  securityContext:
-                    allowPrivilegeEscalation: false
-                    capabilities:
-                      drop:
-                        - ALL
-                    runAsNonRoot: true
-                  env:
-                    - name: SCANNER_API_SERVER_ADDR
-                      value: ":8080"
-                    - name: SCANNER_GRYPE_CACHE_DIR
-                      value: /home/scanner/cache
-                    - name: SCANNER_GRYPE_DB_CACHE_DIR
-                      value: /home/scanner/cache/grype-db
-                    - name: SCANNER_GRYPE_SCOPE
-                      value: squashed
-                  ports:
-                    - name: http
-                      containerPort: 8080
-                  readinessProbe:
-                    httpGet:
-                      path: /probe/ready
-                      port: http
-                  livenessProbe:
-                    httpGet:
-                      path: /probe/healthy
-                      port: http
-                  resources:
-                    requests:
-                      cpu: 100m
-                      memory: 256Mi
-                    limits:
-                      memory: 2Gi
-                  volumeMounts:
-                    - name: cache
-                      mountPath: /home/scanner/cache
-                    - name: tmp
-                      mountPath: /tmp
-              volumes:
-                - name: cache
-                  emptyDir:
-                    sizeLimit: 4Gi
-                - name: tmp
-                  emptyDir:
-                    sizeLimit: 2Gi
-      - apiVersion: v1
-        kind: Service
-        metadata:
-          name: grype-scanner
-          labels:
-            app.kubernetes.io/name: grype-scanner
-            app.kubernetes.io/component: scanner
-            app.kubernetes.io/part-of: harbor
-        spec:
-          selector:
-            app.kubernetes.io/name: grype-scanner
-          ports:
-            - name: http
-              port: 8080
-              targetPort: http

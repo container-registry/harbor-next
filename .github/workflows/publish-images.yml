@@ -39,7 +39,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter, grype-scanner, snyk-scanner]
+        component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter]
         platform:
           - linux/amd64
           - linux/arm64
@@ -58,8 +58,6 @@ jobs:
           echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
           case "${{ matrix.component }}" in
             trivy-adapter) echo "image_name=trivy-adapter" >> "$GITHUB_OUTPUT" ;;
-            grype-scanner) echo "image_name=harbor-grype-adapter" >> "$GITHUB_OUTPUT" ;;
-            snyk-scanner) echo "image_name=harbor-snyk-adapter" >> "$GITHUB_OUTPUT" ;;
             *) echo "image_name=harbor-${{ matrix.component }}" >> "$GITHUB_OUTPUT" ;;
           esac
           if [ -n "$BUILDX_HOST" ]; then
@@ -183,10 +181,6 @@ jobs:
             TRIVY_VERSION=${{ env.TRIVY_VERSION }}
             TRIVY_COMMIT=${{ env.TRIVY_COMMIT }}
             HARBOR_SCANNER_TRIVY_VERSION=${{ env.HARBOR_SCANNER_TRIVY_VERSION }}
-            NODE_VERSION=${{ env.NODE_VERSION }}
-            SNYK_CLI_VERSION=${{ env.SNYK_CLI_VERSION }}
-            GRYPE_VERSION=${{ env.GRYPE_VERSION }}
-            SYFT_VERSION=${{ env.SYFT_VERSION }}
           tags: ${{ env.REGISTRY_ADDRESS }}/${{ env.REGISTRY_PROJECT }}/${{ steps.prepare.outputs.image_name }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
 
@@ -209,7 +203,7 @@ jobs:
     needs: [build]
     strategy:
       matrix:
-        component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter, grype-scanner, snyk-scanner]
+        component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter]
     runs-on: ubuntu-26.04
     permissions:
       contents: read
@@ -223,8 +217,6 @@ jobs:
         run: |
           case "${{ matrix.component }}" in
             trivy-adapter) echo "image_name=trivy-adapter" >> "$GITHUB_OUTPUT" ;;
-            grype-scanner) echo "image_name=harbor-grype-adapter" >> "$GITHUB_OUTPUT" ;;
-            snyk-scanner) echo "image_name=harbor-snyk-adapter" >> "$GITHUB_OUTPUT" ;;
             *) echo "image_name=harbor-${{ matrix.component }}" >> "$GITHUB_OUTPUT" ;;
           esac
           if [ -n "$BUILDX_HOST" ]; then
@@ -287,11 +279,9 @@ jobs:
 
       - name: Sign images
         run: |
-          for image in core jobservice registryctl exporter portal registry trivy-adapter grype-scanner snyk-scanner; do
+          for image in core jobservice registryctl exporter portal registry trivy-adapter; do
             case "${image}" in
               trivy-adapter) image_name="trivy-adapter" ;;
-              grype-scanner) image_name="harbor-grype-adapter" ;;
-              snyk-scanner) image_name="harbor-snyk-adapter" ;;
               *) image_name="harbor-${image}" ;;
             esac
 

@@ -145,5 +145,4 @@ spec:
                   sync deployment  harbor-harbor-next-portal     harbor-portal        "$rev"
                   sync deployment  harbor-harbor-next-exporter   harbor-exporter      "$rev"
                   sync statefulset harbor-harbor-next-trivy      trivy-adapter        "$rev"
-                  sync deployment  grype-scanner                 harbor-grype-adapter "$rev"
                   exit "$fail"
