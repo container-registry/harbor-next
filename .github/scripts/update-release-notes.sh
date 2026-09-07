@@ -18,7 +18,12 @@ github_retry() {
 }
 
 preview_pr_number="${RELEASE_NOTES_PREVIEW_PR_NUMBER:-}"
-if [[ -n "${preview_pr_number}" && ! "${TAG_NAME:-}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+component="${RELEASE_NOTES_COMPONENT:-}"
+if [[ -n "${preview_pr_number}" && "${component}" == "chart" ]]; then
+  # A chart release PR bumps the chart manifest on its branch to the new version.
+  preview_version=$(node -e "const manifest = require('./.release-please-manifest-chart.json'); const version = manifest['deploy/chart']; if (!version) { throw new Error('missing chart release version'); } console.log(version);")
+  TAG_NAME="chart-v${preview_version}"
+elif [[ -n "${preview_pr_number}" && ! "${TAG_NAME:-}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   preview_version=$(node -e "const manifest = require('./.release-please-manifest.json'); const version = manifest['.']; if (!version) { throw new Error('missing root release version'); } console.log(version);")
   TAG_NAME="v${preview_version}"
 fi
@@ -31,12 +36,16 @@ if [[ -z "${GITHUB_REPOSITORY:-}" ]]; then
   GITHUB_REPOSITORY="${GITHUB_REPOSITORY:-$(gh repo view --json nameWithOwner --jq .nameWithOwner)}"
 fi
 
-if [[ ! "${TAG_NAME}" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-  echo "TAG_NAME must be a semantic version tag such as v2.15.4" >&2
+chart_mode=false
+if [[ "${TAG_NAME}" =~ ^chart-v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+  chart_mode=true
+  version="${BASH_REMATCH[1]}"
+elif [[ "${TAG_NAME}" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+  version="${BASH_REMATCH[1]}"
+else
+  echo "TAG_NAME must be vX.Y.Z (app release) or chart-vX.Y.Z (chart release)" >&2
   exit 1
 fi
-
-version="${BASH_REMATCH[1]}"
 registry_address="${REGISTRY_ADDRESS:-8gears.container-registry.com}"
 registry_project="${REGISTRY_PROJECT:-8gcr}"
 registry="${registry_address}/${registry_project}"
@@ -53,14 +62,23 @@ else
   chart_yaml_source="$(git show "${TAG_NAME}:deploy/chart/Chart.yaml" 2>/dev/null || true)"
 fi
 chart_version="$(printf '%s\n' "${chart_yaml_source}" | awk -F'[:[:space:]]+' '$1 == "version" { gsub(/"/, "", $2); print $2; exit }')"
+chart_name="$(printf '%s\n' "${chart_yaml_source}" | awk -F'[:[:space:]]+' '$1 == "name" { gsub(/"/, "", $2); print $2; exit }')"
+chart_name="${chart_name:-harbor-next}"
+if [[ "${chart_mode}" == true ]]; then
+  chart_version="${version}"
+fi
 
 tmp_dir=$(mktemp -d)
 trap 'rm -rf "${tmp_dir}"' EXIT
 
+changelog_path="CHANGELOG.md"
+if [[ "${chart_mode}" == true ]]; then
+  changelog_path="deploy/chart/CHANGELOG.md"
+fi
 if [[ -n "${preview_pr_number}" ]]; then
-  cp CHANGELOG.md "${tmp_dir}/CHANGELOG.md"
+  cp "${changelog_path}" "${tmp_dir}/CHANGELOG.md"
 else
-  git show "${TAG_NAME}:CHANGELOG.md" > "${tmp_dir}/CHANGELOG.md"
+  git show "${TAG_NAME}:${changelog_path}" > "${tmp_dir}/CHANGELOG.md"
 fi
 node .github/scripts/extract-changelog-release.mjs \
   "${tmp_dir}/CHANGELOG.md" \
@@ -68,12 +86,37 @@ node .github/scripts/extract-changelog-release.mjs \
   "${tmp_dir}/release-source.md"
 
 generated_notes_args=(-f "tag_name=${TAG_NAME}")
+skip_generated_notes=""
+if [[ "${chart_mode}" == true ]]; then
+  # Without an explicit previous tag GitHub diffs against the latest app
+  # release and attributes unrelated PRs. The predecessor is the greatest
+  # chart tag LOWER than the target (descending sort, line after the
+  # target), so recreating an older release never diffs against a newer
+  # tag; previews (target tag not created yet) fall back to the newest
+  # existing chart tag.
+  previous_chart_tag=$(git tag --list 'chart-v*' --sort=-v:refname \
+    | awk -v t="${TAG_NAME}" 'found { print; exit } $0 == t { found = 1 }')
+  if [[ -z "${previous_chart_tag}" ]]; then
+    previous_chart_tag=$(git tag --list 'chart-v*' --sort=-v:refname | grep -vx "${TAG_NAME}" | head -n 1 || true)
+  fi
+  if [[ -n "${previous_chart_tag}" ]]; then
+    generated_notes_args+=(-f "previous_tag_name=${previous_chart_tag}")
+  else
+    # Bootstrap chart release: no chart tag exists at all, so any range
+    # GitHub picks would attribute unrelated app PRs. Skip What's Changed.
+    skip_generated_notes="yes"
+  fi
+fi
 if [[ -n "${preview_pr_number}" ]]; then
   generated_notes_args+=(-f "target_commitish=$(git rev-parse HEAD)")
 fi
-github_retry gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
-  "${generated_notes_args[@]}" \
-  --jq .body > "${tmp_dir}/generated-notes.md"
+if [[ -n "${skip_generated_notes}" ]]; then
+  : > "${tmp_dir}/generated-notes.md"
+else
+  github_retry gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+    "${generated_notes_args[@]}" \
+    --jq .body > "${tmp_dir}/generated-notes.md"
+fi
 
 node .github/scripts/format-release-notes.mjs \
   "${tmp_dir}/release-source.md" \
@@ -86,7 +129,11 @@ node .github/scripts/extract-pr-summary.mjs \
   "${GITHUB_REPOSITORY}" \
   "${tmp_dir}/summary.md"
 
-if [[ -n "${preview_pr_number}" ]]; then
+if [[ "${chart_mode}" == true ]]; then
+  # Chart releases run on main only, and their target_commitish is a pinned
+  # SHA rather than a branch, so the app-path lookup does not apply.
+  release_branch="main"
+elif [[ -n "${preview_pr_number}" ]]; then
   release_branch="${GITHUB_REF_NAME:?GITHUB_REF_NAME is required for a release PR preview}"
 elif [[ "${GITHUB_REF_TYPE:-}" == "branch" && -n "${GITHUB_REF_NAME:-}" ]]; then
   # push-triggered path only. Tag-triggered runs (manual recreate on a
@@ -126,7 +173,7 @@ patch_notes="${tmp_dir}/commercial-patches.md"
 
 # The Harbor branch owns the ordered manifest. 8gcr only stores the branch
 # commits, so release notes and image builds always use the same exact list.
-if [[ -f "${series}" ]]; then
+if [[ "${chart_mode}" == false && -f "${series}" ]]; then
   while IFS= read -r branch; do
     branch="${branch%%#*}"
     branch="${branch#"${branch%%[![:space:]]*}"}"
@@ -168,37 +215,57 @@ fi
     echo "## Helm Chart"
     echo
     echo '```sh'
-    echo "helm install harbor oci://${registry}/charts/harbor-next \\"
+    echo "helm install harbor oci://${registry}/charts/${chart_name} \\"
     echo "  --version ${chart_version} -n harbor --create-namespace -f my-values.yaml"
     echo '```'
     echo
+    if [[ "${chart_mode}" == true ]]; then
+      echo "Signed with [cosign](https://github.com/sigstore/cosign). **Verify the chart signature:**"
+      echo '```sh'
+      echo "cosign verify \\"
+      echo "  --certificate-identity \"https://github.com/${GITHUB_REPOSITORY}/.github/workflows/publish-chart.yml@refs/heads/main\" \\"
+      echo '  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \'
+      echo "  ${registry}/charts/${chart_name}:${chart_version}"
+      echo '```'
+      echo
+    fi
     echo "---"
     echo
   fi
 
-  echo "## Container Images"
-  echo
-  echo "Multi-arch images (\`linux/amd64\`, \`linux/arm64\`) signed with [cosign](https://github.com/sigstore/cosign)."
-  echo
-  echo "| Image | Reference |"
-  echo "|-------|-----------|"
+  if [[ "${chart_mode}" == false ]]; then
+    echo "## Container Images"
+    echo
+    echo "Multi-arch images (\`linux/amd64\`, \`linux/arm64\`) signed with [cosign](https://github.com/sigstore/cosign)."
+    echo
+    echo "| Image | Reference |"
+    echo "|-------|-----------|"
 
-  for image in "${images[@]}"; do
-    image_name="harbor-${image}"
-    [[ "${image}" == "trivy-adapter" ]] && image_name="trivy-adapter"
-    echo "| \`${image_name}\` | \`${registry}/${image_name}:${TAG_NAME}\` |"
-  done
+    for image in "${images[@]}"; do
+      image_name="harbor-${image}"
+      [[ "${image}" == "trivy-adapter" ]] && image_name="trivy-adapter"
+      echo "| \`${image_name}\` | \`${registry}/${image_name}:${TAG_NAME}\` |"
+    done
 
-  echo
-  echo "**Verify an image signature:**"
-  echo '```sh'
-  echo "cosign verify \\"
-  echo "  --certificate-identity \"https://github.com/${GITHUB_REPOSITORY}/.github/workflows/publish-images.yml@refs/heads/${release_branch}\" \\"
-  echo '  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \'
-  echo "  ${registry}/harbor-core:${TAG_NAME}"
-  echo '```'
+    echo
+    echo "**Verify an image signature:**"
+    echo '```sh'
+    echo "cosign verify \\"
+    echo "  --certificate-identity \"https://github.com/${GITHUB_REPOSITORY}/.github/workflows/publish-images.yml@refs/heads/${release_branch}\" \\"
+    echo '  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \'
+    echo "  ${registry}/harbor-core:${TAG_NAME}"
+    echo '```'
+  else
+    # The chart's default image tags: the appVersion committed at the tag.
+    app_version="$(printf '%s\n' "${chart_yaml_source}" | awk -F'[:[:space:]]+' '$1 == "appVersion" { gsub(/"/, "", $2); print $2; exit }')"
+    if [[ -n "${app_version}" ]]; then
+      echo "Default Harbor image tags follow the chart appVersion: \`${app_version}\`."
+    fi
+  fi
 
-  if [[ -s "${tmp_dir}/contributors.md" ]]; then
+  # New Contributors spans every PR between the tags, which for the chart
+  # line would credit unrelated app work — app releases only.
+  if [[ "${chart_mode}" == false && -s "${tmp_dir}/contributors.md" ]]; then
     echo
     echo "---"
     echo
