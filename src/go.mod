@@ -5,16 +5,16 @@ go 1.26.5
 godebug x509negativeserial=1
 
 require (
-	github.com/FZambia/sentinel v1.1.1
+	github.com/FZambia/sentinel/v2 v2.0.1
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/aliyun/alibaba-cloud-sdk-go v1.63.107
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
 	github.com/aws/aws-sdk-go v1.55.8 // indirect
 	github.com/beego/beego/v2 v2.3.10
 	github.com/beego/i18n v0.0.0-20161101132742-e9308947f407
-	github.com/bmatcuk/doublestar v1.3.4
-	github.com/casbin/casbin v1.9.1
-	github.com/cenkalti/backoff/v4 v4.3.0
+	github.com/bmatcuk/doublestar/v4 v4.10.0
+	github.com/casbin/casbin/v3 v3.10.0
+	github.com/cenkalti/backoff/v7 v7.0.0
 	github.com/cloudevents/sdk-go/v2 v2.16.2
 	github.com/coreos/go-oidc/v3 v3.20.0
 	github.com/dghubble/sling v1.4.2
@@ -47,7 +47,7 @@ require (
 	github.com/modelpack/model-spec v0.0.7
 	github.com/ncw/swift v1.0.53 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
-	github.com/olekukonko/tablewriter v0.0.5
+	github.com/olekukonko/tablewriter v1.1.4
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/pkg/errors v0.9.1 // indirect
@@ -76,7 +76,7 @@ require (
 	golang.org/x/text v0.41.0
 	golang.org/x/time v0.15.0
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	helm.sh/helm/v3 v3.21.4
+	helm.sh/helm/v4 v4.2.4
 	k8s.io/api v0.37.0
 	k8s.io/apimachinery v0.37.0
 	k8s.io/client-go v0.37.0
