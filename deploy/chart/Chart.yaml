@@ -1,5 +1,5 @@
 apiVersion: v2
-name: harbor-next
+name: harbor
 description: A modern, production-ready Helm chart for [Harbor
   Next](https://github.com/container-registry/harbor-next) - the cloud-native
   container registry for Kubernetes.

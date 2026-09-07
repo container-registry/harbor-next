@@ -1,11 +1,11 @@
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: OCIRepository
 metadata:
-  name: harbor-next-chart
+  name: harbor-chart
   namespace: 8gcr-dev-main
 spec:
   interval: 5m
-  url: oci://8gears.container-registry.com/8gcr/charts/harbor-next
+  url: oci://8gears.container-registry.com/8gcr/charts/harbor
   ref:
     semver: ">=2.0.0"
   secretRef:

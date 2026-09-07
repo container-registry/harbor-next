@@ -13,7 +13,7 @@ A single environment doesn't justify a Kustomize base/overlay split yet; when a 
 | File | Purpose |
 |------|---------|
 | `namespace.yaml` | Namespace `8gcr-dev-main` (the cluster runs multiple Harbor instances; namespace is deployment-specific). |
-| `ocirepository.yaml` | Authenticated pull of the chart from `oci://8gears.container-registry.com/8gcr/charts/harbor-next`, tracking released versions via semver `>=2.0.0`, 5-min interval. |
+| `ocirepository.yaml` | Authenticated pull of the chart from `oci://8gears.container-registry.com/8gcr/charts/harbor`, tracking released versions via semver `>=2.0.0`, 5-min interval. |
 | `helmrelease.yaml` | Renders the chart with the 8gcr environment values; references the secrets below; provisions a CloudNativePG `Cluster` via the chart's `extraManifests` escape hatch. |
 | `image-tracking.yaml` | Flux image-reflector resources (`ImageRepository` + `ImagePolicy`) that resolve the digest behind each `8gcr/harbor-*:latest` tag in-cluster. No git write-back. |
 | `rollout-sync.yaml` | CronJob (+ ServiceAccount/RBAC) that copies each reflected digest into the workload's pod-template annotation, rolling the pods when a `latest` digest moves. Registry to cluster directly — no fluxcdbot commits, no bundle republish per image update. |
@@ -30,7 +30,7 @@ A single environment doesn't justify a Kustomize base/overlay split yet; when a 
    - Moves `latest` for `8gears.container-registry.com/8gcr/harbor-<component>` (`trivy-adapter` keeps its existing `8gcr/trivy-adapter` repository name).
    - It does not publish Flux deployment configuration.
 2. **Chart publish** (`.github/workflows/publish-chart.yml`, dispatched for a published `chart-v<semver>` release tag):
-   - Packages `deploy/chart/` and pushes to `oci://8gears.container-registry.com/8gcr/charts/harbor-next:<version>`.
+   - Packages `deploy/chart/` and pushes to `oci://8gears.container-registry.com/8gcr/charts/harbor:<version>`.
    - This bundle's chart `OCIRepository` follows those releases with a `>=2.0.0` semver range, so a new chart release rolls out without editing this directory.
    - It does not publish Flux deployment configuration.
 3. **Rolling Flux config publish** (`.github/workflows/rolling-flux.yml`, every push to `main` that touches this directory):
@@ -45,7 +45,7 @@ The manifests intentionally do not store plaintext registry credentials. Pull ac
 | Namespace | Secret | Used by |
 |---|---|---|
 | `flux-system` | `harbor-system-pull` | Root `OCIRepository/harbor-8gcr` pulling `ops/hz-hopper/8gcr-rolling` and Flux image scanning for `8gcr/harbor-*`. |
-| `8gcr-dev-main` | `harbor-system-pull` | Chart `OCIRepository/harbor-next-chart` and Harbor component image pulls. |
+| `8gcr-dev-main` | `harbor-system-pull` | Chart `OCIRepository/harbor-chart` and Harbor component image pulls. |
 
 ## One-time bootstrap
 
