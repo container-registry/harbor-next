@@ -9,7 +9,6 @@ All Dockerfiles support multi-architecture builds (linux/amd64, linux/arm64). Bu
 | core | `core.dockerfile` | scratch | Pre-built binary at `bin/linux-${TARGETARCH}/core` |
 | jobservice | `jobservice.dockerfile` | scratch | Pre-built binary |
 | registryctl | `registryctl.dockerfile` | scratch | Pre-built binary |
-| exporter | `exporter.dockerfile` | scratch | Pre-built binary |
 | portal | `portal.dockerfile` | [DHI](#docker-hardened-images-dhi) nginx (debian13) | Multi-stage: Bun/Node Angular build → nginx |
 | registry | `registry.dockerfile` | scratch | Multi-stage: Go build of distribution/distribution |
 | trivy-adapter | `trivy-adapter.dockerfile` | aquasec/trivy | Multi-stage: Go build of harbor-scanner-trivy |
@@ -66,7 +65,7 @@ Pulling requires authentication against our proxy. Run `docker login 8gears.cont
 ## Design Decisions
 
 - **scratch base** for Go services: no shell, no package manager, minimal attack surface. CA certificates copied from Alpine.
-- **tmpfs for /tmp**: Scratch images have no writable filesystem. Services that need `/tmp` (core, jobservice, registryctl, exporter, registry) get it via `tmpfs` mounts in docker-compose, not baked into the image. This keeps images immutable and avoids layer bloat.
+- **tmpfs for /tmp**: Scratch images have no writable filesystem. Services that need `/tmp` (core, jobservice, registryctl, registry) get it via `tmpfs` mounts in docker-compose, not baked into the image. This keeps images immutable and avoids layer bloat.
 - **Non-root execution**: All images run as non-root. Scratch images create a `harbor` user (UID 10000). Portal runs as UID 65532 with GID 0 write access (OpenShift-compatible).
 - **No debug images**: Use `docker debug <container>` (Docker Desktop) to attach a shell to scratch containers.
 - **No make/photon**: These Dockerfiles replace the legacy `make/photon/` Dockerfiles entirely.

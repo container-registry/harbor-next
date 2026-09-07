@@ -57,8 +57,6 @@ jobservice:
   config:
     worker_pool:
       workers: 4
-exporter:
-  enabled: true
 trivy:
   resources:
     requests:

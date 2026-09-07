@@ -428,7 +428,7 @@ defn map-components(legacy):
   when strategy:
     add-info 'updateStrategy.type' '<component>.deploymentStrategy.type':
       'Now a full per-component Deployment strategy spec — applied to
-       core, portal, registry, jobservice, and exporter.'
+       core, portal, registry, and jobservice.'
   strat =:
     when strategy:::
       deploymentStrategy:
@@ -439,7 +439,6 @@ defn map-components(legacy):
     portal: deep-merge(map-portal(legacy) strat)
     registry: deep-merge(map-registry(legacy) strat)
     jobservice: deep-merge(map-jobservice(legacy) strat)
-    exporter: deep-merge(map-exporter(legacy) strat)
     trivy: map-trivy(legacy)
   imgs =: dropped-images:deref
   when present?(imgs):
@@ -639,30 +638,6 @@ defn job-logger-entry(kind sweep):
       level: INFO
       sweeper:
         duration:: sweep
-
-defn map-exporter(legacy):
-  exp =: legacy.exporter
-  when present?(exp):
-    when present?(exp.override.database):
-      add-warn 'exporter.override.database' nil:
-        'Exporter-specific DB pool overrides have no equivalent — the
-         exporter uses the database.* pool settings.'
-    cache-duration =: int-at(exp.cacheDuration 'exporter.cacheDuration')
-    clean-interval =:
-      int-at exp.cacheCleanInterval: 'exporter.cacheCleanInterval'
-    cache-time =: keep-if-not(cache-duration 23)
-    cache-clean =: keep-if-not(clean-interval 14400)
-    when some?(cache-time) || some?(cache-clean):
-      old =: 'exporter.cacheDuration/cacheCleanInterval'
-      new =: 'exporter.config.cache_time/cache_clean_interval'
-      add-info old new:
-        'Exporter is env-driven now — config keys flatten to
-         HARBOR_EXPORTER_* env vars.'
-    extra =:::
-      config:
-        cache_time: cache-time
-        cache_clean_interval: cache-clean
-    deep-merge base-component(exp 'exporter'): extra
 
 trivy-db-repo-default =: +[
   'mirror.gcr.io/aquasec/trivy-db'
@@ -1207,6 +1182,20 @@ defn redis-index-advice(block path):
 
 defn map-metrics(legacy):
   m =: legacy.metrics
+  exp =: legacy.exporter
+  when present?(exp):
+    add-info 'exporter.*' 'metrics.enabled':
+      'The standalone exporter component is gone — core runs the exporter
+       collectors in-process and serves the harbor_* metrics from its own
+       metrics endpoint whenever metrics.enabled is true. Exporter
+       deployment settings (image, replicas, resources, DB overrides, …)
+       have no equivalent and were dropped.'
+  cache-time =:
+    keep-if-not int-at(exp.cacheDuration 'exporter.cacheDuration'): 23
+  when some?(cache-time):
+    add-info 'exporter.cacheDuration' 'metrics.exporterCacheTime':
+      'Carried over — seconds core caches the exporter collector results
+       between scrapes.'
   when present?(m):
     enabled =: bool-of(bool-at(m.enabled 'metrics.enabled') false)
     sm =: m.serviceMonitor
@@ -1226,23 +1215,18 @@ defn map-metrics(legacy):
     when enabled:
       add-info 'metrics.enabled' 'metrics.enabled':
         'Carried over. This chart auto-enables the jobservice metric
-         endpoint from metrics.enabled (chart-managed config.yml) — no
-         explicit jobservice.config.metric block is needed.'
-    when-not enabled:
-      add-info 'metrics.enabled=false' 'exporter.enabled=false':
-        'In 2.x the exporter only deployed with metrics enabled; this
-         chart enables the exporter by default, so it was disabled
-         explicitly to preserve your 2.x behavior.'
+         endpoint and the in-core exporter collectors from
+         metrics.enabled — no explicit jobservice.config.metric or
+         exporter block is needed.'
     =>:::
       metrics:
         enabled: enabled
+        exporterCacheTime: cache-time
         :when bool-of(sm.enabled false):::
           serviceMonitor:
             enabled: true
             labels: sm.additionalLabels
             interval: presence(sm.interval)
-      exporter:
-        enabled: enabled
 
 #------------------------------------------------------------------------------
 # Report

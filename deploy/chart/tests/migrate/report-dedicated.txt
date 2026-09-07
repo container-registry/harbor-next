@@ -5,17 +5,15 @@
   tables: docs/MIGRATION-REFERENCE.md
 ============================================================
 
-WARN — migrated, but review the changed behavior (3)
+WARN — migrated, but review the changed behavior (2)
   * core.secret
       -> core.existingSecret
       Inline component-secret strings are gone (the secret key is now a map of extra env vars). Dropped — the chart auto-generates the inter-component secret; only in-flight uploads/jobs are invalidated. To pin it, pre-create a Secret and reference it via existingSecret.
-  * exporter.override.database
-      Exporter-specific DB pool overrides have no equivalent — the exporter uses the database.* pool settings.
   * persistence.imageChartStorage.s3.accesskey/secretkey
       -> registry.secret.REGISTRY_STORAGE_S3_*
       Inline credentials moved into registry.secret (base64-encoded into a generated Secret). Prefer a pre-created Secret via registry.storageCredentials.s3.existingSecret.
 
-INFO — mapped automatically (12)
+INFO — mapped automatically (13)
   * secretKey
       -> secretKey
       Carried over. Keep it identical to the old install whenever you reuse the 2.x database — replication endpoints and scanner credentials are encrypted with it.
@@ -31,7 +29,7 @@ INFO — mapped automatically (12)
   * trivy.enabled
       -> trivy.enabled
       Default flipped to false in this chart — kept enabled because your 2.x values had it on.
-  * image.repository/tag (core, portal, registry, jobservice, exporter, trivy)
+  * image.repository/tag (core, portal, registry, jobservice, trivy)
       -> chart image defaults
       Legacy stock image references dropped — images default to Harbor Next builds (8gears.container-registry.com/8gcr/harbor-*, tag = chart appVersion). Set <component>.image.* only for mirrors.
   * persistence.imageChartStorage.s3
@@ -45,9 +43,12 @@ INFO — mapped automatically (12)
   * redis.external.addr
       -> externalRedis.host/port
       addr split into separate host and port fields; valkey subchart disabled.
+  * exporter.*
+      -> metrics.enabled
+      The standalone exporter component is gone — core runs the exporter collectors in-process and serves the harbor_* metrics from its own metrics endpoint whenever metrics.enabled is true. Exporter deployment settings (image, replicas, resources, DB overrides, …) have no equivalent and were dropped.
   * metrics.enabled
       -> metrics.enabled
-      Carried over. This chart auto-enables the jobservice metric endpoint from metrics.enabled (chart-managed config.yml) — no explicit jobservice.config.metric block is needed.
+      Carried over. This chart auto-enables the jobservice metric endpoint and the in-core exporter collectors from metrics.enabled — no explicit jobservice.config.metric or exporter block is needed.
   * quoted booleans/numbers (core.gdpr.deleteUser, trivy.enabled, database.maxOpenConns)
       -> native YAML types
       String-typed scalars were coerced — this chart validates value types via values.schema.json, so "true"/"1" strings would be rejected at install time.

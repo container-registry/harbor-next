@@ -603,19 +603,6 @@
         }
       }
     },
-    "exporter": {
-      "type": "object",
-      "description": "Harbor Exporter component configuration",
-      "allOf": [
-        { "$ref": "#/$defs/harborComponent" }
-      ],
-      "properties": {
-        "enabled": {
-          "type": "boolean",
-          "default": true
-        }
-      }
-    },
     "database": {
       "type": "object",
       "description": "External database configuration (required)",
@@ -884,6 +871,12 @@
           "type": "boolean",
           "default": false
         },
+        "exporterCacheTime": {
+          "type": "integer",
+          "description": "Seconds core caches the exporter collector results between scrapes (METRIC_EXPORTER_CACHE_TIME)",
+          "minimum": 0,
+          "default": 30
+        },
         "serviceMonitor": {
           "type": "object",
           "properties": {
@@ -1107,7 +1100,7 @@
         "config": {
           "type": "object",
           "additionalProperties": true,
-          "description": "Primary component config. For env-driven components (core, exporter, trivy) it is flattened to env vars via toEnvVars. For file-driven components (registry, jobservice) it is the config file body passed through verbatim."
+          "description": "Primary component config. For env-driven components (core, trivy) it is flattened to env vars via toEnvVars. For file-driven components (registry, jobservice) it is the config file body passed through verbatim."
         },
         "secret": {
           "type": "object",

@@ -55,6 +55,12 @@ services:
       # Trivy
       TRIVY_ADAPTER_URL: http://trivy-adapter:8080
       WITH_TRIVY: ${WITH_TRIVY:-true}
+      # Metrics — core serves Prometheus metrics, including the Harbor
+      # exporter collectors, on :9090/metrics (compose-network internal)
+      METRIC_ENABLE: ${METRIC_ENABLE:-true}
+      METRIC_EXPORTER_ENABLE: ${METRIC_EXPORTER_ENABLE:-true}
+      METRIC_PORT: "9090"
+      METRIC_PATH: /metrics
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr
     depends_on:
@@ -167,35 +173,6 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "/lprobe", "-port", "8080", "-endpoint", "/probe/ready"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  exporter:
-    image: ${IMAGE_REPO:-}harbor-exporter:${HARBOR_TAG}
-    tmpfs:
-      - /tmp:size=256M,mode=1777
-    environment:
-      HARBOR_DATABASE_HOST: postgresql
-      HARBOR_DATABASE_PORT: "5432"
-      HARBOR_DATABASE_USERNAME: ${DB_USER:-postgres}
-      HARBOR_DATABASE_PASSWORD: ${DB_PASSWORD}
-      HARBOR_DATABASE_DBNAME: ${DB_NAME:-registry}
-      HARBOR_DATABASE_SSLMODE: ${DB_SSLMODE:-disable}
-      HARBOR_EXPORTER_METRICS_PATH: /metrics
-      HARBOR_EXPORTER_PORT: "8080"
-      HARBOR_SERVICE_HOST: core
-      HARBOR_SERVICE_PORT: "8080"
-      HARBOR_SERVICE_SCHEME: http
-      HARBOR_REDIS_URL: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}/2
-      HARBOR_REDIS_NAMESPACE: harbor_job_service_namespace
-      HARBOR_REDIS_TIMEOUT: "3600"
-    depends_on:
-      core:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "/lprobe", "-port", "8080", "-endpoint", "/metrics"]
       interval: 10s
       timeout: 5s
       retries: 5

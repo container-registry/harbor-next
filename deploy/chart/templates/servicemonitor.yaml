@@ -24,7 +24,6 @@ spec:
         operator: In
         values:
           - core
-          - exporter
           - jobservice
           - registry
   namespaceSelector:

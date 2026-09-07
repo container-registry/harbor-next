@@ -96,7 +96,7 @@ Harbor is conventionally described in three layers:
 
 - **Portal** (`src/portal`) — Angular UI for projects, repositories, artifacts, and system configuration. Its API client is generated from Swagger into `src/portal/ng-swagger-gen`.
 
-- **Exporter** (`src/cmd/exporter`, `src/pkg/exporter`) — exposes Prometheus metrics for the Harbor services.
+- **Exporter collectors** (`src/pkg/exporter`) — Prometheus collectors for Harbor business metrics, run in-process by core and served from its metrics endpoint (`METRIC_EXPORTER_ENABLE`).
 
 - **Scanning** — pluggable scanner integration (`src/pkg/scan`). Trivy is the default adapter (`HARBOR_SCANNER_TRIVY_VERSION` in `versions.env`); vulnerability reports and SBOM generation (`src/pkg/scan/sbom`) are supported.
 
@@ -196,7 +196,7 @@ The component set above is identical across deployments. What changes is how ser
 - Host ports are published directly (dev uses SLOT offsets).
 
 ### Kubernetes / Helm (`deploy/chart/` — in development, not yet merged to this branch)
-- Core, JobService, Portal, Registry, and Exporter are separate **Deployments** fronted by ClusterIP **Services**; Trivy runs as a **StatefulSet**.
+- Core, JobService, Portal, and Registry are separate **Deployments** fronted by ClusterIP **Services**; Trivy runs as a **StatefulSet**.
 - **No nginx proxy** — external exposure is via **Ingress**, Gateway API **HTTPRoute**, or OpenShift **Route**.
 - **RegistryCtl runs as a sidecar container in the registry pod** (it has no Deployment of its own; only its config/secret are templated).
 - **Redis/Valkey** ships as an **in-cluster subchart** (`valkey.enabled`, on by default; bundled `valkey` dependency in `Chart.yaml`) or can be pointed at an external instance (`externalRedis`). **PostgreSQL is external** — the chart has no Postgres workload, so you supply it (the 8gcr GitOps bundle provisions one via CloudNativePG through the chart's `extraManifests` hook).

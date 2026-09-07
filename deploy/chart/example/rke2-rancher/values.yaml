@@ -101,9 +101,3 @@ portal:
       cpu: 50m
       memory: 128Mi
 
-exporter:
-  replicas: 1
-  resources:
-    requests:
-      cpu: 50m
-      memory: 128Mi

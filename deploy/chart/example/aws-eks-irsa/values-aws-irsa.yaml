@@ -65,9 +65,7 @@ valkey:
 trivy:
   enabled: false
 
-# --- Exporter / Metrics: disabled ---
-exporter:
-  enabled: false
+# --- Metrics: disabled ---
 metrics:
   enabled: false
 

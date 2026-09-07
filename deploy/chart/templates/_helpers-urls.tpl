@@ -139,10 +139,6 @@ Component name helpers (used by noProxy and other cross-component references)
   {{- printf "%s-nginx" (include "harbor.fullname" .) -}}
 {{- end -}}
 
-{{- define "harbor.exporter" -}}
-  {{- printf "%s-exporter" (include "harbor.fullname" .) -}}
-{{- end -}}
-
 {{- define "harbor.ingress" -}}
   {{- printf "%s-ingress" (include "harbor.fullname" .) -}}
 {{- end -}}
@@ -164,7 +160,7 @@ Component name helpers (used by noProxy and other cross-component references)
 {{- end -}}
 
 {{- define "harbor.noProxy" -}}
-  {{- printf "%s,%s,%s,%s,%s,%s,%s,%s" (include "harbor.core" .) (include "harbor.jobservice" .) (include "harbor.database" .) (include "harbor.registry" .) (include "harbor.portal" .) (include "harbor.trivy" .) (include "harbor.exporter" .) .Values.proxy.noProxy -}}
+  {{- printf "%s,%s,%s,%s,%s,%s,%s" (include "harbor.core" .) (include "harbor.jobservice" .) (include "harbor.database" .) (include "harbor.registry" .) (include "harbor.portal" .) (include "harbor.trivy" .) .Values.proxy.noProxy -}}
 {{- end -}}
 
 {{/*

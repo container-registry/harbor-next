@@ -31,7 +31,7 @@ fi
 
 {
   echo "  artifacthub.io/images: |"
-  for component in core jobservice registryctl exporter portal registry trivy-adapter; do
+  for component in core jobservice registryctl portal registry trivy-adapter; do
     image_name="harbor-${component}"
     if [[ "${component}" == "trivy-adapter" ]]; then
       image_name="trivy-adapter"

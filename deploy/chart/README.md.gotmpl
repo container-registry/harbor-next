@@ -108,12 +108,12 @@ Built-in `values.schema.json` provides:
    │   "(UI)"    │       │   "(API)"   │       │  "(Images)" │
    └─────────────┘       └──────┬──────┘       └──────┬──────┘
                                 │                     │
-                       ┌────────┴────────┐            │
-                       ▼                 ▼            │
-                ┌─────────────┐   ┌─────────────┐     │
-                │ Jobservice  │   │  Exporter   │     │
-                │  "(Tasks)"  │   │ "(Metrics)" │     │
-                └──────┬──────┘   └─────────────┘     │
+                       ┌────────┘                     │
+                       ▼                              │
+                ┌─────────────┐                       │
+                │ Jobservice  │                       │
+                │  "(Tasks)"  │                       │
+                └──────┬──────┘                       │
                        │                              │
           ┌────────────┴────────────┬─────────────────┘
           ▼                         ▼
@@ -194,7 +194,7 @@ path and wins over `image.source`. See
 
 ### Component Configuration
 
-Each Harbor component (core, portal, registry, jobservice, exporter) supports:
+Each Harbor component (core, portal, registry, jobservice) supports:
 
 | Key | Description |
 |-----|-------------|
@@ -224,7 +224,6 @@ Each Harbor component (core, portal, registry, jobservice, exporter) supports:
 | Registry | 100m | 256Mi | 512Mi |
 | Portal | 100m | 128Mi | 256Mi |
 | Jobservice | 100m | 256Mi | 512Mi |
-| Exporter | 100m | 128Mi | 256Mi |
 
 ## Example Values Files
 
@@ -588,7 +587,6 @@ Expected keys in `existingTlsSecret` follow cert-manager convention:
 | `tls.key` | When `clientCertEnabled: true` |
 
 **Caveats:**
-- **Exporter** does not yet plumb `POSTGRESQL_URL` through its viper config, so its DB connection ignores the URL env. Works fine for `sslmode=verify-ca` with a publicly-trusted CA; for mTLS the exporter will fail until a backend-side patch lands.
 - **Schema migrations** use Harbor's `NewMigrator`, which builds its own DSN from individual fields and ignores `cfg.URL`. Servers that **require** client certificates will reject the migrator. Use `sslmode=verify-ca` (CA-only verification) or coordinate the initial migration via an external trusted client until the migrator honors `URL`.
 
 A combined example covering DB TLS + private Redis CA + cert-manager-managed ingress lives at [`example/private-ca/`](example/private-ca/).
