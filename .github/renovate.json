@@ -12,7 +12,8 @@
   "dependencyDashboard": true,
   "configMigration": true,
   "semanticCommits": "enabled",
-  "semanticCommitType": "chore",
+  "semanticCommitType": "deps",
+  "semanticCommitScope": null,
   "labels": [
     "dependencies"
   ],
@@ -132,6 +133,14 @@
       "addLabels": [
         "docker"
       ]
+    },
+    {
+      "description": "Bare deps: commit type everywhere — overrides :semanticPrefixFixDepsChoreOthers from config:recommended, which would otherwise emit fix(deps)/chore(deps)",
+      "matchPackageNames": [
+        "*"
+      ],
+      "semanticCommitType": "deps",
+      "semanticCommitScope": null
     }
   ],
   "customManagers": [
