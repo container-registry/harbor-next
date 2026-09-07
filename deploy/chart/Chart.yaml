@@ -4,7 +4,7 @@ description: A modern, production-ready Helm chart for [Harbor
   Next](https://github.com/container-registry/harbor-next) - the cloud-native
   container registry for Kubernetes.
 type: application
-version: 2.0.0
+version: 1.1.0
 appVersion: "v2.15.0"
 kubeVersion: ">=1.28.0-0"
 
