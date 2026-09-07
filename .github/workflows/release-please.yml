@@ -71,6 +71,30 @@ jobs:
           echo "GIT_ASKPASS=${askpass}" >> "${GITHUB_ENV}"
           echo "GIT_TERMINAL_PROMPT=0" >> "${GITHUB_ENV}"
 
+      - name: Stamp publiccode.yml release date
+        # Inline (not a Taskfile task): this job never installs task, and the
+        # sibling release-PR steps below already munge files with inline shell.
+        if: ${{ github.ref_name == 'main' && steps.release.outputs.prs_created == 'true' && steps.release.outputs.release_created != 'true' }}
+        run: |
+          if ! grep -q '^releaseDate: ' publiccode.yml; then
+            echo "::error::publiccode.yml has no releaseDate field to stamp"
+            exit 1
+          fi
+
+          today=$(date -u +%F)
+          sed -i "s/^releaseDate: .*/releaseDate: ${today}/" publiccode.yml
+
+          if git diff --quiet -- publiccode.yml; then
+            echo "releaseDate already ${today}"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add publiccode.yml
+          git commit -s -m "chore: stamp publiccode.yml release date ${today}"
+          git push
+
       - name: Setup Node
         if: ${{ github.ref_name == 'main' && steps.release.outputs.prs_created == 'true' && steps.release.outputs.release_created != 'true' }}
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0

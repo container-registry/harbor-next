@@ -23,6 +23,8 @@
     {"type": "build",    "section": "Build System",   "hidden": true}
   ],
   "packages": {
-    ".": {}
+    ".": {
+      "extra-files": ["publiccode.yml"]
+    }
   }
 }
