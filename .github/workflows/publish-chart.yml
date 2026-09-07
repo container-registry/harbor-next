@@ -99,6 +99,7 @@ jobs:
           version: ${{ env.HELM_VERSION }}
 
       - name: Install envsubst
+        # Preinstalled on GitHub-hosted runners; kept for self-hosted images.
         run: command -v envsubst || (sudo apt-get update && sudo apt-get install -y gettext-base)
 
       - name: Install cosign
