@@ -1,5 +1,8 @@
 name: Upstream Cherry-Pick
 
+# Event-driven, not cron: re-evaluate upstream cherry-pick candidates
+# whenever main moves (the concurrency group coalesces bursts), plus manual
+# dispatch for dry runs and on-demand sweeps.
 on:
   workflow_dispatch:
     inputs:
@@ -8,8 +11,8 @@ on:
         required: false
         type: boolean
         default: false
-  schedule:
-    - cron: "17 3,15 * * *"
+  push:
+    branches: [main]
 
 permissions:
   contents: write
@@ -23,8 +26,8 @@ concurrency:
 jobs:
   upstream-cherry-pick:
     name: Open upstream cherry-pick PRs
-    # Forks may use the manual dry-run, but must not run the canonical schedule.
-    if: github.event_name != 'schedule' || github.repository == 'container-registry/harbor-next'
+    # Forks may use the manual dry-run, but must not run the canonical push trigger.
+    if: github.event_name != 'push' || github.repository == 'container-registry/harbor-next'
     runs-on: ubuntu-26.04
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
