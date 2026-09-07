@@ -16,7 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AWS_REGION="${AWS_REGION:-eu-central-1}"
 CLUSTER_NAME="${CLUSTER_NAME:-harbor-next-irsa}"
 NAMESPACE="${NAMESPACE:-harbor}"
-RELEASE_NAME="${RELEASE_NAME:-harbor-next}"
+RELEASE_NAME="${RELEASE_NAME:-harbor}"
 
 DB_CLUSTER_ID="${DB_CLUSTER_ID:-harbor-next-aurora}"
 DB_INSTANCE_ID="${DB_INSTANCE_ID:-harbor-next-aurora-1}"
@@ -30,7 +30,7 @@ IAM_POLICY_NAME="${IAM_POLICY_NAME:-harbor-next-irsa}"
 IAM_ROLE_NAME="${IAM_ROLE_NAME:-harbor-next-irsa}"
 
 CHART_VERSION="${CHART_VERSION:-3.0.0}"
-CHART_REF="${CHART_REF:-oci://8gears.container-registry.com/8gcr/charts/harbor-next}"
+CHART_REF="${CHART_REF:-oci://8gears.container-registry.com/8gcr/charts/harbor}"
 
 KUBECONFIG_PATH="${KUBECONFIG_PATH:-${HOME}/.kube/${CLUSTER_NAME}.yaml}"
 export KUBECONFIG="${KUBECONFIG_PATH}"

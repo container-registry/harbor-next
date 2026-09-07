@@ -51,12 +51,12 @@ All scripts accept these overrides:
 | `AWS_REGION` | `eu-central-1` | AWS region |
 | `CLUSTER_NAME` | `harbor-next-irsa` | EKS cluster name |
 | `NAMESPACE` | `harbor` | Kubernetes namespace |
-| `RELEASE_NAME` | `harbor-next` | Helm release name |
+| `RELEASE_NAME` | `harbor` | Helm release name |
 | `BUCKET_NAME` | `harbor-next-irsa-<ACCOUNT_ID>` | S3 bucket name |
 | `DB_CLUSTER_ID` | `harbor-next-aurora` | Aurora cluster identifier |
 | `DB_MASTER_PASSWORD` | (random) | Aurora master password |
 | `CHART_VERSION` | `2.0.0` | Helm chart version |
-| `CHART_REF` | `oci://8gears.container-registry.com/8gcr/charts/harbor-next` | Chart OCI reference |
+| `CHART_REF` | `oci://8gears.container-registry.com/8gcr/charts/harbor` | Chart OCI reference |
 | `KUBECONFIG_PATH` | `~/.kube/<CLUSTER_NAME>.yaml` | Kubeconfig file path |
 
 ## Quick Start
@@ -146,7 +146,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO harbor_iam_u
 ### 7. Deploy Harbor
 
 ```bash
-helm install harbor-next oci://8gears.container-registry.com/8gcr/charts/harbor-next \
+helm install harbor oci://8gears.container-registry.com/8gcr/charts/harbor \
   --version 2.0.0 -n harbor --create-namespace \
   -f values-aws-irsa.yaml \
   --set database.host=<AURORA_ENDPOINT> \
@@ -160,7 +160,7 @@ helm install harbor-next oci://8gears.container-registry.com/8gcr/charts/harbor-
 
 ```bash
 # Port-forward
-kubectl port-forward -n harbor svc/harbor-next-core 8443:443 &
+kubectl port-forward -n harbor svc/harbor-core 8443:443 &
 
 # Push/pull
 docker login localhost:8443 -u admin -p Harbor12345

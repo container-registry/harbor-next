@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "bootstrap-sha": "e11385c8c49528159a8b009590d48fe55455f8eb",
   "pull-request-header": "This PR prepares the next Helm chart release based on conventional commits scoped to deploy/chart.",
-  "pull-request-title-pattern": "chore: release harbor-next chart ${version}",
+  "pull-request-title-pattern": "chore: release harbor chart ${version}",
   "label": "chart-release: pending",
   "release-label": "chart-release: tagged",
   "include-v-in-tag": true,
@@ -21,11 +21,10 @@
   "packages": {
     "deploy/chart": {
       "release-type": "helm",
-      "package-name": "harbor-next",
+      "package-name": "harbor",
       "component": "chart",
       "include-component-in-tag": true,
-      "changelog-path": "CHANGELOG.md",
-      "release-as": "2.0.0"
+      "changelog-path": "CHANGELOG.md"
     }
   }
 }

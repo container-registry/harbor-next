@@ -28,7 +28,7 @@ PostgreSQL is included in the values file via `extraManifests` and will be deplo
 ```bash
 cd deploy/chart
 helm dependency build
-helm install harbor-next . -n vad1mo-dev -f example/openshift/values.yaml
+helm install harbor . -n vad1mo-dev -f example/openshift/values.yaml
 ```
 
 ## 3. Verify
@@ -41,7 +41,7 @@ oc get pods -n vad1mo-dev
 oc get route -n vad1mo-dev
 
 # Wait for all pods to be ready
-oc wait -n vad1mo-dev --for=condition=ready pod -l app.kubernetes.io/instance=harbor-next --timeout=300s
+oc wait -n vad1mo-dev --for=condition=ready pod -l app.kubernetes.io/instance=harbor --timeout=300s
 ```
 
 ## 4. Test Push and Pull
@@ -78,10 +78,10 @@ curl -s -u "admin:${HARBOR_ADMIN_PASSWORD}" \
 ## Cleanup
 
 ```bash
-helm uninstall harbor-next -n vad1mo-dev
+helm uninstall harbor -n vad1mo-dev
 # PVCs are not deleted by helm uninstall — clean up manually
 oc delete pvc -n vad1mo-dev postgres-data
-oc delete pvc -l app.kubernetes.io/instance=harbor-next -n vad1mo-dev
+oc delete pvc -l app.kubernetes.io/instance=harbor -n vad1mo-dev
 ```
 
 ## Troubleshooting
@@ -107,7 +107,7 @@ ttl.sh images expire after 1 hour for tags without a duration suffix. If pods sh
 
 ```bash
 task image:all-images IMAGE_REGISTRY=ttl.sh IMAGE_NAMESPACE=harbor-next
-oc delete pods -n vad1mo-dev -l app.kubernetes.io/instance=harbor-next
+oc delete pods -n vad1mo-dev -l app.kubernetes.io/instance=harbor
 ```
 
 ### Database Connection

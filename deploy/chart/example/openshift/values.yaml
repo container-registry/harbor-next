@@ -5,7 +5,7 @@
 #   - Images pushed to ttl.sh (or another accessible registry)
 #
 # Usage:
-#   helm install harbor-next . -n vad1mo-dev -f example/openshift/values.yaml
+#   helm install harbor . -n vad1mo-dev -f example/openshift/values.yaml
 
 # -- External URL (OpenShift route)
 externalURL: "https://harbor-next-vad1mo-dev.apps.rm1.0a51.p1.openshiftapps.com"

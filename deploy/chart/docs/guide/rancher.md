@@ -90,14 +90,14 @@ helm registry login 8gears.container-registry.com
 We pull the chart using the OCI reference:
 
 ```bash
-helm pull oci://8gears.container-registry.com/8gcr/charts/harbor-next
+helm pull oci://8gears.container-registry.com/8gcr/charts/harbor
 ```
 
 Decompress the downloaded chart:
 
 ```bash
 tar xzvf harbor-*.tgz
-cd harbor-next
+cd harbor
 ```
 
 The chart ships an RKE2/Rancher values file at

@@ -1,3 +1,30 @@
+# Migration
+
+## Chart rename: `harbor-next` → `harbor` (chart v3.0.0)
+
+As of chart 3.0.0 the chart artifact is named `harbor`. This affects existing
+users of this chart (installed as `harbor-next` ≤ 2.0.0):
+
+- **OCI reference changed.** The chart now publishes to
+  `oci://8gears.container-registry.com/8gcr/charts/harbor`. The old
+  `.../charts/harbor-next` path receives no further releases — update any
+  `helm install`/`helm upgrade` commands, Flux `OCIRepository` URLs, and
+  automation that pins the old path.
+- **Default resource names and selector labels changed.** Resource names and
+  the `app.kubernetes.io/name` label derive from the chart name, and label
+  selectors are immutable in Kubernetes. A plain `helm upgrade` of an existing
+  `harbor-next` release with the renamed chart is therefore rejected. To
+  upgrade in place, pin the old identity:
+
+  ```bash
+  helm upgrade <release> oci://8gears.container-registry.com/8gcr/charts/harbor \
+    --set nameOverride=harbor-next -f your-values.yaml
+  ```
+
+  `nameOverride: harbor-next` keeps every rendered name, label, and selector
+  identical to chart 2.0.0. Without it, plan a fresh install plus data
+  migration.
+
 # Migrating from goharbor/harbor-helm (v1.x)
 
 This guide covers migrating from the legacy

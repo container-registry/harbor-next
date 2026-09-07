@@ -7,7 +7,7 @@
 #   - IRSA role with S3 + rds-db:connect permissions
 #
 # Usage:
-#   helm install harbor-next oci://8gears.container-registry.com/8gcr/charts/harbor-next \
+#   helm install harbor oci://8gears.container-registry.com/8gcr/charts/harbor \
 #     --version 2.0.0 -n harbor --create-namespace \
 #     -f values-aws-irsa.yaml \
 #     --set database.host=<AURORA_ENDPOINT> \
@@ -19,7 +19,7 @@
 # Or skip --set-json by editing the `registry.config.storage.s3.bucket` field
 # directly in this file before installing.
 
-# Access via kubectl port-forward svc/harbor-next-core 8443:443 -n harbor
+# Access via kubectl port-forward svc/harbor-core 8443:443 -n harbor
 externalURL: "https://localhost:8443"
 # Demo password. For production, use `existingSecretAdminPassword` with a
 # Secret from AWS Secrets Manager, external-secrets, or SOPS.

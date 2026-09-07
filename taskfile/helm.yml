@@ -6,7 +6,7 @@ version: '3'
 
 vars:
   CHART_DIR: deploy/chart
-  CHART_NAME: harbor-next
+  CHART_NAME: harbor
 
   # Tool versions come from versions.env (single source of truth,
   # loaded via the root Taskfile dotenv; CI installs the same pins).
@@ -256,7 +256,7 @@ tasks:
             macOS:  brew install norwoodj/tap/helm-docs
             Linux:  go install github.com/norwoodj/helm-docs/cmd/helm-docs@latest
     cmds:
-      # --chart-to-generate isolates the harbor-next chart so helm-docs
+      # --chart-to-generate isolates the harbor chart so helm-docs
       # doesn't also process the extracted valkey subchart in charts/.
       - helm-docs --chart-search-root={{.CHART_DIR}} --chart-to-generate={{.CHART_DIR}} --dry-run > /tmp/helm-docs-expected.md
       - defer: rm -f /tmp/helm-docs-expected.md /tmp/helm-docs-actual.md
@@ -281,7 +281,7 @@ tasks:
     desc: "Generate chart README.md from values.yaml + README.md.gotmpl"
     deps: [_require-helm-docs]
     cmds:
-      # --chart-to-generate isolates the harbor-next chart so helm-docs
+      # --chart-to-generate isolates the harbor chart so helm-docs
       # doesn't also process the extracted valkey subchart in charts/.
       - helm-docs --chart-search-root={{.CHART_DIR}} --chart-to-generate={{.CHART_DIR}}
     sources:
