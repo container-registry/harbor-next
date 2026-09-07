@@ -2,13 +2,16 @@ name: Notify Fork Sync
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - "release-[0-9]*.[0-9]*"
 
 permissions: {}
 
 jobs:
   dispatch:
     runs-on: ubuntu-26.04
+    timeout-minutes: 5
     steps:
       - name: Generate GitHub App token
         id: app-token
@@ -19,12 +22,17 @@ jobs:
           owner: container-registry
           repositories: 8gcr
 
-      - name: Trigger sync
+      # 8gcr's upstream-check runs a DRY conflict check per line — no pushes
+      - name: Trigger upstream check
+        env:
+          TOKEN: ${{ steps.app-token.outputs.token }}
+          SHA: ${{ github.sha }}
+          LINE: ${{ github.ref_name }}
         run: |
           curl -f -X POST \
             -H "Accept: application/vnd.github+json" \
             -H "Content-Type: application/json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            -H "Authorization: Bearer ${{ steps.app-token.outputs.token }}" \
+            -H "Authorization: Bearer ${TOKEN}" \
             "https://api.github.com/repos/container-registry/8gcr/dispatches" \
-            -d '{"event_type":"upstream-sync","client_payload":{"sha":"${{ github.sha }}"}}'
+            -d "{\"event_type\":\"upstream-sync\",\"client_payload\":{\"sha\":\"${SHA}\",\"line\":\"${LINE}\"}}"

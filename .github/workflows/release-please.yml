@@ -286,6 +286,42 @@ jobs:
     secrets:
       SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
 
+  # Patch Stream: after the notes are rendered (windows read "PRs since the
+  # last record", so render first, stamp second), tell 8gcr to bump the
+  # patch baselines onto the released commit and stamp patch-record/<tag>.
+  dispatch-release-cut:
+    name: Dispatch Release Cut
+    needs: [release-please, update-release-notes]
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.SYNC_APP_ID }}
+          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+          owner: container-registry
+          repositories: 8gcr
+
+      - name: Trigger patch-bump + record
+        env:
+          TOKEN: ${{ steps.app-token.outputs.token }}
+          TAG: ${{ needs.release-please.outputs.tag_name }}
+          TARGET_SHA: ${{ github.sha }}
+          LINE: ${{ github.ref_name }}
+        run: |
+          curl -f -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -H "Authorization: Bearer ${TOKEN}" \
+            "https://api.github.com/repos/container-registry/8gcr/dispatches" \
+            -d "{\"event_type\":\"release-cut\",\"client_payload\":{\"tag\":\"${TAG}\",\"target_sha\":\"${TARGET_SHA}\",\"line\":\"${LINE}\"}}"
+
   chart:
     name: Publish Helm Chart
     # Driven by the chart's own release-please line (release-please-chart),
