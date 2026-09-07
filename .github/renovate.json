@@ -135,6 +135,13 @@
       ]
     },
     {
+      "description": "gorilla/csrf is deliberately pinned to v1.7.2 (goharbor/harbor#22010) — block the v1.7.3+ updates Renovate keeps proposing, including via vulnerability alerts",
+      "matchPackageNames": [
+        "github.com/gorilla/csrf"
+      ],
+      "allowedVersions": "<= 1.7.2"
+    },
+    {
       "description": "Bare deps: commit type everywhere — overrides :semanticPrefixFixDepsChoreOthers from config:recommended, which would otherwise emit fix(deps)/chore(deps)",
       "matchPackageNames": [
         "*"
