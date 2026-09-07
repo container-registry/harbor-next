@@ -1,0 +1,96 @@
+# Routes the non-OCI package APIs to Harbor core.
+#
+# The chart's own Ingress sends only /api/, /service/, /v2/, /chartrepo/ and /c/
+# to core, and everything else to the portal. Core serves the package registries
+# on their own prefixes, so without these rules an `npm install` or a `mvn` build
+# lands on the Angular app and gets 200 text/html back, which npm reports as a
+# JSON parse error and Maven as an unparsable POM.
+#
+# A separate Ingress rather than a chart change, so it ships with this bundle.
+# ingress-nginx merges rules per host and prefers the longer path, so the chart's
+# catch-all "/" to the portal still serves everything else.
+#
+# No cert-manager annotation on purpose: the chart's Ingress owns harbor-tls, and
+# a second issuer reference for the same secret would race it.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: harbor-packages
+  namespace: 8gcr-dev-main
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # Package uploads are not small, and the chart already disables the limit for
+    # /v2/ for the same reason.
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    # A proxy-cache miss fetches from the upstream registry while the client
+    # waits, so the 60s defaults are too short. Same values the Compose
+    # deployment sets for these prefixes.
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "900"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "900"
+spec:
+  ingressClassName: nginx
+  tls:
+    - secretName: harbor-tls
+      hosts:
+        - 8gcr.container-registry.dev
+  rules:
+    - host: 8gcr.container-registry.dev
+      http:
+        paths:
+          # Keep in sync with the route registration in src/server/server.go.
+          #
+          # The backend name is harbor-harbor-next-core, not harbor-core. The
+          # chart is named harbor-next and the release is named harbor, and the
+          # fullname helper only collapses the two when the chart name is a
+          # substring of the release name. It is not here, so both are kept.
+          # Confirmed with `helm template` against the chart version this
+          # deployment pins; do not shorten it by inspection.
+          - path: /npm/
+            pathType: Prefix
+            backend:
+              service:
+                name: harbor-harbor-next-core
+                port:
+                  number: 80
+          - path: /maven/
+            pathType: Prefix
+            backend:
+              service:
+                name: harbor-harbor-next-core
+                port:
+                  number: 80
+          - path: /pypi/
+            pathType: Prefix
+            backend:
+              service:
+                name: harbor-harbor-next-core
+                port:
+                  number: 80
+          - path: /cargo/
+            pathType: Prefix
+            backend:
+              service:
+                name: harbor-harbor-next-core
+                port:
+                  number: 80
+          - path: /go/
+            pathType: Prefix
+            backend:
+              service:
+                name: harbor-harbor-next-core
+                port:
+                  number: 80
+          - path: /go-sumdb/
+            pathType: Prefix
+            backend:
+              service:
+                name: harbor-harbor-next-core
+                port:
+                  number: 80
+          - path: /homebrew/
+            pathType: Prefix
+            backend:
+              service:
+                name: harbor-harbor-next-core
+                port:
+                  number: 80
