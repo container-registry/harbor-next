@@ -3,28 +3,9 @@ name: PR Preview Images
 on:
   pull_request:
     branches: [main, "release-[0-9]*.[0-9]*"]
-    # Allowlist: only build preview images when an input that actually reaches
-    # one of the images changes. Each entry below is consumed by a dockerfile
-    # COPY/build-arg or by the task build steps (gen-apis / build:binary).
-    # Anything not listed (docs, tests, lint config, dev taskfiles, other
-    # workflows) cannot change an image, so it is skipped. Commercial code
-    # from 8gcr isn't applied for PR previews at all — see publish-images.yml.
-    paths:
-      - "src/**"                             # Go components + portal sources
-      - "api/v2.0/swagger.yaml"              # gen-apis (core) + portal API client
-      - "tools/swagger/templates/**"         # gen-apis output templates
-      - "make/migrations/**"                 # baked into harbor-core
-      - "icons/**"                           # baked into harbor-core
-      - "config/portal/**"                   # portal nginx.conf
-      - "LICENSE"                            # baked into harbor-portal
-      - "VERSION"                            # ReleaseVersion ldflag baked into the Go binaries
-      - "dockerfile/**"                      # every image
-      - "versions.env"                       # build-args + registry/trivy/distribution pins
-      - "Taskfile.yml"                       # build orchestration root
-      - "taskfile/build.yml"                 # gen-apis + build:binary recipes
-      - ".github/workflows/pr-ci.yml"        # this workflow
-      - ".github/actions/setup-go-cached/**" # Go build env used by the build jobs
-      - ".github/actions/setup-task/**"      # Task install action used by the build jobs
+    # No `paths` filter: GitHub evaluates it against the PR's own diff, which
+    # for a stacked PR is only the top slice. The image-input allowlist lives
+    # in the `changes` job below, which diffs against the stack base instead.
 
 permissions:
   contents: read
@@ -37,11 +18,73 @@ env:
   REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
   PR_REGISTRY_PROJECT: ${{ vars.PR_REGISTRY_PROJECT }}
   PREVIEW_TAG: pr-${{ github.event.pull_request.number }}
+  # stack-<n> follows the top of a native GitHub stack; empty for a plain PR
+  STACK_TAG: ${{ github.event.pull_request.stack && format('stack-{0}', github.event.pull_request.stack.number) || '' }}
 
 jobs:
+  changes:
+    name: Check image inputs
+    # Forked PRs have no registry credentials and bot PRs need no preview. In
+    # a native GitHub stack only the top PR builds: its head already contains
+    # every lower PR, so each lower image would be a prefix of it.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !contains(fromJSON('["8gcr-renovate[bot]", "renovate[bot]", "8gcr-sync[bot]"]'), github.actor) &&
+      (github.event.pull_request.stack == null ||
+       github.event.pull_request.stack.position == github.event.pull_request.stack.size)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    outputs:
+      build: ${{ steps.diff.outputs.build }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history: the diff below spans the whole stack
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Diff against the stack base
+        id: diff
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          STACK_BASE_SHA: ${{ github.event.pull_request.stack.base.sha || '' }}
+          # Allowlist: only build preview images when an input that actually
+          # reaches one of the images changes. Each entry is consumed by a
+          # dockerfile COPY/build-arg or by the task build steps (gen-apis /
+          # build:binary). Anything not listed (docs, tests, lint config, dev
+          # taskfiles, other workflows) cannot change an image. Commercial code
+          # from 8gcr isn't applied for PR previews at all, see publish-images.yml.
+          IMAGE_INPUTS: |
+            ^src/
+            ^api/v2\.0/swagger\.yaml$
+            ^tools/swagger/templates/
+            ^make/migrations/
+            ^icons/
+            ^config/portal/
+            ^LICENSE$
+            ^VERSION$
+            ^dockerfile/
+            ^versions\.env$
+            ^Taskfile\.yml$
+            ^taskfile/build\.yml$
+            ^\.github/workflows/pr-ci\.yml$
+            ^\.github/actions/setup-go-cached/
+            ^\.github/actions/setup-task/
+        run: |
+          base="${STACK_BASE_SHA:-${PR_BASE_SHA}}"
+          changed="$(git diff --name-only "${base}...${HEAD_SHA}")"
+          if grep -Ef <(printf '%s' "${IMAGE_INPUTS}") <<<"${changed}"; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No image input changed between ${base} and ${HEAD_SHA}; skipping the preview images"
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
     name: "${{ matrix.component }} (${{ matrix.platform }})"
-    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && !contains(fromJSON('["8gcr-renovate[bot]", "renovate[bot]", "8gcr-sync[bot]"]'), github.actor) }}
+    needs: [changes]
+    if: needs.changes.outputs.build == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -157,8 +200,8 @@ jobs:
 
   merge:
     name: "Merge ${{ matrix.component }}"
-    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && !contains(fromJSON('["8gcr-renovate[bot]", "renovate[bot]", "8gcr-sync[bot]"]'), github.actor) }}
-    needs: [build]
+    needs: [changes, build]
+    if: needs.changes.outputs.build == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -203,15 +246,18 @@ jobs:
         env:
           IMAGE: ${{ env.REGISTRY_ADDRESS }}/${{ env.PR_REGISTRY_PROJECT }}/${{ steps.prepare.outputs.image_name }}
         run: |
+          tags=(-t "${IMAGE}:${PREVIEW_TAG}")
+          if [ -n "${STACK_TAG}" ]; then
+            tags+=(-t "${IMAGE}:${STACK_TAG}")
+          fi
           # shellcheck disable=SC2046
-          docker buildx imagetools create \
-            -t "${IMAGE}:${PREVIEW_TAG}" \
+          docker buildx imagetools create "${tags[@]}" \
             $(printf "${IMAGE}@sha256:%s " *)
 
   sign:
     name: Sign preview images
-    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && !contains(fromJSON('["8gcr-renovate[bot]", "renovate[bot]", "8gcr-sync[bot]"]'), github.actor) }}
-    needs: [merge]
+    needs: [changes, merge]
+    if: needs.changes.outputs.build == 'true'
     runs-on: ubuntu-26.04
     permissions:
       contents: read
@@ -267,8 +313,8 @@ jobs:
 
   pr-comment:
     name: Comment preview image refs
-    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && !contains(fromJSON('["8gcr-renovate[bot]", "renovate[bot]", "8gcr-sync[bot]"]'), github.actor) }}
-    needs: [sign]
+    needs: [changes, sign]
+    if: needs.changes.outputs.build == 'true'
     runs-on: ubuntu-26.04
     permissions:
       issues: write
@@ -288,19 +334,46 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           MARKER: "<!-- harbor-next-pr-preview -->"
+          STACK_NUMBER: ${{ github.event.pull_request.stack.number || '' }}
         with:
           script: |
             const marker = process.env.MARKER;
             const registryAddress = process.env.REGISTRY_ADDRESS;
             const registryProject = process.env.PR_REGISTRY_PROJECT;
             const previewTag = process.env.PREVIEW_TAG;
+            const stackNumber = process.env.STACK_NUMBER;
+            const stackTag = process.env.STACK_TAG;
             const repository = process.env.GITHUB_REPOSITORY;
             const issueNumber = context.payload.pull_request.number;
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
+            let stackSection = '';
+            if (stackNumber) {
+              let members = '';
+              try {
+                const { data: stack } = await github.request('GET /repos/{owner}/{repo}/stacks/{stack_number}', {
+                  owner, repo, stack_number: Number(stackNumber),
+                });
+                members = stack.pull_requests
+                  .map((pr, i) => `${i + 1}. #${pr.number} ${pr.title}`)
+                  .join('\n');
+              } catch (error) {
+                core.warning(`Could not list stack #${stackNumber}: ${error.message}`);
+                members = '(see the stack view on this PR)';
+              }
+              stackSection = `
+            This PR is the top of stack #${stackNumber}. The images are built from its head, so they contain every PR in the stack:
+
+            ${members}
+
+            The same images are tagged \`${stackTag}\`, which always points at the latest build of the top of the stack. Lower PRs do not get images of their own; push a fix there and \`gh stack rebase && gh stack push\` to rebuild.
+            `;
+            }
+
             const body = `${marker}
             Preview images for this PR are available in \`${registryAddress}/${registryProject}\` with tag \`${previewTag}\`.
+            ${stackSection}
 
             - \`${registryAddress}/${registryProject}/harbor-core:${previewTag}\`
             - \`${registryAddress}/${registryProject}/harbor-jobservice:${previewTag}\`
