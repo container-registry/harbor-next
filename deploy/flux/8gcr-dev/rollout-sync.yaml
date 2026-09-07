@@ -138,11 +138,11 @@ spec:
                       echo "ERROR: cannot patch $kind/$workload" >&2; fail=1; return 0; }
                   }
                   rev=deploy.8gears.io/image-revision
-                  sync deployment  harbor-harbor-next-core       harbor-core          "$rev"
-                  sync deployment  harbor-harbor-next-jobservice harbor-jobservice    "$rev"
-                  sync deployment  harbor-harbor-next-registry   harbor-registry      "$rev"
-                  sync deployment  harbor-harbor-next-registry   harbor-registryctl   deploy.8gears.io/registryctl-image-revision
-                  sync deployment  harbor-harbor-next-portal     harbor-portal        "$rev"
-                  sync deployment  harbor-harbor-next-exporter   harbor-exporter      "$rev"
-                  sync statefulset harbor-harbor-next-trivy      trivy-adapter        "$rev"
+                  sync deployment  harbor-core       harbor-core          "$rev"
+                  sync deployment  harbor-jobservice harbor-jobservice    "$rev"
+                  sync deployment  harbor-registry   harbor-registry      "$rev"
+                  sync deployment  harbor-registry   harbor-registryctl   deploy.8gears.io/registryctl-image-revision
+                  sync deployment  harbor-portal     harbor-portal        "$rev"
+                  sync deployment  harbor-exporter   harbor-exporter      "$rev"
+                  sync statefulset harbor-trivy      trivy-adapter        "$rev"
                   exit "$fail"

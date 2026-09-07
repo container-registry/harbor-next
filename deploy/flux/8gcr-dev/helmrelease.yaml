@@ -8,7 +8,7 @@ spec:
   releaseName: harbor
   chartRef:
     kind: OCIRepository
-    name: harbor-next-chart
+    name: harbor-chart
   install:
     remediation:
       retries: 3
@@ -58,14 +58,14 @@ spec:
         nginx.ingress.kubernetes.io/server-snippet: |
           location = /api/v2.0/configurations {
               resolver 10.96.0.10 valid=30s ipv6=off;
-              set $cfg_upstream harbor-harbor-next-core.8gcr-dev-main.svc.cluster.local;
+              set $cfg_upstream harbor-core.8gcr-dev-main.svc.cluster.local;
               access_by_lua_block {
                   local m = ngx.req.get_method()
                   if m == "PUT" or m == "POST" or m == "DELETE" or m == "PATCH" then
                       local http = require "resty.http"
                       local httpc = http.new()
                       httpc:set_timeout(3000)
-                      local ok, cerr = httpc:connect("harbor-harbor-next-core.8gcr-dev-main.svc.cluster.local", 80)
+                      local ok, cerr = httpc:connect("harbor-core.8gcr-dev-main.svc.cluster.local", 80)
                       if not ok then
                           ngx.log(ngx.ERR, "cfg-guard connect: ", cerr)
                           return ngx.exit(403)

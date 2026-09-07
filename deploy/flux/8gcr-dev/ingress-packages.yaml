@@ -39,58 +39,56 @@ spec:
         paths:
           # Keep in sync with the route registration in src/server/server.go.
           #
-          # The backend name is harbor-harbor-next-core, not harbor-core. The
-          # chart is named harbor-next and the release is named harbor, and the
-          # fullname helper only collapses the two when the chart name is a
-          # substring of the release name. It is not here, so both are kept.
-          # Confirmed with `helm template` against the chart version this
-          # deployment pins; do not shorten it by inspection.
+          # The backend is harbor-core: chart and release are both named
+          # harbor, so the fullname helper collapses them to the release
+          # name. Confirmed with `helm template`; keep in sync with the
+          # chart name.
           - path: /npm/
             pathType: Prefix
             backend:
               service:
-                name: harbor-harbor-next-core
+                name: harbor-core
                 port:
                   number: 80
           - path: /maven/
             pathType: Prefix
             backend:
               service:
-                name: harbor-harbor-next-core
+                name: harbor-core
                 port:
                   number: 80
           - path: /pypi/
             pathType: Prefix
             backend:
               service:
-                name: harbor-harbor-next-core
+                name: harbor-core
                 port:
                   number: 80
           - path: /cargo/
             pathType: Prefix
             backend:
               service:
-                name: harbor-harbor-next-core
+                name: harbor-core
                 port:
                   number: 80
           - path: /go/
             pathType: Prefix
             backend:
               service:
-                name: harbor-harbor-next-core
+                name: harbor-core
                 port:
                   number: 80
           - path: /go-sumdb/
             pathType: Prefix
             backend:
               service:
-                name: harbor-harbor-next-core
+                name: harbor-core
                 port:
                   number: 80
           - path: /homebrew/
             pathType: Prefix
             backend:
               service:
-                name: harbor-harbor-next-core
+                name: harbor-core
                 port:
                   number: 80

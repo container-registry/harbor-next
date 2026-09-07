@@ -61,7 +61,7 @@ tests:
           value: Deployment
       - equal:
           path: spec.scaleTargetRef.name
-          value: RELEASE-NAME-harbor-next-core
+          value: RELEASE-NAME-harbor-core
       - equal:
           path: spec.minReplicas
           value: 2
@@ -153,7 +153,7 @@ tests:
           value: StatefulSet
       - equal:
           path: spec.scaleTargetRef.name
-          value: RELEASE-NAME-harbor-next-trivy
+          value: RELEASE-NAME-harbor-trivy
 
   # Trivy HPA must NOT render when trivy itself is disabled — otherwise
   # the HPA targets a non-existent StatefulSet and K8s warns.
