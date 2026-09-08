@@ -20,6 +20,7 @@ const sectionNames = new Map([
   ['Bug Fixes', 'Fixes'],
   ['Performance Improvements', 'Updates'],
   ['Code Refactoring', 'Updates'],
+  ['Chart Changes', 'Updates'],
 ]);
 const droppedSections = new Set(['Documentation']);
 const sectionOrder = ['Commercial Features', 'Features', 'Fixes', 'Updates', 'Upstream', 'Reverts'];
