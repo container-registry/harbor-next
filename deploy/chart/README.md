@@ -730,7 +730,7 @@ Kubernetes: `>=1.28.0-0`
 | core.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler configuration. When enabled the chart OMITS the static `replicas:` field on the Deployment so HPA owns the replica count. `maxReplicas` is REQUIRED. Tracks upstream goharbor/harbor-helm#1068. |
 | core.config | object | {} | Harbor Core application config (converted to env vars in ConfigMap) Any Harbor Core config can be set here without chart changes |
 | core.configureUserSettings | string | `""` | Initial user settings JSON applied on first boot |
-| core.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
+| core.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate; type Recreate clears rollingUpdate) |
 | core.existingSecret | string | `""` | Use existing secret for Core secret |
 | core.existingSecretKey | string | `"secret"` | Key in existing secret containing the Core secret |
 | core.existingXsrfSecret | string | `""` | Existing secret for XSRF key |
@@ -792,7 +792,7 @@ Kubernetes: `>=1.28.0-0`
 | exporter.affinity | object | `{}` | Affinity rules for Exporter pods |
 | exporter.annotations | object | `{}` | Annotations for the Exporter workload object (Deployment) |
 | exporter.config | object | {} | Exporter config as env vars. Nested maps flatten to UPPER_SNAKE_CASE via toEnvVars and are injected via envFrom. Any exporter setting works without chart changes.  Keys are used verbatim — the chart adds no prefix. The exporter reads env through viper with the `harbor` prefix, so keys must carry `HARBOR_` themselves (`HARBOR_EXPORTER_CACHE_TIME`, not `CACHE_TIME`). The nested form flattens to the same thing.  A key set here wins over the chart's own env entry for that name, including the database pool knobs — that is how the exporter gets a different POSTGRESQL_MIN_CONNS from core. |
-| exporter.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
+| exporter.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate; type Recreate clears rollingUpdate) |
 | exporter.enabled | bool | `true` | Enable Harbor exporter for Prometheus metrics |
 | exporter.extraEnv | list | [] | Extra environment variables with valueFrom support |
 | exporter.hostAliases | list | [] | Host entries injected into /etc/hosts (PodSpec.hostAliases). Use for private DNS that does not exist in cluster DNS — service-mesh sidecars, legacy LDAP/SMTP/proxy targets, internal CAs, etc. Format matches the Kubernetes PodSpec: a list of `{ip, hostnames}` entries. |
@@ -899,7 +899,7 @@ Kubernetes: `>=1.28.0-0`
 | jobservice.annotations | object | `{}` | Annotations for the Jobservice workload object (Deployment) |
 | jobservice.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler. See `core.autoscaling` for full docs. |
 | jobservice.config | object | See [values.yaml](values.yaml) | Full Harbor jobservice `config.yml` passed through verbatim. Used only when `existingConfigMap` is empty.  Chart-managed values injected via env-var override at runtime:   - `protocol`, `port` (from chart helpers)   - `worker_pool.backend`, `worker_pool.workers` (when JOB_SERVICE_*     env vars are wired by the chart)   - `worker_pool.redis_pool.redis_url` (chart sets the URL with auth     via JOB_SERVICE_POOL_REDIS_URL; you can leave a placeholder here)   - `worker_pool.redis_pool.namespace`  The following keys are NOT env-overridable (Harbor jobservice limitation — see src/jobservice/config/config.go). You MUST set them in this block; changing `.Values.logLevel` or `.Values.metrics.enabled` globally will NOT propagate here:   - `metric.enabled`, `metric.path`, `metric.port`   - `loggers[].level`, `job_loggers[].level`   - `job_loggers[].sweeper.*`   - `reaper.*`   - `max_retrieve_size_mb` |
-| jobservice.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
+| jobservice.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate; type Recreate clears rollingUpdate) |
 | jobservice.env | object | {} | Supplementary env vars for the jobservice container (and the jobservice ConfigMap-env). Nested maps flatten to `UPPER_SNAKE_CASE` keys via `harbor.toEnvVars`. Use for any setting Harbor reads from env but is not part of the YAML config (e.g. webhook tuning). |
 | jobservice.existingConfigMap | string | `""` | Use an externally-managed ConfigMap containing `config.yml` instead of generating one from `config:` below. Semantics match `registry.existingConfigMap`. |
 | jobservice.existingSecret | string | `""` | Use existing secret for Jobservice secret |
@@ -948,7 +948,7 @@ Kubernetes: `>=1.28.0-0`
 | portal.affinity | object | `{}` | Affinity rules for Portal pods |
 | portal.annotations | object | `{}` | Annotations for the Portal workload object (Deployment) |
 | portal.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler. See `core.autoscaling` for full docs. |
-| portal.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
+| portal.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate; type Recreate clears rollingUpdate) |
 | portal.enabled | bool | `true` | Deploy the portal (Harbor UI). Set `false` for API-only installs — core serves the API, and the Ingress / Gateway route `/` to core instead of the portal. Mirrors `trivy.enabled` / `exporter.enabled`. |
 | portal.existingConfigMap | string | `""` | Use an externally-managed ConfigMap containing `nginx.conf` instead of the chart-generated one. When set, the chart skips ConfigMap generation and the Deployment mounts the named ConfigMap. Use for custom nginx configuration (TLS termination, custom headers, extra locations) without forking the chart. Semantics match `registry.existingConfigMap`. Portal serves static Angular assets via nginx and has no env/key config surface — to customize nginx.conf, point existingConfigMap at your own ConfigMap (there is no `config`/`secret` passthrough here). |
 | portal.extraEnv | list | [] | Extra environment variables with valueFrom support |
@@ -997,7 +997,7 @@ Kubernetes: `>=1.28.0-0`
 | registry.credentials.htpasswdString | string | `""` |  |
 | registry.credentials.password | string | `""` |  |
 | registry.credentials.username | string | `"harbor_registry_user"` |  |
-| registry.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
+| registry.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate; type Recreate clears rollingUpdate) |
 | registry.existingConfigMap | string | `""` | Use an externally-managed ConfigMap containing `config.yml` and `ctl-config.yml` instead of generating one from `config:` below. When set, the chart skips ConfigMap generation and the Deployment mounts the named ConfigMap at /etc/registry. Chart-managed runtime values (redis URL with auth, HTTP secret, storage credentials from `storageCredentials`, log level, ports) are still injected via env-var overrides on the Deployment, so they take precedence over whatever is in the external ConfigMap. Use this for kustomize/GitOps workflows where `config.yml` is owned by a separate manifest pipeline. |
 | registry.existingSecret | string | `""` | Existing Secret that supplies `REGISTRY_HTTP_SECRET`. When set, the generated registry Secret omits `REGISTRY_HTTP_SECRET` and the deployment reads it from this Secret via env. Independent of `storageCredentials`. |
 | registry.existingSecretKey | string | `"REGISTRY_HTTP_SECRET"` | Key in `registry.existingSecret` that holds `REGISTRY_HTTP_SECRET`. |

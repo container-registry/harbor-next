@@ -1,0 +1,137 @@
+# Tests for the shared `harbor.deploymentStrategy` helper: Recreate must
+# emit `rollingUpdate: null` (clears the server-side default on upgrade)
+# and reject a user-supplied rollingUpdate. Helper behavior is verified on
+# core; the per-component tests prove every deployment uses the helper.
+suite: deployment strategy helper tests
+templates:
+  - templates/core.deployment.yaml
+  - templates/core.configmap.yaml
+  - templates/core.secret.yaml
+  - templates/portal.deployment.yaml
+  - templates/portal.configmap.yaml
+  - templates/registry.deployment.yaml
+  - templates/registry.configmap.yaml
+  - templates/registry.secret.yaml
+  - templates/registryctl.configmap.yaml
+  - templates/registryctl.secret.yaml
+  - templates/jobservice.deployment.yaml
+  - templates/jobservice.configmap.yaml
+  - templates/jobservice.configmap-env.yaml
+  - templates/jobservice.secret.yaml
+  - templates/exporter.deployment.yaml
+  - templates/exporter.configmap-env.yaml
+  - templates/exporter.secret.yaml
+tests:
+  - it: should pass RollingUpdate strategy through unchanged
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.deploymentStrategy:
+        type: RollingUpdate
+        rollingUpdate:
+          maxSurge: 1
+          maxUnavailable: 0
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: RollingUpdate
+      - equal:
+          path: spec.strategy.rollingUpdate.maxSurge
+          value: 1
+
+  - it: should null rollingUpdate when type is Recreate
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.deploymentStrategy.type: Recreate
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+      - equal:
+          path: spec.strategy.rollingUpdate
+          value: null
+
+  - it: should render a single null rollingUpdate when Recreate has an empty rollingUpdate map
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.deploymentStrategy:
+        type: Recreate
+        rollingUpdate: {}
+    asserts:
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+      - equal:
+          path: spec.strategy.rollingUpdate
+          value: null
+
+  - it: should fail when Recreate is combined with rollingUpdate
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.deploymentStrategy:
+        type: Recreate
+        rollingUpdate:
+          maxSurge: 1
+    asserts:
+      - failedTemplate:
+          errorPattern: "rollingUpdate may not be set when type is Recreate"
+
+  - it: should null rollingUpdate on portal with Recreate
+    template: templates/portal.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      portal.deploymentStrategy.type: Recreate
+    asserts:
+      - equal:
+          path: spec.strategy.rollingUpdate
+          value: null
+
+  - it: should null rollingUpdate on registry with Recreate
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.deploymentStrategy.type: Recreate
+    asserts:
+      - equal:
+          path: spec.strategy.rollingUpdate
+          value: null
+
+  - it: should null rollingUpdate on jobservice with Recreate
+    template: templates/jobservice.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      jobservice.deploymentStrategy.type: Recreate
+    asserts:
+      - equal:
+          path: spec.strategy.rollingUpdate
+          value: null
+
+  - it: should null rollingUpdate on exporter with Recreate
+    template: templates/exporter.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      exporter.enabled: true
+      exporter.deploymentStrategy.type: Recreate
+    asserts:
+      - equal:
+          path: spec.strategy.rollingUpdate
+          value: null
