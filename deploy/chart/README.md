@@ -625,6 +625,26 @@ metrics:
       release: prometheus
 ```
 
+### Grafana dashboard
+
+Ships the Harbor dashboard from `dashboards/harbor.json` (the same file as
+`contrib/grafana-dashboard/harbor.json`) as a ConfigMap labelled `grafana_dashboard: "1"`,
+which the Grafana sidecar in kube-prometheus-stack or the grafana-operator loads
+automatically. The dashboard filters on the `namespace` label, so it needs
+`metrics.enabled`, `exporter.enabled` and a ServiceMonitor (or equivalent scrape).
+
+```yaml
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+  grafanaDashboard:
+    enabled: true
+    namespace: monitoring  # Optional, defaults to release namespace
+    annotations:
+      grafana_folder: Harbor  # Optional, sidecar folder annotation
+```
+
 ### CloudNativePG via extraManifests
 
 ```yaml
@@ -937,6 +957,11 @@ Kubernetes: `>=1.28.0-0`
 | jobservice.topologySpreadConstraints | list | `[]` | Topology spread constraints for pod scheduling |
 | logLevel | string | `"info"` | Log level for all components (debug, info, warning, error, fatal) |
 | metrics.enabled | bool | `false` | Enable metrics endpoints on all components |
+| metrics.grafanaDashboard | object | `{"annotations":{},"enabled":false,"labels":{"grafana_dashboard":"1"},"namespace":""}` | Ship the Harbor Grafana dashboard (dashboards/harbor.json) as a ConfigMap picked up by the Grafana dashboard sidecar (kube-prometheus-stack, grafana-operator) |
+| metrics.grafanaDashboard.annotations | object | `{}` | Annotations, e.g. grafana_folder for the sidecar folder annotation |
+| metrics.grafanaDashboard.enabled | bool | `false` | Create the dashboard ConfigMap |
+| metrics.grafanaDashboard.labels | object | `{"grafana_dashboard":"1"}` | Labels the Grafana sidecar selects on |
+| metrics.grafanaDashboard.namespace | string | `""` | ConfigMap namespace (defaults to release namespace) |
 | metrics.serviceMonitor | object | `{"enabled":false,"honorLabels":true,"interval":"30s","labels":{},"namespace":"","scrapeTimeout":"10s"}` | Enable Prometheus ServiceMonitor |
 | metrics.serviceMonitor.enabled | bool | `false` | Create ServiceMonitor resource |
 | metrics.serviceMonitor.honorLabels | bool | `true` | Honor labels |

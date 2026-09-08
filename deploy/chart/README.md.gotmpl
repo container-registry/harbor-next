@@ -626,6 +626,26 @@ metrics:
       release: prometheus
 ```
 
+### Grafana dashboard
+
+Ships the Harbor dashboard from `dashboards/harbor.json` (the same file as
+`contrib/grafana-dashboard/harbor.json`) as a ConfigMap labelled `grafana_dashboard: "1"`,
+which the Grafana sidecar in kube-prometheus-stack or the grafana-operator loads
+automatically. The dashboard filters on the `namespace` label, so it needs
+`metrics.enabled`, `exporter.enabled` and a ServiceMonitor (or equivalent scrape).
+
+```yaml
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+  grafanaDashboard:
+    enabled: true
+    namespace: monitoring  # Optional, defaults to release namespace
+    annotations:
+      grafana_folder: Harbor  # Optional, sidecar folder annotation
+```
+
 ### CloudNativePG via extraManifests
 
 ```yaml

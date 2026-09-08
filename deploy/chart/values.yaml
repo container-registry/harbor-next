@@ -1872,6 +1872,18 @@ metrics:
     scrapeTimeout: 10s
     # -- Honor labels
     honorLabels: true
+  # -- Ship the Harbor Grafana dashboard (dashboards/harbor.json) as a ConfigMap
+  # picked up by the Grafana dashboard sidecar (kube-prometheus-stack, grafana-operator)
+  grafanaDashboard:
+    # -- Create the dashboard ConfigMap
+    enabled: false
+    # -- ConfigMap namespace (defaults to release namespace)
+    namespace: ""
+    # -- Labels the Grafana sidecar selects on
+    labels:
+      grafana_dashboard: "1"
+    # -- Annotations, e.g. grafana_folder for the sidecar folder annotation
+    annotations: {}
 
 # ============================================================================
 # 7. ESCAPE HATCHES
