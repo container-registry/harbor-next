@@ -63,8 +63,10 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ template "harbor.jobservice" . }}-env
+            {{- if include "harbor.jobservice.secretHasData" . }}
             - secretRef:
                 name: {{ include "harbor.fullname" . }}-jobservice
+            {{- end }}
           env:
             - name: CORE_SECRET
               valueFrom:
