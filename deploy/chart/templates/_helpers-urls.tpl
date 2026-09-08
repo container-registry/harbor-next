@@ -6,11 +6,12 @@ Internal URL helpers
 
 {{/*
 Return the Core internal URL
+
+Port is load-bearing: a portless single-label host is parsed as a Docker Hub
+namespace by go-containerregistry in Harbor's SBOM accessory push.
+Including the port ensures correct registry host parsing across all image versions.
 */}}
 {{- define "harbor.core.url" -}}
-{{/* Port is load-bearing: a portless single-label host is parsed as a Docker Hub
-     namespace by go-containerregistry in Harbor's SBOM accessory push.
-     Including the port ensures correct registry host parsing across all image versions. */}}
 http://{{ include "harbor.fullname" . }}-core:{{ include "harbor.core.service.port" . }}
 {{- end }}
 
