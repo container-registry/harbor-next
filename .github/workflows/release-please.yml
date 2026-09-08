@@ -124,17 +124,44 @@ jobs:
           git commit -s -m "chore: target next development version ${next_version}"
           git push
 
+  find-release-prs:
+    name: Find Open Release PRs
+    # Previews key off "release PR open", not prs_created, so an
+    # untouched open PR still re-renders after engine changes. Runs after
+    # both release-please instances so a PR created this run is found.
+    needs: [release-please, release-please-chart]
+    if: ${{ !cancelled() && needs.release-please.result == 'success' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+    outputs:
+      app_pr: ${{ steps.find.outputs.app_pr }}
+      chart_pr: ${{ steps.find.outputs.chart_pr }}
+    steps:
+      - name: Locate open release PRs by branch
+        id: find
+        run: |
+          find_pr() {
+            gh pr list --repo "${GITHUB_REPOSITORY}" --state open --base "${GITHUB_REF_NAME}" \
+              --head "$1" --json number --jq '.[0].number // empty'
+          }
+          echo "app_pr=$(find_pr "release-please--branches--${GITHUB_REF_NAME}")" >> "$GITHUB_OUTPUT"
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            echo "chart_pr=$(find_pr 'release-please--branches--main--components--chart')" >> "$GITHUB_OUTPUT"
+          fi
+
   preview-release-notes:
     name: Preview Release Notes
-    needs: [release-please]
-    if: ${{ needs.release-please.outputs.prs_created == 'true' && needs.release-please.outputs.release_created != 'true' }}
+    needs: [release-please, find-release-prs]
+    if: ${{ !cancelled() && needs.find-release-prs.outputs.app_pr != '' && needs.release-please.outputs.release_created != 'true' }}
     permissions:
       contents: write
       pull-requests: write
     uses: $/.github/workflows/release-notes-engine.yml
     with:
-      checkout_ref: ${{ fromJSON(needs.release-please.outputs.prs)[0].headBranchName }}
-      preview_pr_number: ${{ fromJSON(needs.release-please.outputs.prs)[0].number }}
+      checkout_ref: release-please--branches--${{ github.ref_name }}
+      preview_pr_number: ${{ needs.find-release-prs.outputs.app_pr }}
     secrets:
       SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
 
@@ -278,15 +305,15 @@ jobs:
 
   preview-chart-release-notes:
     name: Preview Chart Release Notes
-    needs: [release-please-chart]
-    if: ${{ needs.release-please-chart.outputs.prs_created == 'true' && needs.release-please-chart.outputs.release_created != 'true' }}
+    needs: [release-please-chart, find-release-prs]
+    if: ${{ needs.find-release-prs.outputs.chart_pr != '' && needs.release-please-chart.outputs.release_created != 'true' }}
     permissions:
       contents: write
       pull-requests: write
     uses: $/.github/workflows/release-notes-engine.yml
     with:
-      checkout_ref: ${{ fromJSON(needs.release-please-chart.outputs.prs)[0].headBranchName }}
-      preview_pr_number: ${{ fromJSON(needs.release-please-chart.outputs.prs)[0].number }}
+      checkout_ref: release-please--branches--main--components--chart
+      preview_pr_number: ${{ needs.find-release-prs.outputs.chart_pr }}
       component: chart
     secrets:
       SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
