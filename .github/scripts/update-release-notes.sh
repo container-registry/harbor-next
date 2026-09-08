@@ -169,27 +169,103 @@ export GIT_ASKPASS="${askpass_script}" GIT_TERMINAL_PROMPT=0 PATCHES_TOKEN
 git init --bare "${tmp_dir}/patches-repo"
 patches_remote="https://x-access-token@github.com/container-registry/8gcr"
 series="taskfile/commercial-patches"
+stacks_file="taskfile/commercial-patch-stacks"
 patch_notes="${tmp_dir}/commercial-patches.md"
+prepo() { git -C "${tmp_dir}/patches-repo" "$@"; }
 
 # The Harbor branch owns the ordered manifest. 8gcr only stores the branch
 # commits, so release notes and image builds always use the same exact list.
+#
+# Patch Stream: this release's delta per branch = chain PRs not in the previous
+# patch-record tag's "prs=" set. No patch-base ref yet -> flat tip-subject list.
 if [[ "${chart_mode}" == false && -f "${series}" ]]; then
+  branches=()
   while IFS= read -r branch; do
     branch="${branch%%#*}"
     branch="${branch#"${branch%%[![:space:]]*}"}"
     branch="${branch%"${branch##*[![:space:]]}"}"
     [[ -z "${branch}" ]] && continue
-
     if ! git check-ref-format --branch "${branch}" >/dev/null 2>&1; then
       echo "Invalid commercial branch name in series: ${branch}" >&2
       exit 1
     fi
-
-    git -C "${tmp_dir}/patches-repo" fetch --depth=1 "${patches_remote}" \
-      "${branch}:refs/remotes/origin/${branch}"
-    echo "- $(git -C "${tmp_dir}/patches-repo" log -1 --format=%s "refs/remotes/origin/${branch}")" \
-      >> "${patch_notes}"
+    branches+=("${branch}")
   done < "${series}"
+
+  base_ref="patch-base/${release_branch}"
+  if prepo fetch --depth=1 "${patches_remote}" \
+      "+refs/heads/${base_ref}:refs/heads/${base_ref}" 2>/dev/null; then
+    # previous record: highest patch-record semver strictly below this tag
+    record_ver=$( {
+        prepo ls-remote "${patches_remote}" 'refs/tags/patch-record/*' \
+          | awk '{ sub(/\^\{\}$/, "", $2); sub(/^refs\/tags\/patch-record\/v/, "", $2); print $2 }'
+        echo "${version}"
+      } | sort -u -V | awk -v c="${version}" '$0 == c { exit } { last = $0 } END { if (last != "") print last }')
+    record_tag=""
+    [[ -n "${record_ver}" ]] && record_tag="patch-record/v${record_ver}"
+    seen_file="${tmp_dir}/record-msg.txt"
+    : > "${seen_file}"
+    if [[ -n "${record_tag}" ]]; then
+      prepo fetch --depth=1 "${patches_remote}" \
+        "+refs/tags/${record_tag}:refs/tags/${record_tag}"
+      prepo tag -l --format='%(contents)' "${record_tag}" > "${seen_file}"
+    fi
+
+    unchanged=()
+    for branch in "${branches[@]}"; do
+      # chains only: everything newer than the pinned baseline
+      prepo fetch --shallow-exclude="${base_ref}" "${patches_remote}" \
+        "+refs/heads/${branch}:refs/remotes/origin/${branch}"
+      excl=()
+      if [[ -f "${stacks_file}" ]]; then
+        stack_parent=$(awk -v b="${branch}" '{ sub(/#.*/, "") } NF == 2 && $1 == b { print $2 }' "${stacks_file}")
+        [[ -n "${stack_parent}" ]] && excl=("^refs/remotes/origin/${stack_parent}")
+      fi
+      mapfile -t chain < <(prepo log --reverse --format=%H \
+        "refs/remotes/origin/${branch}" "${excl[@]}" 2>/dev/null || true)
+      if [[ "${#chain[@]}" -eq 0 ]]; then
+        echo "commercial branch has no chain above ${base_ref}: ${branch}" >&2
+        exit 1
+      fi
+      title=$(prepo log -1 --format=%s "${chain[0]}")
+      seen=$(awk -v b="${branch}" '$1 == b { sub(/^prs=/, "", $3); gsub(/,/, "\n", $3); print $3 }' "${seen_file}")
+      section=""
+      for c in "${chain[@]}"; do
+        subj=$(prepo log -1 --format=%s "${c}")
+        pr=$(sed -n 's/.* (#\([0-9][0-9]*\))$/\1/p' <<< "${subj}")
+        [[ -z "${pr}" ]] && continue
+        grep -qx "${pr}" <<< "${seen}" && continue
+        section+="- ${subj}"$'\n'
+        section+=$(prepo log -1 --format=%b "${c}" | awk '
+          /^## Release Notes[[:space:]]*$/ { grab=1; next }
+          /^## / { grab=0 }
+          grab && NF { print "  " $0 }
+        ')
+        section="${section%$'\n'}"$'\n'
+      done
+      if [[ -n "${section}" ]]; then
+        {
+          echo "### ${title}"
+          printf '%s' "${section}"
+          echo
+        } >> "${patch_notes}"
+      else
+        unchanged+=("${title}")
+      fi
+    done
+    if [[ "${#unchanged[@]}" -gt 0 && -s "${patch_notes}" ]]; then
+      titles=$(printf '%s, ' "${unchanged[@]}")
+      echo "_No changes this release:_ ${titles%, }" >> "${patch_notes}"
+    fi
+  else
+    # legacy (pre-Patch-Stream): flat list of branch tip subjects
+    for branch in "${branches[@]}"; do
+      prepo fetch --depth=1 "${patches_remote}" \
+        "+refs/heads/${branch}:refs/remotes/origin/${branch}"
+      echo "- $(prepo log -1 --format=%s "refs/remotes/origin/${branch}")" \
+        >> "${patch_notes}"
+    done
+  fi
 fi
 
 {
