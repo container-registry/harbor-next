@@ -131,7 +131,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    uses: ./.github/workflows/release-notes-engine.yml
+    uses: $/.github/workflows/release-notes-engine.yml
     with:
       checkout_ref: ${{ fromJSON(needs.release-please.outputs.prs)[0].headBranchName }}
       preview_pr_number: ${{ fromJSON(needs.release-please.outputs.prs)[0].number }}
@@ -237,7 +237,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    uses: ./.github/workflows/publish-images.yml
+    uses: $/.github/workflows/publish-images.yml
     with:
       checkout_ref: ${{ needs.release-please.outputs.tag_name }}
       image_tag: ${{ needs.release-please.outputs.tag_name }}
@@ -253,7 +253,7 @@ jobs:
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     permissions:
       contents: write
-    uses: ./.github/workflows/release-notes-engine.yml
+    uses: $/.github/workflows/release-notes-engine.yml
     with:
       tag_name: ${{ needs.release-please.outputs.tag_name }}
     secrets:
@@ -270,7 +270,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    uses: ./.github/workflows/publish-chart.yml
+    uses: $/.github/workflows/publish-chart.yml
     with:
       tag_name: ${{ needs.release-please-chart.outputs.tag_name }}
     secrets:
@@ -283,7 +283,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    uses: ./.github/workflows/release-notes-engine.yml
+    uses: $/.github/workflows/release-notes-engine.yml
     with:
       checkout_ref: ${{ fromJSON(needs.release-please-chart.outputs.prs)[0].headBranchName }}
       preview_pr_number: ${{ fromJSON(needs.release-please-chart.outputs.prs)[0].number }}
@@ -298,7 +298,7 @@ jobs:
     if: ${{ needs.release-please-chart.outputs.release_created == 'true' }}
     permissions:
       contents: write
-    uses: ./.github/workflows/release-notes-engine.yml
+    uses: $/.github/workflows/release-notes-engine.yml
     with:
       tag_name: ${{ needs.release-please-chart.outputs.tag_name }}
       component: chart
@@ -356,7 +356,7 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Install Task
-        uses: ./.github/actions/setup-task
+        uses: $/.github/actions/setup-task
 
       - name: Install Helm
         uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0

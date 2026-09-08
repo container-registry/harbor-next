@@ -76,13 +76,13 @@ jobs:
         run: grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
 
       - name: Setup Go
-        uses: ./.github/actions/setup-go-cached
+        uses: $/.github/actions/setup-go-cached
         with:
           go-version-file: src/go.mod
           go-sum-path: src/go.sum
 
       - name: Install Task
-        uses: ./.github/actions/setup-task
+        uses: $/.github/actions/setup-task
         with:
           version: 3.49.1
 
@@ -222,7 +222,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Go
-        uses: ./.github/actions/setup-go-cached
+        uses: $/.github/actions/setup-go-cached
         with:
           go-version-file: src/go.mod
           go-sum-path: src/go.sum
