@@ -26,6 +26,7 @@ import (
 	"github.com/goharbor/harbor/src/server/middleware/blob"
 	"github.com/goharbor/harbor/src/server/middleware/metric"
 	"github.com/goharbor/harbor/src/server/middleware/quota"
+	"github.com/goharbor/harbor/src/server/middleware/systemquota"
 	"github.com/goharbor/harbor/src/server/v2.0/restapi"
 )
 
@@ -58,6 +59,7 @@ func New() http.Handler {
 		ImmutableAPI:          newImmutableAPI(),
 		OIDCAPI:               newOIDCAPI(),
 		SystemCVEAllowlistAPI: newSystemCVEAllowListAPI(),
+		SystemquotaAPI:        newSystemQuotaAPI(),
 		ConfigureAPI:          newConfigAPI(),
 		UsergroupAPI:          newUserGroupAPI(),
 		UserAPI:               newUsersAPI(),
@@ -75,7 +77,7 @@ func New() http.Handler {
 		log.Fatal(err)
 	}
 
-	api.RegisterMiddleware("CopyArtifact", middleware.Chain(quota.CopyArtifactMiddleware(), blob.CopyArtifactMiddleware()))
+	api.RegisterMiddleware("CopyArtifact", middleware.Chain(systemquota.Gate(), quota.CopyArtifactMiddleware(), blob.CopyArtifactMiddleware()))
 	api.RegisterMiddleware("DeleteArtifact", quota.RefreshForProjectMiddleware())
 	api.RegisterMiddleware("DeleteRepository", quota.RefreshForProjectMiddleware())
 

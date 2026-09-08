@@ -126,3 +126,13 @@ UPDATE multi_project_reference m
 SET rank = ranked.rn
 FROM ranked
 WHERE m.id = ranked.id AND m.rank <> ranked.rn;
+
+-- Global storage quota (harbor-next #839, theme A). Singleton row: the
+-- instance-wide hard limit in bytes and whether registry writes are denied
+-- once usage reaches it. Absence of the row means "no global quota".
+CREATE TABLE IF NOT EXISTS system_quota (
+    id          INTEGER PRIMARY KEY NOT NULL CHECK (id = 1),
+    hard        BIGINT NOT NULL CHECK (hard > 0),
+    enforce     BOOLEAN NOT NULL DEFAULT FALSE,
+    update_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);

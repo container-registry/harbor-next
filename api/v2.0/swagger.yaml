@@ -4705,6 +4705,78 @@ paths:
         '500':
           $ref: '#/responses/500'
 
+  /system/quota:
+    get:
+      summary: Get the global storage quota
+      description: |
+        Returns the instance-wide storage quota together with the current usage, its source
+        (`accounted` from Harbor's blob table or `measured` on the storage volume), the advisory
+        sum of project quotas and whether the quota is enforced on registry writes.
+        Responds 404 when no global quota is set. Only system administrators, and system robot
+        accounts granted `system-quota:read`, can call this API.
+      operationId: getSystemQuota
+      tags:
+        - systemquota
+      parameters:
+        - $ref: '#/parameters/requestId'
+      responses:
+        '200':
+          description: Successfully retrieved the global storage quota.
+          schema:
+            $ref: '#/definitions/SystemQuota'
+        '401':
+          $ref: '#/responses/401'
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          $ref: '#/responses/404'
+        '500':
+          $ref: '#/responses/500'
+    put:
+      summary: Set the global storage quota
+      description: |
+        Creates or replaces the instance-wide storage quota. The hard limit must be a positive number
+        of bytes for the `storage` resource; use DELETE to unset. When `enforce` is true, registry
+        writes are denied once usage reaches the limit. Only system administrators can call this API.
+      operationId: updateSystemQuota
+      tags:
+        - systemquota
+      parameters:
+        - $ref: '#/parameters/requestId'
+        - name: quota
+          in: body
+          description: The new global storage quota
+          required: true
+          schema:
+            $ref: '#/definitions/SystemQuotaUpdateReq'
+      responses:
+        '200':
+          description: Successfully updated the global storage quota.
+        '400':
+          $ref: '#/responses/400'
+        '401':
+          $ref: '#/responses/401'
+        '403':
+          $ref: '#/responses/403'
+        '500':
+          $ref: '#/responses/500'
+    delete:
+      summary: Unset the global storage quota
+      description: Removes the instance-wide storage quota. Only system administrators can call this API.
+      operationId: deleteSystemQuota
+      tags:
+        - systemquota
+      parameters:
+        - $ref: '#/parameters/requestId'
+      responses:
+        '200':
+          description: Successfully removed the global storage quota.
+        '401':
+          $ref: '#/responses/401'
+        '403':
+          $ref: '#/responses/403'
+        '500':
+          $ref: '#/responses/500'
   /system/CVEAllowlist:
     get:
       summary: Get the system level allowlist of CVE.
@@ -8682,6 +8754,67 @@ definitions:
       hard:
         $ref: "#/definitions/ResourceList"
         description: The new hard limits for the quota
+
+  SystemQuotaUpdateReq:
+    type: object
+    description: The request body for setting the global storage quota
+    required:
+      - hard
+    properties:
+      hard:
+        $ref: "#/definitions/ResourceList"
+        description: The hard limit, must contain exactly the storage resource in bytes
+      enforce:
+        type: boolean
+        description: Deny registry writes once usage reaches the limit
+        x-omitempty: false
+
+  SystemQuota:
+    type: object
+    description: The global storage quota and its effective usage
+    properties:
+      hard:
+        $ref: "#/definitions/ResourceList"
+        description: The hard limit in bytes
+        x-omitempty: false
+      used:
+        $ref: "#/definitions/ResourceList"
+        description: The current usage in bytes
+        x-omitempty: false
+      free:
+        type: integer
+        format: int64
+        description: Bytes left below the hard limit, never negative
+        x-omitempty: false
+      used_source:
+        type: string
+        description: Where the usage value comes from
+        enum:
+          - accounted
+          - measured
+        x-omitempty: false
+      measured_at:
+        type: string
+        format: date-time
+        description: When the usage was measured on the storage volume, only set for the measured source
+      allocated:
+        type: integer
+        format: int64
+        description: The sum of the finite storage limits assigned to projects, advisory only
+        x-omitempty: false
+      unlimited_projects:
+        type: integer
+        format: int64
+        description: The number of projects without a storage limit
+        x-omitempty: false
+      enforce:
+        type: boolean
+        description: Whether registry writes are denied once usage reaches the limit
+        x-omitempty: false
+      update_time:
+        type: string
+        format: date-time
+        description: The last time the quota was set
 
   QuotaRefObject:
     type: object

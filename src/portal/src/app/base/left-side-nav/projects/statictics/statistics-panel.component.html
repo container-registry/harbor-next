@@ -57,7 +57,7 @@
             </div>
         </div>
     </div>
-    <div class="card" *ngIf="isValidSession">
+    <div class="card" [class.card-wide]="hasSystemQuota" *ngIf="isValidSession">
         <div class="card-block container">
             <h4 class="head">{{ 'QUOTA.QUOTA_USED' | translate }}</h4>
             <div class="storage-used font-weight-700">
@@ -66,6 +66,37 @@
                         getSizeNumber()
                     }}</span
                     ><span>{{ getSizeUnit() }}</span>
+                    <ng-container *ngIf="hasSystemQuota">
+                        <span class="size-of">{{
+                            'QUOTA.OF' | translate
+                        }}</span>
+                        <span class="margin-right-5px">{{
+                            getHardSizeNumber()
+                        }}</span
+                        ><span>{{ getHardSizeUnit() }}</span>
+                    </ng-container>
+                </div>
+            </div>
+            <div *ngIf="hasSystemQuota" class="system-quota-bar">
+                <div
+                    class="progress success"
+                    [class.danger]="isSystemQuotaDanger"
+                    [class.warning]="isSystemQuotaWarning">
+                    <progress
+                        [value]="systemQuotaUsed"
+                        [max]="systemQuotaHard"></progress>
+                </div>
+                <div class="system-quota-caption">
+                    <span>{{
+                        systemQuota.used_source === 'measured'
+                            ? ('QUOTA.SYSTEM_QUOTA_MEASURED' | translate)
+                            : ('QUOTA.SYSTEM_QUOTA_ACCOUNTED' | translate)
+                    }}</span>
+                    <span
+                        *ngIf="systemQuota.enforce"
+                        class="label label-warning"
+                        >{{ 'QUOTA.SYSTEM_QUOTA_ENFORCED' | translate }}</span
+                    >
                 </div>
             </div>
         </div>

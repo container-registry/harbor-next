@@ -45,11 +45,15 @@ export class EditProjectQuotasComponent {
         setQuota: string;
         storageQuota: string;
         isSystemDefaultQuota: boolean;
+        isSystemQuota?: boolean;
+        enforce?: boolean;
     } = {
         editQuota: '',
         setQuota: '',
         storageQuota: '',
         isSystemDefaultQuota: false,
+        isSystemQuota: false,
+        enforce: false,
     };
     quotaHardLimitValue: QuotaHardLimitInterface = {
         storageLimit: -1,
@@ -73,6 +77,7 @@ export class EditProjectQuotasComponent {
         const emitData = {
             formValue: this.currentForm.value,
             isSystemDefaultQuota: this.defaultTextsObj.isSystemDefaultQuota,
+            isSystemQuota: !!this.defaultTextsObj.isSystemQuota,
             id: this.quotaHardLimitValue.id,
         };
         this.confirmAction.emit(emitData);
@@ -83,7 +88,10 @@ export class EditProjectQuotasComponent {
 
     openEditQuotaModal(defaultTextsObj: EditQuotaQuotaInterface): void {
         this.defaultTextsObj = defaultTextsObj;
-        if (this.defaultTextsObj.isSystemDefaultQuota) {
+        if (
+            this.defaultTextsObj.isSystemDefaultQuota ||
+            this.defaultTextsObj.isSystemQuota
+        ) {
             this.quotaHardLimitValue = {
                 storageLimit:
                     defaultTextsObj.quotaHardLimitValue.storageLimit ===
@@ -132,10 +140,13 @@ export class EditProjectQuotasComponent {
                 storageUsed: defaultTextsObj.quotaHardLimitValue.used.storage,
             };
         }
-        let defaultForm = {
+        let defaultForm: any = {
             storage: this.quotaHardLimitValue.storageLimit,
             storageUnit: this.quotaHardLimitValue.storageUnit,
         };
+        if (this.defaultTextsObj.isSystemQuota) {
+            defaultForm.enforce = !!this.defaultTextsObj.enforce;
+        }
         this.currentForm.resetForm(defaultForm);
         this.openEditQuota = true;
 

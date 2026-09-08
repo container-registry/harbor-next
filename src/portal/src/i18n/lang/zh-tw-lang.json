@@ -371,6 +371,7 @@
         "REGISTRY": "Registry",
         "SCAN_ALL": "全部掃描",
         "SYSTEM_VOLUMES": "系統磁碟區",
+        "SYSTEM_QUOTA": "全域儲存配額",
         "GARBAGE_COLLECTION": "垃圾回收",
         "PURGE_AUDIT": "清除稽核記錄",
         "JOBSERVICE_MONITOR": "工作服務監控器",
@@ -1178,7 +1179,19 @@
         "INVALID_INPUT": "無效輸入",
         "PLACEHOLDER": "找不到任何專案配額",
         "FILTER_PLACEHOLDER": "依名稱搜尋（完全符合）",
-        "QUOTA_USED": "已用配額"
+        "QUOTA_USED": "已用配額",
+        "SYSTEM_QUOTA": "全域儲存配額",
+        "SYSTEM_QUOTA_NOT_SET": "未設定",
+        "EDIT_SYSTEM_QUOTA": "編輯全域儲存配額",
+        "SET_SYSTEM_QUOTA": "設定整個實例的儲存配額。輸入 -1 可移除。",
+        "SYSTEM_QUOTA_LIMIT": "全域配額上限",
+        "SYSTEM_QUOTA_ENFORCE": "對映像倉庫寫入強制執行",
+        "SYSTEM_QUOTA_ENFORCE_TIP": "啟用後，用量達到上限時將拒絕推送。刪除和垃圾回收仍然允許。",
+        "SYSTEM_QUOTA_ENFORCED": "強制執行",
+        "SYSTEM_QUOTA_ALLOCATED": "已分配給專案",
+        "SYSTEM_QUOTA_UNLIMITED_PROJECTS": "{{count}} 個專案無限制",
+        "SYSTEM_QUOTA_MEASURED": "在儲存卷上測量",
+        "SYSTEM_QUOTA_ACCOUNTED": "根據 Harbor 的 blob 表統計"
     },
     "WEEKLY": {
         "MONDAY": "星期一",

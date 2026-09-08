@@ -77,6 +77,7 @@ const (
 	ResourceReplicationPolicy  = Resource("replication-policy")
 	ResourceScanAll            = Resource("scan-all")
 	ResourceSystemVolumes      = Resource("system-volumes")
+	ResourceSystemQuota        = Resource("system-quota")
 	ResourcePurgeAuditLog      = Resource("purge-audit")
 	ResourceExportCVE          = Resource("export-cve")
 	ResourceJobServiceMonitor  = Resource("jobservice-monitor")
@@ -198,6 +199,8 @@ var (
 			{Resource: ResourceScanAll, Action: ActionCreate},
 
 			{Resource: ResourceSystemVolumes, Action: ActionRead},
+
+			{Resource: ResourceSystemQuota, Action: ActionRead},
 
 			{Resource: ResourceGarbageCollection, Action: ActionRead},
 			{Resource: ResourceGarbageCollection, Action: ActionCreate},

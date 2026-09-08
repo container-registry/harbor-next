@@ -371,6 +371,7 @@
         "REGISTRY": "레지스트리",
         "SCAN_ALL": "모두 스캔",
         "SYSTEM_VOLUMES": "시스템 볼륨",
+        "SYSTEM_QUOTA": "전역 스토리지 할당량",
         "GARBAGE_COLLECTION": "가비지 컬렉션",
         "PURGE_AUDIT": "퍼지 감사",
         "JOBSERVICE_MONITOR": "작업 서비스 모니터링",
@@ -1176,7 +1177,19 @@
         "INVALID_INPUT": "유효하지 않은 입력",
         "PLACEHOLDER": "프로젝트를 찾을 수 없습니다",
         "FILTER_PLACEHOLDER": "이름(정확히 일치)으로 검색",
-        "QUOTA_USED": "사용된 할당량"
+        "QUOTA_USED": "사용된 할당량",
+        "SYSTEM_QUOTA": "전역 스토리지 할당량",
+        "SYSTEM_QUOTA_NOT_SET": "설정되지 않음",
+        "EDIT_SYSTEM_QUOTA": "전역 스토리지 할당량 편집",
+        "SET_SYSTEM_QUOTA": "인스턴스 전체의 스토리지 할당량을 설정합니다. 제거하려면 -1을 입력하세요.",
+        "SYSTEM_QUOTA_LIMIT": "전역 할당량 한도",
+        "SYSTEM_QUOTA_ENFORCE": "레지스트리 쓰기에 적용",
+        "SYSTEM_QUOTA_ENFORCE_TIP": "활성화하면 사용량이 한도에 도달했을 때 푸시가 거부됩니다. 삭제와 가비지 컬렉션은 계속 허용됩니다.",
+        "SYSTEM_QUOTA_ENFORCED": "적용됨",
+        "SYSTEM_QUOTA_ALLOCATED": "프로젝트에 할당됨",
+        "SYSTEM_QUOTA_UNLIMITED_PROJECTS": "제한 없는 프로젝트 {{count}}개",
+        "SYSTEM_QUOTA_MEASURED": "스토리지 볼륨에서 측정됨",
+        "SYSTEM_QUOTA_ACCOUNTED": "Harbor blob 테이블에서 집계됨"
     },
     "WEEKLY": {
         "MONDAY": "월요일",

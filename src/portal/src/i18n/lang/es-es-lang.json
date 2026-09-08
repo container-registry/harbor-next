@@ -372,6 +372,7 @@
         "REGISTRY": "Registro",
         "SCAN_ALL": "Escanear Todos",
         "SYSTEM_VOLUMES": "Volúmenes de Sistema",
+        "SYSTEM_QUOTA": "Cuota de almacenamiento global",
         "GARBAGE_COLLECTION": "Garbage Collection",
         "PURGE_AUDIT": "Purgar Auditoria",
         "JOBSERVICE_MONITOR": "Job Service Monitor",
@@ -1179,7 +1180,19 @@
         "INVALID_INPUT": "entrada no válida",
         "PLACEHOLDER": "No pudimos encontrar ninguna cuota de proyecto",
         "FILTER_PLACEHOLDER": "Buscar por nombre (coincidencia exacta)",
-        "QUOTA_USED": "Cuota usada"
+        "QUOTA_USED": "Cuota usada",
+        "SYSTEM_QUOTA": "Cuota de almacenamiento global",
+        "SYSTEM_QUOTA_NOT_SET": "no definida",
+        "EDIT_SYSTEM_QUOTA": "Editar la cuota de almacenamiento global",
+        "SET_SYSTEM_QUOTA": "Defina la cuota de almacenamiento para toda la instancia. Introduzca -1 para eliminarla.",
+        "SYSTEM_QUOTA_LIMIT": "Límite global",
+        "SYSTEM_QUOTA_ENFORCE": "Aplicar en escrituras al registro",
+        "SYSTEM_QUOTA_ENFORCE_TIP": "Si está activado, los push se rechazan cuando el uso alcanza el límite. Las eliminaciones y la recolección de basura siguen permitidas.",
+        "SYSTEM_QUOTA_ENFORCED": "aplicada",
+        "SYSTEM_QUOTA_ALLOCATED": "Asignado a proyectos",
+        "SYSTEM_QUOTA_UNLIMITED_PROJECTS": "{{count}} proyectos sin límite",
+        "SYSTEM_QUOTA_MEASURED": "medido en el volumen de almacenamiento",
+        "SYSTEM_QUOTA_ACCOUNTED": "calculado desde la tabla de blobs de Harbor"
     },
     "WEEKLY": {
         "MONDAY": "Lunes",

@@ -372,6 +372,7 @@
         "REGISTRY": "Registre",
         "SCAN_ALL": "Scanner tout",
         "SYSTEM_VOLUMES": "Volumes système",
+        "SYSTEM_QUOTA": "Quota de stockage global",
         "GARBAGE_COLLECTION": "Purge",
         "PURGE_AUDIT": "Purger l'audit",
         "JOBSERVICE_MONITOR": "Job Service Monitor",
@@ -1178,7 +1179,19 @@
         "INVALID_INPUT": "Saisie non valide",
         "PLACEHOLDER": "Nous n'avons trouvé aucun quota de projet !",
         "FILTER_PLACEHOLDER": "Chercher par nom (correspondance exacte)",
-        "QUOTA_USED": "Quota utilisé"
+        "QUOTA_USED": "Quota utilisé",
+        "SYSTEM_QUOTA": "Quota de stockage global",
+        "SYSTEM_QUOTA_NOT_SET": "non défini",
+        "EDIT_SYSTEM_QUOTA": "Modifier le quota de stockage global",
+        "SET_SYSTEM_QUOTA": "Définir le quota de stockage pour toute l'instance. Saisir -1 pour le supprimer.",
+        "SYSTEM_QUOTA_LIMIT": "Limite globale",
+        "SYSTEM_QUOTA_ENFORCE": "Appliquer aux écritures du registre",
+        "SYSTEM_QUOTA_ENFORCE_TIP": "Si activé, les push sont refusés dès que l'utilisation atteint la limite. Les suppressions et le ramasse-miettes restent autorisés.",
+        "SYSTEM_QUOTA_ENFORCED": "appliqué",
+        "SYSTEM_QUOTA_ALLOCATED": "Alloué aux projets",
+        "SYSTEM_QUOTA_UNLIMITED_PROJECTS": "{{count}} projets sans limite",
+        "SYSTEM_QUOTA_MEASURED": "mesuré sur le volume de stockage",
+        "SYSTEM_QUOTA_ACCOUNTED": "calculé depuis la table des blobs de Harbor"
     },
     "WEEKLY": {
         "MONDAY": "Lundi",

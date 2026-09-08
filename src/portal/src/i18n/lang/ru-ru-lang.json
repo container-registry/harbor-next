@@ -1368,7 +1368,19 @@
         "INVALID_INPUT": "неверный ввод",
         "PLACEHOLDER": "Мы не смогли найти никаких квот проекта",
         "FILTER_PLACEHOLDER": "Поиск по имени (точное совпадение)",
-        "QUOTA_USED": "Использовано квоты"
+        "QUOTA_USED": "Использовано квоты",
+        "SYSTEM_QUOTA": "Глобальная квота хранилища",
+        "SYSTEM_QUOTA_NOT_SET": "не задана",
+        "EDIT_SYSTEM_QUOTA": "Изменить глобальную квоту хранилища",
+        "SET_SYSTEM_QUOTA": "Задайте квоту хранилища для всего экземпляра. Введите -1, чтобы удалить её.",
+        "SYSTEM_QUOTA_LIMIT": "Глобальный лимит",
+        "SYSTEM_QUOTA_ENFORCE": "Применять при записи в реестр",
+        "SYSTEM_QUOTA_ENFORCE_TIP": "Если включено, push отклоняется, когда использование достигает лимита. Удаление и сборка мусора остаются разрешены.",
+        "SYSTEM_QUOTA_ENFORCED": "применяется",
+        "SYSTEM_QUOTA_ALLOCATED": "Выделено проектам",
+        "SYSTEM_QUOTA_UNLIMITED_PROJECTS": "{{count}} проектов без лимита",
+        "SYSTEM_QUOTA_MEASURED": "измерено на томе хранилища",
+        "SYSTEM_QUOTA_ACCOUNTED": "рассчитано по таблице blob в Harbor"
     },
     "WEEKLY": {
         "MONDAY": "Понедельник",
@@ -1627,6 +1639,7 @@
     "REGISTRY": "Реестр",
     "SCAN_ALL": "Сканировать все",
     "SYSTEM_VOLUMES": "Системные тома",
+    "SYSTEM_QUOTA": "Глобальная квота хранилища",
     "GARBAGE_COLLECTION": "Сборка мусора",
     "PURGE_AUDIT": "Очистка Аудита",
     "JOBSERVICE_MONITOR": "Мониторинг заданий",
