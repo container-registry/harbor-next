@@ -24,6 +24,8 @@ tasks:
         msg: "DISPATCH_TOKEN is required (token with write access to container-registry/8gcr)"
       - sh: command -v jq >/dev/null 2>&1
         msg: "jq is required"
+      - sh: command -v curl >/dev/null 2>&1
+        msg: "curl is required"
     cmds:
       - |
         # jq serializes the payload so odd characters in a locally supplied
