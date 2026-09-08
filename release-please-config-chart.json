@@ -8,16 +8,50 @@
   "include-v-in-tag": true,
   "tag-separator": "-",
   "changelog-sections": [
-    {"type": "feat",     "section": "Features"},
-    {"type": "fix",      "section": "Bug Fixes"},
-    {"type": "perf",     "section": "Performance Improvements"},
-    {"type": "refactor", "section": "Code Refactoring"},
-    {"type": "docs",     "section": "Documentation"},
-    {"type": "test",     "section": "Tests", "hidden": true},
-    {"type": "chore",    "section": "Miscellaneous", "hidden": true},
-    {"type": "ci",       "section": "CI/CD",        "hidden": true},
-    {"type": "build",    "section": "Build System", "hidden": true},
-    {"type": "chart",    "section": "Chart Changes"}
+    {
+      "type": "feat",
+      "section": "Features"
+    },
+    {
+      "type": "fix",
+      "section": "Bug Fixes"
+    },
+    {
+      "type": "perf",
+      "section": "Performance Improvements"
+    },
+    {
+      "type": "refactor",
+      "section": "Code Refactoring"
+    },
+    {
+      "type": "docs",
+      "section": "Documentation"
+    },
+    {
+      "type": "test",
+      "section": "Tests",
+      "hidden": true
+    },
+    {
+      "type": "chore",
+      "section": "Miscellaneous",
+      "hidden": true
+    },
+    {
+      "type": "ci",
+      "section": "CI/CD",
+      "hidden": true
+    },
+    {
+      "type": "build",
+      "section": "Build System",
+      "hidden": true
+    },
+    {
+      "type": "chart",
+      "section": "Chart Changes"
+    }
   ],
   "packages": {
     "deploy/chart": {
@@ -25,8 +59,7 @@
       "package-name": "harbor",
       "component": "chart",
       "include-component-in-tag": true,
-      "changelog-path": "CHANGELOG.md",
-      "release-as": "2.0.0"
+      "changelog-path": "CHANGELOG.md"
     }
   }
 }
