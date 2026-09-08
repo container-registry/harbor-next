@@ -512,6 +512,31 @@ Resolution order:
 
 {{/*
 =============================================================================
+Secret content predicates
+=============================================================================
+Each renders its component's secretData define (the single source of truth,
+colocated with the Secret template) and returns "true" only when it is
+non-empty, so a fully externalized (GitOps) install creates no empty
+Secrets and no dangling secretRefs.
+*/}}
+{{- define "harbor.core.secretHasData" -}}
+{{- if include "harbor.core.secretData" . | trim -}}true{{- end -}}
+{{- end -}}
+
+{{- define "harbor.registry.secretHasData" -}}
+{{- if include "harbor.registry.secretData" . | trim -}}true{{- end -}}
+{{- end -}}
+
+{{- define "harbor.jobservice.secretHasData" -}}
+{{- if include "harbor.jobservice.secretData" . | trim -}}true{{- end -}}
+{{- end -}}
+
+{{- define "harbor.registryctl.secretHasData" -}}
+{{- if include "harbor.registryctl.secretData" . | trim -}}true{{- end -}}
+{{- end -}}
+
+{{/*
+=============================================================================
 Validation helpers
 =============================================================================
 */}}

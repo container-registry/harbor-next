@@ -324,19 +324,19 @@ tests:
   # key value can't render `secretKeyRef.key: ""`.
   # ============================================================================
 
-  - it: should strip REGISTRY_HTTP_SECRET from generated Secret when existingSecret is set
+  - it: should skip the generated registry Secret entirely when existingSecret is set
     template: templates/registry.secret.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
       registry.existingSecret: my-reg
-    documentSelector:
-      path: metadata.name
-      value: RELEASE-NAME-harbor-registry
     asserts:
-      - notExists:
-          path: data.REGISTRY_HTTP_SECRET
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-harbor-registry-htpasswd
 
   - it: should inject REGISTRY_HTTP_SECRET into the registry container from existingSecret
     template: templates/registry.deployment.yaml
@@ -638,3 +638,42 @@ tests:
                 - key: REGISTRY_HTPASSWD
                   path: passwd
               secretName: reg-creds
+
+  # Pins: registry.existingSecret skips the generated Secret, so both
+  # containers must drop its secretRef; the default-empty registryctl
+  # Secret (tracing off) is likewise unreferenced.
+  - it: should drop generated Secret envFrom when registry is fully externalized
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.existingSecret: my-reg
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].envFrom
+      - notContains:
+          path: spec.template.spec.containers[1].envFrom
+          content:
+            secretRef:
+              name: RELEASE-NAME-harbor-registry
+      - notContains:
+          path: spec.template.spec.containers[1].envFrom
+          content:
+            secretRef:
+              name: RELEASE-NAME-harbor-registryctl
+
+  - it: should reference the registryctl Secret when jaeger tracing is enabled
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trace.enabled: true
+      trace.provider: jaeger
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[1].envFrom
+          content:
+            secretRef:
+              name: RELEASE-NAME-harbor-registryctl
