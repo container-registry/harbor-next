@@ -96,6 +96,7 @@ tasks:
       # WARN findings (inline credentials, consistency advisories) are
       # informational.
       - for:
+          - example/argocd/values.yaml
           - example/aws-eks-irsa/values-aws-irsa.yaml
           - example/k3d-local/values.yaml
           - example/openshift/values.yaml
@@ -133,6 +134,7 @@ tasks:
       - defer: rm -f {{.CHART_DIR}}/.rendered-config.yaml
       - cmd: helm template test {{.CHART_DIR}} {{.HELM_SET}} > {{.CHART_DIR}}/.rendered-config.yaml && cd {{.CHART_DIR}} && ys tools/rendered-config-check.ys .rendered-config.yaml
       - for:
+          - example/argocd/values.yaml
           - example/aws-eks-irsa/values-aws-irsa.yaml
           - example/k3d-local/values.yaml
           - example/openshift/values.yaml
