@@ -2,6 +2,9 @@ name: PR Preview Images
 
 on:
   pull_request:
+    # `stacked`: GitHub opens the PRs of a stack before it links them, so
+    # `opened` never carries `pull_request.stack`; the link fires `stacked`.
+    types: [opened, synchronize, reopened, stacked]
     branches: [main, "release-[0-9]*.[0-9]*"]
     # No `paths` filter: GitHub evaluates it against the PR's own diff, which
     # for a stacked PR is only the top slice. The image-input allowlist lives
@@ -47,6 +50,8 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           STACK_BASE_SHA: ${{ github.event.pull_request.stack.base.sha || '' }}
+          STACK_NUMBER: ${{ github.event.pull_request.stack.number || '' }}
+          EVENT_ACTION: ${{ github.event.action }}
           # Allowlist: only build preview images when an input that actually
           # reaches one of the images changes. Each entry is consumed by a
           # dockerfile COPY/build-arg or by the task build steps (gen-apis /
@@ -70,6 +75,7 @@ jobs:
             ^\.github/actions/setup-go-cached/
             ^\.github/actions/setup-task/
         run: |
+          echo "event=${EVENT_ACTION} stack=${STACK_NUMBER:-none}"
           base="${STACK_BASE_SHA:-${PR_BASE_SHA}}"
           # --no-renames: a rename out of the allowlist would otherwise show
           # only its new path and hide that an image input went away

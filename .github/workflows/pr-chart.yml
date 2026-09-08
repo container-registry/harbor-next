@@ -8,6 +8,9 @@ name: PR Preview Chart
 
 on:
   pull_request:
+    # `stacked`: GitHub opens the PRs of a stack before it links them, so
+    # `opened` never carries `pull_request.stack`; the link fires `stacked`.
+    types: [opened, synchronize, reopened, stacked]
     branches: [main, "release-[0-9]*.[0-9]*"]
 
 permissions:
@@ -52,12 +55,15 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           STACK_BASE_SHA: ${{ github.event.pull_request.stack.base.sha || '' }}
+          STACK_NUMBER: ${{ github.event.pull_request.stack.number || '' }}
+          EVENT_ACTION: ${{ github.event.action }}
           # Only inputs that reach the packaged chart.
           CHART_INPUTS: |
             ^deploy/chart/
             ^\.github/workflows/pr-chart\.yml$
             ^\.github/scripts/chart-annotate-images\.sh$
         run: |
+          echo "event=${EVENT_ACTION} stack=${STACK_NUMBER:-none}"
           base="${STACK_BASE_SHA:-${PR_BASE_SHA}}"
           # --no-renames: a rename out of the allowlist would otherwise show
           # only its new path and hide that a chart input went away
