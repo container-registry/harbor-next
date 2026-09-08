@@ -54,7 +54,7 @@ We're developing Harbor Next as a [community proposal](https://github.com/goharb
 
 ## Architecture
 
-For the architecture design of Harbor Next, see [Architecture Overview](docs/architecture-overview.md).
+For the architecture design of Harbor Next, see [Architecture Overview](docs/architecture-overview.md). Significant design decisions are recorded as [Architecture Decision Records](docs/adr/README.md).
 
 ## API
 
