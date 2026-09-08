@@ -286,6 +286,46 @@ jobs:
     secrets:
       SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
 
+  mark-commercial-release:
+    # Stamp the release marker into each 8gcr patch branch's changelog file.
+    # Runs strictly AFTER the notes job: notes render the entries above the
+    # newest marker, then this marks them as shipped in this tag. Manual
+    # re-renders of old tags never dispatch (this job only runs on a fresh
+    # release), so old markers are never disturbed.
+    name: Mark Commercial Release
+    needs: [release-please, update-release-notes]
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      # checkout of this repo (the app token below is scoped to 8gcr only)
+      contents: read
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.SYNC_APP_ID }}
+          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+          owner: container-registry
+          repositories: 8gcr
+          # repository_dispatch needs contents write; request nothing else
+          permission-contents: write
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: $/.github/actions/setup-task
+
+      - name: Dispatch release-cut
+        env:
+          DISPATCH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+          TARGET_SHA: ${{ github.sha }}
+          LINE: ${{ github.ref_name }}
+        run: task release-notes:dispatch-release-cut
+
   chart:
     name: Publish Helm Chart
     # Driven by the chart's own release-please line (release-please-chart),
