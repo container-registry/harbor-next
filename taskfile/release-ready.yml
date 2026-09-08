@@ -4,6 +4,7 @@ vars:
   PATCHES_REPO: '{{.PATCHES_REPO | default "github.com/container-registry/8gcr"}}'
   PATCHES_CLONE_URL: '{{.PATCHES_CLONE_URL | default "git@github.com:container-registry/8gcr.git"}}'
   PATCHES_SERIES: '{{.PATCHES_SERIES | default (printf "%s/taskfile/commercial-patches" .ROOT_DIR)}}'
+  PATCHES_STACKS: '{{.PATCHES_STACKS | default (printf "%s/taskfile/commercial-patch-stacks" .ROOT_DIR)}}'
   PATCH_AUTH_DIR: '{{.PATCH_AUTH_DIR | default ".opencode/tmp/patch-auth"}}'
   RELEASE_READY_DIR: '{{.RELEASE_READY_DIR | default ".opencode/tmp/release-ready"}}'
   PATCHES_REMOTE_URL:
@@ -119,39 +120,62 @@ tasks:
     internal: true
     env:
       DECLARED_PATCH_BRANCHES: '{{.PATCH_BRANCHES}}'
+      PATCHES_STACKS_FILE: '{{.PATCHES_STACKS}}'
     cmds:
+      # Branch = linear chain of non-merge commits. Its root must parent on
+      # the target, or on its declared parent's chain (commercial-patch-stacks).
       - |
         base=$(git rev-parse HEAD)
-        patch_commits=()
-        while IFS= read -r branch; do
-          patch_commits+=("$(git rev-parse "refs/remotes/patches/${branch}^{commit}")")
-        done <<< "${DECLARED_PATCH_BRANCHES}"
+        stacks=""
+        if [ -f "${PATCHES_STACKS_FILE}" ]; then
+          stacks=$(awk '
+            { sub(/#.*/, "") }
+            NF == 2 { print $1 " " $2 }
+            NF == 1 || NF > 2 { print "malformed stacks line: " $0 > "/dev/stderr"; exit 1 }
+          ' "${PATCHES_STACKS_FILE}")
+        fi
 
         while IFS= read -r branch; do
-          ref="refs/remotes/patches/${branch}"
-          parents=$(git show -s --format='%P' "${ref}")
-          if [ "$(wc -w <<< "${parents}")" -ne 1 ]; then
-            echo "commercial patch branch must point to one non-merge commit: ${branch}" >&2
-            exit 1
+          tip=$(git rev-parse "refs/remotes/patches/${branch}^{commit}")
+          stack_parent=$(printf '%s\n' "${stacks}" | awk -v b="${branch}" '$1 == b { print $2 }')
+          expected=""
+          if [ -n "${stack_parent}" ]; then
+            printf '%s\n' "${DECLARED_PATCH_BRANCHES}" | grep -qx "${stack_parent}" || {
+              echo "stack parent of ${branch} is not a declared branch: ${stack_parent}" >&2
+              exit 1
+            }
+            expected=$(git rev-parse "refs/remotes/patches/${stack_parent}^{commit}")
           fi
 
-          parent=${parents}
-          valid_parent=false
-          if git merge-base --is-ancestor "${parent}" "${base}"; then
-            valid_parent=true
-          else
-            for patch_commit in "${patch_commits[@]}"; do
-              if [ "${parent}" = "${patch_commit}" ]; then
-                valid_parent=true
-                break
+          c="${tip}"
+          depth=0
+          while :; do
+            parents=$(git show -s --format='%P' "${c}")
+            if [ "$(wc -w <<< "${parents}")" -ne 1 ]; then
+              echo "commercial patch chain contains a merge commit: ${branch} at ${c}" >&2
+              exit 1
+            fi
+            # a stacked root may sit anywhere on its declared parent's
+            # chain (the parent's tip moves on every landed PR)
+            if [ -n "${expected}" ] \
+                && git merge-base --is-ancestor "${parents}" "${expected}" \
+                && ! git merge-base --is-ancestor "${parents}" "${base}"; then
+              break
+            fi
+            if git merge-base --is-ancestor "${parents}" "${base}"; then
+              if [ -n "${expected}" ]; then
+                echo "declared stacked branch is rooted on the target instead of ${stack_parent}: ${branch}" >&2
+                exit 1
               fi
-            done
-          fi
-
-          if [ "${valid_parent}" != true ]; then
-            echo "commercial patch branch is not based on the target or another declared patch: ${branch}" >&2
-            exit 1
-          fi
+              break
+            fi
+            depth=$((depth + 1))
+            if [ "${depth}" -gt 200 ]; then
+              echo "commercial patch chain did not reach the target or its declared stack parent: ${branch}" >&2
+              exit 1
+            fi
+            c="${parents}"
+          done
         done <<< "${DECLARED_PATCH_BRANCHES}"
 
   _import-patches:
@@ -178,13 +202,16 @@ tasks:
         patchset_id=$(printf '%s' "${patch_revset}" | git hash-object --stdin)
         test "$(jj log -r @ --no-graph -T 'description.first_line()')" = "release patches ${patchset_id}"
     cmds:
+      # Duplicate each branch's full chain as one set: `~ ::@` drops what
+      # the target already has; stacked roots keep their in-set parents.
       - |
         patch_revset=$(printf '%s\n' "${DECLARED_PATCH_BRANCHES}" | while IFS= read -r branch; do
           git rev-parse "refs/remotes/patches/${branch}^{commit}"
         done | paste -sd '|' -)
         patchset_id=$(printf '%s' "${patch_revset}" | git hash-object --stdin)
+        chain_revset=$(printf '%s' "${patch_revset}" | sed 's/^/::/; s/|/ | ::/g')
         base=$(jj log -r @ --no-graph -T commit_id)
-        jj duplicate "(${patch_revset})" --onto @
+        jj duplicate "(${chain_revset}) ~ ::${base}" --onto @
         jj new "heads(${base}::) ~ ${base}" -m "release patches ${patchset_id}"
 
   _verify-patches:
