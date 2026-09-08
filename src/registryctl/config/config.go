@@ -40,7 +40,14 @@ type Configuration struct {
 	} `yaml:"https_config,omitempty"`
 	RegistryConfig string                      `yaml:"registry_config"`
 	StorageDriver  storagedriver.StorageDriver `yaml:"-"`
+	// StorageType is the registry storage driver name, e.g. "filesystem" or "s3".
+	StorageType string `yaml:"-"`
+	// StorageRoot is the filesystem driver's rootdirectory; empty for other drivers.
+	StorageRoot string `yaml:"-"`
 }
+
+// defaultFilesystemRoot is distribution's default for the filesystem driver's rootdirectory.
+const defaultFilesystemRoot = "/var/lib/registry"
 
 // Load the configuration options from the specified yaml file.
 func (c *Configuration) Load(yamlFilePath string, detectEnv bool) error {
@@ -83,6 +90,16 @@ func (c *Configuration) setStorageDriver() error {
 		return err
 	}
 	c.StorageDriver = storageDriver
+	c.StorageType = rConf.Storage.Type()
+	c.StorageRoot = ""
+	if c.StorageType == "filesystem" {
+		c.StorageRoot = defaultFilesystemRoot
+		if root, ok := rConf.Storage.Parameters()["rootdirectory"]; ok {
+			if str := fmt.Sprint(root); str != "" {
+				c.StorageRoot = str
+			}
+		}
+	}
 	return nil
 }
 

@@ -59,6 +59,25 @@ func (c *clientTestSuite) TestDeleteManifest() {
 	c.Require().Nil(err)
 }
 
+func (c *clientTestSuite) TestStorage() {
+	server := test.NewServer(
+		&test.RequestHandlerMapping{
+			Method:  "GET",
+			Pattern: "/api/registry/storage",
+			Handler: test.Handler(&test.Response{
+				StatusCode: http.StatusOK,
+				Body:       []byte(`{"driver":"filesystem","supported":true,"path":"/storage","total":100,"free":40,"used":60}`),
+			}),
+		})
+	defer server.Close()
+
+	info, err := NewClient(server.URL, &Config{}).Storage()
+	c.Require().Nil(err)
+	c.Equal("filesystem", info.Driver)
+	c.True(info.Supported)
+	c.Equal(uint64(60), info.Used)
+}
+
 func (c *clientTestSuite) TestDeleteBlob() {
 	server := test.NewServer(
 		&test.RequestHandlerMapping{

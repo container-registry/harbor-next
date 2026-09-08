@@ -15,6 +15,7 @@
 package client
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,6 +26,7 @@ import (
 	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/pkg/registry/interceptor"
+	"github.com/goharbor/harbor/src/pkg/systeminfo/imagestorage"
 )
 
 // const definition
@@ -40,6 +42,8 @@ type Client interface {
 	DeleteBlob(reference string) (err error)
 	// DeleteManifest deletes the specified manifest. The "reference" can be "tag" or "digest"
 	DeleteManifest(repository, reference string) (err error)
+	// Storage reports the registry's storage volume usage as measured by registryctl
+	Storage() (*imagestorage.VolumeInfo, error)
 }
 
 type client struct {
@@ -107,6 +111,24 @@ func (c *client) DeleteManifest(repository, reference string) (err error) {
 	return nil
 }
 
+// Storage ...
+func (c *client) Storage() (*imagestorage.VolumeInfo, error) {
+	req, err := http.NewRequest(http.MethodGet, buildStorageURL(c.baseURL), nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	info := &imagestorage.VolumeInfo{}
+	if err := json.NewDecoder(resp.Body).Decode(info); err != nil {
+		return nil, err
+	}
+	return info, nil
+}
+
 func (c *client) do(req *http.Request) (*http.Response, error) {
 	for _, interceptor := range c.interceptors {
 		if err := interceptor.Intercept(req); err != nil {
@@ -145,4 +167,8 @@ func buildManifestURL(endpoint, repository, reference string) string {
 
 func buildBlobURL(endpoint, reference string) string {
 	return fmt.Sprintf("%s/api/registry/blob/%s", endpoint, reference)
+}
+
+func buildStorageURL(endpoint string) string {
+	return fmt.Sprintf("%s/api/registry/storage", endpoint)
 }

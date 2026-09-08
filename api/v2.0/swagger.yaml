@@ -4264,10 +4264,13 @@ paths:
           $ref: '#/responses/500'
   /systeminfo/volumes:
     get:
-      summary: Get system volume info (total/free size).
+      summary: Get system volume info (total/free/used size).
       operationId: getVolumes
       description: |
-        This endpoint is for retrieving system volume info that only provides for admin user.  Note that the response only reflects the storage status of local disk.
+        Get the total, free and used size of the registry storage volume. Only system administrators can call this API.
+        The numbers are measured by registryctl on the registry's own volume for the filesystem storage driver; for
+        other drivers, or when registryctl cannot be reached, they fall back to the local disk of the core service and
+        `measured` is false.
       tags:
         - systeminfo
       parameters:
@@ -8293,6 +8296,25 @@ definitions:
         type: integer
         format: uint64
         description: Free volume size.
+      used:
+        type: integer
+        format: uint64
+        description: Used volume size.
+        x-omitempty: false
+      driver:
+        type: string
+        description: The registry storage driver the numbers describe, e.g. filesystem.
+      measured:
+        type: boolean
+        description: |
+          True when the numbers were measured on the registry's own storage volume through registryctl.
+          False when they only reflect the local disk of the core service, which is the case for object
+          storage drivers and when registryctl is unreachable.
+        x-omitempty: false
+      measured_at:
+        type: string
+        format: date-time
+        description: When the volume was measured. Only set when measured is true.
   GeneralInfo:
     type: object
     properties:

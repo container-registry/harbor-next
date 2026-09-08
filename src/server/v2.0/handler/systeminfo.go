@@ -67,13 +67,18 @@ func (s *sysInfoAPI) GetVolumes(ctx context.Context, _ systeminfo.GetVolumesPara
 	if err != nil {
 		return s.SendError(ctx, err)
 	}
+	st := &models.Storage{
+		Free:     c.Free,
+		Total:    c.Total,
+		Used:     c.Used,
+		Driver:   c.Driver,
+		Measured: c.Measured,
+	}
+	if c.Measured {
+		st.MeasuredAt = strfmt.DateTime(c.MeasuredAt)
+	}
 	return systeminfo.NewGetVolumesOK().WithPayload(&models.SystemInfo{
-		Storage: []*models.Storage{
-			{
-				Free:  c.Free,
-				Total: c.Total,
-			},
-		},
+		Storage: []*models.Storage{st},
 	})
 }
 
