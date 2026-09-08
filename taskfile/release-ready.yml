@@ -41,7 +41,7 @@ tasks:
       - task: _fetch-patches
       - task: _validate-patches
       - task: _import-patches
-      - task: _duplicate-patches
+      - task: _octopus-patches
       - task: _verify-patches
 
   check:
@@ -121,35 +121,13 @@ tasks:
       DECLARED_PATCH_BRANCHES: '{{.PATCH_BRANCHES}}'
     cmds:
       - |
+        # Patch branches carry real multi-commit history plus sync-merge
+        # commits, so no commit-shape rule applies; each branch only has to
+        # share history with the target so the octopus has a merge base.
         base=$(git rev-parse HEAD)
-        patch_commits=()
         while IFS= read -r branch; do
-          patch_commits+=("$(git rev-parse "refs/remotes/patches/${branch}^{commit}")")
-        done <<< "${DECLARED_PATCH_BRANCHES}"
-
-        while IFS= read -r branch; do
-          ref="refs/remotes/patches/${branch}"
-          parents=$(git show -s --format='%P' "${ref}")
-          if [ "$(wc -w <<< "${parents}")" -ne 1 ]; then
-            echo "commercial patch branch must point to one non-merge commit: ${branch}" >&2
-            exit 1
-          fi
-
-          parent=${parents}
-          valid_parent=false
-          if git merge-base --is-ancestor "${parent}" "${base}"; then
-            valid_parent=true
-          else
-            for patch_commit in "${patch_commits[@]}"; do
-              if [ "${parent}" = "${patch_commit}" ]; then
-                valid_parent=true
-                break
-              fi
-            done
-          fi
-
-          if [ "${valid_parent}" != true ]; then
-            echo "commercial patch branch is not based on the target or another declared patch: ${branch}" >&2
+          if ! git merge-base "refs/remotes/patches/${branch}" "${base}" >/dev/null; then
+            echo "commercial patch branch shares no history with the target: ${branch}" >&2
             exit 1
           fi
         done <<< "${DECLARED_PATCH_BRANCHES}"
@@ -166,7 +144,7 @@ tasks:
       - test -d .jj
     cmd: jj git init --colocate >/dev/null
 
-  _duplicate-patches:
+  _octopus-patches:
     internal: true
     env:
       DECLARED_PATCH_BRANCHES: '{{.PATCH_BRANCHES}}'
@@ -184,8 +162,10 @@ tasks:
         done | paste -sd '|' -)
         patchset_id=$(printf '%s' "${patch_revset}" | git hash-object --stdin)
         base=$(jj log -r @ --no-graph -T commit_id)
-        jj duplicate "(${patch_revset})" --onto @
-        jj new "heads(${base}::) ~ ${base}" -m "release patches ${patchset_id}"
+        # Octopus of the fetched tips onto the target. heads() drops
+        # redundant parents (a stacked branch already contains its parent's
+        # tip, and a tip may already contain the base).
+        jj new "heads(${base}|${patch_revset})" -m "release patches ${patchset_id}"
 
   _verify-patches:
     internal: true
