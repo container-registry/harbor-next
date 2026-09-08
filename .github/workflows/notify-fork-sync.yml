@@ -2,13 +2,16 @@ name: Notify Fork Sync
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - "release-[0-9]*.[0-9]*"
 
 permissions: {}
 
 jobs:
   dispatch:
     runs-on: ubuntu-26.04
+    timeout-minutes: 5
     steps:
       - name: Generate GitHub App token
         id: app-token
@@ -18,13 +21,25 @@ jobs:
           private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
           owner: container-registry
           repositories: 8gcr
+          # Explicit scope (zizmor github-app): repository_dispatch needs
+          # contents write; without this the token inherits every
+          # permission of the app installation.
+          permission-contents: write
 
-      - name: Trigger sync
+      # 8gcr's upstream-check runs a DRY conflict check per line — no pushes
+      - name: Trigger upstream check
+        env:
+          TOKEN: ${{ steps.app-token.outputs.token }}
+          SHA: ${{ github.sha }}
+          LINE: ${{ github.ref_name }}
         run: |
-          curl -f -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Content-Type: application/json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            -H "Authorization: Bearer ${{ steps.app-token.outputs.token }}" \
-            "https://api.github.com/repos/container-registry/8gcr/dispatches" \
-            -d '{"event_type":"upstream-sync","client_payload":{"sha":"${{ github.sha }}"}}'
+          # jq --arg: branch names must be JSON-escaped, not interpolated.
+          jq -cn --arg sha "${SHA}" --arg line "${LINE}" \
+            '{event_type: "upstream-sync", client_payload: {sha: $sha, line: $line}}' \
+            | curl -f -X POST \
+                -H "Accept: application/vnd.github+json" \
+                -H "Content-Type: application/json" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                -H "Authorization: Bearer ${TOKEN}" \
+                "https://api.github.com/repos/container-registry/8gcr/dispatches" \
+                --data-binary @-
