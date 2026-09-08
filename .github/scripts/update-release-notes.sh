@@ -201,8 +201,9 @@ if [[ "${chart_mode}" == false && -f "${series}" ]]; then
     feature_title=""
     feature_entries=""
     if [[ -n "${changelog_blob}" ]]; then
+      # consume the whole blob (no exit) so awk never SIGPIPEs printf
       feature_title=$(printf '%s\n' "${changelog_blob}" \
-        | awk '/^# / { sub(/^# /, ""); print; exit }')
+        | awk '/^# / && !found { sub(/^# /, ""); print; found = 1 }')
       # No mid-stream exit: the whole file is always consumed so awk can
       # never SIGPIPE its producer under pipefail.
       feature_entries=$(printf '%s\n' "${changelog_blob}" \
