@@ -11,17 +11,13 @@ permissions:
   contents: read
 
 concurrency:
-  # Keyed by stack when stacked: a PR pushed on top of an in-flight top would
-  # otherwise let the older build finish last and repoint stack-<n> backwards.
-  group: pr-preview-${{ github.event.pull_request.stack && format('stack-{0}', github.event.pull_request.stack.number) || github.event.pull_request.number || github.ref }}
+  group: pr-preview-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
   REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
   PR_REGISTRY_PROJECT: ${{ vars.PR_REGISTRY_PROJECT }}
   PREVIEW_TAG: pr-${{ github.event.pull_request.number }}
-  # stack-<n> follows the top of a native GitHub stack; empty for a plain PR
-  STACK_TAG: ${{ github.event.pull_request.stack && format('stack-{0}', github.event.pull_request.stack.number) || '' }}
 
 jobs:
   changes:
@@ -250,12 +246,9 @@ jobs:
         env:
           IMAGE: ${{ env.REGISTRY_ADDRESS }}/${{ env.PR_REGISTRY_PROJECT }}/${{ steps.prepare.outputs.image_name }}
         run: |
-          tags=(-t "${IMAGE}:${PREVIEW_TAG}")
-          if [ -n "${STACK_TAG}" ]; then
-            tags+=(-t "${IMAGE}:${STACK_TAG}")
-          fi
           # shellcheck disable=SC2046
-          docker buildx imagetools create "${tags[@]}" \
+          docker buildx imagetools create \
+            -t "${IMAGE}:${PREVIEW_TAG}" \
             $(printf "${IMAGE}@sha256:%s " *)
 
   sign:
@@ -346,7 +339,6 @@ jobs:
             const registryProject = process.env.PR_REGISTRY_PROJECT;
             const previewTag = process.env.PREVIEW_TAG;
             const stackNumber = process.env.STACK_NUMBER;
-            const stackTag = process.env.STACK_TAG;
             const repository = process.env.GITHUB_REPOSITORY;
             const issueNumber = context.payload.pull_request.number;
             const owner = context.repo.owner;
@@ -371,7 +363,7 @@ jobs:
 
             ${members}
 
-            The same images are tagged \`${stackTag}\`, which always points at the latest build of the top of the stack. Lower PRs do not get images of their own; push a fix there and \`gh stack rebase && gh stack push\` to rebuild.
+            Lower PRs do not get images of their own; push a fix there and \`gh stack rebase && gh stack push\` to rebuild these.
             `;
             }
 
