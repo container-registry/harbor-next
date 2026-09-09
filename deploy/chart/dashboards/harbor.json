@@ -175,7 +175,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "harbor_up{namespace=~\"$namespace\"}",
+          "expr": "max by (namespace, component) (harbor_up{namespace=~\"$namespace\"})",
           "legendFormat": "{{component}}",
           "refId": "A",
           "range": true,
@@ -238,7 +238,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "harbor_system_info{namespace=~\"$namespace\"}",
+          "expr": "max by (namespace, harbor_version, auth_mode, self_registration) (harbor_system_info{namespace=~\"$namespace\"})",
           "legendFormat": "__auto",
           "refId": "A",
           "range": false,
@@ -368,7 +368,7 @@
       "id": 4,
       "type": "stat",
       "title": "Storage",
-      "description": "Sum of project quota usage as tracked by Harbor (not the bucket size).",
+      "description": "Storage as tracked by Harbor (blob sizes plus system artifacts), not the bucket size.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -421,7 +421,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(harbor_statistics_total_storage_consumption{namespace=~\"$namespace\"})",
+          "expr": "sum(max by (namespace) (harbor_statistics_total_storage_consumption{namespace=~\"$namespace\"}))",
           "legendFormat": "",
           "refId": "A",
           "range": true,
@@ -487,7 +487,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(harbor_statistics_total_project_amount{namespace=~\"$namespace\"})",
+          "expr": "sum(max by (namespace) (harbor_statistics_total_project_amount{namespace=~\"$namespace\"}))",
           "legendFormat": "",
           "refId": "A",
           "range": true,
@@ -553,7 +553,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(harbor_statistics_total_repo_amount{namespace=~\"$namespace\"})",
+          "expr": "sum(max by (namespace) (harbor_statistics_total_repo_amount{namespace=~\"$namespace\"}))",
           "legendFormat": "",
           "refId": "A",
           "range": true,
@@ -565,7 +565,7 @@
       "id": 7,
       "type": "timeseries",
       "title": "Storage used",
-      "description": "Quota-tracked storage over time.",
+      "description": "Harbor-tracked storage over time.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -646,7 +646,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(harbor_statistics_total_storage_consumption{namespace=~\"$namespace\"})",
+          "expr": "sum(max by (namespace) (harbor_statistics_total_storage_consumption{namespace=~\"$namespace\"}))",
           "legendFormat": "used",
           "refId": "A",
           "range": true,
@@ -739,7 +739,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(harbor_statistics_public_project_amount{namespace=~\"$namespace\"})",
+          "expr": "sum(max by (namespace) (harbor_statistics_public_project_amount{namespace=~\"$namespace\"}))",
           "legendFormat": "public",
           "refId": "A",
           "range": true,
@@ -751,7 +751,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(harbor_statistics_private_project_amount{namespace=~\"$namespace\"})",
+          "expr": "sum(max by (namespace) (harbor_statistics_private_project_amount{namespace=~\"$namespace\"}))",
           "legendFormat": "private",
           "refId": "B",
           "range": true,
@@ -844,7 +844,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (artifact_type) (harbor_project_artifact_total{namespace=~\"$namespace\"})",
+          "expr": "sum by (artifact_type) (max by (namespace, project_name, artifact_type, public) (harbor_project_artifact_total{namespace=~\"$namespace\"}))",
           "legendFormat": "{{artifact_type}}",
           "refId": "A",
           "range": true,
@@ -2827,7 +2827,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (type) (harbor_task_queue_size{namespace=~\"$namespace\"})",
+          "expr": "sum by (type) (max by (namespace, type) (harbor_task_queue_size{namespace=~\"$namespace\"}))",
           "legendFormat": "{{type}}",
           "refId": "A",
           "range": true,
@@ -2920,7 +2920,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "max by (type) (harbor_task_queue_latency{namespace=~\"$namespace\"})",
+          "expr": "max by (type) (max by (namespace, type) (harbor_task_queue_latency{namespace=~\"$namespace\"}))",
           "legendFormat": "{{type}}",
           "refId": "A",
           "range": true,
@@ -3106,7 +3106,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (type) (harbor_task_concurrency{namespace=~\"$namespace\"})",
+          "expr": "sum by (type) (max by (namespace, type, pool) (harbor_task_concurrency{namespace=~\"$namespace\"}))",
           "legendFormat": "{{type}}",
           "refId": "A",
           "range": true,
@@ -3172,7 +3172,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(harbor_task_scheduled_total{namespace=~\"$namespace\"})",
+          "expr": "sum(max by (namespace) (harbor_task_scheduled_total{namespace=~\"$namespace\"}))",
           "legendFormat": "",
           "refId": "A",
           "range": true,
@@ -3427,7 +3427,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "topk(15, harbor_project_quota_usage_byte{namespace=~\"$namespace\"} / (harbor_project_quota_byte{namespace=~\"$namespace\"} > 0) * 100)",
+          "expr": "topk(15, max by (namespace, project_name) (harbor_project_quota_usage_byte{namespace=~\"$namespace\"}) / (max by (namespace, project_name) (harbor_project_quota_byte{namespace=~\"$namespace\"}) > 0) * 100)",
           "legendFormat": "{{project_name}}",
           "refId": "A",
           "range": false,
@@ -3500,7 +3500,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "harbor_project_quota_usage_byte{namespace=~\"$namespace\"} > 1048576",
+          "expr": "max by (namespace, project_name) (harbor_project_quota_usage_byte{namespace=~\"$namespace\"}) > 1048576",
           "legendFormat": "{{project_name}}",
           "refId": "A",
           "range": false,
@@ -3593,7 +3593,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "topk(10, sum by (project_name) (rate(harbor_artifact_pulled{namespace=~\"$namespace\"}[5m])) * 60)",
+          "expr": "topk(10, sum by (project_name) (max by (namespace, project_name) (rate(harbor_artifact_pulled{namespace=~\"$namespace\"}[5m]))) * 60)",
           "legendFormat": "{{project_name}}",
           "refId": "A",
           "range": true,
@@ -3686,7 +3686,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "topk(10, sum by (project_name) (harbor_project_repo_total{namespace=~\"$namespace\"}))",
+          "expr": "topk(10, sum by (project_name) (max by (namespace, project_name, public) (harbor_project_repo_total{namespace=~\"$namespace\"})))",
           "legendFormat": "{{project_name}}",
           "refId": "A",
           "range": true,
@@ -3779,7 +3779,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "topk(10, sum by (project_name) (harbor_project_artifact_total{namespace=~\"$namespace\"}))",
+          "expr": "topk(10, sum by (project_name) (max by (namespace, project_name, artifact_type, public) (harbor_project_artifact_total{namespace=~\"$namespace\"})))",
           "legendFormat": "{{project_name}}",
           "refId": "A",
           "range": true,
@@ -3872,7 +3872,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "topk(10, sum by (project_name) (harbor_project_member_total{namespace=~\"$namespace\"}))",
+          "expr": "topk(10, sum by (project_name) (max by (namespace, project_name) (harbor_project_member_total{namespace=~\"$namespace\"})))",
           "legendFormat": "{{project_name}}",
           "refId": "A",
           "range": true,

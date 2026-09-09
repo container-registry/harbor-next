@@ -16,6 +16,15 @@ def sel(metric, *matchers):
     """metric{namespace=~"$namespace", <matchers>}"""
     return metric + "{" + ", ".join((NS,) + matchers) + "}"
 
+
+def ex(metric, *by, matchers=()):
+    """Exporter gauge deduplicated across exporter replicas.
+
+    The exporter reports installation-wide state, so every scraped replica returns the same
+    value; max by (namespace, <by>) collapses the copies before anything is summed.
+    """
+    return f"max by ({', '.join(('namespace',) + by)}) ({sel(metric, *matchers)})"
+
 _id = [0]
 
 
@@ -172,24 +181,24 @@ def row(title, collapsed=False):
 def overview():
     return "Overview", [
         [
-            state_timeline("Components", f"harbor_up{{{NS}}}", "{{component}}", "Up/down per Harbor component as reported by the exporter's health probe.", w=5),
-            table("Instance", f"harbor_system_info{{{NS}}}", ["namespace", "harbor_version", "auth_mode", "self_registration"],
+            state_timeline("Components", ex("harbor_up", "component"), "{{component}}", "Up/down per Harbor component as reported by the exporter's health probe.", w=5),
+            table("Instance", ex("harbor_system_info", "harbor_version", "auth_mode", "self_registration"), ["namespace", "harbor_version", "auth_mode", "self_registration"],
                   {"namespace": "Namespace", "harbor_version": "Version", "auth_mode": "Auth", "self_registration": "Self-reg"},
                   "Version and auth configuration from harbor_system_info.", w=7),
             stat("Health", f"min(harbor_health{{{NS}}})", "short", "harbor_health: 1 healthy, 0 unhealthy (min across selected namespaces).", w=3,
                  steps=(("red", None), ("green", 1)), color_mode="background", graph="none", decimals=0,
                  mappings=[{"type": "value", "options": {"0": {"text": "unhealthy", "color": "red"}, "1": {"text": "healthy", "color": "green"}}}]),
-            stat("Storage", f"sum(harbor_statistics_total_storage_consumption{{{NS}}})", "bytes", "Sum of project quota usage as tracked by Harbor (not the bucket size).", w=3, graph="none"),
-            stat("Projects", f"sum(harbor_statistics_total_project_amount{{{NS}}})", "short", "Total projects.", w=3, graph="none", decimals=0),
-            stat("Repositories", f"sum(harbor_statistics_total_repo_amount{{{NS}}})", "short", "Total repositories.", w=3, graph="none", decimals=0),
+            stat("Storage", f"sum({ex('harbor_statistics_total_storage_consumption')})", "bytes", "Storage as tracked by Harbor (blob sizes plus system artifacts), not the bucket size.", w=3, graph="none"),
+            stat("Projects", f"sum({ex('harbor_statistics_total_project_amount')})", "short", "Total projects.", w=3, graph="none", decimals=0),
+            stat("Repositories", f"sum({ex('harbor_statistics_total_repo_amount')})", "short", "Total repositories.", w=3, graph="none", decimals=0),
         ],
         [
-            timeseries("Storage used", [(f"sum(harbor_statistics_total_storage_consumption{{{NS}}})", "used")], "bytes", "Quota-tracked storage over time.", fill=20),
+            timeseries("Storage used", [(f"sum({ex('harbor_statistics_total_storage_consumption')})", "used")], "bytes", "Harbor-tracked storage over time.", fill=20),
             timeseries("Projects", [
-                (f"sum(harbor_statistics_public_project_amount{{{NS}}})", "public"),
-                (f"sum(harbor_statistics_private_project_amount{{{NS}}})", "private"),
+                (f"sum({ex('harbor_statistics_public_project_amount')})", "public"),
+                (f"sum({ex('harbor_statistics_private_project_amount')})", "private"),
             ], "short", "Public vs private project count.", stack=True, fill=30),
-            timeseries("Artifacts by type", [(f"sum by (artifact_type) (harbor_project_artifact_total{{{NS}}})", "{{artifact_type}}")], "short",
+            timeseries("Artifacts by type", [(f"sum by (artifact_type) ({ex('harbor_project_artifact_total', 'project_name', 'artifact_type', 'public')})", "{{artifact_type}}")], "short",
                        "Artifact count per type (IMAGE, CHART, SBOM, ...), all projects.", stack=True, fill=30),
         ],
     ]
@@ -276,19 +285,19 @@ def jobs():
                        "Successfully finished jobservice tasks per second, by job type.", stack=True, fill=30),
             timeseries("Failed tasks by type", [(f'sum by (type) (rate({tt_fail}[{RI}]))', "{{type}}")], "ops",
                        "Failed or stopped tasks per second, by job type.", stack=True, fill=30),
-            timeseries("Queue size by type", [(f"sum by (type) (harbor_task_queue_size{{{NS}}})", "{{type}}")], "short",
+            timeseries("Queue size by type", [(f"sum by (type) ({ex('harbor_task_queue_size', 'type')})", "{{type}}")], "short",
                        "Pending tasks per job queue. A growing queue means workers cannot keep up.", stack=True, fill=30),
         ],
         [
-            timeseries("Queue latency by type", [(f"max by (type) (harbor_task_queue_latency{{{NS}}})", "{{type}}")], "s",
+            timeseries("Queue latency by type", [(f"max by (type) ({ex('harbor_task_queue_latency', 'type')})", "{{type}}")], "s",
                        "Age of the oldest pending task per queue.", fill=0),
             timeseries("p90 task duration by type", [(f'max by (type) (harbor_jobservice_task_process_time_seconds{{{NS}, quantile="0.9"}})', "{{type}}")], "s",
                        "90th percentile processing time per job type.", fill=0),
-            timeseries("Running tasks by type", [(f"sum by (type) (harbor_task_concurrency{{{NS}}})", "{{type}}")], "short",
+            timeseries("Running tasks by type", [(f"sum by (type) ({ex('harbor_task_concurrency', 'type', 'pool')})", "{{type}}")], "short",
                        "Tasks currently executing per job type.", stack=True, fill=30),
         ],
         [
-            stat("Scheduled jobs", f"sum(harbor_task_scheduled_total{{{NS}}})", "short", "Number of periodic schedules registered (scan-all, GC, retention, replication, ...).", w=4, h=6, graph="none", decimals=0),
+            stat("Scheduled jobs", f"sum({ex('harbor_task_scheduled_total')})", "short", "Number of periodic schedules registered (scan-all, GC, retention, replication, ...).", w=4, h=6, graph="none", decimals=0),
             stat("Jobservice replicas", f"sum(harbor_jobservice_info{{{NS}}})", "short", "Number of jobservice replicas reporting (one harbor_jobservice_info series each). Worker slots per replica are in the table.", w=4, h=6, graph="none", decimals=0),
             table("Worker pools", f"harbor_jobservice_info{{{NS}}}", ["node", "pool", "workers"], {"node": "Node", "pool": "Pool", "workers": "Workers"},
                   "One row per jobservice replica.", w=16, h=6),
@@ -299,17 +308,17 @@ def jobs():
 def projects():
     return "Projects", [
         [
-            bargauge("Quota usage", f'topk(15, harbor_project_quota_usage_byte{{{NS}}} / (harbor_project_quota_byte{{{NS}}} > 0) * 100)', "{{project_name}}", "percent",
+            bargauge("Quota usage", f"topk(15, {ex('harbor_project_quota_usage_byte', 'project_name')} / ({ex('harbor_project_quota_byte', 'project_name')} > 0) * 100)", "{{project_name}}", "percent",
                      "Quota fill per project, top 15. Projects with unlimited quota (-1) are excluded.", max_=100),
-            piechart("Storage by project", f"harbor_project_quota_usage_byte{{{NS}}} > 1048576", "{{project_name}}", "bytes",
+            piechart("Storage by project", f"{ex('harbor_project_quota_usage_byte', 'project_name')} > 1048576", "{{project_name}}", "bytes",
                      "Quota-tracked storage per project (projects above 1 MiB)."),
-            timeseries("Artifact pulls per minute by project", [(f"topk(10, sum by (project_name) (rate(harbor_artifact_pulled{{{NS}}}[5m])) * 60)", "{{project_name}}")], "short",
+            timeseries("Artifact pulls per minute by project", [(f"topk(10, sum by (project_name) (max by (namespace, project_name) (rate({sel('harbor_artifact_pulled')}[5m]))) * 60)", "{{project_name}}")], "short",
                        "Artifact pulls per minute per project (5m average), top 10.", fill=0),
         ],
         [
-            timeseries("Repositories by project", [(f"topk(10, sum by (project_name) (harbor_project_repo_total{{{NS}}}))", "{{project_name}}")], "short", "Top 10 projects by repository count.", fill=0),
-            timeseries("Artifacts by project", [(f"topk(10, sum by (project_name) (harbor_project_artifact_total{{{NS}}}))", "{{project_name}}")], "short", "Top 10 projects by artifact count (all types).", fill=0),
-            timeseries("Members by project", [(f"topk(10, sum by (project_name) (harbor_project_member_total{{{NS}}}))", "{{project_name}}")], "short", "Top 10 projects by member count.", fill=0),
+            timeseries("Repositories by project", [(f"topk(10, sum by (project_name) ({ex('harbor_project_repo_total', 'project_name', 'public')}))", "{{project_name}}")], "short", "Top 10 projects by repository count.", fill=0),
+            timeseries("Artifacts by project", [(f"topk(10, sum by (project_name) ({ex('harbor_project_artifact_total', 'project_name', 'artifact_type', 'public')}))", "{{project_name}}")], "short", "Top 10 projects by artifact count (all types).", fill=0),
+            timeseries("Members by project", [(f"topk(10, sum by (project_name) ({ex('harbor_project_member_total', 'project_name')}))", "{{project_name}}")], "short", "Top 10 projects by member count.", fill=0),
         ],
     ]
 

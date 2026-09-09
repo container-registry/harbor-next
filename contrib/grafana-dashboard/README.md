@@ -32,7 +32,7 @@ usage. Every metric it uses is exposed by vanilla Harbor.
 1. Grafana: Dashboards, New, Import, upload `harbor.json` or paste its contents.
 2. Select the Prometheus datasource when asked.
 
-With the [harbor-next Helm chart](https://github.com/container-registry/harbor-next-helm)
+With the [harbor-next Helm chart](https://github.com/container-registry/harbor-next/tree/main/deploy/chart)
 set `metrics.grafanaDashboard.enabled: true` and the chart ships this file as a ConfigMap
 that the Grafana dashboard sidecar loads automatically.
 
