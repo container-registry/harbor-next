@@ -37,6 +37,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       build: ${{ steps.diff.outputs.build }}
+      matched: ${{ steps.diff.outputs.matched }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -80,8 +81,15 @@ jobs:
           # --no-renames: a rename out of the allowlist would otherwise show
           # only its new path and hide that an image input went away
           changed="$(git diff --name-only --no-renames "${base}...${HEAD_SHA}")"
-          if grep -Ef <(printf '%s' "${IMAGE_INPUTS}") <<<"${changed}"; then
+          if matched="$(grep -Ef <(printf '%s' "${IMAGE_INPUTS}") <<<"${changed}")"; then
             echo "build=true" >> "$GITHUB_OUTPUT"
+            # Named in the PR comment, so a PR that changes no image input
+            # itself can see why its stack still produces one.
+            {
+              echo "matched<<MATCHED_EOF"
+              printf '%s\n' "${matched}"
+              echo "MATCHED_EOF"
+            } >> "$GITHUB_OUTPUT"
           else
             echo "No image input changed between ${base} and ${HEAD_SHA}; skipping the preview images"
             echo "build=false" >> "$GITHUB_OUTPUT"
@@ -317,118 +325,156 @@ jobs:
   pr-comment:
     name: Comment preview image refs
     needs: [changes, sign]
-    if: needs.changes.outputs.build == 'true'
+    # Also runs when nothing was published: a build that is skipped, fails, or
+    # belongs to a PR that is not the top of its stack leaves an earlier
+    # reference standing, and the comment has to say that it is stale.
+    if: >-
+      always() &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !contains(fromJSON('["8gcr-renovate[bot]", "renovate[bot]", "8gcr-sync[bot]"]'), github.actor)
     runs-on: ubuntu-26.04
+    timeout-minutes: 5
     permissions:
-      issues: write
       pull-requests: write
+    env:
+      PREVIEW_TAG: pr-${{ github.event.pull_request.number }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      STACK_NUMBER: ${{ github.event.pull_request.stack.number || '' }}
+      MATCHED: ${{ needs.changes.outputs.matched }}
+      CHANGES_RESULT: ${{ needs.changes.result }}
+      BUILD_RESULT: ${{ needs.sign.result }}
     steps:
-      - name: Install gh CLI
-        run: |
-          if ! command -v gh &>/dev/null; then
-            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-              | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
-              | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-            sudo apt-get update && sudo apt-get install -y gh
-          fi
-
       - name: Create or update PR comment
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
         env:
           MARKER: "<!-- harbor-next-pr-preview -->"
-          STACK_NUMBER: ${{ github.event.pull_request.stack.number || '' }}
+          SIBLING_MARKER: "<!-- harbor-next-pr-chart-preview -->"
         with:
           script: |
             const marker = process.env.MARKER;
+            const siblingMarker = process.env.SIBLING_MARKER;
+            const staleStart = '<!-- preview:stale-start -->';
+            const staleEnd = '<!-- preview:stale-end -->';
+            const stackNumber = process.env.STACK_NUMBER;
+            const short = process.env.HEAD_SHA.slice(0, 7);
+            const repository = process.env.GITHUB_REPOSITORY;
+            const issueNumber = context.payload.pull_request.number;
+            const { owner, repo } = context.repo;
             const registryAddress = process.env.REGISTRY_ADDRESS;
             const registryProject = process.env.PR_REGISTRY_PROJECT;
             const previewTag = process.env.PREVIEW_TAG;
-            const stackNumber = process.env.STACK_NUMBER;
-            const repository = process.env.GITHUB_REPOSITORY;
-            const issueNumber = context.payload.pull_request.number;
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
+            const components = ['harbor-core', 'harbor-jobservice', 'harbor-registryctl', 'harbor-exporter', 'harbor-portal', 'harbor-registry', 'trivy-adapter'];
 
-            let stackSection = '';
-            if (stackNumber) {
-              let members = '';
-              try {
-                const { data: stack } = await github.request('GET /repos/{owner}/{repo}/stacks/{stack_number}', {
+            const stack = stackNumber
+              ? await github.request('GET /repos/{owner}/{repo}/stacks/{stack_number}', {
                   owner, repo, stack_number: Number(stackNumber),
-                });
-                members = stack.pull_requests
-                  .map((pr, i) => `${i + 1}. #${pr.number} ${pr.title}`)
-                  .join('\n');
-              } catch (error) {
-                core.warning(`Could not list stack #${stackNumber}: ${error.message}`);
-                members = '(see the stack view on this PR)';
-              }
-              stackSection = `
-            This PR is the top of stack #${stackNumber}. The images are built from its head, so they contain every PR in the stack:
-
-            ${members}
-
-            Lower PRs do not get images of their own; push a fix there and \`gh stack rebase && gh stack push\` to rebuild these.
-            `;
-            }
-
-            const body = `${marker}
-            Preview images for this PR are available in \`${registryAddress}/${registryProject}\` with tag \`${previewTag}\`.
-            ${stackSection}
-
-            - \`${registryAddress}/${registryProject}/harbor-core:${previewTag}\`
-            - \`${registryAddress}/${registryProject}/harbor-jobservice:${previewTag}\`
-            - \`${registryAddress}/${registryProject}/harbor-registryctl:${previewTag}\`
-            - \`${registryAddress}/${registryProject}/harbor-exporter:${previewTag}\`
-            - \`${registryAddress}/${registryProject}/harbor-portal:${previewTag}\`
-            - \`${registryAddress}/${registryProject}/harbor-registry:${previewTag}\`
-            - \`${registryAddress}/${registryProject}/trivy-adapter:${previewTag}\`
-
-            Verify a preview image:
-
-            \`\`\`
-            cosign verify \\
-              --certificate-identity-regexp="https://github.com/${repository}/.github/workflows/pr-ci.yml@.*" \\
-              --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \\
-              ${registryAddress}/${registryProject}/harbor-core:${previewTag}
-            \`\`\`
-
-            Verify SBOM attestation:
-
-            \`\`\`
-            cosign verify-attestation \\
-              --certificate-identity-regexp="https://github.com/${repository}/.github/workflows/pr-ci.yml@.*" \\
-              --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \\
-              --type spdxjson \\
-              ${registryAddress}/${registryProject}/harbor-core:${previewTag}
-            \`\`\``;
+                }).then(response => response.data).catch(error => {
+                  core.warning(`Could not list stack #${stackNumber}: ${error.message}`);
+                  return null;
+                })
+              : null;
 
             const comments = await github.paginate(github.rest.issues.listComments, {
-              owner,
-              repo,
-              issue_number: issueNumber,
-              per_page: 100,
+              owner, repo, issue_number: issueNumber, per_page: 100,
             });
+            const existing = comments.find(comment =>
+              comment.user?.login === 'github-actions[bot]' && comment.body?.startsWith(marker));
 
-            const existingComment = comments.find(comment =>
-              comment.user?.login === 'github-actions[bot]' &&
-              comment.body?.startsWith(marker)
-            );
+            const post = async body => {
+              if (existing) {
+                await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+                return;
+              }
+              await github.rest.issues.createComment({ owner, repo, issue_number: issueNumber, body });
+            };
 
-            if (existingComment) {
-              await github.rest.issues.updateComment({
-                owner,
-                repo,
-                comment_id: existingComment.id,
-                body,
-              });
+            // The notice is delimited rather than pattern-matched, so a second
+            // one replaces the first instead of stacking under it.
+            const withoutNotice = body => {
+              const kept = [];
+              let inNotice = false;
+              for (const line of body.split('\n')) {
+                if (line === staleStart) { inNotice = true; continue; }
+                if (line === staleEnd) { inNotice = false; continue; }
+                if (!inNotice && line !== marker) kept.push(line);
+              }
+              return kept.join('\n').trim();
+            };
+
+            if (process.env.BUILD_RESULT !== 'success') {
+              // Nothing was published, so there is nothing to correct unless an
+              // earlier revision left a reference behind.
+              if (!existing) return;
+              let reason;
+              if (process.env.CHANGES_RESULT === 'skipped') {
+                const top = stack?.pull_requests?.[stack.pull_requests.length - 1];
+                reason = `this PR is not the top of stack #${stackNumber}` +
+                  (top ? `, so the stack's preview image is published on #${top.number}` : '');
+              } else if (process.env.BUILD_RESULT === 'skipped') {
+                reason = `no image input changed between the base and \`${short}\``;
+              } else {
+                reason = `the preview image build for \`${short}\` did not succeed (${process.env.BUILD_RESULT})`;
+              }
+              await post([
+                marker,
+                staleStart,
+                '> [!WARNING]',
+                `> **Outdated:** ${reason}. What follows is from an earlier revision of this PR.`,
+                staleEnd,
+                '',
+                withoutNotice(existing.body),
+              ].join('\n'));
               return;
             }
 
-            await github.rest.issues.createComment({
-              owner,
-              repo,
-              issue_number: issueNumber,
-              body,
-            });
+            const matched = (process.env.MATCHED || '').split('\n').map(line => line.trim()).filter(Boolean);
+            const shown = matched.slice(0, 5).map(path => `\`${path}\``).join(', ');
+            const more = matched.length > 5 ? ` and ${matched.length - 5} more` : '';
+
+            const stackSection = [];
+            if (stackNumber) {
+              stackSection.push('', `This PR is the top of stack #${stackNumber}, so the images come from a head that contains every PR in it:`, '');
+              stackSection.push(...(stack
+                ? stack.pull_requests.map((pr, index) => `${index + 1}. #${pr.number} ${pr.title}`)
+                : ['(see the stack view on this PR)']));
+              if (matched.length) {
+                stackSection.push('', `Built because ${shown}${more} changed somewhere in the stack.`);
+              }
+              stackSection.push('', 'Lower PRs publish nothing of their own; push a fix there, then `gh stack rebase && gh stack push` to rebuild this one.');
+            }
+
+            const sibling = comments.find(comment =>
+              comment.user?.login === 'github-actions[bot]' && comment.body?.startsWith(siblingMarker));
+            const siblingSection = sibling
+              ? ['', `A preview chart for this PR is published too, and its comment carries the install command: ${sibling.html_url}`]
+              : [];
+
+            const body = [
+              marker,
+              `Preview images for this PR are available in \`${registryAddress}/${registryProject}\` with tag \`${previewTag}\`, built from \`${short}\`:`,
+              '',
+              ...components.map(name => `- \`${registryAddress}/${registryProject}/${name}:${previewTag}\``),
+              ...stackSection,
+              ...siblingSection,
+              '',
+              'Verify a preview image:',
+              '',
+              '```',
+              'cosign verify \\',
+              `  --certificate-identity-regexp="https://github.com/${repository}/.github/workflows/pr-ci.yml@.*" \\`,
+              '  --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \\',
+              `  ${registryAddress}/${registryProject}/harbor-core:${previewTag}`,
+              '```',
+              '',
+              'Verify the SBOM attestation:',
+              '',
+              '```',
+              'cosign verify-attestation \\',
+              `  --certificate-identity-regexp="https://github.com/${repository}/.github/workflows/pr-ci.yml@.*" \\`,
+              '  --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \\',
+              '  --type spdxjson \\',
+              `  ${registryAddress}/${registryProject}/harbor-core:${previewTag}`,
+              '```',
+            ].join('\n');
+
+            await post(body);
