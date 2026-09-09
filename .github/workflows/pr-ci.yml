@@ -342,6 +342,7 @@ jobs:
       STACK_NUMBER: ${{ github.event.pull_request.stack.number || '' }}
       MATCHED: ${{ needs.changes.outputs.matched }}
       CHANGES_RESULT: ${{ needs.changes.result }}
+      CHANGES_BUILD: ${{ needs.changes.outputs.build }}
       BUILD_RESULT: ${{ needs.sign.result }}
     steps:
       - name: Create or update PR comment
@@ -396,7 +397,9 @@ jobs:
               for (const line of body.split('\n')) {
                 if (line === staleStart) { inNotice = true; continue; }
                 if (line === staleEnd) { inNotice = false; continue; }
-                if (!inNotice && line !== marker) kept.push(line);
+                // `:stale` also matches the inline marker the first
+                // implementation used, so an old notice is not kept forever.
+                if (!inNotice && line !== marker && !/^<!--[^>]*:stale/.test(line)) kept.push(line);
               }
               return kept.join('\n').trim();
             };
@@ -414,10 +417,13 @@ jobs:
                 // A failed or cancelled input check publishes nothing either,
                 // and must not be reported as "no input changed".
                 reason = `the image input check for \`${short}\` did not complete (${process.env.CHANGES_RESULT})`;
-              } else if (process.env.BUILD_RESULT === 'skipped') {
+              } else if (process.env.CHANGES_BUILD !== 'true') {
                 reason = `no image input changed between the base and \`${short}\``;
               } else {
-                reason = `the preview image build for \`${short}\` did not succeed (${process.env.BUILD_RESULT})`;
+                // The publish step repoints the mutable reference before it
+                // signs, so a build that got that far has already replaced it.
+                reason = `the preview image build for \`${short}\` did not succeed (${process.env.BUILD_RESULT}). ` +
+                  'That build may already have repointed the preview reference, so trust the digest below rather than the tag';
               }
               await post([
                 marker,
