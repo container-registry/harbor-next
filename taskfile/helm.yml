@@ -258,6 +258,12 @@ tasks:
       - grep -v 'kroki\.io/svgbob' {{.CHART_DIR}}/README.md > /tmp/helm-docs-actual.md
       - diff -q /tmp/helm-docs-expected.md /tmp/helm-docs-actual.md || (echo "README.md is out of date. Run{{":"}} task helm:docs" && exit 1)
 
+  dashboard-sync:
+    desc: "Check that the chart's Grafana dashboard copy matches contrib/grafana-dashboard/harbor.json"
+    cmds:
+      # helm's .Files.Get cannot read outside the chart, so the chart carries a copy
+      - cmp -s contrib/grafana-dashboard/harbor.json {{.CHART_DIR}}/dashboards/harbor.json || (echo "deploy/chart/dashboards/harbor.json differs from contrib/grafana-dashboard/harbor.json. Run{{":"}} cp contrib/grafana-dashboard/harbor.json {{.CHART_DIR}}/dashboards/harbor.json" && exit 1)
+
   # ============================================================================
   # Development (inner loop)
   # ============================================================================

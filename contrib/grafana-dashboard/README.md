@@ -1,9 +1,11 @@
 # Harbor Grafana dashboard
 
-`harbor.json` is a Grafana dashboard for a Harbor instance. It extends the upstream
-`contrib/grafana-dashboard/metrics-example.json` with health, storage, project and
-repository counts, core API traffic and error analysis, jobservice task metrics and
-registry request metrics. Every metric it uses is exposed by vanilla Harbor.
+`harbor.json` is a Grafana dashboard for a Harbor instance. It is based on the upstream
+Harbor example dashboard
+([goharbor/harbor `contrib/grafana-dashboard/metrics-example.json`](https://github.com/goharbor/harbor/blob/main/contrib/grafana-dashboard/metrics-example.json))
+and adds health, storage, project and repository counts, core API traffic and error
+analysis, registry and storage-backend metrics, jobservice task metrics and per-project
+usage. Every metric it uses is exposed by vanilla Harbor.
 
 ## Prerequisites
 
@@ -14,7 +16,7 @@ registry request metrics. Every metric it uses is exposed by vanilla Harbor.
   `harbor_system_info`, `harbor_statistics_*` and `harbor_project_*`.
 - All four targets (core, jobservice, registry, exporter) scraped by the same Prometheus.
 - On Kubernetes: a `namespace` label on the scraped series, which a ServiceMonitor or
-  PodMonitor adds by default. The `General metrics` row selects Go runtime series with
+  PodMonitor adds by default. The `Runtime` row selects Go runtime series with
   `service=~".*harbor.*"`, so Harbor services need `harbor` somewhere in their name,
   which every Helm chart release name that contains `harbor` produces.
 
@@ -23,7 +25,7 @@ registry request metrics. Every metric it uses is exposed by vanilla Harbor.
 | Variable | Purpose |
 |----------|---------|
 | `Data source` | Prometheus datasource. |
-| `Namespace` | Kubernetes namespace of the Harbor instance, populated from `label_values(harbor_up, namespace)`. Defaults to `All`, which also matches series without a namespace label, so docker-compose installations work without changing anything. Pick one namespace when several Harbor instances share a Prometheus. |
+| `Namespace` | Kubernetes namespace of the Harbor instance, populated from `label_values(harbor_up, namespace)`. Defaults to `All` (`namespace=~".*"`), which also matches series that have no namespace label at all, because an empty-string matcher selects series where the label is absent; docker-compose installations therefore work without changing anything. Pick one namespace when several Harbor instances share a Prometheus. |
 
 ## Import
 

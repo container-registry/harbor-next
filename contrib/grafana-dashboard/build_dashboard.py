@@ -11,6 +11,11 @@ NS = 'namespace=~"$namespace"'
 SVC = 'service=~".*harbor.*"'
 RI = "$__rate_interval"
 
+
+def sel(metric, *matchers):
+    """metric{namespace=~"$namespace", <matchers>}"""
+    return metric + "{" + ", ".join((NS,) + matchers) + "}"
+
 _id = [0]
 
 
@@ -191,37 +196,42 @@ def overview():
 
 
 def core_api():
-    core = f"harbor_core_http_request_total{{{NS}}}"
+    core = sel("harbor_core_http_request_total")
+
+    c2xx, c3xx, c4xx, c5xx, cerr, c404 = (
+        sel("harbor_core_http_request_total", f'code{m}') for m in ('=~"2.."', '=~"3.."', '=~"4.."', '=~"5.."', '=~"[45].."', '="404"')
+    )
     return "Core API", [
         [
             timeseries("Requests by status class", [
-                (f'sum(rate({core[:-1]}, code=~"2.."}}[{RI}]))', "2xx"),
-                (f'sum(rate({core[:-1]}, code=~"3.."}}[{RI}]))', "3xx"),
-                (f'sum(rate({core[:-1]}, code=~"4.."}}[{RI}]))', "4xx"),
-                (f'sum(rate({core[:-1]}, code=~"5.."}}[{RI}]))', "5xx"),
+                (f'sum(rate({c2xx}[{RI}]))', "2xx"),
+                (f'sum(rate({c3xx}[{RI}]))', "3xx"),
+                (f'sum(rate({c4xx}[{RI}]))', "4xx"),
+                (f'sum(rate({c5xx}[{RI}]))', "5xx"),
             ], "reqps", "Core HTTP request rate grouped by status class.", stack=True, fill=40,
                 overrides=[{"matcher": {"id": "byName", "options": n}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": c}}]}
                            for n, c in (("2xx", "green"), ("3xx", "blue"), ("4xx", "orange"), ("5xx", "red"))]),
             timeseries("p90 latency by operation (top 10)", [(f'topk(10, max by (operation) (harbor_core_http_request_duration_seconds{{{NS}, quantile="0.9"}}))', "{{operation}}")], "s",
                        "90th percentile request duration per API operation, ten slowest (summary quantile reported by core).", fill=0),
             timeseries("In-flight requests", [(f"sum(harbor_core_http_inflight_requests{{{NS}}})", "in-flight")], "short", "Requests currently being handled by core.", w=4, fill=20),
-            stat("Error rate", f'sum(rate({core[:-1]}, code=~"[45].."}}[{RI}])) / sum(rate({core}[{RI}])) * 100', "percent",
+            stat("Error rate", f'sum(rate({cerr}[{RI}])) / sum(rate({core}[{RI}])) * 100', "percent",
                  "Share of core requests answered with 4xx or 5xx. Includes expected 401 token handshakes and 404 HEAD probes.", w=4, h=7,
                  steps=(("green", None), ("orange", 20), ("red", 50)), decimals=1),
         ],
         [
-            timeseries("Top 10 operations by errors (4xx+5xx)", [(f'topk(10, sum by (operation) (rate({core[:-1]}, code=~"[45].."}}[{RI}])))', "{{operation}}")], "reqps",
+            timeseries("Top 10 operations by errors (4xx+5xx)", [(f'topk(10, sum by (operation) (rate({cerr}[{RI}])))', "{{operation}}")], "reqps",
                        "Operations producing the most error responses.", fill=0),
-            timeseries("Top 10 operations by 404", [(f'topk(10, sum by (operation, method) (rate({core[:-1]}, code="404"}}[{RI}])))', "{{method}} {{operation}}")], "reqps",
+            timeseries("Top 10 operations by 404", [(f'topk(10, sum by (operation, method) (rate({c404}[{RI}])))', "{{method}} {{operation}}")], "reqps",
                        "404s by operation and method. HEAD manifest/blob 404s are normal client probing.", fill=0),
-            timeseries("Server errors (5xx) by operation", [(f'sum by (operation, code) (rate({core[:-1]}, code=~"5.."}}[{RI}]))', "{{code}} {{operation}}")], "reqps",
+            timeseries("Server errors (5xx) by operation", [(f'sum by (operation, code) (rate({c5xx}[{RI}]))', "{{code}} {{operation}}")], "reqps",
                        "5xx responses only; anything here needs a look.", fill=20, stack=True),
         ],
     ]
 
 
 def registry():
-    req = f"registry_http_requests_total{{{NS}}}"
+    req = sel("registry_http_requests_total")
+    req_5xx = sel("registry_http_requests_total", 'code=~"5.."')
     return "Registry", [
         [
             timeseries("Requests by handler", [(f"sum by (handler, method) (rate({req}[{RI}]))", "{{method}} {{handler}}")], "reqps",
@@ -229,7 +239,7 @@ def registry():
             timeseries("p90 latency by handler", [(f"histogram_quantile(0.9, sum by (le, handler) (rate(registry_http_request_duration_seconds_bucket{{{NS}}}[{RI}])))", "{{handler}}")], "s",
                        "90th percentile registry request duration per handler.", fill=0),
             timeseries("In-flight requests", [(f"sum(registry_http_in_flight_requests{{{NS}}})", "in-flight")], "short", "Requests currently being handled by the registry.", w=4, fill=20),
-            stat("Registry 5xx", f'sum(rate({req[:-1]}, code=~"5.."}}[{RI}])) / sum(rate({req}[{RI}])) * 100', "percent",
+            stat("Registry 5xx", f'sum(rate({req_5xx}[{RI}])) / sum(rate({req}[{RI}])) * 100', "percent",
                  "Share of registry responses that are 5xx.", w=4, h=7, steps=(("green", None), ("orange", 1), ("red", 5)), decimals=2),
         ],
         [
@@ -250,20 +260,21 @@ def registry():
             timeseries("Cache errors", [(f"sum(rate(registry_storage_cache_errors_total{{{NS}}}[{RI}]))", "errors")], "ops",
                        "Blob-descriptor cache errors (Redis unreachable or timeouts).", fill=20, w=6),
             timeseries("Proxy cache", [
-                (f"sum by (type) (rate(registry_proxy_hits_total{{{NS}}}[{RI}]))", "hit {{type}}"),
-                (f"sum by (type) (rate(registry_proxy_misses_total{{{NS}}}[{RI}]))", "miss {{type}}"),
-            ], "ops", "Proxy-cache project hits and misses by blob/manifest. Empty when no proxy-cache project is used.", stack=True, fill=30, w=12),
+                (f"sum by (project) (rate(harbor_core_http_registry_proxy_requests_total{{{NS}}}[{RI}])) - sum by (project) (rate(harbor_core_http_registry_proxy_upstream_requests_total{{{NS}}}[{RI}]))", "hit {{project}}"),
+                (f"sum by (project) (rate(harbor_core_http_registry_proxy_upstream_requests_total{{{NS}}}[{RI}]))", "miss {{project}}"),
+            ], "reqps", "Proxy-cache project requests served from cache (hit) vs fetched upstream (miss), per project. Needs Harbor with the core proxy counters (goharbor/harbor#23578); empty on older releases or without proxy-cache projects.", stack=True, fill=30, w=12),
         ],
     ]
 
 
 def jobs():
-    tt = f"harbor_jobservice_task_total{{{NS}}}"
+    tt_ok = sel("harbor_jobservice_task_total", 'status="success"')
+    tt_fail = sel("harbor_jobservice_task_total", 'status=~"fail|stop"')
     return "Jobs", [
         [
-            timeseries("Task rate by type", [(f'sum by (type) (rate({tt[:-1]}, status="success"}}[{RI}]))', "{{type}}")], "ops",
+            timeseries("Task rate by type", [(f'sum by (type) (rate({tt_ok}[{RI}]))', "{{type}}")], "ops",
                        "Successfully finished jobservice tasks per second, by job type.", stack=True, fill=30),
-            timeseries("Failed tasks by type", [(f'sum by (type) (rate({tt[:-1]}, status=~"fail|stop"}}[{RI}]))', "{{type}}")], "ops",
+            timeseries("Failed tasks by type", [(f'sum by (type) (rate({tt_fail}[{RI}]))', "{{type}}")], "ops",
                        "Failed or stopped tasks per second, by job type.", stack=True, fill=30),
             timeseries("Queue size by type", [(f"sum by (type) (harbor_task_queue_size{{{NS}}})", "{{type}}")], "short",
                        "Pending tasks per job queue. A growing queue means workers cannot keep up.", stack=True, fill=30),
@@ -278,7 +289,7 @@ def jobs():
         ],
         [
             stat("Scheduled jobs", f"sum(harbor_task_scheduled_total{{{NS}}})", "short", "Number of periodic schedules registered (scan-all, GC, retention, replication, ...).", w=4, h=6, graph="none", decimals=0),
-            stat("Workers", f"sum(harbor_jobservice_info{{{NS}}})", "short", "Total jobservice worker slots across pools.", w=4, h=6, graph="none", decimals=0),
+            stat("Jobservice replicas", f"sum(harbor_jobservice_info{{{NS}}})", "short", "Number of jobservice replicas reporting (one harbor_jobservice_info series each). Worker slots per replica are in the table.", w=4, h=6, graph="none", decimals=0),
             table("Worker pools", f"harbor_jobservice_info{{{NS}}}", ["node", "pool", "workers"], {"node": "Node", "pool": "Pool", "workers": "Workers"},
                   "One row per jobservice replica.", w=16, h=6),
         ],

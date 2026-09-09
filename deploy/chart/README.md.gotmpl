@@ -628,11 +628,12 @@ metrics:
 
 ### Grafana dashboard
 
-Ships the Harbor dashboard from `dashboards/harbor.json` (the same file as
-`contrib/grafana-dashboard/harbor.json`) as a ConfigMap labelled `grafana_dashboard: "1"`,
+Ships the Harbor dashboard from `dashboards/harbor.json` as a ConfigMap labelled `grafana_dashboard: "1"`,
 which the Grafana sidecar in kube-prometheus-stack or the grafana-operator loads
 automatically. The dashboard filters on the `namespace` label, so it needs
 `metrics.enabled`, `exporter.enabled` and a ServiceMonitor (or equivalent scrape).
+`dashboards/harbor.json` is a copy of `contrib/grafana-dashboard/harbor.json` (Helm cannot read
+files outside the chart); `task helm:dashboard-sync` fails CI when the two differ.
 
 ```yaml
 metrics:

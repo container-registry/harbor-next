@@ -2442,7 +2442,7 @@
       "id": 28,
       "type": "timeseries",
       "title": "Proxy cache",
-      "description": "Proxy-cache project hits and misses by blob/manifest. Empty when no proxy-cache project is used.",
+      "description": "Proxy-cache project requests served from cache (hit) vs fetched upstream (miss), per project. Needs Harbor with the core proxy counters (goharbor/harbor#23578); empty on older releases or without proxy-cache projects.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -2489,7 +2489,7 @@
               "viz": false
             }
           },
-          "unit": "ops",
+          "unit": "reqps",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -2523,8 +2523,8 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (type) (rate(registry_proxy_hits_total{namespace=~\"$namespace\"}[$__rate_interval]))",
-          "legendFormat": "hit {{type}}",
+          "expr": "sum by (project) (rate(harbor_core_http_registry_proxy_requests_total{namespace=~\"$namespace\"}[$__rate_interval])) - sum by (project) (rate(harbor_core_http_registry_proxy_upstream_requests_total{namespace=~\"$namespace\"}[$__rate_interval]))",
+          "legendFormat": "hit {{project}}",
           "refId": "A",
           "range": true,
           "instant": false
@@ -2535,8 +2535,8 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by (type) (rate(registry_proxy_misses_total{namespace=~\"$namespace\"}[$__rate_interval]))",
-          "legendFormat": "miss {{type}}",
+          "expr": "sum by (project) (rate(harbor_core_http_registry_proxy_upstream_requests_total{namespace=~\"$namespace\"}[$__rate_interval]))",
+          "legendFormat": "miss {{project}}",
           "refId": "B",
           "range": true,
           "instant": false
@@ -3183,8 +3183,8 @@
     {
       "id": 37,
       "type": "stat",
-      "title": "Workers",
-      "description": "Total jobservice worker slots across pools.",
+      "title": "Jobservice replicas",
+      "description": "Number of jobservice replicas reporting (one harbor_jobservice_info series each). Worker slots per replica are in the table.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
