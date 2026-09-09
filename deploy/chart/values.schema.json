@@ -912,6 +912,16 @@
               "type": "boolean"
             }
           }
+        },
+        "grafanaDashboard": {
+          "type": "object",
+          "description": "Ship the Harbor Grafana dashboard as a ConfigMap for the Grafana dashboard sidecar",
+          "properties": {
+            "enabled": {"type": "boolean", "default": false},
+            "namespace": {"type": "string"},
+            "labels": {"type": "object", "additionalProperties": {"type": "string"}},
+            "annotations": {"type": "object", "additionalProperties": {"type": "string"}}
+          }
         }
       }
     },
