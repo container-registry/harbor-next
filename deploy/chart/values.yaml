@@ -1873,7 +1873,7 @@ metrics:
     # -- Honor labels
     honorLabels: true
   # -- Ship the Harbor Grafana dashboard (dashboards/harbor.json) as a ConfigMap
-  # picked up by the Grafana dashboard sidecar (kube-prometheus-stack, grafana-operator)
+  # picked up by a Grafana dashboard sidecar (for example, kube-prometheus-stack)
   grafanaDashboard:
     # -- Create the dashboard ConfigMap
     enabled: false

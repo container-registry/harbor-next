@@ -628,11 +628,25 @@ metrics:
 ### Grafana dashboard
 
 Ships the Harbor dashboard from `dashboards/harbor.json` as a ConfigMap labelled `grafana_dashboard: "1"`,
-which the Grafana sidecar in kube-prometheus-stack or the grafana-operator loads
-automatically. The dashboard filters on the `namespace` label, so it needs
+which a Grafana dashboard sidecar (such as the one in kube-prometheus-stack) loads
+automatically. The dashboard filters on the `cluster` and `namespace` labels, so it needs
 `metrics.enabled`, `exporter.enabled` and a ServiceMonitor (or equivalent scrape).
-`dashboards/harbor.json` is a copy of `contrib/grafana-dashboard/harbor.json` (Helm cannot read
-files outside the chart); `task helm:dashboard-sync` fails CI when the two differ.
+`dashboards/harbor.json` is the single source for both the chart and manual Grafana imports;
+edit it directly or export changes from Grafana. Helm validates the JSON when the dashboard
+is enabled and embeds the file unchanged.
+
+The shared **Data source → Cluster → Namespace** selectors filter every metric panel.
+Cluster and namespace default to **All**, which also includes series without those labels.
+Runtime appears directly below Overview. All rows are expanded, including the database row,
+whose note and tooltips explain the PostgreSQL/pgx metrics available in the
+[8gcr Harbor distribution](https://container-registry.com/8gcr/).
+Those panels require `POSTGRESQL_METRICS_ENABLED=true` on an 8gcr build with pgx monitoring
+and are empty on standard Harbor.
+
+Provision this shared dashboard once per Grafana organization, then use its selectors to
+switch installations. A sidecar must watch the ConfigMap's namespace and labels.
+See the [monitoring example](example/grafana-dashboard/) for setup and the
+[dashboard guide](../../contrib/grafana-dashboard/README.md) for import and editing instructions.
 
 ```yaml
 metrics:
@@ -958,7 +972,7 @@ Kubernetes: `>=1.28.0-0`
 | jobservice.topologySpreadConstraints | list | `[]` | Topology spread constraints for pod scheduling |
 | logLevel | string | `"info"` | Log level for all components (debug, info, warning, error, fatal) |
 | metrics.enabled | bool | `false` | Enable metrics endpoints on all components |
-| metrics.grafanaDashboard | object | `{"annotations":{},"enabled":false,"labels":{"grafana_dashboard":"1"},"namespace":""}` | Ship the Harbor Grafana dashboard (dashboards/harbor.json) as a ConfigMap picked up by the Grafana dashboard sidecar (kube-prometheus-stack, grafana-operator) |
+| metrics.grafanaDashboard | object | `{"annotations":{},"enabled":false,"labels":{"grafana_dashboard":"1"},"namespace":""}` | Ship the Harbor Grafana dashboard (dashboards/harbor.json) as a ConfigMap picked up by a Grafana dashboard sidecar (for example, kube-prometheus-stack) |
 | metrics.grafanaDashboard.annotations | object | `{}` | Annotations, e.g. grafana_folder for the sidecar folder annotation |
 | metrics.grafanaDashboard.enabled | bool | `false` | Create the dashboard ConfigMap |
 | metrics.grafanaDashboard.labels | object | `{"grafana_dashboard":"1"}` | Labels the Grafana sidecar selects on |
