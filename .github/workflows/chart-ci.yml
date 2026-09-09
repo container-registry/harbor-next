@@ -164,9 +164,6 @@ jobs:
       - name: README in sync (helm-docs)
         run: task helm:helm-docs
 
-      - name: Grafana dashboard copy in sync
-        run: task helm:dashboard-sync
-
       - name: Migration golden tests
         run: task helm:migrate:test
 

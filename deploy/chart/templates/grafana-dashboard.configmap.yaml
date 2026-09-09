@@ -1,4 +1,6 @@
 {{- if .Values.metrics.grafanaDashboard.enabled }}
+{{- $dashboard := .Files.Get "dashboards/harbor.json" }}
+{{- $_ := mustFromJson $dashboard }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -17,5 +19,5 @@ metadata:
   {{- end }}
 data:
   harbor.json: |-
-    {{- .Files.Get "dashboards/harbor.json" | nindent 4 }}
+    {{- $dashboard | nindent 4 }}
 {{- end }}
