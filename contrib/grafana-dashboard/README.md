@@ -29,8 +29,8 @@ Project usage and the 8gcr PostgreSQL/pgx monitoring panels:
   `harbor_system_info`, `harbor_statistics_*` and `harbor_project_*`.
 - All four targets (core, jobservice, registry, exporter) scraped by the selected
   Prometheus datasource.
-- A `namespace` label on Kubernetes series. If one datasource combines clusters,
-  use a consistent `cluster` label on all Harbor series to distinguish them.
+- Consistent `cluster` and `namespace` labels on all Harbor series, including
+  exporter, runtime and pgx metrics, to identify the installation in the selectors.
 - Runtime and pgx panels select `service=~".*harbor.*"`; the scraped service label
   must contain `harbor` for those panels to return data.
 - Database panels require an 8gcr build with pgx monitoring, enabled with
@@ -45,19 +45,22 @@ These three dropdowns appear once at the top and filter every metric panel:
 | Selector | Purpose |
 |----------|---------|
 | **Data source** | Prometheus datasource containing the Harbor metrics. |
-| **Cluster** | Cluster values from `harbor_up`. Defaults to **All**. |
-| **Namespace** | Harbor namespaces in the selected cluster. Defaults to **All** and refreshes when Cluster changes. |
+| **Cluster** | Select one cluster from `harbor_up`. |
+| **Namespace** | Select one Harbor namespace in that cluster; refreshes when Cluster changes. |
 
-**All** uses the matcher `.*`, which also includes series without the label.
-Leave Cluster on All when querying a datasource dedicated to one cluster without
-that label. Compose installations can leave both Cluster and Namespace on All;
-Runtime and pgx still need the service label described above.
+Cluster and Namespace are single-select dropdowns without an **All** option.
+The dashboard shows one installation at a time. No local selection is shipped;
+Grafana selects from the available values when the dashboard loads.
 
-Choose one cluster and namespace to inspect an instance. All combines selected
-installations; exporter gauges are deduplicated within each cluster and namespace
-before aggregation. Legends show component, pod, project or service names without
-repeating the cluster and namespace, so names can repeat when All is selected.
-Two Harbor installations in the same cluster and namespace are not distinguished.
+If your metrics lack these labels (for example, Compose or a datasource dedicated
+to one cluster), add consistent `cluster` and `namespace` labels to each Harbor
+scrape target. For Compose, use an environment name and an installation name.
+Runtime and pgx also need the service label described above.
+
+Exporter gauges are deduplicated within the selected cluster and namespace.
+Legends show component, pod, project or service names without repeating the
+cluster and namespace. Two Harbor installations in the same cluster and namespace
+are not distinguished.
 
 ## Import and provisioning
 
@@ -106,9 +109,9 @@ Before saving an export:
 - Keep `${datasource}` references and the shared `cluster`/`namespace` filters.
   Avoid exports that replace them with import-only datasource placeholders.
 - Remove the Grafana database `id` and revision `version`.
-- Clear the datasource variable's `current` to `{}` and every variable's `options`
-  to `[]`. Reset Cluster and Namespace `current` to
-  `{"text": "All", "value": "$__all"}` so no local selections are shipped.
+- Clear every variable's `current` to `{}` and `options` to `[]` so no local
+  selections are shipped. Keep Cluster and Namespace single-select with
+  `includeAll: false`, `allowCustomValue: false` and no `allValue`.
 - Preserve the 8gcr feature note and tooltips, and keep Runtime below Overview.
 
 Helm parses the JSON whenever the dashboard is enabled; existing ConfigMap tests
