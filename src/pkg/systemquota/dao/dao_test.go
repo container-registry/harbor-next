@@ -17,6 +17,9 @@
 package dao
 
 import (
+	"os"
+	"path/filepath"
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -34,8 +37,26 @@ type DaoTestSuite struct {
 
 func (s *DaoTestSuite) SetupSuite() {
 	s.Suite.SetupSuite()
+	s.ensureTable()
 	s.Suite.ClearTables = []string{model.Table}
 	s.dao = New()
+}
+
+// ensureTable applies the system_quota DDL from the authoritative harbor-next
+// schema: the test harness only runs the numbered migrations, so harbor-next
+// tables do not exist unless a test creates them. Reading the statement from
+// harbor_next.sql keeps the DDL single-sourced.
+func (s *DaoTestSuite) ensureTable() {
+	path := filepath.Join("..", "..", "..", "..", "make", "migrations", "postgresql", "harbor_next.sql")
+	schema, err := os.ReadFile(path)
+	s.Require().NoError(err)
+	stmt := regexp.MustCompile(`(?s)CREATE TABLE IF NOT EXISTS system_quota \(.*?\);`).Find(schema)
+	s.Require().NotEmpty(stmt, "system_quota DDL not found in harbor_next.sql")
+
+	o, err := orm.FromContext(s.Context())
+	s.Require().NoError(err)
+	_, err = o.Raw(string(stmt)).Exec()
+	s.Require().NoError(err)
 }
 
 func (s *DaoTestSuite) TestSingletonLifecycle() {
