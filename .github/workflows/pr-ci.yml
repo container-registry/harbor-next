@@ -406,10 +406,14 @@ jobs:
               // earlier revision left a reference behind.
               if (!existing) return;
               let reason;
-              if (process.env.CHANGES_RESULT === 'skipped') {
+              if (process.env.CHANGES_RESULT === 'skipped' && stackNumber) {
                 const top = stack?.pull_requests?.[stack.pull_requests.length - 1];
                 reason = `this PR is not the top of stack #${stackNumber}` +
                   (top ? `, so the stack's preview image is published on #${top.number}` : '');
+              } else if (process.env.CHANGES_RESULT !== 'success') {
+                // A failed or cancelled input check publishes nothing either,
+                // and must not be reported as "no input changed".
+                reason = `the image input check for \`${short}\` did not complete (${process.env.CHANGES_RESULT})`;
               } else if (process.env.BUILD_RESULT === 'skipped') {
                 reason = `no image input changed between the base and \`${short}\``;
               } else {
@@ -434,7 +438,7 @@ jobs:
             const stackSection = [];
             if (stackNumber) {
               stackSection.push('', `This PR is the top of stack #${stackNumber}, so the images come from a head that contains every PR in it:`, '');
-              stackSection.push(...(stack
+              stackSection.push(...(stack?.pull_requests?.length
                 ? stack.pull_requests.map((pr, index) => `${index + 1}. #${pr.number} ${pr.title}`)
                 : ['(see the stack view on this PR)']));
               if (matched.length) {
@@ -446,7 +450,9 @@ jobs:
             const sibling = comments.find(comment =>
               comment.user?.login === 'github-actions[bot]' && comment.body?.startsWith(siblingMarker));
             const siblingSection = sibling
-              ? ['', `A preview chart for this PR is published too, and its comment carries the install command: ${sibling.html_url}`]
+              ? ['', sibling.body.includes(staleStart)
+                  ? `A preview chart for this PR has a comment, but it is currently marked outdated: ${sibling.html_url}`
+                  : `A preview chart for this PR is published too, and its comment carries the install command: ${sibling.html_url}`]
               : [];
 
             const body = [
