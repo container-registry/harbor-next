@@ -19,7 +19,7 @@ Nothing has to be deployed or configured. The Helm chart already runs `registryc
 ## Scope
 
 - Supported: the `filesystem` storage driver (a PVC, hostPath or bind mount).
-- Not supported for now: object storage drivers (S3, GCS, Azure, Swift). They expose no capacity API. For them the numbers fall back to core's local disk and are flagged `measured: false`; the global storage quota keeps using Harbor's own blob accounting.
+- Not supported for now: object storage drivers (S3, GCS, Azure, Swift). They expose no capacity API. For them `/systeminfo/volumes` reports the real driver name with zero sizes and `measured: false`; the global storage quota keeps using Harbor's own blob accounting.
 
 ## Where the numbers show up
 
@@ -30,7 +30,8 @@ Nothing has to be deployed or configured. The Helm chart already runs `registryc
 ## Behaviour details
 
 - Core caches the measurement for one minute, shared across core replicas through Redis, so the global quota gate on the push path does not call registryctl per push.
-- registryctl unreachable: core logs a warning and falls back to its local disk with `measured: false`. Nothing fails.
+- registryctl unreachable or not answering within five seconds: core logs a warning and falls back to its local disk (`total`, `free` and `used` of the core container) with `measured: false`. Nothing fails, and the fallback numbers are never published as Prometheus volume bytes.
+- registryctl configured with a `rootdirectory` that does not exist: the endpoint answers with an error instead of a zero-sized "measurement", and core falls back as above.
 - Several registry replicas on a shared (RWX) volume: every registryctl reports the same filesystem; core uses whichever replica the Service answers with. The numbers are not summed.
 - `used` is `total - free` as seen by the filesystem, which includes upload temp directories and blobs waiting for garbage collection. That is intended: it is the physical usage.
 

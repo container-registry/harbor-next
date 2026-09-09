@@ -80,15 +80,17 @@ func (c StorageVolumeCollector) getMetrics() []prometheus.Metric {
 		log.Errorf("get storage volume capacity error: %v", err)
 		return nil
 	}
-	measured := 0.0
+	// Fallback numbers describe the local disk of whatever process runs the
+	// collector (core, or the standalone exporter), not the registry volume, so
+	// only a measurement is published as volume bytes.
+	result := []prometheus.Metric{storageVolumeMeasured.MustNewConstMetric(0)}
 	if capacity.Measured {
-		measured = 1
-	}
-	result := []prometheus.Metric{
-		storageVolumeBytes.MustNewConstMetric(float64(capacity.Total), "total", capacity.Driver),
-		storageVolumeBytes.MustNewConstMetric(float64(capacity.Free), "free", capacity.Driver),
-		storageVolumeBytes.MustNewConstMetric(float64(capacity.Used), "used", capacity.Driver),
-		storageVolumeMeasured.MustNewConstMetric(measured),
+		result = []prometheus.Metric{
+			storageVolumeBytes.MustNewConstMetric(float64(capacity.Total), "total", capacity.Driver),
+			storageVolumeBytes.MustNewConstMetric(float64(capacity.Free), "free", capacity.Driver),
+			storageVolumeBytes.MustNewConstMetric(float64(capacity.Used), "used", capacity.Driver),
+			storageVolumeMeasured.MustNewConstMetric(1),
+		}
 	}
 	if CacheEnabled() {
 		CachePut(StorageVolumeCollectorName, result)

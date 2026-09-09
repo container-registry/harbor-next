@@ -75,7 +75,8 @@ func (s *sysInfoAPI) GetVolumes(ctx context.Context, _ systeminfo.GetVolumesPara
 		Measured: c.Measured,
 	}
 	if c.Measured {
-		st.MeasuredAt = strfmt.DateTime(c.MeasuredAt)
+		at := strfmt.DateTime(c.MeasuredAt)
+		st.MeasuredAt = &at
 	}
 	return systeminfo.NewGetVolumesOK().WithPayload(&models.SystemInfo{
 		Storage: []*models.Storage{st},

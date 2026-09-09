@@ -15,6 +15,7 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -42,8 +43,9 @@ type Client interface {
 	DeleteBlob(reference string) (err error)
 	// DeleteManifest deletes the specified manifest. The "reference" can be "tag" or "digest"
 	DeleteManifest(repository, reference string) (err error)
-	// Storage reports the registry's storage volume usage as measured by registryctl
-	Storage() (*imagestorage.VolumeInfo, error)
+	// Storage reports the registry's storage volume usage as measured by registryctl.
+	// The context bounds the call; callers on a request path must pass a deadline.
+	Storage(ctx context.Context) (*imagestorage.VolumeInfo, error)
 }
 
 type client struct {
@@ -112,8 +114,8 @@ func (c *client) DeleteManifest(repository, reference string) (err error) {
 }
 
 // Storage ...
-func (c *client) Storage() (*imagestorage.VolumeInfo, error) {
-	req, err := http.NewRequest(http.MethodGet, buildStorageURL(c.baseURL), nil)
+func (c *client) Storage(ctx context.Context) (*imagestorage.VolumeInfo, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, buildStorageURL(c.baseURL), nil)
 	if err != nil {
 		return nil, err
 	}

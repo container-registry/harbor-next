@@ -15,6 +15,7 @@
 package client
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -66,16 +67,62 @@ func (c *clientTestSuite) TestStorage() {
 			Pattern: "/api/registry/storage",
 			Handler: test.Handler(&test.Response{
 				StatusCode: http.StatusOK,
-				Body:       []byte(`{"driver":"filesystem","supported":true,"path":"/storage","total":100,"free":40,"used":60}`),
+				Body:       []byte(`{"driver":"filesystem","supported":true,"path":"/storage","total":100,"free":40,"used":60,"measured_at":"2026-09-08T12:00:00Z"}`),
 			}),
 		})
 	defer server.Close()
 
-	info, err := NewClient(server.URL, &Config{}).Storage()
+	info, err := NewClient(server.URL, &Config{}).Storage(context.Background())
 	c.Require().Nil(err)
 	c.Equal("filesystem", info.Driver)
 	c.True(info.Supported)
+	c.Equal("/storage", info.Path)
+	c.Equal(uint64(100), info.Total)
+	c.Equal(uint64(40), info.Free)
 	c.Equal(uint64(60), info.Used)
+	c.Equal(2026, info.MeasuredAt.Year())
+}
+
+func (c *clientTestSuite) TestStorageErrors() {
+	// non-2xx
+	server := test.NewServer(
+		&test.RequestHandlerMapping{
+			Method:  "GET",
+			Pattern: "/api/registry/storage",
+			Handler: test.Handler(&test.Response{StatusCode: http.StatusInternalServerError, Body: []byte("boom")}),
+		})
+	_, err := NewClient(server.URL, &Config{}).Storage(context.Background())
+	c.Require().NotNil(err)
+	c.Contains(err.Error(), "boom")
+	server.Close()
+
+	// malformed body
+	server = test.NewServer(
+		&test.RequestHandlerMapping{
+			Method:  "GET",
+			Pattern: "/api/registry/storage",
+			Handler: test.Handler(&test.Response{StatusCode: http.StatusOK, Body: []byte("{not json")}),
+		})
+	_, err = NewClient(server.URL, &Config{}).Storage(context.Background())
+	c.Require().NotNil(err)
+	server.Close()
+
+	// transport failure: the server is gone
+	_, err = NewClient(server.URL, &Config{}).Storage(context.Background())
+	c.Require().NotNil(err)
+
+	// canceled context
+	server = test.NewServer(
+		&test.RequestHandlerMapping{
+			Method:  "GET",
+			Pattern: "/api/registry/storage",
+			Handler: test.Handler(&test.Response{StatusCode: http.StatusOK, Body: []byte("{}")}),
+		})
+	defer server.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err = NewClient(server.URL, &Config{}).Storage(ctx)
+	c.Require().NotNil(err)
 }
 
 func (c *clientTestSuite) TestDeleteBlob() {

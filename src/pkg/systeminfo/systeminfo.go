@@ -39,9 +39,3 @@ func Init() {
 		imagestorage.GlobalDriver = regctldriver.NewDriver(registryctl.RegistryCtlClient, local)
 	})
 }
-
-// ResetForTest discards the initialized driver so the next Init rebuilds it.
-func ResetForTest() {
-	initOnce = sync.Once{}
-	imagestorage.GlobalDriver = nil
-}

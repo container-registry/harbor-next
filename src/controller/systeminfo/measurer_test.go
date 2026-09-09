@@ -17,6 +17,7 @@ package systeminfo
 import (
 	"context"
 	"errors"
+	"math"
 	"testing"
 	"time"
 
@@ -51,6 +52,17 @@ func TestMeasurer(t *testing.T) {
 	assert.Nil(t, got)
 
 	m = &measurer{ctl: fakeCapacityCtl{err: errors.New("boom")}}
+	_, err = m.Measure(context.Background())
+	assert.Error(t, err)
+
+	// nil capacity without error means "not measured"
+	m = &measurer{ctl: fakeCapacityCtl{}}
+	got, err = m.Measure(context.Background())
+	assert.NoError(t, err)
+	assert.Nil(t, got)
+
+	// a value beyond int64 cannot be represented as a quota usage
+	m = &measurer{ctl: fakeCapacityCtl{capacity: &imagestorage.Capacity{Used: math.MaxUint64, Measured: true}}}
 	_, err = m.Measure(context.Background())
 	assert.Error(t, err)
 }

@@ -34,6 +34,9 @@ const (
 	driverName = "registryctl"
 	cacheKey   = "systeminfo:registryctl_volume"
 	cacheTTL   = time.Minute
+	// callTimeout bounds one registryctl round trip; Cap runs on the push path
+	// through the global quota gate, so a hung registryctl must fall back fast.
+	callTimeout = 5 * time.Second
 )
 
 type driver struct {
@@ -62,7 +65,9 @@ func (d *driver) Cap() (*storage.Capacity, error) {
 		return d.unmeasured()
 	}
 	if !info.Supported {
-		return d.unmeasured()
+		// Object stores expose no capacity; report the real driver with zero
+		// sizes rather than core's local disk, which would describe the wrong volume.
+		return &storage.Capacity{Driver: info.Driver, Measured: false}, nil
 	}
 	return &storage.Capacity{
 		Total:      info.Total,
@@ -86,6 +91,9 @@ func (d *driver) unmeasured() (*storage.Capacity, error) {
 	if c.Driver == "" {
 		c.Driver = d.fallback.Name()
 	}
+	if c.Used == 0 && c.Total >= c.Free {
+		c.Used = c.Total - c.Free
+	}
 	return c, nil
 }
 
@@ -93,13 +101,15 @@ func (d *driver) volume() (*storage.VolumeInfo, error) {
 	if d.client == nil {
 		return nil, errNoClient
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), callTimeout)
+	defer cancel()
 	ca := d.cache()
 	if ca == nil {
-		return d.client.Storage()
+		return d.client.Storage(ctx)
 	}
 	info := &storage.VolumeInfo{}
-	err := cache.FetchOrSave(context.Background(), ca, cacheKey, info, func() (any, error) {
-		return d.client.Storage()
+	err := cache.FetchOrSave(ctx, ca, cacheKey, info, func() (any, error) {
+		return d.client.Storage(ctx)
 	}, cacheTTL)
 	if err != nil {
 		return nil, err

@@ -57,6 +57,11 @@ func TestObjectStoreIsUnsupported(t *testing.T) {
 	assert.True(t, info.MeasuredAt.IsZero())
 }
 
+func TestMissingRootIsAnError(t *testing.T) {
+	rec, _ := serve(t, NewHandler("filesystem", "/definitely/not/here"), http.MethodGet)
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+}
+
 func TestMethodNotAllowed(t *testing.T) {
 	rec, _ := serve(t, NewHandler("filesystem", t.TempDir()), http.MethodDelete)
 	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)

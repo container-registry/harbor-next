@@ -16,6 +16,7 @@ package exporter
 
 import (
 	"context"
+	"errors"
 	"io"
 	"testing"
 
@@ -27,15 +28,42 @@ import (
 	"github.com/goharbor/harbor/src/pkg/systeminfo/imagestorage"
 )
 
-type fakeVolumeSysInfoCtl struct{ capacity *imagestorage.Capacity }
+type fakeVolumeSysInfoCtl struct {
+	capacity *imagestorage.Capacity
+	err      error
+}
 
 func (f fakeVolumeSysInfoCtl) GetInfo(context.Context, si.Options) (*si.Data, error) { return nil, nil }
 func (f fakeVolumeSysInfoCtl) GetCA(context.Context) (io.ReadCloser, error)          { return nil, nil }
 func (f fakeVolumeSysInfoCtl) GetCapacity(context.Context) (*imagestorage.Capacity, error) {
-	return f.capacity, nil
+	return f.capacity, f.err
+}
+
+func TestStorageVolumeCollectorUnmeasured(t *testing.T) {
+	CacheDelete(StorageVolumeCollectorName)
+	c := StorageVolumeCollector{
+		ctl:    fakeVolumeSysInfoCtl{capacity: &imagestorage.Capacity{Total: 100, Free: 30, Used: 70, Driver: "s3", Measured: false}},
+		newCtx: context.Background,
+	}
+	metrics := c.getMetrics()
+	require.Len(t, metrics, 1, "fallback numbers are not published as volume bytes")
+	d := &dto.Metric{}
+	require.NoError(t, metrics[0].Write(d))
+	assert.Equal(t, float64(0), d.Gauge.GetValue())
+}
+
+func TestStorageVolumeCollectorError(t *testing.T) {
+	CacheDelete(StorageVolumeCollectorName)
+	c := StorageVolumeCollector{
+		ctl:    fakeVolumeSysInfoCtl{err: errors.New("boom")},
+		newCtx: context.Background,
+	}
+	assert.Empty(t, c.getMetrics())
 }
 
 func TestStorageVolumeCollector(t *testing.T) {
+	CacheDelete(StorageVolumeCollectorName)
+	t.Cleanup(func() { CacheDelete(StorageVolumeCollectorName) })
 	c := StorageVolumeCollector{
 		ctl:    fakeVolumeSysInfoCtl{capacity: &imagestorage.Capacity{Total: 100, Free: 30, Used: 70, Driver: "filesystem", Measured: true}},
 		newCtx: context.Background,

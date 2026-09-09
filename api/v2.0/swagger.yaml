@@ -8314,6 +8314,7 @@ definitions:
       measured_at:
         type: string
         format: date-time
+        x-nullable: true
         description: When the volume was measured. Only set when measured is true.
   GeneralInfo:
     type: object

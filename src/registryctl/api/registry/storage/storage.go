@@ -19,7 +19,9 @@
 package storage
 
 import (
+	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/goharbor/harbor/src/lib/log"
@@ -52,6 +54,13 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	info := &imagestorage.VolumeInfo{Driver: h.storageType}
 	if h.fs != nil {
+		// filesystem.Cap reports zeros without an error for a missing path; that
+		// must not be advertised as a measurement of an empty volume.
+		if _, err := os.Stat(h.storageRoot); err != nil {
+			log.Errorf("registry storage root %s is not accessible: %v", h.storageRoot, err)
+			api.HandleInternalServerError(w, fmt.Errorf("registry storage root %s is not accessible: %w", h.storageRoot, err))
+			return
+		}
 		capacity, err := h.fs.Cap()
 		if err != nil {
 			log.Errorf("failed to measure storage volume %s: %v", h.storageRoot, err)

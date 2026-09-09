@@ -15,6 +15,7 @@
 package registryctl
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -31,13 +32,18 @@ type fakeClient struct {
 	info  *storage.VolumeInfo
 	err   error
 	calls int
+	block bool
 }
 
 func (f *fakeClient) Health() error                       { return nil }
 func (f *fakeClient) DeleteBlob(string) error             { return nil }
 func (f *fakeClient) DeleteManifest(string, string) error { return nil }
-func (f *fakeClient) Storage() (*storage.VolumeInfo, error) {
+func (f *fakeClient) Storage(ctx context.Context) (*storage.VolumeInfo, error) {
 	f.calls++
+	if f.block {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
 	return f.info, f.err
 }
 
@@ -74,14 +80,27 @@ func TestUnreachableFallsBack(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, got.Measured)
 	assert.Equal(t, uint64(10), got.Total)
+	assert.Equal(t, uint64(6), got.Used, "fallback derives used from total-free")
 	assert.Equal(t, "filesystem", got.Driver)
 }
 
-func TestUnsupportedDriverFallsBack(t *testing.T) {
+func TestUnsupportedDriverReportsRealDriver(t *testing.T) {
 	c := &fakeClient{info: &storage.VolumeInfo{Driver: "s3", Supported: false}}
 	got, err := newDriver(c, nil).Cap()
 	require.NoError(t, err)
 	assert.False(t, got.Measured)
+	assert.Equal(t, "s3", got.Driver)
+	assert.Zero(t, got.Total, "local disk numbers must not be attributed to the object store")
+}
+
+func TestHungRegistryctlFallsBackWithinTimeout(t *testing.T) {
+	c := &fakeClient{block: true}
+	d := newDriver(c, nil)
+	start := time.Now()
+	got, err := d.Cap()
+	require.NoError(t, err)
+	assert.False(t, got.Measured)
+	assert.Less(t, time.Since(start), callTimeout+2*time.Second)
 }
 
 func TestNoClient(t *testing.T) {
