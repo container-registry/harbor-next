@@ -636,8 +636,9 @@ edit it directly or export changes from Grafana. Helm validates the JSON when th
 is enabled and embeds the file unchanged.
 
 The shared **Data source → Cluster → Namespace** selectors filter every metric panel.
-Select one cluster and namespace to inspect an installation; there is no **All** option.
-All Harbor series must carry consistent `cluster` and `namespace` scrape labels.
+Cluster defaults to **All**, including metrics without a cluster label. Namespace is
+single-select without All and requires a consistent `namespace` scrape label. Select
+a specific cluster to distinguish installations using the same namespace across clusters.
 Runtime appears directly below Overview. All rows are expanded, including the database row,
 whose note and tooltips explain the PostgreSQL/pgx metrics available in the
 [8gcr Harbor distribution](https://container-registry.com/8gcr/).

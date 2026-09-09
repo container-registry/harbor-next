@@ -5578,15 +5578,18 @@
       },
       {
         "allowCustomValue": false,
-        "current": {},
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
         },
         "definition": "label_values(harbor_up, cluster)",
-        "description": "Select one cluster containing Harbor metrics.",
+        "description": "Select a cluster, or All to include clusters and metrics without a cluster label. With All, the selected namespace may span multiple clusters.",
         "hide": 0,
-        "includeAll": false,
+        "includeAll": true,
         "label": "Cluster",
         "multi": false,
         "name": "cluster",
@@ -5601,7 +5604,8 @@
         "regexApplyTo": "value",
         "skipUrlSync": false,
         "sort": 1,
-        "type": "query"
+        "type": "query",
+        "allValue": ".*"
       },
       {
         "allowCustomValue": false,
@@ -5611,7 +5615,7 @@
           "uid": "${datasource}"
         },
         "definition": "label_values(harbor_up{cluster=~\"${cluster:regex}\"}, namespace)",
-        "description": "Select one Harbor namespace in the selected cluster.",
+        "description": "Select one Harbor namespace within the selected cluster scope.",
         "hide": 0,
         "includeAll": false,
         "label": "Namespace",

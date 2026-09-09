@@ -29,11 +29,10 @@ provisioning on only one release per Grafana organization; the same dashboard ca
 display every scraped Harbor installation through its shared **Data source →
 Cluster → Namespace** selectors.
 
-All Harbor series must expose consistent `cluster` and `namespace` labels.
-If your scrape setup does not attach a `cluster` label, add one even when using
-one datasource per cluster. Select one cluster and one namespace; neither
-selector offers All. The Namespace selector lists Harbor namespaces within the
-selected cluster.
+All Harbor series must expose a consistent `namespace` label. Cluster defaults
+to **All**, which also supports metrics without a cluster label. Namespace has no
+All option. When a datasource combines clusters, add consistent `cluster` labels
+and select one cluster to distinguish installations using the same namespace.
 
 All rows are expanded. Runtime follows Overview, and Database includes an 8gcr
 feature note explaining why pgx panels may show no data. See the

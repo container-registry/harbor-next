@@ -29,8 +29,9 @@ Project usage and the 8gcr PostgreSQL/pgx monitoring panels:
   `harbor_system_info`, `harbor_statistics_*` and `harbor_project_*`.
 - All four targets (core, jobservice, registry, exporter) scraped by the selected
   Prometheus datasource.
-- Consistent `cluster` and `namespace` labels on all Harbor series, including
-  exporter, runtime and pgx metrics, to identify the installation in the selectors.
+- A consistent `namespace` label on all Harbor series, including exporter,
+  runtime and pgx metrics. When a datasource combines clusters, use a consistent
+  `cluster` label to distinguish installations with the same namespace.
 - Runtime and pgx panels select `service=~".*harbor.*"`; the scraped service label
   must contain `harbor` for those panels to return data.
 - Database panels require an 8gcr build with pgx monitoring, enabled with
@@ -45,22 +46,24 @@ These three dropdowns appear once at the top and filter every metric panel:
 | Selector | Purpose |
 |----------|---------|
 | **Data source** | Prometheus datasource containing the Harbor metrics. |
-| **Cluster** | Select one cluster from `harbor_up`. |
-| **Namespace** | Select one Harbor namespace in that cluster; refreshes when Cluster changes. |
+| **Cluster** | Select a cluster from `harbor_up`, or **All** (the default). |
+| **Namespace** | Select one Harbor namespace within the cluster scope; refreshes when Cluster changes. No **All** option. |
 
-Cluster and Namespace are single-select dropdowns without an **All** option.
-The dashboard shows one installation at a time. No local selection is shipped;
-Grafana selects from the available values when the dashboard loads.
+Cluster **All** uses `.*`, which also matches metrics without a cluster label.
+Leave Cluster on All for a datasource dedicated to one cluster without that label.
+Namespace remains single-select, with no saved environment-specific default;
+Grafana selects from the available namespaces when the dashboard loads.
 
-If your metrics lack these labels (for example, Compose or a datasource dedicated
-to one cluster), add consistent `cluster` and `namespace` labels to each Harbor
-scrape target. For Compose, use an environment name and an installation name.
-Runtime and pgx also need the service label described above.
-
-Exporter gauges are deduplicated within the selected cluster and namespace.
+If the same namespace exists in multiple clusters, Cluster **All** includes those
+installations together. Choose a specific cluster to isolate one installation.
+Exporter gauges are deduplicated within each cluster and namespace before aggregation.
 Legends show component, pod, project or service names without repeating the
-cluster and namespace. Two Harbor installations in the same cluster and namespace
-are not distinguished.
+cluster and namespace, so names may repeat across clusters when All is selected.
+Two Harbor installations in the same cluster and namespace are not distinguished.
+
+For metrics without a namespace label (for example, Compose), add a consistent
+`namespace` scrape label identifying the installation to each Harbor target.
+Runtime and pgx also need the service label described above.
 
 ## Import and provisioning
 
@@ -109,9 +112,11 @@ Before saving an export:
 - Keep `${datasource}` references and the shared `cluster`/`namespace` filters.
   Avoid exports that replace them with import-only datasource placeholders.
 - Remove the Grafana database `id` and revision `version`.
-- Clear every variable's `current` to `{}` and `options` to `[]` so no local
-  selections are shipped. Keep Cluster and Namespace single-select with
-  `includeAll: false`, `allowCustomValue: false` and no `allValue`.
+- Clear Data source and Namespace `current` to `{}` and every variable's
+  `options` to `[]`. Reset Cluster `current` to
+  `{"text": "All", "value": "$__all"}`, with `includeAll: true` and `allValue: ".*"`.
+  Keep both scope variables single-select with `allowCustomValue: false`;
+  Namespace keeps `includeAll: false` and no `allValue`.
 - Preserve the 8gcr feature note and tooltips, and keep Runtime below Overview.
 
 Helm parses the JSON whenever the dashboard is enabled; existing ConfigMap tests
