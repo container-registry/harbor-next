@@ -37,7 +37,7 @@
                         <span class="width-10rem">{{
                             'QUOTA.SYSTEM_QUOTA' | translate
                         }}</span>
-                        <span class="num-count" *ngIf="!systemQuota">{{
+                        <span class="num-count" *ngIf="systemQuota === null">{{
                             'QUOTA.SYSTEM_QUOTA_NOT_SET' | translate
                         }}</span>
                         <span class="num-count" *ngIf="systemQuota">
@@ -64,6 +64,7 @@
                         <button
                             id="open-edit-system-quota"
                             class="btn btn-link btn-sm default-quota-edit-button"
+                            [disabled]="systemQuota === undefined"
                             (click)="editSystemQuota()">
                             {{ 'QUOTA.EDIT' | translate }}
                         </button>

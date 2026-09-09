@@ -17,6 +17,7 @@ package systemquota
 import (
 	"context"
 	"errors"
+	"math"
 	"sync"
 	"testing"
 	"time"
@@ -27,7 +28,6 @@ import (
 	"github.com/goharbor/harbor/src/lib/cache"
 	_ "github.com/goharbor/harbor/src/lib/cache/memory"
 	liberrors "github.com/goharbor/harbor/src/lib/errors"
-	"github.com/goharbor/harbor/src/pkg/systemquota/dao"
 	"github.com/goharbor/harbor/src/pkg/systemquota/model"
 	blobtesting "github.com/goharbor/harbor/src/testing/controller/blob"
 	"github.com/goharbor/harbor/src/testing/mock"
@@ -83,7 +83,7 @@ func (s *ControllerTestSuite) accounted(blobs, sys int64) {
 }
 
 func (s *ControllerTestSuite) allocation(allocated, unlimited int64) {
-	s.mgr.On("ProjectAllocation", mock.Anything).Return(&dao.ProjectAllocation{Allocated: allocated, Unlimited: unlimited}, nil)
+	s.mgr.On("ProjectAllocation", mock.Anything).Return(&model.ProjectAllocation{Allocated: allocated, Unlimited: unlimited}, nil)
 }
 
 func (s *ControllerTestSuite) TestGetNotSet() {
@@ -203,7 +203,6 @@ func (s *ControllerTestSuite) TestEnforceEnabled() {
 func (s *ControllerTestSuite) TestCheckCapacity() {
 	s.quotaRow(1000, true)
 	s.accounted(900, 0)
-	s.allocation(0, 0)
 
 	s.NoError(s.ctl.CheckCapacity(s.ctx, 0))
 	s.NoError(s.ctl.CheckCapacity(s.ctx, 100))
@@ -211,6 +210,16 @@ func (s *ControllerTestSuite) TestCheckCapacity() {
 	s.Require().Error(err)
 	s.True(liberrors.IsErr(err, liberrors.DENIED))
 	s.Contains(err.Error(), "global storage quota exceeded")
+	// a declared body size that would overflow the addition is still denied
+	s.Error(s.ctl.CheckCapacity(s.ctx, math.MaxInt64))
+	// the hot path never touches the reporting-only aggregate
+	s.mgr.AssertNotCalled(s.T(), "ProjectAllocation", mock.Anything)
+}
+
+func (s *ControllerTestSuite) TestCheckCapacityDeniesAtTheLimit() {
+	s.quotaRow(1000, true)
+	s.accounted(1000, 0)
+	s.Error(s.ctl.CheckCapacity(s.ctx, 0))
 }
 
 func (s *ControllerTestSuite) TestCheckCapacityNotEnforced() {

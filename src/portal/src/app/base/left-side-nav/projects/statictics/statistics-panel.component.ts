@@ -77,11 +77,13 @@ export class StatisticsPanelComponent implements OnInit, OnDestroy {
         this.systemQuotaService.getSystemQuota().subscribe(
             quota => (this.systemQuota = quota),
             error => {
-                // 404 means no global quota is configured, which is the default state
-                this.systemQuota = null;
-                if (!error || error.status !== 404) {
-                    this.msgHandler.handleError(error);
+                // only a 404 proves that no global quota is configured; any other
+                // failure leaves the last known state untouched
+                if (error && error.status === 404) {
+                    this.systemQuota = null;
+                    return;
                 }
+                this.msgHandler.handleError(error);
             }
         );
     }

@@ -121,9 +121,30 @@ type accountedUsage struct {
 // SetMeasurer installs the physical usage source. Intended for theme B; a nil
 // measurer restores accounting-only behaviour.
 func SetMeasurer(m Measurer) {
-	if c, ok := Ctl.(*controller); ok {
-		c.measurer = m
+	c, ok := Ctl.(*controller)
+	if !ok {
+		log.Warningf("global storage quota controller %T does not accept a measurer, usage stays accounted", Ctl)
+		return
 	}
+	c.measurer = m
+}
+
+// usage is the effective usage: measured when a measurer supplies one, else accounted.
+type usage struct {
+	used       int64
+	source     string
+	measuredAt *time.Time
+}
+
+func (c *controller) usage(ctx context.Context) (*usage, error) {
+	if used, at, ok := c.measured(ctx); ok {
+		return &usage{used: used, source: UsedSourceMeasured, measuredAt: &at}, nil
+	}
+	used, err := c.accounted(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &usage{used: used, source: UsedSourceAccounted}, nil
 }
 
 func (c *controller) Get(ctx context.Context) (*Status, error) {
@@ -131,23 +152,17 @@ func (c *controller) Get(ctx context.Context) (*Status, error) {
 	if err != nil {
 		return nil, err
 	}
+	u, err := c.usage(ctx)
+	if err != nil {
+		return nil, err
+	}
 	status := &Status{
 		Hard:       quota.Hard,
 		Enforce:    quota.Enforce,
 		UpdateTime: quota.UpdateTime,
-		UsedSource: UsedSourceAccounted,
-	}
-
-	if used, at, ok := c.measured(ctx); ok {
-		status.Used = used
-		status.UsedSource = UsedSourceMeasured
-		status.MeasuredAt = &at
-	} else {
-		used, err := c.accounted(ctx)
-		if err != nil {
-			return nil, err
-		}
-		status.Used = used
+		Used:       u.used,
+		UsedSource: u.source,
+		MeasuredAt: u.measuredAt,
 	}
 	status.Free = max(status.Hard-status.Used, 0)
 
@@ -193,15 +208,21 @@ func (c *controller) EnforceEnabled(ctx context.Context) bool {
 	return quota.Enforce
 }
 
+// CheckCapacity reads one quota snapshot and the cached usage; it never touches
+// the project allocation aggregate, which is reporting-only.
 func (c *controller) CheckCapacity(ctx context.Context, extra int64) error {
-	if !c.EnforceEnabled(ctx) {
+	quota, err := c.quota(ctx)
+	if err != nil {
+		if !errors.IsNotFoundErr(err) {
+			log.G(ctx).Warningf("failed to load global storage quota, allowing request: %v", err)
+		}
 		return nil
 	}
-	status, err := c.Get(ctx)
+	if !quota.Enforce {
+		return nil
+	}
+	u, err := c.usage(ctx)
 	if err != nil {
-		if errors.IsNotFoundErr(err) {
-			return nil
-		}
 		// Failing open keeps the registry writable when the accounting query
 		// is unavailable; the limit is best-effort by design (#839).
 		log.G(ctx).Warningf("failed to evaluate global storage quota, allowing request: %v", err)
@@ -210,9 +231,11 @@ func (c *controller) CheckCapacity(ctx context.Context, extra int64) error {
 	if extra < 0 {
 		extra = 0
 	}
-	if status.Used+extra > status.Hard {
+	// Once usage reaches the limit every write is denied; the subtraction form
+	// cannot overflow for a large declared body size.
+	if u.used >= quota.Hard || extra > quota.Hard-u.used {
 		return errors.DeniedError(nil).WithMessagef("global storage quota exceeded: used %s of %s",
-			types.ResourceStorage.FormatValue(status.Used), types.ResourceStorage.FormatValue(status.Hard))
+			types.ResourceStorage.FormatValue(u.used), types.ResourceStorage.FormatValue(quota.Hard))
 	}
 	return nil
 }

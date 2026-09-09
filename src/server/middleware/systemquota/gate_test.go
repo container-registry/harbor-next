@@ -79,6 +79,15 @@ func (s *GateTestSuite) TestContentLengthCountsForUploads() {
 	s.mockCtl.AssertCalled(s.T(), "CheckCapacity", mock.Anything, int64(5))
 }
 
+func (s *GateTestSuite) TestManifestBodyIsNotCounted() {
+	s.mockCtl.On("CheckCapacity", mock.Anything, int64(0)).Return(nil)
+	req := httptest.NewRequest(http.MethodPut, "/v2/library/hello/manifests/latest", strings.NewReader(`{"schemaVersion":2}`))
+	rec := httptest.NewRecorder()
+	Gate()(s.next).ServeHTTP(rec, req)
+	s.Equal(http.StatusAccepted, rec.Code)
+	s.mockCtl.AssertCalled(s.T(), "CheckCapacity", mock.Anything, int64(0))
+}
+
 func (s *GateTestSuite) TestSkipper() {
 	req := httptest.NewRequest(http.MethodPut, "/v2/library/hello/manifests/latest", nil)
 	rec := httptest.NewRecorder()

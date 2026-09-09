@@ -11,7 +11,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import { Component, EventEmitter, Output, ViewChild } from '@angular/core';
+import {
+    Component,
+    EventEmitter,
+    OnDestroy,
+    Output,
+    ViewChild,
+} from '@angular/core';
 import { NgForm, Validators } from '@angular/forms';
 import { InlineAlertComponent } from '../../../../../shared/components/inline-alert/inline-alert.component';
 import {
@@ -32,13 +38,14 @@ import {
     QuotaHardLimitInterface,
 } from '../../../../../shared/services';
 import { distinctUntilChanged } from 'rxjs/operators';
+import { Subscription } from 'rxjs';
 
 @Component({
     selector: 'edit-project-quotas',
     templateUrl: './edit-project-quotas.component.html',
     styleUrls: ['./edit-project-quotas.component.scss'],
 })
-export class EditProjectQuotasComponent {
+export class EditProjectQuotasComponent implements OnDestroy {
     openEditQuota: boolean;
     defaultTextsObj: {
         editQuota: string;
@@ -71,7 +78,14 @@ export class EditProjectQuotasComponent {
     @Output() confirmAction = new EventEmitter();
     quotaDangerCoefficient: number = QUOTA_DANGER_COEFFICIENT;
     quotaWarningCoefficient: number = QUOTA_WARNING_COEFFICIENT;
+    private valueChangesSub: Subscription;
     constructor() {}
+
+    ngOnDestroy(): void {
+        if (this.valueChangesSub) {
+            this.valueChangesSub.unsubscribe();
+        }
+    }
 
     onSubmit(): void {
         const emitData = {
@@ -140,7 +154,11 @@ export class EditProjectQuotasComponent {
                 storageUsed: defaultTextsObj.quotaHardLimitValue.used.storage,
             };
         }
-        let defaultForm: any = {
+        let defaultForm: {
+            storage: number;
+            storageUnit: string;
+            enforce?: boolean;
+        } = {
             storage: this.quotaHardLimitValue.storageLimit,
             storageUnit: this.quotaHardLimitValue.storageUnit,
         };
@@ -155,7 +173,11 @@ export class EditProjectQuotasComponent {
             Validators.pattern('(^-1$)|(^([1-9]+)([0-9]+)*$)'),
             validateLimit(this.currentForm.form.controls['storageUnit']),
         ]);
-        this.currentForm.form.valueChanges
+        // one live subscription per modal; reopening replaces the previous one
+        if (this.valueChangesSub) {
+            this.valueChangesSub.unsubscribe();
+        }
+        this.valueChangesSub = this.currentForm.form.valueChanges
             .pipe(
                 distinctUntilChanged(
                     (a, b) => JSON.stringify(a) === JSON.stringify(b)

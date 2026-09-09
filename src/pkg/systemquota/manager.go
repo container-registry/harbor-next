@@ -33,7 +33,7 @@ type Manager interface {
 	// Delete unsets the global quota.
 	Delete(ctx context.Context) error
 	// ProjectAllocation aggregates the per-project hard limits.
-	ProjectAllocation(ctx context.Context) (*dao.ProjectAllocation, error)
+	ProjectAllocation(ctx context.Context) (*model.ProjectAllocation, error)
 }
 
 // New creates a manager backed by the default DAO.
@@ -57,6 +57,6 @@ func (m *manager) Delete(ctx context.Context) error {
 	return m.dao.Delete(ctx)
 }
 
-func (m *manager) ProjectAllocation(ctx context.Context) (*dao.ProjectAllocation, error) {
+func (m *manager) ProjectAllocation(ctx context.Context) (*model.ProjectAllocation, error) {
 	return m.dao.ProjectAllocation(ctx)
 }

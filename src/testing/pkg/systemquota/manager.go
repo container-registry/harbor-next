@@ -5,7 +5,6 @@ package systemquota
 import (
 	context "context"
 
-	dao "github.com/goharbor/harbor/src/pkg/systemquota/dao"
 	model "github.com/goharbor/harbor/src/pkg/systemquota/model"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -64,23 +63,23 @@ func (_m *Manager) Get(ctx context.Context) (*model.SystemQuota, error) {
 }
 
 // ProjectAllocation provides a mock function with given fields: ctx
-func (_m *Manager) ProjectAllocation(ctx context.Context) (*dao.ProjectAllocation, error) {
+func (_m *Manager) ProjectAllocation(ctx context.Context) (*model.ProjectAllocation, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ProjectAllocation")
 	}
 
-	var r0 *dao.ProjectAllocation
+	var r0 *model.ProjectAllocation
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (*dao.ProjectAllocation, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) (*model.ProjectAllocation, error)); ok {
 		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) *dao.ProjectAllocation); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) *model.ProjectAllocation); ok {
 		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*dao.ProjectAllocation)
+			r0 = ret.Get(0).(*model.ProjectAllocation)
 		}
 	}
 

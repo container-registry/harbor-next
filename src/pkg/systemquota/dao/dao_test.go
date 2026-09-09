@@ -17,6 +17,7 @@
 package dao
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -90,19 +91,33 @@ func (s *DaoTestSuite) TestProjectAllocation() {
 	ctx := s.Context()
 	o, err := orm.FromContext(ctx)
 	s.Require().NoError(err)
-	_, err = o.Raw(`INSERT INTO quota (reference, reference_id, hard) VALUES
-		('project', '9001', '{"storage": 100}'),
-		('project', '9002', '{"storage": 250}'),
-		('project', '9003', '{"storage": -1}')`).Exec()
-	s.Require().NoError(err)
-	defer func() {
-		_, _ = o.Raw(`DELETE FROM quota WHERE reference_id IN ('9001','9002','9003')`).Exec()
-	}()
 
-	got, err := s.dao.ProjectAllocation(ctx)
+	before, err := s.dao.ProjectAllocation(ctx)
 	s.Require().NoError(err)
-	s.GreaterOrEqual(got.Allocated, int64(350))
-	s.GreaterOrEqual(got.Unlimited, int64(1))
+
+	// three live projects (100, 250, unlimited) and one deleted project whose
+	// quota row must be ignored
+	var ids []int64
+	for _, name := range []string{"sq-alloc-a", "sq-alloc-b", "sq-alloc-c", "sq-alloc-deleted"} {
+		var id int64
+		s.Require().NoError(o.Raw(`INSERT INTO project (name, owner_id, deleted) VALUES (?, 1, ?) RETURNING project_id`,
+			name, name == "sq-alloc-deleted").QueryRow(&id))
+		ids = append(ids, id)
+	}
+	defer func() {
+		_, _ = o.Raw(`DELETE FROM quota WHERE reference = 'project' AND reference_id IN (?, ?, ?, ?)`,
+			fmt.Sprint(ids[0]), fmt.Sprint(ids[1]), fmt.Sprint(ids[2]), fmt.Sprint(ids[3])).Exec()
+		_, _ = o.Raw(`DELETE FROM project WHERE project_id IN (?, ?, ?, ?)`, ids[0], ids[1], ids[2], ids[3]).Exec()
+	}()
+	for i, hard := range []string{`{"storage": 100}`, `{"storage": 250}`, `{"storage": -1}`, `{"storage": 999}`} {
+		_, err = o.Raw(`INSERT INTO quota (reference, reference_id, hard) VALUES ('project', ?, ?::jsonb)`, fmt.Sprint(ids[i]), hard).Exec()
+		s.Require().NoError(err)
+	}
+
+	after, err := s.dao.ProjectAllocation(ctx)
+	s.Require().NoError(err)
+	s.Equal(before.Allocated+350, after.Allocated)
+	s.Equal(before.Unlimited+1, after.Unlimited)
 }
 
 func TestDaoTestSuite(t *testing.T) {

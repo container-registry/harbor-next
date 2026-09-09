@@ -165,6 +165,36 @@ describe('ProjectQuotasComponent', () => {
         await fixture.whenStable();
         expect(spy.calls.count()).toEqual(2);
     });
+    it('should render the global storage quota card', async () => {
+        // ngOnChanges is not triggered by the test bed, so fetch explicitly
+        component.getSystemQuota();
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(component.systemQuota).toBeTruthy();
+        expect(component.systemQuota.allocated).toEqual(500);
+        const card = fixture.nativeElement.querySelector('.system-quota');
+        expect(card).toBeTruthy();
+        expect(card.querySelector('.system-quota-allocation')).toBeTruthy();
+        expect(card.querySelector('.label-warning')).toBeNull();
+    });
+    it('should open the global storage quota editor', async () => {
+        component.getSystemQuota();
+        fixture.detectChanges();
+        await fixture.whenStable();
+        const spy = spyOn(
+            component.editQuotaDialog,
+            'openEditQuotaModal'
+        ).and.callThrough();
+        const button: HTMLButtonElement = fixture.nativeElement.querySelector(
+            '#open-edit-system-quota'
+        );
+        button.click();
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(spy).toHaveBeenCalled();
+        expect(spy.calls.mostRecent().args[0].isSystemQuota).toBeTrue();
+        expect(spy.calls.mostRecent().args[0].enforce).toBeFalse();
+    });
     it('should get no quota', async () => {
         fixture.detectChanges();
         await fixture.whenStable();

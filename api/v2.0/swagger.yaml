@@ -4758,6 +4758,8 @@ paths:
           $ref: '#/responses/401'
         '403':
           $ref: '#/responses/403'
+        '422':
+          $ref: '#/responses/422'
         '500':
           $ref: '#/responses/500'
     delete:
@@ -8755,15 +8757,27 @@ definitions:
         $ref: "#/definitions/ResourceList"
         description: The new hard limits for the quota
 
+  SystemQuotaHard:
+    type: object
+    description: The hard limit of the global storage quota
+    required:
+      - storage
+    properties:
+      storage:
+        type: integer
+        format: int64
+        minimum: 1
+        description: The storage limit in bytes, at most 1024 TiB
+
   SystemQuotaUpdateReq:
     type: object
     description: The request body for setting the global storage quota
     required:
       - hard
+      - enforce
     properties:
       hard:
-        $ref: "#/definitions/ResourceList"
-        description: The hard limit, must contain exactly the storage resource in bytes
+        $ref: "#/definitions/SystemQuotaHard"
       enforce:
         type: boolean
         description: Deny registry writes once usage reaches the limit

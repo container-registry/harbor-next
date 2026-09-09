@@ -29,14 +29,6 @@ func init() {
 	orm.RegisterModel(new(model.SystemQuota))
 }
 
-// ProjectAllocation summarizes the hard limits assigned to projects.
-type ProjectAllocation struct {
-	// Allocated is the sum of finite project storage limits in bytes.
-	Allocated int64
-	// Unlimited is the number of projects whose storage limit is -1.
-	Unlimited int64
-}
-
 // DAO is the data access object for the global storage quota.
 type DAO interface {
 	// Get returns the singleton row, or a NotFound error when no global quota is set.
@@ -46,7 +38,7 @@ type DAO interface {
 	// Delete removes the singleton row; no error when absent.
 	Delete(ctx context.Context) error
 	// ProjectAllocation aggregates the per-project hard limits from the quota table.
-	ProjectAllocation(ctx context.Context) (*ProjectAllocation, error)
+	ProjectAllocation(ctx context.Context) (*model.ProjectAllocation, error)
 }
 
 type dao struct{}
@@ -93,17 +85,21 @@ func (d *dao) Delete(ctx context.Context) error {
 	return err
 }
 
-func (d *dao) ProjectAllocation(ctx context.Context) (*ProjectAllocation, error) {
+func (d *dao) ProjectAllocation(ctx context.Context) (*model.ProjectAllocation, error) {
 	o, err := orm.FromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 	// hard is JSONB; -1 marks an unlimited project and must not enter the sum.
+	// Deleting a project keeps its quota row, so join project to count only
+	// live ones, as the exporter's project collector does.
 	sql := `SELECT
-		COALESCE(SUM(CASE WHEN hard->>'storage' = '-1' THEN NULL ELSE (hard->>'storage')::bigint END), 0) AS allocated,
-		COUNT(*) FILTER (WHERE hard->>'storage' = '-1') AS unlimited
-		FROM quota WHERE reference = 'project'`
-	result := &ProjectAllocation{}
+		COALESCE(SUM(CASE WHEN quota.hard->>'storage' = '-1' THEN NULL ELSE (quota.hard->>'storage')::bigint END), 0) AS allocated,
+		COUNT(*) FILTER (WHERE quota.hard->>'storage' = '-1') AS unlimited
+		FROM quota
+		JOIN project ON CAST(project.project_id AS text) = quota.reference_id
+		WHERE quota.reference = 'project' AND project.deleted = FALSE`
+	result := &model.ProjectAllocation{}
 	if err := o.Raw(sql).QueryRow(result); err != nil {
 		return nil, err
 	}

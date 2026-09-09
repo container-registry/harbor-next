@@ -34,3 +34,11 @@ type SystemQuota struct {
 func (s *SystemQuota) TableName() string {
 	return Table
 }
+
+// ProjectAllocation summarizes the storage limits assigned to active projects.
+type ProjectAllocation struct {
+	// Allocated is the sum of finite project storage limits in bytes.
+	Allocated int64
+	// Unlimited is the number of projects whose storage limit is -1.
+	Unlimited int64
+}

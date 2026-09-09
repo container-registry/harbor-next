@@ -79,8 +79,8 @@ export class ProjectQuotasComponent implements OnChanges {
     @Output() refreshAllconfig: EventEmitter<Configuration> =
         new EventEmitter<Configuration>();
     quotaList: Quota[] = [];
-    // null when no global quota is set (404)
-    systemQuota: SystemQuota | null = null;
+    // undefined until the first answer, null once a 404 confirmed there is no global quota
+    systemQuota: SystemQuota | null | undefined;
     originalConfig: Configuration;
     currentPage = 1;
     totalCount = 0;
@@ -114,10 +114,13 @@ export class ProjectQuotasComponent implements OnChanges {
         this.systemQuotaService.getSystemQuota().subscribe(
             res => (this.systemQuota = res),
             error => {
-                this.systemQuota = null;
-                if (!error || error.status !== 404) {
-                    this.errorHandler.error(error);
+                // only a 404 proves that no global quota is configured; any other
+                // failure leaves the last known state untouched
+                if (error && error.status === 404) {
+                    this.systemQuota = null;
+                    return;
                 }
+                this.errorHandler.error(error);
             }
         );
     }

@@ -52,14 +52,12 @@ func (s *systemQuotaAPI) UpdateSystemQuota(ctx context.Context, params operation
 	if err := s.RequireSystemAccess(ctx, rbac.ActionUpdate, rbac.ResourceSystemQuota); err != nil {
 		return s.SendError(ctx, err)
 	}
-	if params.Quota == nil || params.Quota.Hard == nil {
-		return s.SendError(ctx, errors.BadRequestError(nil).WithMessage("hard required in body"))
+	// go-swagger validates the required fields; the guards keep a malformed
+	// body from panicking should that validation ever be bypassed.
+	if params.Quota == nil || params.Quota.Hard == nil || params.Quota.Hard.Storage == nil || params.Quota.Enforce == nil {
+		return s.SendError(ctx, errors.BadRequestError(nil).WithMessage("hard.storage and enforce are required"))
 	}
-	hard, ok := params.Quota.Hard[string(types.ResourceStorage)]
-	if !ok || len(params.Quota.Hard) != 1 {
-		return s.SendError(ctx, errors.BadRequestError(nil).WithMessage("hard must contain exactly the storage resource"))
-	}
-	if err := s.ctl.Update(ctx, hard, params.Quota.Enforce); err != nil {
+	if err := s.ctl.Update(ctx, *params.Quota.Hard.Storage, *params.Quota.Enforce); err != nil {
 		return s.SendError(ctx, err)
 	}
 	return operation.NewUpdateSystemQuotaOK()

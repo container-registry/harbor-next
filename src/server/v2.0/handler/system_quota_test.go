@@ -106,30 +106,30 @@ func (s *SystemQuotaTestSuite) TestGet() {
 func (s *SystemQuotaTestSuite) TestUpdate() {
 	s.asAdmin()
 	s.ctl.On("Update", mock.Anything, int64(2048), true).Return(nil)
-	res, err := s.PutJSON("/system/quota", &models.SystemQuotaUpdateReq{Hard: models.ResourceList{"storage": 2048}, Enforce: true})
+	res, err := s.PutJSON("/system/quota", map[string]any{"hard": map[string]any{"storage": 2048}, "enforce": true})
 	s.NoError(err)
 	s.Equal(200, res.StatusCode)
 }
 
-func (s *SystemQuotaTestSuite) TestUpdateRejectsOtherResources() {
+// go-swagger body validation is reported as 422 by lib_http.SendError, like every other endpoint
+func (s *SystemQuotaTestSuite) TestUpdateBodyValidation() {
 	s.asAdmin()
-	res, err := s.PutJSON("/system/quota", &models.SystemQuotaUpdateReq{Hard: models.ResourceList{"count": 1}})
-	s.NoError(err)
-	s.Equal(400, res.StatusCode)
+	for name, body := range map[string]any{
+		"missing hard":    map[string]any{"enforce": true},
+		"missing enforce": map[string]any{"hard": map[string]any{"storage": 1}},
+		"missing storage": map[string]any{"hard": map[string]any{"count": 1}, "enforce": false},
+		"zero storage":    map[string]any{"hard": map[string]any{"storage": 0}, "enforce": false},
+	} {
+		res, err := s.PutJSON("/system/quota", body)
+		s.NoError(err, name)
+		s.Equal(422, res.StatusCode, name)
+	}
 	s.ctl.AssertNotCalled(s.T(), "Update", mock.Anything, mock.Anything, mock.Anything)
-}
-
-func (s *SystemQuotaTestSuite) TestUpdateRequiresHard() {
-	s.asAdmin()
-	res, err := s.PutJSON("/system/quota", map[string]any{"enforce": true})
-	s.NoError(err)
-	// go-swagger body validation is reported as 422 by lib_http.SendError, like every other endpoint
-	s.Equal(422, res.StatusCode)
 }
 
 func (s *SystemQuotaTestSuite) TestUpdateForbiddenForNonAdmin() {
 	s.asUser()
-	res, err := s.PutJSON("/system/quota", &models.SystemQuotaUpdateReq{Hard: models.ResourceList{"storage": 1}})
+	res, err := s.PutJSON("/system/quota", map[string]any{"hard": map[string]any{"storage": 1}, "enforce": false})
 	s.NoError(err)
 	s.Equal(403, res.StatusCode)
 }
