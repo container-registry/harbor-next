@@ -6,25 +6,48 @@ Extra manifests - escape hatch for any additional resources
 
 {{/* Static manifests - merged with chart labels */}}
 {{- range .Values.extraManifests }}
----
-{{- $manifest := deepCopy . }}
+{{- $docs := list . }}
+{{- if kindIs "string" . }}
+{{- $docs = regexSplit "(?m)^---" . -1 }}
+{{- end }}
+{{- range $doc := $docs }}
+{{- $manifest := $doc }}
+{{- if kindIs "string" $doc }}
+{{- if trim $doc }}
+{{- $manifest = fromYaml $doc }}
+{{- if $manifest.Error }}{{- fail (printf "invalid YAML in manifest: %s" $manifest.Error) }}{{- end }}
+{{- end }}
+{{- end }}
+{{- if and $manifest (kindIs "map" $manifest) $manifest.kind }}
+{{- $manifest = deepCopy $manifest }}
 {{- $userMeta := default dict $manifest.metadata }}
 {{- $userLabels := default dict $userMeta.labels }}
 {{- $mergedLabels := merge $userLabels $labels }}
 {{- $_ := set $userMeta "labels" $mergedLabels }}
 {{- $_ := set $manifest "metadata" $userMeta }}
-{{- toYaml $manifest }}
+---
+{{ toYaml $manifest }}{{ "\n" }}
+{{- end }}
+{{- end }}
 {{- end }}
 
 {{/* Templated manifests - can use .Values, .Release, etc. */}}
 {{- range .Values.extraTemplateManifests }}
----
-{{- $rendered := tpl . $ | fromYaml }}
-{{- $manifest := deepCopy $rendered }}
+{{- $rendered := tpl . $ }}
+{{- range $docStr := regexSplit "(?m)^---" $rendered -1 }}
+{{- if trim $docStr }}
+{{- $manifest := fromYaml $docStr }}
+{{- if $manifest.Error }}{{- $manifest = dict }}{{- end }}
+{{- if and $manifest (kindIs "map" $manifest) $manifest.kind }}
+{{- $manifest = deepCopy $manifest }}
 {{- $userMeta := default dict $manifest.metadata }}
 {{- $userLabels := default dict $userMeta.labels }}
 {{- $mergedLabels := merge $userLabels $labels }}
 {{- $_ := set $userMeta "labels" $mergedLabels }}
 {{- $_ := set $manifest "metadata" $userMeta }}
-{{- toYaml $manifest }}
+---
+{{ toYaml $manifest }}{{ "\n" }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- end }}

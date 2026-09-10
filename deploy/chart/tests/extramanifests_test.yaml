@@ -69,3 +69,163 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+
+  # Regression: multi-document strings in extraTemplateManifests previously
+  # dropped every document after the first --- separator (issue #667).
+  - it: should render all documents from a multi-document extraTemplateManifests entry
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      extraTemplateManifests:
+        - |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: first
+          ---
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: second
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  - it: should render first document from a multi-document extraTemplateManifests entry
+    documentIndex: 0
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      extraTemplateManifests:
+        - |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: first
+          ---
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: second
+    asserts:
+      - equal:
+          path: metadata.name
+          value: first
+
+  - it: should render second document from a multi-document extraTemplateManifests entry
+    documentIndex: 1
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      extraTemplateManifests:
+        - |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: first
+          ---
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: second
+    asserts:
+      - equal:
+          path: metadata.name
+          value: second
+
+  # Regression: multi-document string entries in extraManifests previously
+  # failed with a type error because the static branch always called deepCopy
+  # on the raw string value before checking its kind.
+  - it: should render first document from a multi-document extraManifests string entry
+    documentIndex: 0
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      extraManifests:
+        - |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: alpha
+          ---
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: beta
+    asserts:
+      - equal:
+          path: metadata.name
+          value: alpha
+
+  - it: should render second document from a multi-document extraManifests string entry
+    documentIndex: 1
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      extraManifests:
+        - |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: alpha
+          ---
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: beta
+    asserts:
+      - equal:
+          path: metadata.name
+          value: beta
+
+  # Regression: tpl() applied to a full multi-document entry that contains
+  # template directives spanning a --- boundary must resolve correctly before
+  # the rendered output is split into individual documents.
+  - it: should interpolate templates in first document of multi-document extraTemplateManifests entries
+    documentIndex: 0
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      extraTemplateManifests:
+        - |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: {{ .Release.Name }}-first
+          ---
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: {{ .Release.Name }}-second
+    asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-first
+
+  - it: should interpolate templates in second document of multi-document extraTemplateManifests entries
+    documentIndex: 1
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      extraTemplateManifests:
+        - |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: {{ .Release.Name }}-first
+          ---
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: {{ .Release.Name }}-second
+    asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-second
