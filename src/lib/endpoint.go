@@ -23,12 +23,18 @@ import (
 	"github.com/goharbor/harbor/src/lib/errors"
 )
 
+<<<<<<< HEAD
 // ValidateURL checks whether the provided string is a valid URL whose scheme
 // is in allowedSchemes (default: http, https, s3, sftp, ftp — pass schemes
 // explicitly to restrict, e.g. ValidateURL(s, "http", "https")). A scheme-less
 // input is treated as http. On success the URL is returned normalized to
 // "scheme://host:port" to avoid the SSRF
 func ValidateURL(s string, allowedSchemes ...string) (string, error) {
+=======
+// NormalizeAndValidateHTTPURL checks whether the provided string is a valid HTTP URL and normalizes it.
+// If it is, return the URL in format "scheme://host:port" to avoid the SSRF
+func NormalizeAndValidateHTTPURL(s string) (string, error) {
+>>>>>>> 95b28b3cd (fix: make endpoint handling and validation case-insensitive (#23889))
 	s = strings.Trim(s, " ")
 	s = strings.TrimRight(s, "/")
 	if len(s) == 0 {
@@ -48,5 +54,10 @@ func ValidateURL(s string, allowedSchemes ...string) (string, error) {
 		return "", errors.New(nil).WithCode(errors.BadRequestCode).WithMessagef("invalid scheme: %s", parsedURL.Scheme)
 	}
 	// To avoid SSRF security issue, refer to #3755 for more detail
+<<<<<<< HEAD
 	return fmt.Sprintf("%s://%s%s", parsedURL.Scheme, parsedURL.Host, parsedURL.Path), nil
+=======
+	// Normalize host to lowercase per RFC 1035 (preserving scheme & path casing)
+	return fmt.Sprintf("%s://%s%s", url.Scheme, strings.ToLower(url.Host), url.Path), nil
+>>>>>>> 95b28b3cd (fix: make endpoint handling and validation case-insensitive (#23889))
 }

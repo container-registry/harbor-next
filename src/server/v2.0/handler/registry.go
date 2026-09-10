@@ -174,7 +174,11 @@ func (r *registryAPI) UpdateRegistry(ctx context.Context, params operation.Updat
 			registry.Credential.AccessSecret = *params.Registry.AccessSecret
 		}
 		if registry.URL != storedURL && params.Registry.AccessSecret == nil {
+<<<<<<< HEAD
 			normalizedURL, err := lib.ValidateURL(registry.URL)
+=======
+			normalizedURL, err := lib.NormalizeAndValidateHTTPURL(registry.URL)
+>>>>>>> 95b28b3cd (fix: make endpoint handling and validation case-insensitive (#23889))
 			if err != nil {
 				return r.SendError(ctx, err)
 			}
@@ -256,7 +260,11 @@ func (r *registryAPI) PingRegistry(ctx context.Context, params operation.PingReg
 		// authoritative; ignore url/insecure/ca overrides so the ping (and the saved
 		// credentials it sends) can't be redirected to or MITM'd via an untrusted endpoint
 		if params.Registry.URL != nil && params.Registry.ID == nil {
+<<<<<<< HEAD
 			url, err := lib.ValidateURL(*params.Registry.URL)
+=======
+			url, err := lib.NormalizeAndValidateHTTPURL(*params.Registry.URL)
+>>>>>>> 95b28b3cd (fix: make endpoint handling and validation case-insensitive (#23889))
 			if err != nil {
 				return r.SendError(ctx, err)
 			}
