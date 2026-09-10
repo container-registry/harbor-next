@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/container-registry/harbor-next/compare/chart-v2.0.0...chart-v2.1.0) (2026-09-10)
+
+
+### Features
+
+* **chart:** Add Harbor Grafana dashboard with 8gcr pgx monitoring ([#849](https://github.com/container-registry/harbor-next/issues/849)) ([572676e](https://github.com/container-registry/harbor-next/commit/572676e17868d52e4663c0bb4624732253b2021a))
+
 ## [2.0.0](https://github.com/container-registry/harbor-next/compare/chart-v1.0.0...chart-v2.0.0) (2026-09-08)
 
 
