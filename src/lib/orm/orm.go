@@ -104,6 +104,18 @@ func Copy(ctx context.Context) context.Context {
 	return NewContext(valueOnlyContext{ctx}, orm.NewOrm())
 }
 
+// InTransaction returns true when the orm in ctx runs inside a transaction,
+// e.g. the request-wide transaction started by the transaction middleware.
+func InTransaction(ctx context.Context) bool {
+	o, err := FromContext(ctx)
+	if err != nil {
+		return false
+	}
+
+	_, ok := o.(orm.TxOrmer)
+	return ok
+}
+
 type operationNameKey struct{}
 
 // SetTransactionOpNameToContext sets the transaction operation name
