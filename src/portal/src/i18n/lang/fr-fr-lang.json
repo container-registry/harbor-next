@@ -372,6 +372,7 @@
         "REGISTRY": "Registre",
         "SCAN_ALL": "Scanner tout",
         "SYSTEM_VOLUMES": "Volumes système",
+        "SYSTEM_QUOTA": "Global Storage Quota",
         "GARBAGE_COLLECTION": "Purge",
         "PURGE_AUDIT": "Purger l'audit",
         "JOBSERVICE_MONITOR": "Job Service Monitor",
@@ -1178,7 +1179,19 @@
         "INVALID_INPUT": "Saisie non valide",
         "PLACEHOLDER": "Nous n'avons trouvé aucun quota de projet !",
         "FILTER_PLACEHOLDER": "Chercher par nom (correspondance exacte)",
-        "QUOTA_USED": "Quota utilisé"
+        "QUOTA_USED": "Quota utilisé",
+        "SYSTEM_QUOTA": "Global storage quota",
+        "SYSTEM_QUOTA_NOT_SET": "not set",
+        "EDIT_SYSTEM_QUOTA": "Edit Global Storage Quota",
+        "SET_SYSTEM_QUOTA": "Set the storage quota for the whole instance. Enter -1 to remove it.",
+        "SYSTEM_QUOTA_LIMIT": "Global quota limit",
+        "SYSTEM_QUOTA_ENFORCE": "Enforce on registry writes",
+        "SYSTEM_QUOTA_ENFORCE_TIP": "When enabled, pushes are denied once usage reaches the limit. Deletions and garbage collection stay allowed.",
+        "SYSTEM_QUOTA_ENFORCED": "enforced",
+        "SYSTEM_QUOTA_ALLOCATED": "Allocated to projects",
+        "SYSTEM_QUOTA_UNLIMITED_PROJECTS": "{{count}} projects without limit",
+        "SYSTEM_QUOTA_MEASURED": "measured on the storage volume",
+        "SYSTEM_QUOTA_ACCOUNTED": "accounted from Harbor's blob table"
     },
     "WEEKLY": {
         "MONDAY": "Lundi",

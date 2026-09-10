@@ -23,6 +23,7 @@ import { SharedTestingModule } from '../../../../shared/shared.module';
 import { EditProjectQuotasComponent } from './edit-project-quotas/edit-project-quotas.component';
 import { QuotaService } from '../../../../../../ng-swagger-gen/services/quota.service';
 import { ProjectService } from '../../../../../../ng-swagger-gen/services/project.service';
+import { SystemquotaService } from '../../../../../../ng-swagger-gen/services/systemquota.service';
 import { HttpHeaders, HttpResponse } from '@angular/common/http';
 
 describe('ProjectQuotasComponent', () => {
@@ -77,6 +78,21 @@ describe('ProjectQuotasComponent', () => {
             declarations: [ProjectQuotasComponent, EditProjectQuotasComponent],
             providers: [
                 { provide: ProjectService, useValue: fakedProjectService },
+                {
+                    provide: SystemquotaService,
+                    useValue: {
+                        getSystemQuota: () =>
+                            of({
+                                hard: { storage: 1000 },
+                                used: { storage: 100 },
+                                free: 900,
+                                used_source: 'accounted',
+                                allocated: 500,
+                                unlimited_projects: 1,
+                                enforce: false,
+                            }),
+                    },
+                },
                 { provide: ErrorHandler, useValue: fakedErrorHandler },
                 { provide: APP_BASE_HREF, useValue: '/' },
                 { provide: Router, useValue: fakedRouter },
@@ -148,6 +164,36 @@ describe('ProjectQuotasComponent', () => {
         fixture.detectChanges();
         await fixture.whenStable();
         expect(spy.calls.count()).toEqual(2);
+    });
+    it('should render the global storage quota card', async () => {
+        // ngOnChanges is not triggered by the test bed, so fetch explicitly
+        component.getSystemQuota();
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(component.systemQuota).toBeTruthy();
+        expect(component.systemQuota.allocated).toEqual(500);
+        const card = fixture.nativeElement.querySelector('.system-quota');
+        expect(card).toBeTruthy();
+        expect(card.querySelector('.system-quota-allocation')).toBeTruthy();
+        expect(card.querySelector('.label-warning')).toBeNull();
+    });
+    it('should open the global storage quota editor', async () => {
+        component.getSystemQuota();
+        fixture.detectChanges();
+        await fixture.whenStable();
+        const spy = spyOn(
+            component.editQuotaDialog,
+            'openEditQuotaModal'
+        ).and.callThrough();
+        const button: HTMLButtonElement = fixture.nativeElement.querySelector(
+            '#open-edit-system-quota'
+        );
+        button.click();
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(spy).toHaveBeenCalled();
+        expect(spy.calls.mostRecent().args[0].isSystemQuota).toBeTrue();
+        expect(spy.calls.mostRecent().args[0].enforce).toBeFalse();
     });
     it('should get no quota', async () => {
         fixture.detectChanges();

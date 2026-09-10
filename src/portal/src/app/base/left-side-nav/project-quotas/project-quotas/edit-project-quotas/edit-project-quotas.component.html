@@ -12,7 +12,8 @@
             #quotaForm="ngForm"
             class="clr-form clr-form-horizontal"
             [class.clr-form-compact-common]="
-                !defaultTextsObj.isSystemDefaultQuota
+                !defaultTextsObj.isSystemDefaultQuota &&
+                !defaultTextsObj.isSystemQuota
             ">
             <clr-input-container>
                 <label class="left-label required"
@@ -51,7 +52,10 @@
 
                     <div
                         class="progress-block progress-min-width progress-div"
-                        *ngIf="!defaultTextsObj.isSystemDefaultQuota">
+                        *ngIf="
+                            !defaultTextsObj.isSystemDefaultQuota &&
+                            !defaultTextsObj.isSystemQuota
+                        ">
                         <div
                             class="progress success"
                             [class.danger]="
@@ -137,6 +141,22 @@
                     'PROJECT.STORAGE_QUOTA_TIP' | translate
                 }}</clr-control-error>
             </clr-input-container>
+            <clr-checkbox-container *ngIf="defaultTextsObj.isSystemQuota">
+                <clr-checkbox-wrapper>
+                    <input
+                        type="checkbox"
+                        clrCheckbox
+                        name="enforce"
+                        id="system-quota-enforce"
+                        [ngModel]="defaultTextsObj.enforce" />
+                    <label for="system-quota-enforce">{{
+                        'QUOTA.SYSTEM_QUOTA_ENFORCE' | translate
+                    }}</label>
+                </clr-checkbox-wrapper>
+                <clr-control-helper>{{
+                    'QUOTA.SYSTEM_QUOTA_ENFORCE_TIP' | translate
+                }}</clr-control-helper>
+            </clr-checkbox-container>
         </form>
     </div>
     <div class="modal-footer">

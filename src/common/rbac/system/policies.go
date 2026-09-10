@@ -76,6 +76,10 @@ var (
 
 		{Resource: rbac.ResourceSystemVolumes, Action: rbac.ActionRead},
 
+		{Resource: rbac.ResourceSystemQuota, Action: rbac.ActionRead},
+		{Resource: rbac.ResourceSystemQuota, Action: rbac.ActionUpdate},
+		{Resource: rbac.ResourceSystemQuota, Action: rbac.ActionDelete},
+
 		{Resource: rbac.ResourceLdapUser, Action: rbac.ActionCreate},
 		{Resource: rbac.ResourceLdapUser, Action: rbac.ActionList},
 		{Resource: rbac.ResourceConfiguration, Action: rbac.ActionRead},
