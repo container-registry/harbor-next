@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/goharbor/harbor/src/lib/log"
 )
@@ -32,6 +33,9 @@ const (
 	// authoritativeSchemaLockID is the ASCII encoding of "HNEXTSCH". It
 	// serializes reconciliation when multiple core replicas start together.
 	authoritativeSchemaLockID int64 = 0x484e455854534348
+
+	// authoritativeSchemaTimeout bounds startup blocking when a peer holds the advisory lock.
+	authoritativeSchemaTimeout = 10 * time.Minute
 )
 
 type schemaDB interface {
