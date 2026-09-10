@@ -42,8 +42,12 @@ var testcases = []struct {
 	{"http://127.0.0.%31/", "", false},
 	{"http://127.0.0.%31:8080/", "", false},
 	{"http://10.0.0.1/test.txt#/api/version", "http://10.0.0.1/test.txt", true},
+	{"http://HARBOR.FOO.COM", "http://harbor.foo.com", true},
+	{"http://HARBOR.FOO.COM:8080/MyPath", "http://harbor.foo.com:8080/MyPath", true},
+	{"https://My-Registry.Domain.COM/v2/Catalog", "https://my-registry.domain.com/v2/Catalog", true},
 }
 
+<<<<<<< HEAD
 func TestValidateURL(t *testing.T) {
 	for _, test := range testcases {
 		url, err := ValidateURL(test.url)
@@ -83,6 +87,20 @@ func TestValidateURLSchemes(t *testing.T) {
 		}
 		if !test.valid && err == nil {
 			t.Errorf("ValidateURL:%q schemes %v gave <nil> error; want some error", test.url, test.schemes)
+=======
+func TestNormalizeAndValidateHTTPURL(t *testing.T) {
+	for _, test := range testcases {
+		url, err := NormalizeAndValidateHTTPURL(test.url)
+		if test.valid {
+			if err != nil {
+				t.Errorf("NormalizeAndValidateHTTPURL:%q gave err %v; want no error", test.url, err)
+			}
+			if url != test.expectedUrl {
+				t.Errorf("NormalizeAndValidateHTTPURL:%q gave %s; want %s", test.url, url, test.expectedUrl)
+			}
+		} else if !test.valid && err == nil {
+			t.Errorf("NormalizeAndValidateHTTPURL:%q gave <nil> error; want some error", test.url)
+>>>>>>> 95b28b3cd (fix: make endpoint handling and validation case-insensitive (#23889))
 		}
 	}
 }
