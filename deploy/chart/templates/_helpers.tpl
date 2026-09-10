@@ -190,6 +190,24 @@ hostAliases:
 {{- end }}
 
 {{/*
+Deployment strategy block. Recreate forbids rollingUpdate, so emit an
+explicit null to clear the server-side default on upgrade (helm#5144).
+*/}}
+{{- define "harbor.deploymentStrategy" -}}
+{{- if eq (.type | default "") "Recreate" -}}
+{{- if .rollingUpdate -}}
+{{- fail "deploymentStrategy.rollingUpdate may not be set when type is Recreate" -}}
+{{- end -}}
+strategy:
+  {{- omit . "rollingUpdate" | toYaml | nindent 2 }}
+  rollingUpdate: null
+{{- else }}
+strategy:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end }}
+
+{{/*
 =============================================================================
 Probe helpers
 =============================================================================
