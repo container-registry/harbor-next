@@ -70,7 +70,11 @@ require (
 	go.pinniped.dev v0.47.0
 	go.uber.org/ratelimit v0.3.1
 	golang.org/x/crypto v0.55.0 // indirect
+<<<<<<< HEAD
 	golang.org/x/net v0.58.0 // indirect
+=======
+	golang.org/x/net v0.57.0 // indirect
+>>>>>>> 5ed6b1306 (chore(deps): bump golang.org/x/crypto to v0.55.0 (#23826))
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.22.0
 	golang.org/x/text v0.41.0
