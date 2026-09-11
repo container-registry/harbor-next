@@ -60,10 +60,11 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 	t.Cleanup(schemaPool.Close)
 
 	// Legacy tables created by the numbered migrations that harbor_next.sql
-	// declares foreign keys against.
+	// declares foreign keys against or reconciles in place.
 	legacyDependencies := []string{
 		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
 		"CREATE TABLE project (project_id SERIAL PRIMARY KEY)",
+		"CREATE TABLE execution (id SERIAL PRIMARY KEY, revision INTEGER)",
 	}
 	for _, statement := range legacyDependencies {
 		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
@@ -150,6 +151,20 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 				t.Errorf("authoritative schema column %q does not exist", table+"."+column)
 			}
 		}
+	}
+
+	// reconciled in place on a table the numbered migrations own
+	var revisionType string
+	err = schemaPool.DB().QueryRowContext(ctx, `
+		SELECT data_type
+		FROM information_schema.columns
+		WHERE table_schema = current_schema()
+		  AND table_name = 'execution'
+		  AND column_name = 'revision'`).Scan(&revisionType)
+	if err != nil {
+		t.Errorf("look up execution.revision type: %v", err)
+	} else if revisionType != "bigint" {
+		t.Errorf("execution.revision is %q, want bigint", revisionType)
 	}
 }
 
