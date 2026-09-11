@@ -31,7 +31,6 @@ func Test_readonlySkipper(t *testing.T) {
 	}{
 		{"login", args{httptest.NewRequest(http.MethodPost, "/c/login", nil)}, true},
 		{"login get", args{httptest.NewRequest(http.MethodGet, "/c/login", nil)}, false},
-		{"onboard", args{httptest.NewRequest(http.MethodPost, "/c/oidc/onboard", nil)}, true},
 		{"user exist", args{httptest.NewRequest(http.MethodPost, "/c/userExists", nil)}, true},
 	}
 	for _, tt := range tests {

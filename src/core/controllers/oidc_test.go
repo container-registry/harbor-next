@@ -1,5 +1,3 @@
-//go:build db
-
 package controllers
 
 import (
