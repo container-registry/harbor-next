@@ -84,12 +84,20 @@ Harbor Next uses [Taskfile](https://taskfile.dev) for local development and in p
 |------|---------|---------|
 | [Task](https://taskfile.dev/installation/) | v3.x | Build system (replaces Make) |
 | [Docker](https://docs.docker.com/get-docker/) / [Podman](https://podman.io/) | 20.10.10+ | Dev environment, linting, image builds |
+| [Docker Compose](https://docs.docker.com/compose/install/) | v2.24+ | Container orchestration |
 | [Go](https://go.dev/dl/) | see `versions.env` | Backend compilation and tests |
 | [Bun](https://bun.sh) | see `versions.env` | Frontend dependency management |
 | [Node.js](https://nodejs.org/) | 16+ | Frontend build, tests, and API codegen |
 | Git | any | Required by build metadata and mock checks |
 
 Additional Go tools (`air`, `dlv`, `govulncheck`) are auto-installed on first use via `go install` or by running `task setup`.
+
+> Note: The optional `GNUmakefile` provides a small set of common entry points and installs their managed prerequisites locally under `./.cache/`.
+> In other words, `make test` from a fresh clone will just work.
+> You don't need Task, Go, Bun, or Node installed to get started here.
+> Run another Task target with `make TASK='test:unit:pure'`, or use `make shell` to enter a subshell containing all the managed tools.
+> Its first use requires internet access.
+> Using `make` is completely optional, but avoids installing anything to get started.
 
 ### Quick Start
 
