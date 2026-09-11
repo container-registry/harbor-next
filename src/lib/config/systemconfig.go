@@ -345,6 +345,7 @@ func Database() (*models.Database, error) {
 		HealthCheckPeriod: DefaultMgr().Get(backgroundCtx, common.PostGreSQLHealthCheckPeriod).GetDuration(),
 		ConnectTimeout:    DefaultMgr().Get(backgroundCtx, common.PostGreSQLConnectTimeout).GetDuration(),
 		MinConns:          DefaultMgr().Get(backgroundCtx, common.PostGreSQLMinConns).GetOptionalInt32(),
+		StatementTimeout:  DefaultMgr().Get(backgroundCtx, common.PostGreSQLStatementTimeout).GetDuration(),
 		URL:               DefaultMgr().Get(backgroundCtx, common.PostGreSQLURL).GetString(),
 	}
 	database.PostGreSQL = postgresql

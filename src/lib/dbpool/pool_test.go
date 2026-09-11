@@ -276,3 +276,88 @@ func TestBuildDSN_PasswordWithSpecialChars(t *testing.T) {
 		})
 	}
 }
+
+func TestApplyStatementTimeout_Default(t *testing.T) {
+	cfg := &models.PostGreSQL{
+		Host: "h", Port: 5432, Username: "u",
+		Password: "p", Database: "d", SSLMode: "disable",
+	}
+	poolCfg, err := pgxpool.ParseConfig(BuildDSN(cfg))
+	require.NoError(t, err)
+
+	require.NoError(t, applyPoolConfig(poolCfg, cfg))
+
+	assert.Equal(t, "300000", poolCfg.ConnConfig.RuntimeParams["statement_timeout"],
+		"unset StatementTimeout must fall back to DefaultStatementTimeout (5m in ms)")
+}
+
+func TestApplyStatementTimeout_Explicit(t *testing.T) {
+	cfg := &models.PostGreSQL{
+		Host: "h", Port: 5432, Username: "u",
+		Password: "p", Database: "d", SSLMode: "disable",
+		StatementTimeout: 30 * time.Second,
+	}
+	poolCfg, err := pgxpool.ParseConfig(BuildDSN(cfg))
+	require.NoError(t, err)
+
+	require.NoError(t, applyPoolConfig(poolCfg, cfg))
+
+	assert.Equal(t, "30000", poolCfg.ConnConfig.RuntimeParams["statement_timeout"])
+}
+
+func TestApplyStatementTimeout_NegativeDisables(t *testing.T) {
+	cfg := &models.PostGreSQL{
+		Host: "h", Port: 5432, Username: "u",
+		Password: "p", Database: "d", SSLMode: "disable",
+		StatementTimeout: -1 * time.Second,
+	}
+	poolCfg, err := pgxpool.ParseConfig(BuildDSN(cfg))
+	require.NoError(t, err)
+
+	require.NoError(t, applyPoolConfig(poolCfg, cfg))
+
+	assert.NotContains(t, poolCfg.ConnConfig.RuntimeParams, "statement_timeout")
+}
+
+func TestApplyStatementTimeout_URLParamWins(t *testing.T) {
+	cfg := &models.PostGreSQL{
+		URL:              "postgresql://user:pass@host:5432/mydb?sslmode=disable&statement_timeout=1234",
+		StatementTimeout: 30 * time.Second,
+	}
+	poolCfg, err := pgxpool.ParseConfig(BuildDSN(cfg))
+	require.NoError(t, err)
+
+	require.NoError(t, applyPoolConfig(poolCfg, cfg))
+
+	assert.Equal(t, "1234", poolCfg.ConnConfig.RuntimeParams["statement_timeout"],
+		"statement_timeout from a URL DSN must not be overridden")
+}
+
+func TestApplyStatementTimeout_SubMillisecondRoundsUp(t *testing.T) {
+	cfg := &models.PostGreSQL{
+		Host: "h", Port: 5432, Username: "u",
+		Password: "p", Database: "d", SSLMode: "disable",
+		StatementTimeout: 500 * time.Microsecond,
+	}
+	poolCfg, err := pgxpool.ParseConfig(BuildDSN(cfg))
+	require.NoError(t, err)
+
+	require.NoError(t, applyPoolConfig(poolCfg, cfg))
+
+	assert.Equal(t, "1", poolCfg.ConnConfig.RuntimeParams["statement_timeout"],
+		"positive sub-millisecond timeout must round up to 1ms, not truncate to 0 (which disables it)")
+}
+
+func TestApplyStatementTimeout_ExceedsPostgresMaxRejected(t *testing.T) {
+	cfg := &models.PostGreSQL{
+		Host: "h", Port: 5432, Username: "u",
+		Password: "p", Database: "d", SSLMode: "disable",
+		StatementTimeout: MaxStatementTimeout + time.Millisecond,
+	}
+	poolCfg, err := pgxpool.ParseConfig(BuildDSN(cfg))
+	require.NoError(t, err)
+
+	err = applyPoolConfig(poolCfg, cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "statement_timeout")
+}

@@ -38,5 +38,6 @@ type PostGreSQL struct {
 	HealthCheckPeriod time.Duration `json:"health_check_period"`
 	ConnectTimeout    time.Duration `json:"connect_timeout"`
 	MinConns          *int32        `json:"min_conns,omitempty"` // nil = unset (dbpool.DefaultMinConns); 0 is a valid setting
+	StatementTimeout  time.Duration `json:"statement_timeout"`   // 0 = unset (dbpool.DefaultStatementTimeout); negative disables
 	URL               string        `json:"url"`
 }

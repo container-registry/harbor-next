@@ -58,6 +58,8 @@ Kubernetes rejects a non-string env value.
   value: {{ .Values.database.connMaxIdleTime | quote }}
 - name: HARBOR_DATABASE_CONN_MAX_LIFETIME
   value: {{ .Values.database.connMaxLifetime | quote }}
+- name: HARBOR_DATABASE_STATEMENT_TIMEOUT
+  value: {{ .Values.database.statementTimeout | quote }}
 {{- $extAuth := and (not .Values.valkey.enabled) (or .Values.externalRedis.existingSecret .Values.externalRedis.password) -}}
 {{- if or .Values.valkey.auth.enabled $extAuth }}
 - name: REDIS_PASSWORD

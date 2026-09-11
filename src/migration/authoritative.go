@@ -105,6 +105,12 @@ func applyAuthoritativeSchema(ctx context.Context, db schemaDB, path string) err
 	if err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", authoritativeSchemaLockID); err != nil {
 		return fmt.Errorf("lock authoritative Harbor Next schema: %w", err)
 	}
+	// The pool sets statement_timeout on every connection to kill stuck runtime
+	// queries, but schema DDL (e.g. index builds on large tables) may legitimately
+	// run longer — lift the limit for this transaction only.
+	if err := tx.Exec(ctx, "SET LOCAL statement_timeout = 0"); err != nil {
+		return fmt.Errorf("disable statement_timeout for authoritative Harbor Next schema: %w", err)
+	}
 	if err := tx.Exec(ctx, string(schema)); err != nil {
 		return fmt.Errorf("apply authoritative Harbor Next schema: %w", err)
 	}

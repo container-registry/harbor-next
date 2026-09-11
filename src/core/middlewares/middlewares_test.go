@@ -20,6 +20,42 @@ import (
 	"testing"
 )
 
+// The admission gate must cover ONLY the allowlisted user-facing routes;
+// gating an internal machine-to-machine path with an unexpected 429 can break
+// flows (e.g. GC callbacks) destructively.
+func Test_dbAdmissionSkipper(t *testing.T) {
+	tests := []struct {
+		name     string
+		method   string
+		path     string
+		wantSkip bool
+	}{
+		{"login gated", http.MethodPost, "/c/login", false},
+		{"create project gated", http.MethodPost, "/api/v2.0/projects", false},
+		{"create project trailing slash gated", http.MethodPost, "/api/v2.0/projects/", false},
+		{"create user gated", http.MethodPost, "/api/v2.0/users", false},
+		{"create robot gated", http.MethodPost, "/api/v2.0/robots", false},
+
+		{"login page not gated", http.MethodGet, "/c/login", true},
+		{"list projects not gated", http.MethodGet, "/api/v2.0/projects", true},
+		{"project sub-resource not gated", http.MethodPost, "/api/v2.0/projects/1/members", true},
+		{"jobservice callback not gated", http.MethodPost, "/service/notifications/jobs/adminjob/123", true},
+		{"token auth not gated", http.MethodGet, "/service/token", true},
+		{"manifest push not gated", http.MethodPut, "/v2/library/nginx/manifests/latest", true},
+		{"blob pull not gated", http.MethodGet, "/v2/library/nginx/blobs/sha256:abc", true},
+		{"ping not gated", http.MethodGet, "/api/v2.0/ping", true},
+		{"health not gated", http.MethodGet, "/api/v2.0/health", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := httptest.NewRequest(tt.method, tt.path, nil)
+			if got := dbAdmissionSkipper(r); got != tt.wantSkip {
+				t.Errorf("dbAdmissionSkipper(%s %s) = %v, want %v", tt.method, tt.path, got, tt.wantSkip)
+			}
+		})
+	}
+}
+
 func Test_readonlySkipper(t *testing.T) {
 	type args struct {
 		r *http.Request

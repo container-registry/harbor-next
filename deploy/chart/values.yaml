@@ -1521,6 +1521,12 @@ database:
   # -- Max total lifetime before a connection is recycled, useful for
   # failover/LB hygiene (empty/0 keeps the pool's built-in default).
   connMaxLifetime: "30m"
+  # -- Server-side statement_timeout applied to every pooled connection
+  # (POSTGRESQL_STATEMENT_TIMEOUT). Statements running longer are killed by
+  # PostgreSQL so their connections return to the pool instead of being held
+  # forever by a stuck query. Schema migrations are exempt. A negative value
+  # (e.g. "-1s") disables it; empty keeps the built-in 5m default.
+  statementTimeout: "5m"
   # -- Existing secret containing database credentials
   # Default secret key: POSTGRESQL_PASSWORD
   existingSecret: ""

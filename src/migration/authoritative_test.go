@@ -103,7 +103,7 @@ func TestApplyAuthoritativeSchemaIsRepeatable(t *testing.T) {
 		if tx.rolledBack {
 			t.Errorf("transaction %d was rolled back", i+1)
 		}
-		if got, want := len(tx.queries), 2; got != want {
+		if got, want := len(tx.queries), 3; got != want {
 			t.Fatalf("transaction %d query count = %d, want %d", i+1, got, want)
 		}
 		if got, want := tx.queries[0], "SELECT pg_advisory_xact_lock($1)"; got != want {
@@ -112,7 +112,10 @@ func TestApplyAuthoritativeSchemaIsRepeatable(t *testing.T) {
 		if got, want := tx.args[0][0], any(authoritativeSchemaLockID); got != want {
 			t.Errorf("transaction %d lock ID = %v, want %v", i+1, got, want)
 		}
-		if got := tx.queries[1]; got != schema {
+		if got, want := tx.queries[1], "SET LOCAL statement_timeout = 0"; got != want {
+			t.Errorf("transaction %d timeout query = %q, want %q", i+1, got, want)
+		}
+		if got := tx.queries[2]; got != schema {
 			t.Errorf("transaction %d schema query = %q, want %q", i+1, got, schema)
 		}
 	}
@@ -121,6 +124,7 @@ func TestApplyAuthoritativeSchemaIsRepeatable(t *testing.T) {
 func TestApplyAuthoritativeSchemaErrors(t *testing.T) {
 	errBegin := errors.New("begin")
 	errLock := errors.New("lock")
+	errTimeout := errors.New("timeout")
 	errApply := errors.New("apply")
 	errCommit := errors.New("commit")
 
@@ -159,9 +163,16 @@ func TestApplyAuthoritativeSchemaErrors(t *testing.T) {
 			wantRollback: true,
 		},
 		{
+			name:         "disable statement timeout",
+			path:         func(t *testing.T) string { return writeSchema(t, "SELECT 1;") },
+			execErrors:   map[int]error{2: errTimeout},
+			wantErr:      errTimeout,
+			wantRollback: true,
+		},
+		{
 			name:         "execute schema",
 			path:         func(t *testing.T) string { return writeSchema(t, "SELECT 1;") },
-			execErrors:   map[int]error{2: errApply},
+			execErrors:   map[int]error{3: errApply},
 			wantErr:      errApply,
 			wantRollback: true,
 		},
