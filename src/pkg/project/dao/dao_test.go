@@ -432,6 +432,47 @@ func (suite *DaoTestSuite) TestListRoles() {
 	}
 }
 
+// A query operand the column cannot take must be reported as a bad request
+// rather than letting the Postgres syntax error surface as a 500.
+func (suite *DaoTestSuite) TestListInvalidFilterValue() {
+	for _, query := range []string{
+		"creation_time=[a~b]",
+		"creation_time=[2020~abc]",
+		"creation_time=abc",
+		"creation_time={a b}",
+		"project_id=[a~b]",
+		"project_id=abc",
+	} {
+		suite.Run(query, func() {
+			built, err := q.Build(query, "", 1, 10)
+			suite.Require().Nil(err)
+
+			_, err = suite.dao.List(orm.Context(), built)
+			suite.Require().NotNil(err)
+			suite.True(errors.IsErr(err, errors.BadRequestCode), "want a bad request error, got %v", err)
+		})
+	}
+}
+
+func (suite *DaoTestSuite) TestListValidFilterValue() {
+	for _, query := range []string{
+		"creation_time=[2020-01-01T00:00:00~2021-01-01T00:00:00]",
+		"creation_time=[2020-01-01~2021-01-01]",
+		"creation_time=~2020",
+		"project_id=[1~2]",
+		"project_id=1",
+		"name=abc",
+	} {
+		suite.Run(query, func() {
+			built, err := q.Build(query, "", 1, 10)
+			suite.Require().Nil(err)
+
+			_, err = suite.dao.List(orm.Context(), built)
+			suite.Nil(err)
+		})
+	}
+}
+
 func TestDaoTestSuite(t *testing.T) {
 	suite.Run(t, &DaoTestSuite{})
 }
