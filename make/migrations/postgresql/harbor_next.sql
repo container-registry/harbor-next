@@ -126,3 +126,22 @@ UPDATE multi_project_reference m
 SET rank = ranked.rn
 FROM ranked
 WHERE m.id = ranked.id AND m.rank <> ranked.rn;
+
+-- execution.revision is declared int64 in the Go model (src/pkg/task/dao/model.go)
+-- while the column stayed integer. gh#23718 widened p2p_preheat_instance.setup_timestamp,
+-- task.status_revision and schedule.revision to bigint and left this one behind.
+-- Guarded on the current type so repeat runs never rewrite the table.
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'execution'
+          AND column_name = 'revision'
+          AND data_type <> 'bigint'
+    ) THEN
+        ALTER TABLE execution ALTER COLUMN revision TYPE bigint;
+    END IF;
+END
+$$;
