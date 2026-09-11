@@ -163,6 +163,7 @@ func (c *controllerTestSuite) setupProCtl() {
 }
 
 func (c *controllerTestSuite) TestAssembleArtifact() {
+	c.setupArtMgr()
 	c.setupTagCtl()
 	c.setupLabelMgr()
 	c.setupAccMgr()
@@ -251,6 +252,9 @@ func subjectArtifactID(id int64) any {
 }
 
 func (c *controllerTestSuite) TestPopulateInheritedAccessoriesNoParent() {
+	c.setupArtMgr()
+	c.setupAccMgr()
+
 	c.artMgr.On("ListReferences", mock.Anything, mock.Anything).Return([]*artifact.Reference{}, nil)
 
 	art := &Artifact{Artifact: artifact.Artifact{ID: 1}}
@@ -262,6 +266,9 @@ func (c *controllerTestSuite) TestPopulateInheritedAccessoriesNoParent() {
 }
 
 func (c *controllerTestSuite) TestPopulateInheritedAccessoriesFromParent() {
+	c.setupArtMgr()
+	c.setupAccMgr()
+
 	c.artMgr.On("ListReferences", mock.Anything, mock.Anything).Return([]*artifact.Reference{
 		{ParentID: 10, ChildID: 1},
 	}, nil)
@@ -282,6 +289,9 @@ func (c *controllerTestSuite) TestPopulateInheritedAccessoriesFromParent() {
 }
 
 func (c *controllerTestSuite) TestPopulateInheritedAccessoriesOwnSignature() {
+	c.setupArtMgr()
+	c.setupAccMgr()
+
 	c.artMgr.On("ListReferences", mock.Anything, mock.Anything).Return([]*artifact.Reference{
 		{ParentID: 10, ChildID: 1},
 	}, nil)
@@ -298,6 +308,9 @@ func (c *controllerTestSuite) TestPopulateInheritedAccessoriesOwnSignature() {
 }
 
 func (c *controllerTestSuite) TestPopulateInheritedAccessoriesNotationFromParent() {
+	c.setupArtMgr()
+	c.setupAccMgr()
+
 	c.artMgr.On("ListReferences", mock.Anything, mock.Anything).Return([]*artifact.Reference{
 		{ParentID: 10, ChildID: 1},
 	}, nil)
@@ -315,6 +328,9 @@ func (c *controllerTestSuite) TestPopulateInheritedAccessoriesNotationFromParent
 }
 
 func (c *controllerTestSuite) TestPopulateInheritedAccessoriesOwnNotationSignature() {
+	c.setupArtMgr()
+	c.setupAccMgr()
+
 	c.artMgr.On("ListReferences", mock.Anything, mock.Anything).Return([]*artifact.Reference{
 		{ParentID: 10, ChildID: 1},
 	}, nil)
@@ -333,6 +349,9 @@ func (c *controllerTestSuite) TestPopulateInheritedAccessoriesOwnNotationSignatu
 }
 
 func (c *controllerTestSuite) TestPopulateInheritedAccessoriesNonSignatureParent() {
+	c.setupArtMgr()
+	c.setupAccMgr()
+
 	c.artMgr.On("ListReferences", mock.Anything, mock.Anything).Return([]*artifact.Reference{
 		{ParentID: 10, ChildID: 1},
 	}, nil)
@@ -350,6 +369,9 @@ func (c *controllerTestSuite) TestPopulateInheritedAccessoriesNonSignatureParent
 }
 
 func (c *controllerTestSuite) TestPopulateInheritedAccessoriesMultipleParents() {
+	c.setupArtMgr()
+	c.setupAccMgr()
+
 	c.artMgr.On("ListReferences", mock.Anything, mock.Anything).Return([]*artifact.Reference{
 		{ParentID: 10, ChildID: 1},
 		{ParentID: 20, ChildID: 1},
@@ -369,6 +391,9 @@ func (c *controllerTestSuite) TestPopulateInheritedAccessoriesMultipleParents() 
 }
 
 func (c *controllerTestSuite) TestPopulateInheritedAccessoriesUnsignedParent() {
+	c.setupArtMgr()
+	c.setupAccMgr()
+
 	c.artMgr.On("ListReferences", mock.Anything, mock.Anything).Return([]*artifact.Reference{
 		{ParentID: 10, ChildID: 1},
 	}, nil)
@@ -382,6 +407,9 @@ func (c *controllerTestSuite) TestPopulateInheritedAccessoriesUnsignedParent() {
 }
 
 func (c *controllerTestSuite) TestPopulateInheritedAccessoriesWithoutOwnAccessories() {
+	c.setupArtMgr()
+	c.setupAccMgr()
+
 	c.artMgr.On("ListReferences", mock.Anything, mock.Anything).Return([]*artifact.Reference{
 		{ParentID: 10, ChildID: 1},
 	}, nil)
@@ -400,6 +428,8 @@ func (c *controllerTestSuite) TestPopulateInheritedAccessoriesWithoutOwnAccessor
 }
 
 func (c *controllerTestSuite) TestPopulateInheritedAccessoriesListReferencesError() {
+	c.setupArtMgr()
+
 	c.artMgr.On("ListReferences", mock.Anything, mock.Anything).
 		Return(nil, errors.New("failed to list references"))
 
