@@ -176,7 +176,12 @@ func (c *controller) IsHealthy(ctx context.Context, registry *model.Registry) (b
 	}
 	status, err := adapter.HealthCheck()
 	if err != nil {
-		return false, err
+		// The endpoint comes from the request, so a transport failure is a
+		// problem with what the caller supplied, not an internal one. Without
+		// this the raw error ("unsupported protocol scheme \"ftp\"", "no such
+		// host") reached the client as a 500.
+		return false, errors.New(nil).WithCode(errors.BadRequestCode).
+			WithMessagef("failed to check the health of the registry %s: %v", registry.URL, err)
 	}
 	return status == model.Healthy, nil
 }

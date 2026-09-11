@@ -16,12 +16,14 @@ package registry
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
 	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/lib/config"
+	"github.com/goharbor/harbor/src/lib/errors"
 	_ "github.com/goharbor/harbor/src/pkg/config/inmemory"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
 	"github.com/goharbor/harbor/src/testing/mock"
@@ -149,6 +151,44 @@ func (r *registryTestSuite) TestValidate() {
 	r.Equal("http://example.com/redirect", registry.URL)
 	r.regMgr.AssertExpectations(r.T())
 	r.adapter.AssertExpectations(r.T())
+}
+
+// The endpoint comes from the request body, so a transport failure while
+// health-checking it must be reported as a bad request, not a 500.
+func (r *registryTestSuite) TestValidateHealthCheckTransportError() {
+	for _, tc := range []struct {
+		name string
+		url  string
+		err  error
+	}{
+		{
+			name: "unsupported scheme",
+			url:  "ftp://example.invalid",
+			err:  fmt.Errorf(`Get "ftp://example.invalid/api/version": unsupported protocol scheme "ftp"`),
+		},
+		{
+			name: "unresolvable host",
+			url:  "not-a-url",
+			err:  fmt.Errorf(`Get "http://not-a-url/api/version": dial tcp: lookup not-a-url: no such host`),
+		},
+	} {
+		r.Run(tc.name, func() {
+			r.SetupTest()
+			mock.OnAnything(r.regMgr, "CreateAdapter").Return(r.adapter, nil)
+			mock.OnAnything(r.adapter, "HealthCheck").Return("", tc.err)
+
+			err := r.ctl.validate(context.Background(), &model.Registry{
+				Name: "endpoint01",
+				URL:  tc.url,
+			})
+
+			r.Require().NotNil(err)
+			r.True(errors.IsErr(err, errors.BadRequestCode), "want a bad request error, got %v", err)
+			r.Contains(err.Error(), tc.err.Error())
+			r.regMgr.AssertExpectations(r.T())
+			r.adapter.AssertExpectations(r.T())
+		})
+	}
 }
 
 func (r *registryTestSuite) TestDelete() {
