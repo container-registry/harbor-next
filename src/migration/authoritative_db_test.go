@@ -63,6 +63,10 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 		t.Fatalf("create robot dependency: %v", err)
 	}
 
+	if _, err := schemaPool.DB().ExecContext(ctx, "CREATE TABLE execution (id SERIAL PRIMARY KEY, revision INTEGER)"); err != nil {
+		t.Fatalf("create execution dependency: %v", err)
+	}
+
 	path := authoritativeTestSchemaPath()
 	errCh := make(chan error, 2)
 	for range 2 {
@@ -135,6 +139,20 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 				t.Errorf("authoritative schema column %q does not exist", table+"."+column)
 			}
 		}
+	}
+
+	// reconciled in place on a table the numbered migrations own
+	var revisionType string
+	err = schemaPool.DB().QueryRowContext(ctx, `
+		SELECT data_type
+		FROM information_schema.columns
+		WHERE table_schema = current_schema()
+		  AND table_name = 'execution'
+		  AND column_name = 'revision'`).Scan(&revisionType)
+	if err != nil {
+		t.Errorf("look up execution.revision type: %v", err)
+	} else if revisionType != "bigint" {
+		t.Errorf("execution.revision is %q, want bigint", revisionType)
 	}
 }
 
