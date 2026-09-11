@@ -20,6 +20,7 @@ import (
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
 	"github.com/goharbor/harbor/src/server/v2.0/models"
 	"github.com/goharbor/harbor/src/server/v2.0/restapi"
@@ -223,6 +224,24 @@ func (suite *RegistryTestSuite) TestUpdateRegistryStorageSchemeURLAccepted() {
 		suite.Equal(newURL, updated.URL)
 		suite.Empty(updated.Credential.AccessSecret)
 	}
+}
+
+// A URL the health check cannot reach is a problem with the request body, so
+// the ping must answer 400 rather than surfacing the transport error as a 500.
+func (suite *RegistryTestSuite) TestPingRegistryUnreachableURLRejected() {
+	suite.Security.On("IsAuthenticated").Return(true).Once()
+	suite.Security.On("Can", mock.Anything, mock.Anything, mock.Anything).Return(true).Once()
+
+	unreachable := errors.New(nil).WithCode(errors.BadRequestCode).
+		WithMessage(`failed to check the health of the registry ftp://example.invalid: Get "ftp://example.invalid/api/version": unsupported protocol scheme "ftp"`)
+	suite.regCtl.On("IsHealthy", mock.Anything, mock.Anything).Return(false, unreachable).Once()
+
+	res, err := suite.PostJSON("/registries/ping", &models.RegistryPing{
+		Type: suite.ptrStr("harbor"),
+		URL:  suite.ptrStr("ftp://example.invalid"),
+	})
+	suite.NoError(err)
+	suite.Equal(400, res.StatusCode)
 }
 
 func TestRegistryTestSuite(t *testing.T) {
