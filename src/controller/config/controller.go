@@ -28,6 +28,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/audit"
+	"github.com/goharbor/harbor/src/pkg/project"
 	"github.com/goharbor/harbor/src/pkg/user"
 )
 
@@ -143,6 +144,29 @@ func (c *controller) validateCfg(ctx context.Context, cfgs map[string]any) error
 		return err
 	}
 
+	// verify the default project name cfg
+	if err = verifyDefaultProjectNameCfg(cfgs); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// verifyDefaultProjectNameCfg rejects a default_project_name that is not a
+// legal project name; every bare repository path and token scope would
+// otherwise be qualified with an unusable prefix. Empty disables the fallback.
+func verifyDefaultProjectNameCfg(cfgs map[string]any) error {
+	v, exist := cfgs[common.DefaultProjectName]
+	if !exist {
+		return nil
+	}
+	name, ok := v.(string)
+	if !ok {
+		return errors.BadRequestError(nil).WithMessagef("the %s value must be a string", common.DefaultProjectName)
+	}
+	if name != "" && !project.IsValidName(name) {
+		return errors.BadRequestError(nil).WithMessagef("the %s value %q is not a valid project name", common.DefaultProjectName, name)
+	}
 	return nil
 }
 

@@ -120,3 +120,27 @@ func Test_verifyValueLengthCfg(t *testing.T) {
 		})
 	}
 }
+
+func TestVerifyDefaultProjectNameCfg(t *testing.T) {
+	tests := []struct {
+		name    string
+		cfgs    map[string]any
+		wantErr bool
+	}{
+		{name: "absent", cfgs: map[string]any{}, wantErr: false},
+		{name: "empty disables fallback", cfgs: map[string]any{common.DefaultProjectName: ""}, wantErr: false},
+		{name: "valid name", cfgs: map[string]any{common.DefaultProjectName: "library"}, wantErr: false},
+		{name: "uppercase", cfgs: map[string]any{common.DefaultProjectName: "Library"}, wantErr: true},
+		{name: "contains slash", cfgs: map[string]any{common.DefaultProjectName: "a/b"}, wantErr: true},
+		{name: "contains space", cfgs: map[string]any{common.DefaultProjectName: "a b"}, wantErr: true},
+		{name: "leading separator", cfgs: map[string]any{common.DefaultProjectName: "_lib"}, wantErr: true},
+		{name: "not a string", cfgs: map[string]any{common.DefaultProjectName: 42}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := verifyDefaultProjectNameCfg(tt.cfgs); (err != nil) != tt.wantErr {
+				t.Errorf("verifyDefaultProjectNameCfg() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

@@ -264,6 +264,15 @@ func BannerMessage(ctx context.Context) string {
 	return DefaultMgr().Get(ctx, common.BannerMessage).GetString()
 }
 
+// DefaultProjectName returns the project that catches repositories pushed or
+// pulled without a project segment; empty disables the fallback
+func DefaultProjectName(ctx context.Context) string {
+	if DefaultMgr() == nil {
+		return ""
+	}
+	return DefaultMgr().Get(ctx, common.DefaultProjectName).GetString()
+}
+
 // AuditLogEventEnabled returns the audit log enabled setting for a specific event_type, such as delete_user, create_user
 func AuditLogEventEnabled(ctx context.Context, eventType string) bool {
 	if DefaultMgr() == nil || DefaultMgr().Get(ctx, common.AuditLogEventsDisabled) == nil {
