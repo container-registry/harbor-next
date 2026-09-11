@@ -36,6 +36,9 @@ type key struct {
 	Filterable bool
 	FilterFunc func(context.Context, orm.QuerySeter, string, any) orm.QuerySeter
 	Sortable   bool
+	// FieldType is the Go type of the model field the key maps to. It is nil for
+	// keys backed by a FilterFunc, which builds its own condition.
+	FieldType reflect.Type
 }
 
 type metadata struct {
@@ -95,11 +98,13 @@ func parseModel(model any) *metadata {
 			Name:       field.Name,
 			Filterable: filterable,
 			Sortable:   sortable,
+			FieldType:  field.Type,
 		}
 		metadata.Keys[column] = &key{
 			Name:       column,
 			Filterable: filterable,
 			Sortable:   sortable,
+			FieldType:  field.Type,
 		}
 		if defaultSort != nil {
 			metadata.DefaultSorts = []*q.Sort{defaultSort}
