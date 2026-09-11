@@ -353,12 +353,15 @@ func (c *controller) updateUsageWithRetry(ctx context.Context, reference, refere
 		// defaultRetryTimeout, so N concurrent pushes to one project turn a
 		// single conflict into a synchronized retry storm on the database.
 		retry.Backoff(true),
+<<<<<<< HEAD
 		// Give up as soon as the request is gone. An aborted push already
 		// terminated on its next attempt (updateUsageByDB returns the
 		// context error wrapped in retry.Abort); the context additionally
 		// cancels an in-progress backoff sleep instead of letting it run
 		// out and paying one more wasted attempt.
 		retry.Context(ctx),
+=======
+>>>>>>> a13ba0034 (fix(quota): enable retry backoff on quota usage updates (#23789))
 		retry.Callback(func(err error, _ time.Duration) {
 			log.G(ctx).Debugf("failed to update the quota usage for %s %s, error: %v", reference, referenceID, err)
 		}),
@@ -514,7 +517,10 @@ func (c *controller) Update(ctx context.Context, u *quota.Quota) error {
 		// See updateUsageWithRetry: backoff+jitter desynchronizes writers
 		// contending on the single quota row.
 		retry.Backoff(true),
+<<<<<<< HEAD
 		retry.Context(ctx),
+=======
+>>>>>>> a13ba0034 (fix(quota): enable retry backoff on quota usage updates (#23789))
 	}
 
 	return retry.Retry(f, options...)
