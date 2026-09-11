@@ -100,3 +100,13 @@ func (m *ManifestProcessor) UnmarshalConfig(_ context.Context, repository string
 	// unmarshal config layer
 	return json.NewDecoder(blob).Decode(v)
 }
+
+// ConfigSize returns the size of the config blob declared by the given manifest payload,
+// without pulling the blob itself.
+func (m *ManifestProcessor) ConfigSize(manifest []byte) (int64, error) {
+	mani := &v1.Manifest{}
+	if err := json.Unmarshal(manifest, mani); err != nil {
+		return 0, err
+	}
+	return mani.Config.Size, nil
+}
