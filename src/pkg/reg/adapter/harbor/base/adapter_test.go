@@ -315,3 +315,44 @@ func TestListProjects(t *testing.T) {
 	require.Equal(t, "p1", projects[0].Name)
 	require.Equal(t, "p2", projects[1].Name)
 }
+
+func TestIsLocalHarbor(t *testing.T) {
+	cases := []struct {
+		name    string
+		coreURL string
+		url     string
+		want    bool
+	}{
+		{"identical", "http://harbor-core", "http://harbor-core", true},
+		// The case reproduced on a real 2.15.8 deployment: core.extraEnv pins
+		// CORE_URL=http://harbor-core:80 while jobservice keeps the chart's
+		// portless value, so core stamps the local registry URL with the port
+		// (pkg/reg/manager.go getLocalRegistry -> config.InternalCoreURL) and
+		// jobservice compares it against its own env. Private projects then
+		// failed to replicate with 401; public ones still worked.
+		{"core pins the port through extraEnv, jobservice does not", "http://harbor-core", "http://harbor-core:80", true},
+		{"jobservice pins the port through extraEnv, core does not", "http://harbor-core:80", "http://harbor-core", true},
+		{"explicit https default port on the registry URL", "https://harbor-core", "https://harbor-core:443", true},
+		{"explicit https default port on CORE_URL", "https://harbor-core:443", "https://harbor-core", true},
+		{"trailing slash", "http://harbor-core", "http://harbor-core/", true},
+		{"uppercase host", "http://harbor-core", "http://HARBOR-CORE", true},
+		{"non-default port on both", "http://harbor-core:8080", "http://harbor-core:8080", true},
+		{"different host", "http://harbor-core", "http://other-harbor", false},
+		{"different non-default port", "http://harbor-core:8080", "http://harbor-core:8081", false},
+		{"http default port against non-default", "http://harbor-core", "http://harbor-core:8080", false},
+		{"different scheme", "http://harbor-core", "https://harbor-core", false},
+		{"https default port is not http default port", "https://harbor-core", "http://harbor-core:443", false},
+		{"different path", "http://harbor-core", "http://harbor-core/registry", false},
+		{"unparseable registry URL", "http://harbor-core", "http://[::1", false},
+		{"schemeless registry URL", "http://harbor-core", "harbor-core", false},
+		{"empty CORE_URL against schemeless URL", "", "harbor-core", false},
+		{"empty CORE_URL against absolute URL", "", "http://harbor-core", false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("CORE_URL", tc.coreURL)
+			assert.Equal(t, tc.want, isLocalHarbor(tc.url))
+		})
+	}
+}
