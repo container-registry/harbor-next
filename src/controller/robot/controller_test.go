@@ -143,6 +143,118 @@ func (suite *ControllerTestSuite) TestCreate() {
 	suite.Equal(int64(1), id)
 }
 
+func (suite *ControllerTestSuite) TestCreateWithProvidedSecret() {
+	secretKeyPath := "/tmp/secretkey_provided"
+	_, err := test.GenerateKey(secretKeyPath)
+	suite.Nil(err)
+	defer os.Remove(secretKeyPath)
+	suite.T().Setenv("KEY_PATH", secretKeyPath)
+
+	conf := map[string]any{
+		common.RobotTokenDuration: "30",
+	}
+	config.InitWithSettings(conf)
+
+	projectMgr := &project.Manager{}
+	rbacMgr := &rbac.Manager{}
+	robotMgr := &robot.Manager{}
+
+	c := controller{robotMgr: robotMgr, rbacMgr: rbacMgr, proMgr: projectMgr}
+	secCtx := &testsec.Context{}
+	secCtx.On("GetUsername").Return("security-context-user")
+	ctx := security.NewContext(context.Background(), secCtx)
+	projectMgr.On("Get", mock.Anything, mock.Anything).Return(&proModels.Project{ProjectID: 1, Name: "library"}, nil)
+
+	var createdSecret string
+	robotMgr.On("Create", mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			createdSecret = args.Get(1).(*model.Robot).Secret
+		}).
+		Return(int64(1), nil)
+	rbacMgr.On("CreateRbacPolicy", mock.Anything, mock.Anything, mock.Anything).Return(int64(1), nil)
+	rbacMgr.On("CreatePermission", mock.Anything, mock.Anything, mock.Anything).Return(int64(1), nil)
+
+	providedSecret := "MyCustom1Secret"
+	id, pwd, err := c.Create(ctx, &Robot{
+		Robot: model.Robot{
+			Name:        "testcreateprovidedsecret",
+			Description: "testcreateprovidedsecret",
+			Duration:    0,
+			Secret:      providedSecret,
+		},
+		ProjectName: "library",
+		Level:       LEVELPROJECT,
+		Permissions: []*Permission{
+			{
+				Kind:      "project",
+				Namespace: "library",
+				Access: []*types.Policy{
+					{
+						Resource: "repository",
+						Action:   "pull",
+					},
+				},
+			},
+		},
+	})
+	suite.Nil(err)
+	suite.Equal(int64(1), id)
+	// the plaintext secret returned to the caller must match what was provided
+	suite.Equal(providedSecret, pwd)
+	// the secret persisted via robotMgr.Create must not be the plaintext value
+	suite.NotEqual(providedSecret, createdSecret)
+	suite.NotEmpty(createdSecret)
+}
+
+func (suite *ControllerTestSuite) TestCreateWithInvalidProvidedSecret() {
+	secretKeyPath := "/tmp/secretkey_invalid"
+	_, err := test.GenerateKey(secretKeyPath)
+	suite.Nil(err)
+	defer os.Remove(secretKeyPath)
+	suite.T().Setenv("KEY_PATH", secretKeyPath)
+
+	conf := map[string]any{
+		common.RobotTokenDuration: "30",
+	}
+	config.InitWithSettings(conf)
+
+	projectMgr := &project.Manager{}
+	rbacMgr := &rbac.Manager{}
+	robotMgr := &robot.Manager{}
+
+	c := controller{robotMgr: robotMgr, rbacMgr: rbacMgr, proMgr: projectMgr}
+	secCtx := &testsec.Context{}
+	secCtx.On("GetUsername").Return("security-context-user")
+	ctx := security.NewContext(context.Background(), secCtx)
+	projectMgr.On("Get", mock.Anything, mock.Anything).Return(&proModels.Project{ProjectID: 1, Name: "library"}, nil)
+
+	_, _, err = c.Create(ctx, &Robot{
+		Robot: model.Robot{
+			Name:        "testcreateinvalidsecret",
+			Description: "testcreateinvalidsecret",
+			Duration:    0,
+			// too short, no uppercase/digit: must be rejected before robotMgr.Create is called
+			Secret: "short",
+		},
+		ProjectName: "library",
+		Level:       LEVELPROJECT,
+		Permissions: []*Permission{
+			{
+				Kind:      "project",
+				Namespace: "library",
+				Access: []*types.Policy{
+					{
+						Resource: "repository",
+						Action:   "pull",
+					},
+				},
+			},
+		},
+	})
+	suite.Error(err)
+	robotMgr.AssertNotCalled(suite.T(), "Create", mock.Anything, mock.Anything)
+}
+
 func (suite *ControllerTestSuite) TestDelete() {
 	projectMgr := &project.Manager{}
 	rbacMgr := &rbac.Manager{}
