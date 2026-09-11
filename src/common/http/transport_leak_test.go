@@ -29,6 +29,9 @@ func TestNewDefaultTransportLeakGuards(t *testing.T) {
 	assert.Positive(t, tr.MaxIdleConnsPerHost,
 		"MaxIdleConnsPerHost must be set (>0); Go's default of 2 forces connection churn under load")
 	assert.Equal(t, defaultMaxIdleConnsPerHost, tr.MaxIdleConnsPerHost)
+	assert.Equal(t, defaultMaxIdleConns, tr.MaxIdleConns)
+	assert.LessOrEqual(t, tr.MaxIdleConnsPerHost, tr.MaxIdleConns,
+		"the per-host idle cap must not exceed the total idle cap, or the total silently limits the per-host pool")
 	assert.Positive(t, tr.ResponseHeaderTimeout,
 		"ResponseHeaderTimeout must be set (>0) so requests to an unresponsive backend cannot hang forever")
 	assert.Equal(t, defaultResponseHeaderTimeout, tr.ResponseHeaderTimeout)
