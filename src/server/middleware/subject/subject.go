@@ -51,6 +51,10 @@ var (
 
 	// media type of harbor sbom
 	mediaTypeHarborSBOM = "application/vnd.goharbor.harbor.sbom.v1"
+	// media type of spdx sbom
+	mediaTypeSPDX = "application/spdx+json"
+	// media type of cyclonedx sbom
+	mediaTypeCycloneDX = "application/vnd.cyclonedx+json"
 
 	// source of accessory artifact is local, means the accessory is created by harbor itself
 	sourceLocal = "local"
@@ -166,7 +170,7 @@ func Middleware() func(http.Handler) http.Handler {
 				accData.Type = model.TypeNotationSignature
 			case mediaTypeCosignConfig, mediaTypeCosignArtifactType:
 				accData.Type = model.TypeCosignSignature
-			case mediaTypeHarborSBOM:
+			case mediaTypeHarborSBOM, mediaTypeSPDX, mediaTypeCycloneDX:
 				accData.Type = model.TypeHarborSBOM
 			}
 			if subjectArt != nil {
