@@ -1,0 +1,4 @@
+# Declared stacking between commercial patch branches: "child parent".
+# A stacked child's chain roots on its parent's tip instead of the pinned
+# baseline. Gates verify this exact shape — stacking is never inferred.
+0006-aws-rds-iam-auth 0005-pgx-monitoring
