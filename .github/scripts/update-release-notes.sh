@@ -247,8 +247,10 @@ if [[ "${chart_mode}" == false && -f "${series}" ]]; then
       {
         echo "### ${feature_title}"
         echo
-        printf '%s' "${feature_entries}"
-        echo
+        # printf keeps the entries verbatim; the two newlines restore the one
+        # command substitution stripped plus the blank line that separates
+        # this block from whatever follows it.
+        printf '%s\n\n' "${feature_entries}"
       } >> "${patch_notes}"
     else
       unchanged_features+=("${feature_title}")
