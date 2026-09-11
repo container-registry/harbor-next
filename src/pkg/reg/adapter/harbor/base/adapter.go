@@ -24,6 +24,7 @@ import (
 	common_http "github.com/goharbor/harbor/src/common/http"
 	"github.com/goharbor/harbor/src/common/http/modifier"
 	common_http_auth "github.com/goharbor/harbor/src/common/http/modifier/auth"
+	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
@@ -317,8 +318,17 @@ type Project struct {
 	RegistryID int64          `json:"registry_id"`
 }
 
+<<<<<<< HEAD
 func isLocalHarbor(url string) bool {
 	return url == os.Getenv("CORE_URL")
+=======
+func isLocalHarbor(rawURL string) bool {
+	coreURL := os.Getenv("CORE_URL")
+	if rawURL == "" || coreURL == "" {
+		return false
+	}
+	return utils.EqualURL(rawURL, coreURL)
+>>>>>>> 31789d8a6 (fix: make hostname and endpoint comparisons case-insensitive(2) (#23842))
 }
 
 // check whether the current process is running inside core
