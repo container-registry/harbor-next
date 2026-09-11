@@ -31,6 +31,7 @@ import (
 	"github.com/goharbor/harbor/src/controller/tag"
 	"github.com/goharbor/harbor/src/jobservice/job"
 	"github.com/goharbor/harbor/src/lib/config"
+	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/orm"
 	"github.com/goharbor/harbor/src/lib/q"
@@ -295,14 +296,44 @@ func (a *ArtifactEventHandler) onPush(ctx context.Context, event *event.Artifact
 			ctx = context.WithValue(ctx, operator.ContextKey{}, event.Operator)
 		}
 
-		if err := autoScan(ctx, &artifact.Artifact{Artifact: *event.Artifact}, event.Tags...); err != nil {
-			log.Errorf("scan artifact %s@%s failed, error: %v", event.Artifact.RepositoryName, event.Artifact.Digest, err)
+		executeWithRetry := func(actionName string, action func() error) {
+			for attempt := 1; attempt <= 4; attempt++ {
+				err := action()
+				if err == nil {
+					return
+				}
+
+				if errors.IsConflictErr(err) {
+					log.Debugf("%s for artifact %s@%s failed (conflict): %v", actionName, event.Artifact.RepositoryName, event.Artifact.Digest, err)
+					return
+				}
+
+				if errors.IsErr(err, errors.ScannerUnreachableCode) {
+					if attempt < 4 {
+						log.Warningf("%s for artifact %s@%s scanner unreachable. Retrying in 45s (attempt %d/4)...", actionName, event.Artifact.RepositoryName, event.Artifact.Digest, attempt)
+						select {
+						case <-ctx.Done():
+							log.Debugf("%s for artifact %s@%s cancelled during retry delay", actionName, event.Artifact.RepositoryName, event.Artifact.Digest)
+							return
+						case <-time.After(45 * time.Second):
+							continue
+						}
+					}
+				}
+
+				log.Errorf("%s for artifact %s@%s failed, error: %v", actionName, event.Artifact.RepositoryName, event.Artifact.Digest, err)
+				return
+			}
 		}
 
+		executeWithRetry("scan artifact", func() error {
+			return autoScan(ctx, &artifact.Artifact{Artifact: *event.Artifact}, event.Tags...)
+		})
+
 		log.Debugf("auto generate sbom is triggered for artifact event %+v", event)
-		if err := autoGenSBOM(ctx, &artifact.Artifact{Artifact: *event.Artifact}); err != nil {
-			log.Errorf("generate sbom for artifact %s@%s failed, error: %v", event.Artifact.RepositoryName, event.Artifact.Digest, err)
-		}
+		executeWithRetry("generate sbom", func() error {
+			return autoGenSBOM(ctx, &artifact.Artifact{Artifact: *event.Artifact})
+		})
 	}()
 
 	return nil
