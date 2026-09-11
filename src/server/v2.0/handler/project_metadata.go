@@ -28,6 +28,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/pattern"
 	proModels "github.com/goharbor/harbor/src/pkg/project/models"
 	"github.com/goharbor/harbor/src/pkg/scan/vuln"
+	"github.com/goharbor/harbor/src/server/v2.0/models"
 	operation "github.com/goharbor/harbor/src/server/v2.0/restapi/operations/project_metadata"
 )
 
@@ -138,7 +139,7 @@ func (p *projectMetadataAPI) UpdateProjectMetadata(ctx context.Context, params o
 	if err != nil {
 		return p.SendError(ctx, err)
 	}
-	if err = p.ctl.Update(ctx, project.ProjectID, metadata); err != nil {
+	if err = p.update(ctx, project.ProjectID, metadata); err != nil {
 		return p.SendError(ctx, err)
 	}
 	return operation.NewUpdateProjectMetadataOK()
@@ -191,6 +192,7 @@ func (p *projectMetadataAPI) validate(ctx context.Context, projectID int64, meta
 	case proModels.ProMetaProxyCacheFilterPattern:
 		if err := p.requireProxyProject(ctx, projectID); err != nil {
 			return nil, err
+<<<<<<< HEAD
 		}
 		// The API accepts one key per request, so the effective kind is
 		// whatever is already stored; empty means the doublestar default.
@@ -205,6 +207,8 @@ func (p *projectMetadataAPI) validate(ctx context.Context, projectID int64, meta
 		if err := pattern.ValidateRepositoryFilter(value, kind); err != nil {
 			return nil, errors.New(nil).WithCode(errors.BadRequestCode).
 				WithMessagef("invalid proxy_cache_filter_pattern: %q, err: %v", value, err)
+=======
+>>>>>>> 5d19f2625 (fix: Harden proxy cache repository filter validation (#23762))
 		}
 		metas[proModels.ProMetaProxyCacheFilterPattern] = value
 	case proModels.ProMetaProxyCacheFilterKind:
@@ -214,6 +218,7 @@ func (p *projectMetadataAPI) validate(ctx context.Context, projectID int64, meta
 		if err := pattern.ValidateKind(value); err != nil {
 			return nil, errors.New(nil).WithCode(errors.BadRequestCode).
 				WithMessagef("invalid proxy_cache_filter_kind: %v", err)
+<<<<<<< HEAD
 		}
 		// The new kind must keep the stored pattern (the only possible source,
 		// since the API accepts one key per request) compilable.
@@ -226,6 +231,8 @@ func (p *projectMetadataAPI) validate(ctx context.Context, projectID int64, meta
 				return nil, errors.New(nil).WithCode(errors.BadRequestCode).
 					WithMessagef("existing proxy_cache_filter_pattern %q is invalid for new kind %q: %v", pat, value, err)
 			}
+=======
+>>>>>>> 5d19f2625 (fix: Harden proxy cache repository filter validation (#23762))
 		}
 		metas[proModels.ProMetaProxyCacheFilterKind] = value
 	default:
@@ -234,6 +241,28 @@ func (p *projectMetadataAPI) validate(ctx context.Context, projectID int64, meta
 	return metas, nil
 }
 
+<<<<<<< HEAD
+=======
+func (p *projectMetadataAPI) update(ctx context.Context, projectID int64, metas map[string]string) error {
+	_, updatesPattern := metas[proModels.ProMetaProxyCacheFilterPattern]
+	_, updatesKind := metas[proModels.ProMetaProxyCacheFilterKind]
+	if !updatesPattern && !updatesKind {
+		return p.ctl.Update(ctx, projectID, metas)
+	}
+
+	return p.ctl.UpdateWithValidation(ctx, projectID, metas, validateProxyCacheFilterMetadata)
+}
+
+func validateProxyCacheFilterMetadata(metas map[string]string) error {
+	filterPattern := metas[proModels.ProMetaProxyCacheFilterPattern]
+	filterKind := metas[proModels.ProMetaProxyCacheFilterKind]
+	return validateProxyCacheRepositoryFilter(&models.ProjectMetadata{
+		ProxyCacheFilterPattern: &filterPattern,
+		ProxyCacheFilterKind:    &filterKind,
+	})
+}
+
+>>>>>>> 5d19f2625 (fix: Harden proxy cache repository filter validation (#23762))
 // requireProxyProject rejects proxy-cache-filter metadata changes on projects
 // that are not proxy cache projects.
 func (p *projectMetadataAPI) requireProxyProject(ctx context.Context, projectID int64) error {
