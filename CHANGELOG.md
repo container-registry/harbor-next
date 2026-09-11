@@ -6,6 +6,21 @@ This changelog mirrors [GitHub Releases](https://github.com/container-registry/h
 
 ---
 
+## [2.15.9](https://github.com/container-registry/harbor-next/compare/v2.15.8...v2.15.9) (2026-09-11)
+
+
+### Bug Fixes
+
+* **quota:** Enable retry backoff on quota usage updates (backport [#716](https://github.com/container-registry/harbor-next/issues/716)) ([75fab53](https://github.com/container-registry/harbor-next/commit/75fab53f4f00b02c147826422fcf79d9fc901933))
+* **scan:** Keep the last report when the raw report is empty (backport [#863](https://github.com/container-registry/harbor-next/issues/863)) ([1433e30](https://github.com/container-registry/harbor-next/commit/1433e30fd8eadc1818de1f64f694ca974ea5ce5f))
+
+
+### Upstream
+
+* add size limit for audit log payload (goharbor/harbor[#23755](https://github.com/container-registry/harbor-next/issues/23755)) ([45e97fd](https://github.com/container-registry/harbor-next/commit/45e97fd48773e414c62d31f8161ea2a7a6444d2c))
+* fix(i18n): improve Korean translation of FULL_NAME (goharbor/harbor[#22701](https://github.com/container-registry/harbor-next/issues/22701)) ([9ea0d71](https://github.com/container-registry/harbor-next/commit/9ea0d718e72e7d9cf58a649be0bbe05fb8f6f47d))
+* Prevent 500 if no project members have been provided (goharbor/harbor[#23642](https://github.com/container-registry/harbor-next/issues/23642)) ([c518ae7](https://github.com/container-registry/harbor-next/commit/c518ae7b13e8d5bc0a5910c57d6066fca73ea426))
+
 ## [2.15.8](https://github.com/container-registry/harbor-next/compare/v2.15.7...v2.15.8) (2026-08-26)
 
 
