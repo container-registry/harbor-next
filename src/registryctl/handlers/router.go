@@ -16,8 +16,7 @@ package handlers
 
 import (
 	"net/http"
-
-	"github.com/gorilla/mux"
+	"strings"
 
 	"github.com/goharbor/harbor/src/registryctl/api"
 	"github.com/goharbor/harbor/src/registryctl/api/registry/blob"
@@ -25,13 +24,46 @@ import (
 	"github.com/goharbor/harbor/src/registryctl/config"
 )
 
+// manifestsSeparator divides a repository name from a manifest reference in the
+// registry delete path.
+const manifestsSeparator = "/manifests/"
+
 func newRouter(conf config.Configuration) http.Handler {
 	// create the root rooter
-	rootRouter := mux.NewRouter()
-	rootRouter.StrictSlash(true)
-	rootRouter.HandleFunc("/api/health", api.Health).Methods("GET")
+	rootRouter := http.NewServeMux()
+	rootRouter.HandleFunc("GET /api/health", api.Health)
 
-	rootRouter.Path("/api/registry/blob/{reference}").Methods(http.MethodDelete).Handler(blob.NewHandler(conf.StorageDriver))
-	rootRouter.Path("/api/registry/{name:.*}/manifests/{reference}").Methods(http.MethodDelete).Handler(manifest.NewHandler(conf.StorageDriver))
+	rootRouter.Handle("DELETE /api/registry/blob/{reference}", blob.NewHandler(conf.StorageDriver))
+	rootRouter.Handle("DELETE /api/registry/{path...}", manifestRoute(manifest.NewHandler(conf.StorageDriver)))
 	return rootRouter
+}
+
+// manifestRoute recovers the repository name and the manifest reference from the
+// rest of the path. A repository name spans several segments, and only a
+// trailing "..." wildcard matches more than one, so "{name}/manifests/{reference}"
+// has no ServeMux spelling. Splitting on the last separator reproduces what the
+// greedy "{name:.*}" pattern matched.
+func manifestRoute(next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		rest := r.PathValue("path")
+
+		index := strings.LastIndex(rest, manifestsSeparator)
+		if index < 0 {
+			http.NotFound(w, r)
+			return
+		}
+
+		name := rest[:index]
+		reference := rest[index+len(manifestsSeparator):]
+		// The reference was a single-segment wildcard, so keep rejecting the rest.
+		if reference == "" || strings.Contains(reference, "/") {
+			http.NotFound(w, r)
+			return
+		}
+
+		r.SetPathValue("name", name)
+		r.SetPathValue("reference", reference)
+
+		next.ServeHTTP(w, r)
+	}
 }
