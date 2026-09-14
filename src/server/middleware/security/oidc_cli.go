@@ -83,7 +83,7 @@ func (o *oidcCli) Generate(req *http.Request) security.Context {
 		return nil
 	}
 
-	oidc.InjectGroupsToUser(info, u)
+	oidc.InjectGroupsToUser(ctx, info, u)
 	logger.Debugf("an OIDC CLI security context generated for request %s %s", req.Method, req.URL.Path)
 	return local.NewSecurityContext(u)
 }
