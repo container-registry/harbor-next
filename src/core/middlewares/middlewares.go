@@ -47,14 +47,16 @@ var (
 	// which will make ping request timeout, so skip the middlewares which will require DB conn.
 	pingSkipper = middleware.MethodAndPathSkipper(http.MethodGet, match("^/api/v2.0/ping"))
 
-	// dbTxSkippers skip the transaction middleware for PATCH Blob Upload, PUT Blob Upload and `Read` APIs
+	// dbTxSkippers skip the transaction middleware for POST Initiate Blob Upload, PATCH Blob Upload, PUT Blob Upload and `Read` APIs
 	// because the APIs may take a long time to run, enable the transaction middleware in them will hold the database connections
 	// until the API finished, this behavior may eat all the database connections.
 	// There are no database writing operations in the PATCH Blob APIs, so skip the transaction middleware is all ok.
 	// For the PUT Blob Upload API, we will make a transaction manually to write blob info to the database when put blob upload successfully.
+	// The POST Initiate Blob Upload API only writes on the cross-repo mount case, covered by a manual transaction in the blob middleware.
 	dbTxSkippers = []middleware.Skipper{
 		middleware.MethodAndPathSkipper(http.MethodPatch, distribution.BlobUploadURLRegexp),
 		middleware.MethodAndPathSkipper(http.MethodPut, distribution.BlobUploadURLRegexp),
+		middleware.MethodAndPathSkipper(http.MethodPost, distribution.InitiateBlobUploadRegexp),
 		middleware.MethodAndPathSkipper(http.MethodPost, match("^/service/token")),
 		func(r *http.Request) bool { // skip tx for GET, HEAD and Options requests
 			m := r.Method
