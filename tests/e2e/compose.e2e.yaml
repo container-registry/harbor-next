@@ -1,0 +1,41 @@
+# E2E overlay for deploy/compose/docker-compose.yaml.
+#
+# Relative paths resolve against the compose project directory, which run.sh
+# pins to deploy/compose with --project-directory.
+#
+# The network gets an explicit name so the harness can attach a throwaway
+# crane container to it without guessing the engine's <project>_default
+# naming convention.
+
+services:
+  # Replication destination. A plain registry:2 is enough: private-project
+  # replication fails on the source side, so the far end never has to be a
+  # second Harbor (herdr-cc/tasks/localdeploy-status.md).
+  destreg:
+    image: ${E2E_DESTREG_IMAGE:-docker.io/library/registry:2}
+    environment:
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+    restart: unless-stopped
+
+  # The scan-scale lane (#478). compose imposes no memory limit, the Helm chart
+  # defaults jobservice to 512Mi, and report conversion is the one job that
+  # cares — so an unlimited harness cannot reproduce what a chart install hits.
+  # E2E_JOBSERVICE_MEMORY=0 keeps the old unlimited behaviour.
+  #
+  # memswap_limit asks for no swap budget on top of the limit, so the container is
+  # OOM-killed rather than quietly swapping. Verified caveat: podman-compose drops
+  # this key — a container built from this overlay reports MemorySwap = 2x mem_limit,
+  # podman's default, whatever the value here. It is kept because it is the correct
+  # declaration for implementations that honour it, but under podman the container
+  # does get a swap budget. On a host with swap that can turn the kill into slow
+  # swapping instead; if a run stalls rather than failing, that is the first thing
+  # to check (podman run --memory-swap 0 is the only reliable way to get zero).
+  jobservice:
+    mem_limit: ${E2E_JOBSERVICE_MEMORY:-0}
+    memswap_limit: ${E2E_JOBSERVICE_MEMORY:-0}
+    environment:
+      GOMEMLIMIT: ${E2E_JOBSERVICE_GOMEMLIMIT:-off}
+
+networks:
+  default:
+    name: ${E2E_NETWORK}

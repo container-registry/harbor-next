@@ -73,3 +73,7 @@ bin
 .mcp.json
 .claude
 src/portal/src/swagger.json
+
+# e2e harness run artifacts
+tests/e2e/.logs/
+deploy/compose/config/
