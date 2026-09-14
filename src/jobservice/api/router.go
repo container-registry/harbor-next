@@ -17,9 +17,7 @@ package api
 import (
 	"fmt"
 	"net/http"
-
-	"github.com/gorilla/mux"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
+	"strings"
 
 	"github.com/goharbor/harbor/src/jobservice/errs"
 	"github.com/goharbor/harbor/src/jobservice/logger"
@@ -42,8 +40,8 @@ type Router interface {
 
 // BaseRouter provides the basic routes for the job service based on the golang http server mux.
 type BaseRouter struct {
-	// Use mux to keep the routes mapping.
-	router *mux.Router
+	// Use the standard library mux to keep the routes mapping.
+	router http.Handler
 
 	// Handler used to handle the requests
 	handler Handler
@@ -55,16 +53,15 @@ type BaseRouter struct {
 // NewBaseRouter is the constructor of BaseRouter.
 func NewBaseRouter(handler Handler, authenticator Authenticator) Router {
 	br := &BaseRouter{
-		router:        mux.NewRouter(),
 		handler:       handler,
 		authenticator: authenticator,
 	}
 
 	// Register routes here
-	br.registerRoutes()
+	br.router = br.registerRoutes()
 
 	if tracelib.Enabled() {
-		br.router.Use(otelmux.Middleware("serve-http"))
+		br.router = tracelib.NewHandler(br.router, "serve-http")
 	}
 	return br
 }
@@ -90,16 +87,35 @@ func (br *BaseRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	br.router.ServeHTTP(w, req)
 }
 
-// registerRoutes adds routes to the server mux.
-func (br *BaseRouter) registerRoutes() {
-	subRouter := br.router.PathPrefix(fmt.Sprintf("%s/%s", baseRoute, apiVersion)).Subrouter()
+// registerRoutes builds the server mux carrying the job service routes.
+func (br *BaseRouter) registerRoutes() http.Handler {
+	prefix := fmt.Sprintf("%s/%s", baseRoute, apiVersion)
+	router := http.NewServeMux()
 
-	subRouter.HandleFunc("/jobs", br.handler.HandleLaunchJobReq).Methods(http.MethodPost)
-	subRouter.HandleFunc("/jobs", br.handler.HandleGetJobsReq).Methods(http.MethodGet)
-	subRouter.HandleFunc("/jobs/{job_id}", br.handler.HandleGetJobReq).Methods(http.MethodGet)
-	subRouter.HandleFunc("/jobs/{job_id}", br.handler.HandleJobActionReq).Methods(http.MethodPost)
-	subRouter.HandleFunc("/jobs/{job_id}/log", br.handler.HandleJobLogReq).Methods(http.MethodGet)
-	subRouter.HandleFunc("/stats", br.handler.HandleCheckStatusReq).Methods(http.MethodGet)
-	subRouter.HandleFunc("/config", br.handler.HandleGetConfigReq).Methods(http.MethodGet)
-	subRouter.HandleFunc("/jobs/{job_id}/executions", br.handler.HandlePeriodicExecutions).Methods(http.MethodGet)
+	router.HandleFunc("POST "+prefix+"/jobs", br.handler.HandleLaunchJobReq)
+	router.HandleFunc("GET "+prefix+"/jobs", br.handler.HandleGetJobsReq)
+	router.HandleFunc("GET "+prefix+"/jobs/{job_id}", withJobID(br.handler.HandleGetJobReq))
+	router.HandleFunc("POST "+prefix+"/jobs/{job_id}", withJobID(br.handler.HandleJobActionReq))
+	router.HandleFunc("GET "+prefix+"/jobs/{job_id}/log", withJobID(br.handler.HandleJobLogReq))
+	router.HandleFunc("GET "+prefix+"/stats", br.handler.HandleCheckStatusReq)
+	router.HandleFunc("GET "+prefix+"/config", br.handler.HandleGetConfigReq)
+	router.HandleFunc("GET "+prefix+"/jobs/{job_id}/executions", withJobID(br.handler.HandlePeriodicExecutions))
+
+	return router
+}
+
+// withJobID turns away the job IDs the routes could not previously receive.
+// ServeMux matches escaped path segments and unescapes the wildcard afterwards,
+// so "%2F" and "%2e%2e" now reach a handler as a path value holding a separator
+// or a parent reference; gorilla/mux matched the decoded path and answered 404.
+// Keeping that answer leaves the routing contract where it was.
+func withJobID(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		if id := req.PathValue("job_id"); strings.Contains(id, "..") || strings.ContainsRune(id, '/') {
+			http.NotFound(w, req)
+			return
+		}
+
+		next(w, req)
+	}
 }
