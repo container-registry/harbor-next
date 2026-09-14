@@ -32,9 +32,10 @@ applied =: atom({})
 stale-cands =: atom([])
 
 # values subtrees that are open by design but not marked so in the schema
-# (valkey is a subchart boundary — upstream accepts dozens of keys the
-# schema deliberately does not document)
-open-by-config =:: ['.valkey']
+# (valkey and harbor-scanner-trivy are subchart boundaries — the subcharts
+# accept many keys this schema deliberately does not document; each
+# validates its own values with its own schema)
+open-by-config =:: ['.valkey', '.harbor-scanner-trivy']
 
 # stale-property origin PREFIXES that are intentional documentation of
 # optional / mutually-exclusive keys (commented out in values.yaml by

@@ -22,7 +22,8 @@
     "docker-compose",
     "dockerfile",
     "github-actions",
-    "gomod"
+    "gomod",
+    "helmv3"
   ],
   "vulnerabilityAlerts": {
     "labels": [
@@ -159,6 +160,16 @@
       ],
       "matchStrings": [
         "#\\s*renovate:\\s+datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(?:\\s+versioning=(?<versioning>\\S+))?(?:\\s+extractVersion=(?<extractVersion>\\S+))?\\s*\\n[A-Z_]+=(?<currentValue>\\S+)"
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "Update the built-in Trivy adapter image tag default in the chart image source map",
+      "managerFilePatterns": [
+        "/deploy/chart/templates/_helpers\\.tpl$/"
+      ],
+      "matchStrings": [
+        "#\\s*renovate:\\s+datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(?:\\s+versioning=(?<versioning>\\S+))?\\s*\\n\\s*trivy:\\s*(?<currentValue>\\S+)"
       ]
     }
   ]
