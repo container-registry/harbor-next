@@ -80,7 +80,7 @@ func (n *webhookAPI) requireExecutionInPolicy(ctx context.Context, execID, polic
 		return err
 	}
 
-	if exec.VendorID == policyID && (exec.VendorType == job.WebhookJobVendorType || exec.VendorType == job.SlackJobVendorType) {
+	if exec.VendorID == policyID && (exec.VendorType == job.WebhookJobVendorType || exec.VendorType == job.SlackJobVendorType || exec.VendorType == job.MatrixJobVendorType) {
 		return nil
 	}
 
