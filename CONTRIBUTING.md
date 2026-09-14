@@ -265,7 +265,7 @@ This renders in the release notes as:
 
 ## Adding Release Notes to Your PR
 
-**New features (`feat:`) must add a `## Release Notes` section to the PR description.** It is also expected for other user-facing changes (breaking changes, deprecations). The prose appears on the GitHub Release page under a `## Highlights` section.
+**New features (`feat:`) must add a `## Release Notes` section to the PR description.** It is also expected for other user-facing changes (breaking changes, deprecations). The content appears on the GitHub Release page under a `## Summary` section — verbatim, so screenshots and links carry over.
 
 Fill in the `## Release Notes` section in the PR description:
 
@@ -284,7 +284,7 @@ See the [OIDC documentation](https://docs.example.com/oidc) for configuration de
 - Links are fine and encouraged
 - HTML comments in the section are stripped automatically
 
-The `## Release Notes` section is extracted by the release pipeline and injected into the GitHub Release body. It does not affect `CHANGELOG.md`.
+The `## Release Notes` section is extracted by the release pipeline and injected into the GitHub Release body. It does not affect `CHANGELOG.md`, which is written from the commit history and is the other half of the release notes.
 
 ---
 

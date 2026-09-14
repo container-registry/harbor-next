@@ -71,6 +71,11 @@ node .github/scripts/format-release-notes.mjs \
   "${tmp_dir}/formatted-notes.md" \
   "${tmp_dir}/contributors.md"
 
+node .github/scripts/extract-pr-summary.mjs \
+  "${tmp_dir}/formatted-notes.md" \
+  "${GITHUB_REPOSITORY}" \
+  "${tmp_dir}/summary.md"
+
 if [[ -n "${preview_pr_number}" ]]; then
   release_branch="${GITHUB_REF_NAME:?GITHUB_REF_NAME is required for a release PR preview}"
 elif [[ "${GITHUB_REF_TYPE:-}" == "branch" && -n "${GITHUB_REF_NAME:-}" ]]; then
@@ -111,6 +116,12 @@ patch_notes="${tmp_dir}/commercial-patches.md"
 
 # The Harbor branch owns the ordered manifest. 8gcr only stores the branch
 # commits, so release notes and image builds always use the same exact list.
+# Each patch branch carries its own changelog at changelogs/<branch>.md
+# (humans append entries in their PRs; the release-cut stamps
+# "--- release vX.Y.Z (target <sha12>) ---" markers, newest first). The
+# unreleased block — entries above the first marker — is this release's
+# delta, because notes render BEFORE the marker is stamped. Re-rendering an
+# old tag reads that tag's own section instead.
 if [[ -f "${series}" ]]; then
   while IFS= read -r branch; do
     branch="${branch%%#*}"
@@ -125,8 +136,58 @@ if [[ -f "${series}" ]]; then
 
     git -C "${tmp_dir}/patches-repo" fetch --depth=1 "${patches_remote}" \
       "${branch}:refs/remotes/origin/${branch}"
-    echo "- $(git -C "${tmp_dir}/patches-repo" log -1 --format=%s "refs/remotes/origin/${branch}")" \
-      >> "${patch_notes}"
+    changelog_blob=$(git -C "${tmp_dir}/patches-repo" cat-file -p \
+      "refs/remotes/origin/${branch}:changelogs/${branch}.md" 2>/dev/null || true)
+    feature_title=""
+    feature_entries=""
+    if [[ -n "${changelog_blob}" ]]; then
+      # consume the whole blob (no exit) so awk never SIGPIPEs printf
+      feature_title=$(printf '%s\n' "${changelog_blob}" \
+        | awk '/^# / && !found { sub(/^# /, ""); print; found = 1 }')
+      feature_entries=$(printf '%s\n' "${changelog_blob}" \
+        | awk -v tag="${TAG_NAME}" '
+            function newer(a, b,   x, y, i) {
+              sub(/^v/, "", a); sub(/^v/, "", b)
+              split(a, x, "."); split(b, y, ".")
+              for (i = 1; i <= 3; i++) {
+                if (x[i] + 0 > y[i] + 0) return 1
+                if (x[i] + 0 < y[i] + 0) return 0
+              }
+              return 0
+            }
+            /^--- release / {
+              seenmarker = 1
+              intag = ($3 == tag)
+              if (intag) found = 1
+              if (newer($3, tag)) sawnewer = 1
+              next
+            }
+            !seentitle { if (/^# /) seentitle = 1; next }
+            /^- / || /^  / {
+              if (intag) { out = out $0 "\n" }
+              else if (!seenmarker) { unrel = unrel $0 "\n" }
+            }
+            END {
+              if (found) { printf "%s", out }
+              # No marker for the tag: the unreleased block is the delta —
+              # correct for the current release (notes render before the
+              # marker is stamped). A marker NEWER than the tag means this
+              # is a historical re-render of a pre-changelog tag: nothing.
+              else if (!sawnewer) { printf "%s", unrel }
+            }
+          ')
+    fi
+    if [[ -z "${feature_title}" ]]; then
+      echo "::warning::${branch} has no '# Title' in changelogs/${branch}.md" >&2
+      feature_title="${branch}"
+    fi
+    if [[ -n "${feature_entries}" ]]; then
+      {
+        echo "### ${feature_title}"
+        echo
+        printf '%s\n\n' "${feature_entries}"
+      } >> "${patch_notes}"
+    fi
 
     if git -C "${tmp_dir}/patches-repo" cat-file -e \
       "refs/remotes/origin/${branch}:dockerfile/grype-scanner.dockerfile" 2>/dev/null; then
@@ -136,13 +197,15 @@ if [[ -f "${series}" ]]; then
 fi
 
 {
+  if [[ -s "${tmp_dir}/summary.md" ]]; then
+    cat "${tmp_dir}/summary.md"
+    echo
+  fi
+
   if [[ -s "${patch_notes}" ]]; then
     echo "## Commercial Features"
     echo
-    echo "This release includes the following commercial enhancements:"
-    echo
     cat "${patch_notes}"
-    echo
   fi
 
   cat "${tmp_dir}/formatted-notes.md"
