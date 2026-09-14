@@ -25,6 +25,7 @@ import (
 	"github.com/goharbor/harbor/src/pkg/notifier/event"
 	proModels "github.com/goharbor/harbor/src/pkg/project/models"
 	mockproject "github.com/goharbor/harbor/src/testing/controller/project"
+	ormtesting "github.com/goharbor/harbor/src/testing/lib/orm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -76,6 +77,10 @@ func TestGetProjectNameOrID(t *testing.T) {
 }
 
 func TestProjectEventResolver_Resolve(t *testing.T) {
+	// The resolver attaches an ORM when the captured request context has none,
+	// which needs a registered default alias.
+	ormtesting.RegisterLimitedPool(t, 2)
+
 	mockCtrl := &mockproject.Controller{}
 	oldCtrl := project.Ctl
 	project.Ctl = mockCtrl
