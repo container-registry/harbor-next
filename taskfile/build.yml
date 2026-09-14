@@ -165,8 +165,10 @@ tasks:
         trap "rm -rf $DIST_DIR" EXIT
         git clone --branch {{.DISTRIBUTION_VERSION}} --depth 1 {{.DISTRIBUTION_SRC}} "$DIST_DIR"
         cd "$DIST_DIR"
-        go mod edit -require golang.org/x/crypto@v0.52.0
-        go mod edit -require golang.org/x/net@v0.55.0
+        go mod edit -require golang.org/x/crypto@v0.57.0
+        go mod edit -require golang.org/x/net@v0.59.0
+        go mod edit -require golang.org/x/text@v0.42.0
+        go mod edit -require google.golang.org/grpc@v1.83.2
         go mod tidy -e
         go mod vendor
         REVISION=$(git rev-parse HEAD)
@@ -192,8 +194,6 @@ tasks:
         trap "rm -rf $LPROBE_DIR" EXIT
         git clone --branch v{{.LPROBE_VERSION}} --depth 1 https://github.com/fivexl/lprobe.git "$LPROBE_DIR"
         cd "$LPROBE_DIR"
-        go mod edit -require github.com/go-jose/go-jose/v4@v4.1.4
-        go mod edit -require golang.org/x/net@v0.55.0
         go mod tidy -e
         CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/lprobe" .
 
@@ -214,7 +214,10 @@ tasks:
         trap "rm -rf $TRIVY_DIR" EXIT
         git clone --branch v{{.TRIVY_VERSION}} --depth 1 https://github.com/aquasecurity/trivy.git "$TRIVY_DIR"
         cd "$TRIVY_DIR"
-        go mod edit -require github.com/containerd/containerd/v2@v2.3.2
+        go mod edit -require github.com/containerd/containerd/v2@v2.3.5
+        go mod edit -require golang.org/x/crypto@v0.56.0
+        go mod edit -require google.golang.org/grpc@v1.83.2
+        go mod edit -require github.com/moby/go-archive@v0.3.0
         go mod tidy -e
         GOTOOLCHAIN=go{{.GO_VERSION_PIN}} GOEXPERIMENT=jsonv2 CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/trivy" ./cmd/trivy
 
@@ -234,8 +237,6 @@ tasks:
         trap "rm -rf $TRIVY_DIR" EXIT
         git clone --branch {{.HARBOR_SCANNER_TRIVY_VERSION}} --depth 1 https://github.com/container-registry/harbor-scanner-trivy.git "$TRIVY_DIR"
         cd "$TRIVY_DIR"
-        go mod edit -require golang.org/x/net@v0.55.0
-        go mod tidy -e
         CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/scanner-trivy" cmd/scanner-trivy/main.go
 
   # --- API Generation ---
