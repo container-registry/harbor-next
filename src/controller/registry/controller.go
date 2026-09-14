@@ -92,7 +92,11 @@ func (c *controller) validate(ctx context.Context, registry *model.Registry) err
 	if len(registry.Name) > 64 {
 		return errors.New(nil).WithCode(errors.BadRequestCode).WithMessage("the max length of name is 64")
 	}
+<<<<<<< HEAD
 	url, err := lib.ValidateURL(registry.URL)
+=======
+	url, err := lib.NormalizeAndValidateHTTPURL(registry.URL)
+>>>>>>> 95b28b3cd (fix: make endpoint handling and validation case-insensitive (#23889))
 	if err != nil {
 		return err
 	}

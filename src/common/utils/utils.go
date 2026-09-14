@@ -51,7 +51,11 @@ func ParseEndpoint(endpoint string) (*url.URL, error) {
 		endpoint = "http://" + endpoint
 	}
 
-	return url.ParseRequestURI(endpoint)
+	u, err := url.ParseRequestURI(endpoint)
+	if err == nil && u != nil {
+		u.Host = strings.ToLower(u.Host)
+	}
+	return u, err
 }
 
 // ParseRepository splits a repository into two parts: project and rest
