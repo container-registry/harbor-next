@@ -179,8 +179,6 @@ patch_notes="${tmp_dir}/commercial-patches.md"
 # unreleased block — entries above the first marker — is this release's
 # delta, because notes render BEFORE the marker is stamped. Re-rendering an
 # old tag reads that tag's own section instead.
-commercial_count=0
-unchanged_features=()
 if [[ "${chart_mode}" == false && -f "${series}" ]]; then
   while IFS= read -r branch; do
     branch="${branch%%#*}"
@@ -195,7 +193,6 @@ if [[ "${chart_mode}" == false && -f "${series}" ]]; then
 
     git -C "${tmp_dir}/patches-repo" fetch --depth=1 "${patches_remote}" \
       "${branch}:refs/remotes/origin/${branch}"
-    commercial_count=$((commercial_count + 1))
     changelog_blob=$(git -C "${tmp_dir}/patches-repo" cat-file -p \
       "refs/remotes/origin/${branch}:changelogs/${branch}.md" 2>/dev/null || true)
     feature_title=""
@@ -240,18 +237,18 @@ if [[ "${chart_mode}" == false && -f "${series}" ]]; then
           ')
     fi
     if [[ -z "${feature_title}" ]]; then
-      feature_title=$(git -C "${tmp_dir}/patches-repo" log -1 --format=%s \
-        "refs/remotes/origin/${branch}")
+      echo "::warning::${branch} has no '# Title' in changelogs/${branch}.md" >&2
+      feature_title="${branch}"
     fi
     if [[ -n "${feature_entries}" ]]; then
       {
         echo "### ${feature_title}"
         echo
-        printf '%s' "${feature_entries}"
-        echo
+        # printf keeps the entries verbatim; the two newlines restore the one
+        # command substitution stripped plus the blank line that separates
+        # this block from whatever follows it.
+        printf '%s\n\n' "${feature_entries}"
       } >> "${patch_notes}"
-    else
-      unchanged_features+=("${feature_title}")
     fi
   done < "${series}"
 fi
@@ -262,19 +259,10 @@ fi
     echo
   fi
 
-  if [[ "${commercial_count}" -gt 0 ]]; then
+  if [[ -s "${patch_notes}" ]]; then
     echo "## Commercial Features"
     echo
-    if [[ -s "${patch_notes}" ]]; then
-      echo "Changes to commercial features in this release:"
-      echo
-      cat "${patch_notes}"
-    fi
-    if [[ "${#unchanged_features[@]}" -gt 0 ]]; then
-      printf -v unchanged_list '%s, ' "${unchanged_features[@]}"
-      echo "_No changes this release: ${unchanged_list%, }._"
-      echo
-    fi
+    cat "${patch_notes}"
   fi
 
   cat "${tmp_dir}/formatted-notes.md"
