@@ -48,3 +48,38 @@ func Test_readonlySkipper(t *testing.T) {
 		})
 	}
 }
+
+// TestTransactionRunsAfterTheDatabaseReadingMiddlewares covers harbor-next #92.
+// transaction.Middleware holds a pool connection for the whole request, so every
+// middleware that reads from the database has to run before it. When they run
+// inside the transaction they need a second connection while holding the first,
+// and the config-cache builder they queue behind needs one too, so the pool
+// deadlocks against itself under mixed read and write traffic.
+func TestTransactionRunsAfterTheDatabaseReadingMiddlewares(t *testing.T) {
+	position := map[string]int{}
+	for i, entry := range middlewareChain() {
+		if _, dup := position[entry.name]; dup {
+			t.Fatalf("middleware %q appears twice in the chain", entry.name)
+		}
+		position[entry.name] = i
+	}
+
+	tx, ok := position["transaction"]
+	if !ok {
+		t.Fatal("no transaction middleware in the chain")
+	}
+
+	for _, name := range []string{"orm", "notification", "security", "log", "security-unauthorized", "readonly"} {
+		at, ok := position[name]
+		if !ok {
+			t.Fatalf("no %q middleware in the chain", name)
+		}
+		if at > tx {
+			t.Errorf("%q runs inside the request transaction; it reads from the database and would need a second pool connection", name)
+		}
+	}
+
+	if position["log"] < position["security"] {
+		t.Error("log must stay after security so the request's user can be logged")
+	}
+}
