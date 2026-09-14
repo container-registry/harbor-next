@@ -15,8 +15,10 @@
 package orm
 
 import (
+	"math"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/goharbor/harbor/src/lib/errors"
@@ -25,14 +27,21 @@ import (
 
 var timeType = reflect.TypeOf(time.Time{})
 
-// timestampLayouts are the textual operand forms accepted for timestamp
-// columns; anything else would reach Postgres as an unparseable literal.
+// timestampLayouts are the textual timestamp forms a filter operand may take.
+// The API documents a single format ("2020-04-09 02:36:00", see the q parameter
+// in api/v2.0/swagger.yaml) and the query parser turns only
+// "2006-01-02T15:04:05" into a time.Time; everything else arrives as a string
+// and is handed to Postgres as a literal. The list is deliberately wider than
+// the documented format so the undocumented forms that reach Postgres today
+// keep working; a fractional part and a zone offset are optional in each.
 var timestampLayouts = []string{
-	"2006-01-02T15:04:05",
-	"2006-01-02 15:04:05",
+	"2006-01-02T15:04:05.999999999Z07:00",
+	"2006-01-02T15:04:05.999999999",
+	"2006-01-02 15:04:05.999999999Z07:00",
+	"2006-01-02 15:04:05.999999999",
+	"2006-01-02T15:04",
+	"2006-01-02 15:04",
 	"2006-01-02",
-	time.RFC3339,
-	time.RFC3339Nano,
 }
 
 // validateFilterValue reports a bad request when a filter operand cannot be
@@ -98,24 +107,15 @@ func operandAssignable(fieldType reflect.Type, value any) bool {
 	case fieldType == timeType:
 		return timestampAssignable(value)
 	case isIntegerKind(fieldType.Kind()):
-		if s, ok := value.(string); ok {
-			_, err := strconv.ParseInt(s, 10, 64)
-			return err == nil
-		}
-		return isNumeric(value)
+		return integerAssignable(fieldType, value)
 	case isFloatKind(fieldType.Kind()):
 		if s, ok := value.(string); ok {
-			_, err := strconv.ParseFloat(s, 64)
+			_, err := strconv.ParseFloat(strings.TrimSpace(s), fieldType.Bits())
 			return err == nil
 		}
 		return isNumeric(value)
 	case fieldType.Kind() == reflect.Bool:
-		if s, ok := value.(string); ok {
-			_, err := strconv.ParseBool(s)
-			return err == nil
-		}
-		_, ok := value.(bool)
-		return ok
+		return booleanAssignable(value)
 	default:
 		// text columns take any literal
 		return true
@@ -127,12 +127,80 @@ func timestampAssignable(value any) bool {
 	case time.Time, *time.Time:
 		return true
 	case string:
+		v = strings.TrimSpace(v)
 		for _, layout := range timestampLayouts {
 			if _, err := time.Parse(layout, v); err == nil {
 				return true
 			}
 		}
 		return false
+	default:
+		return false
+	}
+}
+
+// integerAssignable reports whether value is an integer the column can hold.
+// Postgres rejects a non-numeric literal and one that overflows the column
+// alike, so the operand is checked against the field's own width rather than
+// against int64: "300" is a fine operand for an int32 column and a 22003 for
+// an int8 one.
+func integerAssignable(fieldType reflect.Type, value any) bool {
+	probe := reflect.New(fieldType).Elem()
+	signed := probe.CanInt()
+
+	if s, ok := value.(string); ok {
+		s = strings.TrimSpace(s)
+		if signed {
+			_, err := strconv.ParseInt(s, 10, fieldType.Bits())
+			return err == nil
+		}
+		_, err := strconv.ParseUint(s, 10, fieldType.Bits())
+		return err == nil
+	}
+
+	rv := reflect.ValueOf(value)
+	switch {
+	case rv.CanInt():
+		if signed {
+			return !probe.OverflowInt(rv.Int())
+		}
+		return rv.Int() >= 0 && !probe.OverflowUint(uint64(rv.Int()))
+	case rv.CanUint():
+		if signed {
+			return rv.Uint() <= math.MaxInt64 && !probe.OverflowInt(int64(rv.Uint()))
+		}
+		return !probe.OverflowUint(rv.Uint())
+	case rv.CanFloat():
+		// a fractional or non-finite operand is not an integer the column can
+		// store, however numeric it looks
+		f := rv.Float()
+		if math.IsNaN(f) || math.IsInf(f, 0) || f != math.Trunc(f) {
+			return false
+		}
+		if signed {
+			return f >= math.MinInt64 && f <= math.MaxInt64 && !probe.OverflowInt(int64(f))
+		}
+		return f >= 0 && f <= math.MaxUint64 && !probe.OverflowUint(uint64(f))
+	}
+	return false
+}
+
+// postgresBooleanLiterals is every token Postgres takes for a boolean column,
+// which is the documented set plus its unambiguous prefixes. strconv.ParseBool
+// accepts a narrower set, so filtering on "yes" or "on" would be rejected here
+// while the database would have taken it.
+var postgresBooleanLiterals = map[string]struct{}{
+	"t": {}, "tr": {}, "tru": {}, "true": {}, "y": {}, "ye": {}, "yes": {}, "on": {}, "1": {},
+	"f": {}, "fa": {}, "fal": {}, "fals": {}, "false": {}, "n": {}, "no": {}, "of": {}, "off": {}, "0": {},
+}
+
+func booleanAssignable(value any) bool {
+	switch v := value.(type) {
+	case bool:
+		return true
+	case string:
+		_, ok := postgresBooleanLiterals[strings.ToLower(strings.TrimSpace(v))]
+		return ok
 	default:
 		return false
 	}

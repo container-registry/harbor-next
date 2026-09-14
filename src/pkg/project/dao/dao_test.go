@@ -458,11 +458,18 @@ func (suite *DaoTestSuite) TestListInvalidFilterValue() {
 	}
 }
 
+// Valid operands must keep filtering after the validation was added.
 func (suite *DaoTestSuite) TestListValidFilterValue() {
 	for _, query := range []string{
 		"creation_time=[2020-01-01T00:00:00~2021-01-01T00:00:00]",
 		"creation_time=[2020-01-01~2021-01-01]",
+		// a negative offset survives the query parser; a "+" one does not,
+		// see TestListInvalidFilterValue
+		"creation_time=[2020-01-01 15:04:05-05:30~2021-01-01 15:04:05-05:30]",
 		"creation_time=~2020",
+		// __icontains renders as ILIKE, so its operand need not match the column
+		"creation_time__icontains=2020",
+		"project_id__icontains=1",
 		"project_id=[1~2]",
 		"project_id=1",
 		"name=abc",

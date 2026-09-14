@@ -153,6 +153,9 @@ func QuerySetterForCount(ctx context.Context, model any, query *q.Query, _ ...st
 	return QuerySetter(ctx, model, query, WithSortDisabled(true))
 }
 
+// icontainsOperator renders as ILIKE, which casts the column to text
+const icontainsOperator = "__icontains"
+
 // set filters according to the query
 func setFilters(ctx context.Context, qs orm.QuerySeter, query *q.Query, meta *metadata) (orm.QuerySeter, error) {
 	for key, value := range query.Keywords {
@@ -177,8 +180,9 @@ func setFilters(ctx context.Context, qs orm.QuerySeter, query *q.Query, meta *me
 		}
 
 		// only accept the below operators
+		var operator string
 		if len(keyPieces) == 2 {
-			operator := orm.ExprSep + keyPieces[1]
+			operator = orm.ExprSep + keyPieces[1]
 			allowedOperators := map[string]struct{}{
 				"__icontains": {},
 				"__in":        {},
@@ -200,9 +204,14 @@ func setFilters(ctx context.Context, qs orm.QuerySeter, query *q.Query, meta *me
 			continue
 		}
 
-		// reject operands the column cannot take before they reach the database
-		if err := validateFilterValue(mk.FieldType, key, value); err != nil {
-			return nil, err
+		// reject operands the column cannot take before they reach the database.
+		// __icontains is exempt for the same reason a fuzzy match is: it renders
+		// as ILIKE, which casts the column to text, so "creation_time__icontains"
+		// does not need an operand shaped like a timestamp.
+		if operator != icontainsOperator {
+			if err := validateFilterValue(mk.FieldType, key, value); err != nil {
+				return nil, err
+			}
 		}
 		// fuzzy match
 		if f, ok := value.(*q.FuzzyMatchValue); ok {
