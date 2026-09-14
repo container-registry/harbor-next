@@ -79,6 +79,8 @@ func TestValidateFilterValue(t *testing.T) {
 		{"text column takes a range of any literal", stringField, q.NewRange("a", "b"), false},
 		{"unknown field type", nil, "abc", false},
 		{"nil value", intField, nil, false},
+		{"time exact match with an RFC3339 string", timeField, "2020-01-02T03:04:05Z", false},
+		{"bytes operand against a text column", stringField, []byte("abc"), false},
 	}
 
 	for _, tc := range cases {

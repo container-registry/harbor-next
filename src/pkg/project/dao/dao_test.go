@@ -434,6 +434,24 @@ func (suite *DaoTestSuite) TestListRoles() {
 
 // A query operand the column cannot take must be reported as a bad request
 // rather than letting the Postgres syntax error surface as a 500.
+// Valid operands must keep filtering after the validation was added.
+func (suite *DaoTestSuite) TestListValidFilterValue() {
+	for _, query := range []string{
+		"creation_time=[2020-01-01~2021-01-01]",
+		"creation_time=[2020-01-01T00:00:00~2021-01-01T00:00:00]",
+		"project_id=1",
+		"name=library",
+	} {
+		suite.Run(query, func() {
+			built, err := q.Build(query, "", 1, 10)
+			suite.Require().Nil(err)
+
+			_, err = suite.dao.List(orm.Context(), built)
+			suite.Nil(err)
+		})
+	}
+}
+
 func (suite *DaoTestSuite) TestListInvalidFilterValue() {
 	for _, query := range []string{
 		"creation_time=[a~b]",
