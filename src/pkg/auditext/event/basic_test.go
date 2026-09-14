@@ -40,8 +40,8 @@ func TestEventResolver_PreCheck(t *testing.T) {
 		wantCapture      bool
 		wantResourceName string
 	}{
-		{"test normal", fields{ResourceIDPattern: `/api/v2.0/tests/(\d+)`, ResourceType: "test", SucceedCodes: []int{200}, ShouldResolveName: true, IDToNameFunc: func(string) string { return "test" }}, args{context.Background(), "/api/v2.0/tests/123", "DELETE"}, true, "test"},
-		{"test resource name", fields{ResourceIDPattern: `/api/v2.0/tests/(\d+)`, ResourceType: "test", SucceedCodes: []int{200}, ShouldResolveName: true, IDToNameFunc: func(string) string { return "test_resource_name" }}, args{context.Background(), "/api/v2.0/tests/234", "DELETE"}, true, "test_resource_name"},
+		{"test normal", fields{ResourceIDPattern: `/api/v2.0/tests/(\d+)`, ResourceType: "test", SucceedCodes: []int{200}, ShouldResolveName: true, IDToNameFunc: func(context.Context, string) string { return "test" }}, args{context.Background(), "/api/v2.0/tests/123", "DELETE"}, true, "test"},
+		{"test resource name", fields{ResourceIDPattern: `/api/v2.0/tests/(\d+)`, ResourceType: "test", SucceedCodes: []int{200}, ShouldResolveName: true, IDToNameFunc: func(context.Context, string) string { return "test_resource_name" }}, args{context.Background(), "/api/v2.0/tests/234", "DELETE"}, true, "test_resource_name"},
 		{"test no resource name", fields{ResourceIDPattern: `/api/v2.0/tests/(\d+)`, ResourceType: "test", SucceedCodes: []int{200}, ShouldResolveName: true}, args{context.Background(), "/api/v2.0/tests/234", "GET"}, true, ""},
 	}
 	for _, tt := range tests {
