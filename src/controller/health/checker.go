@@ -23,9 +23,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/beego/beego/v2/client/orm"
 	"github.com/docker/distribution/health"
 
+	"github.com/goharbor/harbor/src/common/dao"
 	httputil "github.com/goharbor/harbor/src/common/http"
 	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/lib/cache"
@@ -146,16 +146,24 @@ func registryCtlHealthChecker() health.Checker {
 	return PeriodicHealthChecker(checker, period)
 }
 
+// checkDatabase pings the pool directly with a bounded timeout instead of
+// issuing a query through the ORM: Beego ORM acquires connections with
+// context.Background(), so the check would hang indefinitely when the pool
+// is exhausted.
+func checkDatabase() error {
+	pool := dao.GetPool()
+	if pool == nil {
+		return fmt.Errorf("database pool not initialized")
+	}
+	if !pool.Healthy() {
+		return fmt.Errorf("failed to ping the database pool")
+	}
+	return nil
+}
+
 func databaseHealthChecker() health.Checker {
 	period := 10 * time.Second
-	checker := health.CheckFunc(func() error {
-		_, err := orm.NewOrm().Raw("SELECT 1").Exec()
-		if err != nil {
-			return fmt.Errorf("failed to run SQL \"SELECT 1\": %v", err)
-		}
-		return nil
-	})
-	return PeriodicHealthChecker(checker, period)
+	return PeriodicHealthChecker(health.CheckFunc(checkDatabase), period)
 }
 
 func redisHealthChecker() health.Checker {
