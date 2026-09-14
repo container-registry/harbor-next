@@ -25,6 +25,7 @@ import (
 	"github.com/goharbor/harbor/src/server/middleware/quota"
 	"github.com/goharbor/harbor/src/server/middleware/repoproxy"
 	"github.com/goharbor/harbor/src/server/middleware/subject"
+	"github.com/goharbor/harbor/src/server/middleware/systemquota"
 	"github.com/goharbor/harbor/src/server/middleware/v2auth"
 	"github.com/goharbor/harbor/src/server/middleware/vulnerable"
 	"github.com/goharbor/harbor/src/server/router"
@@ -76,6 +77,7 @@ func RegisterRoutes() {
 		Path("/*/manifests/:reference").
 		Middleware(metric.InjectOpIDMiddleware(metric.ManifestOperationID)).
 		Middleware(repoproxy.DisableBlobAndManifestUploadMiddleware()).
+		Middleware(systemquota.Gate()).
 		Middleware(immutable.Middleware()).
 		Middleware(quota.PutManifestMiddleware()).
 		Middleware(cosign.SignatureMiddleware()).
@@ -102,6 +104,7 @@ func RegisterRoutes() {
 		Path("/*/blobs/uploads").
 		Middleware(metric.InjectOpIDMiddleware(metric.BlobsUploadOperationID)).
 		Middleware(repoproxy.DisableBlobAndManifestUploadMiddleware()).
+		Middleware(systemquota.Gate()).
 		Middleware(quota.PostInitiateBlobUploadMiddleware()).
 		Middleware(blob.PostInitiateBlobUploadMiddleware()).
 		Handler(proxy)
@@ -110,12 +113,14 @@ func RegisterRoutes() {
 		Method(http.MethodPatch).
 		Path("/*/blobs/uploads/:session_id").
 		Middleware(metric.InjectOpIDMiddleware(metric.BlobsUploadOperationID)).
+		Middleware(systemquota.Gate()).
 		Middleware(blob.PatchBlobUploadMiddleware()).
 		Handler(proxy)
 	root.NewRoute().
 		Method(http.MethodPut).
 		Path("/*/blobs/uploads/:session_id").
 		Middleware(metric.InjectOpIDMiddleware(metric.BlobsUploadOperationID)).
+		Middleware(systemquota.Gate()).
 		Middleware(quota.PutBlobUploadMiddleware()).
 		Middleware(blob.PutBlobUploadMiddleware()).
 		Handler(proxy)

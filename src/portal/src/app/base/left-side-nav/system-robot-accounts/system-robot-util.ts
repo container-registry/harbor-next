@@ -70,6 +70,7 @@ export const ACTION_RESOURCE_I18N_MAP = {
     registry: 'ROBOT_ACCOUNT.REGISTRY',
     'scan-all': 'ROBOT_ACCOUNT.SCAN_ALL',
     'system-volumes': 'ROBOT_ACCOUNT.SYSTEM_VOLUMES',
+    'system-quota': 'ROBOT_ACCOUNT.SYSTEM_QUOTA',
     'garbage-collection': 'ROBOT_ACCOUNT.GARBAGE_COLLECTION',
     'purge-audit': 'ROBOT_ACCOUNT.PURGE_AUDIT',
     'jobservice-monitor': 'ROBOT_ACCOUNT.JOBSERVICE_MONITOR',

@@ -207,10 +207,12 @@ func (d *daoTestSuite) TestUpdate() {
 	}, "ArtifactID")
 	d.Require().Nil(err)
 
-	// violating foreign key constraint: the artifact that the tag tries to attach doesn't exist
+	// violating foreign key constraint: the artifact that the tag tries to attach doesn't exist.
+	// Artifact ids come from a sequence shared with every other DB test package, so a small
+	// literal such as 2 can collide with this suite's own artifact depending on shard order.
 	err = d.dao.Update(d.ctx, &tag.Tag{
 		ID:         d.tagID,
-		ArtifactID: 2,
+		ArtifactID: 999999999,
 	}, "ArtifactID")
 	d.Require().NotNil(err)
 	d.True(errors.IsErr(err, errors.ViolateForeignKeyConstraintCode))

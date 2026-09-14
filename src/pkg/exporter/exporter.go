@@ -69,6 +69,7 @@ func newCollectorSet(opt *Opt, backend Backend) *Exporter {
 		NewProjectCollector(),
 		NewJobServiceCollector(backend),
 		NewStatisticsCollector(),
+		NewSystemQuotaCollector(),
 	)
 	if err != nil {
 		log.Warningf("calling RegisterCollector() errored out, error: %v", err)

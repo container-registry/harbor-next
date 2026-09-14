@@ -35,6 +35,11 @@ packages:
       Controller:
         config:
           dir: testing/controller/quota
+  github.com/goharbor/harbor/src/controller/systemquota:
+    interfaces:
+      Controller:
+        config:
+          dir: testing/controller/systemquota
   github.com/goharbor/harbor/src/controller/registry:
     interfaces:
       Controller:
@@ -391,6 +396,16 @@ packages:
       DAO:
         config:
           dir: testing/pkg/allowlist/dao
+  github.com/goharbor/harbor/src/pkg/systemquota:
+    interfaces:
+      Manager:
+        config:
+          dir: testing/pkg/systemquota
+  github.com/goharbor/harbor/src/pkg/systemquota/dao:
+    interfaces:
+      DAO:
+        config:
+          dir: testing/pkg/systemquota/dao
   github.com/goharbor/harbor/src/pkg/reg:
     interfaces:
       Manager:

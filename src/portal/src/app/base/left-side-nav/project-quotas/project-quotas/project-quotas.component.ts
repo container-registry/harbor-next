@@ -55,6 +55,8 @@ import { QuotaUpdateReq } from '../../../../../../ng-swagger-gen/models/quota-up
 import { ProjectService } from '../../../../../../ng-swagger-gen/services/project.service';
 import { Quota } from '../../../../../../ng-swagger-gen/models/quota';
 import { FilterComponent } from '../../../../shared/components/filter/filter.component';
+import { SystemquotaService } from '../../../../../../ng-swagger-gen/services/systemquota.service';
+import { SystemQuota } from '../../../../../../ng-swagger-gen/models/system-quota';
 
 const QuotaType = 'project';
 
@@ -77,6 +79,8 @@ export class ProjectQuotasComponent implements OnChanges {
     @Output() refreshAllconfig: EventEmitter<Configuration> =
         new EventEmitter<Configuration>();
     quotaList: Quota[] = [];
+    // undefined until the first answer, null once a 404 confirmed there is no global quota
+    systemQuota: SystemQuota | null | undefined;
     originalConfig: Configuration;
     currentPage = 1;
     totalCount = 0;
@@ -102,8 +106,83 @@ export class ProjectQuotasComponent implements OnChanges {
         private translate: TranslateService,
         private router: Router,
         private errorHandler: ErrorHandler,
-        private projectService: ProjectService
+        private projectService: ProjectService,
+        private systemQuotaService: SystemquotaService
     ) {}
+
+    getSystemQuota() {
+        this.systemQuotaService.getSystemQuota().subscribe(
+            res => (this.systemQuota = res),
+            error => {
+                // only a 404 proves that no global quota is configured; any other
+                // failure leaves the last known state untouched
+                if (error && error.status === 404) {
+                    this.systemQuota = null;
+                    return;
+                }
+                this.errorHandler.error(error);
+            }
+        );
+    }
+
+    editSystemQuota() {
+        const texts = [
+            this.translate.get('QUOTA.EDIT_SYSTEM_QUOTA'),
+            this.translate.get('QUOTA.SET_SYSTEM_QUOTA'),
+            this.translate.get('QUOTA.SYSTEM_QUOTA_LIMIT'),
+        ];
+        forkJoin(...texts).subscribe(res => {
+            this.editQuotaDialog.openEditQuotaModal({
+                editQuota: res[0],
+                setQuota: res[1],
+                storageQuota: res[2],
+                quotaHardLimitValue: {
+                    storageLimit: this.systemQuota
+                        ? this.systemQuota.hard.storage
+                        : QuotaUnlimited,
+                    storageUnit: '',
+                },
+                isSystemDefaultQuota: false,
+                isSystemQuota: true,
+                enforce: this.systemQuota ? this.systemQuota.enforce : false,
+            });
+        });
+    }
+
+    saveSystemQuota(formValue) {
+        this.loading = true;
+        // -1 in the form means "no global quota", which is DELETE on the API
+        const request =
+            +formValue.storage === QuotaUnlimited
+                ? this.systemQuotaService.deleteSystemQuota()
+                : this.systemQuotaService.updateSystemQuota({
+                      quota: {
+                          hard: {
+                              storage: getByte(
+                                  +formValue.storage,
+                                  formValue.storageUnit
+                              ),
+                          },
+                          enforce: !!formValue.enforce,
+                      },
+                  });
+        request
+            .pipe(
+                finalize(() => {
+                    this.loading = false;
+                })
+            )
+            .subscribe(
+                () => {
+                    this.editQuotaDialog.openEditQuota = false;
+                    this.errorHandler.info('QUOTA.SAVE_SUCCESS');
+                    this.getSystemQuota();
+                },
+                error => {
+                    this.editQuotaDialog.inlineAlert.showInlineError(error);
+                }
+            );
+    }
 
     editQuota() {
         if (this.selectedRow && this.selectedRow.length === 1) {
@@ -196,7 +275,9 @@ export class ProjectQuotasComponent implements OnChanges {
     }
 
     confirmEdit(event) {
-        if (event.isSystemDefaultQuota) {
+        if (event.isSystemQuota) {
+            this.saveSystemQuota(event.formValue);
+        } else if (event.isSystemDefaultQuota) {
             this.saveConfig(event.formValue);
         } else {
             this.saveCurrentQuota(event);
@@ -287,6 +368,7 @@ export class ProjectQuotasComponent implements OnChanges {
         if (changes && changes['allConfig']) {
             this.originalConfig = clone(this.config);
             this.getquotaHardLimitValue();
+            this.getSystemQuota();
         }
     }
     getSuitableUnit(value) {

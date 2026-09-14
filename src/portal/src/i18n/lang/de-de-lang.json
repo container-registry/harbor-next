@@ -371,6 +371,7 @@
         "REGISTRY": "Registry",
         "SCAN_ALL": "Scan All",
         "SYSTEM_VOLUMES": "System Volumes",
+        "SYSTEM_QUOTA": "Globales Speicherkontingent",
         "GARBAGE_COLLECTION": "Garbage Collection",
         "PURGE_AUDIT": "Purge Audit",
         "JOBSERVICE_MONITOR": "Job Service Monitor",
@@ -1176,7 +1177,19 @@
         "INVALID_INPUT": "ungültige Eingabe",
         "PLACEHOLDER": "Es konnten keine Begrenzungen gefunden werden",
         "FILTER_PLACEHOLDER": "Suche nach Name (genaue Übereinstimmung)",
-        "QUOTA_USED": "Quota used"
+        "QUOTA_USED": "Quota used",
+        "SYSTEM_QUOTA": "Globales Speicherkontingent",
+        "SYSTEM_QUOTA_NOT_SET": "nicht gesetzt",
+        "EDIT_SYSTEM_QUOTA": "Globales Speicherkontingent bearbeiten",
+        "SET_SYSTEM_QUOTA": "Speicherkontingent für die gesamte Instanz festlegen. -1 eingeben, um es zu entfernen.",
+        "SYSTEM_QUOTA_LIMIT": "Globales Limit",
+        "SYSTEM_QUOTA_ENFORCE": "Bei Registry-Schreibzugriffen durchsetzen",
+        "SYSTEM_QUOTA_ENFORCE_TIP": "Wenn aktiviert, werden Pushes abgelehnt, sobald die Nutzung das Limit erreicht. Löschen und Garbage Collection bleiben erlaubt.",
+        "SYSTEM_QUOTA_ENFORCED": "durchgesetzt",
+        "SYSTEM_QUOTA_ALLOCATED": "Projekten zugewiesen",
+        "SYSTEM_QUOTA_UNLIMITED_PROJECTS": "{{count}} Projekte ohne Limit",
+        "SYSTEM_QUOTA_MEASURED": "auf dem Speichervolume gemessen",
+        "SYSTEM_QUOTA_ACCOUNTED": "aus Harbors Blob-Tabelle berechnet"
     },
     "WEEKLY": {
         "MONDAY": "Montag",

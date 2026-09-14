@@ -93,3 +93,22 @@
     width: 240px;
   }
 }
+
+.system-quota {
+  margin-top: 0.25rem;
+
+  .system-quota-source {
+    font-weight: 400;
+    color: var(--clr-p1-color, #565656);
+    margin-left: 0.25rem;
+  }
+
+  .label {
+    margin-left: 0.5rem;
+  }
+
+  .system-quota-allocation {
+    margin-top: 0.1rem;
+    font-size: 0.6rem;
+  }
+}

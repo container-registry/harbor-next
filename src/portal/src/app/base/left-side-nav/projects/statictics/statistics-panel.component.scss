@@ -45,3 +45,29 @@
 .stat-value {
   text-align: right;
 }
+
+.card-wide {
+  width: 16rem;
+}
+
+.size-of {
+  margin: 0 5px;
+  font-weight: 400;
+}
+
+.system-quota-bar {
+  margin-top: 0.25rem;
+
+  .progress {
+    height: 0.5rem;
+  }
+}
+
+.system-quota-caption {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.55rem;
+  color: var(--clr-p1-color, #565656);
+  margin-top: 0.1rem;
+}

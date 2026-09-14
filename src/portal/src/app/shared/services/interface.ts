@@ -466,4 +466,7 @@ export interface EditQuotaQuotaInterface {
     storageQuota: string;
     quotaHardLimitValue: QuotaHardLimitInterface | any;
     isSystemDefaultQuota: boolean;
+    // global storage quota for the whole instance (harbor-next #839)
+    isSystemQuota?: boolean;
+    enforce?: boolean;
 }
