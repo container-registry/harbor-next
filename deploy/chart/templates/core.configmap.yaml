@@ -45,6 +45,10 @@ data:
   METRIC_PORT: {{ include "harbor.metrics.port" . | quote }}
   METRIC_NAMESPACE: harbor
   METRIC_SUBSYSTEM: core
+  # Core runs the Harbor exporter collectors in-process and serves them on
+  # its metrics endpoint — there is no separate exporter component.
+  METRIC_EXPORTER_ENABLE: "true"
+  METRIC_EXPORTER_CACHE_TIME: {{ .Values.metrics.exporterCacheTime | quote }}
   {{- end }}
 
   # Database configuration
