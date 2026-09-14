@@ -29,6 +29,9 @@ const (
 var (
 	// AnythingOfType func alias of mock.AnythingOfType
 	AnythingOfType = mock.AnythingOfType
+
+	// MatchedBy func alias of mock.MatchedBy
+	MatchedBy = mock.MatchedBy
 )
 
 // Arguments type alias of mock.Arguments
