@@ -39,7 +39,6 @@ require (
 	github.com/google/uuid v1.6.0
 	// pin the github.com/gorilla/csrf to v1.7.2 because of issue https://github.com/goharbor/harbor/issues/22010
 	github.com/gorilla/csrf v1.7.2
-	github.com/gorilla/handlers v1.5.2
 	github.com/gorilla/mux v1.8.1
 	github.com/graph-gophers/dataloader v5.0.0+incompatible
 	github.com/jackc/pgx/v5 v5.10.0
@@ -89,6 +88,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.1
 	github.com/aws/aws-sdk-go-v2/service/ecr v1.62.1
 	github.com/aws/smithy-go v1.28.1
+	github.com/felixge/httpsnoop v1.1.0
 	github.com/goccy/go-yaml v1.19.2
 	gopkg.in/h2non/gock.v1 v1.1.2
 )
@@ -155,7 +155,6 @@ require (
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/fatih/color v1.19.0 // indirect
-	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.3 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
