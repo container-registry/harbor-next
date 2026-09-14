@@ -454,6 +454,7 @@ func (suite *DaoTestSuite) TestListInvalidFilterValue() {
 	}
 }
 
+// Valid operands must keep filtering after the validation was added.
 func (suite *DaoTestSuite) TestListValidFilterValue() {
 	for _, query := range []string{
 		"creation_time=[2020-01-01T00:00:00~2021-01-01T00:00:00]",
