@@ -41,7 +41,7 @@ tasks:
       - task: _fetch-patches
       - task: _validate-patches
       - task: _import-patches
-      - task: _duplicate-patches
+      - task: _octopus-patches
       - task: _verify-patches
 
   check:
@@ -73,9 +73,13 @@ tasks:
     internal: true
     requires:
       vars: [PATCH_BRANCHES]
+    env:
+      DECLARED_PATCH_BRANCHES: '{{.PATCH_BRANCHES}}'
     cmds:
-      - for: { var: PATCH_BRANCHES }
-        cmd: git check-ref-format --branch '{{.ITEM}}' >/dev/null
+      - |
+        while IFS= read -r branch; do
+          git check-ref-format --branch "${branch}" >/dev/null
+        done <<< "${DECLARED_PATCH_BRANCHES}"
 
   _clean-auth:
     internal: true
@@ -101,27 +105,32 @@ tasks:
     env:
       GIT_ASKPASS: '{{.PATCH_AUTH_DIR}}/git-askpass'
       GIT_TERMINAL_PROMPT: '0'
+      PATCHES_FETCH_URL: '{{.PATCHES_REMOTE_URL}}'
+      DECLARED_PATCH_BRANCHES: '{{.PATCH_BRANCHES}}'
     cmds:
-      - for: { var: PATCH_BRANCHES }
-        cmd: >-
-          git fetch --no-tags '{{.PATCHES_REMOTE_URL}}'
-          '+refs/heads/{{.ITEM}}:refs/remotes/patches/{{.ITEM}}'
+      - |
+        refspecs=()
+        while IFS= read -r branch; do
+          refspecs+=("+refs/heads/${branch}:refs/remotes/patches/${branch}")
+        done <<< "${DECLARED_PATCH_BRANCHES}"
+        git fetch --no-tags "${PATCHES_FETCH_URL}" "${refspecs[@]}"
 
   _validate-patches:
     internal: true
+    env:
+      DECLARED_PATCH_BRANCHES: '{{.PATCH_BRANCHES}}'
     cmds:
-      - for: { var: PATCH_BRANCHES }
-        task: _validate-patch
-        vars:
-          PATCH_BRANCH: '{{.ITEM}}'
-
-  _validate-patch:
-    internal: true
-    requires:
-      vars: [PATCH_BRANCH]
-    preconditions:
-      - sh: test "$(git show -s --format='%P' 'refs/remotes/patches/{{.PATCH_BRANCH}}' | wc -w)" -eq 1
-        msg: "commercial patch branch must point to one non-merge commit: {{.PATCH_BRANCH}}"
+      - |
+        # Patch branches carry real multi-commit history plus sync-merge
+        # commits, so no commit-shape rule applies; each branch only has to
+        # share history with the target so the octopus has a merge base.
+        base=$(git rev-parse HEAD)
+        while IFS= read -r branch; do
+          if ! git merge-base "refs/remotes/patches/${branch}" "${base}" >/dev/null; then
+            echo "commercial patch branch shares no history with the target: ${branch}" >&2
+            exit 1
+          fi
+        done <<< "${DECLARED_PATCH_BRANCHES}"
 
   _import-patches:
     internal: true
@@ -135,34 +144,42 @@ tasks:
       - test -d .jj
     cmd: jj git init --colocate >/dev/null
 
-  _duplicate-patches:
+  _octopus-patches:
     internal: true
-    vars:
-      PATCH_REVSET:
-        sh: |
-          printf '%s\n' '{{.PATCH_BRANCHES}}' | while IFS= read -r branch; do
-            git rev-parse "refs/remotes/patches/${branch}^{commit}"
-          done | paste -sd '|' -
-      PATCHSET_ID:
-        sh: printf '%s' '{{.PATCH_REVSET}}' | git hash-object --stdin
-      PATCHSET_DESCRIPTION: 'release patches {{.PATCHSET_ID}}'
+    env:
+      DECLARED_PATCH_BRANCHES: '{{.PATCH_BRANCHES}}'
     status:
-      - test "$(jj log -r @ --no-graph -T 'description.first_line()')" = '{{.PATCHSET_DESCRIPTION}}'
+      - |
+        patch_revset=$(printf '%s\n' "${DECLARED_PATCH_BRANCHES}" | while IFS= read -r branch; do
+          git rev-parse "refs/remotes/patches/${branch}^{commit}"
+        done | paste -sd '|' -)
+        patchset_id=$(printf '%s' "${patch_revset}" | git hash-object --stdin)
+        test "$(jj log -r @ --no-graph -T 'description.first_line()')" = "release patches ${patchset_id}"
     cmds:
       - |
+        patch_revset=$(printf '%s\n' "${DECLARED_PATCH_BRANCHES}" | while IFS= read -r branch; do
+          git rev-parse "refs/remotes/patches/${branch}^{commit}"
+        done | paste -sd '|' -)
+        patchset_id=$(printf '%s' "${patch_revset}" | git hash-object --stdin)
         base=$(jj log -r @ --no-graph -T commit_id)
-        jj duplicate '({{.PATCH_REVSET}})' --onto @
-        jj new "heads(${base}::) ~ ${base}" -m '{{.PATCHSET_DESCRIPTION}}'
+        # Octopus of the fetched tips onto the target. heads() drops
+        # redundant parents (a stacked branch already contains its parent's
+        # tip, and a tip may already contain the base).
+        jj new "heads(${base}|${patch_revset})" -m "release patches ${patchset_id}"
 
   _verify-patches:
     internal: true
+    env:
+      DECLARED_PATCH_BRANCHES: '{{.PATCH_BRANCHES}}'
     preconditions:
       - sh: test -z "$(jj log -r '::@ & conflicts()' --no-graph -T commit_id)"
         msg: "commercial patches did not apply cleanly; run 'jj resolve --list'"
     cmds:
       - echo "Applied commercial patches from {{.PATCHES_SERIES}}:"
-      - for: { var: PATCH_BRANCHES }
-        cmd: echo '  {{.ITEM}}'
+      - |
+        while IFS= read -r branch; do
+          echo "  ${branch}"
+        done <<< "${DECLARED_PATCH_BRANCHES}"
 
   _clean-checkout:
     internal: true
