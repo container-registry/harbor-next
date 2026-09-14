@@ -16,16 +16,26 @@ package systeminfo
 
 import (
 	"os"
+	"sync"
 
+	"github.com/goharbor/harbor/src/common/registryctl"
 	"github.com/goharbor/harbor/src/pkg/systeminfo/imagestorage"
 	"github.com/goharbor/harbor/src/pkg/systeminfo/imagestorage/filesystem"
+	regctldriver "github.com/goharbor/harbor/src/pkg/systeminfo/imagestorage/registryctl"
 )
 
-// Init image storage driver
+var initOnce sync.Once
+
+// Init image storage driver: registryctl measures the registry's own volume
+// (harbor-next #839, theme B); core's local disk is only the fallback, kept
+// for Compose installs where both share the host's data directory.
 func Init() {
-	path := os.Getenv("IMAGE_STORE_PATH")
-	if len(path) == 0 {
-		path = "/data"
-	}
-	imagestorage.GlobalDriver = filesystem.NewDriver(path)
+	initOnce.Do(func() {
+		path := os.Getenv("IMAGE_STORE_PATH")
+		if len(path) == 0 {
+			path = "/data"
+		}
+		local := filesystem.NewDriver(path)
+		imagestorage.GlobalDriver = regctldriver.NewDriver(registryctl.RegistryCtlClient, local)
+	})
 }

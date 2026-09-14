@@ -22,6 +22,7 @@ import (
 	"github.com/goharbor/harbor/src/registryctl/api"
 	"github.com/goharbor/harbor/src/registryctl/api/registry/blob"
 	"github.com/goharbor/harbor/src/registryctl/api/registry/manifest"
+	"github.com/goharbor/harbor/src/registryctl/api/registry/storage"
 	"github.com/goharbor/harbor/src/registryctl/config"
 )
 
@@ -33,5 +34,6 @@ func newRouter(conf config.Configuration) http.Handler {
 
 	rootRouter.Path("/api/registry/blob/{reference}").Methods(http.MethodDelete).Handler(blob.NewHandler(conf.StorageDriver))
 	rootRouter.Path("/api/registry/{name:.*}/manifests/{reference}").Methods(http.MethodDelete).Handler(manifest.NewHandler(conf.StorageDriver))
+	rootRouter.Path("/api/registry/storage").Methods(http.MethodGet).Handler(storage.NewHandler(conf.StorageType, conf.StorageRoot))
 	return rootRouter
 }

@@ -34,11 +34,14 @@ import (
 	"github.com/goharbor/harbor/src/common/dao"
 	common_http "github.com/goharbor/harbor/src/common/http"
 	"github.com/goharbor/harbor/src/common/models"
+	"github.com/goharbor/harbor/src/common/registryctl"
 	configCtl "github.com/goharbor/harbor/src/controller/config"
 	_ "github.com/goharbor/harbor/src/controller/event/handler"
 	"github.com/goharbor/harbor/src/controller/health"
 	"github.com/goharbor/harbor/src/controller/registry"
 	"github.com/goharbor/harbor/src/controller/systemartifact"
+	"github.com/goharbor/harbor/src/controller/systeminfo"
+	"github.com/goharbor/harbor/src/controller/systemquota"
 	"github.com/goharbor/harbor/src/controller/task"
 	"github.com/goharbor/harbor/src/core/api"
 	_ "github.com/goharbor/harbor/src/core/auth/authproxy"
@@ -184,6 +187,11 @@ func main() {
 	log.Info("initializing configurations...")
 	config.Init()
 	log.Info("configurations initialization completed")
+
+	// registryctl measures the registry volume for /systeminfo/volumes and the
+	// global storage quota (harbor-next #839); core pulls, so the client lives here.
+	registryctl.Init()
+	systemquota.SetMeasurer(systeminfo.NewMeasurer())
 
 	// default beego max memory and max upload size is 128GB, consider from some AI related image would be large,
 	// also support customize it from the environment variables if the default value cannot satisfy some scenarios.

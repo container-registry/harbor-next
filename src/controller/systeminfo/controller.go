@@ -18,12 +18,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/common/utils"
+	"github.com/goharbor/harbor/src/controller/systemquota"
 	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/config/models"
 	"github.com/goharbor/harbor/src/lib/errors"
@@ -152,6 +154,32 @@ func OIDCProviderName(cfg map[string]any) string {
 func (c *controller) GetCapacity(_ context.Context) (*imagestorage.Capacity, error) {
 	systeminfo.Init()
 	return imagestorage.GlobalDriver.Cap()
+}
+
+// NewMeasurer adapts the capacity of the registry volume to the global storage
+// quota's Measurer (harbor-next #839): a measured value replaces the accounted
+// one, an unmeasured capacity yields nil so accounting stays in charge.
+func NewMeasurer() systemquota.Measurer {
+	return &measurer{ctl: Ctl}
+}
+
+type measurer struct {
+	ctl Controller
+}
+
+func (m *measurer) Measure(ctx context.Context) (*systemquota.Measurement, error) {
+	capacity, err := m.ctl.GetCapacity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if capacity == nil || !capacity.Measured {
+		//nolint:nilnil // a nil measurement means "not measured", per the Measurer contract
+		return nil, nil
+	}
+	if capacity.Used > math.MaxInt64 {
+		return nil, fmt.Errorf("measured usage %d exceeds int64", capacity.Used)
+	}
+	return &systemquota.Measurement{Used: int64(capacity.Used), At: capacity.MeasuredAt}, nil
 }
 
 func (c *controller) GetCA(ctx context.Context) (io.ReadCloser, error) {
