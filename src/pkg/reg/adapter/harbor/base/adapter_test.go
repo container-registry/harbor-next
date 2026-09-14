@@ -324,12 +324,8 @@ func TestIsLocalHarbor(t *testing.T) {
 		want    bool
 	}{
 		{"identical", "http://harbor-core", "http://harbor-core", true},
-		// The case reproduced on a real 2.15.8 deployment: core.extraEnv pins
-		// CORE_URL=http://harbor-core:80 while jobservice keeps the chart's
-		// portless value, so core stamps the local registry URL with the port
-		// (pkg/reg/manager.go getLocalRegistry -> config.InternalCoreURL) and
-		// jobservice compares it against its own env. Private projects then
-		// failed to replicate with 401; public ones still worked.
+		// The 2.15.8 field failure: an extraEnv pinned the default port on
+		// core's CORE_URL only, and private replication answered 401.
 		{"core pins the port through extraEnv, jobservice does not", "http://harbor-core", "http://harbor-core:80", true},
 		{"jobservice pins the port through extraEnv, core does not", "http://harbor-core:80", "http://harbor-core", true},
 		{"explicit https default port on the registry URL", "https://harbor-core", "https://harbor-core:443", true},
@@ -347,6 +343,9 @@ func TestIsLocalHarbor(t *testing.T) {
 		{"schemeless registry URL", "http://harbor-core", "harbor-core", false},
 		{"empty CORE_URL against schemeless URL", "", "harbor-core", false},
 		{"empty CORE_URL against absolute URL", "", "http://harbor-core", false},
+		{"userinfo only matches exactly", "http://harbor-core", "http://user:pw@harbor-core", false},
+		{"query only matches exactly", "http://harbor-core", "http://harbor-core?x=1", false},
+		{"identical userinfo matches through the exact compare", "http://user:pw@harbor-core", "http://user:pw@harbor-core", true},
 	}
 
 	for _, tc := range cases {
