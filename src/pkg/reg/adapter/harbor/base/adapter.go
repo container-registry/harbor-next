@@ -17,6 +17,7 @@ package base
 import (
 	"fmt"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -317,8 +318,57 @@ type Project struct {
 	RegistryID int64          `json:"registry_id"`
 }
 
+// isLocalHarbor reports whether the given URL points at the Harbor instance
+// this process belongs to.
+//
+// Core and jobservice each read their own CORE_URL. Core stamps the local
+// replication source URL from its value, jobservice compares against its own,
+// and a deployment that sets an explicit default port on only one of them
+// (http://harbor-core vs http://harbor-core:80) made the raw string compare
+// fail. The secret authorizer was then skipped and replication of private
+// projects fell back to basic auth with an empty username, returning 401.
+// Compare the addressable parts instead, treating :80 as the default for http
+// and :443 for https. If either URL fails to parse, the exact compare above
+// stands.
 func isLocalHarbor(url string) bool {
-	return url == os.Getenv("CORE_URL")
+	coreURL := os.Getenv("CORE_URL")
+	if url == coreURL {
+		return true
+	}
+	u, err := neturl.Parse(url)
+	if err != nil {
+		return false
+	}
+	core, err := neturl.Parse(coreURL)
+	if err != nil {
+		return false
+	}
+	// A bare host without a scheme parses into Path, which would make two
+	// unrelated values compare equal on empty scheme and host.
+	if u.Scheme == "" || u.Host == "" || core.Scheme == "" || core.Host == "" {
+		return false
+	}
+	return strings.EqualFold(u.Scheme, core.Scheme) &&
+		strings.EqualFold(hostPort(u), hostPort(core)) &&
+		strings.TrimSuffix(u.Path, "/") == strings.TrimSuffix(core.Path, "/")
+}
+
+// hostPort returns host:port with the scheme's default port made explicit.
+// This is the same equivalence the v2auth middleware already applies when it
+// matches a request host against the configured URL (match() in
+// src/server/middleware/v2auth/auth.go), reached from the other direction:
+// that one strips a default port, this one adds it.
+func hostPort(u *neturl.URL) string {
+	port := u.Port()
+	if port == "" {
+		switch strings.ToLower(u.Scheme) {
+		case "http":
+			port = "80"
+		case "https":
+			port = "443"
+		}
+	}
+	return u.Hostname() + ":" + port
 }
 
 // check whether the current process is running inside core
