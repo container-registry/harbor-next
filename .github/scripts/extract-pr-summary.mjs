@@ -83,13 +83,11 @@ function releaseNotesSection(body) {
 
 const entries = [];
 
-// Each section is emitted verbatim — no synthesized headings or PR titles.
-// Only the source PR number is appended; the blank line keeps it out of a
-// trailing list, blockquote, or code fence.
+// Each section is emitted verbatim: no headings, no PR titles, no PR number.
 for (const number of prNumbers) {
   const section = releaseNotesSection(fetchPullRequest(number)?.body);
   if (section) {
-    entries.push(`${section}\n\n(#${number})`);
+    entries.push(section);
   }
 }
 
