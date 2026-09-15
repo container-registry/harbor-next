@@ -15,8 +15,7 @@ spec:
   {{- end }}
   revisionHistoryLimit: {{ .Values.portal.revisionHistoryLimit | default .Values.global.revisionHistoryLimit }}
   {{- with .Values.portal.deploymentStrategy }}
-  strategy:
-    {{- toYaml . | nindent 4 }}
+  {{- include "harbor.deploymentStrategy" . | nindent 2 }}
   {{- end }}
   selector:
     matchLabels:
