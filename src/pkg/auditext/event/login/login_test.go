@@ -46,7 +46,7 @@ func Test_login_Resolve(t *testing.T) {
 				RequestMethod: "POST",
 				Payload:       "principal=test&password=123456",
 				ResponseCode:  200,
-			}, event: &event.Event{}}, false, "test", "login", "login", true},
+			}, event: &event.Event{}}, false, "test", "login", `test logged in: auth_mode "db_auth"`, true},
 		{"test fail", &loginResolver{}, args{
 			ce: &commonevent.Metadata{
 				Username:      "test",
@@ -54,8 +54,27 @@ func Test_login_Resolve(t *testing.T) {
 				RequestMethod: "POST",
 				Payload:       "principal=test&password=123456",
 				ResponseCode:  401,
-			}, event: &event.Event{}}, false, "test", "login", "login", false},
+			}, event: &event.Event{}}, false, "test", "login", `test logged in: auth_mode "db_auth" (failed: 401 unauthorized)`, false},
+		{"test fail with reason", &loginResolver{}, args{
+			ce: &commonevent.Metadata{
+				Username:       "test",
+				RequestURL:     "/c/login",
+				RequestMethod:  "POST",
+				RequestPayload: "principal=test&password=123456",
+				ResponseCode:   401,
+				ResponseBody:   `{"errors":[{"code":"UNAUTHORIZED","message":"invalid credentials"}]}`,
+			}, event: &event.Event{}}, false, "test", "login", `test logged in: auth_mode "db_auth" (failed: 401 invalid credentials)`, false},
+		{"test oidc callback", &loginResolver{}, args{
+			ce: &commonevent.Metadata{
+				Username:      "alice",
+				RequestURL:    "/c/oidc/callback?code=x",
+				RequestMethod: "GET",
+				ResponseCode:  302,
+			}, event: &event.Event{}}, false, "alice", "login", `alice logged in: auth_mode "db_auth"`, true},
 	}
+	origAuthMode := authModeFn
+	authModeFn = func(_ context.Context) string { return "db_auth" }
+	defer func() { authModeFn = origAuthMode }()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &loginResolver{}

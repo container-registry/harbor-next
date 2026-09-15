@@ -410,3 +410,25 @@ func TestMiddlewareDoesNotReadRegistryResolverCollisions(t *testing.T) {
 		})
 	}
 }
+
+func TestResponseWriterKeepsErrorBody(t *testing.T) {
+	rec := httptest.NewRecorder()
+	rw := &ResponseWriter{ResponseWriter: rec, statusCode: http.StatusOK}
+	_, _ = rw.Write([]byte("fine"))
+	assert.Equal(t, "", rw.body.String(), "successful responses are not kept")
+
+	rec = httptest.NewRecorder()
+	rw = &ResponseWriter{ResponseWriter: rec, statusCode: http.StatusOK}
+	rw.WriteHeader(http.StatusConflict)
+	_, _ = rw.Write([]byte(`{"errors":[{"code":"CONFLICT",`))
+	_, _ = rw.Write([]byte(`"message":"exists"}]}`))
+	assert.Equal(t, `{"errors":[{"code":"CONFLICT","message":"exists"}]}`, rw.body.String())
+	assert.Equal(t, rw.body.String(), rec.Body.String(), "the client still receives the full body")
+
+	rec = httptest.NewRecorder()
+	rw = &ResponseWriter{ResponseWriter: rec, statusCode: http.StatusOK}
+	rw.WriteHeader(http.StatusInternalServerError)
+	_, _ = rw.Write(bytes.Repeat([]byte("x"), maxErrorBodySize+100))
+	assert.Equal(t, maxErrorBodySize, rw.body.Len())
+	assert.Equal(t, maxErrorBodySize+100, rec.Body.Len())
+}

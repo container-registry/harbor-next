@@ -19,14 +19,14 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
-	"time"
-
 	"slices"
+	"time"
 
 	ctlevent "github.com/goharbor/harbor/src/controller/event"
 	"github.com/goharbor/harbor/src/controller/event/metadata/commonevent"
 	"github.com/goharbor/harbor/src/controller/event/model"
 	"github.com/goharbor/harbor/src/lib/config"
+	"github.com/goharbor/harbor/src/pkg/auditext/desc"
 	"github.com/goharbor/harbor/src/pkg/notifier/event"
 )
 
@@ -51,6 +51,10 @@ type Resolver struct {
 	IDToNameFunc ResolveIDToNameFunc
 	// ResourceIDPattern the URL pattern to match the resourceID
 	ResourceIDPattern string
+	// Details adds resource specific facts and from/to changes to the
+	// description; it runs after the outcome is known and before the error
+	// is appended
+	Details func(ce *commonevent.Metadata, evt *model.CommonEvent, d *desc.Description)
 }
 
 // PreCheck check if the event should be captured and resolve the resource name if needed, if need to resolve the resource name, return the resource name
@@ -133,11 +137,18 @@ func (e *Resolver) Resolve(ce *commonevent.Metadata, event *event.Event) error {
 		}
 	}
 
-	evt.OperationDescription = fmt.Sprintf("%s %s with name: %s", evt.Operation, e.ResourceType, evt.ResourceName)
-
 	if !slices.Contains(e.SucceedCodes, ce.ResponseCode) {
 		evt.IsSuccessful = false
 	}
+
+	d := desc.New(evt.Operator, evt.Operation, e.ResourceType).Name(evt.ResourceName)
+	if e.Details != nil {
+		e.Details(ce, evt, d)
+	}
+	if !evt.IsSuccessful {
+		d.Error(ce.ResponseCode, ce.ResponseBody)
+	}
+	evt.OperationDescription = d.String()
 
 	event.Topic = ctlevent.TopicCommonEvent
 	event.Data = evt

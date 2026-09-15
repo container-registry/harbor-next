@@ -47,7 +47,15 @@ func Test_logout_Resolve(t *testing.T) {
 				RequestMethod: "GET",
 				Payload:       "",
 				ResponseCode:  200,
-			}, event: &event.Event{}}, false, "test", "logout", "logout", true},
+			}, event: &event.Event{}}, false, "test", "logout", `test logged out`, true},
+		{"test logout failed", &logoutResolver{}, args{
+			ce: &commonevent.Metadata{
+				Username:      "test",
+				RequestURL:    "/c/log_out",
+				RequestMethod: "GET",
+				ResponseCode:  500,
+				ResponseBody:  `{"errors":[{"code":"INTERNAL","message":"session store unavailable"}]}`,
+			}, event: &event.Event{}}, false, "test", "logout", `test logged out (failed: 500 session store unavailable)`, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
