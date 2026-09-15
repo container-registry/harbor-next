@@ -15,6 +15,7 @@
 package metric
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -35,5 +36,11 @@ func ServeProm(path string, port int) {
 	mux := http.NewServeMux()
 	mux.Handle(path, promhttp.Handler())
 	log.Infof("Prometheus metric server running on port %v", port)
+<<<<<<< HEAD
 	log.Errorf("Promethus metrics server down with %s", http.ListenAndServe(fmt.Sprintf(":%v", port), mux))
+=======
+	if err := http.ListenAndServe(fmt.Sprintf(":%v", port), mux); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Errorf("Prometheus metrics server down with %s", err)
+	}
+>>>>>>> c10a0a62c (fix: ignore http.ErrServerClosed on graceful shutdown (#23296))
 }
