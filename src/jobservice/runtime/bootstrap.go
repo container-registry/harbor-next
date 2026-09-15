@@ -17,6 +17,7 @@ package runtime //nolint:revive
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -258,14 +259,16 @@ func (bs *Bootstrap) LoadAndRun(ctx context.Context, cancel context.CancelFunc) 
 	// Blocking here
 	logger.Infof("API server is serving at %d with [%s] mode at node [%s]", cfg.Port, cfg.Protocol, node)
 	metric.JobserviceInfo.WithLabelValues(node.(string), workerPoolID, fmt.Sprint(cfg.PoolConfig.WorkerCount)).Set(1)
+<<<<<<< HEAD
 	if er := apiServer.Start(); er != nil {
 		if !terminated.Load() {
+=======
+	if er := apiServer.Start(); er != nil && !errors.Is(er, http.ErrServerClosed) {
+		if !terminated {
+>>>>>>> c10a0a62c (fix: ignore http.ErrServerClosed on graceful shutdown (#23296))
 			// Tell the listening goroutine
 			rootContext.ErrorChan <- er
 		}
-	} else {
-		// In case
-		sig <- os.Interrupt
 	}
 
 	// Wait everyone exits.
