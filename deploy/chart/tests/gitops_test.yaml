@@ -14,6 +14,7 @@ templates:
   - templates/core.secret.yaml
   - templates/registry.secret.yaml
   - templates/jobservice.secret.yaml
+  - templates/registryctl.secret.yaml
   - templates/ingress.secret.yaml
 tests:
   # ============================================================================
@@ -236,3 +237,60 @@ tests:
       - equal:
           path: data["tls.crt"]
           value: "Q0VSVFBFTQ=="
+
+  # ============================================================================
+  # Fully externalized: chart-managed component Secrets are skipped entirely
+  # so client-side renderers (Argo CD) create no empty Secrets.
+  # ============================================================================
+  - it: should render no core Secret documents when fully externalized
+    template: templates/core.secret.yaml
+    set: &fully-externalized
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      autoGenSecrets: false
+      existingSecretAdminPassword: harbor-admin
+      existingSecretSecretKey: enc-key
+      database.existingSecret: harbor-database
+      core.existingSecret: core-id
+      core.existingXsrfSecret: core-id
+      core.tokenSecretName: token-cert
+      registry.existingSecret: reg-id
+      registry.credentials.existingSecret: reg-creds
+      jobservice.existingSecret: js-id
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render no registry Secret documents when fully externalized
+    template: templates/registry.secret.yaml
+    set: *fully-externalized
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render no jobservice Secret documents when fully externalized
+    template: templates/jobservice.secret.yaml
+    set: *fully-externalized
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render no registryctl Secret when tracing is off
+    template: templates/registryctl.secret.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render no core Secret when core.secret holds only nested empty maps
+    template: templates/core.secret.yaml
+    set:
+      <<: *fully-externalized
+      core.secret:
+        nested: {}
+    asserts:
+      - hasDocuments:
+          count: 0
