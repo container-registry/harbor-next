@@ -161,16 +161,36 @@ func TestRouterRejectsWrongMethod(t *testing.T) {
 }
 
 // TestRouterServesHeadOnGetRoutes records the other deliberate change: ServeMux
-// ties HEAD to GET, where gorilla/mux answered 405. /stats is the unauthenticated
-// health endpoint, so this exposes nothing a GET did not already.
+// ties HEAD to GET across every GET route, where gorilla/mux answered 405. This
+// is not confined to the unauthenticated /stats endpoint — the authenticated GET
+// routes (and the withJobID-wrapped log route) see the same 405-to-200 shift that
+// callers such as core and harbor-cli will observe, so pin them all.
 func TestRouterServesHeadOnGetRoutes(t *testing.T) {
 	base := fmt.Sprintf("%s/%s", baseRoute, apiVersion)
 
-	probe, rec := serve(t, http.MethodHead, base+"/stats")
+	cases := []struct {
+		path  string
+		route string
+		jobID string
+	}{
+		{"/stats", "stats", ""},
+		{"/jobs", "get-jobs", ""},
+		{"/config", "config", ""},
+		{"/jobs/abc123", "get-job", "abc123"},
+		{"/jobs/abc123/log", "job-log", "abc123"},
+		{"/jobs/abc123/executions", "executions", "abc123"},
+	}
 
-	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.True(t, probe.called)
-	assert.Equal(t, "stats", probe.route)
+	for _, c := range cases {
+		t.Run("HEAD "+c.path, func(t *testing.T) {
+			probe, rec := serve(t, http.MethodHead, base+c.path)
+
+			assert.Equal(t, http.StatusOK, rec.Code)
+			assert.True(t, probe.called, "no handler was reached")
+			assert.Equal(t, c.route, probe.route)
+			assert.Equal(t, c.jobID, probe.jobID)
+		})
+	}
 }
 
 // TestErrorResponseIsNotSniffable covers the reflected path value reaching the
@@ -189,6 +209,25 @@ func TestErrorResponseIsNotSniffable(t *testing.T) {
 	handler.HandleGetJobReq(rec, req)
 
 	assert.Equal(t, http.StatusNotFound, rec.Code)
+	assert.Equal(t, "text/plain; charset=utf-8", rec.Header().Get("Content-Type"))
+	assert.Equal(t, "nosniff", rec.Header().Get("X-Content-Type-Options"))
+}
+
+// TestJobLogResponseIsNotSniffable covers a successful log whose bytes happen to
+// look like HTML: the type is named text/plain and sniffing is turned off, so the
+// log body cannot be rendered as a page when opened in a browser.
+func TestJobLogResponseIsNotSniffable(t *testing.T) {
+	fc := &fakeController{}
+	fc.On("GetJobLogData", "abc123").Return([]byte("<script>alert(1)</script>"), nil)
+
+	handler := NewDefaultHandler(fc)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/abc123/log", nil)
+	req.SetPathValue("job_id", "abc123")
+
+	handler.HandleJobLogReq(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, "text/plain; charset=utf-8", rec.Header().Get("Content-Type"))
 	assert.Equal(t, "nosniff", rec.Header().Get("X-Content-Type-Options"))
 }
