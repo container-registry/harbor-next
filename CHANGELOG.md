@@ -6,6 +6,29 @@ This changelog mirrors [GitHub Releases](https://github.com/container-registry/h
 
 ---
 
+## [2.15.9](https://github.com/container-registry/harbor-next/compare/v2.15.8...v2.15.9) (2026-09-16)
+
+
+### Bug Fixes
+
+* **api:** Reject query operands the column cannot take (backport [#925](https://github.com/container-registry/harbor-next/issues/925)) ([30d06ea](https://github.com/container-registry/harbor-next/commit/30d06ea8c0f63d32334ffa413fe945fba5c8d141))
+* **compose:** Preserve the request port in the nginx Host header ([#926](https://github.com/container-registry/harbor-next/issues/926)) ([310d6e0](https://github.com/container-registry/harbor-next/commit/310d6e028ee84d0e11d6f9b3c30d0d7f5e6e9b37))
+* **db:** Widen execution.revision to bigint (backport [#924](https://github.com/container-registry/harbor-next/issues/924)) ([1d5719e](https://github.com/container-registry/harbor-next/commit/1d5719ee49c069dd225301339d2baa393bb4a3c1))
+* **deps:** Bump go dependencies minor versions (backport [#895](https://github.com/container-registry/harbor-next/issues/895)) ([#899](https://github.com/container-registry/harbor-next/issues/899)) ([a4b7e1c](https://github.com/container-registry/harbor-next/commit/a4b7e1c644a67c0fa354d8b7ba6ad51a9459cb60))
+* **deps:** Bump vendored builds: trivy 0.74.0, adapter v0.41.0, pin cleanup (backport [#893](https://github.com/container-registry/harbor-next/issues/893)) ([#898](https://github.com/container-registry/harbor-next/issues/898)) ([5bcfece](https://github.com/container-registry/harbor-next/commit/5bcfece8a4dcfebb270633393bd5b0657769ff51))
+* **deps:** Upgrade Go to 1.26.8 (backport [#892](https://github.com/container-registry/harbor-next/issues/892)) ([#897](https://github.com/container-registry/harbor-next/issues/897)) ([ff01ea1](https://github.com/container-registry/harbor-next/commit/ff01ea16f3687806d71523e0005602962c931af5))
+* **quota:** Enable retry backoff on quota usage updates (backport [#716](https://github.com/container-registry/harbor-next/issues/716)) ([75fab53](https://github.com/container-registry/harbor-next/commit/75fab53f4f00b02c147826422fcf79d9fc901933))
+* **registry:** Answer 400 when the endpoint URL cannot be reached ([#923](https://github.com/container-registry/harbor-next/issues/923)) ([07d4436](https://github.com/container-registry/harbor-next/commit/07d4436f9517460098e6ad7ac46e7077ecf61704))
+* **replication:** Normalise CORE_URL comparison in isLocalHarbor ([#873](https://github.com/container-registry/harbor-next/issues/873)) ([49cd3cb](https://github.com/container-registry/harbor-next/commit/49cd3cba8f093d5b880ff0d4c07b0d3aa842d0a3))
+* **scan:** Keep the last report when the raw report is empty (backport [#863](https://github.com/container-registry/harbor-next/issues/863)) ([1433e30](https://github.com/container-registry/harbor-next/commit/1433e30fd8eadc1818de1f64f694ca974ea5ce5f))
+
+
+### Upstream
+
+* add size limit for audit log payload (goharbor/harbor[#23755](https://github.com/container-registry/harbor-next/issues/23755)) ([45e97fd](https://github.com/container-registry/harbor-next/commit/45e97fd48773e414c62d31f8161ea2a7a6444d2c))
+* fix(i18n): improve Korean translation of FULL_NAME (goharbor/harbor[#22701](https://github.com/container-registry/harbor-next/issues/22701)) ([9ea0d71](https://github.com/container-registry/harbor-next/commit/9ea0d718e72e7d9cf58a649be0bbe05fb8f6f47d))
+* Prevent 500 if no project members have been provided (goharbor/harbor[#23642](https://github.com/container-registry/harbor-next/issues/23642)) ([c518ae7](https://github.com/container-registry/harbor-next/commit/c518ae7b13e8d5bc0a5910c57d6066fca73ea426))
+
 ## [2.15.8](https://github.com/container-registry/harbor-next/compare/v2.15.7...v2.15.8) (2026-08-26)
 
 
