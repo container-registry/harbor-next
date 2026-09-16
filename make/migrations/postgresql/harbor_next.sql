@@ -138,13 +138,31 @@ WHERE m.id = ranked.id AND m.rank <> ranked.rn;
 -- Guarded on the current type so repeat runs never rewrite the table.
 DO $$
 BEGIN
+    -- Resolve the schema from the same relation the unqualified ALTER below
+    -- resolves to. current_schema() is only the first entry in search_path, so
+    -- it would miss an execution table living in a later one and skip the
+    -- widening without a word. to_regclass returns NULL when there is no
+    -- execution table at all, which leaves the guard false, as it should.
+    --
+    -- relkind keeps the guard on tables: to_regclass resolves any relation, so
+    -- an index named execution earlier in search_path would otherwise match a
+    -- pg_attribute row here and send ALTER TABLE at something it cannot alter.
+    --
+    -- The type is compared after resolving a domain to its base type, so a
+    -- column already typed as a domain over bigint keeps the domain and its
+    -- constraints instead of having them stripped off by the ALTER.
     IF EXISTS (
         SELECT 1
-        FROM information_schema.columns
-        WHERE table_schema = current_schema()
-          AND table_name = 'execution'
-          AND column_name = 'revision'
-          AND data_type <> 'bigint'
+        FROM pg_attribute a
+        JOIN pg_class c ON c.oid = a.attrelid
+        JOIN pg_type t ON t.oid = a.atttypid
+        WHERE a.attrelid = to_regclass('execution')
+          AND c.relkind IN ('r', 'p')
+          AND a.attname = 'revision'
+          AND a.attnum > 0
+          AND NOT a.attisdropped
+          AND CASE WHEN t.typtype = 'd' THEN t.typbasetype ELSE a.atttypid END
+              <> 'bigint'::regtype
     ) THEN
         ALTER TABLE execution ALTER COLUMN revision TYPE bigint;
     END IF;
