@@ -333,7 +333,7 @@ tests:
       registry.existingSecret: my-reg
     documentSelector:
       path: metadata.name
-      value: RELEASE-NAME-harbor-next-registry
+      value: RELEASE-NAME-harbor-registry
     asserts:
       - notExists:
           path: data.REGISTRY_HTTP_SECRET

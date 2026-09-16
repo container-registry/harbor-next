@@ -77,14 +77,14 @@ tests:
             name: SECRET_KEY
             valueFrom:
               secretKeyRef:
-                name: RELEASE-NAME-harbor-next-core
+                name: RELEASE-NAME-harbor-core
                 key: SECRET_KEY
       - contains:
           path: spec.template.spec.volumes
           content:
             name: secret-key
             secret:
-              secretName: RELEASE-NAME-harbor-next-core
+              secretName: RELEASE-NAME-harbor-core
               items:
                 - key: secretKey
                   path: key
@@ -154,7 +154,7 @@ tests:
       existingSecretSecretKey: my-enc
     documentSelector:
       path: metadata.name
-      value: RELEASE-NAME-harbor-next-core
+      value: RELEASE-NAME-harbor-core
     asserts:
       - notExists:
           path: data.SECRET_KEY
@@ -173,7 +173,7 @@ tests:
       secretKey: "sixteenkeychars1"  # schema requires exactly 16 chars
     documentSelector:
       path: metadata.name
-      value: RELEASE-NAME-harbor-next-core
+      value: RELEASE-NAME-harbor-core
     asserts:
       - equal:
           path: data.SECRET_KEY
@@ -199,7 +199,7 @@ tests:
     asserts:
       - equal:
           path: spec.template.spec.containers[0].envFrom[1].secretRef.name
-          value: RELEASE-NAME-harbor-next-core
+          value: RELEASE-NAME-harbor-core
       - contains:
           path: spec.template.spec.containers[0].env
           content:

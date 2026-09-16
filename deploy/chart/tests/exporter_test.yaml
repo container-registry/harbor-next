@@ -106,7 +106,7 @@ tests:
           path: spec.template.spec.containers[0].envFrom
           content:
             configMapRef:
-              name: RELEASE-NAME-harbor-next-exporter-env
+              name: RELEASE-NAME-harbor-exporter-env
 
   # No empty ConfigMap and no envFrom when config is unset (default).
   - it: should not render exporter env ConfigMap when config is empty
@@ -165,7 +165,7 @@ tests:
             name: REDIS_PASSWORD
             valueFrom:
               secretKeyRef:
-                name: RELEASE-NAME-harbor-next-redis
+                name: RELEASE-NAME-harbor-redis
                 key: REDIS_PASSWORD
 
   # Config-reload: exporter.config / exporter.secret feed env via envFrom by

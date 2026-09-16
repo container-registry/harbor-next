@@ -1,4 +1,4 @@
-# harbor-next
+# harbor
 
 ![Version: 2.0.0](https://img.shields.io/badge/Version-2.0.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: v2.15.0](https://img.shields.io/badge/AppVersion-v2.15.0-informational?style=flat-square)
 
@@ -11,7 +11,7 @@ A modern, production-ready Helm chart for [Harbor Next](https://github.com/conta
 kubectl create secret generic my-harbor-db \
   --from-literal=POSTGRESQL_PASSWORD='your-strong-password'
 
-helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-next \
+helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor \
   --set externalURL=https://harbor.example.com \
   --set database.host=my-postgres.example.com \
   --set database.existingSecret=my-harbor-db
@@ -147,7 +147,7 @@ kubectl -n harbor create secret generic my-harbor-db \
 kubectl -n harbor create secret generic my-harbor-admin \
   --from-literal=HARBOR_ADMIN_PASSWORD='your-strong-admin-password'
 
-helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-next \
+helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor \
   --namespace harbor \
   --set externalURL=https://harbor.example.com \
   --set database.host=postgres.example.com \
@@ -158,7 +158,7 @@ helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-ne
 ### With Values File
 
 ```bash
-helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor-next \
+helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor \
   --namespace harbor \
   --create-namespace \
   -f values-production.yaml
@@ -625,6 +625,43 @@ metrics:
       release: prometheus
 ```
 
+### Grafana dashboard
+
+Ships the Harbor dashboard from `dashboards/harbor.json` as a ConfigMap labelled `grafana_dashboard: "1"`,
+which a Grafana dashboard sidecar (such as the one in kube-prometheus-stack) loads
+automatically. The dashboard filters on the `cluster` and `namespace` labels, so it needs
+`metrics.enabled`, `exporter.enabled` and a ServiceMonitor (or equivalent scrape).
+`dashboards/harbor.json` is the single source for both the chart and manual Grafana imports;
+edit it directly or export changes from Grafana. Helm validates the JSON when the dashboard
+is enabled and embeds the file unchanged.
+
+The shared **Data source → Cluster → Namespace** selectors filter every metric panel.
+Cluster and Namespace are single-select without **All**, defaulting to the first
+available value alphabetically when no valid selection exists. Namespace is scoped
+to the selected cluster. All Harbor series need consistent `cluster` and `namespace` labels.
+Runtime appears directly below Overview. All rows are expanded, including the database row,
+whose note and tooltips explain the PostgreSQL/pgx metrics available in the
+[8gcr Harbor distribution](https://container-registry.com/8gcr/).
+Those panels require `POSTGRESQL_METRICS_ENABLED=true` on an 8gcr build with pgx monitoring
+and are empty on standard Harbor.
+
+Provision this shared dashboard once per Grafana organization, then use its selectors to
+switch installations. A sidecar must watch the ConfigMap's namespace and labels.
+See the [monitoring example](example/grafana-dashboard/) for setup and the
+[dashboard guide](../../contrib/grafana-dashboard/README.md) for import and editing instructions.
+
+```yaml
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+  grafanaDashboard:
+    enabled: true
+    namespace: monitoring  # Optional, defaults to release namespace
+    annotations:
+      grafana_folder: Harbor  # Optional, sidecar folder annotation
+```
+
 ### CloudNativePG via extraManifests
 
 ```yaml
@@ -937,6 +974,11 @@ Kubernetes: `>=1.28.0-0`
 | jobservice.topologySpreadConstraints | list | `[]` | Topology spread constraints for pod scheduling |
 | logLevel | string | `"info"` | Log level for all components (debug, info, warning, error, fatal) |
 | metrics.enabled | bool | `false` | Enable metrics endpoints on all components |
+| metrics.grafanaDashboard | object | `{"annotations":{},"enabled":false,"labels":{"grafana_dashboard":"1"},"namespace":""}` | Ship the Harbor Grafana dashboard (dashboards/harbor.json) as a ConfigMap picked up by a Grafana dashboard sidecar (for example, kube-prometheus-stack) |
+| metrics.grafanaDashboard.annotations | object | `{}` | Annotations, e.g. grafana_folder for the sidecar folder annotation |
+| metrics.grafanaDashboard.enabled | bool | `false` | Create the dashboard ConfigMap |
+| metrics.grafanaDashboard.labels | object | `{"grafana_dashboard":"1"}` | Labels the Grafana sidecar selects on |
+| metrics.grafanaDashboard.namespace | string | `""` | ConfigMap namespace (defaults to release namespace) |
 | metrics.serviceMonitor | object | `{"enabled":false,"honorLabels":true,"interval":"30s","labels":{},"namespace":"","scrapeTimeout":"10s"}` | Enable Prometheus ServiceMonitor |
 | metrics.serviceMonitor.enabled | bool | `false` | Create ServiceMonitor resource |
 | metrics.serviceMonitor.honorLabels | bool | `true` | Honor labels |

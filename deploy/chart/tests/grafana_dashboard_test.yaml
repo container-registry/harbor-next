@@ -1,0 +1,60 @@
+# Pins the dashboard ConfigMap: disabled by default, and when enabled the
+# sidecar label, optional namespace, extra labels and folder annotation are
+# what the Grafana sidecar keys on.
+suite: Grafana dashboard ConfigMap tests
+templates:
+  - templates/grafana-dashboard.configmap.yaml
+  - templates/validate-values.yaml
+tests:
+  - it: should not create the dashboard ConfigMap by default
+    template: templates/grafana-dashboard.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should create the dashboard ConfigMap with the sidecar label when enabled
+    template: templates/grafana-dashboard.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      metrics.grafanaDashboard.enabled: true
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-harbor-grafana-dashboard
+      - equal:
+          path: metadata.labels.grafana_dashboard
+          value: "1"
+      - isNull:
+          path: metadata.namespace
+      - matchRegex:
+          path: data["harbor.json"]
+          pattern: '"uid": "harbor-overview"'
+
+  - it: should honour namespace, extra labels and the folder annotation
+    template: templates/grafana-dashboard.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      metrics.grafanaDashboard.enabled: true
+      metrics.grafanaDashboard.namespace: monitoring
+      metrics.grafanaDashboard.labels.release: prometheus
+      metrics.grafanaDashboard.annotations.grafana_folder: Harbor
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: monitoring
+      - equal:
+          path: metadata.labels.release
+          value: prometheus
+      - equal:
+          path: metadata.annotations.grafana_folder
+          value: Harbor

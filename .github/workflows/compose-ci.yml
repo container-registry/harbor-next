@@ -25,7 +25,7 @@ jobs:
         run: grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
 
       - name: Install Task
-        uses: ./.github/actions/setup-task
+        uses: $/.github/actions/setup-task
 
       - name: Install ys (YAMLScript)
         run: |

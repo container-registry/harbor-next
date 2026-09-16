@@ -39,7 +39,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter, grype-scanner, snyk-scanner]
+        component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter]
         platform:
           - linux/amd64
           - linux/arm64
@@ -58,8 +58,6 @@ jobs:
           echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
           case "${{ matrix.component }}" in
             trivy-adapter) echo "image_name=trivy-adapter" >> "$GITHUB_OUTPUT" ;;
-            grype-scanner) echo "image_name=harbor-grype-adapter" >> "$GITHUB_OUTPUT" ;;
-            snyk-scanner) echo "image_name=harbor-snyk-adapter" >> "$GITHUB_OUTPUT" ;;
             *) echo "image_name=harbor-${{ matrix.component }}" >> "$GITHUB_OUTPUT" ;;
           esac
           if [ -n "$BUILDX_HOST" ]; then
@@ -73,7 +71,7 @@ jobs:
           persist-credentials: false
 
       - name: Install Task
-        uses: ./.github/actions/setup-task
+        uses: $/.github/actions/setup-task
         with:
           version: 3.49.1
 
@@ -105,7 +103,7 @@ jobs:
 
       # Root Taskfile evaluation reads Go cache paths, even for apply-patches.
       - name: Setup Go
-        uses: ./.github/actions/setup-go-cached
+        uses: $/.github/actions/setup-go-cached
         with:
           go-version-file: src/go.mod
           go-sum-path: src/go.sum
@@ -137,7 +135,7 @@ jobs:
           COMPONENT: ${{ matrix.component }}
           PLATFORM_PAIR: ${{ env.PLATFORM_PAIR }}
           CHECKOUT_REF: ${{ inputs.checkout_ref }}
-        run: task build:binary:${COMPONENT}:${PLATFORM_PAIR} GIT_COMMIT="$(git rev-parse --short=8 "$CHECKOUT_REF")"
+        run: task build:binary:${COMPONENT}:${PLATFORM_PAIR} BASE_GIT_COMMIT="$(git rev-parse --short=8 "$CHECKOUT_REF")"
 
       - name: Compile image helper binaries
         env:
@@ -153,7 +151,7 @@ jobs:
       - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
         if: env.BUILDX_HOST == ''
 
-      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
         with:
           driver: ${{ env.BUILDX_HOST && 'remote' || '' }}
           endpoint: ${{ env.BUILDX_HOST }}
@@ -168,6 +166,9 @@ jobs:
       - name: Build and push by digest
         id: build
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        env:
+          # Build traces can contain signed storage URLs.
+          DOCKER_BUILD_RECORD_UPLOAD: "false"
         with:
           context: .
           file: dockerfile/${{ matrix.component }}.dockerfile
@@ -183,10 +184,6 @@ jobs:
             TRIVY_VERSION=${{ env.TRIVY_VERSION }}
             TRIVY_COMMIT=${{ env.TRIVY_COMMIT }}
             HARBOR_SCANNER_TRIVY_VERSION=${{ env.HARBOR_SCANNER_TRIVY_VERSION }}
-            NODE_VERSION=${{ env.NODE_VERSION }}
-            SNYK_CLI_VERSION=${{ env.SNYK_CLI_VERSION }}
-            GRYPE_VERSION=${{ env.GRYPE_VERSION }}
-            SYFT_VERSION=${{ env.SYFT_VERSION }}
           tags: ${{ env.REGISTRY_ADDRESS }}/${{ env.REGISTRY_PROJECT }}/${{ steps.prepare.outputs.image_name }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
 
@@ -209,7 +206,7 @@ jobs:
     needs: [build]
     strategy:
       matrix:
-        component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter, grype-scanner, snyk-scanner]
+        component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter]
     runs-on: ubuntu-26.04
     permissions:
       contents: read
@@ -223,8 +220,6 @@ jobs:
         run: |
           case "${{ matrix.component }}" in
             trivy-adapter) echo "image_name=trivy-adapter" >> "$GITHUB_OUTPUT" ;;
-            grype-scanner) echo "image_name=harbor-grype-adapter" >> "$GITHUB_OUTPUT" ;;
-            snyk-scanner) echo "image_name=harbor-snyk-adapter" >> "$GITHUB_OUTPUT" ;;
             *) echo "image_name=harbor-${{ matrix.component }}" >> "$GITHUB_OUTPUT" ;;
           esac
           if [ -n "$BUILDX_HOST" ]; then
@@ -245,7 +240,7 @@ jobs:
           username: ${{ inputs.registry_username || vars.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
-      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
         with:
           driver: ${{ env.BUILDX_HOST && 'remote' || '' }}
           endpoint: ${{ env.BUILDX_HOST }}
@@ -287,11 +282,9 @@ jobs:
 
       - name: Sign images
         run: |
-          for image in core jobservice registryctl exporter portal registry trivy-adapter grype-scanner snyk-scanner; do
+          for image in core jobservice registryctl exporter portal registry trivy-adapter; do
             case "${image}" in
               trivy-adapter) image_name="trivy-adapter" ;;
-              grype-scanner) image_name="harbor-grype-adapter" ;;
-              snyk-scanner) image_name="harbor-snyk-adapter" ;;
               *) image_name="harbor-${image}" ;;
             esac
 

@@ -7,7 +7,9 @@ if (!changelogPath || !version || !outputPath) {
 }
 
 const lines = readFileSync(changelogPath, 'utf8').split(/\r?\n/);
-const headings = [`## [${version}]`, `## [v${version}]`];
+// release-please writes "## [x.y.z](compare-url) (date)" when a previous tag
+// exists and "## x.y.z (date)" for a line's first release (e.g. the chart).
+const headings = [`## [${version}]`, `## [v${version}]`, `## ${version} `, `## v${version} `];
 const start = lines.findIndex(line => headings.some(heading => line.startsWith(heading)));
 
 if (start === -1) {

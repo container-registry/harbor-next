@@ -10,8 +10,12 @@ dotenv:
   - versions.env
 
 vars:
-  GIT_COMMIT:
+  DEFAULT_GIT_COMMIT:
     sh: git rev-parse --short=8 HEAD || echo "unknown"
+  # CLI overrides of root-defined vars don't propagate into included
+  # taskfiles, so callers override via BASE_GIT_COMMIT (same pattern as
+  # RELEASE_VERSION → VERSION).
+  GIT_COMMIT: '{{.BASE_GIT_COMMIT | default .DEFAULT_GIT_COMMIT}}'
   DEFAULT_VERSION:
     sh: cat VERSION 2>/dev/null | tr -d '\n' || echo "dev"
   VERSION: '{{.RELEASE_VERSION | default .DEFAULT_VERSION}}'

@@ -36,12 +36,12 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-go-cached
+      - uses: $/.github/actions/setup-go-cached
         with:
           go-version-file: src/go.mod
           go-sum-path: src/go.sum
 
-      - uses: ./.github/actions/setup-task
+      - uses: $/.github/actions/setup-task
         with:
           version: 3.49.1
 

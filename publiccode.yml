@@ -1,0 +1,128 @@
+publiccodeYmlVersion: "0.4"
+name: Harbor
+url: https://github.com/container-registry/harbor-next
+landingURL: https://github.com/container-registry/harbor-next
+isBasedOn: https://github.com/goharbor/harbor
+softwareVersion: 2.15.8
+releaseDate: 2026-08-26
+logo: docs/img/harbor_logo.png
+platforms:
+  - linux
+  - web
+categories:
+  - it-development
+  - cloud-management
+  - it-security
+organisation:
+  uri: https://container-registry.com/
+  name: 8gears AG
+roadmap: https://github.com/container-registry/harbor-next/blob/main/ROADMAP.md
+developmentStatus: stable
+softwareType: standalone/web
+description:
+  en:
+    localisedName: Harbor
+    shortDescription: Cloud native container registry that stores, signs and scans
+      container images, Helm charts and other OCI artifacts.
+    longDescription: >-
+      Harbor is a CNCF graduated open source container registry that stores and
+      manages container images and other OCI artifacts securely, with policies,
+      role-based access control, vulnerability scanning and signing.
+
+      Harbor is a drop-in registry for Kubernetes, OpenShift, Rancher, k3s and
+      Docker or Podman based environments. Users access repositories through
+      projects with per-project permissions. Artifacts can be replicated between
+      registry instances by policy, scanned for vulnerabilities before
+      deployment, signed and verified with cosign or notation, and cleaned up
+      with retention policies and garbage collection. Authentication integrates
+      with LDAP, Active Directory and OpenID Connect providers. All operations
+      are exposed through a REST API with an embedded Swagger UI and are audit
+      logged.
+
+      This distribution ships multi-architecture images, minimal scratch based
+      images, a Helm chart, an install script free Docker and Podman Compose
+      setup, replication to SFTP endpoints and Harbor Satellite support for edge
+      deployments. It is maintained by 8gears and used across enterprises,
+      government agencies and cloud providers.
+    documentation: https://goharbor.io/docs/
+    apiDocumentation: https://editor.swagger.io/?url=https://raw.githubusercontent.com/container-registry/harbor-next/main/api/v2.0/swagger.yaml
+    features:
+      - Storage of container images, Helm charts and any OCI artifact
+      - Role-based access control per project with LDAP, Active Directory and
+        OIDC login
+      - Vulnerability scanning with policy enforcement to block vulnerable images
+      - Artifact signing and verification with cosign and notation
+      - Policy-based replication between registries, including SFTP endpoints
+      - Retention policies, artifact deletion and garbage collection
+      - Web portal, REST API with Swagger UI and audit logging
+      - Multi-architecture images, Helm chart and Docker or Podman Compose
+        deployment
+      - Support for Kubernetes, OpenShift, Rancher, k3s and Nutanix
+  de:
+    localisedName: Harbor
+    shortDescription: Cloud-native Container-Registry zum Speichern, Signieren und
+      Scannen von Container-Images, Helm-Charts und anderen OCI-Artefakten.
+    longDescription: >-
+      Harbor ist eine bei der CNCF graduierte Open-Source-Container-Registry,
+      die Container-Images und andere OCI-Artefakte sicher speichert und
+      verwaltet, mit Richtlinien, rollenbasierter Zugriffskontrolle,
+      Schwachstellenscans und Signierung.
+
+      Harbor läuft auf Kubernetes, OpenShift, Rancher, k3s sowie in Docker- oder
+      Podman-Umgebungen. Nutzer greifen über Projekte mit projektbezogenen
+      Berechtigungen auf Repositories zu. Artefakte können regelbasiert zwischen
+      Registry-Instanzen repliziert, vor dem Deployment auf Schwachstellen
+      geprüft, mit cosign oder notation signiert und verifiziert sowie über
+      Aufbewahrungsrichtlinien und Garbage Collection bereinigt werden. Die
+      Anmeldung ist über LDAP, Active Directory und OpenID Connect möglich. Alle
+      Operationen stehen über eine REST-API mit eingebetteter Swagger-UI bereit
+      und werden protokolliert.
+
+      Diese Distribution liefert Multi-Architektur-Images, minimale
+      Scratch-Images, ein Helm-Chart, ein Docker- und Podman-Compose-Setup ohne
+      Installationsskript, Replikation auf SFTP-Endpunkte und Unterstützung für
+      Harbor Satellite im Edge-Betrieb. Sie wird von 8gears gepflegt und in
+      Unternehmen, Behörden und bei Cloud-Anbietern eingesetzt.
+    documentation: https://goharbor.io/docs/
+    apiDocumentation: https://editor.swagger.io/?url=https://raw.githubusercontent.com/container-registry/harbor-next/main/api/v2.0/swagger.yaml
+    features:
+      - Speicherung von Container-Images, Helm-Charts und beliebigen
+        OCI-Artefakten
+      - Rollenbasierte Zugriffskontrolle pro Projekt mit LDAP-,
+        Active-Directory- und OIDC-Anmeldung
+      - Schwachstellenscans mit Richtlinien, die verwundbare Images blockieren
+      - Signierung und Verifikation von Artefakten mit cosign und notation
+      - Regelbasierte Replikation zwischen Registries, auch auf SFTP-Endpunkte
+      - Aufbewahrungsrichtlinien, Löschen von Artefakten und Garbage Collection
+      - Web-Portal, REST-API mit Swagger-UI und Audit-Protokollierung
+      - Multi-Architektur-Images, Helm-Chart und Deployment per Docker oder
+        Podman Compose
+      - Unterstützung für Kubernetes, OpenShift, Rancher, k3s und Nutanix
+legal:
+  license: Apache-2.0
+  mainCopyrightOwner: Project Harbor Authors
+maintenance:
+  type: community
+  contacts:
+    - name: 8gears AG
+      email: hello@container-registry.com
+      affiliation: 8gears AG
+localisation:
+  localisationReady: true
+  availableLanguages:
+    - en
+    - de
+    - es
+    - fr
+    - ko
+    - pt-BR
+    - ru
+    - tr
+    - zh-CN
+    - zh-TW
+dependsOn:
+  open:
+    - name: PostgreSQL
+      optional: false
+    - name: Redis
+      optional: false

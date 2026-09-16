@@ -6,19 +6,19 @@
       CHART_CACHE_DRIVER: redis
       CONFIG_PATH: /etc/core/app.conf
       CORE_LOCAL_URL: http://127.0.0.1:8080
-      CORE_URL: http://harbor-harbor-next-core
+      CORE_URL: http://harbor-core
       DATABASE_TYPE: postgresql
       EXT_ENDPOINT: https://harbor.example.com
       GDPR_AUDIT_LOGS: "false"
       GDPR_DELETE_USER: "false"
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
-      JOBSERVICE_URL: http://harbor-harbor-next-jobservice
+      JOBSERVICE_URL: http://harbor-jobservice
       LOG_LEVEL: info
-      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       PORT: "8080"
-      PORTAL_URL: http://harbor-harbor-next-portal
+      PORTAL_URL: http://harbor-portal
       POSTGRESQL_CONN_MAX_IDLE_TIME: 300s
       POSTGRESQL_CONN_MAX_LIFETIME: 30m
       POSTGRESQL_DATABASE: registry
@@ -29,13 +29,13 @@
       POSTGRESQL_SSLMODE: disable
       POSTGRESQL_USERNAME: postgres
       QUOTA_UPDATE_PROVIDER: db
-      REGISTRY_CONTROLLER_URL: http://harbor-harbor-next-registry:8080
+      REGISTRY_CONTROLLER_URL: http://harbor-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
-      REGISTRY_URL: http://harbor-harbor-next-registry:5000
+      REGISTRY_URL: http://harbor-registry:5000
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
-      TOKEN_SERVICE_URL: http://harbor-harbor-next-core/service/token
-      TRIVY_ADAPTER_URL: http://harbor-harbor-next-trivy:8080
+      TOKEN_SERVICE_URL: http://harbor-core/service/token
+      TRIVY_ADAPTER_URL: http://harbor-trivy:8080
       WITH_TRIVY: "false"
       app.conf: |
         appname = Harbor
@@ -50,10 +50,10 @@
         app.kubernetes.io/component: core
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-core
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-core
   2: |
     apiVersion: v1
     kind: Service
@@ -62,10 +62,10 @@
         app.kubernetes.io/component: core
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-core
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-core
     spec:
       ports:
         - name: http-web
@@ -79,7 +79,7 @@
       selector:
         app.kubernetes.io/component: core
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   3: |
     apiVersion: v1
@@ -89,10 +89,10 @@
         app.kubernetes.io/component: exporter
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-exporter
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-exporter
     spec:
       ports:
         - name: http-metrics
@@ -102,7 +102,7 @@
       selector:
         app.kubernetes.io/component: exporter
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   4: |
     apiVersion: networking.k8s.io/v1
@@ -111,10 +111,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next
+        helm.sh/chart: harbor-2.0.0
+      name: harbor
     spec:
       rules:
         - host: harbor.example.com
@@ -122,42 +122,42 @@
             paths:
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /api/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /service/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /v2/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /chartrepo/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /c/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-portal
+                    name: harbor-portal
                     port:
                       number: 80
                 path: /
@@ -166,25 +166,25 @@
     apiVersion: v1
     data:
       CACHE_ENABLED: "false"
-      CORE_URL: http://harbor-harbor-next-core
+      CORE_URL: http://harbor-core
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
-      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
-      REGISTRY_CONTROLLER_URL: http://harbor-harbor-next-registry:8080
+      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
+      REGISTRY_CONTROLLER_URL: http://harbor-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
-      REGISTRY_URL: http://harbor-harbor-next-registry:5000
-      TOKEN_SERVICE_URL: http://harbor-harbor-next-core/service/token
+      REGISTRY_URL: http://harbor-registry:5000
+      TOKEN_SERVICE_URL: http://harbor-core/service/token
     kind: ConfigMap
     metadata:
       labels:
         app.kubernetes.io/component: jobservice
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-jobservice-env
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-jobservice-env
   6: |
     apiVersion: v1
     data:
@@ -218,10 +218,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-jobservice
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-jobservice
   7: |
     apiVersion: v1
     kind: Service
@@ -230,10 +230,10 @@
         app.kubernetes.io/component: jobservice
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-jobservice
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-jobservice
     spec:
       ports:
         - name: http-jobservice
@@ -247,7 +247,7 @@
       selector:
         app.kubernetes.io/component: jobservice
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   8: |
     apiVersion: v1
@@ -291,10 +291,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-portal
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-portal
   9: |
     apiVersion: v1
     kind: Service
@@ -303,10 +303,10 @@
         app.kubernetes.io/component: portal
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-portal
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-portal
     spec:
       ports:
         - name: http
@@ -316,7 +316,7 @@
       selector:
         app.kubernetes.io/component: portal
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   10: |
     apiVersion: v1
@@ -378,10 +378,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-registry
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-registry
   11: |
     apiVersion: v1
     kind: Service
@@ -390,10 +390,10 @@
         app.kubernetes.io/component: registry
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-registry
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-registry
     spec:
       ports:
         - name: http-registry
@@ -411,7 +411,7 @@
       selector:
         app.kubernetes.io/component: registry
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   12: |
     apiVersion: v1
@@ -422,10 +422,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-registryctl
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-registryctl
   13: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -435,10 +435,10 @@
         app.kubernetes.io/component: core
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-core
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-core
   14: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -448,10 +448,10 @@
         app.kubernetes.io/component: exporter
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-exporter
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-exporter
   15: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -461,10 +461,10 @@
         app.kubernetes.io/component: jobservice
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-jobservice
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-jobservice
   16: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -474,10 +474,10 @@
         app.kubernetes.io/component: portal
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-portal
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-portal
   17: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -487,10 +487,10 @@
         app.kubernetes.io/component: registry
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-registry
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-registry
 2. valkey with auth enabled:
   1: |
     apiVersion: v1
@@ -499,19 +499,19 @@
       CHART_CACHE_DRIVER: redis
       CONFIG_PATH: /etc/core/app.conf
       CORE_LOCAL_URL: http://127.0.0.1:8080
-      CORE_URL: http://harbor-harbor-next-core
+      CORE_URL: http://harbor-core
       DATABASE_TYPE: postgresql
       EXT_ENDPOINT: https://harbor.example.com
       GDPR_AUDIT_LOGS: "false"
       GDPR_DELETE_USER: "false"
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
-      JOBSERVICE_URL: http://harbor-harbor-next-jobservice
+      JOBSERVICE_URL: http://harbor-jobservice
       LOG_LEVEL: info
-      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       PORT: "8080"
-      PORTAL_URL: http://harbor-harbor-next-portal
+      PORTAL_URL: http://harbor-portal
       POSTGRESQL_CONN_MAX_IDLE_TIME: 300s
       POSTGRESQL_CONN_MAX_LIFETIME: 30m
       POSTGRESQL_DATABASE: registry
@@ -522,13 +522,13 @@
       POSTGRESQL_SSLMODE: disable
       POSTGRESQL_USERNAME: postgres
       QUOTA_UPDATE_PROVIDER: db
-      REGISTRY_CONTROLLER_URL: http://harbor-harbor-next-registry:8080
+      REGISTRY_CONTROLLER_URL: http://harbor-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
-      REGISTRY_URL: http://harbor-harbor-next-registry:5000
+      REGISTRY_URL: http://harbor-registry:5000
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
-      TOKEN_SERVICE_URL: http://harbor-harbor-next-core/service/token
-      TRIVY_ADAPTER_URL: http://harbor-harbor-next-trivy:8080
+      TOKEN_SERVICE_URL: http://harbor-core/service/token
+      TRIVY_ADAPTER_URL: http://harbor-trivy:8080
       WITH_TRIVY: "false"
       app.conf: |
         appname = Harbor
@@ -543,10 +543,10 @@
         app.kubernetes.io/component: core
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-core
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-core
   2: |
     apiVersion: v1
     kind: Service
@@ -555,10 +555,10 @@
         app.kubernetes.io/component: core
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-core
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-core
     spec:
       ports:
         - name: http-web
@@ -572,7 +572,7 @@
       selector:
         app.kubernetes.io/component: core
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   3: |
     apiVersion: v1
@@ -582,10 +582,10 @@
         app.kubernetes.io/component: exporter
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-exporter
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-exporter
     spec:
       ports:
         - name: http-metrics
@@ -595,7 +595,7 @@
       selector:
         app.kubernetes.io/component: exporter
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   4: |
     apiVersion: networking.k8s.io/v1
@@ -604,10 +604,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next
+        helm.sh/chart: harbor-2.0.0
+      name: harbor
     spec:
       rules:
         - host: harbor.example.com
@@ -615,42 +615,42 @@
             paths:
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /api/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /service/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /v2/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /chartrepo/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /c/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-portal
+                    name: harbor-portal
                     port:
                       number: 80
                 path: /
@@ -659,25 +659,25 @@
     apiVersion: v1
     data:
       CACHE_ENABLED: "false"
-      CORE_URL: http://harbor-harbor-next-core
+      CORE_URL: http://harbor-core
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
-      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
-      REGISTRY_CONTROLLER_URL: http://harbor-harbor-next-registry:8080
+      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
+      REGISTRY_CONTROLLER_URL: http://harbor-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
-      REGISTRY_URL: http://harbor-harbor-next-registry:5000
-      TOKEN_SERVICE_URL: http://harbor-harbor-next-core/service/token
+      REGISTRY_URL: http://harbor-registry:5000
+      TOKEN_SERVICE_URL: http://harbor-core/service/token
     kind: ConfigMap
     metadata:
       labels:
         app.kubernetes.io/component: jobservice
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-jobservice-env
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-jobservice-env
   6: |
     apiVersion: v1
     data:
@@ -711,10 +711,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-jobservice
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-jobservice
   7: |
     apiVersion: v1
     kind: Service
@@ -723,10 +723,10 @@
         app.kubernetes.io/component: jobservice
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-jobservice
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-jobservice
     spec:
       ports:
         - name: http-jobservice
@@ -740,7 +740,7 @@
       selector:
         app.kubernetes.io/component: jobservice
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   8: |
     apiVersion: v1
@@ -784,10 +784,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-portal
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-portal
   9: |
     apiVersion: v1
     kind: Service
@@ -796,10 +796,10 @@
         app.kubernetes.io/component: portal
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-portal
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-portal
     spec:
       ports:
         - name: http
@@ -809,7 +809,7 @@
       selector:
         app.kubernetes.io/component: portal
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   10: |
     apiVersion: v1
@@ -871,10 +871,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-registry
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-registry
   11: |
     apiVersion: v1
     kind: Service
@@ -883,10 +883,10 @@
         app.kubernetes.io/component: registry
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-registry
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-registry
     spec:
       ports:
         - name: http-registry
@@ -904,7 +904,7 @@
       selector:
         app.kubernetes.io/component: registry
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   12: |
     apiVersion: v1
@@ -915,10 +915,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-registryctl
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-registryctl
   13: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -928,10 +928,10 @@
         app.kubernetes.io/component: core
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-core
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-core
   14: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -941,10 +941,10 @@
         app.kubernetes.io/component: exporter
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-exporter
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-exporter
   15: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -954,10 +954,10 @@
         app.kubernetes.io/component: jobservice
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-jobservice
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-jobservice
   16: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -967,10 +967,10 @@
         app.kubernetes.io/component: portal
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-portal
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-portal
   17: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -980,10 +980,10 @@
         app.kubernetes.io/component: registry
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-registry
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-registry
 3. external Redis with TLS + sentinel + password:
   1: |
     apiVersion: v1
@@ -992,19 +992,19 @@
       CHART_CACHE_DRIVER: redis
       CONFIG_PATH: /etc/core/app.conf
       CORE_LOCAL_URL: http://127.0.0.1:8080
-      CORE_URL: http://harbor-harbor-next-core
+      CORE_URL: http://harbor-core
       DATABASE_TYPE: postgresql
       EXT_ENDPOINT: https://harbor.example.com
       GDPR_AUDIT_LOGS: "false"
       GDPR_DELETE_USER: "false"
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
-      JOBSERVICE_URL: http://harbor-harbor-next-jobservice
+      JOBSERVICE_URL: http://harbor-jobservice
       LOG_LEVEL: info
-      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       PORT: "8080"
-      PORTAL_URL: http://harbor-harbor-next-portal
+      PORTAL_URL: http://harbor-portal
       POSTGRESQL_CONN_MAX_IDLE_TIME: 300s
       POSTGRESQL_CONN_MAX_LIFETIME: 30m
       POSTGRESQL_DATABASE: registry
@@ -1015,13 +1015,13 @@
       POSTGRESQL_SSLMODE: disable
       POSTGRESQL_USERNAME: postgres
       QUOTA_UPDATE_PROVIDER: db
-      REGISTRY_CONTROLLER_URL: http://harbor-harbor-next-registry:8080
+      REGISTRY_CONTROLLER_URL: http://harbor-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
-      REGISTRY_URL: http://harbor-harbor-next-registry:5000
+      REGISTRY_URL: http://harbor-registry:5000
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
-      TOKEN_SERVICE_URL: http://harbor-harbor-next-core/service/token
-      TRIVY_ADAPTER_URL: http://harbor-harbor-next-trivy:8080
+      TOKEN_SERVICE_URL: http://harbor-core/service/token
+      TRIVY_ADAPTER_URL: http://harbor-trivy:8080
       WITH_TRIVY: "false"
       app.conf: |
         appname = Harbor
@@ -1036,10 +1036,10 @@
         app.kubernetes.io/component: core
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-core
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-core
   2: |
     apiVersion: v1
     kind: Service
@@ -1048,10 +1048,10 @@
         app.kubernetes.io/component: core
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-core
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-core
     spec:
       ports:
         - name: http-web
@@ -1065,7 +1065,7 @@
       selector:
         app.kubernetes.io/component: core
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   3: |
     apiVersion: v1
@@ -1075,10 +1075,10 @@
         app.kubernetes.io/component: exporter
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-exporter
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-exporter
     spec:
       ports:
         - name: http-metrics
@@ -1088,7 +1088,7 @@
       selector:
         app.kubernetes.io/component: exporter
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   4: |
     apiVersion: networking.k8s.io/v1
@@ -1097,10 +1097,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next
+        helm.sh/chart: harbor-2.0.0
+      name: harbor
     spec:
       rules:
         - host: harbor.example.com
@@ -1108,42 +1108,42 @@
             paths:
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /api/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /service/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /v2/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /chartrepo/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /c/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-portal
+                    name: harbor-portal
                     port:
                       number: 80
                 path: /
@@ -1152,25 +1152,25 @@
     apiVersion: v1
     data:
       CACHE_ENABLED: "false"
-      CORE_URL: http://harbor-harbor-next-core
+      CORE_URL: http://harbor-core
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
-      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
-      REGISTRY_CONTROLLER_URL: http://harbor-harbor-next-registry:8080
+      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
+      REGISTRY_CONTROLLER_URL: http://harbor-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
-      REGISTRY_URL: http://harbor-harbor-next-registry:5000
-      TOKEN_SERVICE_URL: http://harbor-harbor-next-core/service/token
+      REGISTRY_URL: http://harbor-registry:5000
+      TOKEN_SERVICE_URL: http://harbor-core/service/token
     kind: ConfigMap
     metadata:
       labels:
         app.kubernetes.io/component: jobservice
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-jobservice-env
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-jobservice-env
   6: |
     apiVersion: v1
     data:
@@ -1204,10 +1204,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-jobservice
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-jobservice
   7: |
     apiVersion: v1
     kind: Service
@@ -1216,10 +1216,10 @@
         app.kubernetes.io/component: jobservice
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-jobservice
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-jobservice
     spec:
       ports:
         - name: http-jobservice
@@ -1233,7 +1233,7 @@
       selector:
         app.kubernetes.io/component: jobservice
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   8: |
     apiVersion: v1
@@ -1277,10 +1277,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-portal
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-portal
   9: |
     apiVersion: v1
     kind: Service
@@ -1289,10 +1289,10 @@
         app.kubernetes.io/component: portal
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-portal
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-portal
     spec:
       ports:
         - name: http
@@ -1302,7 +1302,7 @@
       selector:
         app.kubernetes.io/component: portal
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   10: |
     apiVersion: v1
@@ -1365,10 +1365,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-registry
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-registry
   11: |
     apiVersion: v1
     kind: Service
@@ -1377,10 +1377,10 @@
         app.kubernetes.io/component: registry
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-registry
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-registry
     spec:
       ports:
         - name: http-registry
@@ -1398,7 +1398,7 @@
       selector:
         app.kubernetes.io/component: registry
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   12: |
     apiVersion: v1
@@ -1409,10 +1409,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-registryctl
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-registryctl
   13: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -1422,10 +1422,10 @@
         app.kubernetes.io/component: core
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-core
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-core
   14: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -1435,10 +1435,10 @@
         app.kubernetes.io/component: exporter
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-exporter
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-exporter
   15: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -1448,10 +1448,10 @@
         app.kubernetes.io/component: jobservice
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-jobservice
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-jobservice
   16: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -1461,10 +1461,10 @@
         app.kubernetes.io/component: portal
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-portal
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-portal
   17: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -1474,10 +1474,10 @@
         app.kubernetes.io/component: registry
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-registry
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-registry
 4. BYO secrets matrix — every existingSecret path:
   1: |
     apiVersion: v1
@@ -1486,19 +1486,19 @@
       CHART_CACHE_DRIVER: redis
       CONFIG_PATH: /etc/core/app.conf
       CORE_LOCAL_URL: http://127.0.0.1:8080
-      CORE_URL: http://harbor-harbor-next-core
+      CORE_URL: http://harbor-core
       DATABASE_TYPE: postgresql
       EXT_ENDPOINT: https://harbor.example.com
       GDPR_AUDIT_LOGS: "false"
       GDPR_DELETE_USER: "false"
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
-      JOBSERVICE_URL: http://harbor-harbor-next-jobservice
+      JOBSERVICE_URL: http://harbor-jobservice
       LOG_LEVEL: info
-      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       PORT: "8080"
-      PORTAL_URL: http://harbor-harbor-next-portal
+      PORTAL_URL: http://harbor-portal
       POSTGRESQL_CONN_MAX_IDLE_TIME: 300s
       POSTGRESQL_CONN_MAX_LIFETIME: 30m
       POSTGRESQL_DATABASE: registry
@@ -1509,13 +1509,13 @@
       POSTGRESQL_SSLMODE: disable
       POSTGRESQL_USERNAME: postgres
       QUOTA_UPDATE_PROVIDER: db
-      REGISTRY_CONTROLLER_URL: http://harbor-harbor-next-registry:8080
+      REGISTRY_CONTROLLER_URL: http://harbor-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
-      REGISTRY_URL: http://harbor-harbor-next-registry:5000
+      REGISTRY_URL: http://harbor-registry:5000
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
-      TOKEN_SERVICE_URL: http://harbor-harbor-next-core/service/token
-      TRIVY_ADAPTER_URL: http://harbor-harbor-next-trivy:8080
+      TOKEN_SERVICE_URL: http://harbor-core/service/token
+      TRIVY_ADAPTER_URL: http://harbor-trivy:8080
       WITH_TRIVY: "false"
       app.conf: |
         appname = Harbor
@@ -1530,10 +1530,10 @@
         app.kubernetes.io/component: core
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-core
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-core
   2: |
     apiVersion: v1
     kind: Service
@@ -1542,10 +1542,10 @@
         app.kubernetes.io/component: core
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-core
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-core
     spec:
       ports:
         - name: http-web
@@ -1559,7 +1559,7 @@
       selector:
         app.kubernetes.io/component: core
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   3: |
     apiVersion: v1
@@ -1569,10 +1569,10 @@
         app.kubernetes.io/component: exporter
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-exporter
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-exporter
     spec:
       ports:
         - name: http-metrics
@@ -1582,7 +1582,7 @@
       selector:
         app.kubernetes.io/component: exporter
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   4: |
     apiVersion: networking.k8s.io/v1
@@ -1591,10 +1591,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next
+        helm.sh/chart: harbor-2.0.0
+      name: harbor
     spec:
       rules:
         - host: harbor.example.com
@@ -1602,42 +1602,42 @@
             paths:
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /api/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /service/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /v2/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /chartrepo/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /c/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-portal
+                    name: harbor-portal
                     port:
                       number: 80
                 path: /
@@ -1646,25 +1646,25 @@
     apiVersion: v1
     data:
       CACHE_ENABLED: "false"
-      CORE_URL: http://harbor-harbor-next-core
+      CORE_URL: http://harbor-core
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
-      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
-      REGISTRY_CONTROLLER_URL: http://harbor-harbor-next-registry:8080
+      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
+      REGISTRY_CONTROLLER_URL: http://harbor-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
-      REGISTRY_URL: http://harbor-harbor-next-registry:5000
-      TOKEN_SERVICE_URL: http://harbor-harbor-next-core/service/token
+      REGISTRY_URL: http://harbor-registry:5000
+      TOKEN_SERVICE_URL: http://harbor-core/service/token
     kind: ConfigMap
     metadata:
       labels:
         app.kubernetes.io/component: jobservice
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-jobservice-env
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-jobservice-env
   6: |
     apiVersion: v1
     data:
@@ -1698,10 +1698,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-jobservice
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-jobservice
   7: |
     apiVersion: v1
     kind: Service
@@ -1710,10 +1710,10 @@
         app.kubernetes.io/component: jobservice
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-jobservice
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-jobservice
     spec:
       ports:
         - name: http-jobservice
@@ -1727,7 +1727,7 @@
       selector:
         app.kubernetes.io/component: jobservice
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   8: |
     apiVersion: v1
@@ -1771,10 +1771,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-portal
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-portal
   9: |
     apiVersion: v1
     kind: Service
@@ -1783,10 +1783,10 @@
         app.kubernetes.io/component: portal
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-portal
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-portal
     spec:
       ports:
         - name: http
@@ -1796,7 +1796,7 @@
       selector:
         app.kubernetes.io/component: portal
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   10: |
     apiVersion: v1
@@ -1858,10 +1858,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-registry
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-registry
   11: |
     apiVersion: v1
     kind: Service
@@ -1870,10 +1870,10 @@
         app.kubernetes.io/component: registry
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-registry
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-registry
     spec:
       ports:
         - name: http-registry
@@ -1891,7 +1891,7 @@
       selector:
         app.kubernetes.io/component: registry
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   12: |
     apiVersion: v1
@@ -1902,10 +1902,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-registryctl
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-registryctl
   13: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -1915,10 +1915,10 @@
         app.kubernetes.io/component: core
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-core
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-core
   14: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -1928,10 +1928,10 @@
         app.kubernetes.io/component: exporter
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-exporter
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-exporter
   15: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -1941,10 +1941,10 @@
         app.kubernetes.io/component: jobservice
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-jobservice
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-jobservice
   16: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -1954,10 +1954,10 @@
         app.kubernetes.io/component: portal
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-portal
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-portal
   17: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -1967,10 +1967,10 @@
         app.kubernetes.io/component: registry
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-registry
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-registry
 5. trace (jaeger) + metrics + ServiceMonitor:
   1: |
     apiVersion: v1
@@ -1979,24 +1979,24 @@
       CHART_CACHE_DRIVER: redis
       CONFIG_PATH: /etc/core/app.conf
       CORE_LOCAL_URL: http://127.0.0.1:8080
-      CORE_URL: http://harbor-harbor-next-core
+      CORE_URL: http://harbor-core
       DATABASE_TYPE: postgresql
       EXT_ENDPOINT: https://harbor.example.com
       GDPR_AUDIT_LOGS: "false"
       GDPR_DELETE_USER: "false"
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
-      JOBSERVICE_URL: http://harbor-harbor-next-jobservice
+      JOBSERVICE_URL: http://harbor-jobservice
       LOG_LEVEL: info
       METRIC_ENABLE: "true"
       METRIC_NAMESPACE: harbor
       METRIC_PATH: /metrics
       METRIC_PORT: "8001"
       METRIC_SUBSYSTEM: core
-      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       PORT: "8080"
-      PORTAL_URL: http://harbor-harbor-next-portal
+      PORTAL_URL: http://harbor-portal
       POSTGRESQL_CONN_MAX_IDLE_TIME: 300s
       POSTGRESQL_CONN_MAX_LIFETIME: 30m
       POSTGRESQL_DATABASE: registry
@@ -2007,13 +2007,13 @@
       POSTGRESQL_SSLMODE: disable
       POSTGRESQL_USERNAME: postgres
       QUOTA_UPDATE_PROVIDER: db
-      REGISTRY_CONTROLLER_URL: http://harbor-harbor-next-registry:8080
+      REGISTRY_CONTROLLER_URL: http://harbor-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
-      REGISTRY_URL: http://harbor-harbor-next-registry:5000
+      REGISTRY_URL: http://harbor-registry:5000
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
-      TOKEN_SERVICE_URL: http://harbor-harbor-next-core/service/token
-      TRIVY_ADAPTER_URL: http://harbor-harbor-next-trivy:8080
+      TOKEN_SERVICE_URL: http://harbor-core/service/token
+      TRIVY_ADAPTER_URL: http://harbor-trivy:8080
       WITH_TRIVY: "false"
       app.conf: |
         appname = Harbor
@@ -2028,10 +2028,10 @@
         app.kubernetes.io/component: core
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-core
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-core
   2: |
     apiVersion: v1
     kind: Service
@@ -2040,10 +2040,10 @@
         app.kubernetes.io/component: core
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-core
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-core
     spec:
       ports:
         - name: http-web
@@ -2057,7 +2057,7 @@
       selector:
         app.kubernetes.io/component: core
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   3: |
     apiVersion: v1
@@ -2067,10 +2067,10 @@
         app.kubernetes.io/component: exporter
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-exporter
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-exporter
     spec:
       ports:
         - name: http-metrics
@@ -2080,7 +2080,7 @@
       selector:
         app.kubernetes.io/component: exporter
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   4: |
     apiVersion: networking.k8s.io/v1
@@ -2089,10 +2089,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next
+        helm.sh/chart: harbor-2.0.0
+      name: harbor
     spec:
       rules:
         - host: harbor.example.com
@@ -2100,42 +2100,42 @@
             paths:
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /api/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /service/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /v2/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /chartrepo/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /c/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-portal
+                    name: harbor-portal
                     port:
                       number: 80
                 path: /
@@ -2144,17 +2144,17 @@
     apiVersion: v1
     data:
       CACHE_ENABLED: "false"
-      CORE_URL: http://harbor-harbor-next-core
+      CORE_URL: http://harbor-core
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
       METRIC_NAMESPACE: harbor
       METRIC_SUBSYSTEM: jobservice
-      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
-      REGISTRY_CONTROLLER_URL: http://harbor-harbor-next-registry:8080
+      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
+      REGISTRY_CONTROLLER_URL: http://harbor-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
-      REGISTRY_URL: http://harbor-harbor-next-registry:5000
-      TOKEN_SERVICE_URL: http://harbor-harbor-next-core/service/token
+      REGISTRY_URL: http://harbor-registry:5000
+      TOKEN_SERVICE_URL: http://harbor-core/service/token
       TRACE_ENABLED: "true"
       TRACE_JAEGER_ENDPOINT: http://jaeger-collector.observability:14268/api/traces
       TRACE_NAMESPACE: harbor-traces
@@ -2166,10 +2166,10 @@
         app.kubernetes.io/component: jobservice
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-jobservice-env
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-jobservice-env
   6: |
     apiVersion: v1
     data:
@@ -2207,10 +2207,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-jobservice
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-jobservice
   7: |
     apiVersion: v1
     kind: Service
@@ -2219,10 +2219,10 @@
         app.kubernetes.io/component: jobservice
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-jobservice
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-jobservice
     spec:
       ports:
         - name: http-jobservice
@@ -2236,7 +2236,7 @@
       selector:
         app.kubernetes.io/component: jobservice
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   8: |
     apiVersion: v1
@@ -2280,10 +2280,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-portal
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-portal
   9: |
     apiVersion: v1
     kind: Service
@@ -2292,10 +2292,10 @@
         app.kubernetes.io/component: portal
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-portal
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-portal
     spec:
       ports:
         - name: http
@@ -2305,7 +2305,7 @@
       selector:
         app.kubernetes.io/component: portal
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   10: |
     apiVersion: v1
@@ -2370,10 +2370,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-registry
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-registry
   11: |
     apiVersion: v1
     kind: Service
@@ -2382,10 +2382,10 @@
         app.kubernetes.io/component: registry
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-registry
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-registry
     spec:
       ports:
         - name: http-registry
@@ -2403,7 +2403,7 @@
       selector:
         app.kubernetes.io/component: registry
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   12: |
     apiVersion: v1
@@ -2419,10 +2419,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-registryctl
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-registryctl
   13: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -2432,10 +2432,10 @@
         app.kubernetes.io/component: core
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-core
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-core
   14: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -2445,10 +2445,10 @@
         app.kubernetes.io/component: exporter
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-exporter
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-exporter
   15: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -2458,10 +2458,10 @@
         app.kubernetes.io/component: jobservice
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-jobservice
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-jobservice
   16: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -2471,10 +2471,10 @@
         app.kubernetes.io/component: portal
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-portal
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-portal
   17: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -2484,10 +2484,10 @@
         app.kubernetes.io/component: registry
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-registry
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-registry
   18: |
     apiVersion: monitoring.coreos.com/v1
     kind: ServiceMonitor
@@ -2495,11 +2495,11 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
+        helm.sh/chart: harbor-2.0.0
         release: prometheus
-      name: harbor-harbor-next
+      name: harbor
     spec:
       endpoints:
         - honorLabels: true
@@ -2521,7 +2521,7 @@
               - registry
         matchLabels:
           app.kubernetes.io/instance: harbor
-          app.kubernetes.io/name: harbor-next
+          app.kubernetes.io/name: harbor
 6. ingress with cert-manager + multiple hosts (including wildcard):
   1: |
     apiVersion: v1
@@ -2530,19 +2530,19 @@
       CHART_CACHE_DRIVER: redis
       CONFIG_PATH: /etc/core/app.conf
       CORE_LOCAL_URL: http://127.0.0.1:8080
-      CORE_URL: http://harbor-harbor-next-core
+      CORE_URL: http://harbor-core
       DATABASE_TYPE: postgresql
       EXT_ENDPOINT: https://harbor.example.com
       GDPR_AUDIT_LOGS: "false"
       GDPR_DELETE_USER: "false"
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
-      JOBSERVICE_URL: http://harbor-harbor-next-jobservice
+      JOBSERVICE_URL: http://harbor-jobservice
       LOG_LEVEL: info
-      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       PORT: "8080"
-      PORTAL_URL: http://harbor-harbor-next-portal
+      PORTAL_URL: http://harbor-portal
       POSTGRESQL_CONN_MAX_IDLE_TIME: 300s
       POSTGRESQL_CONN_MAX_LIFETIME: 30m
       POSTGRESQL_DATABASE: registry
@@ -2553,13 +2553,13 @@
       POSTGRESQL_SSLMODE: disable
       POSTGRESQL_USERNAME: postgres
       QUOTA_UPDATE_PROVIDER: db
-      REGISTRY_CONTROLLER_URL: http://harbor-harbor-next-registry:8080
+      REGISTRY_CONTROLLER_URL: http://harbor-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
-      REGISTRY_URL: http://harbor-harbor-next-registry:5000
+      REGISTRY_URL: http://harbor-registry:5000
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
-      TOKEN_SERVICE_URL: http://harbor-harbor-next-core/service/token
-      TRIVY_ADAPTER_URL: http://harbor-harbor-next-trivy:8080
+      TOKEN_SERVICE_URL: http://harbor-core/service/token
+      TRIVY_ADAPTER_URL: http://harbor-trivy:8080
       WITH_TRIVY: "false"
       app.conf: |
         appname = Harbor
@@ -2574,10 +2574,10 @@
         app.kubernetes.io/component: core
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-core
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-core
   2: |
     apiVersion: v1
     kind: Service
@@ -2586,10 +2586,10 @@
         app.kubernetes.io/component: core
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-core
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-core
     spec:
       ports:
         - name: http-web
@@ -2603,7 +2603,7 @@
       selector:
         app.kubernetes.io/component: core
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   3: |
     apiVersion: v1
@@ -2613,10 +2613,10 @@
         app.kubernetes.io/component: exporter
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-exporter
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-exporter
     spec:
       ports:
         - name: http-metrics
@@ -2626,7 +2626,7 @@
       selector:
         app.kubernetes.io/component: exporter
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   4: |
     apiVersion: networking.k8s.io/v1
@@ -2635,10 +2635,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next
+        helm.sh/chart: harbor-2.0.0
+      name: harbor
     spec:
       rules:
         - host: harbor.example.com
@@ -2646,42 +2646,42 @@
             paths:
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /api/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /service/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /v2/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /chartrepo/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /c/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-portal
+                    name: harbor-portal
                     port:
                       number: 80
                 path: /
@@ -2691,42 +2691,42 @@
             paths:
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /api/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /service/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /v2/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /chartrepo/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /c/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-portal
+                    name: harbor-portal
                     port:
                       number: 80
                 path: /
@@ -2736,42 +2736,42 @@
             paths:
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /api/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /service/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /v2/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /chartrepo/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-core
+                    name: harbor-core
                     port:
                       number: 80
                 path: /c/
                 pathType: Prefix
               - backend:
                   service:
-                    name: harbor-harbor-next-portal
+                    name: harbor-portal
                     port:
                       number: 80
                 path: /
@@ -2780,25 +2780,25 @@
     apiVersion: v1
     data:
       CACHE_ENABLED: "false"
-      CORE_URL: http://harbor-harbor-next-core
+      CORE_URL: http://harbor-core
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
-      NO_PROXY: harbor-harbor-next-core,harbor-harbor-next-jobservice,harbor-harbor-next-database,harbor-harbor-next-registry,harbor-harbor-next-portal,harbor-harbor-next-trivy,harbor-harbor-next-exporter,127.0.0.1,localhost,.local,.internal
-      REGISTRY_CONTROLLER_URL: http://harbor-harbor-next-registry:8080
+      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
+      REGISTRY_CONTROLLER_URL: http://harbor-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
-      REGISTRY_URL: http://harbor-harbor-next-registry:5000
-      TOKEN_SERVICE_URL: http://harbor-harbor-next-core/service/token
+      REGISTRY_URL: http://harbor-registry:5000
+      TOKEN_SERVICE_URL: http://harbor-core/service/token
     kind: ConfigMap
     metadata:
       labels:
         app.kubernetes.io/component: jobservice
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-jobservice-env
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-jobservice-env
   6: |
     apiVersion: v1
     data:
@@ -2832,10 +2832,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-jobservice
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-jobservice
   7: |
     apiVersion: v1
     kind: Service
@@ -2844,10 +2844,10 @@
         app.kubernetes.io/component: jobservice
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-jobservice
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-jobservice
     spec:
       ports:
         - name: http-jobservice
@@ -2861,7 +2861,7 @@
       selector:
         app.kubernetes.io/component: jobservice
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   8: |
     apiVersion: v1
@@ -2905,10 +2905,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-portal
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-portal
   9: |
     apiVersion: v1
     kind: Service
@@ -2917,10 +2917,10 @@
         app.kubernetes.io/component: portal
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-portal
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-portal
     spec:
       ports:
         - name: http
@@ -2930,7 +2930,7 @@
       selector:
         app.kubernetes.io/component: portal
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   10: |
     apiVersion: v1
@@ -2992,10 +2992,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-registry
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-registry
   11: |
     apiVersion: v1
     kind: Service
@@ -3004,10 +3004,10 @@
         app.kubernetes.io/component: registry
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-registry
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-registry
     spec:
       ports:
         - name: http-registry
@@ -3025,7 +3025,7 @@
       selector:
         app.kubernetes.io/component: registry
         app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
       type: ClusterIP
   12: |
     apiVersion: v1
@@ -3036,10 +3036,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-registryctl
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-registryctl
   13: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -3049,10 +3049,10 @@
         app.kubernetes.io/component: core
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-core
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-core
   14: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -3062,10 +3062,10 @@
         app.kubernetes.io/component: exporter
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-exporter
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-exporter
   15: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -3075,10 +3075,10 @@
         app.kubernetes.io/component: jobservice
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-jobservice
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-jobservice
   16: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -3088,10 +3088,10 @@
         app.kubernetes.io/component: portal
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-portal
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-portal
   17: |
     apiVersion: v1
     automountServiceAccountToken: false
@@ -3101,10 +3101,10 @@
         app.kubernetes.io/component: registry
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-registry
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-registry
   18: |
     apiVersion: cert-manager.io/v1
     kind: Certificate
@@ -3112,10 +3112,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-harbor-example-com-671b44f3
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-harbor-example-com-b9096314
     spec:
       dnsNames:
         - harbor.example.com
@@ -3124,7 +3124,7 @@
         kind: ClusterIssuer
         name: letsencrypt-prod
       renewBefore: 360h
-      secretName: harbor-harbor-next-harbor-example-com-671b44f3-tls
+      secretName: harbor-harbor-example-com-b9096314-tls
   19: |
     apiVersion: cert-manager.io/v1
     kind: Certificate
@@ -3132,10 +3132,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-notary-example-com-cad059df
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-notary-example-com-a2fd2ccd
     spec:
       dnsNames:
         - notary.example.com
@@ -3144,7 +3144,7 @@
         kind: ClusterIssuer
         name: letsencrypt-prod
       renewBefore: 360h
-      secretName: harbor-harbor-next-notary-example-com-cad059df-tls
+      secretName: harbor-notary-example-com-a2fd2ccd-tls
   20: |
     apiVersion: cert-manager.io/v1
     kind: Certificate
@@ -3152,10 +3152,10 @@
       labels:
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor-next
+        app.kubernetes.io/name: harbor
         app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-next-2.0.0
-      name: harbor-harbor-next-wildcard-harbor-example-com-16eaf6f2
+        helm.sh/chart: harbor-2.0.0
+      name: harbor-wildcard-harbor-example-com-2f089bf5
     spec:
       dnsNames:
         - '*.harbor.example.com'
@@ -3164,4 +3164,4 @@
         kind: ClusterIssuer
         name: letsencrypt-prod
       renewBefore: 360h
-      secretName: harbor-harbor-next-wildcard-harbor-example-com-16eaf6f2-tls
+      secretName: harbor-wildcard-harbor-example-com-2f089bf5-tls

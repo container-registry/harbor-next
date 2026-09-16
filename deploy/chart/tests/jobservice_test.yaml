@@ -24,7 +24,7 @@ tests:
           of: Deployment
       - equal:
           path: metadata.name
-          value: RELEASE-NAME-harbor-next-jobservice
+          value: RELEASE-NAME-harbor-jobservice
 
   # Pins image concat: <registry>/<repository>:<tag>
   - it: should concat registry, repository and tag
@@ -67,7 +67,7 @@ tests:
             name: CORE_SECRET
             valueFrom:
               secretKeyRef:
-                name: RELEASE-NAME-harbor-next-core
+                name: RELEASE-NAME-harbor-core
                 key: secret
 
   # Pins service fullname + chart-hardcoded port 80
@@ -82,7 +82,7 @@ tests:
           of: Service
       - equal:
           path: metadata.name
-          value: RELEASE-NAME-harbor-next-jobservice
+          value: RELEASE-NAME-harbor-jobservice
       - equal:
           path: spec.ports[0].port
           value: 80
@@ -308,7 +308,7 @@ tests:
           value: job-logs
       - equal:
           path: spec.template.spec.volumes[1].persistentVolumeClaim.claimName
-          value: RELEASE-NAME-harbor-next-jobservice
+          value: RELEASE-NAME-harbor-jobservice
 
   # Pins volume selection: existingClaim overrides chart-computed claimName
   - it: should mount existingClaim verbatim when set
@@ -348,7 +348,7 @@ tests:
                 key: JOBSERVICE_SECRET
       - equal:
           path: spec.template.spec.containers[0].envFrom[1].secretRef.name
-          value: RELEASE-NAME-harbor-next-jobservice
+          value: RELEASE-NAME-harbor-jobservice
 
   - it: should wire REGISTRY_CREDENTIAL_PASSWORD env from credentials.existingSecret
     template: templates/jobservice.deployment.yaml

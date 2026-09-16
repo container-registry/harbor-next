@@ -15,6 +15,8 @@ jobs:
   validate-release-ref:
     name: Validate Release Ref
     runs-on: ubuntu-26.04
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Allow only release refs
         run: |
@@ -24,6 +26,25 @@ jobs:
 
           echo "::error::Release Please can only run on main or release-X.Y branches. Current ref: ${GITHUB_REF_NAME}"
           exit 1
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Reject leftover chart release-as
+        # release-as is a one-shot override that must be removed once its
+        # version ships; leaving it pins every future chart release to the
+        # same version (the #728 bug). Hard-fail the release pipeline the
+        # moment the pinned version's tag exists.
+        run: |
+          release_as=$(jq -r '.packages["deploy/chart"]["release-as"] // empty' release-please-config-chart.json)
+          if [ -z "${release_as}" ]; then
+            exit 0
+          fi
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/chart-v${release_as}" >/dev/null 2>&1; then
+            echo "::error file=release-please-config-chart.json::chart-v${release_as} is already published — remove the one-shot \"release-as\" from release-please-config-chart.json or every future chart release stays pinned to ${release_as}."
+            exit 1
+          fi
 
   release-please:
     needs: [validate-release-ref]
@@ -73,7 +94,7 @@ jobs:
 
       - name: Setup Node
         if: ${{ github.ref_name == 'main' && steps.release.outputs.prs_created == 'true' && steps.release.outputs.release_created != 'true' }}
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 24
           package-manager-cache: false
@@ -103,17 +124,44 @@ jobs:
           git commit -s -m "chore: target next development version ${next_version}"
           git push
 
+  find-release-prs:
+    name: Find Open Release PRs
+    # Previews key off "release PR open", not prs_created, so an
+    # untouched open PR still re-renders after engine changes. Runs after
+    # both release-please instances so a PR created this run is found.
+    needs: [release-please, release-please-chart]
+    if: ${{ !cancelled() && needs.release-please.result == 'success' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+    outputs:
+      app_pr: ${{ steps.find.outputs.app_pr }}
+      chart_pr: ${{ steps.find.outputs.chart_pr }}
+    steps:
+      - name: Locate open release PRs by branch
+        id: find
+        run: |
+          find_pr() {
+            gh pr list --repo "${GITHUB_REPOSITORY}" --state open --base "${GITHUB_REF_NAME}" \
+              --head "$1" --json number --jq '.[0].number // empty'
+          }
+          echo "app_pr=$(find_pr "release-please--branches--${GITHUB_REF_NAME}")" >> "$GITHUB_OUTPUT"
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            echo "chart_pr=$(find_pr 'release-please--branches--main--components--chart')" >> "$GITHUB_OUTPUT"
+          fi
+
   preview-release-notes:
     name: Preview Release Notes
-    needs: [release-please]
-    if: ${{ needs.release-please.outputs.prs_created == 'true' && needs.release-please.outputs.release_created != 'true' }}
+    needs: [release-please, find-release-prs]
+    if: ${{ !cancelled() && needs.find-release-prs.outputs.app_pr != '' && needs.release-please.outputs.release_created != 'true' }}
     permissions:
       contents: write
       pull-requests: write
-    uses: ./.github/workflows/release-notes-engine.yml
+    uses: $/.github/workflows/release-notes-engine.yml
     with:
-      checkout_ref: ${{ fromJSON(needs.release-please.outputs.prs)[0].headBranchName }}
-      preview_pr_number: ${{ fromJSON(needs.release-please.outputs.prs)[0].number }}
+      checkout_ref: release-please--branches--${{ github.ref_name }}
+      preview_pr_number: ${{ needs.find-release-prs.outputs.app_pr }}
     secrets:
       SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
 
@@ -135,6 +183,8 @@ jobs:
       release_created: ${{ steps.release.outputs['deploy/chart--release_created'] }}
       tag_name: ${{ steps.release.outputs['deploy/chart--tag_name'] }}
       version: ${{ steps.release.outputs['deploy/chart--version'] }}
+      prs_created: ${{ steps.release.outputs.prs_created }}
+      prs: ${{ steps.release.outputs.prs }}
     steps:
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
@@ -214,7 +264,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    uses: ./.github/workflows/publish-images.yml
+    uses: $/.github/workflows/publish-images.yml
     with:
       checkout_ref: ${{ needs.release-please.outputs.tag_name }}
       image_tag: ${{ needs.release-please.outputs.tag_name }}
@@ -230,11 +280,51 @@ jobs:
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     permissions:
       contents: write
-    uses: ./.github/workflows/release-notes-engine.yml
+    uses: $/.github/workflows/release-notes-engine.yml
     with:
       tag_name: ${{ needs.release-please.outputs.tag_name }}
     secrets:
       SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+
+  mark-commercial-release:
+    # Stamp the release marker into each 8gcr patch branch's changelog file.
+    # Runs strictly AFTER the notes job: notes render the entries above the
+    # newest marker, then this marks them as shipped in this tag. Manual
+    # re-renders of old tags never dispatch (this job only runs on a fresh
+    # release), so old markers are never disturbed.
+    name: Mark Commercial Release
+    needs: [release-please, update-release-notes]
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      # checkout of this repo (the app token below is scoped to 8gcr only)
+      contents: read
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.SYNC_APP_ID }}
+          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+          owner: container-registry
+          repositories: 8gcr
+          # repository_dispatch needs contents write; request nothing else
+          permission-contents: write
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: $/.github/actions/setup-task
+
+      - name: Dispatch release-cut
+        env:
+          DISPATCH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+          TARGET_SHA: ${{ github.sha }}
+          LINE: ${{ github.ref_name }}
+        run: task release-notes:dispatch-release-cut
 
   chart:
     name: Publish Helm Chart
@@ -247,8 +337,201 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    uses: ./.github/workflows/publish-chart.yml
+    uses: $/.github/workflows/publish-chart.yml
     with:
       tag_name: ${{ needs.release-please-chart.outputs.tag_name }}
     secrets:
       REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+
+  preview-chart-release-notes:
+    name: Preview Chart Release Notes
+    needs: [release-please-chart, find-release-prs]
+    if: ${{ needs.find-release-prs.outputs.chart_pr != '' && needs.release-please-chart.outputs.release_created != 'true' }}
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: $/.github/workflows/release-notes-engine.yml
+    with:
+      checkout_ref: release-please--branches--main--components--chart
+      preview_pr_number: ${{ needs.find-release-prs.outputs.chart_pr }}
+      component: chart
+    secrets:
+      SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+
+  update-chart-release-notes:
+    name: Update Chart Release Notes
+    # After publish, so the install snippet points at a pullable chart.
+    needs: [release-please-chart, chart]
+    if: ${{ needs.release-please-chart.outputs.release_created == 'true' }}
+    permissions:
+      contents: write
+    uses: $/.github/workflows/release-notes-engine.yml
+    with:
+      tag_name: ${{ needs.release-please-chart.outputs.tag_name }}
+      component: chart
+    secrets:
+      SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+
+  chart-app-version:
+    name: Bump Chart appVersion
+    # PRs a forward-only Chart.yaml appVersion bump to main after the
+    # release images are published; maintenance releases behind main's
+    # appVersion are a no-op. The merged PR feeds release-please-chart.
+    needs: [release-please, publish-images]
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    # Serialized: overlapping main + release-X.Y releases share one bump branch.
+    concurrency:
+      group: chart-app-version-bump
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      NEW_APP_VERSION: ${{ needs.release-please.outputs.tag_name }}
+    steps:
+      # Always main, even for release-X.Y releases: the bump PR targets
+      # main and the guard compares against main's Chart.yaml.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Configure ephemeral Git authentication
+        run: |
+          askpass="${RUNNER_TEMP}/git-askpass"
+          cat > "${askpass}" <<'EOF'
+          #!/usr/bin/env bash
+          case "$1" in
+            *Username*) printf '%s\n' 'x-access-token' ;;
+            *Password*) printf '%s\n' "${GH_TOKEN}" ;;
+            *) exit 1 ;;
+          esac
+          EOF
+          chmod 700 "${askpass}"
+          echo "GIT_ASKPASS=${askpass}" >> "${GITHUB_ENV}"
+          echo "GIT_TERMINAL_PROMPT=0" >> "${GITHUB_ENV}"
+
+      - name: Load versions
+        run: |
+          grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
+          {
+            echo "HELM_CACHE_HOME=${RUNNER_TEMP}/helm/cache"
+            echo "HELM_CONFIG_HOME=${RUNNER_TEMP}/helm/config"
+            echo "HELM_DATA_HOME=${RUNNER_TEMP}/helm/data"
+          } >> "$GITHUB_ENV"
+
+      - name: Install Task
+        uses: $/.github/actions/setup-task
+
+      - name: Install Helm
+        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Install helm-unittest plugin
+        # --verify=false: Helm 4 verifies plugin provenance by default;
+        # git-sourced plugins don't ship one.
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version "${HELM_UNITTEST_VERSION}" --verify=false
+
+      - name: Install helm-docs
+        # Pinned release binary, NOT `go install`: source builds drop the
+        # version footer and Chart CI fails on the README diff.
+        run: |
+          arch="$(uname -m)"
+          case "${arch}" in
+            x86_64) asset_arch="x86_64" ;;
+            aarch64|arm64) asset_arch="arm64" ;;
+            *) echo "unsupported arch: ${arch}" >&2; exit 1 ;;
+          esac
+          mkdir -p "${RUNNER_TEMP}/bin"
+          curl -fsSL "https://github.com/norwoodj/helm-docs/releases/download/v${HELM_DOCS_VERSION}/helm-docs_${HELM_DOCS_VERSION}_Linux_${asset_arch}.tar.gz" \
+            | tar -xz -C "${RUNNER_TEMP}/bin" helm-docs
+          echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
+
+      - name: Read current appVersion
+        # Same parser as the taskfile (helm show chart). Also checks the
+        # pending bump branch so a maintenance release cannot rewrite an
+        # open higher-version bump PR — forward-only against BOTH main
+        # and the branch.
+        id: current
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          old=$(helm show chart deploy/chart | sed -n 's/^appVersion: //p')
+          test -n "${old}"
+          echo "OLD_APP_VERSION=${old}" >> "$GITHUB_ENV"
+          pending=""
+          if git fetch --depth=1 origin chart-appversion-bump; then
+            pending=$(git show FETCH_HEAD:deploy/chart/Chart.yaml \
+              | sed -n 's/^appVersion: "\(.*\)"$/\1/p')
+          fi
+          cur=$(printf '%s\n%s\n' "${old}" "${pending}" | sort -V | tail -n1)
+          if [ "${NEW_APP_VERSION}" = "${cur}" ] \
+            || [ "$(printf '%s\n%s\n' "${cur}" "${NEW_APP_VERSION}" | sort -V | tail -n1)" != "${NEW_APP_VERSION}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "${NEW_APP_VERSION} not ahead of main (${old}) / pending bump (${pending:-none}); skipping"
+          fi
+
+      - name: Bump appVersion (forward-only)
+        if: ${{ steps.current.outputs.skip != 'true' }}
+        run: task helm:bump-app-version NEW_APP_VERSION="${NEW_APP_VERSION}"
+
+      - name: Generate GitHub App token
+        # App-minted token so the bump PR triggers Chart CI (GITHUB_TOKEN
+        # events start no workflows). If the app cannot mint for this
+        # repo, fall back to GITHUB_TOKEN: the PR still opens, but its
+        # checks need a manual "Approve and run" (as with release-please
+        # PRs today).
+        if: ${{ steps.current.outputs.skip != 'true' }}
+        id: app-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.SYNC_APP_ID }}
+          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+          owner: container-registry
+          repositories: harbor-next
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Create or update bump PR
+        if: ${{ steps.current.outputs.skip != 'true' }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- deploy/chart; then
+            echo "appVersion already at or ahead of ${NEW_APP_VERSION}; no PR"
+            exit 0
+          fi
+
+          # feat when the release moves major.minor (chart minor bump via
+          # release-please), fix for a patch-only move (chart patch bump).
+          if [ "${OLD_APP_VERSION%.*}" = "${NEW_APP_VERSION%.*}" ]; then
+            type="fix"
+          else
+            type="feat"
+          fi
+          title="${type}: Bump chart appVersion to ${NEW_APP_VERSION}"
+
+          branch="chart-appversion-bump"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "${branch}"
+          git add deploy/chart
+          git commit -s -m "${title}"
+          # One force-pushed branch: newer releases replace a stale bump
+          # PR instead of stacking PRs that could rewind appVersion.
+          git push --force origin "HEAD:refs/heads/${branch}"
+
+          body="Sets the chart appVersion (default image tags) to Harbor ${NEW_APP_VERSION}, released and published by the app release pipeline. README and unittest snapshots regenerated via \`task helm:bump-app-version\`.
+
+          ## Release Notes
+
+          The chart's default Harbor image tags now follow release ${NEW_APP_VERSION}."
+          gh pr create --base main --head "${branch}" \
+            --title "${title}" --body "${body}" \
+            || gh pr edit "${branch}" --title "${title}" --body "${body}"

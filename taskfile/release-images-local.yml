@@ -11,6 +11,10 @@ tasks:
     desc: "Build and push unsigned local release images, then verify both architectures"
     requires:
       vars: [RELEASE_VERSION, IMAGE_TAG]
+    vars:
+      # Base commit captured before apply-patches; jj-first since git HEAD is wrong in non-default jj workspaces.
+      BASE_GIT_COMMIT:
+        sh: jj log -r @- --no-graph -T 'commit_id.short(8)' 2>/dev/null || git rev-parse --short=8 HEAD || echo "unknown"
     preconditions:
       - sh: command -v task >/dev/null 2>&1
         msg: "Task is required"
@@ -28,6 +32,7 @@ tasks:
         task image:all-images
         RELEASE_VERSION="{{.RELEASE_VERSION}}"
         IMAGE_TAG="{{.IMAGE_TAG}}"
+        BASE_GIT_COMMIT="{{.BASE_GIT_COMMIT}}"
         REGISTRY_ADDRESS="{{.LOCAL_REGISTRY_ADDRESS}}"
         REGISTRY_PROJECT="{{.LOCAL_REGISTRY_PROJECT}}"
         PLATFORMS="{{.LOCAL_PLATFORMS}}"

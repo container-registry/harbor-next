@@ -142,12 +142,6 @@ tasks:
     cmds:
       - |
         images="harbor-core harbor-jobservice harbor-registryctl harbor-exporter harbor-portal harbor-registry trivy-adapter"
-        if [ -f dockerfile/grype-scanner.dockerfile ]; then
-          images="${images} harbor-grype-adapter"
-        fi
-        if [ -f dockerfile/snyk-scanner.dockerfile ]; then
-          images="${images} harbor-snyk-adapter"
-        fi
 
         for image in ${images}; do
           reference="{{.REGISTRY_ADDRESS}}/{{.REGISTRY_PROJECT}}/${image}:{{.IMAGE_TAG}}"

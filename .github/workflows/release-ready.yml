@@ -24,7 +24,7 @@ jobs:
           # without mutating the workflow's source tree.
           fetch-depth: 0
 
-      - uses: ./.github/actions/setup-task
+      - uses: $/.github/actions/setup-task
         with:
           version: 3.49.1
 
@@ -56,7 +56,7 @@ jobs:
 
       # Root Taskfile evaluation reads Go cache paths.
       - name: Setup Go
-        uses: ./.github/actions/setup-go-cached
+        uses: $/.github/actions/setup-go-cached
         with:
           go-version-file: src/go.mod
           go-sum-path: src/go.sum

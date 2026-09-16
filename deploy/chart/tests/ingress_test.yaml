@@ -196,7 +196,7 @@ tests:
     asserts:
       - equal:
           path: metadata.name
-          value: RELEASE-NAME-harbor-next-ingress-tls
+          value: RELEASE-NAME-harbor-ingress-tls
 
   - it: should not render the autoGen Secret when autoGenCert is false
     template: templates/ingress.secret.yaml
