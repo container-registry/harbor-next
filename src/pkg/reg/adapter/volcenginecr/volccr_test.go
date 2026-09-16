@@ -30,7 +30,7 @@ func TestVolccr_deleteTags(t *testing.T) {
 func TestVolccr_listCandidateNamespaces(t *testing.T) {
 	a, s := getMockAdapter_withoutCred(t, true, true)
 	defer s.Close()
-	_, err := a.listCandidateNamespaces("ut_test")
+	_, err := a.listCandidateNamespaces("", "ut_test")
 	assert.Error(t, err)
 }
 

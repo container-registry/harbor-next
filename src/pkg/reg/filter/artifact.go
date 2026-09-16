@@ -17,8 +17,8 @@ package filter
 import (
 	"fmt"
 
+	"github.com/goharbor/harbor/src/lib/pattern"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
-	"github.com/goharbor/harbor/src/pkg/reg/util"
 )
 
 // DoFilterArtifacts filter the artifacts according to the filters
@@ -38,17 +38,25 @@ func BuildArtifactFilters(filters []*model.Filter) (ArtifactFilters, error) {
 		switch filter.Type {
 		case model.FilterTypeLabel:
 			if labels, ok := filter.Value.([]string); ok {
-				f = &artifactLabelFilter{
+				lf := &artifactLabelFilter{
 					labels:     labels,
+					kind:       filter.Kind,
 					decoration: filter.Decoration,
 				}
+				if filter.Kind == pattern.KindRegex {
+					for _, label := range labels {
+						lf.matchers = append(lf.matchers, pattern.NewMatcher(filter.Kind, label))
+					}
+				}
+				f = lf
 			} else {
 				return nil, fmt.Errorf("invalid filter value type for label filter, expecting []string")
 			}
 		case model.FilterTypeTag:
-			if pattern, ok := filter.Value.(string); ok {
+			if p, ok := filter.Value.(string); ok {
 				f = &artifactTagFilter{
-					pattern:    pattern,
+					pattern:    p,
+					matcher:    pattern.NewMatcher(filter.Kind, p),
 					decoration: filter.Decoration,
 				}
 			} else {
@@ -86,6 +94,10 @@ func (a ArtifactFilters) Filter(artifacts []*model.Artifact) ([]*model.Artifact,
 // in the filter is the valid one
 type artifactLabelFilter struct {
 	labels []string
+	// "", "doublestar" or "regex"
+	kind string
+	// only populated for the regex kind, one matcher per configured label
+	matchers []*pattern.Matcher
 	// "matches", "excludes"
 	decoration string
 }
@@ -96,16 +108,9 @@ func (a *artifactLabelFilter) Filter(artifacts []*model.Artifact) ([]*model.Arti
 	}
 	var result []*model.Artifact
 	for _, artifact := range artifacts {
-		labels := map[string]struct{}{}
-		for _, label := range artifact.Labels {
-			labels[label] = struct{}{}
-		}
-		match := true
-		for _, label := range a.labels {
-			if _, exist := labels[label]; !exist {
-				match = false
-				break
-			}
+		match, err := a.matchAll(artifact.Labels)
+		if err != nil {
+			return nil, err
 		}
 		// add the artifact to the result list if it contains all labels defined for the filter
 		if a.decoration == model.Excludes {
@@ -121,8 +126,45 @@ func (a *artifactLabelFilter) Filter(artifacts []*model.Artifact) ([]*model.Arti
 	return result, nil
 }
 
+// matchAll returns whether the labels of the artifact satisfy every label of the filter:
+// an exact match for a doublestar filter, a match against any of the artifact labels for
+// a regex one
+func (a *artifactLabelFilter) matchAll(artifactLabels []string) (bool, error) {
+	if a.kind != pattern.KindRegex {
+		labels := make(map[string]struct{}, len(artifactLabels))
+		for _, label := range artifactLabels {
+			labels[label] = struct{}{}
+		}
+		for _, label := range a.labels {
+			if _, exist := labels[label]; !exist {
+				return false, nil
+			}
+		}
+		return true, nil
+	}
+
+	for _, matcher := range a.matchers {
+		matched := false
+		for _, label := range artifactLabels {
+			ok, err := matcher.Match(label)
+			if err != nil {
+				return false, err
+			}
+			if ok {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
 type artifactTagFilter struct {
 	pattern string
+	matcher *pattern.Matcher
 	// "matches", "excludes"
 	decoration string
 }
@@ -142,9 +184,10 @@ func (a *artifactTagFilter) Filter(artifacts []*model.Artifact) ([]*model.Artifa
 			tagsForMatching = append(tagsForMatching, artifact.Tags...)
 		}
 
-		// untagged artifact
+		// untagged artifact: it is kept when the pattern matches the empty tag,
+		// which "**" does and "v*" does not, and an anchored ".*" and "v.*" alike
 		if len(tagsForMatching) == 0 {
-			match, err := util.Match(a.pattern, "")
+			match, err := a.matcher.Match("")
 			if err != nil {
 				return nil, err
 			}
@@ -163,7 +206,7 @@ func (a *artifactTagFilter) Filter(artifacts []*model.Artifact) ([]*model.Artifa
 		// tagged artifact
 		var tags []string
 		for _, tag := range tagsForMatching {
-			match, err := util.Match(a.pattern, tag)
+			match, err := a.matcher.Match(tag)
 			if err != nil {
 				return nil, err
 			}

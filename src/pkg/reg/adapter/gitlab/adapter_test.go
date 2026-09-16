@@ -132,3 +132,54 @@ func TestFetchImages(t *testing.T) {
 	require.Equal(t, 1, len(resources))
 	require.Equal(t, 2, len(resources[0].Metadata.Vtags))
 }
+
+func TestFetchImagesWithRegexFilters(t *testing.T) {
+	ad := getAdapter(t)
+	adapter := ad.(*adapter)
+
+	// the repository list can't be derived from a regex, so all the projects are
+	// listed and the filters do the work
+	resources, err := adapter.FetchArtifacts([]*model.Filter{
+		{
+			Type:  model.FilterTypeName,
+			Value: "library/dockers",
+			Kind:  model.FilterKindRegex,
+		},
+		{
+			Type:  model.FilterTypeTag,
+			Value: "late.*|v2",
+			Kind:  model.FilterKindRegex,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 1, len(resources))
+	require.Equal(t, 2, len(resources[0].Metadata.Vtags))
+
+	// "v" matches no tag as a whole, a substring match would keep "v2"
+	resources, err = adapter.FetchArtifacts([]*model.Filter{
+		{
+			Type:  model.FilterTypeName,
+			Value: "library/dockers",
+			Kind:  model.FilterKindRegex,
+		},
+		{
+			Type:  model.FilterTypeTag,
+			Value: "v",
+			Kind:  model.FilterKindRegex,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 1, len(resources))
+	require.Equal(t, 0, len(resources[0].Metadata.Vtags))
+
+	// and the name regex is anchored too
+	resources, err = adapter.FetchArtifacts([]*model.Filter{
+		{
+			Type:  model.FilterTypeName,
+			Value: "dockers",
+			Kind:  model.FilterKindRegex,
+		},
+	})
+	require.Nil(t, err)
+	require.Equal(t, 0, len(resources))
+}

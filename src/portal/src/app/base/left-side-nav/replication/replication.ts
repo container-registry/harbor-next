@@ -31,6 +31,17 @@ export enum Decoration {
     MATCHES = 'matches',
     EXCLUDES = 'excludes',
 }
+
+// pattern engines a name, tag or label filter value can be evaluated with
+export enum PatternKind {
+    DOUBLESTAR = 'doublestar',
+    REGEX = 'regex',
+}
+
+export const PATTERN_KIND_I18N_MAP = {
+    [PatternKind.DOUBLESTAR]: 'REPLICATION.ENGINE_DOUBLESTAR',
+    [PatternKind.REGEX]: 'REPLICATION.ENGINE_REGEX',
+};
 export enum BandwidthUnit {
     MB = 'Mbps',
     KB = 'Kbps',

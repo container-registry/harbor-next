@@ -65,6 +65,8 @@ export interface Filter {
     type: string;
     style: string;
     decoration?: string;
+    // pattern engine of the filter value, "doublestar" or "regex"
+    kind?: string;
     values?: string[];
 }
 

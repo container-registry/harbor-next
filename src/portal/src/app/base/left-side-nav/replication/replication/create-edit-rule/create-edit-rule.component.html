@@ -1,6 +1,7 @@
 <clr-modal
     [(clrModalOpen)]="createEditRuleOpened"
     [clrModalStaticBackdrop]="true"
+    [clrModalSize]="'lg'"
     [clrModalClosable]="false">
     <h3 class="modal-title">{{ headerTitle | translate }}</h3>
     <div class="modal-body modal-body-height">
@@ -200,6 +201,33 @@
                                         </option>
                                     </select>
                                 </div>
+                                <div
+                                    class="clr-select-wrapper mr-1"
+                                    *ngIf="
+                                        supportsPatternKind(
+                                            supportedFilters[i]?.type
+                                        )
+                                    ">
+                                    <select
+                                        class="clr-select width-engine"
+                                        [attr.title]="
+                                            'REPLICATION.PATTERN_ENGINE'
+                                                | translate
+                                        "
+                                        id="{{
+                                            'engine_' +
+                                                supportedFilters[i]?.type
+                                        }}"
+                                        formControlName="kind">
+                                        <option
+                                            *ngFor="let kind of patternKinds()"
+                                            value="{{ kind }}">
+                                            {{
+                                                engineI18nKey(kind) | translate
+                                            }}
+                                        </option>
+                                    </select>
+                                </div>
                                 <div class="clr-input-wrapper">
                                     <input
                                         class="clr-input"
@@ -210,9 +238,9 @@
                                                 'tag',
                                             'width-tag-label':
                                                 supportedFilters[i]?.type ===
-                                                'tag'
+                                                'tag',
                                         }"
-                                        (input)="trimText($event)"
+                                        (input)="trimText($event, i)"
                                         type="text"
                                         #filterValue
                                         size="14"
@@ -272,6 +300,24 @@
                                         </option>
                                     </select>
                                 </div>
+                                <div class="clr-select-wrapper mr-1">
+                                    <select
+                                        class="clr-select width-engine"
+                                        [attr.title]="
+                                            'REPLICATION.PATTERN_ENGINE'
+                                                | translate
+                                        "
+                                        id="engine_label"
+                                        formControlName="kind">
+                                        <option
+                                            *ngFor="let kind of patternKinds()"
+                                            value="{{ kind }}">
+                                            {{
+                                                engineI18nKey(kind) | translate
+                                            }}
+                                        </option>
+                                    </select>
+                                </div>
 
                                 <div
                                     class="clr-input-wrapper position-relative width-tag-label">
@@ -282,7 +328,7 @@
                                         id="labelFilter"
                                         [(ngModel)]="stringForLabelFilter"
                                         [ngModelOptions]="{
-                                            standalone: true
+                                            standalone: true,
                                         }" />
                                     <clr-dropdown>
                                         <clr-icon
@@ -361,7 +407,8 @@
                                     <span
                                         class="tooltip-content"
                                         *ngIf="
-                                            supportedFilters[i]?.type === 'name'
+                                            supportedFilters[i]?.type ===
+                                                'name' && !isRegex(i)
                                         "
                                         >{{
                                             'TOOLTIP.NAME_FILTER' | translate
@@ -370,7 +417,19 @@
                                     <span
                                         class="tooltip-content"
                                         *ngIf="
-                                            supportedFilters[i]?.type === 'tag'
+                                            supportedFilters[i]?.type ===
+                                                'name' && isRegex(i)
+                                        "
+                                        >{{
+                                            'TOOLTIP.NAME_FILTER_REGEX'
+                                                | translate
+                                        }}</span
+                                    >
+                                    <span
+                                        class="tooltip-content"
+                                        *ngIf="
+                                            supportedFilters[i]?.type ===
+                                                'tag' && !isRegex(i)
                                         "
                                         >{{
                                             'TOOLTIP.TAG_FILTER' | translate
@@ -380,10 +439,32 @@
                                         class="tooltip-content"
                                         *ngIf="
                                             supportedFilters[i]?.type ===
-                                            'label'
+                                                'tag' && isRegex(i)
+                                        "
+                                        >{{
+                                            'TOOLTIP.TAG_FILTER_REGEX'
+                                                | translate
+                                        }}</span
+                                    >
+                                    <span
+                                        class="tooltip-content"
+                                        *ngIf="
+                                            supportedFilters[i]?.type ===
+                                                'label' && !isRegex(i)
                                         "
                                         >{{
                                             'TOOLTIP.LABEL_FILTER' | translate
+                                        }}</span
+                                    >
+                                    <span
+                                        class="tooltip-content"
+                                        *ngIf="
+                                            supportedFilters[i]?.type ===
+                                                'label' && isRegex(i)
+                                        "
+                                        >{{
+                                            'TOOLTIP.LABEL_FILTER_REGEX'
+                                                | translate
                                         }}</span
                                     >
                                     <span
