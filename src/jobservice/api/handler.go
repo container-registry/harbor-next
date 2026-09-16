@@ -19,9 +19,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strconv"
-	"strings"
 
 	"github.com/goharbor/harbor/src/jobservice/common/query"
 	"github.com/goharbor/harbor/src/jobservice/common/utils"
@@ -191,12 +189,10 @@ func (dh *DefaultHandler) HandleCheckStatusReq(w http.ResponseWriter, req *http.
 
 // HandleJobLogReq is implementation of method defined in interface 'Handler'
 func (dh *DefaultHandler) HandleJobLogReq(w http.ResponseWriter, req *http.Request) {
-	jobID := req.PathValue("job_id")
-
-	if strings.Contains(jobID, "..") || strings.ContainsRune(jobID, os.PathSeparator) {
-		dh.handleError(w, req, http.StatusBadRequest, errors.Errorf("invalid Job ID: %s", jobID))
+	if rejectInvalidJobID(w, req) {
 		return
 	}
+	jobID := req.PathValue("job_id")
 
 	logData, err := dh.controller.GetJobLogData(jobID)
 	if err != nil {
@@ -214,6 +210,10 @@ func (dh *DefaultHandler) HandleJobLogReq(w http.ResponseWriter, req *http.Reque
 
 	dh.log(req, http.StatusOK, "")
 
+	// Job logs are plain text. Set the type explicitly and forbid sniffing so a
+	// log whose first bytes look like HTML cannot be rendered as a page.
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusOK)
 	writeDate(w, logData)
 }
@@ -362,9 +362,10 @@ func extractQuery(req *http.Request) *query.Parameter {
 }
 
 func writeDate(w http.ResponseWriter, bytes []byte) {
-	// nolint:gosec // G705: every caller sets an explicit Content-Type, and the
-	// error path adds X-Content-Type-Options: nosniff, so a reflected path value
-	// cannot be sniffed into HTML.
+	// nolint:gosec // G705: every caller sets an explicit Content-Type before
+	// writing, and the callers that echo request-derived bytes (the log, error
+	// and auth-failure paths) also set X-Content-Type-Options: nosniff, so
+	// nothing written here can be sniffed into executable HTML.
 	if _, err := w.Write(bytes); err != nil {
 		logger.Errorf("writer write error: %s", err)
 	}

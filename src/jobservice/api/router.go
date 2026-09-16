@@ -77,6 +77,8 @@ func (br *BaseRouter) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				authErr = errors.Errorf("unauthorized: %s", err)
 			}
 			logger.Errorf("Serve http request '%s %s' failed with error: %s", lib.TrimLineBreaks(req.Method), req.URL.String(), authErr.Error())
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			w.Header().Set("X-Content-Type-Options", "nosniff")
 			w.WriteHeader(http.StatusUnauthorized)
 			writeDate(w, []byte(authErr.Error()))
 			return
@@ -104,15 +106,24 @@ func (br *BaseRouter) registerRoutes() http.Handler {
 	return router
 }
 
-// withJobID turns away the job IDs the routes could not previously receive.
-// ServeMux matches escaped path segments and unescapes the wildcard afterwards,
-// so "%2F" and "%2e%2e" now reach a handler as a path value holding a separator
-// or a parent reference; gorilla/mux matched the decoded path and answered 404.
-// Keeping that answer leaves the routing contract where it was.
+// rejectInvalidJobID is the single decision for the job IDs the routes could not
+// previously receive. ServeMux matches escaped path segments and unescapes the
+// wildcard afterwards, so "%2F" and "%2e%2e" now arrive as a path value holding a
+// separator or a parent reference; gorilla/mux matched the decoded path and
+// answered 404. It writes that 404 and reports true when the caller must stop, so
+// the wrapper below and HandleJobLogReq share one rule and one status.
+func rejectInvalidJobID(w http.ResponseWriter, req *http.Request) bool {
+	if id := req.PathValue("job_id"); strings.Contains(id, "..") || strings.ContainsRune(id, '/') {
+		http.NotFound(w, req)
+		return true
+	}
+	return false
+}
+
+// withJobID turns away those IDs before the wrapped handler runs.
 func withJobID(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		if id := req.PathValue("job_id"); strings.Contains(id, "..") || strings.ContainsRune(id, '/') {
-			http.NotFound(w, req)
+		if rejectInvalidJobID(w, req) {
 			return
 		}
 
