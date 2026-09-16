@@ -6,6 +6,13 @@ This changelog mirrors [GitHub Releases](https://github.com/container-registry/h
 
 ---
 
+## [2.15.10](https://github.com/container-registry/harbor-next/compare/v2.15.9...v2.15.10) (2026-09-16)
+
+
+### Bug Fixes
+
+* **db:** Resolve the execution table through search_path in the revision guard (backport [#929](https://github.com/container-registry/harbor-next/issues/929)) ([#933](https://github.com/container-registry/harbor-next/issues/933)) ([6b05f65](https://github.com/container-registry/harbor-next/commit/6b05f65db287ea5f07d112c4a00759382935fe76))
+
 ## [2.15.9](https://github.com/container-registry/harbor-next/compare/v2.15.8...v2.15.9) (2026-09-16)
 
 
