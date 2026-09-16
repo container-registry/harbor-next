@@ -147,15 +147,71 @@ func TestNewRouterDispatch(t *testing.T) {
 	}
 }
 
-// TestHealthNoLongerRedirectsTrailingSlash records a deliberate drop. gorilla's
+// TestTrailingSlashStaysReachable pins the StrictSlash stand-in. gorilla's
 // StrictSlash(true) answered "/api/health/" with a 301 to "/api/health";
-// ServeMux has no equivalent and answers 404. Nothing requests the trailing-slash
-// form — the health checker builds the exact URL — so the redirect went unused.
-func TestHealthNoLongerRedirectsTrailingSlash(t *testing.T) {
+// ServeMux has no equivalent, so trimTrailingSlash folds the slash away before
+// dispatch and the route is reached directly instead of newly 404-ing.
+func TestTrailingSlashStaysReachable(t *testing.T) {
 	router := newRouter(config.Configuration{})
 
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/health/", nil))
+	cases := []struct {
+		name     string
+		method   string
+		target   string
+		wantCode int
+	}{
+		{"health with a trailing slash", http.MethodGet, "/api/health/", http.StatusOK},
+		// The manifest handler rejects "latest" as a digest, so a routed request
+		// reaches BadRequest; a 404 would mean the trailing slash lost the route.
+		{"manifest delete with a trailing slash", http.MethodDelete, "/api/registry/library/nginx/manifests/latest/", http.StatusBadRequest},
+		// An encoded trailing slash is part of the reference, not a separator: it
+		// must survive the fold and be refused by the blob guard, not stripped into
+		// a valid single-segment reference that deletes "sha256:ab".
+		{"encoded trailing slash on a blob reference is not stripped", http.MethodDelete, "/api/registry/blob/sha256:ab%2F", http.StatusNotFound},
+	}
 
-	assert.Equal(t, http.StatusNotFound, rec.Code)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, httptest.NewRequest(c.method, c.target, nil))
+
+			assert.Equal(t, c.wantCode, rec.Code)
+		})
+	}
+}
+
+// TestBlobRoute pins the encoded-slash guard. The ServeMux "{reference}" wildcard
+// keeps an encoded slash inside the segment, where gorilla's single-segment match
+// answered 404, so a reference carrying a separator must still be refused.
+func TestBlobRoute(t *testing.T) {
+	cases := []struct {
+		name      string
+		reference string
+		reachable bool
+	}{
+		{"plain digest", "sha256:deadbeef", true},
+		{"reference with a decoded slash", "sha256:deadbeef/../evil", false},
+		{"reference that is only a slash", "/", false},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			reached := false
+			route := blobRoute(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				reached = true
+				w.WriteHeader(http.StatusOK)
+			}))
+
+			req := httptest.NewRequest(http.MethodDelete, "/api/registry/blob/x", nil)
+			req.SetPathValue("reference", c.reference)
+			rec := httptest.NewRecorder()
+
+			route(rec, req)
+
+			assert.Equal(t, c.reachable, reached, "handler reachability")
+			if !c.reachable {
+				assert.Equal(t, http.StatusNotFound, rec.Code)
+			}
+		})
+	}
 }
