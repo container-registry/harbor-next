@@ -156,6 +156,142 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 	}
 }
 
+// The revision guard resolves the execution table through search_path rather
+// than current_schema(). This puts execution in a schema that is NOT first in
+// search_path, which is where the original guard read false and skipped the
+// widening in silence.
+func TestExecutionRevisionGuardResolvesThroughSearchPath(t *testing.T) {
+	ctx := context.Background()
+	cfg := authoritativeTestDatabaseConfig()
+	adminPool, err := dbpool.New(ctx, cfg)
+	if err != nil {
+		t.Fatalf("create admin database pool: %v", err)
+	}
+	t.Cleanup(adminPool.Close)
+
+	suffix := time.Now().UnixNano()
+	first := fmt.Sprintf("harbor_next_first_%d", suffix)
+	later := fmt.Sprintf("harbor_next_later_%d", suffix)
+	for _, name := range []string{first, later} {
+		if _, err := adminPool.DB().ExecContext(ctx, "CREATE SCHEMA "+name); err != nil {
+			t.Fatalf("create schema %s: %v", name, err)
+		}
+		t.Cleanup(func() {
+			if _, err := adminPool.DB().ExecContext(ctx, "DROP SCHEMA "+name+" CASCADE"); err != nil {
+				t.Errorf("drop schema %s: %v", name, err)
+			}
+		})
+	}
+
+	cfg.MaxOpenConns = 4
+	schemaPool, err := dbpool.New(ctx, cfg, func(poolCfg *pgxpool.Config) {
+		poolCfg.ConnConfig.RuntimeParams["search_path"] = first + ", " + later
+	})
+	if err != nil {
+		t.Fatalf("create schema database pool: %v", err)
+	}
+	t.Cleanup(schemaPool.Close)
+
+	// execution lives only in the later schema, which is the case the old
+	// current_schema() guard could not see
+	setup := []string{
+		fmt.Sprintf("CREATE TABLE %s.execution (id SERIAL PRIMARY KEY, revision INTEGER)", later),
+		fmt.Sprintf("CREATE TABLE %s.robot (id BIGSERIAL PRIMARY KEY)", first),
+	}
+	for _, statement := range setup {
+		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
+			t.Fatalf("setup %q: %v", statement, err)
+		}
+	}
+
+	if _, err := schemaPool.DB().ExecContext(ctx,
+		fmt.Sprintf("INSERT INTO %s.execution (revision) VALUES (7)", later)); err != nil {
+		t.Fatalf("seed execution row: %v", err)
+	}
+
+	path := authoritativeTestSchemaPath()
+	// twice over: the widening must happen, and the repeat must not undo it
+	for pass := 1; pass <= 2; pass++ {
+		if err := applyAuthoritativeSchema(ctx, sqlSchemaDB{db: schemaPool.DB()}, path); err != nil {
+			t.Fatalf("applyAuthoritativeSchema() pass %d: %v", pass, err)
+		}
+
+		var revisionType string
+		if err := schemaPool.DB().QueryRowContext(ctx, `
+			SELECT data_type
+			FROM information_schema.columns
+			WHERE table_schema = $1
+			  AND table_name = 'execution'
+			  AND column_name = 'revision'`, later).Scan(&revisionType); err != nil {
+			t.Fatalf("look up execution.revision type on pass %d: %v", pass, err)
+		}
+		if revisionType != "bigint" {
+			t.Fatalf("pass %d: execution.revision is %q, want bigint", pass, revisionType)
+		}
+
+		var revision int64
+		if err := schemaPool.DB().QueryRowContext(ctx,
+			fmt.Sprintf("SELECT revision FROM %s.execution", later)).Scan(&revision); err != nil {
+			t.Fatalf("read seeded revision on pass %d: %v", pass, err)
+		}
+		if revision != 7 {
+			t.Errorf("pass %d: seeded revision is %d, want 7 preserved across the widening", pass, revision)
+		}
+	}
+}
+
+// A relation named execution that is not a table must not take the schema
+// apply down with it. to_regclass resolves any relation, so an index of that
+// name earlier in search_path shadows the table; the guard declines rather
+// than sending ALTER TABLE at an index, which would abort the whole file.
+
+// A relation named execution that is not a table must not take the schema
+// apply down with it. to_regclass resolves any relation, so an index of that
+// name earlier in search_path shadows the table; the guard declines rather
+// than sending ALTER TABLE at an index, which would abort the whole file.
+func TestExecutionRevisionGuardIgnoresNonTableRelations(t *testing.T) {
+	ctx := context.Background()
+	cfg := authoritativeTestDatabaseConfig()
+	adminPool, err := dbpool.New(ctx, cfg)
+	if err != nil {
+		t.Fatalf("create admin database pool: %v", err)
+	}
+	t.Cleanup(adminPool.Close)
+
+	schemaName := fmt.Sprintf("harbor_next_shadow_%d", time.Now().UnixNano())
+	if _, err := adminPool.DB().ExecContext(ctx, "CREATE SCHEMA "+schemaName); err != nil {
+		t.Fatalf("create test schema: %v", err)
+	}
+	t.Cleanup(func() {
+		if _, err := adminPool.DB().ExecContext(ctx, "DROP SCHEMA "+schemaName+" CASCADE"); err != nil {
+			t.Errorf("drop test schema: %v", err)
+		}
+	})
+
+	cfg.MaxOpenConns = 4
+	schemaPool, err := dbpool.New(ctx, cfg, func(poolCfg *pgxpool.Config) {
+		poolCfg.ConnConfig.RuntimeParams["search_path"] = schemaName
+	})
+	if err != nil {
+		t.Fatalf("create schema database pool: %v", err)
+	}
+	t.Cleanup(schemaPool.Close)
+
+	for _, statement := range []string{
+		"CREATE TABLE decoy (id BIGSERIAL PRIMARY KEY, revision INTEGER)",
+		"CREATE INDEX execution ON decoy (revision)",
+		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
+	} {
+		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
+			t.Fatalf("setup %q: %v", statement, err)
+		}
+	}
+
+	if err := applyAuthoritativeSchema(ctx, sqlSchemaDB{db: schemaPool.DB()}, authoritativeTestSchemaPath()); err != nil {
+		t.Fatalf("applyAuthoritativeSchema() with a shadowing index returned error: %v", err)
+	}
+}
+
 func authoritativeTestDatabaseConfig() *models.PostGreSQL {
 	port := 5432
 	if value := os.Getenv("POSTGRESQL_PORT"); value != "" {
