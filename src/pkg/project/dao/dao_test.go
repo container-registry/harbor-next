@@ -432,6 +432,58 @@ func (suite *DaoTestSuite) TestListRoles() {
 	}
 }
 
+// A query operand the column cannot take must be reported as a bad request
+// rather than letting the Postgres syntax error surface as a 500.
+func (suite *DaoTestSuite) TestListInvalidFilterValue() {
+	for _, query := range []string{
+		"creation_time=[a~b]",
+		"creation_time=[2020~abc]",
+		// "+" is decoded as a space by the query parser, so this reaches the
+		// column as "2020-01-01 15:04:05 05:30", which Postgres cannot read
+		// either -- it was a 500 before this change rather than a working query
+		"creation_time=[2020-01-01 15:04:05+05:30~2021-01-01 15:04:05+05:30]",
+		"creation_time=abc",
+		"creation_time={a b}",
+		"project_id=[a~b]",
+		"project_id=abc",
+	} {
+		suite.Run(query, func() {
+			built, err := q.Build(query, "", 1, 10)
+			suite.Require().Nil(err)
+
+			_, err = suite.dao.List(orm.Context(), built)
+			suite.Require().NotNil(err)
+			suite.True(errors.IsErr(err, errors.BadRequestCode), "want a bad request error, got %v", err)
+		})
+	}
+}
+
+// Valid operands must keep filtering after the validation was added.
+func (suite *DaoTestSuite) TestListValidFilterValue() {
+	for _, query := range []string{
+		"creation_time=[2020-01-01T00:00:00~2021-01-01T00:00:00]",
+		"creation_time=[2020-01-01~2021-01-01]",
+		// a negative offset survives the query parser; a "+" one does not,
+		// see TestListInvalidFilterValue
+		"creation_time=[2020-01-01 15:04:05-05:30~2021-01-01 15:04:05-05:30]",
+		"creation_time=~2020",
+		// __icontains renders as ILIKE, so its operand need not match the column
+		"creation_time__icontains=2020",
+		"project_id__icontains=1",
+		"project_id=[1~2]",
+		"project_id=1",
+		"name=abc",
+	} {
+		suite.Run(query, func() {
+			built, err := q.Build(query, "", 1, 10)
+			suite.Require().Nil(err)
+
+			_, err = suite.dao.List(orm.Context(), built)
+			suite.Nil(err)
+		})
+	}
+}
+
 func TestDaoTestSuite(t *testing.T) {
 	suite.Run(t, &DaoTestSuite{})
 }
