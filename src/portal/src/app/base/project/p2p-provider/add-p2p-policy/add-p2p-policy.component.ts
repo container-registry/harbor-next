@@ -40,12 +40,16 @@ import { Project } from '../../project';
 import { ActivatedRoute } from '@angular/router';
 import {
     FILTER_TYPE,
+    PATTERN_KIND_I18N_MAP,
+    PATTERN_KINDS,
     PROJECT_SEVERITY_LEVEL_MAP,
     TRIGGER,
     TRIGGER_I18N_MAP,
     DRAGONFLY_SCOPE,
     DRAGONFLY_SCOPE_I18N_MAP,
 } from '../p2p-provider.service';
+import { PatternKind } from '../../../left-side-nav/replication/replication';
+import { wrapPattern } from '../../tag-feature-integration/tag-retention/retention';
 import { ProviderUnderProject } from '../../../../../../ng-swagger-gen/models/provider-under-project';
 import { AppConfigService } from '../../../../services/app-config.service';
 import { Subject, Subscription } from 'rxjs';
@@ -84,7 +88,9 @@ export class AddP2pPolicyComponent implements OnInit, OnDestroy {
     inlineAlert: InlineAlertComponent;
     policy: PreheatPolicy = {};
     repos: string;
+    reposKind: string = PatternKind.DOUBLESTAR;
     tags: string;
+    tagsKind: string = PatternKind.DOUBLESTAR;
     onlySignedImages: boolean = false;
     severity: number;
     labels: string;
@@ -99,7 +105,9 @@ export class AddP2pPolicyComponent implements OnInit, OnDestroy {
     buttonStatus: ClrLoadingState = ClrLoadingState.DEFAULT;
     originPolicyForEdit: PreheatPolicy;
     originReposForEdit: string;
+    originReposKindForEdit: string;
     originTagsForEdit: string;
+    originTagsKindForEdit: string;
     originOnlySignedImagesForEdit: boolean;
     originSeverityForEdit: number;
     originLabelsForEdit: string;
@@ -210,7 +218,9 @@ export class AddP2pPolicyComponent implements OnInit, OnDestroy {
         this.inlineAlert.close();
         this.policy = {};
         this.repos = null;
+        this.reposKind = PatternKind.DOUBLESTAR;
         this.tags = null;
+        this.tagsKind = PatternKind.DOUBLESTAR;
         this.labels = null;
         this.cron = null;
         this.isNameExisting = false;
@@ -223,6 +233,8 @@ export class AddP2pPolicyComponent implements OnInit, OnDestroy {
         }
         this.currentForm.reset({
             triggerType: 'manual',
+            repoKind: this.reposKind,
+            tagKind: this.tagsKind,
             scope: DRAGONFLY_SCOPE.SINGLE_SEED_PEER,
             severity: PROJECT_SEVERITY_LEVEL_MAP[this.projectSeverity],
             onlySignedImages: this.enableContentTrust,
@@ -273,32 +285,25 @@ export class AddP2pPolicyComponent implements OnInit, OnDestroy {
         policy.provider_id = +policy.provider_id;
         const filters: any[] = [];
         if (this.repos) {
-            if (
-                this.repos.indexOf(',') !== -1 &&
-                this.repos.indexOf('{') === -1 &&
-                this.repos.indexOf('}') === -1
-            ) {
-                filters.push({
-                    type: FILTER_TYPE.REPOS,
-                    value: `{${this.repos}}`,
-                });
-            } else {
-                filters.push({ type: FILTER_TYPE.REPOS, value: this.repos });
+            const repoFilter: any = {
+                type: FILTER_TYPE.REPOS,
+                value: wrapPattern(this.repos, this.reposKind),
+            };
+            // doublestar is the default engine, sending it would only add noise to the policy
+            if (this.reposKind === PatternKind.REGEX) {
+                repoFilter.kind = this.reposKind;
             }
+            filters.push(repoFilter);
         }
         if (this.tags) {
-            if (
-                this.tags.indexOf(',') !== -1 &&
-                this.tags.indexOf('{') === -1 &&
-                this.tags.indexOf('}') === -1
-            ) {
-                filters.push({
-                    type: FILTER_TYPE.TAG,
-                    value: `{${this.tags}}`,
-                });
-            } else {
-                filters.push({ type: FILTER_TYPE.TAG, value: this.tags });
+            const tagFilter: any = {
+                type: FILTER_TYPE.TAG,
+                value: wrapPattern(this.tags, this.tagsKind),
+            };
+            if (this.tagsKind === PatternKind.REGEX) {
+                tagFilter.kind = this.tagsKind;
             }
+            filters.push(tagFilter);
         }
         if (this.labels) {
             if (
@@ -425,7 +430,15 @@ export class AddP2pPolicyComponent implements OnInit, OnDestroy {
             return true;
         }
         // eslint-disable-next-line eqeqeq
+        if (this.originReposKindForEdit != this.reposKind) {
+            return true;
+        }
+        // eslint-disable-next-line eqeqeq
         if (this.originTagsForEdit != this.tags) {
+            return true;
+        }
+        // eslint-disable-next-line eqeqeq
+        if (this.originTagsKindForEdit != this.tagsKind) {
             return true;
         }
         // eslint-disable-next-line eqeqeq
@@ -465,6 +478,21 @@ export class AddP2pPolicyComponent implements OnInit, OnDestroy {
             return TRIGGER_I18N_MAP[triggerType];
         }
         return '';
+    }
+
+    patternKinds(): string[] {
+        return PATTERN_KINDS;
+    }
+
+    engineI18nKey(kind: string): string {
+        return (
+            PATTERN_KIND_I18N_MAP[kind] ??
+            PATTERN_KIND_I18N_MAP[PatternKind.DOUBLESTAR]
+        );
+    }
+
+    isRegex(kind: string): boolean {
+        return kind === PatternKind.REGEX;
     }
 
     getScopeI18n(scope): string {

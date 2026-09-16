@@ -182,8 +182,30 @@
                                 <label class="sub-label required">{{
                                     'P2P_PROVIDER.REPOS' | translate
                                 }}</label>
+                                <div class="clr-select-wrapper mr-1">
+                                    <select
+                                        class="clr-select width-engine"
+                                        [attr.title]="
+                                            'P2P_PROVIDER.PATTERN_ENGINE'
+                                                | translate
+                                        "
+                                        [disabled]="loading"
+                                        id="repoKind"
+                                        name="repoKind"
+                                        [(ngModel)]="reposKind">
+                                        <option
+                                            *ngFor="let kind of patternKinds()"
+                                            value="{{ kind }}">
+                                            {{
+                                                engineI18nKey(kind) | translate
+                                            }}
+                                        </option>
+                                    </select>
+                                </div>
                                 <input
-                                    placeholder="**"
+                                    [placeholder]="
+                                        isRegex(reposKind) ? '' : '**'
+                                    "
                                     [disabled]="loading"
                                     autocomplete="off"
                                     class="clr-input width-290"
@@ -200,8 +222,17 @@
                             </div>
                             <clr-control-helper
                                 class="margin-left-90px opacity-08"
+                                *ngIf="!isRegex(reposKind)"
                                 >{{
                                     'TAG_RETENTION.REP_SEPARATOR' | translate
+                                }}</clr-control-helper
+                            >
+                            <clr-control-helper
+                                class="margin-left-90px opacity-08"
+                                *ngIf="isRegex(reposKind)"
+                                >{{
+                                    'TAG_RETENTION.REGEX_REP_SEPARATOR'
+                                        | translate
                                 }}</clr-control-helper
                             >
                             <clr-control-error
@@ -229,8 +260,30 @@
                                 <label class="sub-label required">{{
                                     'P2P_PROVIDER.TAGS' | translate
                                 }}</label>
+                                <div class="clr-select-wrapper mr-1">
+                                    <select
+                                        class="clr-select width-engine"
+                                        [attr.title]="
+                                            'P2P_PROVIDER.PATTERN_ENGINE'
+                                                | translate
+                                        "
+                                        [disabled]="loading"
+                                        id="tagKind"
+                                        name="tagKind"
+                                        [(ngModel)]="tagsKind">
+                                        <option
+                                            *ngFor="let kind of patternKinds()"
+                                            value="{{ kind }}">
+                                            {{
+                                                engineI18nKey(kind) | translate
+                                            }}
+                                        </option>
+                                    </select>
+                                </div>
                                 <input
-                                    placeholder="**"
+                                    [placeholder]="
+                                        isRegex(tagsKind) ? '' : '**'
+                                    "
                                     [disabled]="loading"
                                     autocomplete="off"
                                     class="clr-input width-290"
@@ -247,8 +300,17 @@
                             </div>
                             <clr-control-helper
                                 class="margin-left-90px opacity-08"
+                                *ngIf="!isRegex(tagsKind)"
                                 >{{
                                     'P2P_PROVIDER.TAG_SEPARATOR' | translate
+                                }}</clr-control-helper
+                            >
+                            <clr-control-helper
+                                class="margin-left-90px opacity-08"
+                                *ngIf="isRegex(tagsKind)"
+                                >{{
+                                    'P2P_PROVIDER.REGEX_TAG_SEPARATOR'
+                                        | translate
                                 }}</clr-control-helper
                             >
                             <clr-control-error
