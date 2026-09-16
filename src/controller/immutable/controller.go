@@ -82,11 +82,17 @@ func (r *DefaultAPIController) DeleteImmutableRule(ctx context.Context, id int64
 
 // CreateImmutableRule ...
 func (r *DefaultAPIController) CreateImmutableRule(ctx context.Context, m *model.Metadata) (int64, error) {
+	if err := m.ValidateImmutableRule(); err != nil {
+		return 0, err
+	}
 	return r.manager.CreateImmutableRule(ctx, m)
 }
 
 // UpdateImmutableRule ...
 func (r *DefaultAPIController) UpdateImmutableRule(ctx context.Context, projectID int64, m *model.Metadata) error {
+	if err := m.ValidateImmutableRule(); err != nil {
+		return err
+	}
 	m0, err := r.manager.GetImmutableRule(ctx, m.ID)
 	if err != nil {
 		return err
