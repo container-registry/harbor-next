@@ -18,6 +18,7 @@ import (
 	"context"
 	"net/http"
 	"testing"
+	"time"
 
 	beegoorm "github.com/beego/beego/v2/client/orm"
 
@@ -27,6 +28,8 @@ import (
 	"github.com/goharbor/harbor/src/pkg/notifier/event"
 	ormtesting "github.com/goharbor/harbor/src/testing/lib/orm"
 )
+
+const deadlockTimeout = 10 * time.Second
 
 func stubLookups() func() {
 	origLookup := lookupMemberFn
@@ -394,44 +397,6 @@ func TestAuditLogMemberEventEnabled_EmptyOperation(t *testing.T) {
 	}
 }
 
-func TestEnsureORMContext(t *testing.T) {
-	// Stub the ORM factory so the transaction-replacement branch does not need a
-	// registered default DB (beegoorm.NewOrm panics otherwise).
-	origNewOrm := newBeegoOrm
-	defer func() { newBeegoOrm = origNewOrm }()
-	fresh := &ormtesting.FakeOrmer{}
-	newBeegoOrm = func() beegoorm.Ormer { return fresh }
-
-	t.Run("non-tx ORM returned as-is", func(t *testing.T) {
-		// A regular (non-tx) ORM must be returned unchanged, covering the
-		// TxOrmer type-assertion branch in ensureORMContext.
-		ctx := orm.NewContext(context.Background(), &ormtesting.FakeOrmer{})
-		if got := ensureORMContext(ctx); got != ctx {
-			t.Error("ensureORMContext with non-tx ORM should return the same context")
-		}
-	})
-
-	t.Run("tx ORM replaced with fresh non-tx ORM", func(t *testing.T) {
-		// A transaction ORM must be swapped for a fresh non-tx ORM, guarding the
-		// regression where member audit events reused a completed transaction.
-		ctx := orm.NewContext(context.Background(), &ormtesting.FakeTxOrmer{})
-		got := ensureORMContext(ctx)
-		if got == ctx {
-			t.Fatal("ensureORMContext with tx ORM should return a new context")
-		}
-		o, err := orm.FromContext(got)
-		if err != nil {
-			t.Fatalf("orm.FromContext returned error: %v", err)
-		}
-		if _, isTx := o.(beegoorm.TxOrmer); isTx {
-			t.Error("ensureORMContext should replace the transaction ORM with a non-tx ORM")
-		}
-		if o != fresh {
-			t.Error("ensureORMContext should install the ORM produced by newBeegoOrm")
-		}
-	})
-}
-
 func TestParsePreResolved(t *testing.T) {
 	tests := []struct {
 		input    string
@@ -452,5 +417,28 @@ func TestParsePreResolved(t *testing.T) {
 					tt.input, name, typ, tt.wantName, tt.wantType)
 			}
 		})
+	}
+}
+
+// TestPreCheckDeleteRunsOnTheRequestConnection is the member half of harbor-next
+// #850: PreCheck resolves the member name inside transaction.Middleware's
+// transaction, and resolving it on an ORM of its own needs a second pool
+// connection. With the single-connection pool below that acquire never returns.
+func TestPreCheckDeleteRunsOnTheRequestConnection(t *testing.T) {
+	ormtesting.RegisterLimitedPool(t, 1)
+
+	r := &resolver{}
+	ctx := orm.NewContext(context.Background(), beegoorm.NewOrm())
+
+	completed := ormtesting.RunsWithin(deadlockTimeout, func() {
+		_ = orm.WithTransaction(func(txCtx context.Context) error {
+			r.PreCheck(txCtx, "/api/v2.0/projects/1/members/20", http.MethodDelete)
+			return nil
+		})(ctx)
+	})
+
+	if !completed {
+		t.Fatalf("PreCheck did not return within %s: it asked the pool for a second "+
+			"connection while the request transaction still held the first", deadlockTimeout)
 	}
 }
