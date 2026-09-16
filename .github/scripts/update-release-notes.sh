@@ -179,6 +179,11 @@ patch_notes="${tmp_dir}/commercial-patches.md"
 # unreleased block — entries above the first marker — is this release's
 # delta, because notes render BEFORE the marker is stamped. Re-rendering an
 # old tag reads that tag's own section instead.
+#
+# Nothing here ever reads a commit subject. Under merge-sync every patch
+# branch tip is a "sync: merge <line> <sha> into <branch>" commit, so a
+# subject is never a feature name and must never reach the notes.
+declared_count=0
 if [[ "${chart_mode}" == false && -f "${series}" ]]; then
   while IFS= read -r branch; do
     branch="${branch%%#*}"
@@ -193,6 +198,7 @@ if [[ "${chart_mode}" == false && -f "${series}" ]]; then
 
     git -C "${tmp_dir}/patches-repo" fetch --depth=1 "${patches_remote}" \
       "${branch}:refs/remotes/origin/${branch}"
+    declared_count=$((declared_count + 1))
     changelog_blob=$(git -C "${tmp_dir}/patches-repo" cat-file -p \
       "refs/remotes/origin/${branch}:changelogs/${branch}.md" 2>/dev/null || true)
     feature_title=""
@@ -259,10 +265,18 @@ fi
     echo
   fi
 
-  if [[ -s "${patch_notes}" ]]; then
+  if [[ "${declared_count}" -gt 0 ]]; then
     echo "## Commercial Features"
     echo
-    cat "${patch_notes}"
+    if [[ -s "${patch_notes}" ]]; then
+      cat "${patch_notes}"
+    else
+      # Nothing shipped in any commercial feature. Say exactly that: the
+      # branch inventory that used to be listed here carried commit
+      # subjects, which is how sync merges reached the notes.
+      echo "_No changes this release._"
+      echo
+    fi
   fi
 
   cat "${tmp_dir}/formatted-notes.md"
