@@ -26,7 +26,7 @@ We're developing Harbor Next as a [community proposal](https://github.com/goharb
 - Continuous delivery
 - Easy Contributor onboarding with out of the box dev environments
 - Multi-architecture artifacts
-- Scratch images with minimal size and attack surface.
+- Scratch images with minimal size and attack surface — see [Custom CA Certificates](docs/custom-ca-certificates.md) for configuring internal TLS trust in these images.
 - Use of Docker Distribution V3
 - Replicate images to SFTP endpoints
 - Harbor Satellite Support
