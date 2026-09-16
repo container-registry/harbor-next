@@ -88,7 +88,10 @@ func QuerySetter(ctx context.Context, model any, query *q.Query, options ...Opti
 
 	metadata := parseModel(model)
 	// set filters
-	qs = setFilters(ctx, qs, query, metadata)
+	qs, err = setFilters(ctx, qs, query, metadata)
+	if err != nil {
+		return nil, err
+	}
 
 	opts := newConfig(options...)
 	// sorting
@@ -150,8 +153,11 @@ func QuerySetterForCount(ctx context.Context, model any, query *q.Query, _ ...st
 	return QuerySetter(ctx, model, query, WithSortDisabled(true))
 }
 
+// icontainsOperator renders as ILIKE, which casts the column to text
+const icontainsOperator = "__icontains"
+
 // set filters according to the query
-func setFilters(ctx context.Context, qs orm.QuerySeter, query *q.Query, meta *metadata) orm.QuerySeter {
+func setFilters(ctx context.Context, qs orm.QuerySeter, query *q.Query, meta *metadata) (orm.QuerySeter, error) {
 	for key, value := range query.Keywords {
 		// The "strings.SplitN()" here is a workaround for the incorrect usage of query which should be avoided
 		// e.g. use the query with the knowledge of underlying ORM implementation, the "OrList" should be used instead:
@@ -174,8 +180,9 @@ func setFilters(ctx context.Context, qs orm.QuerySeter, query *q.Query, meta *me
 		}
 
 		// only accept the below operators
+		var operator string
 		if len(keyPieces) == 2 {
-			operator := orm.ExprSep + keyPieces[1]
+			operator = orm.ExprSep + keyPieces[1]
 			allowedOperators := map[string]struct{}{
 				"__icontains": {},
 				"__in":        {},
@@ -195,6 +202,16 @@ func setFilters(ctx context.Context, qs orm.QuerySeter, query *q.Query, meta *me
 		if mk.FilterFunc != nil {
 			qs = mk.FilterFunc(ctx, qs, key, value)
 			continue
+		}
+
+		// reject operands the column cannot take before they reach the database.
+		// __icontains is exempt for the same reason a fuzzy match is: it renders
+		// as ILIKE, which casts the column to text, so "creation_time__icontains"
+		// does not need an operand shaped like a timestamp.
+		if operator != icontainsOperator {
+			if err := validateFilterValue(mk.FieldType, key, value); err != nil {
+				return nil, err
+			}
 		}
 		// fuzzy match
 		if f, ok := value.(*q.FuzzyMatchValue); ok {
@@ -228,7 +245,7 @@ func setFilters(ctx context.Context, qs orm.QuerySeter, query *q.Query, meta *me
 		// exact match
 		qs = qs.Filter(key, value)
 	}
-	return qs
+	return qs, nil
 }
 
 // set sorts according to the query
