@@ -86,3 +86,11 @@ func TestCoreHealthChecker(t *testing.T) {
 	checker := coreHealthChecker()
 	assert.Equal(t, nil, checker.Check())
 }
+
+func TestCheckDatabaseNoPool(t *testing.T) {
+	// unit-test env has no pool registered; the check must fail fast with a
+	// clear error instead of hanging on an ORM query
+	err := checkDatabase()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "database pool not initialized")
+}
