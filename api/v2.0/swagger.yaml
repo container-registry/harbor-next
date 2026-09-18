@@ -17,7 +17,7 @@ info:
     inside the cluster or compose network. Set `METRIC_ENABLE=true` to serve it.
 
     Core additionally serves the Harbor exporter collectors on that same endpoint when
-    `METRIC_EXPORTER_ENABLE=true`, which replaces the standalone `harbor-exporter` container.
+    `METRIC_EXPORTER_ENABLE=true`; there is no standalone exporter component.
 
     The response is the Prometheus text exposition format
     (`text/plain; version=0.0.4`), not JSON.
