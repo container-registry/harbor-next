@@ -25,6 +25,11 @@ packages:
       Controller:
         config:
           dir: testing/controller/blob
+  github.com/goharbor/harbor/src/controller/pat:
+    interfaces:
+      Controller:
+        config:
+          dir: testing/controller/pat
   github.com/goharbor/harbor/src/controller/project:
     interfaces:
       Controller:
