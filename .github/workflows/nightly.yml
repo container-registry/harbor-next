@@ -1,0 +1,234 @@
+name: Nightly
+
+# A nightly is the real release, cut against a throwaway branch.
+#
+# Every step below is the release pipeline's own: the same release-please
+# configuration (derived from release-please-config.json, never a copy), the
+# same publish-images.yml, the same release-notes-engine.yml. The only thing
+# this workflow adds is the channel branch and the scheduled merge of the
+# release PR that the channel produces.
+#
+# main's release-please state is untouched: the channel carries its own
+# config and manifest, on its own branch, and is rebuilt from main's head
+# every night. Because the channel manifest is re-seeded from the real
+# manifest each time, every nightly accumulates from the last published
+# release — the notes are tonight's snapshot of the upcoming release, not a
+# nightly changelog stream of their own.
+
+on:
+  schedule:
+    # 12:12 UTC. The release PR is opened and merged in the same run, so
+    # there is never a half-open nightly release PR waiting around.
+    - cron: '12 12 * * *'
+  workflow_dispatch:
+    inputs:
+      date_stamp:
+        description: Date stamp for the nightly version (YYYYMMDD, default today UTC)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  # Never two nightlies at once: they share the channel branch.
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  channel:
+    name: Open Nightly Channel
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      # Force-pushes the nightly channel branch.
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    env:
+      DATE_STAMP: ${{ inputs.date_stamp }}
+      # Read by the askpass script below when the channel branch is pushed.
+      GH_TOKEN: ${{ secrets.NIGHTLY_CHANNEL_TOKEN || github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history: release-please walks back to the last release tag.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: $/.github/actions/setup-task
+
+      - name: Validate the nightly inputs
+        # The ref guard is what keeps the official tag and image names on the
+        # release line, and the stamp guard is what keeps a caller-supplied
+        # value from reaching a Task command line as anything but a date.
+        # Both are covered by `task nightly:test`.
+        #
+        # Checkout comes first because the guard lives in the repository; it
+        # still runs before anything is fetched, built or published.
+        run: task nightly:validate-inputs
+
+      - name: Configure ephemeral Git authentication
+        run: |
+          askpass="${RUNNER_TEMP}/git-askpass"
+          cat > "${askpass}" <<'EOF'
+          #!/usr/bin/env bash
+          case "$1" in
+            *Username*) printf '%s\n' 'x-access-token' ;;
+            *Password*) printf '%s\n' "${GH_TOKEN}" ;;
+            *) exit 1 ;;
+          esac
+          EOF
+          chmod 700 "${askpass}"
+          echo "GIT_ASKPASS=${askpass}" >> "${GITHUB_ENV}"
+          echo "GIT_TERMINAL_PROMPT=0" >> "${GITHUB_ENV}"
+
+      - name: Resolve nightly version
+        id: version
+        run: |
+          # -o interleaved: the root Taskfile prefixes output per task, which
+          # would end up inside the captured value.
+          # shellcheck disable=SC2086
+          version=$(task -o interleaved nightly:version ${DATE_STAMP:+DATE_STAMP="${DATE_STAMP}"})
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "::notice::Nightly version ${version}"
+
+      - name: Open the nightly channel
+        run: |
+          # shellcheck disable=SC2086
+          task nightly:channel PUSH_CHANNEL=true ${DATE_STAMP:+DATE_STAMP="${DATE_STAMP}"}
+
+  release:
+    name: Release Nightly
+    needs: [channel]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: $/.github/actions/setup-task
+
+      # Opens the release PR against the channel branch. Nothing to release
+      # yet, so the release half is skipped.
+      - name: Open the nightly release PR
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          # Same fallback as the channel push and the merge: a ruleset over the
+          # channel branch would otherwise merge the PR and then fail to tag it.
+          token: ${{ secrets.NIGHTLY_CHANNEL_TOKEN || secrets.GITHUB_TOKEN }}
+          target-branch: nightly
+          config-file: release-please-config-nightly.json
+          manifest-file: .release-please-manifest-nightly.json
+          skip-github-release: true
+
+      - name: Merge the nightly release PR
+        env:
+          # The nightly release PR is merged by this workflow, by design.
+          # NIGHTLY_CHANNEL_TOKEN only has to exist if the channel branch ever
+          # ends up under a ruleset that GITHUB_TOKEN cannot satisfy.
+          GH_TOKEN: ${{ secrets.NIGHTLY_CHANNEL_TOKEN || github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: task nightly:merge-release-pr
+
+      # Tags the merged release commit and publishes the prerelease. The PR
+      # half is skipped so a stray follow-up PR is never left behind.
+      - name: Tag the nightly release
+        id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          # Same fallback as the channel push and the merge: a ruleset over the
+          # channel branch would otherwise merge the PR and then fail to tag it.
+          token: ${{ secrets.NIGHTLY_CHANNEL_TOKEN || secrets.GITHUB_TOKEN }}
+          target-branch: nightly
+          config-file: release-please-config-nightly.json
+          manifest-file: .release-please-manifest-nightly.json
+          skip-github-pull-request: true
+
+  publish-images:
+    name: Publish Nightly Images
+    needs: [release]
+    if: ${{ needs.release.outputs.release_created == 'true' }}
+    permissions:
+      contents: read
+      id-token: write
+    uses: $/.github/workflows/publish-images.yml
+    with:
+      checkout_ref: ${{ needs.release.outputs.tag_name }}
+      image_tag: ${{ needs.release.outputs.tag_name }}
+      version: ${{ needs.release.outputs.version }}
+      artifact_prefix: nightly-${{ needs.release.outputs.tag_name }}
+      registry_address: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
+      registry_project: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
+    secrets:
+      # Only what the reusable workflow declares; inherit would hand it every
+      # secret this workflow can see.
+      REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+      SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+
+  release-notes:
+    name: Update Nightly Release Notes
+    needs: [release, publish-images]
+    if: ${{ needs.release.outputs.release_created == 'true' }}
+    permissions:
+      contents: write
+    uses: $/.github/workflows/release-notes-engine.yml
+    with:
+      tag_name: ${{ needs.release.outputs.tag_name }}
+    secrets:
+      SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+
+  # Deliberately absent, and they must stay absent:
+  #
+  # - mark-commercial-release: stamping the 8gcr changelog markers would move
+  #   the commercial entries out of the unreleased block, and the real
+  #   release's notes would lose them.
+  # - the chart jobs and the appVersion bump: the chart tracks published
+  #   releases, and a nightly is not one.
+
+  verify:
+    name: Verify Nightly Images
+    needs: [release, publish-images]
+    if: ${{ needs.release.outputs.release_created == 'true' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      IMAGE_TAG: ${{ needs.release.outputs.tag_name }}
+      REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
+      REGISTRY_PROJECT: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: $/.github/actions/setup-task
+
+      - name: Install skopeo
+        run: command -v skopeo || (sudo apt-get update && sudo apt-get install -y skopeo)
+
+      - name: Log in to registry
+        # skopeo reads the Docker config this writes. The project answers an
+        # anonymous pull today, but the verification of a release must not
+        # depend on that staying true.
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY_ADDRESS }}
+          username: ${{ vars.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Verify both architectures landed
+        run: |
+          task image:verify-release-images \
+            IMAGE_TAG="${IMAGE_TAG}" \
+            REGISTRY_ADDRESS="${REGISTRY_ADDRESS}" \
+            REGISTRY_PROJECT="${REGISTRY_PROJECT}"

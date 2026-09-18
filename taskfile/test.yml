@@ -285,6 +285,7 @@ tasks:
       - lint:api
       - lint:report
       - vuln-report
+      - taskfiles
 
   _ci-tests:
     internal: true
@@ -311,10 +312,18 @@ tasks:
             go tool cover -html=coverage.out -o coverage.html
           fi
 
+  taskfiles:
+    desc: "Run the Taskfile-level guard tests"
+    cmds:
+      # Spawned rather than called: these live in another included taskfile,
+      # which this one cannot reach by name.
+      - task nightly:test
+
   quick:
     desc: "Run API lint and unit tests only (fast validation)"
     cmds:
       - task: lint:api
+      - task: taskfiles
       - task: unit:pure
 
   # ============================================================================
