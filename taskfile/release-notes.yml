@@ -11,6 +11,140 @@ tasks:
     cmds:
       - .github/scripts/update-release-notes.sh
 
+  previous-stable-tag:
+    desc: "Print the greatest stable release tag below PREDECESSOR_FOR (empty when there is none)"
+    silent: true
+    # Wherever a release's predecessor has to be pinned rather than inferred.
+    # GitHub's own inference counts prereleases, so once a nightly is published
+    # it would become the predecessor of the next real release and that
+    # release's notes would cover a single day. The e2e upgrade check wants the
+    # same answer for the same reason: the release a user upgrades from.
+    #
+    # A prerelease shares its predecessor with the release it leads up to, so
+    # v2.16.0-nightly-20260918 and v2.16.0 both answer with the newest stable
+    # release below 2.16.0.
+    # PREDECESSOR_FOR, not VERSION: VERSION is defined in the root Taskfile,
+    # and a CLI override of a root-defined var does not reach an included
+    # taskfile — every lookup would silently answer for this checkout's own
+    # VERSION instead of the tag asked about.
+    requires:
+      vars: [PREDECESSOR_FOR]
+    # Through env: the value is caller-supplied and must never become command
+    # text. The validation below is the only thing that reads it.
+    env:
+      PREDECESSOR_FOR: '{{.PREDECESSOR_FOR}}'
+    cmds:
+      - |
+        target="${PREDECESSOR_FOR#v}"
+        target="${target%%-*}"
+        # A glob rather than a regex: grep and [[ =~ ]] match a line at a time,
+        # so a value carrying a newline next to a version would pass either.
+        case "${target}" in
+          *[!0-9.]* | *.*.*.* | *..* | .* | *. | "")
+            printf '::error::not a version: %s\n' "${PREDECESSOR_FOR}" >&2
+            exit 1
+            ;;
+        esac
+        case "${target}" in
+          *.*.*) ;;
+          *)
+            printf '::error::not a version: %s\n' "${PREDECESSOR_FOR}" >&2
+            exit 1
+            ;;
+        esac
+        # Listed first so a git failure is still an error; the filter below may
+        # legitimately match nothing, which is not.
+        tags=$(git tag --list 'v[0-9]*' --sort=-v:refname)
+        printf '%s\n' "${tags}" \
+          | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+          | awk -v target="${target}" '
+              function lower(a, b,   x, y, i) {
+                split(a, x, "."); split(b, y, ".")
+                for (i = 1; i <= 3; i++) {
+                  if (x[i] + 0 < y[i] + 0) return 1
+                  if (x[i] + 0 > y[i] + 0) return 0
+                }
+                return 0
+              }
+              # Descending order, so the first tag below the target is the
+              # greatest one.
+              { tag = $0; sub(/^v/, "", tag); if (lower(tag, target)) { print $0; exit } }
+            ' || true
+
+  test:
+    desc: "Exercise the predecessor lookup"
+    silent: true
+    cmds:
+      - |
+        failures=0
+        ok() { printf 'ok    %s\n' "$1"; }
+        bad() { printf 'FAIL  %s\n' "$1" >&2; failures=$((failures + 1)); }
+
+        # -o interleaved for the same reason the caller uses it: the root
+        # Taskfile prefixes output per task.
+        lookup() { task -o interleaved release-notes:previous-stable-tag PREDECESSOR_FOR="$1" 2>&1; }
+
+        # Purpose-built tags, so the answers do not depend on what this
+        # checkout happens to have: a CI clone may carry no tags at all.
+        # The numbers are far above anything this project will ship.
+        fixtures='v900.1.0 v900.2.5 v900.3.0-nightly-20260101'
+        for t in ${fixtures}; do
+          git -c tag.gpgSign=false tag "${t}" >/dev/null 2>&1 || true
+        done
+        drop_fixtures() {
+          for t in ${fixtures}; do
+            git tag -d "${t}" >/dev/null 2>&1 || true
+          done
+        }
+
+        out=$(lookup 900.3.0) || out=""
+        if [ "${out}" = v900.2.5 ]; then
+          ok 'greatest stable below the target'
+        else
+          bad "greatest stable below the target: got: ${out}"
+        fi
+
+        # A prerelease answers with the same predecessor as the release it
+        # leads up to: that is the whole reason this exists.
+        pre=$(lookup v900.3.0-nightly-20260101) || pre=""
+        if [ "${pre}" = v900.2.5 ]; then
+          ok 'prerelease shares its release predecessor'
+        else
+          bad "prerelease predecessor: got: ${pre}"
+        fi
+
+        # Never a prerelease itself, even though one sorts above v900.2.5.
+        case "${out}" in
+          *-*) bad "predecessor is a prerelease: ${out}" ;;
+          *) ok 'predecessor is never a prerelease' ;;
+        esac
+
+        # No stable release below the first one on a line.
+        if out=$(lookup 0.0.1) && [ -z "${out}" ]; then
+          ok 'no predecessor is not an error'
+        else
+          bad "no predecessor: expected empty success, got: ${out}"
+        fi
+
+        for nope in 'abc' '2.16' 'v2' '' '2.16.0.1' '$(id)' "2.16.0'; id #"; do
+          if out=$(lookup "${nope}" 2>&1); then
+            bad "rejects '${nope}': was accepted as '${out}'"
+          else
+            case "${out}" in
+              *uid=*) bad "rejects '${nope}': id executed" ;;
+              *) ok "rejects '${nope}'" ;;
+            esac
+          fi
+        done
+
+        drop_fixtures
+
+        if [ "${failures}" -ne 0 ]; then
+          printf '\n%s predecessor test(s) failed\n' "${failures}" >&2
+          exit 1
+        fi
+        printf '\npredecessor tests passed\n'
+
   dispatch-release-cut:
     desc: "Tell 8gcr a release shipped so it stamps changelog markers (TAG_NAME, TARGET_SHA, LINE, DISPATCH_TOKEN)"
     preconditions:
