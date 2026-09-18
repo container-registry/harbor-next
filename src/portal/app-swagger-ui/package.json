@@ -7,6 +7,7 @@
     "start": "webpack serve --config webpack.config.js --mode development"
   },
   "dependencies": {
+<<<<<<< HEAD
     "css-loader": "^6.11.0",
     "style-loader": "^3.3.4",
     "swagger-ui": "5.32.4"
@@ -16,6 +17,17 @@
     "copy-webpack-plugin": "^11.0.0",
     "html-webpack-plugin": "^5.6.7",
     "webpack": "^5.106.2",
+=======
+    "css-loader": "^7.1.5",
+    "style-loader": "^4.0.0",
+    "swagger-ui": "5.32.15"
+  },
+  "devDependencies": {
+    "clean-webpack-plugin": "^4.0.0",
+    "copy-webpack-plugin": "^14.0.0",
+    "html-webpack-plugin": "^5.6.8",
+    "webpack": "^5.107.2",
+>>>>>>> 1f960cce3 (chore(deps): bump the patch-updates group across 1 directory with 2 updates (#23843))
     "webpack-cli": "^4.10.0",
     "webpack-dev-server": "^4.15.2"
   }
