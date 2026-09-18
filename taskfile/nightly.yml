@@ -1,0 +1,154 @@
+# Nightly release channel.
+#
+# A nightly is the real release pipeline run against a throwaway branch: the
+# same release-please configuration, the same reusable image workflow, the same
+# release-notes engine. Nothing here reimplements the release — the only thing
+# this file owns is materializing tonight's release-please channel.
+#
+# The channel branch is rebuilt from the release line's head every night, so
+# the nightly manifest is re-seeded from the real manifest each time. Every
+# nightly therefore accumulates from the last real release, which is what makes
+# its notes a faithful preview of the upcoming release rather than a nightly
+# changelog stream of its own.
+#
+# DATE_STAMP is the one caller-supplied value here. It reaches the commands
+# below only through `env`, never through templating, so a value carrying shell
+# syntax stays data; _validate-stamp rejects anything but a date on top of that.
+#
+# Usage:
+#   task nightly:version                 # print tonight's version
+#   task nightly:channel                 # build the channel commit locally
+#   task nightly:channel PUSH_CHANNEL=true
+#   task nightly:merge-release-pr        # squash-merge the channel's release PR
+
+version: '3'
+
+vars:
+  # Branch that carries the nightly channel. Force-recreated on every run.
+  NIGHTLY_BRANCH: '{{.NIGHTLY_BRANCH | default "nightly"}}'
+  NIGHTLY_DATE:
+    sh: date -u +%Y%m%d
+  DATE_STAMP: '{{.DATE_STAMP | default .NIGHTLY_DATE}}'
+  # VERSION is the next development version, i.e. exactly the minor
+  # release-please is heading for on this line.
+  NIGHTLY_VERSION: '{{.VERSION}}-nightly-{{.DATE_STAMP}}'
+  NIGHTLY_CONFIG: release-please-config-nightly.json
+  NIGHTLY_MANIFEST: .release-please-manifest-nightly.json
+  RELEASE_CONFIG: release-please-config.json
+  RELEASE_MANIFEST: .release-please-manifest.json
+  PUSH_CHANNEL: '{{.PUSH_CHANNEL | default "false"}}'
+  # Per-invocation identity, never written to the user's or the runner's
+  # global git config.
+  COMMIT_NAME: '{{.COMMIT_NAME | default "github-actions[bot]"}}'
+  COMMIT_EMAIL: '{{.COMMIT_EMAIL | default "41898282+github-actions[bot]@users.noreply.github.com"}}'
+
+tasks:
+  version:
+    desc: "Print tonight's nightly version (VERSION plus the UTC date stamp)"
+    silent: true
+    env:
+      NIGHTLY_VERSION: '{{.NIGHTLY_VERSION}}'
+    cmds:
+      - task: _validate-stamp
+      - printf '%s\n' "${NIGHTLY_VERSION}"
+
+  channel:
+    desc: "Materialize tonight's release-please channel (PUSH_CHANNEL=true to publish the branch)"
+    preconditions:
+      - sh: command -v git >/dev/null 2>&1
+        msg: "git is required"
+      - sh: command -v jq >/dev/null 2>&1
+        msg: "jq is required"
+      - sh: test -f '{{.RELEASE_CONFIG}}'
+        msg: "release-please config not found: {{.RELEASE_CONFIG}}"
+      - sh: test -f '{{.RELEASE_MANIFEST}}'
+        msg: "release-please manifest not found: {{.RELEASE_MANIFEST}}"
+    cmds:
+      - task: _validate-stamp
+      - task: _derive-config
+      - task: _commit-channel
+      - task: _push-channel
+
+  merge-release-pr:
+    desc: "Squash-merge the nightly channel's release-please PR (the scheduled auto-merge)"
+    preconditions:
+      - sh: test -n "${GH_TOKEN:-}"
+        msg: "GH_TOKEN is required"
+      - sh: test -n "${GITHUB_REPOSITORY:-}"
+        msg: "GITHUB_REPOSITORY is required"
+      - sh: command -v gh >/dev/null 2>&1
+        msg: "gh is required"
+    cmds:
+      - |
+        # release-please names its branch after the target branch.
+        pr=$(gh pr list --repo "${GITHUB_REPOSITORY}" --state open \
+          --base '{{.NIGHTLY_BRANCH}}' \
+          --head 'release-please--branches--{{.NIGHTLY_BRANCH}}' \
+          --json number --jq '.[0].number // empty')
+        if [ -z "${pr}" ]; then
+          # Right after a real release there is nothing new to cut yet. That is
+          # an empty night, not a failure: with no release PR to merge, nothing
+          # downstream runs and the workflow ends green.
+          echo "::notice::No release PR on {{.NIGHTLY_BRANCH}}; nothing has landed since the last release"
+          exit 0
+        fi
+        # Squash only: harbor-next allows no other merge method, and
+        # release-please tracks a squashed release PR by its label.
+        gh pr merge "${pr}" --repo "${GITHUB_REPOSITORY}" --squash --delete-branch
+        echo "merged nightly release PR #${pr}"
+
+  _validate-stamp:
+    internal: true
+    # Silent: `nightly:version` output is captured by the workflow.
+    silent: true
+    env:
+      DATE_STAMP: '{{.DATE_STAMP}}'
+    cmd: |
+      if ! printf '%s' "${DATE_STAMP}" | grep -Eq '^[0-9]{8}$'; then
+        printf 'DATE_STAMP must be YYYYMMDD, got: %s\n' "${DATE_STAMP}" >&2
+        exit 1
+      fi
+
+  _derive-config:
+    internal: true
+    env:
+      NIGHTLY_VERSION: '{{.NIGHTLY_VERSION}}'
+    cmds:
+      # Derived from the real config instead of duplicated: the nightly notes
+      # have to accumulate exactly what the real release will, which means the
+      # same exclude-paths and the same changelog-sections, forever.
+      #
+      # release-as pins the date. The prerelease versioning strategy cannot:
+      # it increments the last numeric run of the current prerelease, so
+      # 2.16.0-nightly-20260918 becomes ...20260919 on the next run whatever
+      # the actual date is, and one skipped or repeated night desynchronizes
+      # the stamp from reality for good. release-as is regenerated from the
+      # clock every night, so it can never go stale the way a committed
+      # release-as does.
+      - >-
+        jq --arg version "${NIGHTLY_VERSION}"
+        '.packages["."] += {"release-as": $version, "prerelease": true}'
+        '{{.RELEASE_CONFIG}}' > '{{.NIGHTLY_CONFIG}}'
+      # Seeded from the real manifest, so the channel starts at the last
+      # published release and every nightly renders the full upcoming release.
+      - cp '{{.RELEASE_MANIFEST}}' '{{.NIGHTLY_MANIFEST}}'
+
+  _commit-channel:
+    internal: true
+    env:
+      NIGHTLY_VERSION: '{{.NIGHTLY_VERSION}}'
+    cmds:
+      - git switch --force-create '{{.NIGHTLY_BRANCH}}'
+      - git add '{{.NIGHTLY_CONFIG}}' '{{.NIGHTLY_MANIFEST}}'
+      - >-
+        git -c user.name='{{.COMMIT_NAME}}' -c user.email='{{.COMMIT_EMAIL}}'
+        commit -s -m "chore: Open the ${NIGHTLY_VERSION} nightly channel"
+
+  _push-channel:
+    internal: true
+    status:
+      - test '{{.PUSH_CHANNEL}}' != "true"
+    cmds:
+      # Force: last night's channel and its release commit are replaced. The
+      # commits they carried stay reachable through the nightly tags.
+      - git push --force origin 'HEAD:refs/heads/{{.NIGHTLY_BRANCH}}'
