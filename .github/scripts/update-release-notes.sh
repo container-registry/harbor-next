@@ -40,10 +40,12 @@ chart_mode=false
 if [[ "${TAG_NAME}" =~ ^chart-v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
   chart_mode=true
   version="${BASH_REMATCH[1]}"
-elif [[ "${TAG_NAME}" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+elif [[ "${TAG_NAME}" =~ ^v([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)$ ]]; then
+  # The prerelease suffix is the nightly channel: v2.16.0-nightly-20260918
+  # renders the upcoming 2.16.0's notes as they stand tonight.
   version="${BASH_REMATCH[1]}"
 else
-  echo "TAG_NAME must be vX.Y.Z (app release) or chart-vX.Y.Z (chart release)" >&2
+  echo "TAG_NAME must be vX.Y.Z[-prerelease] (app release) or chart-vX.Y.Z (chart release)" >&2
   exit 1
 fi
 registry_address="${REGISTRY_ADDRESS:-8gears.container-registry.com}"
@@ -105,6 +107,29 @@ if [[ "${chart_mode}" == true ]]; then
     # Bootstrap chart release: no chart tag exists at all, so any range
     # GitHub picks would attribute unrelated app PRs. Skip What's Changed.
     skip_generated_notes="yes"
+  fi
+else
+  # Without an explicit previous tag GitHub infers one, and it counts
+  # prereleases: once a nightly is published, the real release would diff
+  # against last night instead of against the last release. Pin the
+  # predecessor to the greatest STABLE release below this version — which is
+  # also what makes a nightly's What's Changed span the whole upcoming
+  # release rather than a single day.
+  previous_app_tag=$(git tag --list 'v[0-9]*' --sort=-v:refname \
+    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+    | awk -v target="${version%%-*}" '
+        function lower(a, b,   x, y, i) {
+          split(a, x, "."); split(b, y, ".")
+          for (i = 1; i <= 3; i++) {
+            if (x[i] + 0 < y[i] + 0) return 1
+            if (x[i] + 0 > y[i] + 0) return 0
+          }
+          return 0
+        }
+        { tag = $0; sub(/^v/, "", tag); if (lower(tag, target)) { print $0; exit } }
+      ' || true)
+  if [[ -n "${previous_app_tag}" ]]; then
+    generated_notes_args+=(-f "previous_tag_name=${previous_app_tag}")
   fi
 fi
 if [[ -n "${preview_pr_number}" ]]; then
