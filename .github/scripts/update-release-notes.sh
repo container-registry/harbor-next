@@ -115,19 +115,7 @@ else
   # predecessor to the greatest STABLE release below this version — which is
   # also what makes a nightly's What's Changed span the whole upcoming
   # release rather than a single day.
-  previous_app_tag=$(git tag --list 'v[0-9]*' --sort=-v:refname \
-    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
-    | awk -v target="${version%%-*}" '
-        function lower(a, b,   x, y, i) {
-          split(a, x, "."); split(b, y, ".")
-          for (i = 1; i <= 3; i++) {
-            if (x[i] + 0 < y[i] + 0) return 1
-            if (x[i] + 0 > y[i] + 0) return 0
-          }
-          return 0
-        }
-        { tag = $0; sub(/^v/, "", tag); if (lower(tag, target)) { print $0; exit } }
-      ' || true)
+  previous_app_tag=$(.github/scripts/previous-stable-tag.sh "${version}")
   if [[ -n "${previous_app_tag}" ]]; then
     generated_notes_args+=(-f "previous_tag_name=${previous_app_tag}")
   fi

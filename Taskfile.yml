@@ -74,6 +74,8 @@ includes:
     taskfile: ./taskfile/release-notes.yml
   nightly:
     taskfile: ./taskfile/nightly.yml
+  e2e:
+    taskfile: ./taskfile/e2e.yml
 
 tasks:
   default:

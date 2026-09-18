@@ -1,0 +1,43 @@
+# Hand a published image set to the e2e suite.
+#
+# The suite itself lives in container-registry/8gcr (src/e2e); this repository
+# only tells it which tag to test and which release that tag should upgrade
+# from. Every published image set gets a run: nightlies and releases alike.
+version: '3'
+
+tasks:
+  dispatch:
+    desc: "Tell 8gcr to run the e2e suite against a published tag (TAG_NAME, CHANNEL, DISPATCH_TOKEN)"
+    preconditions:
+      - sh: test -n "${TAG_NAME:-}"
+        msg: "TAG_NAME is required (for example, v2.16.0-nightly-20260918)"
+      - sh: test -n "${CHANNEL:-}"
+        msg: "CHANNEL is required (nightly or release)"
+      - sh: test -n "${DISPATCH_TOKEN:-}"
+        msg: "DISPATCH_TOKEN is required (token with write access to container-registry/8gcr)"
+      - sh: command -v jq >/dev/null 2>&1
+        msg: "jq is required"
+      - sh: command -v curl >/dev/null 2>&1
+        msg: "curl is required"
+    cmds:
+      - |
+        # The release a user would be upgrading from. Empty for the very first
+        # release on a line, which then runs without the upgrade check.
+        base_tag="${BASE_TAG:-$(.github/scripts/previous-stable-tag.sh "${TAG_NAME}")}"
+        # jq serializes the payload so odd characters in a locally supplied
+        # value can never break the JSON
+        payload=$(jq -n \
+          --arg tag "${TAG_NAME}" \
+          --arg base "${base_tag}" \
+          --arg channel "${CHANNEL}" \
+          --arg tags "${GODOG_TAGS:-}" \
+          '{event_type: "images-published",
+            client_payload: {tag: $tag, base_tag: $base, channel: $channel, godog_tags: $tags}}')
+        curl -f -X POST \
+          -H "Accept: application/vnd.github+json" \
+          -H "Content-Type: application/json" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          -H "Authorization: Bearer ${DISPATCH_TOKEN}" \
+          "https://api.github.com/repos/container-registry/8gcr/dispatches" \
+          -d "${payload}"
+        echo "dispatched e2e for ${TAG_NAME} (${CHANNEL}), upgrade base ${base_tag:-none}"

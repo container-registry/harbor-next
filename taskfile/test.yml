@@ -285,6 +285,7 @@ tasks:
       - lint:api
       - lint:report
       - vuln-report
+      - scripts
 
   _ci-tests:
     internal: true
@@ -311,10 +312,16 @@ tasks:
             go tool cover -html=coverage.out -o coverage.html
           fi
 
+  scripts:
+    desc: "Run the shell-level tests for .github/scripts"
+    cmds:
+      - .github/scripts/previous-stable-tag_test.sh
+
   quick:
     desc: "Run API lint and unit tests only (fast validation)"
     cmds:
       - task: lint:api
+      - task: scripts
       - task: unit:pure
 
   # ============================================================================
