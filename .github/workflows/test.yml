@@ -29,6 +29,27 @@ concurrency:
 
 jobs:
   # --------------------------------------------------------------------------
+  # Shell-level tests for .github/scripts — seconds, no toolchain
+  # --------------------------------------------------------------------------
+  test-scripts:
+    name: Script Tests
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The predecessor tests build their own repository, but Task's
+          # root variables read this one's HEAD.
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: $/.github/actions/setup-task
+        with:
+          version: 3.49.1
+
+      - name: Run script tests
+        run: task test:scripts
+
+  # --------------------------------------------------------------------------
   # Pure unit tests — no external services, full parallelism
   # --------------------------------------------------------------------------
   test-unit:

@@ -178,6 +178,8 @@ The channel is release-please configuration, not a separate build path:
 
 Two things follow from the channel being rebuilt every night. An empty night, where nothing has landed since the last real release, produces no release PR: the run ends green having published nothing, and says so. And a nightly that already tagged cannot be re-run for the same date, because that tag exists; re-run a nightly that failed before tagging, and pass `date_stamp` if you need a second one on the same day.
 
+Every published image set is handed to the e2e suite in `container-registry/8gcr` (`src/e2e`) through an `images-published` repository dispatch: the tag that was just published, the release a user would be upgrading from, and whether it came from the nightly or the release channel. Releases dispatch the same way, from `release-please.yml`. The dispatch uses the GitHub App that already reaches 8gcr, so it needs no additional secret.
+
 Merging the nightly release PR is the one merge this repository automates. It happens inside the workflow, on a branch that is thrown away twelve hours later, and it never touches a release PR on `main` or `release-X.Y`.
 
 ### Version timeline
