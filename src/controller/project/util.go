@@ -32,23 +32,36 @@ type Result struct {
 func ListAll(ctx context.Context, chunkSize int, query *q.Query, options ...Option) <-chan Result {
 	ch := make(chan Result, chunkSize)
 
+	query = q.MustClone(query)
+	query.PageNumber = 1
+	query.PageSize = int64(chunkSize)
+
 	go func() {
 		defer close(ch)
 
-		query = q.MustClone(query)
-		query.PageNumber = 1
-		query.PageSize = int64(chunkSize)
-
 		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
 			projects, err := Ctl.List(ctx, query, options...)
 			if err != nil {
 				format := "failed to list projects at page %d with page size %d, error :%v"
-				ch <- Result{Error: fmt.Errorf(format, query.PageNumber, query.PageSize, err)}
+				select {
+				case <-ctx.Done():
+				case ch <- Result{Error: fmt.Errorf(format, query.PageNumber, query.PageSize, err)}:
+				}
 				return
 			}
 
 			for _, p := range projects {
-				ch <- Result{Data: p}
+				select {
+				case <-ctx.Done():
+					return
+				case ch <- Result{Data: p}:
+				}
 			}
 
 			if len(projects) < chunkSize {
