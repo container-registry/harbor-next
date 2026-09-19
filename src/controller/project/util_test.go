@@ -18,13 +18,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/project/models"
@@ -89,6 +87,8 @@ func TestListAll_ContextCancelled_PreventsGoroutineLeak(t *testing.T) {
 	origCtl := Ctl
 	defer func() { Ctl = origCtl }()
 
+	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
+
 	projects := make([]*models.Project, 20)
 	for i := 0; i < 20; i++ {
 		projects[i] = &models.Project{
@@ -104,8 +104,6 @@ func TestListAll_ContextCancelled_PreventsGoroutineLeak(t *testing.T) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	chunkSize := 2
 	ch := ListAll(ctx, chunkSize, nil)
 
@@ -113,14 +111,8 @@ func TestListAll_ContextCancelled_PreventsGoroutineLeak(t *testing.T) {
 	require.True(t, ok)
 	require.NoError(t, res.Error)
 	assert.Equal(t, int64(1), res.Data.ProjectID)
-
 	cancel()
-
-	require.Eventually(t, func() bool {
-		buf := make([]byte, 64*1024)
-		n := runtime.Stack(buf, true)
-		return !strings.Contains(string(buf[:n]), "project.ListAll.func1")
-	}, 2*time.Second, 10*time.Millisecond, "ListAll producer goroutine should terminate after context cancellation")
+	_ = ch
 }
 
 func TestListAll_ContextAlreadyCancelled(t *testing.T) {
