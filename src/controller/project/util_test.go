@@ -1,13 +1,31 @@
+// Copyright Project Harbor Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package project
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/project/models"
 )
@@ -98,18 +116,11 @@ func TestListAll_ContextCancelled_PreventsGoroutineLeak(t *testing.T) {
 
 	cancel()
 
-	done := make(chan struct{})
-	go func() {
-		for range ch {
-		}
-		close(done)
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
-		t.Fatal("ListAll did not terminate and close channel after context cancellation")
-	}
+	require.Eventually(t, func() bool {
+		buf := make([]byte, 64*1024)
+		n := runtime.Stack(buf, true)
+		return !strings.Contains(string(buf[:n]), "project.ListAll.func1")
+	}, 2*time.Second, 10*time.Millisecond, "ListAll producer goroutine should terminate after context cancellation")
 }
 
 func TestListAll_ContextAlreadyCancelled(t *testing.T) {
