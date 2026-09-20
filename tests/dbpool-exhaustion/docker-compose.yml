@@ -1,0 +1,35 @@
+# Isolated PostgreSQL for the DB connection-exhaustion repro.
+#
+# Deliberately separate from devenv/docker-compose.yml: it runs on its own
+# project name, its own port and a tmpfs data directory, so a repro run cannot
+# disturb a devenv instance or leave state behind.
+services:
+  postgresql:
+    image: docker.io/library/postgres:18-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root123
+      POSTGRES_DB: registry
+      PGDATA: /var/lib/postgresql/tmpdata
+    command:
+      # Sized well above the pool under test by run.sh, so the server is never
+      # the limit: the repro has to wedge on Harbor's pool, not here.
+      - postgres
+      - -c
+      - max_connections=${REPRO_PG_MAX_CONNECTIONS:-200}
+    ports:
+      # Loopback only. The credentials here are fixed and well known, and
+      # REPRO_KEEP_PG=1 can leave the service up, so it must not be reachable
+      # from the network.
+      - "127.0.0.1:${REPRO_PG_PORT:-55432}:5432"
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      # Probe over TCP, not the unix socket: the entrypoint runs a temporary
+      # local-only server during initdb, which a socket probe would accept as
+      # ready before the real server is listening.
+      test: ["CMD-SHELL", "pg_isready -U postgres -h 127.0.0.1 -p 5432"]
+      interval: 1s
+      timeout: 5s
+      retries: 30
+      start_period: 3s
