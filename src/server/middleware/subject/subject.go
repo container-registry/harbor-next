@@ -27,6 +27,7 @@ import (
 	"github.com/goharbor/harbor/src/common/security"
 	"github.com/goharbor/harbor/src/common/security/proxycachesecret"
 	"github.com/goharbor/harbor/src/controller/artifact"
+	"github.com/goharbor/harbor/src/controller/artifact/processor/sbom"
 	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
@@ -51,10 +52,6 @@ var (
 
 	// media type of harbor sbom
 	mediaTypeHarborSBOM = "application/vnd.goharbor.harbor.sbom.v1"
-	// media type of spdx sbom
-	mediaTypeSPDX = "application/spdx+json"
-	// media type of cyclonedx sbom
-	mediaTypeCycloneDX = "application/vnd.cyclonedx+json"
 
 	// source of accessory artifact is local, means the accessory is created by harbor itself
 	sourceLocal = "local"
@@ -170,8 +167,10 @@ func Middleware() func(http.Handler) http.Handler {
 				accData.Type = model.TypeNotationSignature
 			case mediaTypeCosignConfig, mediaTypeCosignArtifactType:
 				accData.Type = model.TypeCosignSignature
-			case mediaTypeHarborSBOM, mediaTypeSPDX, mediaTypeCycloneDX:
+			case mediaTypeHarborSBOM:
 				accData.Type = model.TypeHarborSBOM
+			case sbom.MediaTypeSPDX, sbom.MediaTypeCycloneDX:
+				accData.Type = model.TypeExternalSBOM
 			}
 			if subjectArt != nil {
 				accData.SubArtifactID = subjectArt.ID

@@ -255,6 +255,76 @@ func (suite *MiddlewareTestSuite) TestSubjectDup() {
 	})
 }
 
+func (suite *MiddlewareTestSuite) TestSBOMClassification() {
+	suite.WithProject(func(projectID int64, projectName string) {
+		name := fmt.Sprintf("%s/hello-world", projectName)
+		_, repoId, err := repository.Ctl.Ensure(suite.Context(), name)
+		suite.Nil(err)
+
+		subArtDigest := suite.DigestString()
+		suite.addArt(projectID, repoId, name, subArtDigest)
+
+		testCases := []struct {
+			name      string
+			mediaType string
+			wantType  string
+		}{
+			{"harbor-sbom", "application/vnd.goharbor.harbor.sbom.v1", accessorymodel.TypeHarborSBOM},
+			{"spdx-sbom", "application/spdx+json", accessorymodel.TypeExternalSBOM},
+			{"cyclonedx-sbom", "application/vnd.cyclonedx+json", accessorymodel.TypeExternalSBOM},
+		}
+
+		for _, tc := range testCases {
+			suite.Run(tc.name, func() {
+				body := fmt.Sprintf(`{
+				   "schemaVersion":2,
+				   "mediaType":"application/vnd.oci.image.manifest.v1+json",
+				   "config":{
+				      "mediaType":"%s",
+				      "size":2,
+				      "digest":"sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+				   },
+				   "layers":[],
+				   "subject":{
+				      "mediaType":"application/vnd.oci.image.manifest.v1+json",
+				      "size":419,
+				      "digest":"%s"
+				   }}`, tc.mediaType, subArtDigest)
+
+				_, descriptor, err := distribution.UnmarshalManifest("application/vnd.oci.image.manifest.v1+json", []byte(body))
+				suite.Nil(err)
+
+				req := suite.NewRequest(http.MethodPut, fmt.Sprintf("/v2/%s/manifests/%s", name, descriptor.Digest.String()), strings.NewReader(body))
+				req.Header.Set("Content-Type", "application/vnd.oci.image.manifest.v1+json")
+				info := lib.ArtifactInfo{
+					Repository: name,
+					Reference:  descriptor.Digest.String(),
+					Tag:        descriptor.Digest.String(),
+					Digest:     descriptor.Digest.String(),
+				}
+				req = req.WithContext(lib.WithArtifactInfo(req.Context(), info))
+
+				artID := suite.addArt(projectID, repoId, name, descriptor.Digest.String())
+				suite.Nil(err)
+
+				res := httptest.NewRecorder()
+				next := suite.NextHandler(http.StatusCreated, map[string]string{"Docker-Content-Digest": descriptor.Digest.String()})
+				Middleware()(next).ServeHTTP(res, req)
+				suite.Equal(http.StatusCreated, res.Code)
+
+				accs, err := accessory.Mgr.List(suite.Context(), &q.Query{
+					Keywords: map[string]any{
+						"SubjectArtifactDigest": subArtDigest,
+						"ArtifactID":            artID,
+					},
+				})
+				suite.Require().Equal(1, len(accs))
+				suite.Equal(tc.wantType, accs[0].GetData().Type)
+			})
+		}
+	})
+}
+
 func (suite *MiddlewareTestSuite) TestIsNydusImage() {
 	makeManifest := func(configType string) string {
 		return fmt.Sprintf(`{

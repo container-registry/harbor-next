@@ -263,6 +263,39 @@ func (suite *SBOMTestSuite) TestGetReportPlaceHolder() {
 	require.Error(suite.T(), err)
 }
 
+type dummyAccessory struct {
+	accessoryModel.AccessoryData
+}
+func (d *dummyAccessory) GetData() accessoryModel.AccessoryData { return d.AccessoryData }
+func (d *dummyAccessory) Kind() string { return "" }
+func (d *dummyAccessory) IsSoft() bool { return false }
+func (d *dummyAccessory) IsHard() bool { return false }
+func (d *dummyAccessory) Display() bool { return false }
+
+func (suite *SBOMTestSuite) Test_deleteSBOMAccessory() {
+	suite.artifactCtl = &artifactTest.Controller{}
+	
+	artID := int64(1)
+	
+	accHarbor := &dummyAccessory{accessoryModel.AccessoryData{Type: accessoryModel.TypeHarborSBOM, ArtifactID: 2}}
+	accExternal := &dummyAccessory{accessoryModel.AccessoryData{Type: accessoryModel.TypeExternalSBOM, ArtifactID: 3}}
+
+	testArt := &artifact.Artifact{
+		Artifact: art.Artifact{
+			ID: artID,
+		},
+		Accessories: []accessoryModel.Accessory{accHarbor, accExternal},
+	}
+	
+	suite.artifactCtl.On("Get", mock.Anything, artID, mock.Anything).Return(testArt, nil).Once()
+	suite.artifactCtl.On("Delete", mock.Anything, int64(2)).Return(nil).Once()
+	// artifactCtl.Delete should NOT be called for int64(3)
+
+	err := suite.handler.deleteSBOMAccessory(context.Background(), artID)
+	suite.Nil(err)
+	suite.artifactCtl.AssertExpectations(suite.T())
+}
+
 func TestExampleTestSuite(t *testing.T) {
 	suite.Run(t, &SBOMTestSuite{})
 }

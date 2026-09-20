@@ -43,4 +43,5 @@ func New(data model.AccessoryData) model.Accessory {
 
 func init() {
 	model.Register(model.TypeHarborSBOM, New)
+	model.Register(model.TypeExternalSBOM, New)
 }

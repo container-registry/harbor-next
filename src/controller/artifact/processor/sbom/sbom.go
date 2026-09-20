@@ -39,7 +39,7 @@ const (
 	MediaTypeCycloneDX = "application/vnd.cyclonedx+json"
 )
 
-var SupportedMediaTypes = []string{
+var supportedMediaTypes = []string{
 	processorMediaType,
 	MediaTypeSPDX,
 	MediaTypeCycloneDX,
@@ -48,10 +48,9 @@ var SupportedMediaTypes = []string{
 func init() {
 	pc := &Processor{}
 	pc.ManifestProcessor = base.NewManifestProcessor()
-	for _, mt := range SupportedMediaTypes {
-		if err := processor.Register(pc, mt); err != nil {
-			log.Errorf("failed to register processor for media type %s: %v", mt, err)
-		}
+	if err := processor.Register(pc, supportedMediaTypes...); err != nil {
+		log.Errorf("failed to register processor for media types %v: %v", supportedMediaTypes, err)
+		return
 	}
 }
 
