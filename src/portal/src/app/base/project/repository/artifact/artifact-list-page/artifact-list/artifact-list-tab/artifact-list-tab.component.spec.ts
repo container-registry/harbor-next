@@ -26,7 +26,7 @@ import {
     ScanningResultDefaultService,
     ScanningResultService,
 } from '../../../../../../../shared/services';
-import { ArtifactFront as Artifact, ArtifactFront } from '../../../artifact';
+import { ArtifactFront as Artifact, ArtifactFront, AccessoryType } from '../../../artifact';
 import { ErrorHandler } from '../../../../../../../shared/units/error-handler';
 import { OperationService } from '../../../../../../../shared/components/operation/operation.service';
 import { ArtifactService as NewArtifactService } from '../../../../../../../../../ng-swagger-gen/services/artifact.service';
@@ -548,6 +548,56 @@ describe('ArtifactListTabComponent', () => {
         expect(comp.canScanNow()).toBeFalsy();
         expect(comp.hasEnabledSbom()).toBeTruthy();
         expect(comp.canAddLabel()).toBeFalsy();
+    });
+    it('checkCosignAndSbomAsync should classify accessories correctly', () => {
+        fixture = TestBed.createComponent(ArtifactListTabComponent);
+        comp = fixture.componentInstance;
+
+        const mockSbomHarbor = {
+            type: AccessoryType.SBOM,
+            digest: 'digest-harbor',
+        } as Accessory;
+        const mockSbomSpdx = {
+            type: AccessoryType.EXTERNAL_SPDX,
+            digest: 'digest-spdx',
+        } as Accessory;
+        const mockSbomCycloneDx = {
+            type: AccessoryType.EXTERNAL_CYCLONEDX,
+            digest: 'digest-cyclonedx',
+        } as Accessory;
+        const mockCosign = {
+            type: AccessoryType.COSIGN,
+            digest: 'digest-cosign',
+        } as Accessory;
+
+        const listSpy = spyOn(comp['newArtifactService'], 'listAccessories');
+
+        // Prefer Harbor SBOM
+        listSpy.and.returnValue(of([mockSbomSpdx, mockSbomHarbor]));
+        let artifact = { digest: 'test' } as ArtifactFront;
+        comp.checkCosignAndSbomAsync([artifact]);
+        expect(artifact.sbomDigest).toBe('digest-harbor');
+        expect(artifact.signed).toBe('false');
+
+        // Fallback to SPDX
+        listSpy.and.returnValue(of([mockSbomSpdx, mockSbomCycloneDx]));
+        artifact = { digest: 'test' } as ArtifactFront;
+        comp.checkCosignAndSbomAsync([artifact]);
+        expect(artifact.sbomDigest).toBe('digest-spdx');
+        expect(artifact.signed).toBe('false');
+
+        // Ignore CycloneDX for sbomDigest
+        listSpy.and.returnValue(of([mockSbomCycloneDx]));
+        artifact = { digest: 'test' } as ArtifactFront;
+        comp.checkCosignAndSbomAsync([artifact]);
+        expect(artifact.sbomDigest).toBeUndefined();
+        expect(artifact.signed).toBe('false');
+
+        // Signature classification
+        listSpy.and.returnValue(of([mockCosign]));
+        artifact = { digest: 'test' } as ArtifactFront;
+        comp.checkCosignAndSbomAsync([artifact]);
+        expect(artifact.signed).toBe('true');
     });
 });
 

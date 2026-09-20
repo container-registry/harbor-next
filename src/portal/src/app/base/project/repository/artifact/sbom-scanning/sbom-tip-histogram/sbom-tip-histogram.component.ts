@@ -71,7 +71,8 @@ export class SbomTipHistogramComponent {
             this.accessories?.filter(
                 accessory =>
                     accessory.type === AccessoryType.SBOM ||
-                    accessory.type === AccessoryType.EXTERNAL_SBOM
+                    accessory.type === AccessoryType.EXTERNAL_SPDX ||
+                    accessory.type === AccessoryType.EXTERNAL_CYCLONEDX
             ) ?? []
         );
     }

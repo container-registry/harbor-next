@@ -271,10 +271,10 @@ func (suite *MiddlewareTestSuite) TestSBOMClassification() {
 			wantType     string
 		}{
 			{"harbor-sbom", "application/vnd.goharbor.harbor.sbom.v1", "", accessorymodel.TypeHarborSBOM},
-			{"spdx-sbom-config", "application/spdx+json", "", accessorymodel.TypeExternalSBOM},
-			{"cyclonedx-sbom-config", "application/vnd.cyclonedx+json", "", accessorymodel.TypeExternalSBOM},
-			{"spdx-sbom-artifactType", "application/vnd.oci.empty.v1+json", "application/spdx+json", accessorymodel.TypeExternalSBOM},
-			{"cyclonedx-sbom-artifactType", "application/vnd.oci.empty.v1+json", "application/vnd.cyclonedx+json", accessorymodel.TypeExternalSBOM},
+			{"spdx-sbom-config", "application/spdx+json", "", accessorymodel.TypeExternalSPDX},
+			{"cyclonedx-sbom-config", "application/vnd.cyclonedx+json", "", accessorymodel.TypeExternalCycloneDX},
+			{"spdx-sbom-artifactType", "application/vnd.oci.empty.v1+json", "application/spdx+json", accessorymodel.TypeExternalSPDX},
+			{"cyclonedx-sbom-artifactType", "application/vnd.oci.empty.v1+json", "application/vnd.cyclonedx+json", accessorymodel.TypeExternalCycloneDX},
 		}
 
 		for _, tc := range testCases {

@@ -34,7 +34,8 @@ var (
 		model.TypeNotationSignature: icon.DigestOfIconAccNotation,
 		model.TypeNydusAccelerator:  icon.DigestOfIconAccNydus,
 		model.TypeHarborSBOM:        icon.DigestOfIconAccSBOM,
-		model.TypeExternalSBOM:      icon.DigestOfIconAccSBOM,
+		model.TypeExternalSPDX:      icon.DigestOfIconAccSBOM,
+		model.TypeExternalCycloneDX: icon.DigestOfIconAccSBOM,
 	}
 )
 

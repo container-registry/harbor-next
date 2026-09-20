@@ -278,7 +278,7 @@ func (suite *SBOMTestSuite) Test_deleteSBOMAccessory() {
 	artID := int64(1)
 	
 	accHarbor := &dummyAccessory{accessoryModel.AccessoryData{Type: accessoryModel.TypeHarborSBOM, ArtifactID: 2}}
-	accExternal := &dummyAccessory{accessoryModel.AccessoryData{Type: accessoryModel.TypeExternalSBOM, ArtifactID: 3}}
+	accExternal := &dummyAccessory{accessoryModel.AccessoryData{Type: accessoryModel.TypeExternalSPDX, ArtifactID: 3}}
 
 	testArt := &artifact.Artifact{
 		Artifact: art.Artifact{

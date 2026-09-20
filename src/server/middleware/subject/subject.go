@@ -169,8 +169,10 @@ func Middleware() func(http.Handler) http.Handler {
 				accData.Type = model.TypeCosignSignature
 			case mediaTypeHarborSBOM:
 				accData.Type = model.TypeHarborSBOM
-			case sbom.MediaTypeSPDX, sbom.MediaTypeCycloneDX:
-				accData.Type = model.TypeExternalSBOM
+			case sbom.MediaTypeSPDX:
+				accData.Type = model.TypeExternalSPDX
+			case sbom.MediaTypeCycloneDX:
+				accData.Type = model.TypeExternalCycloneDX
 			}
 			if subjectArt != nil {
 				accData.SubArtifactID = subjectArt.ID
