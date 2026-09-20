@@ -1131,7 +1131,7 @@ export class ArtifactListTabComponent implements OnInit, OnDestroy {
                     item.sbomDigest = sbomOverview?.sbom_digest;
                     let queryTypes = `${AccessoryType.COSIGN} ${AccessoryType.NOTATION}`;
                     if (!item.sbomDigest) {
-                        queryTypes = `${queryTypes} ${AccessoryType.SBOM}`;
+                        queryTypes = `${queryTypes} ${AccessoryType.SBOM} ${AccessoryType.EXTERNAL_SBOM}`;
                     }
                     this.newArtifactService
                         .listAccessories({
@@ -1145,7 +1145,10 @@ export class ArtifactListTabComponent implements OnInit, OnDestroy {
                         .subscribe({
                             next: res => {
                                 item.signed = res?.filter(
-                                    item => item.type !== AccessoryType.SBOM
+                                    item =>
+                                        item.type !== AccessoryType.SBOM &&
+                                        item.type !==
+                                            AccessoryType.EXTERNAL_SBOM
                                 )?.length
                                     ? TRUE
                                     : FALSE;
@@ -1153,7 +1156,10 @@ export class ArtifactListTabComponent implements OnInit, OnDestroy {
                                     item.sbomDigest =
                                         res?.filter(
                                             item =>
-                                                item.type === AccessoryType.SBOM
+                                                item.type ===
+                                                    AccessoryType.SBOM ||
+                                                item.type ===
+                                                    AccessoryType.EXTERNAL_SBOM
                                         )?.[0]?.digest ?? undefined;
                                 }
                             },

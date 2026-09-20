@@ -23,6 +23,7 @@ import (
 	accessorymodel "github.com/goharbor/harbor/src/pkg/accessory/model"
 	_ "github.com/goharbor/harbor/src/pkg/accessory/model/base"
 	_ "github.com/goharbor/harbor/src/pkg/accessory/model/cosign"
+	_ "github.com/goharbor/harbor/src/pkg/accessory/model/sbom"
 	_ "github.com/goharbor/harbor/src/pkg/accessory/model/subject"
 	"github.com/goharbor/harbor/src/pkg/artifact"
 	"github.com/goharbor/harbor/src/pkg/distribution"
@@ -171,7 +172,6 @@ func (suite *MiddlewareTestSuite) TestSubject() {
 		_, descriptor, req := suite.prepare(name, subArtDigest)
 		suite.Nil(err)
 		artID := suite.addArt(projectID, repoId, name, descriptor.Digest.String())
-		suite.Nil(err)
 
 		res := httptest.NewRecorder()
 		next := suite.NextHandler(http.StatusCreated, map[string]string{"Docker-Content-Digest": descriptor.Digest.String()})
@@ -265,20 +265,28 @@ func (suite *MiddlewareTestSuite) TestSBOMClassification() {
 		suite.addArt(projectID, repoId, name, subArtDigest)
 
 		testCases := []struct {
-			name      string
-			mediaType string
-			wantType  string
+			name         string
+			configType   string
+			artifactType string
+			wantType     string
 		}{
-			{"harbor-sbom", "application/vnd.goharbor.harbor.sbom.v1", accessorymodel.TypeHarborSBOM},
-			{"spdx-sbom", "application/spdx+json", accessorymodel.TypeExternalSBOM},
-			{"cyclonedx-sbom", "application/vnd.cyclonedx+json", accessorymodel.TypeExternalSBOM},
+			{"harbor-sbom", "application/vnd.goharbor.harbor.sbom.v1", "", accessorymodel.TypeHarborSBOM},
+			{"spdx-sbom-config", "application/spdx+json", "", accessorymodel.TypeExternalSBOM},
+			{"cyclonedx-sbom-config", "application/vnd.cyclonedx+json", "", accessorymodel.TypeExternalSBOM},
+			{"spdx-sbom-artifactType", "application/vnd.oci.empty.v1+json", "application/spdx+json", accessorymodel.TypeExternalSBOM},
+			{"cyclonedx-sbom-artifactType", "application/vnd.oci.empty.v1+json", "application/vnd.cyclonedx+json", accessorymodel.TypeExternalSBOM},
 		}
 
 		for _, tc := range testCases {
 			suite.Run(tc.name, func() {
+				artifactTypeJSON := ""
+				if tc.artifactType != "" {
+					artifactTypeJSON = fmt.Sprintf(`,"artifactType":"%s"`, tc.artifactType)
+				}
+				
 				body := fmt.Sprintf(`{
 				   "schemaVersion":2,
-				   "mediaType":"application/vnd.oci.image.manifest.v1+json",
+				   "mediaType":"application/vnd.oci.image.manifest.v1+json"%s,
 				   "config":{
 				      "mediaType":"%s",
 				      "size":2,
@@ -289,7 +297,7 @@ func (suite *MiddlewareTestSuite) TestSBOMClassification() {
 				      "mediaType":"application/vnd.oci.image.manifest.v1+json",
 				      "size":419,
 				      "digest":"%s"
-				   }}`, tc.mediaType, subArtDigest)
+				   }}`, artifactTypeJSON, tc.configType, subArtDigest)
 
 				_, descriptor, err := distribution.UnmarshalManifest("application/vnd.oci.image.manifest.v1+json", []byte(body))
 				suite.Nil(err)
@@ -305,7 +313,6 @@ func (suite *MiddlewareTestSuite) TestSBOMClassification() {
 				req = req.WithContext(lib.WithArtifactInfo(req.Context(), info))
 
 				artID := suite.addArt(projectID, repoId, name, descriptor.Digest.String())
-				suite.Nil(err)
 
 				res := httptest.NewRecorder()
 				next := suite.NextHandler(http.StatusCreated, map[string]string{"Docker-Content-Digest": descriptor.Digest.String()})

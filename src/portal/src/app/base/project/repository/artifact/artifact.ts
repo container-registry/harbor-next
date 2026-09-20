@@ -92,6 +92,7 @@ export enum AccessoryType {
     NOTATION = 'signature.notation',
     NYDUS = 'accelerator.nydus',
     SBOM = 'sbom.harbor',
+    EXTERNAL_SBOM = 'sbom.external',
 }
 
 export enum ArtifactType {

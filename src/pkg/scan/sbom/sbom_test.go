@@ -294,6 +294,21 @@ func (suite *SBOMTestSuite) Test_deleteSBOMAccessory() {
 	err := suite.handler.deleteSBOMAccessory(context.Background(), artID)
 	suite.Nil(err)
 	suite.artifactCtl.AssertExpectations(suite.T())
+
+	// Test Get Error
+	suite.artifactCtl = &artifactTest.Controller{}
+	suite.artifactCtl.On("Get", mock.Anything, artID, mock.Anything).Return(nil, fmt.Errorf("get err")).Once()
+	err = suite.handler.deleteSBOMAccessory(context.Background(), artID)
+	suite.Equal("get err", err.Error())
+	suite.artifactCtl.AssertExpectations(suite.T())
+
+	// Test Delete Error
+	suite.artifactCtl = &artifactTest.Controller{}
+	suite.artifactCtl.On("Get", mock.Anything, artID, mock.Anything).Return(testArt, nil).Once()
+	suite.artifactCtl.On("Delete", mock.Anything, int64(2)).Return(fmt.Errorf("delete err")).Once()
+	err = suite.handler.deleteSBOMAccessory(context.Background(), artID)
+	suite.Equal("delete err", err.Error())
+	suite.artifactCtl.AssertExpectations(suite.T())
 }
 
 func TestExampleTestSuite(t *testing.T) {
