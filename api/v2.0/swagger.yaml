@@ -9722,6 +9722,12 @@ definitions:
       default_project_name:
         $ref: '#/definitions/StringConfigItem'
         description: The project that catches repositories pushed or pulled without a project segment. Empty disables the fallback.
+      registry_mirror_enabled:
+        $ref: '#/definitions/BoolConfigItem'
+        description: Whether pulls that arrive without a project segment are served from a proxy cache project, so Harbor can be used as a registry mirror
+      registry_mirror_namespaces:
+        $ref: '#/definitions/StringConfigItem'
+        description: Comma separated <namespace>=<project> pairs mapping an upstream registry to the proxy cache project serving it, "*" is the catch-all
   Configurations:
     type: object
     properties:
@@ -10023,6 +10029,16 @@ definitions:
       default_project_name:
         type: string
         description: The project that catches repositories pushed or pulled without a project segment. Empty disables the fallback.
+        x-omitempty: true
+        x-isnullable: true
+      registry_mirror_enabled:
+        type: boolean
+        description: Whether pulls that arrive without a project segment are served from a proxy cache project, so Harbor can be used as a registry mirror
+        x-omitempty: true
+        x-isnullable: true
+      registry_mirror_namespaces:
+        type: string
+        description: Comma separated <namespace>=<project> pairs mapping an upstream registry to the proxy cache project serving it, "*" is the catch-all
         x-omitempty: true
         x-isnullable: true
   StringConfigItem:

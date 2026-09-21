@@ -166,3 +166,37 @@ func TestDefaultProjectPinnedByEnv(t *testing.T) {
 		t.Errorf("UpdateUserConfigs() error = %v, want forbidden while %s is set", err, common.DefaultProjectNameEnv)
 	}
 }
+
+func TestVerifyRegistryMirrorCfg(t *testing.T) {
+	existing := map[string]bool{"dockerhub": true, "ghcr": true}
+	c := &controller{projectExists: func(_ context.Context, name string) (bool, error) {
+		if name == "dberr" {
+			return false, errors.New("db down")
+		}
+		return existing[name], nil
+	}}
+	tests := []struct {
+		name    string
+		cfgs    map[string]any
+		wantErr bool
+	}{
+		{name: "absent", cfgs: map[string]any{}},
+		{name: "empty", cfgs: map[string]any{common.RegistryMirrorNamespaces: ""}},
+		{name: "valid mapping", cfgs: map[string]any{common.RegistryMirrorNamespaces: "docker.io=dockerhub, ghcr.io=ghcr,*=dockerhub"}},
+		{name: "not a string", cfgs: map[string]any{common.RegistryMirrorNamespaces: 42}, wantErr: true},
+		{name: "no project", cfgs: map[string]any{common.RegistryMirrorNamespaces: "docker.io"}, wantErr: true},
+		{name: "empty project", cfgs: map[string]any{common.RegistryMirrorNamespaces: "docker.io="}, wantErr: true},
+		{name: "illegal project name", cfgs: map[string]any{common.RegistryMirrorNamespaces: "docker.io=Not A Project"}, wantErr: true},
+		{name: "whitespace in namespace", cfgs: map[string]any{common.RegistryMirrorNamespaces: "docker io=dockerhub"}, wantErr: true},
+		{name: "duplicate namespace", cfgs: map[string]any{common.RegistryMirrorNamespaces: "docker.io=dockerhub,docker.io=ghcr"}, wantErr: true},
+		{name: "missing project", cfgs: map[string]any{common.RegistryMirrorNamespaces: "docker.io=dockerhubb"}, wantErr: true},
+		{name: "lookup error", cfgs: map[string]any{common.RegistryMirrorNamespaces: "docker.io=dberr"}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := c.verifyRegistryMirrorCfg(context.TODO(), tt.cfgs); (err != nil) != tt.wantErr {
+				t.Errorf("verifyRegistryMirrorCfg() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

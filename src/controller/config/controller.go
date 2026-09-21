@@ -21,6 +21,7 @@ import (
 	"os"
 
 	"github.com/goharbor/harbor/src/common"
+	"github.com/goharbor/harbor/src/controller/mirror"
 	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/config/metadata"
 	"github.com/goharbor/harbor/src/lib/config/models"
@@ -165,6 +166,11 @@ func (c *controller) validateCfg(ctx context.Context, cfgs map[string]any) error
 		return err
 	}
 
+	// verify the registry mirror namespace mapping
+	if err = c.verifyRegistryMirrorCfg(ctx, cfgs); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -196,6 +202,34 @@ func (c *controller) verifyDefaultProjectNameCfg(ctx context.Context, cfgs map[s
 	}
 	if !exists {
 		return errors.BadRequestError(nil).WithMessagef("the %s value %q is not an existing project", common.DefaultProjectName, name)
+	}
+	return nil
+}
+
+// verifyRegistryMirrorCfg rejects a namespace mapping Harbor could not route
+// with: it must parse strictly and every project it names must exist,
+// otherwise mirror pulls would be rewritten onto a path no project serves.
+func (c *controller) verifyRegistryMirrorCfg(ctx context.Context, cfgs map[string]any) error {
+	v, exist := cfgs[common.RegistryMirrorNamespaces]
+	if !exist {
+		return nil
+	}
+	raw, ok := v.(string)
+	if !ok {
+		return errors.BadRequestError(nil).WithMessagef("the %s value must be a string", common.RegistryMirrorNamespaces)
+	}
+	mapping, err := mirror.ValidateNamespaces(raw)
+	if err != nil {
+		return errors.BadRequestError(nil).WithMessagef("the %s value is invalid: %v", common.RegistryMirrorNamespaces, err)
+	}
+	for _, name := range mapping {
+		exists, err := c.projectExists(ctx, name)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return errors.BadRequestError(nil).WithMessagef("the %s value names %q, which is not an existing project", common.RegistryMirrorNamespaces, name)
+		}
 	}
 	return nil
 }
