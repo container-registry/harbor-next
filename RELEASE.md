@@ -163,7 +163,7 @@ Use `ci:` for workflow-only changes.
 
 ## Nightly Channel
 
-A nightly is the real release pipeline cut against a throwaway branch, so Harbor gets exercised every day instead of once per minor. The `Nightly` workflow runs at 12:12 UTC and on `workflow_dispatch`, from `main` only: a nightly carries the official tag and image names, so a run from any other ref is rejected rather than publishing that ref's code under them.
+A nightly is the real release pipeline cut against a throwaway branch, so Harbor gets exercised every day instead of once per minor. The `Nightly` workflow runs at 00:00 UTC and on `workflow_dispatch`, from `main` only: a nightly carries the official tag and image names, so a run from any other ref is rejected rather than publishing that ref's code under them.
 
 Nightly versions look like `2.16.0-nightly-20260918`: the `VERSION` on `main`, which is the minor release-please is heading for, plus the UTC date. The tag is `v2.16.0-nightly-20260918` and the images are pushed under that same tag, exactly as a real release tags its own.
 
@@ -178,7 +178,7 @@ The channel is release-please configuration, not a separate build path:
 
 Two things follow from the channel being rebuilt every night. An empty night, where nothing has landed since the last real release, produces no release PR: the run ends green having published nothing, and says so. And a nightly that already tagged cannot be re-run for the same date, because that tag exists; re-run a nightly that failed before tagging, and pass `date_stamp` if you need a second one on the same day.
 
-Merging the nightly release PR is the one merge this repository automates. It happens inside the workflow, on a branch that is thrown away twelve hours later, and it never touches a release PR on `main` or `release-X.Y`.
+Merging the nightly release PR is the one merge this repository automates. It happens inside the workflow, on a branch that is thrown away the next night, and it never touches a release PR on `main` or `release-X.Y`.
 
 ### Version timeline
 
