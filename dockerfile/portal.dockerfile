@@ -2,6 +2,7 @@
 
 ARG BUN_VERSION=MISSING-BUILD-ARG
 ARG NGINX_VERSION=MISSING-BUILD-ARG
+ARG LPROBE_VERSION=MISSING-BUILD-ARG
 
 #
 # Build Angular application and Swagger UI
@@ -20,9 +21,13 @@ COPY LICENSE ./dist/LICENSE
 WORKDIR /harbor/src/portal/app-swagger-ui
 RUN bun install --ignore-scripts && bun run build
 
+# lprobe ships as a released multi-arch image; buildx resolves it for
+# the target platform, so no cross-compilation happens here.
+FROM ghcr.io/fivexl/lprobe:${LPROBE_VERSION} AS lprobe
+
 FROM 8gears.container-registry.com/dhi.io/nginx:${NGINX_VERSION}-debian13
 ARG TARGETARCH
-COPY bin/linux-${TARGETARCH}/lprobe /lprobe
+COPY --from=lprobe /lprobe /lprobe
 COPY --from=builder /harbor/src/portal/dist /usr/share/nginx/html
 COPY --from=builder /harbor/src/portal/app-swagger-ui/dist /usr/share/nginx/html
 COPY config/portal/nginx.conf /etc/nginx/nginx.conf
