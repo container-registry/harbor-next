@@ -1,0 +1,306 @@
+# Nightly release channel.
+#
+# A nightly is the real release pipeline run against a throwaway branch: the
+# same release-please configuration, the same reusable image workflow, the same
+# release-notes engine. Nothing here reimplements the release — the only thing
+# this file owns is materializing tonight's release-please channel.
+#
+# The channel branch is rebuilt from the release line's head every night, so
+# the nightly manifest is re-seeded from the real manifest each time. Every
+# nightly therefore accumulates from the last real release, which is what makes
+# its notes a faithful preview of the upcoming release rather than a nightly
+# changelog stream of its own.
+#
+# DATE_STAMP is the one caller-supplied value here. It reaches the commands
+# below only through `env`, never through templating, so a value carrying shell
+# syntax stays data; _validate-stamp rejects anything but a date on top of that.
+#
+# Usage:
+#   task nightly:version                 # print tonight's version
+#   task nightly:channel                 # build the channel commit locally
+#   task nightly:channel PUSH_CHANNEL=true
+#   task nightly:merge-release-pr        # squash-merge the channel's release PR
+#   task nightly:validate-inputs         # guard a run's ref and date stamp
+#   task nightly:test                    # exercise those guards
+
+version: '3'
+
+vars:
+  # Branch that carries the nightly channel. Force-recreated on every run.
+  NIGHTLY_BRANCH: '{{.NIGHTLY_BRANCH | default "nightly"}}'
+  # The one branch a nightly may be cut from.
+  RELEASE_REF: '{{.RELEASE_REF | default "main"}}'
+  # The caller's stamp before defaulting, so it is empty when none was given.
+  # Read before DATE_STAMP takes its default: "today" is ours, not theirs, and
+  # only a value the caller supplied has to be guarded.
+  DATE_STAMP_RAW: '{{.DATE_STAMP}}'
+  NIGHTLY_DATE:
+    sh: date -u +%Y%m%d
+  DATE_STAMP: '{{.DATE_STAMP | default .NIGHTLY_DATE}}'
+  # VERSION is the next development version, i.e. exactly the minor
+  # release-please is heading for on this line.
+  NIGHTLY_VERSION: '{{.VERSION}}-nightly-{{.DATE_STAMP}}'
+  NIGHTLY_CONFIG: release-please-config-nightly.json
+  NIGHTLY_MANIFEST: .release-please-manifest-nightly.json
+  RELEASE_CONFIG: release-please-config.json
+  RELEASE_MANIFEST: .release-please-manifest.json
+  PUSH_CHANNEL: '{{.PUSH_CHANNEL | default "false"}}'
+  # Per-invocation identity, never written to the user's or the runner's
+  # global git config.
+  COMMIT_NAME: '{{.COMMIT_NAME | default "github-actions[bot]"}}'
+  COMMIT_EMAIL: '{{.COMMIT_EMAIL | default "41898282+github-actions[bot]@users.noreply.github.com"}}'
+
+tasks:
+  version:
+    desc: "Print tonight's nightly version (VERSION plus the UTC date stamp)"
+    silent: true
+    env:
+      NIGHTLY_VERSION: '{{.NIGHTLY_VERSION}}'
+    cmds:
+      - task: _validate-stamp
+      - printf '%s\n' "${NIGHTLY_VERSION}"
+
+  channel:
+    desc: "Materialize tonight's release-please channel (PUSH_CHANNEL=true to publish the branch)"
+    preconditions:
+      - sh: command -v git >/dev/null 2>&1
+        msg: "git is required"
+      - sh: command -v jq >/dev/null 2>&1
+        msg: "jq is required"
+      - sh: test -f '{{.RELEASE_CONFIG}}'
+        msg: "release-please config not found: {{.RELEASE_CONFIG}}"
+      - sh: test -f '{{.RELEASE_MANIFEST}}'
+        msg: "release-please manifest not found: {{.RELEASE_MANIFEST}}"
+    cmds:
+      - task: _validate-stamp
+      - task: _derive-config
+      - task: _commit-channel
+      - task: _push-channel
+
+  merge-release-pr:
+    desc: "Squash-merge the nightly channel's release-please PR (the scheduled auto-merge)"
+    preconditions:
+      - sh: test -n "${GH_TOKEN:-}"
+        msg: "GH_TOKEN is required"
+      - sh: test -n "${GITHUB_REPOSITORY:-}"
+        msg: "GITHUB_REPOSITORY is required"
+      - sh: command -v gh >/dev/null 2>&1
+        msg: "gh is required"
+    cmds:
+      - |
+        # release-please names its branch after the target branch.
+        pr=$(gh pr list --repo "${GITHUB_REPOSITORY}" --state open \
+          --base '{{.NIGHTLY_BRANCH}}' \
+          --head 'release-please--branches--{{.NIGHTLY_BRANCH}}' \
+          --json number --jq '.[0].number // empty')
+        if [ -z "${pr}" ]; then
+          # Right after a real release there is nothing new to cut yet. That is
+          # an empty night, not a failure: with no release PR to merge, nothing
+          # downstream runs and the workflow ends green.
+          echo "::notice::No release PR on {{.NIGHTLY_BRANCH}}; nothing has landed since the last release"
+          exit 0
+        fi
+        # Squash only: harbor-next allows no other merge method, and
+        # release-please tracks a squashed release PR by its label.
+        gh pr merge "${pr}" --repo "${GITHUB_REPOSITORY}" --squash --delete-branch
+        echo "merged nightly release PR #${pr}"
+
+  validate-inputs:
+    desc: "Guard a nightly run's inputs before anything is published"
+    silent: true
+    # The workflow's first step, and the reason a nightly cannot be aimed
+    # somewhere else: a dispatch from another ref would publish that ref's
+    # VERSION and release configuration under the official nightly tag and
+    # image names. The stamp guard is the other half — that value reaches a
+    # Task command line, so nothing but a date may pass.
+    cmds:
+      - task: _validate-ref
+      - task: _stamp-rule
+        vars:
+          # The raw value: the workflow leaves "today" to this taskfile, so an
+          # absent stamp is legal here and is resolved later.
+          STAMP: '{{.DATE_STAMP_RAW}}'
+          STAMP_REQUIRED: 'false'
+
+  test:
+    desc: "Exercise the nightly input guards"
+    silent: true
+    cmds:
+      - |
+        failures=0
+
+        ok() { printf 'ok    %s\n' "$1"; }
+        bad() { printf 'FAIL  %s\n' "$1" >&2; failures=$((failures + 1)); }
+
+        # Every case starts from a clean slate and sets only what it is
+        # testing, so an exported stamp in the caller's shell cannot make a
+        # rejection look like an acceptance.
+        guard() { env -u DATE_STAMP -u GITHUB_REF_NAME "$@" task nightly:validate-inputs 2>&1; }
+
+        accepts() {
+          label=$1
+          shift
+          if out=$(guard "$@"); then ok "${label}"; else bad "${label}: expected accept, got: ${out}"; fi
+        }
+        rejects() {
+          label=$1
+          shift
+          if out=$(guard "$@"); then bad "${label}: expected reject, was accepted"; else ok "${label}"; fi
+        }
+
+        accepts 'ref main, no stamp'        GITHUB_REF_NAME='{{.RELEASE_REF}}'
+        accepts 'ref main, dated stamp'     GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP=20260921
+
+        rejects 'ref release-2.15'          GITHUB_REF_NAME=release-2.15
+        rejects 'ref topic branch'          GITHUB_REF_NAME=nightly-release-channel
+        rejects 'ref channel branch'        GITHUB_REF_NAME='{{.NIGHTLY_BRANCH}}'
+        rejects 'ref empty'                 GITHUB_REF_NAME=
+        rejects 'ref unset'                 IGNORED=1
+
+        rejects 'stamp dashed'              GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP=2026-09-21
+        rejects 'stamp short'               GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP=202609
+        rejects 'stamp long'                GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP=202609211
+        rejects 'stamp trailing text'       GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP='20260921 rm -rf /'
+        rejects 'stamp command substitution' GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP='$(id)'
+        rejects 'stamp quote break'         GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP="x'; id #"
+        # Eight digits on their own line: a line-at-a-time regex accepts this.
+        rejects 'stamp newline smuggled'    GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP="$(printf 'x\n20260921')"
+
+        # Rejecting is not enough: the value must never have run as a command.
+        for attempt in '$(id)' "x'; id #" '`id`'; do
+          out=$(guard GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP="${attempt}" || true)
+          case "${out}" in
+            *uid=*) bad "injection stayed inert: ${attempt} executed id" ;;
+            *) ok "injection stayed inert: ${attempt}" ;;
+          esac
+        done
+
+        # The internal path the channel takes, where the stamp is resolved and
+        # an empty value is a failure rather than a default.
+        # -o interleaved for the same reason the workflow uses it: the root
+        # Taskfile prefixes output per task, and the prefix would land inside
+        # the captured version string.
+        version() { env -u DATE_STAMP task -o interleaved nightly:version "$@" 2>&1; }
+
+        if out=$(version) && [ "${out}" = '{{.VERSION}}-nightly-{{.NIGHTLY_DATE}}' ]; then
+          ok 'version defaults to today'
+        else
+          bad "version defaults to today: got: ${out}"
+        fi
+        # A date that is not today, so the stamp is doing the work.
+        if out=$(version DATE_STAMP=20200102) && [ "${out}" = '{{.VERSION}}-nightly-20200102' ]; then
+          ok 'version honours a dated stamp'
+        else
+          bad "version honours a dated stamp: got: ${out}"
+        fi
+        if out=$(version DATE_STAMP=2026-09-21); then
+          bad "version rejects a bad stamp: was accepted as ${out}"
+        else
+          ok 'version rejects a bad stamp'
+        fi
+
+        if [ "${failures}" -ne 0 ]; then
+          printf '\n%s nightly guard test(s) failed\n' "${failures}" >&2
+          exit 1
+        fi
+        printf '\nnightly guard tests passed\n'
+
+  _validate-ref:
+    internal: true
+    silent: true
+    env:
+      GITHUB_REF_NAME: '{{.GITHUB_REF_NAME}}'
+      RELEASE_REF: '{{.RELEASE_REF}}'
+    cmd: |
+      ref="${GITHUB_REF_NAME:-}"
+      if [ "${ref}" != "${RELEASE_REF}" ]; then
+        # ::error:: is picked up by the workflow log, and is harmless locally.
+        printf '::error::Nightlies are cut from %s only. Current ref: %s\n' \
+          "${RELEASE_REF}" "${ref:-<unset>}" >&2
+        exit 1
+      fi
+
+  _validate-stamp:
+    internal: true
+    # The resolved stamp: "today" has already been filled in by now, so an
+    # empty value here is a failure rather than a default.
+    cmds:
+      - task: _stamp-rule
+        vars:
+          STAMP: '{{.DATE_STAMP}}'
+
+  _stamp-rule:
+    internal: true
+    # Silent: `nightly:version` output is captured by the workflow.
+    silent: true
+    vars:
+      STAMP_REQUIRED: '{{.STAMP_REQUIRED | default "true"}}'
+    # The value reaches the command through env and nothing else. A task's env
+    # is not inherited by the tasks it calls, so the rule lives in the one task
+    # that holds the value — callers pass it in, and there is a single home for
+    # what a date stamp may contain.
+    env:
+      DATE_STAMP: '{{.STAMP}}'
+      STAMP_REQUIRED: '{{.STAMP_REQUIRED}}'
+    cmd: |
+      stamp="${DATE_STAMP:-}"
+      if [ -z "${stamp}" ]; then
+        if [ "${STAMP_REQUIRED}" != "true" ]; then
+          exit 0
+        fi
+        printf '::error::DATE_STAMP must be YYYYMMDD, got: <empty>\n' >&2
+        exit 1
+      fi
+      # A glob, not a regex: grep and [[ =~ ]] both match a line at a time, so
+      # a stamp carrying a newline next to eight digits would pass either.
+      case "${stamp}" in
+        [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
+        *)
+          printf '::error::DATE_STAMP must be YYYYMMDD, got: %s\n' "${stamp}" >&2
+          exit 1
+          ;;
+      esac
+
+  _derive-config:
+    internal: true
+    env:
+      NIGHTLY_VERSION: '{{.NIGHTLY_VERSION}}'
+    cmds:
+      # Derived from the real config instead of duplicated: the nightly notes
+      # have to accumulate exactly what the real release will, which means the
+      # same exclude-paths and the same changelog-sections, forever.
+      #
+      # release-as pins the date. The prerelease versioning strategy cannot:
+      # it increments the last numeric run of the current prerelease, so
+      # 2.16.0-nightly-20260918 becomes ...20260919 on the next run whatever
+      # the actual date is, and one skipped or repeated night desynchronizes
+      # the stamp from reality for good. release-as is regenerated from the
+      # clock every night, so it can never go stale the way a committed
+      # release-as does.
+      - >-
+        jq --arg version "${NIGHTLY_VERSION}"
+        '.packages["."] += {"release-as": $version, "prerelease": true}'
+        '{{.RELEASE_CONFIG}}' > '{{.NIGHTLY_CONFIG}}'
+      # Seeded from the real manifest, so the channel starts at the last
+      # published release and every nightly renders the full upcoming release.
+      - cp '{{.RELEASE_MANIFEST}}' '{{.NIGHTLY_MANIFEST}}'
+
+  _commit-channel:
+    internal: true
+    env:
+      NIGHTLY_VERSION: '{{.NIGHTLY_VERSION}}'
+    cmds:
+      - git switch --force-create '{{.NIGHTLY_BRANCH}}'
+      - git add '{{.NIGHTLY_CONFIG}}' '{{.NIGHTLY_MANIFEST}}'
+      - >-
+        git -c user.name='{{.COMMIT_NAME}}' -c user.email='{{.COMMIT_EMAIL}}'
+        commit -s -m "chore: Open the ${NIGHTLY_VERSION} nightly channel"
+
+  _push-channel:
+    internal: true
+    status:
+      - test '{{.PUSH_CHANNEL}}' != "true"
+    cmds:
+      # Force: last night's channel and its release commit are replaced. The
+      # commits they carried stay reachable through the nightly tags.
+      - git push --force origin 'HEAD:refs/heads/{{.NIGHTLY_BRANCH}}'

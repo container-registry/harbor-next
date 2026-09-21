@@ -161,6 +161,50 @@ Use `ci:` for workflow-only changes.
 6. Squash-merge the release PR.
 7. The same image build, patch application, signing, and release-note flow runs.
 
+## Nightly Channel
+
+A nightly is the real release pipeline cut against a throwaway branch, so Harbor gets exercised every day instead of once per minor. The `Nightly` workflow runs at 12:12 UTC and on `workflow_dispatch`, from `main` only: a nightly carries the official tag and image names, so a run from any other ref is rejected rather than publishing that ref's code under them.
+
+Nightly versions look like `2.16.0-nightly-20260918`: the `VERSION` on `main`, which is the minor release-please is heading for, plus the UTC date. The tag is `v2.16.0-nightly-20260918` and the images are pushed under that same tag, exactly as a real release tags its own.
+
+The channel is release-please configuration, not a separate build path:
+
+1. `task nightly:channel` derives `release-please-config-nightly.json` from `release-please-config.json` with `jq`, adding `release-as` for tonight's version and `prerelease: true`. Deriving it keeps the exclude paths and changelog sections identical to the real release forever.
+2. The same task seeds `.release-please-manifest-nightly.json` from `.release-please-manifest.json` and commits both. It force-pushes the result as the `nightly` branch only when the caller passes `PUSH_CHANNEL=true`, as the workflow does; a bare `task nightly:channel` leaves the branch local, which is how you inspect what tonight's channel would be. Neither generated file is committed to `main`.
+3. Release-please opens a release PR against `nightly`, the workflow squash-merges it, and release-please then tags the merge and publishes a prerelease GitHub Release.
+4. `publish-images.yml` and `release-notes-engine.yml` run with the nightly tag. They are the same reusable workflows the real release calls.
+
+`release-as` is what pins the date. The `prerelease` versioning strategy cannot: it increments the last run of digits in the current prerelease, so `2.16.0-nightly-20260918` becomes `...20260919` on the next run whatever the calendar says, and one repeated or skipped night desynchronizes the stamp for good. The generated `release-as` is recomputed from the clock every night, so it cannot go stale the way a committed `release-as` does.
+
+Two things follow from the channel being rebuilt every night. An empty night, where nothing has landed since the last real release, produces no release PR: the run ends green having published nothing, and says so. And a nightly that already tagged cannot be re-run for the same date, because that tag exists; re-run a nightly that failed before tagging, and pass `date_stamp` if you need a second one on the same day.
+
+Merging the nightly release PR is the one merge this repository automates. It happens inside the workflow, on a branch that is thrown away twelve hours later, and it never touches a release PR on `main` or `release-X.Y`.
+
+### Version timeline
+
+Because the channel manifest is re-seeded from `.release-please-manifest.json` every night, the nightly channel never advances the published version. Each nightly is computed from the last published release, so the minor stays parked until a maintainer cuts the real release:
+
+| Date | `.release-please-manifest.json` | Nightly release | Notes cover |
+|------|---------------------------------|-----------------|-------------|
+| Sep 18 | `2.15.0` | `v2.16.0-nightly-20260918` | everything since `v2.15.0` |
+| Sep 19 | `2.15.0` | `v2.16.0-nightly-20260919` | everything since `v2.15.0`, plus one day |
+| Sep 20 | `2.15.0` | `v2.16.0-nightly-20260920` | everything since `v2.15.0`, plus two days |
+| Sep 21 | a maintainer merges the `main` release PR: `v2.16.0` is published, the manifest moves to `2.16.0`, `VERSION` to `2.17.0` | `v2.16.0-nightly-20260921` if the nightly ran before the merge, `v2.17.0-nightly-20260921` if after | accordingly |
+| Sep 22 | `2.16.0` | `v2.17.0-nightly-20260922` | everything since `v2.16.0` |
+
+The stable `v2.16.0` on Sep 21 is the ordinary main release, cut by a maintainer. A nightly always derives a dated `release-as` and always publishes as a prerelease, so it can never produce a stable version; it just follows the line to whatever the next one is.
+
+### Nightly release notes
+
+Nightly notes are the upcoming release's notes as they stand tonight, not a separate stream. There is no nightly changelog, no nightly section in `CHANGELOG.md` on `main`, and no nightly entry in the commercial changelogs.
+
+Two things make that true:
+
+- The channel accumulates from the last published release, so release-please renders the whole in-progress release into the nightly `CHANGELOG.md` section, and `What's Changed` spans the same range.
+- The nightly workflow does not dispatch `release-cut` to `8gcr`. The commercial entries stay in the unreleased block of each `changelogs/<branch>.md`, so every nightly renders the same commercial features the real release will, and the real release still finds them when it ships.
+
+A nightly's notes therefore read as a preview of the release: the same sections, the same commercial features, the same contributors, with the image references pointing at the nightly tag.
+
 ## Backports
 
 Backports are maintainer-triggered comments on merged PRs:
@@ -233,6 +277,7 @@ Upstream-Author: @original-author
 | `SYNC_APP_ID` | Variable | Yes | GitHub App ID for 8gcr access |
 | `SYNC_APP_PRIVATE_KEY` | Secret | Yes | GitHub App private key for 8gcr access |
 | `BUILDX_HOST` | Runner environment | No | Remote BuildKit endpoint |
+| `NIGHTLY_CHANNEL_TOKEN` | Secret | No | Only needed if a ruleset ever covers the `nightly` branch; the nightly channel push and merge fall back to `GITHUB_TOKEN` |
 
 ## Maintainer Checklist
 
