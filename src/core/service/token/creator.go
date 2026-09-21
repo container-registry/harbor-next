@@ -27,6 +27,7 @@ import (
 	"github.com/goharbor/harbor/src/common/rbac"
 	rbac_project "github.com/goharbor/harbor/src/common/rbac/project"
 	"github.com/goharbor/harbor/src/common/security"
+	"github.com/goharbor/harbor/src/controller/mirror"
 	"github.com/goharbor/harbor/src/controller/project"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
@@ -214,11 +215,60 @@ func (g generalCreator) Create(r *http.Request) (*models.Token, error) {
 		}
 	}
 	access := GetResourceActions(scopes)
+	access = append(access, mirrorAccess(r, access)...)
 	err = filterAccess(r.Context(), access, project.Ctl, g.filterMap)
 	if err != nil {
 		return nil, err
 	}
 	return MakeToken(r.Context(), ctx.GetUsername(), g.service, access)
+}
+
+// mirrorAccess returns the extra repository access a mirror pull needs.
+//
+// Clients build the token scope from the reference they were handed rather
+// than from the challenge Harbor sent, so a mirror pull of "library/nginx"
+// asks for a scope on "library/nginx" while the request it then makes is
+// served from "<proxy project>/library/nginx". Granting the routed repository
+// alongside the requested one keeps both shapes working; filterAccess still
+// drops whatever the caller is not allowed to do, so this widens the scope
+// asked for, never the permissions behind it.
+func mirrorAccess(r *http.Request, access []*token.ResourceActions) []*token.ResourceActions {
+	ctx := r.Context()
+	if !mirror.Enabled(ctx) {
+		return nil
+	}
+	ns := r.URL.Query().Get(mirror.NamespaceQuery)
+	var extra []*token.ResourceActions
+	for _, a := range access {
+		if a.Type != "repository" || a.Name == "" {
+			continue
+		}
+		if !pullOnly(a.Actions) {
+			// A mirror only ever serves reads, and a push scope that
+			// reached here belongs to the project the client named.
+			continue
+		}
+		routed, ok := mirror.Route(ctx, a.Name, ns)
+		if !ok {
+			continue
+		}
+		extra = append(extra, &token.ResourceActions{
+			Type:    a.Type,
+			Name:    routed,
+			Actions: a.Actions,
+		})
+	}
+	return extra
+}
+
+// pullOnly reports whether a requested scope asks for nothing but reads.
+func pullOnly(actions []string) bool {
+	for _, action := range actions {
+		if action != "pull" {
+			return false
+		}
+	}
+	return len(actions) > 0
 }
 
 func parseScopes(u *url.URL) []string {

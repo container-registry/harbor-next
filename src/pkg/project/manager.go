@@ -64,6 +64,11 @@ var (
 	validProjectName = regexp.MustCompile(`^` + restrictedNameChars + `$`)
 )
 
+// IsValidName returns whether name is a legal project name (length and charset).
+func IsValidName(name string) bool {
+	return !utils.IsIllegalLength(name, projectNameMinLen, projectNameMaxLen) && validProjectName.MatchString(name)
+}
+
 type manager struct {
 	dao dao.DAO
 }
