@@ -17,9 +17,11 @@ name: Nightly
 
 on:
   schedule:
-    # 12:12 UTC. The release PR is opened and merged in the same run, so
-    # there is never a half-open nightly release PR waiting around.
-    - cron: '12 12 * * *'
+    # 00:00 UTC: a nightly stamped YYYYMMDD is cut at the start of that day,
+    # so the stamp names the day whose commits it carries. The release PR is
+    # opened and merged in the same run, so there is never a half-open
+    # nightly release PR waiting around.
+    - cron: '0 0 * * *'
   workflow_dispatch:
     inputs:
       date_stamp:
