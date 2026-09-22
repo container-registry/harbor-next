@@ -6,6 +6,14 @@ inputs:
     description: jj release to install
     required: false
     default: "0.44.0"
+  sha256_x86_64:
+    description: Expected SHA-256 of the x86_64 musl tarball for `version`
+    required: false
+    default: "0a07bab4641a55fd2bc2fd1563ba3a3f9a577584086ad74086a1c5b69b3ffce9"
+  sha256_aarch64:
+    description: Expected SHA-256 of the aarch64 musl tarball for `version`
+    required: false
+    default: "60d42fa2a9abaa445eff10cd2087458562aaad5a54b90309e5a3787ecc985ff2"
 
 runs:
   using: composite
@@ -14,22 +22,38 @@ runs:
       shell: bash
       env:
         JJ_VERSION: ${{ inputs.version }}
+        SHA256_X86_64: ${{ inputs.sha256_x86_64 }}
+        SHA256_AARCH64: ${{ inputs.sha256_aarch64 }}
       run: |
+        set -euo pipefail
+
         if command -v jj >/dev/null 2>&1; then
           jj --version
           exit 0
         fi
 
         case "$(uname -m)" in
-          x86_64|amd64) arch="x86_64" ;;
-          aarch64|arm64) arch="aarch64" ;;
+          x86_64|amd64) arch="x86_64"; expected="${SHA256_X86_64}" ;;
+          aarch64|arm64) arch="aarch64"; expected="${SHA256_AARCH64}" ;;
           *)
             echo "::error::Unsupported architecture: $(uname -m)"
             exit 1
             ;;
         esac
 
+        if [ -z "${expected}" ]; then
+          echo "::error::No expected digest for ${arch}; refusing to install an unverified jj"
+          exit 1
+        fi
+
         curl -fsSL "https://github.com/jj-vcs/jj/releases/download/v${JJ_VERSION}/jj-v${JJ_VERSION}-${arch}-unknown-linux-musl.tar.gz" -o /tmp/jj.tar.gz
+
+        # Before anything is unpacked or installed as root. The digest is
+        # pinned in this file rather than fetched next to the archive: a
+        # checksum served from the same place the archive comes from would
+        # only catch corruption, not a substituted release.
+        echo "${expected}  /tmp/jj.tar.gz" | sha256sum --check --strict
+
         mkdir -p /tmp/jj-extract
         tar -xzf /tmp/jj.tar.gz -C /tmp/jj-extract
         sudo install -m 755 /tmp/jj-extract/jj /usr/local/bin/jj
