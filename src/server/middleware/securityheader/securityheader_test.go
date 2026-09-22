@@ -36,6 +36,7 @@ func TestMiddleware(t *testing.T) {
 	assert.Equal(t, "DENY", rec.Header().Get("X-Frame-Options"))
 	assert.Equal(t, "frame-ancestors 'none'", rec.Header().Get("Content-Security-Policy"))
 	assert.Equal(t, "nosniff", rec.Header().Get("X-Content-Type-Options"))
+	assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
 }
 
 func TestMiddlewareOnErrorResponse(t *testing.T) {
@@ -50,6 +51,7 @@ func TestMiddlewareOnErrorResponse(t *testing.T) {
 	assert.Equal(t, "DENY", rec.Header().Get("X-Frame-Options"))
 	assert.Equal(t, "frame-ancestors 'none'", rec.Header().Get("Content-Security-Policy"))
 	assert.Equal(t, "nosniff", rec.Header().Get("X-Content-Type-Options"))
+	assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
 }
 
 func TestMiddlewareSkipped(t *testing.T) {
@@ -65,6 +67,7 @@ func TestMiddlewareSkipped(t *testing.T) {
 	assert.Equal(t, "", rec.Header().Get("X-Frame-Options"))
 	assert.Equal(t, "", rec.Header().Get("Content-Security-Policy"))
 	assert.Equal(t, "", rec.Header().Get("X-Content-Type-Options"))
+	assert.Equal(t, "", rec.Header().Get("Cache-Control"))
 
 	rec = httptest.NewRecorder()
 	Middleware(skipper)(next).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v2.0/docs/", nil))
@@ -72,4 +75,5 @@ func TestMiddlewareSkipped(t *testing.T) {
 	assert.Equal(t, "DENY", rec.Header().Get("X-Frame-Options"))
 	assert.Equal(t, "frame-ancestors 'none'", rec.Header().Get("Content-Security-Policy"))
 	assert.Equal(t, "nosniff", rec.Header().Get("X-Content-Type-Options"))
+	assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
 }
