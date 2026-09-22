@@ -71,6 +71,24 @@ tasks:
       DEV_TAG: 'v{{.VERSION}}-dev'
     cmd: printf '%s\n' "${DEV_TAG}"
 
+  already-released:
+    desc: "Print true when tonight's nightly tag already exists"
+    silent: true
+    # A nightly that already tagged cannot be cut again for the same date, and
+    # a dispatch that cuts a date early leaves the scheduled run for that date
+    # with nothing to do. That is an empty night, not a failure — the same
+    # shape as nothing having landed since the last release.
+    env:
+      NIGHTLY_TAG: 'v{{.NIGHTLY_VERSION}}'
+    cmds:
+      - task: _validate-stamp
+      - |
+        if [ -n "$(git tag --list "${NIGHTLY_TAG}")" ]; then
+          printf 'true\n'
+        else
+          printf 'false\n'
+        fi
+
   channel:
     desc: "Materialize tonight's release-please channel (PUSH_CHANNEL=true to publish the branch)"
     preconditions:
@@ -239,6 +257,30 @@ tasks:
           *-nightly-*) bad 'dev tag carries a date' ;;
           *) ok 'dev tag carries no date' ;;
         esac
+
+        # The already-released check. A purpose-built tag, so the answer does
+        # not depend on which tags this checkout happens to have fetched.
+        released() { task -o interleaved nightly:already-released DATE_STAMP="$1" 2>&1; }
+        fixture_tag='v{{.VERSION}}-nightly-20200103'
+        # Only ever delete a tag this test created. A blind cleanup would
+        # destroy a real tag of the same name if one ever existed.
+        if [ -n "$(git tag --list "${fixture_tag}")" ]; then
+          bad "fixture tag ${fixture_tag} already exists; refusing to touch it"
+        elif ! git -c tag.gpgSign=false tag "${fixture_tag}" >/dev/null 2>&1; then
+          bad "could not create the fixture tag ${fixture_tag}"
+        else
+          if [ "$(released 20200103)" = true ]; then
+            ok 'already-released sees an existing tag'
+          else
+            bad "already-released sees an existing tag: got: $(released 20200103)"
+          fi
+          git tag -d "${fixture_tag}" >/dev/null 2>&1 || true
+          if [ "$(released 20200103)" = false ]; then
+            ok 'already-released is false once the tag is gone'
+          else
+            bad 'already-released stayed true after the tag was deleted'
+          fi
+        fi
 
         # The published-tag guard, which the e2e workflow runs before a tag
         # reaches an image reference.

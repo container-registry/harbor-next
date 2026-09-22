@@ -48,6 +48,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       dev_tag: ${{ steps.version.outputs.dev_tag }}
+      already_released: ${{ steps.version.outputs.already_released }}
     env:
       DATE_STAMP: ${{ inputs.date_stamp }}
       # Read by the askpass script below when the channel branch is pushed.
@@ -99,8 +100,18 @@ jobs:
           dev_tag=$(task -o interleaved nightly:dev-tag)
           echo "dev_tag=${dev_tag}" >> "$GITHUB_OUTPUT"
           echo "::notice::Nightly version ${version} (also tagged ${dev_tag})"
+          # A dispatch can cut a date before its scheduled run reaches it, and
+          # a nightly that already tagged cannot be cut again. Nothing to do is
+          # an empty night, not a failure.
+          # shellcheck disable=SC2086
+          already=$(task -o interleaved nightly:already-released ${DATE_STAMP:+DATE_STAMP="${DATE_STAMP}"})
+          echo "already_released=${already}" >> "$GITHUB_OUTPUT"
+          if [ "${already}" = true ]; then
+            echo "::notice::${version} is already released; nothing to cut tonight"
+          fi
 
       - name: Open the nightly channel
+        if: ${{ steps.version.outputs.already_released != 'true' }}
         run: |
           # shellcheck disable=SC2086
           task nightly:channel PUSH_CHANNEL=true ${DATE_STAMP:+DATE_STAMP="${DATE_STAMP}"}
@@ -108,6 +119,7 @@ jobs:
   release:
     name: Release Nightly
     needs: [channel]
+    if: ${{ needs.channel.outputs.already_released != 'true' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 15
     permissions:

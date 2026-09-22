@@ -88,11 +88,20 @@ tasks:
         # checkout happens to have: a CI clone may carry no tags at all.
         # The numbers are far above anything this project will ship.
         fixtures='v900.1.0 v900.2.5 v900.3.0-nightly-20260101'
+        # Only tags this test created are ever deleted: a blind cleanup would
+        # destroy a real tag that happened to share the name.
+        created=''
         for t in ${fixtures}; do
-          git -c tag.gpgSign=false tag "${t}" >/dev/null 2>&1 || true
+          if [ -n "$(git tag --list "${t}")" ]; then
+            bad "fixture tag ${t} already exists; refusing to touch it"
+          elif git -c tag.gpgSign=false tag "${t}" >/dev/null 2>&1; then
+            created="${created} ${t}"
+          else
+            bad "could not create the fixture tag ${t}"
+          fi
         done
         drop_fixtures() {
-          for t in ${fixtures}; do
+          for t in ${created}; do
             git tag -d "${t}" >/dev/null 2>&1 || true
           done
         }
