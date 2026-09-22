@@ -215,12 +215,16 @@ tasks:
 
   portal:
     desc: "Build Portal image (Angular frontend on Nginx)"
+    vars:
+      # A fresh date keeps the security.txt stamping layer out of the build cache
+      SECURITY_TXT_EXPIRES:
+        sh: date -u -d '+1 year' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+1y +%Y-%m-%dT%H:%M:%SZ
     cmds:
       - task: _build
         vars:
           IMAGE_NAME: harbor-portal
           DOCKERFILE: portal.dockerfile
-          BUILD_ARGS: '--build-arg BUN_VERSION={{.BUN_VERSION}} --build-arg NGINX_VERSION={{.NGINX_VERSION}}'
+          BUILD_ARGS: '--build-arg BUN_VERSION={{.BUN_VERSION}} --build-arg NGINX_VERSION={{.NGINX_VERSION}} --build-arg SECURITY_TXT_EXPIRES={{.SECURITY_TXT_EXPIRES}}'
 
   registry:
     desc: "Build Distribution Registry image (compiles binary, then builds container)"
