@@ -31,15 +31,14 @@ vars:
   # The one branch a nightly may be cut from.
   RELEASE_REF: '{{.RELEASE_REF | default "main"}}'
   # The caller's stamp before defaulting, so it is empty when none was given.
-  # Read before DATE_STAMP takes its default: "today" is ours, not theirs, and
-  # only a value the caller supplied has to be guarded.
+  # Only a value the caller supplied has to be guarded; "today" is ours.
   DATE_STAMP_RAW: '{{.DATE_STAMP}}'
   NIGHTLY_DATE:
     sh: date -u +%Y%m%d
-  DATE_STAMP: '{{.DATE_STAMP | default .NIGHTLY_DATE}}'
+  NIGHTLY_STAMP: '{{.DATE_STAMP | default .NIGHTLY_DATE}}'
   # VERSION is the next development version, i.e. exactly the minor
   # release-please is heading for on this line.
-  NIGHTLY_VERSION: '{{.VERSION}}-nightly-{{.DATE_STAMP}}'
+  NIGHTLY_VERSION: '{{.VERSION}}-nightly-{{.NIGHTLY_STAMP}}'
   NIGHTLY_CONFIG: release-please-config-nightly.json
   NIGHTLY_MANIFEST: .release-please-manifest-nightly.json
   RELEASE_CONFIG: release-please-config.json
@@ -191,6 +190,20 @@ tasks:
         else
           bad "version defaults to today: got: ${out}"
         fi
+        # Exported empty is not the same as unset, and it is what a scheduled
+        # run actually provides: the workflow sets DATE_STAMP from a dispatch
+        # input that a schedule does not have.
+        if out=$(DATE_STAMP= task -o interleaved nightly:version 2>&1) && [ "${out}" = '{{.VERSION}}-nightly-{{.NIGHTLY_DATE}}' ]; then
+          ok 'version defaults to today with DATE_STAMP exported empty'
+        else
+          bad "version with DATE_STAMP exported empty: got: ${out}"
+        fi
+        # And a stamp the caller did supply still wins over the default.
+        if out=$(DATE_STAMP=20200102 task -o interleaved nightly:version 2>&1) && [ "${out}" = '{{.VERSION}}-nightly-20200102' ]; then
+          ok 'exported DATE_STAMP is honoured'
+        else
+          bad "exported DATE_STAMP: got: ${out}"
+        fi
         # A date that is not today, so the stamp is doing the work.
         if out=$(version DATE_STAMP=20200102) && [ "${out}" = '{{.VERSION}}-nightly-20200102' ]; then
           ok 'version honours a dated stamp'
@@ -232,9 +245,13 @@ tasks:
     # reference and a Task command line.
     requires:
       vars: [TAG]
+    # TAG_VALUE for the same reason as STAMP_VALUE: a task's env does not
+    # override a variable already in the process environment, and the calling
+    # workflow exports TAG.
     env:
-      TAG: '{{.TAG}}'
+      TAG_VALUE: '{{.TAG}}'
     cmd: |
+      TAG="${TAG_VALUE}"
       # Globs, not regexes: grep and [[ =~ ]] match a line at a time, so a
       # value carrying a newline next to a tag would pass either.
       case "${TAG}" in
@@ -301,7 +318,7 @@ tasks:
     cmds:
       - task: _stamp-rule
         vars:
-          STAMP: '{{.DATE_STAMP}}'
+          STAMP: '{{.NIGHTLY_STAMP}}'
 
   _stamp-rule:
     internal: true
@@ -313,11 +330,16 @@ tasks:
     # is not inherited by the tasks it calls, so the rule lives in the one task
     # that holds the value — callers pass it in, and there is a single home for
     # what a date stamp may contain.
+    #
+    # STAMP_VALUE, not DATE_STAMP: a task's env does NOT override a variable
+    # already present in the process environment. The workflow exports
+    # DATE_STAMP — empty on a scheduled run, since the dispatch input is
+    # absent — and that empty value would win over whatever is set here.
     env:
-      DATE_STAMP: '{{.STAMP}}'
+      STAMP_VALUE: '{{.STAMP}}'
       STAMP_REQUIRED: '{{.STAMP_REQUIRED}}'
     cmd: |
-      stamp="${DATE_STAMP:-}"
+      stamp="${STAMP_VALUE:-}"
       if [ -z "${stamp}" ]; then
         if [ "${STAMP_REQUIRED}" != "true" ]; then
           exit 0
