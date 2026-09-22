@@ -16,7 +16,6 @@ package session
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/config"
@@ -32,27 +31,28 @@ const (
 // Middleware returns a session middleware that populates the information indicates whether
 // the request carries session or not
 func Middleware() func(http.Handler) http.Handler {
+	secure := secureCookie()
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Determine if the external endpoint utilizes TLS (HTTPS)
-			secure := true
-			ep, err := config.ExtEndpoint()
-			if err == nil && strings.HasPrefix(strings.ToLower(ep), "http://") {
-				secure = false
-			}
-			if secure {
-				r.URL.Scheme = "https"
-			}
-
 			// We can check the cookie directly b/c the filter and controllerRegistry is executed after middleware, so no session
 			// cookie is added by beego.
-			_, err = r.Cookie(config.SessionCookieName)
+			_, err := r.Cookie(config.SessionCookieName)
 			if err == nil {
 				r = r.WithContext(lib.WithCarrySession(r.Context(), true))
 			}
 
 			if r.Header.Get(HeaderNoSessionRenewal) != "" {
 				r = r.WithContext(lib.WithSkipSessionRenewal(r.Context(), true))
+			}
+
+			// Beego marks the session cookie secure only when the request itself
+			// carries TLS, and core is reached over plain HTTP whenever TLS is
+			// terminated in front of it. Report the protocol the browser used, the
+			// way honouring X-Forwarded-Proto would.
+			if secure && r.TLS == nil {
+				withTLS := *r
+				withTLS.TLS = tlsTerminated
+				r = &withTLS
 			}
 
 			handler.ServeHTTP(w, r)
