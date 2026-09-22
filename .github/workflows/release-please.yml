@@ -7,14 +7,15 @@ on:
       - main
       - "release-[0-9]*.[0-9]*"
 
-permissions:
-  contents: write
-  pull-requests: write
+permissions: {}
 
 jobs:
   validate-release-ref:
     name: Validate Release Ref
     runs-on: ubuntu-26.04
+    permissions:
+      # checkout, plus the tag lookup that rejects a stale chart release-as
+      contents: read
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -49,6 +50,11 @@ jobs:
   release-please:
     needs: [validate-release-ref]
     runs-on: ubuntu-26.04
+    permissions:
+      # tags, releases, and the VERSION commit pushed to the release PR branch
+      contents: write
+      # opens and updates the release PR
+      pull-requests: write
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
@@ -133,6 +139,9 @@ jobs:
     if: ${{ !cancelled() && needs.release-please.result == 'success' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 5
+    permissions:
+      # gh pr list only
+      pull-requests: read
     env:
       GH_TOKEN: ${{ github.token }}
     outputs:

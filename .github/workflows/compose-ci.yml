@@ -9,13 +9,14 @@ on:
       - ".github/workflows/compose-ci.yml"
       - ".github/actions/setup-task/**"
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   compose-check:
     name: Compose env drift
     runs-on: ubuntu-26.04
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

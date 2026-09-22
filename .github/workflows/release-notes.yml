@@ -13,6 +13,8 @@ on:
         default: false
         type: boolean
 
+permissions: {}
+
 jobs:
   recreate:
     permissions:
