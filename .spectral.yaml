@@ -7,6 +7,7 @@ functions: [requireRequestId]
 rules:
   no-$ref-siblings: false
   oas2-valid-schema-example: false
+  oas2-api-host: false
 
   required-operationId:
     description: must have a operationId.
@@ -48,3 +49,20 @@ rules:
     then:
       field: summary
       function: truthy
+
+  no-host:
+    description: must not declare host; clients use relative paths.
+    given: $
+    severity: error
+    then:
+      field: host
+      function: undefined
+
+  https-only-schemes:
+    description: schemes must not advertise plaintext http.
+    given: $.schemes[*]
+    severity: error
+    then:
+      function: enumeration
+      functionOptions:
+        values: [https]
