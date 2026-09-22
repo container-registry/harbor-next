@@ -73,10 +73,12 @@ spec:
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
 metadata:
+  # Resource name kept as trivy-adapter: renaming it would orphan the
+  # ImagePolicy reference and the workload annotation rollout-sync patches.
   name: trivy-adapter
   namespace: flux-system
 spec:
-  image: 8gears.container-registry.com/8gcr/trivy-adapter
+  image: 8gears.container-registry.com/8gcr/harbor-scanner-trivy
   interval: 1m
   provider: generic
   secretRef:

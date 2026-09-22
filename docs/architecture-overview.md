@@ -98,7 +98,7 @@ Harbor is conventionally described in three layers:
 
 - **Exporter** (`src/cmd/exporter`, `src/pkg/exporter`) — exposes Prometheus metrics for the Harbor services.
 
-- **Scanning** — pluggable scanner integration (`src/pkg/scan`). Trivy is the default adapter (`HARBOR_SCANNER_TRIVY_VERSION` in `versions.env`); vulnerability reports and SBOM generation (`src/pkg/scan/sbom`) are supported.
+- **Scanning** — pluggable scanner integration (`src/pkg/scan`). Trivy is the default adapter, built and released by [`container-registry/harbor-scanner-trivy`](https://github.com/container-registry/harbor-scanner-trivy) and consumed here as a pinned image (`HARBOR_SCANNER_TRIVY_VERSION` in `versions.env`); vulnerability reports and SBOM generation (`src/pkg/scan/sbom`) are supported.
 
 ## Service-to-service authentication
 Distinct from user-facing auth (LDAP/OIDC/etc.), Harbor's components also authenticate to *one another* across the internal network. Most edges use a shared secret injected at deploy time via config; registry access additionally accepts bearer tokens minted by Core's token service:
