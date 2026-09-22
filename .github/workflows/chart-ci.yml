@@ -11,8 +11,7 @@ on:
       - ".github/scripts/chart-annotate-images.sh"
   merge_group:
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: chart-ci-${{ github.event.pull_request.number || github.ref }}
@@ -22,6 +21,8 @@ jobs:
   chart-quality:
     name: Chart Quality Gate
     runs-on: ubuntu-26.04
+    permissions:
+      contents: read
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

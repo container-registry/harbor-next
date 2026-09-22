@@ -29,6 +29,15 @@ on:
       SYNC_APP_PRIVATE_KEY:
         description: Private key for reading commercial branch metadata
         required: true
+
+# No permissions block, at either level, on purpose. This workflow's grant has
+# to differ per call site: the preview callers pass a release PR to rewrite and
+# grant pull-requests: write, the tag callers grant contents: write alone. One
+# fixed block here cannot serve both — it would ask the tag callers for a write
+# they deliberately withhold. A caller can only reduce what it hands a called
+# workflow, never raise it, so least privilege for this one is already settled
+# by the `permissions:` of each caller job. Adding a block here would not
+# tighten anything; it would only add a way to get it wrong.
 concurrency:
   group: release-notes-${{ inputs.tag_name || github.ref_name }}
   cancel-in-progress: false

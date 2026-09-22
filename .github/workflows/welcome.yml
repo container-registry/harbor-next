@@ -6,13 +6,16 @@ on:
   pull_request_target:
     types: [opened]
 
-permissions:
-  issues: write
-  pull-requests: write
+permissions: {}
 
 jobs:
   welcome:
     runs-on: ubuntu-26.04
+    permissions:
+      # greets first-time issue authors
+      issues: write
+      # greets first-time pull request authors
+      pull-requests: write
     steps:
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
