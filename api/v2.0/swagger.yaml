@@ -5814,7 +5814,7 @@ paths:
         - name: user_id
           in: path
           type: integer
-          format: int
+          format: int64
           required: true
       tags:
         - user
@@ -5840,7 +5840,7 @@ paths:
         - name: user_id
           in: path
           type: integer
-          format: int
+          format: int64
           required: true
           description: Registered user ID
         - name: profile
@@ -5874,7 +5874,7 @@ paths:
         - name: user_id
           in: path
           type: integer
-          format: int
+          format: int64
           required: true
           description: User ID for marking as to be removed.
       tags:
@@ -5909,7 +5909,7 @@ paths:
         - name: user_id
           in: path
           type: integer
-          format: int
+          format: int64
           required: true
         - name: sysadmin_flag
           in: body
@@ -5941,7 +5941,7 @@ paths:
         - name: user_id
           in: path
           type: integer
-          format: int
+          format: int64
           required: true
         - name: password
           in: body
@@ -6007,7 +6007,7 @@ paths:
         - name: user_id
           in: path
           type: integer
-          format: int
+          format: int64
           required: true
           description: User ID
         - name: secret
@@ -7111,13 +7111,13 @@ definitions:
     properties:
       total:
         type: integer
-        format: int
+        format: int64
         description: 'The total number of the found vulnerabilities'
         example: 500
         x-omitempty: false
       fixable:
         type: integer
-        format: int
+        format: int64
         description: 'The number of the fixable vulnerabilities'
         example: 100
         x-omitempty: false
@@ -7126,7 +7126,7 @@ definitions:
         description: 'Numbers of the vulnerabilities with different severity'
         additionalProperties:
           type: integer
-          format: int
+          format: int64
           example: 10
         example:
           'Critical': 5
@@ -7674,7 +7674,9 @@ definitions:
         description: The destination namespace.
       dest_namespace_replace_count:
         type: integer
-        format: int8
+        format: int32
+        minimum: -128
+        maximum: 127
         description: |-
           Specify how many path components will be replaced by the provided destination namespace.
           The default value is -1 in which case the legacy mode will be applied.
@@ -8211,11 +8213,11 @@ definitions:
     properties:
       total:
         type: integer
-        format: uint64
+        format: int64
         description: Total volume size.
       free:
         type: integer
-        format: uint64
+        format: int64
         description: Free volume size.
   GeneralInfo:
     type: object
@@ -8448,13 +8450,13 @@ definitions:
     properties:
       total:
         type: integer
-        format: int
+        format: int64
         description: 'The total number of scan processes triggered by the scan all action'
         example: 100
         x-omitempty: false
       completed:
         type: integer
-        format: int
+        format: int64
         description: 'The number of the finished scan processes triggered by the scan all action'
         example: 90
         x-omitempty: false
@@ -8463,7 +8465,7 @@ definitions:
         description: 'The metrics data for the each status'
         additionalProperties:
           type: integer
-          format: int
+          format: int64
           example: 10
         example:
           'Success': 5
@@ -9819,11 +9821,11 @@ definitions:
     properties:
       id:
         type: integer
-        format: int
+        format: int64
         description: the ID of the OIDC info record
       user_id:
         type: integer
-        format: int
+        format: int64
         description: the ID of the user
       subiss:
         type: string
@@ -9850,7 +9852,7 @@ definitions:
         type: string
       user_id:
         type: integer
-        format: int
+        format: int64
       username:
         type: string
       sysadmin_flag:
@@ -9881,7 +9883,7 @@ definitions:
     properties:
       user_id:
         type: integer
-        format: int
+        format: int64
         description: The ID of the user.
       username:
         type: string
@@ -9899,7 +9901,7 @@ definitions:
     properties:
       user_id:
         type: integer
-        format: int
+        format: int64
         description: The ID of the user.
       username:
         type: string
@@ -10308,7 +10310,7 @@ definitions:
         description: the severity of the CVE
       cvss_score_v3:
         type: number
-        format: float64
+        format: double
         description: the cvss score v3
       desc:
         type: string
