@@ -164,5 +164,6 @@ jobs:
             reports/html/
             reports/e2e-cucumber.json
             reports/e2e-junit-*.xml
+            reports/*.log
           if-no-files-found: warn
           retention-days: 14
