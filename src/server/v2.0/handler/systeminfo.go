@@ -70,8 +70,8 @@ func (s *sysInfoAPI) GetVolumes(ctx context.Context, _ systeminfo.GetVolumesPara
 	return systeminfo.NewGetVolumesOK().WithPayload(&models.SystemInfo{
 		Storage: []*models.Storage{
 			{
-				Free:  c.Free,
-				Total: c.Total,
+				Free:  int64(c.Free),
+				Total: int64(c.Total),
 			},
 		},
 	})
