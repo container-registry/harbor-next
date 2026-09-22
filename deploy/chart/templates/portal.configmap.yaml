@@ -35,6 +35,7 @@ data:
             include /etc/nginx/mime.types;
             add_header X-Frame-Options DENY always;
             add_header Content-Security-Policy "frame-ancestors 'none'" always;
+            add_header X-Content-Type-Options nosniff always;
             gzip on;
             gzip_min_length 1000;
             gzip_proxied expired no-cache no-store private auth;
@@ -49,6 +50,7 @@ data:
                 add_header Cache-Control "no-store, no-cache, must-revalidate";
                 add_header X-Frame-Options DENY always;
                 add_header Content-Security-Policy "frame-ancestors 'none'" always;
+                add_header X-Content-Type-Options nosniff always;
             }
         }
     }
