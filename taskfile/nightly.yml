@@ -59,6 +59,18 @@ tasks:
       - task: _validate-stamp
       - printf '%s\n' "${NIGHTLY_VERSION}"
 
+  dev-tag:
+    desc: "Print the rolling image tag for the release this line is heading for"
+    silent: true
+    # A moving pointer at the newest nightly of the minor under development:
+    # vX.Y.Z-dev, alongside the dated tag. Someone who wants "the current
+    # 2.16.0 preview" pulls this and gets last night's build without having to
+    # know the date. It carries no date on purpose, so it is overwritten every
+    # night; the dated tag is what stays pinned.
+    env:
+      DEV_TAG: 'v{{.VERSION}}-dev'
+    cmd: printf '%s\n' "${DEV_TAG}"
+
   channel:
     desc: "Materialize tonight's release-please channel (PUSH_CHANNEL=true to publish the branch)"
     preconditions:
@@ -215,6 +227,18 @@ tasks:
         else
           ok 'version rejects a bad stamp'
         fi
+
+        # The rolling tag: no date, and a tag the published-tag guard accepts
+        # is NOT what this is — it is an image tag, not a release tag.
+        if out=$(task -o interleaved nightly:dev-tag 2>&1) && [ "${out}" = 'v{{.VERSION}}-dev' ]; then
+          ok 'dev tag names the minor under development'
+        else
+          bad "dev tag: got: ${out}"
+        fi
+        case "$(task -o interleaved nightly:dev-tag 2>&1)" in
+          *-nightly-*) bad 'dev tag carries a date' ;;
+          *) ok 'dev tag carries no date' ;;
+        esac
 
         # The published-tag guard, which the e2e workflow runs before a tag
         # reaches an image reference.

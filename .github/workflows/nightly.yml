@@ -47,6 +47,7 @@ jobs:
       contents: write
     outputs:
       version: ${{ steps.version.outputs.version }}
+      dev_tag: ${{ steps.version.outputs.dev_tag }}
     env:
       DATE_STAMP: ${{ inputs.date_stamp }}
       # Read by the askpass script below when the channel branch is pushed.
@@ -93,7 +94,11 @@ jobs:
           # shellcheck disable=SC2086
           version=$(task -o interleaved nightly:version ${DATE_STAMP:+DATE_STAMP="${DATE_STAMP}"})
           echo "version=${version}" >> "$GITHUB_OUTPUT"
-          echo "::notice::Nightly version ${version}"
+          # The rolling tag for the minor under development, published next to
+          # the dated one so "the current preview" is pullable without a date.
+          dev_tag=$(task -o interleaved nightly:dev-tag)
+          echo "dev_tag=${dev_tag}" >> "$GITHUB_OUTPUT"
+          echo "::notice::Nightly version ${version} (also tagged ${dev_tag})"
 
       - name: Open the nightly channel
         run: |
@@ -157,7 +162,7 @@ jobs:
 
   publish-images:
     name: Publish Nightly Images
-    needs: [release]
+    needs: [channel, release]
     if: ${{ needs.release.outputs.release_created == 'true' }}
     permissions:
       contents: read
@@ -168,6 +173,8 @@ jobs:
       image_tag: ${{ needs.release.outputs.tag_name }}
       version: ${{ needs.release.outputs.version }}
       artifact_prefix: nightly-${{ needs.release.outputs.tag_name }}
+      # Same digest as the dated tag, so the signature covers both.
+      extra_image_tags: ${{ needs.channel.outputs.dev_tag }}
       registry_address: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
       registry_project: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
     secrets:
