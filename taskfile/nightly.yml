@@ -161,6 +161,10 @@ tasks:
         rejects 'stamp short'               GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP=202609
         rejects 'stamp long'                GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP=202609211
         rejects 'stamp trailing text'       GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP='20260921 rm -rf /'
+        rejects 'stamp month 13'            GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP=20261340
+        rejects 'stamp day 31 in September' GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP=20260931
+        rejects 'stamp 29 Feb, common year' GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP=20260229
+        accepts 'stamp 29 Feb, leap year'   GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP=20280229
         rejects 'stamp command substitution' GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP='$(id)'
         rejects 'stamp quote break'         GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP="x'; id #"
         # Eight digits on their own line: a line-at-a-time regex accepts this.
@@ -199,11 +203,81 @@ tasks:
           ok 'version rejects a bad stamp'
         fi
 
+        # The published-tag guard, which the e2e workflow runs before a tag
+        # reaches an image reference.
+        tag_guard() { task nightly:validate-tag TAG="$1" 2>&1; }
+        for good in v2.16.0 v2.16.0-nightly-20260922 v10.0.1; do
+          if out=$(tag_guard "${good}"); then ok "tag ${good}"; else bad "tag ${good}: rejected: ${out}"; fi
+        done
+        for nope in v2.16 2.16.0 v1.2.3.4 v2.16.0-rc1 'v2.16.0; id' 'v2.16.0-nightly-2026' "$(printf 'x\nv2.16.0')" ''; do
+          out=$(tag_guard "${nope}" || true)
+          case "${out}" in
+            *uid=*) bad "tag '${nope}': id executed" ;;
+            *) if task nightly:validate-tag TAG="${nope}" >/dev/null 2>&1; then bad "tag '${nope}': accepted"; else ok "tag rejected: '${nope}'"; fi ;;
+          esac
+        done
+
         if [ "${failures}" -ne 0 ]; then
           printf '\n%s nightly guard test(s) failed\n' "${failures}" >&2
           exit 1
         fi
         printf '\nnightly guard tests passed\n'
+
+  validate-tag:
+    desc: "Guard a published release tag before it reaches an image reference (TAG)"
+    silent: true
+    # Used by the e2e workflow for both channels. It lives here rather than
+    # with the suite because it has to run before the megamerge that brings
+    # the suite in — and because a tag from a caller reaches both an image
+    # reference and a Task command line.
+    requires:
+      vars: [TAG]
+    env:
+      TAG: '{{.TAG}}'
+    cmd: |
+      # Globs, not regexes: grep and [[ =~ ]] match a line at a time, so a
+      # value carrying a newline next to a tag would pass either.
+      case "${TAG}" in
+        v[0-9]*.[0-9]*.[0-9]*) ;;
+        *)
+          printf '::error::not a release tag: %s\n' "${TAG}" >&2
+          exit 1
+          ;;
+      esac
+      rest="${TAG#v}"
+      # Exactly three numeric components, optionally followed by a prerelease.
+      version="${rest%%-*}"
+      suffix=""
+      if [ "${version}" != "${rest}" ]; then
+        suffix="${rest#*-}"
+      fi
+      case "${version}" in
+        *[!0-9.]* | *..* | .* | *. | "")
+          printf '::error::not a release tag: %s\n' "${TAG}" >&2
+          exit 1
+          ;;
+      esac
+      case "${version}" in
+        *.*.*.* | *.*.*) ;;
+        *)
+          printf '::error::not a release tag: %s\n' "${TAG}" >&2
+          exit 1
+          ;;
+      esac
+      case "${version}" in
+        *.*.*.*)
+          printf '::error::not a release tag: %s\n' "${TAG}" >&2
+          exit 1
+          ;;
+      esac
+      # The only prerelease this project publishes.
+      case "${suffix}" in
+        "" | nightly-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
+        *)
+          printf '::error::not a release tag: %s\n' "${TAG}" >&2
+          exit 1
+          ;;
+      esac
 
   _validate-ref:
     internal: true
@@ -260,6 +334,15 @@ tasks:
           exit 1
           ;;
       esac
+      # Eight digits is a shape, not a date: 20261340 and 20260231 both pass
+      # the glob above, and either would name a nightly tag after a day that
+      # does not exist. Round-tripping through date settles it — a value the
+      # calendar does not have comes back different, or not at all. Safe to
+      # pass along by now: it is eight digits and nothing else.
+      if [ "$(date -u -d "${stamp}" +%Y%m%d 2>/dev/null)" != "${stamp}" ]; then
+        printf '::error::DATE_STAMP is not a real date: %s\n' "${stamp}" >&2
+        exit 1
+      fi
 
   _derive-config:
     internal: true

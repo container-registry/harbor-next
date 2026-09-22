@@ -234,3 +234,23 @@ jobs:
             IMAGE_TAG="${IMAGE_TAG}" \
             REGISTRY_ADDRESS="${REGISTRY_ADDRESS}" \
             REGISTRY_PROJECT="${REGISTRY_PROJECT}"
+
+  e2e:
+    name: E2E
+    # After verify: the suite pulls these images, so there is no point
+    # running before both architectures are known to be there.
+    needs: [release, verify]
+    if: ${{ needs.release.outputs.release_created == 'true' }}
+    permissions:
+      contents: read
+    uses: $/.github/workflows/nightly-e2e.yml
+    with:
+      tag: ${{ needs.release.outputs.tag_name }}
+      channel: nightly
+      # Where these images actually went, resolved the same way the publish
+      # job resolves it.
+      registry_address: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
+      registry_project: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
+    secrets:
+      SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+      REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}

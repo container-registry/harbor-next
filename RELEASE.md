@@ -178,6 +178,12 @@ The channel is release-please configuration, not a separate build path:
 
 Two things follow from the channel being rebuilt every night. An empty night, where nothing has landed since the last real release, produces no release PR: the run ends green having published nothing, and says so. And a nightly that already tagged cannot be re-run for the same date, because that tag exists; re-run a nightly that failed before tagging, and pass `date_stamp` if you need a second one on the same day.
 
+Every published image set is then handed to the end-to-end suite by the `E2E` workflow, which nightlies and releases both call. The suite does not live in this repository: it lives on the `dev` overlay branch in `container-registry/8gcr`, and the run brings it here the way the commercial patches are brought here — `task apply-patches OVERLAY_BRANCHES=dev` octopuses the declared patch series plus the overlay onto the commit under test. The run therefore stands in the megamerge the images were built from.
+
+The published tag's own tree cannot stand in for that. A nightly's tag sits on the throwaway `nightly` branch, which carries neither the commercial patches (they are applied when the images are built and never committed) nor the suite. `OVERLAY_BRANCHES` is deliberately not the patch series file: a branch listed there would be built into released images, and the overlay must never be.
+
+Results are published twice: a gocure HTML report in the run's artifacts, and a job summary rendered from the same cucumber document — a pie of scenario outcomes and, per feature, every step with its result and timing.
+
 Merging the nightly release PR is the one merge this repository automates. It happens inside the workflow, on a branch that is thrown away the next night, and it never touches a release PR on `main` or `release-X.Y`.
 
 ### Version timeline

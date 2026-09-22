@@ -315,9 +315,10 @@ tasks:
   taskfiles:
     desc: "Run the Taskfile-level guard tests"
     cmds:
-      # Spawned rather than called: these live in another included taskfile,
+      # Spawned rather than called: these live in other included taskfiles,
       # which this one cannot reach by name.
       - task nightly:test
+      - task release-notes:test
 
   quick:
     desc: "Run API lint and unit tests only (fast validation)"

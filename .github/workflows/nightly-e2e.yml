@@ -1,0 +1,161 @@
+name: E2E
+
+# The end-to-end suite, run against a published image set.
+#
+# The suite does not live in this repository. It lives on the `dev` overlay
+# branch in container-registry/8gcr, alongside the taskfile that drives it,
+# and it is brought here the same way the commercial patches are: octopused
+# onto this commit by `task apply-patches`. A run therefore stands in the
+# megamerge the images under test were built from — main, the declared
+# commercial patches, and the overlay on top.
+#
+# The published tag's own tree is no substitute. A nightly's tag sits on the
+# throwaway `nightly` branch, which carries neither the commercial patches
+# (applied when the images are built, never committed) nor the suite.
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Published tag to test (for example v2.16.0-nightly-20260922)
+        required: true
+        type: string
+      channel:
+        description: nightly or release
+        required: true
+        type: string
+      godog_tags:
+        description: Optional godog tag expression
+        required: false
+        type: string
+      registry_address:
+        required: false
+        type: string
+      registry_project:
+        required: false
+        type: string
+    secrets:
+      # Reads the commercial patch branches and the dev overlay out of 8gcr,
+      # the same way the image build reads the patches.
+      SYNC_APP_PRIVATE_KEY:
+        required: true
+      REGISTRY_PASSWORD:
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published tag to test (for example v2.16.0-nightly-20260922)
+        required: true
+        type: string
+      channel:
+        description: nightly or release
+        required: false
+        default: nightly
+        type: string
+      godog_tags:
+        description: Optional godog tag expression
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  # One run per tag; a second is only ever a duplicate of the first.
+  group: e2e-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    name: E2E (${{ inputs.tag }})
+    runs-on: ubuntu-26.04
+    # Image pulls, a full compose stack and the suite itself.
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      TAG: ${{ inputs.tag }}
+      GODOG_TAGS: ${{ inputs.godog_tags }}
+      REGISTRY_ADDRESS: ${{ inputs.registry_address || vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
+      REGISTRY_PROJECT: ${{ inputs.registry_project || vars.REGISTRY_PROJECT || '8gcr' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history: the octopus needs a merge base with every branch it
+          # merges, and the predecessor lookup walks the tags.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: $/.github/actions/setup-task
+
+      - name: Setup Go
+        uses: $/.github/actions/setup-go-cached
+        with:
+          go-version-file: src/go.mod
+          go-sum-path: src/go.sum
+
+      - name: Validate the tag
+        env:
+          TAG: ${{ inputs.tag }}
+        # The tag reaches an image reference and a Task command line, so
+        # nothing but a release tag may pass.
+        run: task nightly:validate-tag TAG="${TAG}"
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.SYNC_APP_ID }}
+          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+          owner: container-registry
+          repositories: 8gcr
+          # Reading the patch branches and the overlay is all this needs.
+          permission-contents: read
+
+      - name: Build the megamerge
+        env:
+          PATCHES_TOKEN: ${{ steps.app-token.outputs.token }}
+        # The declared commercial patches plus the dev overlay that carries
+        # the suite. Same task the release build uses; the overlay is the
+        # only difference, and it is never part of a release.
+        run: task apply-patches OVERLAY_BRANCHES=dev
+
+      - name: Log in to the registry
+        # Verification must not depend on anonymous pull staying open, even
+        # though the project answers unauthenticated today.
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY_ADDRESS }}
+          username: ${{ vars.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Run the suite
+        # e2e:images comes from the overlay, not from this repository.
+        # E2E_IN_TREE keeps it here instead of cloning the tag.
+        run: |
+          task e2e:images \
+            TAG="${TAG}" \
+            E2E_IN_TREE=true \
+            E2E_TMP_CLONE=. \
+            E2E_IMAGE_REPO="${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/" \
+            ${GODOG_TAGS:+TAGS="${GODOG_TAGS}"}
+
+      - name: Render the report
+        # always(): a failing run is exactly when the report is worth having.
+        if: ${{ always() }}
+        run: |
+          task e2e:report \
+            REPORT_TITLE="E2E — ${TAG}" \
+            REPORT_EXTRA="| Images | \`${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}\` @ \`${TAG}\` |"
+
+      - name: Upload the reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: e2e-${{ inputs.tag }}
+          path: |
+            reports/html/
+            reports/e2e-cucumber.json
+            reports/e2e-junit-*.xml
+          if-no-files-found: warn
+          retention-days: 14

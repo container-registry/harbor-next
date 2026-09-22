@@ -20,6 +20,20 @@ vars:
         NF && seen[$0]++ { print "Duplicate commercial patch branch: " $0 > "/dev/stderr"; exit 1 }
         NF { print }
       ' '{{.PATCHES_SERIES}}'
+  # Branches octopused on top of the declared series without being part of it.
+  # Empty for every release: what ships is the declared series and nothing
+  # else, so a release build is unchanged by this existing. The nightly e2e
+  # run passes `dev`, the development overlay that carries the suite.
+  #
+  # Deliberately not the series file: a branch listed there would be built
+  # into released images.
+  OVERLAY_BRANCHES: '{{.OVERLAY_BRANCHES | default ""}}'
+  # What the octopus actually merges. Overlays come last so they land on top
+  # of the patches.
+  MERGE_BRANCHES:
+    sh: |
+      printf '%s\n' '{{.PATCH_BRANCHES}}'
+      printf '%s' '{{.OVERLAY_BRANCHES}}' | tr ',' '\n' | sed '/^[[:space:]]*$/d'
 
 tasks:
   apply-patches:
@@ -74,7 +88,7 @@ tasks:
     requires:
       vars: [PATCH_BRANCHES]
     env:
-      DECLARED_PATCH_BRANCHES: '{{.PATCH_BRANCHES}}'
+      DECLARED_PATCH_BRANCHES: '{{.MERGE_BRANCHES}}'
     cmds:
       - |
         while IFS= read -r branch; do
@@ -106,7 +120,7 @@ tasks:
       GIT_ASKPASS: '{{.PATCH_AUTH_DIR}}/git-askpass'
       GIT_TERMINAL_PROMPT: '0'
       PATCHES_FETCH_URL: '{{.PATCHES_REMOTE_URL}}'
-      DECLARED_PATCH_BRANCHES: '{{.PATCH_BRANCHES}}'
+      DECLARED_PATCH_BRANCHES: '{{.MERGE_BRANCHES}}'
     cmds:
       - |
         refspecs=()
@@ -118,7 +132,7 @@ tasks:
   _validate-patches:
     internal: true
     env:
-      DECLARED_PATCH_BRANCHES: '{{.PATCH_BRANCHES}}'
+      DECLARED_PATCH_BRANCHES: '{{.MERGE_BRANCHES}}'
     cmds:
       - |
         # Patch branches carry real multi-commit history plus sync-merge
@@ -147,7 +161,7 @@ tasks:
   _octopus-patches:
     internal: true
     env:
-      DECLARED_PATCH_BRANCHES: '{{.PATCH_BRANCHES}}'
+      DECLARED_PATCH_BRANCHES: '{{.MERGE_BRANCHES}}'
     status:
       - |
         patch_revset=$(printf '%s\n' "${DECLARED_PATCH_BRANCHES}" | while IFS= read -r branch; do
@@ -170,7 +184,7 @@ tasks:
   _verify-patches:
     internal: true
     env:
-      DECLARED_PATCH_BRANCHES: '{{.PATCH_BRANCHES}}'
+      DECLARED_PATCH_BRANCHES: '{{.MERGE_BRANCHES}}'
     preconditions:
       - sh: test -z "$(jj log -r '::@ & conflicts()' --no-graph -T commit_id)"
         msg: "commercial patches did not apply cleanly; run 'jj resolve --list'"
