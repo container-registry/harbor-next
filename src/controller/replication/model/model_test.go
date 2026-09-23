@@ -286,3 +286,42 @@ func TestValidate(t *testing.T) {
 	err = policy.Validate()
 	assert.Nil(err)
 }
+
+func TestFilterKindRoundTrip(t *testing.T) {
+	assert := assert.New(t)
+
+	policy := &Policy{
+		Name:         "policy01",
+		SrcRegistry:  &model.Registry{ID: 0},
+		DestRegistry: &model.Registry{ID: 1},
+		Filters: []*model.Filter{
+			{Type: model.FilterTypeName, Value: "library/.*", Kind: model.FilterKindRegex},
+			{Type: model.FilterTypeTag, Value: "v1.*"},
+		},
+	}
+	stored, err := policy.To()
+	assert.Nil(err)
+
+	loaded := &Policy{}
+	assert.Nil(loaded.From(stored))
+	assert.Equal(2, len(loaded.Filters))
+	assert.Equal(model.FilterKindRegex, loaded.Filters[0].Kind)
+	assert.Equal("", loaded.Filters[1].Kind)
+	// the pattern has to come back untouched, an escaped or mangled one would
+	// quietly change which artifacts the policy selects
+	assert.Equal("library/.*", loaded.Filters[0].Value)
+	assert.Equal("v1.*", loaded.Filters[1].Value)
+}
+
+func TestParseFiltersLegacyKind(t *testing.T) {
+	assert := assert.New(t)
+
+	// on a pre-1.10 filter the "kind" field names the filter itself, it must not be
+	// taken for a pattern engine
+	filters, err := parseFilters(`[{"kind":"tag","pattern":"v1.*"}]`)
+	assert.Nil(err)
+	assert.Equal(1, len(filters))
+	assert.Equal(model.FilterTypeTag, filters[0].Type)
+	assert.Equal("v1.*", filters[0].Value)
+	assert.Equal("", filters[0].Kind)
+}

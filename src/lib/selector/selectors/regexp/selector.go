@@ -17,16 +17,14 @@ package regexp
 import (
 	"encoding/json"
 	"regexp"
-	"sync"
-	"unicode/utf8"
 
-	"github.com/goharbor/harbor/src/lib/errors"
+	"github.com/goharbor/harbor/src/lib/pattern"
 	iselector "github.com/goharbor/harbor/src/lib/selector"
 )
 
 const (
 	// Kind ...
-	Kind = "regex"
+	Kind = pattern.KindRegex
 	// Matches [pattern] for tag (default)
 	Matches = "matches"
 	// Excludes [pattern] for tag (default)
@@ -41,7 +39,7 @@ const (
 	NSExcludes = "nsExcludes"
 
 	// MaxPatternLength bounds the compile cost of a user supplied pattern
-	MaxPatternLength = 512
+	MaxPatternLength = pattern.MaxRegexLength
 )
 
 // selector for regular expression
@@ -49,51 +47,23 @@ type selector struct {
 	// Pre defined pattern declarator
 	// "matches", "excludes", "repoMatches" or "repoExcludes"
 	decoration string
-	// The pattern expression
-	pattern string
 	// whether match untagged
 	untagged bool
 
 	// The pattern is compiled on first use and the outcome kept, so that a
 	// policy evaluated over thousands of artifacts compiles only once.
-	once       sync.Once
-	expression *regexp.Regexp
-	compileErr error
+	matcher *pattern.Matcher
 }
 
 // Compile validates and compiles the pattern with the full string semantics of
 // doublestar.Match: the whole candidate value has to be matched, not a substring.
-func Compile(pattern string) (*regexp.Regexp, error) {
-	if l := utf8.RuneCountInString(pattern); l > MaxPatternLength {
-		return nil, errors.Errorf("regex pattern is limited to %d characters, got %d", MaxPatternLength, l)
-	}
-
-	// The pattern has to hold up on its own before it is wrapped: an unbalanced
-	// group such as `foo)|(?:bar` is rejected here but would compile once
-	// wrapped, as an alternation of `\A(?:foo)` and `(?:bar)\z`, and would then
-	// match on a prefix or a suffix instead of the full string.
-	if _, err := regexp.Compile(pattern); err != nil {
-		return nil, errors.Wrapf(err, "invalid regex pattern %q", pattern)
-	}
-
-	expression, err := regexp.Compile(`\A(?:` + pattern + `)\z`)
-	if err != nil {
-		return nil, errors.Wrapf(err, "invalid regex pattern %q", pattern)
-	}
-
-	return expression, nil
+func Compile(expr string) (*regexp.Regexp, error) {
+	return pattern.CompileRegex(expr)
 }
 
 // Validate checks whether the pattern is usable as a regex selector pattern
-func Validate(pattern string) error {
-	// an empty pattern matches everything and is never compiled
-	if len(pattern) == 0 {
-		return nil
-	}
-
-	_, err := Compile(pattern)
-
-	return err
+func Validate(expr string) error {
+	return pattern.ValidateRegex(expr)
 }
 
 // Select candidates by regular expressions
@@ -181,23 +151,11 @@ func (s *selector) tagSelectExclude(artifact *iselector.Candidate) (selected boo
 
 // match returns whether the str matches the pattern of the selector
 func (s *selector) match(str string) (bool, error) {
-	if len(s.pattern) == 0 {
-		return true, nil
-	}
-
-	s.once.Do(func() {
-		s.expression, s.compileErr = Compile(s.pattern)
-	})
-
-	if s.compileErr != nil {
-		return false, s.compileErr
-	}
-
-	return s.expression.MatchString(str), nil
+	return s.matcher.Match(str)
 }
 
 // New is factory method for regex selector
-func New(decoration string, pattern any, extras string) iselector.Selector {
+func New(decoration string, expr any, extras string) iselector.Selector {
 	untagged := true // default behavior for upgrade, active keep the untagged images
 	if decoration == Excludes {
 		untagged = false
@@ -212,13 +170,13 @@ func New(decoration string, pattern any, extras string) iselector.Selector {
 	}
 
 	var p string
-	if pattern != nil {
-		p, _ = pattern.(string)
+	if expr != nil {
+		p, _ = expr.(string)
 	}
 
 	return &selector{
 		decoration: decoration,
-		pattern:    p,
 		untagged:   untagged,
+		matcher:    pattern.NewMatcher(Kind, p),
 	}
 }

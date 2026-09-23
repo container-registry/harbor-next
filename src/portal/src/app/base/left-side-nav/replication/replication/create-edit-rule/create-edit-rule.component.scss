@@ -25,9 +25,11 @@ h4 {
     margin-right: 10px;
 }
 
+// the widest row (decoration + engine + value + tooltip) measures 611px, and the
+// large modal leaves 642px next to the label column
 .filterSelect {
     position: relative;
-    width: 315px;
+    width: 620px;
     margin-bottom:0.25rem;
 }
 
@@ -136,12 +138,6 @@ h4 {
     right: 50px;
     top: 8px;
     transform: rotate(180deg);
-}
-
-clr-modal {
-    ::ng-deep div.modal-dialog {
-        width: 32rem;
-    }
 }
 
 .deletedDiv {
@@ -271,8 +267,14 @@ clr-modal {
     width: 5rem;
 }
 
+// a regular expression needs more room than a glob, and the tag and label rows
+// can spare it: at 10rem the widest row is 611px against the 642px available
 .width-tag-label {
-    width: 6rem;
+    width: 10rem;
+}
+
+.width-engine {
+    width: 6.5rem;
 }
 
 .right-align {

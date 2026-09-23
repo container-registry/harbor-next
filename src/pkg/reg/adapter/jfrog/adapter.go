@@ -216,16 +216,18 @@ func (a *adapter) listAllRepositories() ([]*repository, error) {
 // listRepositories lists repositories from jfrog
 func (a *adapter) listRepositories(filters []*model.Filter) ([]*model.Repository, error) {
 	pattern := ""
+	kind := ""
 	for _, filter := range filters {
 		if filter.Type == model.FilterTypeName {
 			pattern = filter.Value.(string)
+			kind = filter.Kind
 			break
 		}
 	}
 	var totalRepos []string
 	// if the pattern of repository name filter is a specific repository name, just returns
 	// the parsed repositories and will check the existence later when filtering the tags
-	if paths, ok := util.IsSpecificPath(pattern); ok {
+	if paths, ok := util.IsSpecificPathForKind(kind, pattern); ok {
 		totalRepos = paths
 	} else {
 		// search repositories from catalog API
