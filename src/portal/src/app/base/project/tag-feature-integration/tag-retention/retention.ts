@@ -46,6 +46,11 @@ export class Retention extends BaseRetention {
     }
 }
 
+// pattern engines a selector can be evaluated with, as advertised by
+// GET /retentions/metadatas
+export const SELECTOR_KIND_DOUBLESTAR: string = 'doublestar';
+export const SELECTOR_KIND_REGEX: string = 'regex';
+
 export class BaseRule {
     disabled: boolean;
     template: string;
@@ -63,7 +68,7 @@ export class BaseRule {
         this.scope_selectors = {
             repository: [
                 {
-                    kind: 'doublestar',
+                    kind: SELECTOR_KIND_DOUBLESTAR,
                     decoration: 'repoMatches',
                     pattern: '**',
                 },
@@ -71,7 +76,7 @@ export class BaseRule {
         };
         this.tag_selectors = [
             {
-                kind: 'doublestar',
+                kind: SELECTOR_KIND_DOUBLESTAR,
                 decoration: 'matches',
                 pattern: '**',
             },
@@ -155,6 +160,63 @@ export class RuleMetadate {
             },
         ];
     }
+}
+
+// kinds advertised by the metadata endpoint, in the order the backend lists
+// them; the first one is the default for a new rule
+export function selectorKinds(
+    selectors: Array<SelectorRuleMetadate>
+): Array<string> {
+    return (selectors || []).map(s => s && s.kind).filter(kind => !!kind);
+}
+
+// decorations of the metadata entry for the given kind, falling back to the
+// first entry so a backend that advertises a single kind keeps working
+export function selectorDecorations(
+    selectors: Array<SelectorRuleMetadate>,
+    kind: string
+): Array<string> {
+    const entries = selectors || [];
+    const entry = entries.find(s => s && s.kind === kind) || entries[0];
+    return (entry && entry.decorations) || [];
+}
+
+// The portal wraps a comma separated list in braces because that is doublestar
+// syntax for alternation. A regex expresses alternation natively and uses
+// braces for quantifiers such as {2,3}, so the pattern is stored verbatim.
+export function wrapPattern(pattern: string, kind: string): string {
+    if (kind === SELECTOR_KIND_REGEX) {
+        return pattern;
+    }
+    if (
+        pattern.indexOf(',') !== -1 &&
+        pattern.indexOf('{') === -1 &&
+        pattern.indexOf('}') === -1
+    ) {
+        return '{' + pattern + '}';
+    }
+    return pattern;
+}
+
+// Whitespace carries no meaning in a doublestar repository or tag pattern, so it
+// is stripped on save to forgive a pasted comma list like "a, b". In a regex a
+// space is a literal character — inside a character class or an alternation it is
+// part of the expression — so the pattern is stored exactly as it was typed.
+export function normalizePattern(pattern: string, kind: string): string {
+    if (kind === SELECTOR_KIND_REGEX) {
+        return pattern;
+    }
+    return pattern.replace(/\s+/g, '');
+}
+
+export function unwrapPattern(pattern: string, kind: string): string {
+    if (kind === SELECTOR_KIND_REGEX) {
+        return pattern;
+    }
+    if (/^{\S+}$/.test(pattern)) {
+        return pattern.slice(1, pattern.length - 1);
+    }
+    return pattern;
 }
 
 export const RUNNING: string = 'Running';
