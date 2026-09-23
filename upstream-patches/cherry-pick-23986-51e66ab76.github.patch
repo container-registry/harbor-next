@@ -1,0 +1,452 @@
+diff --git a/.github/workflows/CI.yml b/.github/workflows/CI.yml
+new file mode 100644
+index 000000000..9a47c85d3
+--- /dev/null
++++ b/.github/workflows/CI.yml
+@@ -0,0 +1,381 @@
++name: CI
++permissions:
++  contents: read
++
++env:
++   POSTGRESQL_HOST: localhost
++   POSTGRESQL_PORT: 5432
++   POSTGRESQL_USR: postgres
++   POSTGRESQL_PWD: root123
++   POSTGRESQL_DATABASE: registry
++   DOCKER_COMPOSE_VERSION: 2.27.1
++   HARBOR_ADMIN: admin
++   HARBOR_ADMIN_PASSWD: Harbor12345
++   CORE_SECRET: tempString
++   KEY_PATH: "/data/secret/keys/secretkey"
++   REDIS_HOST: localhost
++   REG_VERSION: v2.7.1-patch-2819-2553
++   UI_BUILDER_VERSION: 1.6.0
++
++on:
++  # the paths-ignore is the same as the paths in pass-CI.yml, they should be synced together
++  # see https://web.archive.org/web/20230506145443/https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/troubleshooting-required-status-checks#handling-skipped-but-required-checks
++  pull_request:
++    paths-ignore:
++      - 'docs/**'
++      - '**.md'
++      - 'tests/**'
++      - '!tests/**.sh'
++      - '!tests/apitests/**'
++      - '!tests/ci/**'
++      - '!tests/resources/**'
++      - '!tests/robot-cases/**'
++      - '!tests/robot-cases/Group1-Nightly/**'
++  merge_group:
++  push:
++    # the paths-ignore is the same as the paths in pass-CI.yml, they should be synced together
++    paths-ignore:
++      - 'docs/**'
++      - '**.md'
++      - 'tests/**'
++      - '!tests/**.sh'
++      - '!tests/apitests/**'
++      - '!tests/ci/**'
++      - '!tests/resources/**'
++      - '!tests/robot-cases/**'
++      - '!tests/robot-cases/Group1-Nightly/**'
++
++jobs:
++  UTTEST:
++    env:
++       UTTEST: true
++    runs-on:
++      #- self-hosted
++      - cncf-ubuntu-16-64-x86
++    timeout-minutes: 100
++    steps:
++      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
++        with:
++         path: src/github.com/goharbor/harbor
++      - name: Set up Go 1.26
++        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
++        with:
++           go-version: 1.26.4
++           cache-dependency-path: src/github.com/goharbor/harbor/src/go.sum
++        id: go
++      - name: Cache CI Go tools
++        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
++        with:
++          path: ~/go/bin
++          key: ci-gotools-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src/github.com/goharbor/harbor/tests/ci/ut_install.sh') }}
++      - name: setup env
++        run: |
++          cd src/github.com/goharbor/harbor
++          pwd
++          go env
++          echo "GOPATH=$(go env GOPATH):$GITHUB_WORKSPACE" >> $GITHUB_ENV
++          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
++          echo "TOKEN_PRIVATE_KEY_PATH=${GITHUB_WORKSPACE}/src/github.com/goharbor/harbor/tests/private_key.pem" >> $GITHUB_ENV
++        shell: bash
++      - name: before_install
++        run: |
++          set -x
++          cd src/github.com/goharbor/harbor
++          pwd
++          env
++          #sudo apt install -y xvfb
++          #xvfb-run ls
++          curl -L https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > docker-compose
++          chmod +x docker-compose
++          sudo mv docker-compose /usr/local/bin
++          IP=`hostname -I | awk '{print $1}'`
++          echo '{"insecure-registries" : ["'$IP':5000"]}' | sudo tee /etc/docker/daemon.json
++          echo "IP=$IP" >> $GITHUB_ENV
++          sudo cp ./tests/harbor_ca.crt /usr/local/share/ca-certificates/
++          sudo update-ca-certificates
++          sudo service docker restart
++      - name: install
++        run: |
++          cd src/github.com/goharbor/harbor
++          env
++          df -h
++          bash ./tests/showtime.sh ./tests/ci/ut_install.sh
++      - name: script
++        run: |
++          echo IP: $IP
++          df -h
++          cd src/github.com/goharbor/harbor
++          bash ./tests/showtime.sh ./tests/ci/ut_run.sh $IP
++          df -h
++      - name: Codecov For BackEnd
++        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
++        with:
++          files: ./src/github.com/goharbor/harbor/profile.cov
++          flags: unittests
++          token: ${{ secrets.CODECOV_TOKEN }}
++
++  APITEST_DB:
++    env:
++      APITEST_DB: true
++    runs-on:
++      #- self-hosted
++      - cncf-ubuntu-16-64-x86
++    timeout-minutes: 100
++    steps:
++      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
++        with:
++          path: src/github.com/goharbor/harbor
++      - name: Set up Go 1.23
++        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
++        with:
++          go-version: 1.23.2
++          cache-dependency-path: src/github.com/goharbor/harbor/src/go.sum
++        id: go
++      - name: setup env
++        run: |
++          cd src/github.com/goharbor/harbor
++          pwd
++          go env
++          echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
++          echo "GOPATH=$(go env GOPATH):$GITHUB_WORKSPACE" >> $GITHUB_ENV
++          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
++          echo "TOKEN_PRIVATE_KEY_PATH=${GITHUB_WORKSPACE}/src/github.com/goharbor/harbor/tests/private_key.pem" >> $GITHUB_ENV
++          IP=`hostname -I | awk '{print $1}'`
++          echo "IP=$IP" >> $GITHUB_ENV
++        shell: bash
++      - name: before_install
++        run: |
++          set -x
++          cd src/github.com/goharbor/harbor
++          pwd
++          env
++          df -h
++          #sudo apt install -y xvfb
++          #xvfb-run ls
++          curl -L https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > docker-compose
++          chmod +x docker-compose
++          sudo mv docker-compose /usr/local/bin
++      - name: install
++        run: |
++          cd src/github.com/goharbor/harbor
++          env
++          df -h
++          docker system prune -a -f
++          bash ./tests/showtime.sh ./tests/ci/api_common_install.sh $IP DB
++      - name: script
++        run: |
++          cd src/github.com/goharbor/harbor
++          echo IP: $IP
++          df -h
++          bash ./tests/showtime.sh ./tests/ci/api_run.sh DB $IP
++          df -h
++      - name: upload_logs
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        if: always()
++        with:
++          name: db-api-harbor-logs.tar.gz
++          path: /home/ubuntu/_work/harbor/harbor/src/github.com/goharbor/harbor/integration_logs.tar.gz
++          retention-days: 5
++  APITEST_DB_PROXY_CACHE:
++    env:
++      APITEST_DB: true
++    if: ${{ github.event.repository.custom_properties.SKIP_PROXY_CACHE != 'true' }}
++    runs-on:
++      #- self-hosted
++      - cncf-ubuntu-16-64-x86
++    timeout-minutes: 100
++    steps:
++      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
++        with:
++          path: src/github.com/goharbor/harbor
++      - name: Set up Go 1.23
++        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
++        with:
++          go-version: 1.23.2
++          cache-dependency-path: src/github.com/goharbor/harbor/src/go.sum
++        id: go
++      - name: setup env
++        run: |
++          cd src/github.com/goharbor/harbor
++          pwd
++          go env
++          echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
++          echo "GOPATH=$(go env GOPATH):$GITHUB_WORKSPACE" >> $GITHUB_ENV
++          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
++          echo "TOKEN_PRIVATE_KEY_PATH=${GITHUB_WORKSPACE}/src/github.com/goharbor/harbor/tests/private_key.pem" >> $GITHUB_ENV
++          IP=`hostname -I | awk '{print $1}'`
++          echo "IP=$IP" >> $GITHUB_ENV
++        shell: bash
++      - name: before_install
++        run: |
++          set -x
++          cd src/github.com/goharbor/harbor
++          pwd
++          env
++          df -h
++          #sudo apt install -y xvfb
++          #xvfb-run ls
++          curl -L https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > docker-compose
++          chmod +x docker-compose
++          sudo mv docker-compose /usr/local/bin
++      - name: install
++        run: |
++          cd src/github.com/goharbor/harbor
++          env
++          df -h
++          docker system prune -a -f
++          bash ./tests/showtime.sh ./tests/ci/api_common_install.sh $IP DB
++      - name: script
++        run: |
++          cd src/github.com/goharbor/harbor
++          echo IP: $IP
++          df -h
++          bash ./tests/showtime.sh ./tests/ci/api_run.sh PROXY_CACHE $IP
++          df -h
++      - name: upload_logs
++        if: always()
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        with:
++          name: proxy-api-harbor-logs.tar.gz
++          path: /home/ubuntu/_work/harbor/harbor/src/github.com/goharbor/harbor/integration_logs.tar.gz
++          retention-days: 5
++  APITEST_LDAP:
++    env:
++      APITEST_LDAP: true
++    runs-on:
++      #- self-hosted
++      - cncf-ubuntu-16-64-x86
++    timeout-minutes: 100
++    steps:
++      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
++        with:
++          path: src/github.com/goharbor/harbor
++      - name: Set up Go 1.23
++        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
++        with:
++          go-version: 1.23.2
++          cache-dependency-path: src/github.com/goharbor/harbor/src/go.sum
++        id: go
++      - name: setup env
++        run: |
++          cd src/github.com/goharbor/harbor
++          pwd
++          go env
++          echo "GOPATH=$(go env GOPATH):$GITHUB_WORKSPACE" >> $GITHUB_ENV
++          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
++          echo "TOKEN_PRIVATE_KEY_PATH=${GITHUB_WORKSPACE}/src/github.com/goharbor/harbor/tests/private_key.pem" >> $GITHUB_ENV
++          IP=`hostname -I | awk '{print $1}'`
++          echo "IP=$IP" >> $GITHUB_ENV
++        shell: bash
++      - name: before_install
++        run: |
++          set -x
++          cd src/github.com/goharbor/harbor
++          pwd
++          env
++          df -h
++          #sudo apt install -y xvfb
++          #xvfb-run ls
++          curl -L https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > docker-compose
++          chmod +x docker-compose
++          sudo mv docker-compose /usr/local/bin
++      - name: install
++        run: |
++          cd src/github.com/goharbor/harbor
++          env
++          df -h
++          bash ./tests/showtime.sh ./tests/ci/api_common_install.sh $IP LDAP
++      - name: script
++        run: |
++          echo IP: $IP
++          df -h
++          cd src/github.com/goharbor/harbor
++          bash ./tests/showtime.sh ./tests/ci/api_run.sh LDAP $IP
++          df -h
++      - name: upload_logs
++        if: always()
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        with:
++          name: ldap-api-harbor-logs.tar.gz
++          path: /home/ubuntu/_work/harbor/harbor/src/github.com/goharbor/harbor/integration_logs.tar.gz
++          retention-days: 5
++  OFFLINE:
++    env:
++      OFFLINE: true
++    runs-on:
++      #- self-hosted
++      - cncf-ubuntu-16-64-x86
++    timeout-minutes: 100
++    steps:
++      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
++        with:
++          path: src/github.com/goharbor/harbor
++      - name: Set up Go 1.23
++        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
++        with:
++          go-version: 1.23.2
++          cache-dependency-path: src/github.com/goharbor/harbor/src/go.sum
++        id: go
++      - name: setup env
++        run: |
++          cd src/github.com/goharbor/harbor
++          pwd
++          docker version
++          go env
++          echo "GOPATH=$(go env GOPATH):$GITHUB_WORKSPACE" >> $GITHUB_ENV
++          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
++          echo "TOKEN_PRIVATE_KEY_PATH=${GITHUB_WORKSPACE}/src/github.com/goharbor/harbor/tests/private_key.pem" >> $GITHUB_ENV
++        shell: bash
++      - name: before_install
++        run: |
++          set -x
++          cd src/github.com/goharbor/harbor
++          pwd
++          env
++          df -h
++          #sudo apt install -y xvfb
++          #xvfb-run ls
++          curl -L https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > docker-compose
++          chmod +x docker-compose
++          sudo mv docker-compose /usr/local/bin
++          IP=`hostname -I | awk '{print $1}'`
++          echo '{"insecure-registries" : ["'$IP':5000"]}' | sudo tee /etc/docker/daemon.json
++          echo "IP=$IP" >> $GITHUB_ENV
++          sudo cp ./tests/harbor_ca.crt /usr/local/share/ca-certificates/
++          sudo update-ca-certificates
++          sudo service docker restart
++      - name: script
++        run: |
++          echo IP: $IP
++          df -h
++          cd src/github.com/goharbor/harbor
++          bash ./tests/showtime.sh ./tests/ci/distro_installer.sh
++          df -h
++
++  UI_UT:
++    env:
++      UI_UT: true
++    runs-on:
++      #- self-hosted
++      - cncf-ubuntu-16-64-x86
++    timeout-minutes: 100
++    steps:
++      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
++        with:
++          node-version: '22'
++      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
++        with:
++          path: src/github.com/goharbor/harbor
++      - name: script
++        run: |
++          echo IP: $IP
++          df -h
++          cd src/github.com/goharbor/harbor
++          bash ./tests/showtime.sh ./tests/ci/ui_ut_run.sh
++          df -h
++      - name: Codecov For UI
++        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
++        with:
++          files: ./src/github.com/goharbor/harbor/src/portal/coverage/lcov.info
++          flags: unittests
++          token: ${{ secrets.CODECOV_TOKEN }}
+diff --git a/.github/workflows/codeql-analysis.yml b/.github/workflows/codeql-analysis.yml
+new file mode 100644
+index 000000000..043f2f197
+--- /dev/null
++++ b/.github/workflows/codeql-analysis.yml
+@@ -0,0 +1,59 @@
++name: "Code scanning - action"
++
++on:
++  push:
++  pull_request:
++  merge_group:
++  schedule:
++    - cron: '0 16 * * 6'
++
++permissions:
++  security-events: write
++  contents: read
++
++jobs:
++  CodeQL-Build:
++
++    runs-on: cncf-ubuntu-16-64-x86
++
++    steps:
++    - name: Checkout repository
++      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
++      with:
++        # We must fetch at least the immediate parents so that if this is
++        # a pull request then we can checkout the head.
++        fetch-depth: 2
++
++    # If this run was triggered by a pull request event, then checkout
++    # the head of the pull request instead of the merge commit.
++    - run: git checkout HEAD^2
++      if: ${{ github.event_name == 'pull_request' }}
++
++    # Initializes the CodeQL tools for scanning.
++    - name: Initialize CodeQL
++      uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
++      # Override language selection by uncommenting this and choosing your languages
++      # with:
++      #   languages: go, javascript, csharp, python, cpp, java
++
++    # Autobuild attempts to build any compiled languages  (C/C++, C#, or Java).
++    # If this step fails, then you should remove it and run the build manually (see below)
++    #- name: Autobuild
++    #  uses: github/codeql-action/autobuild@231aa2c8a89117b126725a0e11897209b7118144 # v1.1.39
++
++    # ℹ️ Command-line programs to run using the OS shell.
++    # 📚 https://git.io/JvXDl
++
++    # ✏️ If the Autobuild fails above, remove it and uncomment the following three lines
++    #    and modify them (or add more) to build your code if your project
++    #    uses a compiled language
++
++    #- run: |
++    #   make bootstrap
++    #   make release
++
++    # to make sure autobuild success, specifify golang version in go.mod
++    # https://github.com/github/codeql/issues/15647#issuecomment-2003768106
++
++    - name: Perform CodeQL Analysis
++      uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
