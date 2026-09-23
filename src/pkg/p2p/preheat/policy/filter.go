@@ -23,6 +23,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/selector"
 	"github.com/goharbor/harbor/src/lib/selector/selectors/doublestar"
 	"github.com/goharbor/harbor/src/lib/selector/selectors/label"
+	regexpselector "github.com/goharbor/harbor/src/lib/selector/selectors/regexp"
 	"github.com/goharbor/harbor/src/lib/selector/selectors/severity"
 	"github.com/goharbor/harbor/src/lib/selector/selectors/signature"
 	"github.com/goharbor/harbor/src/pkg/p2p/preheat/models/policy"
@@ -152,6 +153,12 @@ func buildFilter(f *policy.Filter) (selector.Selector, error) {
 		return nil, errors.Errorf("pattern value is missing for filter: %s", f.Type)
 	}
 
+	// Backstop for the write time validation: a policy stored by an older version, or
+	// written past the API, still has to fail here instead of building a broken selector.
+	if err := f.Validate(); err != nil {
+		return nil, err
+	}
+
 	// Current value type
 	cvt := reflect.TypeOf(f.Value).Name()
 
@@ -176,8 +183,14 @@ func buildFilter(f *policy.Filter) (selector.Selector, error) {
 	// Build selectors
 	switch f.Type {
 	case policy.FilterTypeRepository:
+		if f.Kind == policy.FilterKindRegex {
+			return regexpselector.New(regexpselector.RepoMatches, f.Value, ""), nil
+		}
 		return doublestar.New(doublestar.RepoMatches, f.Value, ""), nil
 	case policy.FilterTypeTag:
+		if f.Kind == policy.FilterKindRegex {
+			return regexpselector.New(regexpselector.Matches, f.Value, ""), nil
+		}
 		return doublestar.New(doublestar.Matches, f.Value, ""), nil
 	case policy.FilterTypeLabel:
 		return label.New(label.With, f.Value, ""), nil

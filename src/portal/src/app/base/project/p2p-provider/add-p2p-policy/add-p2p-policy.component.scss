@@ -3,8 +3,12 @@
   font-weight: 400;
 }
 
+// room for the pattern engine select in front of the repository and tag inputs.
+// Clarity sets a 125% root, so a rem here is 20px: the filter row now measures
+// 635px (120 label + 90 sub-label + 130 engine + 5 gap + 290 input) and 38rem
+// clears it with the modal body padding.
 :host::ng-deep.modal-dialog {
-  width: 30rem;
+  width: 38rem;
 }
 
 .display-none {
@@ -29,6 +33,10 @@
 
 .width-290 {
   width: 290px
+}
+
+.width-engine {
+  width: 6.5rem;
 }
 
 .width-6rem {
