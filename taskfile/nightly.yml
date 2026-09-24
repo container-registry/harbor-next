@@ -39,6 +39,11 @@ vars:
   # VERSION is the next development version, i.e. exactly the minor
   # release-please is heading for on this line.
   NIGHTLY_VERSION: '{{.VERSION}}-nightly-{{.NIGHTLY_STAMP}}'
+  # Separate from NIGHTLY_VERSION, not a replacement: already-released checks
+  # the dated tag. Point it at the beta tag and it is true from night one.
+  BETA_VERSION: '{{.VERSION}}-beta'
+  BETA_TAG: 'v{{.BETA_VERSION}}'
+  ANCHOR_TAG: 'v{{.NIGHTLY_VERSION}}'
   NIGHTLY_CONFIG: release-please-config-nightly.json
   NIGHTLY_MANIFEST: .release-please-manifest-nightly.json
   RELEASE_CONFIG: release-please-config.json
@@ -72,8 +77,17 @@ tasks:
     # and dev reads as "internal, you are holding it wrong". It also leaves
     # "nightly" to mean one thing — the dated record — instead of two.
     env:
-      BETA_TAG: 'v{{.VERSION}}-beta'
-    cmd: printf '%s\n' "${BETA_TAG}"
+      BETA_TAG_VALUE: '{{.BETA_TAG}}'
+    cmd: printf '%s\n' "${BETA_TAG_VALUE}"
+
+  anchor-tag:
+    desc: "Print tonight's dated tag, the immutable anchor the beta pointer moves onto"
+    silent: true
+    env:
+      ANCHOR_TAG_VALUE: '{{.ANCHOR_TAG}}'
+    cmds:
+      - task: _validate-stamp
+      - printf '%s\n' "${ANCHOR_TAG_VALUE}"
 
   already-released:
     desc: "Print true when tonight's nightly tag already exists"
@@ -111,7 +125,9 @@ tasks:
       - task: _push-channel
 
   merge-release-pr:
-    desc: "Squash-merge the nightly channel's release-please PR (the scheduled auto-merge)"
+    desc: "Squash-merge the nightly channel's release PR and print the merge commit (empty on an empty night)"
+    silent: true
+    # stdout is the sha and nothing else; the caller captures it.
     preconditions:
       - sh: test -n "${GH_TOKEN:-}"
         msg: "GH_TOKEN is required"
@@ -130,13 +146,192 @@ tasks:
           # Right after a real release there is nothing new to cut yet. That is
           # an empty night, not a failure: with no release PR to merge, nothing
           # downstream runs and the workflow ends green.
-          echo "::notice::No release PR on {{.NIGHTLY_BRANCH}}; nothing has landed since the last release"
+          echo "::notice::No release PR on {{.NIGHTLY_BRANCH}}; nothing has landed since the last release" >&2
           exit 0
         fi
-        # Squash only: harbor-next allows no other merge method, and
-        # release-please tracks a squashed release PR by its label.
-        gh pr merge "${pr}" --repo "${GITHUB_REPOSITORY}" --squash --delete-branch
-        echo "merged nightly release PR #${pr}"
+        # REST, not `gh pr merge`: it returns the squash commit synchronously,
+        # where GraphQL's mergeCommit can still answer null for a second.
+        sha=$(gh api --method PUT \
+          "repos/${GITHUB_REPOSITORY}/pulls/${pr}/merge" \
+          -f merge_method=squash --jq .sha)
+        if [ -z "${sha}" ]; then
+          echo "::error::merged release PR #${pr} but got no merge commit back" >&2
+          exit 1
+        fi
+        gh api --method DELETE \
+          "repos/${GITHUB_REPOSITORY}/git/refs/heads/release-please--branches--{{.NIGHTLY_BRANCH}}" \
+          >/dev/null 2>&1 || true
+        echo "merged nightly release PR #${pr} as ${sha}" >&2
+        printf '%s\n' "${sha}"
+
+  publish-tags:
+    desc: "Point the dated anchor and the rolling beta tag at tonight's release commit (MERGE_SHA)"
+    silent: true
+    # Refs API, not git: the calling job has a depth-1 checkout of the release
+    # line, so the channel's merge commit is not in its object store.
+    requires:
+      vars: [MERGE_SHA]
+    env:
+      MERGE_SHA_VALUE: '{{.MERGE_SHA}}'
+      ANCHOR_TAG_VALUE: '{{.ANCHOR_TAG}}'
+      BETA_TAG_VALUE: '{{.BETA_TAG}}'
+    preconditions:
+      - sh: test -n "${GH_TOKEN:-}"
+        msg: "GH_TOKEN is required"
+      - sh: test -n "${GITHUB_REPOSITORY:-}"
+        msg: "GITHUB_REPOSITORY is required"
+    cmds:
+      - task: _validate-stamp
+      - |
+        sha="${MERGE_SHA_VALUE}"
+        # Reaches an API path, so: a commit sha and nothing else.
+        case "${sha}" in
+          *[!0-9a-f]* | "")
+            printf '::error::not a commit sha: %s\n' "${sha}" >&2
+            exit 1
+            ;;
+        esac
+        case "${#sha}" in
+          40) ;;
+          *)
+            printf '::error::not a full commit sha: %s\n' "${sha}" >&2
+            exit 1
+            ;;
+        esac
+
+        # Anchor first: if the run dies between the two, last night's beta
+        # target is still reachable.
+        existing=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${ANCHOR_TAG_VALUE}" --jq .object.sha 2>/dev/null || true)
+        if [ -n "${existing}" ]; then
+          # Reusing it at another commit would leave the anchor and the pointer
+          # describing different builds.
+          if [ "${existing}" != "${sha}" ]; then
+            printf '::error::%s already points at %s, not %s\n' "${ANCHOR_TAG_VALUE}" "${existing}" "${sha}" >&2
+            exit 1
+          fi
+          echo "::notice::${ANCHOR_TAG_VALUE} already points at ${sha}" >&2
+        else
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f "ref=refs/tags/${ANCHOR_TAG_VALUE}" -f "sha=${sha}" --jq .ref >/dev/null
+          echo "created ${ANCHOR_TAG_VALUE}" >&2
+        fi
+
+        if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${BETA_TAG_VALUE}" --jq .ref >/dev/null 2>&1; then
+          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/${BETA_TAG_VALUE}" \
+            -f "sha=${sha}" -F force=true --jq .ref >/dev/null
+          echo "moved ${BETA_TAG_VALUE} to ${sha}" >&2
+        else
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f "ref=refs/tags/${BETA_TAG_VALUE}" -f "sha=${sha}" --jq .ref >/dev/null
+          echo "created ${BETA_TAG_VALUE}" >&2
+        fi
+
+  upsert-beta-release:
+    desc: "Create the rolling beta pre-release if it is missing, and re-assert that it is a pre-release"
+    silent: true
+    # The prerelease flag is re-asserted and checked every night. Lose it and
+    # the beta becomes "Latest release", and release-please's latest-release
+    # lookup starts counting it.
+    env:
+      BETA_TAG_VALUE: '{{.BETA_TAG}}'
+      BETA_VERSION_VALUE: '{{.BETA_VERSION}}'
+    preconditions:
+      - sh: test -n "${GH_TOKEN:-}"
+        msg: "GH_TOKEN is required"
+      - sh: test -n "${GITHUB_REPOSITORY:-}"
+        msg: "GITHUB_REPOSITORY is required"
+    cmds:
+      - |
+        if ! gh release view "${BETA_TAG_VALUE}" --repo "${GITHUB_REPOSITORY}" --json tagName >/dev/null 2>&1; then
+          gh release create "${BETA_TAG_VALUE}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "${BETA_VERSION_VALUE}" \
+            --prerelease \
+            --notes "Preparing tonight's preview." >/dev/null
+          echo "created pre-release ${BETA_TAG_VALUE}" >&2
+        fi
+        gh release edit "${BETA_TAG_VALUE}" \
+          --repo "${GITHUB_REPOSITORY}" \
+          --prerelease --latest=false >/dev/null
+        state=$(gh release view "${BETA_TAG_VALUE}" --repo "${GITHUB_REPOSITORY}" --json isPrerelease --jq .isPrerelease)
+        if [ "${state}" != "true" ]; then
+          printf '::error::%s is not marked as a pre-release\n' "${BETA_TAG_VALUE}" >&2
+          exit 1
+        fi
+
+  beta-header:
+    desc: "Prepend tonight's header block to the rolling pre-release body"
+    silent: true
+    # After the notes engine, never before: the engine replaces the whole body,
+    # so a header written first is silently gone. Markers keep re-runs idempotent.
+    # ANCHOR is passed in rather than recomputed: this job runs up to an hour
+    # after the channel job, and a run that crosses midnight UTC would derive
+    # tomorrow's date and name a tag that was never published.
+    requires:
+      vars: [MERGE_SHA, ANCHOR]
+    env:
+      MERGE_SHA_VALUE: '{{.MERGE_SHA}}'
+      ANCHOR_TAG_VALUE: '{{.ANCHOR}}'
+      BETA_TAG_VALUE: '{{.BETA_TAG}}'
+      VERSION_VALUE: '{{.VERSION}}'
+      REGISTRY_VALUE: '{{.REGISTRY_ADDRESS}}/{{.REGISTRY_PROJECT}}'
+      E2E_RESULT_VALUE: '{{.E2E_RESULT | default ""}}'
+      E2E_PASSED_VALUE: '{{.E2E_PASSED | default ""}}'
+      E2E_TOTAL_VALUE: '{{.E2E_TOTAL | default ""}}'
+      RUN_URL_VALUE: '{{.RUN_URL | default ""}}'
+    preconditions:
+      - sh: test -n "${GH_TOKEN:-}"
+        msg: "GH_TOKEN is required"
+      - sh: test -n "${GITHUB_REPOSITORY:-}"
+        msg: "GITHUB_REPOSITORY is required"
+    cmds:
+      - |
+        work=$(mktemp -d)
+        trap 'rm -rf "${work}"' EXIT
+
+        # tr -d '\r': one web-UI edit rewrites the body as CRLF, and then the
+        # marker match silently stops finding anything.
+        gh release view "${BETA_TAG_VALUE}" --repo "${GITHUB_REPOSITORY}" \
+          --json body --jq .body | tr -d '\r' > "${work}/current.md"
+
+        awk '
+          /^<!-- beta-header:start -->$/ { skip = 1 }
+          /^<!-- beta-header:end -->$/   { skip = 0; next }
+          !skip
+        ' "${work}/current.md" > "${work}/body.md"
+
+        # No count means no report was written, which is not zero.
+        if [ -n "${E2E_PASSED_VALUE}" ] && [ -n "${E2E_TOTAL_VALUE}" ]; then
+          e2e="${E2E_RESULT_VALUE:-unknown} (${E2E_PASSED_VALUE}/${E2E_TOTAL_VALUE} scenarios passed)"
+        elif [ -n "${E2E_RESULT_VALUE}" ]; then
+          e2e="${E2E_RESULT_VALUE} (no scenario report produced)"
+        else
+          e2e="not reported"
+        fi
+
+        {
+          printf '<!-- beta-header:start -->\n'
+          printf '> **Rolling preview of %s.** Rebuilt every night from `main`. Not feature-frozen, and not a release.\n' "${VERSION_VALUE}"
+          printf '>\n'
+          printf '> Currently built from [`%s`](../../tree/%s) at `%s`.\n' "${ANCHOR_TAG_VALUE}" "${ANCHOR_TAG_VALUE}" "${MERGE_SHA_VALUE}"
+          printf '> End-to-end suite: **%s**.' "${e2e}"
+          if [ -n "${RUN_URL_VALUE}" ]; then
+            printf ' [Run](%s).' "${RUN_URL_VALUE}"
+          fi
+          printf '\n>\n'
+          printf '> `%s` is a moving tag: it changes under you, and for roughly an hour each night it points at a commit whose images are still building. Pin the dated tag instead:\n' "${BETA_TAG_VALUE}"
+          printf '>\n'
+          printf '> ```sh\n'
+          printf '> docker pull %s/harbor-core:%s\n' "${REGISTRY_VALUE}" "${ANCHOR_TAG_VALUE}"
+          printf '> ```\n'
+          printf '<!-- beta-header:end -->\n'
+          printf '\n'
+          cat "${work}/body.md"
+        } > "${work}/notes.md"
+
+        gh release edit "${BETA_TAG_VALUE}" --repo "${GITHUB_REPOSITORY}" \
+          --notes-file "${work}/notes.md" >/dev/null
+        echo "updated the header on ${BETA_TAG_VALUE}" >&2
 
   validate-inputs:
     desc: "Guard a nightly run's inputs before anything is published"
@@ -261,6 +456,33 @@ tasks:
           *-nightly-*) bad 'beta tag carries a date' ;;
           *) ok 'beta tag carries no date' ;;
         esac
+
+        if out=$(task -o interleaved nightly:anchor-tag DATE_STAMP=20260925 2>&1) \
+          && [ "${out}" = 'v{{.VERSION}}-nightly-20260925' ]; then
+          ok 'anchor tag is the dated tag, v prefixed'
+        else
+          bad "anchor tag: got: ${out}"
+        fi
+        if out=$(task -o interleaved nightly:anchor-tag DATE_STAMP='x; id' 2>&1); then
+          bad "anchor tag accepted a bad stamp: ${out}"
+        else
+          ok 'anchor tag rejects a bad stamp'
+        fi
+
+        # publish-tags reaches an API path with the sha, so it is guarded the
+        # same way the stamp and the tag are.
+        sha_guard() {
+          env GH_TOKEN=x GITHUB_REPOSITORY=o/r \
+            task nightly:publish-tags MERGE_SHA="$1" 2>&1
+        }
+        for bad_sha in '' 'deadbeef' 'zzzz5f1e4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8' '$(id)' \
+          '0123456789abcdef0123456789abcdef0123456789abcdef'; do
+          if out=$(sha_guard "${bad_sha}"); then
+            bad "publish-tags accepted '${bad_sha}'"
+          else
+            ok "publish-tags rejected: '${bad_sha}'"
+          fi
+        done
 
         # The already-released check. A purpose-built tag, so the answer does
         # not depend on which tags this checkout happens to have fetched.
@@ -439,21 +661,17 @@ tasks:
   _derive-config:
     internal: true
     env:
-      NIGHTLY_VERSION: '{{.NIGHTLY_VERSION}}'
+      BETA_VERSION: '{{.BETA_VERSION}}'
     cmds:
       # Derived from the real config instead of duplicated: the nightly notes
       # have to accumulate exactly what the real release will, which means the
       # same exclude-paths and the same changelog-sections, forever.
       #
-      # release-as pins the date. The prerelease versioning strategy cannot:
-      # it increments the last numeric run of the current prerelease, so
-      # 2.16.0-nightly-20260918 becomes ...20260919 on the next run whatever
-      # the actual date is, and one skipped or repeated night desynchronizes
-      # the stamp from reality for good. release-as is regenerated from the
-      # clock every night, so it can never go stale the way a committed
-      # release-as does.
+      # release-as is the beta version, not the dated one: the notes engine
+      # looks for a CHANGELOG heading named after the tag it renders, so the
+      # two must match. Only release-as can hold a name still.
       - >-
-        jq --arg version "${NIGHTLY_VERSION}"
+        jq --arg version "${BETA_VERSION}"
         '.packages["."] += {"release-as": $version, "prerelease": true}'
         '{{.RELEASE_CONFIG}}' > '{{.NIGHTLY_CONFIG}}'
       # Seeded from the real manifest, so the channel starts at the last

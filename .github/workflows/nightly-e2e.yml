@@ -34,6 +34,13 @@ on:
       registry_project:
         required: false
         type: string
+    outputs:
+      scenarios_total:
+        value: ${{ jobs.report.outputs.scenarios_total }}
+      scenarios_passed:
+        value: ${{ jobs.report.outputs.scenarios_passed }}
+      scenarios_failed:
+        value: ${{ jobs.report.outputs.scenarios_failed }}
     secrets:
       # Reads the commercial patch branches and the dev overlay out of 8gcr,
       # the same way the image build reads the patches.
@@ -167,3 +174,43 @@ jobs:
             reports/*.log
           if-no-files-found: warn
           retention-days: 14
+
+  report:
+    name: Scenario Counts
+    # Its own job because a reusable workflow does not carry outputs out of a
+    # failed one, and a failed suite is exactly when the counts are wanted.
+    needs: [e2e]
+    if: ${{ always() }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      scenarios_total: ${{ steps.counts.outputs.total }}
+      scenarios_passed: ${{ steps.counts.outputs.passed }}
+      scenarios_failed: ${{ steps.counts.outputs.failed }}
+    steps:
+      - name: Download the reports
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: e2e-${{ inputs.tag }}
+          path: reports
+
+      - name: Count the scenarios
+        id: counts
+        run: |
+          report=reports/e2e-cucumber.json
+          # Absent when the run died before the suite wrote anything. Empty
+          # outputs, not zeroes: "no report" is not "nothing passed".
+          if [ ! -s "${report}" ]; then
+            echo "::notice::no cucumber report; scenario counts unavailable"
+            exit 0
+          fi
+          total=$(jq '[.[].elements[]?] | length' "${report}")
+          failed=$(jq '[.[].elements[]? | select(any(.steps[]?; .result.status != "passed"))] | length' "${report}")
+          echo "total=${total}" >> "$GITHUB_OUTPUT"
+          echo "failed=${failed}" >> "$GITHUB_OUTPUT"
+          echo "passed=$((total - failed))" >> "$GITHUB_OUTPUT"
+          echo "::notice::e2e scenarios: $((total - failed))/${total} passed"
