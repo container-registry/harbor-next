@@ -188,6 +188,29 @@ func TestMatch(t *testing.T) {
 			want:          true,
 		},
 		{
+			// doublestar v4 would match the bare prefix here; Harbor keeps the
+			// v1 answer so stored filters do not widen on upgrade.
+			name:          "doublestar double star does not match the bare prefix",
+			value:         "org",
+			filterPattern: "org/**",
+			kind:          KindDoublestar,
+			want:          false,
+		},
+		{
+			name:          "doublestar alternation with double star does not match the bare prefix",
+			value:         "library",
+			filterPattern: "{library,harbor}/**",
+			kind:          KindDoublestar,
+			want:          false,
+		},
+		{
+			name:          "doublestar alternation with double star matches a nested repository",
+			value:         "library/nginx",
+			filterPattern: "{library,harbor}/**",
+			kind:          KindDoublestar,
+			want:          true,
+		},
+		{
 			name:          "doublestar match all",
 			value:         "library/nginx",
 			filterPattern: "**",

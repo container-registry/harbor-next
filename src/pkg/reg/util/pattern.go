@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bmatcuk/doublestar"
+	libpattern "github.com/goharbor/harbor/src/lib/pattern"
 )
 
 // Match returns whether the str matches the pattern
@@ -26,7 +26,7 @@ func Match(pattern, str string) (bool, error) {
 	if len(pattern) == 0 {
 		return true, nil
 	}
-	return doublestar.Match(pattern, str)
+	return libpattern.MatchDoublestar(pattern, str)
 }
 
 // IsSpecificPath checks whether the input path is a specified string
