@@ -38,7 +38,7 @@ vars:
   NIGHTLY_STAMP: '{{.DATE_STAMP | default .NIGHTLY_DATE}}'
   # VERSION is the next development version, i.e. exactly the minor
   # release-please is heading for on this line.
-  NIGHTLY_VERSION: '{{.VERSION}}-nightly-{{.NIGHTLY_STAMP}}'
+  NIGHTLY_VERSION: '{{.VERSION}}-beta.{{.NIGHTLY_STAMP}}'
   # Separate from NIGHTLY_VERSION, not a replacement: already-released checks
   # the dated tag. Point it at the beta tag and it is true from night one.
   BETA_VERSION: '{{.VERSION}}-beta'
@@ -414,7 +414,7 @@ tasks:
         # the captured version string.
         version() { env -u DATE_STAMP task -o interleaved nightly:version "$@" 2>&1; }
 
-        if out=$(version) && [ "${out}" = '{{.VERSION}}-nightly-{{.NIGHTLY_DATE}}' ]; then
+        if out=$(version) && [ "${out}" = '{{.VERSION}}-beta.{{.NIGHTLY_DATE}}' ]; then
           ok 'version defaults to today'
         else
           bad "version defaults to today: got: ${out}"
@@ -422,19 +422,19 @@ tasks:
         # Exported empty is not the same as unset, and it is what a scheduled
         # run actually provides: the workflow sets DATE_STAMP from a dispatch
         # input that a schedule does not have.
-        if out=$(DATE_STAMP= task -o interleaved nightly:version 2>&1) && [ "${out}" = '{{.VERSION}}-nightly-{{.NIGHTLY_DATE}}' ]; then
+        if out=$(DATE_STAMP= task -o interleaved nightly:version 2>&1) && [ "${out}" = '{{.VERSION}}-beta.{{.NIGHTLY_DATE}}' ]; then
           ok 'version defaults to today with DATE_STAMP exported empty'
         else
           bad "version with DATE_STAMP exported empty: got: ${out}"
         fi
         # And a stamp the caller did supply still wins over the default.
-        if out=$(DATE_STAMP=20200102 task -o interleaved nightly:version 2>&1) && [ "${out}" = '{{.VERSION}}-nightly-20200102' ]; then
+        if out=$(DATE_STAMP=20200102 task -o interleaved nightly:version 2>&1) && [ "${out}" = '{{.VERSION}}-beta.20200102' ]; then
           ok 'exported DATE_STAMP is honoured'
         else
           bad "exported DATE_STAMP: got: ${out}"
         fi
         # A date that is not today, so the stamp is doing the work.
-        if out=$(version DATE_STAMP=20200102) && [ "${out}" = '{{.VERSION}}-nightly-20200102' ]; then
+        if out=$(version DATE_STAMP=20200102) && [ "${out}" = '{{.VERSION}}-beta.20200102' ]; then
           ok 'version honours a dated stamp'
         else
           bad "version honours a dated stamp: got: ${out}"
@@ -453,12 +453,12 @@ tasks:
           bad "beta tag: got: ${out}"
         fi
         case "$(task -o interleaved nightly:beta-tag 2>&1)" in
-          *-nightly-*) bad 'beta tag carries a date' ;;
+          *-beta.*) bad 'beta tag carries a date' ;;
           *) ok 'beta tag carries no date' ;;
         esac
 
         if out=$(task -o interleaved nightly:anchor-tag DATE_STAMP=20260925 2>&1) \
-          && [ "${out}" = 'v{{.VERSION}}-nightly-20260925' ]; then
+          && [ "${out}" = 'v{{.VERSION}}-beta.20260925' ]; then
           ok 'anchor tag is the dated tag, v prefixed'
         else
           bad "anchor tag: got: ${out}"
@@ -487,7 +487,7 @@ tasks:
         # The already-released check. A purpose-built tag, so the answer does
         # not depend on which tags this checkout happens to have fetched.
         released() { task -o interleaved nightly:already-released DATE_STAMP="$1" 2>&1; }
-        fixture_tag='v{{.VERSION}}-nightly-20200103'
+        fixture_tag='v{{.VERSION}}-beta.20200103'
         # Only ever delete a tag this test created. A blind cleanup would
         # destroy a real tag of the same name if one ever existed.
         if [ -n "$(git tag --list "${fixture_tag}")" ]; then
@@ -511,10 +511,10 @@ tasks:
         # The published-tag guard, which the e2e workflow runs before a tag
         # reaches an image reference.
         tag_guard() { task nightly:validate-tag TAG="$1" 2>&1; }
-        for good in v2.16.0 v2.16.0-nightly-20260922 v10.0.1; do
+        for good in v2.16.0 v2.16.0-beta v2.16.0-beta.20260922 v2.16.0-nightly-20260922 v10.0.1; do
           if out=$(tag_guard "${good}"); then ok "tag ${good}"; else bad "tag ${good}: rejected: ${out}"; fi
         done
-        for nope in v2.16 2.16.0 v1.2.3.4 v2.16.0-rc1 'v2.16.0; id' 'v2.16.0-nightly-2026' "$(printf 'x\nv2.16.0')" ''; do
+        for nope in v2.16 2.16.0 v1.2.3.4 v2.16.0-rc1 'v2.16.0; id' 'v2.16.0-beta.2026' 'v2.16.0-beta.' "$(printf 'x\nv2.16.0')" ''; do
           out=$(tag_guard "${nope}" || true)
           case "${out}" in
             *uid=*) bad "tag '${nope}': id executed" ;;
@@ -581,7 +581,10 @@ tasks:
       esac
       # The only prerelease this project publishes.
       case "${suffix}" in
-        "" | nightly-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
+        "" | beta | beta.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
+        # Anchors published before the rename. They are kept forever, so the
+        # e2e suite has to keep being able to name them.
+        nightly-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
         *)
           printf '::error::not a release tag: %s\n' "${TAG}" >&2
           exit 1

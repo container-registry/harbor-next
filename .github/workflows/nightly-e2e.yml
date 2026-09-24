@@ -17,7 +17,7 @@ on:
   workflow_call:
     inputs:
       tag:
-        description: Published tag to test (for example v2.16.0-nightly-20260922)
+        description: Published tag to test (for example v2.16.0-beta.20260922)
         required: true
         type: string
       channel:
@@ -51,7 +51,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Published tag to test (for example v2.16.0-nightly-20260922)
+        description: Published tag to test (for example v2.16.0-beta.20260922)
         required: true
         type: string
       channel:
