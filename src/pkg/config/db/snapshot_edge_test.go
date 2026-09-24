@@ -276,7 +276,7 @@ func TestEdgeRolledBackUpdateDoesNotStick(t *testing.T) {
 	assert.Equal(t, "db_auth", mgr.Get(ctx, common.AUTHMode).GetString())
 }
 
-func TestEdgeSingleConnectionPoolSkipsListener(t *testing.T) {
+func TestEdgeSingleConnectionPoolReadsDatabase(t *testing.T) {
 	cfg := dao.GetPool().PgxPool().Config().Copy()
 	cfg.MaxConns = 1
 	cfg.MinConns = 0
@@ -284,15 +284,18 @@ func TestEdgeSingleConnectionPoolSkipsListener(t *testing.T) {
 	require.NoError(t, err)
 	defer pool.Close()
 
-	s := newSnapshot(&Database{cfgDAO: cfgdao.New()})
+	driver := &countingDriver{Driver: &Database{cfgDAO: cfgdao.New()}}
+	s := newSnapshot(driver)
 	stop := s.Start(pool)
 	defer stop()
-	require.Greater(t, s.Version(), uint64(0))
-	time.Sleep(300 * time.Millisecond)
+	assert.Equal(t, uint64(0), s.Version(), "no snapshot without a listener")
 	assert.Equal(t, int32(0), pool.Stat().AcquiredConns(), "no connection is held")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	var one int
-	require.NoError(t, pool.QueryRow(ctx, "SELECT 1").Scan(&one))
+	// a committed write is visible on the next Load
+	save(t, "ldap_auth")
+	v, err := s.Load(orm.Context())
+	require.NoError(t, err)
+	assert.Equal(t, "ldap_auth", v[common.AUTHMode])
+	assert.Equal(t, int64(1), driver.loads.Load())
+	save(t, "db_auth")
 }

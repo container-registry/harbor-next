@@ -148,6 +148,13 @@ func (s *Snapshot) requestReload() {
 // background work and must run before the pool is closed, as pgxpool.Close waits
 // for that connection.
 func (s *Snapshot) Start(pool *pgxpool.Pool) (stop func()) {
+	// Without a listener the copy would only follow the resync, and a pod would
+	// serve stale values for its own committed writes. Reading the database on
+	// every Load is correct and, with no cache lock left, cannot deadlock.
+	if pool == nil || pool.Config().MaxConns < 2 {
+		log.Warning("database pool too small to hold a connection for the configuration change listener, reading configuration from the database on every request")
+		return func() {}
+	}
 	if !s.running.CompareAndSwap(false, true) {
 		log.Warning("configuration snapshot is already running")
 		return func() {}
@@ -158,18 +165,9 @@ func (s *Snapshot) Start(pool *pgxpool.Pool) (stop func()) {
 	if err := s.reload(ctx); err != nil {
 		log.Errorf("failed to load the configuration snapshot, reading configuration from the database until it succeeds: %v", err)
 	}
-	done.Add(1)
+	done.Add(2)
 	go func() { defer done.Done(); s.reloadLoop(ctx) }()
-	switch {
-	case pool == nil:
-		log.Warningf("no database pool for the configuration change listener, changes from other instances apply within %s", resyncInterval)
-	case pool.Config().MaxConns < 2:
-		// the listener would hold the only connection and starve every request
-		log.Warningf("database pool allows %d connection(s), too few to hold one for the configuration change listener; changes from other instances apply within %s", pool.Config().MaxConns, resyncInterval)
-	default:
-		done.Add(1)
-		go func() { defer done.Done(); s.listenLoop(ctx, pool) }()
-	}
+	go func() { defer done.Done(); s.listenLoop(ctx, pool) }()
 	var once sync.Once
 	return func() {
 		once.Do(func() {
