@@ -84,7 +84,10 @@ func (d *Database) Save(ctx context.Context, cfgs map[string]any) error {
 			log.Errorf("failed to get metadata, skip to save key:%v", key)
 		}
 	}
-	return d.cfgDAO.SaveConfigEntries(ctx, configEntries)
+	if err := d.cfgDAO.SaveConfigEntries(ctx, configEntries); err != nil {
+		return err
+	}
+	return d.cfgDAO.NotifyChange(ctx, notifyChannel)
 }
 
 // Get - Get config item from db

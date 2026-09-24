@@ -33,6 +33,9 @@ type DAO interface {
 	SaveConfigEntries(ctx context.Context, entries []models.ConfigEntry) error
 	// GetConfigItem get configure item by key
 	GetConfigItem(ctx context.Context, query *q.Query) ([]*models.ConfigEntry, error)
+	// NotifyChange signals a configuration change on the Postgres channel; inside a
+	// transaction it is delivered on commit and dropped on rollback
+	NotifyChange(ctx context.Context, channel string) error
 }
 
 type dao struct {
@@ -87,6 +90,15 @@ func (d *dao) SaveConfigEntries(ctx context.Context, entries []models.ConfigEntr
 		}
 	}
 	return nil
+}
+
+func (d *dao) NotifyChange(ctx context.Context, channel string) error {
+	o, err := orm.FromContext(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = o.Raw("SELECT pg_notify(?, '')", channel).Exec()
+	return err
 }
 
 // GetConfigItem get configure item by query

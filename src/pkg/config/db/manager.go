@@ -15,14 +15,18 @@
 package db
 
 import (
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/goharbor/harbor/src/common"
-	"github.com/goharbor/harbor/src/lib/cache"
 	libCfg "github.com/goharbor/harbor/src/lib/config"
-	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/pkg/config"
 	"github.com/goharbor/harbor/src/pkg/config/db/dao"
 	"github.com/goharbor/harbor/src/pkg/config/store"
 )
+
+// snapshot is shared by every DB config manager of the process, so there is one
+// listener and one copy of the settings regardless of how many managers exist.
+var snapshot = newSnapshot(&Database{cfgDAO: dao.New()})
 
 func init() {
 	libCfg.Register(common.DBCfgManager, NewDBCfgManager())
@@ -30,14 +34,7 @@ func init() {
 
 // NewDBCfgManager - create DB config manager
 func NewDBCfgManager() *config.CfgManager {
-	cfgDriver := (store.Driver)(&Database{cfgDAO: dao.New()})
-
-	if cache.Default() != nil {
-		log.Debug("create DB config manager with cache enabled")
-		cfgDriver = NewCacheDriver(cache.Default(), cfgDriver)
-	}
-
-	manager := &config.CfgManager{Store: store.NewConfigStore(cfgDriver)}
+	manager := &config.CfgManager{Store: store.NewConfigStore(snapshot)}
 	// load default value
 	manager.LoadDefault()
 	// load system config from env
@@ -45,11 +42,9 @@ func NewDBCfgManager() *config.CfgManager {
 	return manager
 }
 
-// EnableConfigCache ...
-func EnableConfigCache() {
-	if cache.Default() == nil {
-		log.Error("failed to enable config cache, cache is not ready.")
-		return
-	}
-	libCfg.Register(common.DBCfgManager, NewDBCfgManager())
+// StartSnapshot loads the user settings into memory and keeps them current via
+// Postgres LISTEN/NOTIFY. Call it once the database is migrated; the returned
+// function must run before the pool is closed.
+func StartSnapshot(pool *pgxpool.Pool) (stop func()) {
+	return snapshot.Start(pool)
 }

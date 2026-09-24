@@ -20,19 +20,29 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"strconv"
 	"sync"
+	"sync/atomic"
 
 	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/lib/config/metadata"
 	"github.com/goharbor/harbor/src/lib/log"
 )
 
+type valueMap = map[string]metadata.ConfigureValue
+
 // ConfigStore - the config data store
+//
+// Values are held in an immutable map that is replaced as a whole, so a reload
+// never exposes a mix of old and new values for one key set.
 type ConfigStore struct {
 	cfgDriver Driver
-	cfgValues sync.Map
+	mu        sync.Mutex // serializes writers
+	cfgValues atomic.Pointer[valueMap]
+	// driverVersion is the Versioned.Version() the values were last loaded at.
+	driverVersion atomic.Uint64
 }
 
 // NewConfigStore create config store
@@ -40,13 +50,27 @@ func NewConfigStore(cfgDriver Driver) *ConfigStore {
 	return &ConfigStore{cfgDriver: cfgDriver}
 }
 
+func (c *ConfigStore) values() valueMap {
+	if m := c.cfgValues.Load(); m != nil {
+		return *m
+	}
+	return nil
+}
+
+// update applies fn to a copy of the current values and publishes the copy. Callers must hold c.mu.
+func (c *ConfigStore) update(fn func(next valueMap)) {
+	next := maps.Clone(c.values())
+	if next == nil {
+		next = valueMap{}
+	}
+	fn(next)
+	c.cfgValues.Store(&next)
+}
+
 // Get - Get config data from current store
 func (c *ConfigStore) Get(key string) (*metadata.ConfigureValue, error) {
-	if value, ok := c.cfgValues.Load(key); ok {
-		if result, ok := value.(metadata.ConfigureValue); ok {
-			return &result, nil
-		}
-		return nil, errors.New("data in config store is not a ConfigureValue type")
+	if value, ok := c.values()[key]; ok {
+		return &value, nil
 	}
 	return nil, metadata.ErrValueNotSet
 }
@@ -65,18 +89,17 @@ func (c *ConfigStore) GetFromDriver(ctx context.Context, key string) (map[string
 
 // GetAnyType get any type for config items
 func (c *ConfigStore) GetAnyType(key string) (any, error) {
-	if value, ok := c.cfgValues.Load(key); ok {
-		if result, ok := value.(metadata.ConfigureValue); ok {
-			return result.GetAnyType()
-		}
-		return nil, errors.New("data in config store is not a ConfigureValue type")
+	if value, ok := c.values()[key]; ok {
+		return value.GetAnyType()
 	}
 	return nil, metadata.ErrValueNotSet
 }
 
 // Set - Set configure value in store, not saved to config driver
 func (c *ConfigStore) Set(key string, value metadata.ConfigureValue) error {
-	c.cfgValues.Store(key, value)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.update(func(next valueMap) { next[key] = value })
 	return nil
 }
 
@@ -85,10 +108,20 @@ func (c *ConfigStore) Load(ctx context.Context) error {
 	if c.cfgDriver == nil {
 		return errors.New("failed to load store, cfgDriver is nil")
 	}
+	var version uint64
+	if v, ok := c.cfgDriver.(Versioned); ok {
+		version = v.Version()
+		// Skipping unchanged reloads also keeps values set locally by Update
+		// until the driver reports the change as committed.
+		if version != 0 && version == c.driverVersion.Load() {
+			return nil
+		}
+	}
 	cfgs, err := c.cfgDriver.Load(ctx)
 	if err != nil {
 		return err
 	}
+	loaded := make(valueMap, len(cfgs))
 	for key, value := range cfgs {
 		strValue, err := ToString(value)
 		if err != nil {
@@ -101,26 +134,29 @@ func (c *ConfigStore) Load(ctx context.Context) error {
 			log.Errorf("error when loading data item, key %v, value %v, error %v", key, value, err)
 			continue
 		}
-		c.cfgValues.Store(key, cfgValue)
+		loaded[key] = cfgValue
 	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if version != 0 && version < c.driverVersion.Load() {
+		// a concurrent Load already published newer values
+		return nil
+	}
+	c.update(func(next valueMap) { maps.Copy(next, loaded) })
+	c.driverVersion.Store(version)
 	return nil
 }
 
 // Save - Save all data in current store
 func (c *ConfigStore) Save(ctx context.Context) error {
 	cfgMap := map[string]any{}
-	c.cfgValues.Range(func(key, value any) bool {
-		keyStr := fmt.Sprintf("%v", key)
-		if configValue, ok := value.(metadata.ConfigureValue); ok {
-			valueStr := configValue.Value
-			if _, ok := metadata.Instance().GetByName(keyStr); ok {
-				cfgMap[keyStr] = valueStr
-			} else {
-				log.Errorf("failed to get metadata for key %v", keyStr)
-			}
+	for keyStr, configValue := range c.values() {
+		if _, ok := metadata.Instance().GetByName(keyStr); ok {
+			cfgMap[keyStr] = configValue.Value
+		} else {
+			log.Errorf("failed to get metadata for key %v", keyStr)
 		}
-		return true
-	})
+	}
 
 	if c.cfgDriver == nil {
 		return errors.New("failed to save store, cfgDriver is nil")
@@ -132,6 +168,7 @@ func (c *ConfigStore) Save(ctx context.Context) error {
 // Update - Only update specified settings in cfgMap in store and driver
 func (c *ConfigStore) Update(ctx context.Context, cfgMap map[string]any) error {
 	// Update to store
+	updated := valueMap{}
 	for key, value := range cfgMap {
 		configValue, err := metadata.NewCfgValue(key, utils.GetStrValueOfAnyType(value))
 		if err != nil {
@@ -139,11 +176,11 @@ func (c *ConfigStore) Update(ctx context.Context, cfgMap map[string]any) error {
 			delete(cfgMap, key)
 			continue
 		}
-		if err := c.Set(key, *configValue); err != nil {
-			log.Warningf("failed to update configure item, key=%s, error: %v", key, err)
-			continue
-		}
+		updated[key] = *configValue
 	}
+	c.mu.Lock()
+	c.update(func(next valueMap) { maps.Copy(next, updated) })
+	c.mu.Unlock()
 	// Update to driver
 	return c.cfgDriver.Save(ctx, cfgMap)
 }
