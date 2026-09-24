@@ -108,7 +108,7 @@ func listenBackends(t *testing.T) int {
 	t.Helper()
 	var n int
 	require.NoError(t, dao.GetPool().PgxPool().QueryRow(context.Background(),
-		"SELECT count(*) FROM pg_stat_activity WHERE query = 'LISTEN "+notifyChannel+"'").Scan(&n))
+		"SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND query = 'LISTEN "+notifyChannel+"'").Scan(&n))
 	return n
 }
 
@@ -144,17 +144,16 @@ func TestSnapshotReconnectsListener(t *testing.T) {
 	require.Eventually(t, func() bool { return listenBackends(t) == 1 }, 10*time.Second, 10*time.Millisecond)
 
 	_, err := dao.GetPool().PgxPool().Exec(context.Background(),
-		"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE query = 'LISTEN "+notifyChannel+"'")
+		"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND query = 'LISTEN "+notifyChannel+"'")
 	require.NoError(t, err)
 	require.Eventually(t, func() bool { return listenBackends(t) == 1 }, 15*time.Second, 50*time.Millisecond)
 
 	ctx := orm.Context()
-	before := s.Version()
 	require.NoError(t, (&Database{cfgDAO: cfgdao.New()}).Save(ctx, map[string]any{common.AUTHMode: "ldap_auth"}))
-	waitForVersion(t, s, before)
-	v, err := s.Load(ctx)
-	require.NoError(t, err)
-	assert.Equal(t, "ldap_auth", v[common.AUTHMode])
+	require.Eventually(t, func() bool {
+		v, _ := s.Load(ctx)
+		return v[common.AUTHMode] == "ldap_auth"
+	}, 10*time.Second, 10*time.Millisecond)
 	require.NoError(t, (&Database{cfgDAO: cfgdao.New()}).Save(ctx, map[string]any{common.AUTHMode: "db_auth"}))
 }
 
@@ -200,4 +199,26 @@ func TestSnapshotReadsWithExhaustedPool(t *testing.T) {
 		t.Fatal("config load blocked on the exhausted pool")
 	}
 	assert.NotEmpty(t, mgr.Get(context.Background(), common.AUTHMode).GetString())
+}
+
+// A change committed while the listener is disconnected sends a notification nobody
+// receives; the sync on reconnect must pick it up without waiting for the resync.
+func TestSnapshotSyncsChangesMissedWhileDisconnected(t *testing.T) {
+	s := newSnapshot(&Database{cfgDAO: cfgdao.New()})
+	stop := s.Start(dao.GetPool().PgxPool())
+	defer stop()
+	require.Eventually(t, func() bool { return listenBackends(t) == 1 }, 10*time.Second, 10*time.Millisecond)
+
+	ctx := orm.Context()
+	_, err := dao.GetPool().PgxPool().Exec(context.Background(),
+		"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND query = 'LISTEN "+notifyChannel+"'")
+	require.NoError(t, err)
+	require.Eventually(t, func() bool { return listenBackends(t) == 0 }, 5*time.Second, 5*time.Millisecond)
+	require.NoError(t, (&Database{cfgDAO: cfgdao.New()}).Save(ctx, map[string]any{common.AUTHMode: "ldap_auth"}))
+
+	require.Eventually(t, func() bool {
+		v, _ := s.Load(ctx)
+		return v[common.AUTHMode] == "ldap_auth"
+	}, 15*time.Second, 20*time.Millisecond)
+	require.NoError(t, (&Database{cfgDAO: cfgdao.New()}).Save(ctx, map[string]any{common.AUTHMode: "db_auth"}))
 }

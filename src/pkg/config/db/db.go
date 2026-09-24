@@ -34,15 +34,20 @@ type Database struct {
 
 // Load - load config from database, only user setting will be load from database.
 func (d *Database) Load(ctx context.Context) (map[string]any, error) {
-	resultMap := map[string]any{}
 	configEntries, err := d.cfgDAO.GetConfigEntries(ctx)
 	if err != nil {
-		return resultMap, err
+		return map[string]any{}, err
 	}
+	return decodeEntries(configEntries), nil
+}
+
+// decodeEntries keeps the user settings of the properties rows and decrypts passwords.
+func decodeEntries(configEntries []*models.ConfigEntry) map[string]any {
+	resultMap := map[string]any{}
 	for _, item := range configEntries {
 		itemMetadata, ok := metadata.Instance().GetByName(item.Key)
 		if !ok {
-			log.Debugf("failed to get metadata, key:%v, error:%v, skip to load item", item.Key, err)
+			log.Debugf("failed to get metadata, key:%v, skip to load item", item.Key)
 			continue
 		}
 		if itemMetadata.Scope == metadata.SystemScope {
@@ -58,7 +63,7 @@ func (d *Database) Load(ctx context.Context) (map[string]any, error) {
 		}
 		resultMap[itemMetadata.Name] = item.Value
 	}
-	return resultMap, nil
+	return resultMap
 }
 
 // Save - Only save user config items in the cfgs map
