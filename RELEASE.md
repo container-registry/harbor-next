@@ -178,7 +178,9 @@ The channel is release-please configuration, not a separate build path:
 
 Two things follow from the channel being rebuilt every night. An empty night, where nothing has landed since the last real release, produces no release PR: the run ends green having published nothing, and says so. And a nightly that already tagged cannot be re-run for the same date, because that tag exists; re-run a nightly that failed before tagging, and pass `date_stamp` if you need a second one on the same day.
 
-Each nightly publishes two tags on the same digest: the dated `vX.Y.Z-nightly-YYYYMMDD`, which stays pinned, and a rolling `vX.Y.Z-dev`, which is moved to whatever was built last. Someone who wants the current preview of the release under development pulls `-dev` without having to know a date. The signature is made against the digest, so it covers both.
+Each nightly publishes two tags on the same digest: the dated `vX.Y.Z-nightly-YYYYMMDD`, which stays pinned, and a rolling `vX.Y.Z-beta`, which is moved to whatever was built last. Someone who wants the current preview of the release under development pulls `-beta` without having to know a date. The signature is made against the digest, so it covers both.
+
+The two names divide the work. `-beta` is the invitation: try the next release and tell us. `-nightly-YYYYMMDD` is the record, and it is the reason a mutable tag is supportable at all — when the beta breaks overnight, yesterday's dated tag is still there to pull, bisect against, or roll back to. Being mutable, `-beta` does change under anyone who already fetched it; pin the dated tag wherever that matters.
 
 Every published image set is then handed to the end-to-end suite by the `E2E` workflow, which nightlies and releases both call. The suite does not live in this repository: it lives on the `dev` overlay branch in `container-registry/8gcr`, and the run brings it here the way the commercial patches are brought here — `task apply-patches OVERLAY_BRANCHES=dev` octopuses the declared patch series plus the overlay onto the commit under test. The run therefore stands in the megamerge the images were built from.
 

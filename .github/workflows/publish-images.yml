@@ -235,7 +235,7 @@ jobs:
           EXTRA_IMAGE_TAGS: ${{ inputs.extra_image_tags }}
         run: |
           tags=(-t "${IMAGE}:${IMAGE_TAG}")
-          # A rolling tag such as vX.Y.Z-dev, moved to whatever was built last.
+          # A rolling tag such as vX.Y.Z-beta, moved to whatever was built last.
           for extra in ${EXTRA_IMAGE_TAGS}; do
             tags+=(-t "${IMAGE}:${extra}")
           done

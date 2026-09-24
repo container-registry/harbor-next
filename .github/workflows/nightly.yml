@@ -47,7 +47,7 @@ jobs:
       contents: write
     outputs:
       version: ${{ steps.version.outputs.version }}
-      dev_tag: ${{ steps.version.outputs.dev_tag }}
+      beta_tag: ${{ steps.version.outputs.beta_tag }}
       already_released: ${{ steps.version.outputs.already_released }}
     env:
       DATE_STAMP: ${{ inputs.date_stamp }}
@@ -97,9 +97,9 @@ jobs:
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           # The rolling tag for the minor under development, published next to
           # the dated one so "the current preview" is pullable without a date.
-          dev_tag=$(task -o interleaved nightly:dev-tag)
-          echo "dev_tag=${dev_tag}" >> "$GITHUB_OUTPUT"
-          echo "::notice::Nightly version ${version} (also tagged ${dev_tag})"
+          beta_tag=$(task -o interleaved nightly:beta-tag)
+          echo "beta_tag=${beta_tag}" >> "$GITHUB_OUTPUT"
+          echo "::notice::Nightly version ${version} (also tagged ${beta_tag})"
           # A dispatch can cut a date before its scheduled run reaches it, and
           # a nightly that already tagged cannot be cut again. Nothing to do is
           # an empty night, not a failure.
@@ -186,7 +186,7 @@ jobs:
       version: ${{ needs.release.outputs.version }}
       artifact_prefix: nightly-${{ needs.release.outputs.tag_name }}
       # Same digest as the dated tag, so the signature covers both.
-      extra_image_tags: ${{ needs.channel.outputs.dev_tag }}
+      extra_image_tags: ${{ needs.channel.outputs.beta_tag }}
       registry_address: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
       registry_project: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
     secrets:
