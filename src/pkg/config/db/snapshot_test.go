@@ -108,7 +108,7 @@ func listenBackends(t *testing.T) int {
 	t.Helper()
 	var n int
 	require.NoError(t, dao.GetPool().PgxPool().QueryRow(context.Background(),
-		"SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND query = 'LISTEN "+notifyChannel+"'").Scan(&n))
+		"SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND application_name = '"+listenerAppName+"'").Scan(&n))
 	return n
 }
 
@@ -144,7 +144,7 @@ func TestSnapshotReconnectsListener(t *testing.T) {
 	require.Eventually(t, func() bool { return listenBackends(t) == 1 }, 10*time.Second, 10*time.Millisecond)
 
 	_, err := dao.GetPool().PgxPool().Exec(context.Background(),
-		"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND query = 'LISTEN "+notifyChannel+"'")
+		"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND application_name = '"+listenerAppName+"'")
 	require.NoError(t, err)
 	require.Eventually(t, func() bool { return listenBackends(t) == 1 }, 15*time.Second, 50*time.Millisecond)
 
@@ -211,7 +211,7 @@ func TestSnapshotSyncsChangesMissedWhileDisconnected(t *testing.T) {
 
 	ctx := orm.Context()
 	_, err := dao.GetPool().PgxPool().Exec(context.Background(),
-		"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND query = 'LISTEN "+notifyChannel+"'")
+		"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND application_name = '"+listenerAppName+"'")
 	require.NoError(t, err)
 	require.Eventually(t, func() bool { return listenBackends(t) == 0 }, 5*time.Second, 5*time.Millisecond)
 	require.NoError(t, (&Database{cfgDAO: cfgdao.New()}).Save(ctx, map[string]any{common.AUTHMode: "ldap_auth"}))

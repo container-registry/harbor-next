@@ -33,7 +33,8 @@ import (
 
 const (
 	// notifyChannel is signalled by Database.Save; Postgres delivers it only on commit.
-	notifyChannel = "harbor_config"
+	notifyChannel   = "harbor_config"
+	listenerAppName = "harbor_config_listener"
 	// resyncInterval bounds staleness when a notification is missed or the properties
 	// table is edited outside Harbor.
 	resyncInterval   = 5 * time.Minute
@@ -91,12 +92,24 @@ func (s *Snapshot) Version() uint64 {
 	return s.version.Load()
 }
 
+type querier interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+}
+
 func (s *Snapshot) reload(ctx context.Context) error {
+	if s.pool == nil {
+		return s.reloadFrom(ctx, nil)
+	}
+	return s.reloadFrom(ctx, s.pool)
+}
+
+// reloadFrom reads through q, or through the driver when q is nil.
+func (s *Snapshot) reloadFrom(ctx context.Context, q querier) error {
 	s.reloadMu.Lock()
 	defer s.reloadMu.Unlock()
 	ctx, cancel := context.WithTimeout(ctx, reloadTimeout)
 	defer cancel()
-	cfgs, err := s.load(ctx)
+	cfgs, err := s.load(ctx, q)
 	if err != nil {
 		return err
 	}
@@ -105,11 +118,11 @@ func (s *Snapshot) reload(ctx context.Context) error {
 	return nil
 }
 
-func (s *Snapshot) load(ctx context.Context) (map[string]any, error) {
-	if s.pool == nil {
+func (s *Snapshot) load(ctx context.Context, q querier) (map[string]any, error) {
+	if q == nil {
 		return s.driver.Load(ctx)
 	}
-	rows, err := s.pool.Query(ctx, "SELECT k, v FROM properties")
+	rows, err := q.Query(ctx, "SELECT k, v FROM properties")
 	if err != nil {
 		return nil, err
 	}
@@ -147,11 +160,15 @@ func (s *Snapshot) Start(pool *pgxpool.Pool) (stop func()) {
 	}
 	done.Add(1)
 	go func() { defer done.Done(); s.reloadLoop(ctx) }()
-	if pool != nil {
+	switch {
+	case pool == nil:
+		log.Warningf("no database pool for the configuration change listener, changes from other instances apply within %s", resyncInterval)
+	case pool.Config().MaxConns < 2:
+		// the listener would hold the only connection and starve every request
+		log.Warningf("database pool allows %d connection(s), too few to hold one for the configuration change listener; changes from other instances apply within %s", pool.Config().MaxConns, resyncInterval)
+	default:
 		done.Add(1)
 		go func() { defer done.Done(); s.listenLoop(ctx, pool) }()
-	} else {
-		log.Warningf("no database pool for the configuration change listener, changes from other instances apply within %s", resyncInterval)
 	}
 	var once sync.Once
 	return func() {
@@ -212,13 +229,18 @@ func (s *Snapshot) listen(ctx context.Context, pool *pgxpool.Pool) error {
 		_ = conn.Conn().Close(closeCtx)
 		conn.Release()
 	}()
+	// the name shows operators why this session stays open in pg_stat_activity
+	if _, err := conn.Exec(ctx, "SET application_name = '"+listenerAppName+"'"); err != nil {
+		return err
+	}
 	if _, err := conn.Exec(ctx, "LISTEN "+notifyChannel); err != nil {
 		return err
 	}
 	// Changes committed while no listener was attached sent notifications nobody
 	// received. Reading after LISTEN is active closes that gap; if the read fails the
-	// connection is retried rather than trusting a snapshot that may be stale.
-	if err := s.reload(ctx); err != nil {
+	// connection is retried rather than trusting a snapshot that may be stale. It
+	// reads on the LISTEN connection so it never needs a second one from the pool.
+	if err := s.reloadFrom(ctx, conn); err != nil {
 		return fmt.Errorf("sync after connect: %w", err)
 	}
 	for {

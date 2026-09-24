@@ -182,7 +182,12 @@ func (c *ConfigStore) Update(ctx context.Context, cfgMap map[string]any) error {
 	c.update(func(next valueMap) { maps.Copy(next, updated) })
 	c.mu.Unlock()
 	// Update to driver
-	return c.cfgDriver.Save(ctx, cfgMap)
+	err := c.cfgDriver.Save(ctx, cfgMap)
+	// The save may still fail or be rolled back with the caller's transaction, in which
+	// case the driver version never changes. Forcing the next Load to re-merge makes
+	// readers follow the committed state instead of keeping the local values.
+	c.driverVersion.Store(0)
+	return err
 }
 
 // ToString ...

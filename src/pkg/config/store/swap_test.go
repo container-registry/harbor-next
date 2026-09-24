@@ -85,17 +85,26 @@ func TestLoadSkipsUnchangedVersion(t *testing.T) {
 	assert.Equal(t, "oidc_auth", v.GetString())
 }
 
-func TestUpdateSurvivesLoadUntilDriverCatchesUp(t *testing.T) {
+func TestLoadAfterUpdateFollowsDriver(t *testing.T) {
 	d := &versionedDriver{}
 	d.publish(map[string]any{common.AUTHMode: "db_auth"})
 	s := NewConfigStore(d)
 	require.NoError(t, s.Load(context.Background()))
 
 	require.NoError(t, s.Update(context.Background(), map[string]any{common.AUTHMode: "ldap_auth"}))
-	require.NoError(t, s.Load(context.Background()))
-	v, _ := s.Get(common.AUTHMode)
-	assert.Equal(t, "ldap_auth", v.GetString(), "the stale snapshot must not revert a local write")
 	assert.Equal(t, "ldap_auth", d.saved[common.AUTHMode])
+	v, _ := s.Get(common.AUTHMode)
+	assert.Equal(t, "ldap_auth", v.GetString(), "Get without Load sees the local write")
+
+	// not committed yet, or rolled back: the driver still has the old value
+	require.NoError(t, s.Load(context.Background()))
+	v, _ = s.Get(common.AUTHMode)
+	assert.Equal(t, "db_auth", v.GetString())
+
+	d.publish(map[string]any{common.AUTHMode: "ldap_auth"})
+	require.NoError(t, s.Load(context.Background()))
+	v, _ = s.Get(common.AUTHMode)
+	assert.Equal(t, "ldap_auth", v.GetString())
 }
 
 func TestZeroVersionAlwaysLoads(t *testing.T) {

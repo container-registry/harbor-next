@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -17,6 +18,7 @@ import (
 	"github.com/goharbor/harbor/src/common/dao"
 	"github.com/goharbor/harbor/src/lib/orm"
 	cfgdao "github.com/goharbor/harbor/src/pkg/config/db/dao"
+	"github.com/goharbor/harbor/src/pkg/config/store"
 )
 
 func exhaust(t *testing.T, pool *pgxpool.Pool) (release func()) {
@@ -71,7 +73,7 @@ func TestEdgeListenerReconnectWhilePoolExhausted(t *testing.T) {
 
 	// drop the listener, then take every connection so it cannot reconnect
 	_, err := pool.Exec(context.Background(),
-		"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND query = 'LISTEN "+notifyChannel+"'")
+		"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND application_name = '"+listenerAppName+"'")
 	require.NoError(t, err)
 	require.Eventually(t, func() bool { return listenBackends(t) == 0 }, 5*time.Second, 5*time.Millisecond)
 	release := exhaust(t, pool)
@@ -245,4 +247,52 @@ func TestEdgeSecondStartIsIgnoredAndRestartWorks(t *testing.T) {
 	stop = s.Start(dao.GetPool().PgxPool())
 	require.Eventually(t, func() bool { return listenBackends(t) == 1 }, 10*time.Second, 10*time.Millisecond)
 	stopWithin(t, stop, 10*time.Second)
+}
+
+// PUT /configurations runs in the request transaction; when it rolls back the
+// writing instance must not keep serving the rejected values.
+func TestEdgeRolledBackUpdateDoesNotStick(t *testing.T) {
+	s := newSnapshot(&Database{cfgDAO: cfgdao.New()})
+	stop := s.Start(dao.GetPool().PgxPool())
+	defer stop()
+	save(t, "db_auth")
+	require.Eventually(t, valueIs(s, "db_auth"), 10*time.Second, 10*time.Millisecond)
+
+	mgr := NewDBCfgManager()
+	mgr.Store = store.NewConfigStore(s)
+	ctx := orm.Context()
+	require.NoError(t, mgr.Load(ctx))
+
+	rollback := errors.New("rollback")
+	err := orm.WithTransaction(func(ctx context.Context) error {
+		if err := mgr.UpdateConfig(ctx, map[string]any{common.AUTHMode: "ldap_auth"}); err != nil {
+			return err
+		}
+		return rollback
+	})(ctx)
+	require.ErrorIs(t, err, rollback)
+
+	require.NoError(t, mgr.Load(ctx))
+	assert.Equal(t, "db_auth", mgr.Get(ctx, common.AUTHMode).GetString())
+}
+
+func TestEdgeSingleConnectionPoolSkipsListener(t *testing.T) {
+	cfg := dao.GetPool().PgxPool().Config().Copy()
+	cfg.MaxConns = 1
+	cfg.MinConns = 0
+	pool, err := pgxpool.NewWithConfig(context.Background(), cfg)
+	require.NoError(t, err)
+	defer pool.Close()
+
+	s := newSnapshot(&Database{cfgDAO: cfgdao.New()})
+	stop := s.Start(pool)
+	defer stop()
+	require.Greater(t, s.Version(), uint64(0))
+	time.Sleep(300 * time.Millisecond)
+	assert.Equal(t, int32(0), pool.Stat().AcquiredConns(), "no connection is held")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	var one int
+	require.NoError(t, pool.QueryRow(ctx, "SELECT 1").Scan(&one))
 }
