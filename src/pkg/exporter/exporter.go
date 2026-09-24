@@ -16,42 +16,20 @@ package exporter
 
 import (
 	"errors"
-	"fmt"
-	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/goharbor/harbor/src/lib/log"
 )
 
-// Opt is the config of Harbor exporter
+// Opt is the config of the Harbor exporter collectors
 type Opt struct {
-	Port                   int
-	MetricsPath            string
-	ExporterMetricsEnabled bool
-	MaxRequests            int
-	TLSEnabled             bool
-	Certificate            string
-	Key                    string
-	CacheDuration          int64
-	CacheCleanInterval     int64
+	CacheDuration      int64
+	CacheCleanInterval int64
 }
 
-// NewExporter creates a exporter for Harbor with the configuration
-func NewExporter(opt *Opt) *Exporter {
-	exporter := newCollectorSet(opt, NewRESTBackend())
-
-	r := prometheus.NewRegistry()
-	r.MustRegister(exporter)
-	exporter.Server = newServer(opt, r)
-
-	return exporter
-}
-
-// NewCollector builds the Harbor collectors against the given backend without
-// creating an HTTP server. Core uses this to run the collectors in-process and
-// serve them from its own metrics endpoint.
+// NewCollector builds the Harbor collectors against the given backend. Core
+// runs them in-process and serves them from its own metrics endpoint.
 func NewCollector(opt *Opt, backend Backend) prometheus.Collector {
 	return newCollectorSet(opt, backend)
 }
@@ -76,9 +54,8 @@ func newCollectorSet(opt *Opt, backend Backend) *Exporter {
 	return exporter
 }
 
-// Exporter is struct for Harbor which can used to connection Harbor and collecting data
+// Exporter bundles the Harbor collectors into one prometheus.Collector
 type Exporter struct {
-	*http.Server
 	Opt        *Opt
 	collectors map[string]prometheus.Collector
 }
@@ -94,25 +71,6 @@ func (e *Exporter) RegisterCollector(collectors ...collector) error {
 		log.Infof("collector %s registered ...", name)
 	}
 	return nil
-}
-
-func newServer(opt *Opt, _ *prometheus.Registry) *http.Server {
-	exporterMux := http.NewServeMux()
-	exporterMux.Handle(opt.MetricsPath, promhttp.Handler())
-	exporterMux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`<html>
-		<head><title>Harbor Exporter</title></head>
-		<body>
-		<h1>Harbor Exporter</h1>
-		<p><a href="` + opt.MetricsPath + `">Metrics</a></p>
-		</body>
-		</html>`))
-	})
-
-	return &http.Server{
-		Addr:    fmt.Sprintf(":%d", opt.Port),
-		Handler: exporterMux,
-	}
 }
 
 // Describe implements prometheus.Collector

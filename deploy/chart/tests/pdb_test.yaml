@@ -18,19 +18,6 @@ tests:
       - hasDocuments:
           count: 0
 
-  # Pins the cross-component gating: exporter.pdb.enabled=true is a
-  # no-op when exporter.enabled=false (no Deployment → no PDB target).
-  - it: should not create exporter PDB when exporter is disabled
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      exporter.enabled: false
-      exporter.pdb.enabled: true
-    asserts:
-      - hasDocuments:
-          count: 0
-
   # Pins the cross-component gating: trivy.pdb.enabled=true is a no-op
   # when trivy.enabled=false.
   - it: should not create trivy PDB when trivy is disabled
