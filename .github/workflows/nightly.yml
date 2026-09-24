@@ -47,6 +47,7 @@ jobs:
       contents: write
     outputs:
       version: ${{ steps.version.outputs.version }}
+      anchor_tag: ${{ steps.version.outputs.anchor_tag }}
       beta_tag: ${{ steps.version.outputs.beta_tag }}
       already_released: ${{ steps.version.outputs.already_released }}
     env:
@@ -95,11 +96,14 @@ jobs:
           # shellcheck disable=SC2086
           version=$(task -o interleaved nightly:version ${DATE_STAMP:+DATE_STAMP="${DATE_STAMP}"})
           echo "version=${version}" >> "$GITHUB_OUTPUT"
+          # shellcheck disable=SC2086
+          anchor_tag=$(task -o interleaved nightly:anchor-tag ${DATE_STAMP:+DATE_STAMP="${DATE_STAMP}"})
+          echo "anchor_tag=${anchor_tag}" >> "$GITHUB_OUTPUT"
           # The rolling tag for the minor under development, published next to
           # the dated one so "the current preview" is pullable without a date.
           beta_tag=$(task -o interleaved nightly:beta-tag)
           echo "beta_tag=${beta_tag}" >> "$GITHUB_OUTPUT"
-          echo "::notice::Nightly version ${version} (also tagged ${beta_tag})"
+          echo "::notice::Nightly version ${version} (tagged ${anchor_tag}, pointer ${beta_tag})"
           # A dispatch can cut a date before its scheduled run reaches it, and
           # a nightly that already tagged cannot be cut again. Nothing to do is
           # an empty night, not a failure.
@@ -126,9 +130,7 @@ jobs:
       contents: write
       pull-requests: write
     outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
-      version: ${{ steps.release.outputs.version }}
+      merge_sha: ${{ steps.merge.outputs.merge_sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -150,41 +152,54 @@ jobs:
           skip-github-release: true
 
       - name: Merge the nightly release PR
+        id: merge
         env:
           # The nightly release PR is merged by this workflow, by design.
           # NIGHTLY_CHANNEL_TOKEN only has to exist if the channel branch ever
           # ends up under a ruleset that GITHUB_TOKEN cannot satisfy.
           GH_TOKEN: ${{ secrets.NIGHTLY_CHANNEL_TOKEN || github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: task nightly:merge-release-pr
+        run: |
+          sha=$(task -o interleaved nightly:merge-release-pr)
+          echo "merge_sha=${sha}" >> "$GITHUB_OUTPUT"
+          if [ -z "${sha}" ]; then
+            echo "::notice::Nothing landed since the last release; nothing to publish tonight"
+          fi
 
-      # Tags the merged release commit and publishes the prerelease. The PR
-      # half is skipped so a stray follow-up PR is never left behind.
-      - name: Tag the nightly release
-        id: release
-        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
-        with:
-          # Same fallback as the channel push and the merge: a ruleset over the
-          # channel branch would otherwise merge the PR and then fail to tag it.
-          token: ${{ secrets.NIGHTLY_CHANNEL_TOKEN || secrets.GITHUB_TOKEN }}
-          target-branch: nightly
-          config-file: release-please-config-nightly.json
-          manifest-file: .release-please-manifest-nightly.json
-          skip-github-pull-request: true
+      # release-please only ever opens the PR now. The tag and the single
+      # rolling pre-release are this workflow's, because release-please cannot
+      # hold one name still across nights.
+      - name: Move the tags onto tonight's release commit
+        if: ${{ steps.merge.outputs.merge_sha != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.NIGHTLY_CHANNEL_TOKEN || github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          MERGE_SHA: ${{ steps.merge.outputs.merge_sha }}
+          DATE_STAMP: ${{ inputs.date_stamp }}
+        run: |
+          # shellcheck disable=SC2086
+          task nightly:publish-tags MERGE_SHA="${MERGE_SHA}" ${DATE_STAMP:+DATE_STAMP="${DATE_STAMP}"}
+
+      - name: Upsert the rolling pre-release
+        if: ${{ steps.merge.outputs.merge_sha != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.NIGHTLY_CHANNEL_TOKEN || github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: task nightly:upsert-beta-release
 
   publish-images:
     name: Publish Nightly Images
     needs: [channel, release]
-    if: ${{ needs.release.outputs.release_created == 'true' }}
+    if: ${{ needs.release.outputs.merge_sha != '' }}
     permissions:
       contents: read
       id-token: write
     uses: $/.github/workflows/publish-images.yml
     with:
-      checkout_ref: ${{ needs.release.outputs.tag_name }}
-      image_tag: ${{ needs.release.outputs.tag_name }}
-      version: ${{ needs.release.outputs.version }}
-      artifact_prefix: nightly-${{ needs.release.outputs.tag_name }}
+      checkout_ref: ${{ needs.channel.outputs.anchor_tag }}
+      image_tag: ${{ needs.channel.outputs.anchor_tag }}
+      version: ${{ needs.channel.outputs.version }}
+      artifact_prefix: nightly-${{ needs.channel.outputs.anchor_tag }}
       # Same digest as the dated tag, so the signature covers both.
       extra_image_tags: ${{ needs.channel.outputs.beta_tag }}
       registry_address: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
@@ -197,13 +212,13 @@ jobs:
 
   release-notes:
     name: Update Nightly Release Notes
-    needs: [release, publish-images]
-    if: ${{ needs.release.outputs.release_created == 'true' }}
+    needs: [channel, release, publish-images]
+    if: ${{ needs.release.outputs.merge_sha != '' }}
     permissions:
       contents: write
     uses: $/.github/workflows/release-notes-engine.yml
     with:
-      tag_name: ${{ needs.release.outputs.tag_name }}
+      tag_name: ${{ needs.channel.outputs.beta_tag }}
     secrets:
       SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
 
@@ -217,14 +232,14 @@ jobs:
 
   verify:
     name: Verify Nightly Images
-    needs: [release, publish-images]
-    if: ${{ needs.release.outputs.release_created == 'true' }}
+    needs: [channel, release, publish-images]
+    if: ${{ needs.release.outputs.merge_sha != '' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
       contents: read
     env:
-      IMAGE_TAG: ${{ needs.release.outputs.tag_name }}
+      IMAGE_TAG: ${{ needs.channel.outputs.anchor_tag }}
       REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
       REGISTRY_PROJECT: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
     steps:
@@ -258,13 +273,13 @@ jobs:
     name: E2E
     # After verify: the suite pulls these images, so there is no point
     # running before both architectures are known to be there.
-    needs: [release, verify]
-    if: ${{ needs.release.outputs.release_created == 'true' }}
+    needs: [channel, release, verify]
+    if: ${{ needs.release.outputs.merge_sha != '' }}
     permissions:
       contents: read
     uses: $/.github/workflows/nightly-e2e.yml
     with:
-      tag: ${{ needs.release.outputs.tag_name }}
+      tag: ${{ needs.channel.outputs.anchor_tag }}
       channel: nightly
       # Where these images actually went, resolved the same way the publish
       # job resolves it.
@@ -273,3 +288,44 @@ jobs:
     secrets:
       SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
       REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+
+  annotate:
+    name: Annotate the Rolling Pre-Release
+    # release-notes as well as e2e: the notes engine replaces the whole body,
+    # so a header written before it finishes is silently gone.
+    needs: [channel, release, release-notes, e2e]
+    # Both must have succeeded. A failed release job may not have moved the
+    # tags, and a failed notes job leaves last night's body in place — either
+    # way the header would describe a build the rest of the release does not.
+    if: ${{ !cancelled() && needs.release.result == 'success' && needs.release-notes.result == 'success' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: $/.github/actions/setup-task
+
+      - name: Write the header block
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          MERGE_SHA: ${{ needs.release.outputs.merge_sha }}
+          ANCHOR_TAG: ${{ needs.channel.outputs.anchor_tag }}
+          E2E_RESULT: ${{ needs.e2e.result }}
+          E2E_PASSED: ${{ needs.e2e.outputs.scenarios_passed }}
+          E2E_TOTAL: ${{ needs.e2e.outputs.scenarios_total }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
+          REGISTRY_PROJECT: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
+        run: |
+          task nightly:beta-header \
+            MERGE_SHA="${MERGE_SHA}" \
+            ANCHOR="${ANCHOR_TAG}" \
+            E2E_RESULT="${E2E_RESULT}" \
+            E2E_PASSED="${E2E_PASSED}" \
+            E2E_TOTAL="${E2E_TOTAL}" \
+            RUN_URL="${RUN_URL}"

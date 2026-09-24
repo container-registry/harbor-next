@@ -29,6 +29,28 @@ elif [[ -n "${preview_pr_number}" && ! "${TAG_NAME:-}" =~ ^v[0-9]+\.[0-9]+\.[0-9
 fi
 : "${TAG_NAME:?TAG_NAME is required}"
 
+# A dated anchor is not a release: the notes for that build live on the rolling
+# pre-release. Redirect only while the pointer still points at that anchor —
+# once it has moved on, the beta's notes describe a different build, and
+# rendering them under the old name would be a quiet lie.
+if [[ "${TAG_NAME}" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-nightly-[0-9]{8}$ ]]; then
+  beta_tag="v${BASH_REMATCH[1]}-beta"
+  anchor_sha=$(git rev-parse -q --verify "${TAG_NAME}^{commit}" 2>/dev/null || true)
+  beta_sha=$(git rev-parse -q --verify "${beta_tag}^{commit}" 2>/dev/null || true)
+  if [[ -z "${anchor_sha}" ]]; then
+    echo "${TAG_NAME} is not a tag in this checkout." >&2
+    exit 1
+  elif [[ -z "${beta_sha}" ]]; then
+    echo "${TAG_NAME} has no release, and ${beta_tag} does not exist to redirect to." >&2
+    exit 1
+  elif [[ "${anchor_sha}" != "${beta_sha}" ]]; then
+    echo "${TAG_NAME} has no release, and ${beta_tag} has moved on to another build. Render ${beta_tag} directly if that is what you want." >&2
+    exit 1
+  fi
+  echo "::notice::${TAG_NAME} carries no release; rendering ${beta_tag}" >&2
+  TAG_NAME="${beta_tag}"
+fi
+
 PATCHES_TOKEN="${PATCHES_TOKEN:-${GH_TOKEN}}"
 if [[ -z "${GITHUB_REPOSITORY:-}" ]]; then
   GITHUB_REPOSITORY=$(git remote get-url next 2>/dev/null \
