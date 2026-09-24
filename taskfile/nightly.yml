@@ -59,17 +59,21 @@ tasks:
       - task: _validate-stamp
       - printf '%s\n' "${NIGHTLY_VERSION}"
 
-  dev-tag:
+  beta-tag:
     desc: "Print the rolling image tag for the release this line is heading for"
     silent: true
     # A moving pointer at the newest nightly of the minor under development:
-    # vX.Y.Z-dev, alongside the dated tag. Someone who wants "the current
+    # vX.Y.Z-beta, alongside the dated tag. Someone who wants "the current
     # 2.16.0 preview" pulls this and gets last night's build without having to
     # know the date. It carries no date on purpose, so it is overwritten every
     # night; the dated tag is what stays pinned.
+    #
+    # beta rather than dev: the tag is an invitation to try the next release,
+    # and dev reads as "internal, you are holding it wrong". It also leaves
+    # "nightly" to mean one thing — the dated record — instead of two.
     env:
-      DEV_TAG: 'v{{.VERSION}}-dev'
-    cmd: printf '%s\n' "${DEV_TAG}"
+      BETA_TAG: 'v{{.VERSION}}-beta'
+    cmd: printf '%s\n' "${BETA_TAG}"
 
   already-released:
     desc: "Print true when tonight's nightly tag already exists"
@@ -248,14 +252,14 @@ tasks:
 
         # The rolling tag: no date, and a tag the published-tag guard accepts
         # is NOT what this is — it is an image tag, not a release tag.
-        if out=$(task -o interleaved nightly:dev-tag 2>&1) && [ "${out}" = 'v{{.VERSION}}-dev' ]; then
-          ok 'dev tag names the minor under development'
+        if out=$(task -o interleaved nightly:beta-tag 2>&1) && [ "${out}" = 'v{{.VERSION}}-beta' ]; then
+          ok 'beta tag names the minor under development'
         else
-          bad "dev tag: got: ${out}"
+          bad "beta tag: got: ${out}"
         fi
-        case "$(task -o interleaved nightly:dev-tag 2>&1)" in
-          *-nightly-*) bad 'dev tag carries a date' ;;
-          *) ok 'dev tag carries no date' ;;
+        case "$(task -o interleaved nightly:beta-tag 2>&1)" in
+          *-nightly-*) bad 'beta tag carries a date' ;;
+          *) ok 'beta tag carries no date' ;;
         esac
 
         # The already-released check. A purpose-built tag, so the answer does
