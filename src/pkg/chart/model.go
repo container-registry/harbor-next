@@ -17,7 +17,7 @@ package chart
 import (
 	"time"
 
-	helm_chart "helm.sh/helm/v3/pkg/chart"
+	helm_chart "helm.sh/helm/v4/pkg/chart/v2"
 )
 
 // VersionDetails keeps the detailed data info of the chart version
