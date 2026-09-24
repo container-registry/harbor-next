@@ -165,26 +165,26 @@ Use `ci:` for workflow-only changes.
 
 A nightly is the real release pipeline cut against a throwaway branch, so Harbor gets exercised every day instead of once per minor. The `Nightly` workflow runs at 00:00 UTC and on `workflow_dispatch`, from `main` only: a nightly carries the official tag and image names, so a run from any other ref is rejected rather than publishing that ref's code under them.
 
-Nightly versions look like `2.16.0-nightly-20260918`: the `VERSION` on `main`, which is the minor release-please is heading for, plus the UTC date. The tag is `v2.16.0-nightly-20260918` and the images are pushed under that same tag, exactly as a real release tags its own.
+Nightly versions look like `2.16.0-beta.20260918`: the `VERSION` on `main`, which is the minor release-please is heading for, plus the UTC date. The tag is `v2.16.0-beta.20260918` and the images are pushed under that same tag, exactly as a real release tags its own. It shares a prefix with the pointer `v2.16.0-beta` on purpose: one pattern matches the whole family, and the date is a numeric SemVer field rather than a substring.
 
 The channel is release-please configuration, not a separate build path:
 
 1. `task nightly:channel` derives `release-please-config-nightly.json` from `release-please-config.json` with `jq`, adding `release-as: X.Y.Z-beta` and `prerelease: true`. Deriving it keeps the exclude paths and changelog sections identical to the real release forever.
 2. The same task seeds `.release-please-manifest-nightly.json` from `.release-please-manifest.json` and commits both. It force-pushes the result as the `nightly` branch only when the caller passes `PUSH_CHANNEL=true`, as the workflow does; a bare `task nightly:channel` leaves the branch local, which is how you inspect what tonight's channel would be. Neither generated file is committed to `main`.
 3. Release-please opens a release PR against `nightly` and the workflow squash-merges it. Release-please stops there; it never tags and never creates a Release.
-4. The workflow creates the dated tag `vX.Y.Z-nightly-YYYYMMDD` on that merge commit, force-moves `vX.Y.Z-beta` to it, and upserts the one pre-release that lives on `vX.Y.Z-beta`.
+4. The workflow creates the dated tag `vX.Y.Z-beta.YYYYMMDD` on that merge commit, force-moves `vX.Y.Z-beta` to it, and upserts the one pre-release that lives on `vX.Y.Z-beta`.
 5. `publish-images.yml` builds from the dated tag; `release-notes-engine.yml` rewrites the beta pre-release's body. Both are the reusable workflows the real release calls.
 6. After the suite runs, a last job prepends a header to that body: what the pointer currently points at, the e2e result, and how to pin instead.
 
 `release-as` is what holds the beta name still. The `prerelease` versioning strategy cannot: it increments the last run of digits, so a fixed `2.16.0-beta` is not expressible, and `always-bump-minor` would compute a stable version. The name has to match the CHANGELOG heading release-please writes, because that heading is what the notes engine looks for when it renders the beta tag.
 
-The date is not in the version any more. It lives on the anchor tag and the image tag, both created by the workflow, so a repeated or skipped night cannot desynchronize a stamp that release-please never sees.
+The date is gone from the version release-please computes. It still names the build: the anchor tag and the image tag both carry it, and the workflow creates them, so a repeated or skipped night cannot desynchronize a stamp release-please never sees.
 
 Two things follow from the channel being rebuilt every night. An empty night, where nothing has landed since the last real release, produces no release PR: the run ends green having published nothing, and says so. And a nightly that already tagged cannot be re-run for the same date, because that tag exists; re-run a nightly that failed before tagging, and pass `date_stamp` if you need a second one on the same day.
 
-Each nightly publishes two tags on the same digest: the dated `vX.Y.Z-nightly-YYYYMMDD`, which stays pinned, and a rolling `vX.Y.Z-beta`, which is moved to whatever was built last. Someone who wants the current preview of the release under development pulls `-beta` without having to know a date. The signature is made against the digest, so it covers both.
+Each nightly publishes two tags on the same digest: the dated `vX.Y.Z-beta.YYYYMMDD`, which stays pinned, and a rolling `vX.Y.Z-beta`, which is moved to whatever was built last. Someone who wants the current preview of the release under development pulls `-beta` without having to know a date. The signature is made against the digest, so it covers both.
 
-The two names divide the work. `-beta` is the invitation: try the next release and tell us. `-nightly-YYYYMMDD` is the record, and it is the reason a mutable tag is supportable at all — when the beta breaks overnight, yesterday's dated tag is still there to pull, bisect against, or roll back to. Being mutable, `-beta` does change under anyone who already fetched it; pin the dated tag wherever that matters.
+The two names divide the work. `-beta` is the invitation: try the next release and tell us. `-beta.YYYYMMDD` is the record, and it is the reason a mutable tag is supportable at all — when the beta breaks overnight, yesterday's dated tag is still there to pull, bisect against, or roll back to. Being mutable, `-beta` does change under anyone who already fetched it; pin the dated tag wherever that matters.
 
 Every published image set is then handed to the end-to-end suite by the `E2E` workflow, which nightlies and releases both call. The suite does not live in this repository: it lives on the `dev` overlay branch in `container-registry/8gcr`, and the run brings it here the way the commercial patches are brought here — `task apply-patches OVERLAY_BRANCHES=dev` octopuses the declared patch series plus the overlay onto the commit under test. The run therefore stands in the megamerge the images were built from.
 
@@ -200,11 +200,11 @@ Because the channel manifest is re-seeded from `.release-please-manifest.json` e
 
 | Date | `.release-please-manifest.json` | Anchor tag | Pointer | Notes cover |
 |------|---------------------------------|------------|---------|-------------|
-| Sep 18 | `2.15.0` | `v2.16.0-nightly-20260918` | `v2.16.0-beta` | everything since `v2.15.0` |
-| Sep 19 | `2.15.0` | `v2.16.0-nightly-20260919` | `v2.16.0-beta` moves here | everything since `v2.15.0`, plus one day |
-| Sep 20 | `2.15.0` | `v2.16.0-nightly-20260920` | `v2.16.0-beta` moves here | everything since `v2.15.0`, plus two days |
+| Sep 18 | `2.15.0` | `v2.16.0-beta.20260918` | `v2.16.0-beta` | everything since `v2.15.0` |
+| Sep 19 | `2.15.0` | `v2.16.0-beta.20260919` | `v2.16.0-beta` moves here | everything since `v2.15.0`, plus one day |
+| Sep 20 | `2.15.0` | `v2.16.0-beta.20260920` | `v2.16.0-beta` moves here | everything since `v2.15.0`, plus two days |
 | Sep 21 | a maintainer merges the `main` release PR: `v2.16.0` is published, the manifest moves to `2.16.0`, `VERSION` to `2.17.0` | dated as usual | still `v2.16.0-beta` until `VERSION` advances | accordingly |
-| Sep 22 | `2.16.0` | `v2.17.0-nightly-20260922` | `v2.17.0-beta`, a new pointer | everything since `v2.16.0` |
+| Sep 22 | `2.16.0` | `v2.17.0-beta.20260922` | `v2.17.0-beta`, a new pointer | everything since `v2.16.0` |
 
 Each release line has one pre-release, on its pointer tag, and that body is rewritten every night. The dated tags are anchors: they appear under Tags, never as Releases, and they are what `nightly:already-released` checks and what you pull to pin a build.
 

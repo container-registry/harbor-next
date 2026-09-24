@@ -21,7 +21,7 @@ tasks:
     # same answer for the same reason: the release a user upgrades from.
     #
     # A prerelease shares its predecessor with the release it leads up to, so
-    # v2.16.0-nightly-20260918 and v2.16.0 both answer with the newest stable
+    # v2.16.0-beta.20260918 and v2.16.0 both answer with the newest stable
     # release below 2.16.0.
     # PREDECESSOR_FOR, not VERSION: VERSION is defined in the root Taskfile,
     # and a CLI override of a root-defined var does not reach an included
@@ -87,7 +87,7 @@ tasks:
         # Purpose-built tags, so the answers do not depend on what this
         # checkout happens to have: a CI clone may carry no tags at all.
         # The numbers are far above anything this project will ship.
-        fixtures='v900.1.0 v900.2.5 v900.3.0-nightly-20260101'
+        fixtures='v900.1.0 v900.2.5 v900.3.0-beta.20260101'
         # Only tags this test created are ever deleted: a blind cleanup would
         # destroy a real tag that happened to share the name.
         created=''
@@ -115,7 +115,7 @@ tasks:
 
         # A prerelease answers with the same predecessor as the release it
         # leads up to: that is the whole reason this exists.
-        pre=$(lookup v900.3.0-nightly-20260101) || pre=""
+        pre=$(lookup v900.3.0-beta.20260101) || pre=""
         if [ "${pre}" = v900.2.5 ]; then
           ok 'prerelease shares its release predecessor'
         else
