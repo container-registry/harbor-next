@@ -3651,8 +3651,8 @@ github.com/go-text/typesetting-utils v0.0.0-20230616150549-2a7df14b6a22/go.mod h
 github.com/go-viper/mapstructure/v2 v2.5.0 h1:vM5IJoUAy3d7zRSVtIwQgBj7BiWtMPfmPEgAXnvj1Ro=
 github.com/go-viper/mapstructure/v2 v2.5.0/go.mod h1:oJDH3BJKyqBA2TXFhDsKDGDTlndYOZ6rGS0BRZIxGhM=
 github.com/go-zookeeper/zk v1.0.2/go.mod h1:nOB03cncLtlp4t+UAkGSV+9beXP/akpekBwL+UX1Qcw=
-github.com/gocarina/gocsv v0.0.0-20260824135904-1713ebc4797a h1:jEsNFboaGGQXQJupR63sHnjwbna/aUQh/PF5ak7np7Y=
-github.com/gocarina/gocsv v0.0.0-20260824135904-1713ebc4797a/go.mod h1:5YoVOkjYAQumqlV356Hj3xeYh4BdZuLE0/nRkf2NKkI=
+github.com/gocarina/gocsv v0.0.0-20260908110832-9ab82d65b1cc h1:AVDra1CNeXHnyG9qsJgO59OmygliYlGRTnSJ6pj180M=
+github.com/gocarina/gocsv v0.0.0-20260908110832-9ab82d65b1cc/go.mod h1:5YoVOkjYAQumqlV356Hj3xeYh4BdZuLE0/nRkf2NKkI=
 github.com/goccmack/gocc v0.0.0-20230228185258-2292f9e40198/go.mod h1:DTh/Y2+NbnOVVoypCCQrovMPDKUGp4yZpSbWg5D0XIM=
 github.com/goccmack/gocc v1.0.2/go.mod h1:LXX2tFVUggS/Zgx/ICPOr3MLyusuM7EcbfkPvNsjdO8=
 github.com/goccy/go-json v0.9.11/go.mod h1:6MelG93GURQebXPDq3khkgXZkazVtN9CRI+MGFi0w8I=
