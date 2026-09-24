@@ -15,6 +15,7 @@
 package types
 
 import (
+	"strings"
 	"sync"
 )
 
@@ -67,7 +68,20 @@ func NamespaceFromResource(resource Resource) (Namespace, bool) {
 }
 
 // ResourceAllowedInNamespace returns true when resource's namespace equal the ns
+// It also handles wildcard resources like /project/*/repository which should match any project namespace
 func ResourceAllowedInNamespace(resource Resource, ns Namespace) bool {
+	resourceStr := resource.String()
+	// Check for wildcard pattern like /project/*/repository
+	if strings.Contains(resourceStr, "/*/") {
+		// Extract the kind from the resource path (e.g., "project" from "/project/*/repository")
+		parts := strings.Split(resourceStr, "/")
+		if len(parts) >= 2 {
+			kind := parts[1]
+			return kind == ns.Kind()
+		}
+		return false
+	}
+
 	n, ok := NamespaceFromResource(resource)
 	if ok {
 		return n.Kind() == ns.Kind() && n.Identity() == ns.Identity()
