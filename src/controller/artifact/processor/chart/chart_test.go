@@ -22,7 +22,7 @@ import (
 	"github.com/docker/distribution"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/suite"
-	helm_chart "helm.sh/helm/v3/pkg/chart"
+	helm_chart "helm.sh/helm/v4/pkg/chart/v2"
 
 	"github.com/goharbor/harbor/src/controller/artifact/processor/base"
 	"github.com/goharbor/harbor/src/lib/errors"
