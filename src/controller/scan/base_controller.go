@@ -239,6 +239,9 @@ type scanPlan struct {
 	artifacts    []*ar.Artifact
 }
 
+// errScanSkipped means the artifact has nothing to scan. Callers treat it as a no-op.
+var errScanSkipped = errors.New("scan skipped: no scannable artifact")
+
 // Scan ...
 func (bc *basicController) Scan(ctx context.Context, artifact *ar.Artifact, options ...Option) error {
 	if artifact == nil {
@@ -252,15 +255,18 @@ func (bc *basicController) Scan(ctx context.Context, artifact *ar.Artifact, opti
 	}
 
 	plan, err := bc.planScan(ctx, artifact, opts)
-	if err != nil || plan == nil {
+	if err != nil {
+		if errors.Is(err, errScanSkipped) {
+			return nil
+		}
 		return err
 	}
 
 	return bc.dispatchScan(ctx, artifact, plan, opts)
 }
 
-// planScan resolves the scanner and the artifacts to scan. It only reads. A nil
-// plan with a nil error means there is nothing to scan for this artifact.
+// planScan resolves the scanner and the artifacts to scan. It only reads. It
+// returns errScanSkipped when there is nothing to scan for this artifact.
 func (bc *basicController) planScan(ctx context.Context, artifact *ar.Artifact, opts *Options) (*scanPlan, error) {
 	if artifact == nil {
 		return nil, errors.New("nil artifact to scan")
@@ -289,7 +295,7 @@ func (bc *basicController) planScan(ctx context.Context, artifact *ar.Artifact, 
 	if !scannable {
 		if opts.FromEvent {
 			// skip to return err for event related scan
-			return nil, nil
+			return nil, errScanSkipped
 		}
 		return nil, errors.BadRequestError(nil).WithMessagef("the configured scanner %s does not support scanning artifact with mime type %s", r.Name, artifact.ManifestMediaType)
 	}
@@ -508,7 +514,10 @@ func (bc *basicController) scanOneForScanAll(artifact *ar.Artifact, executionID 
 	}
 
 	plan, err := bc.planScan(ctx, artifact, opts)
-	if err != nil || plan == nil {
+	if err != nil {
+		if errors.Is(err, errScanSkipped) {
+			return nil
+		}
 		return err
 	}
 
