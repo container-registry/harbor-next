@@ -48,3 +48,12 @@ rules:
     then:
       field: summary
       function: truthy
+
+  numeric-format-values:
+    description: numeric format must be one of int32, int64, float, double.
+    given: $..[?(@.type === 'integer' || @.type === 'number')].format
+    severity: error
+    then:
+      function: enumeration
+      functionOptions:
+        values: [int32, int64, float, double]
