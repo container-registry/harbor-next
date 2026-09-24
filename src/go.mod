@@ -12,7 +12,7 @@ require (
 	github.com/aws/aws-sdk-go v1.55.8 // indirect
 	github.com/beego/beego/v2 v2.3.10
 	github.com/beego/i18n v0.0.0-20161101132742-e9308947f407
-	github.com/bmatcuk/doublestar v1.3.4
+	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/casbin/casbin v1.9.1
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/cloudevents/sdk-go/v2 v2.16.2

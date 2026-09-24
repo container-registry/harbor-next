@@ -59,6 +59,18 @@ func TestMatch(t *testing.T) {
 			match:   true,
 		},
 		{
+			// doublestar v4 would match the bare prefix here; Harbor keeps the
+			// v1 answer so stored filters do not widen on upgrade.
+			pattern: "library/**",
+			str:     "library",
+			match:   false,
+		},
+		{
+			pattern: "{library,harbor}/**",
+			str:     "library",
+			match:   false,
+		},
+		{
 			pattern: "{library,harbor}/**",
 			str:     "harbor/hello-world",
 			match:   true,

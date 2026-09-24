@@ -14,7 +14,7 @@
 
 package export
 
-import "github.com/bmatcuk/doublestar"
+import libpattern "github.com/goharbor/harbor/src/lib/pattern"
 
 const (
 	CVEIDMatches      = "cveIdMatches"
@@ -66,5 +66,5 @@ func (vds *defaultVulnerabilitySelector) match(pattern, str string) (bool, error
 	if len(pattern) == 0 {
 		return true, nil
 	}
-	return doublestar.Match(pattern, str)
+	return libpattern.MatchDoublestar(pattern, str)
 }
