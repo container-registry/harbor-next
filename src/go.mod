@@ -25,10 +25,10 @@ require (
 	github.com/go-openapi/errors v0.22.8
 	github.com/go-openapi/loads v0.25.2
 	github.com/go-openapi/runtime v0.33.1
-	github.com/go-openapi/spec v0.22.11
-	github.com/go-openapi/strfmt v0.27.0
+	github.com/go-openapi/spec v1.0.1
+	github.com/go-openapi/strfmt v0.27.1
 	github.com/go-openapi/swag v0.29.1
-	github.com/go-openapi/validate v0.26.5
+	github.com/go-openapi/validate v1.0.0
 	github.com/gocarina/gocsv v0.0.0-20260824135904-1713ebc4797a
 	github.com/gocraft/work v0.5.1
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -135,7 +135,7 @@ require (
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/go-openapi/analysis v0.26.2 // indirect
+	github.com/go-openapi/analysis v1.0.0 // indirect
 	github.com/go-openapi/jsonpointer v1.0.0 // indirect
 	github.com/go-openapi/jsonreference v1.0.1 // indirect
 	github.com/go-openapi/runtime/server-middleware v0.33.1 // indirect
