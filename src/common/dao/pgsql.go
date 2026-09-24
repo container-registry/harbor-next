@@ -109,10 +109,7 @@ func (p *pgsql) UpgradeSchema() error {
 // golang-migrate's pgx/v5 driver registers under that name (not "pgx", which
 // is the v4 driver).
 func NewMigrator(database *models.PostGreSQL) (*migrate.Migrate, error) {
-	dsn, err := migratorDSN(database)
-	if err != nil {
-		return nil, err
-	}
+	dsn := migratorDSN(database)
 
 	// For UT
 	path := os.Getenv("POSTGRES_MIGRATION_SCRIPTS_PATH")
@@ -133,21 +130,20 @@ func NewMigrator(database *models.PostGreSQL) (*migrate.Migrate, error) {
 // cloud-managed databases like RDS IAM auth, where the DSN carries a token
 // that Host/Username/Password alone can't reconstruct) so the numbered and
 // authoritative migration phases always target the same database.
-func migratorDSN(database *models.PostGreSQL) (string, error) {
-	if database.URL == "" {
-		dbURL := url.URL{
-			Scheme:   "pgx5",
-			User:     url.UserPassword(database.Username, database.Password),
-			Host:     net.JoinHostPort(database.Host, strconv.Itoa(database.Port)),
-			Path:     database.Database,
-			RawQuery: fmt.Sprintf("sslmode=%s", database.SSLMode),
+func migratorDSN(database *models.PostGreSQL) string {
+	if database.URL != "" {
+		// libpq key-value DSNs parse without error but with an empty scheme — fall back to fields.
+		if u, err := url.Parse(database.URL); err == nil && u.Scheme != "" {
+			u.Scheme = "pgx5"
+			return u.String()
 		}
-		return dbURL.String(), nil
 	}
-	u, err := url.Parse(database.URL)
-	if err != nil {
-		return "", fmt.Errorf("parse database URL: %w", err)
+	dbURL := url.URL{
+		Scheme:   "pgx5",
+		User:     url.UserPassword(database.Username, database.Password),
+		Host:     net.JoinHostPort(database.Host, strconv.Itoa(database.Port)),
+		Path:     database.Database,
+		RawQuery: fmt.Sprintf("sslmode=%s", database.SSLMode),
 	}
-	u.Scheme = "pgx5"
-	return u.String(), nil
+	return dbURL.String()
 }

@@ -29,12 +29,8 @@ func TestMigratorDSNFromFields(t *testing.T) {
 		Database: "registry",
 		SSLMode:  "disable",
 	}
-	got, err := migratorDSN(cfg)
-	if err != nil {
-		t.Fatalf("migratorDSN() error = %v", err)
-	}
 	want := "pgx5://postgres:root123@db.internal:5432/registry?sslmode=disable"
-	if got != want {
+	if got := migratorDSN(cfg); got != want {
 		t.Errorf("migratorDSN() = %q, want %q", got, want)
 	}
 }
@@ -42,19 +38,36 @@ func TestMigratorDSNFromFields(t *testing.T) {
 func TestMigratorDSNHonorsURL(t *testing.T) {
 	// e.g. an RDS IAM auth token embedded as the password, per 0006-aws-rds-iam-auth
 	cfg := &models.PostGreSQL{URL: "postgres://iam-user:rds-token@rds.example.com:5432/registry?sslmode=require"}
-	got, err := migratorDSN(cfg)
-	if err != nil {
-		t.Fatalf("migratorDSN() error = %v", err)
-	}
 	want := "pgx5://iam-user:rds-token@rds.example.com:5432/registry?sslmode=require"
-	if got != want {
+	if got := migratorDSN(cfg); got != want {
 		t.Errorf("migratorDSN() = %q, want %q — URL field must take precedence over individual fields", got, want)
 	}
 }
 
-func TestMigratorDSNInvalidURL(t *testing.T) {
-	cfg := &models.PostGreSQL{URL: "://not a url"}
-	if _, err := migratorDSN(cfg); err == nil {
-		t.Error("migratorDSN() with an invalid URL returned nil error")
+func TestMigratorDSNFallsBackToFields(t *testing.T) {
+	tests := []struct {
+		name string
+		url  string
+	}{
+		{"libpq key-value DSN", "host=db.internal port=5432 user=postgres password=root123 dbname=registry sslmode=disable"},
+		{"empty-scheme URL", "//db.internal:5432/registry?sslmode=disable"},
+		{"unparsable URL", "://not a url"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &models.PostGreSQL{
+				URL:      tt.url,
+				Host:     "db.internal",
+				Port:     5432,
+				Username: "postgres",
+				Password: "root123",
+				Database: "registry",
+				SSLMode:  "disable",
+			}
+			want := "pgx5://postgres:root123@db.internal:5432/registry?sslmode=disable"
+			if got := migratorDSN(cfg); got != want {
+				t.Errorf("migratorDSN() = %q, want %q — non-URL DSNs must fall back to the individual fields", got, want)
+			}
+		})
 	}
 }
