@@ -11,6 +11,7 @@ on:
       # nothing in the image build consumes deploy/.
       - "deploy/chart/**"
       - "deploy/compose/**"
+  merge_group:
   push:
     branches: [main, "release-[0-9]*.[0-9]*"]
     paths-ignore:

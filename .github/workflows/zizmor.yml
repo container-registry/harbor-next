@@ -7,6 +7,7 @@ on:
       - ".github/workflows/**"
       - ".github/actions/**"
       - ".github/renovate.json"
+  merge_group:
   push:
     branches: [main]
     paths:
