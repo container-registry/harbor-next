@@ -33,6 +33,8 @@ data:
             root   /usr/share/nginx/html;
             index  index.html index.htm;
             include /etc/nginx/mime.types;
+            add_header X-Frame-Options DENY always;
+            add_header Content-Security-Policy "frame-ancestors 'none'" always;
             gzip on;
             gzip_min_length 1000;
             gzip_proxied expired no-cache no-store private auth;
@@ -45,6 +47,8 @@ data:
             }
             location = /index.html {
                 add_header Cache-Control "no-store, no-cache, must-revalidate";
+                add_header X-Frame-Options DENY always;
+                add_header Content-Security-Policy "frame-ancestors 'none'" always;
             }
         }
     }
