@@ -17,17 +17,10 @@ name: Nightly
 
 on:
   schedule:
-    # 00:00 UTC: a nightly stamped YYYYMMDD is cut at the start of that day,
-    # so the stamp names the day whose commits it carries. The release PR is
-    # opened and merged in the same run, so there is never a half-open
-    # nightly release PR waiting around.
+    # The release PR is opened and merged in the same run, so there is never a
+    # half-open nightly release PR waiting around.
     - cron: '0 0 * * *'
   workflow_dispatch:
-    inputs:
-      date_stamp:
-        description: Date stamp for the nightly version (YYYYMMDD, default today UTC)
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -47,11 +40,8 @@ jobs:
       contents: write
     outputs:
       version: ${{ steps.version.outputs.version }}
-      anchor_tag: ${{ steps.version.outputs.anchor_tag }}
       beta_tag: ${{ steps.version.outputs.beta_tag }}
-      already_released: ${{ steps.version.outputs.already_released }}
     env:
-      DATE_STAMP: ${{ inputs.date_stamp }}
       # Read by the askpass script below when the channel branch is pushed.
       GH_TOKEN: ${{ secrets.NIGHTLY_CHANNEL_TOKEN || github.token }}
     steps:
@@ -64,13 +54,9 @@ jobs:
       - uses: $/.github/actions/setup-task
 
       - name: Validate the nightly inputs
-        # The ref guard is what keeps the official tag and image names on the
-        # release line, and the stamp guard is what keeps a caller-supplied
-        # value from reaching a Task command line as anything but a date.
-        # Both are covered by `task nightly:test`.
-        #
-        # Checkout comes first because the guard lives in the repository; it
-        # still runs before anything is fetched, built or published.
+        # Keeps the official tag and image names on the release line. Checkout
+        # comes first because the guard lives in the repository; it still runs
+        # before anything is fetched, built or published.
         run: task nightly:validate-inputs
 
       - name: Configure ephemeral Git authentication
@@ -93,37 +79,18 @@ jobs:
         run: |
           # -o interleaved: the root Taskfile prefixes output per task, which
           # would end up inside the captured value.
-          # shellcheck disable=SC2086
-          version=$(task -o interleaved nightly:version ${DATE_STAMP:+DATE_STAMP="${DATE_STAMP}"})
+          version=$(task -o interleaved nightly:version)
           echo "version=${version}" >> "$GITHUB_OUTPUT"
-          # shellcheck disable=SC2086
-          anchor_tag=$(task -o interleaved nightly:anchor-tag ${DATE_STAMP:+DATE_STAMP="${DATE_STAMP}"})
-          echo "anchor_tag=${anchor_tag}" >> "$GITHUB_OUTPUT"
-          # The rolling tag for the minor under development, published next to
-          # the dated one so "the current preview" is pullable without a date.
           beta_tag=$(task -o interleaved nightly:beta-tag)
           echo "beta_tag=${beta_tag}" >> "$GITHUB_OUTPUT"
-          echo "::notice::Nightly version ${version} (tagged ${anchor_tag}, pointer ${beta_tag})"
-          # A dispatch can cut a date before its scheduled run reaches it, and
-          # a nightly that already tagged cannot be cut again. Nothing to do is
-          # an empty night, not a failure.
-          # shellcheck disable=SC2086
-          already=$(task -o interleaved nightly:already-released ${DATE_STAMP:+DATE_STAMP="${DATE_STAMP}"})
-          echo "already_released=${already}" >> "$GITHUB_OUTPUT"
-          if [ "${already}" = true ]; then
-            echo "::notice::${version} is already released; nothing to cut tonight"
-          fi
+          echo "::notice::Preview ${version}, published as ${beta_tag}"
 
       - name: Open the nightly channel
-        if: ${{ steps.version.outputs.already_released != 'true' }}
-        run: |
-          # shellcheck disable=SC2086
-          task nightly:channel PUSH_CHANNEL=true ${DATE_STAMP:+DATE_STAMP="${DATE_STAMP}"}
+        run: task nightly:channel PUSH_CHANNEL=true
 
   release:
     name: Release Nightly
     needs: [channel]
-    if: ${{ needs.channel.outputs.already_released != 'true' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 15
     permissions:
@@ -175,10 +142,7 @@ jobs:
           GH_TOKEN: ${{ secrets.NIGHTLY_CHANNEL_TOKEN || github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           MERGE_SHA: ${{ steps.merge.outputs.merge_sha }}
-          DATE_STAMP: ${{ inputs.date_stamp }}
-        run: |
-          # shellcheck disable=SC2086
-          task nightly:publish-tags MERGE_SHA="${MERGE_SHA}" ${DATE_STAMP:+DATE_STAMP="${DATE_STAMP}"}
+        run: task nightly:publish-tags MERGE_SHA="${MERGE_SHA}"
 
       - name: Upsert the rolling pre-release
         if: ${{ steps.merge.outputs.merge_sha != '' }}
@@ -196,12 +160,12 @@ jobs:
       id-token: write
     uses: $/.github/workflows/publish-images.yml
     with:
-      checkout_ref: ${{ needs.channel.outputs.anchor_tag }}
-      image_tag: ${{ needs.channel.outputs.anchor_tag }}
+      # The commit, not a tag: the only tag this run makes is the moving one.
+      checkout_ref: ${{ needs.release.outputs.merge_sha }}
+      image_tag: ${{ needs.channel.outputs.beta_tag }}
       version: ${{ needs.channel.outputs.version }}
-      artifact_prefix: nightly-${{ needs.channel.outputs.anchor_tag }}
-      # Same digest as the dated tag, so the signature covers both.
-      extra_image_tags: ${{ needs.channel.outputs.beta_tag }}
+      # Unique per run: the tag no longer is.
+      artifact_prefix: nightly-${{ github.run_id }}
       registry_address: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
       registry_project: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
     secrets:
@@ -238,8 +202,10 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+    outputs:
+      core_digest: ${{ steps.digest.outputs.ref }}
     env:
-      IMAGE_TAG: ${{ needs.channel.outputs.anchor_tag }}
+      IMAGE_TAG: ${{ needs.channel.outputs.beta_tag }}
       REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
       REGISTRY_PROJECT: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
     steps:
@@ -269,6 +235,16 @@ jobs:
             REGISTRY_ADDRESS="${REGISTRY_ADDRESS}" \
             REGISTRY_PROJECT="${REGISTRY_PROJECT}"
 
+      - name: Resolve the digest behind the moving tag
+        id: digest
+        # The only immutable handle on tonight's build now that no dated tag
+        # is published. It goes in the pre-release body so a reader can pin.
+        run: |
+          image="${REGISTRY_ADDRESS}/${REGISTRY_PROJECT}/harbor-core"
+          digest=$(skopeo inspect --format '{{.Digest}}' "docker://${image}:${IMAGE_TAG}")
+          echo "ref=${image}@${digest}" >> "$GITHUB_OUTPUT"
+          echo "::notice::${IMAGE_TAG} is ${digest}"
+
   e2e:
     name: E2E
     # After verify: the suite pulls these images, so there is no point
@@ -279,7 +255,7 @@ jobs:
       contents: read
     uses: $/.github/workflows/nightly-e2e.yml
     with:
-      tag: ${{ needs.channel.outputs.anchor_tag }}
+      tag: ${{ needs.channel.outputs.beta_tag }}
       channel: nightly
       # Where these images actually went, resolved the same way the publish
       # job resolves it.
@@ -293,11 +269,13 @@ jobs:
     name: Annotate the Rolling Pre-Release
     # release-notes as well as e2e: the notes engine replaces the whole body,
     # so a header written before it finishes is silently gone.
-    needs: [channel, release, release-notes, e2e]
+    needs: [channel, release, release-notes, verify, e2e]
     # Both must have succeeded. A failed release job may not have moved the
     # tags, and a failed notes job leaves last night's body in place — either
     # way the header would describe a build the rest of the release does not.
-    if: ${{ !cancelled() && needs.release.result == 'success' && needs.release-notes.result == 'success' }}
+    # verify too: an `if` here drops the implicit success requirement on every
+    # need, and without the digest the header has no immutable reference to give.
+    if: ${{ !cancelled() && needs.release.result == 'success' && needs.release-notes.result == 'success' && needs.verify.result == 'success' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
@@ -314,7 +292,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           MERGE_SHA: ${{ needs.release.outputs.merge_sha }}
-          ANCHOR_TAG: ${{ needs.channel.outputs.anchor_tag }}
+          DIGEST_REF: ${{ needs.verify.outputs.core_digest }}
           E2E_RESULT: ${{ needs.e2e.result }}
           E2E_PASSED: ${{ needs.e2e.outputs.scenarios_passed }}
           E2E_TOTAL: ${{ needs.e2e.outputs.scenarios_total }}
@@ -324,7 +302,7 @@ jobs:
         run: |
           task nightly:beta-header \
             MERGE_SHA="${MERGE_SHA}" \
-            ANCHOR="${ANCHOR_TAG}" \
+            DIGEST_REF="${DIGEST_REF}" \
             E2E_RESULT="${E2E_RESULT}" \
             E2E_PASSED="${E2E_PASSED}" \
             E2E_TOTAL="${E2E_TOTAL}" \

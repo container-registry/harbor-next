@@ -11,16 +11,15 @@
 # its notes a faithful preview of the upcoming release rather than a nightly
 # changelog stream of its own.
 #
-# DATE_STAMP is the one caller-supplied value here. It reaches the commands
-# below only through `env`, never through templating, so a value carrying shell
-# syntax stays data; _validate-stamp rejects anything but a date on top of that.
+# There is one preview tag, vX.Y.Z-beta, and it moves. Builds are told apart
+# by digest, not by tag.
 #
 # Usage:
-#   task nightly:version                 # print tonight's version
+#   task nightly:version                 # print the preview version
 #   task nightly:channel                 # build the channel commit locally
 #   task nightly:channel PUSH_CHANNEL=true
 #   task nightly:merge-release-pr        # squash-merge the channel's release PR
-#   task nightly:validate-inputs         # guard a run's ref and date stamp
+#   task nightly:validate-inputs         # guard the run's ref
 #   task nightly:test                    # exercise those guards
 
 version: '3'
@@ -30,20 +29,10 @@ vars:
   NIGHTLY_BRANCH: '{{.NIGHTLY_BRANCH | default "nightly"}}'
   # The one branch a nightly may be cut from.
   RELEASE_REF: '{{.RELEASE_REF | default "main"}}'
-  # The caller's stamp before defaulting, so it is empty when none was given.
-  # Only a value the caller supplied has to be guarded; "today" is ours.
-  DATE_STAMP_RAW: '{{.DATE_STAMP}}'
-  NIGHTLY_DATE:
-    sh: date -u +%Y%m%d
-  NIGHTLY_STAMP: '{{.DATE_STAMP | default .NIGHTLY_DATE}}'
   # VERSION is the next development version, i.e. exactly the minor
   # release-please is heading for on this line.
-  NIGHTLY_VERSION: '{{.VERSION}}-beta.{{.NIGHTLY_STAMP}}'
-  # Separate from NIGHTLY_VERSION, not a replacement: already-released checks
-  # the dated tag. Point it at the beta tag and it is true from night one.
   BETA_VERSION: '{{.VERSION}}-beta'
   BETA_TAG: 'v{{.BETA_VERSION}}'
-  ANCHOR_TAG: 'v{{.NIGHTLY_VERSION}}'
   NIGHTLY_CONFIG: release-please-config-nightly.json
   NIGHTLY_MANIFEST: .release-please-manifest-nightly.json
   RELEASE_CONFIG: release-please-config.json
@@ -56,56 +45,20 @@ vars:
 
 tasks:
   version:
-    desc: "Print tonight's nightly version (VERSION plus the UTC date stamp)"
+    desc: "Print the preview version this line is heading for"
     silent: true
     env:
-      NIGHTLY_VERSION: '{{.NIGHTLY_VERSION}}'
-    cmds:
-      - task: _validate-stamp
-      - printf '%s\n' "${NIGHTLY_VERSION}"
+      BETA_VERSION_VALUE: '{{.BETA_VERSION}}'
+    cmd: printf '%s\n' "${BETA_VERSION_VALUE}"
 
   beta-tag:
     desc: "Print the rolling image tag for the release this line is heading for"
     silent: true
-    # A moving pointer at the newest nightly of the minor under development:
-    # vX.Y.Z-beta, alongside the dated tag. Someone who wants "the current
-    # 2.16.0 preview" pulls this and gets last night's build without having to
-    # know the date. It carries no date on purpose, so it is overwritten every
-    # night; the dated tag is what stays pinned.
-    #
-    # beta rather than dev: the tag is an invitation to try the next release,
-    # and dev reads as "internal, you are holding it wrong". It also leaves
-    # "nightly" to mean one thing — the dated record — instead of two.
+    # The only preview tag. It is rewritten every night, so a build is pinned
+    # by digest, not by tag.
     env:
       BETA_TAG_VALUE: '{{.BETA_TAG}}'
     cmd: printf '%s\n' "${BETA_TAG_VALUE}"
-
-  anchor-tag:
-    desc: "Print tonight's dated tag, the immutable anchor the beta pointer moves onto"
-    silent: true
-    env:
-      ANCHOR_TAG_VALUE: '{{.ANCHOR_TAG}}'
-    cmds:
-      - task: _validate-stamp
-      - printf '%s\n' "${ANCHOR_TAG_VALUE}"
-
-  already-released:
-    desc: "Print true when tonight's nightly tag already exists"
-    silent: true
-    # A nightly that already tagged cannot be cut again for the same date, and
-    # a dispatch that cuts a date early leaves the scheduled run for that date
-    # with nothing to do. That is an empty night, not a failure — the same
-    # shape as nothing having landed since the last release.
-    env:
-      NIGHTLY_TAG: 'v{{.NIGHTLY_VERSION}}'
-    cmds:
-      - task: _validate-stamp
-      - |
-        if [ -n "$(git tag --list "${NIGHTLY_TAG}")" ]; then
-          printf 'true\n'
-        else
-          printf 'false\n'
-        fi
 
   channel:
     desc: "Materialize tonight's release-please channel (PUSH_CHANNEL=true to publish the branch)"
@@ -119,7 +72,6 @@ tasks:
       - sh: test -f '{{.RELEASE_MANIFEST}}'
         msg: "release-please manifest not found: {{.RELEASE_MANIFEST}}"
     cmds:
-      - task: _validate-stamp
       - task: _derive-config
       - task: _commit-channel
       - task: _push-channel
@@ -165,7 +117,7 @@ tasks:
         printf '%s\n' "${sha}"
 
   publish-tags:
-    desc: "Point the dated anchor and the rolling beta tag at tonight's release commit (MERGE_SHA)"
+    desc: "Move the beta tag onto tonight's release commit (MERGE_SHA)"
     silent: true
     # Refs API, not git: the calling job has a depth-1 checkout of the release
     # line, so the channel's merge commit is not in its object store.
@@ -173,7 +125,6 @@ tasks:
       vars: [MERGE_SHA]
     env:
       MERGE_SHA_VALUE: '{{.MERGE_SHA}}'
-      ANCHOR_TAG_VALUE: '{{.ANCHOR_TAG}}'
       BETA_TAG_VALUE: '{{.BETA_TAG}}'
     preconditions:
       - sh: test -n "${GH_TOKEN:-}"
@@ -181,7 +132,6 @@ tasks:
       - sh: test -n "${GITHUB_REPOSITORY:-}"
         msg: "GITHUB_REPOSITORY is required"
     cmds:
-      - task: _validate-stamp
       - |
         sha="${MERGE_SHA_VALUE}"
         # Reaches an API path, so: a commit sha and nothing else.
@@ -198,23 +148,6 @@ tasks:
             exit 1
             ;;
         esac
-
-        # Anchor first: if the run dies between the two, last night's beta
-        # target is still reachable.
-        existing=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${ANCHOR_TAG_VALUE}" --jq .object.sha 2>/dev/null || true)
-        if [ -n "${existing}" ]; then
-          # Reusing it at another commit would leave the anchor and the pointer
-          # describing different builds.
-          if [ "${existing}" != "${sha}" ]; then
-            printf '::error::%s already points at %s, not %s\n' "${ANCHOR_TAG_VALUE}" "${existing}" "${sha}" >&2
-            exit 1
-          fi
-          echo "::notice::${ANCHOR_TAG_VALUE} already points at ${sha}" >&2
-        else
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
-            -f "ref=refs/tags/${ANCHOR_TAG_VALUE}" -f "sha=${sha}" --jq .ref >/dev/null
-          echo "created ${ANCHOR_TAG_VALUE}" >&2
-        fi
 
         if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${BETA_TAG_VALUE}" --jq .ref >/dev/null 2>&1; then
           gh api --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/${BETA_TAG_VALUE}" \
@@ -264,17 +197,13 @@ tasks:
     silent: true
     # After the notes engine, never before: the engine replaces the whole body,
     # so a header written first is silently gone. Markers keep re-runs idempotent.
-    # ANCHOR is passed in rather than recomputed: this job runs up to an hour
-    # after the channel job, and a run that crosses midnight UTC would derive
-    # tomorrow's date and name a tag that was never published.
     requires:
-      vars: [MERGE_SHA, ANCHOR]
+      vars: [MERGE_SHA, DIGEST_REF]
     env:
       MERGE_SHA_VALUE: '{{.MERGE_SHA}}'
-      ANCHOR_TAG_VALUE: '{{.ANCHOR}}'
+      DIGEST_REF_VALUE: '{{.DIGEST_REF}}'
       BETA_TAG_VALUE: '{{.BETA_TAG}}'
       VERSION_VALUE: '{{.VERSION}}'
-      REGISTRY_VALUE: '{{.REGISTRY_ADDRESS}}/{{.REGISTRY_PROJECT}}'
       E2E_RESULT_VALUE: '{{.E2E_RESULT | default ""}}'
       E2E_PASSED_VALUE: '{{.E2E_PASSED | default ""}}'
       E2E_TOTAL_VALUE: '{{.E2E_TOTAL | default ""}}'
@@ -313,16 +242,16 @@ tasks:
           printf '<!-- beta-header:start -->\n'
           printf '> **Rolling preview of %s.** Rebuilt every night from `main`. Not feature-frozen, and not a release.\n' "${VERSION_VALUE}"
           printf '>\n'
-          printf '> Currently built from [`%s`](../../tree/%s) at `%s`.\n' "${ANCHOR_TAG_VALUE}" "${ANCHOR_TAG_VALUE}" "${MERGE_SHA_VALUE}"
+          printf '> Currently built from [`%s`](../../commit/%s).\n' "${MERGE_SHA_VALUE}" "${MERGE_SHA_VALUE}"
           printf '> End-to-end suite: **%s**.' "${e2e}"
           if [ -n "${RUN_URL_VALUE}" ]; then
             printf ' [Run](%s).' "${RUN_URL_VALUE}"
           fi
           printf '\n>\n'
-          printf '> `%s` is a moving tag: it changes under you, and for roughly an hour each night it points at a commit whose images are still building. Pin the dated tag instead:\n' "${BETA_TAG_VALUE}"
+          printf '> `%s` is a moving tag: it changes under you, and for roughly an hour each night it points at a commit whose images are still building. There is no second tag for tonight, so pin the digest:\n' "${BETA_TAG_VALUE}"
           printf '>\n'
           printf '> ```sh\n'
-          printf '> docker pull %s/harbor-core:%s\n' "${REGISTRY_VALUE}" "${ANCHOR_TAG_VALUE}"
+          printf '> docker pull %s\n' "${DIGEST_REF_VALUE}"
           printf '> ```\n'
           printf '<!-- beta-header:end -->\n'
           printf '\n'
@@ -338,17 +267,10 @@ tasks:
     silent: true
     # The workflow's first step, and the reason a nightly cannot be aimed
     # somewhere else: a dispatch from another ref would publish that ref's
-    # VERSION and release configuration under the official nightly tag and
-    # image names. The stamp guard is the other half — that value reaches a
-    # Task command line, so nothing but a date may pass.
+    # VERSION and release configuration under the official preview tag and
+    # image names.
     cmds:
       - task: _validate-ref
-      - task: _stamp-rule
-        vars:
-          # The raw value: the workflow leaves "today" to this taskfile, so an
-          # absent stamp is legal here and is resolved later.
-          STAMP: '{{.DATE_STAMP_RAW}}'
-          STAMP_REQUIRED: 'false'
 
   test:
     desc: "Exercise the nightly input guards"
@@ -360,10 +282,7 @@ tasks:
         ok() { printf 'ok    %s\n' "$1"; }
         bad() { printf 'FAIL  %s\n' "$1" >&2; failures=$((failures + 1)); }
 
-        # Every case starts from a clean slate and sets only what it is
-        # testing, so an exported stamp in the caller's shell cannot make a
-        # rejection look like an acceptance.
-        guard() { env -u DATE_STAMP -u GITHUB_REF_NAME "$@" task nightly:validate-inputs 2>&1; }
+        guard() { env -u GITHUB_REF_NAME "$@" task nightly:validate-inputs 2>&1; }
 
         accepts() {
           label=$1
@@ -376,8 +295,7 @@ tasks:
           if out=$(guard "$@"); then bad "${label}: expected reject, was accepted"; else ok "${label}"; fi
         }
 
-        accepts 'ref main, no stamp'        GITHUB_REF_NAME='{{.RELEASE_REF}}'
-        accepts 'ref main, dated stamp'     GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP=20260921
+        accepts 'ref main'                  GITHUB_REF_NAME='{{.RELEASE_REF}}'
 
         rejects 'ref release-2.15'          GITHUB_REF_NAME=release-2.15
         rejects 'ref topic branch'          GITHUB_REF_NAME=nightly-release-channel
@@ -385,89 +303,25 @@ tasks:
         rejects 'ref empty'                 GITHUB_REF_NAME=
         rejects 'ref unset'                 IGNORED=1
 
-        rejects 'stamp dashed'              GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP=2026-09-21
-        rejects 'stamp short'               GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP=202609
-        rejects 'stamp long'                GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP=202609211
-        rejects 'stamp trailing text'       GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP='20260921 rm -rf /'
-        rejects 'stamp month 13'            GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP=20261340
-        rejects 'stamp day 31 in September' GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP=20260931
-        rejects 'stamp 29 Feb, common year' GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP=20260229
-        accepts 'stamp 29 Feb, leap year'   GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP=20280229
-        rejects 'stamp command substitution' GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP='$(id)'
-        rejects 'stamp quote break'         GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP="x'; id #"
-        # Eight digits on their own line: a line-at-a-time regex accepts this.
-        rejects 'stamp newline smuggled'    GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP="$(printf 'x\n20260921')"
-
-        # Rejecting is not enough: the value must never have run as a command.
-        for attempt in '$(id)' "x'; id #" '`id`'; do
-          out=$(guard GITHUB_REF_NAME='{{.RELEASE_REF}}' DATE_STAMP="${attempt}" || true)
-          case "${out}" in
-            *uid=*) bad "injection stayed inert: ${attempt} executed id" ;;
-            *) ok "injection stayed inert: ${attempt}" ;;
-          esac
-        done
-
-        # The internal path the channel takes, where the stamp is resolved and
-        # an empty value is a failure rather than a default.
-        # -o interleaved for the same reason the workflow uses it: the root
-        # Taskfile prefixes output per task, and the prefix would land inside
-        # the captured version string.
-        version() { env -u DATE_STAMP task -o interleaved nightly:version "$@" 2>&1; }
-
-        if out=$(version) && [ "${out}" = '{{.VERSION}}-beta.{{.NIGHTLY_DATE}}' ]; then
-          ok 'version defaults to today'
+        # -o interleaved: the root Taskfile prefixes output per task, and the
+        # prefix would land inside the captured value.
+        if out=$(task -o interleaved nightly:version 2>&1) && [ "${out}" = '{{.VERSION}}-beta' ]; then
+          ok 'version is the preview version'
         else
-          bad "version defaults to today: got: ${out}"
+          bad "version: got: ${out}"
         fi
-        # Exported empty is not the same as unset, and it is what a scheduled
-        # run actually provides: the workflow sets DATE_STAMP from a dispatch
-        # input that a schedule does not have.
-        if out=$(DATE_STAMP= task -o interleaved nightly:version 2>&1) && [ "${out}" = '{{.VERSION}}-beta.{{.NIGHTLY_DATE}}' ]; then
-          ok 'version defaults to today with DATE_STAMP exported empty'
-        else
-          bad "version with DATE_STAMP exported empty: got: ${out}"
-        fi
-        # And a stamp the caller did supply still wins over the default.
-        if out=$(DATE_STAMP=20200102 task -o interleaved nightly:version 2>&1) && [ "${out}" = '{{.VERSION}}-beta.20200102' ]; then
-          ok 'exported DATE_STAMP is honoured'
-        else
-          bad "exported DATE_STAMP: got: ${out}"
-        fi
-        # A date that is not today, so the stamp is doing the work.
-        if out=$(version DATE_STAMP=20200102) && [ "${out}" = '{{.VERSION}}-beta.20200102' ]; then
-          ok 'version honours a dated stamp'
-        else
-          bad "version honours a dated stamp: got: ${out}"
-        fi
-        if out=$(version DATE_STAMP=2026-09-21); then
-          bad "version rejects a bad stamp: was accepted as ${out}"
-        else
-          ok 'version rejects a bad stamp'
-        fi
-
-        # The rolling tag: no date, and a tag the published-tag guard accepts
-        # is NOT what this is — it is an image tag, not a release tag.
         if out=$(task -o interleaved nightly:beta-tag 2>&1) && [ "${out}" = 'v{{.VERSION}}-beta' ]; then
           ok 'beta tag names the minor under development'
         else
           bad "beta tag: got: ${out}"
         fi
-        case "$(task -o interleaved nightly:beta-tag 2>&1)" in
-          *-beta.*) bad 'beta tag carries a date' ;;
-          *) ok 'beta tag carries no date' ;;
-        esac
-
-        if out=$(task -o interleaved nightly:anchor-tag DATE_STAMP=20260925 2>&1) \
-          && [ "${out}" = 'v{{.VERSION}}-beta.20260925' ]; then
-          ok 'anchor tag is the dated tag, v prefixed'
-        else
-          bad "anchor tag: got: ${out}"
-        fi
-        if out=$(task -o interleaved nightly:anchor-tag DATE_STAMP='x; id' 2>&1); then
-          bad "anchor tag accepted a bad stamp: ${out}"
-        else
-          ok 'anchor tag rejects a bad stamp'
-        fi
+        # Nothing may reintroduce a date: the pointer is the only preview name.
+        for dated in "$(task -o interleaved nightly:version 2>&1)" "$(task -o interleaved nightly:beta-tag 2>&1)"; do
+          case "${dated}" in
+            *[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]*) bad "carries a date stamp: ${dated}" ;;
+            *) ok "carries no date stamp: ${dated}" ;;
+          esac
+        done
 
         # publish-tags reaches an API path with the sha, so it is guarded the
         # same way the stamp and the tag are.
@@ -484,43 +338,22 @@ tasks:
           fi
         done
 
-        # The already-released check. A purpose-built tag, so the answer does
-        # not depend on which tags this checkout happens to have fetched.
-        released() { task -o interleaved nightly:already-released DATE_STAMP="$1" 2>&1; }
-        fixture_tag='v{{.VERSION}}-beta.20200103'
-        # Only ever delete a tag this test created. A blind cleanup would
-        # destroy a real tag of the same name if one ever existed.
-        if [ -n "$(git tag --list "${fixture_tag}")" ]; then
-          bad "fixture tag ${fixture_tag} already exists; refusing to touch it"
-        elif ! git -c tag.gpgSign=false tag "${fixture_tag}" >/dev/null 2>&1; then
-          bad "could not create the fixture tag ${fixture_tag}"
-        else
-          if [ "$(released 20200103)" = true ]; then
-            ok 'already-released sees an existing tag'
-          else
-            bad "already-released sees an existing tag: got: $(released 20200103)"
-          fi
-          git tag -d "${fixture_tag}" >/dev/null 2>&1 || true
-          if [ "$(released 20200103)" = false ]; then
-            ok 'already-released is false once the tag is gone'
-          else
-            bad 'already-released stayed true after the tag was deleted'
-          fi
-        fi
-
-        # The published-tag guard, which the e2e workflow runs before a tag
-        # reaches an image reference.
+        # The published-tag guard. The workflow only ever hands it the moving
+        # tag, but a manual e2e dispatch can hand it anything, including the
+        # anchors published before the rename.
         tag_guard() { task nightly:validate-tag TAG="$1" 2>&1; }
         for good in v2.16.0 v2.16.0-beta v2.16.0-beta.20260922 v2.16.0-nightly-20260922 v10.0.1; do
-          if out=$(tag_guard "${good}"); then ok "tag ${good}"; else bad "tag ${good}: rejected: ${out}"; fi
+          if out=$(tag_guard "${good}"); then ok "tag ${good}"; else bad "tag ${good}: ${out}"; fi
         done
-        for nope in v2.16 2.16.0 v1.2.3.4 v2.16.0-rc1 'v2.16.0; id' 'v2.16.0-beta.2026' 'v2.16.0-beta.' "$(printf 'x\nv2.16.0')" ''; do
-          out=$(tag_guard "${nope}" || true)
-          case "${out}" in
-            *uid=*) bad "tag '${nope}': id executed" ;;
-            *) if task nightly:validate-tag TAG="${nope}" >/dev/null 2>&1; then bad "tag '${nope}': accepted"; else ok "tag rejected: '${nope}'"; fi ;;
-          esac
+        for nope in v2.16 2.16.0 v1.2.3.4 v2.16.0-rc1 'v2.16.0; id' 'v2.16.0-beta.2026' \
+          'v2.16.0-beta.' "$(printf 'x\nv2.16.0')" ''; do
+          if out=$(tag_guard "${nope}"); then bad "tag accepted: '${nope}'"; else ok "tag rejected: '${nope}'"; fi
         done
+        # Rejecting is not enough: the value must never have run as a command.
+        case "$(tag_guard 'v2.16.0-$(id)' || true)" in
+          *uid=*) bad 'tag injection executed id' ;;
+          *) ok 'tag injection stayed inert' ;;
+        esac
 
         if [ "${failures}" -ne 0 ]; then
           printf '\n%s nightly guard test(s) failed\n' "${failures}" >&2
@@ -606,61 +439,6 @@ tasks:
         exit 1
       fi
 
-  _validate-stamp:
-    internal: true
-    # The resolved stamp: "today" has already been filled in by now, so an
-    # empty value here is a failure rather than a default.
-    cmds:
-      - task: _stamp-rule
-        vars:
-          STAMP: '{{.NIGHTLY_STAMP}}'
-
-  _stamp-rule:
-    internal: true
-    # Silent: `nightly:version` output is captured by the workflow.
-    silent: true
-    vars:
-      STAMP_REQUIRED: '{{.STAMP_REQUIRED | default "true"}}'
-    # The value reaches the command through env and nothing else. A task's env
-    # is not inherited by the tasks it calls, so the rule lives in the one task
-    # that holds the value — callers pass it in, and there is a single home for
-    # what a date stamp may contain.
-    #
-    # STAMP_VALUE, not DATE_STAMP: a task's env does NOT override a variable
-    # already present in the process environment. The workflow exports
-    # DATE_STAMP — empty on a scheduled run, since the dispatch input is
-    # absent — and that empty value would win over whatever is set here.
-    env:
-      STAMP_VALUE: '{{.STAMP}}'
-      STAMP_REQUIRED: '{{.STAMP_REQUIRED}}'
-    cmd: |
-      stamp="${STAMP_VALUE:-}"
-      if [ -z "${stamp}" ]; then
-        if [ "${STAMP_REQUIRED}" != "true" ]; then
-          exit 0
-        fi
-        printf '::error::DATE_STAMP must be YYYYMMDD, got: <empty>\n' >&2
-        exit 1
-      fi
-      # A glob, not a regex: grep and [[ =~ ]] both match a line at a time, so
-      # a stamp carrying a newline next to eight digits would pass either.
-      case "${stamp}" in
-        [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
-        *)
-          printf '::error::DATE_STAMP must be YYYYMMDD, got: %s\n' "${stamp}" >&2
-          exit 1
-          ;;
-      esac
-      # Eight digits is a shape, not a date: 20261340 and 20260231 both pass
-      # the glob above, and either would name a nightly tag after a day that
-      # does not exist. Round-tripping through date settles it — a value the
-      # calendar does not have comes back different, or not at all. Safe to
-      # pass along by now: it is eight digits and nothing else.
-      if [ "$(date -u -d "${stamp}" +%Y%m%d 2>/dev/null)" != "${stamp}" ]; then
-        printf '::error::DATE_STAMP is not a real date: %s\n' "${stamp}" >&2
-        exit 1
-      fi
-
   _derive-config:
     internal: true
     env:
@@ -684,19 +462,20 @@ tasks:
   _commit-channel:
     internal: true
     env:
-      NIGHTLY_VERSION: '{{.NIGHTLY_VERSION}}'
+      BETA_VERSION: '{{.BETA_VERSION}}'
     cmds:
       - git switch --force-create '{{.NIGHTLY_BRANCH}}'
       - git add '{{.NIGHTLY_CONFIG}}' '{{.NIGHTLY_MANIFEST}}'
       - >-
         git -c user.name='{{.COMMIT_NAME}}' -c user.email='{{.COMMIT_EMAIL}}'
-        commit -s -m "chore: Open the ${NIGHTLY_VERSION} nightly channel"
+        commit -s -m "chore: Open the ${BETA_VERSION} preview channel"
 
   _push-channel:
     internal: true
     status:
       - test '{{.PUSH_CHANNEL}}' != "true"
     cmds:
-      # Force: last night's channel and its release commit are replaced. The
-      # commits they carried stay reachable through the nightly tags.
+      # Force: last night's channel and its release commit are replaced. Only
+      # the moving tag keeps a commit reachable, so a superseded night's commit
+      # is reachable only while the tag still points at it.
       - git push --force origin 'HEAD:refs/heads/{{.NIGHTLY_BRANCH}}'
