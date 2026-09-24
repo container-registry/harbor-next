@@ -7,9 +7,15 @@
     "start": "webpack serve --config webpack.config.js --mode development"
   },
   "dependencies": {
+<<<<<<< HEAD
     "css-loader": "^6.11.0",
     "style-loader": "^3.3.4",
     "swagger-ui": "5.32.4"
+=======
+    "css-loader": "^7.1.5",
+    "style-loader": "^4.0.0",
+    "swagger-ui": "5.32.13"
+>>>>>>> eadf89a5f (chore(deps): bump css-loader from 6.11.0 to 7.1.5 in /src/portal/app-swagger-ui (#23848))
   },
   "devDependencies": {
     "clean-webpack-plugin": "^4.0.0",
