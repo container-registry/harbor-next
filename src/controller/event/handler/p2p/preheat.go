@@ -21,13 +21,23 @@ import (
 	"github.com/goharbor/harbor/src/controller/artifact/processor/image"
 	"github.com/goharbor/harbor/src/controller/event"
 	"github.com/goharbor/harbor/src/controller/p2p/preheat"
+	"github.com/goharbor/harbor/src/controller/scan"
 	"github.com/goharbor/harbor/src/controller/tag"
+	"github.com/goharbor/harbor/src/jobservice/job"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
+	"github.com/goharbor/harbor/src/lib/q"
+	"github.com/goharbor/harbor/src/pkg"
+	pkgArt "github.com/goharbor/harbor/src/pkg/artifact"
+	scanModel "github.com/goharbor/harbor/src/pkg/scan/dao/scan"
+	v1 "github.com/goharbor/harbor/src/pkg/scan/rest/v1"
 )
 
 // Handler ...
 type Handler struct {
+	// for UT mock
+	artMgr  pkgArt.Manager
+	scanCtl scan.Controller
 }
 
 // Name ...
@@ -89,9 +99,6 @@ func (p *Handler) handlePushArtifact(ctx context.Context, event *event.PushArtif
 }
 
 func (p *Handler) handleImageScanned(ctx context.Context, event *event.ScanImageEvent) error {
-	// TODO: If the scan is targeting an manifest list, here the artifacts we get are all the children
-	//  artifacts of the manifest list. The children artifacts are high probably untagged ones that
-	//  will be definitely ignored by the tag filter. We need to find a way to resolve this issue.
 	log.Debugf("preheat: image scanned %s:%s", event.Artifact.Repository, event.Artifact.Tag)
 	art, err := artifact.Ctl.GetByReference(ctx, event.Artifact.Repository, event.Artifact.Digest,
 		&artifact.Option{
@@ -101,8 +108,111 @@ func (p *Handler) handleImageScanned(ctx context.Context, event *event.ScanImage
 	if err != nil {
 		return err
 	}
-	_, err = preheat.Enf.PreheatArtifact(ctx, art)
-	return err
+
+	if len(art.Tags) > 0 {
+		_, err = preheat.Enf.PreheatArtifact(ctx, art)
+		return err
+	}
+
+	// Scanning an image index scans its children, which are usually untagged and would be dropped
+	// by the tag filter. Preheat the tagged index that references the child instead, which is also
+	// what a push of the index preheats. Only vulnerability scans are handled, as they are what the
+	// vulnerability filter of the preheat policy is evaluated against.
+	if event.ScanType != "" && event.ScanType != v1.ScanTypeVulnerability {
+		return nil
+	}
+
+	return p.preheatParents(ctx, art)
+}
+
+// preheatParents preheats the tagged image indexes referencing the given artifact once the scans
+// of all their children are finished. Every child fires its own scan event, so only the event of
+// the child whose scan finished last preheats the index, instead of preheating it once per child.
+func (p *Handler) preheatParents(ctx context.Context, child *artifact.Artifact) error {
+	artMgr := pkg.ArtifactMgr
+	// for UT mock
+	if p.artMgr != nil {
+		artMgr = p.artMgr
+	}
+	scanCtl := scan.DefaultController
+	// for UT mock
+	if p.scanCtl != nil {
+		scanCtl = p.scanCtl
+	}
+
+	references, err := artMgr.ListReferences(ctx, q.New(q.KeyWords{"ChildID": child.ID}))
+	if err != nil {
+		return err
+	}
+
+	var errs errors.Errors
+	seen := make(map[int64]bool, len(references))
+	for _, ref := range references {
+		if seen[ref.ParentID] {
+			continue
+		}
+		seen[ref.ParentID] = true
+
+		parent, err := artifact.Ctl.Get(ctx, ref.ParentID, &artifact.Option{
+			WithTag:   true,
+			WithLabel: true,
+		})
+		if err != nil {
+			if !errors.IsNotFoundErr(err) {
+				errs = append(errs, err)
+			}
+			continue
+		}
+		if len(parent.Tags) == 0 {
+			continue
+		}
+
+		last, err := isLastScanned(ctx, scanCtl, parent, child)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		if !last {
+			log.Debugf("preheat: skip %s@%s for its scanned child %s, the scans of its other children are not all finished yet", parent.RepositoryName, parent.Digest, child.Digest)
+			continue
+		}
+
+		log.Debugf("preheat: preheat image index %s@%s for its scanned child %s", parent.RepositoryName, parent.Digest, child.Digest)
+		if _, err := preheat.Enf.PreheatArtifact(ctx, parent); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	if len(errs) > 0 {
+		return errs
+	}
+	return nil
+}
+
+// isLastScanned reports whether the vulnerability scans of all the scannable children of the image
+// index are finished and the given child is the one whose scan finished last. Children finishing at
+// the same time are ordered by digest, so exactly one of their scan events preheats the index.
+func isLastScanned(ctx context.Context, scanCtl scan.Controller, index, child *artifact.Artifact) (bool, error) {
+	reports, err := scanCtl.GetReport(ctx, index, nil)
+	if err != nil {
+		if errors.IsNotFoundErr(err) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	var last *scanModel.Report
+	for _, r := range reports {
+		if !job.Status(r.Status).Final() {
+			return false, nil
+		}
+		if last == nil || r.EndTime.After(last.EndTime) ||
+			(r.EndTime.Equal(last.EndTime) && r.Digest > last.Digest) {
+			last = r
+		}
+	}
+	// no reports are returned when any of the children has not been scanned yet
+	return last != nil && last.Digest == child.Digest, nil
 }
 
 func (p *Handler) handleArtifactLabeled(ctx context.Context, event *event.ArtifactLabeledEvent) error {
