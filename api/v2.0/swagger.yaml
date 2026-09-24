@@ -9412,6 +9412,12 @@ definitions:
       disabled_audit_log_event_types:
         $ref: '#/definitions/StringConfigItem'
         description: The audit log event types to skip to log in database
+      registry_mirror_enabled:
+        $ref: '#/definitions/BoolConfigItem'
+        description: Whether pulls that arrive without a project segment are served from a proxy cache project, so Harbor can be used as a registry mirror
+      registry_mirror_namespaces:
+        $ref: '#/definitions/StringConfigItem'
+        description: Comma separated <namespace>=<project> pairs mapping an upstream registry to the proxy cache project serving it, "*" is the catch-all
   Configurations:
     type: object
     properties:
@@ -9708,6 +9714,16 @@ definitions:
       disabled_audit_log_event_types:
         type: string
         description: the list to disable log audit event types.
+        x-omitempty: true
+        x-isnullable: true
+      registry_mirror_enabled:
+        type: boolean
+        description: Whether pulls that arrive without a project segment are served from a proxy cache project, so Harbor can be used as a registry mirror
+        x-omitempty: true
+        x-isnullable: true
+      registry_mirror_namespaces:
+        type: string
+        description: Comma separated <namespace>=<project> pairs mapping an upstream registry to the proxy cache project serving it, "*" is the catch-all
         x-omitempty: true
         x-isnullable: true
   StringConfigItem:
