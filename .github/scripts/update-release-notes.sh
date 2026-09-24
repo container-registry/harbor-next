@@ -39,13 +39,18 @@ if [[ "${TAG_NAME}" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-(beta\.|nightly-)[0-9]{8}$ ]];
   beta_tag="v${BASH_REMATCH[1]}-beta"
   anchor_sha=$(git rev-parse -q --verify "${TAG_NAME}^{commit}" 2>/dev/null || true)
   beta_sha=$(git rev-parse -q --verify "${beta_tag}^{commit}" 2>/dev/null || true)
-  if [[ -n "${anchor_sha}" && "${anchor_sha}" == "${beta_sha}" ]]; then
-    echo "::notice::${TAG_NAME} carries no release; rendering ${beta_tag}" >&2
-    TAG_NAME="${beta_tag}"
-  else
-    echo "${TAG_NAME} has no release, and ${beta_tag} has moved on. Render ${beta_tag} directly if that is what you want." >&2
+  if [[ -z "${anchor_sha}" ]]; then
+    echo "${TAG_NAME} is not a tag in this checkout." >&2
+    exit 1
+  elif [[ -z "${beta_sha}" ]]; then
+    echo "${TAG_NAME} has no release, and ${beta_tag} does not exist to redirect to." >&2
+    exit 1
+  elif [[ "${anchor_sha}" != "${beta_sha}" ]]; then
+    echo "${TAG_NAME} has no release, and ${beta_tag} has moved on to another build. Render ${beta_tag} directly if that is what you want." >&2
     exit 1
   fi
+  echo "::notice::${TAG_NAME} carries no release; rendering ${beta_tag}" >&2
+  TAG_NAME="${beta_tag}"
 fi
 
 PATCHES_TOKEN="${PATCHES_TOKEN:-${GH_TOKEN}}"
