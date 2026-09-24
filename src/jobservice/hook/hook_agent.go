@@ -20,7 +20,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
+	"github.com/cenkalti/backoff/v7"
 	"github.com/gomodule/redigo/redis"
 
 	"github.com/goharbor/harbor/src/jobservice/common/rds"
@@ -131,11 +131,19 @@ func (ba *basicAgent) retry(evt *Event) {
 		<-ba.tokens
 	}()
 
-	// Resend hook event
-	bf := newBackoff(errRetryBackoff)
+	if err := ba.resend(evt, errRetryBackoff); err != nil {
+		logger.Errorf("Retry: still failed after all retries: %s, evt=%s->%s", err.Error(), evt.Message, evt.URL)
+	}
+}
+
+// resend keeps sending the event until it succeeds, the agent's context is
+// cancelled, or maxElapsedTime runs out. The ceiling is a parameter so tests
+// can drive the real loop without waiting out errRetryBackoff.
+func (ba *basicAgent) resend(evt *Event, maxElapsedTime time.Duration) error {
+	bf := newBackoff()
 	bf.Reset()
 
-	err := backoff.RetryNotify(func() error {
+	_, err := backoff.Retry(ba.context, func() (struct{}, error) {
 		logger.Debugf("Retry: sending hook event: %s->%s", evt.Message, evt.URL)
 
 		// Try to avoid sending outdated events, just a try-best operation.
@@ -146,18 +154,20 @@ func (ba *basicAgent) retry(evt *Event) {
 		} else {
 			if ot {
 				logger.Infof("Hook event is abandoned as it's outdated: %s->%s", evt.Message, evt.URL)
-				return nil
+				return struct{}{}, nil
 			}
 		}
 
-		return ba.client.SendEvent(evt)
-	}, bf, func(e error, d time.Duration) {
-		logger.Errorf("Retry: sending hook event error: %s, evt=%s->%s, duration=%v", e.Error(), evt.Message, evt.URL, d)
-	})
+		return struct{}{}, ba.client.SendEvent(evt)
+	},
+		backoff.WithBackOff(bf),
+		backoff.WithMaxElapsedTime(maxElapsedTime),
+		backoff.WithNotify(func(e error, d time.Duration) {
+			logger.Errorf("Retry: sending hook event error: %s, evt=%s->%s, duration=%v", e.Error(), evt.Message, evt.URL, d)
+		}),
+	)
 
-	if err != nil {
-		logger.Errorf("Retry: still failed after all retries: %s, evt=%s->%s", err.Error(), evt.Message, evt.URL)
-	}
+	return err
 }
 
 // ack hook event
@@ -257,12 +267,14 @@ func (ba *basicAgent) isOutdated(evt *Event) (bool, error) {
 	return false, nil
 }
 
-func newBackoff(maxElapsedTime time.Duration) backoff.BackOff {
+// newBackoff builds the retry schedule. The ceiling that used to live on
+// ExponentialBackOff.MaxElapsedTime is passed to Retry as WithMaxElapsedTime,
+// since v5 removed the field.
+func newBackoff() backoff.BackOff {
 	bf := backoff.NewExponentialBackOff()
 	bf.InitialInterval = 2 * time.Second
 	bf.RandomizationFactor = 0.5
 	bf.Multiplier = 2
-	bf.MaxElapsedTime = maxElapsedTime
 
 	return bf
 }

@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cenkalti/backoff/v7"
 	"github.com/gomodule/redigo/redis"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -130,6 +131,94 @@ func (suite *HookAgentTestSuite) TestEventSendingError() {
 	err := suite.agent.Trigger(suite.event)
 
 	suite.Error(err)
+}
+
+// retryEvent is a hook event for a job with no stats in Redis, which keeps
+// isOutdated deterministic whatever the other tests in this suite have acked.
+func (suite *HookAgentTestSuite) retryEvent() *Event {
+	return &Event{
+		URL:       "http://127.0.0.1:9999/hook",
+		Message:   "retry test",
+		Timestamp: time.Now().Unix(),
+		Data: &job.StatusChange{
+			JobID:  utils.MakeIdentifier(),
+			Status: job.SuccessStatus.String(),
+			Metadata: &job.StatsInfo{
+				JobID:    utils.MakeIdentifier(),
+				Status:   job.SuccessStatus.String(),
+				Revision: time.Now().Unix(),
+				JobKind:  job.KindGeneric,
+				JobName:  job.SampleJob,
+			},
+		},
+	}
+}
+
+func (suite *HookAgentTestSuite) retryAgent(ctx context.Context, client Client) *basicAgent {
+	return &basicAgent{
+		context:   ctx,
+		namespace: suite.namespace,
+		redisPool: suite.pool,
+		client:    client,
+		tokens:    make(chan struct{}, 1),
+	}
+}
+
+// TestRetryResendsUntilSuccess covers the background retry path: the first send
+// fails, the loop backs off and sends again.
+func (suite *HookAgentTestSuite) TestRetryResendsUntilSuccess() {
+	evt := suite.retryEvent()
+
+	mc := &mockClient{}
+	mc.On("SendEvent", evt).Return(errors.New("internal server error: for testing")).Once()
+	mc.On("SendEvent", evt).Return(nil).Once()
+
+	// A deadline well above the first backoff interval, so a regression that
+	// stops the second send from succeeding fails the test instead of holding
+	// the suite for the full errRetryBackoff.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	suite.retryAgent(ctx, mc).retry(evt)
+
+	mc.AssertExpectations(suite.T())
+}
+
+// TestResendStopsAtMaxElapsedTime drives the production retry loop, not a
+// rebuilt copy of it, so dropping WithMaxElapsedTime at the call site fails here.
+func (suite *HookAgentTestSuite) TestResendStopsAtMaxElapsedTime() {
+	evt := suite.retryEvent()
+
+	mc := &mockClient{}
+	mc.On("SendEvent", evt).Return(errors.New("internal server error: for testing"))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	err := suite.retryAgent(ctx, mc).resend(evt, 100*time.Millisecond)
+
+	suite.Error(err)
+	suite.ErrorIs(err, backoff.ErrMaxElapsedTime)
+}
+
+// TestResendStopsOnCancelledContext covers the agent context reaching the retry
+// loop. On a cancelled context the operation runs once and gives up; with a
+// context that never cancels it would instead run out the ceiling below and
+// report ErrMaxElapsedTime.
+func (suite *HookAgentTestSuite) TestResendStopsOnCancelledContext() {
+	evt := suite.retryEvent()
+
+	mc := &mockClient{}
+	mc.On("SendEvent", evt).Return(errors.New("internal server error: for testing")).Once()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := suite.retryAgent(ctx, mc).resend(evt, 5*time.Second)
+
+	suite.Error(err)
+	suite.ErrorIs(err, context.Canceled)
+	mc.AssertExpectations(suite.T())
 }
 
 func (suite *HookAgentTestSuite) checkStatus() {
