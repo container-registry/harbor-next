@@ -8,6 +8,7 @@ require (
 	github.com/FZambia/sentinel/v2 v2.0.1
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/aliyun/alibaba-cloud-sdk-go v1.63.107
+	github.com/amirsalarsafaei/sqlc-pgx-monitoring v1.7.2
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
 	github.com/aws/aws-sdk-go v1.55.8
 	github.com/beego/beego/v2 v2.3.10
@@ -263,6 +264,7 @@ require (
 
 replace (
 	github.com/Azure/go-autorest => github.com/Azure/go-autorest v14.2.0+incompatible
+	github.com/amirsalarsafaei/sqlc-pgx-monitoring => ./local/sqlc-pgx-monitoring
 	github.com/docker/distribution => github.com/distribution/distribution v2.8.2+incompatible
 	github.com/gocraft/work => github.com/goharbor/work v0.5.1
 	github.com/goharbor/harbor => ../

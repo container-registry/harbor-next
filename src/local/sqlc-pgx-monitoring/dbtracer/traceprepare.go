@@ -1,0 +1,100 @@
+package dbtracer
+
+import (
+	"context"
+	"log/slog"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"go.opentelemetry.io/otel/codes"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	"go.opentelemetry.io/otel/trace"
+)
+
+type tracePrepareData struct {
+	startTime     time.Time // 16 bytes
+	qMD           *queryMetadata
+	sql           string // 16 bytes
+	statementName string // 16 bytes
+}
+
+var pgxOperationPrepare = PGXOperationTypeKey.String("prepare")
+
+func (dt *dbTracer) TracePrepareStart(
+	ctx context.Context,
+	_ *pgx.Conn,
+	data pgx.TracePrepareStartData,
+) context.Context {
+	qMD := queryMetadataFromSQL(data.SQL)
+
+	spanName := dt.spanName("postgresql.prepare", qMD)
+
+	ctx, span := dt.getTracer().Start(ctx, spanName, trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			dt.infoAttrs...),
+		trace.WithAttributes(
+			pgxOperationPrepare,
+			PGXPrepareStmtNameKey.String(data.Name)),
+	)
+
+	if qMD != nil {
+		span.SetAttributes(
+			SQLCQueryNameKey.String(qMD.name),
+			SQLCQueryCommandKey.String(qMD.command),
+			semconv.DBOperationName(qMD.name),
+		)
+	}
+
+	return context.WithValue(ctx, dbTracerPrepareCtxKey, &tracePrepareData{
+		startTime:     time.Now(),
+		statementName: data.Name,
+		sql:           data.SQL,
+		qMD:           qMD,
+	})
+}
+
+func (dt *dbTracer) TracePrepareEnd(
+	ctx context.Context,
+	conn *pgx.Conn,
+	data pgx.TracePrepareEndData,
+) {
+	traceData := ctx.Value(dbTracerPrepareCtxKey).(*tracePrepareData)
+	if traceData == nil {
+		return
+	}
+
+	span := trace.SpanFromContext(ctx)
+	if !span.SpanContext().IsValid() {
+		return
+	}
+	defer span.End()
+
+	interval := time.Since(traceData.startTime)
+	dt.recordDBOperationHistogramMetric(ctx, "prepare", traceData.qMD, interval, data.Err)
+
+	var logAttrs []slog.Attr
+	var level slog.Level
+
+	if data.Err != nil {
+		dt.recordSpanError(span, data.Err)
+		logAttrs = append(logAttrs, slog.String("error", data.Err.Error()))
+		level = slog.LevelError
+	} else {
+		span.SetStatus(codes.Ok, "")
+		logAttrs = append(logAttrs, slog.Bool("alreadyPrepared", data.AlreadyPrepared))
+		level = slog.LevelInfo
+	}
+
+	if dt.shouldLog(data.Err) {
+		logAttrs = append(logAttrs, slog.String("statement_name", traceData.statementName),
+			slog.String("sql", traceData.sql),
+			slog.Duration("time", interval),
+			slog.Uint64("pid", uint64(extractConnectionID(conn))),
+		)
+
+		dt.logger.LogAttrs(ctx, level,
+			"prepare",
+			logAttrs...,
+		)
+	}
+}
