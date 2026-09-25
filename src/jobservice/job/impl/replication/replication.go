@@ -43,6 +43,8 @@ import (
 	_ "github.com/goharbor/harbor/src/pkg/reg/adapter/harbor"
 	// import harborSatellite adapter
 	_ "github.com/goharbor/harbor/src/pkg/reg/adapter/harborsatellite"
+	// import huggingface adapter
+	_ "github.com/goharbor/harbor/src/pkg/reg/adapter/huggingface"
 	// import huawei adapter
 	_ "github.com/goharbor/harbor/src/pkg/reg/adapter/huawei"
 	// import jfrog adapter
