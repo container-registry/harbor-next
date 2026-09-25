@@ -82,23 +82,51 @@ var (
 	}
 )
 
+// middlewareEntry names one link of the global chain so the order the chain
+// depends on can be asserted in a test.
+type middlewareEntry struct {
+	name string
+	mw   web.MiddleWare
+}
+
+// middlewareChain returns the global middleware chain, outermost first.
+//
+// transaction.Middleware runs last of the database-aware middlewares. It holds a
+// pool connection for the whole request, and security, readonly and the audit
+// resolver in log all read configuration or user records. Run inside the
+// transaction, they wait for a second connection while holding the first, and
+// the config-cache builder they wait on needs a connection of its own: under
+// load every connection ends up held by a request waiting for one and core does
+// not recover (#92, goharbor/harbor#13155). The same ordering was applied to
+// release-2.1.0 in a773ef358 and lost when it was restructured for main.
+func middlewareChain() []middlewareEntry {
+	return []middlewareEntry{
+		{"url", url.Middleware()},
+		{"mergeslash", mergeslash.Middleware()},
+		{"trace", trace.Middleware()},
+		{"metric", metric.Middleware()},
+		{"requestid", requestid.Middleware()},
+		{"session", session.Middleware()},
+		{"csrf", csrf.Middleware()},
+		{"orm", orm.Middleware(pingSkipper)},
+		// notification must ahead of transaction ensure the DB transaction execution complete
+		{"notification", notification.Middleware(pingSkipper)},
+		{"artifactinfo", artifactinfo.Middleware()},
+		{"security", security.Middleware(pingSkipper)},
+		// log middleware should be after the security middleware so that the user info can be logged
+		{"log", log.Middleware()},
+		{"security-unauthorized", security.UnauthorizedMiddleware()},
+		{"readonly", readonly.Middleware(readonlySkippers...)},
+		{"transaction", transaction.Middleware(dbTxSkippers...)},
+	}
+}
+
 // MiddleWares returns global middlewares
 func MiddleWares() []web.MiddleWare {
-	return []web.MiddleWare{
-		url.Middleware(),
-		mergeslash.Middleware(),
-		trace.Middleware(),
-		metric.Middleware(),
-		requestid.Middleware(),
-		session.Middleware(),
-		csrf.Middleware(),
-		orm.Middleware(pingSkipper),
-		notification.Middleware(pingSkipper), // notification must ahead of transaction ensure the DB transaction execution complete
-		transaction.Middleware(dbTxSkippers...),
-		artifactinfo.Middleware(),
-		security.Middleware(pingSkipper),
-		log.Middleware(), // log middleware should be after the security middleware so that the user info can be logged
-		security.UnauthorizedMiddleware(),
-		readonly.Middleware(readonlySkippers...),
+	entries := middlewareChain()
+	mws := make([]web.MiddleWare, 0, len(entries))
+	for _, entry := range entries {
+		mws = append(mws, entry.mw)
 	}
+	return mws
 }
