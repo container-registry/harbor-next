@@ -162,6 +162,8 @@ var (
 		{Name: common.RobotScannerNamePrefix, Scope: SystemScope, Group: BasicGroup, EnvKey: "ROBOT_SCANNER_NAME_PREFIX", DefaultValue: "scanner", ItemType: &StringType{}, Editable: true, Description: `The scanner robot account name prefix`},
 		{Name: common.NotificationEnable, Scope: UserScope, Group: BasicGroup, EnvKey: "NOTIFICATION_ENABLE", DefaultValue: "true", ItemType: &BoolType{}, Editable: true, Description: `Enable notification`},
 
+		{Name: common.APIDocsEnable, Scope: SystemScope, Group: BasicGroup, EnvKey: "API_DOCS_ENABLE", DefaultValue: "false", ItemType: &BoolType{}, Editable: false, Description: `Serve the API documentation page at /api/v2.0/docs`},
+
 		{Name: common.MetricEnable, Scope: SystemScope, Group: BasicGroup, EnvKey: "METRIC_ENABLE", DefaultValue: "false", ItemType: &BoolType{}, Editable: true},
 		{Name: common.MetricPort, Scope: SystemScope, Group: BasicGroup, EnvKey: "METRIC_PORT", DefaultValue: "9090", ItemType: &PortType{}, Editable: true},
 		{Name: common.MetricPath, Scope: SystemScope, Group: BasicGroup, EnvKey: "METRIC_PATH", DefaultValue: "/metrics", ItemType: &StringType{}, Editable: true},

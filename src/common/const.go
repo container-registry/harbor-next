@@ -168,6 +168,9 @@ const (
 	// DefaultGCTimeWindowHours is the reserve blob time window used by GC, default is 2 hours
 	DefaultGCTimeWindowHours = int64(2)
 
+	// APIDocsEnable controls whether the generated API documentation page is served
+	APIDocsEnable = "api_docs_enable"
+
 	// Metric setting items
 	MetricEnable            = "metric_enable"
 	MetricPort              = "metric_port"
