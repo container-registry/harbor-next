@@ -16,6 +16,7 @@ package db
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"sync"
@@ -239,13 +240,14 @@ func (s *SyncedSettings) subscribe(ctx context.Context, pool *pgxpool.Pool) erro
 	for {
 		waitCtx, cancel := context.WithTimeout(ctx, listenerPingInterval)
 		_, err := conn.Conn().WaitForNotification(waitCtx)
+		idle := errors.Is(waitCtx.Err(), context.DeadlineExceeded) // read before cancel overwrites it
 		cancel()
 		switch {
 		case err == nil:
 			s.scheduleRefresh()
 		case ctx.Err() != nil:
 			return ctx.Err()
-		case waitCtx.Err() != nil:
+		case idle:
 			// pgconn keeps the connection open on a timeout, so it can be probed
 			pingCtx, cancel := context.WithTimeout(ctx, pingTimeout)
 			err = conn.Ping(pingCtx)

@@ -78,19 +78,11 @@ func (d *dao) SaveConfigEntries(ctx context.Context, entries []models.ConfigEntr
 		if entry.Key == common.LDAPGroupAdminDn {
 			entry.Value = utils.TrimLower(entry.Value)
 		}
-		tempEntry := models.ConfigEntry{}
-		tempEntry.Key = entry.Key
-		tempEntry.Value = entry.Value
-		created, _, err := o.ReadOrCreate(&tempEntry, "k")
-		if err != nil && !orm.IsDuplicateKeyError(err) {
-			return errors.Wrap(err, "failed to create configuration entry")
-		}
-		if !created {
-			entry.ID = tempEntry.ID
-			_, err := o.Update(&entry, "v")
-			if err != nil {
-				return err
-			}
+		// A single upsert has no read-then-create race; a duplicate-key error inside
+		// a transaction would abort it and fail every later statement.
+		if _, err := o.Raw("INSERT INTO properties (k, v) VALUES (?, ?) ON CONFLICT (k) DO UPDATE SET v = EXCLUDED.v",
+			entry.Key, entry.Value).Exec(); err != nil {
+			return errors.Wrap(err, "failed to save configuration entry")
 		}
 	}
 	return nil

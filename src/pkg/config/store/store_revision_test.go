@@ -20,7 +20,6 @@ import (
 	"strconv"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,15 +35,18 @@ type revisionedDriver struct {
 	loads    int
 	saved    map[string]any
 	saveErr  error
-	// loadGate, when set, blocks Load until it is closed
-	loadGate chan struct{}
+	// loadGate, when set, blocks Load until it is closed; loadEntered is closed
+	// once a Load is blocked on it
+	loadGate    chan struct{}
+	loadEntered chan struct{}
 }
 
 func (d *revisionedDriver) Load(context.Context) (map[string]any, error) {
 	d.mu.Lock()
-	gate := d.loadGate
+	gate, entered := d.loadGate, d.loadEntered
 	d.mu.Unlock()
 	if gate != nil {
+		close(entered)
 		<-gate
 	}
 	d.mu.Lock()
@@ -150,22 +152,14 @@ func TestOlderLoadNeverOverwritesNewer(t *testing.T) {
 
 	// the slow Load reads revision 2 and blocks inside the driver
 	d.publish(map[string]any{common.AUTHMode: "ldap_auth"})
-	gate := make(chan struct{})
-	d.mu.Lock()
-	d.loadGate = gate
-	d.mu.Unlock()
+	gate, entered := blockLoads(d)
 	slow := make(chan error, 1)
 	go func() { slow <- s.Load(context.Background()) }()
-	require.Eventually(t, func() bool {
-		d.mu.Lock()
-		defer d.mu.Unlock()
-		return d.loads == 1 // only the first Load finished so far
-	}, time.Second, time.Millisecond)
-	time.Sleep(50 * time.Millisecond)
+	<-entered
 
 	// revision 3 is merged by a fast Load while the slow one waits
 	d.mu.Lock()
-	d.loadGate = nil
+	d.loadGate, d.loadEntered = nil, nil
 	d.values = map[string]any{common.AUTHMode: "oidc_auth"}
 	d.revision++
 	d.mu.Unlock()
@@ -239,4 +233,37 @@ func mustValue(t *testing.T, key, value string) metadata.ConfigureValue {
 	v, err := metadata.NewCfgValue(key, value)
 	require.NoError(t, err)
 	return *v
+}
+
+func blockLoads(d *revisionedDriver) (gate, entered chan struct{}) {
+	gate, entered = make(chan struct{}), make(chan struct{})
+	d.mu.Lock()
+	d.loadGate, d.loadEntered = gate, entered
+	d.mu.Unlock()
+	return gate, entered
+}
+
+// A Load that read the driver before an Update was published must not merge its
+// older values over the update.
+func TestInFlightLoadDoesNotOverwriteUpdate(t *testing.T) {
+	d := &revisionedDriver{}
+	d.publish(map[string]any{common.AUTHMode: "db_auth"})
+	s := NewConfigStore(d)
+	require.NoError(t, s.Load(context.Background()))
+
+	// force the next Load to read the driver, then hold it there
+	require.NoError(t, s.Save(context.Background()))
+	gate, entered := blockLoads(d)
+	slow := make(chan error, 1)
+	go func() { slow <- s.Load(context.Background()) }()
+	<-entered
+
+	d.mu.Lock()
+	d.loadGate, d.loadEntered = nil, nil
+	d.mu.Unlock()
+	require.NoError(t, s.Update(context.Background(), map[string]any{common.AUTHMode: "ldap_auth"}))
+	close(gate)
+	require.NoError(t, <-slow)
+	v, _ := s.Get(common.AUTHMode)
+	assert.Equal(t, "ldap_auth", v.GetString())
 }

@@ -315,3 +315,30 @@ func TestSingleConnectionPoolReadsDatabase(t *testing.T) {
 	assert.Equal(t, int64(1), driver.loads.Load())
 	saveAuthMode(t, "db_auth")
 }
+
+// Saving a property that does not exist yet from several instances at once must
+// not fail: Database.Save runs in a transaction, where a duplicate-key error
+// would abort it.
+func TestConcurrentFirstSaveOfPropertySucceeds(t *testing.T) {
+	ctx := orm.Context()
+	o, err := orm.FromContext(ctx)
+	require.NoError(t, err)
+	for round := range 20 {
+		_, err := o.Raw("DELETE FROM properties WHERE k = ?", common.LDAPURL).Exec()
+		require.NoError(t, err)
+		start := make(chan struct{})
+		errs := make(chan error, 8)
+		for i := range 8 {
+			go func() {
+				<-start
+				errs <- orm.WithTransaction(func(ctx context.Context) error {
+					return (&Database{cfgDAO: cfgdao.New()}).Save(ctx, map[string]any{common.LDAPURL: fmt.Sprintf("ldap://%d-%d", round, i)})
+				})(orm.Context())
+			}()
+		}
+		close(start)
+		for range 8 {
+			require.NoError(t, <-errs)
+		}
+	}
+}

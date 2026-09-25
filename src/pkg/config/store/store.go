@@ -48,6 +48,9 @@ type ConfigStore struct {
 	// the driver values again, so a save that failed or was rolled back is undone.
 	localWrites  atomic.Uint64
 	mergedWrites atomic.Uint64
+	// publishedUpdates counts Update values published here. A Load that read the
+	// driver while one was published may hold older values and drops its result.
+	publishedUpdates atomic.Uint64
 }
 
 // NewConfigStore create config store
@@ -121,6 +124,7 @@ func (c *ConfigStore) Load(ctx context.Context) error {
 	if revision != 0 && revision == c.mergedRevision.Load() && writes == c.mergedWrites.Load() {
 		return nil
 	}
+	updates := c.publishedUpdates.Load()
 	cfgs, err := c.cfgDriver.Load(ctx)
 	if err != nil {
 		return err
@@ -144,6 +148,10 @@ func (c *ConfigStore) Load(ctx context.Context) error {
 	defer c.mu.Unlock()
 	if revision != 0 && revision < c.mergedRevision.Load() {
 		// a concurrent Load already published newer values
+		return nil
+	}
+	if updates != c.publishedUpdates.Load() {
+		// an Update was published while the driver was read; the next Load merges again
 		return nil
 	}
 	c.update(func(next valueMap) { maps.Copy(next, loaded) })
@@ -194,6 +202,7 @@ func (c *ConfigStore) Update(ctx context.Context, cfgMap map[string]any) error {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 		c.update(func(next valueMap) { maps.Copy(next, updated) })
+		c.publishedUpdates.Add(1)
 	})
 	return nil
 }
