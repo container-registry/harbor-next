@@ -192,27 +192,49 @@ func (p *Handler) preheatParents(ctx context.Context, child *artifact.Artifact) 
 // isLastScanned reports whether the vulnerability scans of all the scannable children of the image
 // index are finished and the given child is the one whose scan finished last. Children finishing at
 // the same time are ordered by digest, so exactly one of their scan events preheats the index.
+//
+// The reports are fetched per child instead of for the whole index, as the reports of an index are
+// empty as long as any child without capability of the scanner is referenced, and such a child is
+// never scanned.
 func isLastScanned(ctx context.Context, scanCtl scan.Controller, index, child *artifact.Artifact) (bool, error) {
-	reports, err := scanCtl.GetReport(ctx, index, nil)
-	if err != nil {
-		if errors.IsNotFoundErr(err) {
-			return false, nil
+	var (
+		last     *scanModel.Report
+		finished = true
+	)
+	walkFn := func(a *artifact.Artifact) error {
+		if a.IsImageIndex() {
+			return nil
 		}
+
+		reports, err := scanCtl.GetReport(ctx, a, nil)
+		if err != nil {
+			if errors.IsNotFoundErr(err) {
+				return nil
+			}
+			return err
+		}
+		if len(reports) == 0 {
+			finished = false
+			return artifact.ErrBreak
+		}
+
+		for _, r := range reports {
+			if !job.Status(r.Status).Final() {
+				finished = false
+				return artifact.ErrBreak
+			}
+			if last == nil || r.EndTime.After(last.EndTime) ||
+				(r.EndTime.Equal(last.EndTime) && r.Digest > last.Digest) {
+				last = r
+			}
+		}
+		return nil
+	}
+	if err := artifact.Ctl.Walk(ctx, index, walkFn, nil); err != nil {
 		return false, err
 	}
 
-	var last *scanModel.Report
-	for _, r := range reports {
-		if !job.Status(r.Status).Final() {
-			return false, nil
-		}
-		if last == nil || r.EndTime.After(last.EndTime) ||
-			(r.EndTime.Equal(last.EndTime) && r.Digest > last.Digest) {
-			last = r
-		}
-	}
-	// no reports are returned when any of the children has not been scanned yet
-	return last != nil && last.Digest == child.Digest, nil
+	return finished && last != nil && last.Digest == child.Digest, nil
 }
 
 func (p *Handler) handleArtifactLabeled(ctx context.Context, event *event.ArtifactLabeledEvent) error {

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
@@ -169,6 +170,8 @@ func TestHandleImageScanned(t *testing.T) {
 		repoName            = "library/busybox"
 		childDigest         = "sha256:bbbb"
 		siblingDigest       = "sha256:aaaa"
+		nestedDigest        = "sha256:nested"
+		grandDigest         = "sha256:cccc"
 	)
 	newArtifact := func(id int64, digest string, tags ...string) *artifact.Artifact {
 		art := &artifact.Artifact{Artifact: pkg_artifact.Artifact{ID: id, Digest: digest, RepositoryName: repoName, Type: "IMAGE"}}
@@ -177,12 +180,18 @@ func TestHandleImageScanned(t *testing.T) {
 		}
 		return art
 	}
+	newIndex := func(id int64, digest string, tags ...string) *artifact.Artifact {
+		art := newArtifact(id, digest, tags...)
+		art.ManifestMediaType = ocispec.MediaTypeImageIndex
+		return art
+	}
 	now := time.Now()
-	report := func(digest string, status job.Status, end time.Time) *scan_dao.Report {
-		return &scan_dao.Report{Digest: digest, Status: status.String(), EndTime: end}
+	report := func(digest string, status job.Status, end time.Time) []*scan_dao.Report {
+		return []*scan_dao.Report{{Digest: digest, Status: status.String(), EndTime: end}}
 	}
 	untaggedChild := newArtifact(childID, childDigest)
-	taggedIndex := newArtifact(indexID, "sha256:index", "v1")
+	sibling := newArtifact(12, siblingDigest)
+	taggedIndex := newIndex(indexID, "sha256:index", "v1")
 	references := []*pkg_artifact.Reference{
 		{ParentID: indexID, ChildID: childID},
 		{ParentID: indexID, ChildID: childID},
@@ -196,8 +205,9 @@ func TestHandleImageScanned(t *testing.T) {
 		listErr    error
 		parent     *artifact.Artifact
 		parentErr  error
-		reports    []*scan_dao.Report
-		reportErr  error
+		walked     []*artifact.Artifact
+		reports    map[string][]*scan_dao.Report
+		reportErrs map[string]error
 		preheatErr error
 		preheated  []int64
 		wantErr    bool
@@ -216,9 +226,9 @@ func TestHandleImageScanned(t *testing.T) {
 			scanned:    untaggedChild,
 			references: references,
 			parent:     taggedIndex,
-			reports: []*scan_dao.Report{
-				report(siblingDigest, job.ErrorStatus, now.Add(-time.Minute)),
-				report(childDigest, job.SuccessStatus, now),
+			reports: map[string][]*scan_dao.Report{
+				siblingDigest: report(siblingDigest, job.ErrorStatus, now.Add(-time.Minute)),
+				childDigest:   report(childDigest, job.SuccessStatus, now),
 			},
 			preheated: []int64{indexID},
 		},
@@ -228,9 +238,9 @@ func TestHandleImageScanned(t *testing.T) {
 			scanned:    untaggedChild,
 			references: references,
 			parent:     taggedIndex,
-			reports: []*scan_dao.Report{
-				report(siblingDigest, job.StoppedStatus, now.Add(-time.Minute)),
-				report(childDigest, job.SuccessStatus, now),
+			reports: map[string][]*scan_dao.Report{
+				siblingDigest: report(siblingDigest, job.StoppedStatus, now.Add(-time.Minute)),
+				childDigest:   report(childDigest, job.SuccessStatus, now),
 			},
 			preheated: []int64{indexID},
 		},
@@ -239,9 +249,9 @@ func TestHandleImageScanned(t *testing.T) {
 			scanned:    untaggedChild,
 			references: references,
 			parent:     taggedIndex,
-			reports: []*scan_dao.Report{
-				report(siblingDigest, job.SuccessStatus, now),
-				report(childDigest, job.SuccessStatus, now.Add(-time.Minute)),
+			reports: map[string][]*scan_dao.Report{
+				siblingDigest: report(siblingDigest, job.SuccessStatus, now),
+				childDigest:   report(childDigest, job.SuccessStatus, now.Add(-time.Minute)),
 			},
 		},
 		{
@@ -249,9 +259,9 @@ func TestHandleImageScanned(t *testing.T) {
 			scanned:    untaggedChild,
 			references: references,
 			parent:     taggedIndex,
-			reports: []*scan_dao.Report{
-				report(childDigest, job.SuccessStatus, now),
-				report(siblingDigest, job.SuccessStatus, now),
+			reports: map[string][]*scan_dao.Report{
+				childDigest:   report(childDigest, job.SuccessStatus, now),
+				siblingDigest: report(siblingDigest, job.SuccessStatus, now),
 			},
 			preheated: []int64{indexID},
 		},
@@ -260,9 +270,9 @@ func TestHandleImageScanned(t *testing.T) {
 			scanned:    untaggedChild,
 			references: references,
 			parent:     taggedIndex,
-			reports: []*scan_dao.Report{
-				report(siblingDigest, job.RunningStatus, time.Time{}),
-				report(childDigest, job.SuccessStatus, now),
+			reports: map[string][]*scan_dao.Report{
+				siblingDigest: report(siblingDigest, job.RunningStatus, time.Time{}),
+				childDigest:   report(childDigest, job.SuccessStatus, now),
 			},
 		},
 		{
@@ -270,9 +280,9 @@ func TestHandleImageScanned(t *testing.T) {
 			scanned:    untaggedChild,
 			references: references,
 			parent:     taggedIndex,
-			reports: []*scan_dao.Report{
-				report(siblingDigest, job.PendingStatus, time.Time{}),
-				report(childDigest, job.SuccessStatus, now),
+			reports: map[string][]*scan_dao.Report{
+				siblingDigest: report(siblingDigest, job.PendingStatus, time.Time{}),
+				childDigest:   report(childDigest, job.SuccessStatus, now),
 			},
 		},
 		{
@@ -280,12 +290,37 @@ func TestHandleImageScanned(t *testing.T) {
 			scanned:    untaggedChild,
 			references: references,
 			parent:     taggedIndex,
+			reports: map[string][]*scan_dao.Report{
+				childDigest: report(childDigest, job.SuccessStatus, now),
+			},
+		},
+		{
+			name:       "sibling not scannable by the scanner is ignored",
+			scanned:    untaggedChild,
+			references: references,
+			parent:     taggedIndex,
+			reports: map[string][]*scan_dao.Report{
+				childDigest: report(childDigest, job.SuccessStatus, now),
+			},
+			reportErrs: map[string]error{siblingDigest: errors.NotFoundError(nil)},
+			preheated:  []int64{indexID},
+		},
+		{
+			name:       "children of a nested index are walked",
+			scanned:    untaggedChild,
+			references: references,
+			parent:     taggedIndex,
+			walked:     []*artifact.Artifact{untaggedChild, newIndex(13, nestedDigest), newArtifact(14, grandDigest)},
+			reports: map[string][]*scan_dao.Report{
+				grandDigest: report(grandDigest, job.SuccessStatus, now.Add(time.Minute)),
+				childDigest: report(childDigest, job.SuccessStatus, now),
+			},
 		},
 		{
 			name:       "untagged index is ignored",
 			scanned:    untaggedChild,
 			references: references,
-			parent:     newArtifact(indexID, "sha256:index"),
+			parent:     newIndex(indexID, "sha256:index"),
 		},
 		{
 			name:       "deleted index is ignored",
@@ -298,7 +333,10 @@ func TestHandleImageScanned(t *testing.T) {
 			scanned:    untaggedChild,
 			references: references,
 			parent:     taggedIndex,
-			reportErr:  errors.NotFoundError(nil),
+			reportErrs: map[string]error{
+				childDigest:   errors.NotFoundError(nil),
+				siblingDigest: errors.NotFoundError(nil),
+			},
 		},
 		{
 			name:     "sbom scan of untagged child is ignored",
@@ -323,7 +361,7 @@ func TestHandleImageScanned(t *testing.T) {
 			scanned:    untaggedChild,
 			references: references,
 			parent:     taggedIndex,
-			reportErr:  errors.New("scanner error"),
+			reportErrs: map[string]error{childDigest: errors.New("scanner error")},
 			wantErr:    true,
 		},
 		{
@@ -331,7 +369,10 @@ func TestHandleImageScanned(t *testing.T) {
 			scanned:    untaggedChild,
 			references: references,
 			parent:     taggedIndex,
-			reports:    []*scan_dao.Report{report(childDigest, job.SuccessStatus, now)},
+			reports: map[string][]*scan_dao.Report{
+				childDigest:   report(childDigest, job.SuccessStatus, now),
+				siblingDigest: report(siblingDigest, job.SuccessStatus, now.Add(-time.Minute)),
+			},
 			preheatErr: errors.New("enforce error"),
 			preheated:  []int64{indexID},
 			wantErr:    true,
@@ -347,9 +388,26 @@ func TestHandleImageScanned(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.TODO()
 
+			walked := tt.walked
+			if walked == nil {
+				walked = []*artifact.Artifact{untaggedChild, sibling}
+			}
+
 			artCtl := &test_artifact.Controller{}
 			artCtl.On("GetByReference", ctx, repoName, childDigest, mock.Anything).Return(tt.scanned, nil)
 			artCtl.On("Get", ctx, indexID, mock.Anything).Return(tt.parent, tt.parentErr)
+			artCtl.On("Walk", ctx, tt.parent, mock.Anything, mock.Anything).Return(
+				func(_ context.Context, root *artifact.Artifact, walkFn func(*artifact.Artifact) error, _ *artifact.Option) error {
+					for _, a := range append([]*artifact.Artifact{root}, walked...) {
+						if err := walkFn(a); err != nil {
+							if err == artifact.ErrBreak {
+								return nil
+							}
+							return err
+						}
+					}
+					return nil
+				})
 			artifact.Ctl = artCtl
 
 			var preheated []int64
@@ -362,7 +420,10 @@ func TestHandleImageScanned(t *testing.T) {
 			artMgr := &test_pkg_artifact.Manager{}
 			artMgr.On("ListReferences", ctx, mock.Anything).Return(tt.references, tt.listErr)
 			scanCtl := &test_scan.Controller{}
-			scanCtl.On("GetReport", ctx, tt.parent, []string(nil)).Return(tt.reports, tt.reportErr)
+			scanCtl.On("GetReport", ctx, mock.Anything, []string(nil)).Return(
+				func(_ context.Context, a *artifact.Artifact, _ []string) ([]*scan_dao.Report, error) {
+					return tt.reports[a.Digest], tt.reportErrs[a.Digest]
+				})
 
 			handler := &Handler{artMgr: artMgr, scanCtl: scanCtl}
 			err := handler.Handle(ctx, &event.ScanImageEvent{
