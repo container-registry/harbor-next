@@ -175,9 +175,6 @@ func main() {
 	if err := cache.Initialize(u.Scheme, redisHarborURL); err != nil {
 		log.Fatalf("failed to initialize cache: %v", err)
 	}
-	// when config/db init function is called, the cache is not ready,
-	// enable config cache explicitly when the cache is ready
-	dbCfg.EnableConfigCache()
 
 	web.AddTemplateExt("htm")
 
@@ -229,6 +226,8 @@ func main() {
 	}
 	log.Info("database self-test passed")
 
+	stopSettingsSync := dbCfg.StartSettingsSync(dao.GetPool().PgxPool())
+
 	ctx = orm.Clone(ctx)
 	if err := config.Load(ctx); err != nil {
 		log.Fatalf("failed to load config: %v", err)
@@ -271,7 +270,7 @@ func main() {
 
 	closing := make(chan struct{})
 	done := make(chan struct{})
-	go gracefulShutdown(closing, done, shutdownTracerProvider, dao.ClosePool)
+	go gracefulShutdown(closing, done, shutdownTracerProvider, stopSettingsSync, dao.ClosePool)
 	// Start health checker for registries
 	go registry.Ctl.StartRegularHealthCheck(orm.Context(), closing, done)
 	// Init audit log
