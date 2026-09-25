@@ -35,24 +35,20 @@ import (
 
 const (
 	listenerAppName = "harbor_configuration_listener"
-	// fullRefreshInterval bounds staleness when a notification is missed or the
-	// properties table is edited outside Harbor.
+	// catches missed notifications and edits made directly in SQL
 	fullRefreshInterval = 5 * time.Minute
 	reconnectBackoff    = time.Second
 	maxReconnectBackoff = 30 * time.Second
-	// listenerPingInterval detects a listener connection that died without the
-	// socket closing, e.g. after a failover or a network partition.
+	// a peer lost in a failover or partition leaves the socket open, so only a ping notices
 	listenerPingInterval = 30 * time.Second
 	pingTimeout          = 5 * time.Second
 	selectUserSettings   = "SELECT k, v FROM properties"
 )
 
-// refreshTimeout bounds a refresh, including the wait for a pool connection.
 var refreshTimeout = 30 * time.Second
 
-// SyncedSettings serves the user settings from memory and keeps them in sync with
-// the properties table through Postgres change notifications, so the request path
-// never touches the database or a lock to read configuration.
+// SyncedSettings keeps the user settings in memory so reading configuration needs no
+// database connection or lock, which is what let requests deadlock on the pool.
 type SyncedSettings struct {
 	driver   store.Driver
 	pool     *pgxpool.Pool // set by StartSync; refreshes use it because Beego ignores contexts
@@ -70,7 +66,6 @@ func newSyncedSettings(driver store.Driver) *SyncedSettings {
 	return &SyncedSettings{driver: driver, refreshCh: make(chan struct{}, 1)}
 }
 
-// Load returns the synced settings. Until StartSync has read them, it reads the database.
 func (s *SyncedSettings) Load(ctx context.Context) (map[string]any, error) {
 	if settings := s.settings.Load(); settings != nil {
 		return maps.Clone(*settings), nil
@@ -78,17 +73,15 @@ func (s *SyncedSettings) Load(ctx context.Context) (map[string]any, error) {
 	return s.driver.Load(ctx)
 }
 
-// Save writes through to the database, which announces the change on commit.
 func (s *SyncedSettings) Save(ctx context.Context, cfg map[string]any) error {
 	return s.driver.Save(ctx, cfg)
 }
 
-// Get - delegate to driver
 func (s *SyncedSettings) Get(ctx context.Context, key string) (map[string]any, error) {
 	return s.driver.Get(ctx, key)
 }
 
-// Revision increases on every refresh; 0 means the settings are not synced.
+// Revision 0 means the settings are not synced and every Load reads the database.
 func (s *SyncedSettings) Revision() uint64 {
 	return s.revision.Load()
 }
@@ -137,14 +130,10 @@ func (s *SyncedSettings) scheduleRefresh() {
 	}
 }
 
-// StartSync reads the settings and keeps them in sync. It holds one connection of
-// pool for LISTEN for the lifetime of the process. The returned function stops the
-// sync and must run before the pool is closed, as pgxpool.Close waits for that
-// connection.
+// StartSync holds one pool connection for LISTEN; pgxpool.Close waits for it, so stop first.
 func (s *SyncedSettings) StartSync(pool *pgxpool.Pool) (stop func()) {
-	// Without a listener the settings would only follow the full refresh, and a pod
-	// would serve stale values for its own committed writes. Reading the database on
-	// every Load is correct and, with no cache lock left, cannot deadlock.
+	// Without a listener a pod would serve stale values for its own writes until the
+	// full refresh; reading the database is correct and, with no cache lock, safe.
 	if pool == nil || pool.Config().MaxConns < 2 {
 		log.Warning("database pool too small to hold a connection for the configuration change listener, reading configuration from the database on every request")
 		return func() {}
@@ -188,7 +177,6 @@ func (s *SyncedSettings) refreshLoop(ctx context.Context) {
 	}
 }
 
-// watchChanges keeps a change subscription open, reconnecting with backoff.
 func (s *SyncedSettings) watchChanges(ctx context.Context, pool *pgxpool.Pool) {
 	backoff := reconnectBackoff
 	for ctx.Err() == nil {
@@ -210,30 +198,27 @@ func (s *SyncedSettings) watchChanges(ctx context.Context, pool *pgxpool.Pool) {
 	}
 }
 
-// subscribe listens for changes on one connection until it fails or ctx ends.
 func (s *SyncedSettings) subscribe(ctx context.Context, pool *pgxpool.Pool) error {
 	conn, err := pool.Acquire(ctx)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		// A LISTEN session must never go back to the pool: closing it makes Release destroy it.
+		// closed so Release destroys it: a LISTEN session must never serve requests
 		closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = conn.Conn().Close(closeCtx)
 		conn.Release()
 	}()
-	// the name shows operators why this session stays open in pg_stat_activity
+	// explains the long-lived session to operators in pg_stat_activity
 	if _, err := conn.Exec(ctx, "SET application_name = '"+listenerAppName+"'"); err != nil {
 		return err
 	}
 	if _, err := conn.Exec(ctx, "LISTEN "+dao.ConfigurationChangedChannel); err != nil {
 		return err
 	}
-	// Changes committed while no listener was attached announced themselves to
-	// nobody. Reading after LISTEN is active closes that gap; if the read fails the
-	// connection is retried rather than trusting settings that may be stale. It
-	// reads on the LISTEN connection so it never needs a second one from the pool.
+	// Changes committed while disconnected were announced to nobody. Reading on this
+	// connection avoids waiting for a second one from an exhausted pool.
 	if err := s.refreshFrom(ctx, conn); err != nil {
 		return fmt.Errorf("sync after connect: %w", err)
 	}

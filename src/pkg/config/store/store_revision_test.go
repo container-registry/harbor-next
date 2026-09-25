@@ -127,7 +127,7 @@ func TestUpdateIsPublishedWithoutTransaction(t *testing.T) {
 	assert.Equal(t, "ldap_auth", v.GetString())
 }
 
-// SyncQuota sets a value and saves it; when the save fails the next Load must undo it.
+// the SyncQuota pattern
 func TestFailedSaveIsUndoneByNextLoad(t *testing.T) {
 	d := &revisionedDriver{}
 	d.publish(map[string]any{common.ReadOnly: "false"})
@@ -142,8 +142,6 @@ func TestFailedSaveIsUndoneByNextLoad(t *testing.T) {
 	assert.False(t, v.GetBool())
 }
 
-// A Load that read an older revision must not replace values merged from a newer
-// one, even when a local write happened in between.
 func TestOlderLoadNeverOverwritesNewer(t *testing.T) {
 	d := &revisionedDriver{}
 	d.publish(map[string]any{common.AUTHMode: "db_auth"})
@@ -183,7 +181,6 @@ func TestZeroRevisionAlwaysLoads(t *testing.T) {
 	assert.Equal(t, 2, d.loads)
 }
 
-// Readers must see either the old or the new set of values, never a mix.
 func TestLoadSwapsValuesAtomically(t *testing.T) {
 	gen := func(i int) map[string]any {
 		n := strconv.Itoa(i)
@@ -243,8 +240,6 @@ func blockLoads(d *revisionedDriver) (gate, entered chan struct{}) {
 	return gate, entered
 }
 
-// A Load that read the driver before an Update was published must not merge its
-// older values over the update.
 func TestInFlightLoadDoesNotOverwriteUpdate(t *testing.T) {
 	d := &revisionedDriver{}
 	d.publish(map[string]any{common.AUTHMode: "db_auth"})

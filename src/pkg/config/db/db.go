@@ -42,7 +42,6 @@ func (d *Database) Load(ctx context.Context) (map[string]any, error) {
 	return userSettingsFrom(configEntries), nil
 }
 
-// userSettingsFrom keeps the user-scope rows of the properties table and decrypts passwords.
 func userSettingsFrom(configEntries []*models.ConfigEntry) map[string]any {
 	resultMap := map[string]any{}
 	for _, item := range configEntries {
@@ -90,7 +89,7 @@ func (d *Database) Save(ctx context.Context, cfgs map[string]any) error {
 			log.Errorf("failed to get metadata, skip to save key:%v", key)
 		}
 	}
-	// one transaction, so the settings and their announcement commit or fail together
+	// a failed announcement must not leave the settings saved and other instances stale
 	return orm.WithTransaction(func(ctx context.Context) error {
 		if err := d.cfgDAO.SaveConfigEntries(ctx, configEntries); err != nil {
 			return err

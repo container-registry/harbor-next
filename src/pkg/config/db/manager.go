@@ -24,8 +24,7 @@ import (
 	"github.com/goharbor/harbor/src/pkg/config/store"
 )
 
-// userSettings is shared by every DB config manager of the process, so there is one
-// listener and one copy of the settings regardless of how many managers exist.
+// shared so the process holds one listener however many managers exist
 var userSettings = newSyncedSettings(&Database{cfgDAO: dao.New()})
 
 func init() {
@@ -42,9 +41,7 @@ func NewDBCfgManager() *config.CfgManager {
 	return manager
 }
 
-// StartSettingsSync reads the user settings into memory and keeps them in sync via
-// Postgres LISTEN/NOTIFY. Call it once the database is migrated; the returned
-// function must run before the pool is closed.
+// StartSettingsSync must run after migration; the returned stop must run before the pool is closed.
 func StartSettingsSync(pool *pgxpool.Pool) (stop func()) {
 	return userSettings.StartSync(pool)
 }

@@ -36,20 +36,17 @@ type valueMap = map[string]metadata.ConfigureValue
 
 // ConfigStore - the config data store
 //
-// Values are held in an immutable map that is replaced as a whole, so a Load
-// never exposes a mix of old and new values for one key set.
+// The value map is replaced as a whole so readers never mix old and new settings.
 type ConfigStore struct {
 	cfgDriver Driver
 	mu        sync.Mutex // serializes writers
 	cfgValues atomic.Pointer[valueMap]
-	// mergedRevision is the driver revision last merged; it only grows.
+	// only grows, so a slow Load cannot replace newer values
 	mergedRevision atomic.Uint64
-	// localWrites counts saves of values set in this store. A Load after one merges
-	// the driver values again, so a save that failed or was rolled back is undone.
+	// a Save forces the next Load to merge again, undoing a failed or rolled-back save
 	localWrites  atomic.Uint64
 	mergedWrites atomic.Uint64
-	// publishedUpdates counts Update values published here. A Load that read the
-	// driver while one was published may hold older values and drops its result.
+	// a Load that read the driver while an Update was published may hold older values
 	publishedUpdates atomic.Uint64
 }
 
@@ -65,7 +62,7 @@ func (c *ConfigStore) values() valueMap {
 	return nil
 }
 
-// update applies fn to a copy of the current values and publishes the copy. Callers must hold c.mu.
+// Callers must hold c.mu.
 func (c *ConfigStore) update(fn func(next valueMap)) {
 	next := maps.Clone(c.values())
 	if next == nil {
@@ -151,7 +148,7 @@ func (c *ConfigStore) Load(ctx context.Context) error {
 		return nil
 	}
 	if updates != c.publishedUpdates.Load() {
-		// an Update was published while the driver was read; the next Load merges again
+		// the next Load merges again
 		return nil
 	}
 	c.update(func(next valueMap) { maps.Copy(next, loaded) })
@@ -182,8 +179,7 @@ func (c *ConfigStore) Save(ctx context.Context) error {
 
 // Update - Only update specified settings in cfgMap in store and driver
 //
-// The values reach this store once the caller's transaction commits, so concurrent
-// readers never see settings that are rolled back.
+// Values are published only after commit so readers never see rolled-back settings.
 func (c *ConfigStore) Update(ctx context.Context, cfgMap map[string]any) error {
 	updated := valueMap{}
 	for key, value := range cfgMap {

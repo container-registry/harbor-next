@@ -100,7 +100,6 @@ func TestListenerReconnectsOncePoolFreesUp(t *testing.T) {
 	_, err = other.Exec(context.Background(), "UPDATE properties SET v = 'ldap_auth' WHERE k = 'auth_mode'; SELECT pg_notify('harbor_configuration_changed', '')")
 	require.NoError(t, err)
 
-	// reads keep working from memory, with the old value
 	for range 100 {
 		v, err := s.Load(orm.Context())
 		require.NoError(t, err)
@@ -202,7 +201,6 @@ func TestConcurrentSavesConvergeOnLastValue(t *testing.T) {
 			}
 		}()
 	}
-	// concurrent readers during the storm
 	stopReaders := make(chan struct{})
 	var readers sync.WaitGroup
 	for range 16 {
@@ -265,8 +263,7 @@ func TestSecondStartIsIgnoredAndRestartWorks(t *testing.T) {
 	stopWithin(t, stop, 10*time.Second)
 }
 
-// PUT /configurations runs in the request transaction; when it rolls back the
-// writing instance must not keep serving the rejected values.
+// PUT /configurations runs in the request transaction
 func TestRolledBackUpdateIsNotServed(t *testing.T) {
 	s := newSyncedSettings(&Database{cfgDAO: cfgdao.New()})
 	stop := s.StartSync(dao.GetPool().PgxPool())
@@ -307,7 +304,6 @@ func TestSingleConnectionPoolReadsDatabase(t *testing.T) {
 	assert.Equal(t, uint64(0), s.Revision(), "settings are not synced without a listener")
 	assert.Equal(t, int32(0), pool.Stat().AcquiredConns(), "no connection is held")
 
-	// a committed write is visible on the next Load
 	saveAuthMode(t, "ldap_auth")
 	v, err := s.Load(orm.Context())
 	require.NoError(t, err)
@@ -316,13 +312,22 @@ func TestSingleConnectionPoolReadsDatabase(t *testing.T) {
 	saveAuthMode(t, "db_auth")
 }
 
-// Saving a property that does not exist yet from several instances at once must
-// not fail: Database.Save runs in a transaction, where a duplicate-key error
-// would abort it.
+// a duplicate-key error on first creation would abort the transaction
 func TestConcurrentFirstSaveOfPropertySucceeds(t *testing.T) {
 	ctx := orm.Context()
 	o, err := orm.FromContext(ctx)
 	require.NoError(t, err)
+	var original []string
+	_, err = o.Raw("SELECT v FROM properties WHERE k = ?", common.LDAPURL).QueryRows(&original)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, err := o.Raw("DELETE FROM properties WHERE k = ?", common.LDAPURL).Exec()
+		require.NoError(t, err)
+		if len(original) == 1 {
+			_, err = o.Raw("INSERT INTO properties (k, v) VALUES (?, ?)", common.LDAPURL, original[0]).Exec()
+			require.NoError(t, err)
+		}
+	})
 	for round := range 20 {
 		_, err := o.Raw("DELETE FROM properties WHERE k = ?", common.LDAPURL).Exec()
 		require.NoError(t, err)

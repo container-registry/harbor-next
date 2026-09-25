@@ -33,7 +33,6 @@ import (
 	"github.com/goharbor/harbor/src/pkg/config/store"
 )
 
-// countingDriver counts Load calls that reach the database.
 type countingDriver struct {
 	store.Driver
 	loads atomic.Int64
@@ -59,7 +58,6 @@ func TestCommittedSaveRefreshesSettings(t *testing.T) {
 	// initial load plus the catch-up refresh once LISTEN is active
 	waitForRevisionAbove(t, s, 1)
 
-	// reads are served from memory
 	loads := driver.loads.Load()
 	for range 100 {
 		_, err := s.Load(ctx)
@@ -124,7 +122,7 @@ func TestStopClosesListenerSession(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Fatal("stop did not return")
 	}
-	// the LISTEN session is destroyed, not returned to the pool for reuse by requests
+	// destroyed, not returned to the pool for requests
 	require.Eventually(t, func() bool { return listenerSessions(t) == 0 }, 10*time.Second, 10*time.Millisecond)
 }
 
@@ -157,8 +155,7 @@ func TestListenerReconnectsAfterTermination(t *testing.T) {
 	require.NoError(t, (&Database{cfgDAO: cfgdao.New()}).Save(ctx, map[string]any{common.AUTHMode: "db_auth"}))
 }
 
-// The request path must read configuration while every pool connection is held,
-// which is the state of the #92 deadlock.
+// every pool connection held is the state of the #92 deadlock
 func TestReadsSucceedWithExhaustedPool(t *testing.T) {
 	pool := dao.GetPool().PgxPool()
 	s := newSyncedSettings(&Database{cfgDAO: cfgdao.New()})
@@ -201,8 +198,6 @@ func TestReadsSucceedWithExhaustedPool(t *testing.T) {
 	assert.NotEmpty(t, mgr.Get(context.Background(), common.AUTHMode).GetString())
 }
 
-// A change committed while the listener is disconnected sends a notification nobody
-// receives; the sync on reconnect must pick it up without waiting for the resync.
 func TestReconnectAppliesChangesMissedWhileDisconnected(t *testing.T) {
 	s := newSyncedSettings(&Database{cfgDAO: cfgdao.New()})
 	stop := s.StartSync(dao.GetPool().PgxPool())

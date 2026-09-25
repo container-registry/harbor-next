@@ -33,13 +33,10 @@ type DAO interface {
 	SaveConfigEntries(ctx context.Context, entries []models.ConfigEntry) error
 	// GetConfigItem get configure item by key
 	GetConfigItem(ctx context.Context, query *q.Query) ([]*models.ConfigEntry, error)
-	// PublishConfigurationChanged announces a configuration change to every listener
-	// of ConfigurationChangedChannel; inside a transaction Postgres delivers it on
-	// commit and drops it on rollback
+	// PublishConfigurationChanged is delivered by Postgres only when the transaction commits
 	PublishConfigurationChanged(ctx context.Context) error
 }
 
-// ConfigurationChangedChannel is the Postgres channel that carries configuration changes.
 const ConfigurationChangedChannel = "harbor_configuration_changed"
 
 type dao struct {
@@ -78,8 +75,7 @@ func (d *dao) SaveConfigEntries(ctx context.Context, entries []models.ConfigEntr
 		if entry.Key == common.LDAPGroupAdminDn {
 			entry.Value = utils.TrimLower(entry.Value)
 		}
-		// A single upsert has no read-then-create race; a duplicate-key error inside
-		// a transaction would abort it and fail every later statement.
+		// Read-then-create races on a new key, and the duplicate-key error aborts the caller's transaction.
 		if _, err := o.Raw("INSERT INTO properties (k, v) VALUES (?, ?) ON CONFLICT (k) DO UPDATE SET v = EXCLUDED.v",
 			entry.Key, entry.Value).Exec(); err != nil {
 			return errors.Wrap(err, "failed to save configuration entry")
