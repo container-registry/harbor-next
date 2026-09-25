@@ -20,7 +20,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
+	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -345,5 +348,124 @@ func TestConcurrentFirstSaveOfPropertySucceeds(t *testing.T) {
 		for range 8 {
 			require.NoError(t, <-errs)
 		}
+	}
+}
+
+// zombieProxy forwards TCP to Postgres. zombify makes every existing link drop its
+// bytes from then on while the sockets stay open, like a peer lost without a reset;
+// links opened afterwards work normally.
+type zombieProxy struct {
+	ln    net.Listener
+	mu    sync.Mutex
+	dead  []*atomic.Bool
+	conns []net.Conn
+}
+
+func startZombieProxy(t *testing.T, target string) *zombieProxy {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	p := &zombieProxy{ln: ln}
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			u, err := net.Dial("tcp", target)
+			if err != nil {
+				c.Close()
+				continue
+			}
+			dead := &atomic.Bool{}
+			p.mu.Lock()
+			p.dead = append(p.dead, dead)
+			p.conns = append(p.conns, c, u)
+			p.mu.Unlock()
+			go pipe(c, u, dead)
+			go pipe(u, c, dead)
+		}
+	}()
+	t.Cleanup(func() {
+		ln.Close()
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		for _, c := range p.conns {
+			c.Close()
+		}
+	})
+	return p
+}
+
+func pipe(src, dst net.Conn, dead *atomic.Bool) {
+	buf := make([]byte, 32*1024)
+	for {
+		n, err := src.Read(buf)
+		if err != nil {
+			return
+		}
+		if !dead.Load() {
+			if _, err := dst.Write(buf[:n]); err != nil {
+				return
+			}
+		}
+	}
+}
+
+func (p *zombieProxy) zombify() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, d := range p.dead {
+		d.Store(true)
+	}
+}
+
+func (p *zombieProxy) port() uint16 { return uint16(p.ln.Addr().(*net.TCPAddr).Port) }
+
+// A dead connection that never errors must not block the listener: pgxpool pings an
+// idle connection with the caller's context before handing it out.
+func TestListenerRecoversFromDeadConnectionWithoutReset(t *testing.T) {
+	defer func(r, i, p time.Duration) { refreshTimeout, listenerPingInterval, pingTimeout = r, i, p }(refreshTimeout, listenerPingInterval, pingTimeout)
+	refreshTimeout, listenerPingInterval, pingTimeout = 2*time.Second, time.Second, time.Second
+
+	base := dao.GetPool().PgxPool().Config()
+	proxy := startZombieProxy(t, net.JoinHostPort(base.ConnConfig.Host, strconv.Itoa(int(base.ConnConfig.Port))))
+	cfg := base.Copy()
+	cfg.ConnConfig.Host, cfg.ConnConfig.Port = "127.0.0.1", proxy.port()
+	cfg.MaxConns, cfg.MinConns = 4, 0
+	pool, err := pgxpool.NewWithConfig(context.Background(), cfg)
+	require.NoError(t, err)
+	defer pool.Close()
+
+	s := newSyncedSettings(&Database{cfgDAO: cfgdao.New()})
+	stop := s.StartSync(pool)
+	defer stop()
+	saveAuthMode(t, "db_auth")
+	require.Eventually(t, authModeIs(s, "db_auth"), 10*time.Second, 10*time.Millisecond)
+	// the refresh after the save leaves an idle connection next to the listener's
+	require.Eventually(t, func() bool {
+		st := pool.Stat()
+		return st.AcquiredConns() == 1 && st.IdleConns() >= 1
+	}, 10*time.Second, 10*time.Millisecond)
+
+	proxy.zombify()
+	saveAuthMode(t, "ldap_auth")
+	start := time.Now()
+	require.Eventually(t, authModeIs(s, "ldap_auth"), 20*time.Second, 50*time.Millisecond)
+	t.Logf("recovered %s after the connections died", time.Since(start))
+	saveAuthMode(t, "db_auth")
+}
+
+// A working listener that drops is re-established at once, not after a growing backoff.
+func TestListenerReconnectsQuicklyAfterRepeatedDrops(t *testing.T) {
+	s := newSyncedSettings(&Database{cfgDAO: cfgdao.New()})
+	stop := s.StartSync(dao.GetPool().PgxPool())
+	defer stop()
+	for i := range 6 {
+		require.Eventually(t, func() bool { return listenerSessions(t) == 1 }, 3*time.Second, 20*time.Millisecond, "drop %d", i)
+		_, err := dao.GetPool().PgxPool().Exec(context.Background(),
+			"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND application_name = '"+listenerAppName+"'")
+		require.NoError(t, err)
+		require.Eventually(t, func() bool { return listenerSessions(t) == 0 }, 3*time.Second, 10*time.Millisecond)
 	}
 }

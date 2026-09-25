@@ -39,13 +39,17 @@ const (
 	fullRefreshInterval = 5 * time.Minute
 	reconnectBackoff    = time.Second
 	maxReconnectBackoff = 30 * time.Second
+	selectUserSettings  = "SELECT k, v FROM properties"
+)
+
+var (
+	// also bounds the listener setup: pgxpool pings an idle connection with the caller's
+	// context before handing it out, and a dead peer would otherwise block that forever
+	refreshTimeout = 30 * time.Second
 	// a peer lost in a failover or partition leaves the socket open, so only a ping notices
 	listenerPingInterval = 30 * time.Second
 	pingTimeout          = 5 * time.Second
-	selectUserSettings   = "SELECT k, v FROM properties"
 )
-
-var refreshTimeout = 30 * time.Second
 
 // SyncedSettings keeps the user settings in memory so reading configuration needs no
 // database connection or lock, which is what let requests deadlock on the pool.
@@ -180,13 +184,13 @@ func (s *SyncedSettings) refreshLoop(ctx context.Context) {
 func (s *SyncedSettings) watchChanges(ctx context.Context, pool *pgxpool.Pool) {
 	backoff := reconnectBackoff
 	for ctx.Err() == nil {
-		start := time.Now()
-		err := s.subscribe(ctx, pool)
+		listened, err := s.subscribe(ctx, pool)
 		if ctx.Err() != nil {
 			return
 		}
 		log.Warningf("configuration change listener stopped, falling back to the %s full refresh until it reconnects: %v", fullRefreshInterval, err)
-		if time.Since(start) > maxReconnectBackoff {
+		if listened {
+			// the backoff is for failing connects; a dropped working listener retries at once
 			backoff = reconnectBackoff
 		}
 		select {
@@ -198,10 +202,13 @@ func (s *SyncedSettings) watchChanges(ctx context.Context, pool *pgxpool.Pool) {
 	}
 }
 
-func (s *SyncedSettings) subscribe(ctx context.Context, pool *pgxpool.Pool) error {
-	conn, err := pool.Acquire(ctx)
+// subscribe reports whether it got as far as listening before the error.
+func (s *SyncedSettings) subscribe(ctx context.Context, pool *pgxpool.Pool) (bool, error) {
+	setupCtx, cancel := context.WithTimeout(ctx, refreshTimeout)
+	defer cancel()
+	conn, err := pool.Acquire(setupCtx)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer func() {
 		// closed so Release destroys it: a LISTEN session must never serve requests
@@ -211,17 +218,18 @@ func (s *SyncedSettings) subscribe(ctx context.Context, pool *pgxpool.Pool) erro
 		conn.Release()
 	}()
 	// explains the long-lived session to operators in pg_stat_activity
-	if _, err := conn.Exec(ctx, "SET application_name = '"+listenerAppName+"'"); err != nil {
-		return err
+	if _, err := conn.Exec(setupCtx, "SET application_name = '"+listenerAppName+"'"); err != nil {
+		return false, err
 	}
-	if _, err := conn.Exec(ctx, "LISTEN "+dao.ConfigurationChangedChannel); err != nil {
-		return err
+	if _, err := conn.Exec(setupCtx, "LISTEN "+dao.ConfigurationChangedChannel); err != nil {
+		return false, err
 	}
 	// Changes committed while disconnected were announced to nobody. Reading on this
 	// connection avoids waiting for a second one from an exhausted pool.
-	if err := s.refreshFrom(ctx, conn); err != nil {
-		return fmt.Errorf("sync after connect: %w", err)
+	if err := s.refreshFrom(setupCtx, conn); err != nil {
+		return false, fmt.Errorf("sync after connect: %w", err)
 	}
+	cancel()
 	for {
 		waitCtx, cancel := context.WithTimeout(ctx, listenerPingInterval)
 		_, err := conn.Conn().WaitForNotification(waitCtx)
@@ -231,17 +239,17 @@ func (s *SyncedSettings) subscribe(ctx context.Context, pool *pgxpool.Pool) erro
 		case err == nil:
 			s.scheduleRefresh()
 		case ctx.Err() != nil:
-			return ctx.Err()
+			return true, ctx.Err()
 		case idle:
 			// pgconn keeps the connection open on a timeout, so it can be probed
 			pingCtx, cancel := context.WithTimeout(ctx, pingTimeout)
 			err = conn.Ping(pingCtx)
 			cancel()
 			if err != nil {
-				return fmt.Errorf("listener connection lost: %w", err)
+				return true, fmt.Errorf("listener connection lost: %w", err)
 			}
 		default:
-			return err
+			return true, err
 		}
 	}
 }
