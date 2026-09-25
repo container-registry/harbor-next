@@ -8,6 +8,7 @@ require (
 	github.com/FZambia/sentinel/v2 v2.0.1
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/aliyun/alibaba-cloud-sdk-go v1.63.107
+	github.com/amirsalarsafaei/sqlc-pgx-monitoring v1.7.3
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
 	github.com/aws/aws-sdk-go v1.55.8
 	github.com/beego/beego/v2 v2.3.10

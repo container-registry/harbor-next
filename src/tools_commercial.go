@@ -46,6 +46,8 @@ import (
 	_ "github.com/aws/aws-sdk-go-v2/feature/rds/auth"
 
 	// 0005-pgx-monitoring, 0006-aws-rds-iam-auth
+	_ "github.com/amirsalarsafaei/sqlc-pgx-monitoring/dbtracer"
+	_ "github.com/amirsalarsafaei/sqlc-pgx-monitoring/poolstatus"
 	_ "go.opentelemetry.io/otel/exporters/prometheus"
 	_ "go.opentelemetry.io/otel/metric"
 	_ "go.opentelemetry.io/otel/sdk/metric"
