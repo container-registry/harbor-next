@@ -24,9 +24,9 @@ import (
 	"github.com/goharbor/harbor/src/pkg/config/store"
 )
 
-// snapshot is shared by every DB config manager of the process, so there is one
+// userSettings is shared by every DB config manager of the process, so there is one
 // listener and one copy of the settings regardless of how many managers exist.
-var snapshot = newSnapshot(&Database{cfgDAO: dao.New()})
+var userSettings = newSyncedSettings(&Database{cfgDAO: dao.New()})
 
 func init() {
 	libCfg.Register(common.DBCfgManager, NewDBCfgManager())
@@ -34,7 +34,7 @@ func init() {
 
 // NewDBCfgManager - create DB config manager
 func NewDBCfgManager() *config.CfgManager {
-	manager := &config.CfgManager{Store: store.NewConfigStore(snapshot)}
+	manager := &config.CfgManager{Store: store.NewConfigStore(userSettings)}
 	// load default value
 	manager.LoadDefault()
 	// load system config from env
@@ -42,9 +42,9 @@ func NewDBCfgManager() *config.CfgManager {
 	return manager
 }
 
-// StartSnapshot loads the user settings into memory and keeps them current via
+// StartSettingsSync reads the user settings into memory and keeps them in sync via
 // Postgres LISTEN/NOTIFY. Call it once the database is migrated; the returned
 // function must run before the pool is closed.
-func StartSnapshot(pool *pgxpool.Pool) (stop func()) {
-	return snapshot.Start(pool)
+func StartSettingsSync(pool *pgxpool.Pool) (stop func()) {
+	return userSettings.StartSync(pool)
 }

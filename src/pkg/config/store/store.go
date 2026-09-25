@@ -29,20 +29,25 @@ import (
 	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/lib/config/metadata"
 	"github.com/goharbor/harbor/src/lib/log"
+	"github.com/goharbor/harbor/src/lib/orm"
 )
 
 type valueMap = map[string]metadata.ConfigureValue
 
 // ConfigStore - the config data store
 //
-// Values are held in an immutable map that is replaced as a whole, so a reload
+// Values are held in an immutable map that is replaced as a whole, so a Load
 // never exposes a mix of old and new values for one key set.
 type ConfigStore struct {
 	cfgDriver Driver
 	mu        sync.Mutex // serializes writers
 	cfgValues atomic.Pointer[valueMap]
-	// driverVersion is the Versioned.Version() the values were last loaded at.
-	driverVersion atomic.Uint64
+	// mergedRevision is the driver revision last merged; it only grows.
+	mergedRevision atomic.Uint64
+	// localWrites counts saves of values set in this store. A Load after one merges
+	// the driver values again, so a save that failed or was rolled back is undone.
+	localWrites  atomic.Uint64
+	mergedWrites atomic.Uint64
 }
 
 // NewConfigStore create config store
@@ -108,14 +113,13 @@ func (c *ConfigStore) Load(ctx context.Context) error {
 	if c.cfgDriver == nil {
 		return errors.New("failed to load store, cfgDriver is nil")
 	}
-	var version uint64
-	if v, ok := c.cfgDriver.(Versioned); ok {
-		version = v.Version()
-		// Skipping unchanged reloads also keeps values set locally by Update
-		// until the driver reports the change as committed.
-		if version != 0 && version == c.driverVersion.Load() {
-			return nil
-		}
+	var revision uint64
+	if r, ok := c.cfgDriver.(Revisioned); ok {
+		revision = r.Revision()
+	}
+	writes := c.localWrites.Load()
+	if revision != 0 && revision == c.mergedRevision.Load() && writes == c.mergedWrites.Load() {
+		return nil
 	}
 	cfgs, err := c.cfgDriver.Load(ctx)
 	if err != nil {
@@ -138,12 +142,13 @@ func (c *ConfigStore) Load(ctx context.Context) error {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if version != 0 && version < c.driverVersion.Load() {
+	if revision != 0 && revision < c.mergedRevision.Load() {
 		// a concurrent Load already published newer values
 		return nil
 	}
 	c.update(func(next valueMap) { maps.Copy(next, loaded) })
-	c.driverVersion.Store(version)
+	c.mergedRevision.Store(revision)
+	c.mergedWrites.Store(writes)
 	return nil
 }
 
@@ -162,12 +167,16 @@ func (c *ConfigStore) Save(ctx context.Context) error {
 		return errors.New("failed to save store, cfgDriver is nil")
 	}
 
-	return c.cfgDriver.Save(ctx, cfgMap)
+	err := c.cfgDriver.Save(ctx, cfgMap)
+	c.localWrites.Add(1)
+	return err
 }
 
 // Update - Only update specified settings in cfgMap in store and driver
+//
+// The values reach this store once the caller's transaction commits, so concurrent
+// readers never see settings that are rolled back.
 func (c *ConfigStore) Update(ctx context.Context, cfgMap map[string]any) error {
-	// Update to store
 	updated := valueMap{}
 	for key, value := range cfgMap {
 		configValue, err := metadata.NewCfgValue(key, utils.GetStrValueOfAnyType(value))
@@ -178,16 +187,15 @@ func (c *ConfigStore) Update(ctx context.Context, cfgMap map[string]any) error {
 		}
 		updated[key] = *configValue
 	}
-	c.mu.Lock()
-	c.update(func(next valueMap) { maps.Copy(next, updated) })
-	c.mu.Unlock()
-	// Update to driver
-	err := c.cfgDriver.Save(ctx, cfgMap)
-	// The save may still fail or be rolled back with the caller's transaction, in which
-	// case the driver version never changes. Forcing the next Load to re-merge makes
-	// readers follow the committed state instead of keeping the local values.
-	c.driverVersion.Store(0)
-	return err
+	if err := c.cfgDriver.Save(ctx, cfgMap); err != nil {
+		return err
+	}
+	orm.AfterCommit(ctx, func() {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		c.update(func(next valueMap) { maps.Copy(next, updated) })
+	})
+	return nil
 }
 
 // ToString ...

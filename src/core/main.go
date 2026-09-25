@@ -226,7 +226,7 @@ func main() {
 	}
 	log.Info("database self-test passed")
 
-	stopConfigSnapshot := dbCfg.StartSnapshot(dao.GetPool().PgxPool())
+	stopSettingsSync := dbCfg.StartSettingsSync(dao.GetPool().PgxPool())
 
 	ctx = orm.Clone(ctx)
 	if err := config.Load(ctx); err != nil {
@@ -270,7 +270,7 @@ func main() {
 
 	closing := make(chan struct{})
 	done := make(chan struct{})
-	go gracefulShutdown(closing, done, shutdownTracerProvider, stopConfigSnapshot, dao.ClosePool)
+	go gracefulShutdown(closing, done, shutdownTracerProvider, stopSettingsSync, dao.ClosePool)
 	// Start health checker for registries
 	go registry.Ctl.StartRegularHealthCheck(orm.Context(), closing, done)
 	// Init audit log

@@ -27,8 +27,8 @@ type Driver interface {
 	Get(ctx context.Context, key string) (map[string]any, error)
 }
 
-// Versioned is implemented by drivers that can tell whether their content changed
-// since the last Load. Version 0 means unknown, which forces a reload.
-type Versioned interface {
-	Version() uint64
+// Revisioned is implemented by drivers that can tell whether their content changed
+// since the last Load. Revision 0 means unknown, which forces a Load.
+type Revisioned interface {
+	Revision() uint64
 }

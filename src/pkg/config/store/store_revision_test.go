@@ -16,9 +16,11 @@ package store
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,15 +29,24 @@ import (
 	"github.com/goharbor/harbor/src/lib/config/metadata"
 )
 
-type versionedDriver struct {
-	mu      sync.Mutex
-	values  map[string]any
-	version uint64
-	loads   int
-	saved   map[string]any
+type revisionedDriver struct {
+	mu       sync.Mutex
+	values   map[string]any
+	revision uint64
+	loads    int
+	saved    map[string]any
+	saveErr  error
+	// loadGate, when set, blocks Load until it is closed
+	loadGate chan struct{}
 }
 
-func (d *versionedDriver) Load(context.Context) (map[string]any, error) {
+func (d *revisionedDriver) Load(context.Context) (map[string]any, error) {
+	d.mu.Lock()
+	gate := d.loadGate
+	d.mu.Unlock()
+	if gate != nil {
+		<-gate
+	}
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.loads++
@@ -46,30 +57,33 @@ func (d *versionedDriver) Load(context.Context) (map[string]any, error) {
 	return out, nil
 }
 
-func (d *versionedDriver) Save(_ context.Context, cfg map[string]any) error {
+func (d *revisionedDriver) Save(_ context.Context, cfg map[string]any) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if d.saveErr != nil {
+		return d.saveErr
+	}
 	d.saved = cfg
 	return nil
 }
 
-func (d *versionedDriver) Get(context.Context, string) (map[string]any, error) { return nil, nil }
+func (d *revisionedDriver) Get(context.Context, string) (map[string]any, error) { return nil, nil }
 
-func (d *versionedDriver) Version() uint64 {
+func (d *revisionedDriver) Revision() uint64 {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	return d.version
+	return d.revision
 }
 
-func (d *versionedDriver) publish(values map[string]any) {
+func (d *revisionedDriver) publish(values map[string]any) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.values = values
-	d.version++
+	d.revision++
 }
 
-func TestLoadSkipsUnchangedVersion(t *testing.T) {
-	d := &versionedDriver{}
+func TestLoadSkipsUnchangedRevision(t *testing.T) {
+	d := &revisionedDriver{}
 	d.publish(map[string]any{common.AUTHMode: "db_auth"})
 	s := NewConfigStore(d)
 
@@ -85,30 +99,90 @@ func TestLoadSkipsUnchangedVersion(t *testing.T) {
 	assert.Equal(t, "oidc_auth", v.GetString())
 }
 
-func TestLoadAfterUpdateFollowsDriver(t *testing.T) {
-	d := &versionedDriver{}
+func TestUpdateIsNotPublishedWhenSaveFails(t *testing.T) {
+	d := &revisionedDriver{}
+	d.publish(map[string]any{common.AUTHMode: "db_auth"})
+	s := NewConfigStore(d)
+	require.NoError(t, s.Load(context.Background()))
+
+	d.saveErr = errors.New("save failed")
+	require.Error(t, s.Update(context.Background(), map[string]any{common.AUTHMode: "ldap_auth"}))
+	v, _ := s.Get(common.AUTHMode)
+	assert.Equal(t, "db_auth", v.GetString())
+}
+
+func TestUpdateIsPublishedWithoutTransaction(t *testing.T) {
+	d := &revisionedDriver{}
 	d.publish(map[string]any{common.AUTHMode: "db_auth"})
 	s := NewConfigStore(d)
 	require.NoError(t, s.Load(context.Background()))
 
 	require.NoError(t, s.Update(context.Background(), map[string]any{common.AUTHMode: "ldap_auth"}))
 	assert.Equal(t, "ldap_auth", d.saved[common.AUTHMode])
+	// a Load before the driver announces the change keeps the committed local value
+	require.NoError(t, s.Load(context.Background()))
 	v, _ := s.Get(common.AUTHMode)
-	assert.Equal(t, "ldap_auth", v.GetString(), "Get without Load sees the local write")
-
-	// not committed yet, or rolled back: the driver still has the old value
-	require.NoError(t, s.Load(context.Background()))
-	v, _ = s.Get(common.AUTHMode)
-	assert.Equal(t, "db_auth", v.GetString())
-
-	d.publish(map[string]any{common.AUTHMode: "ldap_auth"})
-	require.NoError(t, s.Load(context.Background()))
-	v, _ = s.Get(common.AUTHMode)
 	assert.Equal(t, "ldap_auth", v.GetString())
 }
 
-func TestZeroVersionAlwaysLoads(t *testing.T) {
-	d := &versionedDriver{values: map[string]any{common.AUTHMode: "db_auth"}}
+// SyncQuota sets a value and saves it; when the save fails the next Load must undo it.
+func TestFailedSaveIsUndoneByNextLoad(t *testing.T) {
+	d := &revisionedDriver{}
+	d.publish(map[string]any{common.ReadOnly: "false"})
+	s := NewConfigStore(d)
+	require.NoError(t, s.Load(context.Background()))
+
+	require.NoError(t, s.Set(common.ReadOnly, mustValue(t, common.ReadOnly, "true")))
+	d.saveErr = errors.New("save failed")
+	require.Error(t, s.Save(context.Background()))
+	require.NoError(t, s.Load(context.Background()))
+	v, _ := s.Get(common.ReadOnly)
+	assert.False(t, v.GetBool())
+}
+
+// A Load that read an older revision must not replace values merged from a newer
+// one, even when a local write happened in between.
+func TestOlderLoadNeverOverwritesNewer(t *testing.T) {
+	d := &revisionedDriver{}
+	d.publish(map[string]any{common.AUTHMode: "db_auth"})
+	s := NewConfigStore(d)
+	require.NoError(t, s.Load(context.Background()))
+
+	// the slow Load reads revision 2 and blocks inside the driver
+	d.publish(map[string]any{common.AUTHMode: "ldap_auth"})
+	gate := make(chan struct{})
+	d.mu.Lock()
+	d.loadGate = gate
+	d.mu.Unlock()
+	slow := make(chan error, 1)
+	go func() { slow <- s.Load(context.Background()) }()
+	require.Eventually(t, func() bool {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		return d.loads == 1 // only the first Load finished so far
+	}, time.Second, time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
+
+	// revision 3 is merged by a fast Load while the slow one waits
+	d.mu.Lock()
+	d.loadGate = nil
+	d.values = map[string]any{common.AUTHMode: "oidc_auth"}
+	d.revision++
+	d.mu.Unlock()
+	require.NoError(t, s.Load(context.Background()))
+	require.NoError(t, s.Save(context.Background()))
+
+	d.mu.Lock()
+	d.values = map[string]any{common.AUTHMode: "ldap_auth"} // what the slow Load will read
+	d.mu.Unlock()
+	close(gate)
+	require.NoError(t, <-slow)
+	v, _ := s.Get(common.AUTHMode)
+	assert.Equal(t, "oidc_auth", v.GetString())
+}
+
+func TestZeroRevisionAlwaysLoads(t *testing.T) {
+	d := &revisionedDriver{values: map[string]any{common.AUTHMode: "db_auth"}}
 	s := NewConfigStore(d)
 	require.NoError(t, s.Load(context.Background()))
 	require.NoError(t, s.Load(context.Background()))
@@ -121,7 +195,7 @@ func TestLoadSwapsValuesAtomically(t *testing.T) {
 		n := strconv.Itoa(i)
 		return map[string]any{common.OIDCName: "name-" + n, common.OIDCEndpoint: "https://idp-" + n}
 	}
-	d := &versionedDriver{}
+	d := &revisionedDriver{}
 	d.publish(gen(0))
 	s := NewConfigStore(d)
 	require.NoError(t, s.Load(context.Background()))

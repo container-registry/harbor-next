@@ -33,10 +33,14 @@ type DAO interface {
 	SaveConfigEntries(ctx context.Context, entries []models.ConfigEntry) error
 	// GetConfigItem get configure item by key
 	GetConfigItem(ctx context.Context, query *q.Query) ([]*models.ConfigEntry, error)
-	// NotifyChange signals a configuration change on the Postgres channel; inside a
-	// transaction it is delivered on commit and dropped on rollback
-	NotifyChange(ctx context.Context, channel string) error
+	// PublishConfigurationChanged announces a configuration change to every listener
+	// of ConfigurationChangedChannel; inside a transaction Postgres delivers it on
+	// commit and drops it on rollback
+	PublishConfigurationChanged(ctx context.Context) error
 }
+
+// ConfigurationChangedChannel is the Postgres channel that carries configuration changes.
+const ConfigurationChangedChannel = "harbor_configuration_changed"
 
 type dao struct {
 }
@@ -92,12 +96,12 @@ func (d *dao) SaveConfigEntries(ctx context.Context, entries []models.ConfigEntr
 	return nil
 }
 
-func (d *dao) NotifyChange(ctx context.Context, channel string) error {
+func (d *dao) PublishConfigurationChanged(ctx context.Context) error {
 	o, err := orm.FromContext(ctx)
 	if err != nil {
 		return err
 	}
-	_, err = o.Raw("SELECT pg_notify(?, '')", channel).Exec()
+	_, err = o.Raw("SELECT pg_notify(?, '')", ConfigurationChangedChannel).Exec()
 	return err
 }
 

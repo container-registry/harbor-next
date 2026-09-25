@@ -44,20 +44,20 @@ func (c *countingDriver) Load(ctx context.Context) (map[string]any, error) {
 	return c.Driver.Load(ctx)
 }
 
-func waitForVersion(t *testing.T, s *Snapshot, after uint64) {
+func waitForRevisionAbove(t *testing.T, s *SyncedSettings, after uint64) {
 	t.Helper()
-	require.Eventually(t, func() bool { return s.Version() > after }, 10*time.Second, 10*time.Millisecond)
+	require.Eventually(t, func() bool { return s.Revision() > after }, 10*time.Second, 10*time.Millisecond)
 }
 
-func TestSnapshotReloadsOnCommittedNotify(t *testing.T) {
+func TestCommittedSaveRefreshesSettings(t *testing.T) {
 	driver := &countingDriver{Driver: &Database{cfgDAO: cfgdao.New()}}
-	s := newSnapshot(driver)
-	stop := s.Start(dao.GetPool().PgxPool())
+	s := newSyncedSettings(driver)
+	stop := s.StartSync(dao.GetPool().PgxPool())
 	defer stop()
 
 	ctx := orm.Context()
-	// initial load plus the catch-up reload once LISTEN is active
-	waitForVersion(t, s, 1)
+	// initial load plus the catch-up refresh once LISTEN is active
+	waitForRevisionAbove(t, s, 1)
 
 	// reads are served from memory
 	loads := driver.loads.Load()
@@ -67,9 +67,9 @@ func TestSnapshotReloadsOnCommittedNotify(t *testing.T) {
 	}
 	assert.Equal(t, loads, driver.loads.Load())
 
-	before := s.Version()
+	before := s.Revision()
 	require.NoError(t, (&Database{cfgDAO: cfgdao.New()}).Save(ctx, map[string]any{common.AUTHMode: "ldap_auth"}))
-	waitForVersion(t, s, before)
+	waitForRevisionAbove(t, s, before)
 	v, err := s.Load(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, "ldap_auth", v[common.AUTHMode])
@@ -77,16 +77,16 @@ func TestSnapshotReloadsOnCommittedNotify(t *testing.T) {
 	require.NoError(t, (&Database{cfgDAO: cfgdao.New()}).Save(ctx, map[string]any{common.AUTHMode: "db_auth"}))
 }
 
-func TestSnapshotIgnoresRolledBackSave(t *testing.T) {
-	s := newSnapshot(&Database{cfgDAO: cfgdao.New()})
-	stop := s.Start(dao.GetPool().PgxPool())
+func TestRolledBackSavePublishesNoChange(t *testing.T) {
+	s := newSyncedSettings(&Database{cfgDAO: cfgdao.New()})
+	stop := s.StartSync(dao.GetPool().PgxPool())
 	defer stop()
 
 	ctx := orm.Context()
 	require.NoError(t, (&Database{cfgDAO: cfgdao.New()}).Save(ctx, map[string]any{common.AUTHMode: "db_auth"}))
-	waitForVersion(t, s, 1)
+	waitForRevisionAbove(t, s, 1)
 	time.Sleep(500 * time.Millisecond)
-	before := s.Version()
+	before := s.Revision()
 
 	rollback := errors.New("rollback")
 	err := orm.WithTransaction(func(ctx context.Context) error {
@@ -98,13 +98,13 @@ func TestSnapshotIgnoresRolledBackSave(t *testing.T) {
 	require.ErrorIs(t, err, rollback)
 
 	time.Sleep(500 * time.Millisecond)
-	assert.Equal(t, before, s.Version(), "a rolled back save must not notify")
+	assert.Equal(t, before, s.Revision(), "a rolled back save must not notify")
 	v, err := s.Load(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, "db_auth", v[common.AUTHMode])
 }
 
-func listenBackends(t *testing.T) int {
+func listenerSessions(t *testing.T) int {
 	t.Helper()
 	var n int
 	require.NoError(t, dao.GetPool().PgxPool().QueryRow(context.Background(),
@@ -112,10 +112,10 @@ func listenBackends(t *testing.T) int {
 	return n
 }
 
-func TestSnapshotStopClosesListenConnection(t *testing.T) {
-	s := newSnapshot(&Database{cfgDAO: cfgdao.New()})
-	stop := s.Start(dao.GetPool().PgxPool())
-	require.Eventually(t, func() bool { return listenBackends(t) == 1 }, 10*time.Second, 10*time.Millisecond)
+func TestStopClosesListenerSession(t *testing.T) {
+	s := newSyncedSettings(&Database{cfgDAO: cfgdao.New()})
+	stop := s.StartSync(dao.GetPool().PgxPool())
+	require.Eventually(t, func() bool { return listenerSessions(t) == 1 }, 10*time.Second, 10*time.Millisecond)
 
 	done := make(chan struct{})
 	go func() { stop(); close(done) }()
@@ -125,28 +125,28 @@ func TestSnapshotStopClosesListenConnection(t *testing.T) {
 		t.Fatal("stop did not return")
 	}
 	// the LISTEN session is destroyed, not returned to the pool for reuse by requests
-	require.Eventually(t, func() bool { return listenBackends(t) == 0 }, 10*time.Second, 10*time.Millisecond)
+	require.Eventually(t, func() bool { return listenerSessions(t) == 0 }, 10*time.Second, 10*time.Millisecond)
 }
 
-func TestSnapshotLoadBeforeStartReadsDatabase(t *testing.T) {
+func TestLoadBeforeSyncReadsDatabase(t *testing.T) {
 	driver := &countingDriver{Driver: &Database{cfgDAO: cfgdao.New()}}
-	s := newSnapshot(driver)
+	s := newSyncedSettings(driver)
 	_, err := s.Load(orm.Context())
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), driver.loads.Load())
-	assert.Equal(t, uint64(0), s.Version())
+	assert.Equal(t, uint64(0), s.Revision())
 }
 
-func TestSnapshotReconnectsListener(t *testing.T) {
-	s := newSnapshot(&Database{cfgDAO: cfgdao.New()})
-	stop := s.Start(dao.GetPool().PgxPool())
+func TestListenerReconnectsAfterTermination(t *testing.T) {
+	s := newSyncedSettings(&Database{cfgDAO: cfgdao.New()})
+	stop := s.StartSync(dao.GetPool().PgxPool())
 	defer stop()
-	require.Eventually(t, func() bool { return listenBackends(t) == 1 }, 10*time.Second, 10*time.Millisecond)
+	require.Eventually(t, func() bool { return listenerSessions(t) == 1 }, 10*time.Second, 10*time.Millisecond)
 
 	_, err := dao.GetPool().PgxPool().Exec(context.Background(),
 		"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND application_name = '"+listenerAppName+"'")
 	require.NoError(t, err)
-	require.Eventually(t, func() bool { return listenBackends(t) == 1 }, 15*time.Second, 50*time.Millisecond)
+	require.Eventually(t, func() bool { return listenerSessions(t) == 1 }, 15*time.Second, 50*time.Millisecond)
 
 	ctx := orm.Context()
 	require.NoError(t, (&Database{cfgDAO: cfgdao.New()}).Save(ctx, map[string]any{common.AUTHMode: "ldap_auth"}))
@@ -159,12 +159,12 @@ func TestSnapshotReconnectsListener(t *testing.T) {
 
 // The request path must read configuration while every pool connection is held,
 // which is the state of the #92 deadlock.
-func TestSnapshotReadsWithExhaustedPool(t *testing.T) {
+func TestReadsSucceedWithExhaustedPool(t *testing.T) {
 	pool := dao.GetPool().PgxPool()
-	s := newSnapshot(&Database{cfgDAO: cfgdao.New()})
-	stop := s.Start(pool)
+	s := newSyncedSettings(&Database{cfgDAO: cfgdao.New()})
+	stop := s.StartSync(pool)
 	defer stop()
-	waitForVersion(t, s, 1)
+	waitForRevisionAbove(t, s, 1)
 
 	mgr := NewDBCfgManager()
 	mgr.Store = store.NewConfigStore(s)
@@ -203,17 +203,17 @@ func TestSnapshotReadsWithExhaustedPool(t *testing.T) {
 
 // A change committed while the listener is disconnected sends a notification nobody
 // receives; the sync on reconnect must pick it up without waiting for the resync.
-func TestSnapshotSyncsChangesMissedWhileDisconnected(t *testing.T) {
-	s := newSnapshot(&Database{cfgDAO: cfgdao.New()})
-	stop := s.Start(dao.GetPool().PgxPool())
+func TestReconnectAppliesChangesMissedWhileDisconnected(t *testing.T) {
+	s := newSyncedSettings(&Database{cfgDAO: cfgdao.New()})
+	stop := s.StartSync(dao.GetPool().PgxPool())
 	defer stop()
-	require.Eventually(t, func() bool { return listenBackends(t) == 1 }, 10*time.Second, 10*time.Millisecond)
+	require.Eventually(t, func() bool { return listenerSessions(t) == 1 }, 10*time.Second, 10*time.Millisecond)
 
 	ctx := orm.Context()
 	_, err := dao.GetPool().PgxPool().Exec(context.Background(),
 		"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND application_name = '"+listenerAppName+"'")
 	require.NoError(t, err)
-	require.Eventually(t, func() bool { return listenBackends(t) == 0 }, 5*time.Second, 5*time.Millisecond)
+	require.Eventually(t, func() bool { return listenerSessions(t) == 0 }, 5*time.Second, 5*time.Millisecond)
 	require.NoError(t, (&Database{cfgDAO: cfgdao.New()}).Save(ctx, map[string]any{common.AUTHMode: "ldap_auth"}))
 
 	require.Eventually(t, func() bool {

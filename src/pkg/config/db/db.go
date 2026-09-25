@@ -23,6 +23,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/config/models"
 	"github.com/goharbor/harbor/src/lib/encrypt"
 	"github.com/goharbor/harbor/src/lib/log"
+	"github.com/goharbor/harbor/src/lib/orm"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/config/db/dao"
 )
@@ -38,11 +39,11 @@ func (d *Database) Load(ctx context.Context) (map[string]any, error) {
 	if err != nil {
 		return map[string]any{}, err
 	}
-	return decodeEntries(configEntries), nil
+	return userSettingsFrom(configEntries), nil
 }
 
-// decodeEntries keeps the user settings of the properties rows and decrypts passwords.
-func decodeEntries(configEntries []*models.ConfigEntry) map[string]any {
+// userSettingsFrom keeps the user-scope rows of the properties table and decrypts passwords.
+func userSettingsFrom(configEntries []*models.ConfigEntry) map[string]any {
 	resultMap := map[string]any{}
 	for _, item := range configEntries {
 		itemMetadata, ok := metadata.Instance().GetByName(item.Key)
@@ -89,10 +90,13 @@ func (d *Database) Save(ctx context.Context, cfgs map[string]any) error {
 			log.Errorf("failed to get metadata, skip to save key:%v", key)
 		}
 	}
-	if err := d.cfgDAO.SaveConfigEntries(ctx, configEntries); err != nil {
-		return err
-	}
-	return d.cfgDAO.NotifyChange(ctx, notifyChannel)
+	// one transaction, so the settings and their announcement commit or fail together
+	return orm.WithTransaction(func(ctx context.Context) error {
+		if err := d.cfgDAO.SaveConfigEntries(ctx, configEntries); err != nil {
+			return err
+		}
+		return d.cfgDAO.PublishConfigurationChanged(ctx)
+	})(ctx)
 }
 
 // Get - Get config item from db
