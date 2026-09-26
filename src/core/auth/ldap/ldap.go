@@ -350,6 +350,9 @@ func (l *Auth) PostAuthenticate(ctx context.Context, u *models.User) error {
 			}
 		}
 
+		if err := syncUserGroupMembership(ctx, u); err != nil {
+			return err
+		}
 		return nil
 	}
 
@@ -359,6 +362,24 @@ func (l *Auth) PostAuthenticate(ctx context.Context, u *models.User) error {
 	}
 	if u.UserID <= 0 {
 		return fmt.Errorf("cannot OnBoardUser %v", u)
+	}
+	if err := syncUserGroupMembership(ctx, u); err != nil {
+		return err
+	}
+	return nil
+}
+
+// syncUserGroupMembership persists the group IDs attachLDAPGroup/
+// attachGroupParallel already resolved onto u.GroupIDs, so a later,
+// non-live-session lookup (e.g. PAT authorization) can read them back.
+// Fails closed: returns error if sync fails, which blocks login.
+func syncUserGroupMembership(ctx context.Context, u *models.User) error {
+	if u.UserID <= 0 {
+		return nil
+	}
+	if err := ugCtl.Ctl.SyncUserGroupMembership(ctx, u.UserID, u.GroupIDs); err != nil {
+		log.Errorf("failed to sync group membership for user %d: %v", u.UserID, err)
+		return err
 	}
 	return nil
 }
