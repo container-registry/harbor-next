@@ -63,6 +63,7 @@ const (
 	PostGreSQLHealthCheckPeriod      = "postgresql_health_check_period"
 	PostGreSQLConnectTimeout         = "postgresql_connect_timeout"
 	PostGreSQLMinConns               = "postgresql_min_conns"
+	PostGreSQLStatementTimeout       = "postgresql_statement_timeout"
 	PostGreSQLURL                    = "postgresql_url"
 	SelfRegistration                 = "self_registration"
 	CoreURL                          = "core_url"
