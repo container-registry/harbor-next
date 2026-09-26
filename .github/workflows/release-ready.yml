@@ -5,8 +5,7 @@ on:
   push:
     branches: [main, "release-[0-9]*.[0-9]*"]
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: release-ready-${{ github.ref }}
@@ -16,6 +15,8 @@ jobs:
   release-ready:
     name: Validate Release Patches
     runs-on: ubuntu-26.04
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

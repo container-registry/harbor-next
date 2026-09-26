@@ -40,6 +40,8 @@ on:
       SYNC_APP_PRIVATE_KEY:
         required: true
 
+permissions: {}
+
 jobs:
   build:
     name: "${{ matrix.component }} (${{ matrix.platform }})"

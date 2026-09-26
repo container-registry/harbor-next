@@ -4,9 +4,7 @@ on:
   pull_request:
     branches: [main]
 
-permissions:
-  contents: read
-  pull-requests: write
+permissions: {}
 
 jobs:
   dependency-review:
@@ -14,6 +12,10 @@ jobs:
     # Requires Dependency Graph to be enabled in repo settings
     if: github.event.repository.private == false || always()
     continue-on-error: true
+    permissions:
+      contents: read
+      # comment-summary-in-pr posts the review summary
+      pull-requests: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

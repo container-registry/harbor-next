@@ -29,8 +29,7 @@ on:
         required: false
         type: string
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   # Never two nightlies at once: they share the channel branch.

@@ -21,8 +21,7 @@ on:
       - "deploy/chart/**"
       - "deploy/compose/**"
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: test-${{ github.event.pull_request.number || github.ref }}
@@ -35,6 +34,8 @@ jobs:
   test-taskfiles:
     name: Taskfile Tests
     runs-on: ubuntu-26.04
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -53,6 +54,8 @@ jobs:
   test-unit:
     name: Unit Tests (pure)
     runs-on: ubuntu-26.04
+    permissions:
+      contents: read
     env:
       CGO_ENABLED: "1"
       RACE_FLAGS: -race
@@ -86,6 +89,8 @@ jobs:
   test-db:
     name: Unit Tests (DB ${{ matrix.shard_name }})
     runs-on: ubuntu-26.04
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -197,6 +202,8 @@ jobs:
   go-mod-tidy:
     name: go.mod / go.sum tidy
     runs-on: ubuntu-26.04
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

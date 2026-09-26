@@ -8,7 +8,7 @@ on:
     branches:
       - main
 
-permissions: read-all
+permissions: {}
 
 jobs:
   analysis:
@@ -18,8 +18,16 @@ jobs:
     # Scorecard result publishing requires a single GitHub-hosted Ubuntu runner.
     runs-on: ubuntu-latest
     permissions:
+      # uploads the SARIF to the code-scanning dashboard
       security-events: write
+      # publishes the result and mints the badge
       id-token: write
+      contents: read
+      # the checks read workflow runs, commits, PRs and check results
+      actions: read
+      issues: read
+      pull-requests: read
+      checks: read
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
