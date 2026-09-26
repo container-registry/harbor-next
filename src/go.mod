@@ -90,6 +90,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ecr v1.62.1
 	github.com/aws/smithy-go v1.28.1
 	github.com/goccy/go-yaml v1.19.2
+	go.uber.org/goleak v1.3.0
 	gopkg.in/h2non/gock.v1 v1.1.2
 )
 
