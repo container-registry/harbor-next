@@ -88,7 +88,8 @@ func NewContext(ctx context.Context, o orm.QueryExecutor) context.Context {
 	return context.WithValue(ctx, ormKey{}, o)
 }
 
-// Context returns a context with an orm
+// Context returns a context with an orm. It always builds a new one, so a
+// request path that calls it takes a second pool connection; use ReuseContext there.
 func Context() context.Context {
 	return NewContext(context.Background(), orm.NewOrm())
 }
@@ -102,6 +103,26 @@ func Clone(ctx context.Context) context.Context {
 // linkage of parent.
 func Copy(ctx context.Context) context.Context {
 	return NewContext(valueOnlyContext{ctx}, orm.NewOrm())
+}
+
+// ReuseContext returns a context whose ORM can be queried without taking a
+// second connection from the pool: the ORM ctx already carries, or a fresh one
+// when there is nothing to reuse (no ORM, or a transaction scope that has
+// already committed or rolled back).
+//
+// A second connection taken while transaction.Middleware still holds the first
+// deadlocks the pool under concurrent writes (#850, goharbor/harbor#23879).
+func ReuseContext(ctx context.Context) context.Context {
+	if ctx == nil {
+		return Context()
+	}
+	if _, err := FromContext(ctx); err != nil {
+		return NewContext(ctx, orm.NewOrm())
+	}
+	if h, ok := ctx.Value(hooksKey{}).(*txHooks); ok && h != nil && h.isClosed() {
+		return NewContext(ctx, orm.NewOrm())
+	}
+	return ctx
 }
 
 type operationNameKey struct{}
