@@ -24,6 +24,8 @@
     {"type": "chart",    "section": "Chart",          "hidden": true}
   ],
   "packages": {
-    ".": {}
+    ".": {
+      "extra-files": ["publiccode.yml"]
+    }
   }
 }
