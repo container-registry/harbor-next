@@ -1,0 +1,48 @@
+# Argo CD values for the harbor chart. Argo CD renders client-side
+# (`helm template`), where `lookup` returns nothing — with the default
+# autoGenSecrets: true every sync would regenerate all secret material
+# and roll every workload through the checksum annotations. Pinning all
+# identities makes rendering byte-for-byte deterministic; the chart then
+# also skips its would-be-empty component Secrets entirely.
+#
+# Prerequisite Secrets (names + keys + generation commands):
+# see ../flux/identity-secrets.yaml — identical for Argo CD.
+externalURL: https://harbor.example.com
+
+autoGenSecrets: false
+
+existingSecretAdminPassword: harbor-admin
+existingSecretSecretKey: harbor-encryption
+
+database:
+  host: postgres.database.svc
+  username: harbor
+  existingSecret: harbor-database
+
+core:
+  existingSecret: harbor-core-identity
+  existingXsrfSecret: harbor-core-identity
+  tokenSecretName: harbor-token-cert
+
+registry:
+  existingSecret: harbor-registry-identity
+  credentials:
+    existingSecret: harbor-registry-credentials
+  persistence:
+    enabled: true
+    size: 50Gi
+
+jobservice:
+  existingSecret: harbor-jobservice-identity
+
+ingress:
+  enabled: true
+  autoGenCert: false
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+  hosts:
+    - host: harbor.example.com
+  tls:
+    - secretName: harbor-tls
+      hosts:
+        - harbor.example.com

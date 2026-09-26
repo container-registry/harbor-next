@@ -238,6 +238,7 @@ The [`example/`](example/) directory contains one directory per scenario, each w
 | [`openshift/`](example/openshift/) | OpenShift deployment with edge-terminated routes |
 | [`aws-eks-irsa/`](example/aws-eks-irsa/) | AWS EKS with IRSA for S3 storage and RDS IAM Auth |
 | [`flux/`](example/flux/) | FluxCD GitOps: HelmRelease + drift detection + pinned secrets (`autoGenSecrets: false`), works for Argo CD too |
+| [`argocd/`](example/argocd/) | Argo CD Application: OCI chart + `$values` git source, pinned secrets (`autoGenSecrets: false` is mandatory under client-side rendering) |
 
 ```bash
 helm install harbor . -n harbor --create-namespace -f example/k3d-local/values.yaml
