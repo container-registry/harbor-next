@@ -64,6 +64,11 @@ var (
 	validProjectName = regexp.MustCompile(`^` + restrictedNameChars + `$`)
 )
 
+// IsValidName returns whether name is a legal project name (length and charset).
+func IsValidName(name string) bool {
+	return !utils.IsIllegalLength(name, projectNameMinLen, projectNameMaxLen) && validProjectName.MatchString(name)
+}
+
 type manager struct {
 	dao dao.DAO
 }
@@ -79,8 +84,7 @@ func (m *manager) Create(ctx context.Context, project *models.Project) (int64, e
 		return 0, errors.BadRequestError(nil).WithMessagef(format, project.Name, projectNameMaxLen, projectNameMinLen)
 	}
 
-	legal := validProjectName.MatchString(project.Name)
-	if !legal {
+	if !validProjectName.MatchString(project.Name) {
 		return 0, errors.BadRequestError(nil).WithMessage("project name is not in lower case or contains illegal characters")
 	}
 
