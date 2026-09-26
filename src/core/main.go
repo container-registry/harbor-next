@@ -87,6 +87,7 @@ import (
 	pkguser "github.com/goharbor/harbor/src/pkg/user"
 	"github.com/goharbor/harbor/src/pkg/version"
 	"github.com/goharbor/harbor/src/server"
+	sessionmiddleware "github.com/goharbor/harbor/src/server/middleware/session"
 )
 
 const (
@@ -345,6 +346,12 @@ func main() {
 			log.Errorf("failed to schedule system execution sweep job, error: %v", err)
 		}
 	}()
+	// Must come before web.Run: the beego start hook that builds the session
+	// manager reads this configuration and runs after every hook added here.
+	if err := sessionmiddleware.ConfigureCookie(); err != nil {
+		log.Errorf("failed to configure the session cookie, it keeps beego's defaults: %v", err)
+	}
+
 	web.RunWithMiddleWares("", middlewares.MiddleWares()...)
 }
 
