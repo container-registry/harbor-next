@@ -9,7 +9,6 @@ import (
 	"github.com/docker/distribution/context"
 	"github.com/docker/distribution/registry/storage/driver/inmemory"
 	"github.com/docker/distribution/testutil"
-	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/goharbor/harbor/src/registryctl/api/registry/test"
@@ -52,10 +51,8 @@ func TestDeleteManifest(t *testing.T) {
 	}
 
 	req, err := http.NewRequest(http.MethodDelete, "http://api/registry/{name}/manifests/{reference}/?tags=1,2,3", nil)
-	varMap := make(map[string]string, 1)
-	varMap["reference"] = manifestDigest.String()
-	varMap["name"] = fmt.Sprintf("%v", repo.Named())
-	req = mux.SetURLVars(req, varMap)
+	req.SetPathValue("reference", manifestDigest.String())
+	req.SetPathValue("name", fmt.Sprintf("%v", repo.Named()))
 
 	manifestHandler := NewHandler(inmemoryDriver)
 	rec := httptest.NewRecorder()
