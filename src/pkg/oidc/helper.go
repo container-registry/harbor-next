@@ -364,7 +364,6 @@ func userInfoFromRemote(ctx context.Context, token *Token, setting cfgModels.OID
 // UserInfoFromIDToken extract user info from ID token
 func UserInfoFromIDToken(ctx context.Context, token *Token, setting cfgModels.OIDCSetting) (*UserInfo, error) {
 	if token.RawIDToken == "" {
-		// nolint:nilnil // no ID token present
 		return nil, nil
 	}
 	idt, err := parseIDToken(ctx, token.RawIDToken)
@@ -480,7 +479,7 @@ func filterGroup(groupNames []string, filter string) []string {
 }
 
 // InjectGroupsToUser populates the group to DB and inject the group IDs to user model.
-// The third optional param is for UT only.
+// The third optional parm is for UT only.
 func InjectGroupsToUser(info *UserInfo, user *models.User, f ...populate) {
 	if info == nil || user == nil {
 		log.Warningf("user info or user model is nil, skip the func")
