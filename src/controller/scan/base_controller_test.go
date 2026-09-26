@@ -19,9 +19,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
+	beegoorm "github.com/beego/beego/v2/client/orm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -59,6 +61,21 @@ import (
 	reporttesting "github.com/goharbor/harbor/src/testing/pkg/scan/report"
 	tasktesting "github.com/goharbor/harbor/src/testing/pkg/task"
 )
+
+// reportQuery matches the single List query GetReport builds for a set of
+// artifact digests.
+func reportQuery(registrationUUID string, digests, mimes []string) any {
+	return mock.MatchedBy(func(query *q.Query) bool {
+		if query == nil {
+			return false
+		}
+		gotDigests, _ := query.Keywords["digest__in"].([]string)
+		gotMimes, _ := query.Keywords["mime_type__in"].([]string)
+		return query.Keywords["registration_uuid"] == registrationUUID &&
+			slices.Equal(gotDigests, digests) &&
+			slices.Equal(gotMimes, mimes)
+	})
+}
 
 // ControllerTestSuite is the test suite for scan controller.
 type ControllerTestSuite struct {
@@ -212,9 +229,9 @@ func (suite *ControllerTestSuite) SetupSuite() {
 	}
 
 	emptySBOMReport := []*scan.Report{{Report: ``, UUID: "rp-uuid-004"}}
-	mgr.On("GetBy", mock.Anything, suite.artifact.Digest, suite.registration.UUID, []string{v1.MimeTypeNativeReport}).Return(reports, nil)
-	mgr.On("GetBy", mock.Anything, suite.artifact.Digest, suite.registration.UUID, []string{v1.MimeTypeSBOMReport}).Return(sbomReport, nil)
-	mgr.On("GetBy", mock.Anything, suite.wrongArtifact.Digest, suite.registration.UUID, []string{v1.MimeTypeSBOMReport}).Return(emptySBOMReport, nil)
+	mgr.On("List", mock.Anything, reportQuery(suite.registration.UUID, []string{suite.artifact.Digest}, []string{v1.MimeTypeNativeReport})).Return(reports, nil)
+	mgr.On("List", mock.Anything, reportQuery(suite.registration.UUID, []string{suite.artifact.Digest}, []string{v1.MimeTypeSBOMReport})).Return(sbomReport, nil)
+	mgr.On("List", mock.Anything, reportQuery(suite.registration.UUID, []string{suite.wrongArtifact.Digest}, []string{v1.MimeTypeSBOMReport})).Return(emptySBOMReport, nil)
 	mgr.On("Get", mock.Anything, "rp-uuid-001").Return(reports[0], nil)
 	mgr.On("Update", "rp-uuid-001", suite.rawReport, (int64)(10000)).Return(nil)
 	mgr.On("UpdateStatus", "the-uuid-123", "Success", (int64)(10000)).Return(nil)
@@ -339,8 +356,7 @@ func (suite *ControllerTestSuite) SetupSuite() {
 			return "", nil
 		},
 
-		cloneCtx: func(ctx context.Context) context.Context { return ctx },
-		makeCtx:  func() context.Context { return orm.NewContext(nil, &ormtesting.FakeOrmer{}) },
+		makeCtx: func() context.Context { return orm.NewContext(nil, &ormtesting.FakeOrmer{}) },
 
 		execMgr:         suite.execMgr,
 		taskMgr:         suite.taskMgr,
@@ -680,4 +696,73 @@ func (suite *ControllerTestSuite) makeExtraAttrs(artifactID int64, reportUUIDs .
 	extraAttrs[artifactIDKey] = float64(artifactID)
 
 	return extraAttrs
+}
+
+// inTransaction reports whether ctx carries a transaction ORM, which is what
+// holds a pool connection for as long as the transaction is open.
+func inTransaction(ctx context.Context) bool {
+	o, err := orm.FromContext(ctx)
+	if err != nil {
+		return false
+	}
+	_, isTx := o.(beegoorm.TxOrmer)
+	return isTx
+}
+
+// TestScanAllReadsOutsideTheTransaction covers harbor-next #856. Scan All used
+// to wrap the whole per-artifact scan in a transaction, so one pool connection
+// was held across the read phase, including the artifact_blob join in
+// HasUnscannableLayer, and across the job submission to jobservice.
+func (suite *ControllerTestSuite) TestScanAllReadsOutsideTheTransaction() {
+	var readInTransaction, dispatchInTransaction bool
+
+	mock.OnAnything(suite.ar, "Walk").Return(nil).Run(func(args mock.Arguments) {
+		readInTransaction = inTransaction(args.Get(0).(context.Context))
+		walkFn := args.Get(2).(func(*artifact.Artifact) error)
+		walkFn(suite.artifact)
+	}).Once()
+	mock.OnAnything(suite.ar, "HasUnscannableLayer").Return(false, nil).Once()
+	mock.OnAnything(suite.accessoryMgr, "List").Return([]accessoryModel.Accessory{}, nil).Once()
+	mock.OnAnything(suite.scanHandler, "MakePlaceHolder").Return(nil, fmt.Errorf("stop here")).Run(func(args mock.Arguments) {
+		dispatchInTransaction = inTransaction(args.Get(0).(context.Context))
+	}).Once()
+
+	suite.Error(suite.c.scanOneForScanAll(suite.artifact, int64(1)))
+
+	suite.False(readInTransaction, "the read phase must not run inside the Scan All transaction")
+	suite.True(dispatchInTransaction, "the dispatch phase must still run inside a transaction")
+}
+
+// TestGetReportQueriesReportsOnce covers the other half of harbor-next #856: one
+// query for every artifact in the index, where there used to be a goroutine per
+// artifact each taking a pool connection of its own.
+func (suite *ControllerTestSuite) TestGetReportQueriesReportsOnce() {
+	child := &artifact.Artifact{Artifact: art.Artifact{ID: 3, ProjectID: 1}}
+	child.Type = "IMAGE"
+	child.Digest = "digest-child"
+	child.ManifestMediaType = v1.MimeTypeDockerArtifact
+
+	mock.OnAnything(suite.ar, "Walk").Return(nil).Run(func(args mock.Arguments) {
+		walkFn := args.Get(2).(func(*artifact.Artifact) error)
+		walkFn(suite.artifact)
+		walkFn(child)
+	}).Once()
+	mock.OnAnything(suite.ar, "HasUnscannableLayer").Return(false, nil).Twice()
+	mock.OnAnything(suite.accessoryMgr, "List").Return([]accessoryModel.Accessory{}, nil).Twice()
+
+	reports := []*scan.Report{
+		{UUID: "rp-uuid-011", Digest: suite.artifact.Digest, Status: "Success"},
+		{UUID: "rp-uuid-012", Digest: child.Digest, Status: "Success"},
+	}
+	listCalls := 0
+	suite.reportMgr.On("List", mock.Anything, reportQuery(suite.registration.UUID,
+		[]string{suite.artifact.Digest, child.Digest}, []string{v1.MimeTypeNativeReport})).
+		Return(reports, nil).Run(func(mock.Arguments) { listCalls++ }).Once()
+	mock.OnAnything(suite.taskMgr, "ListScanTasksByReportUUID").Return(nil, nil).Twice()
+	mock.OnAnything(suite.c.reportConverter, "FromRelationalSchema").Return("", nil).Twice()
+
+	got, err := suite.c.GetReport(orm.NewContext(nil, &ormtesting.FakeOrmer{}), suite.artifact, []string{v1.MimeTypeNativeReport})
+	suite.Require().NoError(err)
+	suite.Len(got, 2)
+	suite.Equal(1, listCalls, "the reports of every artifact must come from a single query")
 }
