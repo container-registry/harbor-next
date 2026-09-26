@@ -31,6 +31,8 @@ const (
 	RateLimitCode = "TOO_MANY_REQUEST"
 	// PreconditionCode ...
 	PreconditionCode = "PRECONDITION"
+	// ScannerUnreachableCode is error code for when the scanner adapter metadata ping fails
+	ScannerUnreachableCode = "SCANNER_UNREACHABLE"
 	// GeneralCode ...
 	GeneralCode = "UNKNOWN"
 	// ChallengesUnsupportedCode ...
@@ -89,6 +91,11 @@ func MethodNotAllowedError(err error) *Error {
 // PreconditionFailedError is error for the case of precondition failed
 func PreconditionFailedError(err error) *Error {
 	return New("precondition failed").WithCode(PreconditionCode).WithCause(err)
+}
+
+// ScannerUnreachableError is error for when the scanner adapter is unreachable
+func ScannerUnreachableError(err error) *Error {
+	return New("scanner unreachable").WithCode(ScannerUnreachableCode).WithCause(err)
 }
 
 // UnknownError ...
