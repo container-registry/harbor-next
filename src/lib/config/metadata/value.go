@@ -26,13 +26,17 @@ var (
 	// ErrNotDefined ...
 	ErrNotDefined = errors.New("configure item is not defined in metadata")
 	// ErrTypeNotMatch ...
-	ErrTypeNotMatch = errors.New("the required value doesn't matched with metadata defined")
+	ErrTypeNotMatch = errors.New("The required value does not match the metadata definition")
 	// ErrInvalidData ...
 	ErrInvalidData = errors.New("the data provided is invalid")
 	// ErrValueNotSet ...
 	ErrValueNotSet = errors.New("the configure value is not set")
 	// ErrStringValueIsEmpty ...
+<<<<<<< HEAD
 	ErrStringValueIsEmpty = errors.New("the configure value cannot be empty")
+=======
+	ErrStringValueIsEmpty = errors.New("The configuration value cannot be empty")
+>>>>>>> ab9e0805a (fix: correct grammar, formatting, and non-actionable error messages (#23974))
 )
 
 // ConfigureValue - struct to hold a actual value, also include the name of config metadata.
