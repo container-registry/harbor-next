@@ -72,9 +72,11 @@ spec:
             - name: metrics
               containerPort: 5001
               protocol: TCP
+          {{- if include "harbor.registry.secretHasData" . }}
           envFrom:
             - secretRef:
                 name: {{ include "harbor.registry.name" . }}
+          {{- end }}
           {{- if or .Values.registry.existingSecret $redisAuth $s3Ext $azureExt $ossExt $caExt .Values.registry.extraEnv }}
           env:
             {{- if .Values.registry.existingSecret }}
@@ -158,12 +160,16 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ .Values.registry.existingConfigMap | default (include "harbor.registry.name" .) }}
+            {{- if include "harbor.registry.secretHasData" . }}
             - secretRef:
                 name: {{ include "harbor.registry.name" . }}
+            {{- end }}
             - configMapRef:
                 name: {{ include "harbor.fullname" . }}-registryctl
+            {{- if include "harbor.registryctl.secretHasData" . }}
             - secretRef:
                 name: {{ include "harbor.fullname" . }}-registryctl
+            {{- end }}
           env:
             {{- if .Values.registry.existingSecret }}
             - name: REGISTRY_HTTP_SECRET
