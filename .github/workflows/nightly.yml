@@ -180,6 +180,18 @@ jobs:
           # shellcheck disable=SC2086
           task nightly:publish-tags MERGE_SHA="${MERGE_SHA}" ${DATE_STAMP:+DATE_STAMP="${DATE_STAMP}"}
 
+      # release-please opens the release PR labelled "autorelease: pending" and
+      # clears the label when it publishes the release. It never publishes one
+      # here, so this does it instead. Skip it and release-please refuses to
+      # open a release PR on any later night.
+      - name: Mark the release PR as tagged
+        if: ${{ steps.merge.outputs.merge_sha != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.NIGHTLY_CHANNEL_TOKEN || github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          MERGE_SHA: ${{ steps.merge.outputs.merge_sha }}
+        run: task nightly:mark-release-tagged MERGE_SHA="${MERGE_SHA}"
+
       - name: Upsert the rolling pre-release
         if: ${{ steps.merge.outputs.merge_sha != '' }}
         env:
