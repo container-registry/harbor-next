@@ -51,6 +51,8 @@ jobs:
       beta_tag: ${{ steps.version.outputs.beta_tag }}
       already_released: ${{ steps.version.outputs.already_released }}
     env:
+      # TEMPORARY: one-off proof run from this PR branch. Drop before merge.
+      RELEASE_REF: ${{ github.ref_name }}
       DATE_STAMP: ${{ inputs.date_stamp }}
       # Read by the askpass script below when the channel branch is pushed.
       GH_TOKEN: ${{ secrets.NIGHTLY_CHANNEL_TOKEN || github.token }}
