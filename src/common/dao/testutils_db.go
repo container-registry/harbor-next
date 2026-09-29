@@ -19,6 +19,7 @@ package dao
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/beego/beego/v2/client/orm"
@@ -28,7 +29,6 @@ import (
 )
 
 var defaultRegistered = false
-var o orm.Ormer
 
 // PrepareTestForSQLite is for test only.
 func PrepareTestForSQLite() {
@@ -72,7 +72,7 @@ func PrepareTestForPostgresSQL() {
 	}
 
 	log.Infof("POSTGRES_HOST: %s, POSTGRES_USR: %s, POSTGRES_PORT: %d\n", dbHost, dbUser, dbPort)
-	o = initDatabaseForTest(database)
+	initDatabaseForTest(database)
 }
 
 func initDatabaseForTest(db *models.Database) orm.Ormer {
@@ -98,10 +98,38 @@ func initDatabaseForTest(db *models.Database) orm.Ormer {
 		return nil
 	}
 
+	var ormer orm.Ormer
 	if alias != "default" {
-		return orm.NewOrmUsingDB(alias)
+		ormer = orm.NewOrmUsingDB(alias)
+	} else {
+		ormer = GetOrmer()
 	}
-	return GetOrmer()
+	if err := applyAuthoritativeSchemaForTest(ormer); err != nil {
+		log.Fatal(err)
+		return nil
+	}
+	return ormer
+}
+
+// applyAuthoritativeSchemaForTest runs harbor_next.sql after the numbered
+// chain, the way core does at start-up, so schema that lives only there is
+// present for the DB-backed unit tests. The file is idempotent, so every test
+// binary may apply it again.
+func applyAuthoritativeSchemaForTest(ormer orm.Ormer) error {
+	dir := os.Getenv("POSTGRES_MIGRATION_SCRIPTS_PATH")
+	if dir == "" {
+		log.Warning("POSTGRES_MIGRATION_SCRIPTS_PATH is not set; skipping harbor_next.sql for tests")
+		return nil
+	}
+	path := filepath.Join(filepath.Clean(dir), "harbor_next.sql")
+	schema, err := os.ReadFile(path) // #nosec G703 -- test-only helper; the directory comes from the test environment
+	if err != nil {
+		return fmt.Errorf("read %s: %w", path, err)
+	}
+	if _, err := ormer.Raw(string(schema)).Exec(); err != nil {
+		return fmt.Errorf("apply %s: %w", path, err)
+	}
+	return nil
 }
 
 // PrepareTestData -- Clean and Create data
