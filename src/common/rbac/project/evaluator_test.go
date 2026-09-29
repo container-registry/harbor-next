@@ -24,50 +24,13 @@ import (
 	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/common/models"
 	"github.com/goharbor/harbor/src/common/rbac"
-	roleCtl "github.com/goharbor/harbor/src/controller/role"
-	"github.com/goharbor/harbor/src/lib/q"
+	"github.com/goharbor/harbor/src/pkg/permission/policy"
 	"github.com/goharbor/harbor/src/pkg/permission/types"
 	proModels "github.com/goharbor/harbor/src/pkg/project/models"
 	projecttesting "github.com/goharbor/harbor/src/testing/controller/project"
 	"github.com/goharbor/harbor/src/testing/mock"
+	policytesting "github.com/goharbor/harbor/src/testing/pkg/permission/policy"
 )
-
-// stubRoleCtl implements roleCtl.Controller for tests.
-// Only Get() needs real behaviour; all other methods are no-ops.
-type stubRoleCtl struct {
-	testifymock.Mock
-}
-
-func (s *stubRoleCtl) Get(ctx context.Context, id int64, option *roleCtl.Option) (*roleCtl.Role, error) {
-	args := s.Called(ctx, id, option)
-	r, _ := args.Get(0).(*roleCtl.Role)
-	return r, args.Error(1)
-}
-func (s *stubRoleCtl) Create(ctx context.Context, r *roleCtl.Role) (int64, error) { return 0, nil }
-func (s *stubRoleCtl) Delete(ctx context.Context, id int64, opt ...*roleCtl.Option) error {
-	return nil
-}
-func (s *stubRoleCtl) Update(ctx context.Context, r *roleCtl.Role, opt *roleCtl.Option) error {
-	return nil
-}
-func (s *stubRoleCtl) List(ctx context.Context, query *q.Query, opt *roleCtl.Option) ([]*roleCtl.Role, error) {
-	return nil, nil
-}
-func (s *stubRoleCtl) Count(ctx context.Context, query *q.Query) (int64, error) { return 0, nil }
-
-// customRole returns a *roleCtl.Role carrying the given project-scoped accesses,
-// as the DB-backed role controller would return for a custom role.
-func customRole(name string, access ...*types.Policy) *roleCtl.Role {
-	r := &roleCtl.Role{
-		Permissions: []*roleCtl.Permission{{
-			Kind:      roleCtl.LEVELROLE,
-			Namespace: "*",
-			Access:    access,
-		}},
-	}
-	r.Name = name
-	return r
-}
 
 var (
 	public = &proModels.Project{
@@ -95,34 +58,32 @@ func TestAnonymousAccess(t *testing.T) {
 	{
 		// anonymous to access public project
 		ctl := &projecttesting.Controller{}
-		ctl_r := &stubRoleCtl{}
 		mock.OnAnything(ctl, "Get").Return(public, nil)
 
 		resource := NewNamespace(public.ProjectID).Resource(rbac.ResourceRepository)
 
-		evaluator := NewEvaluator(ctl, NewBuilderForUser(nil, ctl, ctl_r))
+		evaluator := NewEvaluator(ctl, NewBuilderForUser(nil, ctl))
 		assert.True(evaluator.HasPermission(context.TODO(), resource, rbac.ActionPull))
 	}
 
 	{
 		// anonymous to access private project
 		ctl := &projecttesting.Controller{}
-		ctl_r := &stubRoleCtl{}
 		mock.OnAnything(ctl, "Get").Return(private, nil)
 
 		resource := NewNamespace(private.ProjectID).Resource(rbac.ResourceRepository)
 
-		evaluator := NewEvaluator(ctl, NewBuilderForUser(nil, ctl, ctl_r))
+		evaluator := NewEvaluator(ctl, NewBuilderForUser(nil, ctl))
 		assert.False(evaluator.HasPermission(context.TODO(), resource, rbac.ActionPull))
 	}
 }
 
 func TestProjectRoleAccess(t *testing.T) {
+	policytesting.Seed(t)
 	assert := assert.New(t)
 
 	{
 		ctl := &projecttesting.Controller{}
-		ctl_r := &stubRoleCtl{}
 		mock.OnAnything(ctl, "Get").Return(public, nil)
 		mock.OnAnything(ctl, "ListRoles").Return([]int{common.RoleProjectAdmin}, nil)
 
@@ -130,16 +91,13 @@ func TestProjectRoleAccess(t *testing.T) {
 			UserID:   1,
 			Username: "username",
 		}
-		evaluator := NewEvaluator(ctl, NewBuilderForUser(user, ctl, ctl_r))
+		evaluator := NewEvaluator(ctl, NewBuilderForUser(user, ctl))
 		resource := NewNamespace(public.ProjectID).Resource(rbac.ResourceRepository)
 		assert.True(evaluator.HasPermission(context.TODO(), resource, rbac.ActionPush))
-		// built-in roles resolve from the compile-time map — no DB lookup
-		ctl_r.AssertNotCalled(t, "Get")
 	}
 
 	{
 		ctl := &projecttesting.Controller{}
-		ctl_r := &stubRoleCtl{}
 		mock.OnAnything(ctl, "Get").Return(public, nil)
 		mock.OnAnything(ctl, "ListRoles").Return([]int{common.RoleGuest}, nil)
 
@@ -147,10 +105,9 @@ func TestProjectRoleAccess(t *testing.T) {
 			UserID:   1,
 			Username: "username",
 		}
-		evaluator := NewEvaluator(ctl, NewBuilderForUser(user, ctl, ctl_r))
+		evaluator := NewEvaluator(ctl, NewBuilderForUser(user, ctl))
 		resource := NewNamespace(public.ProjectID).Resource(rbac.ResourceRepository)
 		assert.False(evaluator.HasPermission(context.TODO(), resource, rbac.ActionPush))
-		ctl_r.AssertNotCalled(t, "Get")
 	}
 }
 
@@ -165,28 +122,25 @@ func TestCustomProjectRoleAccess(t *testing.T) {
 	{
 		// a custom role granting repository:push is loaded from the DB controller
 		ctl := &projecttesting.Controller{}
-		ctl_r := &stubRoleCtl{}
 		mock.OnAnything(ctl, "Get").Return(public, nil)
 		mock.OnAnything(ctl, "ListRoles").Return([]int{customRoleID}, nil)
-		ctl_r.On("Get", testifymock.Anything, int64(customRoleID), testifymock.Anything).
-			Return(customRole("pusher", &types.Policy{Resource: rbac.ResourceRepository, Action: rbac.ActionPush}), nil)
+		policytesting.SeedWith(t, policy.Grant{
+			RoleID: customRoleID, Resource: rbac.ResourceRepository.String(), Action: rbac.ActionPush.String()})
 
-		evaluator := NewEvaluator(ctl, NewBuilderForUser(user, ctl, ctl_r))
+		evaluator := NewEvaluator(ctl, NewBuilderForUser(user, ctl))
 		resource := NewNamespace(public.ProjectID).Resource(rbac.ResourceRepository)
 		assert.True(evaluator.HasPermission(context.TODO(), resource, rbac.ActionPush))
-		ctl_r.AssertCalled(t, "Get", testifymock.Anything, int64(customRoleID), testifymock.Anything)
 	}
 
 	{
 		// a custom role without repository:push cannot push
 		ctl := &projecttesting.Controller{}
-		ctl_r := &stubRoleCtl{}
 		mock.OnAnything(ctl, "Get").Return(public, nil)
 		mock.OnAnything(ctl, "ListRoles").Return([]int{customRoleID}, nil)
-		ctl_r.On("Get", testifymock.Anything, int64(customRoleID), testifymock.Anything).
-			Return(customRole("puller", &types.Policy{Resource: rbac.ResourceRepository, Action: rbac.ActionPull}), nil)
+		policytesting.SeedWith(t, policy.Grant{
+			RoleID: customRoleID, Resource: rbac.ResourceRepository.String(), Action: rbac.ActionPull.String()})
 
-		evaluator := NewEvaluator(ctl, NewBuilderForUser(user, ctl, ctl_r))
+		evaluator := NewEvaluator(ctl, NewBuilderForUser(user, ctl))
 		resource := NewNamespace(public.ProjectID).Resource(rbac.ResourceRepository)
 		assert.False(evaluator.HasPermission(context.TODO(), resource, rbac.ActionPush))
 	}
@@ -196,13 +150,12 @@ func TestCustomProjectRoleAccess(t *testing.T) {
 		// the member can view the project, even though the role carries only
 		// repository:pull and self:* is not selectable in the ScopeRole catalog.
 		ctl := &projecttesting.Controller{}
-		ctl_r := &stubRoleCtl{}
 		mock.OnAnything(ctl, "Get").Return(private, nil)
 		mock.OnAnything(ctl, "ListRoles").Return([]int{customRoleID}, nil)
-		ctl_r.On("Get", testifymock.Anything, int64(customRoleID), testifymock.Anything).
-			Return(customRole("puller", &types.Policy{Resource: rbac.ResourceRepository, Action: rbac.ActionPull}), nil)
+		policytesting.SeedWith(t, policy.Grant{
+			RoleID: customRoleID, Resource: rbac.ResourceRepository.String(), Action: rbac.ActionPull.String()})
 
-		evaluator := NewEvaluator(ctl, NewBuilderForUser(user, ctl, ctl_r))
+		evaluator := NewEvaluator(ctl, NewBuilderForUser(user, ctl))
 		self := NewNamespace(private.ProjectID).Resource(rbac.ResourceSelf)
 		// can view the project itself
 		assert.True(evaluator.HasPermission(context.TODO(), self, rbac.ActionRead))
@@ -223,16 +176,15 @@ func TestCustomProjectRoleAccess(t *testing.T) {
 		}
 
 		ctl := &projecttesting.Controller{}
-		ctl_r := &stubRoleCtl{}
 		ctl.On("Get", testifymock.Anything, private.ProjectID, testifymock.Anything).Return(private, nil)
 		ctl.On("Get", testifymock.Anything, other.ProjectID, testifymock.Anything).Return(other, nil)
 		// member of `private` via the custom role, but not of `other`
 		ctl.On("ListRoles", testifymock.Anything, private.ProjectID, testifymock.Anything).Return([]int{customRoleID}, nil)
 		ctl.On("ListRoles", testifymock.Anything, other.ProjectID, testifymock.Anything).Return([]int{}, nil)
-		ctl_r.On("Get", testifymock.Anything, int64(customRoleID), testifymock.Anything).
-			Return(customRole("puller", &types.Policy{Resource: rbac.ResourceRepository, Action: rbac.ActionPull}), nil)
+		policytesting.SeedWith(t, policy.Grant{
+			RoleID: customRoleID, Resource: rbac.ResourceRepository.String(), Action: rbac.ActionPull.String()})
 
-		evaluator := NewEvaluator(ctl, NewBuilderForUser(user, ctl, ctl_r))
+		evaluator := NewEvaluator(ctl, NewBuilderForUser(user, ctl))
 		assert.True(evaluator.HasPermission(context.TODO(),
 			NewNamespace(private.ProjectID).Resource(rbac.ResourceSelf), rbac.ActionRead))
 		assert.False(evaluator.HasPermission(context.TODO(),
@@ -241,6 +193,7 @@ func TestCustomProjectRoleAccess(t *testing.T) {
 }
 
 func TestTagRetentionRoleAccess(t *testing.T) {
+	policytesting.Seed(t)
 	writeActions := []rbac.Action{rbac.ActionCreate, rbac.ActionUpdate, rbac.ActionDelete, rbac.ActionOperate}
 	readActions := []rbac.Action{rbac.ActionRead, rbac.ActionList}
 	cases := []struct {
@@ -255,11 +208,10 @@ func TestTagRetentionRoleAccess(t *testing.T) {
 	}
 	for _, tc := range cases {
 		ctl := &projecttesting.Controller{}
-		ctl_r := &stubRoleCtl{}
 		mock.OnAnything(ctl, "Get").Return(private, nil)
 		mock.OnAnything(ctl, "ListRoles").Return([]int{tc.role}, nil)
 		user := &models.User{UserID: 1, Username: "username"}
-		evaluator := NewEvaluator(ctl, NewBuilderForUser(user, ctl, ctl_r))
+		evaluator := NewEvaluator(ctl, NewBuilderForUser(user, ctl))
 		resource := NewNamespace(private.ProjectID).Resource(rbac.ResourceTagRetention)
 
 		for _, action := range readActions {
@@ -272,8 +224,11 @@ func TestTagRetentionRoleAccess(t *testing.T) {
 }
 
 func BenchmarkProjectEvaluator(b *testing.B) {
+	// A project role now resolves through the policy store, so an unseeded
+	// one would benchmark the deny path rather than the allow path.
+	policytesting.Seed(b)
+
 	ctl := &projecttesting.Controller{}
-	ctl_r := &stubRoleCtl{}
 	mock.OnAnything(ctl, "Get").Return(public, nil)
 	mock.OnAnything(ctl, "ListRoles").Return([]int{common.RoleProjectAdmin}, nil)
 
@@ -281,18 +236,21 @@ func BenchmarkProjectEvaluator(b *testing.B) {
 		UserID:   1,
 		Username: "username",
 	}
-	evaluator := NewEvaluator(ctl, NewBuilderForUser(user, ctl, ctl_r))
+	evaluator := NewEvaluator(ctl, NewBuilderForUser(user, ctl))
 	resource := NewNamespace(public.ProjectID).Resource(rbac.ResourceRepository)
 
 	b.ResetTimer()
 	for b.Loop() {
-		evaluator.HasPermission(context.TODO(), resource, rbac.ActionPull)
+		if !evaluator.HasPermission(context.TODO(), resource, rbac.ActionPull) {
+			b.Fatal("permission denied")
+		}
 	}
 }
 
 func BenchmarkProjectEvaluatorParallel(b *testing.B) {
+	policytesting.Seed(b)
+
 	ctl := &projecttesting.Controller{}
-	ctl_r := &stubRoleCtl{}
 	mock.OnAnything(ctl, "Get").Return(public, nil)
 	mock.OnAnything(ctl, "ListRoles").Return([]int{common.RoleProjectAdmin}, nil)
 
@@ -300,12 +258,38 @@ func BenchmarkProjectEvaluatorParallel(b *testing.B) {
 		UserID:   1,
 		Username: "username",
 	}
-	evaluator := NewEvaluator(ctl, NewBuilderForUser(user, ctl, ctl_r))
+	evaluator := NewEvaluator(ctl, NewBuilderForUser(user, ctl))
 	resource := NewNamespace(public.ProjectID).Resource(rbac.ResourceRepository)
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			evaluator.HasPermission(context.TODO(), resource, rbac.ActionPull)
+			if !evaluator.HasPermission(context.TODO(), resource, rbac.ActionPull) {
+				b.Error("permission denied")
+				return
+			}
 		}
 	})
+}
+
+// A resource naming another project is out of a membership's reach, including
+// when it reaches that project through ".." segments that mapping the resource
+// into the role's object space would otherwise clean away.
+func TestTraversalDoesNotReachAnotherProject(t *testing.T) {
+	policytesting.Seed(t)
+	assert := assert.New(t)
+
+	ctl := &projecttesting.Controller{}
+	mock.OnAnything(ctl, "Get").Return(public, nil)
+	mock.OnAnything(ctl, "ListRoles").Return([]int{common.RoleProjectAdmin}, nil)
+
+	user := &models.User{UserID: 1, Username: "username"}
+	evaluator := NewEvaluator(ctl, NewBuilderForUser(user, ctl))
+
+	ctx := context.TODO()
+	assert.True(evaluator.HasPermission(ctx,
+		NewNamespace(public.ProjectID).Resource(rbac.ResourceRepository), rbac.ActionPush))
+	assert.False(evaluator.HasPermission(ctx,
+		types.Resource("/project/1/../../project/2/repository"), rbac.ActionPush))
+	assert.False(evaluator.HasPermission(ctx,
+		types.Resource("/project/1/../2/repository"), rbac.ActionPush))
 }
