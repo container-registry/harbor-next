@@ -16,6 +16,8 @@ package task
 
 import (
 	"context"
+	"slices"
+	"strings"
 
 	"github.com/goharbor/harbor/src/jobservice/job"
 	"github.com/goharbor/harbor/src/lib/log"
@@ -106,7 +108,7 @@ func ScheduleSweepJob(ctx context.Context) error {
 	}
 	// unschedule the job if the cron changed
 	if sched != nil {
-		if sched.CRON != cronSpec {
+		if !sameCronIgnoringSeconds(sched.CRON, cronSpec) {
 			log.Debugf("reschedule the system execution job because the cron changed, old: %s, new: %s", sched.CRON, cronSpec)
 			if err = scheduler.Sched.UnScheduleByID(ctx, sched.ID); err != nil {
 				return err
@@ -125,6 +127,17 @@ func ScheduleSweepJob(ctx context.Context) error {
 
 	log.Debugf("scheduled the system execution sweep job, id: %d", scheduleID)
 	return nil
+}
+
+// sameCronIgnoringSeconds reports whether two 6-field crons match in every field
+// but the first. scheduler.Schedule stores a random seconds value, so the stored
+// cron never equals cronSpec literally.
+func sameCronIgnoringSeconds(stored, expected string) bool {
+	s, e := strings.Fields(stored), strings.Fields(expected)
+	if len(s) != 6 || len(e) != 6 {
+		return false
+	}
+	return slices.Equal(s[1:], e[1:])
 }
 
 // getScheduledSweepJob gets sweep job which already scheduled.
