@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/goharbor/harbor/src/jobservice/job"
+	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/scheduler"
 	schedulertesting "github.com/goharbor/harbor/src/testing/pkg/scheduler"
 )
@@ -32,7 +33,10 @@ func mockSweepScheduler(t *testing.T, stored []*scheduler.Schedule) *schedulerte
 	orig := scheduler.Sched
 	scheduler.Sched = m
 	t.Cleanup(func() { scheduler.Sched = orig })
-	m.On("ListSchedules", mock.Anything, mock.Anything).Return(stored, nil).Once()
+	sweepOnly := mock.MatchedBy(func(query *q.Query) bool {
+		return query != nil && query.Keywords["vendor_type"] == job.ExecSweepVendorType
+	})
+	m.On("ListSchedules", mock.Anything, sweepOnly).Return(stored, nil).Once()
 	return m
 }
 
