@@ -17,17 +17,11 @@ name: Nightly
 
 on:
   schedule:
-    # 00:00 UTC: a nightly stamped YYYYMMDD is cut at the start of that day,
-    # so the stamp names the day whose commits it carries. The release PR is
-    # opened and merged in the same run, so there is never a half-open
+    # 00:00 UTC, so a night's build carries that day's commits. The release PR
+    # is opened and merged in the same run, so there is never a half-open
     # nightly release PR waiting around.
     - cron: '0 0 * * *'
   workflow_dispatch:
-    inputs:
-      date_stamp:
-        description: Date stamp for the nightly version (YYYYMMDD, default today UTC)
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -47,11 +41,8 @@ jobs:
       contents: write
     outputs:
       version: ${{ steps.version.outputs.version }}
-      anchor_tag: ${{ steps.version.outputs.anchor_tag }}
       beta_tag: ${{ steps.version.outputs.beta_tag }}
-      already_released: ${{ steps.version.outputs.already_released }}
     env:
-      DATE_STAMP: ${{ inputs.date_stamp }}
       # Read by the askpass script below when the channel branch is pushed.
       GH_TOKEN: ${{ secrets.NIGHTLY_CHANNEL_TOKEN || github.token }}
     steps:
@@ -65,9 +56,7 @@ jobs:
 
       - name: Validate the nightly inputs
         # The ref guard is what keeps the official tag and image names on the
-        # release line, and the stamp guard is what keeps a caller-supplied
-        # value from reaching a Task command line as anything but a date.
-        # Both are covered by `task nightly:test`.
+        # release line. It is covered by `task nightly:test`.
         #
         # Checkout comes first because the guard lives in the repository; it
         # still runs before anything is fetched, built or published.
@@ -93,37 +82,19 @@ jobs:
         run: |
           # -o interleaved: the root Taskfile prefixes output per task, which
           # would end up inside the captured value.
-          # shellcheck disable=SC2086
-          version=$(task -o interleaved nightly:version ${DATE_STAMP:+DATE_STAMP="${DATE_STAMP}"})
+          version=$(task -o interleaved nightly:version)
           echo "version=${version}" >> "$GITHUB_OUTPUT"
-          # shellcheck disable=SC2086
-          anchor_tag=$(task -o interleaved nightly:anchor-tag ${DATE_STAMP:+DATE_STAMP="${DATE_STAMP}"})
-          echo "anchor_tag=${anchor_tag}" >> "$GITHUB_OUTPUT"
-          # The rolling tag for the minor under development, published next to
-          # the dated one so "the current preview" is pullable without a date.
+          # The one tag a nightly publishes, moved onto tonight's build.
           beta_tag=$(task -o interleaved nightly:beta-tag)
           echo "beta_tag=${beta_tag}" >> "$GITHUB_OUTPUT"
-          echo "::notice::Nightly version ${version} (tagged ${anchor_tag}, pointer ${beta_tag})"
-          # A dispatch can cut a date before its scheduled run reaches it, and
-          # a nightly that already tagged cannot be cut again. Nothing to do is
-          # an empty night, not a failure.
-          # shellcheck disable=SC2086
-          already=$(task -o interleaved nightly:already-released ${DATE_STAMP:+DATE_STAMP="${DATE_STAMP}"})
-          echo "already_released=${already}" >> "$GITHUB_OUTPUT"
-          if [ "${already}" = true ]; then
-            echo "::notice::${version} is already released; nothing to cut tonight"
-          fi
+          echo "::notice::Nightly ${version} on ${beta_tag}"
 
       - name: Open the nightly channel
-        if: ${{ steps.version.outputs.already_released != 'true' }}
-        run: |
-          # shellcheck disable=SC2086
-          task nightly:channel PUSH_CHANNEL=true ${DATE_STAMP:+DATE_STAMP="${DATE_STAMP}"}
+        run: task nightly:channel PUSH_CHANNEL=true
 
   release:
     name: Release Nightly
     needs: [channel]
-    if: ${{ needs.channel.outputs.already_released != 'true' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 15
     permissions:
@@ -169,16 +140,13 @@ jobs:
       # release-please only ever opens the PR now. The tag and the single
       # rolling pre-release are this workflow's, because release-please cannot
       # hold one name still across nights.
-      - name: Move the tags onto tonight's release commit
+      - name: Move the tag onto tonight's release commit
         if: ${{ steps.merge.outputs.merge_sha != '' }}
         env:
           GH_TOKEN: ${{ secrets.NIGHTLY_CHANNEL_TOKEN || github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           MERGE_SHA: ${{ steps.merge.outputs.merge_sha }}
-          DATE_STAMP: ${{ inputs.date_stamp }}
-        run: |
-          # shellcheck disable=SC2086
-          task nightly:publish-tags MERGE_SHA="${MERGE_SHA}" ${DATE_STAMP:+DATE_STAMP="${DATE_STAMP}"}
+        run: task nightly:publish-tags MERGE_SHA="${MERGE_SHA}"
 
       # release-please opens the release PR labelled "autorelease: pending" and
       # clears the label when it publishes the release. It never publishes one
@@ -208,12 +176,12 @@ jobs:
       id-token: write
     uses: $/.github/workflows/publish-images.yml
     with:
-      checkout_ref: ${{ needs.channel.outputs.anchor_tag }}
-      image_tag: ${{ needs.channel.outputs.anchor_tag }}
+      # The merge commit rather than the tag: the tag is moved every night, and
+      # this job checks it out up to an hour after it was moved.
+      checkout_ref: ${{ needs.release.outputs.merge_sha }}
+      image_tag: ${{ needs.channel.outputs.beta_tag }}
       version: ${{ needs.channel.outputs.version }}
-      artifact_prefix: nightly-${{ needs.channel.outputs.anchor_tag }}
-      # Same digest as the dated tag, so the signature covers both.
-      extra_image_tags: ${{ needs.channel.outputs.beta_tag }}
+      artifact_prefix: nightly-${{ needs.channel.outputs.beta_tag }}
       registry_address: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
       registry_project: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
     secrets:
@@ -251,7 +219,7 @@ jobs:
     permissions:
       contents: read
     env:
-      IMAGE_TAG: ${{ needs.channel.outputs.anchor_tag }}
+      IMAGE_TAG: ${{ needs.channel.outputs.beta_tag }}
       REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
       REGISTRY_PROJECT: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
     steps:
@@ -291,7 +259,7 @@ jobs:
       contents: read
     uses: $/.github/workflows/nightly-e2e.yml
     with:
-      tag: ${{ needs.channel.outputs.anchor_tag }}
+      tag: ${{ needs.channel.outputs.beta_tag }}
       channel: nightly
       # Where these images actually went, resolved the same way the publish
       # job resolves it.
@@ -326,7 +294,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           MERGE_SHA: ${{ needs.release.outputs.merge_sha }}
-          ANCHOR_TAG: ${{ needs.channel.outputs.anchor_tag }}
           E2E_RESULT: ${{ needs.e2e.result }}
           E2E_PASSED: ${{ needs.e2e.outputs.scenarios_passed }}
           E2E_TOTAL: ${{ needs.e2e.outputs.scenarios_total }}
@@ -336,7 +303,6 @@ jobs:
         run: |
           task nightly:beta-header \
             MERGE_SHA="${MERGE_SHA}" \
-            ANCHOR="${ANCHOR_TAG}" \
             E2E_RESULT="${E2E_RESULT}" \
             E2E_PASSED="${E2E_PASSED}" \
             E2E_TOTAL="${E2E_TOTAL}" \
