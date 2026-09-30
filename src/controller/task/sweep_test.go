@@ -15,10 +15,60 @@
 package task
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
+	"github.com/goharbor/harbor/src/jobservice/job"
+	"github.com/goharbor/harbor/src/pkg/scheduler"
+	schedulertesting "github.com/goharbor/harbor/src/testing/pkg/scheduler"
 )
+
+func mockSweepScheduler(t *testing.T, stored []*scheduler.Schedule) *schedulertesting.Scheduler {
+	m := schedulertesting.NewScheduler(t)
+	orig := scheduler.Sched
+	scheduler.Sched = m
+	t.Cleanup(func() { scheduler.Sched = orig })
+	m.On("ListSchedules", mock.Anything, mock.Anything).Return(stored, nil).Once()
+	return m
+}
+
+func expectSweepSchedule(m *schedulertesting.Scheduler) *mock.Call {
+	return m.On("Schedule", mock.Anything, job.ExecSweepVendorType, int64(systemVendorID), cronTypeCustom,
+		cronSpec, SchedulerCallback, nil, map[string]any(nil)).Return(int64(2), nil).Once()
+}
+
+func TestScheduleSweepJobKeepsScheduleWithRandomSeconds(t *testing.T) {
+	m := mockSweepScheduler(t, []*scheduler.Schedule{
+		{ID: 1, VendorType: job.ExecSweepVendorType, CRON: "34 0 0 * * *"},
+	})
+
+	require.NoError(t, ScheduleSweepJob(context.TODO()))
+	m.AssertNotCalled(t, "UnScheduleByID", mock.Anything, mock.Anything)
+	m.AssertNotCalled(t, "Schedule", mock.Anything, mock.Anything, mock.Anything, mock.Anything,
+		mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestScheduleSweepJobReschedulesChangedCron(t *testing.T) {
+	m := mockSweepScheduler(t, []*scheduler.Schedule{
+		{ID: 1, VendorType: job.ExecSweepVendorType, CRON: "0 5 3 * * *"},
+	})
+	unschedule := m.On("UnScheduleByID", mock.Anything, int64(1)).Return(nil).Once()
+	expectSweepSchedule(m).NotBefore(unschedule)
+
+	require.NoError(t, ScheduleSweepJob(context.TODO()))
+}
+
+func TestScheduleSweepJobCreatesMissingSchedule(t *testing.T) {
+	m := mockSweepScheduler(t, nil)
+	expectSweepSchedule(m)
+
+	require.NoError(t, ScheduleSweepJob(context.TODO()))
+	m.AssertNotCalled(t, "UnScheduleByID", mock.Anything, mock.Anything)
+}
 
 func TestSameCronIgnoringSeconds(t *testing.T) {
 	cases := []struct {
