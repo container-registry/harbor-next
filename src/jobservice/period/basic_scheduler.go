@@ -157,9 +157,7 @@ func (bs *basicScheduler) UnSchedule(policyID string) error {
 		}
 	}
 
-	// REM from redis db
-	// Accurately remove the item with the specified score
-	removed, err := redis.Int64(conn.Do("ZREMRANGEBYSCORE", rds.KeyPeriodicPolicy(bs.namespace), numericID, numericID))
+	removed, err := bs.removePolicy(policyID, numericID, conn)
 	if err != nil {
 		return errors.Wrap(err, "unschedule periodic job error")
 	}
@@ -169,6 +167,35 @@ func (bs *basicScheduler) UnSchedule(policyID string) error {
 	}
 
 	return nil
+}
+
+// removePolicy removes the policy with the given ID from the policy set and returns the number of removed items.
+// The numeric ID is only a lookup key: policies registered at the same time can share it,
+// so members with that score are matched by policy ID before removing.
+func (bs *basicScheduler) removePolicy(policyID string, numericID int64, conn redis.Conn) (int64, error) {
+	key := rds.KeyPeriodicPolicy(bs.namespace)
+	members, err := redis.ByteSlices(conn.Do("ZRANGEBYSCORE", key, numericID, numericID))
+	if err != nil {
+		return 0, err
+	}
+
+	args := []any{key}
+	for _, m := range members {
+		p := &Policy{}
+		if err := p.DeSerialize(m); err != nil {
+			logger.Errorf("Malformed policy: %s; error: %s", m, err)
+			continue
+		}
+		if p.ID == policyID {
+			args = append(args, m)
+		}
+	}
+
+	if len(args) == 1 {
+		return 0, nil
+	}
+
+	return redis.Int64(conn.Do("ZREM", args...))
 }
 
 // Locate the policy and return the numeric ID.

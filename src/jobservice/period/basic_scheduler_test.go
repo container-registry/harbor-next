@@ -148,6 +148,54 @@ func (suite *BasicSchedulerTestSuite) TestUnSchedule() {
 	require.NoError(suite.T(), err, "unschedule: nil error expected but got %s", err)
 }
 
+// TestUnScheduleSharedNumericID tests un-scheduling a policy whose numeric ID is shared by other policies
+func (suite *BasicSchedulerTestSuite) TestUnScheduleSharedNumericID() {
+	conn := suite.pool.Get()
+	defer func() {
+		_ = conn.Close()
+	}()
+
+	key := rds.KeyPeriodicPolicy(suite.namespace)
+	ids := make([]string, 0, 5)
+	for i := 0; i < 5; i++ {
+		p := &Policy{
+			ID:       fmt.Sprintf("shared_numeric_id_%d", i),
+			JobName:  job.SampleJob,
+			CronSpec: "0 10 10 5 * *",
+		}
+		_, err := suite.scheduler.Schedule(p)
+		require.NoError(suite.T(), err, "schedule: nil error expected but got %s", err)
+		ids = append(ids, p.ID)
+	}
+
+	// Force every registered policy onto the same score, as bulk re-registration can do.
+	members, err := redis.ByteSlices(conn.Do("ZRANGE", key, 0, -1))
+	require.NoError(suite.T(), err, "list policies: nil error expected but got %s", err)
+	const sharedScore = 1000
+	for _, m := range members {
+		_, err := conn.Do("ZADD", key, sharedScore, m)
+		require.NoError(suite.T(), err, "zadd: nil error expected but got %s", err)
+	}
+
+	err = suite.scheduler.UnSchedule(ids[0])
+	require.NoError(suite.T(), err, "unschedule: nil error expected but got %s", err)
+
+	policies, err := Load(suite.namespace, conn)
+	require.NoError(suite.T(), err, "load policies: nil error expected but got %s", err)
+	remaining := make([]string, 0, len(policies))
+	for _, p := range policies {
+		remaining = append(remaining, p.ID)
+	}
+	assert.NotContains(suite.T(), remaining, ids[0], "unscheduled policy should be removed")
+	for _, id := range ids[1:] {
+		assert.Contains(suite.T(), remaining, id, "policy sharing the numeric ID should be kept")
+	}
+
+	for _, id := range ids[1:] {
+		_ = suite.scheduler.UnSchedule(id)
+	}
+}
+
 // setupDirtyJobs adds dirty jobs for testing dirty jobs clear method in the Start()
 func (suite *BasicSchedulerTestSuite) setupDirtyJobs() {
 	// Add one fake job for next testing
