@@ -169,33 +169,66 @@ func (bs *basicScheduler) UnSchedule(policyID string) error {
 	return nil
 }
 
+// removePolicyAttempts bounds the retries when the policy set changes between reading and removing.
+const removePolicyAttempts = 5
+
 // removePolicy removes the policy with the given ID from the policy set and returns the number of removed items.
 // The numeric ID is only a lookup key: policies registered at the same time can share it,
 // so members with that score are matched by policy ID before removing.
+// WATCH keeps a member that a concurrent Schedule() moves to another score from being removed by ZREM.
 func (bs *basicScheduler) removePolicy(policyID string, numericID int64, conn redis.Conn) (int64, error) {
 	key := rds.KeyPeriodicPolicy(bs.namespace)
-	members, err := redis.ByteSlices(conn.Do("ZRANGEBYSCORE", key, numericID, numericID))
-	if err != nil {
-		return 0, err
-	}
+	for range removePolicyAttempts {
+		if _, err := conn.Do("WATCH", key); err != nil {
+			return 0, err
+		}
 
-	args := []any{key}
-	for _, m := range members {
-		p := &Policy{}
-		if err := p.DeSerialize(m); err != nil {
-			logger.Errorf("Malformed policy: %s; error: %s", m, err)
+		members, err := redis.ByteSlices(conn.Do("ZRANGEBYSCORE", key, numericID, numericID))
+		if err != nil {
+			_, _ = conn.Do("UNWATCH")
+			return 0, err
+		}
+
+		args := []any{key}
+		for _, m := range members {
+			p := &Policy{}
+			if err := p.DeSerialize(m); err != nil {
+				logger.Errorf("Malformed policy of %d bytes: %s", len(m), err)
+				continue
+			}
+			if p.ID == policyID {
+				args = append(args, m)
+			}
+		}
+
+		if len(args) == 1 {
+			_, _ = conn.Do("UNWATCH")
+			return 0, nil
+		}
+
+		if err := conn.Send("MULTI"); err != nil {
+			_, _ = conn.Do("UNWATCH")
+			return 0, err
+		}
+		if err := conn.Send("ZREM", args...); err != nil {
+			_, _ = conn.Do("DISCARD")
+			return 0, err
+		}
+		replies, err := redis.Values(conn.Do("EXEC"))
+		if err == redis.ErrNil {
 			continue
 		}
-		if p.ID == policyID {
-			args = append(args, m)
+		if err != nil {
+			return 0, err
 		}
+		if len(replies) != 1 {
+			return 0, errors.Errorf("unexpected replies of removing periodic job %s: %v", lib.TrimLineBreaks(policyID), replies)
+		}
+
+		return redis.Int64(replies[0], nil)
 	}
 
-	if len(args) == 1 {
-		return 0, nil
-	}
-
-	return redis.Int64(conn.Do("ZREM", args...))
+	return 0, errors.Errorf("periodic job policy set kept changing, %s not removed after %d attempts", lib.TrimLineBreaks(policyID), removePolicyAttempts)
 }
 
 // Locate the policy and return the numeric ID.
