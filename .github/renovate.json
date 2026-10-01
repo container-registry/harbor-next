@@ -32,6 +32,25 @@
   },
   "packageRules": [
     {
+      "description": "Renovate's gomod artifact update runs `go get -t` before it tidies, and `./...` walks into src/server/v2.0/handler, which imports the swagger code that `task build:gen-apis` generates and .gitignore keeps out of the repo. That `go get` exits 1 and the update is abandoned, which is why gomod PRs used to arrive without a go.sum. Scope it to the trees that do not reach the generated packages, then let `go mod tidy -e` finish the job. Matches every update type, digests included.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "postUpdateOptions": [
+        "gomodTidyE"
+      ],
+      "goGetDirs": [
+        "./cmd/...",
+        "./common/...",
+        "./controller/...",
+        "./jobservice/...",
+        "./lib/...",
+        "./migration/...",
+        "./pkg/...",
+        "./registryctl/..."
+      ]
+    },
+    {
       "description": "Update Go dependencies daily for non-major releases",
       "matchManagers": [
         "gomod"
@@ -50,14 +69,13 @@
       ]
     },
     {
-      "description": "Update Go dependencies weekly for major releases",
+      "description": "Update Go dependencies weekly for major releases, one PR per module: a Go major is usually a module-path rewrite plus an API migration, so grouping them produces a PR nobody can make green",
       "matchManagers": [
         "gomod"
       ],
       "matchUpdateTypes": [
         "major"
       ],
-      "groupName": "Go major updates",
       "schedule": [
         "* 0-3 * * 1"
       ],

@@ -29,6 +29,25 @@ elif [[ -n "${preview_pr_number}" && ! "${TAG_NAME:-}" =~ ^v[0-9]+\.[0-9]+\.[0-9
 fi
 : "${TAG_NAME:?TAG_NAME is required}"
 
+# A dated anchor is not a release: the notes for that build live on the rolling
+# pre-release. Redirect only while the pointer still points at that anchor —
+# once it has moved on, the beta's notes describe a different build, and
+# rendering them under the old name would be a quiet lie.
+#
+# nightly- is the pre-rename spelling; anchors published under it still exist.
+if [[ "${TAG_NAME}" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-(beta\.|nightly-)[0-9]{8}$ ]]; then
+  beta_tag="v${BASH_REMATCH[1]}-beta"
+  anchor_sha=$(git rev-parse -q --verify "${TAG_NAME}^{commit}" 2>/dev/null || true)
+  beta_sha=$(git rev-parse -q --verify "${beta_tag}^{commit}" 2>/dev/null || true)
+  if [[ -n "${anchor_sha}" && "${anchor_sha}" == "${beta_sha}" ]]; then
+    echo "::notice::${TAG_NAME} carries no release; rendering ${beta_tag}" >&2
+    TAG_NAME="${beta_tag}"
+  else
+    echo "${TAG_NAME} has no release, and ${beta_tag} has moved on. Render ${beta_tag} directly if that is what you want." >&2
+    exit 1
+  fi
+fi
+
 PATCHES_TOKEN="${PATCHES_TOKEN:-${GH_TOKEN}}"
 if [[ -z "${GITHUB_REPOSITORY:-}" ]]; then
   GITHUB_REPOSITORY=$(git remote get-url next 2>/dev/null \
@@ -40,10 +59,12 @@ chart_mode=false
 if [[ "${TAG_NAME}" =~ ^chart-v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
   chart_mode=true
   version="${BASH_REMATCH[1]}"
-elif [[ "${TAG_NAME}" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+elif [[ "${TAG_NAME}" =~ ^v([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)$ ]]; then
+  # The prerelease suffix is the preview channel: v2.16.0-beta.20260918
+  # renders the upcoming 2.16.0's notes as they stand tonight.
   version="${BASH_REMATCH[1]}"
 else
-  echo "TAG_NAME must be vX.Y.Z (app release) or chart-vX.Y.Z (chart release)" >&2
+  echo "TAG_NAME must be vX.Y.Z[-prerelease] (app release) or chart-vX.Y.Z (chart release)" >&2
   exit 1
 fi
 registry_address="${REGISTRY_ADDRESS:-8gears.container-registry.com}"
@@ -105,6 +126,19 @@ if [[ "${chart_mode}" == true ]]; then
     # Bootstrap chart release: no chart tag exists at all, so any range
     # GitHub picks would attribute unrelated app PRs. Skip What's Changed.
     skip_generated_notes="yes"
+  fi
+else
+  # Without an explicit previous tag GitHub infers one, and it counts
+  # prereleases: once a nightly is published, the real release would diff
+  # against last night instead of against the last release. Pin the
+  # predecessor to the greatest STABLE release below this version — which is
+  # also what makes a nightly's What's Changed span the whole upcoming
+  # release rather than a single day.
+  # -o interleaved: the root Taskfile prefixes output per task, and the
+  # prefix would land inside the captured tag.
+  previous_app_tag=$(task -o interleaved release-notes:previous-stable-tag PREDECESSOR_FOR="${version}")
+  if [[ -n "${previous_app_tag}" ]]; then
+    generated_notes_args+=(-f "previous_tag_name=${previous_app_tag}")
   fi
 fi
 if [[ -n "${preview_pr_number}" ]]; then
@@ -179,8 +213,6 @@ patch_notes="${tmp_dir}/commercial-patches.md"
 # unreleased block — entries above the first marker — is this release's
 # delta, because notes render BEFORE the marker is stamped. Re-rendering an
 # old tag reads that tag's own section instead.
-commercial_count=0
-unchanged_features=()
 if [[ "${chart_mode}" == false && -f "${series}" ]]; then
   while IFS= read -r branch; do
     branch="${branch%%#*}"
@@ -195,7 +227,6 @@ if [[ "${chart_mode}" == false && -f "${series}" ]]; then
 
     git -C "${tmp_dir}/patches-repo" fetch --depth=1 "${patches_remote}" \
       "${branch}:refs/remotes/origin/${branch}"
-    commercial_count=$((commercial_count + 1))
     changelog_blob=$(git -C "${tmp_dir}/patches-repo" cat-file -p \
       "refs/remotes/origin/${branch}:changelogs/${branch}.md" 2>/dev/null || true)
     feature_title=""
@@ -240,18 +271,18 @@ if [[ "${chart_mode}" == false && -f "${series}" ]]; then
           ')
     fi
     if [[ -z "${feature_title}" ]]; then
-      feature_title=$(git -C "${tmp_dir}/patches-repo" log -1 --format=%s \
-        "refs/remotes/origin/${branch}")
+      echo "::warning::${branch} has no '# Title' in changelogs/${branch}.md" >&2
+      feature_title="${branch}"
     fi
     if [[ -n "${feature_entries}" ]]; then
       {
         echo "### ${feature_title}"
         echo
-        printf '%s' "${feature_entries}"
-        echo
+        # printf keeps the entries verbatim; the two newlines restore the one
+        # command substitution stripped plus the blank line that separates
+        # this block from whatever follows it.
+        printf '%s\n\n' "${feature_entries}"
       } >> "${patch_notes}"
-    else
-      unchanged_features+=("${feature_title}")
     fi
   done < "${series}"
 fi
@@ -262,19 +293,10 @@ fi
     echo
   fi
 
-  if [[ "${commercial_count}" -gt 0 ]]; then
+  if [[ -s "${patch_notes}" ]]; then
     echo "## Commercial Features"
     echo
-    if [[ -s "${patch_notes}" ]]; then
-      echo "Changes to commercial features in this release:"
-      echo
-      cat "${patch_notes}"
-    fi
-    if [[ "${#unchanged_features[@]}" -gt 0 ]]; then
-      printf -v unchanged_list '%s, ' "${unchanged_features[@]}"
-      echo "_No changes this release: ${unchanged_list%, }._"
-      echo
-    fi
+    cat "${patch_notes}"
   fi
 
   cat "${tmp_dir}/formatted-notes.md"

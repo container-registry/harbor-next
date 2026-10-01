@@ -190,10 +190,13 @@ func (suite *RegistryTestSuite) TestUpdateRegistryInvalidURLReturnsError() {
 	}
 }
 
-// TestUpdateRegistryStorageSchemeURLAccepted documents that schema-aware validation
-// accepts storage-backed registry URLs (sftp/s3) on update, and that changing to one
-// still clears the stored AccessSecret like any other URL change.
-func (suite *RegistryTestSuite) TestUpdateRegistryStorageSchemeURLAccepted() {
+// TestUpdateRegistryStorageSchemeURLRejected pins the update path to http/https,
+// the only schemes a replication adapter can speak. #742 originally documented
+// sftp:// and s3:// as accepted here, but no adapter under src/pkg/reg/ handles
+// either, so such an endpoint was accepted and then failed its health check with
+// a 500 -- the bug this lane fixes. The controller refuses them too; this keeps
+// the handler and the controller saying the same thing.
+func (suite *RegistryTestSuite) TestUpdateRegistryStorageSchemeURLRejected() {
 	for _, newURL := range []string{
 		"sftp://storage.example.com",
 		"s3://bucket.example.com",
@@ -210,18 +213,12 @@ func (suite *RegistryTestSuite) TestUpdateRegistryStorageSchemeURLAccepted() {
 		}
 		mock.OnAnything(suite.regCtl, "Get").Return(saved, nil).Once()
 
-		var updated *model.Registry
-		suite.regCtl.On("Update", mock.Anything, mock.Anything).Return(nil).Once().
-			Run(func(args testifymock.Arguments) { updated = args.Get(1).(*model.Registry) })
-
 		res, err := suite.PutJSON("/registries/1", &models.RegistryUpdate{
 			URL: suite.ptrStr(newURL),
 		})
 		suite.NoError(err)
-		suite.Equal(200, res.StatusCode, "URL %q must be accepted", newURL)
-		suite.Require().NotNil(updated)
-		suite.Equal(newURL, updated.URL)
-		suite.Empty(updated.Credential.AccessSecret)
+		suite.Equal(400, res.StatusCode, "URL %q must be rejected", newURL)
+		suite.regCtl.AssertNotCalled(suite.T(), "Update", testifymock.Anything, testifymock.Anything)
 	}
 }
 

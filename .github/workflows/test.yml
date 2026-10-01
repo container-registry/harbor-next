@@ -11,6 +11,7 @@ on:
       # Go tests don't consume deploy/.
       - "deploy/chart/**"
       - "deploy/compose/**"
+  merge_group:
   push:
     branches: [main, "release-[0-9]*.[0-9]*"]
     paths-ignore:
@@ -28,6 +29,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # --------------------------------------------------------------------------
+  # Taskfile-level guard tests — seconds, no toolchain
+  # --------------------------------------------------------------------------
+  test-taskfiles:
+    name: Taskfile Tests
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: $/.github/actions/setup-task
+        with:
+          version: 3.49.1
+
+      - name: Run Taskfile tests
+        run: task test:taskfiles
+
   # --------------------------------------------------------------------------
   # Pure unit tests — no external services, full parallelism
   # --------------------------------------------------------------------------

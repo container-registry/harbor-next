@@ -18,7 +18,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/bmatcuk/doublestar"
+	"github.com/bmatcuk/doublestar/v4"
 
 	"github.com/goharbor/harbor/src/lib/errors"
 )
@@ -48,6 +48,34 @@ func ValidateKind(kind string) error {
 	}
 }
 
+// MatchDoublestar reports whether value matches the doublestar pattern, keeping
+// the semantics Harbor's stored filters were written against.
+//
+// doublestar v4 made a trailing /** match the bare prefix too, so "library/**"
+// began selecting the "library" repository itself on top of everything under
+// it. Replication, retention, proxy-cache and scan-export filters already in
+// databases were written when it did not, so that one case is filtered back
+// out rather than silently widening them on upgrade.
+func MatchDoublestar(filterPattern, value string) (bool, error) {
+	matched, err := doublestar.Match(filterPattern, value)
+	if err != nil || !matched {
+		return false, err
+	}
+
+	prefix, ok := strings.CutSuffix(filterPattern, "/**")
+	if !ok {
+		return true, nil
+	}
+
+	// Matching the prefix on its own is the case v4 added.
+	bare, err := doublestar.Match(prefix, value)
+	if err != nil {
+		return false, err
+	}
+
+	return !bare, nil
+}
+
 // Match returns true if the value matches the pattern according to the kind.
 // Empty pattern matches all (returns true).
 func Match(value, filterPattern, kind string) (bool, error) {
@@ -69,71 +97,11 @@ func Match(value, filterPattern, kind string) (bool, error) {
 		}
 		return re.MatchString(value), nil
 	case KindDoublestar, "":
-		if !validateDoublestarPattern(filterPattern) {
+		if !doublestar.ValidatePattern(filterPattern) {
 			return false, doublestar.ErrBadPattern
 		}
-		return doublestar.Match(filterPattern, value)
+		return MatchDoublestar(filterPattern, value)
 	default:
 		return false, errors.Errorf("unsupported repository filter kind %q", kind)
 	}
-}
-
-// validateDoublestarPattern is a port of doValidatePattern from
-// github.com/bmatcuk/doublestar/v4; the v1 dependency in go.mod has no
-// ValidatePattern. Keep it in sync with the library's grammar if the
-// dependency is ever bumped.
-func validateDoublestarPattern(s string) bool {
-	altDepth := 0
-	l := len(s)
-VALIDATE:
-	for i := 0; i < l; i++ {
-		switch s[i] {
-		case '\\':
-			// skip the next byte - return false if there is no next byte
-			if i++; i >= l {
-				return false
-			}
-			continue
-
-		case '[':
-			if i++; i >= l {
-				// class didn't end
-				return false
-			}
-			if s[i] == '^' || s[i] == '!' {
-				i++
-			}
-			if i >= l || s[i] == ']' {
-				// class didn't end or empty character class
-				return false
-			}
-
-			for ; i < l; i++ {
-				if s[i] == '\\' {
-					i++
-				} else if s[i] == ']' {
-					// looks good
-					continue VALIDATE
-				}
-			}
-
-			// class didn't end
-			return false
-
-		case '{':
-			altDepth++
-			continue
-
-		case '}':
-			if altDepth == 0 {
-				// alt end without a corresponding start
-				return false
-			}
-			altDepth--
-			continue
-		}
-	}
-
-	// valid as long as all alts are closed
-	return altDepth == 0
 }

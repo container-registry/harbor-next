@@ -8,6 +8,7 @@ on:
       - "versions.env"
       - ".github/workflows/compose-ci.yml"
       - ".github/actions/setup-task/**"
+  merge_group:
 
 permissions:
   contents: read

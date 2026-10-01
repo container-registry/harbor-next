@@ -9,6 +9,7 @@ on:
       - "versions.env"
       - "taskfile/**/*.yml"
       - ".github/workflows/lint-go.yml"
+  merge_group:
   push:
     branches: [main, "release-[0-9]*.[0-9]*"]
     paths:

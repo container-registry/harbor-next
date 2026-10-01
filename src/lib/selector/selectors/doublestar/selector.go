@@ -17,7 +17,7 @@ package doublestar
 import (
 	"encoding/json"
 
-	"github.com/bmatcuk/doublestar"
+	libpattern "github.com/goharbor/harbor/src/lib/pattern"
 
 	iselector "github.com/goharbor/harbor/src/lib/selector"
 )
@@ -165,5 +165,5 @@ func match(pattern, str string) (bool, error) {
 	if len(pattern) == 0 {
 		return true, nil
 	}
-	return doublestar.Match(pattern, str)
+	return libpattern.MatchDoublestar(pattern, str)
 }
