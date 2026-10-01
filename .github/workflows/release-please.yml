@@ -257,6 +257,90 @@ jobs:
           git commit -s -m "chore: initialize ${branch} version"
           git push origin "HEAD:refs/heads/${branch}"
 
+  sync-main-changelog:
+    # Patch releases update only the release-X.Y branch's CHANGELOG.md, so
+    # main's changelog silently stops at X.Y.0. After a maintenance release,
+    # open a PR that inserts the released section into main's changelog in
+    # version-sorted position. Runs from the release branch's workflow copy —
+    # keep this job cherry-picked onto active release-X.Y branches.
+    name: Sync Patch Changelog To Main
+    needs: [release-please]
+    if: ${{ startsWith(github.ref_name, 'release-') && needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+      VERSION: ${{ needs.release-please.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Extract released changelog section
+        run: |
+          node .github/scripts/extract-changelog-release.mjs \
+            CHANGELOG.md "${VERSION}" "${RUNNER_TEMP}/released-section.md"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Configure ephemeral Git authentication
+        run: |
+          askpass="${RUNNER_TEMP}/git-askpass"
+          cat > "${askpass}" <<'EOF'
+          #!/usr/bin/env bash
+          case "$1" in
+            *Username*) printf '%s\n' 'x-access-token' ;;
+            *Password*) printf '%s\n' "${GH_TOKEN}" ;;
+            *) exit 1 ;;
+          esac
+          EOF
+          chmod 700 "${askpass}"
+          echo "GIT_ASKPASS=${askpass}" >> "${GITHUB_ENV}"
+          echo "GIT_TERMINAL_PROMPT=0" >> "${GITHUB_ENV}"
+
+      - name: Open changelog sync PR against main
+        run: |
+          node .github/scripts/insert-changelog-section.mjs \
+            CHANGELOG.md "${RUNNER_TEMP}/released-section.md" "${VERSION}"
+
+          if git diff --quiet -- CHANGELOG.md; then
+            echo "main CHANGELOG.md already contains ${TAG_NAME}"
+            exit 0
+          fi
+
+          branch="chore/sync-changelog-${TAG_NAME}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "${branch}"
+          git add CHANGELOG.md
+          git commit -s -m "chore: Sync ${TAG_NAME} changelog section to main"
+          # Force-push so a rerun after a partial failure (branch pushed, PR
+          # creation failed) recovers instead of dying on the existing branch.
+          git push --force origin "HEAD:refs/heads/${branch}"
+
+          if [[ -n "$(gh pr list --base main --head "${branch}" --state open --json number --jq '.[].number')" ]]; then
+            echo "Sync PR for ${TAG_NAME} already open"
+            exit 0
+          fi
+
+          gh pr create \
+            --base main \
+            --head "${branch}" \
+            --title "chore: Sync ${TAG_NAME} changelog section to main" \
+            --body "Automated by the Sync Patch Changelog To Main job: inserts the ${TAG_NAME} section released from ${GITHUB_REF_NAME} into main's CHANGELOG.md in version-sorted position."
+
   publish-images:
     name: Publish Release Images
     needs: [release-please]
