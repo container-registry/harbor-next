@@ -171,6 +171,21 @@ func (suite *ControllerTestSuite) TestRequestFunctionFailed() {
 	suite.Error(suite.ctl.Request(ctx, suite.reference, referenceID, resources, func() error { return fmt.Errorf("error") }))
 }
 
+func (suite *ControllerTestSuite) TestRequestRollbackSurvivesCanceledContext() {
+	suite.PrepareForUpdate(suite.quota, nil)
+
+	ctx, cancel := context.WithCancel(orm.NewContext(context.TODO(), &ormtesting.FakeOrmer{}))
+	defer cancel()
+	resources := types.ResourceList{types.ResourceStorage: 10}
+
+	err := suite.ctl.Request(ctx, suite.reference, uuid.New().String(), resources, func() error {
+		cancel()
+		return context.Canceled
+	})
+	suite.ErrorIs(err, context.Canceled)
+	suite.quotaMgr.AssertNumberOfCalls(suite.T(), "Update", 2)
+}
+
 func (suite *ControllerTestSuite) TestRequestResourceIsZero() {
 	suite.PrepareForUpdate(suite.quota, nil)
 
