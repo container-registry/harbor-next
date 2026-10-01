@@ -5,3 +5,4 @@ release-2.15/0003-sftp-replication
 release-2.15/0004-federated-robot-accounts
 release-2.15/0005-pgx-monitoring
 release-2.15/0006-aws-rds-iam-auth
+release-2.15/security-hotfixes
