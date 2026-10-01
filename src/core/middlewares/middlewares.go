@@ -91,14 +91,20 @@ type middlewareEntry struct {
 
 // middlewareChain returns the global middleware chain, outermost first.
 //
-// transaction.Middleware runs last of the database-aware middlewares. It holds a
-// pool connection for the whole request, and security, readonly and the audit
-// resolver in log all read configuration or user records. Run inside the
-// transaction, they wait for a second connection while holding the first, and
-// the config-cache builder they wait on needs a connection of its own: under
-// load every connection ends up held by a request waiting for one and core does
-// not recover (#92, goharbor/harbor#13155). The same ordering was applied to
-// release-2.1.0 in a773ef358 and lost when it was restructured for main.
+// transaction.Middleware is the innermost middleware. It holds a pool connection
+// for the whole request, and security, readonly and the audit resolver in log
+// all read configuration or user records, some through an ORM of their own. Run
+// inside the transaction, they wait for a second connection while holding the
+// first, and the config-cache builder they wait on needs a connection of its
+// own: under load every connection ends up held by a request waiting for one and
+// core does not recover (#92, goharbor/harbor#13155). The same ordering was
+// applied to release-2.1.0 in a773ef358 and lost when it was restructured for
+// main.
+//
+// Not all of them are read-only: auth proxy onboards unknown users and OIDC
+// populates user groups. Outside the transaction those writes commit on their
+// own instead of being rolled back with a failed request, which is what a
+// login side effect should do.
 func middlewareChain() []middlewareEntry {
 	return []middlewareEntry{
 		{"url", url.Middleware()},
