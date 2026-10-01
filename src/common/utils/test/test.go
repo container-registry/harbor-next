@@ -21,10 +21,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path"
+	"regexp"
 	"sort"
 	"strings"
-
-	"github.com/gorilla/mux"
 
 	"github.com/goharbor/harbor/src/common"
 )
@@ -84,13 +84,111 @@ func Handler(resp *Response) func(http.ResponseWriter, *http.Request) {
 
 // NewServer creates an HTTP server for unit test
 func NewServer(mappings ...*RequestHandlerMapping) *httptest.Server {
-	r := mux.NewRouter()
-
+	routes := make(prefixRouter, 0, len(mappings))
 	for _, mapping := range mappings {
-		r.PathPrefix(mapping.Pattern).Handler(mapping).Methods(mapping.Method)
+		routes = append(routes, &route{
+			mapping: mapping,
+			prefix:  compilePathPrefix(mapping.Pattern),
+		})
 	}
 
-	return httptest.NewServer(r)
+	return httptest.NewServer(routes)
+}
+
+// route pairs a mapping with the compiled form of its pattern.
+type route struct {
+	mapping *RequestHandlerMapping
+	prefix  *regexp.Regexp
+}
+
+// prefixRouter serves the first route whose pattern prefixes the request path
+// and whose method matches.
+//
+// A pattern is a prefix rather than a whole path, it is not segment aligned, and
+// the routes are tried in registration order. Tests depend on all three: several
+// register "/blobs/digest" alongside "/blobs/digest1" and expect the first to
+// answer both, which a longest-match router would not do.
+type prefixRouter []*route
+
+func (routes prefixRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if cleaned := cleanPath(r.URL.Path); cleaned != r.URL.Path {
+		target := *r.URL
+		target.Path = cleaned
+		http.Redirect(w, r, target.String(), http.StatusMovedPermanently)
+		return
+	}
+
+	// A route whose method does not match is passed over rather than answered,
+	// so a later route still gets its turn at the path.
+	methodMismatch := false
+
+	for _, route := range routes {
+		if !route.prefix.MatchString(r.URL.Path) {
+			continue
+		}
+
+		if r.Method != strings.ToUpper(route.mapping.Method) {
+			methodMismatch = true
+			continue
+		}
+
+		route.mapping.ServeHTTP(w, r)
+		return
+	}
+
+	if methodMismatch {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	http.NotFound(w, r)
+}
+
+// pathVariable finds a "{name}" or "{name:regexp}" placeholder in a pattern.
+var pathVariable = regexp.MustCompile(`\{[^{}]*\}`)
+
+// compilePathPrefix turns a pattern into a regexp anchored at the start of the
+// path. Literal text matches itself, and a placeholder stands for one path
+// segment unless it carries its own regexp after a colon.
+func compilePathPrefix(pattern string) *regexp.Regexp {
+	var expr strings.Builder
+	expr.WriteString("^")
+
+	end := 0
+	for _, location := range pathVariable.FindAllStringIndex(pattern, -1) {
+		expr.WriteString(regexp.QuoteMeta(pattern[end:location[0]]))
+
+		variable := pattern[location[0]+1 : location[1]-1]
+		if _, pattern, ok := strings.Cut(variable, ":"); ok {
+			expr.WriteString("(?:" + pattern + ")")
+		} else {
+			expr.WriteString("[^/]+")
+		}
+
+		end = location[1]
+	}
+	expr.WriteString(regexp.QuoteMeta(pattern[end:]))
+
+	return regexp.MustCompile(expr.String())
+}
+
+// cleanPath normalises p the way the router did before matching, keeping the
+// trailing slash that path.Clean drops.
+func cleanPath(p string) string {
+	if p == "" {
+		return "/"
+	}
+
+	if p[0] != '/' {
+		p = "/" + p
+	}
+
+	cleaned := path.Clean(p)
+	if p[len(p)-1] == '/' && cleaned != "/" {
+		cleaned += "/"
+	}
+
+	return cleaned
 }
 
 // GetUnitTestConfig ...
