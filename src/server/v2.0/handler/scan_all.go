@@ -199,7 +199,7 @@ func (s *scanAllAPI) createOrUpdateScanAllSchedule(ctx context.Context, cronType
 			WithMessagef("invalid cron string for scheduled scan all: %s, error: %v", cron, err)
 	}
 	if previous != nil {
-		if cronType == previous.CRONType && cron == previous.CRON {
+		if cronType == previous.CRONType && scheduler.SameCron(previous.CRON, cron) {
 			return previous.ID, nil
 		}
 
