@@ -138,10 +138,8 @@ The [compatibility list](https://goharbor.io/docs/edge/install-config/harbor-com
 
 ## Community
 
-* **Twitter:** [@project_harbor](https://twitter.com/project_harbor)
-* **User Group:** Join Harbor user email group: [harbor-users@lists.cncf.io](https://lists.cncf.io/g/harbor-users) to get update of Harbor's news, features, releases, or to provide suggestion and feedback.
-* **Developer Group:** Join Harbor developer group: [harbor-dev@lists.cncf.io](https://lists.cncf.io/g/harbor-dev) for discussion on Harbor development and contribution.
-* **Slack:** Join Harbor's community for discussion and ask questions: [Cloud Native Computing Foundation](https://slack.cncf.io/), channel: [#harbor](https://cloud-native.slack.com/messages/harbor/) and [#harbor-dev](https://cloud-native.slack.com/messages/harbor-dev/)
+* **Slack:** Join the [Cloud Native Computing Foundation](https://slack.cncf.io/) Slack and find us in the [#harbor-next](https://cloud-native.slack.com/archives/C0B3SFW2N4T) channel for discussion and questions.
+* **Community Meetings:** We hold regular community meetings open to everyone. See the [meeting schedule and notes](https://hackmd.io/@harbor/meetings) for dates, agenda, and how to join.
 
 ## Demos
 

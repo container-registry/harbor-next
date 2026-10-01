@@ -15,16 +15,19 @@
 package log //nolint:revive
 
 import (
-	"io"
 	"net/http"
+	"strconv"
 
+	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/common/security"
 	"github.com/goharbor/harbor/src/controller/event/metadata/commonevent"
 	"github.com/goharbor/harbor/src/lib"
+	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
 	tracelib "github.com/goharbor/harbor/src/lib/trace"
 	"github.com/goharbor/harbor/src/pkg/notification"
 	"github.com/goharbor/harbor/src/server/middleware"
+	securitymiddleware "github.com/goharbor/harbor/src/server/middleware/security"
 )
 
 // Middleware middleware which add logger to context
@@ -45,16 +48,23 @@ func Middleware() func(http.Handler) http.Handler {
 			r = r.WithContext(ctx)
 		}
 
+		isResourceName, _ := strconv.ParseBool(r.Header.Get("X-Is-Resource-Name"))
 		e := &commonevent.Metadata{
-			Ctx:           r.Context(),
-			Username:      "unknown",
-			RequestMethod: r.Method,
-			RequestURL:    r.URL.String(),
+			Ctx:            r.Context(),
+			Username:       "unknown",
+			RequestMethod:  r.Method,
+			RequestURL:     r.URL.String(),
+			IsResourceName: isResourceName,
+			IPAddress:      securitymiddleware.GetClientIP(r),
+			UserAgent:      securitymiddleware.GetUserAgent(r),
 		}
 		if matched, resName := e.PreCheckMetadata(); matched {
-			lib.NopCloseRequest(r)
-			body, err := io.ReadAll(r.Body)
+			body, err := lib.ReadRequestBody(r, common.MaxAuditLogPayloadSize)
 			if err != nil {
+				if errors.IsErr(err, errors.RequestEntityTooLargeCode) {
+					http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+					return
+				}
 				http.Error(w, "failed to read request body", http.StatusInternalServerError)
 				return
 			}

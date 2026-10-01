@@ -96,6 +96,7 @@ type CommonEvent struct {
 	Operation            string
 	Payload              string
 	SourceIP             string
+	UserAgent            string
 	ResourceType         string
 	ResourceName         string
 	OperationDescription string
@@ -113,6 +114,8 @@ func (c *CommonEvent) ResolveToAuditLog() (*model.AuditLogExt, error) {
 		Resource:             c.ResourceName,
 		OperationDescription: c.OperationDescription,
 		IsSuccessful:         c.IsSuccessful,
+		ClientAddress:        c.SourceIP,
+		UserAgent:            c.UserAgent,
 	}
 	return auditLog, nil
 }

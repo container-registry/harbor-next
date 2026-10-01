@@ -15,7 +15,7 @@
 package exporter
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"strconv"
 
@@ -42,15 +42,15 @@ var (
 )
 
 // NewSystemInfoCollector ...
-func NewSystemInfoCollector(hbrCli *HarborClient) *SystemInfoCollector {
+func NewSystemInfoCollector(backend Backend) *SystemInfoCollector {
 	return &SystemInfoCollector{
-		HarborClient: hbrCli,
+		backend: backend,
 	}
 }
 
 // SystemInfoCollector ...
 type SystemInfoCollector struct {
-	*HarborClient
+	backend Backend
 }
 
 // Describe implements prometheus.Collector
@@ -85,17 +85,10 @@ func (hc *SystemInfoCollector) getSysInfo() []prometheus.Metric {
 		harborVersion = fmt.Sprintf("%s-%s", version.ReleaseVersion, version.GitCommit)
 	}
 
-	// Still call API for auth_mode and self_registration (dynamic config)
-	res, err := hbrCli.Get(sysInfoURL)
+	// Still look up auth_mode and self_registration (dynamic config)
+	sysInfoResponse, err := hc.backend.SystemInfo(context.Background())
 	if err != nil {
 		log.Errorf("request system info failed with err: %v", err)
-		return result
-	}
-	defer res.Body.Close()
-	var sysInfoResponse responseSysInfo
-	err = json.NewDecoder(res.Body).Decode(&sysInfoResponse)
-	if err != nil {
-		log.Errorf("failed to decode res.Body into sysInfoResponse, error: %v", err)
 		return result
 	}
 	result = append(result, harborSysInfo.MustNewConstMetric(1,

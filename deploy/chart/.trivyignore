@@ -1,0 +1,6 @@
+# KSV-0109: "ConfigMap stores secrets" — pattern-matches the key name
+# TOKEN_SERVICE_URL, which is a plain service URL
+# (http://<core>/service/token), not a credential. Actual credentials
+# never enter ConfigMaps in this chart (design principle: BYO Secrets /
+# generated Secrets only).
+KSV-0109

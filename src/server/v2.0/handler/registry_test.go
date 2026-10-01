@@ -41,6 +41,13 @@ func (suite *RegistryTestSuite) SetupSuite() {
 	suite.Suite.SetupSuite()
 }
 
+func (suite *RegistryTestSuite) SetupTest() {
+	suite.regCtl.ExpectedCalls = nil
+	suite.regCtl.Calls = nil
+	suite.Security.ExpectedCalls = nil
+	suite.Security.Calls = nil
+}
+
 func (suite *RegistryTestSuite) ptrStr(s string) *string { return &s }
 
 // TestPingRegistryByIDIgnoresOverrides guards against CVE-class credential
@@ -93,6 +100,126 @@ func (suite *RegistryTestSuite) TestPingRegistryInlineUsesSuppliedURL() {
 	suite.Equal(200, res.StatusCode)
 	suite.Require().NotNil(pinged)
 	suite.Equal("https://inline.example.com", pinged.URL)
+}
+
+// TestPingRegistryInlineInvalidSchemeRejected guards the inline ping path against
+// URLs outside the scheme allowlist reaching the health check.
+func (suite *RegistryTestSuite) TestPingRegistryInlineInvalidSchemeRejected() {
+	suite.Security.On("IsAuthenticated").Return(true).Once()
+	suite.Security.On("Can", mock.Anything, mock.Anything, mock.Anything).Return(true).Once()
+
+	res, err := suite.PostJSON("/registries/ping", &models.RegistryPing{
+		Type: suite.ptrStr("harbor"),
+		URL:  suite.ptrStr("gopher://attacker.example.com"),
+	})
+	suite.NoError(err)
+	suite.Equal(400, res.StatusCode)
+	suite.regCtl.AssertNotCalled(suite.T(), "IsHealthy", testifymock.Anything, testifymock.Anything)
+}
+
+// TestUpdateRegistryID0ReturnsNotFound guards against updating synthetic local registry ID 0,
+// asserting the NotFound response and that controller's Get and Update methods are not called.
+func (suite *RegistryTestSuite) TestUpdateRegistryID0ReturnsNotFound() {
+	suite.Security.On("IsAuthenticated").Return(true).Once()
+	suite.Security.On("Can", mock.Anything, mock.Anything, mock.Anything).Return(true).Once()
+
+	res, err := suite.PutJSON("/registries/0", &models.RegistryUpdate{
+		URL: suite.ptrStr("https://attacker.example.com"),
+	})
+	suite.NoError(err)
+	suite.Equal(404, res.StatusCode)
+
+	suite.regCtl.AssertNotCalled(suite.T(), "Get", testifymock.Anything, testifymock.Anything)
+	suite.regCtl.AssertNotCalled(suite.T(), "Update", testifymock.Anything, testifymock.Anything)
+}
+
+// TestUpdateRegistryClearsAccessSecretOnURLChange tests that updating an existing registry's
+// URL without providing a new AccessSecret clears the stored AccessSecret.
+func (suite *RegistryTestSuite) TestUpdateRegistryClearsAccessSecretOnURLChange() {
+	suite.Security.On("IsAuthenticated").Return(true).Once()
+	suite.Security.On("Can", mock.Anything, mock.Anything, mock.Anything).Return(true).Once()
+
+	saved := &model.Registry{
+		ID:         1,
+		Type:       "harbor",
+		URL:        "https://registry.example.com",
+		Credential: &model.Credential{Type: "basic", AccessKey: "admin", AccessSecret: "secret123"},
+	}
+	mock.OnAnything(suite.regCtl, "Get").Return(saved, nil).Once()
+
+	var updated *model.Registry
+	suite.regCtl.On("Update", mock.Anything, mock.Anything).Return(nil).Once().
+		Run(func(args testifymock.Arguments) { updated = args.Get(1).(*model.Registry) })
+
+	res, err := suite.PutJSON("/registries/1", &models.RegistryUpdate{
+		URL: suite.ptrStr("https://new.example.com"),
+	})
+	suite.NoError(err)
+	suite.Equal(200, res.StatusCode)
+	suite.Require().NotNil(updated)
+	suite.Equal("https://new.example.com", updated.URL)
+	suite.Empty(updated.Credential.AccessSecret)
+}
+
+// TestUpdateRegistryInvalidURLReturnsError tests that updating a registry with an invalid
+// URL returns BadRequest error and does not update the registry.
+func (suite *RegistryTestSuite) TestUpdateRegistryInvalidURLReturnsError() {
+	for _, invalidURL := range []string{
+		"gopher://invalid.example.com",
+		"file:///etc/passwd",
+		"http://127.0.0.%31/",
+	} {
+		suite.SetupTest()
+		suite.Security.On("IsAuthenticated").Return(true).Once()
+		suite.Security.On("Can", mock.Anything, mock.Anything, mock.Anything).Return(true).Once()
+
+		saved := &model.Registry{
+			ID:         1,
+			Type:       "harbor",
+			URL:        "https://registry.example.com",
+			Credential: &model.Credential{Type: "basic", AccessKey: "admin", AccessSecret: "secret123"},
+		}
+		mock.OnAnything(suite.regCtl, "Get").Return(saved, nil).Once()
+
+		res, err := suite.PutJSON("/registries/1", &models.RegistryUpdate{
+			URL: suite.ptrStr(invalidURL),
+		})
+		suite.NoError(err)
+		suite.Equal(400, res.StatusCode, "URL %q must be rejected", invalidURL)
+		suite.regCtl.AssertNotCalled(suite.T(), "Update", testifymock.Anything, testifymock.Anything)
+	}
+}
+
+// TestUpdateRegistryStorageSchemeURLRejected pins the update path to http/https,
+// the only schemes a replication adapter can speak. #742 originally documented
+// sftp:// and s3:// as accepted here, but no adapter under src/pkg/reg/ handles
+// either, so such an endpoint was accepted and then failed its health check with
+// a 500 -- the bug this lane fixes. The controller refuses them too; this keeps
+// the handler and the controller saying the same thing.
+func (suite *RegistryTestSuite) TestUpdateRegistryStorageSchemeURLRejected() {
+	for _, newURL := range []string{
+		"sftp://storage.example.com",
+		"s3://bucket.example.com",
+	} {
+		suite.SetupTest()
+		suite.Security.On("IsAuthenticated").Return(true).Once()
+		suite.Security.On("Can", mock.Anything, mock.Anything, mock.Anything).Return(true).Once()
+
+		saved := &model.Registry{
+			ID:         1,
+			Type:       "harbor",
+			URL:        "https://registry.example.com",
+			Credential: &model.Credential{Type: "basic", AccessKey: "admin", AccessSecret: "secret123"},
+		}
+		mock.OnAnything(suite.regCtl, "Get").Return(saved, nil).Once()
+
+		res, err := suite.PutJSON("/registries/1", &models.RegistryUpdate{
+			URL: suite.ptrStr(newURL),
+		})
+		suite.NoError(err)
+		suite.Equal(400, res.StatusCode, "URL %q must be rejected", newURL)
+		suite.regCtl.AssertNotCalled(suite.T(), "Update", testifymock.Anything, testifymock.Anything)
+	}
 }
 
 func TestRegistryTestSuite(t *testing.T) {

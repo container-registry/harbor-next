@@ -24,8 +24,8 @@ flowchart LR
   harborMain["container-registry/harbor-next\nharbor-next/main"]
   harborRelease["container-registry/harbor-next\nharbor-next/release-X.Y"]
   harborTag["container-registry/harbor-next\nvX.Y.Z tag + GitHub Release"]
-  gcrMain["container-registry/8gcr\n8gcr/main"]
-  gcrPatches["container-registry/8gcr\ncommercial patches"]
+  patchManifest["harbor-next branch\ntaskfile/commercial-patches"]
+  gcrPatches["container-registry/8gcr\ndeclared patch branches"]
   images["8gears.container-registry.com/8gcr\nrelease images"]
 
   upstream -->|selected fixes as upstream: commits| harborMain
@@ -33,8 +33,8 @@ flowchart LR
   harborTag -->|new vX.Y.0 creates| harborRelease
   harborMain -->|/backport vX.Y| harborRelease
   harborRelease -->|maintenance release-please PR merged| harborTag
-  harborMain -->|upstream-sync dispatch| gcrMain
-  gcrMain --> gcrPatches
+  harborMain -->|owns ordered patch list| patchManifest
+  patchManifest -->|selects exact branches| gcrPatches
   harborTag -->|release workflow source| images
   gcrPatches -->|applied at release runtime| images
 ```
@@ -44,7 +44,8 @@ Rules:
 - `upstream/main` is the upstream Harbor source.
 - `harbor-next/main` is active Harbor Next development.
 - `harbor-next/release-X.Y` is a maintenance branch for patch releases.
-- `8gcr/main` provides the commercial patch series used at release runtime.
+- Each Harbor Next branch owns its ordered commercial patch list in `taskfile/commercial-patches`.
+- The release fetches only those named branches from `8gcr`; it never reads or imports `8gcr/main`.
 - Release images are built by checking out the Harbor Next release source, applying 8gcr patches during the workflow run, and building images from that patched working tree.
 
 ## Branch Movement
@@ -93,7 +94,7 @@ sequenceDiagram
   Maintainer->>GitHub: Squash-merge release PR
   GitHub->>Actions: Push starts Release Please workflow again
   RP->>GitHub: Create vX.Y.Z tag and GitHub Release
-  Actions->>GCR: Clone 8gcr patch series
+  Actions->>GCR: Fetch Harbor-declared patch branches
   Actions->>Actions: Apply patches to Harbor Next release source
   Actions->>Registry: Build and push release images
   Actions->>Cosign: Sign release images
@@ -131,6 +132,7 @@ Release-please ignores changes that only touch:
 - `.github/`
 - `docs/`
 - `tests/`
+- `taskfile/`
 
 Use `ci:` for workflow-only changes.
 
@@ -158,6 +160,76 @@ Use `ci:` for workflow-only changes.
 5. Review the patch version, `VERSION`, `.release-please-manifest.json`, and `CHANGELOG.md`.
 6. Squash-merge the release PR.
 7. The same image build, patch application, signing, and release-note flow runs.
+
+## Nightly Channel
+
+A nightly is the real release pipeline cut against a throwaway branch, so Harbor gets exercised every day instead of once per minor. The `Nightly` workflow runs at 00:00 UTC and on `workflow_dispatch`, from `main` only: a nightly carries the official tag and image names, so a run from any other ref is rejected rather than publishing that ref's code under them.
+
+A nightly publishes under one name: `2.16.0-beta`, the `VERSION` on `main`, which is the minor release-please is heading for. The tag `v2.16.0-beta` moves onto tonight's release commit, the images are pushed under it, and the pre-release that lives on it is rewritten. There is no dated tag and no tag per night.
+
+The channel is release-please configuration, not a separate build path:
+
+1. `task nightly:channel` derives `release-please-config-nightly.json` from `release-please-config.json` with `jq`, adding `release-as: X.Y.Z-beta` and `prerelease: true`. Deriving it keeps the exclude paths and changelog sections identical to the real release forever.
+2. The same task seeds `.release-please-manifest-nightly.json` from `.release-please-manifest.json` and commits both. It force-pushes the result as the `nightly` branch only when the caller passes `PUSH_CHANNEL=true`, as the workflow does; a bare `task nightly:channel` leaves the branch local, which is how you inspect what tonight's channel would be. Neither generated file is committed to `main`.
+3. Release-please opens a release PR against `nightly` and the workflow squash-merges it. Release-please stops there; it never tags and never creates a Release.
+4. The workflow force-moves `vX.Y.Z-beta` onto that merge commit and upserts the one pre-release that lives on it.
+5. `publish-images.yml` builds from the merge commit; `release-notes-engine.yml` rewrites the beta pre-release's body. Both are the reusable workflows the real release calls.
+6. After the suite runs, a last job prepends a header to that body: the commit it was built from, the e2e result, and how to pin a digest.
+
+`release-as` is what holds the beta name still. The `prerelease` versioning strategy cannot: it increments the last run of digits, so a fixed `2.16.0-beta` is not expressible, and `always-bump-minor` would compute a stable version. The name has to match the CHANGELOG heading release-please writes, because that heading is what the notes engine looks for when it renders the beta tag.
+
+An empty night, where nothing has landed since the last real release, produces no release PR: the run ends green having published nothing, and says so. A nightly takes no inputs and can be dispatched as often as you like — a second run on the same day either finds nothing new and ends green, or cuts what landed in between and moves the tag again.
+
+`vX.Y.Z-beta` is the invitation: try the next release and tell us. Someone who wants the current preview of the release under development pulls it and gets last night's build without having to know a date.
+
+It moves, which is the price of there being one of it. It changes under anyone who already fetched it, and for roughly an hour each night it points at a commit whose images are still building. Where a build has to stay put — a CI job, a reproduction, a rollback — resolve the digest once and pin that:
+
+```sh
+skopeo inspect docker://8gears.container-registry.com/8gcr/harbor-core:v2.16.0-beta | jq -r .Digest
+```
+
+Digests are what the signature is made against, so a pinned digest is also the verifiable reference.
+
+Tags named `vX.Y.Z-beta.YYYYMMDD` are from before the channel settled on one moving tag. They still resolve, and the tag guard still accepts them, but nothing creates new ones.
+
+Every published image set is then handed to the end-to-end suite by the `E2E` workflow, which nightlies and releases both call. The suite does not live in this repository: it lives on the `dev` overlay branch in `container-registry/8gcr`, and the run brings it here the way the commercial patches are brought here — `task apply-patches OVERLAY_BRANCHES=dev` octopuses the declared patch series plus the overlay onto the commit under test. The run therefore stands in the megamerge the images were built from.
+
+The published tag's own tree cannot stand in for that. A nightly's tag sits on the throwaway `nightly` branch, which carries neither the commercial patches (they are applied when the images are built and never committed) nor the suite. `OVERLAY_BRANCHES` is deliberately not the patch series file: a branch listed there would be built into released images, and the overlay must never be.
+
+Results are published twice: a gocure HTML report in the run's artifacts, and a job summary rendered from the same cucumber document — a pie of scenario outcomes and, per feature, every step with its result and timing.
+
+Merging the nightly release PR is the one merge this repository automates. It happens inside the workflow, on a branch that is thrown away the next night, and it never touches a release PR on `main` or `release-X.Y`.
+
+### Version timeline
+
+Because the channel manifest is re-seeded from `.release-please-manifest.json` every night, the nightly channel never advances the published version. Each nightly is computed from the last published release, so the minor stays parked until a maintainer cuts the real release:
+
+| Date | `.release-please-manifest.json` | Tag | Notes cover |
+|------|---------------------------------|-----|-------------|
+| Sep 18 | `2.15.0` | `v2.16.0-beta` | everything since `v2.15.0` |
+| Sep 19 | `2.15.0` | `v2.16.0-beta` moves to tonight's commit | everything since `v2.15.0`, plus one day |
+| Sep 20 | `2.15.0` | `v2.16.0-beta` moves again | everything since `v2.15.0`, plus two days |
+| Sep 21 | a maintainer merges the `main` release PR: `v2.16.0` is published, the manifest moves to `2.16.0`, `VERSION` to `2.17.0` | still `v2.16.0-beta` until `VERSION` advances | accordingly |
+| Sep 22 | `2.16.0` | `v2.17.0-beta`, a new tag | everything since `v2.16.0` |
+
+Each release line has one tag and one pre-release on it, and that body is rewritten every night.
+
+The stable `v2.16.0` on Sep 21 is the ordinary main release, cut by a maintainer. A nightly always publishes as a prerelease, so it can never produce a stable version.
+
+When the line moves on, the pointer for the old minor stops moving. `v2.16.0-beta` — tag, pre-release and image tag — stays exactly where it last pointed, and `v2.17.0-beta` starts alongside it. Nothing is deleted automatically; retiring a superseded pointer is a maintainer's call.
+
+### Nightly release notes
+
+Nightly notes are the upcoming release's notes as they stand tonight, not a separate stream. There is no nightly changelog, no nightly section in `CHANGELOG.md` on `main`, and no nightly entry in the commercial changelogs.
+
+Two things make that true:
+
+- The channel accumulates from the last published release, so release-please renders the whole in-progress release into the nightly `CHANGELOG.md` section, and `What's Changed` spans the same range.
+- The nightly workflow does not dispatch `release-cut` to `8gcr`. The commercial entries stay in the unreleased block of each `changelogs/<branch>.md`, so every nightly renders the same commercial features the real release will, and the real release still finds them when it ships.
+
+A nightly's notes therefore read as a preview of the release: the same sections, the same commercial features, the same contributors, with the image references pointing at the pointer tag.
+
+Because there is one pre-release rather than one per night, that body is the whole record: it is rewritten from scratch every night, and there is nothing dated to compare it against. The header block at the top is what ties it to a specific build — the commit it was built from and the e2e result for that run.
 
 ## Backports
 
@@ -198,7 +270,9 @@ Each release publishes `linux/amd64` and `linux/arm64` images:
 
 Default registry path: `8gears.container-registry.com/8gcr`.
 
-At release runtime, the workflow clones `container-registry/8gcr`, reads the patch list from `8gcr-ee/patches/series`, applies those patches on top of the checked-out Harbor Next release source, and builds the images. Those images contain the commercial features from the patch series.
+At release runtime, the workflow reads `taskfile/commercial-patches` from the checked-out Harbor Next branch, fetches only those branches from `container-registry/8gcr`, applies their declared commit deltas, and builds the images. The workflow never fetches `8gcr/main` or an 8gcr-owned series file.
+
+Use `task apply-patches` to apply that manifest to a clean checkout and `task release-ready` to validate it against a disposable clean clone. For a local unsigned build and push to the PR registry project (`8gcr-pr` by default), authenticate the container engine and run `task release-images-local RELEASE_VERSION=X.Y.Z IMAGE_TAG=<tag>`; the local task verifies both published architectures after pushing. Main and maintenance-release workflows publish to `8gcr`.
 
 ## Release Notes
 
@@ -222,7 +296,6 @@ Upstream-Author: @original-author
 
 | Name | Type | Required | Purpose |
 |------|------|----------|---------|
-| `RUNNER` | Variable | No | Custom runner label |
 | `REGISTRY_ADDRESS` | Variable | No | Registry host, defaults to `8gears.container-registry.com` |
 | `REGISTRY_PROJECT` | Variable | No | Registry project, defaults to `8gcr` |
 | `REGISTRY_USERNAME` | Variable | Yes | Registry push username |
@@ -230,6 +303,7 @@ Upstream-Author: @original-author
 | `SYNC_APP_ID` | Variable | Yes | GitHub App ID for 8gcr access |
 | `SYNC_APP_PRIVATE_KEY` | Secret | Yes | GitHub App private key for 8gcr access |
 | `BUILDX_HOST` | Runner environment | No | Remote BuildKit endpoint |
+| `NIGHTLY_CHANNEL_TOKEN` | Secret | No | Only needed if a ruleset ever covers the `nightly` branch; the nightly channel push and merge fall back to `GITHUB_TOKEN` |
 
 ## Maintainer Checklist
 

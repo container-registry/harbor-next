@@ -17,7 +17,7 @@ jobs:
   version:
     name: Read Version
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ubuntu-26.04
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -38,7 +38,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    uses: ./.github/workflows/publish-images.yml
+    uses: $/.github/workflows/publish-images.yml
     with:
       checkout_ref: ${{ github.event.workflow_run.head_sha }}
       image_tag: latest

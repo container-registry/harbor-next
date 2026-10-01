@@ -32,9 +32,8 @@ import (
 )
 
 const (
-	csrfKeyEnv           = "CSRF_KEY"
-	csrfPlaintextHTTPEnv = "CSRF_PLAINTEXT_HTTP"
-	tokenHeader          = "X-Harbor-CSRF-Token"
+	csrfKeyEnv  = "CSRF_KEY"
+	tokenHeader = "X-Harbor-CSRF-Token"
 )
 
 var (
@@ -87,15 +86,8 @@ func Middleware() func(handler http.Handler) http.Handler {
 			csrf.Path("/"))
 	})
 	return middleware.New(func(rw http.ResponseWriter, req *http.Request, next http.Handler) {
-		if plaintextHTTPEnabled() {
-			req = csrf.PlaintextHTTPRequest(req)
-		}
 		protect(attach(next)).ServeHTTP(rw, req)
 	}, csrfSkipper)
-}
-
-func plaintextHTTPEnabled() bool {
-	return strings.EqualFold(os.Getenv(csrfPlaintextHTTPEnv), "true")
 }
 
 // csrfSkipper makes sure only some of the uris accessed by non-UI client can skip the csrf check

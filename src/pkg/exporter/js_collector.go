@@ -15,8 +15,12 @@
 package exporter
 
 import (
+	"context"
+
 	"github.com/gomodule/redigo/redis"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/goharbor/harbor/src/lib/log"
 )
 
 // JobServiceCollectorName ...
@@ -42,13 +46,13 @@ var (
 )
 
 // NewJobServiceCollector ...
-func NewJobServiceCollector() *JobServiceCollector {
-	return &JobServiceCollector{Namespace: namespace}
+func NewJobServiceCollector(backend Backend) *JobServiceCollector {
+	return &JobServiceCollector{backend: backend}
 }
 
 // JobServiceCollector ...
 type JobServiceCollector struct {
-	Namespace string
+	backend Backend
 }
 
 // Describe implements prometheus.Collector
@@ -87,13 +91,19 @@ func (hc *JobServiceCollector) getJobserviceInfo() []prometheus.Metric {
 		}
 	}
 
-	// Get concurrency info via raw redis client
-	result := getConccurrentInfo()
+	js, err := hc.backend.JobService(context.Background())
+	if err != nil {
+		// In core the job service redis config is fetched from job service over
+		// HTTP, which may not be up yet. Skip this scrape rather than fail it.
+		log.Errorf("error when resolving job service backend: %v", err)
+		return []prometheus.Metric{}
+	}
 
-	// get info via jobservice client
-	cli := GetBackendWorker()
+	// Get concurrency info via raw redis client
+	result := getConccurrentInfo(js)
+
 	// get queue info
-	qs, err := cli.Queues()
+	qs, err := js.Client.Queues()
 	checkErr(err, "error when get work task queues info")
 	for _, q := range qs {
 		result = append(result, jobServiceTaskQueueSize.MustNewConstMetric(float64(q.Count), q.JobName))
@@ -101,7 +111,7 @@ func (hc *JobServiceCollector) getJobserviceInfo() []prometheus.Metric {
 	}
 
 	// get scheduled job info
-	_, total, err := cli.ScheduledJobs(0)
+	_, total, err := js.Client.ScheduledJobs(0)
 	checkErr(err, "error when get scheduled job number")
 	result = append(result, jobServiceScheduledJobTotal.MustNewConstMetric(float64(total)))
 
@@ -111,15 +121,15 @@ func (hc *JobServiceCollector) getJobserviceInfo() []prometheus.Metric {
 	return result
 }
 
-func getConccurrentInfo() []prometheus.Metric {
-	rdsConn := GetRedisPool().Get()
+func getConccurrentInfo(js *JobServiceBackend) []prometheus.Metric {
+	rdsConn := js.Pool.Get()
 	defer rdsConn.Close()
 	result := []prometheus.Metric{}
-	knownJobvalues, err := redis.Values(rdsConn.Do("SMEMBERS", redisKeyKnownJobs(jsNamespace)))
+	knownJobvalues, err := redis.Values(rdsConn.Do("SMEMBERS", redisKeyKnownJobs(js.Namespace)))
 	checkErr(err, "err when get known jobs")
 	for _, v := range knownJobvalues {
 		job := string(v.([]byte))
-		lockInfovalues, err := redis.Values(rdsConn.Do("HGETALL", redisKeyJobsLockInfo(jsNamespace, job)))
+		lockInfovalues, err := redis.Values(rdsConn.Do("HGETALL", redisKeyJobsLockInfo(js.Namespace, job)))
 		checkErr(err, "err when get job lock info")
 		for i := 0; i < len(lockInfovalues); i += 2 {
 			key, _ := redis.String(lockInfovalues[i], nil)

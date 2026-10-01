@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/beego/beego/v2/client/orm"
-	
+
 	"github.com/goharbor/harbor/src/common/models"
 	"github.com/goharbor/harbor/src/lib/log"
 	libOrm "github.com/goharbor/harbor/src/lib/orm"

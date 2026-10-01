@@ -1,7 +1,26 @@
 swagger: '2.0'
 info:
   title: Harbor API
-  description: These APIs provide services for manipulating Harbor project.
+  description: |
+    These APIs provide services for manipulating Harbor project.
+
+    ### Prometheus metrics
+
+    Harbor exposes Prometheus metrics, but **not** through this API. They are served on a
+    dedicated port on each component, outside `basePath`, so they are not reachable through
+    the public ingress and are not described by any path below:
+
+        http://<component>:<METRIC_PORT><METRIC_PATH>
+
+    `METRIC_PORT` defaults to `9090` (the Helm chart sets `8001`) and `METRIC_PATH` defaults
+    to `/metrics`. The endpoint is unauthenticated and intended to be reachable only from
+    inside the cluster or compose network. Set `METRIC_ENABLE=true` to serve it.
+
+    Core additionally serves the Harbor exporter collectors on that same endpoint when
+    `METRIC_EXPORTER_ENABLE=true`, which replaces the standalone `harbor-exporter` container.
+
+    The response is the Prometheus text exposition format
+    (`text/plain; version=0.0.4`), not JSON.
   version: '2.0'
 host: localhost
 schemes:
@@ -6532,6 +6551,7 @@ parameters:
     description: Robot ID
     required: true
     type: integer
+    format: int64
   gcId:
     name: gc_id
     in: path
@@ -7167,6 +7187,12 @@ definitions:
         format: date-time
         example: '2006-01-02T15:04:05Z'
         description: The time when this operation is triggered.
+      client_address:
+        type: string
+        description: The source IP address of the client that triggered this operation.
+      user_agent:
+        type: string
+        description: The User-Agent header of the client that triggered this operation.
   AuditLogEventType:
     type: object
     properties:
@@ -7541,6 +7567,14 @@ definitions:
       proxy_referrer_api:
         type: string
         description: 'Whether the proxy cache project should proxy OCI 1.1 referrer API requests to the upstream registry. The valid values are "true", "false".'
+        x-nullable: true
+      proxy_cache_filter_pattern:
+        type: string
+        description: 'Repository filter pattern for proxy cache project. Only repositories matching the pattern will be proxied. Empty means allow all. Only has value when the current project is a proxy cache project.'
+        x-nullable: true
+      proxy_cache_filter_kind:
+        type: string
+        description: 'Matching mode for proxy_cache_filter_pattern: "doublestar" (default, glob-style with ** support) or "regex". Only has value when the current project is a proxy cache project.'
         x-nullable: true
   ProjectSummary:
     type: object
@@ -8066,6 +8100,7 @@ definitions:
         description: The type of the robot creator, like local(harbor_user) or robot.
       creator_ref:
         type: integer
+        format: int64
         description: The reference of the robot creator, like the id of harbor user.
       creation_time:
         type: string

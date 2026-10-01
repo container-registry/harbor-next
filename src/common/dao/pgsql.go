@@ -109,12 +109,9 @@ func (p *pgsql) UpgradeSchema() error {
 // golang-migrate's pgx/v5 driver registers under that name (not "pgx", which
 // is the v4 driver).
 func NewMigrator(database *models.PostGreSQL) (*migrate.Migrate, error) {
-	dbURL := url.URL{
-		Scheme:   "pgx5",
-		User:     url.UserPassword(database.Username, database.Password),
-		Host:     net.JoinHostPort(database.Host, strconv.Itoa(database.Port)),
-		Path:     database.Database,
-		RawQuery: fmt.Sprintf("sslmode=%s", database.SSLMode),
+	dsn, err := migratorDSN(database)
+	if err != nil {
+		return nil, err
 	}
 
 	// For UT
@@ -123,10 +120,34 @@ func NewMigrator(database *models.PostGreSQL) (*migrate.Migrate, error) {
 		path = defaultMigrationPath
 	}
 	srcURL := fmt.Sprintf("file://%s", path)
-	m, err := migrate.New(srcURL, dbURL.String())
+	m, err := migrate.New(srcURL, dsn)
 	if err != nil {
 		return nil, err
 	}
 	m.Log = newMigrateLogger()
 	return m, nil
+}
+
+// migratorDSN returns the pgx5-scheme URL golang-migrate connects with.
+// Honors database.URL when set (matches dbpool.BuildDSN's precedence for
+// cloud-managed databases like RDS IAM auth, where the DSN carries a token
+// that Host/Username/Password alone can't reconstruct) so the numbered and
+// authoritative migration phases always target the same database.
+func migratorDSN(database *models.PostGreSQL) (string, error) {
+	if database.URL == "" {
+		dbURL := url.URL{
+			Scheme:   "pgx5",
+			User:     url.UserPassword(database.Username, database.Password),
+			Host:     net.JoinHostPort(database.Host, strconv.Itoa(database.Port)),
+			Path:     database.Database,
+			RawQuery: fmt.Sprintf("sslmode=%s", database.SSLMode),
+		}
+		return dbURL.String(), nil
+	}
+	u, err := url.Parse(database.URL)
+	if err != nil {
+		return "", fmt.Errorf("parse database URL: %w", err)
+	}
+	u.Scheme = "pgx5"
+	return u.String(), nil
 }

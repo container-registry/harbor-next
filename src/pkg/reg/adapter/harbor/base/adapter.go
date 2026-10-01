@@ -17,6 +17,7 @@ package base
 import (
 	"fmt"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -317,8 +318,48 @@ type Project struct {
 	RegistryID int64          `json:"registry_id"`
 }
 
+// isLocalHarbor reports whether url points at this Harbor instance. Core and
+// jobservice each read their own CORE_URL, so the two may differ by an
+// explicit default port; compare normalized URLs instead of raw strings.
 func isLocalHarbor(url string) bool {
-	return url == os.Getenv("CORE_URL")
+	coreURL := os.Getenv("CORE_URL")
+	if url == coreURL {
+		return true
+	}
+	u, err := neturl.Parse(url)
+	if err != nil || !bareURL(u) {
+		return false
+	}
+	core, err := neturl.Parse(coreURL)
+	if err != nil || !bareURL(core) {
+		return false
+	}
+	return strings.EqualFold(u.Scheme, core.Scheme) &&
+		strings.EqualFold(hostPort(u), hostPort(core)) &&
+		strings.TrimSuffix(u.Path, "/") == strings.TrimSuffix(core.Path, "/")
+}
+
+// bareURL reports whether u is a plain scheme://host[:port][/path] URL, the
+// only shape isLocalHarbor normalizes: userinfo, query, or fragment must
+// match exactly, and a schemeless string parses entirely into Path.
+func bareURL(u *neturl.URL) bool {
+	return u.Scheme != "" && u.Host != "" &&
+		u.User == nil && u.RawQuery == "" && u.Fragment == ""
+}
+
+// hostPort returns host:port with the scheme's default port made explicit,
+// the inverse of the default-port strip in v2auth's match().
+func hostPort(u *neturl.URL) string {
+	port := u.Port()
+	if port == "" {
+		switch strings.ToLower(u.Scheme) {
+		case "http":
+			port = "80"
+		case "https":
+			port = "443"
+		}
+	}
+	return u.Hostname() + ":" + port
 }
 
 // check whether the current process is running inside core

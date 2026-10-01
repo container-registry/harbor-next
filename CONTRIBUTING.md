@@ -2,6 +2,8 @@
 
 Thank you for contributing! This guide explains how to open PRs and merge them correctly so the automated release pipeline works as expected.
 
+> **Working on the Helm chart (`deploy/chart/`)?** Additional guidelines apply — see [deploy/chart/CONTRIBUTING.md](deploy/chart/CONTRIBUTING.md) for the chart change workflow, its CI quality gate, and the backward-compatibility rules.
+
 ## Table of Contents
 
 - [Workflow Overview](#workflow-overview)
@@ -56,6 +58,7 @@ Common types:
 | `fix` | Bug fix | Patch version bump |
 | `upstream` | Cherry-picked upstream Harbor change | Patch version bump |
 | `feat!` / `fix!` | Breaking change | Major version bump |
+| `chart` | Helm chart change outside `deploy/chart` (release plumbing, chart workflows) | Chart release line only; hidden from app release notes. Never use `chart!:` or a `BREAKING CHANGE:` footer — breaking commits always render in app release notes (the pr-title check rejects `chart!:`) |
 | `refactor` | Code change, no behaviour change | No release |
 | `docs` | Documentation only | No release |
 | `ci` | CI/CD pipeline changes | No release |
@@ -269,7 +272,7 @@ This renders in the release notes as:
 
 ## Adding Release Notes to Your PR
 
-**New features (`feat:`) must add a `## Release Notes` section to the PR description.** It is also expected for other user-facing changes (breaking changes, deprecations). The prose appears on the GitHub Release page under a `## Highlights` section.
+**New features (`feat:`) must add a `## Release Notes` section to the PR description.** It is also expected for other user-facing changes (breaking changes, deprecations). The content appears on the GitHub Release page under a `## Summary` section — verbatim, so screenshots and links carry over.
 
 Fill in the `## Release Notes` section in the PR description:
 

@@ -44,19 +44,45 @@ var testcases = []struct {
 	{"http://10.0.0.1/test.txt#/api/version", "http://10.0.0.1/test.txt", true},
 }
 
-func TestValidateHTTPURL(t *testing.T) {
+func TestValidateURL(t *testing.T) {
 	for _, test := range testcases {
-		url, err := ValidateHTTPURL(test.url)
+		url, err := ValidateURL(test.url)
 		if test.valid {
 			if err != nil {
-				t.Errorf("ValidateHTTPURL:%q gave err %v; want no error", test.url, err)
+				t.Errorf("ValidateURL:%q gave err %v; want no error", test.url, err)
 			}
 			if url != test.expectedUrl {
-				t.Errorf("ValidateHTTPURL:%q gave %s; want %s", test.url, url, test.expectedUrl)
+				t.Errorf("ValidateURL:%q gave %s; want %s", test.url, url, test.expectedUrl)
 			}
 		} else if !test.valid && err == nil {
-			t.Errorf("ValidateHTTPURL:%q gave <nil> error; want some error", test.url)
+			t.Errorf("ValidateURL:%q gave <nil> error; want some error", test.url)
 		}
 	}
+}
 
+func TestValidateURLSchemes(t *testing.T) {
+	schemeCases := []struct {
+		url     string
+		schemes []string
+		valid   bool
+	}{
+		{"sftp://harbor.foo.com", nil, true},
+		{"s3://bucket/prefix", nil, true},
+		{"ftp://harbor.foo.com", nil, true},
+		{"gopher://harbor.foo.com", nil, false},
+		{"file:///etc/passwd", nil, false},
+		{"sftp://harbor.foo.com", []string{"http", "https"}, false},
+		{"s3://bucket/prefix", []string{"http", "https"}, false},
+		{"http://harbor.foo.com", []string{"http", "https"}, true},
+		{"harbor.foo.com", []string{"http", "https"}, true},
+	}
+	for _, test := range schemeCases {
+		_, err := ValidateURL(test.url, test.schemes...)
+		if test.valid && err != nil {
+			t.Errorf("ValidateURL:%q schemes %v gave err %v; want no error", test.url, test.schemes, err)
+		}
+		if !test.valid && err == nil {
+			t.Errorf("ValidateURL:%q schemes %v gave <nil> error; want some error", test.url, test.schemes)
+		}
+	}
 }

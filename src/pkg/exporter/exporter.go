@@ -40,6 +40,23 @@ type Opt struct {
 
 // NewExporter creates a exporter for Harbor with the configuration
 func NewExporter(opt *Opt) *Exporter {
+	exporter := newCollectorSet(opt, NewRESTBackend())
+
+	r := prometheus.NewRegistry()
+	r.MustRegister(exporter)
+	exporter.Server = newServer(opt, r)
+
+	return exporter
+}
+
+// NewCollector builds the Harbor collectors against the given backend without
+// creating an HTTP server. Core uses this to run the collectors in-process and
+// serve them from its own metrics endpoint.
+func NewCollector(opt *Opt, backend Backend) prometheus.Collector {
+	return newCollectorSet(opt, backend)
+}
+
+func newCollectorSet(opt *Opt, backend Backend) *Exporter {
 	exporter := &Exporter{
 		Opt:        opt,
 		collectors: make(map[string]prometheus.Collector),
@@ -47,20 +64,15 @@ func NewExporter(opt *Opt) *Exporter {
 	if opt.CacheDuration > 0 {
 		CacheInit(opt)
 	}
-	err := exporter.RegisterCollector(NewHealthCollect(hbrCli),
-		NewSystemInfoCollector(hbrCli),
+	err := exporter.RegisterCollector(NewHealthCollect(backend),
+		NewSystemInfoCollector(backend),
 		NewProjectCollector(),
-		NewJobServiceCollector(),
+		NewJobServiceCollector(backend),
 		NewStatisticsCollector(),
 	)
 	if err != nil {
 		log.Warningf("calling RegisterCollector() errored out, error: %v", err)
 	}
-
-	r := prometheus.NewRegistry()
-	r.MustRegister(exporter)
-	exporter.Server = newServer(opt, r)
-
 	return exporter
 }
 

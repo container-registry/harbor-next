@@ -27,6 +27,7 @@ import (
 
 	"github.com/goharbor/harbor/src/controller/artifact"
 	"github.com/goharbor/harbor/src/controller/blob"
+	"github.com/goharbor/harbor/src/controller/event/metadata/requestinfo"
 	"github.com/goharbor/harbor/src/controller/event/operator"
 	"github.com/goharbor/harbor/src/controller/tag"
 	"github.com/goharbor/harbor/src/lib"
@@ -256,7 +257,8 @@ func (c *controller) ProxyManifest(ctx context.Context, art lib.ArtifactInfo, re
 			}
 		}
 		if a != nil {
-			SendPullEvent(bCtx, a, art.Tag, op)
+			ip, ua := requestinfo.FromContext(bCtx)
+			SendPullEvent(bCtx, a, art.Tag, op, ip, ua)
 		}
 	}) {
 		go func() {
@@ -278,7 +280,8 @@ func (c *controller) sendManifestPullEvent(ctx context.Context, art lib.Artifact
 		log.Errorf("failed to get manifest, error %v", err)
 	}
 	if a != nil {
-		SendPullEvent(ctx, a, art.Tag, op)
+		ip, ua := requestinfo.FromContext(ctx)
+		SendPullEvent(ctx, a, art.Tag, op, ip, ua)
 	}
 }
 

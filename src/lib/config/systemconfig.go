@@ -283,9 +283,11 @@ func TrivyAdapterURL() string {
 // Metric returns the overall metric settings
 func Metric() *models.Metric {
 	return &models.Metric{
-		Enabled: DefaultMgr().Get(backgroundCtx, common.MetricEnable).GetBool(),
-		Port:    DefaultMgr().Get(backgroundCtx, common.MetricPort).GetInt(),
-		Path:    DefaultMgr().Get(backgroundCtx, common.MetricPath).GetString(),
+		Enabled:           DefaultMgr().Get(backgroundCtx, common.MetricEnable).GetBool(),
+		Port:              DefaultMgr().Get(backgroundCtx, common.MetricPort).GetInt(),
+		Path:              DefaultMgr().Get(backgroundCtx, common.MetricPath).GetString(),
+		ExporterEnabled:   DefaultMgr().Get(backgroundCtx, common.MetricExporterEnable).GetBool(),
+		ExporterCacheTime: int64(DefaultMgr().Get(backgroundCtx, common.MetricExporterCacheTime).GetInt()),
 	}
 }
 

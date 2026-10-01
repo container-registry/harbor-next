@@ -155,7 +155,7 @@
 }
 
 .pull-command-column {
-  width: 6rem !important;
+  width: 6rem;
 }
 
 .tags-column {
@@ -163,23 +163,23 @@
 }
 
 .co-signed-column {
-  width: 7rem !important;
+  width: 7rem;
 }
 
 .size-column {
-  width: 6rem !important;
+  width: 6rem;
 }
 
 .vul-column {
-  width: 11rem !important;
+  width: 11rem;
 }
 
 .sbom-column {
-  width: 7rem !important;
+  width: 7rem;
 }
 
 .annotations-column {
-  width: 5rem !important;
+  width: 5rem;
 }
 
 .signed {
@@ -214,6 +214,18 @@
   flex: 1 1 auto;
   width: auto;
   min-width: 0;
+
+  // .truncated makes the span a flex container, where text-overflow has no
+  // effect; block restores the ellipsis. height: auto drops .truncated's
+  // fixed 25px box so the parent flexbox recenters the 20px line box.
+  display: block;
+  height: auto;
+}
+
+.tag-cell-count {
+  flex-shrink: 0;
+  white-space: nowrap;
+  margin-left: 2px;
 }
 
 .tag-copy-command {

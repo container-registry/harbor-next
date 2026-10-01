@@ -17,14 +17,18 @@ package lib
 import (
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/goharbor/harbor/src/lib/errors"
 )
 
-// ValidateHTTPURL checks whether the provided string is a valid HTTP URL.
-// If it is, return the URL in format "scheme://host:port" to avoid the SSRF
-func ValidateHTTPURL(s string) (string, error) {
+// ValidateURL checks whether the provided string is a valid URL whose scheme
+// is in allowedSchemes (default: http, https, s3, sftp, ftp — pass schemes
+// explicitly to restrict, e.g. ValidateURL(s, "http", "https")). A scheme-less
+// input is treated as http. On success the URL is returned normalized to
+// "scheme://host:port" to avoid the SSRF
+func ValidateURL(s string, allowedSchemes ...string) (string, error) {
 	s = strings.Trim(s, " ")
 	s = strings.TrimRight(s, "/")
 	if len(s) == 0 {
@@ -33,13 +37,16 @@ func ValidateHTTPURL(s string) (string, error) {
 	if !strings.Contains(s, "://") {
 		s = "http://" + s
 	}
-	url, err := url.Parse(s)
+	parsedURL, err := url.Parse(s)
 	if err != nil {
 		return "", errors.New(nil).WithCode(errors.BadRequestCode).WithMessagef("invalid URL: %s", err.Error())
 	}
-	if url.Scheme != "http" && url.Scheme != "https" {
-		return "", errors.New(nil).WithCode(errors.BadRequestCode).WithMessagef("invalid HTTP scheme: %s", url.Scheme)
+	if len(allowedSchemes) == 0 {
+		allowedSchemes = []string{"http", "https", "s3", "sftp", "ftp"}
+	}
+	if !slices.Contains(allowedSchemes, parsedURL.Scheme) {
+		return "", errors.New(nil).WithCode(errors.BadRequestCode).WithMessagef("invalid scheme: %s", parsedURL.Scheme)
 	}
 	// To avoid SSRF security issue, refer to #3755 for more detail
-	return fmt.Sprintf("%s://%s%s", url.Scheme, url.Host, url.Path), nil
+	return fmt.Sprintf("%s://%s%s", parsedURL.Scheme, parsedURL.Host, parsedURL.Path), nil
 }

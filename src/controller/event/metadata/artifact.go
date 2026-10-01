@@ -20,6 +20,7 @@ import (
 
 	"github.com/goharbor/harbor/src/common/security"
 	event2 "github.com/goharbor/harbor/src/controller/event"
+	"github.com/goharbor/harbor/src/controller/event/metadata/requestinfo"
 	"github.com/goharbor/harbor/src/pkg/artifact"
 	"github.com/goharbor/harbor/src/pkg/notifier/event"
 )
@@ -51,6 +52,7 @@ func (p *PushArtifactEventMetadata) Resolve(event *event.Event) error {
 	if exist {
 		data.Operator = ctx.GetUsername()
 	}
+	ae.ClientAddress, ae.UserAgent = requestinfo.FromContext(p.Ctx)
 	event.Topic = event2.TopicPushArtifact
 	event.Data = data
 	return nil
@@ -61,15 +63,22 @@ type PullArtifactEventMetadata struct {
 	Artifact *artifact.Artifact
 	Tag      string
 	Operator string
+	// ClientAddress is the source IP address of the request that triggered
+	// the pull, empty when not resolved from an HTTP request.
+	ClientAddress string
+	// UserAgent is the User-Agent header of the request that triggered the pull.
+	UserAgent string
 }
 
 // Resolve to the event from the metadata
 func (p *PullArtifactEventMetadata) Resolve(event *event.Event) error {
 	ae := &event2.ArtifactEvent{
-		EventType:  event2.TopicPullArtifact,
-		Repository: p.Artifact.RepositoryName,
-		Artifact:   p.Artifact,
-		OccurAt:    time.Now(),
+		EventType:     event2.TopicPullArtifact,
+		Repository:    p.Artifact.RepositoryName,
+		Artifact:      p.Artifact,
+		OccurAt:       time.Now(),
+		ClientAddress: p.ClientAddress,
+		UserAgent:     p.UserAgent,
 	}
 	if p.Tag != "" {
 		ae.Tags = []string{p.Tag}
@@ -93,14 +102,17 @@ type DeleteArtifactEventMetadata struct {
 
 // Resolve to the event from the metadata
 func (d *DeleteArtifactEventMetadata) Resolve(event *event.Event) error {
+	clientAddress, userAgent := requestinfo.FromContext(d.Ctx)
 	data := &event2.DeleteArtifactEvent{
 		ArtifactEvent: &event2.ArtifactEvent{
-			EventType:  event2.TopicDeleteArtifact,
-			Repository: d.Artifact.RepositoryName,
-			Artifact:   d.Artifact,
-			Tags:       d.Tags,
-			Labels:     d.Labels,
-			OccurAt:    time.Now(),
+			EventType:     event2.TopicDeleteArtifact,
+			Repository:    d.Artifact.RepositoryName,
+			Artifact:      d.Artifact,
+			Tags:          d.Tags,
+			Labels:        d.Labels,
+			OccurAt:       time.Now(),
+			ClientAddress: clientAddress,
+			UserAgent:     userAgent,
 		},
 	}
 	ctx, exist := security.FromContext(d.Ctx)
