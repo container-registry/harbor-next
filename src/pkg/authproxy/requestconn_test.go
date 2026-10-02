@@ -46,8 +46,9 @@ func TestUserFromReviewStatusRunsOnTheRequestConnection(t *testing.T) {
 	}
 
 	ctx := orm.NewContext(context.Background(), beegoorm.NewOrm())
+	var txErr error
 	completed := ormtesting.RunsWithin(deadlockTimeout, func() {
-		_ = orm.WithTransaction(func(txCtx context.Context) error {
+		txErr = orm.WithTransaction(func(txCtx context.Context) error {
 			_, err := UserFromReviewStatus(txCtx, status, nil, nil)
 			return err
 		})(ctx)
@@ -56,5 +57,8 @@ func TestUserFromReviewStatusRunsOnTheRequestConnection(t *testing.T) {
 	if !completed {
 		t.Fatalf("UserFromReviewStatus did not return within %s: it asked the pool for a "+
 			"second connection while the request transaction still held the first", deadlockTimeout)
+	}
+	if txErr != nil {
+		t.Fatalf("UserFromReviewStatus failed on the request connection: %v", txErr)
 	}
 }

@@ -51,6 +51,10 @@ var (
 // whose tests register a real database.
 func RegisterLimitedPool(t testing.TB, maxConns int) *sql.DB {
 	t.Helper()
+	if maxConns < 1 {
+		// database/sql treats a non-positive cap as unlimited.
+		t.Fatalf("RegisterLimitedPool: maxConns must be at least 1, got %d", maxConns)
+	}
 
 	limitedOnce.Do(func() {
 		db := sql.OpenDB(limitedConnector{})
@@ -77,8 +81,9 @@ func RegisterLimitedPool(t testing.TB, maxConns int) *sql.DB {
 	return limitedDB
 }
 
-// RunsWithin reports whether fn returns within d. On timeout fn keeps running in
-// its own goroutine, parked on the pool with nothing left to wake it.
+// RunsWithin reports whether fn returns within d. On timeout it hands the
+// limited pool's parked acquires a connection so fn can finish, and waits up to d
+// for that, so the pool is not left held for later tests in the binary.
 func RunsWithin(d time.Duration, fn func()) bool {
 	done := make(chan struct{})
 	go func() {
@@ -92,7 +97,38 @@ func RunsWithin(d time.Duration, fn func()) bool {
 	case <-done:
 		return true
 	case <-timer.C:
-		return false
+	}
+
+	unparkUntil(done, d)
+	return false
+}
+
+// unparkUntil serves the limited pool's parked acquires until done closes or d
+// passes. Raising the cap does not wake a parked acquire; returning a connection
+// to the pool hands it to the oldest waiter.
+func unparkUntil(done <-chan struct{}, d time.Duration) {
+	if limitedDB == nil {
+		<-time.After(d)
+		return
+	}
+	maxOpen := limitedDB.Stats().MaxOpenConnections
+	limitedDB.SetMaxOpenConns(0)
+	defer limitedDB.SetMaxOpenConns(maxOpen)
+
+	deadline := time.After(d)
+	tick := time.NewTicker(10 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		if c, err := limitedDB.Conn(context.Background()); err == nil {
+			_ = c.Close()
+		}
+		select {
+		case <-done:
+			return
+		case <-deadline:
+			return
+		case <-tick.C:
+		}
 	}
 }
 

@@ -427,6 +427,15 @@ func TestParsePreResolved(t *testing.T) {
 func TestPreCheckDeleteRunsOnTheRequestConnection(t *testing.T) {
 	ormtesting.RegisterLimitedPool(t, 1)
 
+	// Record the real lookup, so a PreCheck that skips it cannot pass.
+	origLookup := lookupMemberFn
+	looked := false
+	lookupMemberFn = func(ctx context.Context, projectID, memberID string) (string, string) {
+		looked = true
+		return lookupMember(ctx, projectID, memberID)
+	}
+	defer func() { lookupMemberFn = origLookup }()
+
 	r := &resolver{}
 	ctx := orm.NewContext(context.Background(), beegoorm.NewOrm())
 
@@ -440,5 +449,8 @@ func TestPreCheckDeleteRunsOnTheRequestConnection(t *testing.T) {
 	if !completed {
 		t.Fatalf("PreCheck did not return within %s: it asked the pool for a second "+
 			"connection while the request transaction still held the first", deadlockTimeout)
+	}
+	if !looked {
+		t.Fatal("PreCheck returned without looking up the member, so the test proves nothing")
 	}
 }
