@@ -93,7 +93,13 @@ func (m *manager) Populate(ctx context.Context, userGroups []model.UserGroup) ([
 		order[i] = i
 	}
 	sort.SliceStable(order, func(a, b int) bool {
-		return userGroups[order[a]].GroupName < userGroups[order[b]].GroupName
+		ga, gb := userGroups[order[a]], userGroups[order[b]]
+		if ga.GroupName != gb.GroupName {
+			return ga.GroupName < gb.GroupName
+		}
+		// LDAP onboarding renames a group whose name is taken to its DN, so equal
+		// names can still become distinct inserts.
+		return ga.LdapGroupDN < gb.LdapGroupDN
 	})
 
 	ids := make([]int, len(userGroups))
