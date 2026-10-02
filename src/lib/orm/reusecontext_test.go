@@ -83,6 +83,27 @@ func TestReuseContextReplacesACompletedTransaction(t *testing.T) {
 	assert.False(t, isTx, "the replacement ORM must not be the spent transaction ORM")
 }
 
+// A context detached from a completed scope must behave as outside any
+// transaction: a new transaction can start on it and AfterCommit fires.
+func TestReuseContextDetachesTheCompletedScope(t *testing.T) {
+	ormtesting.RegisterLimitedPool(t, 2)
+
+	var captured context.Context
+	ctx := NewContext(context.Background(), beegoorm.NewOrm())
+	require.NoError(t, WithTransaction(func(txCtx context.Context) error {
+		captured = txCtx
+		return nil
+	})(ctx))
+
+	reused := ReuseContext(captured)
+	require.NoError(t, WithTransaction(func(context.Context) error { return nil })(reused),
+		"a new transaction must start on the detached context")
+
+	fired := false
+	AfterCommit(reused, func() { fired = true })
+	assert.True(t, fired, "outside a transaction AfterCommit must run immediately")
+}
+
 // TestReuseContextDoesNotTakeASecondConnection runs a query on the reused
 // context against a pool of one, where a second ORM would never get a connection.
 func TestReuseContextDoesNotTakeASecondConnection(t *testing.T) {

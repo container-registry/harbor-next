@@ -120,7 +120,9 @@ func ReuseContext(ctx context.Context) context.Context {
 		return NewContext(ctx, orm.NewOrm())
 	}
 	if h, ok := ctx.Value(hooksKey{}).(*txHooks); ok && h != nil && h.isClosed() {
-		return NewContext(ctx, orm.NewOrm())
+		// Drop the spent scope too, or WithTransaction on this context refuses to
+		// start and AfterCommit queues into a sink that never fires.
+		return NewContext(context.WithValue(ctx, hooksKey{}, (*txHooks)(nil)), orm.NewOrm())
 	}
 	return ctx
 }
