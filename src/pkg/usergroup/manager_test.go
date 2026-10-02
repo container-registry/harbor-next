@@ -17,10 +17,16 @@
 package usergroup
 
 import (
+	"context"
+	"math/rand"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/goharbor/harbor/src/common"
+	"github.com/goharbor/harbor/src/lib/orm"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/usergroup/model"
 	htesting "github.com/goharbor/harbor/src/testing"
@@ -109,6 +115,49 @@ func (s *ManagerTestSuite) TestPopulateGroup() {
 	s.True(len(ids) > 0)
 	for _, i := range ids {
 		s.True(i > 0)
+	}
+}
+
+// TestPopulateConcurrentOverlappingGroups mirrors concurrent logins that onboard the
+// same new groups in different orders, each inside its own request transaction.
+func (s *ManagerTestSuite) TestPopulateConcurrentOverlappingGroups() {
+	const (
+		rounds     = 10
+		logins     = 8
+		groupCount = 6
+	)
+	for r := 0; r < rounds; r++ {
+		names := make([]string, groupCount)
+		for i := range names {
+			names[i] = "concurrent_" + s.RandString(8)
+		}
+
+		var wg sync.WaitGroup
+		got := make([][]int, logins)
+		errs := make([]error, logins)
+		for l := 0; l < logins; l++ {
+			groups := make([]model.UserGroup, groupCount)
+			for i, p := range rand.Perm(groupCount) {
+				groups[i] = model.UserGroup{GroupName: names[p], GroupType: common.HTTPGroupType}
+			}
+			wg.Add(1)
+			go func(l int) {
+				defer wg.Done()
+				errs[l] = orm.WithTransaction(func(ctx context.Context) error {
+					ids, err := s.mgr.Populate(ctx, groups)
+					got[l] = ids
+					// The rest of the request keeps the transaction, and its locks, open.
+					time.Sleep(20 * time.Millisecond)
+					return err
+				})(orm.Context())
+			}(l)
+		}
+		wg.Wait()
+
+		for l := 0; l < logins; l++ {
+			s.Require().NoError(errs[l])
+			s.Require().Lenf(got[l], groupCount, "round %d login %d lost a group membership", r, l)
+		}
 	}
 }
 
