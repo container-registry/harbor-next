@@ -322,9 +322,31 @@ jobs:
         env:
           DISPATCH_TOKEN: ${{ steps.app-token.outputs.token }}
           TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
+          # Where these images actually went, resolved the same way the publish
+          # job resolves it.
+          REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
+          REGISTRY_PROJECT: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
           TARGET_SHA: ${{ github.sha }}
           LINE: ${{ github.ref_name }}
         run: task release-notes:dispatch-release-cut
+
+  e2e:
+    name: E2E
+    # Every release gets the same run a nightly gets, against the images
+    # this release just published.
+    needs: [release-please, publish-images]
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    permissions:
+      contents: read
+    uses: $/.github/workflows/nightly-e2e.yml
+    with:
+      tag: ${{ needs.release-please.outputs.tag_name }}
+      channel: release
+      registry_address: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
+      registry_project: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
+    secrets:
+      SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+      REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
 
   chart:
     name: Publish Helm Chart

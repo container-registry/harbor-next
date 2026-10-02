@@ -126,3 +126,45 @@ UPDATE multi_project_reference m
 SET rank = ranked.rn
 FROM ranked
 WHERE m.id = ranked.id AND m.rank <> ranked.rn;
+
+-- execution.revision is declared int64 in the Go model (src/pkg/task/dao/model.go)
+-- while the column stayed integer. 0181 widened p2p_preheat_instance.setup_timestamp,
+-- task.status_revision and schedule.revision to bigint and left this one behind, so
+-- the model and the column disagree on the only revision column still 32-bit.
+-- Unlike schedule.revision, which stores a job check-in unix timestamp and would
+-- overflow in 2038, this one is an optimistic-locking counter (revision = revision+1
+-- in pkg/task/dao/execution.go) and is widened for consistency with the model, not
+-- because it is close to overflowing.
+-- Guarded on the current type so repeat runs never rewrite the table.
+DO $$
+BEGIN
+    -- Resolve the schema from the same relation the unqualified ALTER below
+    -- resolves to. current_schema() is only the first entry in search_path, so
+    -- it would miss an execution table living in a later one and skip the
+    -- widening without a word. to_regclass returns NULL when there is no
+    -- execution table at all, which leaves the guard false, as it should.
+    --
+    -- relkind keeps the guard on tables: to_regclass resolves any relation, so
+    -- an index named execution earlier in search_path would otherwise match a
+    -- pg_attribute row here and send ALTER TABLE at something it cannot alter.
+    --
+    -- The type is compared after resolving a domain to its base type, so a
+    -- column already typed as a domain over bigint keeps the domain and its
+    -- constraints instead of having them stripped off by the ALTER.
+    IF EXISTS (
+        SELECT 1
+        FROM pg_attribute a
+        JOIN pg_class c ON c.oid = a.attrelid
+        JOIN pg_type t ON t.oid = a.atttypid
+        WHERE a.attrelid = to_regclass('execution')
+          AND c.relkind IN ('r', 'p')
+          AND a.attname = 'revision'
+          AND a.attnum > 0
+          AND NOT a.attisdropped
+          AND CASE WHEN t.typtype = 'd' THEN t.typbasetype ELSE a.atttypid END
+              <> 'bigint'::regtype
+    ) THEN
+        ALTER TABLE execution ALTER COLUMN revision TYPE bigint;
+    END IF;
+END
+$$;

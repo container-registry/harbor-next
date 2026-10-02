@@ -28,6 +28,7 @@ import (
 	"github.com/goharbor/harbor/src/pkg/p2p/preheat/provider/client"
 
 	"github.com/olekukonko/tablewriter"
+	"github.com/olekukonko/tablewriter/tw"
 )
 
 const (
@@ -315,23 +316,26 @@ func (dd *DragonflyDriver) CheckProgress(taskID string) (*PreheatingStatus, erro
 		state = provider.PreheatingStatusSuccess
 
 		var buffer bytes.Buffer
-		table := tablewriter.NewWriter(&buffer)
-		table.SetHeader([]string{"Blob URL", "Hostname", "IP", "Cluster ID", "State", "Error Message"})
+		// Every cell is a string, so the errors tablewriter v1 returns here cannot fire.
+		table := tablewriter.NewTable(&buffer,
+			tablewriter.WithRendition(tw.Rendition{Symbols: tw.NewSymbols(tw.StyleASCII)}),
+		)
+		table.Header([]string{"Blob URL", "Hostname", "IP", "Cluster ID", "State", "Error Message"})
 		for _, jobState := range resp.Result.JobStates {
 			for _, result := range jobState.Results {
 				// Write the success tasks records to the table.
 				for _, successTask := range result.SuccessTasks {
-					table.Append([]string{successTask.URL, successTask.Hostname, successTask.IP, fmt.Sprint(result.SchedulerClusterID), dragonflyJobSuccessState, ""})
+					_ = table.Append([]string{successTask.URL, successTask.Hostname, successTask.IP, fmt.Sprint(result.SchedulerClusterID), dragonflyJobSuccessState, ""})
 				}
 
 				// Write the failure tasks records to the table.
 				for _, failureTask := range result.FailureTasks {
-					table.Append([]string{failureTask.URL, failureTask.Hostname, failureTask.IP, fmt.Sprint(result.SchedulerClusterID), dragonflyJobFailureState, failureTask.Description})
+					_ = table.Append([]string{failureTask.URL, failureTask.Hostname, failureTask.IP, fmt.Sprint(result.SchedulerClusterID), dragonflyJobFailureState, failureTask.Description})
 				}
 			}
 		}
 
-		table.Render()
+		_ = table.Render()
 		successMessage = buffer.String()
 	case dragonflyJobFailureState:
 		var errs errors.Errors

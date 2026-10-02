@@ -16,13 +16,18 @@ package registry
 
 import (
 	"context"
+	stderrors "errors"
+	"net"
+	neturl "net/url"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
 	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/lib/config"
+	"github.com/goharbor/harbor/src/lib/errors"
 	_ "github.com/goharbor/harbor/src/pkg/config/inmemory"
+	"github.com/goharbor/harbor/src/pkg/reg"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
 	"github.com/goharbor/harbor/src/testing/mock"
 	testingproject "github.com/goharbor/harbor/src/testing/pkg/project"
@@ -68,15 +73,18 @@ func (r *registryTestSuite) TestValidate() {
 	err = r.ctl.validate(nil, registry)
 	r.NotNil(err)
 
-	// URL with FTP scheme
+	// URL with FTP scheme: rejected before an adapter is ever built, because
+	// net/http cannot dial it and the transport error used to surface as a 500
 	registry = &model.Registry{
 		Name: "endpoint01",
 		URL:  "ftp://example.com",
 	}
-	mock.OnAnything(r.regMgr, "CreateAdapter").Return(r.adapter, nil)
-	mock.OnAnything(r.adapter, "HealthCheck").Return(model.Healthy, nil)
 	err = r.ctl.validate(nil, registry)
-	r.Nil(err)
+	r.NotNil(err)
+	r.True(errors.IsErr(err, errors.BadRequestCode), "want a bad request error, got %v", err)
+	r.regMgr.AssertNotCalled(r.T(), "CreateAdapter", mock.Anything, mock.Anything)
+
+	r.SetupTest()
 
 	// URL without scheme
 	registry = &model.Registry{
@@ -149,6 +157,84 @@ func (r *registryTestSuite) TestValidate() {
 	r.Equal("http://example.com/redirect", registry.URL)
 	r.regMgr.AssertExpectations(r.T())
 	r.adapter.AssertExpectations(r.T())
+}
+
+// An endpoint that cannot be reached is a bad request, not a 500. This drives
+// the real registry manager and the real Harbor adapter factory rather than
+// mocks: the probe that fails is the GET /api/version issued while the adapter
+// is being built, so it never reaches the HealthCheck call a mocked manager
+// would exercise.
+func (r *registryTestSuite) TestValidateUnreachableEndpoint() {
+	config.InitWithSettings(map[string]any{
+		common.CoreURL: "http://core:8080",
+	})
+
+	// Hold a loopback listener open and hang up on every connection. Keeping
+	// the port bound is what makes this deterministic: releasing it first
+	// would let another process take it between the bind and the request.
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	r.Require().NoError(err)
+	defer listener.Close()
+	address := listener.Addr().String()
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			conn.Close()
+		}
+	}()
+
+	ctl := &controller{
+		regMgr: reg.Mgr,
+		repMgr: r.repMgr,
+		proMgr: r.proMgr,
+	}
+
+	err = ctl.validate(context.Background(), &model.Registry{
+		Name: "endpoint01",
+		Type: model.RegistryTypeHarbor,
+		URL:  "http://" + address,
+	})
+
+	r.Require().NotNil(err)
+	r.True(errors.IsErr(err, errors.BadRequestCode), "want a bad request error, got %v", err)
+	r.Contains(err.Error(), "failed to reach the registry endpoint")
+}
+
+// The other branch: an adapter that builds but whose health check cannot reach
+// the endpoint. Only reachable with a mocked adapter, since the adapters that
+// probe lazily are the ones that need credentials.
+func (r *registryTestSuite) TestValidateHealthCheckTransportError() {
+	transportErr := &neturl.Error{
+		Op:  "Get",
+		URL: "http://example.com/v2/",
+		Err: stderrors.New("dial tcp: connection refused"),
+	}
+	mock.OnAnything(r.regMgr, "CreateAdapter").Return(r.adapter, nil)
+	mock.OnAnything(r.adapter, "HealthCheck").Return("", transportErr)
+
+	err := r.ctl.validate(context.Background(), &model.Registry{
+		Name: "endpoint01",
+		URL:  "http://example.com",
+	})
+
+	r.Require().NotNil(err)
+	r.True(errors.IsErr(err, errors.BadRequestCode), "want a bad request error, got %v", err)
+	r.Contains(err.Error(), "failed to reach the registry endpoint")
+	r.regMgr.AssertExpectations(r.T())
+	r.adapter.AssertExpectations(r.T())
+}
+
+// Errors that are not transport failures keep their own code, so a genuine
+// internal fault is not reported to the caller as a bad request.
+func (r *registryTestSuite) TestUnreachableEndpointErrorPassesOtherErrorsThrough() {
+	internal := stderrors.New("boom")
+	r.Equal(internal, unreachableEndpointError("http://example.com", internal))
+
+	notFound := errors.New(nil).WithCode(errors.NotFoundCode).WithMessage("gone")
+	r.Equal(notFound, unreachableEndpointError("http://example.com", notFound))
 }
 
 func (r *registryTestSuite) TestDelete() {

@@ -16,7 +16,9 @@ package registry
 
 import (
 	"context"
+	stderrors "errors"
 	"math/rand"
+	neturl "net/url"
 	"strings"
 	"time"
 
@@ -92,7 +94,9 @@ func (c *controller) validate(ctx context.Context, registry *model.Registry) err
 	if len(registry.Name) > 64 {
 		return errors.New(nil).WithCode(errors.BadRequestCode).WithMessage("the max length of name is 64")
 	}
-	url, err := lib.ValidateURL(registry.URL)
+	// a registry endpoint is only ever spoken to over HTTP; the default scheme
+	// set of ValidateURL also admits ftp/s3/sftp, which net/http cannot dial
+	url, err := lib.ValidateURL(registry.URL, "http", "https")
 	if err != nil {
 		return err
 	}
@@ -170,15 +174,42 @@ func (c *controller) Delete(ctx context.Context, id int64) error {
 }
 
 func (c *controller) IsHealthy(ctx context.Context, registry *model.Registry) (bool, error) {
+	// the Harbor adapter probes /api/version while the adapter is built, so an
+	// unreachable endpoint surfaces from CreateAdapter rather than HealthCheck
 	adapter, err := c.regMgr.CreateAdapter(ctx, registry)
 	if err != nil {
-		return false, err
+		return false, unreachableEndpointError(registry.URL, err)
 	}
 	status, err := adapter.HealthCheck()
 	if err != nil {
-		return false, err
+		return false, unreachableEndpointError(registry.URL, err)
 	}
 	return status == model.Healthy, nil
+}
+
+// unreachableEndpointError maps a transport failure onto a bad request.
+//
+// net/http returns *url.Error for every failure that stops an HTTP exchange
+// from completing, and each one describes the endpoint the caller supplied
+// rather than a fault inside Harbor:
+//
+//   - the host does not resolve, or the connection is refused or times out
+//   - the scheme is one net/http cannot dial
+//   - the TLS handshake fails, including an untrusted or mismatched
+//     certificate, which the caller fixes with insecure or ca_certificate
+//
+// All of them are a 400 deliberately: the caller has to change what it sent.
+// The message keeps the cause verbatim so the specific reason is visible even
+// though the prefix is shared. Every other error is passed through untouched,
+// so a genuine internal failure keeps its own code, as does a registry that
+// answers over HTTP with a status Harbor did not expect.
+func unreachableEndpointError(url string, err error) error {
+	var urlErr *neturl.Error
+	if !stderrors.As(err, &urlErr) {
+		return err
+	}
+	return errors.New(nil).WithCode(errors.BadRequestCode).
+		WithMessagef("failed to reach the registry endpoint %s: %v", url, err)
 }
 
 func (c *controller) GetInfo(ctx context.Context, id int64) (*model.RegistryInfo, error) {

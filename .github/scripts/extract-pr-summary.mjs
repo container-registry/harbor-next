@@ -15,12 +15,21 @@ const canonicalPrPattern = new RegExp(
   `\\bin \\[#(\\d+)\\]\\(https://github\\.com/${escapedRepository}/pull/\\1\\)`,
   'g',
 );
+// A backport subject already ends in a parenthesis, so release-please appends
+// no reference of its own and the entry never gains a canonical one. The
+// release note for the change lives on the pull request named in the subject,
+// so read that when there is nothing else to read.
+const backportPrPattern = new RegExp(
+  `\\(backport \\[#(\\d+)\\]\\(https://github\\.com/${escapedRepository}/(?:issues|pull)/\\1\\)\\)`,
+  'gi',
+);
 // The entry's own reference is the last canonical match on the line; an
 // earlier one could sit inside the entry title.
 const prNumbers = [...new Set(
   formattedNotes
     .split(/\r?\n/)
-    .map(line => [...line.matchAll(canonicalPrPattern)].at(-1)?.[1])
+    .map(line => [...line.matchAll(canonicalPrPattern)].at(-1)?.[1]
+      ?? [...line.matchAll(backportPrPattern)].at(-1)?.[1])
     .filter(Boolean),
 )];
 

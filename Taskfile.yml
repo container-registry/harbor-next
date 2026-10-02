@@ -72,6 +72,8 @@ includes:
     taskfile: ./taskfile/release-images-local.yml
   release-notes:
     taskfile: ./taskfile/release-notes.yml
+  nightly:
+    taskfile: ./taskfile/nightly.yml
 
 tasks:
   default:
@@ -141,6 +143,11 @@ tasks:
     desc: "Recreate a GitHub release's notes from its tagged changelog"
     cmds:
       - task: release-notes:update
+
+  nightly-channel:
+    desc: "Materialize tonight's nightly release-please channel"
+    cmds:
+      - task: nightly:channel
 
   clean:
     desc: "Remove all build artifacts, images, test output, and dev environment"
