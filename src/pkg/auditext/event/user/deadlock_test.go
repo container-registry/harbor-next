@@ -38,9 +38,16 @@ const deadlockTimeout = 10 * time.Second
 func TestPreCheckDeleteRunsOnTheRequestConnection(t *testing.T) {
 	ormtesting.RegisterLimitedPool(t, 1)
 
-	resolver, ok := commonevent.Resolvers()[urlPattern]
+	registered, ok := commonevent.Resolvers()[urlPattern].(*userEventResolver)
 	if !ok {
-		t.Fatalf("no resolver registered for %s", urlPattern)
+		t.Fatalf("no user resolver registered for %s", urlPattern)
+	}
+	// A copy that records the lookup, so a PreCheck that skips it cannot pass.
+	resolver := *registered
+	looked := false
+	resolver.IDToNameFunc = func(ctx context.Context, id string) string {
+		looked = true
+		return userIDToName(ctx, id)
 	}
 
 	ctx := orm.NewContext(context.Background(), beegoorm.NewOrm())
@@ -54,5 +61,8 @@ func TestPreCheckDeleteRunsOnTheRequestConnection(t *testing.T) {
 	if !completed {
 		t.Fatalf("PreCheck did not return within %s: it asked the pool for a second "+
 			"connection while the request transaction still held the first", deadlockTimeout)
+	}
+	if !looked {
+		t.Fatal("PreCheck returned without resolving the user name, so the test proves nothing")
 	}
 }

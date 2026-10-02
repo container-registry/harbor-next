@@ -39,8 +39,9 @@ func TestPopulateGroupsDBRunsOnTheRequestConnection(t *testing.T) {
 	ormtesting.RegisterLimitedPool(t, 1)
 
 	ctx := orm.NewContext(context.Background(), beegoorm.NewOrm())
+	var txErr error
 	completed := ormtesting.RunsWithin(deadlockTimeout, func() {
-		_ = orm.WithTransaction(func(txCtx context.Context) error {
+		txErr = orm.WithTransaction(func(txCtx context.Context) error {
 			_, err := populateGroupsDB(txCtx, []string{"group-b", "group-a"})
 			return err
 		})(ctx)
@@ -49,5 +50,8 @@ func TestPopulateGroupsDBRunsOnTheRequestConnection(t *testing.T) {
 	if !completed {
 		t.Fatalf("populateGroupsDB did not return within %s: it asked the pool for a "+
 			"second connection while the request transaction still held the first", deadlockTimeout)
+	}
+	if txErr != nil {
+		t.Fatalf("populateGroupsDB failed on the request connection: %v", txErr)
 	}
 }
