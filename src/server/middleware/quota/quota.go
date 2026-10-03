@@ -64,7 +64,11 @@ func RequestMiddleware(config RequestConfig, skippers ...middleware.Skipper) fun
 		logger := log.G(r.Context()).WithFields(log.Fields{"middleware": "quota", "action": "request", "url": r.URL.Path})
 
 		if config.ReferenceObject == nil || config.Resources == nil {
+<<<<<<< HEAD
 			lib_http.SendError(w, fmt.Errorf("invalid config the for middleware"))
+=======
+			lib_http.SendError(w, fmt.Errorf("invalid configuration for the middleware"))
+>>>>>>> ab9e0805a (fix: correct grammar, formatting, and non-actionable error messages (#23974))
 			return
 		}
 
@@ -198,7 +202,11 @@ func RefreshMiddleware(config RefreshConfig, skipers ...middleware.Skipper) func
 		}
 
 		if config.ReferenceObject == nil {
+<<<<<<< HEAD
 			return fmt.Errorf("invalid config the for middleware")
+=======
+			return fmt.Errorf("invalid configuration for the middleware")
+>>>>>>> ab9e0805a (fix: correct grammar, formatting, and non-actionable error messages (#23974))
 		}
 
 		logger := log.G(r.Context()).WithFields(log.Fields{"middleware": "quota", "action": "refresh", "url": r.URL.Path})
