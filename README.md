@@ -5,6 +5,7 @@
 [![Nightly](https://github.com/container-registry/harbor-next/actions/workflows/nightly.yml/badge.svg)](https://github.com/container-registry/harbor-next/actions/workflows/nightly.yml)
 [![release-2.15](https://img.shields.io/github/v/release/container-registry/harbor-next?filter=v2.15.*&label=release-2.15)](https://github.com/container-registry/harbor-next/releases?q=v2.15)
 [![beta](https://img.shields.io/github/v/release/container-registry/harbor-next?include_prereleases&filter=*-beta&label=beta&color=orange)](https://github.com/container-registry/harbor-next/releases?q=prerelease%3Atrue)
+[![chart](https://img.shields.io/github/v/release/container-registry/harbor-next?filter=chart-v*&label=chart)](https://github.com/container-registry/harbor-next/releases?q=chart)
 
 Harbor is a CNCF graduated open-source container registry to store and manage container images and other OCI artifacts securely with policies, role-based access control, vulnerability scans and signing.
 
@@ -92,6 +93,10 @@ docker compose up -d
 ```
 
 **Kubernetes** — install the Harbor Next Helm chart (`deploy/chart/`, also published as an OCI artifact; under active development). Platform guides live in [deploy/chart/docs/guide/](deploy/chart/docs/guide/) (k3s, OpenShift, Rancher, Nutanix).
+
+The chart carries its own version, released under `chart-v*` tags and shown in the chart
+badge above. It does not track the Harbor version, so read its `appVersion` to see which
+Harbor release a given chart deploys.
 
 ## Development
 
