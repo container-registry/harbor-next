@@ -110,7 +110,7 @@ migrations via a separate trusted client until that's fixed upstream.
 {{- end -}}
 
 {{/*
-Volume for the PG TLS Secret — mounted on core/jobservice/exporter.
+Volume for the PG TLS Secret — mounted on core/jobservice.
 */}}
 {{- define "harbor.database.tlsVolume" -}}
 {{- if eq (include "harbor.database.tlsEnabled" .) "true" }}

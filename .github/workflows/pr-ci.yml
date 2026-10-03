@@ -102,7 +102,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter]
+        component: [core, jobservice, registryctl, portal, registry, trivy-adapter]
         platform:
           - linux/amd64
           - linux/arm64
@@ -144,11 +144,11 @@ jobs:
           version: 3.49.1
 
       - name: Generate API code
-        if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
+        if: ${{ contains(fromJSON('["core","jobservice","registryctl","registry","trivy-adapter"]'), matrix.component) }}
         run: task build:gen-apis
 
       - name: Compile Go binary
-        if: ${{ contains(fromJSON('["core","jobservice","registryctl","exporter","registry","trivy-adapter"]'), matrix.component) }}
+        if: ${{ contains(fromJSON('["core","jobservice","registryctl","registry","trivy-adapter"]'), matrix.component) }}
         env:
           COMPONENT: ${{ matrix.component }}
           PLATFORM_PAIR: ${{ env.PLATFORM_PAIR }}
@@ -222,7 +222,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        component: [core, jobservice, registryctl, exporter, portal, registry, trivy-adapter]
+        component: [core, jobservice, registryctl, portal, registry, trivy-adapter]
     runs-on: ubuntu-26.04
     permissions:
       contents: read
@@ -308,7 +308,7 @@ jobs:
 
       - name: Sign images, generate SBOMs, and attest
         run: |
-          for image in core jobservice registryctl exporter portal registry trivy-adapter; do
+          for image in core jobservice registryctl portal registry trivy-adapter; do
             image_name="harbor-${image}"
             if [ "${image}" = "trivy-adapter" ]; then
               image_name="trivy-adapter"
@@ -367,7 +367,7 @@ jobs:
             const registryAddress = process.env.REGISTRY_ADDRESS;
             const registryProject = process.env.PR_REGISTRY_PROJECT;
             const previewTag = process.env.PREVIEW_TAG;
-            const components = ['harbor-core', 'harbor-jobservice', 'harbor-registryctl', 'harbor-exporter', 'harbor-portal', 'harbor-registry', 'trivy-adapter'];
+            const components = ['harbor-core', 'harbor-jobservice', 'harbor-registryctl', 'harbor-portal', 'harbor-registry', 'trivy-adapter'];
 
             const stack = stackNumber
               ? await github.request('GET /repos/{owner}/{repo}/stacks/{stack_number}', {
