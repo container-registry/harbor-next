@@ -154,15 +154,12 @@ jobs:
           PLATFORM_PAIR: ${{ env.PLATFORM_PAIR }}
         run: task build:binary:${COMPONENT}:${PLATFORM_PAIR} BASE_GIT_COMMIT="${GITHUB_SHA:0:8}"
 
-      - name: Compile image helper binaries
+      - name: Compile Trivy CLI
+        if: ${{ matrix.component == 'trivy-adapter' }}
         env:
-          COMPONENT: ${{ matrix.component }}
           PLATFORM_PAIR: ${{ env.PLATFORM_PAIR }}
         run: |
-          task build:binary:lprobe:${PLATFORM_PAIR}
-          if [ "${COMPONENT}" = "trivy-adapter" ]; then
-            task build:binary:trivy:${PLATFORM_PAIR}
-          fi
+          task build:binary:trivy:${PLATFORM_PAIR}
 
       - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
         if: env.BUILDX_HOST == ''

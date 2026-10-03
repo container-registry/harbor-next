@@ -6,13 +6,18 @@ ARG TRIVY_BASE_IMAGE_VERSION=MISSING-BUILD-ARG
 ARG TRIVY_VERSION=MISSING-BUILD-ARG
 ARG TRIVY_COMMIT=unknown
 ARG ALPINE_VERSION=MISSING-BUILD-ARG
+ARG LPROBE_VERSION=MISSING-BUILD-ARG
 
 FROM alpine:${ALPINE_VERSION} AS certs
+
+# lprobe ships as a released multi-arch image; buildx resolves it for
+# the target platform, so no cross-compilation happens here.
+FROM ghcr.io/fivexl/lprobe:${LPROBE_VERSION} AS lprobe
 
 FROM docker.io/aquasec/trivy:${TRIVY_BASE_IMAGE_VERSION}
 COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 ARG TARGETARCH
-COPY bin/linux-${TARGETARCH}/lprobe /lprobe
+COPY --from=lprobe /lprobe /lprobe
 COPY bin/linux-${TARGETARCH}/scanner-trivy /home/scanner/bin/scanner-trivy
 COPY bin/linux-${TARGETARCH}/trivy /usr/local/bin/trivy
 
