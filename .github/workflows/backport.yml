@@ -4,10 +4,7 @@ on:
   issue_comment:
     types: [created]
 
-permissions:
-  contents: write
-  issues: write
-  pull-requests: write
+permissions: {}
 
 jobs:
   backport:
@@ -18,6 +15,11 @@ jobs:
         contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
       }}
     runs-on: ubuntu-26.04
+    permissions:
+      # pushes the cherry-pick branch
+      contents: write
+      # opens the backport PR and reports back on the source PR
+      pull-requests: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}

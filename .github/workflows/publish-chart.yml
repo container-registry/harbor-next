@@ -19,9 +19,7 @@ on:
         required: true
         type: string
 
-permissions:
-  contents: read
-  id-token: write
+permissions: {}
 
 concurrency:
   group: publish-chart-${{ inputs.tag_name }}
@@ -32,6 +30,10 @@ jobs:
     name: Publish Helm Chart
     runs-on: ubuntu-26.04
     timeout-minutes: 30
+    permissions:
+      contents: read
+      # cosign signs the chart with the workflow's OIDC identity
+      id-token: write
     env:
       REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
       REGISTRY_PROJECT: ${{ vars.REGISTRY_PROJECT || '8gcr' }}

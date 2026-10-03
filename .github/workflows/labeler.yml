@@ -4,13 +4,16 @@ on:
   pull_request_target:
     types: [opened, synchronize, reopened]
 
-permissions:
-  contents: read
-  pull-requests: write
+permissions: {}
 
 jobs:
   labeler:
     runs-on: ubuntu-26.04
+    permissions:
+      # reads .github/labeler.yml
+      contents: read
+      # applies the labels
+      pull-requests: write
     steps:
       - uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0
         with:

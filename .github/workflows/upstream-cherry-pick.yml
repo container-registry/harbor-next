@@ -11,10 +11,7 @@ on:
   schedule:
     - cron: "17 3,15 * * *"
 
-permissions:
-  contents: write
-  issues: write
-  pull-requests: write
+permissions: {}
 
 concurrency:
   group: upstream-cherry-pick
@@ -26,6 +23,11 @@ jobs:
     # Forks may use the manual dry-run, but must not run the canonical schedule.
     if: github.event_name != 'schedule' || github.repository == 'container-registry/harbor-next'
     runs-on: ubuntu-26.04
+    permissions:
+      # pushes the cherry-pick branches
+      contents: write
+      # opens the PRs and labels them
+      pull-requests: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}

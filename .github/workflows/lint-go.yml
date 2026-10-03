@@ -19,8 +19,7 @@ on:
       - "taskfile/**/*.yml"
       - ".github/workflows/lint-go.yml"
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: go-lint-${{ github.event.pull_request.number || github.ref }}
@@ -33,6 +32,8 @@ jobs:
   lint:
     name: Go Lint
     runs-on: ubuntu-26.04
+    permissions:
+      contents: read
     env:
       GOLANGCI_LINT_CACHE: ${{ github.workspace }}/.ci-cache/golangci-lint
       XDG_CACHE_HOME: ${{ github.workspace }}/.ci-cache/xdg
