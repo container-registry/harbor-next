@@ -74,11 +74,12 @@ func (ia *InternalAPI) RenameAdmin() {
 
 // SyncQuota ...
 func (ia *InternalAPI) SyncQuota() {
-	if !config.QuotaPerProjectEnable(orm.Context()) {
+	// Request's own connection; the goroutine below outlives the request and keeps its own (#850).
+	ctx := ia.Ctx.Request.Context()
+	if !config.QuotaPerProjectEnable(ctx) {
 		ia.SendError(errors.ForbiddenError(nil).WithMessage("quota per project is deactivated"))
 		return
 	}
-	ctx := orm.Context()
 	cur := config.ReadOnly(ctx)
 	cfgMgr := config.GetCfgManager(ctx)
 	if !cur {
