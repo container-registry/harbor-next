@@ -80,6 +80,12 @@ const (
 	// TypeHarborSBOM identifies sbom.harbor
 	TypeHarborSBOM = "sbom.harbor"
 
+	// TypeExternalSPDX identifies an externally attached SPDX SBOM
+	TypeExternalSPDX = "sbom.external.spdx"
+
+	// TypeExternalCycloneDX identifies an externally attached CycloneDX SBOM
+	TypeExternalCycloneDX = "sbom.external.cyclonedx"
+
 	// TypeInTotoAttestation identifies an attestation that carries an
 	// application/vnd.in-toto+json payload.
 	TypeInTotoAttestation = "attestation.intoto"

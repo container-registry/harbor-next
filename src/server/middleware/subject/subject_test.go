@@ -23,6 +23,7 @@ import (
 	accessorymodel "github.com/goharbor/harbor/src/pkg/accessory/model"
 	_ "github.com/goharbor/harbor/src/pkg/accessory/model/base"
 	_ "github.com/goharbor/harbor/src/pkg/accessory/model/cosign"
+	_ "github.com/goharbor/harbor/src/pkg/accessory/model/sbom"
 	_ "github.com/goharbor/harbor/src/pkg/accessory/model/subject"
 	"github.com/goharbor/harbor/src/pkg/artifact"
 	"github.com/goharbor/harbor/src/pkg/distribution"
@@ -171,7 +172,6 @@ func (suite *MiddlewareTestSuite) TestSubject() {
 		_, descriptor, req := suite.prepare(name, subArtDigest)
 		suite.Nil(err)
 		artID := suite.addArt(projectID, repoId, name, descriptor.Digest.String())
-		suite.Nil(err)
 
 		res := httptest.NewRecorder()
 		next := suite.NextHandler(http.StatusCreated, map[string]string{"Docker-Content-Digest": descriptor.Digest.String()})
@@ -252,6 +252,83 @@ func (suite *MiddlewareTestSuite) TestSubjectDup() {
 		suite.Equal(descriptor.Digest.String(), accs[0].GetData().Digest)
 		suite.True(accs[0].IsHard())
 		suite.Equal(accessorymodel.TypeSubject, accs[0].GetData().Type)
+	})
+}
+
+func (suite *MiddlewareTestSuite) TestSBOMClassification() {
+	suite.WithProject(func(projectID int64, projectName string) {
+		name := fmt.Sprintf("%s/hello-world", projectName)
+		_, repoId, err := repository.Ctl.Ensure(suite.Context(), name)
+		suite.Nil(err)
+
+		subArtDigest := suite.DigestString()
+		suite.addArt(projectID, repoId, name, subArtDigest)
+
+		testCases := []struct {
+			name         string
+			configType   string
+			artifactType string
+			wantType     string
+		}{
+			{"harbor-sbom", "application/vnd.goharbor.harbor.sbom.v1", "", accessorymodel.TypeHarborSBOM},
+			{"spdx-sbom-config", "application/spdx+json", "", accessorymodel.TypeExternalSPDX},
+			{"cyclonedx-sbom-config", "application/vnd.cyclonedx+json", "", accessorymodel.TypeExternalCycloneDX},
+			{"spdx-sbom-artifactType", "application/vnd.oci.empty.v1+json", "application/spdx+json", accessorymodel.TypeExternalSPDX},
+			{"cyclonedx-sbom-artifactType", "application/vnd.oci.empty.v1+json", "application/vnd.cyclonedx+json", accessorymodel.TypeExternalCycloneDX},
+		}
+
+		for _, tc := range testCases {
+			suite.Run(tc.name, func() {
+				artifactTypeJSON := ""
+				if tc.artifactType != "" {
+					artifactTypeJSON = fmt.Sprintf(`,"artifactType":"%s"`, tc.artifactType)
+				}
+				
+				body := fmt.Sprintf(`{
+				   "schemaVersion":2,
+				   "mediaType":"application/vnd.oci.image.manifest.v1+json"%s,
+				   "config":{
+				      "mediaType":"%s",
+				      "size":2,
+				      "digest":"sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+				   },
+				   "layers":[],
+				   "subject":{
+				      "mediaType":"application/vnd.oci.image.manifest.v1+json",
+				      "size":419,
+				      "digest":"%s"
+				   }}`, artifactTypeJSON, tc.configType, subArtDigest)
+
+				_, descriptor, err := distribution.UnmarshalManifest("application/vnd.oci.image.manifest.v1+json", []byte(body))
+				suite.Nil(err)
+
+				req := suite.NewRequest(http.MethodPut, fmt.Sprintf("/v2/%s/manifests/%s", name, descriptor.Digest.String()), strings.NewReader(body))
+				req.Header.Set("Content-Type", "application/vnd.oci.image.manifest.v1+json")
+				info := lib.ArtifactInfo{
+					Repository: name,
+					Reference:  descriptor.Digest.String(),
+					Tag:        descriptor.Digest.String(),
+					Digest:     descriptor.Digest.String(),
+				}
+				req = req.WithContext(lib.WithArtifactInfo(req.Context(), info))
+
+				artID := suite.addArt(projectID, repoId, name, descriptor.Digest.String())
+
+				res := httptest.NewRecorder()
+				next := suite.NextHandler(http.StatusCreated, map[string]string{"Docker-Content-Digest": descriptor.Digest.String()})
+				Middleware()(next).ServeHTTP(res, req)
+				suite.Equal(http.StatusCreated, res.Code)
+
+				accs, err := accessory.Mgr.List(suite.Context(), &q.Query{
+					Keywords: map[string]any{
+						"SubjectArtifactDigest": subArtDigest,
+						"ArtifactID":            artID,
+					},
+				})
+				suite.Require().Equal(1, len(accs))
+				suite.Equal(tc.wantType, accs[0].GetData().Type)
+			})
+		}
 	})
 }
 
