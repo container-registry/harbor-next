@@ -3,7 +3,7 @@
 <p align="center"><img alt="Harbor Next" width="256px" src="https://raw.githubusercontent.com/container-registry/harbor-next/refs/heads/main/docs/img/harbor-next-logo.svg"></p>
 
 [![Nightly](https://github.com/container-registry/harbor-next/actions/workflows/nightly.yml/badge.svg)](https://github.com/container-registry/harbor-next/actions/workflows/nightly.yml)
-[![release-2.15](https://img.shields.io/github/v/release/container-registry/harbor-next?filter=v2.15.*&label=release-2.15)](https://github.com/container-registry/harbor-next/releases/latest)
+[![release-2.15](https://img.shields.io/github/v/release/container-registry/harbor-next?filter=v2.15.*&label=release-2.15)](https://github.com/container-registry/harbor-next/releases?q=v2.15)
 [![beta](https://img.shields.io/github/v/release/container-registry/harbor-next?include_prereleases&filter=*-beta&label=beta&color=orange)](https://github.com/container-registry/harbor-next/releases?q=prerelease%3Atrue)
 
 Harbor is a CNCF graduated open-source container registry to store and manage container images and other OCI artifacts securely with policies, role-based access control, vulnerability scans and signing.
@@ -73,7 +73,7 @@ Harbor Next exposes a RESTful API for administrative operations and integration.
 | Channel | Tag | Built from | Use it for |
 |---------|-----|------------|------------|
 | Stable | the newest `v2.15.x`, shown in the badge above | `release-2.15` | Production. Patch releases only, no new features. |
-| Beta | `v2.16.0-beta` | `main`, rebuilt every night | Trying the next release and reporting what breaks before it ships. |
+| Beta | `v2.16.0-beta` | `main`, updated nightly when release-eligible changes are pending | Trying the next release and reporting what breaks before it ships. |
 | Source | `main` | nothing published | Development only, see [Development](#development). |
 
 Both channels are published to `8gears.container-registry.com/8gcr/`, and every tag has its
