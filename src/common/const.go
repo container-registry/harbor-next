@@ -235,6 +235,16 @@ const (
 	// Customized banner message
 	BannerMessage = "banner_message"
 
+	// RegistryMirrorEnabled turns Harbor into a transparent registry mirror:
+	// pulls that arrive at the root of /v2/ without a project segment are
+	// routed to a proxy-cache project instead of being rejected
+	RegistryMirrorEnabled = "registry_mirror_enabled"
+	// RegistryMirrorNamespaces maps an upstream registry namespace to the
+	// proxy-cache project that serves it, e.g.
+	// "docker.io=dockerhub,ghcr.io=ghcr", with "*" as the catch-all used when
+	// the client sends no namespace hint
+	RegistryMirrorNamespaces = "registry_mirror_namespaces"
+
 	// UnauthenticatedLandingPage controls which page unauthenticated users see
 	UnauthenticatedLandingPage = "unauthenticated_landing_page"
 	LandingPageLogin           = "login"
