@@ -169,9 +169,21 @@ jobs:
         run: helm dependency build deploy/chart
 
       - name: Package chart
+        id: package
         # appVersion stays as committed, so default image tags resolve to a
         # published Harbor release.
-        run: helm package deploy/chart --version "${PREVIEW_VERSION}" --destination dist
+        #
+        # helm names the archive after the chart, which is `harbor`, so read
+        # the path back rather than rebuilding it from the repository name.
+        run: |
+          set -euo pipefail
+          helm package deploy/chart --version "${PREVIEW_VERSION}" --destination dist | tee package.log
+          chart_path=$(grep -o 'dist/[^ ]*\.tgz' package.log | tail -1)
+          if [ -z "${chart_path}" ]; then
+            echo "::error::Failed to capture the packaged chart path from helm package output"
+            exit 1
+          fi
+          echo "path=${chart_path}" >> "$GITHUB_OUTPUT"
 
       - name: Push chart
         id: push
@@ -180,7 +192,7 @@ jobs:
         # itself contain a sha256 digest the capture below would match.
         run: |
           set -euo pipefail
-          helm push "dist/harbor-next-${PREVIEW_VERSION}.tgz" \
+          helm push "${CHART_PATH}" \
             "oci://${REGISTRY_ADDRESS}/${PR_REGISTRY_PROJECT}/charts" 2>&1 | tee push.log
           digest=$(grep -o 'sha256:[a-f0-9]\{64\}' push.log | head -1)
           if [ -z "$digest" ]; then
@@ -188,6 +200,8 @@ jobs:
             exit 1
           fi
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+        env:
+          CHART_PATH: ${{ steps.package.outputs.path }}
 
       - name: Sign chart
         env:
