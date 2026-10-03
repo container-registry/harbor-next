@@ -68,13 +68,12 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "harbor.fullname" . }}-core
-            {{- /* Always the generated Secret: it carries the chart-managed
-                  keys (CSRF_KEY, REGISTRY_CREDENTIAL_PASSWORD, trace
-                  password) plus free-form `core.secret` entries. Pinned
-                  keys are overridden per-key via explicit env below —
-                  explicit env always beats envFrom. */}}
+            {{- /* Chart-managed keys; pinned keys are overridden by the
+                  explicit env below (explicit env beats envFrom). */}}
+            {{- if include "harbor.core.secretHasData" . }}
             - secretRef:
                 name: {{ include "harbor.core" . }}
+            {{- end }}
           env:
             {{- if .Values.existingSecretAdminPassword }}
             - name: HARBOR_ADMIN_PASSWORD

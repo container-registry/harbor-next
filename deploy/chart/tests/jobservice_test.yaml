@@ -380,3 +380,25 @@ tests:
     asserts:
       - exists:
           path: spec.template.metadata.annotations["checksum/configmap-env"]
+
+  # Pins: with every jobservice key externalized the generated Secret is
+  # skipped, so the envFrom secretRef must disappear with it.
+  - it: should drop the generated Secret envFrom when jobservice is fully externalized
+    template: templates/jobservice.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      autoGenSecrets: false
+      existingSecretSecretKey: enc-key
+      core.existingSecret: core-id
+      core.existingXsrfSecret: core-id
+      core.tokenSecretName: token-cert
+      jobservice.existingSecret: js-id
+      registry.credentials.existingSecret: reg-creds
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: RELEASE-NAME-harbor-jobservice
