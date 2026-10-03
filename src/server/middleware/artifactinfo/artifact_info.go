@@ -25,6 +25,7 @@ import (
 	"github.com/opencontainers/go-digest"
 
 	"github.com/goharbor/harbor/src/lib"
+	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/errors"
 	lib_http "github.com/goharbor/harbor/src/lib/http"
 	"github.com/goharbor/harbor/src/lib/log"
@@ -63,6 +64,10 @@ func Middleware() func(http.Handler) http.Handler {
 				return
 			}
 			repo := m[lib.RepositorySubexp]
+			if r, ok := rewriteBareRepository(req, repo); ok {
+				repo = r
+				m[lib.RepositorySubexp] = repo
+			}
 			pn, err := projectNameFromRepo(repo)
 			if err != nil {
 				lib_http.SendError(rw, errors.BadRequestError(err))
@@ -82,6 +87,10 @@ func Middleware() func(http.Handler) http.Handler {
 				art.Tag = t
 			}
 			if bmr, ok := m[blobMountRepo]; ok {
+				if r, ok := rewriteBareBlobMount(req, bmr); ok {
+					bmr = r
+					m[blobMountRepo] = bmr
+				}
 				// Fail early for now, though in docker registry an invalid may return 202
 				// it's not clear in OCI spec how to handle invalid from param
 				bmp, err := projectNameFromRepo(bmr)
@@ -97,6 +106,47 @@ func Middleware() func(http.Handler) http.Handler {
 			next.ServeHTTP(rw, req.WithContext(ctx))
 		})
 	}
+}
+
+// rewriteBareRepository prepends the configured default project to a repository
+// that lacks a project segment (e.g. "alpine" -> "library/alpine") and updates
+// the request URL in place so routing, authorization and the registry proxy all
+// see the qualified repository. It returns the rewritten repository and whether
+// a rewrite happened.
+func rewriteBareRepository(req *http.Request, repo string) (string, bool) {
+	if strings.Contains(repo, "/") {
+		return repo, false
+	}
+	dp := config.DefaultProjectName(req.Context())
+	if dp == "" {
+		return repo, false
+	}
+	// All matched v2 URLs continue with "/" right after the repository name
+	rest, ok := strings.CutPrefix(req.URL.Path, "/v2/"+repo+"/")
+	if !ok {
+		return repo, false
+	}
+	rewritten := dp + "/" + repo
+	req.URL.Path = "/v2/" + rewritten + "/" + rest
+	log.Debugf("rewrote bare repository %q to %q", repo, rewritten)
+	return rewritten, true
+}
+
+// rewriteBareBlobMount qualifies a project-less blob mount "from" query
+// parameter with the configured default project, mirroring rewriteBareRepository.
+func rewriteBareBlobMount(req *http.Request, bmr string) (string, bool) {
+	if strings.Contains(bmr, "/") {
+		return bmr, false
+	}
+	dp := config.DefaultProjectName(req.Context())
+	if dp == "" {
+		return bmr, false
+	}
+	rewritten := dp + "/" + bmr
+	q := req.URL.Query()
+	q.Set(blobFromQuery, rewritten)
+	req.URL.RawQuery = q.Encode()
+	return rewritten, true
 }
 
 func projectNameFromRepo(repo string) (string, error) {
