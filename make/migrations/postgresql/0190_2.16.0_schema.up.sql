@@ -17,6 +17,7 @@ ALTER TABLE robot ALTER COLUMN creator_ref TYPE bigint;
 ALTER TABLE role_permission ALTER COLUMN role_id TYPE bigint;
 ALTER SEQUENCE robot_id_seq AS bigint MAXVALUE 9007199254740991;
 
+<<<<<<< HEAD
 /*
 harbor-next only: capture the client IP address and User-Agent of the
 request that triggered an audit log entry, so admins can trace where an
@@ -24,3 +25,7 @@ action originated from.
 */
 ALTER TABLE audit_log_ext ADD COLUMN IF NOT EXISTS client_address varchar(255) DEFAULT '';
 ALTER TABLE audit_log_ext ADD COLUMN IF NOT EXISTS user_agent varchar(1024) DEFAULT '';
+=======
+CREATE INDEX idx_sbom_report_sbom_digest
+  ON sbom_report (mime_type, ((report::jsonb ->> 'sbom_digest')));
+>>>>>>> 74691f57c (Fix CPU saturation from full table scans during artifact deletion by indexing sbom_digest (#23773))
