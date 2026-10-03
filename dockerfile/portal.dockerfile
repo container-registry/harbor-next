@@ -20,12 +20,22 @@ COPY LICENSE ./dist/LICENSE
 WORKDIR /harbor/src/portal/app-swagger-ui
 RUN bun install --ignore-scripts && bun run build
 
+# RFC 9116 requires an absolute Expires date. The pipelines pass one so that it
+# is a cache input; a build without it falls back to a year from now, and that
+# layer can be reused from cache, so rebuild the image within the year.
+ARG SECURITY_TXT_EXPIRES=""
+COPY config/portal/security.txt.in /security.txt.in
+RUN mkdir -p /well-known && \
+    expires="${SECURITY_TXT_EXPIRES:-$(date -u -d "@$(( $(date -u +%s) + 31536000 ))" +%Y-%m-%dT%H:%M:%SZ)}" && \
+    sed "s|@EXPIRES@|${expires}|" /security.txt.in > /well-known/security.txt
+
 FROM 8gears.container-registry.com/dhi.io/nginx:${NGINX_VERSION}-debian13
 ARG TARGETARCH
 COPY bin/linux-${TARGETARCH}/lprobe /lprobe
 COPY --from=builder /harbor/src/portal/dist /usr/share/nginx/html
 COPY --from=builder /harbor/src/portal/app-swagger-ui/dist /usr/share/nginx/html
 COPY config/portal/nginx.conf /etc/nginx/nginx.conf
+COPY --from=builder /well-known /usr/share/nginx/html/.well-known
 WORKDIR /usr/share/nginx/html
 
 EXPOSE 8080

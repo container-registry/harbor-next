@@ -70,6 +70,8 @@ jobs:
           if [ -n "$BUILDX_HOST" ]; then
             echo "BUILDX_HOST=$BUILDX_HOST" >> "$GITHUB_ENV"
           fi
+          # Portal security.txt: a fresh date keeps the stamping layer out of cache
+          echo "SECURITY_TXT_EXPIRES=$(date -u -d '+1 year' +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -167,6 +169,7 @@ jobs:
             TRIVY_VERSION=${{ env.TRIVY_VERSION }}
             TRIVY_COMMIT=${{ env.TRIVY_COMMIT }}
             HARBOR_SCANNER_TRIVY_VERSION=${{ env.HARBOR_SCANNER_TRIVY_VERSION }}
+            SECURITY_TXT_EXPIRES=${{ env.SECURITY_TXT_EXPIRES }}
           tags: ${{ env.REGISTRY_ADDRESS }}/${{ env.REGISTRY_PROJECT }}/${{ steps.prepare.outputs.image_name }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
 
