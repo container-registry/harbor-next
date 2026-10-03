@@ -54,12 +54,30 @@ openssl req -x509 -nodes -days 365 -newkey rsa:4096 \
 
 When using self-signed certs, Docker clients require `--insecure-registry` or the CA must be trusted on each host.
 
+**Non-default HTTPS port.** Plain HTTP on `PORT_HTTP` redirects to HTTPS, and nginx
+cannot read `PORT_HTTPS` from the environment. When `PORT_HTTPS` is not `443`, copy
+`config/nginx/tls.conf`, set `$https_port` in the copy to the same port, and point
+`TLS_CONF` at it:
+
+```bash
+mkdir -p config
+sed 's/^set \$https_port 443;/set $https_port 8443;/' ../../config/nginx/tls.conf > config/tls.conf
+# .env
+PORT_HTTPS=8443
+TLS_CONF=./config/tls.conf
+```
+
 ## Image Repository
 
 `.env.example` defaults to pulling from the remote registry (`8gears.container-registry.com/8gcr/`).
 To use locally built images instead, set `IMAGE_REPO=` (empty) in `.env`.
 
 Images resolve to `${IMAGE_REPO}harbor-core:${HARBOR_TAG}`, so the value must end with `/`.
+
+Keep `HARBOR_TAG` in step with this compose file. Its portal healthcheck probes
+`127.0.0.1:8081/healthz`, which older portal images do not serve, so an older
+portal image stays `unhealthy` even though it works. Pull or build a portal image
+from the same version when updating the compose file.
 
 ## Registry Proxy
 
