@@ -20,6 +20,7 @@ import (
 	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/selector/selectors/doublestar"
+	selectorindex "github.com/goharbor/harbor/src/lib/selector/selectors/index"
 	"github.com/goharbor/harbor/src/pkg/retention/policy/rule"
 	"github.com/goharbor/harbor/src/pkg/retention/policy/rule/index"
 )
@@ -62,7 +63,21 @@ type Metadata struct {
 
 // ValidateRetentionPolicy validate the retention policy
 func (m *Metadata) ValidateRetentionPolicy() error {
-	// currently only validate the cron string of retention policy
+	for _, r := range m.Rules {
+		for _, s := range r.TagSelectors {
+			if err := validateSelector(s); err != nil {
+				return err
+			}
+		}
+		for _, ss := range r.ScopeSelectors {
+			for _, s := range ss {
+				if err := validateSelector(s); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
 	if m.Trigger != nil {
 		if m.Trigger.Kind == TriggerKindSchedule && m.Trigger.Settings != nil {
 			cronItem, ok := m.Trigger.Settings[TriggerSettingsCron]
@@ -81,6 +96,20 @@ func (m *Metadata) ValidateRetentionPolicy() error {
 			}
 		}
 	}
+	return nil
+}
+
+// validateSelector rejects a selector that could not be built at job runtime
+func validateSelector(s *rule.Selector) error {
+	if s == nil {
+		return nil
+	}
+
+	if err := selectorindex.Validate(s.Kind, s.Decoration, s.Pattern); err != nil {
+		return errors.New(nil).WithCode(errors.BadRequestCode).
+			WithMessagef("invalid tag retention selector: %v", err)
+	}
+
 	return nil
 }
 
