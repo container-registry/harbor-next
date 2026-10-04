@@ -29,6 +29,6 @@ COPY config/portal/nginx.conf /etc/nginx/nginx.conf
 WORKDIR /usr/share/nginx/html
 
 EXPOSE 8080
-HEALTHCHECK --interval=10s --timeout=5s --retries=3 CMD ["/lprobe", "-port", "8080"]
+HEALTHCHECK --interval=10s --timeout=5s --retries=3 CMD ["/lprobe", "-port", "8081", "-endpoint", "/healthz"]
 USER nginx
 ENTRYPOINT ["nginx", "-g", "daemon off;"]
