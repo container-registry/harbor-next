@@ -773,7 +773,7 @@ func (suite *ControllerTestSuite) TestGetReportQueriesReportsOnce() {
 // the job is submitted to jobservice only after that transaction has committed.
 func (suite *ControllerTestSuite) TestScanAllSubmitsAfterTheTransaction() {
 	rpts := []*scan.Report{{UUID: "rp-uuid-021", MimeType: v1.MimeTypeNativeReport}}
-	var recordInTransaction, submitInTransaction bool
+	var recordInTransaction, submitted, submitInTransaction bool
 
 	mock.OnAnything(suite.ar, "Walk").Return(nil).Run(func(args mock.Arguments) {
 		walkFn := args.Get(2).(func(*artifact.Artifact) error)
@@ -790,11 +790,13 @@ func (suite *ControllerTestSuite) TestScanAllSubmitsAfterTheTransaction() {
 		recordInTransaction = inTransaction(args.Get(0).(context.Context))
 	}).Once()
 	suite.taskMgr.On("Submit", mock.Anything, int64(21), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		submitted = true
 		submitInTransaction = inTransaction(args.Get(0).(context.Context))
 	}).Once()
 
 	suite.Require().NoError(suite.c.scanOneForScanAll(suite.artifact, int64(1)))
 
 	suite.True(recordInTransaction, "the task record must be written inside the dispatch transaction")
+	suite.Require().True(submitted, "the job must be submitted")
 	suite.False(submitInTransaction, "the job must be submitted after the dispatch transaction commits")
 }

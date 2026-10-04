@@ -134,16 +134,7 @@ func (m *manager) Create(ctx context.Context, executionID int64, jb *Job, extraA
 		return 0, err
 	}
 
-	log.Debugf("the task %d is submitted to jobservice, the job ID is %s", id, jobID)
-
-	// populate the job ID for the task
-	if err = m.dao.Update(ctx, &dao.Task{
-		ID:    id,
-		JobID: jobID,
-	}, "JobID"); err != nil {
-		log.Errorf("failed to populate the job ID for the task %d: %v", id, err)
-	}
-
+	m.populateJobID(ctx, id, jobID)
 	return id, nil
 }
 
@@ -160,21 +151,26 @@ func (m *manager) Submit(ctx context.Context, id int64, jb *Job) error {
 	jobID, err := m.submitJob(ctx, m.submitClient, id, jb)
 	if err != nil {
 		log.Errorf("mark task %d as error due to failed to submit job %v, error: %v", id, jb.Name, err)
-		// The caller's deadline may be what failed the submission.
-		if markErr := m.markSubmitFailed(context.WithoutCancel(ctx), id); markErr != nil {
+		// The caller's deadline may be what failed the submission, so the cleanup gets its own.
+		markCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), submitTimeout)
+		defer cancel()
+		if markErr := m.markSubmitFailed(markCtx, id); markErr != nil {
 			log.Errorf("failed to mark the task %d as error, it stays pending without a job: %v", id, markErr)
 		}
 		return err
 	}
-	log.Debugf("the task %d is submitted to jobservice, the job ID is %s", id, jobID)
+	m.populateJobID(ctx, id, jobID)
+	return nil
+}
 
-	if err = m.dao.Update(ctx, &dao.Task{
+func (m *manager) populateJobID(ctx context.Context, id int64, jobID string) {
+	log.Debugf("the task %d is submitted to jobservice, the job ID is %s", id, jobID)
+	if err := m.dao.Update(ctx, &dao.Task{
 		ID:    id,
 		JobID: jobID,
 	}, "JobID"); err != nil {
 		log.Errorf("failed to populate the job ID for the task %d: %v", id, err)
 	}
-	return nil
 }
 
 // markSubmitFailed does what the status hook does when jobservice reports an error.
