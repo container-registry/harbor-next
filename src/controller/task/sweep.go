@@ -106,7 +106,7 @@ func ScheduleSweepJob(ctx context.Context) error {
 	}
 	// unschedule the job if the cron changed
 	if sched != nil {
-		if sched.CRON != cronSpec {
+		if !scheduler.SameCron(sched.CRON, cronSpec) {
 			log.Debugf("reschedule the system execution job because the cron changed, old: %s, new: %s", sched.CRON, cronSpec)
 			if err = scheduler.Sched.UnScheduleByID(ctx, sched.ID); err != nil {
 				return err

@@ -20,6 +20,35 @@ import (
 	"testing"
 )
 
+func Test_dbTxSkippers(t *testing.T) {
+	tests := []struct {
+		name string
+		r    *http.Request
+		want bool
+	}{
+		{"post initiate blob upload", httptest.NewRequest(http.MethodPost, "/v2/library/photon/blobs/uploads", nil), true},
+		{"post initiate blob upload with mount", httptest.NewRequest(http.MethodPost, "/v2/library/photon/blobs/uploads?mount=sha256:aaa&from=library/app", nil), true},
+		{"patch blob upload", httptest.NewRequest(http.MethodPatch, "/v2/library/photon/blobs/uploads/uuid-123", nil), true},
+		{"put blob upload", httptest.NewRequest(http.MethodPut, "/v2/library/photon/blobs/uploads/uuid-123?digest=sha256:aaa", nil), true},
+		{"put manifest", httptest.NewRequest(http.MethodPut, "/v2/library/photon/manifests/latest", nil), false},
+		{"post api", httptest.NewRequest(http.MethodPost, "/api/v2.0/projects", nil), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got bool
+			for _, skipper := range dbTxSkippers {
+				if skipper(tt.r) {
+					got = true
+					break
+				}
+			}
+			if got != tt.want {
+				t.Errorf("dbTxSkippers(%s %s) = %v, want %v", tt.r.Method, tt.r.URL.Path, got, tt.want)
+			}
+		})
+	}
+}
+
 func Test_readonlySkipper(t *testing.T) {
 	type args struct {
 		r *http.Request
@@ -46,5 +75,35 @@ func Test_readonlySkipper(t *testing.T) {
 				t.Errorf("readonlySkippers() = %v, want %v", tt.args, tt.want)
 			}
 		})
+	}
+}
+
+// TestTransactionRunsAfterTheDatabaseReadingMiddlewares covers harbor-next #92.
+// transaction.Middleware holds a pool connection for the whole request. Any
+// middleware inside it that reads config or user records needs a second
+// connection while holding the first, and the config-cache builder it queues
+// behind needs one too, so the pool deadlocks against itself under mixed read
+// and write traffic.
+func TestTransactionRunsAfterTheDatabaseReadingMiddlewares(t *testing.T) {
+	chain := middlewareChain()
+	position := map[string]int{}
+	for i, entry := range chain {
+		if _, dup := position[entry.name]; dup {
+			t.Fatalf("middleware %q appears twice in the chain", entry.name)
+		}
+		position[entry.name] = i
+	}
+
+	if last := chain[len(chain)-1].name; last != "transaction" {
+		t.Errorf("%q runs inside the request transaction; transaction must be the innermost middleware so nothing before the handler holds a pool connection while it waits for another", last)
+	}
+
+	for _, name := range []string{"security", "log", "security-unauthorized"} {
+		if _, ok := position[name]; !ok {
+			t.Fatalf("no %q middleware in the chain", name)
+		}
+	}
+	if position["log"] < position["security"] || position["log"] > position["security-unauthorized"] {
+		t.Error("log must run between security and security-unauthorized so the request's user is logged and 401s produce an audit event")
 	}
 }

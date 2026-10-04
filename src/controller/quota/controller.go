@@ -56,6 +56,9 @@ func (t updateQuotaProviderType) String() string {
 
 var (
 	defaultRetryTimeout = time.Minute * 5
+	// rollbackTimeout bounds the detached rollback so it cannot pin a pool
+	// connection behind a quota_usage row lock indefinitely
+	rollbackTimeout = 30 * time.Second
 	// quotaExpireTimeout is the expire time for quota when update quota by redis
 	quotaExpireTimeout = time.Minute * 5
 
@@ -427,7 +430,12 @@ func (c *controller) Request(ctx context.Context, reference, referenceID string,
 	err := f()
 
 	if err != nil {
-		if er := c.updateUsageWithRetry(ctx, reference, referenceID, rollbackResources(resources), provider); er != nil {
+		// detached from the request: a client disconnect is the common failure
+		// here, and the reservation may already be committed outside any request
+		// transaction, so a canceled ctx would leave the usage inflated
+		rbCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), rollbackTimeout)
+		defer cancel()
+		if er := c.updateUsageWithRetry(rbCtx, reference, referenceID, rollbackResources(resources), provider); er != nil {
 			// ignore this error, the quota usage will be correct when users do operations which will call refresh quota
 			log.G(ctx).Warningf("rollback resources %s for %s %s failed, error: %v", resources.String(), reference, referenceID, er)
 		}
