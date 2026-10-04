@@ -2,6 +2,12 @@
 
 <p align="center"><img alt="Harbor Next" width="256px" src="https://raw.githubusercontent.com/container-registry/harbor-next/refs/heads/main/docs/img/harbor-next-logo.svg"></p>
 
+<!-- The stable badge filters on v2.15.*; change the filter when the maintained line moves. -->
+[![Nightly](https://github.com/container-registry/harbor-next/actions/workflows/nightly.yml/badge.svg)](https://github.com/container-registry/harbor-next/actions/workflows/nightly.yml)
+[![stable](https://img.shields.io/github/v/release/container-registry/harbor-next?filter=v2.15.*&label=stable)](https://github.com/container-registry/harbor-next/releases?q=v2.15)
+[![beta](https://img.shields.io/github/v/release/container-registry/harbor-next?include_prereleases&filter=*-beta&label=beta&color=orange)](https://github.com/container-registry/harbor-next/releases?q=prerelease%3Atrue)
+[![helm](https://img.shields.io/github/v/release/container-registry/harbor-next?filter=chart-v*&label=helm&logo=helm&logoColor=white)](https://github.com/container-registry/harbor-next/releases?q=chart)
+
 Harbor is a CNCF graduated open-source container registry to store and manage container images and other OCI artifacts securely with policies, role-based access control, vulnerability scans and signing.
 
 Harbor is hosted by the [Cloud Native Computing Foundation](https://cncf.io)
@@ -64,15 +70,34 @@ Harbor Next exposes a RESTful API for administrative operations and integration.
 
 **System requirements:** Docker Engine 24+ with Compose v2.24+.
 
+### Pick a version
+
+| Channel | Tag | Built from | Use it for |
+|---------|-----|------------|------------|
+| Stable | the newest `v2.15.x`, shown in the badge above | `release-2.15` | Production. Patch releases only, no new features. |
+| Beta | `v2.16.0-beta` | `main`, updated nightly when release-eligible changes are pending | Trying the next release and reporting what breaks before it ships. |
+| Source | `main` | nothing published | Development only, see [Development](#development). |
+
+Both channels are published to `8gears.container-registry.com/8gcr/`, and every tag has its
+notes on the [releases page](https://github.com/container-registry/harbor-next/releases).
+
+The beta tag rolls: the nightly build moves it onto that night's commit, so the same tag
+pulled a week apart is a different image. Pin a stable tag for anything you have to keep
+running, and watch the Nightly badge above before you pull a beta.
+
 **Docker Compose** — see [deploy/compose/README.md](deploy/compose/README.md):
 
 ```bash
 cd deploy/compose
-cp .env.example .env          # set EXT_ENDPOINT, TLS_CERT/TLS_KEY, and secrets
+cp .env.example .env          # set HARBOR_TAG, EXT_ENDPOINT, TLS_CERT/TLS_KEY, and secrets
 docker compose up -d
 ```
 
 **Kubernetes** — install the Harbor Next Helm chart (`deploy/chart/`, also published as an OCI artifact; under active development). Platform guides live in [deploy/chart/docs/guide/](deploy/chart/docs/guide/) (k3s, OpenShift, Rancher, Nutanix).
+
+The chart carries its own version, released under `chart-v*` tags and shown in the helm
+badge above. It does not track the Harbor version, so read its `appVersion` to see which
+Harbor release a given chart deploys.
 
 ## Development
 
