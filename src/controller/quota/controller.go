@@ -331,23 +331,27 @@ func (c *controller) updateUsageByRedis(ctx context.Context, reference, referenc
 }
 
 func (c *controller) updateUsageWithRetry(ctx context.Context, reference, referenceID string, op func(hardLimits, used types.ResourceList) (types.ResourceList, error), provider updateQuotaProviderType, retryOpts ...retry.Option) error {
-	var f func() error
-	switch provider {
-	case updateQuotaProviderDB:
-		f = func() error {
-			return c.updateUsageByDB(ctx, reference, referenceID, op)
-		}
-	case updateQuotaProviderRedis:
-		f = func() error {
+	f := c.usageUpdateFunc(ctx, reference, referenceID, op, provider)
+
+	return retry.Retry(f, c.retryOptions(ctx, reference, referenceID, retryOpts...)...)
+}
+
+// usageUpdateFunc returns one attempt at applying op to the reference's usage,
+// against whichever store the provider names.
+func (c *controller) usageUpdateFunc(ctx context.Context, reference, referenceID string, op func(hardLimits, used types.ResourceList) (types.ResourceList, error), provider updateQuotaProviderType) func() error {
+	if provider == updateQuotaProviderRedis {
+		return func() error {
 			return c.updateUsageByRedis(ctx, reference, referenceID, op)
-		}
-	default:
-		// by default is update quota by db
-		f = func() error {
-			return c.updateUsageByDB(ctx, reference, referenceID, op)
 		}
 	}
 
+	// by default is update quota by db
+	return func() error {
+		return c.updateUsageByDB(ctx, reference, referenceID, op)
+	}
+}
+
+func (c *controller) retryOptions(ctx context.Context, reference, referenceID string, retryOpts ...retry.Option) []retry.Option {
 	options := []retry.Option{
 		retry.Timeout(defaultRetryTimeout),
 		// Exponential backoff with jitter (the retry package default). With
@@ -371,7 +375,52 @@ func (c *controller) updateUsageWithRetry(ctx context.Context, reference, refere
 		options = append(options, retryOpts...)
 	}
 
-	return retry.Retry(f, options...)
+	return options
+}
+
+// rollbackUsage returns resources reserved for an operation that then failed.
+// It is the one usage update that runs detached from its request, so the
+// deadline on ctx is the only thing bounding it - and against the database
+// provider a Go deadline does not bound it at all: the DAO runs its CAS
+// through Beego's ORM, which takes no context, so an UPDATE already waiting
+// on the quota_usage row lock keeps its pool connection until the lock
+// holder commits. statementTimeout makes the database enforce the same
+// deadline on each attempt, which is what actually releases the connection.
+func (c *controller) rollbackUsage(ctx context.Context, reference, referenceID string, resources types.ResourceList, provider updateQuotaProviderType) error {
+	op := rollbackResources(resources)
+
+	if provider == updateQuotaProviderRedis {
+		return c.updateUsageWithRetry(ctx, reference, referenceID, op, provider)
+	}
+
+	attempt := func() error {
+		return statementTimeout(rollbackTimeout, func(ctx context.Context) error {
+			return c.updateUsageByDB(ctx, reference, referenceID, op)
+		})(ctx)
+	}
+
+	return retry.Retry(attempt, c.retryOptions(ctx, reference, referenceID)...)
+}
+
+// statementTimeout runs f in a transaction whose statements the database gives
+// up on after timeout. SET LOCAL needs a transaction to be scoped to, and
+// reverts when that transaction ends, so this leaves no setting behind on the
+// pooled connection.
+func statementTimeout(timeout time.Duration, f func(ctx context.Context) error) func(ctx context.Context) error {
+	return orm.WithTransaction(func(ctx context.Context) error {
+		ormer, err := orm.FromContext(ctx)
+		if err != nil {
+			return retry.Abort(err)
+		}
+
+		// milliseconds: the bare integer form of statement_timeout, and the
+		// only form that takes a bind parameter in neither Postgres nor Beego
+		if _, err := ormer.Raw(fmt.Sprintf("SET LOCAL statement_timeout = %d", timeout.Milliseconds())).Exec(); err != nil {
+			return retry.Abort(err)
+		}
+
+		return f(ctx)
+	})
 }
 
 func (c *controller) Refresh(ctx context.Context, reference, referenceID string, options ...Option) error {
@@ -439,7 +488,7 @@ func (c *controller) Request(ctx context.Context, reference, referenceID string,
 		// transaction, so a canceled ctx would leave the usage inflated
 		rbCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), rollbackTimeout)
 		defer cancel()
-		if er := c.updateUsageWithRetry(rbCtx, reference, referenceID, rollbackResources(resources), provider); er != nil {
+		if er := c.rollbackUsage(rbCtx, reference, referenceID, resources, provider); er != nil {
 			// ignore this error, the quota usage will be correct when users do operations which will call refresh quota
 			log.G(ctx).Warningf("rollback resources %s for %s %s failed, error: %v", resources.String(), reference, referenceID, er)
 		}
