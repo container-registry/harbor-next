@@ -831,6 +831,17 @@
         }
       }
     },
+    "harbor-scanner-trivy": {
+      "type": "object",
+      "description": "harbor-scanner-trivy subchart values, passed through verbatim — the OPT-IN alternative to the built-in trivy.* templates (the two modes are mutually exclusive; the subchart wins). The subchart's own values.schema.json validates the full surface at install time; only the condition flag is typed here.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Deploy the Trivy adapter via the harbor-scanner-trivy subchart instead of the built-in trivy.* templates."
+        }
+      }
+    },
     "tls": {
       "type": "object",
       "description": "TLS configuration",
