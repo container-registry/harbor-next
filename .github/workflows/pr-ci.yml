@@ -186,6 +186,10 @@ jobs:
         env:
           # Build traces can contain signed storage URLs.
           DOCKER_BUILD_RECORD_UPLOAD: "false"
+          # One summary block per component per platform buries the rest of the
+          # job summary, and the digest this job publishes is already exported
+          # as an artifact for the merge job.
+          DOCKER_BUILD_SUMMARY: "false"
         with:
           context: .
           file: dockerfile/${{ matrix.component }}.dockerfile
