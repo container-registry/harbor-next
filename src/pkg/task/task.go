@@ -34,6 +34,9 @@ var (
 	Mgr = NewManager()
 )
 
+// submitTimeout bounds Submit; GlobalClient has none and its log downloads must not get one.
+const submitTimeout = 30 * time.Second
+
 // Manager manages tasks.
 // The execution and task managers provide an execution-task model to abstract the interactive with jobservice.
 // All of the operations with jobservice should be delegated by them
@@ -42,6 +45,10 @@ type Manager interface {
 	// An execution must be created first and the task will be linked to it.
 	// The "extraAttrs" can be used to set the customized attributes
 	Create(ctx context.Context, executionID int64, job *Job, extraAttrs ...map[string]any) (id int64, err error)
+	// CreateRecord inserts the pending task record only; commit it, then call Submit.
+	CreateRecord(ctx context.Context, executionID int64, extraAttrs ...map[string]any) (id int64, err error)
+	// Submit submits the job of a CreateRecord task, marking the task as error if that fails.
+	Submit(ctx context.Context, id int64, job *Job) (err error)
 	// Stop the specified task
 	Stop(ctx context.Context, id int64) (err error)
 	// Get the specified task
@@ -76,18 +83,20 @@ type Manager interface {
 // NewManager creates an instance of the default task manager
 func NewManager() Manager {
 	return &manager{
-		dao:      dao.NewTaskDAO(),
-		execDAO:  dao.NewExecutionDAO(),
-		jsClient: cjob.GlobalClient,
-		coreURL:  config.GetCoreURL(),
+		dao:          dao.NewTaskDAO(),
+		execDAO:      dao.NewExecutionDAO(),
+		jsClient:     cjob.GlobalClient,
+		submitClient: cjob.NewDefaultClientWithTimeout(config.InternalJobServiceURL(), config.CoreSecret(), submitTimeout),
+		coreURL:      config.GetCoreURL(),
 	}
 }
 
 type manager struct {
-	dao      dao.TaskDAO
-	execDAO  dao.ExecutionDAO
-	jsClient cjob.Client
-	coreURL  string
+	dao          dao.TaskDAO
+	execDAO      dao.ExecutionDAO
+	jsClient     cjob.Client
+	submitClient cjob.Client
+	coreURL      string
 }
 
 func (m *manager) Update(ctx context.Context, task *Task, props ...string) error {
@@ -113,8 +122,9 @@ func (m *manager) Create(ctx context.Context, executionID int64, jb *Job, extraA
 	// As all database operations are in a transaction which is committed until API returns,
 	// when the job is submitted to the jobservice and running, the task record may not
 	// insert yet, this will cause the status hook handler returning 404, and the jobservice
-	// will re-send the status hook again
-	jobID, err := m.submitJob(ctx, id, jb)
+	// will re-send the status hook again. CreateRecord followed by Submit after the commit
+	// avoids both this and holding the transaction open across the submission.
+	jobID, err := m.submitJob(ctx, m.jsClient, id, jb)
 	if err != nil {
 		// failed to submit job to jobservice, delete the task record
 		log.Errorf("delete task %d from db due to failed to submit job %v, error: %v", id, jb.Name, err)
@@ -135,6 +145,69 @@ func (m *manager) Create(ctx context.Context, executionID int64, jb *Job, extraA
 	}
 
 	return id, nil
+}
+
+func (m *manager) CreateRecord(ctx context.Context, executionID int64, extraAttrs ...map[string]any) (int64, error) {
+	id, err := m.createTaskRecord(ctx, executionID, extraAttrs...)
+	if err != nil {
+		return 0, err
+	}
+	log.Debugf("the database record for task %d created", id)
+	return id, nil
+}
+
+func (m *manager) Submit(ctx context.Context, id int64, jb *Job) error {
+	jobID, err := m.submitJob(ctx, m.submitClient, id, jb)
+	if err != nil {
+		log.Errorf("mark task %d as error due to failed to submit job %v, error: %v", id, jb.Name, err)
+		// The caller's deadline may be what failed the submission.
+		if markErr := m.markSubmitFailed(context.WithoutCancel(ctx), id); markErr != nil {
+			log.Errorf("failed to mark the task %d as error, it stays pending without a job: %v", id, markErr)
+		}
+		return err
+	}
+	log.Debugf("the task %d is submitted to jobservice, the job ID is %s", id, jobID)
+
+	if err = m.dao.Update(ctx, &dao.Task{
+		ID:    id,
+		JobID: jobID,
+	}, "JobID"); err != nil {
+		log.Errorf("failed to populate the job ID for the task %d: %v", id, err)
+	}
+	return nil
+}
+
+// markSubmitFailed does what the status hook does when jobservice reports an error.
+func (m *manager) markSubmitFailed(ctx context.Context, id int64) error {
+	t, err := m.dao.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	if err = m.dao.Update(ctx, &dao.Task{
+		ID:         id,
+		Status:     job.ErrorStatus.String(),
+		StatusCode: job.ErrorStatus.Code(),
+		UpdateTime: now,
+		EndTime:    now,
+	}, "Status", "StatusCode", "UpdateTime", "EndTime"); err != nil {
+		return err
+	}
+	if fc, exist := statusChangePostFuncRegistry[t.VendorType]; exist {
+		if err = fc(ctx, id, job.ErrorStatus.String()); err != nil {
+			log.Errorf("failed to run the task status change post function for task %d: %v", id, err)
+		}
+	}
+	changed, status, err := m.execDAO.RefreshStatus(ctx, t.ExecutionID)
+	if err != nil {
+		return err
+	}
+	if fc, exist := executionStatusChangePostFuncRegistry[t.VendorType]; exist && changed {
+		if err = fc(ctx, t.ExecutionID, status); err != nil {
+			log.Errorf("failed to run the execution status change post function for execution %d: %v", t.ExecutionID, err)
+		}
+	}
+	return nil
 }
 
 func (m *manager) createTaskRecord(ctx context.Context, executionID int64, extraAttrs ...map[string]any) (int64, error) {
@@ -163,7 +236,7 @@ func (m *manager) createTaskRecord(ctx context.Context, executionID int64, extra
 	})
 }
 
-func (m *manager) submitJob(_ context.Context, id int64, jb *Job) (string, error) {
+func (m *manager) submitJob(_ context.Context, client cjob.Client, id int64, jb *Job) (string, error) {
 	jobData := &models.JobData{
 		Name:       jb.Name,
 		StatusHook: fmt.Sprintf("%s/service/notifications/tasks/%d", m.coreURL, id),
@@ -180,7 +253,7 @@ func (m *manager) submitJob(_ context.Context, id int64, jb *Job) (string, error
 		}
 	}
 
-	return m.jsClient.SubmitJob(jobData)
+	return client.SubmitJob(jobData)
 }
 
 func (m *manager) Stop(ctx context.Context, id int64) error {

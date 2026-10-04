@@ -408,7 +408,8 @@ func (suite *ControllerTestSuite) TestScanControllerScan() {
 		mock.OnAnything(suite.reportMgr, "Delete").Return(nil).Once()
 
 		mock.OnAnything(suite.execMgr, "Create").Return(int64(1), nil).Once()
-		mock.OnAnything(suite.taskMgr, "Create").Return(int64(1), nil).Once()
+		mock.OnAnything(suite.taskMgr, "CreateRecord").Return(int64(1), nil).Once()
+		suite.taskMgr.On("Submit", mock.Anything, int64(1), mock.Anything).Return(nil).Once()
 		mock.OnAnything(suite.scanHandler, "MakePlaceHolder").Return(rpts, nil).Once()
 		mock.OnAnything(suite.scanHandler, "RequiredPermissions").Return(requiredPermission).Once()
 
@@ -433,7 +434,7 @@ func (suite *ControllerTestSuite) TestScanControllerScan() {
 		mock.OnAnything(suite.scanHandler, "MakePlaceHolder").Return(rpts, nil).Once()
 		mock.OnAnything(suite.scanHandler, "RequiredPermissions").Return(requiredPermission).Once()
 		mock.OnAnything(suite.execMgr, "Create").Return(int64(1), nil).Once()
-		mock.OnAnything(suite.taskMgr, "Create").Return(int64(0), fmt.Errorf("failed to create task")).Once()
+		mock.OnAnything(suite.taskMgr, "CreateRecord").Return(int64(0), fmt.Errorf("failed to create task")).Once()
 		suite.Require().Error(suite.c.Scan(context.TODO(), suite.artifact))
 	}
 
@@ -664,7 +665,7 @@ func (suite *ControllerTestSuite) TestScanAll() {
 
 		mock.OnAnything(suite.reportMgr, "Delete").Return(nil).Once()
 		mock.OnAnything(suite.reportMgr, "Create").Return("uuid", nil).Once()
-		mock.OnAnything(suite.taskMgr, "Create").Return(int64(0), fmt.Errorf("failed")).Once()
+		mock.OnAnything(suite.taskMgr, "CreateRecord").Return(int64(0), fmt.Errorf("failed")).Once()
 		mock.OnAnything(suite.execMgr, "UpdateExtraAttrs").Return(nil).Once()
 		suite.execMgr.On("MarkError", mock.Anything, executionID, mock.Anything).Return(nil).Once()
 
@@ -765,4 +766,35 @@ func (suite *ControllerTestSuite) TestGetReportQueriesReportsOnce() {
 	suite.Require().NoError(err)
 	suite.Len(got, 2)
 	suite.Equal(1, listCalls, "the reports of every artifact must come from a single query")
+}
+
+// TestScanAllSubmitsAfterTheTransaction covers the job submission half of
+// harbor-next #856: the task record is written in the dispatch transaction, and
+// the job is submitted to jobservice only after that transaction has committed.
+func (suite *ControllerTestSuite) TestScanAllSubmitsAfterTheTransaction() {
+	rpts := []*scan.Report{{UUID: "rp-uuid-021", MimeType: v1.MimeTypeNativeReport}}
+	var recordInTransaction, submitInTransaction bool
+
+	mock.OnAnything(suite.ar, "Walk").Return(nil).Run(func(args mock.Arguments) {
+		walkFn := args.Get(2).(func(*artifact.Artifact) error)
+		walkFn(suite.artifact)
+	}).Once()
+	mock.OnAnything(suite.ar, "HasUnscannableLayer").Return(false, nil).Once()
+	mock.OnAnything(suite.accessoryMgr, "List").Return([]accessoryModel.Accessory{}, nil).Once()
+	mock.OnAnything(suite.scanHandler, "MakePlaceHolder").Return(rpts, nil).Once()
+	mock.OnAnything(suite.scanHandler, "RequiredPermissions").Return([]*types.Policy{
+		{Resource: rbac.ResourceRepository, Action: rbac.ActionPull},
+		{Resource: rbac.ResourceRepository, Action: rbac.ActionScannerPull},
+	}).Once()
+	mock.OnAnything(suite.taskMgr, "CreateRecord").Return(int64(21), nil).Run(func(args mock.Arguments) {
+		recordInTransaction = inTransaction(args.Get(0).(context.Context))
+	}).Once()
+	suite.taskMgr.On("Submit", mock.Anything, int64(21), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		submitInTransaction = inTransaction(args.Get(0).(context.Context))
+	}).Once()
+
+	suite.Require().NoError(suite.c.scanOneForScanAll(suite.artifact, int64(1)))
+
+	suite.True(recordInTransaction, "the task record must be written inside the dispatch transaction")
+	suite.False(submitInTransaction, "the job must be submitted after the dispatch transaction commits")
 }
