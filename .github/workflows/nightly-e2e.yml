@@ -64,8 +64,7 @@ on:
         required: false
         type: string
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   # One run per tag; a second is only ever a duplicate of the first.

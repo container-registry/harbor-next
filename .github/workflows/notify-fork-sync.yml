@@ -9,6 +9,8 @@ permissions: {}
 jobs:
   dispatch:
     runs-on: ubuntu-26.04
+    # Acts only through the app token minted below.
+    permissions: {}
     steps:
       - name: Generate GitHub App token
         id: app-token

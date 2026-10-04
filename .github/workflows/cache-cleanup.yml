@@ -5,9 +5,7 @@ on:
     - cron: '0 4 * * 0' # Weekly, Sunday 4am UTC
   workflow_dispatch: {}
 
-permissions:
-  contents: read
-  actions: write
+permissions: {}
 
 jobs:
   cleanup-github-cache:
@@ -15,6 +13,9 @@ jobs:
     # Do not run the upstream maintenance schedule in forks.
     if: github.event_name != 'schedule' || github.repository == 'container-registry/harbor-next'
     runs-on: ubuntu-latest
+    permissions:
+      # gh cache list/delete; no checkout, so no contents
+      actions: write
     steps:
       - name: Delete cache entries older than 7 days
         env:
