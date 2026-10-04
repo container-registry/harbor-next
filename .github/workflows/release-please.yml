@@ -14,7 +14,7 @@ jobs:
     name: Validate Release Ref
     runs-on: ubuntu-26.04
     permissions:
-      # checkout, plus the tag lookup that rejects a stale chart release-as
+      # checkout, plus the tag lookup that rejects a stale chart release tag
       contents: read
     env:
       GH_TOKEN: ${{ github.token }}
