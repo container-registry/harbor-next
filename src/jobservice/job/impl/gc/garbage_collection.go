@@ -625,7 +625,9 @@ func (gc *GarbageCollector) deletedArt(ctx job.Context) (map[string][]model.Arti
 // * non dry-run, remove the reference of the untagged blobs
 func (gc *GarbageCollector) markOrSweepUntaggedBlobs(ctx job.Context) ([]*blobModels.Blob, error) {
 	var orphanBlobs []*blobModels.Blob
-	for result := range project.ListAll(ctx.SystemContext(), 50, nil, project.Metadata(false)) {
+	sysCtx, cancel := context.WithCancel(ctx.SystemContext())
+	defer cancel()
+	for result := range project.ListAll(sysCtx, 50, nil, project.Metadata(false)) {
 		if gc.shouldStop(ctx) {
 			return nil, errGcStop
 		}
