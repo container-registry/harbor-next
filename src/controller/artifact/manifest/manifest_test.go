@@ -18,9 +18,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/docker/distribution/manifest/manifestlist"
-	"github.com/docker/distribution/manifest/schema1"
-	"github.com/docker/distribution/manifest/schema2"
+	"github.com/distribution/distribution/v3/manifest/manifestlist"
+	"github.com/distribution/distribution/v3/manifest/schema2"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -45,9 +44,6 @@ func withRegistry(t *testing.T, registry map[string]Abstractor) {
 // An empty registry means no artifact can be abstracted at all, so pin the bootstrap.
 func TestDefaultRegistrations(t *testing.T) {
 	for _, mediaType := range []string{
-		"",
-		"application/json",
-		schema1.MediaTypeSignedManifest,
 		v1.MediaTypeImageManifest,
 		schema2.MediaTypeManifest,
 		v1.MediaTypeImageIndex,
@@ -121,4 +117,19 @@ func TestRegisterDuplicateWithinBatch(t *testing.T) {
 
 	assert.Error(t, Register(stubAbstractor{}, "a", "a"))
 	assert.Empty(t, Registry)
+}
+
+// Schema1 and content-type-less manifests have no abstractor any more; they
+// must be refused as unsupported rather than abstracted as something else.
+func TestSchema1MediaTypesUnsupported(t *testing.T) {
+	for _, mediaType := range []string{
+		"",
+		"application/json",
+		"application/vnd.docker.distribution.manifest.v1+json",
+		"application/vnd.docker.distribution.manifest.v1+prettyjws",
+	} {
+		abstractor, err := Get(mediaType)
+		assert.Nil(t, abstractor, mediaType)
+		assert.True(t, errors.IsErr(err, errors.UNSUPPORTED), "%q: got %v", mediaType, err)
+	}
 }

@@ -21,9 +21,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/manifest/manifestlist"
-	"github.com/docker/distribution/manifest/schema2"
+	"github.com/distribution/distribution/v3"
+	"github.com/distribution/distribution/v3/manifest/manifestlist"
+	"github.com/distribution/distribution/v3/manifest/ocischema"
+	"github.com/distribution/distribution/v3/manifest/schema2"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 
@@ -121,6 +122,19 @@ func (m *ManifestListCache) updateManifestList(ctx context.Context, repo string,
 			}
 		}
 		return manifestlist.FromDescriptors(existMans)
+	case *ocischema.DeserializedImageIndex:
+		existMans := make([]v1.Descriptor, 0)
+		for _, ma := range v.Manifests {
+			art := lib.ArtifactInfo{Repository: repo, Digest: string(ma.Digest)}
+			a, err := m.local.GetManifest(ctx, art)
+			if err != nil {
+				return nil, err
+			}
+			if a != nil {
+				existMans = append(existMans, ma)
+			}
+		}
+		return ocischema.FromDescriptors(existMans, v.Annotations)
 	}
 	return nil, fmt.Errorf("current manifest list type is unknown, manifest type[%T], content [%+v]", manifest, manifest)
 }
