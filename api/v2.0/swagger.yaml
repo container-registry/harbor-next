@@ -3,9 +3,7 @@ info:
   title: Harbor API
   description: These APIs provide services for manipulating Harbor project.
   version: '2.0'
-host: localhost
 schemes:
-  - http
   - https
 basePath: /api/v2.0
 produces:

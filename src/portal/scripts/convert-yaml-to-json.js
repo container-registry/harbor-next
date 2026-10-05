@@ -23,6 +23,9 @@ const swaggerObj = yaml.load(fs.readFileSync(inputFile, {encoding: 'utf-8'}));
 if (swaggerObj.host) {
     delete swaggerObj.host;
 }
+if (Array.isArray(swaggerObj.schemes)) {
+    swaggerObj.schemes = swaggerObj.schemes.filter(scheme => scheme !== 'http');
+}
 // enhancement for property 'additionalProperties'
 traverseObject(swaggerObj);
 
