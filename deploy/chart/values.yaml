@@ -125,6 +125,10 @@ proxy:
     - jobservice
     - trivy
 
+# -- Allow webhook and Slack notifications to reach private network addresses.
+# Sets HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS on core and jobservice.
+allowPrivateNetworkAccess: false
+
 # ============================================================================
 # 2. EXPOSE / INGRESS / GATEWAY
 # ============================================================================
@@ -341,6 +345,10 @@ core:
 
   # -- Artifact pull async flush duration
   artifactPullAsyncFlushDuration: ""
+
+  # -- Allow cosign and notation to pull an unsigned artifact in order to sign it.
+  # Sets CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED on core.
+  contentTrustLegacySignerPullEnabled: false
 
   # -- GDPR settings
   gdpr:
@@ -1553,6 +1561,9 @@ database:
   # Set to true only when PG is configured to require client certificate
   # authentication. libpq fails if `sslcert` is set but the file is missing.
   clientCertEnabled: false
+  # -- Export PostgreSQL pool and query metrics (8gcr builds with pgx monitoring;
+  # needs `metrics.enabled`). See [Database metrics](#database-metrics).
+  metricsEnabled: false
 
 # --- Valkey (Redis-compatible) ---
 valkey:

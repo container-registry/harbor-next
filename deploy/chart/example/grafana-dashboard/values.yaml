@@ -5,6 +5,8 @@ existingSecretAdminPassword: harbor-admin
 database:
   host: postgres.example.com
   existingSecret: harbor-db
+  # Optional: requires an 8gcr build with PostgreSQL/pgx monitoring.
+  metricsEnabled: true
 
 registry:
   persistence:
@@ -28,12 +30,3 @@ metrics:
       grafana_dashboard: "1"
     annotations:
       grafana_folder: Harbor
-
-# Optional: requires an 8gcr build with PostgreSQL/pgx monitoring.
-core:
-  config:
-    postgresql:
-      metrics_enabled: "true"
-jobservice:
-  env:
-    POSTGRESQL_METRICS_ENABLED: "true"

@@ -417,3 +417,112 @@ tests:
       - equal:
           path: data.POSTGRESQL_MIN_CONNS
           value: "8"
+
+  # Typed toggles render explicit env only when true; off leaves the
+  # `core.config` passthrough untouched.
+  - it: should not set pgx, private network or legacy signer env by default
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRESQL_METRICS_ENABLED
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_ENABLE_COMMERCIAL_PGX_MONITORING
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED
+          any: true
+
+  - it: should set pgx, private network and legacy signer env when enabled
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      database.metricsEnabled: true
+      allowPrivateNetworkAccess: true
+      core.contentTrustLegacySignerPullEnabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRESQL_METRICS_ENABLED
+            value: "true"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_ENABLE_COMMERCIAL_PGX_MONITORING
+            value: "true"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
+            value: "true"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED
+            value: "true"
+
+  # Toggles off: values set by hand through the `core.config` passthrough
+  # still reach core, and the chart adds no competing explicit env.
+  - it: should keep hand-set pgx, private network and legacy signer config when the toggles are off
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.config:
+        POSTGRESQL_METRICS_ENABLED: "true"
+        HARBOR_ENABLE_COMMERCIAL_PGX_MONITORING: "true"
+        HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "true"
+        CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED: "true"
+    asserts:
+      - template: templates/core.configmap.yaml
+        equal:
+          path: data.POSTGRESQL_METRICS_ENABLED
+          value: "true"
+      - template: templates/core.configmap.yaml
+        equal:
+          path: data.HARBOR_ENABLE_COMMERCIAL_PGX_MONITORING
+          value: "true"
+      - template: templates/core.configmap.yaml
+        equal:
+          path: data.HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
+          value: "true"
+      - template: templates/core.configmap.yaml
+        equal:
+          path: data.CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED
+          value: "true"
+      - template: templates/core.deployment.yaml
+        notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRESQL_METRICS_ENABLED
+          any: true
+      - template: templates/core.deployment.yaml
+        notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
+          any: true
+      - template: templates/core.deployment.yaml
+        notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED
+          any: true

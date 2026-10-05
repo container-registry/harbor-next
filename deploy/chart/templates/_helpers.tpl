@@ -571,3 +571,14 @@ Validate required values
 {{- define "imagePullSecret" }}
 {{- printf "{\"auths\":{\"%s\":{\"auth\":\"%s\"}}}" .Values.imageCredentials.registry (printf "%s:%s" .Values.imageCredentials.username .Values.imageCredentials.password | b64enc) | b64enc }}
 {{- end }}
+
+{{/*
+HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS env entry for core and jobservice.
+Rendered only when allowPrivateNetworkAccess is true.
+*/}}
+{{- define "harbor.privateNetworkAccess.env" -}}
+{{- if .Values.allowPrivateNetworkAccess }}
+- name: HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
+  value: "true"
+{{- end }}
+{{- end }}

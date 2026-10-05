@@ -143,3 +143,19 @@ sequence-sensitive.
   value: {{ include "harbor.database.dsn" . | quote }}
 {{- end }}
 {{- end }}
+
+{{/*
+pgx monitoring env entries for core and jobservice. Harbor keeps the pool
+metrics off unless the pgx monitoring feature gate is also on, so
+database.metricsEnabled sets both; either one alone does nothing. Rendered
+only when true, so the `core.config` / `jobservice.env` passthrough keeps
+working when the value is off.
+*/}}
+{{- define "harbor.database.metricsEnv" -}}
+{{- if .Values.database.metricsEnabled }}
+- name: HARBOR_ENABLE_COMMERCIAL_PGX_MONITORING
+  value: "true"
+- name: POSTGRESQL_METRICS_ENABLED
+  value: "true"
+{{- end }}
+{{- end }}

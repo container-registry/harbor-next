@@ -195,6 +195,11 @@
         "expireHours": { "type": "integer", "minimum": 1 }
       }
     },
+    "allowPrivateNetworkAccess": {
+      "type": "boolean",
+      "default": false,
+      "description": "Allow webhook and Slack notifications to reach private network addresses (HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS on core and jobservice)"
+    },
     "proxy": {
       "type": "object",
       "properties": {
@@ -442,6 +447,11 @@
           "type": ["string", "integer"],
           "description": "Async flush duration (seconds) for artifact pull time / pull count updates."
         },
+        "contentTrustLegacySignerPullEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow cosign and notation to pull an unsigned artifact in order to sign it (CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED on core)"
+        },
         "gdpr": {
           "type": "object",
           "description": "GDPR compliance settings.",
@@ -678,6 +688,11 @@
         },
         "connMaxLifetime": {
           "type": "string"
+        },
+        "metricsEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Export PostgreSQL pool and query metrics on 8gcr builds with pgx monitoring"
         }
       }
     },

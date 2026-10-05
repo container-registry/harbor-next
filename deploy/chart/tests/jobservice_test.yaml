@@ -380,3 +380,98 @@ tests:
     asserts:
       - exists:
           path: spec.template.metadata.annotations["checksum/configmap-env"]
+
+  # Typed toggles render explicit env only when true; off leaves the
+  # `jobservice.env` passthrough untouched.
+  - it: should not set pgx or private network env by default
+    template: templates/jobservice.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRESQL_METRICS_ENABLED
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_ENABLE_COMMERCIAL_PGX_MONITORING
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
+          any: true
+
+  # The legacy signer pull is a core-only setting; jobservice never gets it.
+  - it: should set pgx and private network env but not legacy signer env when enabled
+    template: templates/jobservice.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      database.metricsEnabled: true
+      allowPrivateNetworkAccess: true
+      core.contentTrustLegacySignerPullEnabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRESQL_METRICS_ENABLED
+            value: "true"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_ENABLE_COMMERCIAL_PGX_MONITORING
+            value: "true"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
+            value: "true"
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED
+          any: true
+
+  # Toggles off: values set by hand through the `jobservice.env`
+  # passthrough still reach jobservice, and the chart adds no competing
+  # explicit env.
+  - it: should keep hand-set pgx and private network env when the toggles are off
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      jobservice.env:
+        POSTGRESQL_METRICS_ENABLED: "true"
+        HARBOR_ENABLE_COMMERCIAL_PGX_MONITORING: "true"
+        HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "true"
+    asserts:
+      - template: templates/jobservice.configmap-env.yaml
+        equal:
+          path: data.POSTGRESQL_METRICS_ENABLED
+          value: "true"
+      - template: templates/jobservice.configmap-env.yaml
+        equal:
+          path: data.HARBOR_ENABLE_COMMERCIAL_PGX_MONITORING
+          value: "true"
+      - template: templates/jobservice.configmap-env.yaml
+        equal:
+          path: data.HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
+          value: "true"
+      - template: templates/jobservice.deployment.yaml
+        notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRESQL_METRICS_ENABLED
+          any: true
+      - template: templates/jobservice.deployment.yaml
+        notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
+          any: true

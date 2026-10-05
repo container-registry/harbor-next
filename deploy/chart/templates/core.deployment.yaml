@@ -144,6 +144,12 @@ spec:
               value: {{ include "harbor.redis.url.harbor" . | quote }}
             - name: _REDIS_URL_CACHE_LAYER
               value: {{ include "harbor.redis.url.cache" . | quote }}
+            {{- include "harbor.database.metricsEnv" . | nindent 12 }}
+            {{- include "harbor.privateNetworkAccess.env" . | nindent 12 }}
+            {{- if .Values.core.contentTrustLegacySignerPullEnabled }}
+            - name: CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED
+              value: "true"
+            {{- end }}
             {{- include "harbor.extraCA.env" . | nindent 12 }}
             {{- with .Values.core.extraEnv }}
             {{- toYaml . | nindent 12 }}

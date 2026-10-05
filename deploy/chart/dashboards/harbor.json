@@ -4593,7 +4593,7 @@
       "type": "row"
     },
     {
-      "description": "Requires 8gcr PostgreSQL monitoring with POSTGRESQL_METRICS_ENABLED=true and metrics scraping enabled. Standard Harbor does not expose these metrics. Empty panels can also mean monitoring is disabled or no matching metrics were scraped.",
+      "description": "Requires 8gcr PostgreSQL monitoring with POSTGRESQL_METRICS_ENABLED=true and HARBOR_ENABLE_COMMERCIAL_PGX_MONITORING=true (chart: database.metricsEnabled) and metrics scraping enabled. Standard Harbor does not expose these metrics. Empty panels can also mean monitoring is disabled or no matching metrics were scraped.",
       "gridPos": {
         "h": 3,
         "w": 24,
@@ -4607,7 +4607,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "**[8gcr](https://container-registry.com/8gcr/) feature.** These panels require PostgreSQL monitoring with `POSTGRESQL_METRICS_ENABLED=true` and metrics scraping enabled.\n\nStandard Harbor does not expose these metrics. **No data** can also mean monitoring is disabled or no matching metrics were scraped.",
+        "content": "**[8gcr](https://container-registry.com/8gcr/) feature.** These panels require PostgreSQL monitoring with `POSTGRESQL_METRICS_ENABLED=true` and `HARBOR_ENABLE_COMMERCIAL_PGX_MONITORING=true` (chart: `database.metricsEnabled`) and metrics scraping enabled.\n\nStandard Harbor does not expose these metrics. **No data** can also mean monitoring is disabled or no matching metrics were scraped.",
         "mode": "markdown"
       },
       "pluginVersion": "13.3.0-34259522365",
@@ -4620,7 +4620,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Requires 8gcr PostgreSQL monitoring with POSTGRESQL_METRICS_ENABLED=true and metrics scraping enabled. Standard Harbor does not expose these metrics. Empty panels can also mean monitoring is disabled or no matching metrics were scraped.\n\nConnections used and idle, and total configured pool capacity, summed across replicas of each service within a cluster and namespace.",
+      "description": "Requires 8gcr PostgreSQL monitoring with POSTGRESQL_METRICS_ENABLED=true and HARBOR_ENABLE_COMMERCIAL_PGX_MONITORING=true (chart: database.metricsEnabled) and metrics scraping enabled. Standard Harbor does not expose these metrics. Empty panels can also mean monitoring is disabled or no matching metrics were scraped.\n\nConnections used and idle, and total configured pool capacity, summed across replicas of each service within a cluster and namespace.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -4740,7 +4740,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Requires 8gcr PostgreSQL monitoring with POSTGRESQL_METRICS_ENABLED=true and metrics scraping enabled. Standard Harbor does not expose these metrics. Empty panels can also mean monitoring is disabled or no matching metrics were scraped.\n\nSeconds per second spent waiting for a free pool connection. Non-zero means the pool is saturated.",
+      "description": "Requires 8gcr PostgreSQL monitoring with POSTGRESQL_METRICS_ENABLED=true and HARBOR_ENABLE_COMMERCIAL_PGX_MONITORING=true (chart: database.metricsEnabled) and metrics scraping enabled. Standard Harbor does not expose these metrics. Empty panels can also mean monitoring is disabled or no matching metrics were scraped.\n\nSeconds per second spent waiting for a free pool connection. Non-zero means the pool is saturated.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -4836,7 +4836,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Requires 8gcr PostgreSQL monitoring with POSTGRESQL_METRICS_ENABLED=true and metrics scraping enabled. Standard Harbor does not expose these metrics. Empty panels can also mean monitoring is disabled or no matching metrics were scraped.\n\nAcquires that had to wait for the pool, and acquires canceled by context (request timeouts).",
+      "description": "Requires 8gcr PostgreSQL monitoring with POSTGRESQL_METRICS_ENABLED=true and HARBOR_ENABLE_COMMERCIAL_PGX_MONITORING=true (chart: database.metricsEnabled) and metrics scraping enabled. Standard Harbor does not expose these metrics. Empty panels can also mean monitoring is disabled or no matching metrics were scraped.\n\nAcquires that had to wait for the pool, and acquires canceled by context (request timeouts).",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -4944,7 +4944,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Requires 8gcr PostgreSQL monitoring with POSTGRESQL_METRICS_ENABLED=true and metrics scraping enabled. Standard Harbor does not expose these metrics. Empty panels can also mean monitoring is disabled or no matching metrics were scraped.\n\nPostgreSQL operation latency across all Harbor processes.",
+      "description": "Requires 8gcr PostgreSQL monitoring with POSTGRESQL_METRICS_ENABLED=true and HARBOR_ENABLE_COMMERCIAL_PGX_MONITORING=true (chart: database.metricsEnabled) and metrics scraping enabled. Standard Harbor does not expose these metrics. Empty panels can also mean monitoring is disabled or no matching metrics were scraped.\n\nPostgreSQL operation latency across all Harbor processes.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -5064,7 +5064,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Requires 8gcr PostgreSQL monitoring with POSTGRESQL_METRICS_ENABLED=true and metrics scraping enabled. Standard Harbor does not expose these metrics. Empty panels can also mean monitoring is disabled or no matching metrics were scraped.\n\nDatabase operations per second by type (query, batch, prepare, connect, copy_from).",
+      "description": "Requires 8gcr PostgreSQL monitoring with POSTGRESQL_METRICS_ENABLED=true and HARBOR_ENABLE_COMMERCIAL_PGX_MONITORING=true (chart: database.metricsEnabled) and metrics scraping enabled. Standard Harbor does not expose these metrics. Empty panels can also mean monitoring is disabled or no matching metrics were scraped.\n\nDatabase operations per second by type (query, batch, prepare, connect, copy_from).",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -5160,7 +5160,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Requires 8gcr PostgreSQL monitoring with POSTGRESQL_METRICS_ENABLED=true and metrics scraping enabled. Standard Harbor does not expose these metrics. Empty panels can also mean monitoring is disabled or no matching metrics were scraped.\n\nOperations that returned an error, by PostgreSQL status.",
+      "description": "Requires 8gcr PostgreSQL monitoring with POSTGRESQL_METRICS_ENABLED=true and HARBOR_ENABLE_COMMERCIAL_PGX_MONITORING=true (chart: database.metricsEnabled) and metrics scraping enabled. Standard Harbor does not expose these metrics. Empty panels can also mean monitoring is disabled or no matching metrics were scraped.\n\nOperations that returned an error, by PostgreSQL status.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -5256,7 +5256,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Requires 8gcr PostgreSQL monitoring with POSTGRESQL_METRICS_ENABLED=true and metrics scraping enabled. Standard Harbor does not expose these metrics. Empty panels can also mean monitoring is disabled or no matching metrics were scraped.\n\nAverage time to get a connection from the pool (total acquire duration / acquires).",
+      "description": "Requires 8gcr PostgreSQL monitoring with POSTGRESQL_METRICS_ENABLED=true and HARBOR_ENABLE_COMMERCIAL_PGX_MONITORING=true (chart: database.metricsEnabled) and metrics scraping enabled. Standard Harbor does not expose these metrics. Empty panels can also mean monitoring is disabled or no matching metrics were scraped.\n\nAverage time to get a connection from the pool (total acquire duration / acquires).",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -5352,7 +5352,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Requires 8gcr PostgreSQL monitoring with POSTGRESQL_METRICS_ENABLED=true and metrics scraping enabled. Standard Harbor does not expose these metrics. Empty panels can also mean monitoring is disabled or no matching metrics were scraped.\n\nPool connections opened and closed per second, with the close reason.",
+      "description": "Requires 8gcr PostgreSQL monitoring with POSTGRESQL_METRICS_ENABLED=true and HARBOR_ENABLE_COMMERCIAL_PGX_MONITORING=true (chart: database.metricsEnabled) and metrics scraping enabled. Standard Harbor does not expose these metrics. Empty panels can also mean monitoring is disabled or no matching metrics were scraped.\n\nPool connections opened and closed per second, with the close reason.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -5460,7 +5460,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Requires 8gcr PostgreSQL monitoring with POSTGRESQL_METRICS_ENABLED=true and metrics scraping enabled. Standard Harbor does not expose these metrics. Empty panels can also mean monitoring is disabled or no matching metrics were scraped.\n\nConnections currently being constructed.",
+      "description": "Requires 8gcr PostgreSQL monitoring with POSTGRESQL_METRICS_ENABLED=true and HARBOR_ENABLE_COMMERCIAL_PGX_MONITORING=true (chart: database.metricsEnabled) and metrics scraping enabled. Standard Harbor does not expose these metrics. Empty panels can also mean monitoring is disabled or no matching metrics were scraped.\n\nConnections currently being constructed.",
       "fieldConfig": {
         "defaults": {
           "color": {

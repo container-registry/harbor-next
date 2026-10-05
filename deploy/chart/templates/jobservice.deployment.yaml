@@ -113,6 +113,8 @@ spec:
                   key: {{ .Values.database.existingSecretKey | default "POSTGRESQL_PASSWORD" }}
             {{- include "harbor.database.tlsEnv" . | nindent 12 }}
             {{- end }}
+            {{- include "harbor.database.metricsEnv" . | nindent 12 }}
+            {{- include "harbor.privateNetworkAccess.env" . | nindent 12 }}
             {{- include "harbor.extraCA.env" . | nindent 12 }}
             {{- with .Values.jobservice.extraEnv }}
             {{- toYaml . | nindent 12 }}

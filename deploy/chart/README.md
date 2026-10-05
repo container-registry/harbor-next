@@ -642,8 +642,7 @@ to the selected cluster. All Harbor series need consistent `cluster` and `namesp
 Runtime appears directly below Overview. All rows are expanded, including the database row,
 whose note and tooltips explain the PostgreSQL/pgx metrics available in the
 [8gcr Harbor distribution](https://container-registry.com/8gcr/).
-Those panels require `POSTGRESQL_METRICS_ENABLED=true` on an 8gcr build with pgx monitoring
-and are empty on standard Harbor.
+Those panels need [database metrics](#database-metrics) and stay empty on standard Harbor.
 
 Provision this shared dashboard once per Grafana organization, then use its selectors to
 switch installations. A sidecar must watch the ConfigMap's namespace and labels.
@@ -660,6 +659,24 @@ metrics:
     namespace: monitoring  # Optional, defaults to release namespace
     annotations:
       grafana_folder: Harbor  # Optional, sidecar folder annotation
+```
+
+### Database metrics
+
+8gcr builds with pgx monitoring can export PostgreSQL pool and query metrics.
+`database.metricsEnabled: true` sets `POSTGRESQL_METRICS_ENABLED` and
+`HARBOR_ENABLE_COMMERCIAL_PGX_MONITORING` on core and jobservice; the metrics stay off
+unless both are set. Setting the feature this way also locks its toggle in the UI.
+Standard Harbor ignores both.
+
+The series are served on each component's metrics endpoint, so `metrics.enabled` must be
+on. With `jobservice.existingConfigMap`, enable the `metric` block in that config yourself.
+
+```yaml
+database:
+  metricsEnabled: true
+metrics:
+  enabled: true
 ```
 
 ### CloudNativePG via extraManifests
@@ -755,6 +772,7 @@ Kubernetes: `>=1.28.0-0`
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| allowPrivateNetworkAccess | bool | `false` | Allow webhook and Slack notifications to reach private network addresses. Sets HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS on core and jobservice. |
 | autoGenSecrets | bool | `true` | Allow the chart to auto-generate secret material it needs (encryption key, component identity secrets, CSRF key, token-service CA, registry htpasswd, ingress certificate). Convenient for `helm install`, but the generated values are random per render: GitOps engines that template client-side (Argo CD) rotate them on every sync and roll every workload. Set to `false` to instead **fail at render time** naming the value that must be pinned — see the GitOps section in the README and `example/flux/`. |
 | cache | object | `{"enabled":false,"expireHours":24}` | Cache configuration (Redis-based caching for manifests) |
 | cache.enabled | bool | `false` | Enable Redis caching |
@@ -767,6 +785,7 @@ Kubernetes: `>=1.28.0-0`
 | core.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler configuration. When enabled the chart OMITS the static `replicas:` field on the Deployment so HPA owns the replica count. `maxReplicas` is REQUIRED. Tracks upstream goharbor/harbor-helm#1068. |
 | core.config | object | {} | Harbor Core application config (converted to env vars in ConfigMap) Any Harbor Core config can be set here without chart changes |
 | core.configureUserSettings | string | `""` | Initial user settings JSON applied on first boot |
+| core.contentTrustLegacySignerPullEnabled | bool | `false` | Allow cosign and notation to pull an unsigned artifact in order to sign it. Sets CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED on core. |
 | core.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
 | core.existingSecret | string | `""` | Use existing secret for Core secret |
 | core.existingSecretKey | string | `"secret"` | Key in existing secret containing the Core secret |
@@ -817,6 +836,7 @@ Kubernetes: `>=1.28.0-0`
 | database.existingTlsSecret | string | `""` | Secret holding the PEM-encoded CA bundle (and optionally client cert + key) for verifying / authenticating to PostgreSQL. Required for `verify-ca` / `verify-full` sslmode against managed PG with a private CA (RDS-with-custom-CA, GCP CloudSQL, on-prem with internal PKI). Tracks upstream goharbor/harbor-helm#1859.  Expected keys (cert-manager convention):   ca.crt   — CA bundle (always required when this Secret is set)   tls.crt  — client cert (only when clientCertEnabled=true)   tls.key  — client key  (only when clientCertEnabled=true)  When set, the chart mounts the Secret at /etc/harbor/db-tls and injects POSTGRESQL_URL env on core + jobservice. The runtime DB pool honors that env over the individual fields.  Caveats:   - Exporter does not yet plumb POSTGRESQL_URL into its viper config,     so its DB connection ignores client certs (it'll work fine for     sslmode=verify-ca with a publicly-trusted CA).   - Harbor's migration tool (NewMigrator) does not honor cfg.URL     either, so schema migrations against a server that REQUIRES     mTLS will fail. Use sslmode=verify-ca or migrate via an external     trusted client until that's fixed upstream. |
 | database.host | string | `""` | Database host (required) |
 | database.maxOpenConns | int | `100` | Hard cap on open connections per pool (POSTGRESQL_MAX_OPEN_CONNS). Core, jobservice (via core's config), and the exporter each open their own pool, so the per-release total is roughly this times the number of pooled components. Lower it on small/shared PostgreSQL. |
+| database.metricsEnabled | bool | `false` | Export PostgreSQL pool and query metrics (8gcr builds with pgx monitoring; needs `metrics.enabled`). See [Database metrics](#database-metrics). |
 | database.minConns | int | `2` | Minimum idle connections kept warm per pool (POSTGRESQL_MIN_CONNS). pgxpool floor; replaces the removed maxIdleConns.  `0` is valid and meaningful — it is pgxpool's own default: no warm floor, connections opened on demand and left to age out via connMaxIdleTime, so an idle release drains to zero connections. The trade is that the first query after an idle gap pays TCP + TLS + auth + backend fork. Worth it when many releases share one PostgreSQL server, where the floor is multiplied by pools times tenants. `null` falls back to 2. |
 | database.password | string | `""` | Database password (ignored if existingSecret is set) |
 | database.port | int | `5432` | Database port |

@@ -643,8 +643,7 @@ to the selected cluster. All Harbor series need consistent `cluster` and `namesp
 Runtime appears directly below Overview. All rows are expanded, including the database row,
 whose note and tooltips explain the PostgreSQL/pgx metrics available in the
 [8gcr Harbor distribution](https://container-registry.com/8gcr/).
-Those panels require `POSTGRESQL_METRICS_ENABLED=true` on an 8gcr build with pgx monitoring
-and are empty on standard Harbor.
+Those panels need [database metrics](#database-metrics) and stay empty on standard Harbor.
 
 Provision this shared dashboard once per Grafana organization, then use its selectors to
 switch installations. A sidecar must watch the ConfigMap's namespace and labels.
@@ -661,6 +660,24 @@ metrics:
     namespace: monitoring  # Optional, defaults to release namespace
     annotations:
       grafana_folder: Harbor  # Optional, sidecar folder annotation
+```
+
+### Database metrics
+
+8gcr builds with pgx monitoring can export PostgreSQL pool and query metrics.
+`database.metricsEnabled: true` sets `POSTGRESQL_METRICS_ENABLED` and
+`HARBOR_ENABLE_COMMERCIAL_PGX_MONITORING` on core and jobservice; the metrics stay off
+unless both are set. Setting the feature this way also locks its toggle in the UI.
+Standard Harbor ignores both.
+
+The series are served on each component's metrics endpoint, so `metrics.enabled` must be
+on. With `jobservice.existingConfigMap`, enable the `metric` block in that config yourself.
+
+```yaml
+database:
+  metricsEnabled: true
+metrics:
+  enabled: true
 ```
 
 ### CloudNativePG via extraManifests
