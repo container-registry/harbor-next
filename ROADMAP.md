@@ -29,7 +29,7 @@ Legend: ✅ Delivered · 🚧 In progress · 🗓️ Planned · 💲 Commercial 
 - ✅ **Customizable Branding** 💲 — system-wide white-label branding (logo, product name, login/about skinning) via REST API and Portal.
 - ✅ **Hybrid / multi-authentication** 💲 — local DB users alongside an external auth backend (LDAP/OIDC).
 - ✅ **SFTP replication adapter** 💲 — replication storage adapter targeting SFTP endpoints.
-- ✅ **Pluggable identity providers** 💲 — generalized identity-provider framework with Workload Identity Federation.
+- ✅ **Federated robot accounts** 💲 — robot accounts that sign in with workload identity tokens from trusted issuers (Workload Identity Federation).
 - ✅ **Database observability (pgx monitoring)** 💲 — PostgreSQL connection-pool and query metrics exported via OpenTelemetry.
 - ✅ **AWS RDS IAM authentication** 💲 — IAM auth for PostgreSQL/S3, removing static DB passwords on RDS and S3.
 
