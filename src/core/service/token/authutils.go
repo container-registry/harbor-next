@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/distribution/registry/auth/token"
+	"github.com/distribution/distribution/v3/registry/auth/token"
 	"github.com/docker/libtrust"
 	"github.com/golang-jwt/jwt/v5"
 

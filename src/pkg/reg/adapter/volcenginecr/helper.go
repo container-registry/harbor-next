@@ -21,7 +21,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/docker/distribution/registry/client/auth/challenge"
+	"github.com/goharbor/harbor/src/pkg/reg/util/challenge"
 
 	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/log"

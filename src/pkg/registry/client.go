@@ -24,10 +24,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/manifest/manifestlist"
-	_ "github.com/docker/distribution/manifest/ocischema" // register oci manifest unmarshal function
-	"github.com/docker/distribution/manifest/schema2"
+	"github.com/distribution/distribution/v3"
+	"github.com/distribution/distribution/v3/manifest/manifestlist"
+	_ "github.com/distribution/distribution/v3/manifest/ocischema" // register oci manifest unmarshal function
+	"github.com/distribution/distribution/v3/manifest/schema2"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 

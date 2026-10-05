@@ -63,7 +63,8 @@ func TestRepositoryNameRe(t *testing.T) {
 		{"a:tag", false},
 		{"a@sha256:abc", false},
 		{"localhost:port/a", false},
-		{"[::1]:5000/a", false},
+		// reference v0.6 accepts IPv6 domains.
+		{"[::1]:5000/a", true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

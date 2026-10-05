@@ -50,7 +50,8 @@ func TestParseRefTable(t *testing.T) {
 		{"a@md5:" + strings.Repeat("a", 32), "", "", true},
 		{"", "", "", true},
 		{"a:", "", "", true},
-		{"[::1]:5000/a:v1", "", "", true},
+		// reference v0.6 accepts IPv6 domains.
+		{"[::1]:5000/a:v1", "[::1]:5000/a", "v1", false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.in, func(t *testing.T) {
