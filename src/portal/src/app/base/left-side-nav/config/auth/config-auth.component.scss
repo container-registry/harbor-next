@@ -12,6 +12,10 @@
     margin-left: 0.4rem;
 }
 
-.clr-control-label {
-    width: 19rem !important;
+.clr-form-horizontal {
+    .clr-form-control {
+        & > .clr-control-label {
+            width: 15rem;
+        }
+    }
 }
