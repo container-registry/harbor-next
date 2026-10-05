@@ -16,6 +16,7 @@ package proxy
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -128,6 +129,58 @@ func (suite *CacheTestSuite) TestUpdateManifestList() {
 	newMan, err := suite.mListCache.updateManifestList(ctx, "library/hello-world", manList)
 	suite.Require().Nil(err)
 	suite.Assert().Equal(len(newMan.References()), 1)
+}
+
+// TestUpdateManifestListParsedIndexes runs real payloads through UnmarshalManifest, so a
+// change in the type the library returns for an index cannot silently skip the cache.
+func (suite *CacheTestSuite) TestUpdateManifestListParsedIndexes() {
+	amdDig := "sha256:1a9ec845ee94c202b2d5da74a24f0ed2058318bfa9879fa541efaecba272e86b"
+	armDig := "sha256:92c7f9c92844bbbb5d0a101b22f7c2a7949e40f8ea90c8b3bc396879d95e899a"
+	cases := []struct {
+		name          string
+		mediaType     string
+		childType     string
+		annotations   string
+		wantAnnotated bool
+	}{
+		{"docker manifest list", manifestlist.MediaTypeManifestList, schema2.MediaTypeManifest, "", false},
+		{"oci image index", v1.MediaTypeImageIndex, v1.MediaTypeImageManifest, `,"annotations":{"org.example.k":"v"}`, true},
+	}
+	for _, tc := range cases {
+		suite.Run(tc.name, func() {
+			ctx := context.Background()
+			payload := fmt.Sprintf(`{"schemaVersion":2,"mediaType":%q,"manifests":[`+
+				`{"mediaType":%q,"digest":%q,"size":3253,"platform":{"architecture":"amd64","os":"linux"}},`+
+				`{"mediaType":%q,"digest":%q,"size":3253,"platform":{"architecture":"arm64","os":"linux"}}]%s}`,
+				tc.mediaType, tc.childType, amdDig, tc.childType, armDig, tc.annotations)
+			man, _, err := distribution.UnmarshalManifest(tc.mediaType, []byte(payload))
+			suite.Require().NoError(err)
+
+			local := localInterfaceMock{}
+			local.On("GetManifest", ctx, lib.ArtifactInfo{Repository: "library/hello-world", Digest: amdDig}).Return(&artifact.Artifact{}, nil)
+			local.On("GetManifest", ctx, mock.Anything).Return(nil, nil)
+			cache := &ManifestListCache{local: &local}
+
+			newMan, err := cache.updateManifestList(ctx, "library/hello-world", man)
+			suite.Require().NoError(err)
+			refs := newMan.References()
+			suite.Require().Len(refs, 1)
+			suite.Equal(amdDig, string(refs[0].Digest))
+
+			mt, pl, err := newMan.Payload()
+			suite.Require().NoError(err)
+			suite.Equal(tc.mediaType, mt)
+			var idx v1.Index
+			suite.Require().NoError(json.Unmarshal(pl, &idx))
+			suite.Equal(tc.mediaType, idx.MediaType)
+			suite.Require().Len(idx.Manifests, 1)
+			suite.Require().NotNil(idx.Manifests[0].Platform)
+			suite.Equal("amd64", idx.Manifests[0].Platform.Architecture)
+			if tc.wantAnnotated {
+				suite.Equal(map[string]string{"org.example.k": "v"}, idx.Annotations)
+			}
+		})
+	}
 }
 
 func (suite *CacheTestSuite) TestPushManifestList() {
