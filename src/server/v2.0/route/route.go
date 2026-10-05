@@ -29,5 +29,6 @@ const (
 func RegisterRoutes() {
 	router.NewRoute().Path("/api/" + APIVersion + "/*").
 		Middleware(apiversion.Middleware(APIVersion)).
+		Middleware(docsMiddleware()).
 		Handler(handler.New())
 }
