@@ -61,6 +61,9 @@ services:
         DEV_GID: ${DEV_GID:-1000}
     profiles: [core]
     user: "${DEV_CONTAINER_USER:-harbor}"
+    # Podman defines this name already; Docker on Linux needs it mapped.
+    extra_hosts:
+      - "host.containers.internal:host-gateway"
     volumes:
       - ..:/app
       - ${HOST_GOMODCACHE:?}:/go/pkg/mod
@@ -99,8 +102,8 @@ services:
       JOBSERVICE_URL: http://jobservice:8888
       CORE_SECRET: devenv-secret-do-not-use-in-production
       JOBSERVICE_SECRET: devenv-secret-do-not-use-in-production
-      # Portal (dev server on port 4200, not Nginx on 8080)
-      PORTAL_URL: http://portal:4200
+      # Host port: dev:up runs ng serve on the host; the portal profile publishes it too
+      PORTAL_URL: http://host.containers.internal:${PORT_PORTAL:-4200}
       # Trivy scanner
       TRIVY_ADAPTER_URL: http://trivy-adapter:8080
       WITH_TRIVY: "true"
