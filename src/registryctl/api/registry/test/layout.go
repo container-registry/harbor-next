@@ -19,7 +19,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/docker/distribution/registry/storage/driver"
+	"github.com/distribution/distribution/v3/registry/storage/driver"
 )
 
 // StorageRoot is the prefix distribution writes every registry path under.

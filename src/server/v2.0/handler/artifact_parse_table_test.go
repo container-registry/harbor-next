@@ -42,7 +42,8 @@ func TestParseCopyFromTable(t *testing.T) {
 		{"library/app:" + strings.Repeat("x", 129), "", "", true},
 		{"library/app@sha256:" + strings.Repeat("g", 64), "", "", true},
 		{"library/app@sha256:abc", "", "", true},
-		{"[::1]:5000/app:v1", "", "", true},
+		// reference v0.6 accepts IPv6 domains; the project lookup rejects them later.
+		{"[::1]:5000/app:v1", "[::1]:5000/app", "v1", false},
 		{"", "", "", true},
 	}
 	for _, tc := range cases {

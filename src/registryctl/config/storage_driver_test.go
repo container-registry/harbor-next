@@ -29,7 +29,7 @@ import (
 	"sync"
 	"testing"
 
-	_ "github.com/docker/distribution/registry/storage/driver/s3-aws"
+	_ "github.com/distribution/distribution/v3/registry/storage/driver/s3-aws"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -268,14 +268,9 @@ func TestS3DriverDeleteScope(t *testing.T) {
 			require.NoError(t, d.Delete(ctx, reg+"/repositories/lib/app"))
 			require.NoError(t, d.Delete(ctx, reg+"/repositories/big/repo"))
 
-			// v2 stops listing at the first non-child key: "lib/app-x/" sorts
-			// before "lib/app/", so nothing under lib/app is deleted and no
-			// error is returned.
 			assert.Equal(t, []string{
 				base + "/blobs/sha256/aa/aa11/data",
 				base + "/repositories/lib/app-x/_layers/sha256/bb/link",
-				base + "/repositories/lib/app/_layers/sha256/bb/link",
-				base + "/repositories/lib/app/_manifests/revisions/sha256/aa/link",
 				base + "/repositories/lib/app2/_manifests/revisions/sha256/aa/link",
 				"outside/root/object",
 			}, f.keys())
