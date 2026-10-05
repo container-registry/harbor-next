@@ -330,8 +330,6 @@ func TestPullManifestAcceptHeaders(t *testing.T) {
 		"application/vnd.docker.distribution.manifest.list.v2+json",
 		"application/vnd.oci.image.manifest.v1+json",
 		"application/vnd.docker.distribution.manifest.v2+json",
-		"application/vnd.docker.distribution.manifest.v1+prettyjws",
-		"application/vnd.docker.distribution.manifest.v1+json",
 	}, f.accepts[0])
 	assert.Equal(t, []string{"application/vnd.oci.image.manifest.v1+json"}, f.accepts[1])
 }
@@ -355,4 +353,33 @@ func TestPullManifestReturnsDigestAndBytes(t *testing.T) {
 			assert.Equal(t, tc.payload, string(payload))
 		})
 	}
+}
+
+func TestCopyRefusesSchema1Children(t *testing.T) {
+	for _, child := range []string{
+		"application/vnd.docker.distribution.manifest.v1+prettyjws",
+		"application/vnd.docker.distribution.manifest.v1+json",
+	} {
+		t.Run(child, func(t *testing.T) {
+			f, c := newFakeClient(t)
+			list := fmt.Sprintf(`{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.list.v2+json","manifests":[{"mediaType":%q,"digest":%q,"size":10}]}`, child, layerD)
+			f.putManifest("src/app", "application/vnd.docker.distribution.manifest.list.v2+json", list, "old")
+			f.putBlob("src/app", layerD)
+
+			err := c.Copy("src/app", "old", "dst/app", "old", true)
+			assert.True(t, errors.IsErr(err, errors.UNSUPPORTED), "got %v", err)
+			assert.Empty(t, f.manifestPuts(), "nothing pushed")
+			assert.Empty(t, f.mounts(), "nothing mounted")
+		})
+	}
+}
+
+func TestPullManifestRefusesSchema1(t *testing.T) {
+	f, c := newFakeClient(t)
+	f.putManifest("p/a", "application/vnd.docker.distribution.manifest.v1+prettyjws",
+		`{"schemaVersion":1,"name":"p/a","tag":"v1","fsLayers":[],"history":[],"signatures":[]}`, "v1")
+	assert.NotPanics(t, func() {
+		_, _, err := c.PullManifest("p/a", "v1")
+		assert.Error(t, err)
+	})
 }

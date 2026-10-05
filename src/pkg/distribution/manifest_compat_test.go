@@ -64,6 +64,11 @@ var (
    ]
 }`
 
+	schema1Manifest = `{"schemaVersion":1,"name":"library/hello","tag":"latest","architecture":"amd64",
+ "fsLayers":[{"blobSum":"sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"}],
+ "history":[{"v1Compatibility":"{}"}],
+ "signatures":[{"header":{"alg":"ES256"},"signature":"x","protected":"e30"}]}`
+
 	dockerList = `{"schemaVersion":2,"mediaType":"application/vnd.docker.distribution.manifest.list.v2+json",
  "manifests":[
   {"mediaType":"application/vnd.docker.distribution.manifest.v2+json","digest":"` + mfDigestA + `","size":527,"platform":{"architecture":"amd64","os":"linux"}},
@@ -190,6 +195,10 @@ func TestUnmarshalManifestRejects(t *testing.T) {
 		{"index payload under manifest content type", "application/vnd.oci.image.manifest.v1+json", ociIndex},
 		{"list payload under index content type", "application/vnd.oci.image.index.v1+json", dockerList},
 		{"bad content type syntax", "application/vnd.oci.image.manifest.v1+json; =", ociManifest},
+		{"schema1 signed", "application/vnd.docker.distribution.manifest.v1+prettyjws", schema1Manifest},
+		{"schema1 unsigned", "application/vnd.docker.distribution.manifest.v1+json", schema1Manifest},
+		{"schema1 without content type", "", schema1Manifest},
+		{"schema1 as application/json", "application/json", schema1Manifest},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -198,5 +207,15 @@ func TestUnmarshalManifestRejects(t *testing.T) {
 				assert.Error(t, err)
 			})
 		})
+	}
+}
+
+func TestIsSchema1(t *testing.T) {
+	assert.True(t, IsSchema1("application/vnd.docker.distribution.manifest.v1+json"))
+	assert.True(t, IsSchema1("application/vnd.docker.distribution.manifest.v1+prettyjws"))
+	assert.Equal(t, "application/vnd.docker.distribution.manifest.v1+json", MediaTypeSchema1Manifest)
+	assert.Equal(t, "application/vnd.docker.distribution.manifest.v1+prettyjws", MediaTypeSchema1SignedManifest)
+	for _, mt := range []string{"", "application/json", "application/vnd.docker.distribution.manifest.v2+json", "application/vnd.oci.image.manifest.v1+json"} {
+		assert.False(t, IsSchema1(mt), mt)
 	}
 }

@@ -227,3 +227,21 @@ func TestCopyArtifactOverrideRules(t *testing.T) {
 		assert.Equal(t, tOCI, dst.manifests["d@v1"].payload)
 	})
 }
+
+func TestCopyContentRefusesSchema1(t *testing.T) {
+	const d = "sha256:aa11111111111111111111111111111111111111111111111111111111111111"
+	for _, mt := range []string{
+		"application/vnd.docker.distribution.manifest.v1+prettyjws",
+		"application/vnd.docker.distribution.manifest.v1+json",
+	} {
+		t.Run(mt, func(t *testing.T) {
+			src, dst := newRecording(), newRecording()
+			err := newTransfer(src, dst).copyContent(distribution.Descriptor{MediaType: mt, Digest: digest.Digest(d)}, "s", "d", trans.NewOptions())
+			assert.ErrorContains(t, err, "schema1")
+			assert.Empty(t, src.pulledMf)
+			assert.Empty(t, src.pulledBl)
+			assert.Empty(t, dst.pushedBl)
+			assert.Empty(t, dst.pushedMf)
+		})
+	}
+}
