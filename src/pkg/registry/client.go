@@ -27,7 +27,6 @@ import (
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/manifest/manifestlist"
 	_ "github.com/docker/distribution/manifest/ocischema" // register oci manifest unmarshal function
-	"github.com/docker/distribution/manifest/schema1"
 	"github.com/docker/distribution/manifest/schema2"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -38,6 +37,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
+	harbordist "github.com/goharbor/harbor/src/pkg/distribution"
 	"github.com/goharbor/harbor/src/pkg/registry/auth"
 	"github.com/goharbor/harbor/src/pkg/registry/interceptor"
 	"github.com/goharbor/harbor/src/pkg/registry/interceptor/readonly"
@@ -56,8 +56,6 @@ var (
 		manifestlist.MediaTypeManifestList,
 		v1.MediaTypeImageManifest,
 		schema2.MediaTypeManifest,
-		schema1.MediaTypeSignedManifest,
-		schema1.MediaTypeManifest,
 	}
 )
 
@@ -593,10 +591,12 @@ func (c *client) Copy(srcRepo, srcRef, dstRepo, dstRef string, override bool) er
 		// skip foreign layer
 		case schema2.MediaTypeForeignLayer:
 			continue
+		case harbordist.MediaTypeSchema1Manifest, harbordist.MediaTypeSchema1SignedManifest:
+			return errors.New(nil).WithCode(errors.UNSUPPORTED).
+				WithMessagef("cannot copy %s: Docker schema1 manifests are not supported", digest)
 		// manifest or index
 		case v1.MediaTypeImageIndex, manifestlist.MediaTypeManifestList,
-			v1.MediaTypeImageManifest, schema2.MediaTypeManifest,
-			schema1.MediaTypeSignedManifest, schema1.MediaTypeManifest:
+			v1.MediaTypeImageManifest, schema2.MediaTypeManifest:
 			if err = c.Copy(srcRepo, digest, dstRepo, digest, false); err != nil {
 				return err
 			}

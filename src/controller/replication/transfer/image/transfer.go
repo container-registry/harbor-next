@@ -16,6 +16,7 @@ package image //nolint:revive
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -24,7 +25,6 @@ import (
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/manifest/manifestlist"
-	"github.com/docker/distribution/manifest/schema1"
 	"github.com/docker/distribution/manifest/schema2"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 
@@ -32,6 +32,7 @@ import (
 	trans "github.com/goharbor/harbor/src/controller/replication/transfer"
 	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/log"
+	harbordist "github.com/goharbor/harbor/src/pkg/distribution"
 	"github.com/goharbor/harbor/src/pkg/reg/adapter"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
 )
@@ -263,17 +264,18 @@ func (t *transfer) copyContent(content distribution.Descriptor, srcRepo, dstRepo
 	// when the media type of pulled manifest is index,
 	// the contents it contains are a few manifests/indexes
 	case v1.MediaTypeImageIndex, manifestlist.MediaTypeManifestList,
-		v1.MediaTypeImageManifest, schema2.MediaTypeManifest,
-		schema1.MediaTypeSignedManifest, schema1.MediaTypeManifest:
+		v1.MediaTypeImageManifest, schema2.MediaTypeManifest:
 		// as using digest as the reference, so set the override to true directly
 		return t.copyArtifact(srcRepo, digest, dstRepo, digest, true, opts)
+	case harbordist.MediaTypeSchema1Manifest, harbordist.MediaTypeSchema1SignedManifest:
+		return fmt.Errorf("cannot copy %s: Docker schema1 manifests are not supported", digest)
 	// handle foreign layer
 	case schema2.MediaTypeForeignLayer:
 		t.logger.Infof("the layer %s is a foreign layer, skip", digest)
 		return nil
 	// copy layer or artifact config
 	// the media type of the layer or config can be "application/octet-stream",
-	// schema1.MediaTypeManifestLayer, schema2.MediaTypeLayer, schema2.MediaTypeImageConfig
+	// schema2.MediaTypeLayer, schema2.MediaTypeImageConfig
 	default:
 		if opts.CopyByChunk {
 			// copy by chunk

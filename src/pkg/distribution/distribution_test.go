@@ -19,7 +19,6 @@ import (
 
 	_ "github.com/docker/distribution/manifest/manifestlist"
 	_ "github.com/docker/distribution/manifest/ocischema"
-	_ "github.com/docker/distribution/manifest/schema1"
 	_ "github.com/docker/distribution/manifest/schema2"
 )
 
