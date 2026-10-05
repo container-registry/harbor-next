@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -38,6 +39,15 @@ import (
 // returned matches the expected one
 func HTTPStatusCodeHealthChecker(method string, url string, header http.Header,
 	timeout time.Duration, statusCode int) health.Checker {
+	client := &http.Client{
+		Transport: httputil.GetHTTPTransport(),
+		Timeout:   timeout,
+	}
+	return httpHealthChecker(client, method, url, header, statusCode)
+}
+
+func httpHealthChecker(client *http.Client, method string, url string, header http.Header,
+	statusCodes ...int) health.Checker {
 	return health.CheckFunc(func() error {
 		req, err := http.NewRequest(method, url, nil)
 		if err != nil {
@@ -49,16 +59,12 @@ func HTTPStatusCodeHealthChecker(method string, url string, header http.Header,
 			}
 		}
 
-		client := httputil.NewClient(&http.Client{
-			Transport: httputil.GetHTTPTransport(),
-			Timeout:   timeout,
-		})
 		resp, err := client.Do(req)
 		if err != nil {
 			return fmt.Errorf("failed to check health: %v", err)
 		}
 		defer resp.Body.Close()
-		if resp.StatusCode != statusCode {
+		if !slices.Contains(statusCodes, resp.StatusCode) {
 			data, err := io.ReadAll(resp.Body)
 			if err != nil {
 				log.Debugf("failed to read response body: %v", err)
@@ -115,11 +121,24 @@ func coreHealthChecker() health.Checker {
 }
 
 func portalHealthChecker() health.Checker {
-	url := config.GetPortalURL()
-	timeout := 60 * time.Second
 	period := 10 * time.Second
-	checker := HTTPStatusCodeHealthChecker(http.MethodGet, url, nil, timeout, http.StatusOK)
-	return PeriodicHealthChecker(checker, period)
+	return PeriodicHealthChecker(portalHTTPChecker(config.GetPortalURL(), 60*time.Second), period)
+}
+
+// portalHTTPChecker treats a redirect as healthy without following it. With TLS
+// the portal redirects plain HTTP to the external HTTPS port, which nothing
+// listens on inside the container network.
+func portalHTTPChecker(url string, timeout time.Duration) health.Checker {
+	client := &http.Client{
+		Transport: httputil.GetHTTPTransport(),
+		Timeout:   timeout,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	return httpHealthChecker(client, http.MethodGet, url, nil,
+		http.StatusOK, http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther,
+		http.StatusTemporaryRedirect, http.StatusPermanentRedirect)
 }
 
 func jobserviceHealthChecker() health.Checker {
