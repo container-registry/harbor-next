@@ -69,7 +69,7 @@ func (r *replicationAPI) CreateReplicationPolicy(ctx context.Context, params ope
 	}
 	// Make this field be optional to keep backward compatibility
 	if params.Policy.DestNamespaceReplaceCount != nil {
-		policy.DestNamespaceReplaceCount = *params.Policy.DestNamespaceReplaceCount
+		policy.DestNamespaceReplaceCount = int8(*params.Policy.DestNamespaceReplaceCount)
 	} else {
 		policy.DestNamespaceReplaceCount = -1 // -1 mean the legacy mode
 	}
@@ -144,7 +144,7 @@ func (r *replicationAPI) UpdateReplicationPolicy(ctx context.Context, params ope
 	}
 	// Make this field be optional to keep backward compatibility
 	if params.Policy.DestNamespaceReplaceCount != nil {
-		policy.DestNamespaceReplaceCount = *params.Policy.DestNamespaceReplaceCount
+		policy.DestNamespaceReplaceCount = int8(*params.Policy.DestNamespaceReplaceCount)
 	} else {
 		policy.DestNamespaceReplaceCount = -1 // -1 mean the legacy mode
 	}
@@ -447,7 +447,7 @@ func (r *replicationAPI) GetReplicationLog(ctx context.Context, params operation
 }
 
 func convertReplicationPolicy(policy *repctlmodel.Policy) *models.ReplicationPolicy {
-	replaceCount := policy.DestNamespaceReplaceCount
+	replaceCount := int32(policy.DestNamespaceReplaceCount)
 	p := &models.ReplicationPolicy{
 		CreationTime:              strfmt.DateTime(policy.CreationTime),
 		Deletion:                  policy.ReplicateDeletion,
