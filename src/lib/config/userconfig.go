@@ -193,6 +193,11 @@ func GDPRSetting(ctx context.Context) (*cfgModels.GDPRSetting, error) {
 	}, nil
 }
 
+// APIDocsEnable returns a bool to indicate whether the API documentation page is served
+func APIDocsEnable(ctx context.Context) bool {
+	return DefaultMgr().Get(ctx, common.APIDocsEnable).GetBool()
+}
+
 // NotificationEnable returns a bool to indicates if notification enabled in harbor
 func NotificationEnable(ctx context.Context) bool {
 	return DefaultMgr().Get(ctx, common.NotificationEnable).GetBool()
