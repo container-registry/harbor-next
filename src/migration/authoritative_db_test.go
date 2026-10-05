@@ -86,11 +86,11 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 
 	objects := []string{
 		"branding",
-		"identity_providers",
-		"robot_identity_providers",
+		"trusted_issuers",
+		"robot_trusted_issuers",
 		"claim_rules",
 		"idx_claim_rules_lookup",
-		"idx_identity_providers_jwks_cache",
+		"idx_trusted_issuers_jwks_cache",
 	}
 	for _, object := range objects {
 		var exists bool
@@ -107,17 +107,17 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 		"branding": {
 			"id", "config", "update_time",
 		},
-		"identity_providers": {
+		"trusted_issuers": {
 			"id", "name", "description", "issuer", "openid_config_url",
 			"offline_validation", "supported_algorithms", "claims_supported",
 			"jwks_uri", "jwks_keys", "jwks_cached_at", "jwks_expires_at",
 			"jwks_last_fetch_attempt", "project_id", "creation_time", "update_time",
 		},
-		"robot_identity_providers": {
-			"id", "identity_provider_id", "robot_id", "creation_time",
+		"robot_trusted_issuers": {
+			"id", "trusted_issuer_id", "robot_id", "creation_time",
 		},
 		"claim_rules": {
-			"id", "identity_provider_id", "robot_id", "claim_path", "value", "creation_time",
+			"id", "trusted_issuer_id", "robot_id", "claim_path", "value", "creation_time",
 		},
 	}
 	for table, tableColumns := range columns {
@@ -236,6 +236,108 @@ func TestExecutionRevisionGuardResolvesThroughSearchPath(t *testing.T) {
 		}
 		if revision != 7 {
 			t.Errorf("pass %d: seeded revision is %d, want 7 preserved across the widening", pass, revision)
+		}
+	}
+}
+
+// Databases created before the rename still carry the identity_providers
+// layout and the old config and RBAC names. The apply renames them in place
+// and keeps the rows.
+func TestTrustedIssuersRenameKeepsRows(t *testing.T) {
+	ctx := context.Background()
+	cfg := authoritativeTestDatabaseConfig()
+	adminPool, err := dbpool.New(ctx, cfg)
+	if err != nil {
+		t.Fatalf("create admin database pool: %v", err)
+	}
+	t.Cleanup(adminPool.Close)
+
+	schemaName := fmt.Sprintf("harbor_next_rename_%d", time.Now().UnixNano())
+	if _, err := adminPool.DB().ExecContext(ctx, "CREATE SCHEMA "+schemaName); err != nil {
+		t.Fatalf("create test schema: %v", err)
+	}
+	t.Cleanup(func() {
+		if _, err := adminPool.DB().ExecContext(ctx, "DROP SCHEMA "+schemaName+" CASCADE"); err != nil {
+			t.Errorf("drop test schema: %v", err)
+		}
+	})
+
+	cfg.MaxOpenConns = 4
+	schemaPool, err := dbpool.New(ctx, cfg, func(poolCfg *pgxpool.Config) {
+		poolCfg.ConnConfig.RuntimeParams["search_path"] = schemaName
+	})
+	if err != nil {
+		t.Fatalf("create schema database pool: %v", err)
+	}
+	t.Cleanup(schemaPool.Close)
+
+	for _, statement := range []string{
+		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
+		"CREATE TABLE execution (id SERIAL PRIMARY KEY, revision INTEGER)",
+		"CREATE TABLE properties (id SERIAL PRIMARY KEY, k VARCHAR(64) NOT NULL UNIQUE, v VARCHAR(1024) NOT NULL)",
+		`CREATE TABLE permission_policy (id SERIAL PRIMARY KEY, scope VARCHAR(255) NOT NULL, resource VARCHAR(255),
+			action VARCHAR(255), effect VARCHAR(255), CONSTRAINT unique_rbac_policy UNIQUE (scope, resource, action, effect))`,
+		`CREATE TABLE role_permission (id SERIAL PRIMARY KEY, role_type VARCHAR(255) NOT NULL, role_id INT NOT NULL,
+			permission_policy_id INT NOT NULL, CONSTRAINT unique_role_permission UNIQUE (role_type, role_id, permission_policy_id))`,
+		`CREATE TABLE identity_providers (id SERIAL PRIMARY KEY, name TEXT NOT NULL, description TEXT, issuer TEXT NOT NULL,
+			openid_config_url TEXT, offline_validation BOOLEAN NOT NULL DEFAULT FALSE, supported_algorithms TEXT,
+			claims_supported TEXT, jwks_uri TEXT, jwks_keys JSONB, jwks_cached_at TIMESTAMP, jwks_expires_at TIMESTAMP,
+			jwks_last_fetch_attempt TIMESTAMP, project_id INT NOT NULL DEFAULT 0, creation_time TIMESTAMP DEFAULT NOW(),
+			update_time TIMESTAMP DEFAULT NOW(), UNIQUE (issuer, project_id))`,
+		`CREATE TABLE robot_identity_providers (id SERIAL PRIMARY KEY,
+			identity_provider_id INT NOT NULL REFERENCES identity_providers(id) ON DELETE CASCADE,
+			robot_id BIGINT NOT NULL REFERENCES robot(id) ON DELETE CASCADE, creation_time TIMESTAMP DEFAULT NOW(),
+			UNIQUE (identity_provider_id, robot_id))`,
+		`CREATE TABLE claim_rules (id SERIAL PRIMARY KEY,
+			identity_provider_id INT NOT NULL REFERENCES identity_providers(id) ON DELETE CASCADE,
+			robot_id BIGINT NOT NULL DEFAULT 0, claim_path TEXT NOT NULL, value TEXT, creation_time TIMESTAMP DEFAULT NOW())`,
+		"CREATE INDEX idx_identity_providers_jwks_cache ON identity_providers (id, jwks_expires_at, jwks_last_fetch_attempt)",
+		"INSERT INTO robot (id) VALUES (1)",
+		"INSERT INTO identity_providers (name, issuer) VALUES ('ci', 'https://issuer.example.com')",
+		"INSERT INTO robot_identity_providers (identity_provider_id, robot_id) VALUES (1, 1)",
+		"INSERT INTO claim_rules (identity_provider_id, claim_path, value) VALUES (1, 'sub', 'repo:x')",
+		"INSERT INTO properties (k, v) VALUES ('enable_commercial_identity_providers', 'true'), ('enable_project_federated_idp', 'true')",
+		"INSERT INTO permission_policy (scope, resource, action, effect) VALUES ('/system', 'federated-idp', 'list', 'allow')",
+		"INSERT INTO role_permission (role_type, role_id, permission_policy_id) VALUES ('robot', 1, 1)",
+	} {
+		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
+			t.Fatalf("setup %q: %v", statement, err)
+		}
+	}
+
+	path := authoritativeTestSchemaPath()
+	for pass := 1; pass <= 2; pass++ {
+		if err := applyAuthoritativeSchema(ctx, sqlSchemaDB{db: schemaPool.DB()}, path); err != nil {
+			t.Fatalf("applyAuthoritativeSchema() pass %d: %v", pass, err)
+		}
+	}
+
+	for _, gone := range []string{"identity_providers", "robot_identity_providers", "idx_identity_providers_jwks_cache"} {
+		var exists bool
+		if err := schemaPool.DB().QueryRowContext(ctx, "SELECT to_regclass($1) IS NOT NULL", gone).Scan(&exists); err != nil {
+			t.Fatalf("look up %s: %v", gone, err)
+		}
+		if exists {
+			t.Errorf("%s still exists after the rename", gone)
+		}
+	}
+
+	checks := map[string]string{
+		"SELECT issuer FROM trusted_issuers WHERE id = 1":                                                  "https://issuer.example.com",
+		"SELECT robot_id::text FROM robot_trusted_issuers WHERE trusted_issuer_id = 1":                     "1",
+		"SELECT value FROM claim_rules WHERE trusted_issuer_id = 1":                                        "repo:x",
+		"SELECT v FROM properties WHERE k = 'enable_commercial_federated_robot_accounts'":                  "true",
+		"SELECT v FROM properties WHERE k = 'enable_project_federated_robot_accounts'":                     "true",
+		"SELECT resource FROM permission_policy p JOIN role_permission r ON r.permission_policy_id = p.id": "trusted-issuer",
+	}
+	for query, want := range checks {
+		var got string
+		if err := schemaPool.DB().QueryRowContext(ctx, query).Scan(&got); err != nil {
+			t.Errorf("%s: %v", query, err)
+			continue
+		}
+		if got != want {
+			t.Errorf("%s = %q, want %q", query, got, want)
 		}
 	}
 }
