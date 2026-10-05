@@ -28,6 +28,12 @@ vars:
     sh: command -v go >/dev/null 2>&1 && echo "${GOBIN:-$(go env GOPATH)/bin}" || echo "${GOBIN:-$HOME/go/bin}"
   GOBUILD_FLAGS: "-buildvcs=false -trimpath"
   DISTRIBUTION_SRC: "https://github.com/distribution/distribution.git"
+  # Applied in order on top of DISTRIBUTION_VERSION; each must apply cleanly to
+  # that tag, so a version bump fails the build until patches are rebased or
+  # dropped. See patches/distribution/README.md.
+  DISTRIBUTION_PATCHES:
+    - patches/distribution/0001-s3-bound-pooled-part-buffer-growth-to-chunk-size.patch
+    - patches/distribution/0002-s3-add-spooldir-to-buffer-upload-parts-on-disk.patch
   NPM_REGISTRY: "https://registry.npmjs.org/"
 
   # Multi-arch image build configuration
@@ -188,6 +194,9 @@ tasks:
         echo "External Dependencies:"
         echo "  Distribution:   {{.DISTRIBUTION_SRC}}"
         echo "  Distribution:   {{.DISTRIBUTION_VERSION}}"
+        {{- range .DISTRIBUTION_PATCHES}}
+        echo "    + patch:      {{.}}"
+        {{- end}}
         echo "  NPM Registry:   {{.NPM_REGISTRY}}"
         echo ""
         echo "═══════════════════════════════════════════════════════════"
