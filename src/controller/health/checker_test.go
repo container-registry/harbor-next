@@ -85,6 +85,27 @@ func TestPortalHealthCheckerDoesNotFollowRedirect(t *testing.T) {
 	assert.Error(t, portalHTTPChecker(portal.URL, time.Second).Check())
 }
 
+func TestPortalHTTPCheckerStatuses(t *testing.T) {
+	for code, healthy := range map[int]bool{
+		http.StatusOK:                  true,
+		http.StatusMovedPermanently:    true,
+		http.StatusFound:               true,
+		http.StatusSeeOther:            true,
+		http.StatusTemporaryRedirect:   true,
+		http.StatusPermanentRedirect:   true,
+		http.StatusNotFound:            false,
+		http.StatusInternalServerError: false,
+	} {
+		portal := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Location", "https://127.0.0.1:1/")
+			w.WriteHeader(code)
+		}))
+		err := portalHTTPChecker(portal.URL, time.Second).Check()
+		portal.Close()
+		assert.Equal(t, healthy, err == nil, "status %d", code)
+	}
+}
+
 func TestPeriodicHealthChecker(t *testing.T) {
 	firstCheck := true
 	checkFunc := func() error {
