@@ -8,7 +8,7 @@
 -- Only additive, data-preserving changes belong here. Destructive changes and
 -- large data backfills require a separately reviewed operational procedure.
 --
--- branding and identity_providers/robot_identity_providers/claim_rules were
+-- branding and trusted_issuers/robot_trusted_issuers/claim_rules were
 -- formerly release-2.15 migrations 0181/0182; both numbers were later reused
 -- by real upstream migrations, so they moved here instead of being renumbered.
 
@@ -19,8 +19,99 @@ CREATE TABLE IF NOT EXISTS branding (
     update_time  TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
--- Workload identity federation
-CREATE TABLE IF NOT EXISTS identity_providers (
+-- Federated robot accounts: trusted issuers
+--
+-- These tables were first named identity_providers/robot_identity_providers
+-- with an identity_provider_id column. Rename them in place before the CREATE
+-- statements below so existing rows survive, then carry the renamed config key
+-- and RBAC resource along. Every step is guarded, so a fresh database or a
+-- repeat run skips it.
+DO $$
+DECLARE
+    r record;
+BEGIN
+    IF to_regclass('identity_providers') IS NOT NULL AND to_regclass('trusted_issuers') IS NULL THEN
+        ALTER TABLE identity_providers RENAME TO trusted_issuers;
+    END IF;
+    IF to_regclass('robot_identity_providers') IS NOT NULL AND to_regclass('robot_trusted_issuers') IS NULL THEN
+        ALTER TABLE robot_identity_providers RENAME TO robot_trusted_issuers;
+    END IF;
+
+    FOR r IN
+        SELECT a.attrelid::regclass AS tbl
+        FROM pg_attribute a
+        WHERE a.attrelid IN (to_regclass('robot_trusted_issuers'), to_regclass('claim_rules'))
+          AND a.attname = 'identity_provider_id'
+          AND a.attnum > 0
+          AND NOT a.attisdropped
+          AND NOT EXISTS (
+              SELECT 1 FROM pg_attribute n
+              WHERE n.attrelid = a.attrelid AND n.attname = 'trusted_issuer_id' AND NOT n.attisdropped
+          )
+    LOOP
+        EXECUTE format('ALTER TABLE %s RENAME COLUMN identity_provider_id TO trusted_issuer_id', r.tbl);
+    END LOOP;
+
+    -- constraints, their indexes and the serial sequences keep the names
+    -- they were created with, so follow them up by name
+    FOR r IN
+        SELECT con.conrelid::regclass AS tbl, con.conname
+        FROM pg_constraint con
+        WHERE con.conrelid IN (to_regclass('trusted_issuers'), to_regclass('robot_trusted_issuers'), to_regclass('claim_rules'))
+          AND con.conname LIKE '%identity_provider%'
+    LOOP
+        EXECUTE format('ALTER TABLE %s RENAME CONSTRAINT %I TO %I',
+            r.tbl, r.conname, replace(r.conname, 'identity_provider', 'trusted_issuer'));
+    END LOOP;
+
+    FOR r IN
+        SELECT c.oid::regclass AS rel, c.relkind, c.relname
+        FROM pg_class c
+        WHERE c.relname LIKE '%identity_provider%'
+          AND c.relkind IN ('i', 'S')
+          AND c.relnamespace IN (
+              SELECT relnamespace FROM pg_class
+              WHERE oid IN (to_regclass('trusted_issuers'), to_regclass('robot_trusted_issuers'))
+          )
+          AND (
+              EXISTS (
+                  SELECT 1 FROM pg_index i
+                  WHERE i.indexrelid = c.oid
+                    AND i.indrelid IN (to_regclass('trusted_issuers'), to_regclass('robot_trusted_issuers'), to_regclass('claim_rules'))
+              )
+              OR EXISTS (
+                  SELECT 1 FROM pg_depend d
+                  WHERE d.classid = 'pg_class'::regclass
+                    AND d.objid = c.oid
+                    AND d.refobjid IN (to_regclass('trusted_issuers'), to_regclass('robot_trusted_issuers'))
+              )
+          )
+    LOOP
+        IF to_regclass(quote_ident(replace(r.relname, 'identity_provider', 'trusted_issuer'))) IS NULL THEN
+            EXECUTE format('ALTER %s %s RENAME TO %I',
+                CASE r.relkind WHEN 'S' THEN 'SEQUENCE' ELSE 'INDEX' END,
+                r.rel, replace(r.relname, 'identity_provider', 'trusted_issuer'));
+        END IF;
+    END LOOP;
+
+    IF to_regclass('properties') IS NOT NULL THEN
+        UPDATE properties SET k = 'enable_project_federated_robot_accounts'
+        WHERE k = 'enable_project_federated_idp'
+          AND NOT EXISTS (SELECT 1 FROM properties WHERE k = 'enable_project_federated_robot_accounts');
+    END IF;
+    IF to_regclass('permission_policy') IS NOT NULL THEN
+        UPDATE permission_policy p SET resource = 'trusted-issuer'
+        WHERE p.resource = 'federated-idp'
+          AND NOT EXISTS (
+              SELECT 1 FROM permission_policy n
+              WHERE n.scope = p.scope AND n.resource = 'trusted-issuer'
+                AND n.action IS NOT DISTINCT FROM p.action AND n.effect IS NOT DISTINCT FROM p.effect
+          );
+    END IF;
+END
+$$;
+
+CREATE TABLE IF NOT EXISTS trusted_issuers (
     id                      SERIAL PRIMARY KEY,
     name                    TEXT NOT NULL,
     description             TEXT,
@@ -40,28 +131,28 @@ CREATE TABLE IF NOT EXISTS identity_providers (
     UNIQUE (issuer, project_id)
 );
 
-CREATE TABLE IF NOT EXISTS robot_identity_providers (
-    id                   SERIAL PRIMARY KEY,
-    identity_provider_id INT NOT NULL REFERENCES identity_providers(id) ON DELETE CASCADE,
-    robot_id             BIGINT NOT NULL REFERENCES robot(id) ON DELETE CASCADE,
-    creation_time        TIMESTAMP DEFAULT NOW(),
-    UNIQUE (identity_provider_id, robot_id)
+CREATE TABLE IF NOT EXISTS robot_trusted_issuers (
+    id                SERIAL PRIMARY KEY,
+    trusted_issuer_id INT NOT NULL REFERENCES trusted_issuers(id) ON DELETE CASCADE,
+    robot_id          BIGINT NOT NULL REFERENCES robot(id) ON DELETE CASCADE,
+    creation_time     TIMESTAMP DEFAULT NOW(),
+    UNIQUE (trusted_issuer_id, robot_id)
 );
 
 CREATE TABLE IF NOT EXISTS claim_rules (
-    id                   SERIAL PRIMARY KEY,
-    identity_provider_id INT NOT NULL REFERENCES identity_providers(id) ON DELETE CASCADE,
-    robot_id             BIGINT NOT NULL DEFAULT 0,
-    claim_path           TEXT NOT NULL,
-    value                TEXT,
-    creation_time        TIMESTAMP DEFAULT NOW()
+    id                SERIAL PRIMARY KEY,
+    trusted_issuer_id INT NOT NULL REFERENCES trusted_issuers(id) ON DELETE CASCADE,
+    robot_id          BIGINT NOT NULL DEFAULT 0,
+    claim_path        TEXT NOT NULL,
+    value             TEXT,
+    creation_time     TIMESTAMP DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_claim_rules_lookup
-    ON claim_rules (identity_provider_id, claim_path, value, robot_id);
+    ON claim_rules (trusted_issuer_id, claim_path, value, robot_id);
 
-CREATE INDEX IF NOT EXISTS idx_identity_providers_jwks_cache
-    ON identity_providers (id, jwks_expires_at, jwks_last_fetch_attempt);
+CREATE INDEX IF NOT EXISTS idx_trusted_issuers_jwks_cache
+    ON trusted_issuers (id, jwks_expires_at, jwks_last_fetch_attempt);
 
 -- Multi-format artifact repositories (npm, Maven): rebuildable Postgres
 -- projection over the OCI `_index` control artifact. Authoritative mutable

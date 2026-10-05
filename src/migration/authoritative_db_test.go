@@ -91,11 +91,11 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 
 	objects := []string{
 		"branding",
-		"identity_providers",
-		"robot_identity_providers",
+		"trusted_issuers",
+		"robot_trusted_issuers",
 		"claim_rules",
 		"idx_claim_rules_lookup",
-		"idx_identity_providers_jwks_cache",
+		"idx_trusted_issuers_jwks_cache",
 		"multi_format_package",
 		"multi_format_version",
 		"multi_project_reference",
@@ -119,17 +119,17 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 		"branding": {
 			"id", "config", "update_time",
 		},
-		"identity_providers": {
+		"trusted_issuers": {
 			"id", "name", "description", "issuer", "openid_config_url",
 			"offline_validation", "supported_algorithms", "claims_supported",
 			"jwks_uri", "jwks_keys", "jwks_cached_at", "jwks_expires_at",
 			"jwks_last_fetch_attempt", "project_id", "creation_time", "update_time",
 		},
-		"robot_identity_providers": {
-			"id", "identity_provider_id", "robot_id", "creation_time",
+		"robot_trusted_issuers": {
+			"id", "trusted_issuer_id", "robot_id", "creation_time",
 		},
 		"claim_rules": {
-			"id", "identity_provider_id", "robot_id", "claim_path", "value", "creation_time",
+			"id", "trusted_issuer_id", "robot_id", "claim_path", "value", "creation_time",
 		},
 	}
 	for table, tableColumns := range columns {
@@ -298,6 +298,149 @@ func TestExecutionRevisionGuardIgnoresNonTableRelations(t *testing.T) {
 
 	if err := applyAuthoritativeSchema(ctx, sqlSchemaDB{db: schemaPool.DB()}, authoritativeTestSchemaPath()); err != nil {
 		t.Fatalf("applyAuthoritativeSchema() with a shadowing index returned error: %v", err)
+	}
+}
+
+// Databases created before the trusted issuer rename hold their rows in
+// identity_providers and robot_identity_providers. The schema apply renames
+// them in place, keeps the rows and their links, and a repeat run changes
+// nothing.
+func TestTrustedIssuerRenamePreservesData(t *testing.T) {
+	ctx := context.Background()
+	cfg := authoritativeTestDatabaseConfig()
+	adminPool, err := dbpool.New(ctx, cfg)
+	if err != nil {
+		t.Fatalf("create admin database pool: %v", err)
+	}
+	t.Cleanup(adminPool.Close)
+
+	schemaName := fmt.Sprintf("harbor_next_rename_%d", time.Now().UnixNano())
+	if _, err := adminPool.DB().ExecContext(ctx, "CREATE SCHEMA "+schemaName); err != nil {
+		t.Fatalf("create test schema: %v", err)
+	}
+	t.Cleanup(func() {
+		if _, err := adminPool.DB().ExecContext(ctx, "DROP SCHEMA "+schemaName+" CASCADE"); err != nil {
+			t.Errorf("drop test schema: %v", err)
+		}
+	})
+
+	cfg.MaxOpenConns = 4
+	schemaPool, err := dbpool.New(ctx, cfg, func(poolCfg *pgxpool.Config) {
+		poolCfg.ConnConfig.RuntimeParams["search_path"] = schemaName
+	})
+	if err != nil {
+		t.Fatalf("create schema database pool: %v", err)
+	}
+	t.Cleanup(schemaPool.Close)
+
+	db := schemaPool.DB()
+	for _, statement := range []string{
+		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
+		"CREATE TABLE project (project_id SERIAL PRIMARY KEY)",
+		"CREATE TABLE properties (id SERIAL PRIMARY KEY, k varchar(64) NOT NULL UNIQUE, v text NOT NULL)",
+		`CREATE TABLE permission_policy (id SERIAL PRIMARY KEY, scope varchar(255) NOT NULL,
+			resource varchar(255), action varchar(255), effect varchar(255),
+			CONSTRAINT unique_rbac_policy UNIQUE (scope, resource, action, effect))`,
+		`CREATE TABLE identity_providers (
+			id SERIAL PRIMARY KEY, name TEXT NOT NULL, description TEXT, issuer TEXT NOT NULL,
+			openid_config_url TEXT, offline_validation BOOLEAN NOT NULL DEFAULT FALSE,
+			supported_algorithms TEXT, claims_supported TEXT, jwks_uri TEXT, jwks_keys JSONB,
+			jwks_cached_at TIMESTAMP, jwks_expires_at TIMESTAMP, jwks_last_fetch_attempt TIMESTAMP,
+			project_id INT NOT NULL DEFAULT 0, creation_time TIMESTAMP DEFAULT NOW(),
+			update_time TIMESTAMP DEFAULT NOW(), UNIQUE (issuer, project_id))`,
+		`CREATE TABLE robot_identity_providers (
+			id SERIAL PRIMARY KEY,
+			identity_provider_id INT NOT NULL REFERENCES identity_providers(id) ON DELETE CASCADE,
+			robot_id BIGINT NOT NULL REFERENCES robot(id) ON DELETE CASCADE,
+			creation_time TIMESTAMP DEFAULT NOW(), UNIQUE (identity_provider_id, robot_id))`,
+		`CREATE TABLE claim_rules (
+			id SERIAL PRIMARY KEY,
+			identity_provider_id INT NOT NULL REFERENCES identity_providers(id) ON DELETE CASCADE,
+			robot_id BIGINT NOT NULL DEFAULT 0, claim_path TEXT NOT NULL, value TEXT,
+			creation_time TIMESTAMP DEFAULT NOW())`,
+		"CREATE INDEX idx_claim_rules_lookup ON claim_rules (identity_provider_id, claim_path, value, robot_id)",
+		"CREATE INDEX idx_identity_providers_jwks_cache ON identity_providers (id, jwks_expires_at, jwks_last_fetch_attempt)",
+		"INSERT INTO robot (id) VALUES (7)",
+		"INSERT INTO identity_providers (name, issuer) VALUES ('kube', 'https://kubernetes.default.svc')",
+		"INSERT INTO robot_identity_providers (identity_provider_id, robot_id) VALUES (1, 7)",
+		"INSERT INTO claim_rules (identity_provider_id, robot_id, claim_path, value) VALUES (1, 7, 'sub', 'system:serviceaccount:ci:builder')",
+		"INSERT INTO properties (k, v) VALUES ('enable_project_federated_idp', 'true')",
+		"INSERT INTO permission_policy (scope, resource, action, effect) VALUES ('/project/1', 'federated-idp', 'list', 'allow')",
+	} {
+		if _, err := db.ExecContext(ctx, statement); err != nil {
+			t.Fatalf("setup %q: %v", statement, err)
+		}
+	}
+
+	for pass := 1; pass <= 2; pass++ {
+		if err := applyAuthoritativeSchema(ctx, sqlSchemaDB{db: db}, authoritativeTestSchemaPath()); err != nil {
+			t.Fatalf("applyAuthoritativeSchema() pass %d: %v", pass, err)
+		}
+
+		for _, gone := range []string{
+			"identity_providers", "robot_identity_providers", "idx_identity_providers_jwks_cache",
+			"identity_providers_id_seq", "robot_identity_providers_id_seq",
+		} {
+			var exists bool
+			if err := db.QueryRowContext(ctx, "SELECT to_regclass($1) IS NOT NULL", gone).Scan(&exists); err != nil {
+				t.Fatalf("look up %s: %v", gone, err)
+			}
+			if exists {
+				t.Errorf("pass %d: %s still exists after the rename", pass, gone)
+			}
+		}
+
+		var leftover []string
+		rows, err := db.QueryContext(ctx, `
+			SELECT conname FROM pg_constraint
+			WHERE connamespace = to_regnamespace($1) AND conname LIKE '%identity_provider%'`, schemaName)
+		if err != nil {
+			t.Fatalf("list constraints: %v", err)
+		}
+		for rows.Next() {
+			var name string
+			if err := rows.Scan(&name); err != nil {
+				t.Fatalf("scan constraint: %v", err)
+			}
+			leftover = append(leftover, name)
+		}
+		rows.Close()
+		if len(leftover) > 0 {
+			t.Errorf("pass %d: constraints still named after identity providers: %v", pass, leftover)
+		}
+
+		var name, claimValue string
+		var robotID int64
+		if err := db.QueryRowContext(ctx, `
+			SELECT t.name, r.robot_id, c.value
+			FROM trusted_issuers t
+			JOIN robot_trusted_issuers r ON r.trusted_issuer_id = t.id
+			JOIN claim_rules c ON c.trusted_issuer_id = t.id
+			WHERE t.issuer = 'https://kubernetes.default.svc'`).Scan(&name, &robotID, &claimValue); err != nil {
+			t.Fatalf("pass %d: read renamed rows: %v", pass, err)
+		}
+		if name != "kube" || robotID != 7 || claimValue != "system:serviceaccount:ci:builder" {
+			t.Errorf("pass %d: renamed rows = (%q, %d, %q), want (kube, 7, system:serviceaccount:ci:builder)", pass, name, robotID, claimValue)
+		}
+
+		var configKeys, policyResources int
+		if err := db.QueryRowContext(ctx,
+			"SELECT count(*) FROM properties WHERE k = 'enable_project_federated_robot_accounts' AND v = 'true'").Scan(&configKeys); err != nil {
+			t.Fatalf("count config keys: %v", err)
+		}
+		if err := db.QueryRowContext(ctx,
+			"SELECT count(*) FROM permission_policy WHERE resource = 'trusted-issuer'").Scan(&policyResources); err != nil {
+			t.Fatalf("count policies: %v", err)
+		}
+		if configKeys != 1 || policyResources != 1 {
+			t.Errorf("pass %d: renamed config keys = %d, policies = %d, want 1 and 1", pass, configKeys, policyResources)
+		}
+	}
+
+	// the serial sequence followed the table, so new rows still get ids
+	if _, err := db.ExecContext(ctx,
+		"INSERT INTO trusted_issuers (name, issuer) VALUES ('gitlab', 'https://gitlab.com')"); err != nil {
+		t.Fatalf("insert after rename: %v", err)
 	}
 }
 
