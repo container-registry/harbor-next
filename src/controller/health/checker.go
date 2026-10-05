@@ -137,7 +137,7 @@ func portalHTTPChecker(url string, timeout time.Duration) health.Checker {
 		},
 	}
 	return httpHealthChecker(client, http.MethodGet, url, nil,
-		http.StatusOK, http.StatusMovedPermanently, http.StatusFound,
+		http.StatusOK, http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther,
 		http.StatusTemporaryRedirect, http.StatusPermanentRedirect)
 }
 
