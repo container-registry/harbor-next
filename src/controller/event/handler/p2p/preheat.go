@@ -16,6 +16,8 @@ package p2p
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/goharbor/harbor/src/controller/artifact"
 	"github.com/goharbor/harbor/src/controller/artifact/processor/image"
@@ -27,17 +29,21 @@ import (
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/q"
+	libredis "github.com/goharbor/harbor/src/lib/redis"
 	"github.com/goharbor/harbor/src/pkg"
 	pkgArt "github.com/goharbor/harbor/src/pkg/artifact"
 	scanModel "github.com/goharbor/harbor/src/pkg/scan/dao/scan"
 	v1 "github.com/goharbor/harbor/src/pkg/scan/rest/v1"
 )
 
+const preheatClaimExpiration = 24 * time.Hour
+
 // Handler ...
 type Handler struct {
 	// for UT mock
 	artMgr  pkgArt.Manager
 	scanCtl scan.Controller
+	claim   func(ctx context.Context, key string) (bool, error)
 }
 
 // Name ...
@@ -109,25 +115,38 @@ func (p *Handler) handleImageScanned(ctx context.Context, event *event.ScanImage
 		return err
 	}
 
-	if len(art.Tags) > 0 {
-		_, err = preheat.Enf.PreheatArtifact(ctx, art)
-		return err
+	var errs errors.Errors
+	if len(art.Tags) > 0 && isScanCompleted(event) {
+		if _, err := preheat.Enf.PreheatArtifact(ctx, art); err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	// Scanning an image index scans its children, which are usually untagged and would be dropped
 	// by the tag filter. Preheat the tagged index that references the child instead, which is also
 	// what a push of the index preheats. Only vulnerability scans are handled, as they are what the
 	// vulnerability filter of the preheat policy is evaluated against.
-	if event.ScanType != "" && event.ScanType != v1.ScanTypeVulnerability {
-		return nil
+	if event.ScanType == "" || event.ScanType == v1.ScanTypeVulnerability {
+		if err := p.preheatParents(ctx, art); err != nil {
+			errs = append(errs, err)
+		}
 	}
 
-	return p.preheatParents(ctx, art)
+	if len(errs) > 0 {
+		return errs
+	}
+	return nil
+}
+
+func isScanCompleted(e *event.ScanImageEvent) bool {
+	return e.EventType == event.TopicScanningCompleted
 }
 
 // preheatParents preheats the tagged image indexes referencing the given artifact once the scans
-// of all their children are finished. Every child fires its own scan event, so only the event of
-// the child whose scan finished last preheats the index, instead of preheating it once per child.
+// of all their children are finished. Every child fires its own scan event, and once the scans are
+// all finished, any number of these events can find so, as they are handled concurrently and maybe
+// by different core instances. So the preheat of the index is claimed atomically for the finished
+// scans, and only the event winning the claim preheats the index.
 func (p *Handler) preheatParents(ctx context.Context, child *artifact.Artifact) error {
 	artMgr := pkg.ArtifactMgr
 	// for UT mock
@@ -138,6 +157,10 @@ func (p *Handler) preheatParents(ctx context.Context, child *artifact.Artifact) 
 	// for UT mock
 	if p.scanCtl != nil {
 		scanCtl = p.scanCtl
+	}
+	claim := claimPreheat
+	if p.claim != nil {
+		claim = p.claim
 	}
 
 	references, err := artMgr.ListReferences(ctx, q.New(q.KeyWords{"ChildID": child.ID}))
@@ -167,13 +190,23 @@ func (p *Handler) preheatParents(ctx context.Context, child *artifact.Artifact) 
 			continue
 		}
 
-		last, err := isLastScanned(ctx, scanCtl, parent, child)
+		finishedAt, finished, err := scansFinished(ctx, scanCtl, parent)
 		if err != nil {
 			errs = append(errs, err)
 			continue
 		}
-		if !last {
-			log.Debugf("preheat: skip %s@%s for its scanned child %s, the scans of its other children are not all finished yet", parent.RepositoryName, parent.Digest, child.Digest)
+		if !finished {
+			log.Debugf("preheat: skip %s@%s for its scanned child %s, the scans of its children are not all finished yet", parent.RepositoryName, parent.Digest, child.Digest)
+			continue
+		}
+
+		claimed, err := claim(ctx, fmt.Sprintf("p2p:preheat:scanned_index:%d:%d", parent.ID, finishedAt.UnixNano()))
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		if !claimed {
+			log.Debugf("preheat: skip %s@%s for its scanned child %s, it is preheated for the same scans already", parent.RepositoryName, parent.Digest, child.Digest)
 			continue
 		}
 
@@ -189,14 +222,13 @@ func (p *Handler) preheatParents(ctx context.Context, child *artifact.Artifact) 
 	return nil
 }
 
-// isLastScanned reports whether the vulnerability scans of all the scannable children of the image
-// index are finished and the given child is the one whose scan finished last. Children finishing at
-// the same time are ordered by digest, so exactly one of their scan events preheats the index.
+// scansFinished reports whether the vulnerability scans of all the scannable children of the image
+// index are finished, and when the last of them finished.
 //
 // The reports are fetched per child instead of for the whole index, as the reports of an index are
 // empty as long as any child without capability of the scanner is referenced, and such a child is
 // never scanned.
-func isLastScanned(ctx context.Context, scanCtl scan.Controller, index, child *artifact.Artifact) (bool, error) {
+func scansFinished(ctx context.Context, scanCtl scan.Controller, index *artifact.Artifact) (time.Time, bool, error) {
 	var (
 		last     *scanModel.Report
 		finished = true
@@ -223,18 +255,28 @@ func isLastScanned(ctx context.Context, scanCtl scan.Controller, index, child *a
 				finished = false
 				return artifact.ErrBreak
 			}
-			if last == nil || r.EndTime.After(last.EndTime) ||
-				(r.EndTime.Equal(last.EndTime) && r.Digest > last.Digest) {
+			if last == nil || r.EndTime.After(last.EndTime) {
 				last = r
 			}
 		}
 		return nil
 	}
 	if err := artifact.Ctl.Walk(ctx, index, walkFn, nil); err != nil {
-		return false, err
+		return time.Time{}, false, err
 	}
 
-	return finished && last != nil && last.Digest == child.Digest, nil
+	if !finished || last == nil {
+		return time.Time{}, false, nil
+	}
+	return last.EndTime, true, nil
+}
+
+func claimPreheat(ctx context.Context, key string) (bool, error) {
+	client, err := libredis.GetHarborClient()
+	if err != nil {
+		return false, err
+	}
+	return client.SetNX(ctx, key, 1, preheatClaimExpiration).Result()
 }
 
 func (p *Handler) handleArtifactLabeled(ctx context.Context, event *event.ArtifactLabeledEvent) error {
