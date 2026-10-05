@@ -23,9 +23,8 @@ CREATE TABLE IF NOT EXISTS branding (
 --
 -- These tables were first named identity_providers/robot_identity_providers
 -- with an identity_provider_id column. Rename them in place before the CREATE
--- statements below so existing rows survive, then carry the renamed config key
--- and RBAC resource along. Every step is guarded, so a fresh database or a
--- repeat run skips it.
+-- statements below so existing rows survive. Every step is guarded, so a fresh
+-- database or a repeat run skips it.
 DO $$
 DECLARE
     r record;
@@ -93,21 +92,6 @@ BEGIN
                 r.rel, replace(r.relname, 'identity_provider', 'trusted_issuer'));
         END IF;
     END LOOP;
-
-    IF to_regclass('properties') IS NOT NULL THEN
-        UPDATE properties SET k = 'enable_project_federated_robot_accounts'
-        WHERE k = 'enable_project_federated_idp'
-          AND NOT EXISTS (SELECT 1 FROM properties WHERE k = 'enable_project_federated_robot_accounts');
-    END IF;
-    IF to_regclass('permission_policy') IS NOT NULL THEN
-        UPDATE permission_policy p SET resource = 'trusted-issuer'
-        WHERE p.resource = 'federated-idp'
-          AND NOT EXISTS (
-              SELECT 1 FROM permission_policy n
-              WHERE n.scope = p.scope AND n.resource = 'trusted-issuer'
-                AND n.action IS NOT DISTINCT FROM p.action AND n.effect IS NOT DISTINCT FROM p.effect
-          );
-    END IF;
 END
 $$;
 
@@ -153,6 +137,59 @@ CREATE INDEX IF NOT EXISTS idx_claim_rules_lookup
 
 CREATE INDEX IF NOT EXISTS idx_trusted_issuers_jwks_cache
     ON trusted_issuers (id, jwks_expires_at, jwks_last_fetch_attempt);
+
+-- Stored settings and robot permissions written under the old names. Config
+-- keys without metadata are skipped on load, so they would silently reset.
+DO $$
+DECLARE
+    keys CONSTANT text[][] := ARRAY[
+        ['enable_commercial_identity_providers', 'enable_commercial_federated_robot_accounts'],
+        ['enable_project_federated_idp', 'enable_project_federated_robot_accounts']
+    ];
+    kv text[];
+BEGIN
+    IF to_regclass('properties') IS NOT NULL THEN
+        FOREACH kv SLICE 1 IN ARRAY keys LOOP
+            IF EXISTS (SELECT 1 FROM properties WHERE properties.k = kv[2]) THEN
+                DELETE FROM properties WHERE properties.k = kv[1];
+            ELSE
+                UPDATE properties SET k = kv[2] WHERE properties.k = kv[1];
+            END IF;
+        END LOOP;
+    END IF;
+
+    IF to_regclass('permission_policy') IS NOT NULL AND to_regclass('role_permission') IS NOT NULL THEN
+        -- a role already holding the new policy drops its old duplicate
+        DELETE FROM role_permission rp
+        USING permission_policy o, permission_policy n, role_permission rn
+        WHERE rp.permission_policy_id = o.id
+          AND o.resource = 'federated-idp'
+          AND n.resource = 'trusted-issuer'
+          AND n.scope = o.scope AND n.action IS NOT DISTINCT FROM o.action
+          AND n.effect IS NOT DISTINCT FROM o.effect
+          AND rn.permission_policy_id = n.id
+          AND rn.role_type = rp.role_type AND rn.role_id = rp.role_id;
+
+        UPDATE role_permission rp
+        SET permission_policy_id = n.id
+        FROM permission_policy o, permission_policy n
+        WHERE rp.permission_policy_id = o.id
+          AND o.resource = 'federated-idp'
+          AND n.resource = 'trusted-issuer'
+          AND n.scope = o.scope AND n.action IS NOT DISTINCT FROM o.action
+          AND n.effect IS NOT DISTINCT FROM o.effect;
+
+        DELETE FROM permission_policy o
+        USING permission_policy n
+        WHERE o.resource = 'federated-idp'
+          AND n.resource = 'trusted-issuer'
+          AND n.scope = o.scope AND n.action IS NOT DISTINCT FROM o.action
+          AND n.effect IS NOT DISTINCT FROM o.effect;
+
+        UPDATE permission_policy SET resource = 'trusted-issuer' WHERE resource = 'federated-idp';
+    END IF;
+END
+$$;
 
 -- Multi-format artifact repositories (npm, Maven): rebuildable Postgres
 -- projection over the OCI `_index` control artifact. Authoritative mutable

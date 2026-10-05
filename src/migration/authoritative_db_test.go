@@ -303,8 +303,8 @@ func TestExecutionRevisionGuardIgnoresNonTableRelations(t *testing.T) {
 
 // Databases created before the trusted issuer rename hold their rows in
 // identity_providers and robot_identity_providers. The schema apply renames
-// them in place, keeps the rows and their links, and a repeat run changes
-// nothing.
+// them in place, keeps the rows and their links, folds old config keys and
+// RBAC policies into existing new ones, and a repeat run changes nothing.
 func TestTrustedIssuerRenamePreservesData(t *testing.T) {
 	ctx := context.Background()
 	cfg := authoritativeTestDatabaseConfig()
@@ -341,6 +341,9 @@ func TestTrustedIssuerRenamePreservesData(t *testing.T) {
 		`CREATE TABLE permission_policy (id SERIAL PRIMARY KEY, scope varchar(255) NOT NULL,
 			resource varchar(255), action varchar(255), effect varchar(255),
 			CONSTRAINT unique_rbac_policy UNIQUE (scope, resource, action, effect))`,
+		`CREATE TABLE role_permission (id SERIAL PRIMARY KEY, role_type varchar(255) NOT NULL,
+			role_id int NOT NULL, permission_policy_id int NOT NULL,
+			CONSTRAINT unique_role_permission UNIQUE (role_type, role_id, permission_policy_id))`,
 		`CREATE TABLE identity_providers (
 			id SERIAL PRIMARY KEY, name TEXT NOT NULL, description TEXT, issuer TEXT NOT NULL,
 			openid_config_url TEXT, offline_validation BOOLEAN NOT NULL DEFAULT FALSE,
@@ -364,8 +367,15 @@ func TestTrustedIssuerRenamePreservesData(t *testing.T) {
 		"INSERT INTO identity_providers (name, issuer) VALUES ('kube', 'https://kubernetes.default.svc')",
 		"INSERT INTO robot_identity_providers (identity_provider_id, robot_id) VALUES (1, 7)",
 		"INSERT INTO claim_rules (identity_provider_id, robot_id, claim_path, value) VALUES (1, 7, 'sub', 'system:serviceaccount:ci:builder')",
-		"INSERT INTO properties (k, v) VALUES ('enable_project_federated_idp', 'true')",
-		"INSERT INTO permission_policy (scope, resource, action, effect) VALUES ('/project/1', 'federated-idp', 'list', 'allow')",
+		`INSERT INTO properties (k, v) VALUES ('enable_project_federated_idp', 'true'),
+			('enable_commercial_identity_providers', 'true'), ('enable_commercial_federated_robot_accounts', 'false')`,
+		// /project/2 already holds the new policy next to the old one
+		`INSERT INTO permission_policy (scope, resource, action, effect) VALUES
+			('/project/1', 'federated-idp', 'list', 'allow'),
+			('/project/2', 'federated-idp', 'list', 'allow'),
+			('/project/2', 'trusted-issuer', 'list', 'allow')`,
+		`INSERT INTO role_permission (role_type, role_id, permission_policy_id) VALUES
+			('robot', 7, 1), ('robot', 7, 2), ('robot', 7, 3), ('robot', 8, 2)`,
 	} {
 		if _, err := db.ExecContext(ctx, statement); err != nil {
 			t.Fatalf("setup %q: %v", statement, err)
@@ -423,17 +433,26 @@ func TestTrustedIssuerRenamePreservesData(t *testing.T) {
 			t.Errorf("pass %d: renamed rows = (%q, %d, %q), want (kube, 7, system:serviceaccount:ci:builder)", pass, name, robotID, claimValue)
 		}
 
-		var configKeys, policyResources int
-		if err := db.QueryRowContext(ctx,
-			"SELECT count(*) FROM properties WHERE k = 'enable_project_federated_robot_accounts' AND v = 'true'").Scan(&configKeys); err != nil {
-			t.Fatalf("count config keys: %v", err)
+		counts := map[string]int{
+			"SELECT count(*) FROM properties WHERE k = 'enable_project_federated_robot_accounts' AND v = 'true'":                  1,
+			"SELECT count(*) FROM properties WHERE k = 'enable_commercial_federated_robot_accounts' AND v = 'false'":              1,
+			"SELECT count(*) FROM properties WHERE k IN ('enable_project_federated_idp', 'enable_commercial_identity_providers')": 0,
+			"SELECT count(*) FROM permission_policy WHERE resource = 'federated-idp'":                                             0,
+			"SELECT count(*) FROM permission_policy WHERE resource = 'trusted-issuer'":                                            2,
+			"SELECT count(*) FROM role_permission":                                                                                3,
+			`SELECT count(*) FROM role_permission r JOIN permission_policy p ON p.id = r.permission_policy_id
+				WHERE p.resource = 'trusted-issuer' AND r.role_type = 'robot' AND r.role_id = 7`: 2,
+			`SELECT count(*) FROM role_permission r JOIN permission_policy p ON p.id = r.permission_policy_id
+				WHERE p.resource = 'trusted-issuer' AND p.scope = '/project/2' AND r.role_type = 'robot' AND r.role_id = 8`: 1,
 		}
-		if err := db.QueryRowContext(ctx,
-			"SELECT count(*) FROM permission_policy WHERE resource = 'trusted-issuer'").Scan(&policyResources); err != nil {
-			t.Fatalf("count policies: %v", err)
-		}
-		if configKeys != 1 || policyResources != 1 {
-			t.Errorf("pass %d: renamed config keys = %d, policies = %d, want 1 and 1", pass, configKeys, policyResources)
+		for query, want := range counts {
+			var got int
+			if err := db.QueryRowContext(ctx, query).Scan(&got); err != nil {
+				t.Fatalf("pass %d: %s: %v", pass, query, err)
+			}
+			if got != want {
+				t.Errorf("pass %d: %s = %d, want %d", pass, query, got, want)
+			}
 		}
 	}
 
