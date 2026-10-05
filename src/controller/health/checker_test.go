@@ -16,12 +16,15 @@ package health
 
 import (
 	"errors"
+	"net"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/docker/distribution/health"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/goharbor/harbor/src/common/utils/test"
 )
@@ -61,6 +64,46 @@ func TestHTTPStatusCodeHealthChecker(t *testing.T) {
 	checker = HTTPStatusCodeHealthChecker(
 		http.MethodGet, url, nil, 5*time.Second, http.StatusUnauthorized)
 	assert.NotEqual(t, nil, checker.Check())
+}
+
+func TestPortalHealthCheckerDoesNotFollowRedirect(t *testing.T) {
+	// Nothing listens on the redirect target, like the external HTTPS port
+	// inside the container network.
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	unreachable := "https://" + l.Addr().String() + "/"
+	require.NoError(t, l.Close())
+
+	portal := httptest.NewServer(http.RedirectHandler(unreachable, http.StatusMovedPermanently))
+	defer portal.Close()
+
+	t.Setenv("PORTAL_URL", portal.URL)
+	checker := portalHealthChecker()
+	assert.Eventually(t, func() bool { return checker.Check() == nil }, 5*time.Second, 50*time.Millisecond)
+
+	portal.Close()
+	assert.Error(t, portalHTTPChecker(portal.URL, time.Second).Check())
+}
+
+func TestPortalHTTPCheckerStatuses(t *testing.T) {
+	for code, healthy := range map[int]bool{
+		http.StatusOK:                  true,
+		http.StatusMovedPermanently:    true,
+		http.StatusFound:               true,
+		http.StatusSeeOther:            true,
+		http.StatusTemporaryRedirect:   true,
+		http.StatusPermanentRedirect:   true,
+		http.StatusNotFound:            false,
+		http.StatusInternalServerError: false,
+	} {
+		portal := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Location", "https://127.0.0.1:1/")
+			w.WriteHeader(code)
+		}))
+		err := portalHTTPChecker(portal.URL, time.Second).Check()
+		portal.Close()
+		assert.Equal(t, healthy, err == nil, "status %d", code)
+	}
 }
 
 func TestPeriodicHealthChecker(t *testing.T) {
