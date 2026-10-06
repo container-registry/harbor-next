@@ -47,7 +47,7 @@ data:
                 try_files $uri $uri/ /index.html;
             }
             # Deployment configuration and translations, unlike the hashed bundles
-            location ~ ^/(setting\.json|swagger\.json|i18n/) {
+            location ~ ^/([^/]+\.json$|i18n/) {
                 try_files $uri $uri/ /index.html;
                 add_header Cache-Control "no-store" always;
                 add_header X-Frame-Options DENY always;
