@@ -16,9 +16,13 @@ package http
 
 import (
 	"context"
+<<<<<<< HEAD
 	"crypto/tls"
 	"errors"
 	"io"
+=======
+	"errors"
+>>>>>>> b323c0c8e (Merge commit from fork)
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -123,7 +127,11 @@ func TestWithPublicNetworkOnly(t *testing.T) {
 
 	dial := func() error {
 		transport := &http.Transport{Proxy: http.ProxyFromEnvironment}
+<<<<<<< HEAD
 		withPublicNetworkOnly(net.DefaultResolver)(transport)
+=======
+		WithPublicNetworkOnly()(transport)
+>>>>>>> b323c0c8e (Merge commit from fork)
 		conn, err := transport.DialContext(context.Background(), "tcp", listener.Addr().String())
 		if conn != nil {
 			_ = conn.Close()
@@ -175,7 +183,11 @@ func TestWithPublicNetworkOnlyHonoursProxy(t *testing.T) {
 	proxy := newRecordingProxy(t)
 
 	transport := &http.Transport{Proxy: http.ProxyURL(proxy.url)}
+<<<<<<< HEAD
 	withPublicNetworkOnly(net.DefaultResolver)(transport)
+=======
+	WithPublicNetworkOnly()(transport)
+>>>>>>> b323c0c8e (Merge commit from fork)
 	client := &http.Client{Transport: transport, Timeout: 2 * time.Second}
 
 	resp, err := client.Get("http://8.8.8.8/hook")
@@ -272,6 +284,7 @@ func TestWithPublicNetworkOnlyProxyEscapeHatch(t *testing.T) {
 	_ = resp.Body.Close()
 	assert.Equal(t, []string{"http://10.0.0.1/hook"}, proxy.seen())
 }
+<<<<<<< HEAD
 
 // TestPublicNetworkTransportPinsProxiedHTTPTarget covers DNS rebinding through a proxy: the proxy
 // receives the address Harbor validated, never the hostname, so it cannot resolve it again to a
@@ -389,3 +402,5 @@ func TestPublicNetworkTransportPinsProxiedHTTPSTarget(t *testing.T) {
 	defer mu.Unlock()
 	assert.Equal(t, []string{"8.8.8.8:443", "8.8.4.4:443"}, connects)
 }
+=======
+>>>>>>> b323c0c8e (Merge commit from fork)

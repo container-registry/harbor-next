@@ -16,7 +16,10 @@ package http
 
 import (
 	"context"
+<<<<<<< HEAD
 	"crypto/tls"
+=======
+>>>>>>> b323c0c8e (Merge commit from fork)
 	"fmt"
 	"net"
 	"net/http"
@@ -32,8 +35,12 @@ import (
 
 // privateNetworkAccessEnv opts every Harbor outbound HTTP client that installs the
 // public-network guard back into reaching private/loopback/link-local destinations.
+<<<<<<< HEAD
 // Default (unset/false) fails closed. Set through the chart value network.allowPrivateNetworkAccess
 // or the compose HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS variable.
+=======
+// Default (unset/false) fails closed. See make/harbor.yml.tmpl network.allow_private_network_access.
+>>>>>>> b323c0c8e (Merge commit from fork)
 const privateNetworkAccessEnv = "HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS"
 
 // Exceptions and denials follow the IANA IPv4/IPv6 special-purpose address registries.
@@ -91,6 +98,10 @@ func newGuardedDialer() *net.Dialer {
 	return &net.Dialer{
 		Timeout:   30 * time.Second,
 		KeepAlive: 30 * time.Second,
+<<<<<<< HEAD
+=======
+		DualStack: true,
+>>>>>>> b323c0c8e (Merge commit from fork)
 	}
 }
 
@@ -168,6 +179,7 @@ func ValidatePublicNetworkTarget(ctx context.Context, resolver NetworkResolver, 
 	if privateNetworkAccessAllowed() {
 		return nil
 	}
+<<<<<<< HEAD
 	_, err := resolvePublicNetworkTarget(ctx, resolver, host)
 	return err
 }
@@ -180,11 +192,20 @@ func resolvePublicNetworkTarget(ctx context.Context, resolver NetworkResolver, h
 	}
 	if isBlockedTargetHostname(host) {
 		return netip.Addr{}, fmt.Errorf("target hostname %q is not public", host)
+=======
+	host = strings.TrimSuffix(strings.ToLower(host), ".")
+	if host == "" {
+		return fmt.Errorf("target must include a hostname")
+	}
+	if isBlockedTargetHostname(host) {
+		return fmt.Errorf("target hostname %q is not public", host)
+>>>>>>> b323c0c8e (Merge commit from fork)
 	}
 
 	address, err := netip.ParseAddr(host)
 	if err == nil {
 		if !isPublicNetworkAddress(address) {
+<<<<<<< HEAD
 			return netip.Addr{}, fmt.Errorf("target address %q is not public", host)
 		}
 		return address, nil
@@ -203,6 +224,26 @@ func resolvePublicNetworkTarget(ctx context.Context, resolver NetworkResolver, h
 		}
 	}
 	return addresses[0].Unmap(), nil
+=======
+			return fmt.Errorf("target address %q is not public", host)
+		}
+		return nil
+	}
+
+	if resolver == nil {
+		return fmt.Errorf("target hostname %q cannot be resolved", host)
+	}
+	addresses, err := resolver.LookupNetIP(ctx, "ip", host)
+	if err != nil || len(addresses) == 0 {
+		return fmt.Errorf("target hostname %q cannot be resolved", host)
+	}
+	for _, address := range addresses {
+		if !isPublicNetworkAddress(address) {
+			return fmt.Errorf("target hostname %q resolves to a non-public address", host)
+		}
+	}
+	return nil
+>>>>>>> b323c0c8e (Merge commit from fork)
 }
 
 func isBlockedTargetHostname(host string) bool {
@@ -217,11 +258,24 @@ func isBlockedTargetHostname(host string) bool {
 	return false
 }
 
+<<<<<<< HEAD
 // withPublicNetworkOnly blocks connections to non-public destinations. Direct connections are
 // checked at dial time on the resolved address. When the transport's proxy
 // (HTTP_PROXY/HTTPS_PROXY/NO_PROXY) applies, the dial goes to the operator's proxy instead, so
 // the target host is validated before the request is handed to it. Honors the
 // HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS escape hatch.
+=======
+// WithPublicNetworkOnly blocks connections to non-public destinations. Intended for the
+// notification (webhook/slack) HTTP clients, whose targets are attacker-controlled. Direct
+// connections are checked at dial time on the resolved address. When the transport's proxy
+// (HTTP_PROXY/HTTPS_PROXY/NO_PROXY) applies, the dial goes to the operator's proxy instead, so
+// the target host is validated before the request is handed to it. Honors the
+// HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS escape hatch.
+func WithPublicNetworkOnly() func(*http.Transport) {
+	return withPublicNetworkOnly(net.DefaultResolver)
+}
+
+>>>>>>> b323c0c8e (Merge commit from fork)
 func withPublicNetworkOnly(resolver NetworkResolver) func(*http.Transport) {
 	return func(transport *http.Transport) {
 		guard := &publicNetworkGuard{resolver: resolver, upstreamProxy: transport.Proxy}
@@ -236,6 +290,7 @@ func withPublicNetworkOnly(resolver NetworkResolver) func(*http.Transport) {
 	}
 }
 
+<<<<<<< HEAD
 // NewPublicNetworkTransport returns a transport that only reaches public destinations, for the
 // notification (webhook/slack) clients. On top of the dial-time guard it pins proxied requests
 // to the address Harbor validated: the proxy receives that IP instead of the hostname, so it
@@ -338,6 +393,8 @@ func closeRequestBody(req *http.Request) {
 	}
 }
 
+=======
+>>>>>>> b323c0c8e (Merge commit from fork)
 type publicNetworkGuard struct {
 	resolver      NetworkResolver
 	upstreamProxy func(*http.Request) (*url.URL, error)
@@ -360,7 +417,11 @@ func (guard *publicNetworkGuard) proxy(req *http.Request) (*url.URL, error) {
 		if _, isProxy := guard.proxyAddrs.Load(canonicalAddr(req.URL)); isProxy {
 			return nil, fmt.Errorf("connections to private network address %s are blocked", req.URL.Host)
 		}
+<<<<<<< HEAD
 		return nil, nil //nolint:nilnil // http.Transport.Proxy reads a nil URL and nil error as "no proxy"
+=======
+		return nil, nil
+>>>>>>> b323c0c8e (Merge commit from fork)
 	}
 	// The proxy, not this process, resolves and connects to the target, so the dial-time check
 	// cannot see it. Validate the target before handing it over.

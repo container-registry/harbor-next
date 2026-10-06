@@ -160,7 +160,11 @@ func (n *webhookAPI) CreateWebhookPolicyOfProject(ctx context.Context, params we
 	if ok, err := n.validateEventTypes(policy); !ok {
 		return n.SendError(ctx, err)
 	}
+<<<<<<< HEAD
 	if ok, err := n.validateTargets(ctx, policy); !ok {
+=======
+	if ok, err := n.normalizeAndValidateTargets(ctx, policy); !ok {
+>>>>>>> b323c0c8e (Merge commit from fork)
 		return n.SendError(ctx, err)
 	}
 
@@ -199,7 +203,11 @@ func (n *webhookAPI) UpdateWebhookPolicyOfProject(ctx context.Context, params we
 	if ok, err := n.validateEventTypes(policy); !ok {
 		return n.SendError(ctx, err)
 	}
+<<<<<<< HEAD
 	if ok, err := n.validateTargets(ctx, policy); !ok {
+=======
+	if ok, err := n.normalizeAndValidateTargets(ctx, policy); !ok {
+>>>>>>> b323c0c8e (Merge commit from fork)
 		return n.SendError(ctx, err)
 	}
 
@@ -411,7 +419,11 @@ func (n *webhookAPI) GetSupportedEventTypes(ctx context.Context, params webhook.
 	return webhook.NewGetSupportedEventTypesOK().WithPayload(notificationTypes)
 }
 
+<<<<<<< HEAD
 func (n *webhookAPI) validateTargets(ctx context.Context, policy *policy_model.Policy) (bool, error) {
+=======
+func (n *webhookAPI) normalizeAndValidateTargets(ctx context.Context, policy *policy_model.Policy) (bool, error) {
+>>>>>>> b323c0c8e (Merge commit from fork)
 	if len(policy.Targets) == 0 {
 		return false, errors.New(nil).WithMessagef("empty notification target with policy %s", policy.Name).WithCode(errors.BadRequestCode)
 	}
@@ -427,6 +439,12 @@ func (n *webhookAPI) validateTargets(ctx context.Context, policy *policy_model.P
 		if err := n.validateTargetHost(validationCtx, url.Hostname(), validatedHosts); err != nil {
 			return false, errors.New(err).WithCode(errors.BadRequestCode)
 		}
+<<<<<<< HEAD
+=======
+		// Prevent SSRF security issue #3755 and normalize host per RFC 1035
+		target.Address = url.Scheme + "://" + strings.ToLower(url.Host) + url.Path
+
+>>>>>>> b323c0c8e (Merge commit from fork)
 		if !isNotifyTypeSupported(target.Type) {
 			return false, errors.New(nil).WithMessagef("unsupported target type %s with policy %s", target.Type, policy.Name).WithCode(errors.BadRequestCode)
 		}

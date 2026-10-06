@@ -35,12 +35,22 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+<<<<<<< HEAD
 // stubResolver resolves a fixed hostname to a public address for the webhook target tests, so the
 // suite never depends on real DNS.
 type stubResolver struct{}
 
 func (stubResolver) LookupNetIP(_ context.Context, _ string, host string) ([]netip.Addr, error) {
 	if host == "hooks.example.com" {
+=======
+// stubResolver resolves the fixed test hostnames used by the webhook target tests to a public
+// address, so the suite never depends on real DNS.
+type stubResolver struct{}
+
+func (stubResolver) LookupNetIP(_ context.Context, _ string, host string) ([]netip.Addr, error) {
+	switch host {
+	case "hooks.example.com", "webhook-target.corp.local":
+>>>>>>> b323c0c8e (Merge commit from fork)
 		return []netip.Addr{netip.MustParseAddr("93.184.216.34")}, nil
 	}
 	return nil, fmt.Errorf("no such host %q", host)
@@ -110,6 +120,23 @@ func (suite *WebhookTestSuite) TestCreateWebhookPolicyOfProject() {
 		resp, err := suite.PostJSON(url, &models.WebhookPolicy{EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "http", Address: "http://127.0.0.1"}}})
 		suite.NoError(err)
 		suite.Equal(400, resp.StatusCode)
+<<<<<<< HEAD
+=======
+	}
+
+	{
+		// SSRF: the cloud metadata endpoint must be rejected
+		resp, err := suite.PostJSON(url, &models.WebhookPolicy{EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "http", Address: "http://169.254.169.254/latest/meta-data/"}}})
+		suite.NoError(err)
+		suite.Equal(400, resp.StatusCode)
+	}
+
+	{
+		// valid policy targeting a public address should got 201
+		resp, err := suite.PostJSON(url, &models.WebhookPolicy{EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "http", Address: "http://hooks.example.com/notify"}}})
+		suite.NoError(err)
+		suite.Equal(201, resp.StatusCode)
+>>>>>>> b323c0c8e (Merge commit from fork)
 	}
 
 	{
@@ -156,7 +183,11 @@ func (suite *WebhookTestSuite) TestUpdateWebhookPolicyOfProject() {
 	}
 
 	{
+<<<<<<< HEAD
 		// valid policy targeting a public address should get 200
+=======
+		// valid policy targeting a public address should got 200
+>>>>>>> b323c0c8e (Merge commit from fork)
 		resp, err := suite.PutJSON(url, &models.WebhookPolicy{EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "http", Address: "http://hooks.example.com/notify"}}})
 		suite.NoError(err)
 		suite.Equal(200, resp.StatusCode)
