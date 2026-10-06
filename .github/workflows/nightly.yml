@@ -5,8 +5,9 @@ name: Nightly
 # Every step below is the release pipeline's own: the same release-please
 # configuration (derived from release-please-config.json, never a copy), the
 # same publish-images.yml, the same release-notes-engine.yml. The only thing
-# this workflow adds is the channel branch and the scheduled merge of the
-# release PR that the channel produces.
+# this workflow adds is the channel branch and the tag on the release PR that
+# the channel produces. That PR is never merged: release-please keeps the one
+# PR open and rebuilds it every night, so it stays the running preview.
 #
 # main's release-please state is untouched: the channel carries its own
 # config and manifest, on its own branch, and is rebuilt from main's head
@@ -17,9 +18,7 @@ name: Nightly
 
 on:
   schedule:
-    # 00:00 UTC, so a night's build carries that day's commits. The release PR
-    # is opened and merged in the same run, so there is never a half-open
-    # nightly release PR waiting around.
+    # 00:00 UTC, so a night's build carries that day's commits.
     - cron: '0 0 * * *'
   workflow_dispatch:
 
@@ -100,7 +99,7 @@ jobs:
       contents: write
       pull-requests: write
     outputs:
-      merge_sha: ${{ steps.merge.outputs.merge_sha }}
+      release_sha: ${{ steps.head.outputs.release_sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -108,59 +107,49 @@ jobs:
 
       - uses: $/.github/actions/setup-task
 
-      # Opens the release PR against the channel branch. Nothing to release
-      # yet, so the release half is skipped.
-      - name: Open the nightly release PR
+      # Opens the release PR against the channel branch on the first night and
+      # rebuilds that same PR on every night after. Nothing to release yet, so
+      # the release half is skipped.
+      - name: Update the nightly release PR
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
-          # Same fallback as the channel push and the merge: a ruleset over the
-          # channel branch would otherwise merge the PR and then fail to tag it.
+          # Same fallback as the channel push and the tag: a ruleset over the
+          # channel branch would otherwise block the PR update.
           token: ${{ secrets.NIGHTLY_CHANNEL_TOKEN || secrets.GITHUB_TOKEN }}
           target-branch: nightly
           config-file: release-please-config-nightly.json
           manifest-file: .release-please-manifest-nightly.json
           skip-github-release: true
 
-      - name: Merge the nightly release PR
-        id: merge
+      # The PR head is tonight's release commit: the channel tip plus the
+      # CHANGELOG and manifest release-please wrote. The notes engine reads
+      # CHANGELOG.md at the tag, so the tag has to sit here and not on the
+      # channel tip. The PR keeps its "autorelease: pending" label, because
+      # that label is how release-please finds it again tomorrow.
+      - name: Resolve tonight's release commit
+        id: head
         env:
-          # The nightly release PR is merged by this workflow, by design.
-          # NIGHTLY_CHANNEL_TOKEN only has to exist if the channel branch ever
-          # ends up under a ruleset that GITHUB_TOKEN cannot satisfy.
           GH_TOKEN: ${{ secrets.NIGHTLY_CHANNEL_TOKEN || github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          sha=$(task -o interleaved nightly:merge-release-pr)
-          echo "merge_sha=${sha}" >> "$GITHUB_OUTPUT"
+          sha=$(task -o interleaved nightly:release-head)
+          echo "release_sha=${sha}" >> "$GITHUB_OUTPUT"
           if [ -z "${sha}" ]; then
-            echo "::notice::Nothing landed since the last release; nothing to publish tonight"
+            echo "::notice::No release commit was built tonight; nothing to publish"
           fi
 
-      # release-please only ever opens the PR now. The tag and the single
-      # rolling pre-release are this workflow's, because release-please cannot
-      # hold one name still across nights.
+      # The tag and the single rolling pre-release are this workflow's, because
+      # release-please cannot hold one name still across nights.
       - name: Move the tag onto tonight's release commit
-        if: ${{ steps.merge.outputs.merge_sha != '' }}
+        if: ${{ steps.head.outputs.release_sha != '' }}
         env:
           GH_TOKEN: ${{ secrets.NIGHTLY_CHANNEL_TOKEN || github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          MERGE_SHA: ${{ steps.merge.outputs.merge_sha }}
-        run: task nightly:publish-tags MERGE_SHA="${MERGE_SHA}"
-
-      # release-please opens the release PR labelled "autorelease: pending" and
-      # clears the label when it publishes the release. It never publishes one
-      # here, so this does it instead. Skip it and release-please refuses to
-      # open a release PR on any later night.
-      - name: Mark the release PR as tagged
-        if: ${{ steps.merge.outputs.merge_sha != '' }}
-        env:
-          GH_TOKEN: ${{ secrets.NIGHTLY_CHANNEL_TOKEN || github.token }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          MERGE_SHA: ${{ steps.merge.outputs.merge_sha }}
-        run: task nightly:mark-release-tagged MERGE_SHA="${MERGE_SHA}"
+          RELEASE_SHA: ${{ steps.head.outputs.release_sha }}
+        run: task nightly:publish-tags RELEASE_SHA="${RELEASE_SHA}"
 
       - name: Upsert the rolling pre-release
-        if: ${{ steps.merge.outputs.merge_sha != '' }}
+        if: ${{ steps.head.outputs.release_sha != '' }}
         env:
           GH_TOKEN: ${{ secrets.NIGHTLY_CHANNEL_TOKEN || github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -169,15 +158,15 @@ jobs:
   publish-images:
     name: Publish Nightly Images
     needs: [channel, release]
-    if: ${{ needs.release.outputs.merge_sha != '' }}
+    if: ${{ needs.release.outputs.release_sha != '' }}
     permissions:
       contents: read
       id-token: write
     uses: $/.github/workflows/publish-images.yml
     with:
-      # The merge commit rather than the tag: the tag is moved every night, and
-      # this job checks it out up to an hour after it was moved.
-      checkout_ref: ${{ needs.release.outputs.merge_sha }}
+      # The release commit rather than the tag: the tag is moved every night,
+      # and this job checks it out up to an hour after it was moved.
+      checkout_ref: ${{ needs.release.outputs.release_sha }}
       image_tag: ${{ needs.channel.outputs.beta_tag }}
       version: ${{ needs.channel.outputs.version }}
       artifact_prefix: nightly-${{ needs.channel.outputs.beta_tag }}
@@ -192,7 +181,7 @@ jobs:
   release-notes:
     name: Update Nightly Release Notes
     needs: [channel, release, publish-images]
-    if: ${{ needs.release.outputs.merge_sha != '' }}
+    if: ${{ needs.release.outputs.release_sha != '' }}
     permissions:
       contents: write
     uses: $/.github/workflows/release-notes-engine.yml
@@ -212,7 +201,7 @@ jobs:
   verify:
     name: Verify Nightly Images
     needs: [channel, release, publish-images]
-    if: ${{ needs.release.outputs.merge_sha != '' }}
+    if: ${{ needs.release.outputs.release_sha != '' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
@@ -253,7 +242,7 @@ jobs:
     # After verify: the suite pulls these images, so there is no point
     # running before both architectures are known to be there.
     needs: [channel, release, verify]
-    if: ${{ needs.release.outputs.merge_sha != '' }}
+    if: ${{ needs.release.outputs.release_sha != '' }}
     permissions:
       contents: read
     uses: $/.github/workflows/nightly-e2e.yml
@@ -292,7 +281,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          MERGE_SHA: ${{ needs.release.outputs.merge_sha }}
+          RELEASE_SHA: ${{ needs.release.outputs.release_sha }}
           E2E_RESULT: ${{ needs.e2e.result }}
           E2E_PASSED: ${{ needs.e2e.outputs.scenarios_passed }}
           E2E_TOTAL: ${{ needs.e2e.outputs.scenarios_total }}
@@ -301,7 +290,7 @@ jobs:
           REGISTRY_PROJECT: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
         run: |
           task nightly:beta-header \
-            MERGE_SHA="${MERGE_SHA}" \
+            RELEASE_SHA="${RELEASE_SHA}" \
             E2E_RESULT="${E2E_RESULT}" \
             E2E_PASSED="${E2E_PASSED}" \
             E2E_TOTAL="${E2E_TOTAL}" \
