@@ -230,6 +230,43 @@ func (suite *ControllerTestSuite) TestRequestLimitedStillReserves() {
 	suite.quotaMgr.AssertCalled(suite.T(), "Update", mock.Anything, mock.Anything)
 }
 
+func (suite *ControllerTestSuite) TestRequestLimitedReadsQuotaOnce() {
+	// the reservation reuses the quota read by the unlimited check
+	suite.PrepareForUpdate(suite.quota, nil)
+
+	ctx := orm.NewContext(context.TODO(), &ormtesting.FakeOrmer{})
+	err := suite.ctl.Request(ctx, suite.reference, uuid.New().String(), types.ResourceList{types.ResourceStorage: 10}, func() error {
+		return nil
+	})
+	suite.Nil(err)
+	suite.quotaMgr.AssertNumberOfCalls(suite.T(), "GetByRef", 1)
+	suite.quotaMgr.AssertNumberOfCalls(suite.T(), "Update", 1)
+}
+
+func (suite *ControllerTestSuite) TestReserveFromStaleQuotaRereadsOnConflict() {
+	// a prefetched quota that lost the version check must not be reused
+	hardLimits := types.ResourceList{types.ResourceStorage: 100}
+	mock.OnAnything(suite.quotaMgr, "GetByRef").Return(func(context.Context, string, string) *quota.Quota {
+		return &quota.Quota{Hard: hardLimits.String(), Used: types.ResourceList{types.ResourceStorage: 50}.String()}
+	}, nil)
+	mock.OnAnything(suite.quotaMgr, "Update").Return(orm.ErrOptimisticLock).Once()
+	mock.OnAnything(suite.quotaMgr, "Update").Return(nil).Once()
+
+	stale := &quota.Quota{Hard: hardLimits.String(), Used: types.ResourceList{types.ResourceStorage: 0}.String()}
+	opts := []retry.Option{retry.InitialInterval(time.Millisecond), retry.MaxInterval(5 * time.Millisecond)}
+
+	ctx := orm.NewContext(context.TODO(), &ormtesting.FakeOrmer{})
+	c := suite.ctl.(*controller)
+	err := c.updateUsageWithRetryFrom(ctx, suite.reference, uuid.New().String(), reserveResources(types.ResourceList{types.ResourceStorage: 10}), updateQuotaProviderDB, stale, opts...)
+	suite.Nil(err)
+
+	suite.quotaMgr.AssertNumberOfCalls(suite.T(), "GetByRef", 1)
+	suite.quotaMgr.AssertNumberOfCalls(suite.T(), "Update", 2)
+	suite.quotaMgr.AssertCalled(suite.T(), "Update", mock.Anything, mock.MatchedBy(func(q *quota.Quota) bool {
+		return q.Used == types.ResourceList{types.ResourceStorage: 60}.String()
+	}))
+}
+
 func (suite *ControllerTestSuite) TestRequestLimitedDenies() {
 	// finite hard limit exceeded: the request must be denied before f runs
 	suite.PrepareForUpdate(suite.quota, nil)

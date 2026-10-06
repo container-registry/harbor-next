@@ -219,10 +219,14 @@ func (c *controller) List(ctx context.Context, query *q.Query, options ...Option
 }
 
 // updateUsageByDB updates the quota usage by the database which updates the quota usage immediately.
-func (c *controller) updateUsageByDB(ctx context.Context, reference, referenceID string, op func(hardLimits, used types.ResourceList) (types.ResourceList, error)) error {
-	q, err := c.quotaMgr.GetByRef(ctx, reference, referenceID)
-	if err != nil {
-		return retry.Abort(err)
+// A non-nil q is used instead of reading the quota again; the version check of the update
+// rejects it if it is stale.
+func (c *controller) updateUsageByDB(ctx context.Context, reference, referenceID string, op func(hardLimits, used types.ResourceList) (types.ResourceList, error), q *quota.Quota) error {
+	if q == nil {
+		var err error
+		if q, err = c.quotaMgr.GetByRef(ctx, reference, referenceID); err != nil {
+			return retry.Abort(err)
+		}
 	}
 
 	hardLimits, err := q.GetHard()
@@ -331,21 +335,29 @@ func (c *controller) updateUsageByRedis(ctx context.Context, reference, referenc
 }
 
 func (c *controller) updateUsageWithRetry(ctx context.Context, reference, referenceID string, op func(hardLimits, used types.ResourceList) (types.ResourceList, error), provider updateQuotaProviderType, retryOpts ...retry.Option) error {
+	return c.updateUsageWithRetryFrom(ctx, reference, referenceID, op, provider, nil, retryOpts...)
+}
+
+// updateUsageWithRetryFrom is updateUsageWithRetry with the quota already read by the caller,
+// which the first database attempt uses instead of reading it again. Retries always re-read.
+func (c *controller) updateUsageWithRetryFrom(ctx context.Context, reference, referenceID string, op func(hardLimits, used types.ResourceList) (types.ResourceList, error), provider updateQuotaProviderType, prefetched *quota.Quota, retryOpts ...retry.Option) error {
+	byDB := func() error {
+		q := prefetched
+		prefetched = nil
+		return c.updateUsageByDB(ctx, reference, referenceID, op, q)
+	}
+
 	var f func() error
 	switch provider {
 	case updateQuotaProviderDB:
-		f = func() error {
-			return c.updateUsageByDB(ctx, reference, referenceID, op)
-		}
+		f = byDB
 	case updateQuotaProviderRedis:
 		f = func() error {
 			return c.updateUsageByRedis(ctx, reference, referenceID, op)
 		}
 	default:
 		// by default is update quota by db
-		f = func() error {
-			return c.updateUsageByDB(ctx, reference, referenceID, op)
-		}
+		f = byDB
 	}
 
 	options := []retry.Option{
@@ -408,7 +420,8 @@ func (c *controller) Request(ctx context.Context, reference, referenceID string,
 	// let the refresh (RefreshMiddleware / Refresh) keep the usage figure
 	// up to date. If a real limit is set concurrently, enforcement starts
 	// with the next request and the refresh reconciles the usage.
-	if unlimited, err := c.isUnlimited(ctx, reference, referenceID, resources); err == nil && unlimited {
+	q, unlimited, err := c.isUnlimited(ctx, reference, referenceID, resources)
+	if err == nil && unlimited {
 		err := f()
 		if err == nil {
 			// the skipped reservation was also the only usage writer on
@@ -422,12 +435,12 @@ func (c *controller) Request(ctx context.Context, reference, referenceID string,
 	}
 
 	provider := updateQuotaProviderType(config.GetQuotaUpdateProvider())
-	if err := c.updateUsageWithRetry(ctx, reference, referenceID, reserveResources(resources), provider); err != nil {
+	if err := c.updateUsageWithRetryFrom(ctx, reference, referenceID, reserveResources(resources), provider, q); err != nil {
 		log.G(ctx).Errorf("reserve resources %s for %s %s failed, error: %v", resources.String(), reference, referenceID, err)
 		return err
 	}
 
-	err := f()
+	err = f()
 
 	if err != nil {
 		// detached from the request: a client disconnect is the common failure
@@ -446,26 +459,27 @@ func (c *controller) Request(ctx context.Context, reference, referenceID string,
 
 // isUnlimited reports whether every resource in the request has an
 // UNLIMITED hard limit for the reference, in which case a reservation can
-// never deny the request.
-func (c *controller) isUnlimited(ctx context.Context, reference, referenceID string, resources types.ResourceList) (bool, error) {
+// never deny the request. It returns the quota it read so the reservation
+// does not read it again.
+func (c *controller) isUnlimited(ctx context.Context, reference, referenceID string, resources types.ResourceList) (*quota.Quota, bool, error) {
 	q, err := c.quotaMgr.GetByRef(ctx, reference, referenceID)
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 
 	hardLimits, err := q.GetHard()
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 
 	for resource := range resources {
 		hardLimit, found := hardLimits[resource]
 		if !found || hardLimit != types.UNLIMITED {
-			return false, nil
+			return q, false, nil
 		}
 	}
 
-	return true, nil
+	return q, true, nil
 }
 
 // calcQuota calculates the quota and usage in real time.
