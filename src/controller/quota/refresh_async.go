@@ -39,10 +39,14 @@ import (
 // interval, regardless of how many requests marked it.
 //
 // The flush recomputes usage from the database (CalculateUsage) instead of
-// accumulating in-memory deltas, so it is idempotent: a mark lost to a
-// process restart, or a concurrent flush from another core replica, can
-// only delay convergence - never corrupt the stored value. A failed flush
-// re-marks the project and is retried on the next interval.
+// accumulating in-memory deltas, so it is idempotent: a concurrent flush
+// from another core replica cannot corrupt the stored value. Marks live only
+// in memory, so a restart before the flush loses them and the usage stays
+// stale until the next refresh of that project. A hard limit change
+// refreshes right after committing the limit (see Update); if that refresh
+// fails, the project is re-marked and enforcement uses the stale figure
+// until the next flush succeeds. A failed flush re-marks the project and is
+// retried on the next interval.
 // defaultDeferredRefreshInterval is the flush cadence; override with the
 // QUOTA_ASYNC_REFRESH_DURATION env var (seconds). Setting the env var also
 // switches RefreshMiddleware to the coalesced path (see AsyncRefreshEnabled).
@@ -107,8 +111,8 @@ func MarkRefresh(reference, referenceID string) {
 
 // flushDirtyQuota recomputes and stores the usage of every project marked
 // dirty since the previous flush.
-func flushDirtyQuota(_ context.Context) {
-	refreshDirty(orm.Context())
+func flushDirtyQuota(ctx context.Context) {
+	refreshDirty(orm.Clone(ctx))
 }
 
 func refreshDirty(ctx context.Context) {
