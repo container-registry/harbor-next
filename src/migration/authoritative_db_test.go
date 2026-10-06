@@ -63,7 +63,8 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 	// declares foreign keys against or reconciles in place.
 	legacyDependencies := []string{
 		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
-		"CREATE TABLE project (project_id SERIAL PRIMARY KEY)",
+		"CREATE TABLE project (project_id SERIAL PRIMARY KEY, owner_id INTEGER)",
+		"CREATE TABLE retention_policy (id SERIAL PRIMARY KEY, scope_level VARCHAR(20), scope_reference INTEGER, data TEXT)",
 		"CREATE TABLE execution (id SERIAL PRIMARY KEY, revision INTEGER)",
 	}
 	for _, statement := range legacyDependencies {
@@ -209,7 +210,8 @@ func TestExecutionRevisionGuardResolvesThroughSearchPath(t *testing.T) {
 	setup := []string{
 		fmt.Sprintf("CREATE TABLE %s.execution (id SERIAL PRIMARY KEY, revision INTEGER)", later),
 		fmt.Sprintf("CREATE TABLE %s.robot (id BIGSERIAL PRIMARY KEY)", first),
-		fmt.Sprintf("CREATE TABLE %s.project (project_id SERIAL PRIMARY KEY)", first),
+		fmt.Sprintf("CREATE TABLE %s.project (project_id SERIAL PRIMARY KEY, owner_id INTEGER)", first),
+		fmt.Sprintf("CREATE TABLE %s.retention_policy (id SERIAL PRIMARY KEY, scope_level VARCHAR(20), scope_reference INTEGER, data TEXT)", first),
 	}
 	for _, statement := range setup {
 		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
@@ -289,7 +291,8 @@ func TestExecutionRevisionGuardIgnoresNonTableRelations(t *testing.T) {
 		"CREATE TABLE decoy (id BIGSERIAL PRIMARY KEY, revision INTEGER)",
 		"CREATE INDEX execution ON decoy (revision)",
 		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
-		"CREATE TABLE project (project_id SERIAL PRIMARY KEY)",
+		"CREATE TABLE project (project_id SERIAL PRIMARY KEY, owner_id INTEGER)",
+		"CREATE TABLE retention_policy (id SERIAL PRIMARY KEY, scope_level VARCHAR(20), scope_reference INTEGER, data TEXT)",
 	} {
 		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
 			t.Fatalf("setup %q: %v", statement, err)
@@ -298,6 +301,147 @@ func TestExecutionRevisionGuardIgnoresNonTableRelations(t *testing.T) {
 
 	if err := applyAuthoritativeSchema(ctx, sqlSchemaDB{db: schemaPool.DB()}, authoritativeTestSchemaPath()); err != nil {
 		t.Fatalf("applyAuthoritativeSchema() with a shadowing index returned error: %v", err)
+	}
+}
+
+// Scheduled retention runs as the policy's execution_principal, so the schema
+// apply gives legacy project schedules the project owner. Only active project
+// schedules without a principal may change, and a repeat apply must not touch
+// what the first one wrote.
+func TestRetentionScheduleBackfillsExecutionPrincipal(t *testing.T) {
+	ctx := context.Background()
+	cfg := authoritativeTestDatabaseConfig()
+	adminPool, err := dbpool.New(ctx, cfg)
+	if err != nil {
+		t.Fatalf("create admin database pool: %v", err)
+	}
+	t.Cleanup(adminPool.Close)
+
+	schemaName := fmt.Sprintf("harbor_next_retention_%d", time.Now().UnixNano())
+	if _, err := adminPool.DB().ExecContext(ctx, "CREATE SCHEMA "+schemaName); err != nil {
+		t.Fatalf("create test schema: %v", err)
+	}
+	t.Cleanup(func() {
+		if _, err := adminPool.DB().ExecContext(ctx, "DROP SCHEMA "+schemaName+" CASCADE"); err != nil {
+			t.Errorf("drop test schema: %v", err)
+		}
+	})
+
+	cfg.MaxOpenConns = 4
+	schemaPool, err := dbpool.New(ctx, cfg, func(poolCfg *pgxpool.Config) {
+		poolCfg.ConnConfig.RuntimeParams["search_path"] = schemaName
+	})
+	if err != nil {
+		t.Fatalf("create schema database pool: %v", err)
+	}
+	t.Cleanup(schemaPool.Close)
+
+	for _, statement := range []string{
+		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
+		"CREATE TABLE project (project_id SERIAL PRIMARY KEY, owner_id INTEGER)",
+		"CREATE TABLE retention_policy (id SERIAL PRIMARY KEY, scope_level VARCHAR(20), scope_reference INTEGER, data TEXT)",
+		"CREATE TABLE execution (id SERIAL PRIMARY KEY, revision INTEGER)",
+	} {
+		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
+			t.Fatalf("setup %q: %v", statement, err)
+		}
+	}
+
+	policies := []struct {
+		name      string
+		projectID int
+		ownerID   int
+		data      string
+		want      string
+	}{
+		{
+			name:      "active schedule without principal",
+			projectID: 10, ownerID: 5,
+			data: `{"trigger":{"kind":"Schedule","settings":{"cron":"0 0 * * * *"}}}`,
+			want: `{"type":"local","id":5}`,
+		},
+		{
+			name:      "active schedule with null principal",
+			projectID: 11, ownerID: 6,
+			data: `{"trigger":{"kind":"Schedule","settings":{"cron":"0 0 * * * *"}},"execution_principal":null}`,
+			want: `{"type":"local","id":6}`,
+		},
+		{
+			name:      "active schedule with existing principal",
+			projectID: 12, ownerID: 7,
+			data: `{"trigger":{"kind":"Schedule","settings":{"cron":"0 0 * * * *"}},"execution_principal":{"type":"robot","id":42}}`,
+			want: `{"type":"robot","id":42}`,
+		},
+		{
+			name:      "inactive schedule",
+			projectID: 13, ownerID: 8,
+			data: `{"trigger":{"kind":"Schedule","settings":{"cron":""}}}`,
+			want: "",
+		},
+		{
+			name:      "manual trigger",
+			projectID: 14, ownerID: 9,
+			data: `{"trigger":{"kind":"Manual","settings":{}}}`,
+			want: "",
+		},
+	}
+	for _, policy := range policies {
+		if _, err := schemaPool.DB().ExecContext(ctx,
+			"INSERT INTO project (project_id, owner_id) VALUES ($1, $2)", policy.projectID, policy.ownerID); err != nil {
+			t.Fatalf("seed project for %s: %v", policy.name, err)
+		}
+		if _, err := schemaPool.DB().ExecContext(ctx,
+			"INSERT INTO retention_policy (scope_level, scope_reference, data) VALUES ('project', $1, $2)",
+			policy.projectID, policy.data); err != nil {
+			t.Fatalf("seed retention policy for %s: %v", policy.name, err)
+		}
+	}
+	// a schedule outside the project scope has no owner to fall back to
+	if _, err := schemaPool.DB().ExecContext(ctx,
+		`INSERT INTO retention_policy (scope_level, scope_reference, data) VALUES ('system', 10, '{"trigger":{"kind":"Schedule","settings":{"cron":"0 0 * * * *"}}}')`); err != nil {
+		t.Fatalf("seed system retention policy: %v", err)
+	}
+
+	path := authoritativeTestSchemaPath()
+	for pass := 1; pass <= 2; pass++ {
+		if err := applyAuthoritativeSchema(ctx, sqlSchemaDB{db: schemaPool.DB()}, path); err != nil {
+			t.Fatalf("applyAuthoritativeSchema() pass %d: %v", pass, err)
+		}
+
+		for _, policy := range policies {
+			var principal string
+			if err := schemaPool.DB().QueryRowContext(ctx, `
+				SELECT COALESCE(data::jsonb -> 'execution_principal', 'null'::jsonb)::text
+				FROM retention_policy
+				WHERE scope_level = 'project' AND scope_reference = $1`, policy.projectID).Scan(&principal); err != nil {
+				t.Fatalf("pass %d: read %s: %v", pass, policy.name, err)
+			}
+			if policy.want == "" {
+				if principal != "null" {
+					t.Errorf("pass %d: %s got principal %s, want none", pass, policy.name, principal)
+				}
+				continue
+			}
+			var equal bool
+			if err := schemaPool.DB().QueryRowContext(ctx,
+				"SELECT $1::jsonb = $2::jsonb", principal, policy.want).Scan(&equal); err != nil {
+				t.Fatalf("pass %d: compare %s: %v", pass, policy.name, err)
+			}
+			if !equal {
+				t.Errorf("pass %d: %s got principal %s, want %s", pass, policy.name, principal, policy.want)
+			}
+		}
+
+		var systemPrincipal string
+		if err := schemaPool.DB().QueryRowContext(ctx, `
+			SELECT COALESCE(data::jsonb -> 'execution_principal', 'null'::jsonb)::text
+			FROM retention_policy
+			WHERE scope_level = 'system'`).Scan(&systemPrincipal); err != nil {
+			t.Fatalf("pass %d: read system policy: %v", pass, err)
+		}
+		if systemPrincipal != "null" {
+			t.Errorf("pass %d: system policy got principal %s, want none", pass, systemPrincipal)
+		}
 	}
 }
 
