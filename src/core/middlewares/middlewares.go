@@ -30,6 +30,7 @@ import (
 	"github.com/goharbor/harbor/src/server/middleware/notification"
 	"github.com/goharbor/harbor/src/server/middleware/orm"
 	"github.com/goharbor/harbor/src/server/middleware/readonly"
+	"github.com/goharbor/harbor/src/server/middleware/regpath"
 	"github.com/goharbor/harbor/src/server/middleware/requestid"
 	"github.com/goharbor/harbor/src/server/middleware/security"
 	"github.com/goharbor/harbor/src/server/middleware/securityheader"
@@ -118,6 +119,7 @@ func middlewareChain() []middlewareEntry {
 		{"securityheader", securityheader.Middleware(securityHeaderSkipper)},
 		{"url", url.Middleware()},
 		{"mergeslash", mergeslash.Middleware()},
+		{"regpath", regpath.Middleware()},
 		{"trace", trace.Middleware()},
 		{"metric", metric.Middleware()},
 		{"requestid", requestid.Middleware()},
