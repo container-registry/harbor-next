@@ -65,12 +65,18 @@ const (
 	// seconds. A value of 0 disables the response-header timeout entirely.
 	responseHeaderTimeoutEnvKey = "HTTP_RESPONSE_HEADER_TIMEOUT_SECONDS"
 
+	// defaultMaxIdleConns caps the total idle keep-alive connections retained
+	// across all hosts.
+	defaultMaxIdleConns = 1000
+
 	// defaultMaxIdleConnsPerHost caps idle keep-alive connections retained per
-	// host. Go's net/http default is only 2; when harbor-core proxies many
-	// concurrent requests to a single backend (notably the registry), that
-	// forces constant connection churn and the associated FD/goroutine
-	// pressure. A higher cap lets connections be reused.
-	defaultMaxIdleConnsPerHost = 32
+	// host. Go's net/http default is only 2, which is too small for
+	// high-concurrency scenarios (e.g. core/jobservice talking to the registry,
+	// or replicating to a single remote endpoint): almost every connection is
+	// closed after use, piling up TIME_WAIT sockets and eventually exhausting
+	// ephemeral ports (EADDRNOTAVAIL). Idle connections beyond actual need are
+	// reaped by IdleConnTimeout, so a generous value is safe.
+	defaultMaxIdleConnsPerHost = 200
 
 	// defaultResponseHeaderTimeout bounds how long the transport waits for a
 	// backend's response headers after the request has been written. Without
@@ -132,7 +138,7 @@ func newDefaultTransport() *http.Transport {
 			DualStack: true,
 		}).DialContext,
 		TLSClientConfig:       &tls.Config{},
-		MaxIdleConns:          100,
+		MaxIdleConns:          defaultMaxIdleConns,
 		MaxIdleConnsPerHost:   defaultMaxIdleConnsPerHost,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
