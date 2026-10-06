@@ -417,3 +417,27 @@ tests:
       - equal:
           path: data.POSTGRESQL_MIN_CONNS
           value: "8"
+
+  # Pins: webhook targets on private networks stay blocked unless explicitly allowed.
+  - it: should block private-network webhook targets by default
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - equal:
+          path: data.HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
+          value: "false"
+
+  - it: should pass network.allowPrivateNetworkAccess through to core
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      network.allowPrivateNetworkAccess: true
+    asserts:
+      - equal:
+          path: data.HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
+          value: "true"

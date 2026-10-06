@@ -125,6 +125,13 @@ proxy:
     - jobservice
     - trivy
 
+# -- Outbound network policy for webhook and Slack notification targets
+network:
+  # -- Allow webhook and Slack notification targets on private, loopback, link-local and
+  # cloud-metadata addresses. These are rejected by default; enable only to deliver
+  # webhooks to a trusted internal endpoint.
+  allowPrivateNetworkAccess: false
+
 # ============================================================================
 # 2. EXPOSE / INGRESS / GATEWAY
 # ============================================================================
