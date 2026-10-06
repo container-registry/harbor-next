@@ -48,9 +48,16 @@ func UnregisterResolver(urlPattern string) {
 	mu.Unlock()
 }
 
-// Resolvers get map of resolvers
+// Resolvers returns a snapshot of the registered resolvers, safe to range over
+// while resolvers are registered or unregistered concurrently
 func Resolvers() map[string]Resolver {
-	return urlResolvers
+	mu.Lock()
+	defer mu.Unlock()
+	snapshot := make(map[string]Resolver, len(urlResolvers))
+	for urlPattern, resolver := range urlResolvers {
+		snapshot[urlPattern] = resolver
+	}
+	return snapshot
 }
 
 // Metadata the raw data of event
