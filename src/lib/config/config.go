@@ -81,6 +81,9 @@ func DefaultMgr() Manager {
 	if err != nil {
 		log.Error("failed to get config manager")
 	}
+	if manager == nil {
+		log.Error("config manager is nil")
+	}
 	return manager
 }
 
@@ -119,10 +122,18 @@ func GetCfgManager(_ context.Context) Manager {
 
 // Load configurations
 func Load(ctx context.Context) error {
-	return DefaultMgr().Load(ctx)
+	mgr := DefaultMgr()
+	if mgr == nil {
+		return errors.New("config manager is not initialized")
+	}
+	return mgr.Load(ctx)
 }
 
 // Upload save all configurations, used by testing
 func Upload(cfg map[string]any) error {
-	return DefaultMgr().UpdateConfig(orm.Context(), cfg)
+	mgr := DefaultMgr()
+	if mgr == nil {
+		return errors.New("config manager is not initialized")
+	}
+	return mgr.UpdateConfig(orm.Context(), cfg)
 }
