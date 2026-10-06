@@ -29,6 +29,11 @@ func TestMatrixJobMaxFails(t *testing.T) {
 	})
 }
 
+func TestMatrixJobMaxCurrency(t *testing.T) {
+	rep := &MatrixJob{}
+	assert.Equal(t, uint(1), rep.MaxCurrency())
+}
+
 func TestMatrixJobShouldRetry(t *testing.T) {
 	rep := &MatrixJob{}
 	assert.True(t, rep.ShouldRetry())
