@@ -1,6 +1,7 @@
 package token
 
 import (
+	"crypto/elliptic"
 	"os"
 	"path/filepath"
 	"testing"
@@ -187,4 +188,113 @@ func TestParseWithClaimsWithClockSkew(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, token.Token.Claims.(*robot_claim.Claim).Access[0].Resource, types.Resource("/project/library/repository"))
 	assert.Equal(t, token.Token.Claims.(*robot_claim.Claim).Access[0].Action, types.Action("push"))
+}
+
+func TestParseWithPS256(t *testing.T) {
+	// Test that Parse() accepts PS256 (RSAPSS) tokens
+	// Create a token signed with PS256 algorithm
+	rbacPolicy := &types.Policy{
+		Resource: "/project/library/repository",
+		Action:   "pull",
+	}
+	var policies []*types.Policy
+	policies = append(policies, rbacPolicy)
+
+	tokenID := int64(456)
+	projectID := int64(789)
+
+	expiresAt := time.Now().UTC().Add(10 * 24 * time.Hour)
+	robot := robot_claim.Claim{
+		TokenID:   tokenID,
+		ProjectID: projectID,
+		Access:    policies,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
+		},
+	}
+
+	// Get default RSA key options
+	defaultOpt := DefaultTokenOptions()
+	assert.NotNil(t, defaultOpt)
+
+	// Manually create a token with PS256 signing method to test Parse() acceptance
+	key, err := defaultOpt.GetKey()
+	assert.Nil(t, err)
+
+	// Create token with PS256 (RSAPSS) instead of RS256
+	ps256Token := jwt.NewWithClaims(jwt.SigningMethodPS256, robot)
+	rawTk, err := ps256Token.SignedString(key)
+	assert.Nil(t, err)
+	assert.NotNil(t, rawTk)
+
+	// Parse should accept the PS256 token when the key is RSA
+	rClaims := &robot_claim.Claim{}
+	token, err := Parse(defaultOpt, rawTk, rClaims)
+	assert.Nil(t, err)
+	assert.NotNil(t, token)
+	assert.Equal(t, tokenID, rClaims.TokenID)
+	assert.Equal(t, projectID, rClaims.ProjectID)
+}
+
+func TestParseWithECDSA(t *testing.T) {
+	// Test that Parse() works with ECDSA-signed tokens
+	rbacPolicy := &types.Policy{
+		Resource: "/project/library/repository",
+		Action:   "push",
+	}
+	var policies []*types.Policy
+	policies = append(policies, rbacPolicy)
+
+	tokenID := int64(789)
+	projectID := int64(456)
+
+	expiresAt := time.Now().UTC().Add(10 * 24 * time.Hour)
+	robot := robot_claim.Claim{
+		TokenID:   tokenID,
+		ProjectID: projectID,
+		Access:    policies,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
+		},
+	}
+
+	// Create ECDSA key options using a generated test ECDSA key
+	keyFile := writeECKeyFile(t, elliptic.P256(), "EC PRIVATE KEY")
+	defer os.Remove(keyFile)
+
+	opt, err := NewOptions("", "test-issuer", keyFile)
+	assert.Nil(t, err)
+	assert.NotNil(t, opt)
+
+	// Verify it's using ECDSA
+	assert.Equal(t, jwt.SigningMethodES256, opt.SignMethod)
+
+	// Create and sign a token with ECDSA
+	token, err := New(opt, robot)
+	assert.Nil(t, err)
+	assert.NotNil(t, token)
+
+	rawTk, err := token.Raw()
+	assert.Nil(t, err)
+	assert.NotNil(t, rawTk)
+
+	// Parse the ECDSA token
+	rClaims := &robot_claim.Claim{}
+	parsedToken, err := Parse(opt, rawTk, rClaims)
+	assert.Nil(t, err)
+	assert.NotNil(t, parsedToken)
+	assert.Equal(t, tokenID, rClaims.TokenID)
+	assert.Equal(t, projectID, rClaims.ProjectID)
+}
+
+func TestParseInvalidToken(t *testing.T) {
+	defaultOpt := DefaultTokenOptions()
+	if defaultOpt == nil {
+		assert.NotNil(t, defaultOpt)
+		return
+	}
+	rClaims := &robot_claim.Claim{}
+	token, err := Parse(defaultOpt, "invalid.token.string", rClaims)
+	assert.NotNil(t, err)
+	assert.Nil(t, token)
 }
