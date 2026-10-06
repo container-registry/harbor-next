@@ -123,7 +123,7 @@ func TestWithPublicNetworkOnly(t *testing.T) {
 
 	dial := func() error {
 		transport := &http.Transport{Proxy: http.ProxyFromEnvironment}
-		WithPublicNetworkOnly()(transport)
+		withPublicNetworkOnly(net.DefaultResolver)(transport)
 		conn, err := transport.DialContext(context.Background(), "tcp", listener.Addr().String())
 		if conn != nil {
 			_ = conn.Close()
@@ -175,7 +175,7 @@ func TestWithPublicNetworkOnlyHonoursProxy(t *testing.T) {
 	proxy := newRecordingProxy(t)
 
 	transport := &http.Transport{Proxy: http.ProxyURL(proxy.url)}
-	WithPublicNetworkOnly()(transport)
+	withPublicNetworkOnly(net.DefaultResolver)(transport)
 	client := &http.Client{Transport: transport, Timeout: 2 * time.Second}
 
 	resp, err := client.Get("http://8.8.8.8/hook")

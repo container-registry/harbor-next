@@ -427,9 +427,6 @@ func (n *webhookAPI) validateTargets(ctx context.Context, policy *policy_model.P
 		if err := n.validateTargetHost(validationCtx, url.Hostname(), validatedHosts); err != nil {
 			return false, errors.New(err).WithCode(errors.BadRequestCode)
 		}
-		// Prevent SSRF security issue #3755
-		target.Address = url.Scheme + "://" + url.Host + url.Path
-
 		if !isNotifyTypeSupported(target.Type) {
 			return false, errors.New(nil).WithMessagef("unsupported target type %s with policy %s", target.Type, policy.Name).WithCode(errors.BadRequestCode)
 		}

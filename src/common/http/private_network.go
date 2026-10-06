@@ -217,16 +217,11 @@ func isBlockedTargetHostname(host string) bool {
 	return false
 }
 
-// WithPublicNetworkOnly blocks connections to non-public destinations. Intended for the
-// notification (webhook/slack) HTTP clients, whose targets are attacker-controlled. Direct
-// connections are checked at dial time on the resolved address. When the transport's proxy
+// withPublicNetworkOnly blocks connections to non-public destinations. Direct connections are
+// checked at dial time on the resolved address. When the transport's proxy
 // (HTTP_PROXY/HTTPS_PROXY/NO_PROXY) applies, the dial goes to the operator's proxy instead, so
 // the target host is validated before the request is handed to it. Honors the
 // HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS escape hatch.
-func WithPublicNetworkOnly() func(*http.Transport) {
-	return withPublicNetworkOnly(net.DefaultResolver)
-}
-
 func withPublicNetworkOnly(resolver NetworkResolver) func(*http.Transport) {
 	return func(transport *http.Transport) {
 		guard := &publicNetworkGuard{resolver: resolver, upstreamProxy: transport.Proxy}
@@ -242,7 +237,7 @@ func withPublicNetworkOnly(resolver NetworkResolver) func(*http.Transport) {
 }
 
 // NewPublicNetworkTransport returns a transport that only reaches public destinations, for the
-// notification (webhook/slack) clients. On top of WithPublicNetworkOnly it pins proxied requests
+// notification (webhook/slack) clients. On top of the dial-time guard it pins proxied requests
 // to the address Harbor validated: the proxy receives that IP instead of the hostname, so it
 // cannot resolve the name again to a private address (DNS rebinding). HTTPS tunnels to the IP
 // and still sends the original Host and verifies the certificate against the hostname. Plain
