@@ -29,6 +29,11 @@ func TestTeamsJobMaxFails(t *testing.T) {
 	})
 }
 
+func TestTeamsJobMaxCurrency(t *testing.T) {
+	rep := &TeamsJob{}
+	assert.Equal(t, uint(1), rep.MaxCurrency())
+}
+
 func TestTeamsJobShouldRetry(t *testing.T) {
 	rep := &TeamsJob{}
 	assert.True(t, rep.ShouldRetry())
