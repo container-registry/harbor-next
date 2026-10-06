@@ -34,6 +34,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/pkg/notification"
 	"github.com/goharbor/harbor/src/pkg/oidc"
+	"github.com/goharbor/harbor/src/server/middleware/session"
 
 	"go.pinniped.dev/pkg/oidcclient/pkce"
 )
@@ -254,6 +255,7 @@ func (oc *OIDCController) RedirectLogout() {
 		oc.SendInternalServerError(err)
 		return
 	}
+	session.SecureDestroyedCookie(oc.Ctx.ResponseWriter)
 	if sessionData == nil {
 		log.Warningf("OIDC session token not found.")
 		oc.Controller.Redirect("/account/sign-in", http.StatusFound)

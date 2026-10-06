@@ -219,3 +219,56 @@ func TestSessionCookieOnResponse(t *testing.T) {
 		})
 	}
 }
+
+func TestSecureDestroyedCookie(t *testing.T) {
+	cases := []struct {
+		name        string
+		extEndpoint string
+		wantSecure  bool
+	}{
+		{name: "TLS terminated in front of core", extEndpoint: "https://harbor.test", wantSecure: true},
+		{name: "plain HTTP endpoint", extEndpoint: "http://harbor.test", wantSecure: false},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			config.InitWithSettings(map[string]any{common.ExtEndpoint: c.extEndpoint})
+			t.Setenv(sameSiteEnv, "")
+			web.BConfig.WebConfig.Session.SessionName = config.SessionCookieName
+			require.Nil(t, ConfigureCookie())
+
+			raw, err := web.AppConfig.String(sessionConfigKey)
+			require.Nil(t, err)
+			conf := &beegosession.ManagerConfig{}
+			require.Nil(t, json.Unmarshal([]byte(raw), conf))
+			manager, err := beegosession.NewManager("memory", conf)
+			require.Nil(t, err)
+
+			// what logout does: destroy the session, then mark its expired cookie
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				manager.SessionDestroy(w, r)
+				SecureDestroyedCookie(w)
+			})
+
+			req := httptest.NewRequest("GET", "/c/log_out", nil)
+			req.AddCookie(&http.Cookie{Name: config.SessionCookieName, Value: "abc"})
+			rec := httptest.NewRecorder()
+			Middleware()(handler).ServeHTTP(rec, req)
+
+			cookies := rec.Result().Cookies()
+			require.Len(t, cookies, 1)
+			assert.Equal(t, config.SessionCookieName, cookies[0].Name)
+			assert.Equal(t, -1, cookies[0].MaxAge)
+			assert.True(t, cookies[0].HttpOnly)
+			assert.Equal(t, c.wantSecure, cookies[0].Secure)
+			assert.Equal(t, http.SameSiteLaxMode, cookies[0].SameSite)
+		})
+	}
+}
+
+func TestHasSecure(t *testing.T) {
+	assert.True(t, hasSecure("sid=; Path=/; HttpOnly; Secure; SameSite=Lax"))
+	assert.True(t, hasSecure("sid=x; secure"))
+	assert.False(t, hasSecure("sid=; Path=/; HttpOnly; SameSite=Lax"))
+	assert.False(t, hasSecure("sid=Secure; Path=/"))
+}

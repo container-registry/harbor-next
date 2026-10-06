@@ -78,6 +78,30 @@ func ConfigureCookie() error {
 	return web.AppConfig.Set(sessionConfigKey, string(conf))
 }
 
+// SecureDestroyedCookie adds Secure to the expired session cookie that beego's
+// SessionDestroy writes, which it builds without the configured Secure flag.
+// Call it right after DestroySession, before the response is written.
+func SecureDestroyedCookie(w http.ResponseWriter) {
+	if !secureCookie() {
+		return
+	}
+	cookies := w.Header()["Set-Cookie"]
+	for i, c := range cookies {
+		if strings.HasPrefix(c, config.SessionCookieName+"=") && !hasSecure(c) {
+			cookies[i] = c + "; Secure"
+		}
+	}
+}
+
+func hasSecure(cookie string) bool {
+	for _, attr := range strings.Split(cookie, ";")[1:] {
+		if strings.EqualFold(strings.TrimSpace(attr), "secure") {
+			return true
+		}
+	}
+	return false
+}
+
 // secureCookie reports whether the external endpoint uses TLS, the way the CSRF
 // middleware decides the same question for its own cookie.
 func secureCookie() bool {
