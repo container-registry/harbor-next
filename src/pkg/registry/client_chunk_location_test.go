@@ -17,7 +17,10 @@ package registry
 import (
 	"net/http"
 	"net/http/httptest"
+<<<<<<< HEAD
 	"net/url"
+=======
+>>>>>>> 0a9e68e6d (Merge commit from fork)
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -103,12 +106,17 @@ func TestBuildChunkBlobUploadURL_LocationOrigin(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
+<<<<<<< HEAD
 			u, err := url.Parse(got)
 			if err != nil {
 				t.Fatalf("resolved URL %q does not parse: %v", got, err)
 			}
 			if u.Host != tc.wantHost {
 				t.Fatalf("resolved URL %q targets host %q, want %q", got, u.Host, tc.wantHost)
+=======
+			if !strings.Contains(got, tc.wantHost) {
+				t.Fatalf("resolved URL %q does not target expected host %q", got, tc.wantHost)
+>>>>>>> 0a9e68e6d (Merge commit from fork)
 			}
 		})
 	}
@@ -161,6 +169,7 @@ func TestBuildBlobUploadURL_EndpointPathPrefix(t *testing.T) {
 		}
 	}
 }
+<<<<<<< HEAD
 
 // TestResolveUploadLocation_ErrorRedactsSecrets keeps credentials and signed upload tokens carried
 // in a rejected Location out of the returned error, which replication logs verbatim.
@@ -180,3 +189,5 @@ func TestResolveUploadLocation_ErrorRedactsSecrets(t *testing.T) {
 		}
 	}
 }
+=======
+>>>>>>> 0a9e68e6d (Merge commit from fork)
