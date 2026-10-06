@@ -181,7 +181,7 @@ jobs:
         # itself contain a sha256 digest the capture below would match.
         run: |
           set -euo pipefail
-          helm push "dist/harbor-next-${PREVIEW_VERSION}.tgz" \
+          helm push "dist/harbor-${PREVIEW_VERSION}.tgz" \
             "oci://${REGISTRY_ADDRESS}/${PR_REGISTRY_PROJECT}/charts" 2>&1 | tee push.log
           digest=$(grep -o 'sha256:[a-f0-9]\{64\}' push.log | head -1)
           if [ -z "$digest" ]; then
@@ -195,7 +195,7 @@ jobs:
           CHART_DIGEST: ${{ steps.push.outputs.digest }}
         run: |
           cosign sign --yes \
-            "${REGISTRY_ADDRESS}/${PR_REGISTRY_PROJECT}/charts/harbor-next@${CHART_DIGEST}"
+            "${REGISTRY_ADDRESS}/${PR_REGISTRY_PROJECT}/charts/harbor@${CHART_DIGEST}"
 
   pr-comment:
     name: Comment preview chart ref
@@ -239,7 +239,7 @@ jobs:
             const issueNumber = context.payload.pull_request.number;
             const { owner, repo } = context.repo;
             const previewProject = process.env.PR_REGISTRY_PROJECT;
-            const chart = `${process.env.REGISTRY_ADDRESS}/${previewProject}/charts/harbor-next`;
+            const chart = `${process.env.REGISTRY_ADDRESS}/${previewProject}/charts/harbor`;
             const previewVersion = process.env.PREVIEW_VERSION;
             const appVersion = process.env.APP_VERSION;
             const digest = process.env.DIGEST;
