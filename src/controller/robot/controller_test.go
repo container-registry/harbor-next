@@ -433,6 +433,22 @@ func (suite *ControllerTestSuite) TestIsValidSec() {
 	suite.False(IsValidSec(sec))
 }
 
+// TestIsValidSecLengthBoundary pins the lower end of the 8 character minimum,
+// which the mixed-case cases above never reach: a secret can satisfy every
+// character-class rule and still be rejected purely for being too short.
+func (suite *ControllerTestSuite) TestIsValidSecLengthBoundary() {
+	// Empty is rejected: it trivially contains no uppercase, lowercase or digit.
+	suite.False(IsValidSec(""))
+
+	// Shortest secret that satisfies every rule: "1aB" + five more characters.
+	suite.True(IsValidSec("1aB2cD3e"))
+	suite.False(IsValidSec("1aB2cD3"))
+
+	// One character over the minimum is accepted, proving the bound is 8 and
+	// not an artefact of the character classes being satisfied early.
+	suite.True(IsValidSec("1aB2cD3eF"))
+}
+
 func (suite *ControllerTestSuite) TestCreateSec() {
 	_, pwd, _, err := CreateSec()
 	suite.Nil(err)
