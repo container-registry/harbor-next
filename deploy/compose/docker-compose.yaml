@@ -59,6 +59,8 @@ services:
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr
       # Lets push-authorized users skip content trust via a cosign/notation User-Agent (spoofable)
       CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED: ${CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED:-false}
+      # Webhook targets on private, loopback or link-local addresses are rejected unless true
+      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: ${HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS:-false}
     depends_on:
       postgresql:
         condition: service_healthy
@@ -97,6 +99,7 @@ services:
       REGISTRY_CREDENTIAL_PASSWORD: ${REGISTRY_CREDENTIAL_PASSWORD:-}
       TOKEN_SERVICE_URL: http://core:8080/service/token
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: ${HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS:-false}
     depends_on:
       core:
         condition: service_healthy
