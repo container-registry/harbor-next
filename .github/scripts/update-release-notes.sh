@@ -71,6 +71,11 @@ node .github/scripts/format-release-notes.mjs \
   "${tmp_dir}/formatted-notes.md" \
   "${tmp_dir}/contributors.md"
 
+node .github/scripts/extract-pr-summary.mjs \
+  "${tmp_dir}/formatted-notes.md" \
+  "${GITHUB_REPOSITORY}" \
+  "${tmp_dir}/summary.md"
+
 if [[ -n "${preview_pr_number}" ]]; then
   release_branch="${GITHUB_REF_NAME:?GITHUB_REF_NAME is required for a release PR preview}"
 elif [[ "${GITHUB_REF_TYPE:-}" == "branch" && -n "${GITHUB_REF_NAME:-}" ]]; then
@@ -203,6 +208,11 @@ if [[ -f "${series}" ]]; then
 fi
 
 {
+  if [[ -s "${tmp_dir}/summary.md" ]]; then
+    cat "${tmp_dir}/summary.md"
+    echo
+  fi
+
   if [[ "${declared_count}" -gt 0 ]]; then
     echo "## Commercial Features"
     echo
