@@ -15,8 +15,10 @@
 package handler
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -33,6 +35,17 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+// stubResolver resolves a fixed hostname to a public address for the webhook target tests, so the
+// suite never depends on real DNS.
+type stubResolver struct{}
+
+func (stubResolver) LookupNetIP(_ context.Context, _ string, host string) ([]netip.Addr, error) {
+	if host == "hooks.example.com" {
+		return []netip.Addr{netip.MustParseAddr("93.184.216.34")}, nil
+	}
+	return nil, fmt.Errorf("no such host %q", host)
+}
+
 type WebhookTestSuite struct {
 	htesting.Suite
 	webhookCtl *webhook.Controller
@@ -41,14 +54,16 @@ type WebhookTestSuite struct {
 }
 
 func (suite *WebhookTestSuite) SetupSuite() {
+	suite.T().Setenv("HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS", "false")
 	suite.webhookCtl = &webhook.Controller{}
 	suite.execCtl = &task.ExecutionController{}
 	suite.taskCtl = &task.Controller{}
 	suite.Config = &restapi.Config{
 		WebhookAPI: &webhookAPI{
-			webhookCtl: suite.webhookCtl,
-			execCtl:    suite.execCtl,
-			taskCtl:    suite.taskCtl,
+			webhookCtl:     suite.webhookCtl,
+			execCtl:        suite.execCtl,
+			taskCtl:        suite.taskCtl,
+			targetResolver: stubResolver{},
 		},
 	}
 
@@ -91,8 +106,22 @@ func (suite *WebhookTestSuite) TestCreateWebhookPolicyOfProject() {
 	}
 
 	{
-		// valid policy should got 200
+		// SSRF: a loopback target must be rejected
 		resp, err := suite.PostJSON(url, &models.WebhookPolicy{EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "http", Address: "http://127.0.0.1"}}})
+		suite.NoError(err)
+		suite.Equal(400, resp.StatusCode)
+	}
+
+	{
+		// SSRF: the cloud metadata endpoint must be rejected
+		resp, err := suite.PostJSON(url, &models.WebhookPolicy{EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "http", Address: "http://169.254.169.254/latest/meta-data/"}}})
+		suite.NoError(err)
+		suite.Equal(400, resp.StatusCode)
+	}
+
+	{
+		// valid policy targeting a public address should get 201
+		resp, err := suite.PostJSON(url, &models.WebhookPolicy{EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "http", Address: "http://hooks.example.com/notify"}}})
 		suite.NoError(err)
 		suite.Equal(201, resp.StatusCode)
 	}
@@ -120,8 +149,15 @@ func (suite *WebhookTestSuite) TestUpdateWebhookPolicyOfProject() {
 	}
 
 	{
-		// valid policy should got 200
+		// SSRF: a loopback target must be rejected on update too
 		resp, err := suite.PutJSON(url, &models.WebhookPolicy{EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "http", Address: "http://127.0.0.1"}}})
+		suite.NoError(err)
+		suite.Equal(400, resp.StatusCode)
+	}
+
+	{
+		// valid policy targeting a public address should get 200
+		resp, err := suite.PutJSON(url, &models.WebhookPolicy{EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "http", Address: "http://hooks.example.com/notify"}}})
 		suite.NoError(err)
 		suite.Equal(200, resp.StatusCode)
 	}

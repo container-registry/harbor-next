@@ -210,6 +210,15 @@
         }
       }
     },
+    "network": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowPrivateNetworkAccess": {
+          "type": "boolean"
+        }
+      }
+    },
     "expose": {
       "type": "object",
       "properties": {

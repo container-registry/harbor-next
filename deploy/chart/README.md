@@ -987,6 +987,8 @@ Kubernetes: `>=1.28.0-0`
 | metrics.serviceMonitor.namespace | string | `""` | ServiceMonitor namespace (defaults to release namespace) |
 | metrics.serviceMonitor.scrapeTimeout | string | `"10s"` | Scrape timeout |
 | nameOverride | string | `""` | Override the chart name |
+| network | object | `{"allowPrivateNetworkAccess":false}` | Outbound network policy for webhook and Slack notification targets |
+| network.allowPrivateNetworkAccess | bool | `false` | Allow webhook and Slack notification targets on private, loopback, link-local and cloud-metadata addresses. These are rejected by default; enable only to deliver webhooks to a trusted internal endpoint. |
 | portal.affinity | object | `{}` | Affinity rules for Portal pods |
 | portal.annotations | object | `{}` | Annotations for the Portal workload object (Deployment) |
 | portal.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler. See `core.autoscaling` for full docs. |
