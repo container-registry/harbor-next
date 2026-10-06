@@ -263,20 +263,41 @@ func resolveNextLink(base *url.URL, link string) (*url.URL, error) {
 	// userinfo has no legitimate use in a pagination link and is the vector that turns a
 	// same-origin-looking value into a cross-origin host.
 	if ref.User != nil {
-		return nil, fmt.Errorf("pagination Link must not contain userinfo: %q", link)
+		return nil, fmt.Errorf("pagination Link must not contain userinfo: %q", RedactedURL(ref))
 	}
 	next := base.ResolveReference(ref)
 	if !SameOrigin(base, next) {
-		return nil, fmt.Errorf("pagination Link %q resolves to a different origin than %q", link, base.Redacted())
+		return nil, fmt.Errorf("pagination Link %q resolves to a different origin than %q", RedactedURL(next), RedactedURL(base))
 	}
 	return next, nil
+}
+
+// RedactedURL renders u for error messages without userinfo, query or fragment. Pagination
+// and upload URLs come from remote registries, which may carry credentials or signed tokens
+// there, and callers log these errors.
+func RedactedURL(u *url.URL) string {
+	r := *u
+	r.User = nil
+	r.RawQuery = ""
+	r.ForceQuery = false
+	r.Fragment = ""
+	r.RawFragment = ""
+	return r.String()
 }
 
 // SameOrigin reports whether a and b share scheme, host and effective port.
 func SameOrigin(a, b *url.URL) bool {
 	return strings.EqualFold(a.Scheme, b.Scheme) &&
-		strings.EqualFold(a.Hostname(), b.Hostname()) &&
+		sameHost(a.Hostname(), b.Hostname()) &&
 		effectivePort(a) == effectivePort(b)
+}
+
+// sameHost compares host names case-insensitively, except for an IPv6 zone identifier,
+// which names a network interface and must match exactly.
+func sameHost(a, b string) bool {
+	aHost, aZone, _ := strings.Cut(a, "%")
+	bHost, bZone, _ := strings.Cut(b, "%")
+	return strings.EqualFold(aHost, bHost) && aZone == bZone
 }
 
 // effectivePort returns the URL's port, substituting the scheme's default when none is set,
