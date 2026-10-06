@@ -141,12 +141,15 @@ func manifestBodyLimitMiddleware() middleware.Middleware {
 			lib_http.SendError(w, errors.RequestEntityTooLargeError(nil))
 			return
 		}
-		r.Body = http.MaxBytesReader(w, r.Body, common.MaxManifestBodySize)
 		if r.ContentLength < 0 {
+			// Unknown length: buffer through ReadRequestBody, which reads at most
+			// limit+1 bytes and returns 413 when the body is over the limit.
 			if _, err := lib.ReadRequestBody(r, common.MaxManifestBodySize); err != nil {
 				lib_http.SendError(w, err)
 				return
 			}
+		} else {
+			r.Body = http.MaxBytesReader(w, r.Body, common.MaxManifestBodySize)
 		}
 		next.ServeHTTP(w, r)
 	})

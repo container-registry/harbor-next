@@ -225,7 +225,7 @@ func TestRemoveSubmatch(t *testing.T) {
 
 }
 
-const maxAuditBodySize = 4 << 20
+const maxAuditBodySize = common.MaxAuditLogPayloadSize
 
 type observedReadCloser struct {
 	remaining int64
@@ -340,6 +340,7 @@ func (disabledAuditResolver) PreCheck(context.Context, string, string) (bool, st
 
 func TestMiddlewareDoesNotReadDisabledAuditBody(t *testing.T) {
 	commonevent.RegisterResolver(`^/__disabled_audit_test__$`, disabledAuditResolver{})
+	defer commonevent.UnregisterResolver(`^/__disabled_audit_test__$`)
 	body := &observedReadCloser{remaining: 2 * maxAuditBodySize}
 	request := httptest.NewRequest(http.MethodPut, "/__disabled_audit_test__", body)
 

@@ -41,6 +41,13 @@ func RegisterResolver(urlPattern string, resolver Resolver) {
 	mu.Unlock()
 }
 
+// UnregisterResolver removes the resolver registered for a URL pattern
+func UnregisterResolver(urlPattern string) {
+	mu.Lock()
+	delete(urlResolvers, urlPattern)
+	mu.Unlock()
+}
+
 // Resolvers get map of resolvers
 func Resolvers() map[string]Resolver {
 	return urlResolvers
