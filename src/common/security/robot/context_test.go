@@ -285,6 +285,41 @@ func Test_filterRobotPolicies(t *testing.T) {
 				{Resource: "/project/1/repository", Action: "pull", Effect: "allow"},
 			},
 		},
+		{
+			"wildcard scope applies to a project it does not name",
+			args{
+				&proModels.Project{ProjectID: 7},
+				[]*types.Policy{
+					{Resource: "/project/*/repository/*", Action: "pull", Effect: "allow"},
+				},
+			},
+			[]*types.Policy{
+				{Resource: "/project/*/repository/*", Action: "pull", Effect: "allow"},
+			},
+		},
+		{
+			"wildcard push policy also grants pull",
+			args{
+				&proModels.Project{ProjectID: 7},
+				[]*types.Policy{
+					{Resource: "/project/*/repository/*", Action: "push", Effect: "allow"},
+				},
+			},
+			[]*types.Policy{
+				{Resource: "/project/*/repository/*", Action: "push", Effect: "allow"},
+				{Resource: "/project/*/repository/*", Action: "pull", Effect: ""},
+			},
+		},
+		{
+			"wildcard scope does not leak into a non-project namespace",
+			args{
+				&proModels.Project{ProjectID: 7},
+				[]*types.Policy{
+					{Resource: "/system/*/garbagecollection", Action: "create", Effect: "allow"},
+				},
+			},
+			nil,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

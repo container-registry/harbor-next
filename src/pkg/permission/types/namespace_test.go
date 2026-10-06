@@ -75,6 +75,30 @@ func TestResourceAllowedInNamespace_Wildcard(t *testing.T) {
 			},
 			expected: false,
 		},
+		{
+			name:     "wildcard with trailing subresource matches project namespace",
+			resource: Resource("/project/*/repository/*"),
+			ns:       projectNamespace,
+			expected: true,
+		},
+		{
+			name:     "wildcard artifact digest matches project namespace",
+			resource: Resource("/project/*/artifact/*"),
+			ns:       projectNamespace,
+			expected: true,
+		},
+		{
+			name:     "wildcard under a different top level kind does not match",
+			resource: Resource("/system/*/garbagecollection"),
+			ns:       projectNamespace,
+			expected: false,
+		},
+		{
+			name:     "non wildcard resource does not match a different project identity",
+			resource: Resource("/project/999/repository"),
+			ns:       projectNamespace,
+			expected: false,
+		},
 	}
 
 	for _, tt := range tests {
