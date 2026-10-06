@@ -20,6 +20,13 @@ env:
   # declare node20; opt in to the 2026-06-16 node24 default early.
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
+# release-please force-pushes the release PR branch on every run, so
+# overlapping runs push over each other. Never cancel: a cancelled run could
+# stop between tagging and publishing.
+concurrency:
+  group: release-please-${{ github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   validate-release-ref:
     name: Validate Release Ref
@@ -417,9 +424,16 @@ jobs:
           # repository_dispatch needs contents write; request nothing else
           permission-contents: write
 
+      # The tag, not github.sha: the concurrency group can drop the pending
+      # run for the release merge, so a later push may cut this release.
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
           persist-credentials: false
+
+      - name: Resolve release commit
+        id: release-commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - uses: ./.github/actions/setup-task
 
@@ -427,6 +441,6 @@ jobs:
         env:
           DISPATCH_TOKEN: ${{ steps.app-token.outputs.token }}
           TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
-          TARGET_SHA: ${{ github.sha }}
+          TARGET_SHA: ${{ steps.release-commit.outputs.sha }}
           LINE: ${{ github.ref_name }}
         run: task release-notes:dispatch-release-cut
