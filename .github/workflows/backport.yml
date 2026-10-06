@@ -67,6 +67,12 @@ jobs:
           fi
 
           title=$(gh pr view "${PR_NUMBER}" --json title --jq .title)
+          # a backport of a backport keeps pointing at the original PR
+          if [[ ! "${title}" =~ \(backport\ \#[0-9]+\)$ ]]; then
+            suffix=" (backport #${PR_NUMBER})"
+            # GitHub rejects PR titles over 256 characters
+            title="${title:0:$((256 - ${#suffix}))}${suffix}"
+          fi
           url=$(gh pr view "${PR_NUMBER}" --json url --jq .url)
           sha=$(gh pr view "${PR_NUMBER}" --json mergeCommit --jq .mergeCommit.oid)
 
