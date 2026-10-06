@@ -18,6 +18,7 @@ package quota
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -47,9 +48,11 @@ func (suite *RollbackTestSuite) SetupSuite() {
 	suite.reference = "rollback-bound"
 }
 
-// lockQuotaRow holds the quota row's write lock until the returned function is
-// called, on a connection of its own. Any UPDATE of that row waits for it.
-func (suite *RollbackTestSuite) lockQuotaRow(id int64) func() {
+// lockUsageRow holds the quota_usage row's write lock, on a connection of its
+// own, until the returned function is called or lockHoldLimit passes. The
+// rollback CAS updates that row, so it waits for the lock; the time limit
+// turns a rollback that ignores its deadline into a failure, not a hang.
+func (suite *RollbackTestSuite) lockUsageRow(id int64) func() {
 	locked := make(chan struct{})
 	release := make(chan struct{})
 	done := make(chan struct{})
@@ -62,22 +65,29 @@ func (suite *RollbackTestSuite) lockQuotaRow(id int64) func() {
 				return err
 			}
 			var ids []int64
-			if _, err := o.Raw("SELECT id FROM quota WHERE id = ? FOR UPDATE", id).QueryRows(&ids); err != nil {
+			if _, err := o.Raw("SELECT id FROM quota_usage WHERE id = ? FOR UPDATE", id).QueryRows(&ids); err != nil {
 				return err
 			}
 			close(locked)
-			<-release
+			select {
+			case <-release:
+			case <-time.After(lockHoldLimit):
+			}
 			return nil
 		})(orm.Context())
 		suite.NoError(err)
 	}()
 
 	<-locked
+	var once sync.Once
 	return func() {
-		close(release)
+		once.Do(func() { close(release) })
 		<-done
 	}
 }
+
+// lockHoldLimit bounds how long lockUsageRow holds its lock.
+const lockHoldLimit = 5 * time.Second
 
 // TestRollbackGivesUpOnALockedRow is the regression test for the deadline that
 // was not one. updateUsageByDB runs its CAS through Beego's ORM, which takes
@@ -92,7 +102,7 @@ func (suite *RollbackTestSuite) TestRollbackGivesUpOnALockedRow() {
 	q, err := quota.Mgr.Get(ctx, id)
 	suite.Require().NoError(err)
 
-	defer suite.lockQuotaRow(id)()
+	defer suite.lockUsageRow(id)()
 
 	// short enough that a test waiting out the lock is unmistakable, and the
 	// same value reaches both the context and statement_timeout, exactly as
@@ -109,7 +119,7 @@ func (suite *RollbackTestSuite) TestRollbackGivesUpOnALockedRow() {
 	elapsed := time.Since(start)
 
 	suite.Error(err, "the rollback cannot succeed while another transaction holds the row")
-	suite.Less(elapsed, 10*time.Second, "the rollback waited out the lock instead of its own deadline")
+	suite.Less(elapsed, lockHoldLimit, "the rollback waited out the lock instead of its own deadline")
 }
 
 func TestRollbackTestSuite(t *testing.T) {

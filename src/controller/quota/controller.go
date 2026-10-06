@@ -339,13 +339,16 @@ func (c *controller) updateUsageWithRetry(ctx context.Context, reference, refere
 // usageUpdateFunc returns one attempt at applying op to the reference's usage,
 // against whichever store the provider names.
 func (c *controller) usageUpdateFunc(ctx context.Context, reference, referenceID string, op func(hardLimits, used types.ResourceList) (types.ResourceList, error), provider updateQuotaProviderType) func() error {
-	if provider == updateQuotaProviderRedis {
+	switch provider {
+	case updateQuotaProviderRedis:
 		return func() error {
 			return c.updateUsageByRedis(ctx, reference, referenceID, op)
 		}
+	case updateQuotaProviderDB:
+	default:
+		// by default is update quota by db
 	}
 
-	// by default is update quota by db
 	return func() error {
 		return c.updateUsageByDB(ctx, reference, referenceID, op)
 	}
@@ -394,9 +397,28 @@ func (c *controller) rollbackUsage(ctx context.Context, reference, referenceID s
 	}
 
 	attempt := func() error {
-		return statementTimeout(rollbackTimeout, func(ctx context.Context) error {
+		// each attempt gets only what is left of ctx's deadline, so a retry
+		// started late cannot hold a connection past the rollback bound
+		timeout := rollbackTimeout
+		if deadline, ok := ctx.Deadline(); ok {
+			timeout = time.Until(deadline)
+		}
+		if timeout <= 0 {
+			return retry.Abort(context.DeadlineExceeded)
+		}
+		// statement_timeout 0 means no timeout, so never round down to it
+		timeout = max(timeout, time.Millisecond)
+
+		err := statementTimeout(timeout, func(ctx context.Context) error {
 			return c.updateUsageByDB(ctx, reference, referenceID, op)
 		})(ctx)
+		// only a CAS conflict proves the write did not land; any other error,
+		// a failed commit included, may have applied it, and retrying would
+		// subtract the reservation twice
+		if err != nil && !errors.Is(err, orm.ErrOptimisticLock) {
+			return retry.Abort(err)
+		}
+		return err
 	}
 
 	return retry.Retry(attempt, c.retryOptions(ctx, reference, referenceID)...)
