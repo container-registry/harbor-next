@@ -36,13 +36,22 @@ import (
 // something else must keep the usage figure current: the request path
 // marks the project dirty in memory (no database access), and a background
 // task recomputes and stores the usage once per dirty project per
-// interval, regardless of how many requests marked it.
+// interval, regardless of how many requests marked it. A flush starts one
+// interval after the previous one finished and refreshes the dirty projects
+// one after another, so the usage figure lags by the interval plus the
+// flush duration.
 //
 // The flush recomputes usage from the database (CalculateUsage) instead of
-// accumulating in-memory deltas, so it is idempotent: a mark lost to a
-// process restart, or a concurrent flush from another core replica, can
-// only delay convergence - never corrupt the stored value. A failed flush
-// re-marks the project and is retried on the next interval.
+// accumulating in-memory deltas, so it is idempotent: a concurrent flush
+// from another core replica can never corrupt the stored value. A failed
+// flush re-marks the project and is retried on the next interval.
+//
+// Marks live only in this process. Graceful shutdown flushes them
+// (FlushDeferredRefresh), but a crash loses them, and nothing recreates a
+// lost mark: the stored usage then stays stale until the next push, delete,
+// GC or retention run refreshes the project. Enforcement never relies on
+// it - a hard-limit change away from UNLIMITED recomputes the usage first
+// (see Controller.Update).
 // defaultDeferredRefreshInterval is the flush cadence; override with the
 // QUOTA_ASYNC_REFRESH_DURATION env var (seconds). Setting the env var also
 // switches RefreshMiddleware to the coalesced path (see AsyncRefreshEnabled).
@@ -107,8 +116,16 @@ func MarkRefresh(reference, referenceID string) {
 
 // flushDirtyQuota recomputes and stores the usage of every project marked
 // dirty since the previous flush.
-func flushDirtyQuota(_ context.Context) {
-	refreshDirty(orm.Context())
+func flushDirtyQuota(ctx context.Context) {
+	refreshDirty(orm.Clone(ctx))
+}
+
+// FlushDeferredRefresh refreshes every project marked dirty so far. Core
+// calls it during graceful shutdown, before the database pool closes, so a
+// rolling restart does not drop the pending marks. Projects not reached
+// before ctx is done stay marked.
+func FlushDeferredRefresh(ctx context.Context) {
+	refreshDirty(orm.Clone(ctx))
 }
 
 func refreshDirty(ctx context.Context) {
