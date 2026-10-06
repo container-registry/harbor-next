@@ -16,6 +16,7 @@ package handler
 
 import (
 	"context"
+	"math"
 
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/go-openapi/strfmt"
@@ -70,11 +71,19 @@ func (s *sysInfoAPI) GetVolumes(ctx context.Context, _ systeminfo.GetVolumesPara
 	return systeminfo.NewGetVolumesOK().WithPayload(&models.SystemInfo{
 		Storage: []*models.Storage{
 			{
-				Free:  c.Free,
-				Total: c.Total,
+				Free:  clampToInt64(c.Free),
+				Total: clampToInt64(c.Total),
 			},
 		},
 	})
+}
+
+// clampToInt64 caps byte counts at math.MaxInt64 so they can't wrap negative.
+func clampToInt64(v uint64) int64 {
+	if v > math.MaxInt64 {
+		return math.MaxInt64
+	}
+	return int64(v)
 }
 
 func (s *sysInfoAPI) convertInfo(d *si.Data) *models.GeneralInfo {
