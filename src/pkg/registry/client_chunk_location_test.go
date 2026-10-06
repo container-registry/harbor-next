@@ -17,6 +17,7 @@ package registry
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -102,8 +103,12 @@ func TestBuildChunkBlobUploadURL_LocationOrigin(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if !strings.Contains(got, tc.wantHost) {
-				t.Fatalf("resolved URL %q does not target expected host %q", got, tc.wantHost)
+			u, err := url.Parse(got)
+			if err != nil {
+				t.Fatalf("resolved URL %q does not parse: %v", got, err)
+			}
+			if u.Host != tc.wantHost {
+				t.Fatalf("resolved URL %q targets host %q, want %q", got, u.Host, tc.wantHost)
 			}
 		})
 	}
@@ -153,6 +158,25 @@ func TestBuildBlobUploadURL_EndpointPathPrefix(t *testing.T) {
 					t.Fatalf("got %q, want %q", got, tc.want)
 				}
 			})
+		}
+	}
+}
+
+// TestResolveUploadLocation_ErrorRedactsSecrets keeps credentials and signed upload tokens carried
+// in a rejected Location out of the returned error, which replication logs verbatim.
+func TestResolveUploadLocation_ErrorRedactsSecrets(t *testing.T) {
+	const endpoint = "http://good-registry.example:5000"
+	for _, location := range []string{
+		"http://evil.attacker.com/steal?token=s3cr3t-token",
+		"http://user:s3cr3t-pass@evil.attacker.com/steal",
+		"http://good-registry.example:5000@evil.attacker.com/steal?token=s3cr3t-token",
+	} {
+		_, err := resolveUploadLocation(endpoint, location)
+		if err == nil {
+			t.Fatalf("expected rejection for %q", location)
+		}
+		if msg := err.Error(); strings.Contains(msg, "s3cr3t") {
+			t.Fatalf("error leaks secret from Location %q: %s", location, msg)
 		}
 	}
 }
