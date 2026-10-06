@@ -68,7 +68,7 @@ var (
 
 	// securityHeaderSkipper limits the security header middleware to /api/, the
 	// registry APIs under /v2/ set their own caching and content headers.
-	securityHeaderSkipper = middleware.NegativeSkipper(middleware.MethodAndPathSkipper("*", match("^/api/")))
+	securityHeaderSkipper = middleware.NegativeSkipper(middleware.MethodAndPathSkipper("*", match("^/api(/|$)")))
 
 	// readonlySkippers skip the post request when harbor sets to readonly.
 	readonlySkippers = []middleware.Skipper{

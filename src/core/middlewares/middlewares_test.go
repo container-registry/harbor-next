@@ -49,6 +49,14 @@ func Test_dbTxSkippers(t *testing.T) {
 	}
 }
 
+func Test_securityHeaderSkipper(t *testing.T) {
+	for path, skip := range map[string]bool{"/api/": false, "/api/v2.0/ping": false, "/v2/library/photon/manifests/latest": true, "/apikeys": true} {
+		if got := securityHeaderSkipper(httptest.NewRequest(http.MethodGet, path, nil)); got != skip {
+			t.Errorf("securityHeaderSkipper(%s) = %v, want %v", path, got, skip)
+		}
+	}
+}
+
 func Test_readonlySkipper(t *testing.T) {
 	type args struct {
 		r *http.Request
