@@ -100,3 +100,23 @@ func (suite *AuthHandlerTestSuite) TestCustomHandler() {
 	require.NoError(suite.T(), err, "authorize HTTP request")
 	suite.Equal("my-api-key", r.Header.Get("api-key"), "check custom authorization header")
 }
+
+// TestCredentialRedactedString test credential String method redacting sensitive data
+func (suite *AuthHandlerTestSuite) TestCredentialRedactedString() {
+	var nilCred *Credential
+	suite.Equal("<nil>", fmt.Sprintf("%v", nilCred), "nil credential formatting")
+
+	cred := &Credential{
+		Mode: AuthModeBasic,
+		Data: map[string]string{
+			"username": "secretpassword",
+		},
+	}
+	redacted := "{Mode:BASIC Data:<redacted>}"
+	suite.Equal(redacted, cred.String(), "credential String redaction")
+	suite.Equal(redacted, fmt.Sprintf("%v", cred), "pointer %v redaction")
+	suite.Equal(redacted, fmt.Sprintf("%v", *cred), "value %v redaction")
+	suite.Equal(redacted, fmt.Sprintf("%+v", *cred), "value %+v redaction")
+	suite.Equal(redacted, fmt.Sprintf("%#v", cred), "pointer %#v redaction")
+	suite.Equal(redacted, fmt.Sprintf("%#v", *cred), "value %#v redaction")
+}
