@@ -46,7 +46,7 @@ func newEnv() *env {
 		return d
 	}
 	return &env{
-		coreURL:  get("E2E_CORE_URL", "http://localhost:8080"),
+		coreURL:  strings.TrimRight(get("E2E_CORE_URL", "http://localhost:8080"), "/"),
 		user:     get("E2E_ADMIN_USER", "admin"),
 		password: get("E2E_ADMIN_PASSWORD", "Harbor12345"),
 		dbDSN:    get("E2E_DB_DSN", "postgres://postgres:root123@localhost:5432/registry?sslmode=disable"),

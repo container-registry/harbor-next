@@ -16,6 +16,7 @@ Configuration (env, with slot-0 defaults):
     E2E_ADMIN_PASSWORD  Harbor12345
     E2E_DB_DSN          postgres://postgres:root123@localhost:5432/registry?sslmode=disable
     E2E_ASYNC_REFRESH   (unset)
+    E2E_ASYNC_REFRESH_DURATION  10 (seconds, 1-3600; match the core's QUOTA_ASYNC_REFRESH_DURATION)
 
 `TestAsyncRefreshConvergence` runs only when `E2E_ASYNC_REFRESH=1` is set,
 and expects the target core to have been started with
