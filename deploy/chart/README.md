@@ -721,6 +721,9 @@ ingress:
 
 Notes:
 
+- Chart-managed component Secrets that would end up empty (everything
+  externalized) are skipped entirely, together with their `envFrom`
+  references — a fully pinned install creates no empty Secrets.
 - A complete Flux setup (GitRepository + HelmRelease with drift detection
   + prerequisite Secret manifests with generation commands) lives at
   [`example/flux/`](example/flux/). The same values work unchanged in an
