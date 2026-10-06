@@ -23,8 +23,6 @@ import (
 	"strings"
 	"time"
 
-	beegoorm "github.com/beego/beego/v2/client/orm"
-
 	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/common/rbac"
 	ctlevent "github.com/goharbor/harbor/src/controller/event"
@@ -58,7 +56,7 @@ func auditLogMemberEventEnabled(ctx context.Context, operation string) bool {
 	if len(operation) == 0 {
 		return false
 	}
-	ormCtx := ensureORMContext(ctx)
+	ormCtx := orm.ReuseContext(ctx)
 	return config.AuditLogEventEnabled(ormCtx, fmt.Sprintf("%v_%v", operation, rbac.ResourceMember.String()))
 }
 
@@ -168,7 +166,7 @@ func (r *resolver) Resolve(ce *commonevent.Metadata, evt *event.Event) error {
 }
 
 func lookupMember(ctx context.Context, projectNameOrID, memberIDStr string) (string, string) {
-	ormCtx := ensureORMContext(ctx)
+	ormCtx := orm.ReuseContext(ctx)
 	projectID, _ := resolveProjectFn(ormCtx, projectNameOrID)
 	if projectID == 0 {
 		return memberIDStr, ""
@@ -187,7 +185,7 @@ func lookupMember(ctx context.Context, projectNameOrID, memberIDStr string) (str
 
 // resolveProject resolves a project name or ID string to (projectID, projectName).
 func resolveProject(ctx context.Context, projectNameOrID string) (int64, string) {
-	ormCtx := ensureORMContext(ctx)
+	ormCtx := orm.ReuseContext(ctx)
 	if id, err := strconv.ParseInt(projectNameOrID, 10, 64); err == nil {
 		if p, err := pkg.ProjectMgr.Get(ormCtx, id); err == nil && p != nil {
 			return p.ProjectID, p.Name
@@ -211,24 +209,4 @@ func parsePreResolved(info string) (string, string) {
 		return parts[1], parts[0]
 	}
 	return info, ""
-}
-
-// newBeegoOrm builds a fresh, non-transaction ORM. It is a package-level seam
-// so tests can exercise the transaction-replacement branch of ensureORMContext
-// without a registered default database (beegoorm.NewOrm panics otherwise).
-var newBeegoOrm = beegoorm.NewOrm
-
-func ensureORMContext(ctx context.Context) context.Context {
-	if ctx == nil {
-		return orm.Context()
-	}
-	if o, err := orm.FromContext(ctx); err == nil {
-		if _, ok := o.(beegoorm.TxOrmer); !ok {
-			return ctx
-		}
-	}
-	// Member audit events are resolved asynchronously and may run after the
-	// request transaction has already been committed/rolled back. Replace
-	// transaction-bound ORM with a fresh ORM to avoid using a completed tx.
-	return orm.NewContext(ctx, newBeegoOrm())
 }

@@ -95,8 +95,8 @@ func getTLSConfig(config *cfgModels.HTTPAuthProxy) rest.TLSClientConfig {
 }
 
 // UserFromReviewStatus transform a review status to a user model.
-// Group entries will be populated if needed.
-func UserFromReviewStatus(status k8s_api_v1beta1.TokenReviewStatus, adminGroups []string, adminUsernames []string) (*models.User, error) {
+// Group entries will be populated if needed, on the connection ctx already holds (#850).
+func UserFromReviewStatus(ctx context.Context, status k8s_api_v1beta1.TokenReviewStatus, adminGroups []string, adminUsernames []string) (*models.User, error) {
 	if !status.Authenticated {
 		return nil, fmt.Errorf("failed to authenticate the token, error in status: %s", status.Error)
 	}
@@ -113,7 +113,7 @@ func UserFromReviewStatus(status k8s_api_v1beta1.TokenReviewStatus, adminGroups 
 
 	if len(status.User.Groups) > 0 {
 		userGroups := model.UserGroupsFromName(status.User.Groups, common.HTTPGroupType)
-		groupIDList, err := usergroup.Mgr.Populate(orm.Context(), userGroups)
+		groupIDList, err := usergroup.Mgr.Populate(orm.ReuseContext(ctx), userGroups)
 		if err != nil {
 			return nil, err
 		}
