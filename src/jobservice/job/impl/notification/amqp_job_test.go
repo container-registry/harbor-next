@@ -105,6 +105,11 @@ func TestAMQPJobMaxFails(t *testing.T) {
 	})
 }
 
+func TestAMQPJobMaxCurrency(t *testing.T) {
+	rep := &AMQPJob{}
+	assert.Equal(t, uint(1), rep.MaxCurrency())
+}
+
 func TestAMQPJobShouldRetry(t *testing.T) {
 	rep := &AMQPJob{}
 	assert.True(t, rep.ShouldRetry())
