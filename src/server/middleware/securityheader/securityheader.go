@@ -24,6 +24,7 @@ var headers = map[string]string{
 	"X-Frame-Options":         "DENY",
 	"Content-Security-Policy": "frame-ancestors 'none'",
 	"X-Content-Type-Options":  "nosniff",
+	"Cache-Control":           "no-store",
 }
 
 // Middleware sets the security related response headers
