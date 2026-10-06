@@ -72,6 +72,10 @@ const (
 	reportUUIDsKey      = "report_uuids"
 	robotIDKey          = "robot_id"
 	enabledCapabilities = "enabled_capabilities"
+
+	// scanAllArtifactTimeout bounds one artifact of a Scan All run so a hung
+	// scanner cannot hold its resources indefinitely.
+	scanAllArtifactTimeout = 3 * time.Minute
 )
 
 // uuidGenerator is a func template which is for generating UUID.
@@ -113,8 +117,7 @@ type basicController struct {
 	// Configuration getter func
 	config configGetter
 
-	cloneCtx func(context.Context) context.Context
-	makeCtx  func() context.Context
+	makeCtx func() context.Context
 
 	execMgr task.ExecutionManager
 	taskMgr task.Manager
@@ -160,8 +163,7 @@ func NewController() Controller {
 			}
 		},
 
-		cloneCtx: orm.Clone,
-		makeCtx:  orm.Context,
+		makeCtx: orm.Context,
 
 		execMgr: task.ExecMgr,
 		taskMgr: task.Mgr,
@@ -230,44 +232,98 @@ func (bc *basicController) collectScanningArtifacts(ctx context.Context, r *scan
 	return artifacts, scannable, nil
 }
 
+// scanPlan is the read-only half of a scan: which scanner to use and which
+// artifacts to submit to it.
+type scanPlan struct {
+	registration *scanner.Registration
+	artifacts    []*ar.Artifact
+}
+
+// errScanSkipped means the artifact has nothing to scan. Callers treat it as a no-op.
+var errScanSkipped = errors.New("scan skipped: no scannable artifact")
+
 // Scan ...
 func (bc *basicController) Scan(ctx context.Context, artifact *ar.Artifact, options ...Option) error {
 	if artifact == nil {
 		return errors.New("nil artifact to scan")
 	}
 
-	r, err := bc.sc.GetRegistrationByProject(ctx, artifact.ProjectID)
-	if err != nil {
-		return errors.Wrap(err, "scan controller: scan")
-	}
-
-	// In case it does not exist
-	if r == nil {
-		return errors.PreconditionFailedError(nil).WithMessagef("no available scanner for project: %d", artifact.ProjectID)
-	}
-
-	// Check if it is disabled
-	if r.Disabled {
-		return errors.PreconditionFailedError(nil).WithMessagef("scanner %s is deactivated", r.Name)
-	}
-
-	artifacts, scannable, err := bc.collectScanningArtifacts(ctx, r, artifact)
-	if err != nil {
-		return err
-	}
 	// Parse options
 	opts, err := parseOptions(options...)
 	if err != nil {
 		return errors.Wrap(err, "scan controller: scan")
 	}
 
+	plan, err := bc.planScan(ctx, artifact, opts)
+	if err != nil {
+		if errors.Is(err, errScanSkipped) {
+			return nil
+		}
+		return err
+	}
+
+	pending, err := bc.dispatchScan(ctx, artifact, plan, opts)
+	if err != nil {
+		return err
+	}
+	return bc.submitScan(ctx, pending)
+}
+
+// planScan resolves the scanner and the artifacts to scan. It only reads. It
+// returns errScanSkipped when there is nothing to scan for this artifact.
+func (bc *basicController) planScan(ctx context.Context, artifact *ar.Artifact, opts *Options) (*scanPlan, error) {
+	if artifact == nil {
+		return nil, errors.New("nil artifact to scan")
+	}
+
+	r, err := bc.sc.GetRegistrationByProject(ctx, artifact.ProjectID)
+	if err != nil {
+		return nil, errors.Wrap(err, "scan controller: scan")
+	}
+
+	// In case it does not exist
+	if r == nil {
+		return nil, errors.PreconditionFailedError(nil).WithMessagef("no available scanner for project: %d", artifact.ProjectID)
+	}
+
+	// Check if it is disabled
+	if r.Disabled {
+		return nil, errors.PreconditionFailedError(nil).WithMessagef("scanner %s is deactivated", r.Name)
+	}
+
+	artifacts, scannable, err := bc.collectScanningArtifacts(ctx, r, artifact)
+	if err != nil {
+		return nil, err
+	}
+
 	if !scannable {
 		if opts.FromEvent {
 			// skip to return err for event related scan
-			return nil
+			return nil, errScanSkipped
 		}
-		return errors.BadRequestError(nil).WithMessagef("the configured scanner %s does not support scanning artifact with mime type %s", r.Name, artifact.ManifestMediaType)
+		return nil, errors.BadRequestError(nil).WithMessagef("the configured scanner %s does not support scanning artifact with mime type %s", r.Name, artifact.ManifestMediaType)
 	}
+
+	return &scanPlan{registration: r, artifacts: artifacts}, nil
+}
+
+// scanSubmission is a scan job with a task record but not yet submitted to jobservice.
+type scanSubmission struct {
+	taskID int64
+	job    *task.Job
+}
+
+// pendingScan is what dispatchScan leaves for submitScan.
+type pendingScan struct {
+	artifact    *ar.Artifact
+	submissions []*scanSubmission
+	launches    int
+	failed      int
+}
+
+// dispatchScan creates the report placeholders and task records: the only half to run in a transaction.
+func (bc *basicController) dispatchScan(ctx context.Context, artifact *ar.Artifact, plan *scanPlan, opts *Options) (*pendingScan, error) {
+	r, artifacts := plan.registration, plan.artifacts
 
 	var (
 		errs                []error
@@ -280,7 +336,7 @@ func (bc *basicController) Scan(ctx context.Context, artifact *ar.Artifact, opti
 			if errors.IsConflictErr(err) {
 				errs = append(errs, err)
 			} else {
-				return err
+				return nil, err
 			}
 		}
 
@@ -292,7 +348,7 @@ func (bc *basicController) Scan(ctx context.Context, artifact *ar.Artifact, opti
 		if tag == "" {
 			latestTag, err := bc.getLatestTagOfArtifact(ctx, art.ID)
 			if err != nil {
-				return err
+				return nil, err
 			}
 
 			tag = latestTag
@@ -311,7 +367,7 @@ func (bc *basicController) Scan(ctx context.Context, artifact *ar.Artifact, opti
 
 	// all report placeholder conflicted
 	if len(errs) == len(artifacts) {
-		return errs[0]
+		return nil, errs[0]
 	}
 
 	if opts.ExecutionID == 0 {
@@ -339,25 +395,50 @@ func (bc *basicController) Scan(ctx context.Context, artifact *ar.Artifact, opti
 		// both vulnerability and sbom need to keep the latest scan execution to get the latest scan status
 		executionID, err := bc.execMgr.Create(ctx, vendorType, artifact.ID, task.ExecutionTriggerManual, extraAttrs)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		opts.ExecutionID = executionID
 	}
 
-	errs = errs[:0]
+	pending := &pendingScan{artifact: artifact, launches: len(launchScanJobParams)}
 	for _, launchScanJobParam := range launchScanJobParams {
 		launchScanJobParam.ExecutionID = opts.ExecutionID
 
-		if err := bc.launchScanJob(ctx, launchScanJobParam, opts); err != nil {
+		// don't launch scan job for the artifact which is not supported by the scanner
+		if !hasCapability(launchScanJobParam.Registration, launchScanJobParam.Artifact) {
+			continue
+		}
+
+		sub, err := bc.launchScanJob(ctx, launchScanJobParam, opts)
+		if err != nil {
 			log.G(ctx).Warningf("scan artifact %s@%s failed, error: %v", artifact.RepositoryName, artifact.Digest, err)
-			errs = append(errs, err)
+			pending.failed++
+			continue
+		}
+		pending.submissions = append(pending.submissions, sub)
+	}
+
+	// all scanning of the artifacts failed
+	if pending.failed == pending.launches {
+		return nil, fmt.Errorf("scan artifact %s@%s failed", artifact.RepositoryName, artifact.Digest)
+	}
+
+	return pending, nil
+}
+
+// submitScan submits the jobs dispatchScan prepared; Scan All calls it after the commit.
+func (bc *basicController) submitScan(ctx context.Context, pending *pendingScan) error {
+	for _, sub := range pending.submissions {
+		if err := bc.taskMgr.Submit(ctx, sub.taskID, sub.job); err != nil {
+			log.G(ctx).Warningf("scan artifact %s@%s failed, error: %v", pending.artifact.RepositoryName, pending.artifact.Digest, err)
+			pending.failed++
 		}
 	}
 
 	// all scanning of the artifacts failed
-	if len(errs) == len(launchScanJobParams) {
-		return fmt.Errorf("scan artifact %s@%s failed", artifact.RepositoryName, artifact.Digest)
+	if pending.failed == pending.launches {
+		return fmt.Errorf("scan artifact %s@%s failed", pending.artifact.RepositoryName, pending.artifact.Digest)
 	}
 
 	return nil
@@ -456,6 +537,43 @@ func (bc *basicController) isScanAllStopped(ctx context.Context, execID int64) b
 	return bc.cache().Contains(ctx, scanAllStoppedKey(execID))
 }
 
+// scanOneForScanAll submits a single artifact of a Scan All run.
+//
+// Only the dispatch half runs in a transaction, and the jobs are submitted
+// after it commits. Scan All used to wrap the whole per-artifact scan, so one
+// pool connection was held across the read phase, which includes the
+// artifact_blob join in HasUnscannableLayer, and across the job submission to
+// jobservice. A slow step there held a connection for as long as it took (#856).
+func (bc *basicController) scanOneForScanAll(artifact *ar.Artifact, executionID int64) error {
+	// Add timeout to prevent DB connections from being held indefinitely if scanner hangs.
+	ctx, cancel := context.WithTimeout(bc.makeCtx(), scanAllArtifactTimeout)
+	defer cancel()
+
+	opts, err := parseOptions(WithExecutionID(executionID))
+	if err != nil {
+		return errors.Wrap(err, "scan controller: scan all")
+	}
+
+	plan, err := bc.planScan(ctx, artifact, opts)
+	if err != nil {
+		if errors.Is(err, errScanSkipped) {
+			return nil
+		}
+		return err
+	}
+
+	var pending *pendingScan
+	dispatch := func(txCtx context.Context) error {
+		pending, err = bc.dispatchScan(txCtx, artifact, plan, opts)
+		return err
+	}
+	if err := orm.WithTransaction(dispatch)(orm.SetTransactionOpNameToContext(ctx, "tx-start-scanall")); err != nil {
+		return err
+	}
+
+	return bc.submitScan(ctx, pending)
+}
+
 func (bc *basicController) startScanAll(ctx context.Context, executionID int64) error {
 	batchSize := 50
 
@@ -478,14 +596,7 @@ func (bc *basicController) startScanAll(ctx context.Context, executionID int64) 
 
 		summary.TotalCount++
 
-		scan := func(ctx context.Context) error {
-			return bc.Scan(ctx, artifact, WithExecutionID(executionID))
-		}
-
-		// Add timeout to prevent DB connections from being held indefinitely if scanner hangs.
-		scanCtx, scanCancel := context.WithTimeout(bc.makeCtx(), 3*time.Minute)
-		err := orm.WithTransaction(scan)(orm.SetTransactionOpNameToContext(scanCtx, "tx-start-scanall"))
-		scanCancel()
+		err := bc.scanOneForScanAll(artifact, executionID)
 
 		if err != nil {
 			// Just logged
@@ -608,29 +719,30 @@ func (bc *basicController) GetReport(ctx context.Context, artifact *ar.Artifact,
 		return nil, errors.NotFoundError(nil).WithMessagef("report not found for %s@%s", artifact.RepositoryName, artifact.Digest)
 	}
 
-	groupReports := make([][]*scan.Report, len(artifacts))
-
-	var wg sync.WaitGroup
-	for i, a := range artifacts {
-		wg.Add(1)
-
-		go func(i int, a *ar.Artifact) {
-			defer wg.Done()
-
-			reports, err := bc.manager.GetBy(bc.cloneCtx(ctx), a.Digest, r.UUID, mimes)
-			if err != nil {
-				log.Warningf("get reports of %s@%s failed, error: %v", a.RepositoryName, a.Digest, err)
-				return
-			}
-
-			groupReports[i] = reports
-		}(i, a)
+	// One query for every artifact in the index. This used to be a goroutine per
+	// artifact, each on an ORM of its own, so a single request took one pool
+	// connection per child artifact (#856).
+	digests := make([]string, 0, len(artifacts))
+	for _, a := range artifacts {
+		digests = append(digests, a.Digest)
 	}
-	wg.Wait()
+	found, err := bc.manager.List(ctx, q.New(q.KeyWords{
+		"digest__in":        digests,
+		"registration_uuid": r.UUID,
+		"mime_type__in":     mimes,
+	}))
+	if err != nil {
+		return nil, errors.Wrap(err, "scan controller: get report")
+	}
+
+	groupReports := make(map[string][]*scan.Report, len(artifacts))
+	for _, report := range found {
+		groupReports[report.Digest] = append(groupReports[report.Digest], report)
+	}
 
 	var reports []*scan.Report
-	for _, group := range groupReports {
-		if len(group) != 0 {
+	for _, a := range artifacts {
+		if group := groupReports[a.Digest]; len(group) != 0 {
 			reports = append(reports, group...)
 		} else {
 			// NOTE: If the artifact is OCI image, this happened when the artifact is not scanned,
@@ -897,13 +1009,8 @@ func (bc *basicController) makeRobotAccount(ctx context.Context, projectID int64
 	return r, nil
 }
 
-// launchScanJob launches a job to run scan
-func (bc *basicController) launchScanJob(ctx context.Context, param *launchScanJobParam, opts *Options) error {
-	// don't launch scan job for the artifact which is not supported by the scanner
-	if !hasCapability(param.Registration, param.Artifact) {
-		return nil
-	}
-
+// launchScanJob creates the robot account and task record of a scan job for submitScan.
+func (bc *basicController) launchScanJob(ctx context.Context, param *launchScanJobParam, opts *Options) (*scanSubmission, error) {
 	var ck string
 	if param.Registration.UseInternalAddr {
 		ck = configCoreInternalAddr
@@ -913,17 +1020,17 @@ func (bc *basicController) launchScanJob(ctx context.Context, param *launchScanJ
 
 	registryAddr, err := bc.config(ck)
 	if err != nil {
-		return errors.Wrap(err, "scan controller: launch scan job")
+		return nil, errors.Wrap(err, "scan controller: launch scan job")
 	}
 
 	// Get Scanner handler by scan type to separate the scan logic for different scan types
 	handler := sca.GetScanHandler(param.Type)
 	if handler == nil {
-		return fmt.Errorf("failed to get scan handler, type is %v", param.Type)
+		return nil, fmt.Errorf("failed to get scan handler, type is %v", param.Type)
 	}
 	robot, err := bc.makeRobotAccount(ctx, param.Artifact.ProjectID, param.Artifact.RepositoryName, param.Registration, handler.RequiredPermissions())
 	if err != nil {
-		return errors.Wrap(err, "scan controller: launch scan job")
+		return nil, errors.Wrap(err, "scan controller: launch scan job")
 	}
 
 	// Set job parameters
@@ -948,17 +1055,17 @@ func (bc *basicController) launchScanJob(ctx context.Context, param *launchScanJ
 
 	rJSON, err := param.Registration.ToJSON()
 	if err != nil {
-		return errors.Wrap(err, "scan controller: launch scan job")
+		return nil, errors.Wrap(err, "scan controller: launch scan job")
 	}
 
 	sJSON, err := scanReq.ToJSON()
 	if err != nil {
-		return errors.Wrap(err, "launch scan job")
+		return nil, errors.Wrap(err, "launch scan job")
 	}
 
 	robotJSON, err := robot.ToJSON()
 	if err != nil {
-		return errors.Wrap(err, "launch scan job")
+		return nil, errors.Wrap(err, "launch scan job")
 	}
 
 	mimes := make([]string, len(param.Reports))
@@ -993,8 +1100,11 @@ func (bc *basicController) launchScanJob(ctx context.Context, param *launchScanJ
 		reportUUIDsKey: reportUUIDs,
 	}
 
-	_, err = bc.taskMgr.Create(ctx, param.ExecutionID, j, extraAttrs)
-	return err
+	taskID, err := bc.taskMgr.CreateRecord(ctx, param.ExecutionID, extraAttrs)
+	if err != nil {
+		return nil, err
+	}
+	return &scanSubmission{taskID: taskID, job: j}, nil
 }
 
 // listScanTasks returns the tasks of the reports
@@ -1003,39 +1113,19 @@ func (bc *basicController) listScanTasks(ctx context.Context, reportUUIDs []stri
 		return nil, nil
 	}
 
-	tasks := make([]*task.Task, len(reportUUIDs))
-	errs := make([]error, len(reportUUIDs))
-
-	var wg sync.WaitGroup
-	for i, reportUUID := range reportUUIDs {
-		wg.Add(1)
-
-		go func(ix int, reportUUID string) {
-			defer wg.Done()
-
-			task, err := bc.getScanTask(bc.cloneCtx(ctx), reportUUID)
-			if err == nil {
-				tasks[ix] = task
-			} else if !errors.IsNotFoundErr(err) {
-				errs[ix] = err
-			} else {
-				log.G(ctx).Warningf("task for the scan report %s not found", reportUUID)
-			}
-		}(i, reportUUID)
-	}
-	wg.Wait()
-
-	for _, err := range errs {
-		if err != nil {
-			return nil, err
-		}
-	}
-
+	// Sequential on the caller's connection. A goroutine per report UUID, each on
+	// an ORM of its own, took one pool connection per report (#856).
 	var results []*task.Task
-	for _, task := range tasks {
-		if task != nil {
-			results = append(results, task)
+	for _, reportUUID := range reportUUIDs {
+		t, err := bc.getScanTask(ctx, reportUUID)
+		if err != nil {
+			if !errors.IsNotFoundErr(err) {
+				return nil, err
+			}
+			log.G(ctx).Warningf("task for the scan report %s not found", reportUUID)
+			continue
 		}
+		results = append(results, t)
 	}
 
 	return results, nil
