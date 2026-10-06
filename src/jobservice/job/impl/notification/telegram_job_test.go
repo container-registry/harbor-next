@@ -26,6 +26,11 @@ func TestTelegramJobMaxFails(t *testing.T) {
 	})
 }
 
+func TestTelegramJobMaxCurrency(t *testing.T) {
+	rep := &TelegramJob{}
+	assert.Equal(t, uint(1), rep.MaxCurrency())
+}
+
 func TestTelegramJobShouldRetry(t *testing.T) {
 	rep := &TelegramJob{}
 	assert.True(t, rep.ShouldRetry())
