@@ -70,6 +70,17 @@ func TestProjectAdminGrantRequiresAdminRole(t *testing.T) {
 	}{
 		{name: "project robot", robot: true, wantForbidden: true},
 		{
+			name:          "maintainer",
+			user:          &commonmodels.User{UserID: 4, Username: "maintainer"},
+			roles:         []int{common.RoleMaintainer},
+			wantForbidden: true,
+		},
+		{
+			name:          "non-member",
+			user:          &commonmodels.User{UserID: 5, Username: "non-member"},
+			wantForbidden: true,
+		},
+		{
 			name:  "project admin",
 			user:  &commonmodels.User{UserID: 2, Username: "project-admin"},
 			roles: []int{common.RoleProjectAdmin},
@@ -157,5 +168,27 @@ func TestProjectAdminGrantRequiresAdminRole(t *testing.T) {
 			assert.Equal(t, []int{common.RoleProjectAdmin}, controller.createdRoles)
 			assert.Equal(t, []int{common.RoleProjectAdmin}, controller.updatedRoles)
 		})
+	}
+}
+
+// The generic member permission check already stops local users without a
+// project-admin role, so drive requireProjectAdminGrant directly to prove its
+// own role check denies them too.
+func TestRequireProjectAdminGrantDeniesLocalNonAdmin(t *testing.T) {
+	const projectID int64 = 1
+	for _, roles := range [][]int{nil, {common.RoleDeveloper}, {common.RoleMaintainer}} {
+		projectCtl := projecttesting.NewController(t)
+		projectCtl.On("Get", mock.Anything, projectID).
+			Return(&project.Project{ProjectID: projectID}, nil)
+		projectCtl.On("ListRoles", mock.Anything, projectID, mock.Anything).
+			Return(roles, nil)
+
+		api := &memberAPI{projectCtl: projectCtl}
+		user := &commonmodels.User{UserID: 6, Username: "local-user"}
+		ctx := security.NewContext(context.Background(), local.NewSecurityContext(user))
+
+		err := api.requireProjectAdminGrant(ctx, projectID, common.RoleProjectAdmin)
+		assert.True(t, liberrors.IsErr(err, liberrors.ForbiddenCode), "roles %v", roles)
+		assert.NoError(t, api.requireProjectAdminGrant(ctx, projectID, common.RoleDeveloper))
 	}
 }
