@@ -16,7 +16,9 @@ package quota
 
 import (
 	"context"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -40,6 +42,42 @@ func dirtyLen() int {
 	dirty.Lock()
 	defer dirty.Unlock()
 	return len(dirty.keys)
+}
+
+func TestAsyncRefreshDisabledByDefault(t *testing.T) {
+	if os.Getenv(asyncRefreshDurationEnv) != "" {
+		// asyncRefreshConfigured is fixed at init time, so an environment
+		// that legitimately enables async refresh cannot satisfy this test
+		t.Skipf("%s is set in this environment", asyncRefreshDurationEnv)
+	}
+	assert.False(t, AsyncRefreshEnabled())
+}
+
+func TestParseRefreshInterval(t *testing.T) {
+	cases := []struct {
+		name       string
+		env        string
+		interval   time.Duration
+		configured bool
+	}{
+		{"unset", "", defaultDeferredRefreshInterval, false},
+		{"valid", "60", 60 * time.Second, true},
+		{"one second", "1", time.Second, true},
+		{"zero", "0", defaultDeferredRefreshInterval, false},
+		{"negative", "-5", defaultDeferredRefreshInterval, false},
+		{"not a number", "10s", defaultDeferredRefreshInterval, false},
+		{"largest representable", "9223372036", 9223372036 * time.Second, true},
+		{"overflows time.Duration", "9223372037", defaultDeferredRefreshInterval, false},
+		{"overflows int64", "99999999999999999999", defaultDeferredRefreshInterval, false},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			interval, configured := parseRefreshInterval(c.env)
+			assert.Equal(t, c.interval, interval)
+			assert.Equal(t, c.configured, configured)
+		})
+	}
 }
 
 func TestMarkRefreshCoalesces(t *testing.T) {
