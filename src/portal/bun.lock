@@ -55,7 +55,7 @@
         "jasmine-core": "~4.5.0",
         "jasmine-spec-reporter": "~7.0.0",
         "karma": "6.4.2",
-        "karma-chrome-launcher": "~3.1.0",
+        "karma-chrome-launcher": "~3.2.0",
         "karma-coverage": "^2.2.1",
         "karma-jasmine": "~5.1.0",
         "karma-jasmine-html-reporter": "^1.7.0",
@@ -1560,7 +1560,7 @@
 
     "karma": ["karma@6.4.2", "", { "dependencies": { "@colors/colors": "1.5.0", "body-parser": "^1.19.0", "braces": "^3.0.2", "chokidar": "^3.5.1", "connect": "^3.7.0", "di": "^0.0.1", "dom-serialize": "^2.2.1", "glob": "^7.1.7", "graceful-fs": "^4.2.6", "http-proxy": "^1.18.1", "isbinaryfile": "^4.0.8", "lodash": "^4.17.21", "log4js": "^6.4.1", "mime": "^2.5.2", "minimatch": "^3.0.4", "mkdirp": "^0.5.5", "qjobs": "^1.2.0", "range-parser": "^1.2.1", "rimraf": "^3.0.2", "socket.io": "^4.4.1", "source-map": "^0.6.1", "tmp": "^0.2.1", "ua-parser-js": "^0.7.30", "yargs": "^16.1.1" }, "bin": "bin/karma" }, "sha512-C6SU/53LB31BEgRg+omznBEMY4SjHU3ricV6zBcAe1EeILKkeScr+fZXtaI5WyDbkVowJxxAI6h73NcFPmXolQ=="],
 
-    "karma-chrome-launcher": ["karma-chrome-launcher@3.1.1", "", { "dependencies": { "which": "^1.2.1" } }, "sha512-hsIglcq1vtboGPAN+DGCISCFOxW+ZVnIqhDQcCMqqCp+4dmJ0Qpq5QAjkbA0X2L9Mi6OBkHi2Srrbmm7pUKkzQ=="],
+    "karma-chrome-launcher": ["karma-chrome-launcher@3.2.0", "", { "dependencies": { "which": "^1.2.1" } }, "sha512-rE9RkUPI7I9mAxByQWkGJFXfFD6lE4gC5nPuZdobf/QdTEJI6EU4yIay/cfU/xV4ZxlM5JiTv7zWYgA64NpS5Q=="],
 
     "karma-coverage": ["karma-coverage@2.2.1", "", { "dependencies": { "istanbul-lib-coverage": "^3.2.0", "istanbul-lib-instrument": "^5.1.0", "istanbul-lib-report": "^3.0.0", "istanbul-lib-source-maps": "^4.0.1", "istanbul-reports": "^3.0.5", "minimatch": "^3.0.4" } }, "sha512-yj7hbequkQP2qOSb20GuNSIyE//PgJWHwC2IydLE6XRtsnaflv+/OSGNssPjobYUlhVVagy99TQpqUt3vAUG7A=="],
 
