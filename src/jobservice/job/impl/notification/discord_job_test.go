@@ -29,6 +29,11 @@ func TestDiscordJobMaxFails(t *testing.T) {
 	})
 }
 
+func TestDiscordJobMaxCurrency(t *testing.T) {
+	rep := &DiscordJob{}
+	assert.Equal(t, uint(1), rep.MaxCurrency())
+}
+
 func TestDiscordJobShouldRetry(t *testing.T) {
 	rep := &DiscordJob{}
 	assert.True(t, rep.ShouldRetry())
