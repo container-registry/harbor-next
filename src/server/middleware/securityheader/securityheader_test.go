@@ -35,6 +35,7 @@ func TestMiddleware(t *testing.T) {
 
 	assert.Equal(t, "DENY", rec.Header().Get("X-Frame-Options"))
 	assert.Equal(t, "frame-ancestors 'none'", rec.Header().Get("Content-Security-Policy"))
+	assert.Equal(t, "nosniff", rec.Header().Get("X-Content-Type-Options"))
 }
 
 func TestMiddlewareOnErrorResponse(t *testing.T) {
@@ -48,6 +49,7 @@ func TestMiddlewareOnErrorResponse(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 	assert.Equal(t, "DENY", rec.Header().Get("X-Frame-Options"))
 	assert.Equal(t, "frame-ancestors 'none'", rec.Header().Get("Content-Security-Policy"))
+	assert.Equal(t, "nosniff", rec.Header().Get("X-Content-Type-Options"))
 }
 
 func TestMiddlewareSkipped(t *testing.T) {
@@ -62,10 +64,12 @@ func TestMiddlewareSkipped(t *testing.T) {
 
 	assert.Equal(t, "", rec.Header().Get("X-Frame-Options"))
 	assert.Equal(t, "", rec.Header().Get("Content-Security-Policy"))
+	assert.Equal(t, "", rec.Header().Get("X-Content-Type-Options"))
 
 	rec = httptest.NewRecorder()
 	Middleware(skipper)(next).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v2.0/docs/", nil))
 
 	assert.Equal(t, "DENY", rec.Header().Get("X-Frame-Options"))
 	assert.Equal(t, "frame-ancestors 'none'", rec.Header().Get("Content-Security-Policy"))
+	assert.Equal(t, "nosniff", rec.Header().Get("X-Content-Type-Options"))
 }
