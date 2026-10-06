@@ -282,6 +282,33 @@ func TestGetChallenge(t *testing.T) {
 			challenge: `Bearer realm="https://registry.test/service/token",service="harbor-registry"`,
 		},
 		{
+			name: "Request to '/v2' carrying a lowercase basic auth header should get a Basic challenge, RFC 7235 makes the scheme case-insensitive",
+			request: func() *http.Request {
+				req, _ := http.NewRequest(http.MethodGet, "https://registry.test/v2/", nil)
+				req.Header.Set("Authorization", "basic dXNlcjpwYXNz")
+				return req
+			}(),
+			challenge: `Basic realm="harbor"`,
+		},
+		{
+			name: "Request to '/v2' carrying an uppercase BASIC auth header should get a Basic challenge",
+			request: func() *http.Request {
+				req, _ := http.NewRequest(http.MethodGet, "https://registry.test/v2/", nil)
+				req.Header.Set("Authorization", "BASIC dXNlcjpwYXNz")
+				return req
+			}(),
+			challenge: `Basic realm="harbor"`,
+		},
+		{
+			name: "Request to '/v2' carrying a bearer auth header should get a token service challenge, scheme is case-insensitive",
+			request: func() *http.Request {
+				req, _ := http.NewRequest(http.MethodGet, "https://registry.test/v2/", nil)
+				req.Header.Set("Authorization", "bearer xx")
+				return req
+			}(),
+			challenge: `Bearer realm="https://registry.test/service/token",service="harbor-registry"`,
+		},
+		{
 			name: "Request to mount a blob from one repo to another should return challenge with scope according to the artifact info in the context of the request",
 			request: func() *http.Request {
 				req, _ := http.NewRequest(http.MethodPost, "https://harbor.test/v2/project_1/ubuntu/blobs/uploads/mount=?mount=sha256:08e4a417ff4e3913d8723a05cc34055db01c2fd165b588e049c5bad16ce6094f&from=project_2/ubuntu", nil)
