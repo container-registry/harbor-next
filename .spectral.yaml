@@ -66,3 +66,21 @@ rules:
       function: enumeration
       functionOptions:
         values: [https]
+
+  integer-format-values:
+    description: integer format must be int32 or int64.
+    given: $..[?(@.type === 'integer')].format
+    severity: error
+    then:
+      function: enumeration
+      functionOptions:
+        values: [int32, int64]
+
+  number-format-values:
+    description: number format must be float or double.
+    given: $..[?(@.type === 'number')].format
+    severity: error
+    then:
+      function: enumeration
+      functionOptions:
+        values: [float, double]
