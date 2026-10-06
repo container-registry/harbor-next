@@ -348,7 +348,7 @@ func main() {
 	// Must come before web.Run: the beego start hook that builds the session
 	// manager reads this configuration and runs after every hook added here.
 	if err := sessionmiddleware.ConfigureCookie(); err != nil {
-		log.Errorf("failed to configure the session cookie, it keeps beego's defaults: %v", err)
+		log.Fatalf("failed to configure the session cookie, refusing to serve sessions without Secure and SameSite: %v", err)
 	}
 
 	web.RunWithMiddleWares("", middlewares.MiddleWares()...)
