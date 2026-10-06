@@ -5,19 +5,21 @@
   "release-type": "simple",
   "versioning": "always-bump-patch",
   "include-v-in-tag": true,
-  "exclude-paths": [".github", "docs", "tests"],
+  "exclude-paths": [".github", "docs", "tests", "taskfile", "deploy/chart"],
   "changelog-sections": [
     {"type": "feat",     "section": "Features"},
     {"type": "fix",      "section": "Bug Fixes"},
+    {"type": "deps",     "section": "Dependencies", "hidden": true},
     {"type": "perf",     "section": "Performance Improvements"},
     {"type": "upstream", "section": "Upstream"},
     {"type": "revert",   "section": "Reverts"},
     {"type": "refactor", "section": "Code Refactoring"},
-    {"type": "docs",     "section": "Documentation", "hidden": true},
+    {"type": "docs",     "section": "Documentation"},
     {"type": "test",     "section": "Tests", "hidden": true},
     {"type": "chore",    "section": "Miscellaneous", "hidden": true},
     {"type": "ci",       "section": "CI/CD",          "hidden": true},
-    {"type": "build",    "section": "Build System",   "hidden": true}
+    {"type": "build",    "section": "Build System",   "hidden": true},
+    {"type": "chart",    "section": "Chart",          "hidden": true}
   ],
   "packages": {
     ".": {

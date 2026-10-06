@@ -1,12 +1,12 @@
 name: Main Images
 
 on:
-  workflow_dispatch:
-  push:
+  workflow_run:
+    workflows: [Release Ready]
+    types: [completed]
     branches: [main]
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: main-images-${{ github.ref }}
@@ -15,13 +15,17 @@ concurrency:
 jobs:
   version:
     name: Read Version
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
 
       - name: Read VERSION
         id: version
@@ -35,9 +39,9 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    uses: ./.github/workflows/publish-images.yml
+    uses: $/.github/workflows/publish-images.yml
     with:
-      checkout_ref: ${{ github.sha }}
+      checkout_ref: ${{ github.event.workflow_run.head_sha }}
       image_tag: latest
       version: ${{ needs.version.outputs.version }}
       artifact_prefix: main-latest

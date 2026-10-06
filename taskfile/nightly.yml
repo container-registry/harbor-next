@@ -1,0 +1,882 @@
+# Nightly release channel.
+#
+# A nightly is the real release pipeline run against a throwaway branch: the
+# same release-please configuration, the same reusable image workflow, the same
+# release-notes engine. Nothing here reimplements the release — the only thing
+# this file owns is materializing tonight's release-please channel.
+#
+# The channel branch is rebuilt from the release line's head every night, so
+# the nightly manifest is re-seeded from the real manifest each time. Every
+# nightly therefore accumulates from the last real release, which is what makes
+# its notes a faithful preview of the upcoming release rather than a nightly
+# changelog stream of its own.
+#
+# One name comes out of all this: vX.Y.Z-beta. The tag moves onto tonight's
+# release commit, the images are pushed under it, and the single pre-release
+# that lives on it is rewritten. Nothing is dated. A dated tag is a second
+# name to keep in step with the release, and a tag per night is a tag list
+# nobody reads.
+#
+# Usage:
+#   task nightly:version                 # print the beta version
+#   task nightly:channel                 # build the channel commit locally
+#   task nightly:channel PUSH_CHANNEL=true
+#   task nightly:merge-release-pr        # squash-merge the channel's release PR
+#   task nightly:validate-inputs         # guard a run's ref
+#   task nightly:test                    # exercise those guards
+
+version: '3'
+
+vars:
+  # Branch that carries the nightly channel. Force-recreated on every run.
+  NIGHTLY_BRANCH: '{{.NIGHTLY_BRANCH | default "nightly"}}'
+  # The one branch a nightly may be cut from.
+  RELEASE_REF: '{{.RELEASE_REF | default "main"}}'
+  # VERSION is the next development version, i.e. exactly the minor
+  # release-please is heading for on this line. A nightly is that minor's
+  # rolling preview, so this is the only version a nightly publishes under.
+  BETA_VERSION: '{{.VERSION}}-beta'
+  BETA_TAG: 'v{{.BETA_VERSION}}'
+  # release-please's own labels. It puts PENDING_LABEL on the release PR when
+  # it opens it, and refuses to open another one while a merged release PR
+  # still carries it.
+  PENDING_LABEL: 'autorelease: pending'
+  TAGGED_LABEL: 'autorelease: tagged'
+  NIGHTLY_CONFIG: release-please-config-nightly.json
+  NIGHTLY_MANIFEST: .release-please-manifest-nightly.json
+  RELEASE_CONFIG: release-please-config.json
+  RELEASE_MANIFEST: .release-please-manifest.json
+  PUSH_CHANNEL: '{{.PUSH_CHANNEL | default "false"}}'
+  # Per-invocation identity, never written to the user's or the runner's
+  # global git config.
+  COMMIT_NAME: '{{.COMMIT_NAME | default "github-actions[bot]"}}'
+  COMMIT_EMAIL: '{{.COMMIT_EMAIL | default "41898282+github-actions[bot]@users.noreply.github.com"}}'
+
+tasks:
+  version:
+    desc: "Print the nightly version: the minor under development, as a beta"
+    silent: true
+    env:
+      BETA_VERSION_VALUE: '{{.BETA_VERSION}}'
+    cmd: printf '%s\n' "${BETA_VERSION_VALUE}"
+
+  beta-tag:
+    desc: "Print the rolling tag for the release this line is heading for"
+    silent: true
+    # The one tag a nightly publishes: vX.Y.Z-beta, moved every night onto
+    # whatever was built last. Someone who wants "the current 2.16.0 preview"
+    # pulls this and gets last night's build without having to know a date.
+    #
+    # beta rather than dev: the tag is an invitation to try the next release,
+    # and dev reads as "internal, you are holding it wrong". It also leaves
+    # "nightly" to mean one thing — the channel — instead of two.
+    env:
+      BETA_TAG_VALUE: '{{.BETA_TAG}}'
+    cmd: printf '%s\n' "${BETA_TAG_VALUE}"
+
+  channel:
+    desc: "Materialize tonight's release-please channel (PUSH_CHANNEL=true to publish the branch)"
+    preconditions:
+      - sh: command -v git >/dev/null 2>&1
+        msg: "git is required"
+      - sh: command -v jq >/dev/null 2>&1
+        msg: "jq is required"
+      - sh: test -f '{{.RELEASE_CONFIG}}'
+        msg: "release-please config not found: {{.RELEASE_CONFIG}}"
+      - sh: test -f '{{.RELEASE_MANIFEST}}'
+        msg: "release-please manifest not found: {{.RELEASE_MANIFEST}}"
+    cmds:
+      - task: _derive-config
+      - task: _commit-channel
+      - task: _push-channel
+
+  merge-release-pr:
+    desc: "Squash-merge the nightly channel's release PR and print the merge commit (empty on an empty night)"
+    silent: true
+    # stdout is the sha and nothing else; the caller captures it.
+    preconditions:
+      - sh: test -n "${GH_TOKEN:-}"
+        msg: "GH_TOKEN is required"
+      - sh: test -n "${GITHUB_REPOSITORY:-}"
+        msg: "GITHUB_REPOSITORY is required"
+      - sh: command -v gh >/dev/null 2>&1
+        msg: "gh is required"
+    cmds:
+      - |
+        # release-please names its branch after the target branch.
+        pr=$(gh pr list --repo "${GITHUB_REPOSITORY}" --state open \
+          --base '{{.NIGHTLY_BRANCH}}' \
+          --head 'release-please--branches--{{.NIGHTLY_BRANCH}}' \
+          --json number --jq '.[0].number // empty')
+        if [ -z "${pr}" ]; then
+          # An empty night and a wedged channel look identical from here: both
+          # arrive with no release PR to merge. The difference is why. A
+          # release PR that was merged and never relabelled makes release-please
+          # abort with "There are untagged, merged release PRs outstanding"
+          # every night after, and every one of those nights would otherwise
+          # end green with nothing published.
+          stuck=$(gh pr list --repo "${GITHUB_REPOSITORY}" --state merged \
+            --base '{{.NIGHTLY_BRANCH}}' --label '{{.PENDING_LABEL}}' \
+            --limit 1 --json number --jq '.[0].number // empty')
+          if [ -n "${stuck}" ]; then
+            # Two different faults land here, and the tags say which. A night
+            # that published its tags and then failed to relabel left nothing
+            # but a stale label, so clearing it is a repair rather than a
+            # guess, and it is what keeps tomorrow from ending the same way.
+            # A night that never tagged is the real wedge, and nothing here
+            # can settle that one.
+            #
+            # REST for the merge commit: GraphQL's mergeCommit can answer null
+            # for a moment after a merge, and reading it as "no commit" here
+            # would call a repairable label a wedge.
+            stuck_sha=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${stuck}" --jq '.merge_commit_sha // empty')
+            if [ -n "${stuck_sha}" ] && gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags" \
+              --paginate --jq '.[].object.sha' | grep -qx "${stuck_sha}"; then
+              task nightly:mark-release-tagged MERGE_SHA="${stuck_sha}" >&2
+              printf '::error::release PR #%s was tagged at %s and kept the "%s" label, which stopped release-please opening a release PR tonight. The label is cleared now, so the next run cuts a release again.\n' \
+                "${stuck}" "${stuck_sha}" '{{.PENDING_LABEL}}' >&2
+              exit 1
+            fi
+            printf '::error::release PR #%s is merged into %s untagged and still labelled "%s", so release-please will not open another one. Tag its merge commit and run `task nightly:mark-release-tagged MERGE_SHA=<sha>`.\n' \
+              "${stuck}" '{{.NIGHTLY_BRANCH}}' '{{.PENDING_LABEL}}' >&2
+            exit 1
+          fi
+          # Right after a real release there is nothing new to cut yet. That is
+          # an empty night, not a failure: with no release PR to merge, nothing
+          # downstream runs and the workflow ends green.
+          echo "::notice::No release PR on {{.NIGHTLY_BRANCH}}; nothing has landed since the last release" >&2
+          exit 0
+        fi
+        # REST, not `gh pr merge`: it returns the squash commit synchronously,
+        # where GraphQL's mergeCommit can still answer null for a second.
+        sha=$(gh api --method PUT \
+          "repos/${GITHUB_REPOSITORY}/pulls/${pr}/merge" \
+          -f merge_method=squash --jq .sha)
+        if [ -z "${sha}" ]; then
+          echo "::error::merged release PR #${pr} but got no merge commit back" >&2
+          exit 1
+        fi
+        gh api --method DELETE \
+          "repos/${GITHUB_REPOSITORY}/git/refs/heads/release-please--branches--{{.NIGHTLY_BRANCH}}" \
+          >/dev/null 2>&1 || true
+        echo "merged nightly release PR #${pr} as ${sha}" >&2
+        printf '%s\n' "${sha}"
+
+  publish-tags:
+    desc: "Move the rolling beta tag onto tonight's release commit (MERGE_SHA)"
+    silent: true
+    # Refs API, not git: the calling job has a depth-1 checkout of the release
+    # line, so the channel's merge commit is not in its object store.
+    requires:
+      vars: [MERGE_SHA]
+    env:
+      MERGE_SHA_VALUE: '{{.MERGE_SHA}}'
+      BETA_TAG_VALUE: '{{.BETA_TAG}}'
+    preconditions:
+      - sh: test -n "${GH_TOKEN:-}"
+        msg: "GH_TOKEN is required"
+      - sh: test -n "${GITHUB_REPOSITORY:-}"
+        msg: "GITHUB_REPOSITORY is required"
+    cmds:
+      - task: _sha-rule
+        vars:
+          SHA: '{{.MERGE_SHA}}'
+      - |
+        sha="${MERGE_SHA_VALUE}"
+
+        # The exit status decides whether the tag is there, never the output:
+        # gh prints the API's error body on stdout, so a 404 leaves a
+        # perfectly non-empty value behind, and an absent tag reads as an
+        # existing one at a sha of {"message":"Not Found",...}.
+        if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${BETA_TAG_VALUE}" --jq .ref >/dev/null 2>&1; then
+          # force, because the new commit is not a descendant of the old one:
+          # every night's channel is branched fresh from the release line.
+          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/${BETA_TAG_VALUE}" \
+            -f "sha=${sha}" -F force=true --jq .ref >/dev/null
+          echo "moved ${BETA_TAG_VALUE} to ${sha}" >&2
+        else
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f "ref=refs/tags/${BETA_TAG_VALUE}" -f "sha=${sha}" --jq .ref >/dev/null
+          echo "created ${BETA_TAG_VALUE}" >&2
+        fi
+
+  mark-release-tagged:
+    desc: "Relabel the merged release PR now that its tags exist (MERGE_SHA)"
+    silent: true
+    # release-please labels the release PR PENDING_LABEL when it opens it and
+    # clears the label when it publishes the release. This workflow passes
+    # skip-github-release and publishes the tags itself, so nothing else ever
+    # clears it, and release-please refuses to open another release PR while a
+    # merged one still carries it. Leave this out and the channel wedges on
+    # the night after a successful one, silently.
+    requires:
+      vars: [MERGE_SHA]
+    env:
+      MERGE_SHA_VALUE: '{{.MERGE_SHA}}'
+    preconditions:
+      - sh: test -n "${GH_TOKEN:-}"
+        msg: "GH_TOKEN is required"
+      - sh: test -n "${GITHUB_REPOSITORY:-}"
+        msg: "GITHUB_REPOSITORY is required"
+    cmds:
+      - task: _sha-rule
+        vars:
+          SHA: '{{.MERGE_SHA}}'
+      - |
+        # The PR this commit came from, matched on the merge commit so that
+        # this relabels the one whose tags were just published and no other.
+        #
+        # REST, not `gh pr list --json mergeCommit`: that field is GraphQL's,
+        # and it can still answer null for a second after a merge. A lookup
+        # that quietly found nothing would leave the label behind, and the
+        # channel would wedge the following night.
+        pr=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${MERGE_SHA_VALUE}/pulls" \
+          --jq '[.[] | select(.base.ref == "{{.NIGHTLY_BRANCH}}")] | .[0].number // empty')
+        if [ -z "${pr}" ]; then
+          printf '::error::no pull request on %s is associated with %s\n' \
+            '{{.NIGHTLY_BRANCH}}' "${MERGE_SHA_VALUE}" >&2
+          exit 1
+        fi
+        labels=$(gh pr view "${pr}" --repo "${GITHUB_REPOSITORY}" --json labels --jq '.labels[].name')
+        case "${labels}" in
+          *'{{.PENDING_LABEL}}'*)
+            # Retried, because the tags are already published by the time this
+            # runs: one refused API call would otherwise leave the label to be
+            # cleared by hand or by the next run's repair.
+            attempt=1
+            until gh pr edit "${pr}" --repo "${GITHUB_REPOSITORY}" \
+              --remove-label '{{.PENDING_LABEL}}' --add-label '{{.TAGGED_LABEL}}' >/dev/null; do
+              if [ "${attempt}" -ge 3 ]; then
+                printf '::error::could not relabel release PR #%s after %s attempts\n' "${pr}" "${attempt}" >&2
+                exit 1
+              fi
+              attempt=$((attempt + 1))
+              sleep 5
+            done
+            printf 'marked release PR #%s as "%s"\n' "${pr}" '{{.TAGGED_LABEL}}' >&2
+            ;;
+          *'{{.TAGGED_LABEL}}'*)
+            # Idempotent: re-running a night that already relabelled.
+            printf '::notice::release PR #%s is already "%s"\n' "${pr}" '{{.TAGGED_LABEL}}' >&2
+            ;;
+          *)
+            # Neither label is a state this pipeline produces, and guessing
+            # which way it went would be the silent failure all over again.
+            printf '::error::release PR #%s carries neither "%s" nor "%s"\n' \
+              "${pr}" '{{.PENDING_LABEL}}' '{{.TAGGED_LABEL}}' >&2
+            exit 1
+            ;;
+        esac
+
+  upsert-beta-release:
+    desc: "Create the rolling beta pre-release if it is missing, and re-assert that it is a pre-release"
+    silent: true
+    # The prerelease flag is re-asserted and checked every night. Lose it and
+    # the beta becomes "Latest release", and release-please's latest-release
+    # lookup starts counting it.
+    env:
+      BETA_TAG_VALUE: '{{.BETA_TAG}}'
+      BETA_VERSION_VALUE: '{{.BETA_VERSION}}'
+    preconditions:
+      - sh: test -n "${GH_TOKEN:-}"
+        msg: "GH_TOKEN is required"
+      - sh: test -n "${GITHUB_REPOSITORY:-}"
+        msg: "GITHUB_REPOSITORY is required"
+    cmds:
+      - |
+        if ! gh release view "${BETA_TAG_VALUE}" --repo "${GITHUB_REPOSITORY}" --json tagName >/dev/null 2>&1; then
+          gh release create "${BETA_TAG_VALUE}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "${BETA_VERSION_VALUE}" \
+            --prerelease \
+            --notes "Preparing tonight's preview." >/dev/null
+          echo "created pre-release ${BETA_TAG_VALUE}" >&2
+        fi
+        gh release edit "${BETA_TAG_VALUE}" \
+          --repo "${GITHUB_REPOSITORY}" \
+          --prerelease --latest=false >/dev/null
+        state=$(gh release view "${BETA_TAG_VALUE}" --repo "${GITHUB_REPOSITORY}" --json isPrerelease --jq .isPrerelease)
+        if [ "${state}" != "true" ]; then
+          printf '::error::%s is not marked as a pre-release\n' "${BETA_TAG_VALUE}" >&2
+          exit 1
+        fi
+
+  beta-header:
+    desc: "Prepend tonight's header block to the rolling pre-release body"
+    silent: true
+    # After the notes engine, never before: the engine replaces the whole body,
+    # so a header written first is silently gone. Markers keep re-runs idempotent.
+    #
+    # MERGE_SHA is what ties the body to a build. The tag cannot: it is moved
+    # every night, so naming it here would only say "the current one".
+    requires:
+      vars: [MERGE_SHA]
+    env:
+      MERGE_SHA_VALUE: '{{.MERGE_SHA}}'
+      BETA_TAG_VALUE: '{{.BETA_TAG}}'
+      VERSION_VALUE: '{{.VERSION}}'
+      REGISTRY_VALUE: '{{.REGISTRY_ADDRESS}}/{{.REGISTRY_PROJECT}}'
+      E2E_RESULT_VALUE: '{{.E2E_RESULT | default ""}}'
+      E2E_PASSED_VALUE: '{{.E2E_PASSED | default ""}}'
+      E2E_TOTAL_VALUE: '{{.E2E_TOTAL | default ""}}'
+      RUN_URL_VALUE: '{{.RUN_URL | default ""}}'
+    preconditions:
+      - sh: test -n "${GH_TOKEN:-}"
+        msg: "GH_TOKEN is required"
+      - sh: test -n "${GITHUB_REPOSITORY:-}"
+        msg: "GITHUB_REPOSITORY is required"
+    cmds:
+      - |
+        work=$(mktemp -d)
+        trap 'rm -rf "${work}"' EXIT
+
+        # tr -d '\r': one web-UI edit rewrites the body as CRLF, and then the
+        # marker match silently stops finding anything.
+        gh release view "${BETA_TAG_VALUE}" --repo "${GITHUB_REPOSITORY}" \
+          --json body --jq .body | tr -d '\r' > "${work}/current.md"
+
+        awk '
+          /^<!-- beta-header:start -->$/ { skip = 1 }
+          /^<!-- beta-header:end -->$/   { skip = 0; next }
+          !skip
+        ' "${work}/current.md" > "${work}/body.md"
+
+        # No count means no report was written, which is not zero.
+        if [ -n "${E2E_PASSED_VALUE}" ] && [ -n "${E2E_TOTAL_VALUE}" ]; then
+          e2e="${E2E_RESULT_VALUE:-unknown} (${E2E_PASSED_VALUE}/${E2E_TOTAL_VALUE} scenarios passed)"
+        elif [ -n "${E2E_RESULT_VALUE}" ]; then
+          e2e="${E2E_RESULT_VALUE} (no scenario report produced)"
+        else
+          e2e="not reported"
+        fi
+
+        # cut rather than a printf precision: Task runs these commands under
+        # mvdan/sh, where printf '%.7s' is not implemented.
+        short=$(printf '%s' "${MERGE_SHA_VALUE}" | cut -c1-7)
+
+        {
+          printf '<!-- beta-header:start -->\n'
+          printf '> **Rolling preview of %s.** Rebuilt every night from `main`. Not feature-frozen, and not a release.\n' "${VERSION_VALUE}"
+          printf '>\n'
+          printf '> Currently built from [`%s`](../../commit/%s).\n' "${short}" "${MERGE_SHA_VALUE}"
+          printf '> End-to-end suite: **%s**.' "${e2e}"
+          if [ -n "${RUN_URL_VALUE}" ]; then
+            printf ' [Run](%s).' "${RUN_URL_VALUE}"
+          fi
+          printf '\n>\n'
+          printf '> `%s` is the only tag a nightly publishes, and it moves. It changes under anyone who already pulled it, and for roughly an hour each night it points at a commit whose images are still building. Where a build has to stay put, resolve the digest once and pin that:\n' "${BETA_TAG_VALUE}"
+          printf '>\n'
+          printf '> ```sh\n'
+          printf '> skopeo inspect docker://%s/harbor-core:%s | jq -r .Digest\n' "${REGISTRY_VALUE}" "${BETA_TAG_VALUE}"
+          printf '> docker pull %s/harbor-core@sha256:...\n' "${REGISTRY_VALUE}"
+          printf '> ```\n'
+          printf '<!-- beta-header:end -->\n'
+          printf '\n'
+          cat "${work}/body.md"
+        } > "${work}/notes.md"
+
+        gh release edit "${BETA_TAG_VALUE}" --repo "${GITHUB_REPOSITORY}" \
+          --notes-file "${work}/notes.md" >/dev/null
+        echo "updated the header on ${BETA_TAG_VALUE}" >&2
+
+  validate-inputs:
+    desc: "Guard a nightly run's inputs before anything is published"
+    silent: true
+    # The workflow's first step, and the reason a nightly cannot be aimed
+    # somewhere else: a dispatch from another ref would publish that ref's
+    # VERSION and release configuration under the official nightly tag and
+    # image names. A nightly takes no other input, so the ref is the whole
+    # guard.
+    cmds:
+      - task: _validate-ref
+
+  test:
+    desc: "Exercise the nightly input guards"
+    silent: true
+    cmds:
+      - |
+        failures=0
+
+        ok() { printf 'ok    %s\n' "$1"; }
+        bad() { printf 'FAIL  %s\n' "$1" >&2; failures=$((failures + 1)); }
+
+        # Every case starts from a clean slate and sets only what it is
+        # testing, so a ref exported in the caller's shell cannot make a
+        # rejection look like an acceptance.
+        guard() { env -u GITHUB_REF_NAME "$@" task nightly:validate-inputs 2>&1; }
+
+        accepts() {
+          label=$1
+          shift
+          if out=$(guard "$@"); then ok "${label}"; else bad "${label}: expected accept, got: ${out}"; fi
+        }
+        rejects() {
+          label=$1
+          shift
+          if out=$(guard "$@"); then bad "${label}: expected reject, was accepted"; else ok "${label}"; fi
+        }
+
+        accepts 'ref main'                  GITHUB_REF_NAME='{{.RELEASE_REF}}'
+
+        rejects 'ref release-2.15'          GITHUB_REF_NAME=release-2.15
+        rejects 'ref topic branch'          GITHUB_REF_NAME=nightly-release-channel
+        rejects 'ref channel branch'        GITHUB_REF_NAME='{{.NIGHTLY_BRANCH}}'
+        rejects 'ref empty'                 GITHUB_REF_NAME=
+        rejects 'ref unset'                 IGNORED=1
+
+        # -o interleaved for the same reason the workflow uses it: the root
+        # Taskfile prefixes output per task, and the prefix would land inside
+        # the captured version string.
+        if out=$(task -o interleaved nightly:version 2>&1) && [ "${out}" = '{{.VERSION}}-beta' ]; then
+          ok 'version is the minor under development, as a beta'
+        else
+          bad "version: got: ${out}"
+        fi
+
+        # The one tag a nightly publishes. It is the version with a v, and it
+        # never carries a date — a date here would put a second name back on
+        # every night's build.
+        if out=$(task -o interleaved nightly:beta-tag 2>&1) && [ "${out}" = 'v{{.VERSION}}-beta' ]; then
+          ok 'beta tag names the minor under development'
+        else
+          bad "beta tag: got: ${out}"
+        fi
+        case "$(task -o interleaved nightly:beta-tag 2>&1)" in
+          *-beta.* | *[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]*) bad 'beta tag carries a date' ;;
+          *) ok 'beta tag carries no date' ;;
+        esac
+
+        # publish-tags reaches an API path with the sha, so it is guarded the
+        # same way the ref and the tag are.
+        sha_guard() {
+          env GH_TOKEN=x GITHUB_REPOSITORY=o/r \
+            task nightly:publish-tags MERGE_SHA="$1" 2>&1
+        }
+        for bad_sha in '' 'deadbeef' 'zzzz5f1e4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8' '$(id)' \
+          '0123456789abcdef0123456789abcdef0123456789abcdef'; do
+          if out=$(sha_guard "${bad_sha}"); then
+            bad "publish-tags accepted '${bad_sha}'"
+          else
+            ok "publish-tags rejected: '${bad_sha}'"
+          fi
+        done
+
+        # The tag path. gh is stubbed because what is under test is how its
+        # exit status is read: on a missing tag gh prints the API's error body
+        # on stdout, so a check that reads the output sees a tag that is not
+        # there, at a sha of {"message":"Not Found",...}.
+        stub_dir=$(mktemp -d)
+        trap 'rm -rf "${stub_dir}"' EXIT
+        # Written through sed because a YAML block scalar owns the leading
+        # whitespace: the heredoc body has to stay indented with the rest of
+        # the script, and a shell script may not start with spaces.
+        sed 's/^ *//' > "${stub_dir}/gh" <<'STUB'
+        #!/bin/sh
+        printf '%s\n' "$*" >> "${GH_STUB_LOG}"
+        case "$1 $2" in
+          "pr view")
+            printf '%s\n' "${GH_STUB_LABELS}"
+            exit 0
+            ;;
+          "pr edit")
+            # A refused label edit, which is the case the retry exists for.
+            [ -n "${GH_STUB_EDIT_FAIL}" ] && exit 1
+            exit 0
+            ;;
+        esac
+        case "$*" in
+          *"--state open"*)
+            printf '%s\n' "${GH_STUB_OPEN_PR}"
+            exit 0
+            ;;
+          *"--state merged"*)
+            printf '%s\n' "${GH_STUB_PENDING_PR}"
+            exit 0
+            ;;
+          *"--method POST"* | *"--method PATCH"*)
+            printf 'refs/tags/stub\n'
+            exit 0
+            ;;
+          *matching-refs/tags*)
+            printf '%s\n' "${GH_STUB_TAG_SHAS}"
+            exit 0
+            ;;
+          *"/commits/"*"/pulls"*)
+            printf '%s\n' "${GH_STUB_PR}"
+            exit 0
+            ;;
+          *"/pulls/"*)
+            printf '%s\n' "${GH_STUB_MERGE_SHA}"
+            exit 0
+            ;;
+          *"git/ref/tags/${GH_STUB_TAG} "*)
+            if [ -n "${GH_STUB_SHA}" ]; then
+              printf '%s\n' "${GH_STUB_SHA}"
+              exit 0
+            fi
+            printf '{"message":"Not Found","status":"404"}\n'
+            exit 1
+            ;;
+          *git/ref/tags/*)
+            printf '{"message":"Not Found","status":"404"}\n'
+            exit 1
+            ;;
+        esac
+        exit 0
+        STUB
+        chmod 700 "${stub_dir}/gh"
+
+        beta_tag='v{{.VERSION}}-beta'
+        merge_sha=0123456789abcdef0123456789abcdef01234567
+        other_sha=fedcba9876543210fedcba9876543210fedcba98
+
+        # $1 is the log to record gh's arguments in, $2 the sha the beta tag
+        # already resolves to, empty for a tag that is not there yet.
+        publish() {
+          env PATH="${stub_dir}:${PATH}" GH_TOKEN=stub GITHUB_REPOSITORY=o/r \
+            GH_STUB_LOG="$1" GH_STUB_TAG="${beta_tag}" GH_STUB_SHA="$2" \
+            task nightly:publish-tags MERGE_SHA="${merge_sha}" 2>&1
+        }
+
+        log="${stub_dir}/missing.log"
+        : > "${log}"
+        if out=$(publish "${log}" ""); then
+          if grep -qF "ref=refs/tags/${beta_tag} " "${log}"; then
+            ok 'publish-tags creates the beta tag on the first night'
+          else
+            bad "publish-tags did not create the missing beta tag: $(cat "${log}")"
+          fi
+        else
+          bad "publish-tags failed on a missing beta tag: ${out}"
+        fi
+
+        # The 404-on-stdout trap: gh prints the API's error body on stdout, so
+        # a check that reads the output instead of the exit status would take
+        # a missing tag for an existing one and try to move it.
+        if grep -qF -- '--method PATCH' "${stub_dir}/missing.log"; then
+          bad 'publish-tags tried to move a tag that was not there'
+        else
+          ok 'publish-tags reads gh exit status, not its stdout'
+        fi
+
+        log="${stub_dir}/move.log"
+        : > "${log}"
+        if out=$(publish "${log}" "${other_sha}"); then
+          if grep -qF "git/refs/tags/${beta_tag} -f sha=${merge_sha}" "${log}"; then
+            ok 'publish-tags moves an existing beta tag onto tonight'
+          else
+            bad "publish-tags did not move the beta tag: $(cat "${log}")"
+          fi
+        else
+          bad "publish-tags failed on an existing beta tag: ${out}"
+        fi
+        if grep -qF -- '--method POST' "${stub_dir}/move.log"; then
+          bad 'publish-tags recreated a tag that already existed'
+        else
+          ok 'publish-tags moves rather than recreates'
+        fi
+
+        # The label swap, which is the only thing that lets release-please
+        # open another release PR after tonight's was merged.
+        mark_tagged() {
+          env PATH="${stub_dir}:${PATH}" GH_TOKEN=stub GITHUB_REPOSITORY=o/r \
+            GH_STUB_LOG="$1" GH_STUB_PR="$2" GH_STUB_LABELS="$3" \
+            task nightly:mark-release-tagged MERGE_SHA="${merge_sha}" 2>&1
+        }
+
+        log="${stub_dir}/pending.log"
+        : > "${log}"
+        if out=$(mark_tagged "${log}" 1025 'autorelease: pending'); then
+          if grep -qF 'pr edit 1025' "${log}"; then
+            ok 'mark-release-tagged relabels a pending release PR'
+          else
+            bad "mark-release-tagged did not relabel: $(cat "${log}")"
+          fi
+        else
+          bad "mark-release-tagged failed on a pending release PR: ${out}"
+        fi
+
+        log="${stub_dir}/tagged.log"
+        : > "${log}"
+        if out=$(mark_tagged "${log}" 1025 'autorelease: tagged'); then
+          if grep -qF 'pr edit' "${log}"; then
+            bad 'mark-release-tagged relabelled a PR that was already tagged'
+          else
+            ok 'mark-release-tagged leaves an already tagged PR alone'
+          fi
+        else
+          bad "mark-release-tagged failed on an already tagged PR: ${out}"
+        fi
+
+        log="${stub_dir}/unlabelled.log"
+        : > "${log}"
+        if out=$(mark_tagged "${log}" 1025 ''); then
+          bad 'mark-release-tagged passed on a release PR carrying neither label'
+        else
+          case "${out}" in
+            *'carries neither'*) ok 'mark-release-tagged fails on a release PR carrying neither label' ;;
+            *) bad "mark-release-tagged failed for the wrong reason: ${out}" ;;
+          esac
+        fi
+
+        # Retry exhaustion. The tag is already published by the time the label
+        # is swapped, so a refused edit has to say so rather than pass; the
+        # attempt count is asserted because a loop that gave up on the first
+        # refusal would still produce the right error.
+        log="${stub_dir}/editfail.log"
+        : > "${log}"
+        if out=$(env PATH="${stub_dir}:${PATH}" GH_TOKEN=stub GITHUB_REPOSITORY=o/r \
+          GH_STUB_LOG="${log}" GH_STUB_PR=1025 GH_STUB_LABELS='autorelease: pending' \
+          GH_STUB_EDIT_FAIL=1 \
+          task nightly:mark-release-tagged MERGE_SHA="${merge_sha}" 2>&1); then
+          bad 'mark-release-tagged passed while every label edit was refused'
+        else
+          case "${out}" in
+            *'could not relabel release PR #1025 after 3 attempts'*)
+              attempts=$(grep -cF 'pr edit 1025' "${log}")
+              if [ "${attempts}" -eq 3 ]; then
+                ok 'mark-release-tagged retries a refused label edit three times'
+              else
+                bad "mark-release-tagged made ${attempts} label edit attempts, expected 3"
+              fi
+              ;;
+            *) bad "mark-release-tagged failed for the wrong reason: ${out}" ;;
+          esac
+        fi
+
+        for bad_sha in '' 'deadbeef' '$(id)' 'zzzz5f1e4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8'; do
+          if out=$(env GH_TOKEN=x GITHUB_REPOSITORY=o/r \
+            task nightly:mark-release-tagged MERGE_SHA="${bad_sha}" 2>&1); then
+            bad "mark-release-tagged accepted '${bad_sha}'"
+          else
+            case "${out}" in
+              *uid=*) bad "mark-release-tagged: id executed for '${bad_sha}'" ;;
+              *) ok "mark-release-tagged rejected: '${bad_sha}'" ;;
+            esac
+          fi
+        done
+
+        log="${stub_dir}/nopr.log"
+        : > "${log}"
+        # What a mergeCommit that has not settled yet looks like from here:
+        # nothing comes back, and that may not pass for success.
+        if out=$(mark_tagged "${log}" '' ''); then
+          bad 'mark-release-tagged passed without finding the release PR'
+        else
+          case "${out}" in
+            *'no pull request on nightly is associated with'*) ok 'mark-release-tagged fails when it cannot find the release PR' ;;
+            *) bad "mark-release-tagged failed for the wrong reason: ${out}" ;;
+          esac
+        fi
+
+        # An empty night and a wedged channel both arrive with no release PR
+        # to merge. Only one of them is allowed to end green.
+        merge_release_pr() {
+          env PATH="${stub_dir}:${PATH}" GH_TOKEN=stub GITHUB_REPOSITORY=o/r \
+            GH_STUB_LOG="${stub_dir}/merge.log" GH_STUB_OPEN_PR= GH_STUB_PENDING_PR="$1" \
+            task -o interleaved nightly:merge-release-pr 2>&1
+        }
+
+        if out=$(merge_release_pr ""); then
+          case "${out}" in
+            *'nothing has landed since the last release'*) ok 'an empty night ends green' ;;
+            *) bad "an empty night ended green for the wrong reason: ${out}" ;;
+          esac
+        else
+          bad "an empty night failed: ${out}"
+        fi
+
+        if out=$(merge_release_pr 1025); then
+          bad "a merged release PR still labelled pending ended green: ${out}"
+        else
+          case "${out}" in
+            *'#1025 is merged into'*) ok 'a wedged channel fails instead of reporting an empty night' ;;
+            *) bad "a wedged channel failed for the wrong reason: ${out}" ;;
+          esac
+        fi
+
+        # A label left behind by a night that did publish its tags. The run
+        # still fails, because tonight published nothing, and the label is
+        # cleared so the next one is not stopped by it too.
+        log="${stub_dir}/repair.log"
+        : > "${log}"
+        if out=$(env PATH="${stub_dir}:${PATH}" GH_TOKEN=stub GITHUB_REPOSITORY=o/r \
+          GH_STUB_LOG="${log}" GH_STUB_OPEN_PR= GH_STUB_PENDING_PR=1025 \
+          GH_STUB_MERGE_SHA="${merge_sha}" GH_STUB_TAG_SHAS="${merge_sha}" \
+          GH_STUB_PR=1025 GH_STUB_LABELS='autorelease: pending' \
+          task -o interleaved nightly:merge-release-pr 2>&1); then
+          bad "a stale label ended green: ${out}"
+        elif ! grep -qF 'pr edit 1025' "${log}"; then
+          bad "a stale label was not cleared: $(cat "${log}")"
+        else
+          case "${out}" in
+            *"was tagged at ${merge_sha}"*) ok 'a stale label is cleared and the run still fails' ;;
+            *) bad "a stale label failed for the wrong reason: ${out}" ;;
+          esac
+        fi
+
+        # The published-tag guard, which the e2e workflow runs before a tag
+        # reaches an image reference.
+        tag_guard() { task nightly:validate-tag TAG="$1" 2>&1; }
+        for good in v2.16.0 v2.16.0-beta v2.16.0-beta.20260922 v2.16.0-nightly-20260922 v10.0.1; do
+          if out=$(tag_guard "${good}"); then ok "tag ${good}"; else bad "tag ${good}: rejected: ${out}"; fi
+        done
+        for nope in v2.16 2.16.0 v1.2.3.4 v2.16.0-rc1 'v2.16.0; id' 'v2.16.0-beta.2026' 'v2.16.0-beta.' "$(printf 'x\nv2.16.0')" ''; do
+          out=$(tag_guard "${nope}" || true)
+          case "${out}" in
+            *uid=*) bad "tag '${nope}': id executed" ;;
+            *) if task nightly:validate-tag TAG="${nope}" >/dev/null 2>&1; then bad "tag '${nope}': accepted"; else ok "tag rejected: '${nope}'"; fi ;;
+          esac
+        done
+
+        if [ "${failures}" -ne 0 ]; then
+          printf '\n%s nightly guard test(s) failed\n' "${failures}" >&2
+          exit 1
+        fi
+        printf '\nnightly guard tests passed\n'
+
+  validate-tag:
+    desc: "Guard a published release tag before it reaches an image reference (TAG)"
+    silent: true
+    # Used by the e2e workflow for both channels. It lives here rather than
+    # with the suite because it has to run before the megamerge that brings
+    # the suite in — and because a tag from a caller reaches both an image
+    # reference and a Task command line.
+    requires:
+      vars: [TAG]
+    # TAG_VALUE rather than TAG: a task's env does not override a variable
+    # already in the process environment, and the calling workflow exports
+    # TAG.
+    env:
+      TAG_VALUE: '{{.TAG}}'
+    cmd: |
+      TAG="${TAG_VALUE}"
+      # Globs, not regexes: grep and [[ =~ ]] match a line at a time, so a
+      # value carrying a newline next to a tag would pass either.
+      case "${TAG}" in
+        v[0-9]*.[0-9]*.[0-9]*) ;;
+        *)
+          printf '::error::not a release tag: %s\n' "${TAG}" >&2
+          exit 1
+          ;;
+      esac
+      rest="${TAG#v}"
+      # Exactly three numeric components, optionally followed by a prerelease.
+      version="${rest%%-*}"
+      suffix=""
+      if [ "${version}" != "${rest}" ]; then
+        suffix="${rest#*-}"
+      fi
+      case "${version}" in
+        *[!0-9.]* | *..* | .* | *. | "")
+          printf '::error::not a release tag: %s\n' "${TAG}" >&2
+          exit 1
+          ;;
+      esac
+      case "${version}" in
+        *.*.*.* | *.*.*) ;;
+        *)
+          printf '::error::not a release tag: %s\n' "${TAG}" >&2
+          exit 1
+          ;;
+      esac
+      case "${version}" in
+        *.*.*.*)
+          printf '::error::not a release tag: %s\n' "${TAG}" >&2
+          exit 1
+          ;;
+      esac
+      # The only prerelease this project publishes.
+      case "${suffix}" in
+        "" | beta) ;;
+        # Dated nightlies, from before the channel settled on one moving tag.
+        # They are kept, so the e2e suite has to keep being able to name them.
+        beta.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
+        nightly-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
+        *)
+          printf '::error::not a release tag: %s\n' "${TAG}" >&2
+          exit 1
+          ;;
+      esac
+
+  _validate-ref:
+    internal: true
+    silent: true
+    env:
+      GITHUB_REF_NAME: '{{.GITHUB_REF_NAME}}'
+      RELEASE_REF: '{{.RELEASE_REF}}'
+    cmd: |
+      ref="${GITHUB_REF_NAME:-}"
+      if [ "${ref}" != "${RELEASE_REF}" ]; then
+        # ::error:: is picked up by the workflow log, and is harmless locally.
+        printf '::error::Nightlies are cut from %s only. Current ref: %s\n' \
+          "${RELEASE_REF}" "${ref:-<unset>}" >&2
+        exit 1
+      fi
+
+  _sha-rule:
+    internal: true
+    silent: true
+    # A merge sha reaches an API path in two tasks, so there is one place that
+    # says what one may contain. SHA_VALUE rather than SHA: a task's env does
+    # not override a variable already in the process environment, and the
+    # workflow exports MERGE_SHA.
+    env:
+      SHA_VALUE: '{{.SHA}}'
+    cmd: |
+      sha="${SHA_VALUE}"
+      case "${sha}" in
+        *[!0-9a-f]* | "")
+          printf '::error::not a commit sha: %s\n' "${sha}" >&2
+          exit 1
+          ;;
+      esac
+      case "${#sha}" in
+        40) ;;
+        *)
+          printf '::error::not a full commit sha: %s\n' "${sha}" >&2
+          exit 1
+          ;;
+      esac
+
+  _derive-config:
+    internal: true
+    env:
+      BETA_VERSION: '{{.BETA_VERSION}}'
+    cmds:
+      # Derived from the real config instead of duplicated: the nightly notes
+      # have to accumulate exactly what the real release will, which means the
+      # same exclude-paths and the same changelog-sections, forever.
+      #
+      # release-as is the beta version, not the dated one: the notes engine
+      # looks for a CHANGELOG heading named after the tag it renders, so the
+      # two must match. Only release-as can hold a name still.
+      - >-
+        jq --arg version "${BETA_VERSION}"
+        '.packages["."] += {"release-as": $version, "prerelease": true}'
+        '{{.RELEASE_CONFIG}}' > '{{.NIGHTLY_CONFIG}}'
+      # Seeded from the real manifest, so the channel starts at the last
+      # published release and every nightly renders the full upcoming release.
+      - cp '{{.RELEASE_MANIFEST}}' '{{.NIGHTLY_MANIFEST}}'
+
+  _commit-channel:
+    internal: true
+    env:
+      BETA_VERSION_VALUE: '{{.BETA_VERSION}}'
+    cmds:
+      - git switch --force-create '{{.NIGHTLY_BRANCH}}'
+      - git add '{{.NIGHTLY_CONFIG}}' '{{.NIGHTLY_MANIFEST}}'
+      - >-
+        git -c user.name='{{.COMMIT_NAME}}' -c user.email='{{.COMMIT_EMAIL}}'
+        commit -s -m "chore: Open the ${BETA_VERSION_VALUE} nightly channel"
+
+  _push-channel:
+    internal: true
+    status:
+      - test '{{.PUSH_CHANNEL}}' != "true"
+    cmds:
+      # Force: last night's channel and its release commit are replaced.
+      # Nothing keeps the old release commit reachable once the beta tag moves
+      # off it, and nothing needs to: it carried no content of its own beyond
+      # the channel manifest, and every commit it released is on main.
+      - git push --force origin 'HEAD:refs/heads/{{.NIGHTLY_BRANCH}}'

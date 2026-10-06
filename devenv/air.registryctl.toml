@@ -14,7 +14,8 @@ tmp_dir = "tmp"
 
   # Delve debugger on port 2347, starts immediately (--continue)
   # Attach anytime with: dlv connect localhost:2347
-  full_bin = "/go/bin/dlv exec ./tmp/registryctl --listen=0.0.0.0:2347 --headless=true --api-version=2 --accept-multiclient --continue --"
+  # Falls back to the plain binary when dlv can't run; run() keeps Air-appended args_bin working.
+  full_bin = "run() { if /go/bin/dlv version >/dev/null 2>&1; then exec /go/bin/dlv exec ./tmp/registryctl --listen=0.0.0.0:2347 --headless=true --api-version=2 --accept-multiclient --continue -- \"$@\"; else echo 'air: dlv unavailable - running plain binary (no debugger on :2347)' >&2; exec ./tmp/registryctl \"$@\"; fi; }; run"
 
   # Watch src directory for Go files only
   include_dir = ["src"]

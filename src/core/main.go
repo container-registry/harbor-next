@@ -28,10 +28,12 @@ import (
 	"time"
 
 	"github.com/beego/beego/v2/server/web"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/common/dao"
 	common_http "github.com/goharbor/harbor/src/common/http"
+	"github.com/goharbor/harbor/src/common/models"
 	configCtl "github.com/goharbor/harbor/src/controller/config"
 	_ "github.com/goharbor/harbor/src/controller/event/handler"
 	"github.com/goharbor/harbor/src/controller/health"
@@ -69,9 +71,12 @@ import (
 	"github.com/goharbor/harbor/src/pkg/audit"
 	_ "github.com/goharbor/harbor/src/pkg/auditext/event/config"
 	_ "github.com/goharbor/harbor/src/pkg/auditext/event/login"
+	_ "github.com/goharbor/harbor/src/pkg/auditext/event/member"
+	_ "github.com/goharbor/harbor/src/pkg/auditext/event/project"
 	_ "github.com/goharbor/harbor/src/pkg/auditext/event/user"
 	dbCfg "github.com/goharbor/harbor/src/pkg/config/db"
 	_ "github.com/goharbor/harbor/src/pkg/config/inmemory"
+	"github.com/goharbor/harbor/src/pkg/exporter"
 	"github.com/goharbor/harbor/src/pkg/notification"
 	_ "github.com/goharbor/harbor/src/pkg/notifier/topic"
 	"github.com/goharbor/harbor/src/pkg/oidc"
@@ -170,9 +175,6 @@ func main() {
 	if err := cache.Initialize(u.Scheme, redisHarborURL); err != nil {
 		log.Fatalf("failed to initialize cache: %v", err)
 	}
-	// when config/db init function is called, the cache is not ready,
-	// enable config cache explicitly when the cache is ready
-	dbCfg.EnableConfigCache()
 
 	web.AddTemplateExt("htm")
 
@@ -224,6 +226,8 @@ func main() {
 	}
 	log.Info("database self-test passed")
 
+	stopSettingsSync := dbCfg.StartSettingsSync(dao.GetPool().PgxPool())
+
 	ctx = orm.Clone(ctx)
 	if err := config.Load(ctx); err != nil {
 		log.Fatalf("failed to load config: %v", err)
@@ -251,12 +255,22 @@ func main() {
 	health.RegisterHealthCheckers()
 	registerScanners(orm.Context())
 
+	// Must come after the database is up and the health checkers are registered:
+	// the collectors read both on the first scrape.
+	switch {
+	case metricCfg.Enabled && metricCfg.ExporterEnabled:
+		registerExporterCollectors(metricCfg)
+	case metricCfg.ExporterEnabled:
+		log.Warning("METRIC_EXPORTER_ENABLE is set but METRIC_ENABLE is not; " +
+			"no metrics endpoint is served, so the exporter collectors were not registered")
+	}
+
 	// start global task pool, do not stop in the gracefulShutdown because it may take long time to finish.
 	gtask.DefaultPool().Start(ctx)
 
 	closing := make(chan struct{})
 	done := make(chan struct{})
-	go gracefulShutdown(closing, done, shutdownTracerProvider, dao.ClosePool)
+	go gracefulShutdown(closing, done, shutdownTracerProvider, stopSettingsSync, dao.ClosePool)
 	// Start health checker for registries
 	go registry.Ctl.StartRegularHealthCheck(orm.Context(), closing, done)
 	// Init audit log
@@ -336,6 +350,21 @@ func main() {
 const (
 	trivyScanner = "Trivy"
 )
+
+// registerExporterCollectors runs the Harbor exporter collectors in-process and
+// exposes them on core's metrics endpoint, so a separate harbor-exporter
+// container is not required. The collectors read the database and the health
+// checkers, so this must run after both are ready.
+func registerExporterCollectors(cfg *models.Metric) {
+	opt := &exporter.Opt{CacheDuration: cfg.ExporterCacheTime}
+	// prometheus.Register rather than MustRegister: a duplicate registration
+	// must not take core down.
+	if err := prometheus.Register(exporter.NewCollector(opt, exporter.NewLocalBackend())); err != nil {
+		log.Errorf("failed to register Harbor exporter collectors: %v", err)
+		return
+	}
+	log.Infof("Harbor exporter collectors registered on %s (cache %ds)", cfg.Path, cfg.ExporterCacheTime)
+}
 
 func registerScanners(ctx context.Context) {
 	wantedScanners := make([]scanner.Registration, 0)

@@ -645,7 +645,7 @@ func (c *client) do(req *http.Request) (*http.Response, error) {
 		}
 	}
 	utils.SetUserAgentHeader(req)
-	resp, err := c.client.Do(req)
+	resp, err := c.client.Do(req) // nolint:gosec // G704: registry clients intentionally call administrator-configured registry endpoints
 	if err != nil {
 		return nil, err
 	}

@@ -283,9 +283,11 @@ func TrivyAdapterURL() string {
 // Metric returns the overall metric settings
 func Metric() *models.Metric {
 	return &models.Metric{
-		Enabled: DefaultMgr().Get(backgroundCtx, common.MetricEnable).GetBool(),
-		Port:    DefaultMgr().Get(backgroundCtx, common.MetricPort).GetInt(),
-		Path:    DefaultMgr().Get(backgroundCtx, common.MetricPath).GetString(),
+		Enabled:           DefaultMgr().Get(backgroundCtx, common.MetricEnable).GetBool(),
+		Port:              DefaultMgr().Get(backgroundCtx, common.MetricPort).GetInt(),
+		Path:              DefaultMgr().Get(backgroundCtx, common.MetricPath).GetString(),
+		ExporterEnabled:   DefaultMgr().Get(backgroundCtx, common.MetricExporterEnable).GetBool(),
+		ExporterCacheTime: int64(DefaultMgr().Get(backgroundCtx, common.MetricExporterCacheTime).GetInt()),
 	}
 }
 
@@ -342,7 +344,7 @@ func Database() (*models.Database, error) {
 		ConnMaxIdleTime:   DefaultMgr().Get(backgroundCtx, common.PostGreSQLConnMaxIdleTime).GetDuration(),
 		HealthCheckPeriod: DefaultMgr().Get(backgroundCtx, common.PostGreSQLHealthCheckPeriod).GetDuration(),
 		ConnectTimeout:    DefaultMgr().Get(backgroundCtx, common.PostGreSQLConnectTimeout).GetDuration(),
-		MinConns:          int32(DefaultMgr().Get(backgroundCtx, common.PostGreSQLMinConns).GetInt()),
+		MinConns:          DefaultMgr().Get(backgroundCtx, common.PostGreSQLMinConns).GetOptionalInt32(),
 		URL:               DefaultMgr().Get(backgroundCtx, common.PostGreSQLURL).GetString(),
 	}
 	database.PostGreSQL = postgresql

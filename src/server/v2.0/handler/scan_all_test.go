@@ -392,7 +392,7 @@ func (suite *ScanAllTestSuite) TestCreateScanAllSchedule() {
 }
 
 func (suite *ScanAllTestSuite) TestUpdateScanAllSchedule() {
-	times := 11
+	times := 12
 	suite.Security.On("IsAuthenticated").Return(true).Times(times)
 	suite.Security.On("Can", mock.Anything, mock.Anything, mock.Anything).Return(true).Times(times)
 	mock.OnAnything(suite.scannerCtl, "ListRegistrations").Return([]*scanner.Registration{{ID: int64(1)}}, nil).Times(times)
@@ -469,6 +469,22 @@ func (suite *ScanAllTestSuite) TestUpdateScanAllSchedule() {
 		res, err := suite.PutJSON("/system/scanAll/schedule", body)
 		suite.NoError(err)
 		suite.Equal(200, res.StatusCode)
+	}
+
+	{
+		// update scan all schedule with periodic, stored cron has randomized seconds and schedule not changed
+		stored := *suite.schedule
+		stored.CRON = "37 0 0 * * *"
+		mock.OnAnything(suite.scheduler, "ListSchedules").Return([]*scheduler.Schedule{&stored}, nil).Once()
+		calls := len(suite.scheduler.Calls)
+
+		body := models.Schedule{Schedule: &models.ScheduleObj{Type: ScheduleDaily, Cron: "0 0 0 * * *"}}
+		res, err := suite.PutJSON("/system/scanAll/schedule", body)
+		suite.NoError(err)
+		suite.Equal(200, res.StatusCode)
+		for _, c := range suite.scheduler.Calls[calls:] {
+			suite.NotContains([]string{"UnScheduleByID", "Schedule"}, c.Method, "unchanged schedule must not be recreated")
+		}
 	}
 
 	{

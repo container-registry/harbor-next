@@ -1,0 +1,107 @@
+{{- if .Values.exporter.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "harbor.fullname" . }}-exporter
+  labels:
+    {{- include "harbor.componentLabels" (dict "root" . "component" "exporter") | nindent 4 }}
+  {{- with (include "harbor.annotations" (dict "root" . "local" .Values.exporter.annotations)) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.exporter.replicas }}
+  revisionHistoryLimit: {{ .Values.exporter.revisionHistoryLimit | default .Values.global.revisionHistoryLimit }}
+  {{- with .Values.exporter.deploymentStrategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "exporter") | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/configmap-env: {{ include (print $.Template.BasePath "/exporter.configmap-env.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/exporter.secret.yaml") . | sha256sum }}
+        {{- with (include "harbor.annotations" (dict "root" . "local" .Values.exporter.podAnnotations)) }}
+        {{- . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- with .Values.commonLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.exporter.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "exporter") | nindent 8 }}
+    spec:
+      {{- include "harbor.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "harbor.serviceAccountName" (dict "root" . "component" "exporter" "serviceAccount" .Values.exporter.serviceAccount) }}
+      automountServiceAccountToken: {{ .Values.exporter.serviceAccount.automountServiceAccountToken | default false }}
+      {{- with (.Values.exporter.priorityClassName | default .Values.global.priorityClassName) }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.exporter.podSecurityContext | nindent 8 }}
+      {{- with .Values.exporter.initContainers }}
+      initContainers:
+        {{- tpl (toYaml .) $ | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: exporter
+          securityContext:
+            {{- toYaml .Values.exporter.securityContext | nindent 12 }}
+          image: {{ include "harbor.image" (dict "imageRoot" .Values.exporter.image "component" "exporter" "root" .) }}
+          imagePullPolicy: {{ include "harbor.imagePullPolicy" . }}
+          ports:
+            - name: {{ include "harbor.metrics.portName" . | quote }}
+              containerPort: 8001
+              protocol: TCP
+          {{- if or .Values.exporter.config .Values.exporter.secret }}
+          envFrom:
+            {{- if .Values.exporter.config }}
+            - configMapRef:
+                name: "{{ include "harbor.fullname" . }}-exporter-env"
+            {{- end }}
+            {{- if .Values.exporter.secret }}
+            - secretRef:
+                name: "{{ include "harbor.fullname" . }}-exporter"
+            {{- end }}
+          {{- end }}
+          {{- /* Explicit env beats envFrom in Kubernetes, so a chart-managed
+                entry would otherwise make the matching `exporter.config` /
+                `exporter.secret` key unreachable — there would be no way to
+                retune the exporter independently of core (issue #564). Any
+                name the user claims in the passthrough wins; the chart only
+                fills the gaps. Order within the chart-managed list is
+                preserved: REDIS_PASSWORD must stay ahead of HARBOR_REDIS_URL
+                for $(VAR) expansion. */}}
+          env:
+            {{- $ovr := include "harbor.exporter.envOverrides" . | fromYaml }}
+            {{- range (include "harbor.exporter.chartEnv" . | fromYamlArray) }}
+            {{- if not (hasKey $ovr .name) }}
+{{ toYaml (list .) | indent 12 }}
+            {{- end }}
+            {{- end }}
+            {{- include "harbor.extraCA.env" . | nindent 12 }}
+            {{- with .Values.exporter.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- include "harbor.probes" .Values.exporter.probes | nindent 10 }}
+          resources:
+            {{- toYaml .Values.exporter.resources | nindent 12 }}
+          {{- with .Values.exporter.lifecycle }}
+          lifecycle:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- include "harbor.extraCA.volumeMount" . | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- include "harbor.extraCA.volume" . | nindent 8 }}
+      {{- include "harbor.podScheduling" (dict "component" .Values.exporter "root" $) | nindent 6 }}
+{{- end }}

@@ -250,9 +250,16 @@
         "PROXY_CACHE_MAX_UPSTREAM_CONN_PLACEHOLDER": "Veuillez entrer -1 ou un entier supérieur à 0.",
         "PROXY_CACHE_LOCAL_ON_NOT_FOUND": "Servir le contenu mis en cache lorsque le registre amont est indisponible",
         "PROXY_CACHE_LOCAL_ON_NOT_FOUND_TOOLTIP": "Activez cette option pour permettre à ce projet de continuer à servir le contenu mis en cache même si l'artefact n'est pas trouvé dans le registre amont ou si le registre amont est indisponible. Cela peut entraîner la diffusion de contenu obsolète si le registre amont est indisponible.",
-        "NO_PROJECT": "Nous n'avons trouvé aucun projet",
         "PROXY_REFERRER_API_TIP": "Cochez cette case pour activer le proxy des requêtes de l'API referrer OCI 1.1 vers le registre en amont.",
-        "PROXY_REFERRER_API_LABEL": "Activer le proxy pour l'API referrer"
+        "PROXY_REFERRER_API_LABEL": "Activer le proxy pour l'API referrer",
+        "REPOSITORY_FILTER": "Filtre de dépôt",
+        "REPOSITORY_FILTER_TOOLTIP": "Filtre optionnel pour limiter les dépôts mis en cache depuis le registre amont. 'Doublestar' (par défaut) utilise des motifs glob avec support ** (ex. library/**). 'Regex' utilise des expressions régulières, le motif doit correspondre au chemin complet du dépôt (ex. ^library/.*). S'applique uniquement aux projets de cache proxy actuels.",
+        "REPOSITORY_FILTER_PLACEHOLDER": "ex. library/**",
+        "FILTER_KIND_REGEX": "Regex",
+        "FILTER_KIND_DOUBLESTAR": "Doublestar",
+        "REPOSITORY_FILTER_REGEX_INVALID": "Le motif d'expression régulière n'est pas valide.",
+        "REPOSITORY_FILTER_DOUBLESTAR_INVALID": "Le motif doublestar a des crochets ou des accolades non équilibrés.",
+        "NO_PROJECT": "Nous n'avons trouvé aucun projet"
     },
     "PROJECT_DETAIL": {
         "SUMMARY": "Résumé",
@@ -504,7 +511,19 @@
         "NOT_FOUND": "Nous n'avons trouvé aucun log !",
         "RESOURCE": "Ressource",
         "RESOURCE_TYPE": "Type de ressource",
-        "DOWNLOAD": "Télécharger"
+        "DOWNLOAD": "Télécharger",
+        "IP_ADDRESS": "Adresse IP",
+        "USER_AGENT": "Agent utilisateur"
+    },
+    "AUDIT_LOG_CONFIG": {
+        "RECORDING": "Enregistrement des événements",
+        "USERS": "Utilisateurs",
+        "MEMBERS": "Membres du projet",
+        "ROBOTS": "Robots",
+        "ARTIFACTS": "Artefacts",
+        "PROJECTS": "Projets",
+        "CONFIGURATION": "Configuration",
+        "REPOSITORIES": "Dépôts"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Déclencheur",
@@ -779,6 +798,7 @@
         "REPOSITORY": "Dépôt",
         "REPO_READ_ONLY": "Dépôt en lecture seule",
         "SYSTEM": "Réglages Système",
+        "AUDIT_LOG": "Log d'audit",
         "PROJECT_QUOTAS": "Quotas de projet",
         "VULNERABILITY": "Vulnérabilité",
         "GC": "Purge",
@@ -1749,6 +1769,8 @@
         "PURGE_NOW": "Purger maintenant",
         "PURGE_NOW_SUCCESS": "La purge s'est déclenchée avec succès",
         "PURGE_SCHEDULE_RESET": "Le programme de purge a été réinitialisé",
+        "ROTATION_POLICY": "Politique de rotation",
+        "EXECUTION": "Exécution",
         "PURGE_HISTORY": "Historique de purges",
         "FORWARD_ENDPOINT": "Endpoint Syslog de transfert de logs d'audit",
         "FORWARD_ENDPOINT_TOOLTIP": "Transfère les logs d'audit à l'endpoint Syslog, par exemple : harbor-log:10514",
@@ -1760,7 +1782,9 @@
         "STOP_GC_SUCCESS": "Déclenchement avec succès de l'arrêt de l'exécution du GC",
         "STOP_PURGE_SUCCESS": "Déclenchement avec succès de l'arrêt de la purge",
         "NO_GC_RECORDS": "Nous n'avons trouvé aucun historique du GC !",
-        "NO_PURGE_RECORDS": "Nous n'avons trouvé aucun historique de purges !"
+        "NO_PURGE_RECORDS": "Nous n'avons trouvé aucun historique de purges !",
+        "PURGE_PARAMS_SAVED": "Paramètres de rotation des logs enregistrés avec succès",
+        "NO_EVENT_TYPES_WARNING": "Cette planification ne purgera rien car aucun type d'événement n'est sélectionné. Sélectionnez au moins un type d'événement et cliquez sur ENREGISTRER."
     },
     "CVE_EXPORT": {
         "EXPORT_SOME_PROJECTS": "Exporter les CVEs",

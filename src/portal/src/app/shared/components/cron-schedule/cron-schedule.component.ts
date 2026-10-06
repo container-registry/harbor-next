@@ -93,7 +93,12 @@ export class CronScheduleComponent implements OnChanges, OnInit {
         this.isEditMode = true;
         this.scheduleType = this.originScheduleType;
         if (this.scheduleType && this.scheduleType === SCHEDULE_TYPE.CUSTOM) {
-            this.cronString = this.oriCron || PREFIX;
+            // the scheduler persists the cron with a randomized seconds
+            // field, but the API rejects any cron whose seconds are not 0
+            this.cronString = (this.oriCron?.trim() || PREFIX).replace(
+                /^\S+/,
+                '0'
+            );
             this.dateInvalid = !cronRegex(this.cronString);
         } else {
             this.cronString = PREFIX;

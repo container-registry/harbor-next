@@ -168,10 +168,15 @@ const (
 	// DefaultGCTimeWindowHours is the reserve blob time window used by GC, default is 2 hours
 	DefaultGCTimeWindowHours = int64(2)
 
+	// APIDocsEnable controls whether the generated API documentation page is served
+	APIDocsEnable = "api_docs_enable"
+
 	// Metric setting items
-	MetricEnable = "metric_enable"
-	MetricPort   = "metric_port"
-	MetricPath   = "metric_path"
+	MetricEnable            = "metric_enable"
+	MetricPort              = "metric_port"
+	MetricPath              = "metric_path"
+	MetricExporterEnable    = "metric_exporter_enable"
+	MetricExporterCacheTime = "metric_exporter_cache_time"
 
 	// Trace setting items
 	TraceEnabled         = "trace_enabled"
@@ -256,6 +261,13 @@ const (
 	BeegoMaxUploadSizeBytes = "beego_max_upload_size_bytes"
 	// DefaultBeegoMaxUploadSizeBytes sets default max upload size to 128GB
 	DefaultBeegoMaxUploadSizeBytes = 1 << 37
+
+	// MaxManifestBodySize bounds the manifest PUT body buffered in memory. OCI
+	// manifests are sub-MiB in practice, so 4MiB is a generous ceiling.
+	MaxManifestBodySize = 4 << 20
+
+	// MaxAuditLogPayloadSize bounds the audit log payload size.
+	MaxAuditLogPayloadSize = 4 << 20
 
 	// Global Leeway used for token validation
 	JwtLeeway = 60 * time.Second

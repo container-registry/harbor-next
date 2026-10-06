@@ -35,6 +35,17 @@ tasks:
 
   # --- Internal Go Build ---
 
+  tidy:
+    desc: "Sync src/go.sum with the source tree before compiling"
+    # Commercial patch branches add go.mod requirements without go.sum
+    # entries (patches carry no go.sum by policy), so the megamerged tree
+    # only builds after a tidy. No-op on an already-tidy tree.
+    run: once
+    deps: [gen-apis]
+    dir: src
+    cmds:
+      - go mod tidy
+
   _go-build:
     internal: true
     run: when_changed
@@ -72,12 +83,12 @@ tasks:
       - src/go.sum
     generates:
       - bin/{{index .MATCH 0}}/core
-    deps: [gen-apis]
+    deps: [gen-apis, tidy]
     cmds:
       - task: _go-build
         vars:
           PLATFORM: '{{index .MATCH 0}}'
-          MAIN_PATH: ./core/main.go
+          MAIN_PATH: ./core/
           OUTPUT_NAME: core
 
   binary:jobservice:*:
@@ -90,6 +101,7 @@ tasks:
       - src/go.sum
     generates:
       - bin/{{index .MATCH 0}}/jobservice
+    deps: [tidy]
     cmds:
       - task: _go-build
         vars:
@@ -107,6 +119,7 @@ tasks:
       - src/go.sum
     generates:
       - bin/{{index .MATCH 0}}/registryctl
+    deps: [tidy]
     cmds:
       - task: _go-build
         vars:
@@ -124,6 +137,7 @@ tasks:
       - src/go.sum
     generates:
       - bin/{{index .MATCH 0}}/harbor-exporter
+    deps: [tidy]
     cmds:
       - task: _go-build
         vars:
@@ -147,8 +161,10 @@ tasks:
         trap "rm -rf $DIST_DIR" EXIT
         git clone --branch {{.DISTRIBUTION_VERSION}} --depth 1 {{.DISTRIBUTION_SRC}} "$DIST_DIR"
         cd "$DIST_DIR"
-        go mod edit -require golang.org/x/crypto@v0.52.0
-        go mod edit -require golang.org/x/net@v0.55.0
+        go mod edit -require golang.org/x/crypto@v0.57.0
+        go mod edit -require golang.org/x/net@v0.59.0
+        go mod edit -require golang.org/x/text@v0.42.0
+        go mod edit -require google.golang.org/grpc@v1.83.2
         go mod tidy -e
         go mod vendor
         REVISION=$(git rev-parse HEAD)
@@ -174,8 +190,6 @@ tasks:
         trap "rm -rf $LPROBE_DIR" EXIT
         git clone --branch v{{.LPROBE_VERSION}} --depth 1 https://github.com/fivexl/lprobe.git "$LPROBE_DIR"
         cd "$LPROBE_DIR"
-        go mod edit -require github.com/go-jose/go-jose/v4@v4.1.4
-        go mod edit -require golang.org/x/net@v0.55.0
         go mod tidy -e
         CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/lprobe" .
 
@@ -196,7 +210,10 @@ tasks:
         trap "rm -rf $TRIVY_DIR" EXIT
         git clone --branch v{{.TRIVY_VERSION}} --depth 1 https://github.com/aquasecurity/trivy.git "$TRIVY_DIR"
         cd "$TRIVY_DIR"
-        go mod edit -require github.com/containerd/containerd/v2@v2.3.2
+        go mod edit -require github.com/containerd/containerd/v2@v2.3.5
+        go mod edit -require golang.org/x/crypto@v0.56.0
+        go mod edit -require google.golang.org/grpc@v1.83.2
+        go mod edit -require github.com/moby/go-archive@v0.3.0
         go mod tidy -e
         GOEXPERIMENT=jsonv2 CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath \
           -ldflags "-s -w -X github.com/aquasecurity/trivy/pkg/version/app.ver={{.TRIVY_VERSION}}" \

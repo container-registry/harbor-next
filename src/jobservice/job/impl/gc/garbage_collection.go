@@ -500,8 +500,11 @@ func (gc *GarbageCollector) sweep(ctx job.Context) error {
 func (gc *GarbageCollector) cleanCache(ctx context.Context) error {
 	u, err := url.Parse(gc.redisURL)
 	if err != nil {
-		gc.logger.Errorf("failed to parse redis url %s, error: %v", gc.redisURL, err)
-		return err
+		if urlErr, ok := err.(*url.Error); ok {
+			err = urlErr.Err
+		}
+		gc.logger.Errorf("failed to parse the redis url of the registry, error: %v", err)
+		return errors.Wrap(err, "failed to parse the redis url of the registry")
 	}
 
 	c, err := cache.New(u.Scheme, cache.Address(gc.redisURL))
@@ -622,7 +625,9 @@ func (gc *GarbageCollector) deletedArt(ctx job.Context) (map[string][]model.Arti
 // * non dry-run, remove the reference of the untagged blobs
 func (gc *GarbageCollector) markOrSweepUntaggedBlobs(ctx job.Context) ([]*blobModels.Blob, error) {
 	var orphanBlobs []*blobModels.Blob
-	for result := range project.ListAll(ctx.SystemContext(), 50, nil, project.Metadata(false)) {
+	sysCtx, cancel := context.WithCancel(ctx.SystemContext())
+	defer cancel()
+	for result := range project.ListAll(sysCtx, 50, nil, project.Metadata(false)) {
 		if gc.shouldStop(ctx) {
 			return nil, errGcStop
 		}

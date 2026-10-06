@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/FZambia/sentinel"
+	"github.com/FZambia/sentinel/v2"
 	"github.com/gomodule/redigo/redis"
 
 	"github.com/goharbor/harbor/src/lib/log"
@@ -183,7 +183,11 @@ func getSentinelPool(u *url.URL, param *PoolParam, name string) (*redis.Pool, er
 			return redis.Dial("tcp", masterAddr, redisOptions...)
 		},
 		TestOnBorrow: func(c redis.Conn, _ time.Time) error {
-			if !sentinel.TestRole(c, "master") {
+			isMaster, err := sentinel.TestRole(c, "master")
+			if err != nil {
+				return fmt.Errorf("check role failed, %s: %w", name, err)
+			}
+			if !isMaster {
 				return fmt.Errorf("check role failed, %s", name)
 			}
 			return nil

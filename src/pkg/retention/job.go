@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/olekukonko/tablewriter"
+	"github.com/olekukonko/tablewriter/tw"
 
 	"github.com/goharbor/harbor/src/controller/quota"
 	"github.com/goharbor/harbor/src/jobservice/job"
@@ -201,13 +202,20 @@ func logResults(logger logger.Interface, all []*selector.Candidate, results []*s
 		data = append(data, row)
 	}
 
-	table := tablewriter.NewWriter(&buf)
-	table.SetAutoFormatHeaders(false)
-	table.SetHeader([]string{"Digest", "Tag", "Kind", "Labels", "PushedTime", "PulledTime", "CreatedTime", "Retention"})
-	table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
-	table.SetCenterSeparator("|")
-	table.AppendBulk(data)
-	table.Render()
+	table := tablewriter.NewTable(&buf,
+		tablewriter.WithHeaderAutoFormat(tw.Off),
+		tablewriter.WithRendition(tw.Rendition{
+			Borders: tw.Border{Left: tw.On, Top: tw.Off, Right: tw.On, Bottom: tw.Off},
+			Symbols: tw.NewSymbolCustom("harbor").WithCenter("|").WithMidLeft("|").WithMidRight("|"),
+		}),
+	)
+	table.Header([]string{"Digest", "Tag", "Kind", "Labels", "PushedTime", "PulledTime", "CreatedTime", "Retention"})
+	if err := table.Bulk(data); err != nil {
+		logger.Errorf("Build retention report table: %v", err)
+	}
+	if err := table.Render(); err != nil {
+		logger.Errorf("Render retention report table: %v", err)
+	}
 
 	logger.Infof("\n%s", buf.String())
 

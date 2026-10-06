@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"slices"
 	"strings"
 	"time"
 
@@ -94,11 +95,22 @@ func (s *scheduler) CountSchedules(ctx context.Context, query *q.Query) (int64, 
 	return s.dao.Count(ctx, query)
 }
 
+// SameCron reports whether a stored 6-field cron matches a requested one.
+// Schedule replaces the seconds field with a random value, so the seconds are ignored.
+func SameCron(stored, requested string) bool {
+	s, r := strings.Fields(stored), strings.Fields(requested)
+	if len(s) != 6 || len(r) != 6 {
+		return false
+	}
+	return slices.Equal(s[1:], r[1:])
+}
+
 func (s *scheduler) Schedule(ctx context.Context, vendorType string, vendorID int64, cronType string,
 	cron string, callbackFuncName string, callbackFuncParams any, extraAttrs map[string]any) (int64, error) {
 	if len(vendorType) == 0 {
 		return 0, fmt.Errorf("empty vendor type")
 	}
+	// The seconds field is randomized to spread load; use SameCron to compare a stored cron with a requested one.
 	cron = fmt.Sprintf("%d %s", rand.Intn(60), strings.Join(strings.Split(cron, " ")[1:], " "))
 	if _, err := utils.CronParser().Parse(cron); err != nil {
 		return 0, errors.New(nil).WithCode(errors.BadRequestCode).

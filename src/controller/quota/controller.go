@@ -56,6 +56,9 @@ func (t updateQuotaProviderType) String() string {
 
 var (
 	defaultRetryTimeout = time.Minute * 5
+	// rollbackTimeout bounds the detached rollback so it cannot pin a pool
+	// connection behind a quota_usage row lock indefinitely
+	rollbackTimeout = 30 * time.Second
 	// quotaExpireTimeout is the expire time for quota when update quota by redis
 	quotaExpireTimeout = time.Minute * 5
 
@@ -347,7 +350,18 @@ func (c *controller) updateUsageWithRetry(ctx context.Context, reference, refere
 
 	options := []retry.Option{
 		retry.Timeout(defaultRetryTimeout),
-		retry.Backoff(false),
+		// Exponential backoff with jitter (the retry package default). With
+		// backoff disabled, every optimistic-lock loser re-reads and re-CASes
+		// the same quota_usage row in a zero-delay loop for up to
+		// defaultRetryTimeout, so N concurrent pushes to one project turn a
+		// single conflict into a synchronized retry storm on the database.
+		retry.Backoff(true),
+		// Give up as soon as the request is gone. An aborted push already
+		// terminated on its next attempt (updateUsageByDB returns the
+		// context error wrapped in retry.Abort); the context additionally
+		// cancels an in-progress backoff sleep instead of letting it run
+		// out and paying one more wasted attempt.
+		retry.Context(ctx),
 		retry.Callback(func(err error, _ time.Duration) {
 			log.G(ctx).Debugf("failed to update the quota usage for %s %s, error: %v", reference, referenceID, err)
 		}),
@@ -387,6 +401,26 @@ func (c *controller) Request(ctx context.Context, reference, referenceID string,
 		return f()
 	}
 
+	// When every requested resource is unlimited, the reservation cannot
+	// deny anything: IsSafe always passes for UNLIMITED hard limits, so the
+	// reserve/rollback pair degenerates into contended writes on the single
+	// quota_usage row per project with no enforcement effect. Skip it and
+	// let the refresh (RefreshMiddleware / Refresh) keep the usage figure
+	// up to date. If a real limit is set concurrently, enforcement starts
+	// with the next request and the refresh reconciles the usage.
+	if unlimited, err := c.isUnlimited(ctx, reference, referenceID, resources); err == nil && unlimited {
+		err := f()
+		if err == nil {
+			// the skipped reservation was also the only usage writer on
+			// this path - keep the usage figure current via the deferred
+			// coalesced refresh
+			MarkRefresh(reference, referenceID)
+		}
+		return err
+	} else if err != nil {
+		log.G(ctx).Warningf("failed to check hard limits for %s %s, falling back to reservation, error: %v", reference, referenceID, err)
+	}
+
 	provider := updateQuotaProviderType(config.GetQuotaUpdateProvider())
 	if err := c.updateUsageWithRetry(ctx, reference, referenceID, reserveResources(resources), provider); err != nil {
 		log.G(ctx).Errorf("reserve resources %s for %s %s failed, error: %v", resources.String(), reference, referenceID, err)
@@ -396,13 +430,42 @@ func (c *controller) Request(ctx context.Context, reference, referenceID string,
 	err := f()
 
 	if err != nil {
-		if er := c.updateUsageWithRetry(ctx, reference, referenceID, rollbackResources(resources), provider); er != nil {
+		// detached from the request: a client disconnect is the common failure
+		// here, and the reservation may already be committed outside any request
+		// transaction, so a canceled ctx would leave the usage inflated
+		rbCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), rollbackTimeout)
+		defer cancel()
+		if er := c.updateUsageWithRetry(rbCtx, reference, referenceID, rollbackResources(resources), provider); er != nil {
 			// ignore this error, the quota usage will be correct when users do operations which will call refresh quota
 			log.G(ctx).Warningf("rollback resources %s for %s %s failed, error: %v", resources.String(), reference, referenceID, er)
 		}
 	}
 
 	return err
+}
+
+// isUnlimited reports whether every resource in the request has an
+// UNLIMITED hard limit for the reference, in which case a reservation can
+// never deny the request.
+func (c *controller) isUnlimited(ctx context.Context, reference, referenceID string, resources types.ResourceList) (bool, error) {
+	q, err := c.quotaMgr.GetByRef(ctx, reference, referenceID)
+	if err != nil {
+		return false, err
+	}
+
+	hardLimits, err := q.GetHard()
+	if err != nil {
+		return false, err
+	}
+
+	for resource := range resources {
+		hardLimit, found := hardLimits[resource]
+		if !found || hardLimit != types.UNLIMITED {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
 
 // calcQuota calculates the quota and usage in real time.
@@ -456,7 +519,10 @@ func (c *controller) Update(ctx context.Context, u *quota.Quota) error {
 
 	options := []retry.Option{
 		retry.Timeout(defaultRetryTimeout),
-		retry.Backoff(false),
+		// See updateUsageWithRetry: backoff+jitter desynchronizes writers
+		// contending on the single quota row.
+		retry.Backoff(true),
+		retry.Context(ctx),
 	}
 
 	return retry.Retry(f, options...)

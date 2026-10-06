@@ -1,0 +1,86 @@
+# All tests assert chart-computed output for known inputs or fail-fast
+# guards. Pure Helm pass-through tests were removed — they only proved
+# `--set` works, not that the chart does anything with the value.
+# Full-render regression coverage lives in snapshots_test.yaml.
+suite: ServiceMonitor tests
+templates:
+  - templates/servicemonitor.yaml
+  - templates/validate-values.yaml
+tests:
+  # Pins the top-level conditional: the entire ServiceMonitor template
+  # is wrapped in `if .Values.metrics.serviceMonitor.enabled`, so
+  # disabling it must render 0 documents.
+  - it: should not create ServiceMonitor when disabled
+    template: templates/servicemonitor.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      metrics.serviceMonitor.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # Pins the conditional namespace block: when
+  # metrics.serviceMonitor.namespace is set, the ServiceMonitor is
+  # emitted into that namespace instead of the release namespace.
+  - it: should set custom namespace
+    template: templates/servicemonitor.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      metrics.enabled: true
+      metrics.serviceMonitor.enabled: true
+      metrics.serviceMonitor.namespace: monitoring
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: monitoring
+
+  # Pins the hardcoded /metrics path — Harbor's pods expose Prometheus
+  # metrics on this exact path, so the ServiceMonitor endpoint must
+  # match. Not user-configurable.
+  - it: should set metrics path
+    template: templates/servicemonitor.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      metrics.enabled: true
+      metrics.serviceMonitor.enabled: true
+    asserts:
+      - equal:
+          path: spec.endpoints[0].path
+          value: /metrics
+
+  # Pins the namespaceSelector resolving to the release namespace via
+  # `.Release.Namespace` — so a ServiceMonitor in the monitoring
+  # namespace still scrapes Harbor pods in the release namespace.
+  - it: should match release namespace in namespaceSelector
+    template: templates/servicemonitor.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      metrics.enabled: true
+      metrics.serviceMonitor.enabled: true
+    asserts:
+      - equal:
+          path: spec.namespaceSelector.matchNames[0]
+          value: NAMESPACE
+
+  # Regression guard for 9160ed527 (Fix #21). Enabling the ServiceMonitor
+  # without enabling /metrics scraping creates an orphan ServiceMonitor
+  # that scrapes nothing — Prometheus silently gets no Harbor metrics.
+  - it: should fail when serviceMonitor enabled without metrics.enabled
+    template: templates/validate-values.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      metrics.enabled: false
+      metrics.serviceMonitor.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "metrics.serviceMonitor.enabled requires metrics.enabled=true. Without metrics enabled, Harbor pods do not expose the /metrics endpoint the ServiceMonitor would scrape."

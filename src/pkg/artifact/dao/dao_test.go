@@ -536,7 +536,16 @@ func (d *daoTestSuite) TestListWithLatest() {
 
 	d.Require().Nil(err)
 	d.Require().Equal(2, len(latest))
-	d.Equal("library2/hello-world1", latest[0].RepositoryName)
+
+	latestByRepository := make(map[string]*Artifact, len(latest))
+	for _, artifact := range latest {
+		latestByRepository[artifact.RepositoryName] = artifact
+	}
+	d.Require().Len(latestByRepository, 2)
+	d.Require().Contains(latestByRepository, "library2/hello-world1")
+	d.Equal("digest", latestByRepository["library2/hello-world1"].Digest)
+	d.Require().Contains(latestByRepository, "library2/hello-world2")
+	d.Equal("digest2", latestByRepository["library2/hello-world2"].Digest)
 
 	defer d.dao.Delete(d.ctx, id)
 	defer d.dao.Delete(d.ctx, id1)

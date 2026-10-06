@@ -56,8 +56,13 @@ func NewNativeToRelationalSchemaConverter() NativeScanReportConverter {
 // ToRelationalSchema converts the vulnerability report data present as JSON  to the new relational VulnerabilityRecord instance
 func (c *nativeToRelationalSchemaConverter) ToRelationalSchema(ctx context.Context, reportUUID string, registrationUUID string, digest string, reportData string) (string, string, error) {
 	if len(reportData) == 0 {
-		log.G(ctx).Infof("There is no vulnerability report to toSchema for report UUID : %s", reportUUID)
-		return reportUUID, "", nil
+		// An empty raw report is not a scan result. The scan_report row is reused across re-scans
+		// (#23310), so clearing associations here would leave the row half-updated (associations gone,
+		// severity counters and report column stale) while the job still fails on the empty report.
+		// Fail before touching the database so the last successful result stays intact. A clean image
+		// arrives as a structured report with an empty vulnerability list and is reconciled to zero by
+		// toSchema.
+		return "", "", errors.Errorf("empty vulnerability report for report UUID %s", reportUUID)
 	}
 	// parse the raw report with the V1 schema of the report to the normalized structures
 	rawReport := new(vuln.Report)
@@ -179,7 +184,11 @@ func (c *nativeToRelationalSchemaConverter) toSchema(ctx context.Context, report
 		recordIDs = append(recordIDs, recordID)
 	}
 
-	if err := c.dao.InsertForReport(ctx, reportUUID, recordIDs...); err != nil {
+	// Reconcile the report's vulnerability associations with a set-diff instead of a bulk insert so a
+	// re-scan of an unchanged artifact (the common ScanAll case) writes nothing. Combined with the
+	// stable report UUID kept by MakePlaceHolder, this stops report_vulnerability_record from growing
+	// on every scan. See #23310.
+	if err := c.dao.SyncForReport(ctx, reportUUID, recordIDs...); err != nil {
 		fields := log.Fields{
 			"error":  err,
 			"report": reportUUID,
@@ -361,12 +370,16 @@ func parseScoreFromVendorAttribute(ctx context.Context, vendorAttribute string) 
 
 	// set the nvd as the first priority, if it's unavailable, return the first V3Score available.
 	if val, ok := data.CVSS["nvd"]["V3Score"]; ok {
-		return val.(float64)
+		if f, ok := val.(float64); ok {
+			return f
+		}
 	}
 
 	for vendor := range data.CVSS {
 		if val, ok := data.CVSS[vendor]["V3Score"]; ok {
-			return val.(float64)
+			if f, ok := val.(float64); ok {
+				return f
+			}
 		}
 	}
 	return 0

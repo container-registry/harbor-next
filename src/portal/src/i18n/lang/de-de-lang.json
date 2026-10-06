@@ -249,9 +249,16 @@
         "PROXY_CACHE_MAX_UPSTREAM_CONN_PLACEHOLDER": "Bitte geben Sie -1 oder eine Ganzzahl größer als 0 ein.",
         "PROXY_CACHE_LOCAL_ON_NOT_FOUND": "Veraltete Inhalte bereitstellen, wenn der Upstream nicht verfügbar ist",
         "PROXY_CACHE_LOCAL_ON_NOT_FOUND_TOOLTIP": "Aktivieren Sie diese Option, damit dieses Projekt weiterhin zwischengespeicherte Inhalte bereitstellt, auch wenn das Artefakt im Upstream-Registry nicht gefunden wird oder das Upstream-Registry nicht verfügbar ist. Dies kann dazu führen, dass veraltete Inhalte bereitgestellt werden, wenn das Upstream-Registry nicht verfügbar ist.",
-        "NO_PROJECT": "Es konnte kein Projekt gefunden werden",
         "PROXY_REFERRER_API_TIP": "Enable this to proxy OCI 1.1 referrer API requests to the upstream registry.",
-        "PROXY_REFERRER_API_LABEL": "Enable proxy for referrer API"
+        "PROXY_REFERRER_API_LABEL": "Enable proxy for referrer API",
+        "REPOSITORY_FILTER": "Repository-Filter",
+        "REPOSITORY_FILTER_TOOLTIP": "Optionaler Filter zur Begrenzung der aus dem Upstream-Registry gecachten Repositories. 'Doublestar' (Standard) verwendet Glob-Muster mit ** Unterstützung (z. B. library/**). 'Regex' verwendet reguläre Ausdrücke, das Muster muss mit dem vollständigen Repository-Pfad übereinstimmen (z. B. ^library/.*). Gilt nur für aktuelle Proxy-Cache-Projekte.",
+        "REPOSITORY_FILTER_PLACEHOLDER": "z. B. library/**",
+        "FILTER_KIND_REGEX": "Regex",
+        "FILTER_KIND_DOUBLESTAR": "Doublestar",
+        "REPOSITORY_FILTER_REGEX_INVALID": "Das reguläre Ausdrucksmuster ist ungültig.",
+        "REPOSITORY_FILTER_DOUBLESTAR_INVALID": "Das Doublestar-Muster hat unausgeglichene Klammern oder geschweifte Klammern.",
+        "NO_PROJECT": "Es konnte kein Projekt gefunden werden"
     },
     "PROJECT_DETAIL": {
         "SUMMARY": "Zusammenfassung",
@@ -502,7 +509,19 @@
         "NOT_FOUND": "Es konnten keine Logdaten gefunden werden!",
         "RESOURCE": "Ressource",
         "RESOURCE_TYPE": "Ressourcen-Typ",
-        "DOWNLOAD": "Herunterladen"
+        "DOWNLOAD": "Herunterladen",
+        "IP_ADDRESS": "IP-Adresse",
+        "USER_AGENT": "User-Agent"
+    },
+    "AUDIT_LOG_CONFIG": {
+        "RECORDING": "Ereignisaufzeichnung",
+        "USERS": "Nutzer",
+        "MEMBERS": "Projektmitglieder",
+        "ROBOTS": "Roboter",
+        "ARTIFACTS": "Artifacts",
+        "PROJECTS": "Projekte",
+        "CONFIGURATION": "Configuration",
+        "REPOSITORIES": "Repositories"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Trigger",
@@ -777,6 +796,7 @@
         "REPOSITORY": "Repository",
         "REPO_READ_ONLY": "Repository Read Only",
         "SYSTEM": "Systemeinstellungen",
+        "AUDIT_LOG": "Audit Log",
         "PROJECT_QUOTAS": "Projekt-Begrenzungen",
         "VULNERABILITY": "Schwachstellen",
         "GC": "Speicherbereinigung",
@@ -1747,6 +1767,8 @@
         "PURGE_NOW": "JETZT SÄUBERN",
         "PURGE_NOW_SUCCESS": "Signal zur Bereinigung erfolgreich gesendet",
         "PURGE_SCHEDULE_RESET": "Bereinigungsplan wurde zurückgesetzt",
+        "ROTATION_POLICY": "Rotationsrichtlinie",
+        "EXECUTION": "Ausführung",
         "PURGE_HISTORY": "Bereinigungshistorie",
         "FORWARD_ENDPOINT": "Syslog Endpunkt für die Weiterleitung des Audit-Logs",
         "FORWARD_ENDPOINT_TOOLTIP": "Leite Audit-Logs an einen Syslog-Endpunkt, zum Beispiel: harbor-log:10514",
@@ -1758,7 +1780,9 @@
         "STOP_GC_SUCCESS": "Signal zum stoppen der Speicherbereinigungs-Aktion erfolgreich",
         "STOP_PURGE_SUCCESS": "Signal zum Anhalten der Bereinigung erfolgreich",
         "NO_GC_RECORDS": "Es konnte keine Speicherbereinigungs-Historie gefunden werden!",
-        "NO_PURGE_RECORDS": "Es konnte keine Bereinigungs-Historie gefunden werden!"
+        "NO_PURGE_RECORDS": "Es konnte keine Bereinigungs-Historie gefunden werden!",
+        "PURGE_PARAMS_SAVED": "Log-Rotation-Einstellungen erfolgreich gespeichert",
+        "NO_EVENT_TYPES_WARNING": "Dieser Zeitplan bereinigt nichts, da keine Event-Typen ausgewählt sind. Wähle mindestens einen Event-Typ aus und klicke auf SPEICHERN."
     },
     "CVE_EXPORT": {
         "EXPORT_SOME_PROJECTS": "Exportiere CVEs",

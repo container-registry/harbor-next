@@ -15,6 +15,7 @@
 package main
 
 import (
+	"math"
 	"net/http"
 	"os"
 	"os/signal"
@@ -55,7 +56,7 @@ func main() {
 			ConnMaxIdleTime:   getConnMaxIdleTime(viper.GetString("database.conn_max_idle_time")),
 			HealthCheckPeriod: viper.GetDuration("database.health_check_period"),
 			ConnectTimeout:    viper.GetDuration("database.connect_timeout"),
-			MinConns:          int32(viper.GetInt("database.min_conns")),
+			MinConns:          getMinConns(),
 		},
 	}
 	if err := dao.InitDatabase(dbCfg); err != nil {
@@ -71,11 +72,13 @@ func main() {
 		},
 	})
 
-	exporter.InitBackendWorker(&exporter.RedisPoolConfig{
+	if err := exporter.InitBackendWorker(&exporter.RedisPoolConfig{
 		URL:               viper.GetString("redis.url"),
 		Namespace:         viper.GetString("redis.namespace"),
 		IdleTimeoutSecond: viper.GetInt("redis.timeout"),
-	})
+	}); err != nil {
+		log.Fatalf("failed to initialize job service backend worker: %v", err)
+	}
 
 	exporterOpt := &exporter.Opt{
 		Port:                   viper.GetInt("exporter.port"),
@@ -123,6 +126,24 @@ func main() {
 
 	dao.ClosePool()
 	os.Exit(exitCode)
+}
+
+// getMinConns returns nil unless HARBOR_DATABASE_MIN_CONNS is set to a
+// non-empty value, so dbpool can tell an explicit 0 (no warm floor) from an
+// unset knob. viper.GetInt collapses both to 0; IsSet does not.
+func getMinConns() *int32 {
+	if !viper.IsSet("database.min_conns") {
+		return nil
+	}
+	v := viper.GetInt("database.min_conns")
+	// viper parses the full int range; a bare int32() would wrap — 1<<32
+	// becomes an explicit 0. Treat out-of-range as unset instead.
+	if v < math.MinInt32 || v > math.MaxInt32 {
+		log.Warningf("database.min_conns %d exceeds int32 range, using the pool default", v)
+		return nil
+	}
+	i := int32(v)
+	return &i
 }
 
 func getConnMaxLifetime(duration string) time.Duration {

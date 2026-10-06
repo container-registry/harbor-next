@@ -652,7 +652,19 @@
         "OF": "из",
         "NOT_FOUND": "Мы не смогли найти никаких логов!",
         "RESOURCE": "Ресурс",
-        "RESOURCE_TYPE": "Тип ресурса"
+        "RESOURCE_TYPE": "Тип ресурса",
+        "IP_ADDRESS": "IP-адрес",
+        "USER_AGENT": "User-Agent"
+    },
+    "AUDIT_LOG_CONFIG": {
+        "RECORDING": "Запись событий",
+        "USERS": "Пользователи",
+        "MEMBERS": "Участники проекта",
+        "ROBOTS": "Роботы",
+        "ARTIFACTS": "Артефакты",
+        "PROJECTS": "Проекты",
+        "CONFIGURATION": "Конфигурация",
+        "REPOSITORIES": "Репозитории"
     },
     "REPLICATION": {
         "YES": "Да",
@@ -1030,6 +1042,7 @@
         "REPO_READ_ONLY": "Репозиторий только для чтения",
         "WEBHOOK_NOTIFICATION_ENABLED": "Вебхуки включены",
         "SYSTEM": "Настройки системы",
+        "AUDIT_LOG": "Журнал аудита",
         "PROJECT_QUOTAS": "Квоты проектов",
         "VULNERABILITY": "Уязвимость",
         "GC": "Сборка мусора",
@@ -1494,7 +1507,14 @@
     "PROXY_CACHE_LOCAL_ON_NOT_FOUND_TOOLTIP": "Включите эту опцию, чтобы разрешить проекту продолжать отдавать кэшированный контент, даже если артефакт не найден в вышестоящем реестре или вышестоящий реестр недоступен. Это может привести к отдаче устаревшего контента, если вышестоящий реестр недоступен.",
     "NO_PROJECT": "Мы не смогли найти никаких проектов!",
     "PROXY_REFERRER_API_TIP": "Установите этот флаг, чтобы включить прокси для запроса OCI 1.1 ссылающиеся API к первичному реестру.",
-    "PROXY_REFERRER_API_LABEL": "Включить прокси для ссылающиеся API"
+    "PROXY_REFERRER_API_LABEL": "Включить прокси для ссылающиеся API",
+    "REPOSITORY_FILTER": "Фильтр репозитория",
+    "REPOSITORY_FILTER_TOOLTIP": "Необязательный фильтр для ограничения кэшируемых репозиториев из вышестоящего реестра. 'Doublestar' (по умолчанию) использует glob-шаблоны с поддержкой ** (напр. library/**). 'Regex' использует регулярные выражения, шаблон должен соответствовать полному пути к репозиторию (напр. ^library/.*). Применяется только к текущим проектам прокси-кэша.",
+    "REPOSITORY_FILTER_PLACEHOLDER": "напр. library/**",
+    "FILTER_KIND_REGEX": "Regex",
+    "FILTER_KIND_DOUBLESTAR": "Doublestar",
+    "REPOSITORY_FILTER_REGEX_INVALID": "Недопустимый шаблон регулярного выражения.",
+    "REPOSITORY_FILTER_DOUBLESTAR_INVALID": "Шаблон doublestar содержит несбалансированные квадратные или фигурные скобки."
   },
   "PROJECT_DETAIL": {
     "SUMMARY": "Сводка",
@@ -1744,7 +1764,19 @@
     "OF": "из",
     "NOT_FOUND": "Мы не смогли найти никаких логов!",
     "RESOURCE": "Ресурс",
-    "RESOURCE_TYPE": "Тип Ресурса"
+    "RESOURCE_TYPE": "Тип Ресурса",
+    "IP_ADDRESS": "IP-адрес",
+    "USER_AGENT": "User-Agent"
+  },
+  "AUDIT_LOG_CONFIG": {
+    "RECORDING": "Запись событий",
+    "USERS": "Пользователи",
+    "MEMBERS": "Участники проекта",
+    "ROBOTS": "Роботы",
+    "ARTIFACTS": "Артефакты",
+    "PROJECTS": "Проекты",
+    "CONFIGURATION": "Конфигурация",
+    "REPOSITORIES": "Репозитории"
   },
   "REPLICATION": {
     "REPLICATION_TRIGGER": "Триггер",
@@ -2019,6 +2051,7 @@
     "REPOSITORY": "Репозиторий",
     "REPO_READ_ONLY": "Репозиторий только для чтения",
     "SYSTEM": "Настройки системы",
+    "AUDIT_LOG": "Журнал аудита",
     "PROJECT_QUOTAS": "Квоты",
     "VULNERABILITY": "Уязвимость",
     "GC": "Сборщик мусора",
@@ -2971,6 +3004,8 @@
     "PURGE_NOW": "ОЧИСТИТЬ СЕЙЧАС",
     "PURGE_NOW_SUCCESS": "Успешно вызвана очистка",
     "PURGE_SCHEDULE_RESET": "Расписание очистки было сброшено",
+    "ROTATION_POLICY": "Политика ротации",
+    "EXECUTION": "Выполнение",
     "PURGE_HISTORY": "История очистки",
     "FORWARD_ENDPOINT": "Адрес Syslog для пересылки Журнала Аудита",
     "FORWARD_ENDPOINT_TOOLTIP": "Пересылает журнал аудита на адрес syslog, например: \"harbor-log:10514\"",
@@ -2982,7 +3017,9 @@
     "STOP_GC_SUCCESS": "Успешно вызвана остановка операции СМ",
     "STOP_PURGE_SUCCESS": "Успешно вызвана остановка операцию очистки",
     "NO_GC_RECORDS": "Мы не смогли найти никаких историй СМ!",
-    "NO_PURGE_RECORDS": "Мы не смогли найти никаких историй очистки!"
+    "NO_PURGE_RECORDS": "Мы не смогли найти никаких историй очистки!",
+    "PURGE_PARAMS_SAVED": "Настройки ротации логов успешно сохранены",
+    "NO_EVENT_TYPES_WARNING": "Это расписание ничего не удалит, так как не выбраны типы событий. Выберите хотя бы один тип события и нажмите СОХРАНИТЬ."
   },
   "CVE_EXPORT": {
     "EXPORT_SOME_PROJECTS": "Экспорт CVE",

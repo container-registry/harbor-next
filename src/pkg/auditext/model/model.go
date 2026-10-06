@@ -38,6 +38,8 @@ type AuditLogExt struct {
 	Username             string    `orm:"column(username)"  json:"username"`
 	OpTime               time.Time `orm:"column(op_time)" json:"op_time" sort:"default:desc"`
 	Payload              string    `orm:"-" json:"payload"`
+	ClientAddress        string    `orm:"column(client_address)" json:"client_address"`
+	UserAgent            string    `orm:"column(user_agent)" json:"user_agent"`
 }
 
 // TableName for audit log
@@ -61,6 +63,10 @@ var EventTypes = []string{
 	"create_robot",
 	"delete_robot",
 	"update_configuration",
+	"create_member",
+	"delete_member",
+	"update_member",
+	"update_project",
 }
 
 // OtherEventTypes defines the types of other audit log event types excludes previous EventTypes: create_artifact, delete_artifact, pull_artifact
