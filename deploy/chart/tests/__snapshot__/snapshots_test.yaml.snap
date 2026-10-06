@@ -274,6 +274,8 @@
                 add_header X-Frame-Options DENY always;
                 add_header Content-Security-Policy "frame-ancestors 'none'" always;
                 add_header X-Content-Type-Options nosniff always;
+                add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+                add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
                 gzip on;
                 gzip_min_length 1000;
                 gzip_proxied expired no-cache no-store private auth;
@@ -291,12 +293,16 @@
                     add_header X-Frame-Options DENY always;
                     add_header Content-Security-Policy "frame-ancestors 'none'" always;
                     add_header X-Content-Type-Options nosniff always;
+                    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+                    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
                 }
                 location = /index.html {
                     add_header Cache-Control "no-store, no-cache, must-revalidate";
                     add_header X-Frame-Options DENY always;
                     add_header Content-Security-Policy "frame-ancestors 'none'" always;
                     add_header X-Content-Type-Options nosniff always;
+                    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+                    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
                 }
             }
         }
@@ -781,6 +787,8 @@
                 add_header X-Frame-Options DENY always;
                 add_header Content-Security-Policy "frame-ancestors 'none'" always;
                 add_header X-Content-Type-Options nosniff always;
+                add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+                add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
                 gzip on;
                 gzip_min_length 1000;
                 gzip_proxied expired no-cache no-store private auth;
@@ -798,12 +806,16 @@
                     add_header X-Frame-Options DENY always;
                     add_header Content-Security-Policy "frame-ancestors 'none'" always;
                     add_header X-Content-Type-Options nosniff always;
+                    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+                    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
                 }
                 location = /index.html {
                     add_header Cache-Control "no-store, no-cache, must-revalidate";
                     add_header X-Frame-Options DENY always;
                     add_header Content-Security-Policy "frame-ancestors 'none'" always;
                     add_header X-Content-Type-Options nosniff always;
+                    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+                    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
                 }
             }
         }
@@ -1288,6 +1300,8 @@
                 add_header X-Frame-Options DENY always;
                 add_header Content-Security-Policy "frame-ancestors 'none'" always;
                 add_header X-Content-Type-Options nosniff always;
+                add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+                add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
                 gzip on;
                 gzip_min_length 1000;
                 gzip_proxied expired no-cache no-store private auth;
@@ -1305,12 +1319,16 @@
                     add_header X-Frame-Options DENY always;
                     add_header Content-Security-Policy "frame-ancestors 'none'" always;
                     add_header X-Content-Type-Options nosniff always;
+                    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+                    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
                 }
                 location = /index.html {
                     add_header Cache-Control "no-store, no-cache, must-revalidate";
                     add_header X-Frame-Options DENY always;
                     add_header Content-Security-Policy "frame-ancestors 'none'" always;
                     add_header X-Content-Type-Options nosniff always;
+                    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+                    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
                 }
             }
         }
@@ -1796,6 +1814,8 @@
                 add_header X-Frame-Options DENY always;
                 add_header Content-Security-Policy "frame-ancestors 'none'" always;
                 add_header X-Content-Type-Options nosniff always;
+                add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+                add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
                 gzip on;
                 gzip_min_length 1000;
                 gzip_proxied expired no-cache no-store private auth;
@@ -1813,12 +1833,16 @@
                     add_header X-Frame-Options DENY always;
                     add_header Content-Security-Policy "frame-ancestors 'none'" always;
                     add_header X-Content-Type-Options nosniff always;
+                    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+                    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
                 }
                 location = /index.html {
                     add_header Cache-Control "no-store, no-cache, must-revalidate";
                     add_header X-Frame-Options DENY always;
                     add_header Content-Security-Policy "frame-ancestors 'none'" always;
                     add_header X-Content-Type-Options nosniff always;
+                    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+                    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
                 }
             }
         }
@@ -2319,6 +2343,8 @@
                 add_header X-Frame-Options DENY always;
                 add_header Content-Security-Policy "frame-ancestors 'none'" always;
                 add_header X-Content-Type-Options nosniff always;
+                add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+                add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
                 gzip on;
                 gzip_min_length 1000;
                 gzip_proxied expired no-cache no-store private auth;
@@ -2336,12 +2362,16 @@
                     add_header X-Frame-Options DENY always;
                     add_header Content-Security-Policy "frame-ancestors 'none'" always;
                     add_header X-Content-Type-Options nosniff always;
+                    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+                    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
                 }
                 location = /index.html {
                     add_header Cache-Control "no-store, no-cache, must-revalidate";
                     add_header X-Frame-Options DENY always;
                     add_header Content-Security-Policy "frame-ancestors 'none'" always;
                     add_header X-Content-Type-Options nosniff always;
+                    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+                    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
                 }
             }
         }
@@ -2958,6 +2988,8 @@
                 add_header X-Frame-Options DENY always;
                 add_header Content-Security-Policy "frame-ancestors 'none'" always;
                 add_header X-Content-Type-Options nosniff always;
+                add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+                add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
                 gzip on;
                 gzip_min_length 1000;
                 gzip_proxied expired no-cache no-store private auth;
@@ -2975,12 +3007,16 @@
                     add_header X-Frame-Options DENY always;
                     add_header Content-Security-Policy "frame-ancestors 'none'" always;
                     add_header X-Content-Type-Options nosniff always;
+                    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+                    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
                 }
                 location = /index.html {
                     add_header Cache-Control "no-store, no-cache, must-revalidate";
                     add_header X-Frame-Options DENY always;
                     add_header Content-Security-Policy "frame-ancestors 'none'" always;
                     add_header X-Content-Type-Options nosniff always;
+                    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+                    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
                 }
             }
         }
