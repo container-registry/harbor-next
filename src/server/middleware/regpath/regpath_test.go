@@ -27,6 +27,7 @@ type probe struct {
 	path   string
 }
 
+<<<<<<< HEAD
 // probeStatus is deliberately not 200, so a pass-through assertion proves the
 // next handler's response reached the client rather than the recorder default.
 const probeStatus = http.StatusAccepted
@@ -35,6 +36,11 @@ func (p *probe) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	p.called = true
 	p.path = r.URL.Path
 	w.WriteHeader(probeStatus)
+=======
+func (p *probe) ServeHTTP(_ http.ResponseWriter, r *http.Request) {
+	p.called = true
+	p.path = r.URL.Path
+>>>>>>> d57831f1d (Merge commit from fork)
 }
 
 func TestMiddleware(t *testing.T) {
@@ -43,9 +49,15 @@ func TestMiddleware(t *testing.T) {
 		path        string
 		wantBlocked bool
 	}{
+<<<<<<< HEAD
 		// Authorizes as "public/x" but path.Clean resolves it
 		// to the private "private/secret-image". Must be blocked.
 		{"manifest traversal across repositories", "/v2/public/x/manifests/x/../../../../private/secret-image/manifests/1.0.0", true},
+=======
+		// The advisory PoC: authorizes as "public/x" but path.Clean resolves it
+		// to the private "private/secret-image". Must be blocked.
+		{"manifest traversal (advisory PoC)", "/v2/public/x/manifests/x/../../../../private/secret-image/manifests/1.0.0", true},
+>>>>>>> d57831f1d (Merge commit from fork)
 		{"traversal to digest", "/v2/pub/x/manifests/x/../../../priv/secret/manifests/sha256:abc", true},
 		{"single dot segment", "/v2/pub/./blobs/uploads/", true},
 		{"leading dotdot", "/v2/../v2/priv/secret/manifests/latest", true},
@@ -72,6 +84,7 @@ func TestMiddleware(t *testing.T) {
 				assert.Equal(t, http.StatusBadRequest, rec.Code, "want 400 for %q", tt.path)
 			} else {
 				assert.True(t, p.called, "next handler must run for %q", tt.path)
+<<<<<<< HEAD
 				assert.Equal(t, probeStatus, rec.Code, "want pass-through for %q", tt.path)
 			}
 		})
@@ -106,6 +119,9 @@ func TestMiddlewareEncodedDotSegments(t *testing.T) {
 			} else {
 				assert.True(t, p.called, "next handler must run for %q", tt.target)
 				assert.Equal(t, probeStatus, rec.Code)
+=======
+				assert.Equal(t, http.StatusOK, rec.Code, "want pass-through for %q", tt.path)
+>>>>>>> d57831f1d (Merge commit from fork)
 			}
 		})
 	}

@@ -91,6 +91,7 @@ var (
 	}
 )
 
+<<<<<<< HEAD
 // middlewareEntry names one link of the global chain so the order the chain
 // depends on can be asserted in a test.
 type middlewareEntry struct {
@@ -135,6 +136,27 @@ func middlewareChain() []middlewareEntry {
 		{"security-unauthorized", security.UnauthorizedMiddleware()},
 		{"readonly", readonly.Middleware(readonlySkippers...)},
 		{"transaction", transaction.Middleware(dbTxSkippers...)},
+=======
+// MiddleWares returns global middlewares
+func MiddleWares() []web.MiddleWare {
+	return []web.MiddleWare{
+		url.Middleware(),
+		mergeslash.Middleware(),
+		regpath.Middleware(),
+		trace.Middleware(),
+		metric.Middleware(),
+		requestid.Middleware(),
+		session.Middleware(),
+		csrf.Middleware(),
+		orm.Middleware(pingSkipper),
+		notification.Middleware(pingSkipper), // notification must ahead of transaction ensure the DB transaction execution complete
+		transaction.Middleware(dbTxSkippers...),
+		artifactinfo.Middleware(),
+		security.Middleware(pingSkipper),
+		log.Middleware(), // log middleware should be after the security middleware so that the user info can be logged
+		security.UnauthorizedMiddleware(),
+		readonly.Middleware(readonlySkippers...),
+>>>>>>> d57831f1d (Merge commit from fork)
 	}
 }
 
