@@ -18,6 +18,7 @@ package quota
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -29,6 +30,8 @@ import (
 	"github.com/goharbor/harbor/src/pkg/quota"
 	"github.com/goharbor/harbor/src/pkg/quota/types"
 	htesting "github.com/goharbor/harbor/src/testing"
+	"github.com/goharbor/harbor/src/testing/mock"
+	quotatesting "github.com/goharbor/harbor/src/testing/pkg/quota"
 )
 
 type RollbackTestSuite struct {
@@ -120,6 +123,41 @@ func (suite *RollbackTestSuite) TestRollbackGivesUpOnALockedRow() {
 
 	suite.Error(err, "the rollback cannot succeed while another transaction holds the row")
 	suite.Less(elapsed, lockHoldLimit, "the rollback waited out the lock instead of its own deadline")
+}
+
+// TestRollbackDoesNotRetryNonConflictErrors: only a CAS conflict proves the
+// write did not land, so any other error must end the rollback after one
+// attempt instead of subtracting the reservation again.
+func (suite *RollbackTestSuite) TestRollbackDoesNotRetryNonConflictErrors() {
+	q := &quota.Quota{
+		Hard: types.ResourceList{types.ResourceStorage: 100}.String(),
+		Used: types.ResourceList{types.ResourceStorage: 10}.String(),
+	}
+	mgr := &quotatesting.Manager{}
+	mock.OnAnything(mgr, "GetByRef").Return(q, nil)
+	mock.OnAnything(mgr, "Update").Return(errors.New("commit outcome unknown"))
+	ctl := &controller{quotaMgr: mgr}
+
+	rbCtx, cancel := context.WithTimeout(orm.Context(), rollbackTimeout)
+	defer cancel()
+
+	err := ctl.rollbackUsage(rbCtx, suite.reference, uuid.New().String(), types.ResourceList{types.ResourceStorage: 10}, updateQuotaProviderDB)
+	suite.Error(err)
+	mgr.AssertNumberOfCalls(suite.T(), "Update", 1)
+}
+
+// TestRollbackAbortsOnExpiredDeadline: with no time left there is nothing to
+// give the database as statement_timeout, so no attempt may start.
+func (suite *RollbackTestSuite) TestRollbackAbortsOnExpiredDeadline() {
+	mgr := &quotatesting.Manager{}
+	ctl := &controller{quotaMgr: mgr}
+
+	rbCtx, cancel := context.WithDeadline(orm.Context(), time.Now().Add(-time.Second))
+	defer cancel()
+
+	err := ctl.rollbackUsage(rbCtx, suite.reference, uuid.New().String(), types.ResourceList{types.ResourceStorage: 10}, updateQuotaProviderDB)
+	suite.Error(err)
+	mgr.AssertNotCalled(suite.T(), "GetByRef", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestRollbackTestSuite(t *testing.T) {
