@@ -32,6 +32,7 @@ import (
 	"github.com/goharbor/harbor/src/server/middleware/readonly"
 	"github.com/goharbor/harbor/src/server/middleware/requestid"
 	"github.com/goharbor/harbor/src/server/middleware/security"
+	"github.com/goharbor/harbor/src/server/middleware/securityheader"
 	"github.com/goharbor/harbor/src/server/middleware/session"
 	"github.com/goharbor/harbor/src/server/middleware/trace"
 	"github.com/goharbor/harbor/src/server/middleware/transaction"
@@ -64,6 +65,10 @@ var (
 			return m == http.MethodGet || m == http.MethodHead || m == http.MethodOptions
 		},
 	}
+
+	// securityHeaderSkipper limits the security header middleware to /api/, the
+	// registry APIs under /v2/ set their own caching and content headers.
+	securityHeaderSkipper = middleware.NegativeSkipper(middleware.MethodAndPathSkipper("*", match("^/api(/|$)")))
 
 	// readonlySkippers skip the post request when harbor sets to readonly.
 	readonlySkippers = []middleware.Skipper{
@@ -110,6 +115,7 @@ type middlewareEntry struct {
 // login side effect should do.
 func middlewareChain() []middlewareEntry {
 	return []middlewareEntry{
+		{"securityheader", securityheader.Middleware(securityHeaderSkipper)},
 		{"url", url.Middleware()},
 		{"mergeslash", mergeslash.Middleware()},
 		{"trace", trace.Middleware()},
