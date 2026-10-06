@@ -99,6 +99,34 @@ func TestLoadCustomCACertificatesMerges(t *testing.T) {
 	assert.Contains(t, string(got), customCert)
 }
 
+// TestLoadCustomCACertificatesUppercaseExtension pins the case-insensitive
+// extension match. Operators mounting a Secret often end up with names like
+// "Company-CA.CRT" or "ca.Pem", and if the match became case-sensitive those
+// certificates would be skipped silently -- TLS would then fail with
+// "certificate signed by unknown authority" and nothing would point at the
+// extension as the cause.
+func TestLoadCustomCACertificatesUppercaseExtension(t *testing.T) {
+	withCleanSSLCertFileEnv(t)
+
+	customCert := generateSelfSignedCert(t)
+	certDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(certDir, "Company-CA.CRT"), []byte(customCert), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(certDir, "Mixed.Pem"), []byte(customCert), 0o644))
+
+	systemBundle := filepath.Join(t.TempDir(), "ca-certificates.crt")
+	require.NoError(t, os.WriteFile(systemBundle, []byte("-----BEGIN SYSTEM BUNDLE-----\n"), 0o644))
+
+	combined := filepath.Join(t.TempDir(), "combined.crt")
+	loadCustomCACertificates(certDir, systemBundle, combined)
+
+	assert.Equal(t, combined, os.Getenv("SSL_CERT_FILE"))
+
+	got, err := os.ReadFile(combined)
+	require.NoError(t, err)
+	assert.Contains(t, string(got), "-----BEGIN SYSTEM BUNDLE-----")
+	assert.Contains(t, string(got), customCert)
+}
+
 func TestLoadCustomCACertificatesRespectsExistingSSLCertFile(t *testing.T) {
 	withCleanSSLCertFileEnv(t)
 
