@@ -21,8 +21,11 @@ import (
 
 	"github.com/go-openapi/runtime/middleware"
 
+	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/common/rbac"
+	"github.com/goharbor/harbor/src/common/security/local"
 	"github.com/goharbor/harbor/src/controller/member"
+	"github.com/goharbor/harbor/src/controller/project"
 	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/errors"
 	memberModels "github.com/goharbor/harbor/src/pkg/member/models"
@@ -32,11 +35,12 @@ import (
 
 type memberAPI struct {
 	BaseAPI
-	ctl member.Controller
+	ctl        member.Controller
+	projectCtl project.Controller
 }
 
 func newMemberAPI() *memberAPI {
-	return &memberAPI{ctl: member.NewController()}
+	return &memberAPI{ctl: member.NewController(), projectCtl: project.Ctl}
 }
 
 func (m *memberAPI) CreateProjectMember(ctx context.Context, params operation.CreateProjectMemberParams) middleware.Responder {
@@ -49,6 +53,9 @@ func (m *memberAPI) CreateProjectMember(ctx context.Context, params operation.Cr
 	}
 	req, err := toMemberReq(params.ProjectMember)
 	if err != nil {
+		return m.SendError(ctx, err)
+	}
+	if err := m.requireProjectAdminGrant(ctx, projectNameOrID, req.Role); err != nil {
 		return m.SendError(ctx, err)
 	}
 	id, err := m.ctl.Create(ctx, projectNameOrID, *req)
@@ -70,6 +77,40 @@ func toMemberReq(memberReq *models.ProjectMember) (*member.Request, error) {
 		return nil, err
 	}
 	return &result, nil
+}
+
+func (m *memberAPI) requireProjectAdminGrant(ctx context.Context, project any, role int) error {
+	if role != common.RoleProjectAdmin {
+		return nil
+	}
+	securityCtx, err := m.GetSecurityContext(ctx)
+	if err != nil {
+		return err
+	}
+	if securityCtx.IsSysAdmin() {
+		return nil
+	}
+	localCtx, ok := securityCtx.(*local.SecurityContext)
+	if !ok {
+		return errors.ForbiddenError(nil)
+	}
+	p, err := m.projectCtl.Get(ctx, project)
+	if err != nil {
+		return err
+	}
+	if p == nil {
+		return errors.BadRequestError(nil).WithMessage("project is not found")
+	}
+	roles, err := m.projectCtl.ListRoles(ctx, p.ProjectID, localCtx.User())
+	if err != nil {
+		return err
+	}
+	for _, currentRole := range roles {
+		if currentRole == common.RoleProjectAdmin {
+			return nil
+		}
+	}
+	return errors.ForbiddenError(nil)
 }
 
 func (m *memberAPI) DeleteProjectMember(ctx context.Context, params operation.DeleteProjectMemberParams) middleware.Responder {
@@ -164,7 +205,9 @@ func (m *memberAPI) UpdateProjectMember(ctx context.Context, params operation.Up
 	if params.Mid == 0 {
 		return m.SendError(ctx, errors.BadRequestError(nil).WithMessage("member id can not be empty"))
 	}
-
+	if err := m.requireProjectAdminGrant(ctx, projectNameOrID, int(params.Role.RoleID)); err != nil {
+		return m.SendError(ctx, err)
+	}
 	err := m.ctl.UpdateRole(ctx, projectNameOrID, int(params.Mid), int(params.Role.RoleID))
 	if err != nil {
 		return m.SendError(ctx, err)
