@@ -263,15 +263,24 @@ func resolveNextLink(base *url.URL, link string) (*url.URL, error) {
 	// userinfo has no legitimate use in a pagination link and is the vector that turns a
 	// same-origin-looking value into a cross-origin host.
 	if ref.User != nil {
+<<<<<<< HEAD
 		return nil, fmt.Errorf("pagination Link must not contain userinfo: %q", RedactedURL(ref))
 	}
 	next := base.ResolveReference(ref)
 	if !SameOrigin(base, next) {
 		return nil, fmt.Errorf("pagination Link %q resolves to a different origin than %q", RedactedURL(next), RedactedURL(base))
+=======
+		return nil, fmt.Errorf("pagination Link must not contain userinfo: %q", link)
+	}
+	next := base.ResolveReference(ref)
+	if !SameOrigin(base, next) {
+		return nil, fmt.Errorf("pagination Link %q resolves to a different origin than %q", link, base.Redacted())
+>>>>>>> c38a9eb5d (Merge commit from fork)
 	}
 	return next, nil
 }
 
+<<<<<<< HEAD
 // RedactedURL renders u for error messages without userinfo, query or fragment. Pagination
 // and upload URLs come from remote registries, which may carry credentials or signed tokens
 // there, and callers log these errors.
@@ -300,6 +309,15 @@ func sameHost(a, b string) bool {
 	return strings.EqualFold(aHost, bHost) && aZone == bZone
 }
 
+=======
+// SameOrigin reports whether a and b share scheme, host and effective port.
+func SameOrigin(a, b *url.URL) bool {
+	return strings.EqualFold(a.Scheme, b.Scheme) &&
+		strings.EqualFold(a.Hostname(), b.Hostname()) &&
+		effectivePort(a) == effectivePort(b)
+}
+
+>>>>>>> c38a9eb5d (Merge commit from fork)
 // effectivePort returns the URL's port, substituting the scheme's default when none is set,
 // so that an alternate-port target is treated as a different origin.
 func effectivePort(u *url.URL) string {

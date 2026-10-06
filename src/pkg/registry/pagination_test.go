@@ -152,6 +152,7 @@ func TestNextPageURL(t *testing.T) {
 		})
 	}
 }
+<<<<<<< HEAD
 
 // TestNextPageURLErrorRedactsSecrets keeps credentials and tokens carried in a rejected Link
 // out of the returned error, which replication logs.
@@ -166,3 +167,5 @@ func TestNextPageURLErrorRedactsSecrets(t *testing.T) {
 		assert.NotContains(t, err.Error(), "s3cr3t", link)
 	}
 }
+=======
+>>>>>>> c38a9eb5d (Merge commit from fork)

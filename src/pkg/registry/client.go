@@ -738,7 +738,11 @@ func nextPageURL(endpoint, link string) (string, error) {
 		return "", err
 	}
 	if u.User.String() != base.User.String() || !commonhttp.SameOrigin(base, u) {
+<<<<<<< HEAD
 		return "", fmt.Errorf("pagination Link %q leaves the registry origin %q", commonhttp.RedactedURL(u), commonhttp.RedactedURL(base))
+=======
+		return "", fmt.Errorf("pagination Link %q leaves the registry origin %q", link, base.Redacted())
+>>>>>>> c38a9eb5d (Merge commit from fork)
 	}
 	return next, nil
 }

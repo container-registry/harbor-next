@@ -174,6 +174,7 @@ func mustHost(t *testing.T, raw string) string {
 	}
 	return u.Host
 }
+<<<<<<< HEAD
 
 // TestResolveNextLinkErrorRedactsSecrets keeps credentials and tokens carried in a rejected
 // Link out of the returned error, which callers log.
@@ -213,3 +214,5 @@ func TestSameOriginIPv6Zone(t *testing.T) {
 		t.Fatal("zone identifiers differing in case must not be the same origin")
 	}
 }
+=======
+>>>>>>> c38a9eb5d (Merge commit from fork)
