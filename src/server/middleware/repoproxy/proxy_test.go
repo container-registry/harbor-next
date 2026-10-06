@@ -27,6 +27,7 @@ import (
 	"github.com/goharbor/harbor/src/common/security/proxycachesecret"
 	robotSc "github.com/goharbor/harbor/src/common/security/robot"
 	securitySecret "github.com/goharbor/harbor/src/common/security/secret"
+	"github.com/goharbor/harbor/src/common/security/v2token"
 	"github.com/goharbor/harbor/src/controller/project"
 	registryCtl "github.com/goharbor/harbor/src/controller/registry"
 	"github.com/goharbor/harbor/src/controller/robot"
@@ -37,6 +38,7 @@ import (
 	pkgRobot "github.com/goharbor/harbor/src/pkg/robot/model"
 	projecttesting "github.com/goharbor/harbor/src/testing/controller/project"
 	registrytesting "github.com/goharbor/harbor/src/testing/controller/registry"
+	robotmock "github.com/goharbor/harbor/src/testing/controller/robot"
 	testingmock "github.com/goharbor/harbor/src/testing/mock"
 )
 
@@ -80,10 +82,17 @@ func TestIsProxySession(t *testing.T) {
 	userSc2 := robotSc.NewSecurityContext(otherRobot)
 	nonScannerCtx := security.NewContext(context.Background(), userSc2)
 
+	// Auto-SBOM pushes arrive with a v2_token context named after the scanner robot
+	v2TokenScannerSc := v2token.New(context.Background(), sysScannerRobot.Name, nil)
+	v2TokenScannerCtx := security.NewContext(context.Background(), v2TokenScannerSc)
+	v2TokenPoisoningSc := v2token.New(context.Background(), poisoningRobot.Name, nil)
+	v2TokenPoisoningCtx := security.NewContext(context.Background(), v2TokenPoisoningSc)
+
 	cases := []struct {
-		name string
-		in   context.Context
-		want bool
+		name   string
+		in     context.Context
+		robots []*robot.Robot
+		want   bool
 	}{
 		{
 			name: `normal`,
@@ -96,24 +105,55 @@ func TestIsProxySession(t *testing.T) {
 			want: true,
 		},
 		{
-			name: `system scanner robot account`,
-			in:   scannerCtx,
-			want: true,
+			name:   `system scanner robot account`,
+			in:     scannerCtx,
+			robots: []*robot.Robot{sysScannerRobot},
+			want:   true,
 		},
 		{
-			name: `user-created robot prefixed with scanner (poisoning attempt)`,
-			in:   poisoningCtx,
-			want: false,
+			name:   `user-created robot prefixed with scanner (poisoning attempt)`,
+			in:     poisoningCtx,
+			robots: []*robot.Robot{poisoningRobot},
+			want:   false,
 		},
 		{
 			name: `non scanner robot`,
 			in:   nonScannerCtx,
 			want: false,
 		},
+		{
+			name:   `system scanner robot behind v2_token (auto SBOM push)`,
+			in:     v2TokenScannerCtx,
+			robots: []*robot.Robot{sysScannerRobot},
+			want:   true,
+		},
+		{
+			name:   `user-created robot prefixed with scanner behind v2_token`,
+			in:     v2TokenPoisoningCtx,
+			robots: []*robot.Robot{poisoningRobot},
+			want:   false,
+		},
+		{
+			name:   `unknown scanner robot behind v2_token`,
+			in:     v2TokenScannerCtx,
+			robots: []*robot.Robot{},
+			want:   false,
+		},
 	}
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
+			robotController := &robotmock.Controller{}
+			originalRobotController := robot.Ctl
+			robot.Ctl = robotController
+			defer func() {
+				robot.Ctl = originalRobotController
+			}()
+
+			if tt.robots != nil {
+				testingmock.OnAnything(robotController, "List").Return(tt.robots, nil)
+			}
+
 			got := isProxySession(tt.in, "library")
 			if got != tt.want {
 				t.Errorf(`(%v) = %v; want "%v"`, tt.in, got, tt.want)
