@@ -37,6 +37,7 @@ import (
 	configCtl "github.com/goharbor/harbor/src/controller/config"
 	_ "github.com/goharbor/harbor/src/controller/event/handler"
 	"github.com/goharbor/harbor/src/controller/health"
+	"github.com/goharbor/harbor/src/controller/quota"
 	"github.com/goharbor/harbor/src/controller/registry"
 	"github.com/goharbor/harbor/src/controller/systemartifact"
 	"github.com/goharbor/harbor/src/controller/task"
@@ -140,6 +141,16 @@ func gracefulShutdown(closing, done chan struct{}, shutdowns ...func()) {
 	}
 
 	os.Exit(0)
+}
+
+// flushDeferredQuotaRefreshTimeout leaves the database pool shutdown room
+// inside the 3s budget of gracefulShutdown.
+const flushDeferredQuotaRefreshTimeout = 2 * time.Second
+
+func flushDeferredQuotaRefresh() {
+	ctx, cancel := context.WithTimeout(context.Background(), flushDeferredQuotaRefreshTimeout)
+	defer cancel()
+	quota.FlushDeferredRefresh(ctx)
 }
 
 func main() {
@@ -271,7 +282,7 @@ func main() {
 
 	closing := make(chan struct{})
 	done := make(chan struct{})
-	go gracefulShutdown(closing, done, shutdownTracerProvider, stopSettingsSync, dao.ClosePool)
+	go gracefulShutdown(closing, done, shutdownTracerProvider, stopSettingsSync, flushDeferredQuotaRefresh, dao.ClosePool)
 	// Start health checker for registries
 	go registry.Ctl.StartRegularHealthCheck(orm.Context(), closing, done)
 	// Init audit log

@@ -244,6 +244,79 @@ func (suite *ControllerTestSuite) TestRequestLimitedDenies() {
 	suite.False(called)
 }
 
+func (suite *ControllerTestSuite) prepareUpdateFrom(oldHard types.ResourceList, used int64) {
+	// fresh object per call: Update and Refresh both mutate the returned quota
+	mock.OnAnything(suite.quotaMgr, "GetByRef").Return(func(context.Context, string, string) *quota.Quota {
+		return &quota.Quota{Hard: oldHard.String(), Used: types.ResourceList{types.ResourceStorage: used}.String()}
+	}, nil)
+	mock.OnAnything(suite.quotaMgr, "Update").Return(nil)
+}
+
+func (suite *ControllerTestSuite) TestUpdateBecomingLimitedRefreshesUsage() {
+	drainDirty()
+	defer drainDirty()
+	suite.prepareUpdateFrom(types.ResourceList{types.ResourceStorage: types.UNLIMITED}, 10)
+	mock.OnAnything(suite.driver, "CalculateUsage").Return(types.ResourceList{types.ResourceStorage: 500}, nil)
+
+	ctx := orm.NewContext(context.TODO(), &ormtesting.FakeOrmer{})
+	u := &quota.Quota{Reference: suite.reference, ReferenceID: uuid.New().String(), Hard: types.ResourceList{types.ResourceStorage: 100}.String()}
+	suite.Nil(suite.ctl.Update(ctx, u))
+
+	// the real usage exceeds the new limit and must still be stored
+	suite.driver.AssertNumberOfCalls(suite.T(), "CalculateUsage", 1)
+	suite.quotaMgr.AssertCalled(suite.T(), "Update", mock.Anything, mock.MatchedBy(func(q *quota.Quota) bool {
+		return q.UsedChanged && q.Used == types.ResourceList{types.ResourceStorage: 500}.String()
+	}))
+	suite.Equal(0, dirtyLen())
+}
+
+func (suite *ControllerTestSuite) TestUpdateFiniteLimitChangeSkipsRefresh() {
+	suite.prepareUpdateFrom(types.ResourceList{types.ResourceStorage: 100}, 10)
+
+	ctx := orm.NewContext(context.TODO(), &ormtesting.FakeOrmer{})
+	u := &quota.Quota{Reference: suite.reference, ReferenceID: uuid.New().String(), Hard: types.ResourceList{types.ResourceStorage: 200}.String()}
+	suite.Nil(suite.ctl.Update(ctx, u))
+
+	suite.driver.AssertNotCalled(suite.T(), "CalculateUsage", mock.Anything, mock.Anything)
+	suite.quotaMgr.AssertNumberOfCalls(suite.T(), "Update", 1)
+}
+
+func (suite *ControllerTestSuite) TestUpdateBecomingLimitedRefreshFailureMarksDirty() {
+	drainDirty()
+	defer drainDirty()
+	suite.prepareUpdateFrom(types.ResourceList{types.ResourceStorage: types.UNLIMITED}, 10)
+	mock.OnAnything(suite.driver, "CalculateUsage").Return(nil, fmt.Errorf("db down"))
+
+	ctx := orm.NewContext(context.TODO(), &ormtesting.FakeOrmer{})
+	u := &quota.Quota{Reference: suite.reference, ReferenceID: uuid.New().String(), Hard: types.ResourceList{types.ResourceStorage: 100}.String()}
+	// the new limit is stored; the failed recompute falls back to the deferred refresh
+	suite.Nil(suite.ctl.Update(ctx, u))
+	suite.Equal(1, dirtyLen())
+}
+
+func TestBecomesLimited(t *testing.T) {
+	unlimited := types.ResourceList{types.ResourceStorage: types.UNLIMITED}
+	finite := types.ResourceList{types.ResourceStorage: 100}
+	cases := []struct {
+		name     string
+		old, new types.ResourceList
+		want     bool
+	}{
+		{"unlimited to finite", unlimited, finite, true},
+		{"finite to unlimited", finite, unlimited, false},
+		{"finite to finite", finite, types.ResourceList{types.ResourceStorage: 200}, false},
+		{"unlimited to unlimited", unlimited, unlimited, false},
+		{"resource not limited before", types.ResourceList{}, finite, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := becomesLimited(c.old, c.new); got != c.want {
+				t.Errorf("becomesLimited(%v, %v) = %v, want %v", c.old, c.new, got, c.want)
+			}
+		})
+	}
+}
+
 func TestControllerTestSuite(t *testing.T) {
 	suite.Run(t, &ControllerTestSuite{})
 }

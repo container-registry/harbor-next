@@ -492,7 +492,9 @@ func (c *controller) calcQuota(ctx context.Context, reference, referenceID strin
 }
 
 func (c *controller) Update(ctx context.Context, u *quota.Quota) error {
+	var limited bool
 	f := func() error {
+		limited = false
 		q, err := c.quotaMgr.GetByRef(ctx, u.Reference, u.ReferenceID)
 		if err != nil {
 			return err
@@ -502,6 +504,7 @@ func (c *controller) Update(ctx context.Context, u *quota.Quota) error {
 			if newHard, err := u.GetHard(); err == nil {
 				if !types.Equals(oldHard, newHard) {
 					q.SetHard(newHard)
+					limited = becomesLimited(oldHard, newHard)
 				}
 			}
 		}
@@ -525,7 +528,35 @@ func (c *controller) Update(ctx context.Context, u *quota.Quota) error {
 		retry.Context(ctx),
 	}
 
-	return retry.Retry(f, options...)
+	if err := retry.Retry(f, options...); err != nil {
+		return err
+	}
+
+	// Requests under an UNLIMITED limit skip the reservation and leave the
+	// stored usage to the deferred refresh, which may be pending or lost to
+	// a restart. Recompute it now so the first reservation under the new
+	// limit is checked against the real usage.
+	if limited {
+		refreshCtx, cancel := context.WithTimeout(ctx, perRefreshTimeout)
+		defer cancel()
+		if err := c.Refresh(refreshCtx, u.Reference, u.ReferenceID, IgnoreLimitation(true)); err != nil {
+			log.G(ctx).Warningf("failed to refresh the usage of %s %s after its hard limit changed, error: %v", u.Reference, u.ReferenceID, err)
+			MarkRefresh(u.Reference, u.ReferenceID)
+		}
+	}
+
+	return nil
+}
+
+// becomesLimited reports whether a resource that was UNLIMITED in oldHard
+// has a finite limit in newHard.
+func becomesLimited(oldHard, newHard types.ResourceList) bool {
+	for resource, newLimit := range newHard {
+		if oldLimit, found := oldHard[resource]; found && oldLimit == types.UNLIMITED && newLimit != types.UNLIMITED {
+			return true
+		}
+	}
+	return false
 }
 
 // Driver returns quota driver for the reference

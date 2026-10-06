@@ -153,3 +153,33 @@ func TestRefreshDirtyRetriesFailedFlush(t *testing.T) {
 
 	assert.Equal(t, 1, dirtyLen(), "failed flush must re-mark the reference for the next interval")
 }
+
+func TestRefreshDirtyKeepsMarksWhenContextDone(t *testing.T) {
+	drainDirty()
+	defer drainDirty()
+
+	quotaMgr := &quotatesting.Manager{}
+	origCtl := Ctl
+	Ctl = &controller{quotaMgr: quotaMgr}
+	defer func() { Ctl = origCtl }()
+
+	reference := "mock-async-done"
+	d := &drivertesting.Driver{}
+	driver.Register(reference, d)
+	mock.OnAnything(d, "CalculateUsage").Return(types.ResourceList{types.ResourceStorage: 42}, nil)
+	mock.OnAnything(quotaMgr, "GetByRef").Return(&quota.Quota{
+		Hard: types.ResourceList{types.ResourceStorage: types.UNLIMITED}.String(),
+		Used: types.ResourceList{types.ResourceStorage: 0}.String(),
+	}, nil)
+	mock.OnAnything(quotaMgr, "Update").Return(nil)
+
+	MarkRefresh(reference, "1")
+	MarkRefresh(reference, "2")
+
+	ctx, cancel := context.WithCancel(orm.NewContext(context.TODO(), &ormtesting.FakeOrmer{}))
+	cancel()
+	refreshDirty(ctx)
+
+	quotaMgr.AssertNotCalled(t, "GetByRef", mock.Anything, mock.Anything, mock.Anything)
+	assert.Equal(t, 2, dirtyLen(), "projects not reached before the deadline must stay marked")
+}
