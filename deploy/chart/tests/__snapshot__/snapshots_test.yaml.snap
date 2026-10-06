@@ -16,7 +16,7 @@
       HTTPS_PROXY: ""
       JOBSERVICE_URL: http://harbor-jobservice
       LOG_LEVEL: info
-      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,127.0.0.1,localhost,.local,.internal
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       PORT: "8080"
       PORTAL_URL: http://harbor-portal
@@ -83,29 +83,6 @@
         app.kubernetes.io/name: harbor
       type: ClusterIP
   3: |
-    apiVersion: v1
-    kind: Service
-    metadata:
-      labels:
-        app.kubernetes.io/component: exporter
-        app.kubernetes.io/instance: harbor
-        app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-2.0.0
-      name: harbor-exporter
-    spec:
-      ports:
-        - name: http-metrics
-          port: 8001
-          protocol: TCP
-          targetPort: 8001
-      selector:
-        app.kubernetes.io/component: exporter
-        app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor
-      type: ClusterIP
-  4: |
     apiVersion: networking.k8s.io/v1
     kind: Ingress
     metadata:
@@ -163,7 +140,7 @@
                       number: 80
                 path: /
                 pathType: Prefix
-  5: |
+  4: |
     apiVersion: v1
     data:
       CACHE_ENABLED: "false"
@@ -172,7 +149,7 @@
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
-      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,127.0.0.1,localhost,.local,.internal
       REGISTRY_CONTROLLER_URL: http://harbor-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_URL: http://harbor-registry:5000
@@ -187,7 +164,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice-env
-  6: |
+  5: |
     apiVersion: v1
     data:
       config.yml: |
@@ -224,7 +201,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
-  7: |
+  6: |
     apiVersion: v1
     kind: Service
     metadata:
@@ -251,7 +228,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/name: harbor
       type: ClusterIP
-  8: |
+  7: |
     apiVersion: v1
     data:
       nginx.conf: |
@@ -317,7 +294,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
-  9: |
+  8: |
     apiVersion: v1
     kind: Service
     metadata:
@@ -340,7 +317,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/name: harbor
       type: ClusterIP
-  10: |
+  9: |
     apiVersion: v1
     data:
       config.yml: |
@@ -404,7 +381,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
-  11: |
+  10: |
     apiVersion: v1
     kind: Service
     metadata:
@@ -435,7 +412,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/name: harbor
       type: ClusterIP
-  12: |
+  11: |
     apiVersion: v1
     data:
       _PLACEHOLDER: "true"
@@ -448,7 +425,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-registryctl
-  13: |
+  12: |
     apiVersion: v1
     automountServiceAccountToken: false
     kind: ServiceAccount
@@ -461,20 +438,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-core
-  14: |
-    apiVersion: v1
-    automountServiceAccountToken: false
-    kind: ServiceAccount
-    metadata:
-      labels:
-        app.kubernetes.io/component: exporter
-        app.kubernetes.io/instance: harbor
-        app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-2.0.0
-      name: harbor-exporter
-  15: |
+  13: |
     apiVersion: v1
     automountServiceAccountToken: false
     kind: ServiceAccount
@@ -487,7 +451,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
-  16: |
+  14: |
     apiVersion: v1
     automountServiceAccountToken: false
     kind: ServiceAccount
@@ -500,7 +464,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
-  17: |
+  15: |
     apiVersion: v1
     automountServiceAccountToken: false
     kind: ServiceAccount
@@ -531,7 +495,7 @@
       HTTPS_PROXY: ""
       JOBSERVICE_URL: http://harbor-jobservice
       LOG_LEVEL: info
-      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,127.0.0.1,localhost,.local,.internal
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       PORT: "8080"
       PORTAL_URL: http://harbor-portal
@@ -598,29 +562,6 @@
         app.kubernetes.io/name: harbor
       type: ClusterIP
   3: |
-    apiVersion: v1
-    kind: Service
-    metadata:
-      labels:
-        app.kubernetes.io/component: exporter
-        app.kubernetes.io/instance: harbor
-        app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-2.0.0
-      name: harbor-exporter
-    spec:
-      ports:
-        - name: http-metrics
-          port: 8001
-          protocol: TCP
-          targetPort: 8001
-      selector:
-        app.kubernetes.io/component: exporter
-        app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor
-      type: ClusterIP
-  4: |
     apiVersion: networking.k8s.io/v1
     kind: Ingress
     metadata:
@@ -678,7 +619,7 @@
                       number: 80
                 path: /
                 pathType: Prefix
-  5: |
+  4: |
     apiVersion: v1
     data:
       CACHE_ENABLED: "false"
@@ -687,7 +628,7 @@
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
-      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,127.0.0.1,localhost,.local,.internal
       REGISTRY_CONTROLLER_URL: http://harbor-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_URL: http://harbor-registry:5000
@@ -702,7 +643,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice-env
-  6: |
+  5: |
     apiVersion: v1
     data:
       config.yml: |
@@ -739,7 +680,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
-  7: |
+  6: |
     apiVersion: v1
     kind: Service
     metadata:
@@ -766,7 +707,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/name: harbor
       type: ClusterIP
-  8: |
+  7: |
     apiVersion: v1
     data:
       nginx.conf: |
@@ -832,7 +773,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
-  9: |
+  8: |
     apiVersion: v1
     kind: Service
     metadata:
@@ -855,7 +796,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/name: harbor
       type: ClusterIP
-  10: |
+  9: |
     apiVersion: v1
     data:
       config.yml: |
@@ -919,7 +860,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
-  11: |
+  10: |
     apiVersion: v1
     kind: Service
     metadata:
@@ -950,7 +891,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/name: harbor
       type: ClusterIP
-  12: |
+  11: |
     apiVersion: v1
     data:
       _PLACEHOLDER: "true"
@@ -963,7 +904,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-registryctl
-  13: |
+  12: |
     apiVersion: v1
     automountServiceAccountToken: false
     kind: ServiceAccount
@@ -976,20 +917,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-core
-  14: |
-    apiVersion: v1
-    automountServiceAccountToken: false
-    kind: ServiceAccount
-    metadata:
-      labels:
-        app.kubernetes.io/component: exporter
-        app.kubernetes.io/instance: harbor
-        app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-2.0.0
-      name: harbor-exporter
-  15: |
+  13: |
     apiVersion: v1
     automountServiceAccountToken: false
     kind: ServiceAccount
@@ -1002,7 +930,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
-  16: |
+  14: |
     apiVersion: v1
     automountServiceAccountToken: false
     kind: ServiceAccount
@@ -1015,7 +943,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
-  17: |
+  15: |
     apiVersion: v1
     automountServiceAccountToken: false
     kind: ServiceAccount
@@ -1046,7 +974,7 @@
       HTTPS_PROXY: ""
       JOBSERVICE_URL: http://harbor-jobservice
       LOG_LEVEL: info
-      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,127.0.0.1,localhost,.local,.internal
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       PORT: "8080"
       PORTAL_URL: http://harbor-portal
@@ -1113,29 +1041,6 @@
         app.kubernetes.io/name: harbor
       type: ClusterIP
   3: |
-    apiVersion: v1
-    kind: Service
-    metadata:
-      labels:
-        app.kubernetes.io/component: exporter
-        app.kubernetes.io/instance: harbor
-        app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-2.0.0
-      name: harbor-exporter
-    spec:
-      ports:
-        - name: http-metrics
-          port: 8001
-          protocol: TCP
-          targetPort: 8001
-      selector:
-        app.kubernetes.io/component: exporter
-        app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor
-      type: ClusterIP
-  4: |
     apiVersion: networking.k8s.io/v1
     kind: Ingress
     metadata:
@@ -1193,7 +1098,7 @@
                       number: 80
                 path: /
                 pathType: Prefix
-  5: |
+  4: |
     apiVersion: v1
     data:
       CACHE_ENABLED: "false"
@@ -1202,7 +1107,7 @@
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
-      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,127.0.0.1,localhost,.local,.internal
       REGISTRY_CONTROLLER_URL: http://harbor-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_URL: http://harbor-registry:5000
@@ -1217,7 +1122,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice-env
-  6: |
+  5: |
     apiVersion: v1
     data:
       config.yml: |
@@ -1254,7 +1159,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
-  7: |
+  6: |
     apiVersion: v1
     kind: Service
     metadata:
@@ -1281,7 +1186,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/name: harbor
       type: ClusterIP
-  8: |
+  7: |
     apiVersion: v1
     data:
       nginx.conf: |
@@ -1347,7 +1252,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
-  9: |
+  8: |
     apiVersion: v1
     kind: Service
     metadata:
@@ -1370,7 +1275,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/name: harbor
       type: ClusterIP
-  10: |
+  9: |
     apiVersion: v1
     data:
       config.yml: |
@@ -1435,7 +1340,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
-  11: |
+  10: |
     apiVersion: v1
     kind: Service
     metadata:
@@ -1466,7 +1371,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/name: harbor
       type: ClusterIP
-  12: |
+  11: |
     apiVersion: v1
     data:
       _PLACEHOLDER: "true"
@@ -1479,7 +1384,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-registryctl
-  13: |
+  12: |
     apiVersion: v1
     automountServiceAccountToken: false
     kind: ServiceAccount
@@ -1492,20 +1397,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-core
-  14: |
-    apiVersion: v1
-    automountServiceAccountToken: false
-    kind: ServiceAccount
-    metadata:
-      labels:
-        app.kubernetes.io/component: exporter
-        app.kubernetes.io/instance: harbor
-        app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-2.0.0
-      name: harbor-exporter
-  15: |
+  13: |
     apiVersion: v1
     automountServiceAccountToken: false
     kind: ServiceAccount
@@ -1518,7 +1410,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
-  16: |
+  14: |
     apiVersion: v1
     automountServiceAccountToken: false
     kind: ServiceAccount
@@ -1531,7 +1423,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
-  17: |
+  15: |
     apiVersion: v1
     automountServiceAccountToken: false
     kind: ServiceAccount
@@ -1562,7 +1454,7 @@
       HTTPS_PROXY: ""
       JOBSERVICE_URL: http://harbor-jobservice
       LOG_LEVEL: info
-      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,127.0.0.1,localhost,.local,.internal
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       PORT: "8080"
       PORTAL_URL: http://harbor-portal
@@ -1629,29 +1521,6 @@
         app.kubernetes.io/name: harbor
       type: ClusterIP
   3: |
-    apiVersion: v1
-    kind: Service
-    metadata:
-      labels:
-        app.kubernetes.io/component: exporter
-        app.kubernetes.io/instance: harbor
-        app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-2.0.0
-      name: harbor-exporter
-    spec:
-      ports:
-        - name: http-metrics
-          port: 8001
-          protocol: TCP
-          targetPort: 8001
-      selector:
-        app.kubernetes.io/component: exporter
-        app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor
-      type: ClusterIP
-  4: |
     apiVersion: networking.k8s.io/v1
     kind: Ingress
     metadata:
@@ -1709,7 +1578,7 @@
                       number: 80
                 path: /
                 pathType: Prefix
-  5: |
+  4: |
     apiVersion: v1
     data:
       CACHE_ENABLED: "false"
@@ -1718,7 +1587,7 @@
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
-      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,127.0.0.1,localhost,.local,.internal
       REGISTRY_CONTROLLER_URL: http://harbor-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_URL: http://harbor-registry:5000
@@ -1733,7 +1602,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice-env
-  6: |
+  5: |
     apiVersion: v1
     data:
       config.yml: |
@@ -1770,7 +1639,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
-  7: |
+  6: |
     apiVersion: v1
     kind: Service
     metadata:
@@ -1797,7 +1666,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/name: harbor
       type: ClusterIP
-  8: |
+  7: |
     apiVersion: v1
     data:
       nginx.conf: |
@@ -1863,7 +1732,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
-  9: |
+  8: |
     apiVersion: v1
     kind: Service
     metadata:
@@ -1886,7 +1755,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/name: harbor
       type: ClusterIP
-  10: |
+  9: |
     apiVersion: v1
     data:
       config.yml: |
@@ -1950,7 +1819,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
-  11: |
+  10: |
     apiVersion: v1
     kind: Service
     metadata:
@@ -1981,7 +1850,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/name: harbor
       type: ClusterIP
-  12: |
+  11: |
     apiVersion: v1
     data:
       _PLACEHOLDER: "true"
@@ -1994,7 +1863,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-registryctl
-  13: |
+  12: |
     apiVersion: v1
     automountServiceAccountToken: false
     kind: ServiceAccount
@@ -2007,20 +1876,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-core
-  14: |
-    apiVersion: v1
-    automountServiceAccountToken: false
-    kind: ServiceAccount
-    metadata:
-      labels:
-        app.kubernetes.io/component: exporter
-        app.kubernetes.io/instance: harbor
-        app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-2.0.0
-      name: harbor-exporter
-  15: |
+  13: |
     apiVersion: v1
     automountServiceAccountToken: false
     kind: ServiceAccount
@@ -2033,7 +1889,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
-  16: |
+  14: |
     apiVersion: v1
     automountServiceAccountToken: false
     kind: ServiceAccount
@@ -2046,7 +1902,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
-  17: |
+  15: |
     apiVersion: v1
     automountServiceAccountToken: false
     kind: ServiceAccount
@@ -2078,11 +1934,13 @@
       JOBSERVICE_URL: http://harbor-jobservice
       LOG_LEVEL: info
       METRIC_ENABLE: "true"
+      METRIC_EXPORTER_CACHE_TIME: "30"
+      METRIC_EXPORTER_ENABLE: "true"
       METRIC_NAMESPACE: harbor
       METRIC_PATH: /metrics
       METRIC_PORT: "8001"
       METRIC_SUBSYSTEM: core
-      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,127.0.0.1,localhost,.local,.internal
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       PORT: "8080"
       PORTAL_URL: http://harbor-portal
@@ -2149,29 +2007,6 @@
         app.kubernetes.io/name: harbor
       type: ClusterIP
   3: |
-    apiVersion: v1
-    kind: Service
-    metadata:
-      labels:
-        app.kubernetes.io/component: exporter
-        app.kubernetes.io/instance: harbor
-        app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-2.0.0
-      name: harbor-exporter
-    spec:
-      ports:
-        - name: http-metrics
-          port: 8001
-          protocol: TCP
-          targetPort: 8001
-      selector:
-        app.kubernetes.io/component: exporter
-        app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor
-      type: ClusterIP
-  4: |
     apiVersion: networking.k8s.io/v1
     kind: Ingress
     metadata:
@@ -2229,7 +2064,7 @@
                       number: 80
                 path: /
                 pathType: Prefix
-  5: |
+  4: |
     apiVersion: v1
     data:
       CACHE_ENABLED: "false"
@@ -2240,7 +2075,7 @@
       LOG_LEVEL: info
       METRIC_NAMESPACE: harbor
       METRIC_SUBSYSTEM: jobservice
-      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,127.0.0.1,localhost,.local,.internal
       REGISTRY_CONTROLLER_URL: http://harbor-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_URL: http://harbor-registry:5000
@@ -2260,7 +2095,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice-env
-  6: |
+  5: |
     apiVersion: v1
     data:
       config.yml: |
@@ -2301,7 +2136,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
-  7: |
+  6: |
     apiVersion: v1
     kind: Service
     metadata:
@@ -2328,7 +2163,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/name: harbor
       type: ClusterIP
-  8: |
+  7: |
     apiVersion: v1
     data:
       nginx.conf: |
@@ -2394,7 +2229,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
-  9: |
+  8: |
     apiVersion: v1
     kind: Service
     metadata:
@@ -2417,7 +2252,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/name: harbor
       type: ClusterIP
-  10: |
+  9: |
     apiVersion: v1
     data:
       config.yml: |
@@ -2484,7 +2319,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
-  11: |
+  10: |
     apiVersion: v1
     kind: Service
     metadata:
@@ -2515,7 +2350,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/name: harbor
       type: ClusterIP
-  12: |
+  11: |
     apiVersion: v1
     data:
       _PLACEHOLDER: "true"
@@ -2533,7 +2368,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-registryctl
-  13: |
+  12: |
     apiVersion: v1
     automountServiceAccountToken: false
     kind: ServiceAccount
@@ -2546,20 +2381,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-core
-  14: |
-    apiVersion: v1
-    automountServiceAccountToken: false
-    kind: ServiceAccount
-    metadata:
-      labels:
-        app.kubernetes.io/component: exporter
-        app.kubernetes.io/instance: harbor
-        app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-2.0.0
-      name: harbor-exporter
-  15: |
+  13: |
     apiVersion: v1
     automountServiceAccountToken: false
     kind: ServiceAccount
@@ -2572,7 +2394,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
-  16: |
+  14: |
     apiVersion: v1
     automountServiceAccountToken: false
     kind: ServiceAccount
@@ -2585,7 +2407,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
-  17: |
+  15: |
     apiVersion: v1
     automountServiceAccountToken: false
     kind: ServiceAccount
@@ -2598,7 +2420,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
-  18: |
+  16: |
     apiVersion: monitoring.coreos.com/v1
     kind: ServiceMonitor
     metadata:
@@ -2626,7 +2448,6 @@
             operator: In
             values:
               - core
-              - exporter
               - jobservice
               - registry
         matchLabels:
@@ -2650,7 +2471,7 @@
       HTTPS_PROXY: ""
       JOBSERVICE_URL: http://harbor-jobservice
       LOG_LEVEL: info
-      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,127.0.0.1,localhost,.local,.internal
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       PORT: "8080"
       PORTAL_URL: http://harbor-portal
@@ -2717,29 +2538,6 @@
         app.kubernetes.io/name: harbor
       type: ClusterIP
   3: |
-    apiVersion: v1
-    kind: Service
-    metadata:
-      labels:
-        app.kubernetes.io/component: exporter
-        app.kubernetes.io/instance: harbor
-        app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-2.0.0
-      name: harbor-exporter
-    spec:
-      ports:
-        - name: http-metrics
-          port: 8001
-          protocol: TCP
-          targetPort: 8001
-      selector:
-        app.kubernetes.io/component: exporter
-        app.kubernetes.io/instance: harbor
-        app.kubernetes.io/name: harbor
-      type: ClusterIP
-  4: |
     apiVersion: networking.k8s.io/v1
     kind: Ingress
     metadata:
@@ -2887,7 +2685,7 @@
                       number: 80
                 path: /
                 pathType: Prefix
-  5: |
+  4: |
     apiVersion: v1
     data:
       CACHE_ENABLED: "false"
@@ -2896,7 +2694,7 @@
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
-      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
+      NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,127.0.0.1,localhost,.local,.internal
       REGISTRY_CONTROLLER_URL: http://harbor-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_URL: http://harbor-registry:5000
@@ -2911,7 +2709,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice-env
-  6: |
+  5: |
     apiVersion: v1
     data:
       config.yml: |
@@ -2948,7 +2746,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
-  7: |
+  6: |
     apiVersion: v1
     kind: Service
     metadata:
@@ -2975,7 +2773,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/name: harbor
       type: ClusterIP
-  8: |
+  7: |
     apiVersion: v1
     data:
       nginx.conf: |
@@ -3041,7 +2839,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
-  9: |
+  8: |
     apiVersion: v1
     kind: Service
     metadata:
@@ -3064,7 +2862,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/name: harbor
       type: ClusterIP
-  10: |
+  9: |
     apiVersion: v1
     data:
       config.yml: |
@@ -3128,7 +2926,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
-  11: |
+  10: |
     apiVersion: v1
     kind: Service
     metadata:
@@ -3159,7 +2957,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/name: harbor
       type: ClusterIP
-  12: |
+  11: |
     apiVersion: v1
     data:
       _PLACEHOLDER: "true"
@@ -3172,7 +2970,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-registryctl
-  13: |
+  12: |
     apiVersion: v1
     automountServiceAccountToken: false
     kind: ServiceAccount
@@ -3185,20 +2983,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-core
-  14: |
-    apiVersion: v1
-    automountServiceAccountToken: false
-    kind: ServiceAccount
-    metadata:
-      labels:
-        app.kubernetes.io/component: exporter
-        app.kubernetes.io/instance: harbor
-        app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
-        helm.sh/chart: harbor-2.0.0
-      name: harbor-exporter
-  15: |
+  13: |
     apiVersion: v1
     automountServiceAccountToken: false
     kind: ServiceAccount
@@ -3211,7 +2996,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
-  16: |
+  14: |
     apiVersion: v1
     automountServiceAccountToken: false
     kind: ServiceAccount
@@ -3224,7 +3009,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
-  17: |
+  15: |
     apiVersion: v1
     automountServiceAccountToken: false
     kind: ServiceAccount
@@ -3237,7 +3022,7 @@
         app.kubernetes.io/version: v2.15.0
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
-  18: |
+  16: |
     apiVersion: cert-manager.io/v1
     kind: Certificate
     metadata:
@@ -3257,7 +3042,7 @@
         name: letsencrypt-prod
       renewBefore: 360h
       secretName: harbor-harbor-example-com-b9096314-tls
-  19: |
+  17: |
     apiVersion: cert-manager.io/v1
     kind: Certificate
     metadata:
@@ -3277,7 +3062,7 @@
         name: letsencrypt-prod
       renewBefore: 360h
       secretName: harbor-notary-example-com-a2fd2ccd-tls
-  20: |
+  18: |
     apiVersion: cert-manager.io/v1
     kind: Certificate
     metadata:
