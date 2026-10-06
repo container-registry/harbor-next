@@ -171,14 +171,14 @@ The channel is release-please configuration, not a separate build path:
 
 1. `task nightly:channel` derives `release-please-config-nightly.json` from `release-please-config.json` with `jq`, adding `release-as: X.Y.Z-beta` and `prerelease: true`. Deriving it keeps the exclude paths and changelog sections identical to the real release forever.
 2. The same task seeds `.release-please-manifest-nightly.json` from `.release-please-manifest.json` and commits both. It force-pushes the result as the `nightly` branch only when the caller passes `PUSH_CHANNEL=true`, as the workflow does; a bare `task nightly:channel` leaves the branch local, which is how you inspect what tonight's channel would be. Neither generated file is committed to `main`.
-3. Release-please opens a release PR against `nightly` and the workflow squash-merges it. Release-please stops there; it never tags and never creates a Release.
-4. The workflow force-moves `vX.Y.Z-beta` onto that merge commit and upserts the one pre-release that lives on it.
-5. `publish-images.yml` builds from the merge commit; `release-notes-engine.yml` rewrites the beta pre-release's body. Both are the reusable workflows the real release calls.
+3. Release-please keeps one release PR open against `nightly`. Whenever it rebuilds the PR, `always-update` resets the PR branch onto tonight's channel tip, commits the CHANGELOG and manifest on top, and rewrites the PR body, so the open PR is the running preview of the upcoming release. Nothing merges it. Release-please stops there; it never tags and never creates a Release.
+4. `task nightly:release-head` reads that PR's head commit and the workflow force-moves `vX.Y.Z-beta` onto it, then upserts the one pre-release that lives on it. The tag follows the PR head rather than the channel tip because the notes engine reads `CHANGELOG.md` at the tag, and only the release commit carries the beta heading.
+5. `publish-images.yml` builds from that release commit; `release-notes-engine.yml` rewrites the beta pre-release's body. Both are the reusable workflows the real release calls.
 6. After the suite runs, a last job prepends a header to that body: the commit it was built from, the e2e result, and how to pin a digest.
 
 `release-as` is what holds the beta name still. The `prerelease` versioning strategy cannot: it increments the last run of digits, so a fixed `2.16.0-beta` is not expressible, and `always-bump-minor` would compute a stable version. The name has to match the CHANGELOG heading release-please writes, because that heading is what the notes engine looks for when it renders the beta tag.
 
-An empty night, where nothing has landed since the last real release, produces no release PR: the run ends green having published nothing, and says so. A nightly takes no inputs and can be dispatched as often as you like — a second run on the same day either finds nothing new and ends green, or cuts what landed in between and moves the tag again.
+An empty night, where nothing user-facing has landed since the last real release, leaves the release PR where it was, because release-please finds no changelog to write: its head still sits on last night's channel tip, so the run ends green having published nothing, and says so. A nightly takes no inputs and can be dispatched as often as you like — a second run on the same day either finds nothing new and ends green, or cuts what landed in between and moves the tag again.
 
 `vX.Y.Z-beta` is the invitation: try the next release and tell us. Someone who wants the current preview of the release under development pulls it and gets last night's build without having to know a date.
 
@@ -198,7 +198,7 @@ The published tag's own tree cannot stand in for that. A nightly's tag sits on t
 
 Results are published twice: a gocure HTML report in the run's artifacts, and a job summary rendered from the same cucumber document — a pie of scenario outcomes and, per feature, every step with its result and timing.
 
-Merging the nightly release PR is the one merge this repository automates. It happens inside the workflow, on a branch that is thrown away the next night, and it never touches a release PR on `main` or `release-X.Y`.
+Do not merge the nightly release PR. Release-please finds it again by its branch and its `autorelease: pending` label, and a merged release PR that still carries that label stops release-please from touching the channel at all. If it does get merged, the next nightly fails and names the PR; relabel it `autorelease: tagged` and run the nightly again, and release-please opens a fresh one.
 
 ### Version timeline
 

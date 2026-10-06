@@ -21,7 +21,7 @@
 #   task nightly:version                 # print the beta version
 #   task nightly:channel                 # build the channel commit locally
 #   task nightly:channel PUSH_CHANNEL=true
-#   task nightly:merge-release-pr        # squash-merge the channel's release PR
+#   task nightly:release-head            # print the open release PR's head, if rebuilt tonight
 #   task nightly:validate-inputs         # guard a run's ref
 #   task nightly:test                    # exercise those guards
 
@@ -38,8 +38,9 @@ vars:
   BETA_VERSION: '{{.VERSION}}-beta'
   BETA_TAG: 'v{{.BETA_VERSION}}'
   # release-please's own labels. It puts PENDING_LABEL on the release PR when
-  # it opens it, and refuses to open another one while a merged release PR
-  # still carries it.
+  # it opens it, finds its open PR again by that label, and refuses to touch
+  # any release PR while a merged one still carries it. TAGGED_LABEL is what
+  # clears a merged one.
   PENDING_LABEL: 'autorelease: pending'
   TAGGED_LABEL: 'autorelease: tagged'
   NIGHTLY_CONFIG: release-please-config-nightly.json
@@ -90,9 +91,15 @@ tasks:
       - task: _commit-channel
       - task: _push-channel
 
-  merge-release-pr:
-    desc: "Squash-merge the nightly channel's release PR and print the merge commit (empty on an empty night)"
+  release-head:
+    desc: "Print the head commit of the open nightly release PR if release-please rebuilt it tonight (empty otherwise)"
     silent: true
+    # The release PR is never merged. release-please keeps one PR open on the
+    # channel and, with always-update, resets its branch onto tonight's channel
+    # tip and commits the CHANGELOG and manifest on top. That commit is what
+    # the beta tag follows: the notes engine reads CHANGELOG.md at the tag, and
+    # only the release commit carries the beta heading.
+    #
     # stdout is the sha and nothing else; the caller captures it.
     preconditions:
       - sh: test -n "${GH_TOKEN:-}"
@@ -103,74 +110,62 @@ tasks:
         msg: "gh is required"
     cmds:
       - |
+        # A merged release PR still labelled pending makes release-please
+        # abort every night after with "There are untagged, merged release PRs
+        # outstanding". Nothing here merges it, so a hand did.
+        merged=$(gh pr list --repo "${GITHUB_REPOSITORY}" --state merged \
+          --base '{{.NIGHTLY_BRANCH}}' --label '{{.PENDING_LABEL}}' \
+          --limit 1 --json number --jq '.[0].number // empty')
+        if [ -n "${merged}" ]; then
+          printf '::error::release PR #%s was merged into %s. The nightly release PR must stay open; while a merged one is labelled "%s", release-please will not update or open one. Relabel #%s "%s" and run the nightly again.\n' \
+            "${merged}" '{{.NIGHTLY_BRANCH}}' '{{.PENDING_LABEL}}' "${merged}" '{{.TAGGED_LABEL}}' >&2
+          exit 1
+        fi
+
         # release-please names its branch after the target branch.
         pr=$(gh pr list --repo "${GITHUB_REPOSITORY}" --state open \
           --base '{{.NIGHTLY_BRANCH}}' \
           --head 'release-please--branches--{{.NIGHTLY_BRANCH}}' \
-          --json number --jq '.[0].number // empty')
+          --json number,headRefOid,labels \
+          --jq '.[0] // empty | "\(.number) \(.headRefOid) \(any(.labels[]; .name == "{{.PENDING_LABEL}}"))"')
         if [ -z "${pr}" ]; then
-          # An empty night and a wedged channel look identical from here: both
-          # arrive with no release PR to merge. The difference is why. A
-          # release PR that was merged and never relabelled makes release-please
-          # abort with "There are untagged, merged release PRs outstanding"
-          # every night after, and every one of those nights would otherwise
-          # end green with nothing published.
-          stuck=$(gh pr list --repo "${GITHUB_REPOSITORY}" --state merged \
-            --base '{{.NIGHTLY_BRANCH}}' --label '{{.PENDING_LABEL}}' \
-            --limit 1 --json number --jq '.[0].number // empty')
-          if [ -n "${stuck}" ]; then
-            # Two different faults land here, and the tags say which. A night
-            # that published its tags and then failed to relabel left nothing
-            # but a stale label, so clearing it is a repair rather than a
-            # guess, and it is what keeps tomorrow from ending the same way.
-            # A night that never tagged is the real wedge, and nothing here
-            # can settle that one.
-            #
-            # REST for the merge commit: GraphQL's mergeCommit can answer null
-            # for a moment after a merge, and reading it as "no commit" here
-            # would call a repairable label a wedge.
-            stuck_sha=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${stuck}" --jq '.merge_commit_sha // empty')
-            if [ -n "${stuck_sha}" ] && gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags" \
-              --paginate --jq '.[].object.sha' | grep -qx "${stuck_sha}"; then
-              task nightly:mark-release-tagged MERGE_SHA="${stuck_sha}" >&2
-              printf '::error::release PR #%s was tagged at %s and kept the "%s" label, which stopped release-please opening a release PR tonight. The label is cleared now, so the next run cuts a release again.\n' \
-                "${stuck}" "${stuck_sha}" '{{.PENDING_LABEL}}' >&2
-              exit 1
-            fi
-            printf '::error::release PR #%s is merged into %s untagged and still labelled "%s", so release-please will not open another one. Tag its merge commit and run `task nightly:mark-release-tagged MERGE_SHA=<sha>`.\n' \
-              "${stuck}" '{{.NIGHTLY_BRANCH}}' '{{.PENDING_LABEL}}' >&2
-            exit 1
-          fi
-          # Right after a real release there is nothing new to cut yet. That is
-          # an empty night, not a failure: with no release PR to merge, nothing
-          # downstream runs and the workflow ends green.
+          # Right after a real release there is nothing new to cut yet.
           echo "::notice::No release PR on {{.NIGHTLY_BRANCH}}; nothing has landed since the last release" >&2
           exit 0
         fi
-        # REST, not `gh pr merge`: it returns the squash commit synchronously,
-        # where GraphQL's mergeCommit can still answer null for a second.
-        sha=$(gh api --method PUT \
-          "repos/${GITHUB_REPOSITORY}/pulls/${pr}/merge" \
-          -f merge_method=squash --jq .sha)
-        if [ -z "${sha}" ]; then
-          echo "::error::merged release PR #${pr} but got no merge commit back" >&2
+        set -- ${pr}
+        number=$1
+        head=$2
+        if [ "$3" != "true" ]; then
+          # release-please only finds its open PR by this label. Without it
+          # the next night opens a second PR instead of updating this one.
+          printf '::error::release PR #%s has lost the "%s" label; put it back so release-please keeps updating this PR\n' \
+            "${number}" '{{.PENDING_LABEL}}' >&2
           exit 1
         fi
-        gh api --method DELETE \
-          "repos/${GITHUB_REPOSITORY}/git/refs/heads/release-please--branches--{{.NIGHTLY_BRANCH}}" \
-          >/dev/null 2>&1 || true
-        echo "merged nightly release PR #${pr} as ${sha}" >&2
-        printf '%s\n' "${sha}"
+
+        # An empty night leaves the PR where it was, on a channel tip that was
+        # force-pushed away. Its head is last night's build, so tagging it
+        # again would publish nothing new under tonight's name.
+        channel=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/{{.NIGHTLY_BRANCH}}" --jq .object.sha)
+        parent=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${head}" --jq '.parents | map(.sha) | join(" ")')
+        if [ -z "${channel}" ] || [ "${parent}" != "${channel}" ]; then
+          printf '::notice::release PR #%s was not rebuilt on tonight'"'"'s %s tip; nothing to publish tonight\n' \
+            "${number}" '{{.NIGHTLY_BRANCH}}' >&2
+          exit 0
+        fi
+        echo "release PR #${number} is at ${head}" >&2
+        printf '%s\n' "${head}"
 
   publish-tags:
-    desc: "Move the rolling beta tag onto tonight's release commit (MERGE_SHA)"
+    desc: "Move the rolling beta tag onto tonight's release commit (RELEASE_SHA)"
     silent: true
     # Refs API, not git: the calling job has a depth-1 checkout of the release
-    # line, so the channel's merge commit is not in its object store.
+    # line, so the release PR's head commit is not in its object store.
     requires:
-      vars: [MERGE_SHA]
+      vars: [RELEASE_SHA]
     env:
-      MERGE_SHA_VALUE: '{{.MERGE_SHA}}'
+      RELEASE_SHA_VALUE: '{{.RELEASE_SHA}}'
       BETA_TAG_VALUE: '{{.BETA_TAG}}'
     preconditions:
       - sh: test -n "${GH_TOKEN:-}"
@@ -180,9 +175,9 @@ tasks:
     cmds:
       - task: _sha-rule
         vars:
-          SHA: '{{.MERGE_SHA}}'
+          SHA: '{{.RELEASE_SHA}}'
       - |
-        sha="${MERGE_SHA_VALUE}"
+        sha="${RELEASE_SHA_VALUE}"
 
         # The exit status decides whether the tag is there, never the output:
         # gh prints the API's error body on stdout, so a 404 leaves a
@@ -199,74 +194,6 @@ tasks:
             -f "ref=refs/tags/${BETA_TAG_VALUE}" -f "sha=${sha}" --jq .ref >/dev/null
           echo "created ${BETA_TAG_VALUE}" >&2
         fi
-
-  mark-release-tagged:
-    desc: "Relabel the merged release PR now that its tags exist (MERGE_SHA)"
-    silent: true
-    # release-please labels the release PR PENDING_LABEL when it opens it and
-    # clears the label when it publishes the release. This workflow passes
-    # skip-github-release and publishes the tags itself, so nothing else ever
-    # clears it, and release-please refuses to open another release PR while a
-    # merged one still carries it. Leave this out and the channel wedges on
-    # the night after a successful one, silently.
-    requires:
-      vars: [MERGE_SHA]
-    env:
-      MERGE_SHA_VALUE: '{{.MERGE_SHA}}'
-    preconditions:
-      - sh: test -n "${GH_TOKEN:-}"
-        msg: "GH_TOKEN is required"
-      - sh: test -n "${GITHUB_REPOSITORY:-}"
-        msg: "GITHUB_REPOSITORY is required"
-    cmds:
-      - task: _sha-rule
-        vars:
-          SHA: '{{.MERGE_SHA}}'
-      - |
-        # The PR this commit came from, matched on the merge commit so that
-        # this relabels the one whose tags were just published and no other.
-        #
-        # REST, not `gh pr list --json mergeCommit`: that field is GraphQL's,
-        # and it can still answer null for a second after a merge. A lookup
-        # that quietly found nothing would leave the label behind, and the
-        # channel would wedge the following night.
-        pr=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${MERGE_SHA_VALUE}/pulls" \
-          --jq '[.[] | select(.base.ref == "{{.NIGHTLY_BRANCH}}")] | .[0].number // empty')
-        if [ -z "${pr}" ]; then
-          printf '::error::no pull request on %s is associated with %s\n' \
-            '{{.NIGHTLY_BRANCH}}' "${MERGE_SHA_VALUE}" >&2
-          exit 1
-        fi
-        labels=$(gh pr view "${pr}" --repo "${GITHUB_REPOSITORY}" --json labels --jq '.labels[].name')
-        case "${labels}" in
-          *'{{.PENDING_LABEL}}'*)
-            # Retried, because the tags are already published by the time this
-            # runs: one refused API call would otherwise leave the label to be
-            # cleared by hand or by the next run's repair.
-            attempt=1
-            until gh pr edit "${pr}" --repo "${GITHUB_REPOSITORY}" \
-              --remove-label '{{.PENDING_LABEL}}' --add-label '{{.TAGGED_LABEL}}' >/dev/null; do
-              if [ "${attempt}" -ge 3 ]; then
-                printf '::error::could not relabel release PR #%s after %s attempts\n' "${pr}" "${attempt}" >&2
-                exit 1
-              fi
-              attempt=$((attempt + 1))
-              sleep 5
-            done
-            printf 'marked release PR #%s as "%s"\n' "${pr}" '{{.TAGGED_LABEL}}' >&2
-            ;;
-          *'{{.TAGGED_LABEL}}'*)
-            # Idempotent: re-running a night that already relabelled.
-            printf '::notice::release PR #%s is already "%s"\n' "${pr}" '{{.TAGGED_LABEL}}' >&2
-            ;;
-          *)
-            # Neither label is a state this pipeline produces, and guessing
-            # which way it went would be the silent failure all over again.
-            printf '::error::release PR #%s carries neither "%s" nor "%s"\n' \
-              "${pr}" '{{.PENDING_LABEL}}' '{{.TAGGED_LABEL}}' >&2
-            exit 1
-            ;;
-        esac
 
   upsert-beta-release:
     desc: "Create the rolling beta pre-release if it is missing, and re-assert that it is a pre-release"
@@ -307,12 +234,12 @@ tasks:
     # After the notes engine, never before: the engine replaces the whole body,
     # so a header written first is silently gone. Markers keep re-runs idempotent.
     #
-    # MERGE_SHA is what ties the body to a build. The tag cannot: it is moved
+    # RELEASE_SHA is what ties the body to a build. The tag cannot: it is moved
     # every night, so naming it here would only say "the current one".
     requires:
-      vars: [MERGE_SHA]
+      vars: [RELEASE_SHA]
     env:
-      MERGE_SHA_VALUE: '{{.MERGE_SHA}}'
+      RELEASE_SHA_VALUE: '{{.RELEASE_SHA}}'
       BETA_TAG_VALUE: '{{.BETA_TAG}}'
       VERSION_VALUE: '{{.VERSION}}'
       REGISTRY_VALUE: '{{.REGISTRY_ADDRESS}}/{{.REGISTRY_PROJECT}}'
@@ -352,13 +279,13 @@ tasks:
 
         # cut rather than a printf precision: Task runs these commands under
         # mvdan/sh, where printf '%.7s' is not implemented.
-        short=$(printf '%s' "${MERGE_SHA_VALUE}" | cut -c1-7)
+        short=$(printf '%s' "${RELEASE_SHA_VALUE}" | cut -c1-7)
 
         {
           printf '<!-- beta-header:start -->\n'
           printf '> **Rolling preview of %s.** Rebuilt every night from `main`. Not feature-frozen, and not a release.\n' "${VERSION_VALUE}"
           printf '>\n'
-          printf '> Currently built from [`%s`](../../commit/%s).\n' "${short}" "${MERGE_SHA_VALUE}"
+          printf '> Currently built from [`%s`](../../commit/%s).\n' "${short}" "${RELEASE_SHA_VALUE}"
           printf '> End-to-end suite: **%s**.' "${e2e}"
           if [ -n "${RUN_URL_VALUE}" ]; then
             printf ' [Run](%s).' "${RUN_URL_VALUE}"
@@ -450,7 +377,7 @@ tasks:
         # same way the ref and the tag are.
         sha_guard() {
           env GH_TOKEN=x GITHUB_REPOSITORY=o/r \
-            task nightly:publish-tags MERGE_SHA="$1" 2>&1
+            task nightly:publish-tags RELEASE_SHA="$1" 2>&1
         }
         for bad_sha in '' 'deadbeef' 'zzzz5f1e4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8' '$(id)' \
           '0123456789abcdef0123456789abcdef0123456789abcdef'; do
@@ -473,17 +400,6 @@ tasks:
         sed 's/^ *//' > "${stub_dir}/gh" <<'STUB'
         #!/bin/sh
         printf '%s\n' "$*" >> "${GH_STUB_LOG}"
-        case "$1 $2" in
-          "pr view")
-            printf '%s\n' "${GH_STUB_LABELS}"
-            exit 0
-            ;;
-          "pr edit")
-            # A refused label edit, which is the case the retry exists for.
-            [ -n "${GH_STUB_EDIT_FAIL}" ] && exit 1
-            exit 0
-            ;;
-        esac
         case "$*" in
           *"--state open"*)
             printf '%s\n' "${GH_STUB_OPEN_PR}"
@@ -497,16 +413,12 @@ tasks:
             printf 'refs/tags/stub\n'
             exit 0
             ;;
-          *matching-refs/tags*)
-            printf '%s\n' "${GH_STUB_TAG_SHAS}"
+          *git/ref/heads/*)
+            printf '%s\n' "${GH_STUB_CHANNEL_SHA}"
             exit 0
             ;;
-          *"/commits/"*"/pulls"*)
-            printf '%s\n' "${GH_STUB_PR}"
-            exit 0
-            ;;
-          *"/pulls/"*)
-            printf '%s\n' "${GH_STUB_MERGE_SHA}"
+          *"/commits/"*)
+            printf '%s\n' "${GH_STUB_PARENTS}"
             exit 0
             ;;
           *"git/ref/tags/${GH_STUB_TAG} "*)
@@ -527,7 +439,7 @@ tasks:
         chmod 700 "${stub_dir}/gh"
 
         beta_tag='v{{.VERSION}}-beta'
-        merge_sha=0123456789abcdef0123456789abcdef01234567
+        release_sha=0123456789abcdef0123456789abcdef01234567
         other_sha=fedcba9876543210fedcba9876543210fedcba98
 
         # $1 is the log to record gh's arguments in, $2 the sha the beta tag
@@ -535,7 +447,7 @@ tasks:
         publish() {
           env PATH="${stub_dir}:${PATH}" GH_TOKEN=stub GITHUB_REPOSITORY=o/r \
             GH_STUB_LOG="$1" GH_STUB_TAG="${beta_tag}" GH_STUB_SHA="$2" \
-            task nightly:publish-tags MERGE_SHA="${merge_sha}" 2>&1
+            task nightly:publish-tags RELEASE_SHA="${release_sha}" 2>&1
         }
 
         log="${stub_dir}/missing.log"
@@ -562,7 +474,7 @@ tasks:
         log="${stub_dir}/move.log"
         : > "${log}"
         if out=$(publish "${log}" "${other_sha}"); then
-          if grep -qF "git/refs/tags/${beta_tag} -f sha=${merge_sha}" "${log}"; then
+          if grep -qF "git/refs/tags/${beta_tag} -f sha=${release_sha}" "${log}"; then
             ok 'publish-tags moves an existing beta tag onto tonight'
           else
             bad "publish-tags did not move the beta tag: $(cat "${log}")"
@@ -576,142 +488,57 @@ tasks:
           ok 'publish-tags moves rather than recreates'
         fi
 
-        # The label swap, which is the only thing that lets release-please
-        # open another release PR after tonight's was merged.
-        mark_tagged() {
+        # The one open release PR. Its head is published only when it sits
+        # directly on tonight's channel tip, and a merged one has to be loud.
+        channel_sha=89abcdef0123456789abcdef0123456789abcdef
+        release_head() {
           env PATH="${stub_dir}:${PATH}" GH_TOKEN=stub GITHUB_REPOSITORY=o/r \
-            GH_STUB_LOG="$1" GH_STUB_PR="$2" GH_STUB_LABELS="$3" \
-            task nightly:mark-release-tagged MERGE_SHA="${merge_sha}" 2>&1
+            GH_STUB_LOG="${stub_dir}/head.log" GH_STUB_OPEN_PR="$1" GH_STUB_PENDING_PR="$2" \
+            GH_STUB_CHANNEL_SHA="${channel_sha}" GH_STUB_PARENTS="$3" \
+            task -o interleaved nightly:release-head
         }
 
-        log="${stub_dir}/pending.log"
-        : > "${log}"
-        if out=$(mark_tagged "${log}" 1025 'autorelease: pending'); then
-          if grep -qF 'pr edit 1025' "${log}"; then
-            ok 'mark-release-tagged relabels a pending release PR'
-          else
-            bad "mark-release-tagged did not relabel: $(cat "${log}")"
-          fi
+        if out=$(release_head "1076 ${release_sha} true" "" "${channel_sha}" 2>/dev/null) \
+          && [ "${out}" = "${release_sha}" ]; then
+          ok 'release-head prints the head of a PR rebuilt tonight'
         else
-          bad "mark-release-tagged failed on a pending release PR: ${out}"
+          bad "release-head on a rebuilt PR: got: ${out}"
         fi
 
-        log="${stub_dir}/tagged.log"
-        : > "${log}"
-        if out=$(mark_tagged "${log}" 1025 'autorelease: tagged'); then
-          if grep -qF 'pr edit' "${log}"; then
-            bad 'mark-release-tagged relabelled a PR that was already tagged'
-          else
-            ok 'mark-release-tagged leaves an already tagged PR alone'
-          fi
-        else
-          bad "mark-release-tagged failed on an already tagged PR: ${out}"
-        fi
-
-        log="${stub_dir}/unlabelled.log"
-        : > "${log}"
-        if out=$(mark_tagged "${log}" 1025 ''); then
-          bad 'mark-release-tagged passed on a release PR carrying neither label'
-        else
+        if out=$(release_head "1076 ${release_sha} true" "" "${other_sha}" 2>&1); then
           case "${out}" in
-            *'carries neither'*) ok 'mark-release-tagged fails on a release PR carrying neither label' ;;
-            *) bad "mark-release-tagged failed for the wrong reason: ${out}" ;;
-          esac
-        fi
-
-        # Retry exhaustion. The tag is already published by the time the label
-        # is swapped, so a refused edit has to say so rather than pass; the
-        # attempt count is asserted because a loop that gave up on the first
-        # refusal would still produce the right error.
-        log="${stub_dir}/editfail.log"
-        : > "${log}"
-        if out=$(env PATH="${stub_dir}:${PATH}" GH_TOKEN=stub GITHUB_REPOSITORY=o/r \
-          GH_STUB_LOG="${log}" GH_STUB_PR=1025 GH_STUB_LABELS='autorelease: pending' \
-          GH_STUB_EDIT_FAIL=1 \
-          task nightly:mark-release-tagged MERGE_SHA="${merge_sha}" 2>&1); then
-          bad 'mark-release-tagged passed while every label edit was refused'
-        else
-          case "${out}" in
-            *'could not relabel release PR #1025 after 3 attempts'*)
-              attempts=$(grep -cF 'pr edit 1025' "${log}")
-              if [ "${attempts}" -eq 3 ]; then
-                ok 'mark-release-tagged retries a refused label edit three times'
-              else
-                bad "mark-release-tagged made ${attempts} label edit attempts, expected 3"
-              fi
-              ;;
-            *) bad "mark-release-tagged failed for the wrong reason: ${out}" ;;
-          esac
-        fi
-
-        for bad_sha in '' 'deadbeef' '$(id)' 'zzzz5f1e4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8'; do
-          if out=$(env GH_TOKEN=x GITHUB_REPOSITORY=o/r \
-            task nightly:mark-release-tagged MERGE_SHA="${bad_sha}" 2>&1); then
-            bad "mark-release-tagged accepted '${bad_sha}'"
-          else
-            case "${out}" in
-              *uid=*) bad "mark-release-tagged: id executed for '${bad_sha}'" ;;
-              *) ok "mark-release-tagged rejected: '${bad_sha}'" ;;
-            esac
-          fi
-        done
-
-        log="${stub_dir}/nopr.log"
-        : > "${log}"
-        # What a mergeCommit that has not settled yet looks like from here:
-        # nothing comes back, and that may not pass for success.
-        if out=$(mark_tagged "${log}" '' ''); then
-          bad 'mark-release-tagged passed without finding the release PR'
-        else
-          case "${out}" in
-            *'no pull request on nightly is associated with'*) ok 'mark-release-tagged fails when it cannot find the release PR' ;;
-            *) bad "mark-release-tagged failed for the wrong reason: ${out}" ;;
-          esac
-        fi
-
-        # An empty night and a wedged channel both arrive with no release PR
-        # to merge. Only one of them is allowed to end green.
-        merge_release_pr() {
-          env PATH="${stub_dir}:${PATH}" GH_TOKEN=stub GITHUB_REPOSITORY=o/r \
-            GH_STUB_LOG="${stub_dir}/merge.log" GH_STUB_OPEN_PR= GH_STUB_PENDING_PR="$1" \
-            task -o interleaved nightly:merge-release-pr 2>&1
-        }
-
-        if out=$(merge_release_pr ""); then
-          case "${out}" in
-            *'nothing has landed since the last release'*) ok 'an empty night ends green' ;;
-            *) bad "an empty night ended green for the wrong reason: ${out}" ;;
+            *"${release_sha}"*) bad 'release-head published a PR left on last night'"'"'s channel' ;;
+            *'was not rebuilt'*) ok 'an empty night does not retag a stale release PR' ;;
+            *) bad "a stale release PR ended green for the wrong reason: ${out}" ;;
           esac
         else
-          bad "an empty night failed: ${out}"
+          bad "a stale release PR failed: ${out}"
         fi
 
-        if out=$(merge_release_pr 1025); then
+        if out=$(release_head "" "" "" 2>&1); then
+          case "${out}" in
+            *'nothing has landed since the last release'*) ok 'a night with no release PR ends green' ;;
+            *) bad "a night with no release PR ended green for the wrong reason: ${out}" ;;
+          esac
+        else
+          bad "a night with no release PR failed: ${out}"
+        fi
+
+        if out=$(release_head "1076 ${release_sha} true" 1069 "${channel_sha}" 2>&1); then
           bad "a merged release PR still labelled pending ended green: ${out}"
         else
           case "${out}" in
-            *'#1025 is merged into'*) ok 'a wedged channel fails instead of reporting an empty night' ;;
-            *) bad "a wedged channel failed for the wrong reason: ${out}" ;;
+            *'#1069 was merged into nightly'*) ok 'a merged release PR fails loudly' ;;
+            *) bad "a merged release PR failed for the wrong reason: ${out}" ;;
           esac
         fi
 
-        # A label left behind by a night that did publish its tags. The run
-        # still fails, because tonight published nothing, and the label is
-        # cleared so the next one is not stopped by it too.
-        log="${stub_dir}/repair.log"
-        : > "${log}"
-        if out=$(env PATH="${stub_dir}:${PATH}" GH_TOKEN=stub GITHUB_REPOSITORY=o/r \
-          GH_STUB_LOG="${log}" GH_STUB_OPEN_PR= GH_STUB_PENDING_PR=1025 \
-          GH_STUB_MERGE_SHA="${merge_sha}" GH_STUB_TAG_SHAS="${merge_sha}" \
-          GH_STUB_PR=1025 GH_STUB_LABELS='autorelease: pending' \
-          task -o interleaved nightly:merge-release-pr 2>&1); then
-          bad "a stale label ended green: ${out}"
-        elif ! grep -qF 'pr edit 1025' "${log}"; then
-          bad "a stale label was not cleared: $(cat "${log}")"
+        if out=$(release_head "1076 ${release_sha} false" "" "${channel_sha}" 2>&1); then
+          bad "a release PR without the pending label ended green: ${out}"
         else
           case "${out}" in
-            *"was tagged at ${merge_sha}"*) ok 'a stale label is cleared and the run still fails' ;;
-            *) bad "a stale label failed for the wrong reason: ${out}" ;;
+            *'lost the'*) ok 'a release PR without the pending label fails' ;;
+            *) bad "a release PR without the pending label failed for the wrong reason: ${out}" ;;
           esac
         fi
 
@@ -817,10 +644,10 @@ tasks:
   _sha-rule:
     internal: true
     silent: true
-    # A merge sha reaches an API path in two tasks, so there is one place that
-    # says what one may contain. SHA_VALUE rather than SHA: a task's env does
+    # A release sha reaches an API path, so there is one place that says what
+    # one may contain. SHA_VALUE rather than SHA: a task's env does
     # not override a variable already in the process environment, and the
-    # workflow exports MERGE_SHA.
+    # workflow exports RELEASE_SHA.
     env:
       SHA_VALUE: '{{.SHA}}'
     cmd: |
