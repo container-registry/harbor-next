@@ -59,3 +59,25 @@ func TestLoginLockedUserReturnsError(t *testing.T) {
 		assert.IsType(t, ErrAuth{}, err)
 	}
 }
+
+// TestLoginUnlockedUserSucceeds is the counterpart to
+// TestLoginLockedUserReturnsError: the lock check must only reject principals
+// that are actually locked. Without this, a change that returned an error for
+// every principal would satisfy the locked-user test above while breaking
+// normal login outright.
+func TestLoginUnlockedUserSucceeds(t *testing.T) {
+	config.InitWithSettings(map[string]any{})
+	Register(common.DBAuth, &stubAuthenticateHelper{})
+
+	// A principal that has never been locked, so it exercises the
+	// pass-through path rather than the rejection above.
+	user, err := Login(context.Background(), models.AuthModel{
+		Principal: "unlocked-test-user",
+		Password:  "irrelevant",
+	})
+
+	assert.NoError(t, err)
+	if assert.NotNil(t, user) {
+		assert.Equal(t, "unlocked-test-user", user.Username)
+	}
+}
