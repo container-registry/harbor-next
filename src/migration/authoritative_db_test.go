@@ -63,7 +63,8 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 	// declares foreign keys against or reconciles in place.
 	legacyDependencies := []string{
 		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
-		"CREATE TABLE project (project_id SERIAL PRIMARY KEY)",
+		"CREATE TABLE project (project_id SERIAL PRIMARY KEY, owner_id INTEGER)",
+		"CREATE TABLE retention_policy (id SERIAL PRIMARY KEY, scope_level VARCHAR(20), scope_reference INTEGER, data TEXT)",
 		"CREATE TABLE execution (id SERIAL PRIMARY KEY, revision INTEGER)",
 	}
 	for _, statement := range legacyDependencies {
@@ -209,7 +210,8 @@ func TestExecutionRevisionGuardResolvesThroughSearchPath(t *testing.T) {
 	setup := []string{
 		fmt.Sprintf("CREATE TABLE %s.execution (id SERIAL PRIMARY KEY, revision INTEGER)", later),
 		fmt.Sprintf("CREATE TABLE %s.robot (id BIGSERIAL PRIMARY KEY)", first),
-		fmt.Sprintf("CREATE TABLE %s.project (project_id SERIAL PRIMARY KEY)", first),
+		fmt.Sprintf("CREATE TABLE %s.project (project_id SERIAL PRIMARY KEY, owner_id INTEGER)", first),
+		fmt.Sprintf("CREATE TABLE %s.retention_policy (id SERIAL PRIMARY KEY, scope_level VARCHAR(20), scope_reference INTEGER, data TEXT)", first),
 	}
 	for _, statement := range setup {
 		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
@@ -289,7 +291,8 @@ func TestExecutionRevisionGuardIgnoresNonTableRelations(t *testing.T) {
 		"CREATE TABLE decoy (id BIGSERIAL PRIMARY KEY, revision INTEGER)",
 		"CREATE INDEX execution ON decoy (revision)",
 		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
-		"CREATE TABLE project (project_id SERIAL PRIMARY KEY)",
+		"CREATE TABLE project (project_id SERIAL PRIMARY KEY, owner_id INTEGER)",
+		"CREATE TABLE retention_policy (id SERIAL PRIMARY KEY, scope_level VARCHAR(20), scope_reference INTEGER, data TEXT)",
 	} {
 		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
 			t.Fatalf("setup %q: %v", statement, err)
