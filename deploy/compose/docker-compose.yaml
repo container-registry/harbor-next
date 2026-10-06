@@ -57,6 +57,8 @@ services:
       WITH_TRIVY: ${WITH_TRIVY:-true}
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr
+      # Lets push-authorized users skip content trust via a cosign/notation User-Agent (spoofable)
+      CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED: ${CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED:-false}
     depends_on:
       postgresql:
         condition: service_healthy
