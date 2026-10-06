@@ -127,6 +127,7 @@ func (uts *UserTestSuite) TestSetUserSysAdminRequiresSysAdmin() {
 	uts.uCtl.AssertCalled(uts.T(), "SetSysAdmin", mock.Anything, 3, true)
 }
 
+<<<<<<< HEAD
 func (uts *UserTestSuite) TestRevokeUserSysAdminRequiresSysAdmin() {
 	body := map[string]bool{"sysadmin_flag": false}
 
@@ -140,6 +141,8 @@ func (uts *UserTestSuite) TestRevokeUserSysAdminRequiresSysAdmin() {
 	uts.uCtl.AssertNotCalled(uts.T(), "SetSysAdmin", mock.Anything, 4, false)
 }
 
+=======
+>>>>>>> 5d0c95721 (Merge commit from fork)
 func (uts *UserTestSuite) TestGetRandomSecret() {
 	for i := 1; i < 5; i++ {
 		rSec, err := getRandomSecret()
