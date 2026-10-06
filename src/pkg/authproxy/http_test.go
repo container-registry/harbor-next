@@ -3,6 +3,7 @@
 package authproxy
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -103,7 +104,7 @@ func TestUserFromReviewStatus(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		u, err := UserFromReviewStatus(c.input, c.adminGroups, c.adminUsernames)
+		u, err := UserFromReviewStatus(context.Background(), c.input, c.adminGroups, c.adminUsernames)
 		if c.expect.hasErr == true {
 			assert.NotNil(t, err)
 		} else {

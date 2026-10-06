@@ -17,6 +17,7 @@ package usergroup
 import (
 	"context"
 	"errors"
+	"sort"
 
 	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/common/utils"
@@ -83,16 +84,40 @@ func (m *manager) Get(ctx context.Context, id int) (*model.UserGroup, error) {
 }
 
 func (m *manager) Populate(ctx context.Context, userGroups []model.UserGroup) ([]int, error) {
-	ugList := make([]int, 0)
-	for _, group := range userGroups {
+	// Inside a request transaction every insert holds its group_name unique-key lock
+	// until the request commits. Onboarding in name order makes concurrent logins with
+	// overlapping groups wait on each other instead of deadlocking (40P01) and silently
+	// dropping a group from the session.
+	order := make([]int, len(userGroups))
+	for i := range order {
+		order[i] = i
+	}
+	sort.SliceStable(order, func(a, b int) bool {
+		ga, gb := userGroups[order[a]], userGroups[order[b]]
+		if ga.GroupName != gb.GroupName {
+			return ga.GroupName < gb.GroupName
+		}
+		// LDAP onboarding renames a group whose name is taken to its DN, so equal
+		// names can still become distinct inserts.
+		return ga.LdapGroupDN < gb.LdapGroupDN
+	})
+
+	ids := make([]int, len(userGroups))
+	for _, i := range order {
+		group := userGroups[i]
 		err := m.Onboard(ctx, &group)
 		if err != nil {
 			// log the current error and continue
 			log.Warningf("failed to onboard user group %+v, error %v, continue with other user groups", group, err)
 			continue
 		}
-		if group.ID > 0 {
-			ugList = append(ugList, group.ID)
+		ids[i] = group.ID
+	}
+
+	ugList := make([]int, 0, len(ids))
+	for _, id := range ids {
+		if id > 0 {
+			ugList = append(ugList, id)
 		}
 	}
 	return ugList, nil

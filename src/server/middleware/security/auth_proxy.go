@@ -81,7 +81,7 @@ func (a *authProxy) Generate(req *http.Request) security.Context {
 		log.Errorf("failed to get user %s: %v", rawUserName, err)
 		return nil
 	}
-	u2, err := authproxy.UserFromReviewStatus(tokenReviewStatus, httpAuthProxyConf.AdminGroups, httpAuthProxyConf.AdminUsernames)
+	u2, err := authproxy.UserFromReviewStatus(req.Context(), tokenReviewStatus, httpAuthProxyConf.AdminGroups, httpAuthProxyConf.AdminUsernames)
 	if err != nil {
 		log.Errorf("failed to get user information from token review status: %v", err)
 		return nil

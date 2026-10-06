@@ -45,7 +45,7 @@ func SetHardcodeVerifierForTest(s string) {
 }
 
 //nolint:unused // used by package tests; lint excludes test-only usage
-func mockPopulateGroups(groupNames []string) ([]int, error) {
+func mockPopulateGroups(_ context.Context, groupNames []string) ([]int, error) {
 	res := make([]int, 0)
 	for _, g := range groupNames {
 		id, err := strconv.Atoi(g)
