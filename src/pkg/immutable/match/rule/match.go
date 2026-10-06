@@ -39,7 +39,6 @@ func (rm *Matcher) Match(ctx context.Context, pid int64, c iselector.Candidate) 
 		return false, err
 	}
 
-	cands := []*iselector.Candidate{&c}
 	for _, r := range rm.rules {
 		if r.Disabled {
 			continue
@@ -51,9 +50,13 @@ func (rm *Matcher) Match(ctx context.Context, pid int64, c iselector.Candidate) 
 		if len(repositorySelectors) < 1 {
 			continue
 		}
+<<<<<<< HEAD
 		// Repository selectors only look at the repository, so they are
 		// evaluated once rather than per tag.
 		matched, err := selectsOne(repositorySelectors, "", &c)
+=======
+		matched, err := dimensionSelects(repositorySelectors, "", &c)
+>>>>>>> d8a18f71b (Merge commit from fork)
 		if err != nil {
 			return false, err
 		}
@@ -97,8 +100,13 @@ func (rm *Matcher) Match(ctx context.Context, pid int64, c iselector.Candidate) 
 	return false, nil
 }
 
+<<<<<<< HEAD
 // dimensionSelects reports whether the tag dimension of a rule puts the
 // candidate in scope. The selectors must behave like the portal's single
+=======
+// dimensionSelects reports whether a rule dimension (repository or tag) puts
+// the candidate in scope. The selectors must behave like the portal's single
+>>>>>>> d8a18f71b (Merge commit from fork)
 // `{a,b}` pattern: inclusion selectors are alternatives (any may match) and an
 // exclusion selector removes whatever it matches, so every exclusion selector
 // has to select the candidate. A dimension holding only exclusions starts from
