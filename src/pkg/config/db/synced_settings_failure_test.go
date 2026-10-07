@@ -185,6 +185,7 @@ func TestStartGivesUpOnExhaustedPoolThenCatchesUp(t *testing.T) {
 }
 
 func TestConcurrentSavesConvergeOnLastValue(t *testing.T) {
+	restoreLDAPURL(t)
 	driver := &countingDriver{Driver: &Database{cfgDAO: cfgdao.New()}}
 	s := newSyncedSettings(driver)
 	stop := s.StartSync(dao.GetPool().PgxPool())
@@ -316,9 +317,13 @@ func TestSingleConnectionPoolReadsDatabase(t *testing.T) {
 }
 
 // a duplicate-key error on first creation would abort the transaction
-func TestConcurrentFirstSaveOfPropertySucceeds(t *testing.T) {
-	ctx := orm.Context()
-	o, err := orm.FromContext(ctx)
+// restoreLDAPURL puts the properties row for common.LDAPURL back the way the
+// test found it. The tests here write that key directly, and the integration
+// database outlives the test binary, so without this a later test - or a
+// later run against a reused database - inherits whatever the last save left.
+func restoreLDAPURL(t *testing.T) {
+	t.Helper()
+	o, err := orm.FromContext(orm.Context())
 	require.NoError(t, err)
 	var original []string
 	_, err = o.Raw("SELECT v FROM properties WHERE k = ?", common.LDAPURL).QueryRows(&original)
@@ -331,6 +336,13 @@ func TestConcurrentFirstSaveOfPropertySucceeds(t *testing.T) {
 			require.NoError(t, err)
 		}
 	})
+}
+
+func TestConcurrentFirstSaveOfPropertySucceeds(t *testing.T) {
+	restoreLDAPURL(t)
+	ctx := orm.Context()
+	o, err := orm.FromContext(ctx)
+	require.NoError(t, err)
 	for round := range 20 {
 		_, err := o.Raw("DELETE FROM properties WHERE k = ?", common.LDAPURL).Exec()
 		require.NoError(t, err)
