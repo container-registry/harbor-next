@@ -10,10 +10,6 @@ vars:
   GCFLAGS_DEBUG: "all=-N -l"
   VERSION_LDFLAGS: '-X github.com/goharbor/harbor/src/pkg/version.GitCommit={{.GIT_COMMIT}} -X github.com/goharbor/harbor/src/pkg/version.ReleaseVersion={{.VERSION}}'
   PLATFORMS: '{{.PLATFORMS | default .CI_PLATFORMS}}'
-  # Go version pinned in src/go.mod, reused to pin GOTOOLCHAIN for
-  # vendored-source builds (Trivy) so they don't pick up a newer local `go`.
-  GO_VERSION_PIN:
-    sh: awk '/^go /{print $2}' src/go.mod
 
 tasks:
   all-binaries:
@@ -214,12 +210,9 @@ tasks:
         trap "rm -rf $TRIVY_DIR" EXIT
         git clone --branch v{{.TRIVY_VERSION}} --depth 1 https://github.com/aquasecurity/trivy.git "$TRIVY_DIR"
         cd "$TRIVY_DIR"
-        go mod edit -require github.com/containerd/containerd/v2@v2.3.5
-        go mod edit -require golang.org/x/crypto@v0.56.0
-        go mod edit -require google.golang.org/grpc@v1.83.2
-        go mod edit -require github.com/moby/go-archive@v0.3.0
-        go mod tidy -e
-        GOTOOLCHAIN=go{{.GO_VERSION_PIN}} GOEXPERIMENT=jsonv2 CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/trivy" ./cmd/trivy
+        # GOTOOLCHAIN=auto: the trivy tag's go.mod may require a newer Go than
+        # Harbor's pinned toolchain (CI runs GOTOOLCHAIN=local).
+        GOTOOLCHAIN=auto GOEXPERIMENT=jsonv2 CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/trivy" ./cmd/trivy
 
   binary:trivy-adapter:*:
     desc: "Build harbor-scanner-trivy binary (cross-compiled from source)"
