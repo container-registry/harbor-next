@@ -418,26 +418,50 @@ tests:
           path: data.POSTGRESQL_MIN_CONNS
           value: "8"
 
-  # Pins: webhook targets on private networks stay blocked unless explicitly allowed.
-  - it: should block private-network webhook targets by default
+  # Pins: no policy rendered by default, so Harbor applies block_restricted; no legacy variable.
+  - it: should leave the webhook egress policy to Harbor by default
     template: templates/core.configmap.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
+    asserts:
+      - equal:
+          path: data.HARBOR_WEBHOOK_EGRESS_POLICY
+          value: ""
+      - equal:
+          path: data.HARBOR_WEBHOOK_EGRESS_ALLOWLIST
+          value: ""
+      - notExists:
+          path: data.HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
+
+  - it: should pass the webhook egress policy through to core
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      network.webhookEgress.policy: public_only
+      network.webhookEgress.allowlist:
+        - 10.20.0.0/16
+        - "*.svc.cluster.local"
+    asserts:
+      - equal:
+          path: data.HARBOR_WEBHOOK_EGRESS_POLICY
+          value: public_only
+      - equal:
+          path: data.HARBOR_WEBHOOK_EGRESS_ALLOWLIST
+          value: 10.20.0.0/16,*.svc.cluster.local
+
+  # Pins: the deprecated value keeps reaching core, including an explicit false.
+  - it: should pass the deprecated allowPrivateNetworkAccess through to core
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      network.allowPrivateNetworkAccess: false
     asserts:
       - equal:
           path: data.HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
           value: "false"
-
-  - it: should pass network.allowPrivateNetworkAccess through to core
-    template: templates/core.configmap.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      network.allowPrivateNetworkAccess: true
-    asserts:
-      - equal:
-          path: data.HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
-          value: "true"

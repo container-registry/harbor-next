@@ -127,10 +127,18 @@ proxy:
 
 # -- Outbound network policy for webhook and Slack notification targets
 network:
-  # -- Allow webhook and Slack notification targets on private, loopback, link-local and
-  # cloud-metadata addresses. These are rejected by default; enable only to deliver
-  # webhooks to a trusted internal endpoint.
-  allowPrivateNetworkAccess: false
+  # -- Deprecated, use network.webhookEgress.policy. Only used while the policy is empty:
+  # true means allow_all, false means public_only.
+  # @default -- unset
+  allowPrivateNetworkAccess: null
+  webhookEgress:
+    # -- Destinations webhook and Slack notifications may reach. allow_all: no checks.
+    # block_restricted: private networks allowed; loopback, link-local and cloud metadata blocked.
+    # public_only: public addresses only. Empty uses Harbor's default, block_restricted.
+    policy: ""
+    # -- Destinations always allowed, whatever the policy: IPs, CIDRs, hostnames and "*.domain"
+    # suffixes. Allowlisted hostnames are trusted wherever DNS points them.
+    allowlist: []
 
 # ============================================================================
 # 2. EXPOSE / INGRESS / GATEWAY
