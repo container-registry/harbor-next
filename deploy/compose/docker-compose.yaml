@@ -68,7 +68,10 @@ services:
       # On by default so cosign/notation can pull the unsigned image they are about to sign;
       # the User-Agent it keys on is spoofable. Set to false to enforce content trust on every pull
       CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED: ${CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED:-true}
-      # Webhook targets on private, loopback or link-local addresses are rejected unless true
+      # Webhook egress: allow_all, block_restricted or public_only; wins over the deprecated
+      # boolean below, whose false default keeps the 2.15 behavior (public_only)
+      HARBOR_WEBHOOK_EGRESS_POLICY: ${HARBOR_WEBHOOK_EGRESS_POLICY:-}
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ${HARBOR_WEBHOOK_EGRESS_ALLOWLIST:-}
       HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: ${HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS:-false}
     depends_on:
       postgresql:
@@ -108,6 +111,8 @@ services:
       REGISTRY_CREDENTIAL_PASSWORD: ${REGISTRY_CREDENTIAL_PASSWORD:-}
       TOKEN_SERVICE_URL: http://core:8080/service/token
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      HARBOR_WEBHOOK_EGRESS_POLICY: ${HARBOR_WEBHOOK_EGRESS_POLICY:-}
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ${HARBOR_WEBHOOK_EGRESS_ALLOWLIST:-}
       HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: ${HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS:-false}
     depends_on:
       core:

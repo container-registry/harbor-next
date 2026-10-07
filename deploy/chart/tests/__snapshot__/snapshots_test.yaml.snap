@@ -11,7 +11,9 @@
       EXT_ENDPOINT: https://harbor.example.com
       GDPR_AUDIT_LOGS: "false"
       GDPR_DELETE_USER: "false"
-      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
+      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: ""
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ""
+      HARBOR_WEBHOOK_EGRESS_POLICY: block_restricted
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       JOBSERVICE_URL: http://harbor-jobservice
@@ -168,7 +170,9 @@
     data:
       CACHE_ENABLED: "false"
       CORE_URL: http://harbor-core:80
-      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
+      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: ""
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ""
+      HARBOR_WEBHOOK_EGRESS_POLICY: block_restricted
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
@@ -526,7 +530,9 @@
       EXT_ENDPOINT: https://harbor.example.com
       GDPR_AUDIT_LOGS: "false"
       GDPR_DELETE_USER: "false"
-      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
+      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: ""
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ""
+      HARBOR_WEBHOOK_EGRESS_POLICY: block_restricted
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       JOBSERVICE_URL: http://harbor-jobservice
@@ -683,7 +689,9 @@
     data:
       CACHE_ENABLED: "false"
       CORE_URL: http://harbor-core:80
-      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
+      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: ""
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ""
+      HARBOR_WEBHOOK_EGRESS_POLICY: block_restricted
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
@@ -1041,7 +1049,9 @@
       EXT_ENDPOINT: https://harbor.example.com
       GDPR_AUDIT_LOGS: "false"
       GDPR_DELETE_USER: "false"
-      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
+      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: ""
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ""
+      HARBOR_WEBHOOK_EGRESS_POLICY: block_restricted
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       JOBSERVICE_URL: http://harbor-jobservice
@@ -1198,7 +1208,9 @@
     data:
       CACHE_ENABLED: "false"
       CORE_URL: http://harbor-core:80
-      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
+      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: ""
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ""
+      HARBOR_WEBHOOK_EGRESS_POLICY: block_restricted
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
@@ -1557,7 +1569,9 @@
       EXT_ENDPOINT: https://harbor.example.com
       GDPR_AUDIT_LOGS: "false"
       GDPR_DELETE_USER: "false"
-      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
+      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: ""
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ""
+      HARBOR_WEBHOOK_EGRESS_POLICY: block_restricted
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       JOBSERVICE_URL: http://harbor-jobservice
@@ -1714,7 +1728,9 @@
     data:
       CACHE_ENABLED: "false"
       CORE_URL: http://harbor-core:80
-      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
+      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: ""
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ""
+      HARBOR_WEBHOOK_EGRESS_POLICY: block_restricted
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
@@ -2072,7 +2088,9 @@
       EXT_ENDPOINT: https://harbor.example.com
       GDPR_AUDIT_LOGS: "false"
       GDPR_DELETE_USER: "false"
-      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
+      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: ""
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ""
+      HARBOR_WEBHOOK_EGRESS_POLICY: block_restricted
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       JOBSERVICE_URL: http://harbor-jobservice
@@ -2234,7 +2252,9 @@
     data:
       CACHE_ENABLED: "false"
       CORE_URL: http://harbor-core:80
-      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
+      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: ""
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ""
+      HARBOR_WEBHOOK_EGRESS_POLICY: block_restricted
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
@@ -2645,7 +2665,9 @@
       EXT_ENDPOINT: https://harbor.example.com
       GDPR_AUDIT_LOGS: "false"
       GDPR_DELETE_USER: "false"
-      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
+      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: ""
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ""
+      HARBOR_WEBHOOK_EGRESS_POLICY: block_restricted
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       JOBSERVICE_URL: http://harbor-jobservice
@@ -2892,7 +2914,9 @@
     data:
       CACHE_ENABLED: "false"
       CORE_URL: http://harbor-core:80
-      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
+      HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: ""
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ""
+      HARBOR_WEBHOOK_EGRESS_POLICY: block_restricted
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
