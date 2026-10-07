@@ -219,6 +219,15 @@
         }
       }
     },
+    "contentTrust": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "legacySignerPullEnabled": {
+          "type": "boolean"
+        }
+      }
+    },
     "expose": {
       "type": "object",
       "properties": {

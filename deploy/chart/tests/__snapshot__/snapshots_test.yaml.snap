@@ -5,6 +5,7 @@
       CACHE_ENABLED: "false"
       CHART_CACHE_DRIVER: redis
       CONFIG_PATH: /etc/core/app.conf
+      CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED: "false"
       CORE_LOCAL_URL: http://127.0.0.1:8080
       CORE_URL: http://harbor-core
       DATABASE_TYPE: postgresql
@@ -520,6 +521,7 @@
       CACHE_ENABLED: "false"
       CHART_CACHE_DRIVER: redis
       CONFIG_PATH: /etc/core/app.conf
+      CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED: "false"
       CORE_LOCAL_URL: http://127.0.0.1:8080
       CORE_URL: http://harbor-core
       DATABASE_TYPE: postgresql
@@ -1035,6 +1037,7 @@
       CACHE_ENABLED: "false"
       CHART_CACHE_DRIVER: redis
       CONFIG_PATH: /etc/core/app.conf
+      CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED: "false"
       CORE_LOCAL_URL: http://127.0.0.1:8080
       CORE_URL: http://harbor-core
       DATABASE_TYPE: postgresql
@@ -1551,6 +1554,7 @@
       CACHE_ENABLED: "false"
       CHART_CACHE_DRIVER: redis
       CONFIG_PATH: /etc/core/app.conf
+      CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED: "false"
       CORE_LOCAL_URL: http://127.0.0.1:8080
       CORE_URL: http://harbor-core
       DATABASE_TYPE: postgresql
@@ -2066,6 +2070,7 @@
       CACHE_ENABLED: "false"
       CHART_CACHE_DRIVER: redis
       CONFIG_PATH: /etc/core/app.conf
+      CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED: "false"
       CORE_LOCAL_URL: http://127.0.0.1:8080
       CORE_URL: http://harbor-core
       DATABASE_TYPE: postgresql
@@ -2639,6 +2644,7 @@
       CACHE_ENABLED: "false"
       CHART_CACHE_DRIVER: redis
       CONFIG_PATH: /etc/core/app.conf
+      CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED: "false"
       CORE_LOCAL_URL: http://127.0.0.1:8080
       CORE_URL: http://harbor-core
       DATABASE_TYPE: postgresql

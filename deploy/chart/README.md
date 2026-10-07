@@ -761,6 +761,7 @@ Kubernetes: `>=1.28.0-0`
 | cache.expireHours | int | `24` | Cache expiration in hours |
 | commonAnnotations | object | `{}` | Annotations to add to all resources this chart deploys. `checksum/*` keys are reserved by the chart (used for config/secret-driven pod rollout) — setting one here renders a duplicate key on pod templates. |
 | commonLabels | object | `{}` | Labels to add to all resources this chart deploys. Never applied to selectors (`spec.selector` / `matchLabels` stay immutable). |
+| contentTrust.legacySignerPullEnabled | bool | `false` | Let a push-capable client pull an unsigned manifest when the project requires cosign signatures, so it can create the first signature. Without it `cosign sign` fails on its own manifest read with PROJECTPOLICYVIOLATION. The only signal is the request User-Agent, which any client can set, so a push-capable principal can also use it to pull unsigned images from that project. Off by default. |
 | core.affinity | object | `{}` | Affinity rules for Core pods |
 | core.annotations | object | `{}` | Annotations for the Core workload object (Deployment) |
 | core.artifactPullAsyncFlushDuration | string | `""` | Artifact pull async flush duration |

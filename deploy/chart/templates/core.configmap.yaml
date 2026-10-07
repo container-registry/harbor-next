@@ -38,6 +38,7 @@ data:
   NO_PROXY: {{ include "harbor.noProxy" . }}
   {{- end }}
   HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: {{ .Values.network.allowPrivateNetworkAccess | quote }}
+  CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED: {{ .Values.contentTrust.legacySignerPullEnabled | quote }}
   PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: "docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory"
   REPLICATION_ADAPTER_WHITELIST: "ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite"
   {{- if .Values.metrics.enabled}}

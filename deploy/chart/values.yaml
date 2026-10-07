@@ -132,6 +132,14 @@ network:
   # webhooks to a trusted internal endpoint.
   allowPrivateNetworkAccess: false
 
+contentTrust:
+  # -- Let a push-capable client pull an unsigned manifest when the project requires
+  # cosign signatures, so it can create the first signature. Without it `cosign sign`
+  # fails on its own manifest read with PROJECTPOLICYVIOLATION. The only signal is the
+  # request User-Agent, which any client can set, so a push-capable principal can also
+  # use it to pull unsigned images from that project. Off by default.
+  legacySignerPullEnabled: false
+
 # ============================================================================
 # 2. EXPOSE / INGRESS / GATEWAY
 # ============================================================================

@@ -441,3 +441,27 @@ tests:
       - equal:
           path: data.HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
           value: "true"
+
+  # Pins: a project that requires cosign signatures must not also lock the signer out.
+  - it: should keep the legacy signer pull exemption off by default
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - equal:
+          path: data.CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED
+          value: "false"
+
+  - it: should pass contentTrust.legacySignerPullEnabled through to core
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      contentTrust.legacySignerPullEnabled: true
+    asserts:
+      - equal:
+          path: data.CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED
+          value: "true"
