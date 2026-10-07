@@ -423,7 +423,7 @@ func (n *webhookAPI) validateTargets(ctx context.Context, policy *policy_model.P
 		if err != nil {
 			return false, errors.New(err).WithCode(errors.BadRequestCode)
 		}
-		// Reject targets resolving to private/loopback/link-local/metadata addresses (CWE-918).
+		// Reject targets the jobservice egress policy would refuse (CWE-918).
 		if err := n.validateTargetHost(validationCtx, url.Hostname(), validatedHosts); err != nil {
 			return false, errors.New(err).WithCode(errors.BadRequestCode)
 		}
@@ -447,7 +447,7 @@ func (n *webhookAPI) validateTargets(ctx context.Context, policy *policy_model.P
 	return true, nil
 }
 
-// validateTargetHost rejects a webhook target hostname that resolves to a non-public address.
+// validateTargetHost rejects a webhook target hostname that resolves to a blocked address.
 // Hosts already validated in the same call are skipped, and the number of distinct hosts is
 // capped so a single policy cannot force an unbounded number of DNS lookups.
 func (n *webhookAPI) validateTargetHost(ctx context.Context, host string, validatedHosts map[string]struct{}) error {
@@ -458,7 +458,7 @@ func (n *webhookAPI) validateTargetHost(ctx context.Context, host string, valida
 	if len(validatedHosts) >= maxWebhookTargetHosts {
 		return fmt.Errorf("notification policy exceeds %d distinct target hostnames", maxWebhookTargetHosts)
 	}
-	if err := commonhttp.ValidatePublicNetworkTarget(ctx, n.targetResolver, host); err != nil {
+	if err := commonhttp.ValidateNetworkTarget(ctx, n.targetResolver, host); err != nil {
 		return err
 	}
 	validatedHosts[host] = struct{}{}
