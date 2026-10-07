@@ -40,7 +40,7 @@ require (
 	github.com/gorilla/handlers v1.5.2
 	github.com/gorilla/mux v1.8.1
 	github.com/graph-gophers/dataloader v5.0.0+incompatible
-	github.com/jackc/pgx/v5 v5.10.0
+	github.com/jackc/pgx/v5 v5.11.0
 	github.com/jpillora/backoff v1.0.0
 	github.com/klauspost/compress v1.19.2 // indirect
 	github.com/modelpack/model-spec v0.0.7
