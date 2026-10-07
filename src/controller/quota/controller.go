@@ -397,19 +397,7 @@ func (c *controller) rollbackUsage(ctx context.Context, reference, referenceID s
 	}
 
 	attempt := func() error {
-		// each attempt gets only what is left of ctx's deadline, so a retry
-		// started late cannot hold a connection past the rollback bound
-		timeout := rollbackTimeout
-		if deadline, ok := ctx.Deadline(); ok {
-			timeout = time.Until(deadline)
-		}
-		if timeout <= 0 {
-			return retry.Abort(context.DeadlineExceeded)
-		}
-		// statement_timeout 0 means no timeout, so never round down to it
-		timeout = max(timeout, time.Millisecond)
-
-		err := statementTimeout(timeout, func(ctx context.Context) error {
+		err := statementTimeout(func(ctx context.Context) error {
 			return c.updateUsageByDB(ctx, reference, referenceID, op)
 		})(ctx)
 		// only a CAS conflict proves the write did not land; any other error,
@@ -428,12 +416,22 @@ func (c *controller) rollbackUsage(ctx context.Context, reference, referenceID s
 // up on after timeout. SET LOCAL needs a transaction to be scoped to, and
 // reverts when that transaction ends, so this leaves no setting behind on the
 // pooled connection.
-func statementTimeout(timeout time.Duration, f func(ctx context.Context) error) func(ctx context.Context) error {
+func statementTimeout(f func(ctx context.Context) error) func(ctx context.Context) error {
 	return orm.WithTransaction(func(ctx context.Context) error {
 		ormer, err := orm.FromContext(ctx)
 		if err != nil {
 			return retry.Abort(err)
 		}
+
+		timeout := rollbackTimeout
+		if deadline, ok := ctx.Deadline(); ok {
+			timeout = time.Until(deadline)
+		}
+		if timeout <= 0 {
+			return retry.Abort(context.DeadlineExceeded)
+		}
+		// statement_timeout 0 means no timeout, so never round down to it
+		timeout = max(timeout, time.Millisecond)
 
 		// milliseconds: the bare integer form of statement_timeout, and the
 		// only form that takes a bind parameter in neither Postgres nor Beego
