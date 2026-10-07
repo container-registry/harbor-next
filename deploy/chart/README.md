@@ -987,8 +987,10 @@ Kubernetes: `>=1.28.0-0`
 | metrics.serviceMonitor.namespace | string | `""` | ServiceMonitor namespace (defaults to release namespace) |
 | metrics.serviceMonitor.scrapeTimeout | string | `"10s"` | Scrape timeout |
 | nameOverride | string | `""` | Override the chart name |
-| network | object | `{"allowPrivateNetworkAccess":false}` | Outbound network policy for webhook and Slack notification targets |
-| network.allowPrivateNetworkAccess | bool | `false` | Allow webhook and Slack notification targets on private, loopback, link-local and cloud-metadata addresses. These are rejected by default; enable only to deliver webhooks to a trusted internal endpoint. |
+| network | object | `{"allowPrivateNetworkAccess":null,"webhookEgress":{"allowlist":[],"policy":""}}` | Outbound network policy for webhook and Slack notification targets |
+| network.allowPrivateNetworkAccess | string | unset | Deprecated, use network.webhookEgress.policy. Only used while the policy is empty: true means allow_all, false means public_only. |
+| network.webhookEgress.allowlist | list | `[]` | Destinations always allowed, whatever the policy: IPs, CIDRs, hostnames and "*.domain" suffixes. Allowlisted hostnames are trusted wherever DNS points them. |
+| network.webhookEgress.policy | string | `""` | Destinations webhook and Slack notifications may reach. allow_all: no checks. block_restricted: private networks allowed; loopback, link-local and cloud metadata blocked. public_only: public addresses only. Empty uses Harbor's default, block_restricted. |
 | portal.affinity | object | `{}` | Affinity rules for Portal pods |
 | portal.annotations | object | `{}` | Annotations for the Portal workload object (Deployment) |
 | portal.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler. See `core.autoscaling` for full docs. |
