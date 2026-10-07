@@ -52,7 +52,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-core
   2: |
@@ -64,7 +64,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-core
     spec:
@@ -91,7 +91,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-exporter
     spec:
@@ -113,7 +113,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor
     spec:
@@ -184,7 +184,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice-env
   6: |
@@ -221,7 +221,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
   7: |
@@ -233,7 +233,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
     spec:
@@ -314,7 +314,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
   9: |
@@ -326,7 +326,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
     spec:
@@ -401,7 +401,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
   11: |
@@ -413,7 +413,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
     spec:
@@ -445,7 +445,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-registryctl
   13: |
@@ -458,7 +458,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-core
   14: |
@@ -471,7 +471,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-exporter
   15: |
@@ -484,7 +484,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
   16: |
@@ -497,7 +497,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
   17: |
@@ -510,7 +510,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
 2. valkey with auth enabled:
@@ -567,7 +567,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-core
   2: |
@@ -579,7 +579,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-core
     spec:
@@ -606,7 +606,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-exporter
     spec:
@@ -628,7 +628,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor
     spec:
@@ -699,7 +699,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice-env
   6: |
@@ -736,7 +736,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
   7: |
@@ -748,7 +748,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
     spec:
@@ -829,7 +829,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
   9: |
@@ -841,7 +841,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
     spec:
@@ -916,7 +916,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
   11: |
@@ -928,7 +928,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
     spec:
@@ -960,7 +960,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-registryctl
   13: |
@@ -973,7 +973,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-core
   14: |
@@ -986,7 +986,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-exporter
   15: |
@@ -999,7 +999,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
   16: |
@@ -1012,7 +1012,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
   17: |
@@ -1025,7 +1025,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
 3. external Redis with TLS + sentinel + password:
@@ -1082,7 +1082,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-core
   2: |
@@ -1094,7 +1094,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-core
     spec:
@@ -1121,7 +1121,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-exporter
     spec:
@@ -1143,7 +1143,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor
     spec:
@@ -1214,7 +1214,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice-env
   6: |
@@ -1251,7 +1251,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
   7: |
@@ -1263,7 +1263,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
     spec:
@@ -1344,7 +1344,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
   9: |
@@ -1356,7 +1356,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
     spec:
@@ -1432,7 +1432,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
   11: |
@@ -1444,7 +1444,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
     spec:
@@ -1476,7 +1476,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-registryctl
   13: |
@@ -1489,7 +1489,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-core
   14: |
@@ -1502,7 +1502,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-exporter
   15: |
@@ -1515,7 +1515,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
   16: |
@@ -1528,7 +1528,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
   17: |
@@ -1541,7 +1541,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
 4. BYO secrets matrix — every existingSecret path:
@@ -1598,7 +1598,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-core
   2: |
@@ -1610,7 +1610,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-core
     spec:
@@ -1637,7 +1637,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-exporter
     spec:
@@ -1659,7 +1659,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor
     spec:
@@ -1730,7 +1730,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice-env
   6: |
@@ -1767,7 +1767,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
   7: |
@@ -1779,7 +1779,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
     spec:
@@ -1860,7 +1860,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
   9: |
@@ -1872,7 +1872,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
     spec:
@@ -1947,7 +1947,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
   11: |
@@ -1959,7 +1959,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
     spec:
@@ -1991,7 +1991,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-registryctl
   13: |
@@ -2004,7 +2004,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-core
   14: |
@@ -2017,7 +2017,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-exporter
   15: |
@@ -2030,7 +2030,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
   16: |
@@ -2043,7 +2043,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
   17: |
@@ -2056,7 +2056,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
 5. trace (jaeger) + metrics + ServiceMonitor:
@@ -2118,7 +2118,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-core
   2: |
@@ -2130,7 +2130,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-core
     spec:
@@ -2157,7 +2157,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-exporter
     spec:
@@ -2179,7 +2179,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor
     spec:
@@ -2257,7 +2257,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice-env
   6: |
@@ -2298,7 +2298,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
   7: |
@@ -2310,7 +2310,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
     spec:
@@ -2391,7 +2391,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
   9: |
@@ -2403,7 +2403,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
     spec:
@@ -2481,7 +2481,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
   11: |
@@ -2493,7 +2493,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
     spec:
@@ -2530,7 +2530,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-registryctl
   13: |
@@ -2543,7 +2543,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-core
   14: |
@@ -2556,7 +2556,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-exporter
   15: |
@@ -2569,7 +2569,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
   16: |
@@ -2582,7 +2582,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
   17: |
@@ -2595,7 +2595,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
   18: |
@@ -2606,7 +2606,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
         release: prometheus
       name: harbor
@@ -2686,7 +2686,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-core
   2: |
@@ -2698,7 +2698,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-core
     spec:
@@ -2725,7 +2725,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-exporter
     spec:
@@ -2747,7 +2747,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor
     spec:
@@ -2908,7 +2908,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice-env
   6: |
@@ -2945,7 +2945,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
   7: |
@@ -2957,7 +2957,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
     spec:
@@ -3038,7 +3038,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
   9: |
@@ -3050,7 +3050,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
     spec:
@@ -3125,7 +3125,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
   11: |
@@ -3137,7 +3137,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
     spec:
@@ -3169,7 +3169,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-registryctl
   13: |
@@ -3182,7 +3182,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-core
   14: |
@@ -3195,7 +3195,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-exporter
   15: |
@@ -3208,7 +3208,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-jobservice
   16: |
@@ -3221,7 +3221,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-portal
   17: |
@@ -3234,7 +3234,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-registry
   18: |
@@ -3245,7 +3245,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-harbor-example-com-b9096314
     spec:
@@ -3265,7 +3265,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-notary-example-com-a2fd2ccd
     spec:
@@ -3285,7 +3285,7 @@
         app.kubernetes.io/instance: harbor
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: harbor
-        app.kubernetes.io/version: v2.15.0
+        app.kubernetes.io/version: v2.15.10
         helm.sh/chart: harbor-2.0.0
       name: harbor-wildcard-harbor-example-com-2f089bf5
     spec:
