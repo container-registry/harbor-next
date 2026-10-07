@@ -210,12 +210,9 @@ tasks:
         trap "rm -rf $TRIVY_DIR" EXIT
         git clone --branch v{{.TRIVY_VERSION}} --depth 1 https://github.com/aquasecurity/trivy.git "$TRIVY_DIR"
         cd "$TRIVY_DIR"
-        go mod edit -require github.com/containerd/containerd/v2@v2.3.5
-        go mod edit -require golang.org/x/crypto@v0.56.0
-        go mod edit -require google.golang.org/grpc@v1.83.2
-        go mod edit -require github.com/moby/go-archive@v0.3.0
-        go mod tidy -e
-        GOEXPERIMENT=jsonv2 CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath \
+        # GOTOOLCHAIN=auto: the trivy tag's go.mod may require a newer Go than
+        # Harbor's pinned toolchain (CI runs GOTOOLCHAIN=local).
+        GOTOOLCHAIN=auto GOEXPERIMENT=jsonv2 CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath \
           -ldflags "-s -w -X github.com/aquasecurity/trivy/pkg/version/app.ver={{.TRIVY_VERSION}}" \
           -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/trivy" ./cmd/trivy
         git rev-parse --short=8 HEAD > "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/.trivy-commit"
