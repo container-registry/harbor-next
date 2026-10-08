@@ -195,8 +195,8 @@ jobs:
   # - mark-commercial-release: stamping the 8gcr changelog markers would move
   #   the commercial entries out of the unreleased block, and the real
   #   release's notes would lose them.
-  # - the chart jobs and the appVersion bump: the chart tracks published
-  #   releases, and a nightly is not one.
+  # - the chart jobs: the chart tracks published releases, and a nightly is
+  #   not one.
 
   verify:
     name: Verify Nightly Images

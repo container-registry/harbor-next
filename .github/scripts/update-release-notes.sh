@@ -164,9 +164,18 @@ node .github/scripts/extract-pr-summary.mjs \
   "${tmp_dir}/summary.md"
 
 if [[ "${chart_mode}" == true ]]; then
-  # Chart releases run on main only, and their target_commitish is a pinned
-  # SHA rather than a branch, so the app-path lookup does not apply.
-  release_branch="main"
+  # A chart release's target_commitish is a pinned SHA, not a branch, so a
+  # recreate finds the branch from history: chart-v2.1.0 and older were
+  # published from main, later ones from the release-X.Y branch that tagged
+  # them. The branch is the cosign identity of publish-chart.yml.
+  if [[ ( -n "${preview_pr_number}" || "${GITHUB_REF_TYPE:-}" == "branch" ) && -n "${GITHUB_REF_NAME:-}" ]]; then
+    release_branch="${GITHUB_REF_NAME}"
+  elif git merge-base --is-ancestor "${TAG_NAME}" origin/main 2>/dev/null; then
+    release_branch="main"
+  else
+    release_branch=$(git branch -r --contains "${TAG_NAME}" --format='%(refname:short)' \
+      | sed -n 's#^origin/\(release-[0-9]*\.[0-9]*\)$#\1#p' | head -n 1)
+  fi
 elif [[ -n "${preview_pr_number}" ]]; then
   release_branch="${GITHUB_REF_NAME:?GITHUB_REF_NAME is required for a release PR preview}"
 elif [[ "${GITHUB_REF_TYPE:-}" == "branch" && -n "${GITHUB_REF_NAME:-}" ]]; then
@@ -329,7 +338,7 @@ fi
       echo "Signed with [cosign](https://github.com/sigstore/cosign). **Verify the chart signature:**"
       echo '```sh'
       echo "cosign verify \\"
-      echo "  --certificate-identity \"https://github.com/${GITHUB_REPOSITORY}/.github/workflows/publish-chart.yml@refs/heads/main\" \\"
+      echo "  --certificate-identity \"https://github.com/${GITHUB_REPOSITORY}/.github/workflows/publish-chart.yml@refs/heads/${release_branch}\" \\"
       echo '  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \'
       echo "  ${registry}/charts/${chart_name}:${chart_version}"
       echo '```'
