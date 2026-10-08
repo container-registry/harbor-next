@@ -83,14 +83,15 @@ func signatureChecking(ctx context.Context, r *http.Request, af lib.ArtifactInfo
 		return nil
 	}
 
-	// Opt-in, content-trust-only bootstrap: allow a push-capable signing client to pull the
-	// (still unsigned) subject manifest so it can create the first cosign/notation signature.
-	// This is the legacy User-Agent-based exemption removed from SkipPolicyChecking; because
-	// the User-Agent is spoofable, it is honoured only when the operator
-	// sets CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED=true, and it never affects the
+	// Content-trust-only bootstrap: allow a push-capable signing client to pull the (still
+	// unsigned) subject manifest so it can create the first cosign/notation signature. This is
+	// the legacy User-Agent-based exemption removed from SkipPolicyChecking, and the User-Agent
+	// is just as spoofable here; it stays on by default because signing under an enabled policy
+	// does not work without it. An operator turns it off with
+	// CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED=false. It never affects the
 	// vulnerability-prevention policy.
 	if util.LegacySignerPullEnabled() && util.LegacySignerBootstrapPull(r, projectID) {
-		logger.Debugf("legacy signer bootstrap pull (opt-in) of artifact %s@%s, content-trust check skipped", af.Repository, af.Digest)
+		logger.Debugf("legacy signer bootstrap pull of artifact %s@%s, content-trust check skipped", af.Repository, af.Digest)
 		return nil
 	}
 

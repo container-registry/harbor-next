@@ -57,8 +57,9 @@ services:
       WITH_TRIVY: ${WITH_TRIVY:-true}
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr
-      # Lets push-authorized users skip content trust via a cosign/notation User-Agent (spoofable)
-      CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED: ${CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED:-false}
+      # On by default so cosign/notation can pull the unsigned image they are about to sign;
+      # the User-Agent it keys on is spoofable. Set to false to enforce content trust on every pull
+      CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED: ${CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED:-true}
       # Webhook egress: allow_all, block_restricted (default when empty) or public_only
       HARBOR_WEBHOOK_EGRESS_POLICY: ${HARBOR_WEBHOOK_EGRESS_POLICY:-}
       HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ${HARBOR_WEBHOOK_EGRESS_ALLOWLIST:-}
