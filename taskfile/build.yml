@@ -161,6 +161,14 @@ tasks:
         trap "rm -rf $DIST_DIR" EXIT
         git clone --branch {{.DISTRIBUTION_VERSION}} --depth 1 {{.DISTRIBUTION_SRC}} "$DIST_DIR"
         cd "$DIST_DIR"
+        VERSION_STR={{.DISTRIBUTION_VERSION}}
+        {{- range .DISTRIBUTION_PATCHES}}
+        echo "Applying {{.}}"
+        git apply "{{$.ROOT_DIR}}/{{.}}"
+        {{- end}}
+        {{- if .DISTRIBUTION_PATCHES}}
+        VERSION_STR="${VERSION_STR}+patched.{{len .DISTRIBUTION_PATCHES}}"
+        {{- end}}
         go mod edit -require golang.org/x/crypto@v0.57.0
         go mod edit -require golang.org/x/net@v0.59.0
         go mod edit -require golang.org/x/text@v0.42.0
@@ -169,7 +177,6 @@ tasks:
         go mod vendor
         REVISION=$(git rev-parse HEAD)
         PKG=github.com/distribution/distribution/v3
-        VERSION_STR={{.DISTRIBUTION_VERSION}}
         LDFLAGS="-X ${PKG}/version.version=${VERSION_STR#v} -X ${PKG}/version.revision=${REVISION} -X ${PKG}/version.mainpkg=${PKG} -s -w"
         CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath -ldflags "${LDFLAGS}" -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/registry" ./cmd/registry
 
