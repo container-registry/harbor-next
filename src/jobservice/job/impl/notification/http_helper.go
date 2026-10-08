@@ -68,7 +68,11 @@ func init() {
 		clients: map[string]*http.Client{},
 	}
 
+<<<<<<< HEAD
 	var secureOptions []func(*http.Transport)
+=======
+	secureOptions := []func(*http.Transport){commonhttp.WithEgressGuard()}
+>>>>>>> f6f5bac8d (feat(webhook): add webhook egress policy levels and allowlist (#24079))
 	if commonhttp.InternalTLSEnabled() {
 		secureOptions = append(secureOptions, commonhttp.WithInternalTLSConfig())
 	}
@@ -78,7 +82,14 @@ func init() {
 		CheckRedirect: blockRedirect,
 	}
 	httpHelper.clients[insecure] = &http.Client{
+<<<<<<< HEAD
 		Transport:     commonhttp.NewPublicNetworkTransport(commonhttp.WithInsecureSkipVerify(true)),
+=======
+		Transport: commonhttp.NewTransport(
+			commonhttp.WithInsecureSkipVerify(true),
+			commonhttp.WithEgressGuard(),
+		),
+>>>>>>> f6f5bac8d (feat(webhook): add webhook egress policy levels and allowlist (#24079))
 		Timeout:       timeout,
 		CheckRedirect: blockRedirect,
 	}
