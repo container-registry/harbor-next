@@ -23,7 +23,7 @@ const sectionNames = new Map([
   ['Chart Changes', 'Updates'],
 ]);
 const droppedSections = new Set(['Documentation']);
-const sectionOrder = ['Commercial Features', 'Features', 'Fixes', 'Updates', 'Upstream', 'Reverts'];
+const sectionOrder = ['Harbor Releases', 'Commercial Features', 'Features', 'Fixes', 'Updates', 'Upstream', 'Reverts'];
 const sections = new Map(sectionOrder.map(section => [section, []]));
 const trailing = [];
 let currentSection = '';

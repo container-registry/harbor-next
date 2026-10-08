@@ -24,6 +24,10 @@
     {"type": "chart",    "section": "Chart",          "hidden": true}
   ],
   "packages": {
-    ".": {}
+    ".": {
+      "extra-files": [
+        {"type": "generic", "path": "deploy/chart/Chart.yaml"}
+      ]
+    }
   }
 }

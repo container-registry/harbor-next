@@ -32,7 +32,7 @@ builds both `linux/amd64` and `linux/arm64`.
 
 ## Release-please
 
-`main` uses `always-bump-minor`; `VERSION` on `main` tracks the next development release while `.release-please-manifest.json` tracks the published release. `release-X.Y` branches use patch-only versioning. `ci:`, `build:`, `chore:`, `test:` are hidden from release notes.
+`main` uses `always-bump-minor`; `VERSION` on `main` tracks the next development release while `.release-please-manifest.json` tracks the published release. `release-X.Y` branches use patch-only versioning. The Helm chart is released only from `release-X.Y` branches (`always-bump-patch`); app release commits stamp its `appVersion`. See `deploy/chart/CONTRIBUTING.md`. `ci:`, `build:`, `chore:`, `test:` are hidden from release notes.
 
 **exclude-paths:** changes touching only `.github/`, `docs/`, `tests/`, or `taskfile/` don't bump version — use `ci:` for CI-only changes.
 
