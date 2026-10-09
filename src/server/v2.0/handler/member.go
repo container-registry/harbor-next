@@ -24,11 +24,14 @@ import (
 	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/common/rbac"
 	"github.com/goharbor/harbor/src/common/security/local"
+	robotsec "github.com/goharbor/harbor/src/common/security/robot"
 	"github.com/goharbor/harbor/src/controller/member"
 	"github.com/goharbor/harbor/src/controller/project"
+	"github.com/goharbor/harbor/src/controller/robot"
 	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/errors"
 	memberModels "github.com/goharbor/harbor/src/pkg/member/models"
+	"github.com/goharbor/harbor/src/pkg/permission/types"
 	"github.com/goharbor/harbor/src/server/v2.0/models"
 	operation "github.com/goharbor/harbor/src/server/v2.0/restapi/operations/member"
 )
@@ -55,7 +58,7 @@ func (m *memberAPI) CreateProjectMember(ctx context.Context, params operation.Cr
 	if err != nil {
 		return m.SendError(ctx, err)
 	}
-	if err := m.requireProjectAdminGrant(ctx, projectNameOrID, req.Role); err != nil {
+	if err := m.requireProjectAdminGrant(ctx, projectNameOrID, req.Role, rbac.ActionCreate); err != nil {
 		return m.SendError(ctx, err)
 	}
 	id, err := m.ctl.Create(ctx, projectNameOrID, *req)
@@ -79,7 +82,7 @@ func toMemberReq(memberReq *models.ProjectMember) (*member.Request, error) {
 	return &result, nil
 }
 
-func (m *memberAPI) requireProjectAdminGrant(ctx context.Context, project any, role int) error {
+func (m *memberAPI) requireProjectAdminGrant(ctx context.Context, project any, role int, action rbac.Action) error {
 	if role != common.RoleProjectAdmin {
 		return nil
 	}
@@ -89,6 +92,12 @@ func (m *memberAPI) requireProjectAdminGrant(ctx context.Context, project any, r
 	}
 	if securityCtx.IsSysAdmin() {
 		return nil
+	}
+	if robotCtx, ok := securityCtx.(*robotsec.SecurityContext); ok {
+		if grantsMemberOnAllProjects(robotCtx.User(), action) {
+			return nil
+		}
+		return errors.ForbiddenError(nil)
 	}
 	localCtx, ok := securityCtx.(*local.SecurityContext)
 	if !ok {
@@ -111,6 +120,28 @@ func (m *memberAPI) requireProjectAdminGrant(ctx context.Context, project any, r
 		}
 	}
 	return errors.ForbiddenError(nil)
+}
+
+// grantsMemberOnAllProjects reports whether r is a system robot whose cover-all
+// project permission allows the member action. Such a robot already manages
+// members on every project, so granting project-admin adds no authority. A
+// project robot, or one scoped to named projects, stays below project-admin.
+func grantsMemberOnAllProjects(r *robot.Robot, action rbac.Action) bool {
+	if r == nil || !r.IsSysLevel() {
+		return false
+	}
+	for _, perm := range r.Permissions {
+		if !perm.IsCoverAll() {
+			continue
+		}
+		for _, policy := range perm.Access {
+			if policy.Resource == rbac.ResourceMember && policy.Action == action &&
+				policy.GetEffect() != types.EffectDeny.String() {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (m *memberAPI) DeleteProjectMember(ctx context.Context, params operation.DeleteProjectMemberParams) middleware.Responder {
@@ -205,7 +236,7 @@ func (m *memberAPI) UpdateProjectMember(ctx context.Context, params operation.Up
 	if params.Mid == 0 {
 		return m.SendError(ctx, errors.BadRequestError(nil).WithMessage("member id can not be empty"))
 	}
-	if err := m.requireProjectAdminGrant(ctx, projectNameOrID, int(params.Role.RoleID)); err != nil {
+	if err := m.requireProjectAdminGrant(ctx, projectNameOrID, int(params.Role.RoleID), rbac.ActionUpdate); err != nil {
 		return m.SendError(ctx, err)
 	}
 	err := m.ctl.UpdateRole(ctx, projectNameOrID, int(params.Mid), int(params.Role.RoleID))
