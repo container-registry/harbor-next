@@ -6,6 +6,14 @@ This changelog mirrors [GitHub Releases](https://github.com/container-registry/h
 
 ---
 
+## [2.15.11](https://github.com/container-registry/harbor-next/compare/v2.15.10...v2.15.11) (2026-10-09)
+
+
+### Bug Fixes
+
+* **contenttrust:** Allow The Legacy Signer Pull By Default (backport [#1191](https://github.com/container-registry/harbor-next/issues/1191)) ([#1192](https://github.com/container-registry/harbor-next/issues/1192)) ([3cd2204](https://github.com/container-registry/harbor-next/commit/3cd2204cca88102e03f2a215bf1a4e574e42290f))
+* **member:** Allow System Robots With All-Project Member Access To Grant Project-Admin (backport [#1210](https://github.com/container-registry/harbor-next/issues/1210)) ([#1211](https://github.com/container-registry/harbor-next/issues/1211)) ([a47bf61](https://github.com/container-registry/harbor-next/commit/a47bf6193d8a470e575f37787b7b471ad15f736c))
+
 ## [2.15.10](https://github.com/container-registry/harbor-next/compare/v2.15.9...v2.15.10) (2026-10-06)
 
 
