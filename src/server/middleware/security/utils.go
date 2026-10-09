@@ -17,6 +17,7 @@ package security
 import (
 	"net/http"
 	"strings"
+	"unicode/utf8"
 
 	commonsecret "github.com/goharbor/harbor/src/common/secret"
 	"github.com/goharbor/harbor/src/common/security"
@@ -33,6 +34,13 @@ func bearerToken(req *http.Request) string {
 		return ""
 	}
 	return strings.TrimSpace(token[1])
+}
+
+// queryable reports whether s can be sent to PostgreSQL as text. A credential
+// that cannot is rejected as invalid before the lookup: otherwise the database
+// error it causes would answer a malformed username with 503 instead of 401.
+func queryable(s string) bool {
+	return utf8.ValidString(s) && !strings.ContainsRune(s, 0)
 }
 
 // FromJobservice detects whether this request is from jobservice.

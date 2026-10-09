@@ -49,6 +49,8 @@ const (
 	UNSUPPORTED = "UNSUPPORTED"
 	// RequestEntityTooLargeCode is the error code for request entity too large error.
 	RequestEntityTooLargeCode = "REQUEST_ENTITY_TOO_LARGE"
+	// ServiceUnavailableCode is the docker distribution code for a transient failure the client should retry.
+	ServiceUnavailableCode = "UNAVAILABLE"
 )
 
 // NotFoundError is error for the case of object not found

@@ -37,13 +37,13 @@ func TestOIDCCli(t *testing.T) {
 	// not the candidate request
 	req, err := http.NewRequest(http.MethodGet, "http://127.0.0.1/api/v2.0/users/", nil)
 	require.Nil(t, err)
-	ctx := oidcCli.Generate(req)
+	ctx := mustGenerate(t, oidcCli, req)
 	assert.Nil(t, ctx)
 
 	// the auth mode isn't OIDC
 	req, err = http.NewRequest(http.MethodGet, "http://127.0.0.1/service/token", nil)
 	require.Nil(t, err)
-	ctx = oidcCli.Generate(req)
+	ctx = mustGenerate(t, oidcCli, req)
 	assert.Nil(t, ctx)
 
 	// pass
@@ -59,7 +59,7 @@ func TestOIDCCli(t *testing.T) {
 	oidc.SetHardcodeVerifierForTest(password)
 	req = req.WithContext(lib.WithAuthMode(req.Context(), common.OIDCAuth))
 	req.SetBasicAuth(username, password)
-	ctx = oidcCli.Generate(req)
+	ctx = mustGenerate(t, oidcCli, req)
 	assert.NotNil(t, ctx)
 }
 

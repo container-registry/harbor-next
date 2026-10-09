@@ -46,33 +46,35 @@ var (
 
 type oidcCli struct{}
 
-func (o *oidcCli) Generate(req *http.Request) security.Context {
+func (o *oidcCli) Generate(req *http.Request) (security.Context, error) {
 	ctx := req.Context()
 	if lib.GetAuthMode(ctx) != common.OIDCAuth {
-		return nil
+		return nil, nil
 	}
 	logger := log.G(ctx)
 	username, secret, ok := req.BasicAuth()
 	if !ok {
-		return nil
+		return nil, nil
 	}
 	if !o.valid(req) {
-		return nil
+		return nil, nil
 	}
 
 	if strings.HasPrefix(username, config.RobotPrefix(ctx)) {
-		return nil
+		return nil, nil
+	}
+	if !queryable(username) {
+		logger.Debugf("OIDC CLI username is not valid UTF-8 or contains NUL, rejecting")
+		return nil, nil
 	}
 
 	u, err := uctl.GetByName(ctx, username)
 	if err != nil {
-		// NotFound is expected probe traffic -> DEBUG; real DB/DAO errors stay ERROR.
 		if errors.IsNotFoundErr(err) {
 			logger.Debugf("failed to get user model, username: %s, error: %v", username, err)
-		} else {
-			logger.Errorf("failed to get user model, username: %s, error: %v", username, err)
+			return nil, nil
 		}
-		return nil
+		return nil, fmt.Errorf("failed to get user model, username: %s, error: %w", username, err)
 	}
 
 	info, err := oidc.VerifySecret(ctx, username, secret)
@@ -80,12 +82,12 @@ func (o *oidcCli) Generate(req *http.Request) security.Context {
 		if u.UserID != 1 { // skip the admin user
 			logger.Errorf("failed to verify secret, username: %s, error: %v", username, err)
 		}
-		return nil
+		return nil, nil
 	}
 
 	oidc.InjectGroupsToUser(ctx, info, u)
 	logger.Debugf("an OIDC CLI security context generated for request %s %s", req.Method, req.URL.Path)
-	return local.NewSecurityContext(u)
+	return local.NewSecurityContext(u), nil
 }
 
 func (o *oidcCli) valid(req *http.Request) bool {

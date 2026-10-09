@@ -56,6 +56,11 @@ linters:
           - revive
         text: "var-naming: avoid package names that conflict with Go standard library package names"
         path: "(common/http/|lib/errors/|lib/http/)"
+      # Security context generators return (nil, nil) for a request without a
+      # credential they accept; the error is reserved for backend failures.
+      - linters:
+          - nilnil
+        path: server/middleware/security/
     paths:
       - third_party$
       - builtin$
