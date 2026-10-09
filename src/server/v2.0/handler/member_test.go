@@ -64,11 +64,24 @@ func TestProjectAdminGrantRequiresAdminRole(t *testing.T) {
 	tests := []struct {
 		name          string
 		user          *commonmodels.User
-		robot         bool
+		robot         *robot.Robot
 		roles         []int
 		wantForbidden bool
 	}{
-		{name: "project robot", robot: true, wantForbidden: true},
+		{
+			name:          "project robot",
+			robot:         memberRobot(robot.LEVELPROJECT, "/project/1", rbac.ActionCreate, rbac.ActionUpdate),
+			wantForbidden: true,
+		},
+		{
+			name:  "system robot covering all projects",
+			robot: memberRobot(robot.LEVELSYSTEM, robot.SCOPEALLPROJECT, rbac.ActionCreate, rbac.ActionUpdate),
+		},
+		{
+			name:          "system robot scoped to one project",
+			robot:         memberRobot(robot.LEVELSYSTEM, "/project/1", rbac.ActionCreate, rbac.ActionUpdate),
+			wantForbidden: true,
+		},
 		{
 			name:          "maintainer",
 			user:          &commonmodels.User{UserID: 4, Username: "maintainer"},
@@ -110,18 +123,8 @@ func TestProjectAdminGrantRequiresAdminRole(t *testing.T) {
 			})
 
 			var securityCtx security.Context
-			if test.robot {
-				securityCtx = robotsec.NewSecurityContext(&robot.Robot{
-					Robot: robotmodel.Robot{Name: "project-robot"},
-					Level: robot.LEVELPROJECT,
-					Permissions: []*robot.Permission{{
-						Scope: "/project/1",
-						Access: []*types.Policy{
-							{Resource: rbac.ResourceMember, Action: rbac.ActionCreate},
-							{Resource: rbac.ResourceMember, Action: rbac.ActionUpdate},
-						},
-					}},
-				})
+			if test.robot != nil {
+				securityCtx = robotsec.NewSecurityContext(test.robot)
 			} else {
 				securityCtx = local.NewSecurityContext(test.user)
 			}
@@ -130,7 +133,7 @@ func TestProjectAdminGrantRequiresAdminRole(t *testing.T) {
 			api := newMemberAPI()
 			api.ctl = controller
 			ctx := security.NewContext(context.Background(), securityCtx)
-			if test.robot {
+			if test.robot != nil {
 				allowed, err := api.HasProjectPermission(
 					ctx, projectID, rbac.ActionCreate, rbac.ResourceMember,
 				)
@@ -187,8 +190,96 @@ func TestRequireProjectAdminGrantDeniesLocalNonAdmin(t *testing.T) {
 		user := &commonmodels.User{UserID: 6, Username: "local-user"}
 		ctx := security.NewContext(context.Background(), local.NewSecurityContext(user))
 
-		err := api.requireProjectAdminGrant(ctx, projectID, common.RoleProjectAdmin)
+		err := api.requireProjectAdminGrant(ctx, projectID, common.RoleProjectAdmin, rbac.ActionCreate)
 		assert.True(t, liberrors.IsErr(err, liberrors.ForbiddenCode), "roles %v", roles)
-		assert.NoError(t, api.requireProjectAdminGrant(ctx, projectID, common.RoleDeveloper))
+		assert.NoError(t, api.requireProjectAdminGrant(ctx, projectID, common.RoleDeveloper, rbac.ActionCreate))
+	}
+}
+
+func memberRobot(level, scope string, actions ...rbac.Action) *robot.Robot {
+	access := make([]*types.Policy, 0, len(actions))
+	for _, action := range actions {
+		access = append(access, &types.Policy{Resource: rbac.ResourceMember, Action: action})
+	}
+	return &robot.Robot{
+		Robot:       robotmodel.Robot{Name: "member-robot"},
+		Level:       level,
+		Permissions: []*robot.Permission{{Scope: scope, Access: access}},
+	}
+}
+
+// A system robot is exempt only for the member action its cover-all
+// permission allows; anything narrower stays below project-admin.
+func TestRequireProjectAdminGrantSystemRobot(t *testing.T) {
+	const projectID int64 = 1
+	tests := []struct {
+		name          string
+		robot         *robot.Robot
+		action        rbac.Action
+		wantForbidden bool
+	}{
+		{
+			name:   "create allowed by cover-all member:create",
+			robot:  memberRobot(robot.LEVELSYSTEM, robot.SCOPEALLPROJECT, rbac.ActionCreate),
+			action: rbac.ActionCreate,
+		},
+		{
+			name:          "update without cover-all member:update",
+			robot:         memberRobot(robot.LEVELSYSTEM, robot.SCOPEALLPROJECT, rbac.ActionCreate),
+			action:        rbac.ActionUpdate,
+			wantForbidden: true,
+		},
+		{
+			name:          "cover-all scope without member permission",
+			robot:         memberRobot(robot.LEVELSYSTEM, robot.SCOPEALLPROJECT),
+			action:        rbac.ActionCreate,
+			wantForbidden: true,
+		},
+		{
+			name: "cover-all member:create denied",
+			robot: &robot.Robot{
+				Level: robot.LEVELSYSTEM,
+				Permissions: []*robot.Permission{{
+					Scope: robot.SCOPEALLPROJECT,
+					Access: []*types.Policy{{
+						Resource: rbac.ResourceMember, Action: rbac.ActionCreate, Effect: types.EffectDeny,
+					}},
+				}},
+			},
+			action:        rbac.ActionCreate,
+			wantForbidden: true,
+		},
+		{
+			name: "cover-all member:create with an unknown effect",
+			robot: &robot.Robot{
+				Level: robot.LEVELSYSTEM,
+				Permissions: []*robot.Permission{{
+					Scope: robot.SCOPEALLPROJECT,
+					Access: []*types.Policy{{
+						Resource: rbac.ResourceMember, Action: rbac.ActionCreate, Effect: "bogus",
+					}},
+				}},
+			},
+			action:        rbac.ActionCreate,
+			wantForbidden: true,
+		},
+		{
+			name:          "project robot carrying a cover-all scope",
+			robot:         memberRobot(robot.LEVELPROJECT, robot.SCOPEALLPROJECT, rbac.ActionCreate),
+			action:        rbac.ActionCreate,
+			wantForbidden: true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			api := &memberAPI{}
+			ctx := security.NewContext(context.Background(), robotsec.NewSecurityContext(test.robot))
+			err := api.requireProjectAdminGrant(ctx, projectID, common.RoleProjectAdmin, test.action)
+			if test.wantForbidden {
+				assert.True(t, liberrors.IsErr(err, liberrors.ForbiddenCode))
+				return
+			}
+			assert.NoError(t, err)
+		})
 	}
 }
