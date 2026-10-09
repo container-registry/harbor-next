@@ -18,7 +18,6 @@ package v2auth
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -35,6 +34,7 @@ import (
 	"github.com/goharbor/harbor/src/controller/project"
 	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/config"
+	"github.com/goharbor/harbor/src/lib/errors"
 	_ "github.com/goharbor/harbor/src/pkg/config/inmemory"
 	"github.com/goharbor/harbor/src/pkg/permission/types"
 	proModels "github.com/goharbor/harbor/src/pkg/project/models"
@@ -52,7 +52,7 @@ func TestMain(m *testing.M) {
 		name := projectIDOrName.(string)
 		id, _ := strconv.Atoi(strings.TrimPrefix(name, "project_"))
 		if id == 0 {
-			return nil, fmt.Errorf("%s not found", name)
+			return nil, errors.NotFoundError(nil).WithMessagef("%s not found", name)
 		}
 		return &proModels.Project{
 			ProjectID: int64(id),

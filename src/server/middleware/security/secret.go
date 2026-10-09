@@ -26,12 +26,12 @@ import (
 
 type secret struct{}
 
-func (s *secret) Generate(req *http.Request) security.Context {
+func (s *secret) Generate(req *http.Request) (security.Context, error) {
 	log := log.G(req.Context())
 	sec := commonsecret.FromRequest(req)
 	if len(sec) == 0 {
-		return nil
+		return nil, nil
 	}
 	log.Debugf("a secret security context generated for request %s %s", req.Method, req.URL.Path)
-	return securitysecret.NewSecurityContext(sec, config.SecretStore)
+	return securitysecret.NewSecurityContext(sec, config.SecretStore), nil
 }

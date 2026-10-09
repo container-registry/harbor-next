@@ -15,6 +15,8 @@
 package security
 
 import (
+	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -26,8 +28,11 @@ import (
 	"github.com/goharbor/harbor/src/common/security/local"
 	"github.com/goharbor/harbor/src/core/auth"
 	"github.com/goharbor/harbor/src/lib"
+	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
 )
+
+var login = auth.Login
 
 type basicAuth struct{}
 
@@ -92,11 +97,15 @@ func truncateRunes(s string, maxLen int) string {
 	return string(runes[:maxLen])
 }
 
-func (b *basicAuth) Generate(req *http.Request) security.Context {
+func (b *basicAuth) Generate(req *http.Request) (security.Context, error) {
 	log := log.G(req.Context())
 	username, password, ok := req.BasicAuth()
 	if !ok {
-		return nil
+		return nil, nil
+	}
+	if !queryable(username) {
+		log.Debugf("basic auth username is not valid UTF-8 or contains NUL, rejecting")
+		return nil, nil
 	}
 
 	// In OIDC/LDAP/UAA modes only the admin uses basic auth; other principals are
@@ -104,12 +113,18 @@ func (b *basicAuth) Generate(req *http.Request) security.Context {
 	// useless auth-backend round-trip. Empty mode is treated as DB auth (as in
 	// auth.Login) so a config lookup failure can't lock out basic auth.
 	authMode := lib.GetAuthMode(req.Context())
-	if authMode != "" && authMode != common.DBAuth && !auth.IsSuperUser(req.Context(), username) {
-		log.Debugf("basic auth skipped for user %s, auth mode is %s", username, authMode)
-		return nil
+	if authMode != "" && authMode != common.DBAuth {
+		superUser, err := isSuperUser(req.Context(), username)
+		if err != nil {
+			return nil, err
+		}
+		if !superUser {
+			log.Debugf("basic auth skipped for user %s, auth mode is %s", username, authMode)
+			return nil, nil
+		}
 	}
 
-	user, err := auth.Login(req.Context(), models.AuthModel{
+	user, err := login(req.Context(), models.AuthModel{
 		Principal: username,
 		Password:  password,
 	})
@@ -117,18 +132,29 @@ func (b *basicAuth) Generate(req *http.Request) security.Context {
 	if err != nil {
 		// Bad credentials are expected probe traffic (scanners/bots): log at DEBUG
 		// without the eager WithField structured-logger cost on this hot path.
-		// Unexpected backend/config errors stay at ERROR with client context.
 		if _, ok := err.(auth.ErrAuth); ok {
 			log.Debugf("failed to authenticate user:%s, error:%v", username, err)
-		} else {
-			log.WithField("client IP", GetClientIP(req)).WithField("user agent", GetUserAgent(req)).Errorf("failed to authenticate user:%s, error:%v", username, err)
+			return nil, nil
 		}
-		return nil
+		return nil, fmt.Errorf("failed to authenticate user:%s, error: %w", username, err)
 	}
 	if user == nil {
 		log.Debug("basic auth user is nil")
-		return nil
+		return nil, nil
 	}
 	log.Debugf("a basic auth security context generated for request %s %s", req.Method, req.URL.Path)
-	return local.NewSecurityContext(user)
+	return local.NewSecurityContext(user), nil
+}
+
+// isSuperUser is auth.IsSuperUser without folding a failed lookup into false,
+// which would skip basic auth and leave the admin anonymous.
+func isSuperUser(ctx context.Context, username string) (bool, error) {
+	u, err := uctl.GetByName(ctx, username)
+	if errors.IsNotFoundErr(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("failed to look up user %s: %w", username, err)
+	}
+	return u.UserID == 1, nil
 }

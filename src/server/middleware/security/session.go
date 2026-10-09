@@ -28,22 +28,22 @@ import (
 
 type session struct{}
 
-func (s *session) Generate(req *http.Request) security.Context {
+func (s *session) Generate(req *http.Request) (security.Context, error) {
 	log := log.G(req.Context())
 	store, err := web.GlobalSessions.SessionStart(httptest.NewRecorder(), req)
 	if err != nil {
 		log.Errorf("failed to get the session store for request: %v", err)
-		return nil
+		return nil, nil
 	}
 	userInterface := store.Get(req.Context(), "user")
 	if userInterface == nil {
-		return nil
+		return nil, nil
 	}
 	user, ok := userInterface.(models.User)
 	if !ok {
 		log.Warning("cannot convert the user in session to user model")
-		return nil
+		return nil, nil
 	}
 	log.Debugf("a session security context generated for request %s %s", req.Method, req.URL.Path)
-	return local.NewSecurityContext(&user)
+	return local.NewSecurityContext(&user), nil
 }

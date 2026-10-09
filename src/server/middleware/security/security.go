@@ -42,7 +42,10 @@ var (
 
 // security context generator
 type generator interface {
-	Generate(req *http.Request) security.Context
+	// Generate returns nil when the request carries no credential the generator
+	// handles or the credential is invalid, and an error only when a backend it
+	// depends on fails, so the credential could be neither accepted nor rejected.
+	Generate(req *http.Request) (security.Context, error)
 }
 
 // Middleware returns a security context middleware that populates the security context into the request context
@@ -60,7 +63,17 @@ func Middleware(skippers ...middleware.Skipper) func(http.Handler) http.Handler 
 		}
 		r = r.WithContext(lib.WithAuthMode(r.Context(), mode))
 		for _, generator := range generators {
-			if ctx := generator.Generate(r); ctx != nil {
+			ctx, err := generator.Generate(r)
+			if err != nil {
+				// Fail closed, and not as 401: continuing as anonymous would tell a client
+				// with valid credentials that they are wrong, and many give up instead of
+				// retrying.
+				log.WithField("client IP", GetClientIP(r)).WithField("user agent", GetUserAgent(r)).
+					Errorf("failed to verify credentials, rejecting request: %v", err)
+				lib_http.SendServiceUnavailable(w)
+				return
+			}
+			if ctx != nil {
 				r = r.WithContext(security.NewContext(r.Context(), ctx))
 				break
 			}
@@ -75,7 +88,8 @@ func UnauthorizedMiddleware(skippers ...middleware.Skipper) func(http.Handler) h
 	return middleware.New(func(w http.ResponseWriter, r *http.Request, next http.Handler) {
 		if _, ok := security.FromContext(r.Context()); !ok {
 			u := &unauthorized{}
-			r = r.WithContext(security.NewContext(r.Context(), u.Generate(r)))
+			ctx, _ := u.Generate(r)
+			r = r.WithContext(security.NewContext(r.Context(), ctx))
 		}
 
 		next.ServeHTTP(w, r)
