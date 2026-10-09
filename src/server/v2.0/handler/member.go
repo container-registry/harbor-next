@@ -136,7 +136,7 @@ func grantsMemberOnAllProjects(r *robot.Robot, action rbac.Action) bool {
 		}
 		for _, policy := range perm.Access {
 			if policy.Resource == rbac.ResourceMember && policy.Action == action &&
-				policy.GetEffect() != types.EffectDeny.String() {
+				policy.GetEffect() == types.EffectAllow.String() {
 				return true
 			}
 		}

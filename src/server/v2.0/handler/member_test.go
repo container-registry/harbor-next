@@ -250,6 +250,20 @@ func TestRequireProjectAdminGrantSystemRobot(t *testing.T) {
 			wantForbidden: true,
 		},
 		{
+			name: "cover-all member:create with an unknown effect",
+			robot: &robot.Robot{
+				Level: robot.LEVELSYSTEM,
+				Permissions: []*robot.Permission{{
+					Scope: robot.SCOPEALLPROJECT,
+					Access: []*types.Policy{{
+						Resource: rbac.ResourceMember, Action: rbac.ActionCreate, Effect: "bogus",
+					}},
+				}},
+			},
+			action:        rbac.ActionCreate,
+			wantForbidden: true,
+		},
+		{
 			name:          "project robot carrying a cover-all scope",
 			robot:         memberRobot(robot.LEVELPROJECT, robot.SCOPEALLPROJECT, rbac.ActionCreate),
 			action:        rbac.ActionCreate,
