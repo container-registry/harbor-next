@@ -436,3 +436,64 @@ func TestCoverAllProjectRobotCannotReachSubresource(t *testing.T) {
 	assert.False(t, ctx.Can(context.TODO(), rbac.ActionUpdate, robotSub),
 		"cover-all project:update must not reach /project/N/robot")
 }
+
+// Only an explicit member:grant-admin policy reaches the permission: no other
+// permission of the robot catalog does, on the cover-all or the project scope.
+func TestGrantAdminNeedsExplicitGrant(t *testing.T) {
+	var access []*types.Policy
+	for _, policy := range rbac.GetPermissionProvider().GetPermissions(rbac.ScopeProject) {
+		if policy.Resource == rbac.ResourceMember && policy.Action == rbac.ActionGrantAdmin {
+			continue
+		}
+		access = append(access, &types.Policy{Resource: policy.Resource, Action: policy.Action})
+	}
+	var systemAccess []*types.Policy
+	for _, policy := range rbac.GetPermissionProvider().GetPermissions(rbac.ScopeSystem) {
+		systemAccess = append(systemAccess, &types.Policy{Resource: policy.Resource, Action: policy.Action})
+	}
+	grant := &types.Policy{Resource: rbac.ResourceMember, Action: rbac.ActionGrantAdmin}
+	projectScope := fmt.Sprintf("/project/%d", private.ProjectID)
+	tests := []struct {
+		name  string
+		robot *robot.Robot
+		want  bool
+	}{
+		{
+			name: "system robot with the whole catalog on all projects and the system",
+			robot: &robot.Robot{Level: robot.LEVELSYSTEM, Robot: model.Robot{Name: "all"}, Permissions: []*robot.Permission{
+				{Kind: "system", Namespace: "/", Scope: robot.SCOPESYSTEM, Access: systemAccess},
+				{Kind: "project", Namespace: "*", Scope: robot.SCOPEALLPROJECT, Access: access},
+			}},
+		},
+		{
+			name: "project robot with the whole catalog",
+			robot: &robot.Robot{Level: robot.LEVELPROJECT, Robot: model.Robot{Name: "proj", ProjectID: private.ProjectID}, Permissions: []*robot.Permission{
+				{Kind: "project", Namespace: private.Name, Scope: projectScope, Access: access},
+			}},
+		},
+		{
+			name: "system robot with member:grant-admin on all projects",
+			robot: &robot.Robot{Level: robot.LEVELSYSTEM, Robot: model.Robot{Name: "grant"}, Permissions: []*robot.Permission{
+				{Kind: "project", Namespace: "*", Scope: robot.SCOPEALLPROJECT, Access: []*types.Policy{grant}},
+			}},
+			want: true,
+		},
+		{
+			name: "project robot with member:grant-admin",
+			robot: &robot.Robot{Level: robot.LEVELPROJECT, Robot: model.Robot{Name: "proj-grant", ProjectID: private.ProjectID}, Permissions: []*robot.Permission{
+				{Kind: "project", Namespace: private.Name, Scope: projectScope, Access: []*types.Policy{grant}},
+			}},
+			want: true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctl := &projecttesting.Controller{}
+			mock.OnAnything(ctl, "Get").Return(private, nil)
+			ctx := NewSecurityContext(test.robot)
+			ctx.ctl = ctl
+			resource := project.NewNamespace(private.ProjectID).Resource(rbac.ResourceMember)
+			assert.Equal(t, test.want, ctx.Can(context.TODO(), rbac.ActionGrantAdmin, resource))
+		})
+	}
+}

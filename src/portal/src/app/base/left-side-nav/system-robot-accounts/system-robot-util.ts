@@ -49,6 +49,18 @@ export enum Action {
 
 export const NAMESPACE_ALL_PROJECTS: string = '*';
 
+export const GRANT_ADMIN_PERMISSION: Access = {
+    resource: 'member',
+    action: 'grant-admin',
+};
+
+// "Select all" never ticks these: each one needs its own deliberate tick.
+export const EXPLICIT_ONLY_PERMISSIONS: Access[] = [GRANT_ADMIN_PERMISSION];
+
+export function isExplicitOnly(permission: Access): boolean {
+    return hasPermission(EXPLICIT_ONLY_PERMISSIONS, permission);
+}
+
 export const NAMESPACE_SYSTEM: string = '/';
 
 export const ACTION_RESOURCE_I18N_MAP = {
@@ -61,6 +73,7 @@ export const ACTION_RESOURCE_I18N_MAP = {
     stop: 'SYSTEM_ROBOT.STOP',
     list: 'SYSTEM_ROBOT.LIST',
     update: 'ROBOT_ACCOUNT.UPDATE',
+    'grant-admin': 'ROBOT_ACCOUNT.GRANT_ADMIN',
     'audit-log': 'ROBOT_ACCOUNT.AUDIT_LOG',
     'preheat-instance': 'ROBOT_ACCOUNT.PREHEAT_INSTANCE',
     project: 'ROBOT_ACCOUNT.PROJECT',

@@ -363,6 +363,8 @@
         "NAME_PREFIX": "Préfixe du nom du compte robot",
         "NAME_PREFIX_REQUIRED": "Le préfixe du nom du compte robot est obligatoire",
         "UPDATE": "Mettre à jour",
+        "GRANT_ADMIN": "Accorder le rôle Administrateur de projet",
+        "GRANT_ADMIN_HINT": "Avec cette permission, le robot peut nommer n'importe qui administrateur de projet. « Sélectionner tout » ne l'inclut jamais.",
         "AUDIT_LOG": "Log d'audit",
         "PREHEAT_INSTANCE": "Préchauffer l'instance",
         "PROJECT": "Projet",

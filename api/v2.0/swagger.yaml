@@ -8191,7 +8191,7 @@ definitions:
         description: The resource of the access. Possible resources are listed here for system and project level https://github.com/goharbor/harbor/blob/main/src/common/rbac/const.go
       action:
         type: string
-        description: The action of the access. Possible actions are *, pull, push, create, read, update, delete, list, operate, scanner-pull and stop.
+        description: The action of the access. Possible actions are *, pull, push, create, read, update, delete, list, operate, scanner-pull, stop and grant-admin. grant-admin applies to the member resource and allows giving the project admin role.
       effect:
         type: string
         description: The effect of the access

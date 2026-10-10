@@ -94,6 +94,12 @@
                     </tr>
                 </tbody>
             </table>
+            <div class="grant-admin-hint" *ngIf="offersGrantAdmin()">
+                <clr-icon
+                    shape="exclamation-triangle"
+                    class="is-warning"></clr-icon>
+                <span>{{ 'ROBOT_ACCOUNT.GRANT_ADMIN_HINT' | translate }}</span>
+            </div>
         </clr-dropdown-menu>
     </clr-dropdown>
 </ng-container>
@@ -138,4 +144,8 @@
             </tr>
         </tbody>
     </table>
+    <div class="grant-admin-hint" *ngIf="offersGrantAdmin()">
+        <clr-icon shape="exclamation-triangle" class="is-warning"></clr-icon>
+        <span>{{ 'ROBOT_ACCOUNT.GRANT_ADMIN_HINT' | translate }}</span>
+    </div>
 </ng-container>

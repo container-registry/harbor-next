@@ -362,6 +362,8 @@
         "NAME_PREFIX": "Prefixo para contas de automação",
         "NAME_PREFIX_REQUIRED": "Prefixo é obrigatório.",
         "UPDATE": "Update",
+        "GRANT_ADMIN": "Conceder Administrador do Projeto",
+        "GRANT_ADMIN_HINT": "Com esta permissão o robô pode tornar qualquer pessoa administrador do projeto. Selecionar todas nunca a inclui.",
         "AUDIT_LOG": "Audit Log",
         "PREHEAT_INSTANCE": "Preheat Instance",
         "PROJECT": "Project",

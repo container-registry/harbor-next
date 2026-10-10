@@ -362,6 +362,8 @@
         "NAME_PREFIX": "Prefix für den Namen der Robot-Zugänge",
         "NAME_PREFIX_REQUIRED": "Es ist ein Prefix für den Robot-Zugang erforderlich",
         "UPDATE": "Update",
+        "GRANT_ADMIN": "Projekt Admin vergeben",
+        "GRANT_ADMIN_HINT": "Mit „Projekt Admin vergeben“ kann der Robot-Zugang jeden zum Projekt Admin machen. „Alle auswählen“ schließt diese Berechtigung nie ein.",
         "AUDIT_LOG": "Audit Log",
         "PREHEAT_INSTANCE": "Preheat Instance",
         "PROJECT": "Project",

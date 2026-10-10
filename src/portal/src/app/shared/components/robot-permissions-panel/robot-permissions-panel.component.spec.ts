@@ -18,6 +18,7 @@ import {
     PermissionSelectPanelModes,
     RobotPermissionsPanelComponent,
 } from './robot-permissions-panel.component';
+import { hasPermission } from '../../../base/left-side-nav/system-robot-accounts/system-robot-util';
 
 describe('RobotPermissionsPanelComponent', () => {
     let component: TestHostComponent;
@@ -55,6 +56,65 @@ describe('RobotPermissionsPanelComponent', () => {
         await fixture.whenStable();
         const modal = fixture.nativeElement.querySelector('clr-modal');
         expect(modal).toBeTruthy();
+    });
+});
+
+describe('RobotPermissionsPanelComponent with member:grant-admin', () => {
+    const pull = { resource: 'repository', action: 'pull' };
+    const createMember = { resource: 'member', action: 'create' };
+    const grantAdmin = { resource: 'member', action: 'grant-admin' };
+    let fixture: ComponentFixture<RobotPermissionsPanelComponent>;
+    let panel: RobotPermissionsPanelComponent;
+
+    function render(candidates) {
+        fixture = TestBed.createComponent(RobotPermissionsPanelComponent);
+        panel = fixture.componentInstance;
+        panel.mode = PermissionSelectPanelModes.NORMAL;
+        panel.candidatePermissions = candidates;
+        panel.initCandidates();
+        panel.permissionsModel = [];
+        fixture.detectChanges();
+    }
+
+    beforeEach(async () => {
+        await TestBed.configureTestingModule({
+            imports: [SharedTestingModule],
+            declarations: [RobotPermissionsPanelComponent],
+        }).compileComponents();
+        render([pull, createMember, grantAdmin]);
+    });
+
+    it('select all leaves member:grant-admin unticked', () => {
+        panel.selectAllOrUnselectAll();
+        expect(hasPermission(panel.permissionsModel, pull)).toBeTrue();
+        expect(hasPermission(panel.permissionsModel, createMember)).toBeTrue();
+        expect(hasPermission(panel.permissionsModel, grantAdmin)).toBeFalse();
+    });
+
+    it('counts everything but member:grant-admin as all selected', () => {
+        panel.permissionsModel = [pull, createMember];
+        expect(panel.isAllSelected()).toBeTrue();
+    });
+
+    it('select all keeps a member:grant-admin ticked on its own', () => {
+        panel.setCheckBoxValue(grantAdmin.resource, grantAdmin.action, true);
+        expect(panel.isAllSelected()).toBeFalse();
+        panel.selectAllOrUnselectAll();
+        expect(panel.permissionsModel.length).toBe(3);
+        expect(hasPermission(panel.permissionsModel, grantAdmin)).toBeTrue();
+    });
+
+    it('warns what member:grant-admin allows when it is offered', () => {
+        const hint = fixture.nativeElement.querySelector('.grant-admin-hint');
+        expect(hint).toBeTruthy();
+        expect(hint.textContent).toContain('ROBOT_ACCOUNT.GRANT_ADMIN_HINT');
+    });
+
+    it('shows no warning when member:grant-admin is not offered', () => {
+        render([pull, createMember]);
+        expect(
+            fixture.nativeElement.querySelector('.grant-admin-hint')
+        ).toBeNull();
     });
 });
 
