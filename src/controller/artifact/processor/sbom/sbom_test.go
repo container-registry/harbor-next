@@ -75,6 +75,77 @@ func (suite *SBOMProcessorTestSuite) TestAbstractAdditionNormal() {
 	addition, err := suite.processor.AbstractAddition(context.Background(), &artifact.Artifact{RepositoryName: "repo", Digest: "digest"}, "sbom")
 	suite.Nil(err)
 	suite.Equal(sbomContent, string(addition.Content))
+	suite.Equal(processorMediaType, addition.ContentType)
+}
+
+func (suite *SBOMProcessorTestSuite) TestAbstractAdditionSPDX() {
+	manContent := `{
+    "schemaVersion": 2,
+    "config": {
+        "mediaType": "application/spdx+json",
+        "digest": "sha256:e91b9dfcbbb3b88bac94726f276b89de46e4460b55f6e6d6f876e666b150ec5b",
+        "size": 498
+    },
+	 "layers": [
+    {
+      "mediaType": "application/spdx+json",
+      "size": 32654,
+      "digest": "sha256:abc"
+    }]
+}`
+	sbomContent := "this is an spdx sbom"
+	reader := strings.NewReader(sbomContent)
+	blobReader := io.NopCloser(reader)
+	mani, _, err := distribution.UnmarshalManifest(v1.MediaTypeImageManifest, []byte(manContent))
+	suite.Require().NoError(err)
+	suite.regCli.On("PullManifest", mock.Anything, mock.Anything).Return(mani, "sha256:123", nil).Once()
+	suite.regCli.On("PullBlob", mock.Anything, mock.Anything).Return(int64(123), blobReader, nil).Once()
+	
+	art := &artifact.Artifact{
+		RepositoryName: "repo",
+		Digest:         "digest",
+		ArtifactType:   MediaTypeSPDX,
+	}
+
+	addition, err := suite.processor.AbstractAddition(context.Background(), art, "sbom")
+	suite.Nil(err)
+	suite.Equal(sbomContent, string(addition.Content))
+	suite.Equal(MediaTypeSPDX, addition.ContentType)
+}
+
+func (suite *SBOMProcessorTestSuite) TestAbstractAdditionCycloneDX() {
+	manContent := `{
+    "schemaVersion": 2,
+    "config": {
+        "mediaType": "application/vnd.cyclonedx+json",
+        "digest": "sha256:e91b9dfcbbb3b88bac94726f276b89de46e4460b55f6e6d6f876e666b150ec5b",
+        "size": 498
+    },
+	 "layers": [
+    {
+      "mediaType": "application/vnd.cyclonedx+json",
+      "size": 32654,
+      "digest": "sha256:abc"
+    }]
+}`
+	sbomContent := "this is a cyclonedx sbom"
+	reader := strings.NewReader(sbomContent)
+	blobReader := io.NopCloser(reader)
+	mani, _, err := distribution.UnmarshalManifest(v1.MediaTypeImageManifest, []byte(manContent))
+	suite.Require().NoError(err)
+	suite.regCli.On("PullManifest", mock.Anything, mock.Anything).Return(mani, "sha256:123", nil).Once()
+	suite.regCli.On("PullBlob", mock.Anything, mock.Anything).Return(int64(123), blobReader, nil).Once()
+	
+	art := &artifact.Artifact{
+		RepositoryName: "repo",
+		Digest:         "digest",
+		ArtifactType:   MediaTypeCycloneDX,
+	}
+
+	addition, err := suite.processor.AbstractAddition(context.Background(), art, "sbom")
+	suite.Nil(err)
+	suite.Equal(sbomContent, string(addition.Content))
+	suite.Equal(MediaTypeCycloneDX, addition.ContentType)
 }
 
 func (suite *SBOMProcessorTestSuite) TestAbstractAdditionMultiLayer() {

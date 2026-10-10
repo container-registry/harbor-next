@@ -91,8 +91,6 @@ var (
 		// Helm charts
 		"application/vnd.cncf.helm.config.v1+json":            {},
 		"application/vnd.cncf.helm.chart.content.v1.tar+gzip": {},
-		// SBOMs
-		"application/vnd.cyclonedx+json": {},
 	}
 )
 
