@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.1.0](https://github.com/container-registry/harbor-next/compare/chart-v2.0.0...chart-v2.1.0) (2026-10-10)
+
+
+### Features
+
+* **chart:** Add Harbor Grafana dashboard with 8gcr pgx monitoring ([#849](https://github.com/container-registry/harbor-next/issues/849)) ([572676e](https://github.com/container-registry/harbor-next/commit/572676e17868d52e4663c0bb4624732253b2021a))
+* **chart:** Bump appVersion To v2.15.10 ([#1184](https://github.com/container-registry/harbor-next/issues/1184)) ([da299f0](https://github.com/container-registry/harbor-next/commit/da299f0cc56aae0a2d9681246aad88cf7b11bbd2))
+
+
+### Bug Fixes
+
+* Send Cache-Control no-store On API And Static JSON Responses ([#992](https://github.com/container-registry/harbor-next/issues/992)) ([6f90be5](https://github.com/container-registry/harbor-next/commit/6f90be58edaf93482e6f5591b77212c06ad93afa))
+* Send Referrer-Policy And Permissions-Policy From Portal And Core ([#994](https://github.com/container-registry/harbor-next/issues/994)) ([f8f658c](https://github.com/container-registry/harbor-next/commit/f8f658ce8430293abbb18fa4b69d2dffe62f5e7d))
+* Send X-Content-Type-Options nosniff From Portal And Core ([#990](https://github.com/container-registry/harbor-next/issues/990)) ([08858a4](https://github.com/container-registry/harbor-next/commit/08858a48865715f352d93de9655f11456c134ae3))
+* Send X-Frame-Options And CSP frame-ancestors From Portal And Core ([#989](https://github.com/container-registry/harbor-next/issues/989)) ([bbeb449](https://github.com/container-registry/harbor-next/commit/bbeb4498766854b36c63dfc704e4d4f16f95cc38))
+* **webhook:** Block Private-Network Targets And Stop Reflecting Response Bodies ([#1140](https://github.com/container-registry/harbor-next/issues/1140)) ([ff8c122](https://github.com/container-registry/harbor-next/commit/ff8c12202c3d2487cb587d524cb0c82559f52268))
+
 ## [2.0.0](https://github.com/container-registry/harbor-next/compare/chart-v1.0.0...chart-v2.0.0) (2026-09-08)
 
 
