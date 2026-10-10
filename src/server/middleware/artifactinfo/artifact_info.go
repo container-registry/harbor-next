@@ -63,6 +63,10 @@ func Middleware() func(http.Handler) http.Handler {
 				return
 			}
 			repo := m[lib.RepositorySubexp]
+			if r, ok := rewriteMirrorRepository(req, repo); ok {
+				repo = r
+				m[lib.RepositorySubexp] = repo
+			}
 			pn, err := projectNameFromRepo(repo)
 			if err != nil {
 				lib_http.SendError(rw, errors.BadRequestError(err))
