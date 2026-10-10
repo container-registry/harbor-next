@@ -35,6 +35,12 @@ const (
 	ActionOperate     = Action("operate")
 	ActionScannerPull = Action("scanner-pull") // for robot account created by scanner to pull image, bypass the policy check
 	ActionStop        = Action("stop")         // for stop scan/scan-all execution
+
+	// ActionGrantAdmin on the member resource lets a principal give the built-in
+	// project admin role without holding all of that role's permissions. It is a
+	// verb of its own so that no create/update grant or resource wildcard can
+	// imply it.
+	ActionGrantAdmin = Action("grant-admin")
 )
 
 // const resource variables
@@ -155,7 +161,8 @@ func (n *NolimitProvider) GetPermissions(s scope) []*types.Policy {
 			&types.Policy{Resource: ResourceMember, Action: ActionRead},
 			&types.Policy{Resource: ResourceMember, Action: ActionUpdate},
 			&types.Policy{Resource: ResourceMember, Action: ActionList},
-			&types.Policy{Resource: ResourceMember, Action: ActionDelete})
+			&types.Policy{Resource: ResourceMember, Action: ActionDelete},
+			&types.Policy{Resource: ResourceMember, Action: ActionGrantAdmin})
 	}
 	return []*types.Policy{}
 }

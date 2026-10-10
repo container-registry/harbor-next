@@ -142,3 +142,25 @@ func BenchmarkProjectEvaluatorParallel(b *testing.B) {
 		}
 	})
 }
+
+// No built-in role and no public-project policy carries member:grant-admin, so
+// only an explicit robot grant or a system admin reaches it.
+func TestGrantAdminNotHeldByAnyRole(t *testing.T) {
+	roles := []int{common.RoleProjectAdmin, common.RoleMaintainer, common.RoleDeveloper, common.RoleGuest, common.RoleLimitedGuest}
+	for _, p := range []*proModels.Project{public, private} {
+		for _, role := range roles {
+			ctl := &projecttesting.Controller{}
+			mock.OnAnything(ctl, "Get").Return(p, nil)
+			mock.OnAnything(ctl, "ListRoles").Return([]int{role}, nil)
+
+			user := &models.User{UserID: 1, Username: "username"}
+			evaluator := NewEvaluator(ctl, NewBuilderForUser(user, ctl))
+			resource := NewNamespace(p.ProjectID).Resource(rbac.ResourceMember)
+			assert.False(t, evaluator.HasPermission(context.TODO(), resource, rbac.ActionGrantAdmin), "project %s role %d", p.Name, role)
+
+			for _, policy := range (&projectRBACRole{roleID: role}).GetPolicies() {
+				assert.NotEqual(t, rbac.ActionGrantAdmin, policy.Action, "role %d", role)
+			}
+		}
+	}
+}

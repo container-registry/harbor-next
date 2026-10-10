@@ -28,6 +28,7 @@ import (
 	"github.com/goharbor/harbor/src/controller/project"
 	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/errors"
+	"github.com/goharbor/harbor/src/lib/log"
 	memberModels "github.com/goharbor/harbor/src/pkg/member/models"
 	"github.com/goharbor/harbor/src/server/v2.0/models"
 	operation "github.com/goharbor/harbor/src/server/v2.0/restapi/operations/member"
@@ -55,13 +56,15 @@ func (m *memberAPI) CreateProjectMember(ctx context.Context, params operation.Cr
 	if err != nil {
 		return m.SendError(ctx, err)
 	}
-	if err := m.requireProjectAdminGrant(ctx, projectNameOrID, req.Role); err != nil {
+	grant, err := m.requireProjectAdminGrant(ctx, projectNameOrID, req.Role)
+	if err != nil {
 		return m.SendError(ctx, err)
 	}
 	id, err := m.ctl.Create(ctx, projectNameOrID, *req)
 	if err != nil {
 		return m.SendError(ctx, err)
 	}
+	grant.log(ctx, fmt.Sprintf("%s (member %d)", describeMemberRequest(req), id))
 	return operation.NewCreateProjectMemberCreated().
 		WithLocation(fmt.Sprintf("/api/v2.0/projects/%v/members/%d", projectNameOrID, id))
 }
@@ -79,38 +82,56 @@ func toMemberReq(memberReq *models.ProjectMember) (*member.Request, error) {
 	return &result, nil
 }
 
-func (m *memberAPI) requireProjectAdminGrant(ctx context.Context, project any, role int) error {
+// requireProjectAdminGrant lets the built-in project admin role be given only by
+// a system admin, by a local user who holds that role on the project, or by a
+// caller holding member:grant-admin on the project. A grant through that
+// permission is returned so the caller can log it once the assignment has
+// succeeded; the zero value means there is nothing to log.
+func (m *memberAPI) requireProjectAdminGrant(ctx context.Context, project any, role int) (adminGrant, error) {
 	if role != common.RoleProjectAdmin {
-		return nil
+		return adminGrant{}, nil
 	}
 	securityCtx, err := m.GetSecurityContext(ctx)
 	if err != nil {
-		return err
+		return adminGrant{}, err
 	}
 	if securityCtx.IsSysAdmin() {
-		return nil
+		return adminGrant{}, nil
 	}
+	denied := errors.ForbiddenError(nil).WithMessagef(
+		"granting the project admin role requires that role on the project or %s:%s",
+		rbac.ResourceMember, rbac.ActionGrantAdmin)
 	localCtx, ok := securityCtx.(*local.SecurityContext)
 	if !ok {
-		return errors.ForbiddenError(nil)
+		// No project role carries member:grant-admin, so only robots and other
+		// non-local principals can hold it; it is checked as an explicit policy
+		// and a deny wins over an allow.
+		has, err := m.HasProjectPermission(ctx, project, rbac.ActionGrantAdmin, rbac.ResourceMember)
+		if err != nil {
+			return adminGrant{}, err
+		}
+		if !has {
+			return adminGrant{}, denied
+		}
+		return adminGrant{principal: securityCtx.GetUsername(), project: project}, nil
 	}
 	p, err := m.projectCtl.Get(ctx, project)
 	if err != nil {
-		return err
+		return adminGrant{}, err
 	}
 	if p == nil {
-		return errors.BadRequestError(nil).WithMessage("project is not found")
+		return adminGrant{}, errors.BadRequestError(nil).WithMessage("project is not found")
 	}
 	roles, err := m.projectCtl.ListRoles(ctx, p.ProjectID, localCtx.User())
 	if err != nil {
-		return err
+		return adminGrant{}, err
 	}
 	for _, currentRole := range roles {
 		if currentRole == common.RoleProjectAdmin {
-			return nil
+			return adminGrant{}, nil
 		}
 	}
-	return errors.ForbiddenError(nil)
+	return adminGrant{}, denied
 }
 
 func (m *memberAPI) DeleteProjectMember(ctx context.Context, params operation.DeleteProjectMemberParams) middleware.Responder {
@@ -205,12 +226,45 @@ func (m *memberAPI) UpdateProjectMember(ctx context.Context, params operation.Up
 	if params.Mid == 0 {
 		return m.SendError(ctx, errors.BadRequestError(nil).WithMessage("member id can not be empty"))
 	}
-	if err := m.requireProjectAdminGrant(ctx, projectNameOrID, int(params.Role.RoleID)); err != nil {
-		return m.SendError(ctx, err)
-	}
-	err := m.ctl.UpdateRole(ctx, projectNameOrID, int(params.Mid), int(params.Role.RoleID))
+	grant, err := m.requireProjectAdminGrant(ctx, projectNameOrID, int(params.Role.RoleID))
 	if err != nil {
 		return m.SendError(ctx, err)
 	}
+
+	if err := m.ctl.UpdateRole(ctx, projectNameOrID, int(params.Mid), int(params.Role.RoleID)); err != nil {
+		return m.SendError(ctx, err)
+	}
+	grant.log(ctx, fmt.Sprintf("member %d", params.Mid))
 	return operation.NewUpdateProjectMemberOK()
+}
+
+// adminGrant is a project admin assignment allowed through member:grant-admin.
+// The zero value means there is nothing to log.
+type adminGrant struct {
+	principal string
+	project   any
+}
+
+func (g adminGrant) log(ctx context.Context, grantee string) {
+	if g.principal == "" {
+		return
+	}
+	log.G(ctx).Infof("%q gave the project admin role to %s in project %v through the %s:%s permission",
+		g.principal, grantee, g.project, rbac.ResourceMember, rbac.ActionGrantAdmin)
+}
+
+// describeMemberRequest names the grantee the way the member controller picks it.
+func describeMemberRequest(req *member.Request) string {
+	switch {
+	case req.MemberUser.UserID > 0:
+		return fmt.Sprintf("user id %d", req.MemberUser.UserID)
+	case req.MemberGroup.ID > 0:
+		return fmt.Sprintf("group id %d", req.MemberGroup.ID)
+	case len(req.MemberUser.Username) > 0:
+		return fmt.Sprintf("user %q", req.MemberUser.Username)
+	case len(req.MemberGroup.LdapGroupDN) > 0:
+		return fmt.Sprintf("LDAP group %q", req.MemberGroup.LdapGroupDN)
+	default:
+		return fmt.Sprintf("group %q", req.MemberGroup.GroupName)
+	}
 }

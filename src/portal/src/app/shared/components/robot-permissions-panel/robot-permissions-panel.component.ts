@@ -26,8 +26,10 @@ import {
 } from '@angular/core';
 import {
     convertKey,
+    GRANT_ADMIN_PERMISSION,
     hasPermission,
     isCandidate,
+    isExplicitOnly,
 } from '../../../base/left-side-nav/system-robot-accounts/system-robot-util';
 import { Access } from '../../../../../ng-swagger-gen/models/access';
 import { Permission } from '../../../../../ng-swagger-gen/models/permission';
@@ -136,6 +138,7 @@ export class RobotPermissionsPanelComponent implements OnChanges, DoCheck {
             this.candidateResources.forEach(resource => {
                 if (
                     this.isCandidate(resource, action) &&
+                    !isExplicitOnly({ resource, action }) &&
                     !hasPermission(this.permissionsModel, { resource, action })
                 ) {
                     flag = false;
@@ -149,16 +152,28 @@ export class RobotPermissionsPanelComponent implements OnChanges, DoCheck {
         if (this.isAllSelected()) {
             this.permissionsModel = [];
         } else {
-            this.permissionsModel = [];
+            this.permissionsModel = (this.permissionsModel || []).filter(item =>
+                isExplicitOnly(item)
+            );
             this.candidateActions.forEach(action => {
                 this.candidateResources.forEach(resource => {
-                    if (this.isCandidate(resource, action)) {
+                    if (
+                        this.isCandidate(resource, action) &&
+                        !isExplicitOnly({ resource, action })
+                    ) {
                         this.permissionsModel.push({ resource, action });
                     }
                 });
             });
         }
         this.permissionsModelChange.emit(this.permissionsModel);
+    }
+
+    offersGrantAdmin(): boolean {
+        return this.isCandidate(
+            GRANT_ADMIN_PERMISSION.resource,
+            GRANT_ADMIN_PERMISSION.action
+        );
     }
 
     convertKey(key: string): string {

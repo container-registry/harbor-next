@@ -77,6 +77,10 @@ func (p *permissionsAPI) GetPermissions(ctx context.Context, _ permissions.GetPe
 	if isSystemAdmin {
 		// project admin cannot see the system level permissions
 		sysPermissions = provider.GetPermissions(rbac.ScopeSystem)
+	} else {
+		// No project role holds member:grant-admin, so robot creation would refuse
+		// it from a project admin; do not offer it.
+		proPermissions = withoutGrantAdmin(proPermissions)
 	}
 
 	return permissions.NewGetPermissionsOK().WithPayload(p.convertPermissions(sysPermissions, proPermissions))
@@ -107,4 +111,15 @@ func (p *permissionsAPI) convertPermissions(system, project []*types.Policy) *mo
 	}
 
 	return res
+}
+
+func withoutGrantAdmin(policies []*types.Policy) []*types.Policy {
+	result := make([]*types.Policy, 0, len(policies))
+	for _, p := range policies {
+		if p.Resource == rbac.ResourceMember && p.Action == rbac.ActionGrantAdmin {
+			continue
+		}
+		result = append(result, p)
+	}
+	return result
 }

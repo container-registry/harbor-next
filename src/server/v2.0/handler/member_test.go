@@ -187,8 +187,9 @@ func TestRequireProjectAdminGrantDeniesLocalNonAdmin(t *testing.T) {
 		user := &commonmodels.User{UserID: 6, Username: "local-user"}
 		ctx := security.NewContext(context.Background(), local.NewSecurityContext(user))
 
-		err := api.requireProjectAdminGrant(ctx, projectID, common.RoleProjectAdmin)
+		_, err := api.requireProjectAdminGrant(ctx, projectID, common.RoleProjectAdmin)
 		assert.True(t, liberrors.IsErr(err, liberrors.ForbiddenCode), "roles %v", roles)
-		assert.NoError(t, api.requireProjectAdminGrant(ctx, projectID, common.RoleDeveloper))
+		_, err = api.requireProjectAdminGrant(ctx, projectID, common.RoleDeveloper)
+		assert.NoError(t, err)
 	}
 }
