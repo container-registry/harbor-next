@@ -13,7 +13,7 @@ services:
       core:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "/lprobe", "-port", "8081", "-endpoint", "/healthz"]
+      test: ["CMD", "/healthprobe", "-port", "8081", "-endpoint", "/healthz"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -69,7 +69,7 @@ services:
       registry:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "/lprobe", "-port", "8080", "-endpoint", "/api/v2.0/ping"]
+      test: ["CMD", "/healthprobe", "-port", "8080", "-endpoint", "/api/v2.0/ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -104,7 +104,7 @@ services:
       core:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "/lprobe", "-port", "8888", "-endpoint", "/api/v1/stats"]
+      test: ["CMD", "/healthprobe", "-port", "8888", "-endpoint", "/api/v1/stats"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -128,7 +128,7 @@ services:
       registry:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "/lprobe", "-port", "8080", "-endpoint", "/api/health"]
+      test: ["CMD", "/healthprobe", "-port", "8080", "-endpoint", "/api/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -145,7 +145,7 @@ services:
       HTTPS_PROXY: ${HTTPS_PROXY:-}
       NO_PROXY: ${NO_PROXY:-}
     healthcheck:
-      test: ["CMD", "/lprobe", "-port", "5001", "-endpoint", "/debug/health"]
+      test: ["CMD", "/healthprobe", "-port", "5001", "-endpoint", "/debug/health"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -171,7 +171,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "/lprobe", "-port", "8080", "-endpoint", "/probe/ready"]
+      test: ["CMD", "/healthprobe", "-port", "8080", "-endpoint", "/probe/ready"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -200,7 +200,7 @@ services:
       core:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "/lprobe", "-port", "8080", "-endpoint", "/metrics"]
+      test: ["CMD", "/healthprobe", "-port", "8080", "-endpoint", "/metrics"]
       interval: 10s
       timeout: 5s
       retries: 5

@@ -2,6 +2,7 @@
 
 ARG BUN_VERSION=MISSING-BUILD-ARG
 ARG NGINX_VERSION=MISSING-BUILD-ARG
+ARG HEALTHPROBE_VERSION=MISSING-BUILD-ARG
 
 #
 # Build Angular application and Swagger UI
@@ -29,9 +30,10 @@ RUN mkdir -p /well-known && \
     expires="${SECURITY_TXT_EXPIRES:-$(date -u -d "@$(( $(date -u +%s) + 31536000 ))" +%Y-%m-%dT%H:%M:%SZ)}" && \
     sed "s|@EXPIRES@|${expires}|" /security.txt.in > /well-known/security.txt
 
+FROM 8gears.container-registry.com/healthprobe/healthprobe:${HEALTHPROBE_VERSION} AS healthprobe
+
 FROM 8gears.container-registry.com/dhi.io/nginx:${NGINX_VERSION}-debian13
-ARG TARGETARCH
-COPY bin/linux-${TARGETARCH}/lprobe /lprobe
+COPY --from=healthprobe /healthprobe-notls /healthprobe
 COPY --from=builder /harbor/src/portal/dist /usr/share/nginx/html
 COPY --from=builder /harbor/src/portal/app-swagger-ui/dist /usr/share/nginx/html
 COPY config/portal/nginx.conf /etc/nginx/nginx.conf
@@ -39,6 +41,6 @@ COPY --from=builder /well-known /usr/share/nginx/html/.well-known
 WORKDIR /usr/share/nginx/html
 
 EXPOSE 8080
-HEALTHCHECK --interval=10s --timeout=5s --retries=3 CMD ["/lprobe", "-port", "8081", "-endpoint", "/healthz"]
+HEALTHCHECK --interval=10s --timeout=5s --retries=3 CMD ["/healthprobe", "-port", "8081", "-endpoint", "/healthz"]
 USER nginx
 ENTRYPOINT ["nginx", "-g", "daemon off;"]

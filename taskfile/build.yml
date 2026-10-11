@@ -173,26 +173,6 @@ tasks:
         LDFLAGS="-X ${PKG}/version.version=${VERSION_STR#v} -X ${PKG}/version.revision=${REVISION} -X ${PKG}/version.mainpkg=${PKG} -s -w"
         CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath -ldflags "${LDFLAGS}" -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/registry" ./cmd/registry
 
-  binary:lprobe:*:
-    desc: "Build lprobe healthcheck binary"
-    run: once
-    generates:
-      - bin/{{index .MATCH 0}}/lprobe
-    vars:
-      PLATFORM: '{{index .MATCH 0}}'
-      GOOS: '{{index (splitList "-" (index .MATCH 0)) 0}}'
-      GOARCH: '{{index (splitList "-" (index .MATCH 0)) 1}}'
-    cmds:
-      - cmd: mkdir -p bin/{{.PLATFORM}}
-        silent: true
-      - |
-        LPROBE_DIR=$(mktemp -d)
-        trap "rm -rf $LPROBE_DIR" EXIT
-        git clone --branch v{{.LPROBE_VERSION}} --depth 1 https://github.com/fivexl/lprobe.git "$LPROBE_DIR"
-        cd "$LPROBE_DIR"
-        go mod tidy -e
-        CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/lprobe" .
-
   binary:trivy:*:
     desc: "Build Trivy CLI binary"
     run: once
