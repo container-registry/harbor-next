@@ -90,15 +90,64 @@ describe('RobotPermissionsPanelComponent with member:grant-admin', () => {
         expect(headers.length).toBe(3);
     });
 
-    it('renders member:grant-admin as a sub-row of the member resource', () => {
+    it('renders member:grant-admin as a plain sub-row of the member resource', () => {
         const rows = fixture.nativeElement.querySelectorAll('tbody tr');
         expect(rows.length).toBe(3);
         expect(rows[0].textContent).toContain('ROBOT_ACCOUNT.MEMBER');
         expect(rows[1].classList).toContain('sub-row');
         expect(rows[1].textContent).toContain('ROBOT_ACCOUNT.GRANT_ADMIN');
-        expect(rows[1].textContent).toContain('ROBOT_ACCOUNT.GRANT_ADMIN_HINT');
-        expect(rows[1].querySelector('clr-icon[shape="shield"]')).toBeTruthy();
-        expect(rows[1].querySelector('input[type="checkbox"]')).toBeTruthy();
+        expect(rows[1].textContent).not.toContain('GRANT_ADMIN_HINT');
+        expect(rows[1].querySelector('clr-icon')).toBeNull();
+    });
+
+    it('puts the sub-row checkbox in the Create column', () => {
+        const rows = fixture.nativeElement.querySelectorAll('tbody tr');
+        const cells = rows[1].querySelectorAll('td');
+        expect(cells.length).toBe(1 + panel.candidateActions.length);
+        expect(panel.subRowColumn()).toBe('create');
+        const createIndex = 1 + panel.candidateActions.indexOf('create');
+        expect(
+            cells[createIndex].querySelector('input[type="checkbox"]')
+        ).toBeTruthy();
+        expect(rows[1].querySelectorAll('input[type="checkbox"]').length).toBe(
+            1
+        );
+    });
+
+    it('shows a caret on the member row only and starts expanded', () => {
+        const rows = fixture.nativeElement.querySelectorAll('tbody tr');
+        expect(rows[0].querySelector('.sub-row-toggle')).toBeTruthy();
+        expect(rows[2].querySelector('.sub-row-toggle')).toBeNull();
+        expect(panel.isExpanded('member')).toBeTrue();
+        expect(fixture.nativeElement.querySelector('.sub-row')).toBeTruthy();
+    });
+
+    it('hides the sub-row when the member row is collapsed', () => {
+        fixture.nativeElement.querySelector('.sub-row-toggle').click();
+        fixture.detectChanges();
+        expect(panel.isExpanded('member')).toBeFalse();
+        expect(fixture.nativeElement.querySelector('.sub-row')).toBeNull();
+        fixture.nativeElement.querySelector('.sub-row-toggle').click();
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('.sub-row')).toBeTruthy();
+    });
+
+    it('select all expands the member row and ticks member:grant-admin', async () => {
+        panel.toggleExpanded('member');
+        expect(panel.isExpanded('member')).toBeFalse();
+        panel.selectAllOrUnselectAll();
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(panel.isExpanded('member')).toBeTrue();
+        expect(hasPermission(panel.permissionsModel, grantAdmin)).toBeTrue();
+        expect(
+            fixture.nativeElement.querySelector(
+                '.sub-row input[type="checkbox"]'
+            ).checked
+        ).toBeTrue();
+        panel.selectAllOrUnselectAll();
+        expect(hasPermission(panel.permissionsModel, grantAdmin)).toBeFalse();
     });
 
     it('toggles member:grant-admin from its own checkbox', () => {

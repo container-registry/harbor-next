@@ -26,15 +26,11 @@
 
 .sub-row-indent {
   color: var(--clr-color-neutral-600, #666);
-  margin-right: 0.15rem;
+  margin-right: 0.25rem;
 }
 
-.sub-row-title {
-  margin-left: 0.15rem;
-}
-
-.sub-row-desc {
-  color: var(--clr-color-neutral-600, #666);
-  font-size: 0.55rem;
-  margin-left: 0.3rem;
+.sub-row-toggle {
+  margin: 0 0.15rem 0 0;
+  min-width: 0.7rem;
+  vertical-align: middle;
 }

@@ -22,6 +22,20 @@
                     <ng-container *ngFor="let resource of candidateResources">
                         <tr>
                             <td class="left td">
+                                <button
+                                    *ngIf="hasSubRows(resource)"
+                                    type="button"
+                                    class="btn btn-link btn-sm p-0 sub-row-toggle"
+                                    [attr.aria-expanded]="isExpanded(resource)"
+                                    (click)="toggleExpanded(resource)">
+                                    <clr-icon
+                                        [attr.shape]="
+                                            isExpanded(resource)
+                                                ? 'caret down'
+                                                : 'caret right'
+                                        "
+                                        size="12"></clr-icon>
+                                </button>
                                 {{ convertKey(resource) | translate }}
                             </td>
                             <td
@@ -44,34 +58,39 @@
                                     " />
                             </td>
                         </tr>
-                        <tr
-                            class="sub-row"
-                            *ngFor="let sub of subRowsOf(resource)">
-                            <td class="left td sub-row-label">
-                                <span class="sub-row-indent" aria-hidden="true"
-                                    >&#8627;</span
-                                >
-                                <clr-icon shape="shield" size="14"></clr-icon>
-                                <span class="sub-row-title">{{
-                                    convertKey(sub) | translate
-                                }}</span>
-                                <span class="sub-row-desc">{{
-                                    describeSubRow(sub) | translate
-                                }}</span>
-                            </td>
-                            <td
-                                class="td left"
-                                [attr.colspan]="candidateActions.length">
-                                <input
-                                    type="checkbox"
-                                    clrCheckbox
-                                    [disabled]="true"
-                                    [ngModel]="getCheckBoxValue(resource, sub)"
-                                    (ngModelChange)="
-                                        setCheckBoxValue(resource, sub, $event)
-                                    " />
-                            </td>
-                        </tr>
+                        <ng-container *ngIf="isExpanded(resource)">
+                            <tr
+                                class="sub-row"
+                                *ngFor="let sub of subRowsOf(resource)">
+                                <td class="left td sub-row-label">
+                                    <span
+                                        class="sub-row-indent"
+                                        aria-hidden="true"
+                                        >&#8627;</span
+                                    >
+                                    {{ convertKey(sub) | translate }}
+                                </td>
+                                <td
+                                    class="td"
+                                    *ngFor="let action of candidateActions">
+                                    <input
+                                        *ngIf="action === subRowColumn()"
+                                        type="checkbox"
+                                        clrCheckbox
+                                        [disabled]="true"
+                                        [ngModel]="
+                                            getCheckBoxValue(resource, sub)
+                                        "
+                                        (ngModelChange)="
+                                            setCheckBoxValue(
+                                                resource,
+                                                sub,
+                                                $event
+                                            )
+                                        " />
+                                </td>
+                            </tr>
+                        </ng-container>
                     </ng-container>
                 </tbody>
             </table>
@@ -118,6 +137,20 @@
                     <ng-container *ngFor="let resource of candidateResources">
                         <tr>
                             <td class="left td">
+                                <button
+                                    *ngIf="hasSubRows(resource)"
+                                    type="button"
+                                    class="btn btn-link btn-sm p-0 sub-row-toggle"
+                                    [attr.aria-expanded]="isExpanded(resource)"
+                                    (click)="toggleExpanded(resource)">
+                                    <clr-icon
+                                        [attr.shape]="
+                                            isExpanded(resource)
+                                                ? 'caret down'
+                                                : 'caret right'
+                                        "
+                                        size="12"></clr-icon>
+                                </button>
                                 {{ convertKey(resource) | translate }}
                             </td>
                             <td
@@ -139,33 +172,38 @@
                                     " />
                             </td>
                         </tr>
-                        <tr
-                            class="sub-row"
-                            *ngFor="let sub of subRowsOf(resource)">
-                            <td class="left td sub-row-label">
-                                <span class="sub-row-indent" aria-hidden="true"
-                                    >&#8627;</span
-                                >
-                                <clr-icon shape="shield" size="14"></clr-icon>
-                                <span class="sub-row-title">{{
-                                    convertKey(sub) | translate
-                                }}</span>
-                                <span class="sub-row-desc">{{
-                                    describeSubRow(sub) | translate
-                                }}</span>
-                            </td>
-                            <td
-                                class="td left"
-                                [attr.colspan]="candidateActions.length">
-                                <input
-                                    type="checkbox"
-                                    clrCheckbox
-                                    [ngModel]="getCheckBoxValue(resource, sub)"
-                                    (ngModelChange)="
-                                        setCheckBoxValue(resource, sub, $event)
-                                    " />
-                            </td>
-                        </tr>
+                        <ng-container *ngIf="isExpanded(resource)">
+                            <tr
+                                class="sub-row"
+                                *ngFor="let sub of subRowsOf(resource)">
+                                <td class="left td sub-row-label">
+                                    <span
+                                        class="sub-row-indent"
+                                        aria-hidden="true"
+                                        >&#8627;</span
+                                    >
+                                    {{ convertKey(sub) | translate }}
+                                </td>
+                                <td
+                                    class="td"
+                                    *ngFor="let action of candidateActions">
+                                    <input
+                                        *ngIf="action === subRowColumn()"
+                                        type="checkbox"
+                                        clrCheckbox
+                                        [ngModel]="
+                                            getCheckBoxValue(resource, sub)
+                                        "
+                                        (ngModelChange)="
+                                            setCheckBoxValue(
+                                                resource,
+                                                sub,
+                                                $event
+                                            )
+                                        " />
+                                </td>
+                            </tr>
+                        </ng-container>
                     </ng-container>
                 </tbody>
             </table>
@@ -201,6 +239,20 @@
             <ng-container *ngFor="let resource of candidateResources">
                 <tr>
                     <td class="left td">
+                        <button
+                            *ngIf="hasSubRows(resource)"
+                            type="button"
+                            class="btn btn-link btn-sm p-0 sub-row-toggle"
+                            [attr.aria-expanded]="isExpanded(resource)"
+                            (click)="toggleExpanded(resource)">
+                            <clr-icon
+                                [attr.shape]="
+                                    isExpanded(resource)
+                                        ? 'caret down'
+                                        : 'caret right'
+                                "
+                                size="12"></clr-icon>
+                        </button>
                         {{ convertKey(resource) | translate }}
                     </td>
                     <td class="td" *ngFor="let action of candidateActions">
@@ -214,31 +266,26 @@
                             " />
                     </td>
                 </tr>
-                <tr class="sub-row" *ngFor="let sub of subRowsOf(resource)">
-                    <td class="left td sub-row-label">
-                        <span class="sub-row-indent" aria-hidden="true"
-                            >&#8627;</span
-                        >
-                        <clr-icon shape="shield" size="14"></clr-icon>
-                        <span class="sub-row-title">{{
-                            convertKey(sub) | translate
-                        }}</span>
-                        <span class="sub-row-desc">{{
-                            describeSubRow(sub) | translate
-                        }}</span>
-                    </td>
-                    <td
-                        class="td left"
-                        [attr.colspan]="candidateActions.length">
-                        <input
-                            type="checkbox"
-                            clrCheckbox
-                            [ngModel]="getCheckBoxValue(resource, sub)"
-                            (ngModelChange)="
-                                setCheckBoxValue(resource, sub, $event)
-                            " />
-                    </td>
-                </tr>
+                <ng-container *ngIf="isExpanded(resource)">
+                    <tr class="sub-row" *ngFor="let sub of subRowsOf(resource)">
+                        <td class="left td sub-row-label">
+                            <span class="sub-row-indent" aria-hidden="true"
+                                >&#8627;</span
+                            >
+                            {{ convertKey(sub) | translate }}
+                        </td>
+                        <td class="td" *ngFor="let action of candidateActions">
+                            <input
+                                *ngIf="action === subRowColumn()"
+                                type="checkbox"
+                                clrCheckbox
+                                [ngModel]="getCheckBoxValue(resource, sub)"
+                                (ngModelChange)="
+                                    setCheckBoxValue(resource, sub, $event)
+                                " />
+                        </td>
+                    </tr>
+                </ng-container>
             </ng-container>
         </tbody>
     </table>

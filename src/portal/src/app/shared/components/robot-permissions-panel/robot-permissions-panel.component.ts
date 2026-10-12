@@ -29,7 +29,6 @@ import {
     hasPermission,
     isCandidate,
     SUB_ROW_ACTIONS,
-    SUB_ROW_DESCRIPTION_I18N_MAP,
 } from '../../../base/left-side-nav/system-robot-accounts/system-robot-util';
 import { Access } from '../../../../../ng-swagger-gen/models/access';
 import { Permission } from '../../../../../ng-swagger-gen/models/permission';
@@ -56,6 +55,8 @@ export class RobotPermissionsPanelComponent implements OnChanges, DoCheck {
 
     candidateActions: string[] = [];
     candidateResources: string[] = [];
+    // Resources with sub-rows are disclosure rows; collapsed ones hide their sub-rows.
+    collapsed: { [resource: string]: boolean } = {};
 
     @Input()
     permissionsModel!: Access[];
@@ -148,8 +149,21 @@ export class RobotPermissionsPanelComponent implements OnChanges, DoCheck {
             this.permissionsModel = (this.candidatePermissions || []).map(
                 item => ({ resource: item.resource, action: item.action })
             );
+            this.collapsed = {};
         }
         this.permissionsModelChange.emit(this.permissionsModel);
+    }
+
+    hasSubRows(resource: string): boolean {
+        return this.subRowsOf(resource).length > 0;
+    }
+
+    isExpanded(resource: string): boolean {
+        return !this.collapsed[resource];
+    }
+
+    toggleExpanded(resource: string) {
+        this.collapsed[resource] = !this.collapsed[resource];
     }
 
     // Actions that are not grid columns and render as a sub-row of their resource.
@@ -159,8 +173,11 @@ export class RobotPermissionsPanelComponent implements OnChanges, DoCheck {
         );
     }
 
-    describeSubRow(action: string): string {
-        return SUB_ROW_DESCRIPTION_I18N_MAP[action] || '';
+    // The column that carries a sub-row's checkbox: Create, or the first column.
+    subRowColumn(): string {
+        return this.candidateActions.indexOf('create') !== -1
+            ? 'create'
+            : this.candidateActions[0];
     }
 
     convertKey(key: string): string {
