@@ -17,6 +17,7 @@ import {
     DoCheck,
     ElementRef,
     EventEmitter,
+    HostBinding,
     Input,
     OnChanges,
     OnInit,
@@ -43,6 +44,12 @@ export class RobotPermissionsPanelComponent implements OnChanges, DoCheck {
 
     @Input()
     mode: PermissionSelectPanelModes = PermissionSelectPanelModes.NORMAL;
+
+    // In a horizontal form the panel is a flex item; let the table span the row.
+    @HostBinding('class.fill')
+    get fill(): boolean {
+        return this.mode === PermissionSelectPanelModes.NORMAL;
+    }
 
     @Input()
     dropdownPosition: string = 'bottom-left';

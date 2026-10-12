@@ -52,3 +52,12 @@
     cursor: pointer;
     vertical-align: middle;
 }
+
+:host(.fill) {
+    display: block;
+    width: 100%;
+}
+
+:host(.fill) .table {
+    width: 100%;
+}
