@@ -69,20 +69,26 @@ jobs:
       contents: read
     steps:
       # !failure() rather than the implicit success(): it lets these steps run
-      # in a cancelled run too, and still stops at the first broken step.
-      - if: ${{ !failure() }}
+      # in a cancelled run too. continue-on-error keeps failure() false, so
+      # each step that needs an earlier one checks that step's outcome
+      # instead: a broken setup leaves one annotation, not a second one from
+      # a step that could never have worked.
+      - id: checkout
+        if: ${{ !failure() }}
         continue-on-error: true
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - if: ${{ !failure() }}
+      - id: task
+        if: ${{ !failure() && steps.checkout.outcome == 'success' }}
         continue-on-error: true
         uses: $/.github/actions/setup-task
 
       # The task builds the card with jq. Hosted images ship it; a runner
       # without it gets it here.
       - name: Install jq
+        id: jq
         if: ${{ !failure() }}
         continue-on-error: true
         run: |
@@ -92,7 +98,7 @@ jobs:
           fi
 
       - name: Post the outcome
-        if: ${{ !failure() }}
+        if: ${{ !failure() && steps.task.outcome == 'success' && steps.jq.outcome == 'success' }}
         continue-on-error: true
         env:
           GCHAT_WEBHOOK_URL: ${{ secrets.GCHAT_WEBHOOK_URL }}

@@ -192,6 +192,9 @@ tasks:
   test:
     desc: "Exercise the Google Chat card and its failure paths, offline"
     silent: true
+    preconditions:
+      - sh: command -v jq >/dev/null 2>&1
+        msg: "jq is required: notify:test builds and checks the card with it"
     cmds:
       - |
         failures=0
