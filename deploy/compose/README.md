@@ -21,10 +21,14 @@ openssl genpkey -algorithm RSA -outform PEM -pkeyopt rsa_keygen_bits:4096 \
   | openssl rsa -traditional -out config/token_service_key.pem
 chmod 644 config/token_service_key.pem   # container UID 10000 ≠ host UID → needs world-readable
 
-# 3. Start
+# 3. Generate the secret key Core uses to encrypt stored credentials (exactly 16 alphanumeric chars)
+openssl rand -base64 32 | tr -dc 'A-Za-z0-9' | head -c 16 > config/secret_key
+chmod 644 config/secret_key
+
+# 4. Start
 docker compose up -d
 
-# 4. Verify
+# 5. Verify
 docker compose ps
 curl https://registry.example.com/api/v2.0/systeminfo
 ```
