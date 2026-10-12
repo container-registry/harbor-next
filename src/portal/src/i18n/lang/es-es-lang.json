@@ -363,7 +363,7 @@
         "NAME_PREFIX": "Prefijo Nombre de Robot",
         "NAME_PREFIX_REQUIRED": "Rrefijo del nombre del robot requerido",
         "UPDATE": "Actualizar",
-        "GRANT_ADMIN": "Conceder Administrador de Proyecto",
+        "GRANT_ADMIN": "Grant Project Admin",
         "AUDIT_LOG": " Log de Auditoría",
         "PREHEAT_INSTANCE": "Instancia de Preheat",
         "PROJECT": "Projecto",

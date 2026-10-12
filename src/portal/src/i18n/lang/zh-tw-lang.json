@@ -362,7 +362,7 @@
         "NAME_PREFIX": "機器人名稱前置字串",
         "NAME_PREFIX_REQUIRED": "機器人名稱前置字串為必填",
         "UPDATE": "更新",
-        "GRANT_ADMIN": "授予專案管理員",
+        "GRANT_ADMIN": "Grant Project Admin",
         "AUDIT_LOG": "稽核日誌",
         "PREHEAT_INSTANCE": "預熱執行個體",
         "PROJECT": "專案",
