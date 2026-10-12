@@ -30,7 +30,6 @@ import (
 	"github.com/goharbor/harbor/src/controller/member"
 	"github.com/goharbor/harbor/src/controller/project"
 	"github.com/goharbor/harbor/src/controller/robot"
-	liberrors "github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/pkg/permission/types"
 	robotmodel "github.com/goharbor/harbor/src/pkg/robot/model"
 	"github.com/goharbor/harbor/src/server/v2.0/models"
@@ -59,36 +58,56 @@ func (c *recordingMemberController) UpdateRole(
 	return nil
 }
 
-func TestProjectAdminGrantRequiresAdminRole(t *testing.T) {
+func memberWriteAccess() []*types.Policy {
+	return []*types.Policy{
+		{Resource: rbac.ResourceMember, Action: rbac.ActionCreate},
+		{Resource: rbac.ResourceMember, Action: rbac.ActionUpdate},
+	}
+}
+
+// Whoever may create and update members of a project may give them any
+// role, the project admin role included. There is no extra check for that
+// role, so provisioning robots keep working (see #1137 and its revert).
+func TestMemberWritesGrantProjectAdmin(t *testing.T) {
 	const projectID int64 = 1
+	// The robot context captures project.Ctl when it is built, so each case
+	// builds its context after the mock controller is in place.
 	tests := []struct {
-		name          string
-		user          *commonmodels.User
-		robot         bool
-		roles         []int
-		wantForbidden bool
+		name        string
+		securityCtx func() security.Context
 	}{
-		{name: "project robot", robot: true, wantForbidden: true},
 		{
-			name:          "maintainer",
-			user:          &commonmodels.User{UserID: 4, Username: "maintainer"},
-			roles:         []int{common.RoleMaintainer},
-			wantForbidden: true,
+			name: "project robot",
+			securityCtx: func() security.Context {
+				return robotsec.NewSecurityContext(&robot.Robot{
+					Robot: robotmodel.Robot{Name: "project-robot"},
+					Level: robot.LEVELPROJECT,
+					Permissions: []*robot.Permission{{
+						Scope:  "/project/1",
+						Access: memberWriteAccess(),
+					}},
+				})
+			},
 		},
 		{
-			name:          "non-member",
-			user:          &commonmodels.User{UserID: 5, Username: "non-member"},
-			wantForbidden: true,
-		},
-		{
-			name:  "project admin",
-			user:  &commonmodels.User{UserID: 2, Username: "project-admin"},
-			roles: []int{common.RoleProjectAdmin},
+			name: "system robot covering all projects",
+			securityCtx: func() security.Context {
+				return robotsec.NewSecurityContext(&robot.Robot{
+					Robot: robotmodel.Robot{Name: "system-robot"},
+					Level: robot.LEVELSYSTEM,
+					Permissions: []*robot.Permission{{
+						Scope:  robot.SCOPEALLPROJECT,
+						Access: memberWriteAccess(),
+					}},
+				})
+			},
 		},
 		{
 			name: "system admin",
-			user: &commonmodels.User{
-				UserID: 3, Username: "system-admin", SysAdminFlag: true,
+			securityCtx: func() security.Context {
+				return local.NewSecurityContext(&commonmodels.User{
+					UserID: 3, Username: "system-admin", SysAdminFlag: true,
+				})
 			},
 		},
 	}
@@ -100,43 +119,22 @@ func TestProjectAdminGrantRequiresAdminRole(t *testing.T) {
 			projectCtl.On("Get", mock.Anything, projectID, mock.Anything).
 				Return(p, nil).Maybe()
 			projectCtl.On("Get", mock.Anything, projectID).Return(p, nil).Maybe()
-			projectCtl.On("ListRoles", mock.Anything, projectID, mock.Anything).
-				Return(test.roles, nil).Maybe()
-
 			previousProjectCtl := project.Ctl
 			project.Ctl = projectCtl
 			t.Cleanup(func() {
 				project.Ctl = previousProjectCtl
 			})
 
-			var securityCtx security.Context
-			if test.robot {
-				securityCtx = robotsec.NewSecurityContext(&robot.Robot{
-					Robot: robotmodel.Robot{Name: "project-robot"},
-					Level: robot.LEVELPROJECT,
-					Permissions: []*robot.Permission{{
-						Scope: "/project/1",
-						Access: []*types.Policy{
-							{Resource: rbac.ResourceMember, Action: rbac.ActionCreate},
-							{Resource: rbac.ResourceMember, Action: rbac.ActionUpdate},
-						},
-					}},
-				})
-			} else {
-				securityCtx = local.NewSecurityContext(test.user)
-			}
-
 			controller := &recordingMemberController{}
 			api := newMemberAPI()
 			api.ctl = controller
-			ctx := security.NewContext(context.Background(), securityCtx)
-			if test.robot {
-				allowed, err := api.HasProjectPermission(
-					ctx, projectID, rbac.ActionCreate, rbac.ResourceMember,
-				)
-				require.NoError(t, err)
-				require.True(t, allowed)
-			}
+			ctx := security.NewContext(context.Background(), test.securityCtx())
+
+			allowed, err := api.HasProjectPermission(
+				ctx, projectID, rbac.ActionCreate, rbac.ResourceMember,
+			)
+			require.NoError(t, err)
+			require.True(t, allowed, "the caller must hold member:create")
 
 			createParams := operation.NewCreateProjectMemberParams()
 			createParams.ProjectNameOrID = "1"
@@ -151,44 +149,10 @@ func TestProjectAdminGrantRequiresAdminRole(t *testing.T) {
 			updateParams.Role = &models.RoleRequest{RoleID: common.RoleProjectAdmin}
 			updateResponder := api.UpdateProjectMember(ctx, updateParams)
 
-			if test.wantForbidden {
-				createError, ok := createResponder.(*ErrResponder)
-				require.True(t, ok)
-				assert.True(t, liberrors.IsErr(createError.err, liberrors.ForbiddenCode))
-				updateError, ok := updateResponder.(*ErrResponder)
-				require.True(t, ok)
-				assert.True(t, liberrors.IsErr(updateError.err, liberrors.ForbiddenCode))
-				assert.Empty(t, controller.createdRoles)
-				assert.Empty(t, controller.updatedRoles)
-				return
-			}
-
 			assert.IsType(t, &operation.CreateProjectMemberCreated{}, createResponder)
 			assert.IsType(t, &operation.UpdateProjectMemberOK{}, updateResponder)
 			assert.Equal(t, []int{common.RoleProjectAdmin}, controller.createdRoles)
 			assert.Equal(t, []int{common.RoleProjectAdmin}, controller.updatedRoles)
 		})
-	}
-}
-
-// The generic member permission check already stops local users without a
-// project-admin role, so drive requireProjectAdminGrant directly to prove its
-// own role check denies them too.
-func TestRequireProjectAdminGrantDeniesLocalNonAdmin(t *testing.T) {
-	const projectID int64 = 1
-	for _, roles := range [][]int{nil, {common.RoleDeveloper}, {common.RoleMaintainer}} {
-		projectCtl := projecttesting.NewController(t)
-		projectCtl.On("Get", mock.Anything, projectID).
-			Return(&project.Project{ProjectID: projectID}, nil)
-		projectCtl.On("ListRoles", mock.Anything, projectID, mock.Anything).
-			Return(roles, nil)
-
-		api := &memberAPI{projectCtl: projectCtl}
-		user := &commonmodels.User{UserID: 6, Username: "local-user"}
-		ctx := security.NewContext(context.Background(), local.NewSecurityContext(user))
-
-		err := api.requireProjectAdminGrant(ctx, projectID, common.RoleProjectAdmin)
-		assert.True(t, liberrors.IsErr(err, liberrors.ForbiddenCode), "roles %v", roles)
-		assert.NoError(t, api.requireProjectAdminGrant(ctx, projectID, common.RoleDeveloper))
 	}
 }
