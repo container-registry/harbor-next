@@ -9,7 +9,9 @@ name: Notify Google Chat
 #
 # A missing webhook is a notice and a webhook outage is a warning; neither
 # turns the caller's run red. A fork or a dispatch without the secret is not a
-# broken nightly.
+# broken nightly. Every step is continue-on-error for the same reason: a
+# runner without jq, or a Task download that fails, costs the card and leaves
+# an annotation, never a red nightly.
 
 on:
   workflow_call:
@@ -69,15 +71,29 @@ jobs:
       # !failure() rather than the implicit success(): it lets these steps run
       # in a cancelled run too, and still stops at the first broken step.
       - if: ${{ !failure() }}
+        continue-on-error: true
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - if: ${{ !failure() }}
+        continue-on-error: true
         uses: $/.github/actions/setup-task
+
+      # The task builds the card with jq. Hosted images ship it; a runner
+      # without it gets it here.
+      - name: Install jq
+        if: ${{ !failure() }}
+        continue-on-error: true
+        run: |
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y jq
+          fi
 
       - name: Post the outcome
         if: ${{ !failure() }}
+        continue-on-error: true
         env:
           GCHAT_WEBHOOK_URL: ${{ secrets.GCHAT_WEBHOOK_URL }}
           RESULTS: ${{ inputs.results }}

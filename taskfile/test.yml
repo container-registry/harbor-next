@@ -319,6 +319,7 @@ tasks:
       # which this one cannot reach by name.
       - task nightly:test
       - task release-notes:test
+      - task notify:test
 
   quick:
     desc: "Run API lint and unit tests only (fast validation)"
