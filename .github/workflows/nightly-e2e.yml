@@ -72,6 +72,13 @@ on:
         default: images
         type: choice
         options: [images, nightly]
+      overlay:
+        # Lets a suite change on an 8gcr branch run against published images
+        # before it reaches dev. Scheduled and release runs always use dev.
+        description: 8gcr overlay branch that carries the suite
+        required: false
+        default: dev
+        type: string
       godog_tags:
         description: Optional godog tag expression (images only)
         required: false
@@ -96,6 +103,7 @@ jobs:
     env:
       TAG: ${{ inputs.tag }}
       SUITE: ${{ inputs.suite || 'images' }}
+      OVERLAY: ${{ inputs.overlay || 'dev' }}
       GODOG_TAGS: ${{ inputs.godog_tags }}
       REGISTRY_ADDRESS: ${{ inputs.registry_address || vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
       REGISTRY_PROJECT: ${{ inputs.registry_project || vars.REGISTRY_PROJECT || '8gcr' }}
@@ -146,7 +154,8 @@ jobs:
         # The declared commercial patches plus the dev overlay that carries
         # the suite. Same task the release build uses; the overlay is the
         # only difference, and it is never part of a release.
-        run: task apply-patches OVERLAY_BRANCHES=dev
+        # apply-patches checks the branch name with git check-ref-format.
+        run: task apply-patches OVERLAY_BRANCHES="${OVERLAY}"
 
       - name: Log in to the registry
         # Verification must not depend on anonymous pull staying open, even
