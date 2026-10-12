@@ -26,10 +26,10 @@ import {
 } from '@angular/core';
 import {
     convertKey,
-    GRANT_ADMIN_PERMISSION,
     hasPermission,
     isCandidate,
-    isExplicitOnly,
+    SUB_ROW_ACTIONS,
+    SUB_ROW_DESCRIPTION_I18N_MAP,
 } from '../../../base/left-side-nav/system-robot-accounts/system-robot-util';
 import { Access } from '../../../../../ng-swagger-gen/models/access';
 import { Permission } from '../../../../../ng-swagger-gen/models/permission';
@@ -102,7 +102,10 @@ export class RobotPermissionsPanelComponent implements OnChanges, DoCheck {
             if (this.candidateResources.indexOf(item?.resource) === -1) {
                 this.candidateResources.push(item?.resource);
             }
-            if (this.candidateActions.indexOf(item?.action) === -1) {
+            if (
+                this.candidateActions.indexOf(item?.action) === -1 &&
+                SUB_ROW_ACTIONS.indexOf(item?.action) === -1
+            ) {
                 this.candidateActions.push(item?.action);
             }
         });
@@ -133,47 +136,31 @@ export class RobotPermissionsPanelComponent implements OnChanges, DoCheck {
     }
 
     isAllSelected(): boolean {
-        let flag: boolean = true;
-        this.candidateActions.forEach(action => {
-            this.candidateResources.forEach(resource => {
-                if (
-                    this.isCandidate(resource, action) &&
-                    !isExplicitOnly({ resource, action }) &&
-                    !hasPermission(this.permissionsModel, { resource, action })
-                ) {
-                    flag = false;
-                }
-            });
-        });
-        return flag;
+        return (this.candidatePermissions || []).every(item =>
+            hasPermission(this.permissionsModel, item)
+        );
     }
 
     selectAllOrUnselectAll() {
         if (this.isAllSelected()) {
             this.permissionsModel = [];
         } else {
-            this.permissionsModel = (this.permissionsModel || []).filter(item =>
-                isExplicitOnly(item)
+            this.permissionsModel = (this.candidatePermissions || []).map(
+                item => ({ resource: item.resource, action: item.action })
             );
-            this.candidateActions.forEach(action => {
-                this.candidateResources.forEach(resource => {
-                    if (
-                        this.isCandidate(resource, action) &&
-                        !isExplicitOnly({ resource, action })
-                    ) {
-                        this.permissionsModel.push({ resource, action });
-                    }
-                });
-            });
         }
         this.permissionsModelChange.emit(this.permissionsModel);
     }
 
-    offersGrantAdmin(): boolean {
-        return this.isCandidate(
-            GRANT_ADMIN_PERMISSION.resource,
-            GRANT_ADMIN_PERMISSION.action
+    // Actions that are not grid columns and render as a sub-row of their resource.
+    subRowsOf(resource: string): string[] {
+        return SUB_ROW_ACTIONS.filter(action =>
+            this.isCandidate(resource, action)
         );
+    }
+
+    describeSubRow(action: string): string {
+        return SUB_ROW_DESCRIPTION_I18N_MAP[action] || '';
     }
 
     convertKey(key: string): string {

@@ -363,7 +363,7 @@
         "NAME_PREFIX_REQUIRED": "Prefixo é obrigatório.",
         "UPDATE": "Update",
         "GRANT_ADMIN": "Conceder Administrador do Projeto",
-        "GRANT_ADMIN_HINT": "Com esta permissão o robô pode tornar qualquer pessoa administrador do projeto. Selecionar todas nunca a inclui.",
+        "GRANT_ADMIN_HINT": "permite que este robô atribua a função de Administrador do Projeto",
         "AUDIT_LOG": "Audit Log",
         "PREHEAT_INSTANCE": "Preheat Instance",
         "PROJECT": "Project",

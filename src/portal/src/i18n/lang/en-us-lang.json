@@ -363,7 +363,7 @@
         "NAME_PREFIX_REQUIRED": "Robot name prefix is required",
         "UPDATE": "Update",
         "GRANT_ADMIN": "Grant Project Admin",
-        "GRANT_ADMIN_HINT": "Grant Project Admin lets the robot make anyone a project admin. Select all never includes it.",
+        "GRANT_ADMIN_HINT": "lets this robot assign the Project Admin role",
         "AUDIT_LOG": "Audit Log",
         "PREHEAT_INSTANCE": "Preheat Instance",
         "PROJECT": "Project",

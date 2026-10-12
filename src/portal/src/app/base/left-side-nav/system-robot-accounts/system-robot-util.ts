@@ -49,17 +49,12 @@ export enum Action {
 
 export const NAMESPACE_ALL_PROJECTS: string = '*';
 
-export const GRANT_ADMIN_PERMISSION: Access = {
-    resource: 'member',
-    action: 'grant-admin',
+// Actions rendered as a sub-row of their resource instead of a grid column.
+export const SUB_ROW_ACTIONS: string[] = ['grant-admin'];
+
+export const SUB_ROW_DESCRIPTION_I18N_MAP = {
+    'grant-admin': 'ROBOT_ACCOUNT.GRANT_ADMIN_HINT',
 };
-
-// "Select all" never ticks these: each one needs its own deliberate tick.
-export const EXPLICIT_ONLY_PERMISSIONS: Access[] = [GRANT_ADMIN_PERMISSION];
-
-export function isExplicitOnly(permission: Access): boolean {
-    return hasPermission(EXPLICIT_ONLY_PERMISSIONS, permission);
-}
 
 export const NAMESPACE_SYSTEM: string = '/';
 
