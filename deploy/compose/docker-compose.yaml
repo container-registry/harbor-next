@@ -25,8 +25,14 @@ services:
       - /tmp:size=256M,mode=1777
     volumes:
       - ./config/token_service_key.pem:/etc/core/token_service_key.pem:ro
-      # 16-byte AES key for stored credentials (registry endpoints, OIDC); Core reads /etc/core/key by default
-      - ./config/secret_key:/etc/core/key:ro
+      # 16-byte AES key for stored credentials (registry endpoints, OIDC); Core reads /etc/core/key by default.
+      # Long syntax so a missing key fails the start instead of being created as an empty directory.
+      - type: bind
+        source: ./config/secret_key
+        target: /etc/core/key
+        read_only: true
+        bind:
+          create_host_path: false
     environment:
       # Database
       POSTGRESQL_HOST: postgresql
