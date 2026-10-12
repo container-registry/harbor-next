@@ -610,8 +610,16 @@ func TestUpdatingRobotsWithGrantAdmin(t *testing.T) {
 		wantCode string
 	}{
 		{"project admin adds it", projectAdmin, existing(gaMember(rbac.ActionCreate)...), request(true), errors.DENIED},
+		{"project admin re-adds it over an unrecognised effect", projectAdmin, existing(append(gaMember(rbac.ActionCreate), &types.Policy{Resource: rbac.ResourceMember, Action: rbac.ActionGrantAdmin, Effect: "bogus"})...), request(true), errors.DENIED},
 		{"project admin keeps it", projectAdmin, existing(gaMember(rbac.ActionCreate, rbac.ActionGrantAdmin)...), request(true), ""},
 		{"project admin drops it", projectAdmin, existing(gaMember(rbac.ActionCreate, rbac.ActionGrantAdmin)...), request(false), ""},
+		{
+			"robot without it re-adds it over an unrecognised effect",
+			func() security.Context {
+				return robotsec.NewSecurityContext(gaProjectRobot(gaAllow(rbac.ResourceRobot, rbac.ActionUpdate)))
+			},
+			existing(append(gaMember(rbac.ActionCreate), &types.Policy{Resource: rbac.ResourceMember, Action: rbac.ActionGrantAdmin, Effect: "bogus"})...), request(true), errors.DENIED,
+		},
 		{
 			"robot without it adds it",
 			func() security.Context {

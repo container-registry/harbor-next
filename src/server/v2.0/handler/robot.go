@@ -493,17 +493,20 @@ func grantAdminNamespaces(permissions []*models.RobotPermission) map[string]bool
 }
 
 // grantAdminEffect is the effect a policy list has on member:grant-admin: deny
-// when any entry denies it, allow when one allows it, empty otherwise.
+// when any entry denies it, allow when one allows it (explicitly or by the
+// empty default), empty otherwise. An unrecognised effect counts as nothing.
 func grantAdminEffect(access []*types.Policy) types.Effect {
 	var effect types.Effect
 	for _, a := range access {
 		if a == nil || a.Resource != rbac.ResourceMember || a.Action != rbac.ActionGrantAdmin {
 			continue
 		}
-		if a.Effect == types.EffectDeny {
+		switch a.Effect {
+		case types.EffectDeny:
 			return types.EffectDeny
+		case "", types.EffectAllow:
+			effect = types.EffectAllow
 		}
-		effect = types.EffectAllow
 	}
 	return effect
 }
