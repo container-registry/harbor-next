@@ -1,36 +1,54 @@
 .td {
-  height: 24px;
-  line-height: 24px;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
+    height: 24px;
+    line-height: 24px;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
 }
 
 .dropdown-menu {
-  max-width: unset;
+    max-width: unset;
 }
 
 :host::ng-deep.trigger clr-icon {
-  padding: 0;
-  position: unset !important;
+    padding: 0;
+    position: unset !important;
 }
 
 .select-all-for-dropdown {
-  margin-bottom: 0.25rem;
-  width: fit-content;
+    margin-bottom: 0.25rem;
+    width: fit-content;
+}
+
+// Keep every resource label on one line; the sub-row must not widen the column
+// past the longest resource name, or the table bleeds out of its container.
+.table th,
+.table td {
+    padding-right: 0.3rem;
+}
+
+.left {
+    white-space: nowrap;
 }
 
 .sub-row-label {
-  padding-left: 1.25rem !important;
-  white-space: nowrap;
+    padding-left: 0.5rem !important;
+    font-size: 0.6rem;
 }
 
 .sub-row-indent {
-  color: var(--clr-color-neutral-600, #666);
-  margin-right: 0.25rem;
+    color: var(--clr-color-neutral-600, #666);
+    margin-right: 0.15rem;
 }
 
 .sub-row-toggle {
-  margin: 0 0.15rem 0 0;
-  min-width: 0.7rem;
-  vertical-align: middle;
+    display: inline-flex;
+    align-items: center;
+    width: 0.7rem;
+    margin: 0 0.15rem 0 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+    vertical-align: middle;
 }
