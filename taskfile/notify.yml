@@ -1,0 +1,177 @@
+# Run notifications.
+#
+# The nightly reports its outcome to a Google Chat space through an incoming
+# webhook. Everything about the message lives here: the workflow that calls it
+# only hands over the run's results and the webhook secret.
+#
+# The overall status is derived from RESULTS, the caller's `needs` context as
+# JSON, so the card always agrees with what the run page shows:
+#
+#   any job cancelled            -> cancelled
+#   no job failed                -> success
+#   only e2e failed              -> e2e-failed (the images were published)
+#   anything else failed         -> failed, naming the failed jobs
+#
+# Usage:
+#   task notify:gchat RESULTS='{"release":{"result":"success"}}' NIGHTLY_TAG=v2.16.0-beta ...
+#
+# GCHAT_WEBHOOK_URL comes from the environment. It embeds the space's key and
+# token, so it is never echoed, never put on a command line, and an unset one
+# is a notice rather than a failure: forks and ad-hoc dispatches have no
+# webhook and must not go red for it.
+
+version: '3'
+
+tasks:
+  gchat:
+    desc: "Post a nightly outcome card to Google Chat (GCHAT_WEBHOOK_URL from env)"
+    silent: true
+    requires:
+      vars: [RESULTS]
+    # Through env: every value is caller-supplied and must never become
+    # command text. NIGHTLY_VERSION and NIGHTLY_TAG rather than VERSION and
+    # BETA_TAG: those are already defined (by the root Taskfile and by
+    # nightly.yml), and they would quietly stand in for a value the caller
+    # left out.
+    env:
+      RESULTS_VALUE: '{{.RESULTS}}'
+      TITLE_VALUE: '{{.TITLE | default "Harbor Next nightly"}}'
+      VERSION_VALUE: '{{.NIGHTLY_VERSION | default ""}}'
+      BETA_TAG_VALUE: '{{.NIGHTLY_TAG | default ""}}'
+      HEAD_SHA_VALUE: '{{.HEAD_SHA | default ""}}'
+      RELEASE_SHA_VALUE: '{{.RELEASE_SHA | default ""}}'
+      E2E_PASSED_VALUE: '{{.E2E_PASSED | default ""}}'
+      E2E_FAILED_VALUE: '{{.E2E_FAILED | default ""}}'
+      E2E_TOTAL_VALUE: '{{.E2E_TOTAL | default ""}}'
+      RUN_URL_VALUE: '{{.RUN_URL | default ""}}'
+      REPO_URL_VALUE: '{{.REPO_URL | default ""}}'
+    cmds:
+      - |
+        if [ -z "${GCHAT_WEBHOOK_URL:-}" ]; then
+          echo "::notice::GCHAT_WEBHOOK_URL is not set; skipping the Google Chat notification"
+          exit 0
+        fi
+
+        # The secret is masked as a whole already. The key and token are
+        # masked on their own too, in case either ever surfaces decoded.
+        if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+          for part in $(printf '%s' "${GCHAT_WEBHOOK_URL}" | tr '?&' '\n\n' | sed -n 's/^[a-z]*=//p'); do
+            echo "::add-mask::${part}"
+          done
+        fi
+
+        work=$(mktemp -d)
+        trap 'rm -rf "${work}"' EXIT
+
+        # cut rather than a printf precision: Task runs these commands under
+        # mvdan/sh, where printf '%.7s' is not implemented.
+        head_short=$(printf '%s' "${HEAD_SHA_VALUE}" | cut -c1-7)
+        release_short=$(printf '%s' "${RELEASE_SHA_VALUE}" | cut -c1-7)
+
+        # jq builds the whole payload, so no value can inject into the JSON.
+        printf '%s' "${RESULTS_VALUE}" | jq \
+          --arg title "${TITLE_VALUE}" \
+          --arg version "${VERSION_VALUE}" \
+          --arg beta_tag "${BETA_TAG_VALUE}" \
+          --arg head_sha "${HEAD_SHA_VALUE}" \
+          --arg head_short "${head_short}" \
+          --arg release_sha "${RELEASE_SHA_VALUE}" \
+          --arg release_short "${release_short}" \
+          --arg e2e_passed "${E2E_PASSED_VALUE}" \
+          --arg e2e_failed "${E2E_FAILED_VALUE}" \
+          --arg e2e_total "${E2E_TOTAL_VALUE}" \
+          --arg run_url "${RUN_URL_VALUE}" \
+          --arg repo_url "${REPO_URL_VALUE}" '
+          def jobs_with($r): [to_entries[] | select(.value.result == $r) | .key];
+          def link($text; $url): if $url == "" then $text else "<a href=\"\($url)\">\($text)</a>" end;
+          def row($label; $text): {decoratedText: {topLabel: $label, text: $text, wrapText: true}};
+
+          jobs_with("failure") as $failed
+          | jobs_with("cancelled") as $cancelled
+          | (.e2e.result // "") as $e2e_result
+          | (if ($cancelled | length) > 0 then "cancelled"
+             elif ($failed | length) == 0 then "success"
+             elif $failed == ["e2e"] then "e2e-failed"
+             else "failed" end) as $status
+          | ({
+              "success":    {label: "Passed",           color: "#1e8e3e", headline: "published, e2e passed"},
+              "e2e-failed": {label: "E2E failed",       color: "#d93025", headline: "published, e2e failed"},
+              "failed":     {label: "Failed",           color: "#d93025", headline: "failed in \($failed | join(", "))"},
+              "cancelled":  {label: "Cancelled",        color: "#80868b", headline: "cancelled"}
+            }[$status]) as $s
+          # No count means no report was written, which is not zero.
+          | (if $e2e_total != "" then "\($e2e_passed)/\($e2e_total) passed, \($e2e_failed) failed"
+             elif $e2e_result == "" or $e2e_result == "skipped" then "not run"
+             else "\($e2e_result) (no scenario report produced)" end) as $e2e
+          | (if $beta_tag == "" then $title else "\($title) \($beta_tag)" end) as $name
+          | {
+              text: "\($name): \($s.headline)",
+              cardsV2: [{
+                cardId: "nightly-outcome",
+                card: {
+                  header: ({title: "\($name): \($s.label)"}
+                    + (if $version == "" then {} else {subtitle: "Version \($version)"} end)),
+                  sections: [
+                    {
+                      widgets: (
+                        [row("Status"; "<b><font color=\"\($s.color)\">\($s.label)</font></b>")]
+                        + (if ($failed | length) > 0 then [row("Failed jobs"; $failed | join(", "))] else [] end)
+                        + (if ($cancelled | length) > 0 then [row("Cancelled jobs"; $cancelled | join(", "))] else [] end)
+                        + (if $beta_tag == "" then [] else [row("Tag"; $beta_tag)] end)
+                        + (if $head_sha == "" then [] else
+                            [row("Built from main"; link($head_short; if $repo_url == "" then "" else "\($repo_url)/commit/\($head_sha)" end))] end)
+                        + (if $release_sha == "" then [] else
+                            [row("Release commit"; link($release_short; if $repo_url == "" then "" else "\($repo_url)/commit/\($release_sha)" end))] end)
+                        + [row("End-to-end suite"; $e2e)]
+                      )
+                    },
+                    {
+                      widgets: [{
+                        buttonList: {
+                          buttons: (
+                            (if $run_url == "" then [] else
+                              [{text: "Open run", onClick: {openLink: {url: $run_url}}}] end)
+                            + (if $repo_url == "" or $beta_tag == "" or $status == "failed" or $status == "cancelled" then [] else
+                                [{text: "Release notes", onClick: {openLink: {url: "\($repo_url)/releases/tag/\($beta_tag)"}}}] end)
+                          )
+                        }
+                      }]
+                    }
+                  ]
+                }
+              }]
+            }
+          | if (.cardsV2[0].card.sections[1].widgets[0].buttonList.buttons | length) == 0
+            then .cardsV2[0].card.sections |= .[:1] else . end
+        ' > "${work}/payload.json"
+
+        # The URL goes to curl on stdin as a config line, never as an
+        # argument, so it shows up in no process list and no trace.
+        # --fail-with-body is not used: a non-2xx is handled below, as a
+        # warning with its HTTP code, because a webhook outage must not turn
+        # a nightly red.
+        code=$(printf 'url = "%s"\n' "${GCHAT_WEBHOOK_URL}" | curl -sS \
+          --config - \
+          --max-time 30 \
+          --retry 2 \
+          -X POST \
+          -H 'Content-Type: application/json; charset=UTF-8' \
+          --data-binary "@${work}/payload.json" \
+          -o "${work}/response.json" \
+          -w '%{http_code}') || true
+
+        case "${code}" in
+          2??)
+            echo "posted the nightly outcome to Google Chat (HTTP ${code})"
+            ;;
+          *)
+            # Google's error body names the problem with the payload; only its
+            # message is shown, never anything that could echo the request.
+            reason=$(jq -r '.error.message // empty' "${work}/response.json" 2>/dev/null || true)
+            if [ "${code:-000}" = "000" ]; then
+              echo "::warning::Google Chat webhook could not be reached (HTTP 000); the nightly notification was not delivered"
+            else
+              echo "::warning::Google Chat webhook answered HTTP ${code}; the nightly notification was not delivered${reason:+: ${reason}}"
+            fi
+            ;;
+        esac
