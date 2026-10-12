@@ -322,10 +322,11 @@ tasks:
       # notify:test needs jq, which a local checkout may lack. There it is
       # skipped with a message so test:quick stays usable; on CI, where the
       # workflow installs jq, a missing one is an error, never a quiet skip.
+      # IS_CI is the root Taskfile's shared CI detection.
       - |
         if command -v jq >/dev/null 2>&1; then
           task notify:test
-        elif [ -n "${CI:-}${GITHUB_ACTIONS:-}" ]; then
+        elif [ '{{.IS_CI}}' = true ]; then
           echo "notify:test needs jq, and CI is expected to provide it" >&2
           exit 1
         else
