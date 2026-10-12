@@ -362,7 +362,6 @@
         "NAME_PREFIX_REQUIRED": "Le préfixe du nom du compte robot est obligatoire",
         "UPDATE": "Mettre à jour",
         "GRANT_ADMIN": "Accorder le rôle Administrateur de projet",
-        "GRANT_ADMIN_HINT": "permet à ce robot d'attribuer le rôle Administrateur de projet",
         "AUDIT_LOG": "Log d'audit",
         "PREHEAT_INSTANCE": "Préchauffer l'instance",
         "PROJECT": "Projet",

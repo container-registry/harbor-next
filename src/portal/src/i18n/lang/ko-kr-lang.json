@@ -363,7 +363,6 @@
         "NAME_PREFIX_REQUIRED": "로봇 이름 접두어는 필수항목입니다",
         "UPDATE": "업데이트",
         "GRANT_ADMIN": "프로젝트 관리자 권한 부여",
-        "GRANT_ADMIN_HINT": "이 로봇이 프로젝트 관리자 역할을 부여할 수 있게 합니다",
         "AUDIT_LOG": "감사 로그",
         "PREHEAT_INSTANCE": "인스턴스 예열",
         "PROJECT": "프로젝트",

@@ -52,10 +52,6 @@ export const NAMESPACE_ALL_PROJECTS: string = '*';
 // Actions rendered as a sub-row of their resource instead of a grid column.
 export const SUB_ROW_ACTIONS: string[] = ['grant-admin'];
 
-export const SUB_ROW_DESCRIPTION_I18N_MAP = {
-    'grant-admin': 'ROBOT_ACCOUNT.GRANT_ADMIN_HINT',
-};
-
 export const NAMESPACE_SYSTEM: string = '/';
 
 export const ACTION_RESOURCE_I18N_MAP = {
