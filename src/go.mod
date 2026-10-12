@@ -1,8 +1,12 @@
 module github.com/goharbor/harbor/src
 
+<<<<<<< HEAD
 go 1.26.8
 
 godebug x509negativeserial=1
+=======
+go 1.26.9
+>>>>>>> 4d425b805 (bump: bump up Go version to v1.26.9 (#24120))
 
 require (
 	github.com/FZambia/sentinel/v2 v2.0.1
