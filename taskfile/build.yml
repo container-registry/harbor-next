@@ -162,8 +162,9 @@ tasks:
         git clone --branch {{.DISTRIBUTION_VERSION}} --depth 1 {{.DISTRIBUTION_SRC}} "$DIST_DIR"
         cd "$DIST_DIR"
         go mod edit -require golang.org/x/crypto@v0.57.0
-        go mod edit -require golang.org/x/net@v0.59.0
+        go mod edit -require golang.org/x/net@v0.60.0
         go mod edit -require golang.org/x/text@v0.42.0
+        go mod edit -require github.com/klauspost/compress@v1.18.7
         go mod edit -require google.golang.org/grpc@v1.83.2
         go mod tidy -e
         go mod vendor
@@ -190,6 +191,7 @@ tasks:
         trap "rm -rf $LPROBE_DIR" EXIT
         git clone --branch v{{.LPROBE_VERSION}} --depth 1 https://github.com/fivexl/lprobe.git "$LPROBE_DIR"
         cd "$LPROBE_DIR"
+        go mod edit -require golang.org/x/net@v0.60.0
         go mod tidy -e
         CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/lprobe" .
 
@@ -210,6 +212,8 @@ tasks:
         trap "rm -rf $TRIVY_DIR" EXIT
         git clone --branch v{{.TRIVY_VERSION}} --depth 1 https://github.com/aquasecurity/trivy.git "$TRIVY_DIR"
         cd "$TRIVY_DIR"
+        go mod edit -require golang.org/x/net@v0.60.0
+        GOTOOLCHAIN=auto go mod tidy -e
         # GOTOOLCHAIN=auto: the trivy tag's go.mod may require a newer Go than
         # Harbor's pinned toolchain (CI runs GOTOOLCHAIN=local).
         GOTOOLCHAIN=auto GOEXPERIMENT=jsonv2 CGO_ENABLED=0 GOOS={{.GOOS}} GOARCH={{.GOARCH}} go build -trimpath -o "{{.ROOT_DIR}}/bin/{{.PLATFORM}}/trivy" ./cmd/trivy
