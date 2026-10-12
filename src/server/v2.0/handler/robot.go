@@ -26,6 +26,7 @@ import (
 	"github.com/go-openapi/strfmt"
 
 	"github.com/goharbor/harbor/src/common/rbac"
+	"github.com/goharbor/harbor/src/common/security"
 	"github.com/goharbor/harbor/src/common/security/local"
 	robotSc "github.com/goharbor/harbor/src/common/security/robot"
 	"github.com/goharbor/harbor/src/common/utils"
@@ -94,6 +95,9 @@ func (rAPI *robotAPI) CreateRobot(ctx context.Context, params operation.CreateRo
 		creatorRef = s.User().ID
 	default:
 		return rAPI.SendError(ctx, errors.New(nil).WithMessage("invalid security context"))
+	}
+	if err := requireGrantAdminDelegation(sc, grantAdminNamespaces(params.Robot.Permissions)); err != nil {
+		return rAPI.SendError(ctx, err)
 	}
 	r.CreatorType = sc.Name()
 	r.CreatorRef = creatorRef
@@ -401,6 +405,19 @@ func (rAPI *robotAPI) updateV2Robot(ctx context.Context, params operation.Update
 	if err := rAPI.requireAccess(ctx, r, rbac.ActionUpdate); err != nil {
 		return err
 	}
+	sc, err := rAPI.GetSecurityContext(ctx)
+	if err != nil {
+		return err
+	}
+	added := grantAdminNamespaces(params.Robot.Permissions)
+	for _, p := range r.Permissions {
+		if p.Kind == robot.LEVELPROJECT && grantAdminEffect(p.Access) == types.EffectAllow {
+			delete(added, p.Namespace)
+		}
+	}
+	if err := requireGrantAdminDelegation(sc, added); err != nil {
+		return err
+	}
 	if params.Robot.Level != r.Level || params.Robot.Name != r.Name {
 		return errors.BadRequestError(nil).WithMessage("cannot update the level or name of robot")
 	}
@@ -455,6 +472,79 @@ func containsAccess(policies []*types.Policy, item *models.Access) bool {
 		}
 	}
 	return false
+}
+
+// grantAdminNamespaces lists the project namespaces a robot request allows
+// member:grant-admin on.
+func grantAdminNamespaces(permissions []*models.RobotPermission) map[string]bool {
+	namespaces := map[string]bool{}
+	for _, p := range permissions {
+		if p == nil || p.Kind != robot.LEVELPROJECT {
+			continue
+		}
+		for _, a := range p.Access {
+			if a != nil && a.Resource == rbac.ResourceMember.String() && a.Action == rbac.ActionGrantAdmin.String() &&
+				(a.Effect == "" || a.Effect == types.EffectAllow.String()) {
+				namespaces[p.Namespace] = true
+			}
+		}
+	}
+	return namespaces
+}
+
+// grantAdminEffect is the effect a policy list has on member:grant-admin: deny
+// when any entry denies it, allow when one allows it, empty otherwise.
+func grantAdminEffect(access []*types.Policy) types.Effect {
+	var effect types.Effect
+	for _, a := range access {
+		if a == nil || a.Resource != rbac.ResourceMember || a.Action != rbac.ActionGrantAdmin {
+			continue
+		}
+		if a.Effect == types.EffectDeny {
+			return types.EffectDeny
+		}
+		effect = types.EffectAllow
+	}
+	return effect
+}
+
+// requireGrantAdminDelegation lets member:grant-admin be put on a robot only by
+// a system admin or by a robot that can use it on every namespace asked for: an
+// allow on that namespace or on all projects, and no deny that reaches it. A
+// deny on one project also stops a grant on all projects.
+func requireGrantAdminDelegation(sc security.Context, namespaces map[string]bool) error {
+	if len(namespaces) == 0 || sc.IsSysAdmin() {
+		return nil
+	}
+	denied := errors.DeniedError(nil).WithMessagef(
+		"%s:%s can be given to a robot only by a system admin or by a robot that holds it on the same projects",
+		rbac.ResourceMember, rbac.ActionGrantAdmin)
+	creator, ok := sc.(*robotSc.SecurityContext)
+	if !ok || creator.User() == nil {
+		return denied
+	}
+	for namespace := range namespaces {
+		allowed := false
+		for _, p := range creator.User().Permissions {
+			if p.Kind != robot.LEVELPROJECT {
+				continue
+			}
+			switch grantAdminEffect(p.Access) {
+			case types.EffectDeny:
+				if p.Namespace == "*" || p.Namespace == namespace || namespace == "*" {
+					return denied
+				}
+			case types.EffectAllow:
+				if p.Namespace == "*" || p.Namespace == namespace {
+					allowed = true
+				}
+			}
+		}
+		if !allowed {
+			return denied
+		}
+	}
+	return nil
 }
 
 // isValidPermissionScope checks if permission slice A is a subset of permission slice B

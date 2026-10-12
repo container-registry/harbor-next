@@ -78,8 +78,8 @@ func (p *permissionsAPI) GetPermissions(ctx context.Context, _ permissions.GetPe
 		// project admin cannot see the system level permissions
 		sysPermissions = provider.GetPermissions(rbac.ScopeSystem)
 	} else {
-		// No project role holds member:grant-admin, so robot creation would refuse
-		// it from a project admin; do not offer it.
+		// Only a system admin may put member:grant-admin on a robot, so a project
+		// admin is not offered it.
 		proPermissions = withoutGrantAdmin(proPermissions)
 	}
 
