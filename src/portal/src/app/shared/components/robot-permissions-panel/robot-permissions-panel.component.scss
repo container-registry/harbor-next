@@ -19,10 +19,22 @@
   width: fit-content;
 }
 
-.grant-admin-hint {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-top: 0.25rem;
-  max-width: 32rem;
+.sub-row-label {
+  padding-left: 1.25rem !important;
+  white-space: nowrap;
+}
+
+.sub-row-indent {
+  color: var(--clr-color-neutral-600, #666);
+  margin-right: 0.15rem;
+}
+
+.sub-row-title {
+  margin-left: 0.15rem;
+}
+
+.sub-row-desc {
+  color: var(--clr-color-neutral-600, #666);
+  font-size: 0.55rem;
+  margin-left: 0.3rem;
 }

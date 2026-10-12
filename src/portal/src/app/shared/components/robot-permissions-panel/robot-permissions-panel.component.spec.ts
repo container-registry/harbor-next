@@ -84,37 +84,52 @@ describe('RobotPermissionsPanelComponent with member:grant-admin', () => {
         render([pull, createMember, grantAdmin]);
     });
 
-    it('select all leaves member:grant-admin unticked', () => {
-        panel.selectAllOrUnselectAll();
-        expect(hasPermission(panel.permissionsModel, pull)).toBeTrue();
-        expect(hasPermission(panel.permissionsModel, createMember)).toBeTrue();
+    it('keeps member:grant-admin out of the action columns', () => {
+        expect(panel.candidateActions).toEqual(['create', 'pull']);
+        const headers = fixture.nativeElement.querySelectorAll('thead th');
+        expect(headers.length).toBe(3);
+    });
+
+    it('renders member:grant-admin as a sub-row of the member resource', () => {
+        const rows = fixture.nativeElement.querySelectorAll('tbody tr');
+        expect(rows.length).toBe(3);
+        expect(rows[0].textContent).toContain('ROBOT_ACCOUNT.MEMBER');
+        expect(rows[1].classList).toContain('sub-row');
+        expect(rows[1].textContent).toContain('ROBOT_ACCOUNT.GRANT_ADMIN');
+        expect(rows[1].textContent).toContain('ROBOT_ACCOUNT.GRANT_ADMIN_HINT');
+        expect(rows[1].querySelector('clr-icon[shape="shield"]')).toBeTruthy();
+        expect(rows[1].querySelector('input[type="checkbox"]')).toBeTruthy();
+    });
+
+    it('toggles member:grant-admin from its own checkbox', () => {
+        panel.setCheckBoxValue(grantAdmin.resource, grantAdmin.action, true);
+        expect(hasPermission(panel.permissionsModel, grantAdmin)).toBeTrue();
+        expect(panel.getCheckBoxValue('member', 'grant-admin')).toBeTrue();
+        panel.setCheckBoxValue(grantAdmin.resource, grantAdmin.action, false);
         expect(hasPermission(panel.permissionsModel, grantAdmin)).toBeFalse();
     });
 
-    it('counts everything but member:grant-admin as all selected', () => {
-        panel.permissionsModel = [pull, createMember];
-        expect(panel.isAllSelected()).toBeTrue();
-    });
-
-    it('select all keeps a member:grant-admin ticked on its own', () => {
-        panel.setCheckBoxValue(grantAdmin.resource, grantAdmin.action, true);
-        expect(panel.isAllSelected()).toBeFalse();
+    it('select all includes member:grant-admin', () => {
         panel.selectAllOrUnselectAll();
-        expect(panel.permissionsModel.length).toBe(3);
+        expect(hasPermission(panel.permissionsModel, pull)).toBeTrue();
+        expect(hasPermission(panel.permissionsModel, createMember)).toBeTrue();
         expect(hasPermission(panel.permissionsModel, grantAdmin)).toBeTrue();
+        expect(panel.isAllSelected()).toBeTrue();
+        panel.selectAllOrUnselectAll();
+        expect(panel.permissionsModel.length).toBe(0);
     });
 
-    it('warns what member:grant-admin allows when it is offered', () => {
-        const hint = fixture.nativeElement.querySelector('.grant-admin-hint');
-        expect(hint).toBeTruthy();
-        expect(hint.textContent).toContain('ROBOT_ACCOUNT.GRANT_ADMIN_HINT');
+    it('is not all selected while member:grant-admin is unticked', () => {
+        panel.permissionsModel = [pull, createMember];
+        expect(panel.isAllSelected()).toBeFalse();
     });
 
-    it('shows no warning when member:grant-admin is not offered', () => {
+    it('shows no sub-row when member:grant-admin is not offered', () => {
         render([pull, createMember]);
-        expect(
-            fixture.nativeElement.querySelector('.grant-admin-hint')
-        ).toBeNull();
+        expect(fixture.nativeElement.querySelector('.sub-row')).toBeNull();
+        expect(fixture.nativeElement.querySelectorAll('tbody tr').length).toBe(
+            2
+        );
     });
 });
 

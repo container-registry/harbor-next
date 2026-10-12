@@ -364,7 +364,7 @@
         "NAME_PREFIX_REQUIRED": "机器人账户名称前缀为必填项",
         "UPDATE": "更新",
         "GRANT_ADMIN": "授予项目管理员",
-        "GRANT_ADMIN_HINT": "拥有此权限的机器人可以将任何人设为项目管理员。全选不会包含此权限。",
+        "GRANT_ADMIN_HINT": "允许此机器人账户授予项目管理员角色",
         "AUDIT_LOG": "审核日志",
         "PREHEAT_INSTANCE": "预热实例",
         "PROJECT": "项目",
