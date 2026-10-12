@@ -29,9 +29,11 @@ import (
 	"github.com/goharbor/harbor/src/common"
 	commonmodels "github.com/goharbor/harbor/src/common/models"
 	"github.com/goharbor/harbor/src/common/rbac"
+	secretstore "github.com/goharbor/harbor/src/common/secret"
 	"github.com/goharbor/harbor/src/common/security"
 	"github.com/goharbor/harbor/src/common/security/local"
 	robotsec "github.com/goharbor/harbor/src/common/security/robot"
+	secretsec "github.com/goharbor/harbor/src/common/security/secret"
 	"github.com/goharbor/harbor/src/controller/member"
 	"github.com/goharbor/harbor/src/controller/project"
 	"github.com/goharbor/harbor/src/controller/robot"
@@ -220,6 +222,11 @@ func gaAssertGrants(t *testing.T, newCtx func() context.Context, want gaOutcome)
 		}
 		_, failed := responder.(*ErrResponder)
 		require.False(t, failed, "role %d: %v", role, responder)
+		var got []int
+		for _, req := range ctl.created {
+			got = append(got, req.Role)
+		}
+		assert.Equal(t, []int{role}, append(got, ctl.updated...), "the member controller must receive the role once")
 	}
 	for name, body := range gaBodies {
 		t.Run("create "+name, func(t *testing.T) {
@@ -287,6 +294,16 @@ func TestGrantAdminPermissionForRobots(t *testing.T) {
 			gaAssertGrants(t, gaRobotCtx(test.robot), test.want)
 		})
 	}
+}
+
+// The internal secret context answers yes to every permission check, so it must
+// not pass as a holder of member:grant-admin.
+func TestGrantAdminNotForSecretContext(t *testing.T) {
+	gaInstallProjectCtl(t, nil)
+	store := secretstore.NewStore(map[string]string{"s3cret": secretstore.JobserviceUser})
+	gaAssertGrants(t, func() context.Context {
+		return security.NewContext(context.Background(), secretsec.NewSecurityContext("s3cret", store))
+	}, gaOutcome{lower: true})
 }
 
 func TestGrantAdminPermissionForLocalUsers(t *testing.T) {
@@ -425,11 +442,9 @@ func TestRobotCatalogOffersGrantAdmin(t *testing.T) {
 	assert.Equal(t, errors.BadRequestCode, errors.ErrCode(err), "got %v", err)
 }
 
-// A robot gives member:grant-admin to a robot it creates only when it holds it
-// on the same or a wider namespace. Robot creation checks no role of a local
-// user, so a project admin can mint it for a project robot of their own project,
-// where they may grant project admin anyway; only a system admin can mint it for
-// all projects. The project admin case needs the database and is not covered here.
+// Only a system admin, or a robot that can use member:grant-admin on every
+// namespace asked for, may put it on a robot it creates. The raw subset check
+// does not see denies, so this looks at the creator's effective permission.
 func TestMintingGrantAdminRobots(t *testing.T) {
 	createSystemRobots := &robot.Permission{
 		Kind: robot.LEVELSYSTEM, Namespace: "/", Scope: robot.SCOPESYSTEM,
@@ -478,6 +493,45 @@ func TestMintingGrantAdminRobots(t *testing.T) {
 			level: robot.LEVELPROJECT, perms: grantOn("p1"), wantCode: errors.DENIED,
 		},
 		{
+			name: "project admin minting it for a robot of their project",
+			secCtx: func() security.Context {
+				return local.NewSecurityContext(&commonmodels.User{UserID: 4, Username: "project-admin"})
+			},
+			level: robot.LEVELPROJECT, perms: grantOn("p1"), wantCode: errors.DENIED,
+		},
+		{
+			name: "system robot allowed and denied member:grant-admin on all projects",
+			secCtx: func() security.Context {
+				return robotsec.NewSecurityContext(gaSystemRobot(createSystemRobots,
+					gaCoverAll(gaAllow(rbac.ResourceMember, rbac.ActionGrantAdmin), gaDeny(rbac.ResourceMember, rbac.ActionGrantAdmin))))
+			},
+			level: robot.LEVELSYSTEM, perms: grantOn("*"), wantCode: errors.DENIED,
+		},
+		{
+			name: "system robot allowed on all projects but denied on the project it mints for",
+			secCtx: func() security.Context {
+				return robotsec.NewSecurityContext(gaSystemRobot(createSystemRobots,
+					gaCoverAll(gaMember(rbac.ActionGrantAdmin)...), gaOnProject(gaProjectID, gaDeny(rbac.ResourceMember, rbac.ActionGrantAdmin))))
+			},
+			level: robot.LEVELSYSTEM, perms: grantOn("p1"), wantCode: errors.DENIED,
+		},
+		{
+			name: "system robot allowed on all projects but denied on one, minting for all projects",
+			secCtx: func() security.Context {
+				return robotsec.NewSecurityContext(gaSystemRobot(createSystemRobots,
+					gaCoverAll(gaMember(rbac.ActionGrantAdmin)...), gaOnProject(2, gaDeny(rbac.ResourceMember, rbac.ActionGrantAdmin))))
+			},
+			level: robot.LEVELSYSTEM, perms: grantOn("*"), wantCode: errors.DENIED,
+		},
+		{
+			name: "system robot allowed on all projects but denied on another project, minting for the project",
+			secCtx: func() security.Context {
+				return robotsec.NewSecurityContext(gaSystemRobot(createSystemRobots,
+					gaCoverAll(gaMember(rbac.ActionGrantAdmin)...), gaOnProject(2, gaDeny(rbac.ResourceMember, rbac.ActionGrantAdmin))))
+			},
+			level: robot.LEVELSYSTEM, perms: grantOn("p1"),
+		},
+		{
 			name: "system robot holding member:grant-admin on all projects",
 			secCtx: func() security.Context {
 				return robotsec.NewSecurityContext(gaSystemRobot(createSystemRobots, gaCoverAll(gaMember(rbac.ActionGrantAdmin)...)))
@@ -509,6 +563,94 @@ func TestMintingGrantAdminRobots(t *testing.T) {
 			responder := (&robotAPI{robotCtl: robotCtl}).CreateRobot(ctx, params)
 			if test.wantCode == "" {
 				assert.IsType(t, &robotop.CreateRobotCreated{}, responder)
+				return
+			}
+			errResponder, ok := responder.(*ErrResponder)
+			require.True(t, ok, "got %T", responder)
+			assert.True(t, errors.IsErr(errResponder.err, test.wantCode), "got %v", errResponder.err)
+		})
+	}
+}
+
+// Updating a robot may add member:grant-admin under the same rule as creating
+// one; a grant the robot already holds may stay, so a project admin can still
+// edit such a robot.
+func TestUpdatingRobotsWithGrantAdmin(t *testing.T) {
+	grantAdmin := gaAllow(rbac.ResourceMember, rbac.ActionGrantAdmin)
+	existing := func(access ...*types.Policy) *robot.Robot {
+		r := gaProjectRobot(access...)
+		r.Editable = true
+		r.Duration = -1
+		return r
+	}
+	request := func(grant bool) *models.Robot {
+		access := []*models.Access{{Resource: rbac.ResourceMember.String(), Action: rbac.ActionCreate.String()}}
+		if grant {
+			access = append(access, &models.Access{Resource: rbac.ResourceMember.String(), Action: rbac.ActionGrantAdmin.String()})
+		}
+		return &models.Robot{
+			Name: "robot$p1+provisioner", Level: robot.LEVELPROJECT,
+			Permissions: []*models.RobotPermission{{Kind: robot.LEVELPROJECT, Namespace: "p1", Access: access}},
+		}
+	}
+	projectAdmin := func() security.Context {
+		return local.NewSecurityContext(&commonmodels.User{UserID: 4, Username: "project-admin"})
+	}
+	rolesOf := func(_ int64, u *commonmodels.User) []int {
+		if u != nil && u.Username == "project-admin" {
+			return []int{common.RoleProjectAdmin}
+		}
+		return nil
+	}
+	tests := []struct {
+		name     string
+		secCtx   func() security.Context
+		robot    *robot.Robot
+		request  *models.Robot
+		wantCode string
+	}{
+		{"project admin adds it", projectAdmin, existing(gaMember(rbac.ActionCreate)...), request(true), errors.DENIED},
+		{"project admin keeps it", projectAdmin, existing(gaMember(rbac.ActionCreate, rbac.ActionGrantAdmin)...), request(true), ""},
+		{"project admin drops it", projectAdmin, existing(gaMember(rbac.ActionCreate, rbac.ActionGrantAdmin)...), request(false), ""},
+		{
+			"robot without it adds it",
+			func() security.Context {
+				return robotsec.NewSecurityContext(gaProjectRobot(gaAllow(rbac.ResourceRobot, rbac.ActionUpdate)))
+			},
+			existing(gaMember(rbac.ActionCreate)...), request(true), errors.DENIED,
+		},
+		{
+			"robot holding it adds it",
+			func() security.Context {
+				return robotsec.NewSecurityContext(gaProjectRobot(gaAllow(rbac.ResourceRobot, rbac.ActionUpdate), grantAdmin))
+			},
+			existing(gaMember(rbac.ActionCreate)...), request(true), "",
+		},
+		{
+			"system admin adds it",
+			func() security.Context {
+				return local.NewSecurityContext(&commonmodels.User{UserID: 2, Username: "admin", SysAdminFlag: true})
+			},
+			existing(gaMember(rbac.ActionCreate)...), request(true), "",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			gaInstallProjectCtl(t, rolesOf)
+			robotCtl := robottesting.NewController(t)
+			robotCtl.On("Get", mock.Anything, test.robot.ID, mock.Anything).Return(test.robot, nil).Once()
+			if test.wantCode == "" {
+				robotCtl.On("Update", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+			}
+			params := robotop.UpdateRobotParams{
+				HTTPRequest: httptest.NewRequest(http.MethodPut, "/api/v2.0/robots/10", nil),
+				RobotID:     test.robot.ID,
+				Robot:       test.request,
+			}
+			ctx := security.NewContext(context.Background(), test.secCtx())
+			responder := (&robotAPI{robotCtl: robotCtl}).UpdateRobot(ctx, params)
+			if test.wantCode == "" {
+				assert.IsType(t, &robotop.UpdateRobotOK{}, responder)
 				return
 			}
 			errResponder, ok := responder.(*ErrResponder)

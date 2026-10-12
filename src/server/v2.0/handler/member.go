@@ -24,6 +24,7 @@ import (
 	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/common/rbac"
 	"github.com/goharbor/harbor/src/common/security/local"
+	robotSc "github.com/goharbor/harbor/src/common/security/robot"
 	"github.com/goharbor/harbor/src/controller/member"
 	"github.com/goharbor/harbor/src/controller/project"
 	"github.com/goharbor/harbor/src/lib"
@@ -84,7 +85,7 @@ func toMemberReq(memberReq *models.ProjectMember) (*member.Request, error) {
 
 // requireProjectAdminGrant lets the built-in project admin role be given only by
 // a system admin, by a local user who holds that role on the project, or by a
-// caller holding member:grant-admin on the project. A grant through that
+// robot holding member:grant-admin on the project. A grant through that
 // permission is returned so the caller can log it once the assignment has
 // succeeded; the zero value means there is nothing to log.
 func (m *memberAPI) requireProjectAdminGrant(ctx context.Context, project any, role int) (adminGrant, error) {
@@ -101,11 +102,11 @@ func (m *memberAPI) requireProjectAdminGrant(ctx context.Context, project any, r
 	denied := errors.ForbiddenError(nil).WithMessagef(
 		"granting the project admin role requires that role on the project or %s:%s",
 		rbac.ResourceMember, rbac.ActionGrantAdmin)
-	localCtx, ok := securityCtx.(*local.SecurityContext)
-	if !ok {
-		// No project role carries member:grant-admin, so only robots and other
-		// non-local principals can hold it; it is checked as an explicit policy
-		// and a deny wins over an allow.
+	switch sc := securityCtx.(type) {
+	case *robotSc.SecurityContext:
+		// Checked as an explicit robot policy, where a deny wins over an allow.
+		// Other non-local contexts, such as the internal secret, answer yes to
+		// every permission and must not pass here.
 		has, err := m.HasProjectPermission(ctx, project, rbac.ActionGrantAdmin, rbac.ResourceMember)
 		if err != nil {
 			return adminGrant{}, err
@@ -113,22 +114,23 @@ func (m *memberAPI) requireProjectAdminGrant(ctx context.Context, project any, r
 		if !has {
 			return adminGrant{}, denied
 		}
-		return adminGrant{principal: securityCtx.GetUsername(), project: project}, nil
-	}
-	p, err := m.projectCtl.Get(ctx, project)
-	if err != nil {
-		return adminGrant{}, err
-	}
-	if p == nil {
-		return adminGrant{}, errors.BadRequestError(nil).WithMessage("project is not found")
-	}
-	roles, err := m.projectCtl.ListRoles(ctx, p.ProjectID, localCtx.User())
-	if err != nil {
-		return adminGrant{}, err
-	}
-	for _, currentRole := range roles {
-		if currentRole == common.RoleProjectAdmin {
-			return adminGrant{}, nil
+		return adminGrant{principal: sc.GetUsername(), project: project}, nil
+	case *local.SecurityContext:
+		p, err := m.projectCtl.Get(ctx, project)
+		if err != nil {
+			return adminGrant{}, err
+		}
+		if p == nil {
+			return adminGrant{}, errors.BadRequestError(nil).WithMessage("project is not found")
+		}
+		roles, err := m.projectCtl.ListRoles(ctx, p.ProjectID, sc.User())
+		if err != nil {
+			return adminGrant{}, err
+		}
+		for _, currentRole := range roles {
+			if currentRole == common.RoleProjectAdmin {
+				return adminGrant{}, nil
+			}
 		}
 	}
 	return adminGrant{}, denied
