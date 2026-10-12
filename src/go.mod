@@ -1,6 +1,6 @@
 module github.com/goharbor/harbor/src
 
-go 1.26.8
+go 1.26.9
 
 godebug x509negativeserial=1
 
