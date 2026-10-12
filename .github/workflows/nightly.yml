@@ -295,3 +295,29 @@ jobs:
             E2E_PASSED="${E2E_PASSED}" \
             E2E_TOTAL="${E2E_TOTAL}" \
             RUN_URL="${RUN_URL}"
+
+  notify:
+    name: Report to Google Chat
+    # Every job, so a failure anywhere shows up in the results the card is
+    # built from.
+    needs: [channel, release, publish-images, release-notes, verify, e2e, annotate]
+    # always(): a failed or cancelled night is exactly when the card matters.
+    # The one night that stays quiet is the empty one: release succeeded but
+    # built nothing, so there is nothing published to report on. A failed or
+    # skipped release still reports, because then the empty sha means broken.
+    if: ${{ always() && !(needs.release.result == 'success' && needs.release.outputs.release_sha == '') }}
+    permissions:
+      contents: read
+    uses: $/.github/workflows/notify-gchat.yml
+    with:
+      # The status, the failed job names and the e2e result all come from
+      # here; the task derives them, not this expression.
+      results: ${{ toJSON(needs) }}
+      version: ${{ needs.channel.outputs.version }}
+      tag: ${{ needs.channel.outputs.beta_tag }}
+      release_sha: ${{ needs.release.outputs.release_sha }}
+      e2e_passed: ${{ needs.e2e.outputs.scenarios_passed }}
+      e2e_failed: ${{ needs.e2e.outputs.scenarios_failed }}
+      e2e_total: ${{ needs.e2e.outputs.scenarios_total }}
+    secrets:
+      GCHAT_WEBHOOK_URL: ${{ secrets.GCHAT_WEBHOOK_URL }}

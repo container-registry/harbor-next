@@ -175,6 +175,7 @@ The channel is release-please configuration, not a separate build path:
 4. `task nightly:release-head` reads that PR's head commit and the workflow force-moves `vX.Y.Z-beta` onto it, then upserts the one pre-release that lives on it. The tag follows the PR head rather than the channel tip because the notes engine reads `CHANGELOG.md` at the tag, and only the release commit carries the beta heading.
 5. `publish-images.yml` builds from that release commit; `release-notes-engine.yml` rewrites the beta pre-release's body. Both are the reusable workflows the real release calls.
 6. After the suite runs, a last job prepends a header to that body: the commit it was built from, the e2e result, and how to pin a digest.
+7. Finally, `notify-gchat.yml` posts the outcome to Google Chat as a card through `task notify:gchat`. It reports success, an e2e failure (with its scenario counts when a report is available), a failure in any earlier job (named on the card) and a cancellation, together with the tag, the `main` commit the night was cut from and a link to the run. An empty night posts nothing. Without `GCHAT_WEBHOOK_URL` the job only leaves a notice, and a webhook that is down leaves a warning with the HTTP code; neither turns the nightly red. Neither does a missing or broken `jq`. `task notify:test` covers the task-level card and notification error paths offline, with curl stubbed.
 
 `release-as` is what holds the beta name still. The `prerelease` versioning strategy cannot: it increments the last run of digits, so a fixed `2.16.0-beta` is not expressible, and `always-bump-minor` would compute a stable version. The name has to match the CHANGELOG heading release-please writes, because that heading is what the notes engine looks for when it renders the beta tag.
 
@@ -304,6 +305,7 @@ Upstream-Author: @original-author
 | `SYNC_APP_PRIVATE_KEY` | Secret | Yes | GitHub App private key for 8gcr access |
 | `BUILDX_HOST` | Runner environment | No | Remote BuildKit endpoint |
 | `NIGHTLY_CHANNEL_TOKEN` | Secret | No | Only needed if a ruleset ever covers the `nightly` branch; the nightly channel push and merge fall back to `GITHUB_TOKEN` |
+| `GCHAT_WEBHOOK_URL` | Secret | No | Google Chat incoming webhook the nightly posts its outcome to; without it the notification is skipped |
 
 ## Maintainer Checklist
 
