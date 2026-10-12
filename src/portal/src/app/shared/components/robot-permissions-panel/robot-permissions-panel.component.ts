@@ -150,11 +150,19 @@ export class RobotPermissionsPanelComponent implements OnChanges, DoCheck {
     }
 
     selectAllOrUnselectAll() {
+        // A robot may hold permissions this panel does not offer, such as a
+        // grant only a system admin can give; leave those as they are.
+        const kept = (this.permissionsModel || []).filter(
+            item => !this.isCandidate(item.resource, item.action)
+        );
         if (this.isAllSelected()) {
-            this.permissionsModel = [];
+            this.permissionsModel = kept;
         } else {
-            this.permissionsModel = (this.candidatePermissions || []).map(
-                item => ({ resource: item.resource, action: item.action })
+            this.permissionsModel = kept.concat(
+                (this.candidatePermissions || []).map(item => ({
+                    resource: item.resource,
+                    action: item.action,
+                }))
             );
             this.collapsed = {};
         }
@@ -184,7 +192,13 @@ export class RobotPermissionsPanelComponent implements OnChanges, DoCheck {
     subRowColumn(): string {
         return this.candidateActions.indexOf('create') !== -1
             ? 'create'
-            : this.candidateActions[0];
+            : this.candidateActions[0] || '';
+    }
+
+    // One cell per action column; a single cell when there is no column, so the
+    // checkbox still shows for a robot that holds only sub-row permissions.
+    subRowCells(): string[] {
+        return this.candidateActions.length ? this.candidateActions : [''];
     }
 
     convertKey(key: string): string {

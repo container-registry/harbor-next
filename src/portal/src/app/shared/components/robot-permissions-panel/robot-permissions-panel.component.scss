@@ -26,7 +26,7 @@
     padding-right: 0.3rem;
 }
 
-.left {
+.table tbody td.left {
     white-space: nowrap;
 }
 
@@ -44,6 +44,7 @@
     display: inline-flex;
     align-items: center;
     width: 0.7rem;
+    height: 1.2rem;
     margin: 0 0.15rem 0 0;
     padding: 0;
     border: 0;
@@ -51,6 +52,11 @@
     color: inherit;
     cursor: pointer;
     vertical-align: middle;
+}
+
+.sub-row-toggle:focus-visible {
+    outline: 2px solid var(--clr-color-action-600, #0072a3);
+    outline-offset: 1px;
 }
 
 :host(.fill) {

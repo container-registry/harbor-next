@@ -57,6 +57,21 @@ describe('RobotPermissionsPanelComponent', () => {
         const modal = fixture.nativeElement.querySelector('clr-modal');
         expect(modal).toBeTruthy();
     });
+
+    it('fills its row in normal mode only', async () => {
+        const host = () =>
+            fixture.nativeElement.querySelector('robot-permissions-panel');
+        expect(host().classList).toContain('fill');
+        for (const mode of [
+            PermissionSelectPanelModes.DROPDOWN,
+            PermissionSelectPanelModes.MODAL,
+        ]) {
+            component.mode = mode;
+            fixture.detectChanges();
+            await fixture.whenStable();
+            expect(host().classList).not.toContain('fill');
+        }
+    });
 });
 
 describe('RobotPermissionsPanelComponent with member:grant-admin', () => {
@@ -179,6 +194,46 @@ describe('RobotPermissionsPanelComponent with member:grant-admin', () => {
         expect(fixture.nativeElement.querySelectorAll('tbody tr').length).toBe(
             2
         );
+    });
+
+    it('select all keeps permissions the panel does not offer', () => {
+        render([pull, createMember]);
+        panel.permissionsModel = [grantAdmin];
+        panel.selectAllOrUnselectAll();
+        expect(hasPermission(panel.permissionsModel, grantAdmin)).toBeTrue();
+        expect(hasPermission(panel.permissionsModel, pull)).toBeTrue();
+        expect(panel.isAllSelected()).toBeTrue();
+        panel.selectAllOrUnselectAll();
+        expect(panel.permissionsModel).toEqual([grantAdmin]);
+    });
+
+    it('still shows the checkbox when member:grant-admin is the only permission', () => {
+        render([grantAdmin]);
+        expect(panel.candidateActions).toEqual([]);
+        const subRow = fixture.nativeElement.querySelector('.sub-row');
+        expect(subRow.querySelectorAll('td').length).toBe(2);
+        expect(subRow.querySelector('input[type="checkbox"]')).toBeTruthy();
+    });
+
+    it('names the sub-row checkbox after its label', () => {
+        const checkbox = fixture.nativeElement.querySelector(
+            '.sub-row input[type="checkbox"]'
+        );
+        expect(checkbox.getAttribute('aria-label')).toBe(
+            'ROBOT_ACCOUNT.GRANT_ADMIN'
+        );
+    });
+
+    it('disables every checkbox in the read-only modal', async () => {
+        panel.mode = PermissionSelectPanelModes.MODAL;
+        panel.modalOpen = true;
+        fixture.detectChanges();
+        await fixture.whenStable();
+        const boxes = fixture.nativeElement.querySelectorAll(
+            'input[type="checkbox"]'
+        );
+        expect(boxes.length).toBe(3);
+        boxes.forEach(box => expect(box.disabled).toBeTrue());
     });
 });
 

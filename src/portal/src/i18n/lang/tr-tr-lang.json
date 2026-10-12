@@ -362,7 +362,7 @@
         "NAME_PREFIX": "Robot Name Prefix",
         "NAME_PREFIX_REQUIRED": "Robot name prefix is required",
         "UPDATE": "Update",
-        "GRANT_ADMIN": "Proje Yöneticisi Ata",
+        "GRANT_ADMIN": "Grant Project Admin",
         "AUDIT_LOG": "Audit Log",
         "PREHEAT_INSTANCE": "Preheat Instance",
         "PROJECT": "Project",

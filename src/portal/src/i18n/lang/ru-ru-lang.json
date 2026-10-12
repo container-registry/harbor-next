@@ -1618,7 +1618,7 @@
     "NAME_PREFIX": "Префикс имени робота",
     "NAME_PREFIX_REQUIRED": "Префикс имени робота обязателен",
     "UPDATE": "Обновить",
-    "GRANT_ADMIN": "Назначать администратора проекта",
+    "GRANT_ADMIN": "Grant Project Admin",
     "AUDIT_LOG": "Журнал аудита",
     "PREHEAT_INSTANCE": "Разогрев Экземпляра",
     "PROJECT": "Проект",

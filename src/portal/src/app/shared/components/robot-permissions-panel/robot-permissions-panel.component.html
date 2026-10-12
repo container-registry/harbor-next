@@ -1,3 +1,75 @@
+<ng-template #permissionTable let-readonly="readonly">
+    <table class="table table-compact mt-0">
+        <thead>
+            <tr>
+                <th class="left">
+                    {{ 'AUDIT_LOG.RESOURCE' | translate }}
+                </th>
+                <th class="left" *ngFor="let item of candidateActions">
+                    {{ convertKey(item) | translate }}
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            <ng-container *ngFor="let resource of candidateResources">
+                <tr>
+                    <td class="left td">
+                        <button
+                            *ngIf="hasSubRows(resource)"
+                            type="button"
+                            class="sub-row-toggle"
+                            [attr.aria-expanded]="isExpanded(resource)"
+                            [attr.aria-label]="convertKey(resource) | translate"
+                            (click)="toggleExpanded(resource)">
+                            <clr-icon
+                                [attr.shape]="
+                                    isExpanded(resource)
+                                        ? 'caret down'
+                                        : 'caret right'
+                                "
+                                size="12"></clr-icon>
+                        </button>
+                        {{ convertKey(resource) | translate }}
+                    </td>
+                    <td class="td" *ngFor="let action of candidateActions">
+                        <input
+                            *ngIf="isCandidate(resource, action)"
+                            type="checkbox"
+                            clrCheckbox
+                            [disabled]="readonly"
+                            [ngModel]="getCheckBoxValue(resource, action)"
+                            (ngModelChange)="
+                                setCheckBoxValue(resource, action, $event)
+                            " />
+                    </td>
+                </tr>
+                <ng-container *ngIf="isExpanded(resource)">
+                    <tr class="sub-row" *ngFor="let sub of subRowsOf(resource)">
+                        <td class="left td sub-row-label">
+                            <span class="sub-row-indent" aria-hidden="true"
+                                >&#8627;</span
+                            >
+                            {{ convertKey(sub) | translate }}
+                        </td>
+                        <td class="td" *ngFor="let action of subRowCells()">
+                            <input
+                                *ngIf="action === subRowColumn()"
+                                type="checkbox"
+                                clrCheckbox
+                                [disabled]="readonly"
+                                [attr.aria-label]="convertKey(sub) | translate"
+                                [ngModel]="getCheckBoxValue(resource, sub)"
+                                (ngModelChange)="
+                                    setCheckBoxValue(resource, sub, $event)
+                                " />
+                        </td>
+                    </tr>
+                </ng-container>
+            </ng-container>
+        </tbody>
+    </table>
+</ng-template>
+
 <ng-container *ngIf="mode === PermissionSelectPanelModes.MODAL">
     <div (click)="modalOpen = true">
         <ng-content select="[modal]"></ng-content>
@@ -7,93 +79,11 @@
         [(clrModalOpen)]="modalOpen"
         [clrModalStaticBackdrop]="false">
         <div class="modal-body">
-            <table class="table table-compact mt-0">
-                <thead>
-                    <tr>
-                        <th class="left">
-                            {{ 'AUDIT_LOG.RESOURCE' | translate }}
-                        </th>
-                        <th class="left" *ngFor="let item of candidateActions">
-                            {{ convertKey(item) | translate }}
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <ng-container *ngFor="let resource of candidateResources">
-                        <tr>
-                            <td class="left td">
-                                <button
-                                    *ngIf="hasSubRows(resource)"
-                                    type="button"
-                                    class="sub-row-toggle"
-                                    [attr.aria-expanded]="isExpanded(resource)"
-                                    (click)="toggleExpanded(resource)">
-                                    <clr-icon
-                                        [attr.shape]="
-                                            isExpanded(resource)
-                                                ? 'caret down'
-                                                : 'caret right'
-                                        "
-                                        size="12"></clr-icon>
-                                </button>
-                                {{ convertKey(resource) | translate }}
-                            </td>
-                            <td
-                                class="td"
-                                *ngFor="let action of candidateActions">
-                                <input
-                                    *ngIf="isCandidate(resource, action)"
-                                    type="checkbox"
-                                    clrCheckbox
-                                    [disabled]="true"
-                                    [ngModel]="
-                                        getCheckBoxValue(resource, action)
-                                    "
-                                    (ngModelChange)="
-                                        setCheckBoxValue(
-                                            resource,
-                                            action,
-                                            $event
-                                        )
-                                    " />
-                            </td>
-                        </tr>
-                        <ng-container *ngIf="isExpanded(resource)">
-                            <tr
-                                class="sub-row"
-                                *ngFor="let sub of subRowsOf(resource)">
-                                <td class="left td sub-row-label">
-                                    <span
-                                        class="sub-row-indent"
-                                        aria-hidden="true"
-                                        >&#8627;</span
-                                    >
-                                    {{ convertKey(sub) | translate }}
-                                </td>
-                                <td
-                                    class="td"
-                                    *ngFor="let action of candidateActions">
-                                    <input
-                                        *ngIf="action === subRowColumn()"
-                                        type="checkbox"
-                                        clrCheckbox
-                                        [disabled]="true"
-                                        [ngModel]="
-                                            getCheckBoxValue(resource, sub)
-                                        "
-                                        (ngModelChange)="
-                                            setCheckBoxValue(
-                                                resource,
-                                                sub,
-                                                $event
-                                            )
-                                        " />
-                                </td>
-                            </tr>
-                        </ng-container>
-                    </ng-container>
-                </tbody>
-            </table>
+            <ng-container
+                *ngTemplateOutlet="
+                    permissionTable;
+                    context: { readonly: true }
+                "></ng-container>
         </div>
     </clr-modal>
 </ng-container>
@@ -122,91 +112,11 @@
                     }}</span>
                 </button>
             </div>
-            <table class="table table-compact mt-0">
-                <thead>
-                    <tr>
-                        <th class="left">
-                            {{ 'AUDIT_LOG.RESOURCE' | translate }}
-                        </th>
-                        <th class="left" *ngFor="let item of candidateActions">
-                            {{ convertKey(item) | translate }}
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <ng-container *ngFor="let resource of candidateResources">
-                        <tr>
-                            <td class="left td">
-                                <button
-                                    *ngIf="hasSubRows(resource)"
-                                    type="button"
-                                    class="sub-row-toggle"
-                                    [attr.aria-expanded]="isExpanded(resource)"
-                                    (click)="toggleExpanded(resource)">
-                                    <clr-icon
-                                        [attr.shape]="
-                                            isExpanded(resource)
-                                                ? 'caret down'
-                                                : 'caret right'
-                                        "
-                                        size="12"></clr-icon>
-                                </button>
-                                {{ convertKey(resource) | translate }}
-                            </td>
-                            <td
-                                class="td"
-                                *ngFor="let action of candidateActions">
-                                <input
-                                    *ngIf="isCandidate(resource, action)"
-                                    type="checkbox"
-                                    clrCheckbox
-                                    [ngModel]="
-                                        getCheckBoxValue(resource, action)
-                                    "
-                                    (ngModelChange)="
-                                        setCheckBoxValue(
-                                            resource,
-                                            action,
-                                            $event
-                                        )
-                                    " />
-                            </td>
-                        </tr>
-                        <ng-container *ngIf="isExpanded(resource)">
-                            <tr
-                                class="sub-row"
-                                *ngFor="let sub of subRowsOf(resource)">
-                                <td class="left td sub-row-label">
-                                    <span
-                                        class="sub-row-indent"
-                                        aria-hidden="true"
-                                        >&#8627;</span
-                                    >
-                                    {{ convertKey(sub) | translate }}
-                                </td>
-                                <td
-                                    class="td"
-                                    *ngFor="let action of candidateActions">
-                                    <input
-                                        *ngIf="action === subRowColumn()"
-                                        type="checkbox"
-                                        clrCheckbox
-                                        [ngModel]="
-                                            getCheckBoxValue(resource, sub)
-                                        "
-                                        (ngModelChange)="
-                                            setCheckBoxValue(
-                                                resource,
-                                                sub,
-                                                $event
-                                            )
-                                        " />
-                                </td>
-                            </tr>
-                        </ng-container>
-                    </ng-container>
-                </tbody>
-            </table>
+            <ng-container
+                *ngTemplateOutlet="
+                    permissionTable;
+                    context: { readonly: false }
+                "></ng-container>
         </clr-dropdown-menu>
     </clr-dropdown>
 </ng-container>
@@ -224,69 +134,9 @@
             }}</span>
         </button>
     </div>
-    <table class="table table-compact mt-0">
-        <thead>
-            <tr>
-                <th class="left">
-                    {{ 'AUDIT_LOG.RESOURCE' | translate }}
-                </th>
-                <th class="left" *ngFor="let item of candidateActions">
-                    {{ convertKey(item) | translate }}
-                </th>
-            </tr>
-        </thead>
-        <tbody>
-            <ng-container *ngFor="let resource of candidateResources">
-                <tr>
-                    <td class="left td">
-                        <button
-                            *ngIf="hasSubRows(resource)"
-                            type="button"
-                            class="sub-row-toggle"
-                            [attr.aria-expanded]="isExpanded(resource)"
-                            (click)="toggleExpanded(resource)">
-                            <clr-icon
-                                [attr.shape]="
-                                    isExpanded(resource)
-                                        ? 'caret down'
-                                        : 'caret right'
-                                "
-                                size="12"></clr-icon>
-                        </button>
-                        {{ convertKey(resource) | translate }}
-                    </td>
-                    <td class="td" *ngFor="let action of candidateActions">
-                        <input
-                            *ngIf="isCandidate(resource, action)"
-                            type="checkbox"
-                            clrCheckbox
-                            [ngModel]="getCheckBoxValue(resource, action)"
-                            (ngModelChange)="
-                                setCheckBoxValue(resource, action, $event)
-                            " />
-                    </td>
-                </tr>
-                <ng-container *ngIf="isExpanded(resource)">
-                    <tr class="sub-row" *ngFor="let sub of subRowsOf(resource)">
-                        <td class="left td sub-row-label">
-                            <span class="sub-row-indent" aria-hidden="true"
-                                >&#8627;</span
-                            >
-                            {{ convertKey(sub) | translate }}
-                        </td>
-                        <td class="td" *ngFor="let action of candidateActions">
-                            <input
-                                *ngIf="action === subRowColumn()"
-                                type="checkbox"
-                                clrCheckbox
-                                [ngModel]="getCheckBoxValue(resource, sub)"
-                                (ngModelChange)="
-                                    setCheckBoxValue(resource, sub, $event)
-                                " />
-                        </td>
-                    </tr>
-                </ng-container>
-            </ng-container>
-        </tbody>
-    </table>
+    <ng-container
+        *ngTemplateOutlet="
+            permissionTable;
+            context: { readonly: false }
+        "></ng-container>
 </ng-container>
