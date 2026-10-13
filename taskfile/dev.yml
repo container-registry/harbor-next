@@ -8,6 +8,7 @@ vars:
   COMPOSE_LOCAL_ENV: deploy/compose/example/local/.env.example
   TOKEN_KEY_FILE: devenv/token_service_key.pem
   TOKEN_KEY_FILE_LOCAL: deploy/compose/config/token_service_key.pem
+  SECRET_KEY_FILE_LOCAL: deploy/compose/config/secret_key
 
   # Database (only vars used in task commands)
   POSTGRES_USER: postgres
@@ -407,9 +408,21 @@ tasks:
       - openssl genpkey -algorithm RSA -outform PEM -pkeyopt rsa_keygen_bits:4096 | openssl rsa -traditional -out {{.TOKEN_KEY_FILE_LOCAL}}
       - chmod 644 {{.TOKEN_KEY_FILE_LOCAL}}
 
+  # The key encrypts credentials in the release:up database volume, so it is
+  # only removed together with that volume (release:down:clean), never by clean.
+  gen:secret-key:local:
+    internal: true
+    status: ['test "$(wc -c < {{.SECRET_KEY_FILE_LOCAL}})" -eq 16']
+    cmds:
+      - mkdir -p $(dirname {{.SECRET_KEY_FILE_LOCAL}})
+      - openssl rand -base64 32 | tr -dc 'A-Za-z0-9' | head -c 16 > {{.SECRET_KEY_FILE_LOCAL}}.tmp
+      - test "$(wc -c < {{.SECRET_KEY_FILE_LOCAL}}.tmp)" -eq 16
+      - chmod 644 {{.SECRET_KEY_FILE_LOCAL}}.tmp
+      - mv {{.SECRET_KEY_FILE_LOCAL}}.tmp {{.SECRET_KEY_FILE_LOCAL}}
+
   release:up:
     desc: "Start release images locally (IMAGE_REPO= for remote, empty for local)"
-    deps: [require-docker, gen:private-key:local]
+    deps: [require-docker, gen:private-key:local, gen:secret-key:local]
     vars:
       TAG: '{{.TAG | default .VERSION}}'
       REPO: '{{.IMAGE_REPO | default ""}}'
@@ -439,7 +452,9 @@ tasks:
     env:
       HARBOR_TAG: '{{.TAG}}'
       IMAGE_REPO: '{{.REPO}}'
-    cmd: docker compose -f {{.COMPOSE_LOCAL_FILE}} --env-file {{.COMPOSE_LOCAL_ENV}} down -v
+    cmds:
+      - docker compose -f {{.COMPOSE_LOCAL_FILE}} --env-file {{.COMPOSE_LOCAL_ENV}} down -v
+      - rm -f {{.SECRET_KEY_FILE_LOCAL}}
 
   # ---------------------------------------------------------------------------
   # Utilities
