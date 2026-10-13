@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS identity_providers (
     name                    TEXT NOT NULL,
     description             TEXT,
     issuer                  TEXT NOT NULL,
+    audience                TEXT NOT NULL DEFAULT '',
     openid_config_url       TEXT,
     offline_validation      BOOLEAN NOT NULL DEFAULT FALSE,
     supported_algorithms    TEXT,
@@ -36,9 +37,15 @@ CREATE TABLE IF NOT EXISTS identity_providers (
     jwks_last_fetch_attempt TIMESTAMP,
     project_id              INT NOT NULL DEFAULT 0,
     creation_time           TIMESTAMP DEFAULT NOW(),
-    update_time             TIMESTAMP DEFAULT NOW(),
-    UNIQUE (issuer, project_id)
+    update_time             TIMESTAMP DEFAULT NOW()
 );
+
+-- A trusted issuer is identified by issuer plus audience; the application keeps
+-- the pair unique, like the name.
+ALTER TABLE identity_providers ADD COLUMN IF NOT EXISTS audience TEXT NOT NULL DEFAULT '';
+
+-- Drops the legacy uniqueness on (issuer, project_id); fresh installs never get it.
+ALTER TABLE identity_providers DROP CONSTRAINT IF EXISTS identity_providers_issuer_project_id_key;
 
 CREATE TABLE IF NOT EXISTS robot_identity_providers (
     id                   SERIAL PRIMARY KEY,
