@@ -121,7 +121,7 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 			"id", "config", "update_time",
 		},
 		"identity_providers": {
-			"id", "name", "description", "issuer", "openid_config_url",
+			"id", "name", "description", "issuer", "audience", "openid_config_url",
 			"offline_validation", "supported_algorithms", "claims_supported",
 			"jwks_uri", "jwks_keys", "jwks_cached_at", "jwks_expires_at",
 			"jwks_last_fetch_attempt", "project_id", "creation_time", "update_time",
@@ -442,6 +442,138 @@ func TestRetentionScheduleBackfillsExecutionPrincipal(t *testing.T) {
 		if systemPrincipal != "null" {
 			t.Errorf("pass %d: system policy got principal %s, want none", pass, systemPrincipal)
 		}
+	}
+}
+
+// A trusted issuer is identified by issuer plus audience, and the application
+// keeps that pair unique. Databases created by the earlier revision of the
+// authoritative schema have identity_providers without the audience column and
+// with UNIQUE (issuer, project_id), which would block a second audience of one
+// issuer in a project. The schema apply must add the column and drop the
+// constraint, and the repeat must leave both as they are.
+func TestIdentityProvidersAudienceReconcilesLegacyTable(t *testing.T) {
+	ctx := context.Background()
+	cfg := authoritativeTestDatabaseConfig()
+	adminPool, err := dbpool.New(ctx, cfg)
+	if err != nil {
+		t.Fatalf("create admin database pool: %v", err)
+	}
+	t.Cleanup(adminPool.Close)
+
+	schemaName := fmt.Sprintf("harbor_next_audience_%d", time.Now().UnixNano())
+	if _, err := adminPool.DB().ExecContext(ctx, "CREATE SCHEMA "+schemaName); err != nil {
+		t.Fatalf("create test schema: %v", err)
+	}
+	t.Cleanup(func() {
+		if _, err := adminPool.DB().ExecContext(ctx, "DROP SCHEMA "+schemaName+" CASCADE"); err != nil {
+			t.Errorf("drop test schema: %v", err)
+		}
+	})
+
+	cfg.MaxOpenConns = 4
+	schemaPool, err := dbpool.New(ctx, cfg, func(poolCfg *pgxpool.Config) {
+		poolCfg.ConnConfig.RuntimeParams["search_path"] = schemaName
+	})
+	if err != nil {
+		t.Fatalf("create schema database pool: %v", err)
+	}
+	t.Cleanup(schemaPool.Close)
+
+	// identity_providers as the previous revision of harbor_next.sql created it
+	for _, statement := range []string{
+		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
+		"CREATE TABLE project (project_id SERIAL PRIMARY KEY, owner_id INTEGER)",
+		"CREATE TABLE retention_policy (id SERIAL PRIMARY KEY, scope_level VARCHAR(20), scope_reference INTEGER, data TEXT)",
+		"CREATE TABLE execution (id SERIAL PRIMARY KEY, revision INTEGER)",
+		`CREATE TABLE identity_providers (
+			id                      SERIAL PRIMARY KEY,
+			name                    TEXT NOT NULL,
+			description             TEXT,
+			issuer                  TEXT NOT NULL,
+			openid_config_url       TEXT,
+			offline_validation      BOOLEAN NOT NULL DEFAULT FALSE,
+			supported_algorithms    TEXT,
+			claims_supported        TEXT,
+			jwks_uri                TEXT,
+			jwks_keys               JSONB,
+			jwks_cached_at          TIMESTAMP,
+			jwks_expires_at         TIMESTAMP,
+			jwks_last_fetch_attempt TIMESTAMP,
+			project_id              INT NOT NULL DEFAULT 0,
+			creation_time           TIMESTAMP DEFAULT NOW(),
+			update_time             TIMESTAMP DEFAULT NOW(),
+			UNIQUE (issuer, project_id)
+		)`,
+		"INSERT INTO identity_providers (name, issuer, project_id) VALUES ('legacy', 'https://issuer.example.com', 1)",
+	} {
+		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
+			t.Fatalf("setup %q: %v", statement, err)
+		}
+	}
+
+	var legacyConstraint bool
+	if err := schemaPool.DB().QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM pg_constraint
+			WHERE conrelid = to_regclass('identity_providers')
+			  AND conname = 'identity_providers_issuer_project_id_key'
+		)`).Scan(&legacyConstraint); err != nil {
+		t.Fatalf("look up legacy constraint: %v", err)
+	}
+	if !legacyConstraint {
+		t.Fatalf("legacy fixture does not carry identity_providers_issuer_project_id_key; the test proves nothing")
+	}
+
+	path := authoritativeTestSchemaPath()
+	for pass := 1; pass <= 2; pass++ {
+		if err := applyAuthoritativeSchema(ctx, sqlSchemaDB{db: schemaPool.DB()}, path); err != nil {
+			t.Fatalf("applyAuthoritativeSchema() pass %d: %v", pass, err)
+		}
+
+		var dataType, isNullable, columnDefault string
+		if err := schemaPool.DB().QueryRowContext(ctx, `
+			SELECT data_type, is_nullable, COALESCE(column_default, '')
+			FROM information_schema.columns
+			WHERE table_schema = current_schema()
+			  AND table_name = 'identity_providers'
+			  AND column_name = 'audience'`).Scan(&dataType, &isNullable, &columnDefault); err != nil {
+			t.Fatalf("pass %d: look up identity_providers.audience: %v", pass, err)
+		}
+		if dataType != "text" || isNullable != "NO" || columnDefault != "''::text" {
+			t.Errorf("pass %d: identity_providers.audience is %s nullable=%s default=%s, want text NOT NULL DEFAULT ''",
+				pass, dataType, isNullable, columnDefault)
+		}
+
+		var constraintExists bool
+		if err := schemaPool.DB().QueryRowContext(ctx, `
+			SELECT EXISTS (
+				SELECT 1
+				FROM pg_constraint
+				WHERE conrelid = to_regclass('identity_providers')
+				  AND conname = 'identity_providers_issuer_project_id_key'
+			)`).Scan(&constraintExists); err != nil {
+			t.Fatalf("pass %d: look up legacy constraint: %v", pass, err)
+		}
+		if constraintExists {
+			t.Errorf("pass %d: identity_providers_issuer_project_id_key still exists", pass)
+		}
+
+		// the row written before the column existed reads back with the default
+		var audience string
+		if err := schemaPool.DB().QueryRowContext(ctx,
+			"SELECT audience FROM identity_providers WHERE name = 'legacy'").Scan(&audience); err != nil {
+			t.Fatalf("pass %d: read legacy row: %v", pass, err)
+		}
+		if audience != "" {
+			t.Errorf("pass %d: legacy row audience is %q, want empty default", pass, audience)
+		}
+	}
+
+	// two audiences of one issuer in one project, which the dropped constraint forbade
+	if _, err := schemaPool.DB().ExecContext(ctx,
+		"INSERT INTO identity_providers (name, issuer, audience, project_id) VALUES ('second', 'https://issuer.example.com', 'harbor', 1)"); err != nil {
+		t.Errorf("insert second audience of the same issuer in the same project: %v", err)
 	}
 }
 
