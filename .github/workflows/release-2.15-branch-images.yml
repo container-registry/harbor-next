@@ -1,0 +1,86 @@
+name: Release 2.15 Branch Images
+
+# Images from the release-2.15 branch tip, with the commercial patches
+# applied, before a release is cut. They go to the PR registry project under
+# v<VERSION>-beta, so the e2e lane can run against them the same way it runs
+# against a published release: dispatch nightly-e2e.yml on main with that
+# tag and registry_project 8gcr-pr.
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Tag for the images; blank means v<VERSION>-beta from the VERSION file
+        required: false
+        type: string
+  pull_request:
+    branches: [release-2.15]
+    types: [opened, reopened, synchronize]
+    # Only a change to this file builds on a PR; code PRs get pr-ci.yml's
+    # unpatched previews.
+    paths:
+      - ".github/workflows/release-2.15-branch-images.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-2.15-branch-images-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tag:
+    name: Pick The Image Tag
+    # Forked PRs have no registry credentials.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    outputs:
+      image_tag: ${{ steps.pick.outputs.image_tag }}
+      version: ${{ steps.pick.outputs.version }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Pick the tag
+        id: pick
+        env:
+          INPUT_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          version=$(tr -d '[:space:]' < VERSION)
+          tag="${INPUT_TAG:-v${version}-beta}"
+          # The tag reaches an image reference; keep it to what a release tag
+          # looks like, which is also what the e2e lane accepts.
+          case "${tag}" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *)
+              echo "::error::not a release-shaped tag: ${tag}"
+              exit 1
+              ;;
+          esac
+          echo "image_tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "::notice::building ${tag} from ${GITHUB_SHA}"
+
+  publish-images:
+    name: Build, Push, and Sign 2.15 Branch Images
+    needs: [tag]
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/publish-images.yml
+    with:
+      checkout_ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      image_tag: ${{ needs.tag.outputs.image_tag }}
+      version: ${{ needs.tag.outputs.version }}
+      artifact_prefix: release-2.15-branch-${{ needs.tag.outputs.image_tag }}
+      registry_address: 8gears.container-registry.com
+      registry_project: 8gcr-pr
+      registry_username: ${{ vars.PR_REGISTRY_USERNAME }}
+    secrets:
+      REGISTRY_PASSWORD: ${{ secrets.PR_REGISTRY_PASSWORD }}
+      SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
