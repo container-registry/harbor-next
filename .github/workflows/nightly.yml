@@ -249,6 +249,9 @@ jobs:
     with:
       tag: ${{ needs.channel.outputs.beta_tag }}
       channel: nightly
+      # Everything the compose stack can serve, not just the @smoke gate a
+      # release runs.
+      suite: nightly
       # Where these images actually went, resolved the same way the publish
       # job resolves it.
       registry_address: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
