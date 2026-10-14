@@ -83,6 +83,16 @@ on:
         description: Optional godog tag expression (images only)
         required: false
         type: string
+      registry_address:
+        description: Registry the images were pushed to
+        required: false
+        type: string
+      registry_project:
+        # Preview and branch images land in the PR project, not the release
+        # one. Blank keeps the repository default.
+        description: Registry project that holds the images, for example 8gcr-pr
+        required: false
+        type: string
 
 permissions: {}
 
