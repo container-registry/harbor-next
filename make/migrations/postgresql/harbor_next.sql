@@ -67,6 +67,44 @@ CREATE TABLE IF NOT EXISTS claim_rules (
 CREATE INDEX IF NOT EXISTS idx_claim_rules_lookup
     ON claim_rules (identity_provider_id, claim_path, value, robot_id);
 
+-- Trusted issuers created before the audience column kept it as an issuer-level
+-- aud claim rule. Copy it into the column so they keep matching tokens. Only an
+-- empty audience with a single aud value is filled, so a later run changes nothing.
+-- The aud claim stays, so a core rolled back to before the column still checks it.
+UPDATE identity_providers ip
+SET audience = cr.value
+FROM claim_rules cr
+WHERE ip.audience = ''
+  AND cr.identity_provider_id = ip.id
+  AND cr.robot_id = 0
+  AND cr.claim_path = 'aud'
+  AND cr.value <> ''
+  AND NOT EXISTS (
+      SELECT 1
+      FROM claim_rules other
+      WHERE other.identity_provider_id = ip.id
+        AND other.robot_id = 0
+        AND other.claim_path = 'aud'
+        AND other.value <> cr.value
+  )
+  -- issuer plus audience must stay unique, so skip a value another trusted
+  -- issuer of the same URL already has or would also get
+  AND NOT EXISTS (
+      SELECT 1
+      FROM identity_providers same
+      WHERE same.id <> ip.id
+        AND same.issuer = ip.issuer
+        AND (same.audience = cr.value
+             OR (same.audience = ''
+                 AND EXISTS (
+                     SELECT 1
+                     FROM claim_rules sc
+                     WHERE sc.identity_provider_id = same.id
+                       AND sc.robot_id = 0
+                       AND sc.claim_path = 'aud'
+                       AND sc.value = cr.value)))
+  );
+
 CREATE INDEX IF NOT EXISTS idx_identity_providers_jwks_cache
     ON identity_providers (id, jwks_expires_at, jwks_last_fetch_attempt);
 
