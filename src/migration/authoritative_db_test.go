@@ -504,6 +504,29 @@ func TestIdentityProvidersAudienceReconcilesLegacyTable(t *testing.T) {
 			UNIQUE (issuer, project_id)
 		)`,
 		"INSERT INTO identity_providers (name, issuer, project_id) VALUES ('legacy', 'https://issuer.example.com', 1)",
+		`CREATE TABLE claim_rules (
+			id                   SERIAL PRIMARY KEY,
+			identity_provider_id INT NOT NULL REFERENCES identity_providers(id) ON DELETE CASCADE,
+			robot_id             BIGINT NOT NULL DEFAULT 0,
+			claim_path           TEXT NOT NULL,
+			value                TEXT,
+			creation_time        TIMESTAMP DEFAULT NOW()
+		)`,
+		// audience kept as the issuer-level aud claim before the column existed
+		"INSERT INTO identity_providers (name, issuer, project_id) VALUES ('aud-claim', 'https://aud.example.com', 0)",
+		"INSERT INTO claim_rules (identity_provider_id, claim_path, value) SELECT id, 'aud', 'harbor' FROM identity_providers WHERE name = 'aud-claim'",
+		"INSERT INTO claim_rules (identity_provider_id, claim_path, value) SELECT id, 'sub', 'ci' FROM identity_providers WHERE name = 'aud-claim'",
+		// two issuer-level aud values cannot pick one audience
+		"INSERT INTO identity_providers (name, issuer, project_id) VALUES ('two-auds', 'https://two.example.com', 0)",
+		"INSERT INTO claim_rules (identity_provider_id, claim_path, value) SELECT id, 'aud', 'a' FROM identity_providers WHERE name = 'two-auds'",
+		"INSERT INTO claim_rules (identity_provider_id, claim_path, value) SELECT id, 'aud', 'b' FROM identity_providers WHERE name = 'two-auds'",
+		// a robot-level aud rule is not the trusted issuer's audience
+		"INSERT INTO identity_providers (name, issuer, project_id) VALUES ('robot-aud', 'https://robot.example.com', 0)",
+		"INSERT INTO claim_rules (identity_provider_id, robot_id, claim_path, value) SELECT id, 7, 'aud', 'robot' FROM identity_providers WHERE name = 'robot-aud'",
+		// one issuer URL in two projects with the same aud cannot both take it
+		"INSERT INTO identity_providers (name, issuer, project_id) VALUES ('shared-1', 'https://shared.example.com', 1)",
+		"INSERT INTO identity_providers (name, issuer, project_id) VALUES ('shared-2', 'https://shared.example.com', 2)",
+		"INSERT INTO claim_rules (identity_provider_id, claim_path, value) SELECT id, 'aud', 'shared' FROM identity_providers WHERE name LIKE 'shared-%'",
 	} {
 		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
 			t.Fatalf("setup %q: %v", statement, err)
@@ -558,15 +581,68 @@ func TestIdentityProvidersAudienceReconcilesLegacyTable(t *testing.T) {
 			t.Errorf("pass %d: identity_providers_issuer_project_id_key still exists", pass)
 		}
 
-		// the row written before the column existed reads back with the default
-		var audience string
-		if err := schemaPool.DB().QueryRowContext(ctx,
-			"SELECT audience FROM identity_providers WHERE name = 'legacy'").Scan(&audience); err != nil {
-			t.Fatalf("pass %d: read legacy row: %v", pass, err)
+		// rows written before the column existed take their single issuer-level aud
+		// claim as the audience and otherwise keep the empty default
+		for name, want := range map[string]string{
+			"legacy":    "",
+			"aud-claim": "harbor",
+			"two-auds":  "",
+			"robot-aud": "",
+			"shared-1":  "",
+			"shared-2":  "",
+		} {
+			var audience string
+			if err := schemaPool.DB().QueryRowContext(ctx,
+				"SELECT audience FROM identity_providers WHERE name = $1", name).Scan(&audience); err != nil {
+				t.Fatalf("pass %d: read %s row: %v", pass, name, err)
+			}
+			if audience != want {
+				t.Errorf("pass %d: %s row audience is %q, want %q", pass, name, audience, want)
+			}
 		}
-		if audience != "" {
-			t.Errorf("pass %d: legacy row audience is %q, want empty default", pass, audience)
+
+		// claims are left as they were
+		for name, want := range map[string]string{
+			"aud-claim": "aud,sub",
+			"two-auds":  "aud,aud",
+			"robot-aud": "aud",
+			"shared-1":  "aud",
+			"shared-2":  "aud",
+		} {
+			var paths string
+			if err := schemaPool.DB().QueryRowContext(ctx, `
+				SELECT COALESCE(string_agg(cr.claim_path, ',' ORDER BY cr.claim_path), '')
+				FROM claim_rules cr
+				JOIN identity_providers ip ON ip.id = cr.identity_provider_id
+				WHERE ip.name = $1`, name).Scan(&paths); err != nil {
+				t.Fatalf("pass %d: read %s claim rules: %v", pass, name, err)
+			}
+			if paths != want {
+				t.Errorf("pass %d: %s claim rules are %q, want %q", pass, name, paths, want)
+			}
 		}
+	}
+
+	// a legacy aud equal to the audience another trusted issuer of the same URL
+	// already has is not taken over
+	for _, statement := range []string{
+		"INSERT INTO identity_providers (name, issuer, project_id) VALUES ('late', 'https://aud.example.com', 3)",
+		"INSERT INTO claim_rules (identity_provider_id, claim_path, value) SELECT id, 'aud', 'harbor' FROM identity_providers WHERE name = 'late'",
+	} {
+		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
+			t.Fatalf("setup %q: %v", statement, err)
+		}
+	}
+	if err := applyAuthoritativeSchema(ctx, sqlSchemaDB{db: schemaPool.DB()}, path); err != nil {
+		t.Fatalf("applyAuthoritativeSchema() with a colliding legacy issuer: %v", err)
+	}
+	var lateAudience string
+	if err := schemaPool.DB().QueryRowContext(ctx,
+		"SELECT audience FROM identity_providers WHERE name = 'late'").Scan(&lateAudience); err != nil {
+		t.Fatalf("read late row: %v", err)
+	}
+	if lateAudience != "" {
+		t.Errorf("late row audience is %q, want it left empty next to aud-claim", lateAudience)
 	}
 
 	// two audiences of one issuer in one project, which the dropped constraint forbade
