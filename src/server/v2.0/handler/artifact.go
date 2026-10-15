@@ -88,12 +88,16 @@ func (a *artifactAPI) ListArtifacts(ctx context.Context, params operation.ListAr
 		return a.SendError(ctx, err)
 	}
 	repositoryName := fmt.Sprintf("%s/%s", params.ProjectName, params.RepositoryName)
+<<<<<<< HEAD
 	_, err := a.repoCtl.GetByName(ctx, repositoryName)
 	if err != nil {
 		switch {
 		case errors.IsErr(err, errors.NotFoundCode):
 			return operation.NewListArtifactsNotFound().WithPayload(&models.Errors{Errors: []*models.Error{{Message: "Repository not found"}}})
 		}
+=======
+	if _, err := a.repoCtl.GetByName(ctx, repositoryName); err != nil {
+>>>>>>> 159f151d5 (Fix. Return 404 when artefacts are requested for the non-existing repository. (#17618))
 		return a.SendError(ctx, err)
 	}
 
