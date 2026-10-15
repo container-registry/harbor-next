@@ -6,6 +6,19 @@ This changelog mirrors [GitHub Releases](https://github.com/container-registry/h
 
 ---
 
+## [2.15.12](https://github.com/container-registry/harbor-next/compare/v2.15.11...v2.15.12) (2026-10-14)
+
+
+### Bug Fixes
+
+* **db:** Add The Trusted Issuer Audience Column (backport [#1236](https://github.com/container-registry/harbor-next/issues/1236)) ([#1239](https://github.com/container-registry/harbor-next/issues/1239)) ([bf87416](https://github.com/container-registry/harbor-next/commit/bf8741686559276029baf52123ce199787a19df7))
+* **db:** Fill The Trusted Issuer Audience From Its Legacy aud Claim (backport [#1248](https://github.com/container-registry/harbor-next/issues/1248)) ([#1249](https://github.com/container-registry/harbor-next/issues/1249)) ([ac68e28](https://github.com/container-registry/harbor-next/commit/ac68e286c0793496930f638ea639f9eeae67fc54))
+
+
+### Reverts
+
+* Drop The Project-Admin Grant Guard (backport [#1137](https://github.com/container-registry/harbor-next/issues/1137) revert) ([#1227](https://github.com/container-registry/harbor-next/issues/1227)) ([42badca](https://github.com/container-registry/harbor-next/commit/42badcae7cdf8b38f888c3adc959d975840bfadd))
+
 ## [2.15.11](https://github.com/container-registry/harbor-next/compare/v2.15.10...v2.15.11) (2026-10-09)
 
 
