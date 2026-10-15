@@ -21,6 +21,7 @@ require (
 	github.com/beego/i18n v0.0.0-20161101132742-e9308947f407
 	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/casbin/casbin v1.9.1
+	github.com/casbin/casbin/v3 v3.10.0
 	github.com/cenkalti/backoff/v7 v7.0.0
 	github.com/cloudevents/sdk-go/v2 v2.16.2
 	github.com/coreos/go-oidc/v3 v3.20.0
