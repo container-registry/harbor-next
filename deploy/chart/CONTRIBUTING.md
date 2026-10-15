@@ -305,38 +305,50 @@ release must keep working.
 
 ## Versioning and Releases
 
-The chart releases on its own line, independent of the app (repo)
-version. A dedicated release-please instance, configured by
-`release-please-config-chart.json` and `.release-please-manifest-chart.json`,
-watches commits scoped to `deploy/chart/` and opens a
-`chore: release harbor chart X.Y.Z` PR (labelled `chart-release:
-pending`). Merging that PR tags `chart-vX.Y.Z`, writes the new `version`
-into `Chart.yaml`, updates `deploy/chart/CHANGELOG.md`, and triggers the
-`chart` job in `release-please.yml`, which packages, pushes, cosign-signs,
-and publishes the Artifact Hub metadata to
-`oci://8gears.container-registry.com/8gcr/charts`.
+The chart is released from the same `release-X.Y` branch as the Harbor
+patch releases it ships, the way goharbor/harbor-helm keeps one chart minor
+per Harbor minor:
 
-- **`version` in `Chart.yaml` is release-please-managed**, not hand-set.
-  The `release-type: helm` strategy bumps it on each chart release. Bumps
-  follow standard semver from the chart commit types: `fix(chart):` is a
-  patch, `feat(chart):` a minor, `feat(chart)!:` / `BREAKING CHANGE:` a
-  major. The major lands on the chart's own line, so a breaking chart
-  change never forces the app/repo version.
-- **`appVersion` is yours to set** (in a `feat(chart):` / `fix(chart):`
-  commit). It is the Harbor app version the chart targets and the default
-  image tag, and it is NOT overridden at release time, so point it at a
-  Harbor version whose images are already published. The chart release
-  does not build images.
+| Harbor | Branch | Chart |
+|--------|--------|-------|
+| 2.15.x | `release-2.15` | 2.1.x |
+| 2.16.x | `release-2.16` | next minor, cut with the branch |
+
+`main` never publishes a chart (only PR previews). Each release branch runs
+its own release-please instance for `deploy/chart`
+(`release-please-config-chart.json`, `.release-please-manifest-chart.json`),
+next to the app's maintenance instance.
+
+- **`appVersion` is stamped by the app release.** It carries an
+  `x-release-please-version` marker, and both app configs list
+  `deploy/chart/Chart.yaml` under `extra-files`. The `chore: release X.Y.Z`
+  commit therefore also sets `appVersion: vX.Y.Z`. Do not edit it by hand.
+- **`version` is stamped by the chart release PR.** The app release commit
+  touches `deploy/chart`, and the chart line shows `chore:` commits (as
+  "Harbor Releases"), so every app release opens or refreshes
+  `chore: release harbor chart X.Y.Z` on the same branch. Merging it tags
+  `chart-vX.Y.Z` and runs the `chart` job in `release-please.yml`
+  (package, push, cosign sign, Artifact Hub metadata). The signing identity
+  is `publish-chart.yml@refs/heads/release-X.Y`.
+- **Release branches are patch-only** (`always-bump-patch`), so two branches
+  never claim the same `chart-v*` tag. Chart fixes land on `main` and are
+  backported like app fixes. Chart features ship with the next Harbor
+  minor unless backported.
+- **A new branch gets a new chart minor.** When the `vX.Y.0` release cuts
+  `release-X.Y`, `create-maintenance-branch` seeds the chart line:
+  `last-release-sha` is the parent of the app release commit, and a
+  one-shot `release-as` sets the next chart minor. The release-please run it
+  dispatches opens the first chart release PR, and the `release-as` is
+  dropped automatically after that release.
+- **Chart major:** set `version:` in `Chart.yaml` on `main` to the next
+  major (for example `3.0.0`) before the Harbor minor that should carry it.
+  The branch cut uses that version when it is higher than the next minor.
 - **Chart commits do not release the app.** `deploy/chart` is in the app
-  release-please `exclude-paths`, so a commit touching only the chart never
-  bumps the repo `VERSION`. Root-level helpers the chart relies on
+  release-please `exclude-paths`. Root-level helpers the chart relies on
   (`taskfile/helm.yml`, `versions.env`) still count toward the app.
-- **Chart releases run on `main` only** for now. Maintenance branches
-  (`release-X.Y`) release the app, not the chart.
-- **Bootstrap (one-time):** the initial release is pinned with
-  `"release-as": "2.0.0"` in `release-please-config-chart.json`. After the
-  first `chart-v2.0.0` release PR merges, delete that `release-as` line so
-  subsequent releases compute their version from commits.
+- **Snapshot tests pin `version` and `appVersion`** (`9.9.9-test`), and the
+  README has no version badges, so a release PR that only restamps them
+  passes Chart CI unchanged.
 
 ## Command Cheat Sheet
 

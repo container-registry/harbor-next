@@ -42,8 +42,8 @@ jobs:
       - name: Reject leftover chart release-as
         # release-as is a one-shot override that must be removed once its
         # version ships; leaving it pins every future chart release to the
-        # same version (the #728 bug). Hard-fail the release pipeline the
-        # moment the pinned version's tag exists.
+        # same version (the #728 bug). release-please-chart drops the one
+        # create-maintenance-branch sets; this catches any it could not.
         run: |
           release_as=$(jq -r '.packages["deploy/chart"]["release-as"] // empty' release-please-config-chart.json)
           if [ -z "${release_as}" ]; then
@@ -183,8 +183,8 @@ jobs:
               --head "$1" --json number --jq '.[0].number // empty'
           }
           echo "app_pr=$(find_pr "release-please--branches--${GITHUB_REF_NAME}")" >> "$GITHUB_OUTPUT"
-          if [ "${GITHUB_REF_NAME}" = "main" ]; then
-            echo "chart_pr=$(find_pr 'release-please--branches--main--components--chart')" >> "$GITHUB_OUTPUT"
+          if [ "${GITHUB_REF_NAME}" != "main" ]; then
+            echo "chart_pr=$(find_pr "release-please--branches--${GITHUB_REF_NAME}--components--chart")" >> "$GITHUB_OUTPUT"
           fi
 
   preview-release-notes:
@@ -208,13 +208,18 @@ jobs:
     # instance (not a second package in the app manifest) on purpose:
     # adding a package to a manifest switches every output to the
     # "<path>--<name>" form, which would break the app jobs that read the
-    # unprefixed release-please outputs. Chart releases run on main only.
+    # unprefixed release-please outputs.
+    # Chart releases run on release-X.Y only, next to the app patch releases
+    # whose release commit stamps appVersion; create-maintenance-branch seeds
+    # the line when it cuts the branch.
     needs: [validate-release-ref]
-    if: ${{ github.ref_name == 'main' }}
+    if: ${{ github.ref_name != 'main' }}
     runs-on: ubuntu-26.04
     permissions:
       contents: write
       pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
     outputs:
       release_created: ${{ steps.release.outputs['deploy/chart--release_created'] }}
       tag_name: ${{ steps.release.outputs['deploy/chart--tag_name'] }}
@@ -230,6 +235,46 @@ jobs:
           config-file: release-please-config-chart.json
           manifest-file: .release-please-manifest-chart.json
 
+      - name: Check out release branch
+        if: ${{ steps.release.outputs['deploy/chart--release_created'] == 'true' }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref_name }}
+          persist-credentials: false
+
+      - name: Drop the fulfilled release-as
+        # create-maintenance-branch pins the line's first chart version with
+        # a one-shot release-as. Once that version is tagged it has to go, or
+        # validate-release-ref fails every later run on this branch.
+        if: ${{ steps.release.outputs['deploy/chart--release_created'] == 'true' }}
+        env:
+          CHART_VERSION: ${{ steps.release.outputs['deploy/chart--version'] }}
+        run: |
+          release_as=$(jq -r '.packages["deploy/chart"]["release-as"] // empty' release-please-config-chart.json)
+          if [ "${release_as}" != "${CHART_VERSION}" ]; then
+            exit 0
+          fi
+
+          askpass="${RUNNER_TEMP}/git-askpass"
+          cat > "${askpass}" <<'EOF'
+          #!/usr/bin/env bash
+          case "$1" in
+            *Username*) printf '%s\n' 'x-access-token' ;;
+            *Password*) printf '%s\n' "${GH_TOKEN}" ;;
+            *) exit 1 ;;
+          esac
+          EOF
+          chmod 700 "${askpass}"
+          export GIT_ASKPASS="${askpass}" GIT_TERMINAL_PROMPT=0
+
+          jq 'del(.packages["deploy/chart"]["release-as"])' release-please-config-chart.json > "${RUNNER_TEMP}/chart-config.json"
+          mv "${RUNNER_TEMP}/chart-config.json" release-please-config-chart.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add release-please-config-chart.json
+          git commit -s -m "ci: Drop the fulfilled chart release-as ${CHART_VERSION}"
+          git push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"
+
   create-maintenance-branch:
     name: Create Maintenance Branch
     needs: [release-please]
@@ -242,6 +287,9 @@ jobs:
     runs-on: ubuntu-26.04
     permissions:
       contents: write
+      # gh workflow run: a push made with GITHUB_TOKEN starts no workflow,
+      # so release-please on the new branch is dispatched explicitly.
+      actions: write
     env:
       TAG_NAME: ${{ needs.release-please.outputs.tag_name }}
       VERSION: ${{ needs.release-please.outputs.version }}
@@ -282,16 +330,37 @@ jobs:
           git switch --detach "${sha}"
 
           printf '%s\n' "${VERSION}" > VERSION
-          if git diff --quiet -- VERSION; then
-            git push origin "${sha}:refs/heads/${branch}"
-            exit 0
+
+          # The branch owns the chart line for this app minor. The app
+          # release commit (${sha}) already stamped appVersion into
+          # Chart.yaml; with last-release-sha at its parent, that commit is
+          # the line's first chart commit and opens the first chart release
+          # PR. Its version is the next chart minor, or the version set in
+          # Chart.yaml on main when that is higher (how a chart major is
+          # requested).
+          latest_chart=$(git tag --list 'chart-v[0-9]*' --sort=-v:refname | head -n 1)
+          latest_chart="${latest_chart#chart-v}"
+          IFS=. read -r chart_major chart_minor _ <<< "${latest_chart:-0.0.0}"
+          chart_version="${chart_major}.$((chart_minor + 1)).0"
+          requested=$(sed -n 's/^version: *//p' deploy/chart/Chart.yaml | tr -d '"')
+          chart_version=$(printf '%s\n%s\n' "${chart_version}" "${requested}" | sort -V | tail -n 1)
+
+          jq --arg sha "$(git rev-parse "${sha}^")" --arg version "${chart_version}" \
+            '. + {"last-release-sha": $sha} | .packages["deploy/chart"]["release-as"] = $version' \
+            release-please-config-chart.json > "${RUNNER_TEMP}/chart-config.json"
+          mv "${RUNNER_TEMP}/chart-config.json" release-please-config-chart.json
+          if [ -n "${latest_chart}" ]; then
+            jq --arg version "${latest_chart}" '.["deploy/chart"] = $version' \
+              .release-please-manifest-chart.json > "${RUNNER_TEMP}/chart-manifest.json"
+            mv "${RUNNER_TEMP}/chart-manifest.json" .release-please-manifest-chart.json
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add VERSION
-          git commit -s -m "chore: initialize ${branch} version"
+          git add VERSION release-please-config-chart.json .release-please-manifest-chart.json
+          git commit -s -m "chore: Initialize ${branch} version and chart ${chart_version} release line"
           git push origin "HEAD:refs/heads/${branch}"
+          gh workflow run release-please.yml --repo "${GITHUB_REPOSITORY}" --ref "${branch}"
 
   publish-images:
     name: Publish Release Images
@@ -417,7 +486,7 @@ jobs:
       pull-requests: write
     uses: $/.github/workflows/release-notes-engine.yml
     with:
-      checkout_ref: release-please--branches--main--components--chart
+      checkout_ref: release-please--branches--${{ github.ref_name }}--components--chart
       preview_pr_number: ${{ needs.find-release-prs.outputs.chart_pr }}
       component: chart
     secrets:
@@ -436,167 +505,3 @@ jobs:
       component: chart
     secrets:
       SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
-
-  chart-app-version:
-    name: Bump Chart appVersion
-    # PRs a forward-only Chart.yaml appVersion bump to main after the
-    # release images are published; maintenance releases behind main's
-    # appVersion are a no-op. The merged PR feeds release-please-chart.
-    needs: [release-please, publish-images]
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
-    runs-on: ubuntu-26.04
-    timeout-minutes: 15
-    # Serialized: overlapping main + release-X.Y releases share one bump branch.
-    concurrency:
-      group: chart-app-version-bump
-      cancel-in-progress: false
-    permissions:
-      contents: write
-      pull-requests: write
-    env:
-      NEW_APP_VERSION: ${{ needs.release-please.outputs.tag_name }}
-    steps:
-      # Always main, even for release-X.Y releases: the bump PR targets
-      # main and the guard compares against main's Chart.yaml.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: main
-          persist-credentials: false
-
-      - name: Configure ephemeral Git authentication
-        run: |
-          askpass="${RUNNER_TEMP}/git-askpass"
-          cat > "${askpass}" <<'EOF'
-          #!/usr/bin/env bash
-          case "$1" in
-            *Username*) printf '%s\n' 'x-access-token' ;;
-            *Password*) printf '%s\n' "${GH_TOKEN}" ;;
-            *) exit 1 ;;
-          esac
-          EOF
-          chmod 700 "${askpass}"
-          echo "GIT_ASKPASS=${askpass}" >> "${GITHUB_ENV}"
-          echo "GIT_TERMINAL_PROMPT=0" >> "${GITHUB_ENV}"
-
-      - name: Load versions
-        run: |
-          grep -E '^[A-Z_]+=' versions.env >> "$GITHUB_ENV"
-          {
-            echo "HELM_CACHE_HOME=${RUNNER_TEMP}/helm/cache"
-            echo "HELM_CONFIG_HOME=${RUNNER_TEMP}/helm/config"
-            echo "HELM_DATA_HOME=${RUNNER_TEMP}/helm/data"
-          } >> "$GITHUB_ENV"
-
-      - name: Install Task
-        uses: $/.github/actions/setup-task
-
-      - name: Install Helm
-        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
-        with:
-          version: ${{ env.HELM_VERSION }}
-
-      - name: Install helm-unittest plugin
-        # --verify=false: Helm 4 verifies plugin provenance by default;
-        # git-sourced plugins don't ship one.
-        run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version "${HELM_UNITTEST_VERSION}" --verify=false
-
-      - name: Install helm-docs
-        # Pinned release binary, NOT `go install`: source builds drop the
-        # version footer and Chart CI fails on the README diff.
-        run: |
-          arch="$(uname -m)"
-          case "${arch}" in
-            x86_64) asset_arch="x86_64" ;;
-            aarch64|arm64) asset_arch="arm64" ;;
-            *) echo "unsupported arch: ${arch}" >&2; exit 1 ;;
-          esac
-          mkdir -p "${RUNNER_TEMP}/bin"
-          curl -fsSL "https://github.com/norwoodj/helm-docs/releases/download/v${HELM_DOCS_VERSION}/helm-docs_${HELM_DOCS_VERSION}_Linux_${asset_arch}.tar.gz" \
-            | tar -xz -C "${RUNNER_TEMP}/bin" helm-docs
-          echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
-
-      - name: Read current appVersion
-        # Same parser as the taskfile (helm show chart). Also checks the
-        # pending bump branch so a maintenance release cannot rewrite an
-        # open higher-version bump PR — forward-only against BOTH main
-        # and the branch.
-        id: current
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          old=$(helm show chart deploy/chart | sed -n 's/^appVersion: //p')
-          test -n "${old}"
-          echo "OLD_APP_VERSION=${old}" >> "$GITHUB_ENV"
-          pending=""
-          if git fetch --depth=1 origin chart-appversion-bump; then
-            pending=$(git show FETCH_HEAD:deploy/chart/Chart.yaml \
-              | sed -n 's/^appVersion: "\(.*\)"$/\1/p')
-          fi
-          cur=$(printf '%s\n%s\n' "${old}" "${pending}" | sort -V | tail -n1)
-          if [ "${NEW_APP_VERSION}" = "${cur}" ] \
-            || [ "$(printf '%s\n%s\n' "${cur}" "${NEW_APP_VERSION}" | sort -V | tail -n1)" != "${NEW_APP_VERSION}" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "${NEW_APP_VERSION} not ahead of main (${old}) / pending bump (${pending:-none}); skipping"
-          fi
-
-      - name: Bump appVersion (forward-only)
-        if: ${{ steps.current.outputs.skip != 'true' }}
-        run: task helm:bump-app-version NEW_APP_VERSION="${NEW_APP_VERSION}"
-
-      - name: Generate GitHub App token
-        # App-minted token so the bump PR triggers Chart CI (GITHUB_TOKEN
-        # events start no workflows). If the app cannot mint for this
-        # repo, fall back to GITHUB_TOKEN: the PR still opens, but its
-        # checks need a manual "Approve and run" (as with release-please
-        # PRs today).
-        if: ${{ steps.current.outputs.skip != 'true' }}
-        id: app-token
-        continue-on-error: true
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ vars.SYNC_APP_ID }}
-          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
-          owner: container-registry
-          repositories: harbor-next
-          permission-contents: write
-          permission-pull-requests: write
-
-      - name: Create or update bump PR
-        if: ${{ steps.current.outputs.skip != 'true' }}
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
-        run: |
-          set -euo pipefail
-          if git diff --quiet -- deploy/chart; then
-            echo "appVersion already at or ahead of ${NEW_APP_VERSION}; no PR"
-            exit 0
-          fi
-
-          # feat when the release moves major.minor (chart minor bump via
-          # release-please), fix for a patch-only move (chart patch bump).
-          if [ "${OLD_APP_VERSION%.*}" = "${NEW_APP_VERSION%.*}" ]; then
-            type="fix"
-          else
-            type="feat"
-          fi
-          title="${type}: Bump chart appVersion to ${NEW_APP_VERSION}"
-
-          branch="chart-appversion-bump"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git switch -c "${branch}"
-          git add deploy/chart
-          git commit -s -m "${title}"
-          # One force-pushed branch: newer releases replace a stale bump
-          # PR instead of stacking PRs that could rewind appVersion.
-          git push --force origin "HEAD:refs/heads/${branch}"
-
-          body="Sets the chart appVersion (default image tags) to Harbor ${NEW_APP_VERSION}, released and published by the app release pipeline. README and unittest snapshots regenerated via \`task helm:bump-app-version\`.
-
-          ## Release Notes
-
-          The chart's default Harbor image tags now follow release ${NEW_APP_VERSION}."
-          gh pr create --base main --head "${branch}" \
-            --title "${title}" --body "${body}" \
-            || gh pr edit "${branch}" --title "${title}" --body "${body}"
