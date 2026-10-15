@@ -34,6 +34,11 @@ import (
 
 var (
 	errNonSuccess = errors.New("non success status code")
+
+	// vars so tests can pin the switch regardless of the
+	// QUOTA_ASYNC_REFRESH_DURATION env var and observe the dirty mark
+	asyncRefreshEnabled = cq.AsyncRefreshEnabled
+	markRefresh         = cq.MarkRefresh
 )
 
 // RequestConfig request resources middleware config
@@ -235,8 +240,8 @@ func RefreshMiddleware(config RefreshConfig, skipers ...middleware.Skipper) func
 		// per reference per interval. (The reference lookup above still
 		// reads the database - the mark itself is memory-only.) See
 		// controller/quota/refresh_async.go for semantics.
-		if cq.AsyncRefreshEnabled() {
-			cq.MarkRefresh(reference, referenceID)
+		if asyncRefreshEnabled() {
+			markRefresh(reference, referenceID)
 			return nil
 		}
 

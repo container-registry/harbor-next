@@ -85,6 +85,17 @@ func NewContext(ctx context.Context, o orm.QueryExecutor) context.Context {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	if _, isTx := o.(orm.TxOrmer); !isTx {
+		// A non-transactional ormer opens its own database session, so a hooks
+		// sink inherited through ctx (Clone, Copy) belongs to a transaction this
+		// session is not part of. Detach it, otherwise AfterCommit would queue
+		// into a scope that may already have committed and drained, and
+		// WithTransaction would hand its hooks to that scope instead of firing
+		// them after its own commit.
+		if _, inherited := ctx.Value(hooksKey{}).(*txHooks); inherited {
+			ctx = context.WithValue(ctx, hooksKey{}, (*txHooks)(nil))
+		}
+	}
 	return context.WithValue(ctx, ormKey{}, o)
 }
 

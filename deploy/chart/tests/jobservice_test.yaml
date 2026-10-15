@@ -380,3 +380,27 @@ tests:
     asserts:
       - exists:
           path: spec.template.metadata.annotations["checksum/configmap-env"]
+
+  # Pins: jobservice sends the notifications, so it must see the same setting as core.
+  - it: should block private-network webhook targets by default in jobservice
+    template: templates/jobservice.configmap-env.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - equal:
+          path: data.HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
+          value: "false"
+
+  - it: should pass network.allowPrivateNetworkAccess through to jobservice
+    template: templates/jobservice.configmap-env.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      network.allowPrivateNetworkAccess: true
+    asserts:
+      - equal:
+          path: data.HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
+          value: "true"

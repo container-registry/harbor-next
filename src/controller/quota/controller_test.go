@@ -244,6 +244,36 @@ func (suite *ControllerTestSuite) TestRequestLimitedDenies() {
 	suite.False(called)
 }
 
+func (suite *ControllerTestSuite) TestUpdateHardLimitRefreshesUsage() {
+	// usage left stale by skipped reservations must be recomputed before
+	// the new limit is enforced
+	q := &quota.Quota{
+		Hard: types.ResourceList{types.ResourceStorage: types.UNLIMITED}.String(),
+		Used: types.ResourceList{types.ResourceStorage: 0}.String(),
+	}
+	suite.PrepareForUpdate(q, types.ResourceList{types.ResourceStorage: 50})
+
+	ctx := orm.NewContext(context.TODO(), &ormtesting.FakeOrmer{})
+	u := &quota.Quota{Reference: suite.reference, ReferenceID: uuid.New().String()}
+	u.SetHard(types.ResourceList{types.ResourceStorage: 100})
+
+	suite.Nil(suite.ctl.Update(ctx, u))
+	suite.driver.AssertNumberOfCalls(suite.T(), "CalculateUsage", 1)
+	used, err := q.GetUsed()
+	suite.Require().NoError(err)
+	suite.Equal(int64(50), used[types.ResourceStorage])
+}
+
+func (suite *ControllerTestSuite) TestUpdateWithoutHardChangeSkipsRefresh() {
+	suite.PrepareForUpdate(suite.quota, nil)
+
+	ctx := orm.NewContext(context.TODO(), &ormtesting.FakeOrmer{})
+	u := &quota.Quota{Reference: suite.reference, ReferenceID: uuid.New().String(), Hard: suite.quota.Hard}
+
+	suite.Nil(suite.ctl.Update(ctx, u))
+	suite.driver.AssertNotCalled(suite.T(), "CalculateUsage", mock.Anything, mock.Anything)
+}
+
 func TestControllerTestSuite(t *testing.T) {
 	suite.Run(t, &ControllerTestSuite{})
 }

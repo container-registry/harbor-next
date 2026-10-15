@@ -406,22 +406,26 @@ func (c *controller) Request(ctx context.Context, reference, referenceID string,
 	// reserve/rollback pair degenerates into contended writes on the single
 	// quota_usage row per project with no enforcement effect. Skip it and
 	// let the refresh (RefreshMiddleware / Refresh) keep the usage figure
-	// up to date. If a real limit is set concurrently, enforcement starts
-	// with the next request and the refresh reconciles the usage.
-	if unlimited, err := c.isUnlimited(ctx, reference, referenceID, resources); err == nil && unlimited {
-		err := f()
-		if err == nil {
-			// the skipped reservation was also the only usage writer on
-			// this path - keep the usage figure current via the deferred
-			// coalesced refresh
-			MarkRefresh(reference, referenceID)
+	// up to date. Setting a real limit refreshes the usage first (see
+	// Update), so enforcement starts from the true figure.
+	// Only the DB provider gains from the skip: the Redis provider never
+	// touches the quota row here, and the check would add a database read.
+	provider := updateQuotaProviderType(config.GetQuotaUpdateProvider())
+	if provider == updateQuotaProviderDB {
+		if unlimited, err := c.isUnlimited(ctx, reference, referenceID, resources); err == nil && unlimited {
+			err := f()
+			if err == nil {
+				// the skipped reservation was also the only usage writer on
+				// this path - keep the usage figure current via the deferred
+				// coalesced refresh
+				MarkRefresh(reference, referenceID)
+			}
+			return err
+		} else if err != nil {
+			log.G(ctx).Warningf("failed to check hard limits for %s %s, falling back to reservation, error: %v", reference, referenceID, err)
 		}
-		return err
-	} else if err != nil {
-		log.G(ctx).Warningf("failed to check hard limits for %s %s, falling back to reservation, error: %v", reference, referenceID, err)
 	}
 
-	provider := updateQuotaProviderType(config.GetQuotaUpdateProvider())
 	if err := c.updateUsageWithRetry(ctx, reference, referenceID, reserveResources(resources), provider); err != nil {
 		log.G(ctx).Errorf("reserve resources %s for %s %s failed, error: %v", resources.String(), reference, referenceID, err)
 		return err
@@ -492,6 +496,7 @@ func (c *controller) calcQuota(ctx context.Context, reference, referenceID strin
 }
 
 func (c *controller) Update(ctx context.Context, u *quota.Quota) error {
+	hardChanged := false
 	f := func() error {
 		q, err := c.quotaMgr.GetByRef(ctx, u.Reference, u.ReferenceID)
 		if err != nil {
@@ -502,6 +507,7 @@ func (c *controller) Update(ctx context.Context, u *quota.Quota) error {
 			if newHard, err := u.GetHard(); err == nil {
 				if !types.Equals(oldHard, newHard) {
 					q.SetHard(newHard)
+					hardChanged = true
 				}
 			}
 		}
@@ -525,7 +531,25 @@ func (c *controller) Update(ctx context.Context, u *quota.Quota) error {
 		retry.Context(ctx),
 	}
 
-	return retry.Retry(f, options...)
+	if err := retry.Retry(f, options...); err != nil {
+		return err
+	}
+
+	// Only the DB provider skips reservations (see Request), and a Redis
+	// refresh would rewrite the cached entry with the old hard limit.
+	if hardChanged && updateQuotaProviderType(config.GetQuotaUpdateProvider()) == updateQuotaProviderDB {
+		// Unlimited requests skip the reservation and leave the usage to the
+		// in-memory deferred refresh, which a restart can lose. Recompute it
+		// now so the new limit is enforced against the real usage. Requests
+		// admitted between the limit commit and this refresh still see the
+		// old usage; that window is one refresh long.
+		if err := c.Refresh(ctx, u.Reference, u.ReferenceID, IgnoreLimitation(true)); err != nil {
+			log.G(ctx).Warningf("failed to refresh usage of %s %s after hard limit change, deferring, error: %v", u.Reference, u.ReferenceID, err)
+			MarkRefresh(u.Reference, u.ReferenceID)
+		}
+	}
+
+	return nil
 }
 
 // Driver returns quota driver for the reference

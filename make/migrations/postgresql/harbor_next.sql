@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS identity_providers (
     name                    TEXT NOT NULL,
     description             TEXT,
     issuer                  TEXT NOT NULL,
+    audience                TEXT NOT NULL DEFAULT '',
     openid_config_url       TEXT,
     offline_validation      BOOLEAN NOT NULL DEFAULT FALSE,
     supported_algorithms    TEXT,
@@ -36,9 +37,15 @@ CREATE TABLE IF NOT EXISTS identity_providers (
     jwks_last_fetch_attempt TIMESTAMP,
     project_id              INT NOT NULL DEFAULT 0,
     creation_time           TIMESTAMP DEFAULT NOW(),
-    update_time             TIMESTAMP DEFAULT NOW(),
-    UNIQUE (issuer, project_id)
+    update_time             TIMESTAMP DEFAULT NOW()
 );
+
+-- A trusted issuer is identified by issuer plus audience; the application keeps
+-- the pair unique, like the name.
+ALTER TABLE identity_providers ADD COLUMN IF NOT EXISTS audience TEXT NOT NULL DEFAULT '';
+
+-- Drops the legacy uniqueness on (issuer, project_id); fresh installs never get it.
+ALTER TABLE identity_providers DROP CONSTRAINT IF EXISTS identity_providers_issuer_project_id_key;
 
 CREATE TABLE IF NOT EXISTS robot_identity_providers (
     id                   SERIAL PRIMARY KEY,
@@ -59,6 +66,44 @@ CREATE TABLE IF NOT EXISTS claim_rules (
 
 CREATE INDEX IF NOT EXISTS idx_claim_rules_lookup
     ON claim_rules (identity_provider_id, claim_path, value, robot_id);
+
+-- Trusted issuers created before the audience column kept it as an issuer-level
+-- aud claim rule. Copy it into the column so they keep matching tokens. Only an
+-- empty audience with a single aud value is filled, so a later run changes nothing.
+-- The aud claim stays, so a core rolled back to before the column still checks it.
+UPDATE identity_providers ip
+SET audience = cr.value
+FROM claim_rules cr
+WHERE ip.audience = ''
+  AND cr.identity_provider_id = ip.id
+  AND cr.robot_id = 0
+  AND cr.claim_path = 'aud'
+  AND cr.value <> ''
+  AND NOT EXISTS (
+      SELECT 1
+      FROM claim_rules other
+      WHERE other.identity_provider_id = ip.id
+        AND other.robot_id = 0
+        AND other.claim_path = 'aud'
+        AND other.value <> cr.value
+  )
+  -- issuer plus audience must stay unique, so skip a value another trusted
+  -- issuer of the same URL already has or would also get
+  AND NOT EXISTS (
+      SELECT 1
+      FROM identity_providers same
+      WHERE same.id <> ip.id
+        AND same.issuer = ip.issuer
+        AND (same.audience = cr.value
+             OR (same.audience = ''
+                 AND EXISTS (
+                     SELECT 1
+                     FROM claim_rules sc
+                     WHERE sc.identity_provider_id = same.id
+                       AND sc.robot_id = 0
+                       AND sc.claim_path = 'aud'
+                       AND sc.value = cr.value)))
+  );
 
 CREATE INDEX IF NOT EXISTS idx_identity_providers_jwks_cache
     ON identity_providers (id, jwks_expires_at, jwks_last_fetch_attempt);
@@ -168,3 +213,17 @@ BEGIN
     END IF;
 END
 $$;
+
+-- Scheduled retention runs as the policy's execution_principal. Policies
+-- scheduled before that field existed have none and would stop running, so
+-- give them the project owner. The callback still re-checks that the owner
+-- can delete artifacts each time the schedule fires.
+UPDATE retention_policy rp
+SET data = jsonb_set(rp.data::jsonb, '{execution_principal}',
+                     jsonb_build_object('type', 'local', 'id', p.owner_id))::text
+FROM project p
+WHERE rp.scope_level = 'project'
+  AND p.project_id = rp.scope_reference
+  AND rp.data::jsonb #>> '{trigger,kind}' = 'Schedule'
+  AND COALESCE(rp.data::jsonb #>> '{trigger,settings,cron}', '') <> ''
+  AND COALESCE(rp.data::jsonb -> 'execution_principal', 'null'::jsonb) = 'null'::jsonb;
