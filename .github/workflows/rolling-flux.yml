@@ -36,7 +36,7 @@ jobs:
         run: echo "ROLLING_TAG=${GITHUB_REF_NAME}-${GITHUB_SHA:0:7}" >> "$GITHUB_ENV"
 
       - name: Setup ORAS
-        uses: oras-project/setup-oras@22ce207df3b08e061f537244349aac6ae1d214f6 # v1.2.4
+        uses: oras-project/setup-oras@005458ad77f1c8facd38a094e4af2e69e5607ff4 # v2.0.2
         with:
           version: 1.2.0
 
