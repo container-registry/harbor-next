@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -212,8 +213,19 @@ func TestAsyncRefreshConvergence(t *testing.T) {
 		t.Fatalf("push: %v", err)
 	}
 
-	// assume interval <= 10s; allow 3 intervals + slack
-	deadline := time.Now().Add(35 * time.Second)
+	// allow 3 flush intervals + slack; E2E_ASYNC_REFRESH_DURATION mirrors
+	// the core's QUOTA_ASYNC_REFRESH_DURATION (seconds, default 10)
+	interval := 10 * time.Second
+	if env := os.Getenv("E2E_ASYNC_REFRESH_DURATION"); env != "" {
+		// capped at an hour so the wait below cannot overflow
+		v, err := strconv.Atoi(env)
+		if err != nil || v <= 0 || v > 3600 {
+			t.Fatalf("E2E_ASYNC_REFRESH_DURATION=%q: want whole seconds in 1..3600", env)
+		}
+		interval = time.Duration(v) * time.Second
+	}
+	wait := 3*interval + 5*time.Second
+	deadline := time.Now().Add(wait)
 	for time.Now().Before(deadline) {
 		used, err := e.projectUsedStorage(project)
 		if err == nil && used >= int64(len(layer.data)) {
@@ -222,5 +234,5 @@ func TestAsyncRefreshConvergence(t *testing.T) {
 		}
 		time.Sleep(2 * time.Second)
 	}
-	t.Fatal("async refresh did not converge within 35s")
+	t.Fatalf("async refresh did not converge within %s", wait)
 }

@@ -73,12 +73,16 @@ func (t sqlSchemaTx) Rollback() error {
 	return t.tx.Rollback()
 }
 
-func authoritativeSchemaPath() string {
+func migrationSourceDir() string {
 	dir := os.Getenv("POSTGRES_MIGRATION_SCRIPTS_PATH")
 	if dir == "" {
 		dir = defaultMigrationDir
 	}
-	return filepath.Join(dir, authoritativeSchemaFile)
+	return dir
+}
+
+func authoritativeSchemaPath() string {
+	return filepath.Join(migrationSourceDir(), authoritativeSchemaFile)
 }
 
 func applyAuthoritativeSchema(ctx context.Context, db schemaDB, path string) error {
