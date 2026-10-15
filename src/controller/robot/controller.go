@@ -109,9 +109,20 @@ func (d *controller) Create(ctx context.Context, r *Robot) (int64, string, error
 		expiresAt = time.Now().AddDate(0, 0, duration).Unix()
 	}
 
-	secret, pwd, salt, err := CreateSec()
-	if err != nil {
-		return 0, "", err
+	var secret, pwd, salt string
+	var err error
+	if r.Secret != "" {
+		if !IsValidSec(r.Secret) {
+			return 0, "", fmt.Errorf("invalid secret format: must be 8-128 characters long with at least 1 uppercase letter, 1 lowercase letter and 1 number")
+		}
+		salt = utils.GenerateRandomString()
+		secret = utils.Encrypt(r.Secret, salt, utils.SHA256)
+		pwd = r.Secret
+	} else {
+		secret, pwd, salt, err = CreateSec()
+		if err != nil {
+			return 0, "", err
+		}
 	}
 
 	name := r.Name
