@@ -40,6 +40,7 @@
     "@cds/core": "6.4.2",
     "@clr/angular": "15.4.0",
     "@clr/icons": "13.0.2",
+<<<<<<< HEAD
     "@clr/ui": "15.4.0",
     "@ngx-translate/core": "15.0.0",
     "@ngx-translate/http-loader": "8.0.0",
@@ -52,6 +53,22 @@
     "rxjs": "^7.4.0",
     "tslib": "^2.7.0",
     "zone.js": "^0.13.3"
+=======
+    "@clr/ui": "18.0.0",
+    "@ngx-translate/core": "17.0.0",
+    "@ngx-translate/http-loader": "17.0.0",
+    "cron-validator": "1.4.0",
+    "echarts": "6.1.0",
+    "js-yaml": "4.3.1",
+    "marked": "18.0.13",
+    "ngx-clipboard": "16.0.0",
+    "ngx-cookie": "6.0.1",
+    "ngx-markdown": "21.3.0",
+    "prismjs": "1.30.0",
+    "rxjs": "7.8.2",
+    "tslib": "2.8.1",
+    "zone.js": "0.16.2"
+>>>>>>> 1f54a55a2 (chore(deps): bump marked from 18.0.12 to 18.0.13 in /src/portal in the patch-updates group across 1 directory (#23952))
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "^16.2.16",
