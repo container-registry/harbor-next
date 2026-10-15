@@ -7,6 +7,7 @@ a {
 }
 
 .app-loading {
+<<<<<<< HEAD
   position: absolute !important;
   top: 0;
   left: 0;
@@ -53,6 +54,18 @@ a {
       margin: -2px 0 0;
     }
   }
+=======
+    position: absolute !important;
+    inset: 0;
+    margin: auto !important;
+    width: 108px !important;
+    height: 108px !important;
+}
+
+.tooltip-content {
+    white-space: normal;
+    overflow-wrap: break-word;
+>>>>>>> 721c6d48d (chore(deps-dev): bump stylelint from 14.16.1 to 17.15.0 in /src/portal (#23957))
 }
 
 .modal-header {
