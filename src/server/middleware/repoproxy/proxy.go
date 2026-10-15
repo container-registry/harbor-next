@@ -475,7 +475,11 @@ func DisableBlobAndManifestUploadMiddleware() func(http.Handler) http.Handler {
 		if p.IsProxy() && !isProxySession(ctx, art.ProjectName) {
 			httpLib.SendError(w,
 				errors.DeniedError(
+<<<<<<< HEAD
 					errors.Errorf("cannot push artifact to a proxy project: %v", p.Name)))
+=======
+					errors.Errorf("Cannot push artifact to a proxy project: %v", p.Name)))
+>>>>>>> ab9e0805a (fix: correct grammar, formatting, and non-actionable error messages (#23974))
 			return
 		}
 		next.ServeHTTP(w, r)

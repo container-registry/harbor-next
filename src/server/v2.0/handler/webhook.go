@@ -433,7 +433,7 @@ func (n *webhookAPI) validateTargets(ctx context.Context, policy *policy_model.P
 		// don't allow set the payload format for slack type
 		// slack should be migrated as a kind of payload in the future
 		if len(target.PayloadFormat) > 0 && target.Type == "slack" {
-			return false, errors.New(nil).WithMessage("set payload format is not allowed for slack").WithCode(errors.BadRequestCode)
+			return false, errors.New(nil).WithMessage("Setting payload format is not allowed for Slack").WithCode(errors.BadRequestCode)
 		}
 
 		if len(target.PayloadFormat) > 0 && !isPayloadFormatSupported(target.PayloadFormat) {
