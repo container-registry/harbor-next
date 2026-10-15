@@ -206,6 +206,44 @@ func TestApplyAuthoritativeSchemaErrors(t *testing.T) {
 	}
 }
 
+// blockingSchemaTx simulates a peer holding the advisory lock: Exec blocks until ctx is done.
+type blockingSchemaTx struct {
+	rolledBack bool
+}
+
+func (tx *blockingSchemaTx) Exec(ctx context.Context, _ string, _ ...any) error {
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func (tx *blockingSchemaTx) Commit() error {
+	return nil
+}
+
+func (tx *blockingSchemaTx) Rollback() error {
+	tx.rolledBack = true
+	return nil
+}
+
+func TestApplyAuthoritativeSchemaHonorsContextDeadline(t *testing.T) {
+	path := writeSchema(t, "SELECT 1;")
+	tx := &blockingSchemaTx{}
+	db := fakeSchemaDB{begin: func(context.Context) (schemaTx, error) {
+		return tx, nil
+	}}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	err := applyAuthoritativeSchema(ctx, db, path)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("applyAuthoritativeSchema() error = %v, want error wrapping %v", err, context.DeadlineExceeded)
+	}
+	if !tx.rolledBack {
+		t.Error("transaction was not rolled back after the deadline expired")
+	}
+}
+
 func writeSchema(t *testing.T, contents string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), authoritativeSchemaFile)
