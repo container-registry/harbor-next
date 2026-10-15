@@ -1,0 +1,4 @@
+Contact: https://github.com/container-registry/harbor-next/security/advisories/new
+Policy: https://github.com/container-registry/harbor-next/blob/main/SECURITY.md
+Preferred-Languages: en
+Expires: @EXPIRES@

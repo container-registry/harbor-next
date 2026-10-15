@@ -28,6 +28,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/orm"
+	"github.com/goharbor/harbor/src/server/middleware/session"
 )
 
 // InternalAPI handles request of harbor admin...
@@ -70,6 +71,7 @@ func (ia *InternalAPI) RenameAdmin() {
 		log.Errorf("failed to destroy session for admin user, error: %v", err)
 		return
 	}
+	session.SecureDestroyedCookie(ia.Ctx.ResponseWriter)
 }
 
 // SyncQuota ...

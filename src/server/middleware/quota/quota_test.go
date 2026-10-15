@@ -230,6 +230,13 @@ func (suite *RefreshMiddlewareTestSuite) SetupTest() {
 	suite.originallQuotaController = quotaController
 	suite.quotaController = &quotatesting.Controller{}
 	quotaController = suite.quotaController
+	asyncRefreshEnabled = func() bool { return false }
+}
+
+func (suite *RefreshMiddlewareTestSuite) TearDownTest() {
+	quotaController = suite.originallQuotaController
+	asyncRefreshEnabled = quota.AsyncRefreshEnabled
+	markRefresh = quota.MarkRefresh
 }
 
 func (suite *RefreshMiddlewareTestSuite) TestQuotaDisabled() {
@@ -346,6 +353,34 @@ func (suite *RefreshMiddlewareTestSuite) TestRefershFailed() {
 
 	RefreshMiddleware(config)(next).ServeHTTP(rr, req)
 	suite.Equal(http.StatusInternalServerError, rr.Code)
+}
+
+func (suite *RefreshMiddlewareTestSuite) TestRefreshCoalescedWhenAsyncEnabled() {
+	asyncRefreshEnabled = func() bool { return true }
+	var marked []string
+	markRefresh = func(reference, referenceID string) {
+		marked = append(marked, reference+"/"+referenceID)
+	}
+
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/url", nil)
+	rr := httptest.NewRecorder()
+
+	config := RefreshConfig{
+		ReferenceObject: func(*http.Request) (string, string, error) {
+			return "project", "1", nil
+		},
+	}
+
+	mock.OnAnything(suite.quotaController, "IsEnabled").Return(true, nil)
+
+	RefreshMiddleware(config)(next).ServeHTTP(rr, req)
+	suite.Equal(http.StatusOK, rr.Code)
+	suite.quotaController.AssertNotCalled(suite.T(), "Refresh", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	suite.Equal([]string{"project/1"}, marked)
 }
 
 func TestRefreshMiddlewareTestSuite(t *testing.T) {
