@@ -108,6 +108,10 @@ func main() {
 		return jobCtx, nil
 	})
 
+	if utils.IsEmptyStr(config.GetAuthSecret()) {
+		logger.Warning("the JOBSERVICE_SECRET is empty")
+	}
+
 	// Start
 	if err := runtime.JobService.LoadAndRun(ctx, cancel); err != nil {
 		logger.Fatal(err)
