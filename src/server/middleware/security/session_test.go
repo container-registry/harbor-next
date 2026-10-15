@@ -59,6 +59,6 @@ func TestSession(t *testing.T) {
 	require.Nil(t, err)
 
 	session := &session{}
-	ctx := session.Generate(req)
+	ctx := mustGenerate(t, session, req)
 	assert.NotNil(t, ctx)
 }

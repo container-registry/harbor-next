@@ -26,17 +26,17 @@ import (
 
 type proxyCacheSecret struct{}
 
-func (p *proxyCacheSecret) Generate(req *http.Request) security.Context {
+func (p *proxyCacheSecret) Generate(req *http.Request) (security.Context, error) {
 	log := log.G(req.Context())
 
 	artifact := lib.GetArtifactInfo(req.Context())
 	if artifact == (lib.ArtifactInfo{}) {
-		return nil
+		return nil, nil
 	}
 	secret := ps.GetSecret(req)
 	if !ps.GetManager().Verify(secret, artifact.Repository) {
-		return nil
+		return nil, nil
 	}
 	log.Debugf("a proxy cache secret security context generated for request %s %s", req.Method, req.URL.Path)
-	return proxycachesecret.NewSecurityContext(artifact.Repository)
+	return proxycachesecret.NewSecurityContext(artifact.Repository), nil
 }

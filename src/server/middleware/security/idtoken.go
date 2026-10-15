@@ -15,6 +15,7 @@
 package security
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -24,46 +25,49 @@ import (
 	"github.com/goharbor/harbor/src/controller/user"
 	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/config"
+	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/pkg/oidc"
 )
 
 type idToken struct{}
 
-func (i *idToken) Generate(req *http.Request) security.Context {
+func (i *idToken) Generate(req *http.Request) (security.Context, error) {
 	ctx := req.Context()
 	log := log.G(ctx)
 	if lib.GetAuthMode(ctx) != common.OIDCAuth {
-		return nil
+		return nil, nil
 	}
 	if !strings.HasPrefix(req.URL.Path, "/api") && req.URL.Path != "/service/token" {
-		return nil
+		return nil, nil
 	}
 	token := bearerToken(req)
 	if len(token) == 0 {
-		return nil
+		return nil, nil
 	}
 	claims, err := oidc.VerifyToken(ctx, token)
 	if err != nil {
 		log.Warningf("failed to verify token: %v", err)
-		return nil
+		return nil, nil
 	}
 	u, err := user.Ctl.GetBySubIss(ctx, claims.Subject, claims.Issuer)
-	if err != nil {
+	if errors.IsNotFoundErr(err) {
 		log.Warningf("failed to get user based on token claims: %v", err)
-		return nil
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user based on token claims: %w", err)
 	}
 	setting, err := config.OIDCSetting(ctx)
 	if err != nil {
-		log.Errorf("failed to get OIDC settings: %v", err)
-		return nil
+		return nil, fmt.Errorf("failed to get OIDC settings: %w", err)
 	}
 	info, err := oidc.UserInfoFromIDToken(ctx, &oidc.Token{RawIDToken: token}, *setting)
 	if err != nil {
 		log.Errorf("Failed to get user info from ID token: %v", err)
-		return nil
+		return nil, nil
 	}
 	oidc.InjectGroupsToUser(ctx, info, u)
 	log.Debugf("an ID token security context generated for request %s %s", req.Method, req.URL.Path)
-	return local.NewSecurityContext(u)
+	return local.NewSecurityContext(u), nil
 }

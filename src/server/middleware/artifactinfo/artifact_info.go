@@ -46,6 +46,10 @@ var (
 		"blob":        lib.V2BlobURLRe,
 		"referrers":   lib.V2ReferrersURLRe,
 	}
+	// Holds the from parameter of a blob mount to the grammar the path patterns
+	// enforce, since its project is looked up in the database, where a NUL byte
+	// fails the query and would surface as a backend error instead of a 400.
+	repositoryRe = regexp.MustCompile(`^` + reference.NameRegexp.String() + `$`)
 )
 
 // Middleware gets the information of artifact via url of the request and inject it into the context
@@ -100,6 +104,9 @@ func Middleware() func(http.Handler) http.Handler {
 }
 
 func projectNameFromRepo(repo string) (string, error) {
+	if !repositoryRe.MatchString(repo) {
+		return "", fmt.Errorf("invalid repository name: %s", repo)
+	}
 	components := strings.SplitN(repo, "/", 2)
 	if len(components) < 2 {
 		return "", fmt.Errorf("invalid repository name: %s", repo)

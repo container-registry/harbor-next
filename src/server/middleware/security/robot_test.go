@@ -25,6 +25,7 @@ import (
 
 	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/lib/config"
+	"github.com/goharbor/harbor/src/lib/orm"
 )
 
 func TestRobot(t *testing.T) {
@@ -37,6 +38,7 @@ func TestRobot(t *testing.T) {
 	req, err := http.NewRequest(http.MethodGet, "http://127.0.0.1/api/projects/", nil)
 	require.Nil(t, err)
 	req.SetBasicAuth("robot@est1", "Harbor12345")
-	ctx := robot.Generate(req)
+	req = req.WithContext(orm.Context())
+	ctx := mustGenerate(t, robot, req)
 	assert.Nil(t, ctx)
 }

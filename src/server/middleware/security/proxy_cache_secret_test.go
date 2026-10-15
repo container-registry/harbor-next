@@ -32,7 +32,7 @@ func TestProxyCacheSecret(t *testing.T) {
 
 	// request without artifact info in context
 	req, _ := http.NewRequest(http.MethodGet, "http://127.0.0.1/v2/library/hello-world/manifests/latest", nil)
-	sc := psc.Generate(req)
+	sc := mustGenerate(t, psc, req)
 	assert.Nil(t, sc)
 
 	// request with invalid secret
@@ -41,12 +41,12 @@ func TestProxyCacheSecret(t *testing.T) {
 	})
 	req = req.WithContext(ctx)
 	req.Header.Set("Authorization", fmt.Sprintf("Proxy-Cache-Secret %s", "invalid-secret"))
-	sc = psc.Generate(req)
+	sc = mustGenerate(t, psc, req)
 	assert.Nil(t, sc)
 
 	// pass
 	secret := ps.GetManager().Generate("library/hello-world")
 	req.Header.Set("Authorization", fmt.Sprintf("Proxy-Cache-Secret %s", secret))
-	sc = psc.Generate(req)
+	sc = mustGenerate(t, psc, req)
 	assert.NotNil(t, sc)
 }

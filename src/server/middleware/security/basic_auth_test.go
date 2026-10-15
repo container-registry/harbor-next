@@ -35,7 +35,7 @@ func TestBasicAuth(t *testing.T) {
 	require.Nil(t, err)
 	req.SetBasicAuth("admin", "Harbor12345")
 	req = req.WithContext(orm.Context())
-	ctx := basicAuth.Generate(req)
+	ctx := mustGenerate(t, basicAuth, req)
 	assert.NotNil(t, ctx)
 }
 
@@ -47,18 +47,18 @@ func TestBasicAuthNonDBMode(t *testing.T) {
 	require.Nil(t, err)
 	adminReq.SetBasicAuth("admin", "Harbor12345")
 	adminReq = adminReq.WithContext(lib.WithAuthMode(orm.Context(), common.OIDCAuth))
-	assert.NotNil(t, basicAuth.Generate(adminReq), "admin must still authenticate via basic auth in OIDC mode")
+	assert.NotNil(t, mustGenerate(t, basicAuth, adminReq), "admin must still authenticate via basic auth in OIDC mode")
 
 	userReq, err := http.NewRequest(http.MethodGet, "http://127.0.0.1/api/projects/", nil)
 	require.Nil(t, err)
 	userReq.SetBasicAuth("nonadmin-probe", "whatever")
 	userReq = userReq.WithContext(lib.WithAuthMode(orm.Context(), common.OIDCAuth))
-	assert.Nil(t, basicAuth.Generate(userReq), "non-admin basic auth must be skipped in OIDC mode")
+	assert.Nil(t, mustGenerate(t, basicAuth, userReq), "non-admin basic auth must be skipped in OIDC mode")
 
 	// empty auth mode is treated as DB auth, so the skip must not lock out basic auth.
 	emptyModeReq, err := http.NewRequest(http.MethodGet, "http://127.0.0.1/api/projects/", nil)
 	require.Nil(t, err)
 	emptyModeReq.SetBasicAuth("admin", "Harbor12345")
 	emptyModeReq = emptyModeReq.WithContext(orm.Context())
-	assert.NotNil(t, basicAuth.Generate(emptyModeReq), "admin must authenticate when auth mode is empty (treated as DB)")
+	assert.NotNil(t, mustGenerate(t, basicAuth, emptyModeReq), "admin must authenticate when auth mode is empty (treated as DB)")
 }

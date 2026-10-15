@@ -18,6 +18,7 @@ import (
 	"github.com/goharbor/harbor/src/core/service/token"
 	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/config"
+	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/orm"
 	proModels "github.com/goharbor/harbor/src/pkg/project/models"
@@ -31,20 +32,20 @@ func TestGenerate(t *testing.T) {
 	vt := &v2Token{}
 	req1, _ := http.NewRequest(http.MethodHead, "/api/2.0/", nil)
 	ctx := orm.Context()
-	assert.Nil(t, vt.Generate(req1))
+	assert.Nil(t, mustGenerate(t, vt, req1))
 	req2, _ := http.NewRequest(http.MethodGet, "/v2/library/ubuntu/manifests/v1.0", nil)
 	req2.Header.Set("Authorization", "Bearer 123")
-	assert.Nil(t, vt.Generate(req2))
+	assert.Nil(t, mustGenerate(t, vt, req2))
 	mt, err := token.MakeToken(ctx, "admin", "none", []*registry_token.ResourceActions{})
 	require.Nil(t, err)
 	req3 := req2.Clone(req2.Context())
 	req3.Header.Set("Authorization", fmt.Sprintf("Bearer %s", mt.Token))
-	assert.Nil(t, vt.Generate(req3))
+	assert.Nil(t, mustGenerate(t, vt, req3))
 	req4 := req3.Clone(req3.Context())
 	mt2, err2 := token.MakeToken(ctx, "admin", token.Registry, []*registry_token.ResourceActions{})
 	require.Nil(t, err2)
 	req4.Header.Set("Authorization", fmt.Sprintf("Bearer %s", mt2.Token))
-	assert.NotNil(t, vt.Generate(req4))
+	assert.NotNil(t, mustGenerate(t, vt, req4))
 }
 
 func makeClaimsWithIAT(iat time.Time) *v2TokenClaims {
@@ -72,14 +73,16 @@ func TestTokenIssuedAfterProjectCreation(t *testing.T) {
 		project     *proModels.Project
 		projErr     error
 		allowed     bool
+		wantErr     bool
 	}{
-		{"after creation - allowed", "myproject", after, proj, nil, true},
-		{"before creation - rejected", "myproject", before, proj, nil, false},
-		{"exact creation time - allowed", "myproject", projectCreated, proj, nil, true},
-		{"within leeway window - allowed", "myproject", projectCreated.Add(-30 * time.Second), proj, nil, true},
-		{"just outside leeway - rejected", "myproject", projectCreated.Add(-61 * time.Second), proj, nil, false},
-		{"no project in context - skipped", "", after, nil, nil, true},
-		{"project lookup error - rejected", "myproject", after, nil, fmt.Errorf("not found"), false},
+		{"after creation - allowed", "myproject", after, proj, nil, true, false},
+		{"before creation - rejected", "myproject", before, proj, nil, false, false},
+		{"exact creation time - allowed", "myproject", projectCreated, proj, nil, true, false},
+		{"within leeway window - allowed", "myproject", projectCreated.Add(-30 * time.Second), proj, nil, true, false},
+		{"just outside leeway - rejected", "myproject", projectCreated.Add(-61 * time.Second), proj, nil, false, false},
+		{"no project in context - skipped", "", after, nil, nil, true, false},
+		{"project not found - rejected", "myproject", after, nil, errors.NotFoundError(nil), false, false},
+		{"project lookup error - backend error", "myproject", after, nil, fmt.Errorf("connection refused"), false, true},
 	}
 
 	for _, tt := range tests {
@@ -98,8 +101,9 @@ func TestTokenIssuedAfterProjectCreation(t *testing.T) {
 				ctx = lib.WithArtifactInfo(ctx, lib.ArtifactInfo{ProjectName: tt.projectName})
 			}
 
-			result := tokenIssuedAfterProjectCreation(ctx, logger, makeClaimsWithIAT(tt.iat))
+			result, err := tokenIssuedAfterProjectCreation(ctx, logger, makeClaimsWithIAT(tt.iat))
 			assert.Equal(t, tt.allowed, result)
+			assert.Equal(t, tt.wantErr, err != nil)
 		})
 	}
 }
@@ -113,7 +117,9 @@ func TestTokenIssuedAfterProjectCreation_NilIAT(t *testing.T) {
 	ctx := lib.WithArtifactInfo(context.Background(), lib.ArtifactInfo{ProjectName: "myproject"})
 	claims := &v2TokenClaims{} // no iat
 
-	assert.False(t, tokenIssuedAfterProjectCreation(ctx, logger, claims))
+	valid, err := tokenIssuedAfterProjectCreation(ctx, logger, claims)
+	assert.NoError(t, err)
+	assert.False(t, valid)
 }
 
 func TestTokenIssuedAfterProjectCreation_BlobMountSource(t *testing.T) {
@@ -137,5 +143,7 @@ func TestTokenIssuedAfterProjectCreation_BlobMountSource(t *testing.T) {
 		BlobMountProjectName: "src",
 	})
 
-	assert.False(t, tokenIssuedAfterProjectCreation(ctx, logger, makeClaimsWithIAT(iat)))
+	valid, err := tokenIssuedAfterProjectCreation(ctx, logger, makeClaimsWithIAT(iat))
+	assert.NoError(t, err)
+	assert.False(t, valid)
 }

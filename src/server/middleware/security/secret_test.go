@@ -32,11 +32,11 @@ func TestSecret(t *testing.T) {
 	// contains no secret
 	req, err := http.NewRequest(http.MethodGet, "http://127.0.0.1/api/projects/", nil)
 	require.Nil(t, err)
-	ctx := secret.Generate(req)
+	ctx := mustGenerate(t, &secret, req)
 	assert.Nil(t, ctx)
 
 	// contains secret
 	commonsecret.AddToRequest(req, "secret")
-	ctx = secret.Generate(req)
+	ctx = mustGenerate(t, &secret, req)
 	assert.NotNil(t, ctx)
 }

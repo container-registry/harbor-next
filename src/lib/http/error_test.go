@@ -50,6 +50,15 @@ func TestSendError(t *testing.T) {
 	assert.Equal(t, `{"errors":[{"code":"NOT_FOUND","message":"object not found"}]}`+"\n", rw.Body.String())
 }
 
+func TestSendServiceUnavailable(t *testing.T) {
+	rw := httptest.NewRecorder()
+	SendServiceUnavailable(rw)
+	assert.Equal(t, http.StatusServiceUnavailable, rw.Code)
+	assert.Equal(t, "5", rw.Header().Get("Retry-After"))
+	assert.Equal(t, "application/json; charset=utf-8", rw.Header().Get("Content-Type"))
+	assert.Equal(t, `{"errors":[{"code":"UNAVAILABLE","message":"service unavailable"}]}`+"\n", rw.Body.String())
+}
+
 func TestAPIError(t *testing.T) {
 	var err error
 	// open API error: github.com/go-openapi/errors.Error
