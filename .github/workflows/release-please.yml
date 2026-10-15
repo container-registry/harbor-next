@@ -9,6 +9,13 @@ on:
 
 permissions: {}
 
+# release-please force-pushes release-please--branches--main on every run, so
+# overlapping runs push over each other. Never cancel: a cancelled run could
+# stop between tagging and publishing.
+concurrency:
+  group: release-please-${{ github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   validate-release-ref:
     name: Validate Release Ref
@@ -107,28 +114,48 @@ jobs:
 
       - name: Advance main development version
         if: ${{ github.ref_name == 'main' && steps.release.outputs.prs_created == 'true' && steps.release.outputs.release_created != 'true' }}
+        env:
+          RELEASE_BRANCH: ${{ fromJSON(steps.release.outputs.prs)[0].headBranchName }}
         run: |
-          release_version=$(node -e "const manifest = require('./.release-please-manifest.json'); const version = manifest['.']; if (!version) { throw new Error('missing root release version'); } console.log(version);")
-          if [[ ! "${release_version}" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-            echo "::error::Unsupported release version: ${release_version}"
-            exit 1
-          fi
-
-          major="${BASH_REMATCH[1]}"
-          minor="${BASH_REMATCH[2]}"
-          next_version="${major}.$((minor + 1)).0"
-          printf '%s\n' "${next_version}" > VERSION
-
-          if git diff --quiet -- VERSION; then
-            echo "VERSION already targets ${next_version}"
-            exit 0
-          fi
-
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add VERSION
-          git commit -s -m "chore: target next development version ${next_version}"
-          git push
+
+          # The branch can be force-pushed under us, so recompute from the
+          # fresh tip on every attempt instead of replaying an old commit.
+          for attempt in 1 2 3; do
+            if [ "${attempt}" -gt 1 ]; then
+              git fetch --no-tags origin "+refs/heads/${RELEASE_BRANCH}:refs/remotes/origin/${RELEASE_BRANCH}"
+              git checkout -B "${RELEASE_BRANCH}" "origin/${RELEASE_BRANCH}"
+            fi
+
+            release_version=$(node -e "const manifest = require('./.release-please-manifest.json'); const version = manifest['.']; if (!version) { throw new Error('missing root release version'); } console.log(version);")
+            if [[ ! "${release_version}" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+              echo "::error::Unsupported release version: ${release_version}"
+              exit 1
+            fi
+
+            major="${BASH_REMATCH[1]}"
+            minor="${BASH_REMATCH[2]}"
+            next_version="${major}.$((minor + 1)).0"
+            printf '%s\n' "${next_version}" > VERSION
+
+            if git diff --quiet -- VERSION; then
+              echo "VERSION already targets ${next_version}"
+              exit 0
+            fi
+
+            git add VERSION
+            git commit -s -m "chore: target next development version ${next_version}"
+            if git push origin "HEAD:refs/heads/${RELEASE_BRANCH}"; then
+              exit 0
+            fi
+            if [ "${attempt}" -lt 3 ]; then
+              echo "::warning::Push of VERSION ${next_version} rejected (attempt ${attempt}/3), refetching ${RELEASE_BRANCH}"
+            fi
+          done
+
+          echo "::error::Could not push VERSION to ${RELEASE_BRANCH} after 3 attempts"
+          exit 1
 
   find-release-prs:
     name: Find Open Release PRs
@@ -321,9 +348,16 @@ jobs:
           # repository_dispatch needs contents write; request nothing else
           permission-contents: write
 
+      # The tag, not github.sha: the concurrency group can drop the pending
+      # run for the release merge, so a later push may cut this release.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
           persist-credentials: false
+
+      - name: Resolve release commit
+        id: release-commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - uses: $/.github/actions/setup-task
 
@@ -335,7 +369,7 @@ jobs:
           # job resolves it.
           REGISTRY_ADDRESS: ${{ vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
           REGISTRY_PROJECT: ${{ vars.REGISTRY_PROJECT || '8gcr' }}
-          TARGET_SHA: ${{ github.sha }}
+          TARGET_SHA: ${{ steps.release-commit.outputs.sha }}
           LINE: ${{ github.ref_name }}
         run: task release-notes:dispatch-release-cut
 

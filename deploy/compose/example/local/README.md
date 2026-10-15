@@ -30,6 +30,8 @@ cp .env.example .env
 openssl genpkey -algorithm RSA -outform PEM -pkeyopt rsa_keygen_bits:4096 \
   | openssl rsa -traditional -out ../../config/token_service_key.pem
 chmod 644 ../../config/token_service_key.pem   # container UID 10000 ≠ host UID → needs world-readable
+[ -f ../../config/secret_key ] || openssl rand -base64 32 | tr -dc 'A-Za-z0-9' | head -c 16 > ../../config/secret_key
+chmod 644 ../../config/secret_key   # keep it for as long as the postgres volume exists, see ../../README.md "Secret Key"
 docker compose -f ../../docker-compose.yaml --env-file .env up -d
 ```
 
