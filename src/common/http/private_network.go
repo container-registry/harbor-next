@@ -30,10 +30,25 @@ import (
 	"time"
 )
 
+<<<<<<< HEAD
 // privateNetworkAccessEnv opts every Harbor outbound HTTP client that installs the
 // public-network guard back into reaching private/loopback/link-local destinations.
 // Default (unset/false) fails closed. Set through the chart value network.allowPrivateNetworkAccess
 // or the compose HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS variable.
+=======
+// webhookEgressPolicyEnv selects which destinations the webhook and Slack notification clients
+// may reach: allow_all (the default), block_restricted or public_only. See egressLevel.
+const webhookEgressPolicyEnv = "HARBOR_WEBHOOK_EGRESS_POLICY"
+
+// webhookEgressAllowlistEnv lists destinations the notification clients may always reach, whatever
+// the policy: IPs, CIDRs, hostnames, and "*.domain" suffixes, separated by commas or whitespace. An
+// allowlisted hostname is not resolved by Harbor for the check, so it is trusted wherever DNS
+// points it.
+const webhookEgressAllowlistEnv = "HARBOR_WEBHOOK_EGRESS_ALLOWLIST"
+
+// privateNetworkAccessEnv is the deprecated boolean from 2.15. When the policy is not set it keeps
+// its meaning: true allows everything, false allows public destinations only.
+>>>>>>> f1b4e3ccc (Fix webhook egress allow all (#24126))
 const privateNetworkAccessEnv = "HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS"
 
 // Exceptions and denials follow the IANA IPv4/IPv6 special-purpose address registries.
@@ -100,11 +115,150 @@ func privateNetworkAccessAllowed() bool {
 	return err == nil && allowed
 }
 
+<<<<<<< HEAD
 // blockPrivateNetwork is a net.Dialer.Control callback. It runs after DNS resolution and on
 // every dial (including redirect hops), so it defeats DNS rebinding. It fails closed unless
 // HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS is set.
 func blockPrivateNetwork(_ string, address string, _ syscall.RawConn) error {
 	if privateNetworkAccessAllowed() {
+=======
+func (level egressLevel) String() string {
+	return egressLevelNames[level]
+}
+
+// egressPolicy decides which destinations the notification clients may reach. The allowlist
+// overrides the level.
+type egressPolicy struct {
+	level           egressLevel
+	allowedPrefixes []netip.Prefix
+	// allowedHosts holds exact hostnames; entries starting with "." match any subdomain.
+	allowedHosts []string
+}
+
+var egressPolicyCache struct {
+	sync.Mutex
+	loaded                    bool
+	policyEnv, legacyEnv, raw string
+	policy                    egressPolicy
+}
+
+// currentEgressPolicy reads the policy from the environment, re-parsing only when it changed so
+// that invalid and deprecated values are logged once rather than on every dial.
+func currentEgressPolicy() egressPolicy {
+	policyEnv, legacyEnv, allowlist := os.Getenv(webhookEgressPolicyEnv), os.Getenv(privateNetworkAccessEnv), os.Getenv(webhookEgressAllowlistEnv)
+	egressPolicyCache.Lock()
+	defer egressPolicyCache.Unlock()
+	cache := &egressPolicyCache
+	if !cache.loaded || cache.policyEnv != policyEnv || cache.legacyEnv != legacyEnv || cache.raw != allowlist {
+		cache.policy = parseEgressPolicy(policyEnv, legacyEnv, allowlist)
+		cache.policyEnv, cache.legacyEnv, cache.raw = policyEnv, legacyEnv, allowlist
+		cache.loaded = true
+	}
+	return cache.policy
+}
+
+func parseEgressPolicy(policyEnv, legacyEnv, allowlist string) egressPolicy {
+	policy := egressPolicy{level: parseEgressLevel(policyEnv, legacyEnv)}
+	for _, entry := range strings.FieldsFunc(allowlist, func(r rune) bool { return r == ',' || unicode.IsSpace(r) }) {
+		entry = strings.TrimSuffix(strings.ToLower(entry), ".")
+		if prefix, err := netip.ParsePrefix(entry); err == nil {
+			policy.allowedPrefixes = append(policy.allowedPrefixes, netip.PrefixFrom(prefix.Addr().Unmap(), unmappedBits(prefix)).Masked())
+			continue
+		}
+		if address, err := netip.ParseAddr(entry); err == nil && address.Zone() == "" {
+			address = address.Unmap()
+			policy.allowedPrefixes = append(policy.allowedPrefixes, netip.PrefixFrom(address, address.BitLen()))
+			continue
+		}
+		// only "*.domain" is a wildcard; it is stored as ".domain"
+		host, isWildcard := strings.CutPrefix(entry, "*.")
+		if !isValidAllowlistHost(host) {
+			log.Warningf("ignoring invalid %s entry %q", webhookEgressAllowlistEnv, entry)
+			continue
+		}
+		if isWildcard {
+			host = "." + host
+		}
+		policy.allowedHosts = append(policy.allowedHosts, host)
+	}
+	return policy
+}
+
+// parseEgressLevel applies the policy, then the deprecated boolean, then the default. An invalid
+// value falls back to public_only so that a typo can never widen egress.
+func parseEgressLevel(policyEnv, legacyEnv string) egressLevel {
+	if value := strings.ToLower(strings.TrimSpace(policyEnv)); value != "" {
+		for level, name := range egressLevelNames {
+			if value == name {
+				return level
+			}
+		}
+		log.Warningf("invalid %s=%q, allowing public webhook targets only", webhookEgressPolicyEnv, policyEnv)
+		return egressPublicOnly
+	}
+	value := strings.TrimSpace(legacyEnv)
+	if value == "" {
+		return egressAllowAll
+	}
+	allowed, err := strconv.ParseBool(value)
+	switch {
+	case err != nil:
+		log.Warningf("invalid %s=%q, allowing public webhook targets only", privateNetworkAccessEnv, legacyEnv)
+		return egressPublicOnly
+	case allowed:
+		log.Warningf("%s is deprecated, use %s=%s", privateNetworkAccessEnv, webhookEgressPolicyEnv, egressAllowAll)
+		return egressAllowAll
+	default:
+		log.Warningf("%s is deprecated, use %s=%s", privateNetworkAccessEnv, webhookEgressPolicyEnv, egressPublicOnly)
+		return egressPublicOnly
+	}
+}
+
+// unmappedBits keeps an IPv4-mapped prefix such as ::ffff:10.0.0.0/104 equivalent to 10.0.0.0/8.
+func unmappedBits(prefix netip.Prefix) int {
+	if prefix.Addr().Is4In6() {
+		return max(prefix.Bits()-96, 0)
+	}
+	return prefix.Bits()
+}
+
+// isValidAllowlistHost accepts DNS names only. The last label must not be numeric, so an IP
+// address can never enter the list as a hostname and skip address classification.
+func isValidAllowlistHost(host string) bool {
+	labels := strings.Split(host, ".")
+	if host == "" || strings.Trim(labels[len(labels)-1], "0123456789") == "" {
+		return false
+	}
+	for _, label := range labels {
+		if label == "" || len(label) > 63 || strings.HasPrefix(label, "-") || strings.HasSuffix(label, "-") {
+			return false
+		}
+		for _, r := range label {
+			if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '-' && r != '_' {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// allowsHost reports whether host is on the allowlist. host must be lower-case without a
+// trailing dot.
+func (policy egressPolicy) allowsHost(host string) bool {
+	for _, allowed := range policy.allowedHosts {
+		if host == allowed || strings.HasPrefix(allowed, ".") && strings.HasSuffix(host, allowed) {
+			return true
+		}
+	}
+	return false
+}
+
+// checkAddress returns an error when the policy blocks address.
+func (policy egressPolicy) checkAddress(address netip.Addr) error {
+	address = address.Unmap()
+	switch {
+	case policy.level == egressAllowAll, containsAddress(policy.allowedPrefixes, address.WithZone("")):
+>>>>>>> f1b4e3ccc (Fix webhook egress allow all (#24126))
 		return nil
 	}
 	host, _, err := net.SplitHostPort(address)

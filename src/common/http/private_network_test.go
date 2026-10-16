@@ -106,6 +106,7 @@ func TestValidatePublicNetworkTarget(t *testing.T) {
 	}
 }
 
+<<<<<<< HEAD
 // TestValidatePublicNetworkTargetEscapeHatch proves the HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
 // opt-out lets an operator keep webhooking to internal targets (backward-compat contract).
 func TestValidatePublicNetworkTargetEscapeHatch(t *testing.T) {
@@ -117,6 +118,207 @@ func TestValidatePublicNetworkTargetEscapeHatch(t *testing.T) {
 
 func TestWithPublicNetworkOnly(t *testing.T) {
 	t.Setenv(privateNetworkAccessEnv, "false")
+=======
+// TestValidateNetworkTargetDefault covers the default policy (allow_all): all targets are allowed.
+func TestValidateNetworkTargetDefault(t *testing.T) {
+	setEgressEnv(t, "", "", "")
+	resolver := &stubNetworkResolver{answers: map[string][]netip.Addr{
+		"rebind.example.com": {netip.MustParseAddr("169.254.169.254")},
+	}}
+
+	for _, host := range []string{
+		"8.8.8.8",
+		"10.0.0.1",
+		"127.0.0.1",
+		"169.254.169.254",
+		"localhost",
+		"metadata.google.internal",
+		"rebind.example.com",
+	} {
+		t.Run("allows "+host, func(t *testing.T) {
+			require.NoError(t, ValidateNetworkTarget(context.Background(), resolver, host))
+		})
+	}
+}
+
+// TestValidateNetworkTargetBlockRestricted covers the block_restricted policy: internal webhook receivers keep
+// working, while targets that reach the host itself or cloud metadata stay blocked.
+func TestValidateNetworkTargetBlockRestricted(t *testing.T) {
+	setEgressEnv(t, "block_restricted", "", "")
+	resolver := &stubNetworkResolver{answers: map[string][]netip.Addr{
+		"receiver.ns.svc.cluster.local": {netip.MustParseAddr("10.96.12.7")},
+		"rebind.example.com":            {netip.MustParseAddr("169.254.169.254")},
+	}}
+
+	for _, host := range []string{
+		"receiver.ns.svc.cluster.local",
+		"8.8.8.8",
+		"10.0.0.1",
+		"100.64.0.1",
+		"172.16.0.1",
+		"192.168.0.1",
+		"198.18.0.1",
+		"fc00::1",
+		"fd12:3456::1",
+	} {
+		t.Run("allows "+host, func(t *testing.T) {
+			require.NoError(t, ValidateNetworkTarget(context.Background(), resolver, host))
+		})
+	}
+
+	for _, host := range []string{
+		"localhost",
+		"metadata.google.internal",
+		"rebind.example.com",
+		"0.0.0.0",
+		"127.0.0.1",
+		"169.254.169.254",
+		"100.100.100.200",
+		"168.63.129.16",
+		"224.0.0.1",
+		"255.255.255.255",
+		"::",
+		"::1",
+		"::ffff:169.254.169.254",
+		"::169.254.169.254",
+		"64:ff9b::a9fe:a9fe",
+		"2002:a9fe:a9fe::1",
+		"2001:0:a9fe:a9fe::1",
+		"fd00:ec2::254",
+		"fd20:ce::254",
+		"fe80::1",
+		"fe80::1%eth0",
+		"ff02::1",
+	} {
+		t.Run("blocks "+host, func(t *testing.T) {
+			require.ErrorContains(t, ValidateNetworkTarget(context.Background(), resolver, host), "restricted")
+		})
+	}
+}
+
+// TestEgressLevelPrecedence pins the compatibility contract: the policy wins, the deprecated boolean
+// keeps its 2.15 meaning when the policy is unset, and invalid values fail closed.
+func TestEgressLevelPrecedence(t *testing.T) {
+	for _, tc := range []struct {
+		policy, legacy string
+		want           egressLevel
+	}{
+		{"", "", egressAllowAll},
+		{" ", " ", egressAllowAll},
+		{"", "true", egressAllowAll},
+		{"", "1", egressAllowAll},
+		{"", "false", egressPublicOnly},
+		{"", "flase", egressPublicOnly},
+		{"allow_all", "", egressAllowAll},
+		{"Block_Restricted", "", egressBlockRestricted},
+		{"public_only", "", egressPublicOnly},
+		{"public_only", "true", egressPublicOnly},
+		{"allow_all", "false", egressAllowAll},
+		{"allow-all", "true", egressPublicOnly},
+	} {
+		t.Run(tc.policy+"/"+tc.legacy, func(t *testing.T) {
+			assert.Equal(t, tc.want, parseEgressLevel(tc.policy, tc.legacy))
+		})
+	}
+}
+
+// TestValidateNetworkTargetPerLevel covers what each level lets through.
+func TestValidateNetworkTargetPerLevel(t *testing.T) {
+	for _, tc := range []struct {
+		policy, legacy              string
+		public, private, restricted bool
+	}{
+		{"allow_all", "", true, true, true},
+		{"", "true", true, true, true},
+		{"block_restricted", "", true, true, false},
+		{"", "", true, true, true},
+		{"public_only", "", true, false, false},
+		{"", "false", true, false, false},
+	} {
+		t.Run(tc.policy+"/"+tc.legacy, func(t *testing.T) {
+			setEgressEnv(t, tc.policy, tc.legacy, "")
+			for target, allowed := range map[string]bool{
+				"8.8.8.8":                  tc.public,
+				"10.0.0.1":                 tc.private,
+				"fd12::1":                  tc.private,
+				"169.254.169.254":          tc.restricted,
+				"127.0.0.1":                tc.restricted,
+				"metadata.google.internal": tc.restricted,
+			} {
+				err := ValidateNetworkTarget(context.Background(), nil, target)
+				if allowed {
+					assert.NoError(t, err, target)
+				} else {
+					assert.Error(t, err, target)
+				}
+				if address, parseErr := netip.ParseAddr(target); parseErr == nil {
+					err := checkEgress("tcp", net.JoinHostPort(address.String(), "443"), nil)
+					assert.Equal(t, allowed, err == nil, "dial %s: %v", target, err)
+				}
+			}
+		})
+	}
+}
+
+// TestValidateNetworkTargetAllowlist covers HARBOR_PRIVATE_NETWORK_ALLOWLIST: listed destinations
+// pass even with private access disabled, including restricted ones the operator names
+// explicitly, and allowlisted hostnames are trusted without resolution.
+func TestValidateNetworkTargetAllowlist(t *testing.T) {
+	setEgressEnv(t, "public_only", "", "10.1.0.0/16, hooks.internal *.svc.cluster.local,127.0.0.1,::ffff:192.168.0.0/112,not_a_host!,*.")
+	resolver := &stubNetworkResolver{answers: map[string][]netip.Addr{
+		"listed-range.example.com": {netip.MustParseAddr("10.1.4.4")},
+		"other-range.example.com":  {netip.MustParseAddr("10.2.4.4")},
+	}}
+
+	for _, host := range []string{
+		"10.1.2.3",
+		"listed-range.example.com",
+		"hooks.internal",
+		"HOOKS.internal.",
+		"receiver.ns.svc.cluster.local",
+		"127.0.0.1",
+		"192.168.7.7",
+		"8.8.8.8",
+	} {
+		t.Run("allows "+host, func(t *testing.T) {
+			require.NoError(t, ValidateNetworkTarget(context.Background(), resolver, host))
+		})
+	}
+	for _, host := range []string{
+		"10.2.0.1",
+		"other-range.example.com",
+		"svc.cluster.local",
+		"evilhooks.internal",
+		"127.0.0.2",
+		"169.254.169.254",
+	} {
+		t.Run("blocks "+host, func(t *testing.T) {
+			require.Error(t, ValidateNetworkTarget(context.Background(), resolver, host))
+		})
+	}
+	assert.NotContains(t, resolver.calls, "hooks.internal", "allowlisted hostnames are not resolved")
+}
+
+func TestCheckEgress(t *testing.T) {
+	setEgressEnv(t, "block_restricted", "", "")
+	require.NoError(t, checkEgress("tcp4", "10.0.0.1:443", nil))
+	require.NoError(t, checkEgress("tcp6", "[fd12::1]:443", nil))
+	require.ErrorContains(t, checkEgress("tcp4", "169.254.169.254:80", nil), "restricted network address")
+	require.ErrorContains(t, checkEgress("tcp6", "[::ffff:127.0.0.1]:80", nil), "restricted network address")
+
+	setEgressEnv(t, "public_only", "", "")
+	require.ErrorContains(t, checkEgress("tcp4", "10.0.0.1:443", nil), "private network address")
+	require.NoError(t, checkEgress("tcp4", "8.8.8.8:443", nil))
+
+	setEgressEnv(t, "", "", "")
+	require.NoError(t, checkEgress("tcp4", "10.0.0.1:443", nil))
+	require.NoError(t, checkEgress("tcp4", "169.254.169.254:80", nil))
+	require.NoError(t, checkEgress("tcp4", "127.0.0.1:80", nil))
+}
+
+func TestWithEgressGuard(t *testing.T) {
+	setEgressEnv(t, "block_restricted", "", "")
+>>>>>>> f1b4e3ccc (Fix webhook egress allow all (#24126))
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = listener.Close() })
@@ -221,11 +423,19 @@ func TestWithPublicNetworkOnlyProxyBlocksPrivateTargets(t *testing.T) {
 
 }
 
+<<<<<<< HEAD
 // TestWithPublicNetworkOnlyProxyAddressNotReachableDirectly covers a NO_PROXY entry that matches
 // the proxy itself: a direct request to the proxy's address must not inherit the dial exemption
 // the proxy gets once it has been used.
 func TestWithPublicNetworkOnlyProxyAddressNotReachableDirectly(t *testing.T) {
 	t.Setenv(privateNetworkAccessEnv, "false")
+=======
+// TestWithEgressGuardProxyAddressNotReachableDirectly covers a NO_PROXY entry that matches the
+// proxy itself: a direct request to the proxy's address must not inherit the dial exemption the
+// proxy gets once it has been used.
+func TestWithEgressGuardProxyAddressNotReachableDirectly(t *testing.T) {
+	setEgressEnv(t, "block_restricted", "", "")
+>>>>>>> f1b4e3ccc (Fix webhook egress allow all (#24126))
 	proxy := newRecordingProxy(t)
 	transport := &http.Transport{Proxy: func(req *http.Request) (*url.URL, error) {
 		if req.URL.Host == proxy.url.Host {
@@ -245,10 +455,17 @@ func TestWithPublicNetworkOnlyProxyAddressNotReachableDirectly(t *testing.T) {
 	assert.Equal(t, []string{"http://8.8.8.8/hook"}, proxy.seen())
 }
 
+<<<<<<< HEAD
 // TestWithPublicNetworkOnlyNoProxyStillGuardsDial covers NO_PROXY: when the proxy function
 // declines a target, the direct dial keeps the resolved-address check.
 func TestWithPublicNetworkOnlyNoProxyStillGuardsDial(t *testing.T) {
 	t.Setenv(privateNetworkAccessEnv, "false")
+=======
+// TestWithEgressGuardNoProxyStillGuardsDial covers NO_PROXY: when the proxy function declines a
+// target, the direct dial keeps the resolved-address check.
+func TestWithEgressGuardNoProxyStillGuardsDial(t *testing.T) {
+	setEgressEnv(t, "block_restricted", "", "")
+>>>>>>> f1b4e3ccc (Fix webhook egress allow all (#24126))
 	target := newRecordingProxy(t)
 	transport := &http.Transport{Proxy: func(*http.Request) (*url.URL, error) { return nil, nil }}
 	withPublicNetworkOnly(&stubNetworkResolver{})(transport)
@@ -273,6 +490,7 @@ func TestWithPublicNetworkOnlyProxyEscapeHatch(t *testing.T) {
 	assert.Equal(t, []string{"http://10.0.0.1/hook"}, proxy.seen())
 }
 
+<<<<<<< HEAD
 // TestPublicNetworkTransportPinsProxiedHTTPTarget covers DNS rebinding through a proxy: the proxy
 // receives the address Harbor validated, never the hostname, so it cannot resolve it again to a
 // private address. Plain HTTP carries that address as Host too.
@@ -317,6 +535,17 @@ func TestPublicNetworkTransportPinsProxiedHTTPTarget(t *testing.T) {
 		"http://8.8.8.8/hook host=8.8.8.8",
 		"http://[2606:4700:4700::1111]:8080/hook host=[2606:4700:4700::1111]:8080",
 	}, seen)
+=======
+func TestParseEgressPolicy(t *testing.T) {
+	policy := parseEgressPolicy("", "", "10.0.0.0/8 ::ffff:172.16.0.0/108, 192.168.1.10, fe80::1%eth0, *.svc.cluster.local, Hooks.Example.COM., bad host, -, *.")
+	assert.Equal(t, egressAllowAll, policy.level)
+	assert.Equal(t, []netip.Prefix{
+		netip.MustParsePrefix("10.0.0.0/8"),
+		netip.MustParsePrefix("172.16.0.0/12"),
+		netip.MustParsePrefix("192.168.1.10/32"),
+	}, policy.allowedPrefixes)
+	assert.Equal(t, []string{".svc.cluster.local", "hooks.example.com", "bad", "host"}, policy.allowedHosts)
+>>>>>>> f1b4e3ccc (Fix webhook egress allow all (#24126))
 }
 
 // TestPublicNetworkTransportPinsProxiedHTTPSTarget checks the HTTPS tunnel: CONNECT goes to the
