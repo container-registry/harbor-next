@@ -21,6 +21,32 @@ engine first, then run `task release-images-local RELEASE_VERSION=X.Y.Z
 IMAGE_TAG=<tag>`. It defaults to `8gears.container-registry.com/8gcr-pr` and
 builds both `linux/amd64` and `linux/arm64`.
 
+## Commercial Patch Branches
+
+Commercial features are git branches on `container-registry/8gcr`, listed in release order in `taskfile/commercial-patches` (`release-X.Y` lists `release-X.Y/000N-*`). Each is based on this repo's `main` (or `release-X.Y`). They are siblings, not a stack, and releases build their jj octopus merge:
+
+```bash
+task apply-patches                                 # octopus of every listed branch onto @
+task apply-patches OVERLAY_BRANCHES=fix/my-branch  # plus extra 8gcr branches, e.g. a PR under test
+task release-ready:check                           # the same against a throwaway local clone
+```
+
+- Build and test a patch change only in the combined tree. A single patch branch is not guaranteed to compile on its own: the `0001-commercial-feature-gate` portal imports components that live in `0002-branding` and `0004-federated-robot-accounts`.
+- A fix to a commercial feature is a PR into its `000N-*` branch, plus a backport PR into `release-X.Y/000N-*` for each supported release line.
+- StGit and `.patch` files are retired.
+
+## Workspaces
+
+Work in jj workspaces next to the main checkout, one per task: `jj workspace add ../harbor.<name> -r main@<remote>`. A workspace has no `.git`, so `git`, `gh` repo detection and the git-based tasks above (`apply-patches` fetches with git) fail there. Inside a workspace use jj (`jj git push --remote <r> --bookmark <b>`) and `gh -R <owner>/<repo>`, and build the combined tree with jj directly:
+
+```bash
+jj git fetch --all-remotes
+jj new "heads(main@<remote> | $(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' -e 's/$/@<8gcr-remote>/' taskfile/commercial-patches | paste -sd'|' -))"
+jj log -r '@ & conflicts()'                        # must print nothing
+```
+
+jj has no `commit -s`; for DCO set `templates.commit_trailers = "format_signed_off_by_trailer(self)"` in the jj user config.
+
 ## PRs
 
 - Branch off `main`, never push direct.
