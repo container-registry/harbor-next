@@ -37,7 +37,7 @@ task release-ready:check                           # the same against a throwawa
 
 ## Workspaces
 
-Work in jj workspaces next to the main checkout, one per task: `jj workspace add ../harbor.<name> -r main@<remote>`. A workspace has no `.git`, so `git`, `gh` repo detection and the git-based tasks above (`apply-patches` fetches with git) fail there. Inside a workspace use jj (`jj git push --remote <r> --bookmark <b>`) and `gh -R <owner>/<repo>`, and build the combined tree with jj directly:
+Work in jj workspaces next to the main checkout, one per task, named `harbor.<target>-<slug>` where `<target>` is the repository the work lands in: `next-` (this repo), `8gcr-` (commercial branches), `upstream-` (goharbor/harbor). Example: `jj workspace add ../harbor.8gcr-0001-env-value -r 0001-commercial-feature-gate@<8gcr-remote>`. A workspace has no `.git`, so `git`, `gh` repo detection and the git-based tasks above (`apply-patches` fetches with git) fail there. Inside a workspace use jj (`jj git push --remote <r> --bookmark <b>`) and `gh -R <owner>/<repo>`, and build the combined tree with jj directly:
 
 ```bash
 jj git fetch --all-remotes
