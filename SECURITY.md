@@ -24,7 +24,7 @@ Report vulnerabilities privately through GitHub private vulnerability reporting:
 - Or go to the repository **Security** tab and click **Report a vulnerability**.
 - Or go to [New Issue](https://github.com/container-registry/harbor-next/issues/new/choose) and select **Security Vulnerability**, which routes to the same private form.
 
-Reporting requires a GitHub account. If you cannot use GitHub, contact a maintainer listed in [OWNERS.md](OWNERS.md) through any private channel and ask them to open the report on your behalf.
+Reporting requires a GitHub account. If you cannot use GitHub, email the security contact at [infosec@container-registry.com](mailto:infosec@container-registry.com), or contact a maintainer listed in [OWNERS.md](OWNERS.md) through any private channel and ask them to open the report on your behalf.
 
 Private vulnerability reports are visible only to project maintainers, who will coordinate with the reporter during investigation and remediation. The maintainer-side handling process is documented in [docs/security-process.md](docs/security-process.md).
 
