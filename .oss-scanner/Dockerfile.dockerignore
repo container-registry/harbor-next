@@ -1,0 +1,6 @@
+.git/
+bin/
+src/portal/node_modules/
+src/portal/.angular/
+src/portal/dist/
+src/portal/app-swagger-ui/node_modules/
