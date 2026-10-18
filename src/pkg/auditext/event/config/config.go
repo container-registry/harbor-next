@@ -51,7 +51,12 @@ var userCfgsFn = func(ctx context.Context) map[string]any {
 	if _, err := orm.FromContext(ctx); err != nil {
 		return nil
 	}
-	return mgr.GetUserCfgs(ctx)
+	cfgs := mgr.GetUserCfgs(ctx)
+	if len(cfgs) == 0 {
+		// Harbor always has user settings; none means the read failed
+		return nil
+	}
+	return cfgs
 }
 
 // resolver used to resolve the configuration event
@@ -132,7 +137,7 @@ func diffConfig(d *desc.Description, req, before, after map[string]any) {
 
 // isSecret is true for keys typed as passwords in the config metadata and,
 // because uaa_client_secret is only a StringType there, for any key that
-// names a password, secret or token.
+// names a password or secret. Token lifetimes and endpoints are not secrets.
 func isSecret(key string) bool {
 	if item, ok := metadata.Instance().GetByName(key); ok {
 		if _, isPwd := item.ItemType.(*metadata.PasswordType); isPwd {
@@ -140,7 +145,7 @@ func isSecret(key string) bool {
 		}
 	}
 	k := strings.ToLower(key)
-	return strings.Contains(k, "password") || strings.Contains(k, "secret") || strings.Contains(k, "token")
+	return strings.Contains(k, "password") || strings.Contains(k, "secret")
 }
 
 func (c *resolver) PreCheck(ctx context.Context, _ string, method string) (bool, string) {

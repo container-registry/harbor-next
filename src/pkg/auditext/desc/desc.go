@@ -32,6 +32,8 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 const (
@@ -46,11 +48,20 @@ const (
 )
 
 // Description is the ordered set of parts the template is rendered from.
+// The sentence head (actor, action, resource, name, project) is kept apart
+// from the details, so a detail key such as "name" never rewrites the head.
 type Description struct {
-	keys []string
-	vals map[string]any
-	err  string
+	actor, action, resource, name, project string
+	keys                                   []string
+	vals                                   map[string]any
+	err                                    string
 }
+
+// secret is the value stored for a sensitive field; it only renders as Changed.
+type secret struct{}
+
+// maxReasonLen bounds the failure reason so it never crowds out the details.
+const maxReasonLen = 256
 
 // verbs maps the operation column to the verb used in the sentence
 var verbs = map[string]string{
@@ -83,18 +94,21 @@ func (c Change) render(key string) string {
 	}
 }
 
-// New starts a description with the three keys every row carries.
+// New starts a description with the three parts every row carries.
 func New(actor, action, resource string) *Description {
-	d := &Description{vals: map[string]any{}}
-	d.Set("actor", actor)
-	d.Set("action", action)
-	d.Set("resource", resource)
-	return d
+	return &Description{actor: actor, action: action, resource: resource, vals: map[string]any{}}
 }
 
 // Name sets the resource name. Empty names are left out.
 func (d *Description) Name(name string) *Description {
-	return d.Set("name", name)
+	d.name = name
+	return d
+}
+
+// Project sets the project the resource lives in. Empty names are left out.
+func (d *Description) Project(project string) *Description {
+	d.project = project
+	return d
 }
 
 // Set records a plain fact about the resource. Nil, empty strings, empty
@@ -136,12 +150,12 @@ func (d *Description) Removed(key string, from any) *Description {
 
 // Secret records that a sensitive field changed without its value.
 func (d *Description) Secret(key string) *Description {
-	return d.Set(key, Changed)
+	return d.Set(key, secret{})
 }
 
 // Error marks the operation failed. It is always rendered last.
 func (d *Description) Error(status int, reason string) *Description {
-	d.err = Reason(status, reason)
+	d.err = truncate(Reason(status, reason), maxReasonLen)
 	return d
 }
 
@@ -151,52 +165,46 @@ func (d *Description) Has(key string) bool {
 	return ok
 }
 
-// String renders the template, cut to MaxLen characters.
+// String renders the template, cut to MaxLen characters. The failure suffix
+// is kept whole; only the sentence before it is cut.
 func (d *Description) String() string {
-	return truncate(d.render(), MaxLen)
+	suffix := ""
+	if d.err != "" {
+		suffix = " (failed: " + d.err + ")"
+	}
+	return truncate(d.render(), MaxLen-utf8.RuneCountInString(suffix)) + suffix
 }
 
 func (d *Description) render() string {
 	var b strings.Builder
-	actor, _ := d.vals["actor"].(string)
-	action, _ := d.vals["action"].(string)
-	verb, ok := verbs[action]
+	verb, ok := verbs[d.action]
 	if !ok {
-		verb = action
+		verb = d.action
 	}
-	b.WriteString(actor)
+	b.WriteString(d.actor)
 	b.WriteByte(' ')
 	b.WriteString(verb)
-	if action != "login" && action != "logout" {
-		if resource, ok := d.vals["resource"].(string); ok && resource != "" {
+	if d.action != "login" && d.action != "logout" {
+		if d.resource != "" {
 			b.WriteByte(' ')
-			b.WriteString(resource)
+			b.WriteString(d.resource)
 		}
-		if name, ok := d.vals["name"].(string); ok && name != "" {
+		if d.name != "" {
 			b.WriteByte(' ')
-			b.WriteString(strconv.Quote(name))
+			b.WriteString(strconv.Quote(d.name))
 		}
-		if project, ok := d.vals["project"].(string); ok && project != "" {
+		if d.project != "" {
 			b.WriteString(" in project ")
-			b.WriteString(strconv.Quote(project))
+			b.WriteString(strconv.Quote(d.project))
 		}
 	}
 	details := make([]string, 0, len(d.keys))
 	for _, k := range d.keys {
-		switch k {
-		case "actor", "action", "resource", "name", "project":
-			continue
-		}
 		details = append(details, detail(k, d.vals[k]))
 	}
 	if len(details) > 0 {
 		b.WriteString(": ")
 		b.WriteString(strings.Join(details, ", "))
-	}
-	if d.err != "" {
-		b.WriteString(" (failed: ")
-		b.WriteString(d.err)
-		b.WriteByte(')')
 	}
 	return b.String()
 }
@@ -218,10 +226,8 @@ func detail(key string, v any) string {
 	switch t := v.(type) {
 	case Change:
 		return t.render(key)
-	case string:
-		if t == Changed {
-			return key + " " + Changed
-		}
+	case secret:
+		return key + " " + Changed
 	}
 	return key + " " + value(v)
 }
@@ -241,7 +247,9 @@ func value(v any) string {
 
 // Reason turns an HTTP status and a response body into "<status> <reason>".
 // Harbor API errors ({"errors":[{"code":..,"message":..}]}) yield their
-// message; anything else falls back to the status text.
+// message; anything else falls back to the status text. Control characters
+// in the message are escaped so a rejected value can neither break the line
+// nor, as NUL would, make PostgreSQL refuse the row.
 func Reason(status int, body string) string {
 	msg := ""
 	var apiErr struct {
@@ -252,7 +260,7 @@ func Reason(status int, body string) string {
 	if err := json.Unmarshal([]byte(body), &apiErr); err == nil && len(apiErr.Errors) > 0 {
 		msg = apiErr.Errors[0].Message
 	}
-	msg = strings.TrimSpace(msg)
+	msg = escapeControl(strings.TrimSpace(msg))
 	if msg == "" {
 		msg = strings.ToLower(http.StatusText(status))
 	}
@@ -260,6 +268,24 @@ func Reason(status int, body string) string {
 		return fmt.Sprintf("%d", status)
 	}
 	return fmt.Sprintf("%d %s", status, msg)
+}
+
+// escapeControl writes control characters the way strconv.Quote does, leaving
+// everything else, quotes and backslashes included, untouched.
+func escapeControl(s string) string {
+	if !strings.ContainsFunc(s, unicode.IsControl) {
+		return s
+	}
+	var b strings.Builder
+	for _, r := range s {
+		if unicode.IsControl(r) {
+			q := strconv.QuoteRune(r)
+			b.WriteString(q[1 : len(q)-1])
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }
 
 func writeValue(b *bytes.Buffer, v any) error {

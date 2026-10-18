@@ -156,10 +156,13 @@ func (r *resolver) Resolve(ce *commonevent.Metadata, evt *event.Event) error {
 	var req struct {
 		RoleID     int `json:"role_id"`
 		MemberUser struct {
+			UserID   int    `json:"user_id"`
 			Username string `json:"username"`
 		} `json:"member_user"`
 		MemberGroup struct {
-			GroupName string `json:"group_name"`
+			ID          int    `json:"id"`
+			GroupName   string `json:"group_name"`
+			LdapGroupDN string `json:"ldap_group_dn"`
 		} `json:"member_group"`
 	}
 	_ = json.Unmarshal([]byte(ce.RequestPayload), &req)
@@ -175,10 +178,17 @@ func (r *resolver) Resolve(ce *commonevent.Metadata, evt *event.Event) error {
 		}
 		if entityName == "" {
 			// rejected create: the requested member is only in the body
-			if req.MemberUser.Username != "" {
+			switch {
+			case req.MemberUser.Username != "":
 				entityName, entityType = req.MemberUser.Username, common.UserMember
-			} else if req.MemberGroup.GroupName != "" {
+			case req.MemberGroup.GroupName != "":
 				entityName, entityType = req.MemberGroup.GroupName, common.GroupMember
+			case req.MemberGroup.LdapGroupDN != "":
+				entityName, entityType = req.MemberGroup.LdapGroupDN, common.GroupMember
+			case req.MemberUser.UserID != 0:
+				entityName, entityType = strconv.Itoa(req.MemberUser.UserID), common.UserMember
+			case req.MemberGroup.ID != 0:
+				entityName, entityType = strconv.Itoa(req.MemberGroup.ID), common.GroupMember
 			}
 		}
 	case "delete":
@@ -198,7 +208,7 @@ func (r *resolver) Resolve(ce *commonevent.Metadata, evt *event.Event) error {
 	}
 
 	e.ResourceName = entityName
-	d := desc.New(ce.Username, operation, rbac.ResourceMember.String()).Name(entityName).Set("project", projectName)
+	d := desc.New(ce.Username, operation, rbac.ResourceMember.String()).Name(entityName).Project(projectName)
 	switch entityType {
 	case common.GroupMember:
 		d.Set("type", "group")
@@ -218,6 +228,10 @@ func (r *resolver) Resolve(ce *commonevent.Metadata, evt *event.Event) error {
 			to = roleName(after.Role)
 		} else if req.RoleID != 0 {
 			to = roleName(req.RoleID)
+		}
+		// no target role when the body was empty or unreadable: nothing to diff
+		if to == "" {
+			break
 		}
 		if before != nil {
 			d.Changed("role", roleName(before.Role), to)

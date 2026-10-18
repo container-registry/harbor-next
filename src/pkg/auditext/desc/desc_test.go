@@ -44,7 +44,7 @@ func TestDescriptionFactsDropEmptyKeepZero(t *testing.T) {
 }
 
 func TestDescriptionProjectAndLogin(t *testing.T) {
-	d := New("admin", "update", "member").Name("alice").Set("project", "myproj").Changed("role", "developer", "projectAdmin")
+	d := New("admin", "update", "member").Name("alice").Project("myproj").Changed("role", "developer", "projectAdmin")
 	assert.Equal(t, `admin updated member "alice" in project "myproj": role "developer" -> "projectAdmin"`, d.String())
 	assert.Equal(t, `alice logged in: auth_mode "ldap_auth"`, New("alice", "login", "user").Name("alice").Set("auth_mode", "ldap_auth").String())
 	assert.Equal(t, `alice logged out`, New("alice", "logout", "user").Name("alice").String())
@@ -124,4 +124,38 @@ func TestDescriptionFitsColumn(t *testing.T) {
 	exact := strings.Repeat("x", MaxLen)
 	assert.Equal(t, exact, truncate(exact, MaxLen))
 	assert.Equal(t, "ab", truncate("ab", MaxLen))
+}
+
+func TestDetailKeysNeverRewriteHead(t *testing.T) {
+	// a rejected metadata request may carry any key, including the ones the
+	// sentence head is built from
+	d := New("admin", "update", "project").Name("myproj").Project("myproj").
+		Added("actor", "x").Added("action", "y").Added("resource", "z").Added("name", "w").Added("project", "v")
+	assert.Equal(t, `admin updated project "myproj" in project "myproj": actor set "x", action set "y", resource set "z", name set "w", project set "v"`, d.String())
+}
+
+func TestSecretMarkerIsTyped(t *testing.T) {
+	d := New("admin", "update", "configuration").Secret("ldap_search_password").Set("note", "changed")
+	assert.Equal(t, `admin updated configuration: ldap_search_password changed, note "changed"`, d.String())
+}
+
+func TestTruncationKeepsFailureSuffix(t *testing.T) {
+	long := strings.Repeat("x", 2000)
+	d := New("admin", "update", "project").Name("myproj").Changed("description", "", long)
+	d.Error(400, `{"errors":[{"code":"BAD_REQUEST","message":"too long"}]}`)
+	got := d.String()
+	assert.Equal(t, MaxLen, utf8.RuneCountInString(got))
+	assert.True(t, strings.HasSuffix(got, `... (failed: 400 too long)`), got)
+
+	// an oversized reason is cut on its own, so the sentence keeps its details
+	d = New("admin", "update", "project").Name("myproj").Changed("public", false, true)
+	d.Error(500, `{"errors":[{"code":"INTERNAL","message":"`+long+`"}]}`)
+	got = d.String()
+	assert.True(t, strings.HasPrefix(got, `admin updated project "myproj": public false -> true (failed: 500 xxx`), got)
+	assert.LessOrEqual(t, utf8.RuneCountInString(got), MaxLen)
+}
+
+func TestReasonEscapesControlCharacters(t *testing.T) {
+	assert.Equal(t, `400 bad value \x00 here\nnext`, Reason(400, "{\"errors\":[{\"message\":\"bad value \\u0000 here\\nnext\"}]}"))
+	assert.Equal(t, `400 plain "quoted" \ ok`, Reason(400, `{"errors":[{"message":"plain \"quoted\" \\ ok"}]}`))
 }

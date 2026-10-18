@@ -16,8 +16,10 @@ package login
 
 import (
 	"context"
+	"strings"
 	"testing"
 
+	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/controller/event/metadata/commonevent"
 	"github.com/goharbor/harbor/src/controller/event/model"
 	"github.com/goharbor/harbor/src/pkg/notifier/event"
@@ -70,13 +72,19 @@ func Test_login_Resolve(t *testing.T) {
 				RequestURL:    "/c/oidc/callback?code=x",
 				RequestMethod: "GET",
 				ResponseCode:  302,
-			}, event: &event.Event{}}, false, "alice", "login", `alice logged in: auth_mode "db_auth"`, true},
+			}, event: &event.Event{}}, false, "alice", "login", `alice logged in: auth_mode "oidc_auth"`, true},
 	}
 	origAuthMode := authModeFn
-	authModeFn = func(_ context.Context) string { return "db_auth" }
 	defer func() { authModeFn = origAuthMode }()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// the OIDC callback only exists under oidc_auth
+			authModeFn = func(_ context.Context) string {
+				if strings.HasPrefix(tt.args.ce.RequestURL, "/c/oidc/") {
+					return common.OIDCAuth
+				}
+				return "db_auth"
+			}
 			l := &loginResolver{}
 			if err := l.Resolve(tt.args.ce, tt.args.event); (err != nil) != tt.wantErr {
 				t.Errorf("resolver.Resolve() error = %v, wantErr %v", err, tt.wantErr)

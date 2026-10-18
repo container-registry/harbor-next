@@ -28,10 +28,12 @@ import (
 )
 
 func TestIsSecret(t *testing.T) {
-	for _, k := range []string{"ldap_search_password", "oidc_client_secret", "uaa_client_secret", "email_password", "robot_token_duration"} {
+	for _, k := range []string{"ldap_search_password", "oidc_client_secret", "uaa_client_secret", "email_password"} {
 		assert.True(t, isSecret(k), k)
 	}
-	for _, k := range []string{"auth_mode", "ldap_url", "oidc_endpoint", "project_creation_restriction"} {
+	// token lifetimes and endpoints are settings, not credentials
+	for _, k := range []string{"auth_mode", "ldap_url", "oidc_endpoint", "project_creation_restriction",
+		"token_expiration", "robot_token_duration", "http_authproxy_tokenreview_endpoint"} {
 		assert.False(t, isSecret(k), k)
 	}
 }
