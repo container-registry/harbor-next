@@ -106,6 +106,36 @@ func TestProjectRoleAccess(t *testing.T) {
 	}
 }
 
+func TestTagRetentionRoleAccess(t *testing.T) {
+	writeActions := []rbac.Action{rbac.ActionCreate, rbac.ActionUpdate, rbac.ActionDelete, rbac.ActionOperate}
+	readActions := []rbac.Action{rbac.ActionRead, rbac.ActionList}
+	cases := []struct {
+		role     int
+		canRead  bool
+		canWrite bool
+	}{
+		{common.RoleProjectAdmin, true, true},
+		{common.RoleMaintainer, true, true},
+		{common.RoleDeveloper, true, false},
+		{common.RoleGuest, false, false},
+	}
+	for _, tc := range cases {
+		ctl := &projecttesting.Controller{}
+		mock.OnAnything(ctl, "Get").Return(private, nil)
+		mock.OnAnything(ctl, "ListRoles").Return([]int{tc.role}, nil)
+		user := &models.User{UserID: 1, Username: "username"}
+		evaluator := NewEvaluator(ctl, NewBuilderForUser(user, ctl))
+		resource := NewNamespace(private.ProjectID).Resource(rbac.ResourceTagRetention)
+
+		for _, action := range readActions {
+			assert.Equal(t, tc.canRead, evaluator.HasPermission(context.TODO(), resource, action), "role %d %s", tc.role, action)
+		}
+		for _, action := range writeActions {
+			assert.Equal(t, tc.canWrite, evaluator.HasPermission(context.TODO(), resource, action), "role %d %s", tc.role, action)
+		}
+	}
+}
+
 func BenchmarkProjectEvaluator(b *testing.B) {
 	ctl := &projecttesting.Controller{}
 	mock.OnAnything(ctl, "Get").Return(public, nil)
