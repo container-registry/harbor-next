@@ -6,6 +6,13 @@ This changelog mirrors [GitHub Releases](https://github.com/container-registry/h
 
 ---
 
+## [2.15.13](https://github.com/container-registry/harbor-next/compare/v2.15.12...v2.15.13) (2026-10-19)
+
+
+### Reverts
+
+* Durable Deletion Authority And Limit Developers To Reading Policies (Revert [#1171](https://github.com/container-registry/harbor-next/issues/1171) / [#1164](https://github.com/container-registry/harbor-next/issues/1164)) ([#1268](https://github.com/container-registry/harbor-next/issues/1268)) ([20d7f0b](https://github.com/container-registry/harbor-next/commit/20d7f0b8dacc548a9b60d4afbd012bc25f7ded04))
+
 ## [2.15.12](https://github.com/container-registry/harbor-next/compare/v2.15.11...v2.15.12) (2026-10-14)
 
 
