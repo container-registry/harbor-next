@@ -54,6 +54,17 @@ func BuildArtifactFilters(filters []*model.Filter) (ArtifactFilters, error) {
 			} else {
 				return nil, fmt.Errorf("invalid filter value type for tag filter, expecting string")
 			}
+		case model.FilterTypeResource:
+			if resourceType, ok := filter.Value.(string); ok {
+				// "artifact" covers all kinds of artifacts, only "image" narrows down the result
+				if resourceType == model.ResourceTypeImage {
+					f = &artifactTypeFilter{
+						types: []string{resourceType},
+					}
+				}
+			} else {
+				return nil, fmt.Errorf("invalid filter value type for resource filter, expecting string")
+			}
 		}
 		if f != nil {
 			fs = append(fs, f)
@@ -82,6 +93,35 @@ func (a ArtifactFilters) Filter(artifacts []*model.Artifact) ([]*model.Artifact,
 	return artifacts, nil
 }
 
+<<<<<<< HEAD
+=======
+type artifactTypeFilter struct {
+	types []string
+}
+
+func (a *artifactTypeFilter) Filter(artifacts []*model.Artifact) ([]*model.Artifact, error) {
+	if len(a.types) == 0 {
+		return artifacts, nil
+	}
+	var result []*model.Artifact
+	for _, artifact := range artifacts {
+		// some adapters (e.g. the native registry adapter) don't know the type of
+		// the artifacts, keep them rather than filtering out everything
+		if len(artifact.Type) == 0 {
+			result = append(result, artifact)
+			continue
+		}
+		for _, t := range a.types {
+			if strings.EqualFold(artifact.Type, t) {
+				result = append(result, artifact)
+				break
+			}
+		}
+	}
+	return result, nil
+}
+
+>>>>>>> a360e527a (fix(replication): make the image resource filter take effect again (#24176))
 // filter the artifacts according to the labels. Only the artifact contains all labels defined
 // in the filter is the valid one
 type artifactLabelFilter struct {
