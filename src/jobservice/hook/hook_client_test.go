@@ -202,6 +202,22 @@ func TestExternalCallbackWithoutCredential(t *testing.T) {
 	defer server.Close()
 	t.Setenv("CORE_URL", "http://core.example:8080")
 	t.Setenv("JOBSERVICE_SECRET", "jobservice-test")
+	// A path outside notifications is never rebased onto core, so the local server is reached.
+	event := &Event{URL: server.URL + "/external-hook", Data: &job.StatusChange{JobID: "job-1"}, Message: "test", Timestamp: time.Now().Unix()}
+	require.NoError(t, NewClient(context.Background()).SendEvent(event))
+}
+
+func TestCoreCallbackCarriesCredential(t *testing.T) {
+	reached := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached = true
+		require.Equal(t, "jobservice-test", secret.FromRequest(r))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	t.Setenv("CORE_URL", server.URL)
+	t.Setenv("JOBSERVICE_SECRET", "jobservice-test")
 	event := &Event{URL: server.URL + "/service/notifications/tasks/12", Data: &job.StatusChange{JobID: "job-1"}, Message: "test", Timestamp: time.Now().Unix()}
 	require.NoError(t, NewClient(context.Background()).SendEvent(event))
+	require.True(t, reached)
 }
