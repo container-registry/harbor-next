@@ -149,7 +149,6 @@ func (suite *BasicSchedulerTestSuite) TestUnSchedule() {
 	require.NoError(suite.T(), err, "unschedule: nil error expected but got %s", err)
 }
 
-<<<<<<< HEAD
 // TestUnScheduleSharedNumericID tests un-scheduling a policy whose numeric ID is shared by other policies
 func (suite *BasicSchedulerTestSuite) TestUnScheduleSharedNumericID() {
 	for _, withStats := range []bool{false, true} {
@@ -174,26 +173,11 @@ func (suite *BasicSchedulerTestSuite) TestUnScheduleSharedNumericID() {
 // TestUnScheduleSkipsMalformedMember tests un-scheduling with a non-policy member at the same numeric ID
 func (suite *BasicSchedulerTestSuite) TestUnScheduleSkipsMalformedMember() {
 	ids := suite.scheduleOnSharedScore("malformed_neighbour", 1, 1100, false)
-=======
-// TestClearDirtyJobsNegativeEpoch verifies that clearDirtyJobs removes entries
-// with negative epoch scores (e.g. jobs enqueued for time.Time{}).
-func (suite *BasicSchedulerTestSuite) TestClearDirtyJobsNegativeEpoch() {
-	j := &work.Job{
-		Name:       job.SampleJob,
-		ID:         "negative_epoch_job",
-		EnqueuedAt: time.Time{}.Unix(),
-		Args:       map[string]any{},
-	}
-
-	rawJSON, err := utils.SerializeJob(j)
-	suite.NoError(err, "serialize job model")
->>>>>>> bcea998ed (fix(jobservice): prevent CPU spin from unreachable cron expressions (#23925))
 
 	conn := suite.pool.Get()
 	defer func() {
 		_ = conn.Close()
 	}()
-<<<<<<< HEAD
 	key := rds.KeyPeriodicPolicy(suite.namespace)
 	for _, m := range []string{"not-json", `"a string"`} {
 		_, err := conn.Do("ZADD", key, 1100, m)
@@ -269,7 +253,25 @@ func (suite *BasicSchedulerTestSuite) policyIDs() []string {
 		ids = append(ids, p.ID)
 	}
 	return ids
-=======
+}
+
+// TestClearDirtyJobsNegativeEpoch verifies that clearDirtyJobs removes entries
+// with negative epoch scores (e.g. jobs enqueued for time.Time{}).
+func (suite *BasicSchedulerTestSuite) TestClearDirtyJobsNegativeEpoch() {
+	j := &work.Job{
+		Name:       job.SampleJob,
+		ID:         "negative_epoch_job",
+		EnqueuedAt: time.Time{}.Unix(),
+		Args:       map[string]any{},
+	}
+
+	rawJSON, err := utils.SerializeJob(j)
+	suite.NoError(err, "serialize job model")
+
+	conn := suite.pool.Get()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	key := rds.RedisKeyScheduled(suite.namespace)
 	_, err = conn.Do("ZADD", key, j.EnqueuedAt, rawJSON)
@@ -281,7 +283,6 @@ func (suite *BasicSchedulerTestSuite) policyIDs() []string {
 	remaining, err := rds.GetZsetByScore(conn, key, []int64{math.MinInt64, 0})
 	suite.NoError(err, "get negative-epoch entries")
 	suite.Empty(remaining, "clearDirtyJobs should remove negative-epoch entries")
->>>>>>> bcea998ed (fix(jobservice): prevent CPU spin from unreachable cron expressions (#23925))
 }
 
 // setupDirtyJobs adds dirty jobs for testing dirty jobs clear method in the Start()

@@ -110,14 +110,10 @@ func (s *scheduler) Schedule(ctx context.Context, vendorType string, vendorID in
 	if len(vendorType) == 0 {
 		return 0, fmt.Errorf("empty vendor type")
 	}
-<<<<<<< HEAD
 	// The seconds field is randomized to spread load; use SameCron to compare a stored cron with a requested one.
 	cron = fmt.Sprintf("%d %s", rand.Intn(60), strings.Join(strings.Split(cron, " ")[1:], " "))
-	if _, err := utils.CronParser().Parse(cron); err != nil {
-=======
 	parsedCron, err := utils.CronParser().Parse(cron)
 	if err != nil {
->>>>>>> bcea998ed (fix(jobservice): prevent CPU spin from unreachable cron expressions (#23925))
 		return 0, errors.New(nil).WithCode(errors.BadRequestCode).
 			WithMessagef("invalid cron %s: %v", cron, err)
 	}
