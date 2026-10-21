@@ -163,10 +163,7 @@ func TestCheckNoEscalation_CallerLacksPermission(t *testing.T) {
 	assert.Equal(t, errors.ForbiddenCode, errors.ErrCode(err), "expected ForbiddenError, got: %v", err)
 }
 
-// A built-in role's permissions live in the compile-time policy map, not the DB.
-// Assigning a built-in role (e.g. projectAdmin) must still be blocked when the
-// caller lacks its permissions — the previous DB-only lookup reported built-in
-// roles as permissionless and silently allowed escalation.
+// Built-in roles are grantable without holding their permissions (#1227).
 func TestCheckNoEscalation_BuiltinRoleExempt(t *testing.T) {
 	sc := &securityMock.Context{}
 	sc.On("IsSysAdmin").Return(false)

@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/goharbor/harbor/src/common/rbac"
+	"github.com/goharbor/harbor/src/pkg/permission/policy"
 	"github.com/goharbor/harbor/src/pkg/permission/types"
 )
 
@@ -42,7 +43,7 @@ func TestScopeRoleCatalogMatchesProjectAdmin(t *testing.T) {
 	}
 
 	projectAdmin := map[string]bool{}
-	for _, p := range rolePoliciesMap["projectAdmin"] {
+	for _, p := range policy.ShippedRolePolicies("projectAdmin") {
 		if p.Resource == rbac.ResourceSelf {
 			continue
 		}

@@ -67,6 +67,8 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 		"CREATE TABLE execution (id SERIAL PRIMARY KEY, revision INTEGER)",
 		"CREATE TABLE role (role_id SERIAL PRIMARY KEY, role_code VARCHAR(20), name VARCHAR(20))",
 		"CREATE TABLE project_member (id SERIAL PRIMARY KEY, project_id INTEGER, entity_id INTEGER, entity_type CHAR(1), role INTEGER)",
+		"CREATE TABLE role_permission (id BIGSERIAL PRIMARY KEY, role_type VARCHAR(255), role_id BIGINT, permission_policy_id BIGINT)",
+		"CREATE TABLE permission_policy (id BIGSERIAL PRIMARY KEY, scope VARCHAR(255), resource VARCHAR(255), action VARCHAR(255), effect VARCHAR(255))",
 	}
 	for _, statement := range legacyDependencies {
 		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
@@ -105,6 +107,7 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 		"idx_multi_format_version_pkg",
 		"idx_multi_project_reference_multi",
 		"idx_multi_project_reference_sub",
+		"policy_version",
 	}
 	for _, object := range objects {
 		var exists bool
@@ -115,6 +118,42 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 		if !exists {
 			t.Errorf("authoritative schema object %q does not exist", object)
 		}
+	}
+
+	var triggers int
+	if err := schemaPool.DB().QueryRowContext(ctx,
+		"SELECT count(*) FROM pg_trigger WHERE tgname LIKE '%_notify_%' AND tgrelid IN (to_regclass('role_permission'), to_regclass('permission_policy'))").
+		Scan(&triggers); err != nil {
+		t.Fatalf("count policy triggers: %v", err)
+	}
+	if triggers != 6 {
+		t.Errorf("policy notify triggers = %d after repeated runs, want 6", triggers)
+	}
+	policyVersion := func() int64 {
+		var v int64
+		if err := schemaPool.DB().QueryRowContext(ctx, "SELECT version FROM policy_version").Scan(&v); err != nil {
+			t.Fatalf("read policy_version: %v", err)
+		}
+		return v
+	}
+	before := policyVersion()
+	if _, err := schemaPool.DB().ExecContext(ctx, "INSERT INTO role_permission (role_type, role_id, permission_policy_id) VALUES ('robotaccount', 1, 1)"); err != nil {
+		t.Fatalf("insert robot grant: %v", err)
+	}
+	if got := policyVersion(); got != before {
+		t.Errorf("robot grant bumped policy_version to %d, want %d", got, before)
+	}
+	if _, err := schemaPool.DB().ExecContext(ctx, "INSERT INTO role_permission (role_type, role_id, permission_policy_id) VALUES ('project-role', 6, 1)"); err != nil {
+		t.Fatalf("insert project role grant: %v", err)
+	}
+	if got := policyVersion(); got != before+1 {
+		t.Errorf("project role grant left policy_version at %d, want %d", got, before+1)
+	}
+	if _, err := schemaPool.DB().ExecContext(ctx, "UPDATE role_permission SET role_type = 'robotaccount' WHERE role_type = 'project-role'"); err != nil {
+		t.Fatalf("move project role grant to a robot: %v", err)
+	}
+	if got := policyVersion(); got != before+2 {
+		t.Errorf("moving a grant off a project role left policy_version at %d, want %d", got, before+2)
 	}
 
 	columns := map[string][]string{
@@ -212,6 +251,8 @@ func TestExecutionRevisionGuardResolvesThroughSearchPath(t *testing.T) {
 		fmt.Sprintf("CREATE TABLE %s.execution (id SERIAL PRIMARY KEY, revision INTEGER)", later),
 		fmt.Sprintf("CREATE TABLE %s.role (role_id SERIAL PRIMARY KEY, role_code VARCHAR(20), name VARCHAR(20))", later),
 		fmt.Sprintf("CREATE TABLE %s.project_member (id SERIAL PRIMARY KEY, project_id INTEGER, entity_id INTEGER, entity_type CHAR(1), role INTEGER)", later),
+		fmt.Sprintf("CREATE TABLE %s.role_permission (id BIGSERIAL PRIMARY KEY, role_type VARCHAR(255), role_id BIGINT, permission_policy_id BIGINT)", later),
+		fmt.Sprintf("CREATE TABLE %s.permission_policy (id BIGSERIAL PRIMARY KEY, scope VARCHAR(255), resource VARCHAR(255), action VARCHAR(255), effect VARCHAR(255))", later),
 		fmt.Sprintf("CREATE TABLE %s.robot (id BIGSERIAL PRIMARY KEY)", first),
 		fmt.Sprintf("CREATE TABLE %s.project (project_id SERIAL PRIMARY KEY)", first),
 	}
@@ -296,6 +337,8 @@ func TestExecutionRevisionGuardIgnoresNonTableRelations(t *testing.T) {
 		"CREATE TABLE project (project_id SERIAL PRIMARY KEY)",
 		"CREATE TABLE role (role_id SERIAL PRIMARY KEY, role_code VARCHAR(20), name VARCHAR(20))",
 		"CREATE TABLE project_member (id SERIAL PRIMARY KEY, project_id INTEGER, entity_id INTEGER, entity_type CHAR(1), role INTEGER)",
+		"CREATE TABLE role_permission (id BIGSERIAL PRIMARY KEY, role_type VARCHAR(255), role_id BIGINT, permission_policy_id BIGINT)",
+		"CREATE TABLE permission_policy (id BIGSERIAL PRIMARY KEY, scope VARCHAR(255), resource VARCHAR(255), action VARCHAR(255), effect VARCHAR(255))",
 	} {
 		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
 			t.Fatalf("setup %q: %v", statement, err)
@@ -349,6 +392,8 @@ func TestIdentityProvidersAudienceReconcilesLegacyTable(t *testing.T) {
 		"CREATE TABLE execution (id SERIAL PRIMARY KEY, revision INTEGER)",
 		"CREATE TABLE role (role_id SERIAL PRIMARY KEY, role_code VARCHAR(20), name VARCHAR(20))",
 		"CREATE TABLE project_member (id SERIAL PRIMARY KEY, project_id INTEGER, entity_id INTEGER, entity_type CHAR(1), role INTEGER)",
+		"CREATE TABLE role_permission (id BIGSERIAL PRIMARY KEY, role_type VARCHAR(255), role_id BIGINT, permission_policy_id BIGINT)",
+		"CREATE TABLE permission_policy (id BIGSERIAL PRIMARY KEY, scope VARCHAR(255), resource VARCHAR(255), action VARCHAR(255), effect VARCHAR(255))",
 		`CREATE TABLE identity_providers (
 			id                      SERIAL PRIMARY KEY,
 			name                    TEXT NOT NULL,

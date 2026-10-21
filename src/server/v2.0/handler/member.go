@@ -22,12 +22,12 @@ import (
 	"github.com/go-openapi/runtime/middleware"
 
 	"github.com/goharbor/harbor/src/common/rbac"
-	rbacProject "github.com/goharbor/harbor/src/common/rbac/project"
 	"github.com/goharbor/harbor/src/controller/member"
 	roleCtl "github.com/goharbor/harbor/src/controller/role"
 	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/errors"
 	memberModels "github.com/goharbor/harbor/src/pkg/member/models"
+	"github.com/goharbor/harbor/src/pkg/permission/policy"
 	"github.com/goharbor/harbor/src/pkg/permission/types"
 	"github.com/goharbor/harbor/src/server/v2.0/models"
 	operation "github.com/goharbor/harbor/src/server/v2.0/restapi/operations/member"
@@ -191,7 +191,7 @@ func (m *memberAPI) checkNoEscalation(ctx context.Context, projectNameOrID any, 
 	// admin included: provisioning robots depend on it (#1137 and its revert
 	// #1227). The guard applies to custom roles, whose permission sets are
 	// arbitrary.
-	if rbacProject.BuiltinRolePolicies(int(roleID)) != nil {
+	if policy.IsBuiltinRole(roleID) {
 		return nil
 	}
 	r, err := m.roleCtl.Get(ctx, roleID, &roleCtl.Option{WithPermission: true})

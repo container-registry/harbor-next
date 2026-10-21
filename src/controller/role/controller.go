@@ -60,10 +60,9 @@ type Controller interface {
 
 // controller is the DB-backed implementation of Controller.
 //
-// It is intentionally uncached: built-in roles never reach this controller for
-// authorization (they resolve from the compile-time rolePoliciesMap in
-// common/rbac/project), so only the far rarer custom-role lookups touch the
-// database. That keeps RBAC off any Redis dependency on its hot path.
+// It is intentionally uncached: authorization never reaches this controller
+// (it asks the in-memory store in pkg/permission/policy), so only role
+// management touches the database here.
 type controller struct {
 	roleMgr   role.Manager
 	proMgr    project.Manager

@@ -15,41 +15,32 @@
 package rbac
 
 import (
-	"github.com/casbin/casbin"
-	"github.com/casbin/casbin/model"
+	"sync"
 
-	"github.com/goharbor/harbor/src/lib/log"
+	"github.com/casbin/casbin/v3"
+	"github.com/casbin/casbin/v3/model"
+
+	"github.com/goharbor/harbor/src/pkg/permission/policy"
 	"github.com/goharbor/harbor/src/pkg/permission/types"
 )
 
-// Syntax for models see https://casbin.org/docs/en/syntax-for-models
-const modelText = `
-# Request definition
-[request_definition]
-r = sub, obj, act
+// baseModel is parsed once. Parsing the model text is the expensive half of
+// building an enforcer, and every enforcer built here uses the same text.
+var baseModel = sync.OnceValues(func() (model.Model, error) {
+	return model.NewModelFromString(policy.Model)
+})
 
-# Policy definition
-[policy_definition]
-p = sub, obj, act, eft
+func makeEnforcer(policies []*types.Policy, username string) (*casbin.Enforcer, error) {
+	base, err := baseModel()
+	if err != nil {
+		return nil, err
+	}
+	m := base.Copy()
 
-# Role definition
-[role_definition]
-g = _, _
-
-# Policy effect
-[policy_effect]
-e = some(where (p.eft == allow)) && !some(where (p.eft == deny))
-
-# Matchers
-[matchers]
-m = g(r.sub, p.sub) && keyMatch2(r.obj, p.obj) && (r.act == p.act || p.act == '*')
-`
-
-func makeEnforcer(rbacUser types.RBACUser) *casbin.Enforcer {
-	m := model.Model{}
-	m.LoadModelFromText(modelText)
-
-	e := casbin.NewEnforcer(m, &adapter{rbacUser: rbacUser}, log.GetLevel() <= log.DebugLevel)
-	e.AddFunction("keyMatch2", keyMatch2Func)
-	return e
+	e, err := casbin.NewEnforcer(m, &adapter{policies: policies, username: username})
+	if err != nil {
+		return nil, err
+	}
+	e.AddFunction(policy.KeyMatch2FuncName, policy.KeyMatch2Func)
+	return e, nil
 }
