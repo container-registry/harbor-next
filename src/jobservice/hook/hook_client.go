@@ -23,18 +23,12 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-<<<<<<< HEAD
-=======
 	"path"
->>>>>>> 7396332d5 (Improve job status hook handling (#24137))
 	"strings"
 	"time"
 
 	commonhttp "github.com/goharbor/harbor/src/common/http"
-<<<<<<< HEAD
-=======
 	"github.com/goharbor/harbor/src/common/secret"
->>>>>>> 7396332d5 (Improve job status hook handling (#24137))
 	"github.com/goharbor/harbor/src/jobservice/config"
 	"github.com/goharbor/harbor/src/lib/log"
 )
@@ -157,7 +151,6 @@ func (bc *basicClient) SendEvent(evt *Event) error {
 	return nil
 }
 
-<<<<<<< HEAD
 // rebaseOnCore swaps the scheme and host of a hook URL for core's current
 // address. The URL is frozen into the job record when the job is created, so it
 // goes stale whenever CORE_URL changes under a running instance, e.g. when
@@ -185,7 +178,8 @@ func rebaseOnCore(raw string) string {
 // path-prefixed value cannot be spliced onto the hook path correctly.
 func isPlainOrigin(u *url.URL) bool {
 	return (u.Scheme == "http" || u.Scheme == "https") && u.Host != "" && (u.Path == "" || u.Path == "/")
-=======
+}
+
 // isCoreNotificationURL identifies callbacks to the configured core service.
 // Match scheme and authority (including port), reject URL user info, and require
 // a clean decoded path so dot segments cannot resolve outside notifications.
@@ -199,5 +193,4 @@ func isCoreNotificationURL(target *url.URL) bool {
 		strings.EqualFold(target.Host, core.Host) &&
 		path.Clean(target.Path) == target.Path &&
 		strings.HasPrefix(target.Path, strings.TrimSuffix(core.Path, "/")+"/service/notifications/")
->>>>>>> 7396332d5 (Improve job status hook handling (#24137))
 }
