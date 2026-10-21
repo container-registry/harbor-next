@@ -68,28 +68,20 @@ func init() {
 		clients: map[string]*http.Client{},
 	}
 
-<<<<<<< HEAD
-	var secureOptions []func(*http.Transport)
-=======
 	secureOptions := []func(*http.Transport){commonhttp.WithEgressGuard()}
->>>>>>> f6f5bac8d (feat(webhook): add webhook egress policy levels and allowlist (#24079))
 	if commonhttp.InternalTLSEnabled() {
 		secureOptions = append(secureOptions, commonhttp.WithInternalTLSConfig())
 	}
 	httpHelper.clients[secure] = &http.Client{
-		Transport:     commonhttp.NewPublicNetworkTransport(secureOptions...),
+		Transport:     commonhttp.NewTransport(secureOptions...),
 		Timeout:       timeout,
 		CheckRedirect: blockRedirect,
 	}
 	httpHelper.clients[insecure] = &http.Client{
-<<<<<<< HEAD
-		Transport:     commonhttp.NewPublicNetworkTransport(commonhttp.WithInsecureSkipVerify(true)),
-=======
 		Transport: commonhttp.NewTransport(
 			commonhttp.WithInsecureSkipVerify(true),
 			commonhttp.WithEgressGuard(),
 		),
->>>>>>> f6f5bac8d (feat(webhook): add webhook egress policy levels and allowlist (#24079))
 		Timeout:       timeout,
 		CheckRedirect: blockRedirect,
 	}
@@ -102,9 +94,8 @@ func blockRedirect(_ *http.Request, _ []*http.Request) error {
 	return http.ErrUseLastResponse
 }
 
-// drainBody discards up to maxDrainBytes of the response body as a best-effort attempt to let the
-// pooled connection be reused; a longer body is not read to the end, so that connection is closed
-// instead. The body itself is never surfaced to the caller.
+// drainBody discards a bounded amount of the response body so the pooled connection can be
+// reused once the body is closed; the body itself is never surfaced to the caller.
 func drainBody(body io.Reader) {
 	_, _ = io.Copy(io.Discard, io.LimitReader(body, maxDrainBytes))
 }

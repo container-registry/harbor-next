@@ -16,7 +16,6 @@ package http
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -33,12 +32,6 @@ import (
 	"github.com/goharbor/harbor/src/lib/log"
 )
 
-<<<<<<< HEAD
-// privateNetworkAccessEnv opts every Harbor outbound HTTP client that installs the
-// public-network guard back into reaching private/loopback/link-local destinations.
-// Default (unset/false) fails closed. Set through the chart value network.allowPrivateNetworkAccess
-// or the compose HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS variable.
-=======
 // webhookEgressPolicyEnv selects which destinations the webhook and Slack notification clients
 // may reach: allow_all, block_restricted (the default) or public_only. See egressLevel.
 const webhookEgressPolicyEnv = "HARBOR_WEBHOOK_EGRESS_POLICY"
@@ -51,7 +44,6 @@ const webhookEgressAllowlistEnv = "HARBOR_WEBHOOK_EGRESS_ALLOWLIST"
 
 // privateNetworkAccessEnv is the deprecated boolean from 2.15. When the policy is not set it keeps
 // its meaning: true allows everything, false allows public destinations only.
->>>>>>> f6f5bac8d (feat(webhook): add webhook egress policy levels and allowlist (#24079))
 const privateNetworkAccessEnv = "HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS"
 
 // Exceptions and denials follow the IANA IPv4/IPv6 special-purpose address registries.
@@ -125,23 +117,10 @@ func newGuardedDialer() *net.Dialer {
 	return &net.Dialer{
 		Timeout:   30 * time.Second,
 		KeepAlive: 30 * time.Second,
+		DualStack: true,
 	}
 }
 
-<<<<<<< HEAD
-// privateNetworkAccessAllowed reports whether the operator opted back into private egress.
-func privateNetworkAccessAllowed() bool {
-	allowed, err := strconv.ParseBool(os.Getenv(privateNetworkAccessEnv))
-	return err == nil && allowed
-}
-
-// blockPrivateNetwork is a net.Dialer.Control callback. It runs after DNS resolution and on
-// every dial (including redirect hops), so it defeats DNS rebinding. It fails closed unless
-// HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS is set.
-func blockPrivateNetwork(_ string, address string, _ syscall.RawConn) error {
-	if privateNetworkAccessAllowed() {
-		return nil
-=======
 // egressLevel is how far the notification clients may reach beyond public addresses.
 type egressLevel int
 
@@ -192,7 +171,6 @@ func currentEgressPolicy() egressPolicy {
 		cache.policy = parseEgressPolicy(policyEnv, legacyEnv, allowlist)
 		cache.policyEnv, cache.legacyEnv, cache.raw = policyEnv, legacyEnv, allowlist
 		cache.loaded = true
->>>>>>> f6f5bac8d (feat(webhook): add webhook egress policy levels and allowlist (#24079))
 	}
 	return cache.policy
 }
@@ -385,14 +363,6 @@ func ValidateNetworkTarget(ctx context.Context, resolver NetworkResolver, host s
 	if policy.level == egressAllowAll {
 		return nil
 	}
-<<<<<<< HEAD
-	_, err := resolvePublicNetworkTarget(ctx, resolver, host)
-	return err
-}
-
-// resolvePublicNetworkTarget returns the first address of a host whose addresses are all public.
-func resolvePublicNetworkTarget(ctx context.Context, resolver NetworkResolver, host string) (netip.Addr, error) {
-=======
 	if err := validateNetworkTarget(ctx, resolver, policy, host); err != nil {
 		policy.logBlocked(host, err)
 		return err
@@ -401,53 +371,38 @@ func resolvePublicNetworkTarget(ctx context.Context, resolver NetworkResolver, h
 }
 
 func validateNetworkTarget(ctx context.Context, resolver NetworkResolver, policy egressPolicy, host string) error {
->>>>>>> f6f5bac8d (feat(webhook): add webhook egress policy levels and allowlist (#24079))
 	host = strings.TrimSuffix(strings.ToLower(host), ".")
 	if host == "" {
-		return netip.Addr{}, fmt.Errorf("target must include a hostname")
+		return fmt.Errorf("target must include a hostname")
 	}
 	if policy.allowsHost(host) {
 		return nil
 	}
 	if isBlockedTargetHostname(host) {
-<<<<<<< HEAD
-		return netip.Addr{}, fmt.Errorf("target hostname %q is not public", host)
-=======
 		return fmt.Errorf("target hostname %q is restricted", host)
->>>>>>> f6f5bac8d (feat(webhook): add webhook egress policy levels and allowlist (#24079))
 	}
 
 	address, err := netip.ParseAddr(host)
 	if err == nil {
-<<<<<<< HEAD
-		if !isPublicNetworkAddress(address) {
-			return netip.Addr{}, fmt.Errorf("target address %q is not public", host)
-=======
 		if err := policy.checkAddress(address); err != nil {
 			return fmt.Errorf("target address %q is blocked: %w", host, err)
->>>>>>> f6f5bac8d (feat(webhook): add webhook egress policy levels and allowlist (#24079))
 		}
-		return address, nil
+		return nil
 	}
 
 	if resolver == nil {
-		return netip.Addr{}, fmt.Errorf("target hostname %q cannot be resolved", host)
+		return fmt.Errorf("target hostname %q cannot be resolved", host)
 	}
 	addresses, err := resolver.LookupNetIP(ctx, "ip", host)
 	if err != nil || len(addresses) == 0 {
-		return netip.Addr{}, fmt.Errorf("target hostname %q cannot be resolved", host)
+		return fmt.Errorf("target hostname %q cannot be resolved", host)
 	}
 	for _, address := range addresses {
-<<<<<<< HEAD
-		if !isPublicNetworkAddress(address) {
-			return netip.Addr{}, fmt.Errorf("target hostname %q resolves to a non-public address", host)
-=======
 		if err := policy.checkAddress(address); err != nil {
 			return fmt.Errorf("target hostname %q resolves to a blocked address: %w", host, err)
->>>>>>> f6f5bac8d (feat(webhook): add webhook egress policy levels and allowlist (#24079))
 		}
 	}
-	return addresses[0].Unmap(), nil
+	return nil
 }
 
 func isBlockedTargetHostname(host string) bool {
@@ -462,14 +417,6 @@ func isBlockedTargetHostname(host string) bool {
 	return false
 }
 
-<<<<<<< HEAD
-// withPublicNetworkOnly blocks connections to non-public destinations. Direct connections are
-// checked at dial time on the resolved address. When the transport's proxy
-// (HTTP_PROXY/HTTPS_PROXY/NO_PROXY) applies, the dial goes to the operator's proxy instead, so
-// the target host is validated before the request is handed to it. Honors the
-// HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS escape hatch.
-func withPublicNetworkOnly(resolver NetworkResolver) func(*http.Transport) {
-=======
 // WithEgressGuard enforces the egress policy on a transport. Intended for the notification
 // (webhook/slack) HTTP clients, whose targets are user-controlled. Direct connections are checked
 // at dial time on the resolved address. When the transport's proxy (HTTP_PROXY/HTTPS_PROXY/NO_PROXY)
@@ -480,7 +427,6 @@ func WithEgressGuard() func(*http.Transport) {
 }
 
 func withEgressGuard(resolver NetworkResolver) func(*http.Transport) {
->>>>>>> f6f5bac8d (feat(webhook): add webhook egress policy levels and allowlist (#24079))
 	return func(transport *http.Transport) {
 		guard := &egressGuard{resolver: resolver, upstreamProxy: transport.Proxy}
 		dialer := newGuardedDialer()
@@ -494,113 +440,7 @@ func withEgressGuard(resolver NetworkResolver) func(*http.Transport) {
 	}
 }
 
-<<<<<<< HEAD
-// NewPublicNetworkTransport returns a transport that only reaches public destinations, for the
-// notification (webhook/slack) clients. On top of the dial-time guard it pins proxied requests
-// to the address Harbor validated: the proxy receives that IP instead of the hostname, so it
-// cannot resolve the name again to a private address (DNS rebinding). HTTPS tunnels to the IP
-// and still sends the original Host and verifies the certificate against the hostname. Plain
-// HTTP through a proxy sends the IP as Host, because the proxy reads the target from it.
-func NewPublicNetworkTransport(opts ...func(*http.Transport)) http.RoundTripper {
-	return newPublicNetworkTransport(net.DefaultResolver, opts...)
-}
-
-func newPublicNetworkTransport(resolver NetworkResolver, opts ...func(*http.Transport)) http.RoundTripper {
-	transport := newDefaultTransport()
-	for _, opt := range opts {
-		opt(transport)
-	}
-	upstreamProxy := transport.Proxy
-	withPublicNetworkOnly(resolver)(transport)
-	return &pinnedProxyTransport{base: transport, upstreamProxy: upstreamProxy, resolver: resolver}
-}
-
-type pinnedProxyTransport struct {
-	base          *http.Transport
-	upstreamProxy func(*http.Request) (*url.URL, error)
-	resolver      NetworkResolver
-	// tlsTransports holds a clone of base per HTTPS hostname, with ServerName set so the
-	// certificate is verified against the hostname while the tunnel goes to the pinned IP.
-	tlsTransports sync.Map
-}
-
-func (pinned *pinnedProxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if pinned.upstreamProxy == nil || privateNetworkAccessAllowed() {
-		return pinned.base.RoundTrip(req)
-	}
-	proxyURL, err := pinned.upstreamProxy(req)
-	if err != nil {
-		closeRequestBody(req)
-		return nil, err
-	}
-	hostname := req.URL.Hostname()
-	if _, err := netip.ParseAddr(hostname); proxyURL == nil || err == nil {
-		// direct requests are checked at dial time, and a literal IP has nothing to rebind
-		return pinned.base.RoundTrip(req)
-	}
-
-	address, err := resolvePublicNetworkTarget(req.Context(), pinned.resolver, hostname)
-	if err != nil {
-		closeRequestBody(req)
-		return nil, err
-	}
-	pinnedReq := req.Clone(req.Context())
-	switch port := req.URL.Port(); {
-	case port != "":
-		pinnedReq.URL.Host = net.JoinHostPort(address.String(), port)
-	case address.Is6():
-		pinnedReq.URL.Host = "[" + address.String() + "]"
-	default:
-		pinnedReq.URL.Host = address.String()
-	}
-	transport := pinned.base
-	if strings.EqualFold(req.URL.Scheme, "https") {
-		// the tunnel goes to the IP; the request inside it keeps the original Host
-		if pinnedReq.Host == "" {
-			pinnedReq.Host = req.URL.Host
-		}
-		transport = pinned.tlsTransport(hostname)
-	} else {
-		// a plain HTTP proxy request carries Host in its absolute URI, which the proxy would
-		// resolve again, so the target sees the IP as Host
-		pinnedReq.Host = pinnedReq.URL.Host
-	}
-	resp, err := transport.RoundTrip(pinnedReq)
-	if resp != nil {
-		resp.Request = req
-	}
-	return resp, err
-}
-
-// Base returns the guarded transport underneath the pinning, for inspection.
-func (pinned *pinnedProxyTransport) Base() *http.Transport {
-	return pinned.base
-}
-
-func (pinned *pinnedProxyTransport) tlsTransport(hostname string) *http.Transport {
-	if transport, ok := pinned.tlsTransports.Load(hostname); ok {
-		return transport.(*http.Transport)
-	}
-	transport := pinned.base.Clone()
-	if transport.TLSClientConfig == nil {
-		transport.TLSClientConfig = &tls.Config{}
-	}
-	transport.TLSClientConfig.ServerName = hostname
-	actual, _ := pinned.tlsTransports.LoadOrStore(hostname, transport)
-	return actual.(*http.Transport)
-}
-
-// closeRequestBody honours the RoundTripper contract of closing the body on error.
-func closeRequestBody(req *http.Request) {
-	if req.Body != nil {
-		_ = req.Body.Close()
-	}
-}
-
-type publicNetworkGuard struct {
-=======
 type egressGuard struct {
->>>>>>> f6f5bac8d (feat(webhook): add webhook egress policy levels and allowlist (#24079))
 	resolver      NetworkResolver
 	upstreamProxy func(*http.Request) (*url.URL, error)
 	guardedDial   func(context.Context, string, string) (net.Conn, error)
@@ -624,7 +464,7 @@ func (guard *egressGuard) proxy(req *http.Request) (*url.URL, error) {
 				return nil, err
 			}
 		}
-		return nil, nil //nolint:nilnil // http.Transport.Proxy reads a nil URL and nil error as "no proxy"
+		return nil, nil
 	}
 	// The proxy, not this process, resolves and connects to the target, so the dial-time check
 	// cannot see it. Validate the target before handing it over.

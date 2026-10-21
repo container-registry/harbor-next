@@ -16,9 +16,7 @@ package http
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
-	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -114,15 +112,6 @@ func TestValidateNetworkTarget(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
-// TestValidatePublicNetworkTargetEscapeHatch proves the HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
-// opt-out lets an operator keep webhooking to internal targets (backward-compat contract).
-func TestValidatePublicNetworkTargetEscapeHatch(t *testing.T) {
-	t.Setenv(privateNetworkAccessEnv, "false")
-	require.Error(t, ValidatePublicNetworkTarget(context.Background(), nil, "127.0.0.1"))
-	t.Setenv(privateNetworkAccessEnv, "true")
-	require.NoError(t, ValidatePublicNetworkTarget(context.Background(), nil, "127.0.0.1"))
-=======
 // TestValidateNetworkTargetDefault covers the default policy: internal webhook receivers keep
 // working, while targets that reach the host itself or cloud metadata stay blocked.
 func TestValidateNetworkTargetDefault(t *testing.T) {
@@ -176,7 +165,6 @@ func TestValidateNetworkTargetDefault(t *testing.T) {
 			require.ErrorContains(t, ValidateNetworkTarget(context.Background(), resolver, host), "restricted")
 		})
 	}
->>>>>>> f6f5bac8d (feat(webhook): add webhook egress policy levels and allowlist (#24079))
 }
 
 // TestEgressLevelPrecedence pins the compatibility contract: the policy wins, the deprecated boolean
@@ -302,13 +290,8 @@ func TestWithEgressGuard(t *testing.T) {
 
 	dial := func(address string) error {
 		transport := &http.Transport{Proxy: http.ProxyFromEnvironment}
-<<<<<<< HEAD
-		withPublicNetworkOnly(net.DefaultResolver)(transport)
-		conn, err := transport.DialContext(context.Background(), "tcp", listener.Addr().String())
-=======
 		WithEgressGuard()(transport)
 		conn, err := transport.DialContext(context.Background(), "tcp", address)
->>>>>>> f6f5bac8d (feat(webhook): add webhook egress policy levels and allowlist (#24079))
 		if conn != nil {
 			_ = conn.Close()
 		}
@@ -363,11 +346,7 @@ func TestWithEgressGuardHonoursProxy(t *testing.T) {
 	proxy := newRecordingProxy(t)
 
 	transport := &http.Transport{Proxy: http.ProxyURL(proxy.url)}
-<<<<<<< HEAD
-	withPublicNetworkOnly(net.DefaultResolver)(transport)
-=======
 	WithEgressGuard()(transport)
->>>>>>> f6f5bac8d (feat(webhook): add webhook egress policy levels and allowlist (#24079))
 	client := &http.Client{Transport: transport, Timeout: 2 * time.Second}
 
 	resp, err := client.Get("http://8.8.8.8/hook")
@@ -468,123 +447,6 @@ func TestWithEgressGuardProxyPrivateAllowed(t *testing.T) {
 	assert.Equal(t, []string{"http://10.0.0.1/hook"}, proxy.seen())
 }
 
-<<<<<<< HEAD
-// TestPublicNetworkTransportPinsProxiedHTTPTarget covers DNS rebinding through a proxy: the proxy
-// receives the address Harbor validated, never the hostname, so it cannot resolve it again to a
-// private address. Plain HTTP carries that address as Host too.
-func TestPublicNetworkTransportPinsProxiedHTTPTarget(t *testing.T) {
-	t.Setenv(privateNetworkAccessEnv, "false")
-	var mu sync.Mutex
-	var seen []string
-	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		seen = append(seen, r.URL.String()+" host="+r.Host)
-		mu.Unlock()
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	t.Cleanup(proxy.Close)
-	proxyURL, err := url.Parse(proxy.URL)
-	require.NoError(t, err)
-
-	resolver := &stubNetworkResolver{answers: map[string][]netip.Addr{
-		"public.example.com":  {netip.MustParseAddr("8.8.8.8")},
-		"public6.example.com": {netip.MustParseAddr("2606:4700:4700::1111")},
-		"rebound.example.com": {netip.MustParseAddr("10.0.0.1")},
-	}}
-	client := &http.Client{
-		Transport: newPublicNetworkTransport(resolver, func(transport *http.Transport) {
-			transport.Proxy = http.ProxyURL(proxyURL)
-		}),
-		Timeout: 2 * time.Second,
-	}
-
-	for _, target := range []string{"http://public.example.com/hook", "http://public6.example.com:8080/hook"} {
-		resp, err := client.Get(target)
-		require.NoError(t, err)
-		_ = resp.Body.Close()
-		assert.Equal(t, target, resp.Request.URL.String(), "the caller's request is reported back")
-	}
-	_, err = client.Get("http://rebound.example.com/hook")
-	require.ErrorContains(t, err, "non-public address")
-
-	mu.Lock()
-	defer mu.Unlock()
-	assert.Equal(t, []string{
-		"http://8.8.8.8/hook host=8.8.8.8",
-		"http://[2606:4700:4700::1111]:8080/hook host=[2606:4700:4700::1111]:8080",
-	}, seen)
-}
-
-// TestPublicNetworkTransportPinsProxiedHTTPSTarget checks the HTTPS tunnel: CONNECT goes to the
-// validated address, and the certificate is still verified against the hostname.
-func TestPublicNetworkTransportPinsProxiedHTTPSTarget(t *testing.T) {
-	t.Setenv(privateNetworkAccessEnv, "false")
-	target := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	t.Cleanup(target.Close)
-
-	var mu sync.Mutex
-	var connects []string
-	// the proxy records the CONNECT target and tunnels every request to the test server
-	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodConnect {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
-		mu.Lock()
-		connects = append(connects, r.Host)
-		mu.Unlock()
-		upstream, err := net.Dial("tcp", target.Listener.Addr().String())
-		if err != nil {
-			w.WriteHeader(http.StatusBadGateway)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		conn, buffered, err := http.NewResponseController(w).Hijack()
-		if err != nil {
-			_ = upstream.Close()
-			return
-		}
-		go func() {
-			_, _ = buffered.WriteTo(upstream)
-			_, _ = io.Copy(upstream, conn)
-			_ = upstream.Close()
-		}()
-		_, _ = io.Copy(conn, upstream)
-		_ = conn.Close()
-	}))
-	t.Cleanup(proxy.Close)
-	proxyURL, err := url.Parse(proxy.URL)
-	require.NoError(t, err)
-
-	resolver := &stubNetworkResolver{answers: map[string][]netip.Addr{
-		// httptest's certificate is issued for example.com
-		"example.com": {netip.MustParseAddr("8.8.8.8")},
-		"other.test":  {netip.MustParseAddr("8.8.4.4")},
-	}}
-	roots := target.Client().Transport.(*http.Transport).TLSClientConfig.RootCAs
-	client := &http.Client{
-		Transport: newPublicNetworkTransport(resolver, func(transport *http.Transport) {
-			transport.Proxy = http.ProxyURL(proxyURL)
-			transport.TLSClientConfig = &tls.Config{RootCAs: roots}
-		}),
-		Timeout: 2 * time.Second,
-	}
-
-	resp, err := client.Get("https://example.com/hook")
-	require.NoError(t, err)
-	_ = resp.Body.Close()
-	assert.Equal(t, http.StatusNoContent, resp.StatusCode)
-
-	// a hostname the certificate does not cover still fails verification
-	_, err = client.Get("https://other.test/hook")
-	require.Error(t, err)
-
-	mu.Lock()
-	defer mu.Unlock()
-	assert.Equal(t, []string{"8.8.8.8:443", "8.8.4.4:443"}, connects)
-=======
 func TestParseEgressPolicy(t *testing.T) {
 	policy := parseEgressPolicy("", "", "10.0.0.0/8 ::ffff:172.16.0.0/108, 192.168.1.10, fe80::1%eth0, *.svc.cluster.local, Hooks.Example.COM., bad host, -, *.")
 	assert.Equal(t, egressBlockRestricted, policy.level)
@@ -623,5 +485,4 @@ func TestWithEgressGuardAllowlistedHostThroughProxy(t *testing.T) {
 	_, err = client.Get("http://hooks.elsewhere.internal/hook")
 	require.ErrorContains(t, err, "cannot be resolved")
 	assert.Equal(t, []string{"http://hooks.corp.internal/hook"}, proxy.seen())
->>>>>>> f6f5bac8d (feat(webhook): add webhook egress policy levels and allowlist (#24079))
 }
