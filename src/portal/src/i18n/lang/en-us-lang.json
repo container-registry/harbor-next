@@ -1273,13 +1273,8 @@
     },
     "RETAG": {
         "MSG_SUCCESS": "Copy artifact successfully",
-<<<<<<< HEAD
-        "TIP_REPO": "A repository name is broken up into path components. A component of a repository name must be at least one lowercase, alpha-numeric characters, optionally separated by periods, dashes or underscores. More strictly, it must match the regular expression [a-z0-9]+(?:[._-][a-z0-9]+)*.If a repository name has two or more path components, they must be separated by a forward slash ('/').The total length of a repository name, including slashes, must be less the 256 characters.",
-        "TIP_TAG": "A tag is a label applied to a Docker image in a repository. Tags are how various images in a repository are distinguished from each other.It need to match Regex: (`[\\w][\\w.-]{0,127}`)"
-=======
         "TIP_REPO": "A repository name is broken up into path components. A component of a repository name must be at least one lowercase, alphanumeric character, optionally separated by periods, dashes or underscores. More strictly, it must match the regular expression [a-z0-9]+(?:[._-][a-z0-9]+)*. If a repository name has two or more path components, they must be separated by a forward slash ('/'). The total length of a repository name, including slashes, must be less than 256 characters.",
         "TIP_TAG": "A tag is a label applied to a Docker image in a repository. Tags are how various images in a repository are distinguished from each other. It needs to match regex: (`[\\w][\\w.-]{0,127}`)"
->>>>>>> ab9e0805a (fix: correct grammar, formatting, and non-actionable error messages (#23974))
     },
     "CVE_ALLOWLIST": {
         "DEPLOYMENT_SECURITY": "Deployment security",
@@ -1403,7 +1398,6 @@
         "ADD_TITLE": "Add Tag Immutability Rule",
         "ADD_SUBTITLE": "Specify a tag immutability rule for this project.  Note: all tag immutability rules are first independently calculated and then unioned to capture the final set of immutable tags.",
         "IN_REPOSITORIES": "For the repositories",
-<<<<<<< HEAD
         "CONDITION": "Immutability Condition",
         "ACTION_IMMUTABLE": "apply",
         "RULE_NAME_5": " always",
@@ -1415,10 +1409,7 @@
         "RULE_TEMPLATE_7": " to artifacts pushed within the last # days",
         "RULE_TEMPLATE_8": " to the most recently pushed # artifacts",
         "RULE_TEMPLATE_9": " to the most recently pulled # artifacts",
-        "REP_SEPARATOR": "Enter multiple comma separated repos,repo*,or **",
-=======
         "REP_SEPARATOR": "Enter multiple comma-separated repos: repo, repo*, or **.",
->>>>>>> ab9e0805a (fix: correct grammar, formatting, and non-actionable error messages (#23974))
         "TAGS": "Tags",
         "TAG_SEPARATOR": "Enter multiple comma-separated tags: tag, tag*, or **.",
         "EDIT_TITLE": "Edit Tag Immutability Rule",
@@ -1628,13 +1619,8 @@
         "DIGEST": "Digest",
         "TYPE": "Type",
         "TASKS": "Tasks",
-<<<<<<< HEAD
-        "TASKS_PLACEHOLDER": "We couldn't find any task",
-        "SEVERITY_WARNING": "Vulnerability settings here conflicts with the relevant project configuration that will override the settings here",
-=======
         "TASKS_PLACEHOLDER": "We couldn't find any tasks!",
         "SEVERITY_WARNING": "Vulnerability settings here conflict with the relevant project configuration that will override the settings here",
->>>>>>> ab9e0805a (fix: correct grammar, formatting, and non-actionable error messages (#23974))
         "REPOS": "Repositories",
         "TAGS": "Tags",
         "CRITERIA": "Criteria",
@@ -1657,13 +1643,8 @@
         "DELETE_SUCCESSFULLY": "Deleted policy successfully",
         "UPDATED_SUCCESSFULLY": "Updated policy successfully",
         "EXECUTIONS": "Executions",
-<<<<<<< HEAD
-        "TAG_SEPARATOR": "Enter multiple comma separated tags,tag*,or **",
-        "CONTENT_WARNING": "Content trust settings here conflicts with the relevant project configuration that will override the settings here",
-=======
         "TAG_SEPARATOR": "Enter multiple comma-separated tags: tag, tag*, or **.",
         "CONTENT_WARNING": "Content trust settings here conflict with the relevant project configuration that will override the settings here",
->>>>>>> ab9e0805a (fix: correct grammar, formatting, and non-actionable error messages (#23974))
         "PREHEAT_EXPLAIN": "Preheat will migrate the image to the p2p network",
         "CRITERIA_EXPLAIN": "As specified in 'Deployment security' section under Configuration tab",
         "SKIP_CERT_VERIFY": "Check this box to skip certificate verification when the remote provider uses a self-signed or untrusted certificate.",

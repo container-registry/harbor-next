@@ -32,11 +32,7 @@ var (
 	// ErrValueNotSet ...
 	ErrValueNotSet = errors.New("the configure value is not set")
 	// ErrStringValueIsEmpty ...
-<<<<<<< HEAD
-	ErrStringValueIsEmpty = errors.New("the configure value cannot be empty")
-=======
 	ErrStringValueIsEmpty = errors.New("The configuration value cannot be empty")
->>>>>>> ab9e0805a (fix: correct grammar, formatting, and non-actionable error messages (#23974))
 )
 
 // ConfigureValue - struct to hold a actual value, also include the name of config metadata.
