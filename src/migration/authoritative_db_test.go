@@ -65,6 +65,8 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
 		"CREATE TABLE project (project_id SERIAL PRIMARY KEY)",
 		"CREATE TABLE execution (id SERIAL PRIMARY KEY, revision INTEGER)",
+		"CREATE TABLE role (role_id SERIAL PRIMARY KEY, role_code VARCHAR(20), name VARCHAR(20))",
+		"CREATE TABLE project_member (id SERIAL PRIMARY KEY, project_id INTEGER, entity_id INTEGER, entity_type CHAR(1), role INTEGER)",
 	}
 	for _, statement := range legacyDependencies {
 		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
@@ -208,6 +210,8 @@ func TestExecutionRevisionGuardResolvesThroughSearchPath(t *testing.T) {
 	// current_schema() guard could not see
 	setup := []string{
 		fmt.Sprintf("CREATE TABLE %s.execution (id SERIAL PRIMARY KEY, revision INTEGER)", later),
+		fmt.Sprintf("CREATE TABLE %s.role (role_id SERIAL PRIMARY KEY, role_code VARCHAR(20), name VARCHAR(20))", later),
+		fmt.Sprintf("CREATE TABLE %s.project_member (id SERIAL PRIMARY KEY, project_id INTEGER, entity_id INTEGER, entity_type CHAR(1), role INTEGER)", later),
 		fmt.Sprintf("CREATE TABLE %s.robot (id BIGSERIAL PRIMARY KEY)", first),
 		fmt.Sprintf("CREATE TABLE %s.project (project_id SERIAL PRIMARY KEY)", first),
 	}
@@ -290,6 +294,8 @@ func TestExecutionRevisionGuardIgnoresNonTableRelations(t *testing.T) {
 		"CREATE INDEX execution ON decoy (revision)",
 		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
 		"CREATE TABLE project (project_id SERIAL PRIMARY KEY)",
+		"CREATE TABLE role (role_id SERIAL PRIMARY KEY, role_code VARCHAR(20), name VARCHAR(20))",
+		"CREATE TABLE project_member (id SERIAL PRIMARY KEY, project_id INTEGER, entity_id INTEGER, entity_type CHAR(1), role INTEGER)",
 	} {
 		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
 			t.Fatalf("setup %q: %v", statement, err)
@@ -341,6 +347,8 @@ func TestIdentityProvidersAudienceReconcilesLegacyTable(t *testing.T) {
 		"CREATE TABLE project (project_id SERIAL PRIMARY KEY, owner_id INTEGER)",
 		"CREATE TABLE retention_policy (id SERIAL PRIMARY KEY, scope_level VARCHAR(20), scope_reference INTEGER, data TEXT)",
 		"CREATE TABLE execution (id SERIAL PRIMARY KEY, revision INTEGER)",
+		"CREATE TABLE role (role_id SERIAL PRIMARY KEY, role_code VARCHAR(20), name VARCHAR(20))",
+		"CREATE TABLE project_member (id SERIAL PRIMARY KEY, project_id INTEGER, entity_id INTEGER, entity_type CHAR(1), role INTEGER)",
 		`CREATE TABLE identity_providers (
 			id                      SERIAL PRIMARY KEY,
 			name                    TEXT NOT NULL,

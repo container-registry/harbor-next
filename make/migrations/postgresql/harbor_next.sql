@@ -213,3 +213,38 @@ BEGIN
     END IF;
 END
 $$;
+
+-- Custom project roles (upstream goharbor/harbor#23804). Built-in role
+-- permissions stay in the compile-time policy map; only custom roles persist
+-- theirs in permission_policy/role_permission.
+ALTER TABLE role ADD COLUMN IF NOT EXISTS is_builtin   BOOLEAN      NOT NULL DEFAULT FALSE;
+ALTER TABLE role ADD COLUMN IF NOT EXISTS description  TEXT;
+ALTER TABLE role ADD COLUMN IF NOT EXISTS modified     BOOLEAN      NOT NULL DEFAULT FALSE;
+ALTER TABLE role ADD COLUMN IF NOT EXISTS created_by   VARCHAR(255);
+ALTER TABLE role ADD COLUMN IF NOT EXISTS created_at   TIMESTAMP WITH TIME ZONE;
+ALTER TABLE role ADD COLUMN IF NOT EXISTS modified_by  VARCHAR(255);
+ALTER TABLE role ADD COLUMN IF NOT EXISTS modified_at  TIMESTAMP WITH TIME ZONE;
+
+-- Role names match the API/UI contract (was varchar(20)) and are unique
+-- case-insensitively, so "Maintainer" and "maintainer" cannot coexist.
+ALTER TABLE role ALTER COLUMN name TYPE varchar(255);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_role_name ON role (lower(name));
+
+-- Roles seeded by the numbered migrations are built-in and immutable.
+UPDATE role SET is_builtin = TRUE
+WHERE name IN ('projectAdmin', 'developer', 'guest', 'maintainer', 'limitedGuest')
+  AND is_builtin = FALSE;
+
+-- A role still assigned to a member cannot be deleted, which closes the
+-- count-then-delete race in the role Delete controller.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_project_member_role'
+    ) THEN
+        ALTER TABLE project_member
+            ADD CONSTRAINT fk_project_member_role
+            FOREIGN KEY (role) REFERENCES role (role_id) ON DELETE RESTRICT;
+    END IF;
+END
+$$;
