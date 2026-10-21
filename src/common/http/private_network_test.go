@@ -16,7 +16,9 @@ package http
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -485,4 +487,169 @@ func TestWithEgressGuardAllowlistedHostThroughProxy(t *testing.T) {
 	_, err = client.Get("http://hooks.elsewhere.internal/hook")
 	require.ErrorContains(t, err, "cannot be resolved")
 	assert.Equal(t, []string{"http://hooks.corp.internal/hook"}, proxy.seen())
+}
+
+func newPinTestClient(proxyURL *url.URL, resolver NetworkResolver, opts ...func(*http.Transport)) *http.Client {
+	opts = append([]func(*http.Transport){func(transport *http.Transport) {
+		transport.Proxy = http.ProxyURL(proxyURL)
+	}}, opts...)
+	return &http.Client{Transport: newEgressTransport(resolver, opts...), Timeout: 2 * time.Second}
+}
+
+// TestEgressTransportPinsProxiedHTTPTarget covers DNS rebinding through a proxy: the proxy
+// receives the address Harbor validated, never the hostname, so it cannot resolve it again to a
+// blocked address. Plain HTTP carries that address as Host too.
+func TestEgressTransportPinsProxiedHTTPTarget(t *testing.T) {
+	for _, level := range []string{"block_restricted", "public_only"} {
+		t.Run(level, func(t *testing.T) {
+			setEgressEnv(t, level, "", "")
+			var mu sync.Mutex
+			var seen []string
+			proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				mu.Lock()
+				seen = append(seen, r.URL.String()+" host="+r.Host)
+				mu.Unlock()
+				w.WriteHeader(http.StatusNoContent)
+			}))
+			t.Cleanup(proxy.Close)
+			proxyURL, err := url.Parse(proxy.URL)
+			require.NoError(t, err)
+
+			resolver := &stubNetworkResolver{answers: map[string][]netip.Addr{
+				"public.example.com":  {netip.MustParseAddr("8.8.8.8")},
+				"public6.example.com": {netip.MustParseAddr("2606:4700:4700::1111")},
+				"meta.example.com":    {netip.MustParseAddr("169.254.169.254")},
+			}}
+			client := newPinTestClient(proxyURL, resolver)
+
+			for _, target := range []string{"http://public.example.com/hook", "http://public6.example.com:8080/hook"} {
+				resp, err := client.Get(target)
+				require.NoError(t, err)
+				_ = resp.Body.Close()
+				assert.Equal(t, target, resp.Request.URL.String(), "the caller's request is reported back")
+			}
+			_, err = client.Get("http://meta.example.com/hook")
+			require.ErrorContains(t, err, "blocked address")
+
+			mu.Lock()
+			defer mu.Unlock()
+			assert.Equal(t, []string{
+				"http://8.8.8.8/hook host=8.8.8.8",
+				"http://[2606:4700:4700::1111]:8080/hook host=[2606:4700:4700::1111]:8080",
+			}, seen)
+		})
+	}
+}
+
+// TestEgressTransportPrivateTargetPerLevel checks the pin keeps each level's meaning: a private
+// answer is pinned under block_restricted and refused under public_only.
+func TestEgressTransportPrivateTargetPerLevel(t *testing.T) {
+	resolver := &stubNetworkResolver{answers: map[string][]netip.Addr{
+		"internal.example.com": {netip.MustParseAddr("10.0.0.5")},
+	}}
+	setEgressEnv(t, "block_restricted", "", "")
+	proxy := newRecordingProxy(t)
+	resp, err := newPinTestClient(proxy.url, resolver).Get("http://internal.example.com/hook")
+	require.NoError(t, err)
+	_ = resp.Body.Close()
+	assert.Equal(t, []string{"http://10.0.0.5/hook"}, proxy.seen())
+
+	setEgressEnv(t, "public_only", "", "")
+	_, err = newPinTestClient(proxy.url, resolver).Get("http://internal.example.com/hook")
+	require.ErrorContains(t, err, "blocked address")
+	assert.Len(t, proxy.seen(), 1)
+}
+
+// TestEgressTransportAllowlistedHostForwardedByName keeps an allowlisted name unresolved and
+// unpinned, and allow_all passes every request through untouched.
+func TestEgressTransportAllowlistedHostForwardedByName(t *testing.T) {
+	resolver := &stubNetworkResolver{}
+	setEgressEnv(t, "public_only", "", "hooks.internal.example.com, *.svc.cluster.local")
+	proxy := newRecordingProxy(t)
+	client := newPinTestClient(proxy.url, resolver)
+	for _, target := range []string{"http://hooks.internal.example.com/hook", "http://Recv.SVC.cluster.local./hook"} {
+		resp, err := client.Get(target)
+		require.NoError(t, err)
+		_ = resp.Body.Close()
+	}
+	assert.Equal(t, []string{"http://hooks.internal.example.com/hook", "http://Recv.SVC.cluster.local./hook"}, proxy.seen())
+	assert.Empty(t, resolver.calls, "an allowlisted hostname is never resolved")
+
+	setEgressEnv(t, "allow_all", "", "")
+	resp, err := client.Get("http://other.example.com/hook")
+	require.NoError(t, err)
+	_ = resp.Body.Close()
+	assert.Equal(t, "http://other.example.com/hook", proxy.seen()[2])
+}
+
+// TestEgressTransportPinsProxiedHTTPSTarget checks the HTTPS tunnel: CONNECT goes to the
+// validated address, and the certificate is still verified against the hostname.
+func TestEgressTransportPinsProxiedHTTPSTarget(t *testing.T) {
+	setEgressEnv(t, "block_restricted", "", "")
+	target := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(target.Close)
+
+	var mu sync.Mutex
+	var connects []string
+	// the proxy records the CONNECT target and tunnels every request to the test server
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodConnect {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		mu.Lock()
+		connects = append(connects, r.Host)
+		mu.Unlock()
+		upstream, err := net.Dial("tcp", target.Listener.Addr().String())
+		if err != nil {
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		conn, buffered, err := http.NewResponseController(w).Hijack()
+		if err != nil {
+			_ = upstream.Close()
+			return
+		}
+		go func() {
+			_, _ = buffered.WriteTo(upstream)
+			_, _ = io.Copy(upstream, conn)
+			_ = upstream.Close()
+		}()
+		_, _ = io.Copy(conn, upstream)
+		_ = conn.Close()
+	}))
+	t.Cleanup(proxy.Close)
+	proxyURL, err := url.Parse(proxy.URL)
+	require.NoError(t, err)
+
+	resolver := &stubNetworkResolver{answers: map[string][]netip.Addr{
+		// httptest's certificate is issued for example.com
+		"example.com": {netip.MustParseAddr("8.8.8.8")},
+		"other.test":  {netip.MustParseAddr("8.8.4.4")},
+		"meta.test":   {netip.MustParseAddr("169.254.169.254")},
+	}}
+	roots := target.Client().Transport.(*http.Transport).TLSClientConfig.RootCAs
+	client := newPinTestClient(proxyURL, resolver, func(transport *http.Transport) {
+		transport.TLSClientConfig = &tls.Config{RootCAs: roots}
+	})
+
+	resp, err := client.Get("https://example.com/hook")
+	require.NoError(t, err)
+	_ = resp.Body.Close()
+	assert.Equal(t, http.StatusNoContent, resp.StatusCode)
+
+	// a hostname the certificate does not cover still fails verification
+	_, err = client.Get("https://other.test/hook")
+	require.Error(t, err)
+
+	// a rebound answer never reaches the proxy
+	_, err = client.Get("https://meta.test/hook")
+	require.ErrorContains(t, err, "blocked address")
+
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Equal(t, []string{"8.8.8.8:443", "8.8.4.4:443"}, connects)
 }
