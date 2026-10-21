@@ -41,12 +41,11 @@
                             class="color-red"></clr-icon>
                         <span>{{ 'REPLICATION.FAILURE' | translate }}</span>
                         <clr-tooltip>
-                            @if (execution.status_text) {
                             <clr-icon
+                                *ngIf="execution.status_text"
                                 clrTooltipTrigger
                                 shape="info-circle"
                                 size="18"></clr-icon>
-                            }
                             <clr-tooltip-content
                                 [clrPosition]="'bottom-right'"
                                 clrSize="lg"
@@ -194,12 +193,11 @@
                 <clr-dg-cell
                     >{{ getStatusStr(t.status)
                     }}<clr-tooltip>
-                        @if (t.status_message) {
                         <clr-icon
+                            *ngIf="t.status_message"
                             clrTooltipTrigger
                             shape="info-circle"
                             size="20"></clr-icon>
-                        }
                         <clr-tooltip-content
                             [clrPosition]="'left'"
                             clrSize="lg"
