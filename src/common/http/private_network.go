@@ -29,6 +29,9 @@ import (
 	"syscall"
 	"time"
 	"unicode"
+	"unicode/utf8"
+
+	"golang.org/x/net/idna"
 
 	"github.com/goharbor/harbor/src/lib/log"
 )
@@ -609,5 +612,21 @@ func canonicalAddr(target *url.URL) string {
 	if port == "" {
 		port = defaultPorts[strings.ToLower(target.Scheme)]
 	}
-	return net.JoinHostPort(target.Hostname(), port)
+	host := target.Hostname()
+	// net/http dials the IDNA ASCII form, so a Unicode alias of the proxy host must map to it too
+	if !isASCII(host) {
+		if ascii, err := idna.Lookup.ToASCII(host); err == nil {
+			host = ascii
+		}
+	}
+	return net.JoinHostPort(host, port)
+}
+
+func isASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] >= utf8.RuneSelf {
+			return false
+		}
+	}
+	return true
 }

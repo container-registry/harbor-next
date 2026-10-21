@@ -24,6 +24,7 @@ import (
 	"net/http/httptest"
 	"net/netip"
 	"net/url"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -443,6 +444,44 @@ func TestWithEgressGuardProxyAddressNotReachableDirectly(t *testing.T) {
 	_, err = client.Get(proxy.url.String() + "/internal")
 	require.ErrorContains(t, err, "restricted network address")
 	assert.Equal(t, []string{"http://8.8.8.8/hook"}, proxy.seen())
+}
+
+// TestWithEgressGuardProxyAddressUnicodeAlias covers a direct request naming the proxy in fullwidth
+// Unicode: net/http dials its IDNA ASCII form, the proxy address, so it must not get the exemption.
+func TestWithEgressGuardProxyAddressUnicodeAlias(t *testing.T) {
+	setEgressEnv(t, "block_restricted", "", "")
+	proxy := newRecordingProxy(t)
+	transport := &http.Transport{Proxy: func(req *http.Request) (*url.URL, error) {
+		if req.URL.Path == "/hook" {
+			return proxy.url, nil
+		}
+		return nil, nil
+	}}
+	withEgressGuard(&stubNetworkResolver{})(transport)
+	client := &http.Client{Transport: transport, Timeout: 2 * time.Second}
+
+	resp, err := client.Get("http://8.8.8.8/hook")
+	require.NoError(t, err)
+	_ = resp.Body.Close()
+
+	fullwidth := strings.NewReplacer("0", "０", "1", "１", "2", "２", "7", "７", ".", "．").Replace(proxy.url.Hostname())
+	_, err = client.Get("http://" + net.JoinHostPort(fullwidth, proxy.url.Port()) + "/internal")
+	require.Error(t, err)
+	assert.Equal(t, []string{"http://8.8.8.8/hook"}, proxy.seen())
+}
+
+func TestCanonicalAddr(t *testing.T) {
+	for raw, want := range map[string]string{
+		"http://proxy":       "proxy:80",
+		"https://PROXY:8443": "PROXY:8443",
+		"socks5://[::1]":     "[::1]:1080",
+		"http://１２７．０．０．１:3128": "127.0.0.1:3128",
+		"http://ｐｒｏｘｙ.example":  "proxy.example:80",
+	} {
+		target, err := url.Parse(raw)
+		require.NoError(t, err)
+		assert.Equal(t, want, canonicalAddr(target), raw)
+	}
 }
 
 // TestWithEgressGuardNoProxyStillGuardsDial covers NO_PROXY: when the proxy function declines a
