@@ -60,17 +60,15 @@ func TestPushBlobChunkRejectsCrossHostLocation(t *testing.T) {
 	// chunk 1 (start==0): initiate + PATCH to upstream; upstream returns attacker as next Location,
 	// which is validated against the server that issued it and rejected right there.
 	loc, _, err := c.PushBlobChunk("repo", "sha256:deadbeef", 4, strings.NewReader("AB"), 0, 1, "")
-	if err == nil {
-		// defensive: should the Location ever be handed back, the next chunk must refuse it too.
-		_, _, err = c.PushBlobChunk("repo", "sha256:deadbeef", 4, strings.NewReader("CD"), 2, 3, loc)
+	if err == nil || !strings.Contains(err.Error(), "different origin") {
+		t.Fatalf("first chunk must be rejected on receipt of the cross-host Location, got err=%v", err)
 	}
-
+	if strings.Contains(loc, attacker.URL) {
+		t.Fatalf("rejected Location must not be handed back, got %q", loc)
+	}
 	if got := atomic.LoadInt64(&attackerHits); got != 0 {
 		t.Fatalf("attacker host was contacted %d time(s) with auth %q; cross-host upload Location must be refused (SSRF + credential leak)",
 			got, attackerAuth.Load())
-	}
-	if err == nil {
-		t.Fatalf("cross-host Location must fail closed, got nil error (location=%q)", loc)
 	}
 }
 
@@ -225,17 +223,8 @@ func TestResolveUploadLocation_OriginRules(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-<<<<<<< HEAD
-			u, err := url.Parse(got)
-			if err != nil {
-				t.Fatalf("resolved URL %q does not parse: %v", got, err)
-			}
-			if u.Host != tc.wantHost {
-				t.Fatalf("resolved URL %q targets host %q, want %q", got, u.Host, tc.wantHost)
-=======
 			if got != tc.want {
 				t.Fatalf("got %q, want %q", got, tc.want)
->>>>>>> c32959059 (fix(registry): validate upload Location against the request origin, n… (#24113))
 			}
 		})
 	}
@@ -305,12 +294,29 @@ func TestBuildBlobUploadURL(t *testing.T) {
 // in a rejected Location out of the returned error, which replication logs verbatim.
 func TestResolveUploadLocation_ErrorRedactsSecrets(t *testing.T) {
 	const endpoint = "http://good-registry.example:5000"
+	origin, _ := url.Parse(endpoint + "/v2/foo/blobs/uploads/")
 	for _, location := range []string{
 		"http://evil.attacker.com/steal?token=s3cr3t-token",
 		"http://user:s3cr3t-pass@evil.attacker.com/steal",
 		"http://good-registry.example:5000@evil.attacker.com/steal?token=s3cr3t-token",
 	} {
-		_, err := resolveUploadLocation(endpoint, location)
+		_, err := resolveUploadLocation(endpoint, origin, location)
+		if err == nil {
+			t.Fatalf("expected rejection for %q", location)
+		}
+		if msg := err.Error(); strings.Contains(msg, "s3cr3t") {
+			t.Fatalf("error leaks secret from Location %q: %s", location, msg)
+		}
+	}
+}
+
+// TestParseUploadLocation_ErrorRedactsSecrets covers the non-absolute error path of the builders.
+func TestParseUploadLocation_ErrorRedactsSecrets(t *testing.T) {
+	for _, location := range []string{
+		"/v2/foo/blobs/uploads/uuid?token=s3cr3t-token#s3cr3t-frag",
+		"v2/foo?token=s3cr3t-token",
+	} {
+		_, err := parseUploadLocation(location)
 		if err == nil {
 			t.Fatalf("expected rejection for %q", location)
 		}

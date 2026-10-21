@@ -844,22 +844,11 @@ func parseUploadLocation(location string) (*url.URL, error) {
 	if err != nil {
 		return nil, err
 	}
-<<<<<<< HEAD
-	ref, err := url.Parse(location)
-	if err != nil {
-		return nil, err
-	}
-	// userinfo turns a same-origin-looking value into a cross-origin host and has no legitimate use
-	// in an upload Location.
-	if ref.User != nil {
-		return nil, fmt.Errorf("registry upload Location must not contain userinfo: %q", redactUploadLocation(ref))
-=======
 	if u.User != nil {
-		return nil, fmt.Errorf("registry upload Location must not contain userinfo: %q", location)
->>>>>>> c32959059 (fix(registry): validate upload Location against the request origin, n… (#24113))
+		return nil, fmt.Errorf("registry upload Location must not contain userinfo: %q", redactUploadLocation(u))
 	}
 	if !u.IsAbs() || u.Host == "" {
-		return nil, fmt.Errorf("registry upload Location must be an absolute URL: %q", location)
+		return nil, fmt.Errorf("registry upload Location must be an absolute URL: %q", redactUploadLocation(u))
 	}
 	return u, nil
 }
@@ -880,7 +869,7 @@ func resolveUploadLocation(endpoint string, origin *url.URL, location string) (s
 	}
 	// userinfo has no legitimate use in an upload Location and makes the host ambiguous.
 	if ref.User != nil {
-		return "", fmt.Errorf("registry upload Location must not contain userinfo: %q", location)
+		return "", fmt.Errorf("registry upload Location must not contain userinfo: %q", redactUploadLocation(ref))
 	}
 	// "//host/..." is a network-path reference and is resolved against origin below.
 	if ref.Scheme == "" && ref.Host == "" && strings.HasPrefix(location, "/") && !strings.HasPrefix(location, "//") {
@@ -895,15 +884,9 @@ func resolveUploadLocation(endpoint string, origin *url.URL, location string) (s
 			return "", err
 		}
 	}
-<<<<<<< HEAD
-	next := base.ResolveReference(ref)
-	if !sameRegistryOrigin(base, next) {
-		return nil, fmt.Errorf("registry upload Location %q resolves to a different origin than %q", redactUploadLocation(next), base.Redacted())
-=======
 	next := origin.ResolveReference(ref)
 	if !sameRegistryOrigin(origin, next) {
-		return "", fmt.Errorf("registry upload Location %q resolves to a different origin than %q", location, origin.Redacted())
->>>>>>> c32959059 (fix(registry): validate upload Location against the request origin, n… (#24113))
+		return "", fmt.Errorf("registry upload Location %q resolves to a different origin than %q", redactUploadLocation(next), origin.Redacted())
 	}
 	return next.String(), nil
 }
