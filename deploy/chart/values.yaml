@@ -1386,8 +1386,9 @@ exporter:
   # @default -- {}
   deploymentStrategy: {}
 
-  # -- Container probes, rendered verbatim. See `core.probes` for the
-  # tuning rationale.
+  # -- Container probes, rendered verbatim; see `core.probes`. Timeouts are 5s
+  # because a `/metrics` request that misses the exporter cache (off by
+  # default) queries the database, which takes 1-2s on large registries.
   # @default -- See [values.yaml](values.yaml)
   probes:
     startup:
@@ -1396,21 +1397,21 @@ exporter:
         port: 8001
       periodSeconds: 2
       failureThreshold: 30
-      timeoutSeconds: 2
+      timeoutSeconds: 5
     readiness:
       httpGet:
         path: /metrics
         port: 8001
       periodSeconds: 5
       failureThreshold: 2
-      timeoutSeconds: 2
+      timeoutSeconds: 5
     liveness:
       httpGet:
         path: /metrics
         port: 8001
       periodSeconds: 10
       failureThreshold: 3
-      timeoutSeconds: 3
+      timeoutSeconds: 5
 
   # -- Exporter image settings
   image:
