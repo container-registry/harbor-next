@@ -464,6 +464,7 @@ func (guard *egressGuard) proxy(req *http.Request) (*url.URL, error) {
 				return nil, err
 			}
 		}
+		// nolint:nilnil // a nil proxy URL means no proxy for http.Transport.Proxy
 		return nil, nil
 	}
 	// The proxy, not this process, resolves and connects to the target, so the dial-time check
