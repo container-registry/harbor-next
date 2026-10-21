@@ -148,6 +148,18 @@ func TestParseAccountRegion(t *testing.T) {
 			expectErr:   false,
 		},
 		{
+			url:         "https://123456.DKR.ECR.US-WEST-2.AMAZONAWS.COM",
+			expectedID:  "123456",
+			expectedReg: "us-west-2",
+			expectErr:   false,
+		},
+		{
+			url:         "HTTPS://API.ECR.CN-NORTH-1.AMAZONAWS.COM.CN",
+			expectedID:  "",
+			expectedReg: "cn-north-1",
+			expectErr:   false,
+		},
+		{
 			url:         "https://api.ecr-public.us-east-1.amazonaws.com",
 			expectedID:  "",
 			expectedReg: "us-east-1",
@@ -383,7 +395,7 @@ func TestAwsAuthCredential_Modify(t *testing.T) {
 		"test-region", "xxx", "ppp", true, "", &server.URL)
 	require.Nil(t, err)
 	a, _ := NewAuth("xxx", svc).(*awsAuthCredential)
-	req := httptest.NewRequest(http.MethodGet, "https://1234.dkr.ecr.test-region.amazonaws.com/v2/", nil)
+	req := httptest.NewRequest(http.MethodGet, "https://1234.DKR.ECR.TEST-REGION.AMAZONAWS.COM/v2/", nil)
 	err = a.Modify(req)
 	require.Nil(t, err)
 	err = a.Modify(req)
