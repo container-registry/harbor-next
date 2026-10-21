@@ -1996,6 +1996,7 @@
         "DELETION_TITLE": "删除角色确认",
         "DELETION_SUMMARY": "您确认删除角色 {{param}}?",
         "UPDATE": "更新",
+        "OPERATE": "执行",
         "AUDIT_LOG": "审核日志",
         "PREHEAT_INSTANCE": "预热实例",
         "PROJECT": "项目",

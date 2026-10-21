@@ -33,7 +33,6 @@ import { Access } from '../../../../../ng-swagger-gen/models/access';
 import { Permission } from '../../../../../ng-swagger-gen/models/permission';
 
 @Component({
-    standalone: false,
     selector: 'role-permissions-panel',
     templateUrl: './role-permissions-panel.component.html',
     styleUrls: ['./role-permissions-panel.component.scss'],

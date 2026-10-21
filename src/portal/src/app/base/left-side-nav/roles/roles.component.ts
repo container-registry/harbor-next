@@ -64,7 +64,6 @@ import { Permissions } from '../../../../../ng-swagger-gen/models/permissions';
 import { AddRoleComponent } from './add-role/add-role.component';
 
 @Component({
-    standalone: false,
     selector: 'roles',
     templateUrl: './roles.component.html',
     styleUrls: ['./roles.component.scss'],
@@ -285,7 +284,7 @@ export class RolesComponent implements OnInit, OnDestroy {
             ConfirmationTargets.ROLE,
             ConfirmationButtons.DELETE_CANCEL
         );
-        this.operateDialogService.openComfirmDialog(deletionMessage);
+        this.operateDialogService.openConfirmDialog(deletionMessage);
     }
 
     addSuccess(role: Role) {
@@ -311,6 +310,11 @@ export class RolesComponent implements OnInit, OnDestroy {
 
     getRoleAccess(r: Role): Access[] {
         return getRoleAccess(r);
+    }
+
+    // Built-in roles come back with Go's zero time, which is not a real date.
+    hasTime(value: string): boolean {
+        return !!value && new Date(value).getUTCFullYear() > 1;
     }
 
     protected readonly PermissionSelectPanelModes = PermissionSelectPanelModes;

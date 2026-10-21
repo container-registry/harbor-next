@@ -115,20 +115,12 @@
                     member_type_toString(m.entity_type) | translate
                 }}</clr-dg-cell>
                 <clr-dg-cell>
-<<<<<<< HEAD
                     <span
                         *ngIf="ChangeRoleOngoing(m.id)"
                         class="spinner spinner-inline"></span>
                     <span *ngIf="!ChangeRoleOngoing(m.id)">{{
-                        roleInfo[m.role_id] | translate
+                        getMemberRoleDisplayName(m)
                     }}</span>
-=======
-                    @if (ChangeRoleOngoing(m.id)) {
-                    <span class="spinner spinner-inline"></span>
-                    } @if (!ChangeRoleOngoing(m.id)) {
-                    <span>{{ getMemberRoleDisplayName(m) }}</span>
-                    }
->>>>>>> 205159bd9 (Custom project roles — frontend UI (#23970))
                 </clr-dg-cell>
             </clr-dg-row>
             <clr-dg-footer>

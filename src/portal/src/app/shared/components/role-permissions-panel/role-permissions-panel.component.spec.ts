@@ -75,7 +75,6 @@ describe('RolePermissionsPanelComponent', () => {
             <role-permissions-panel [mode]="mode"> </role-permissions-panel>
         </ng-container>
     `,
-    standalone: false,
 })
 class TestHostComponent {
     @ViewChild(RolePermissionsPanelComponent)

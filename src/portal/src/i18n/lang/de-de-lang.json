@@ -1994,6 +1994,7 @@
         "DELETION_TITLE": "Entfernen der Rolle(n) bestätigen",
         "DELETION_SUMMARY": "Sollen die Rolle(n) {{param}} gelöscht werden?",
         "UPDATE": "Update",
+        "OPERATE": "Ausführen",
         "AUDIT_LOG": "Audit Log",
         "PREHEAT_INSTANCE": "Preheat Instance",
         "PROJECT": "Projekt",

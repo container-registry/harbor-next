@@ -55,7 +55,6 @@ import { Permissions } from '../../../../../../ng-swagger-gen/models/permissions
 import { getAllRoles } from '../../../../shared/units/role-util';
 
 @Component({
-    standalone: false,
     selector: 'add-role',
     templateUrl: './add-role.component.html',
     styleUrls: ['./add-role.component.scss'],

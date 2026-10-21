@@ -96,8 +96,7 @@
             <clr-dg-placeholder>{{
                 'ROLE.NOT_FOUND' | translate
             }}</clr-dg-placeholder>
-            @for (r of roles; track r.id) {
-            <clr-dg-row [clrDgItem]="r">
+            <clr-dg-row *ngFor="let r of roles" [clrDgItem]="r">
                 <clr-dg-cell class="id-col">{{ r.id }}</clr-dg-cell>
                 <clr-dg-cell>{{ getRoleName(r) }}</clr-dg-cell>
                 <clr-dg-cell class="builtin-col">
@@ -134,13 +133,13 @@
 
                 <clr-dg-cell>{{ r.created_by || '–' }}</clr-dg-cell>
                 <clr-dg-cell>{{
-                    r.created_at
+                    hasTime(r.created_at)
                         ? (r.created_at | harborDatetime : 'short')
                         : '–'
                 }}</clr-dg-cell>
                 <clr-dg-cell>
                     {{
-                        r.modified_at
+                        hasTime(r.modified_at)
                             ? (r.modified_at | harborDatetime : 'short')
                             : '–'
                     }}
@@ -152,7 +151,6 @@
                     >
                 </clr-dg-cell>
             </clr-dg-row>
-            }
             <clr-dg-footer>
                 <clr-dg-pagination
                     #pagination

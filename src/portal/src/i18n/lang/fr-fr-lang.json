@@ -1996,6 +1996,7 @@
         "DELETION_TITLE": "Confirmer la suppression du ou des rôles",
         "DELETION_SUMMARY": "Voulez-vous supprimer le(s) rôle(s) {{param}} ?",
         "UPDATE": "Mettre à jour",
+        "OPERATE": "Exécuter",
         "AUDIT_LOG": "Log d'audit",
         "PREHEAT_INSTANCE": "Préchauffer l'instance",
         "PROJECT": "Projet",

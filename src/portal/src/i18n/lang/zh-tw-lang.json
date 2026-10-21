@@ -2013,6 +2013,7 @@
         "DELETION_TITLE": "確認移除角色",
         "DELETION_SUMMARY": "確定要刪除角色 {{param}} 嗎？",
         "UPDATE": "更新",
+        "OPERATE": "執行",
         "AUDIT_LOG": "稽核日誌",
         "PREHEAT_INSTANCE": "預熱執行個體",
         "PROJECT": "專案",

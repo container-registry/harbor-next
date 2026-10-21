@@ -30,9 +30,17 @@ function fakeRoleService(total: number) {
     for (let id = 1; id <= total; id++) {
         all.push(role(id));
     }
-    const calls: { page: number; pageSize: number }[] = [];
-    const page = (params: { page?: number; pageSize?: number }): Role[] => {
-        calls.push({ page: params.page, pageSize: params.pageSize });
+    const calls: { page: number; pageSize: number; sort: string }[] = [];
+    const page = (params: {
+        page?: number;
+        pageSize?: number;
+        sort?: string;
+    }): Role[] => {
+        calls.push({
+            page: params.page,
+            pageSize: params.pageSize,
+            sort: params.sort,
+        });
         const from = (params.page - 1) * params.pageSize;
         return all.slice(from, from + params.pageSize);
     };
@@ -63,7 +71,9 @@ describe('role-util', () => {
                 res => (roles = res)
             );
             expect(roles.length).toBe(7);
-            expect(service.calls).toEqual([{ page: 1, pageSize: 100 }]);
+            expect(service.calls).toEqual([
+                { page: 1, pageSize: 100, sort: 'role_id' },
+            ]);
         });
 
         it('aggregates every page, in order, when the total exceeds one page', () => {
@@ -77,9 +87,9 @@ describe('role-util', () => {
                 Array.from({ length: 250 }, (_, i) => i + 1)
             );
             expect(service.calls).toEqual([
-                { page: 1, pageSize: 100 },
-                { page: 2, pageSize: 100 },
-                { page: 3, pageSize: 100 },
+                { page: 1, pageSize: 100, sort: 'role_id' },
+                { page: 2, pageSize: 100, sort: 'role_id' },
+                { page: 3, pageSize: 100, sort: 'role_id' },
             ]);
         });
 

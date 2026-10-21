@@ -17,6 +17,8 @@ import { RoleService } from '../../../../ng-swagger-gen/services/role.service';
 import { Role } from '../../../../ng-swagger-gen/models/role';
 
 const ROLE_PAGE_SIZE = 100;
+// Built-ins keep their historical order (Project Admin first), customs follow.
+const ROLE_SORT = 'role_id';
 
 const BUILTIN_ROLE_I18N_KEYS: Record<string, string> = {
     projectAdmin: 'MEMBER.PROJECT_ADMIN',
@@ -45,7 +47,11 @@ export function roleDisplayName(role: Role): string {
  */
 export function getAllRoles(roleService: RoleService): Observable<Role[]> {
     return roleService
-        .ListRoleResponse({ page: 1, pageSize: ROLE_PAGE_SIZE })
+        .ListRoleResponse({
+            page: 1,
+            pageSize: ROLE_PAGE_SIZE,
+            sort: ROLE_SORT,
+        })
         .pipe(
             switchMap(resp => {
                 const first = (resp.body as Role[]) ?? [];
@@ -60,7 +66,11 @@ export function getAllRoles(roleService: RoleService): Observable<Role[]> {
                 const rest: Observable<Role[]>[] = [];
                 for (let page = 2; page <= totalPages; page++) {
                     rest.push(
-                        roleService.ListRole({ page, pageSize: ROLE_PAGE_SIZE })
+                        roleService.ListRole({
+                            page,
+                            pageSize: ROLE_PAGE_SIZE,
+                            sort: ROLE_SORT,
+                        })
                     );
                 }
                 return forkJoin(rest).pipe(

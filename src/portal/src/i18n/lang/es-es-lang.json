@@ -2000,6 +2000,7 @@
         "DELETION_TITLE": "Confirmar la eliminación de rol(es)",
         "DELETION_SUMMARY": "¿Quieres eliminar el/los rol(es) {{param}}?",
         "UPDATE": "Actualizar",
+        "OPERATE": "Operar",
         "AUDIT_LOG": " Log de Auditoría",
         "PREHEAT_INSTANCE": "Instancia de Preheat",
         "PROJECT": "Proyecto",

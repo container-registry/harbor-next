@@ -3234,6 +3234,7 @@
     "DELETION_TITLE": "Подтвердить удаление ролей",
     "DELETION_SUMMARY": "Вы хотите удалить роли {{param}}?",
     "UPDATE": "Обновить",
+    "OPERATE": "Выполнить",
     "AUDIT_LOG": "Журнал аудита",
     "PREHEAT_INSTANCE": "Разогрев Экземпляра",
     "PROJECT": "Проект",

@@ -1994,6 +1994,7 @@
         "DELETION_TITLE": "Rollerin kaldırılmasını onaylayın",
         "DELETION_SUMMARY": "{{param}} rollerini silmek istiyor musunuz?",
         "UPDATE": "Update",
+        "OPERATE": "Çalıştır",
         "AUDIT_LOG": "Audit Log",
         "PREHEAT_INSTANCE": "Preheat Instance",
         "PROJECT": "Proje",

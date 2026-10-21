@@ -2003,6 +2003,7 @@
         "DELETION_TITLE": "Confirmar a remoção da(s) função(ões)",
         "DELETION_SUMMARY": "Você quer remover a(s) função(ões) {{param}}?",
         "UPDATE": "Update",
+        "OPERATE": "Operar",
         "AUDIT_LOG": "Audit Log",
         "PREHEAT_INSTANCE": "Preheat Instance",
         "PROJECT": "Projeto",
