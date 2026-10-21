@@ -14,7 +14,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { CUSTOM_ELEMENTS_SCHEMA, EventEmitter } from '@angular/core';
 import { ImmutableTagService } from '../immutable-tag.service';
-import { ImmutableRetentionRule } from '../../tag-retention/retention';
+import {
+    ImmutableRetentionRule,
+    SELECTOR_KIND_DOUBLESTAR,
+    SELECTOR_KIND_REGEX,
+} from '../../tag-retention/retention';
 import { ErrorHandler } from '../../../../../shared/units/error-handler';
 import { InlineAlertComponent } from '../../../../../shared/components/inline-alert/inline-alert.component';
 import { AddImmutableRuleComponent } from './add-immutable-rule.component';
@@ -164,6 +168,60 @@ describe('AddRuleComponent', () => {
             fixture.nativeElement.querySelector('.alert-text');
         expect(elRep1).toBeFalsy();
     });
+    it('should default to the doublestar engine', () => {
+        expect(component.repoKind).toEqual(SELECTOR_KIND_DOUBLESTAR);
+        expect(component.tagsKind).toEqual(SELECTOR_KIND_DOUBLESTAR);
+    });
+
+    it('should store a regex pattern verbatim', () => {
+        component.tagsKind = SELECTOR_KIND_REGEX;
+        component.tagsInput = 'v\\d{2,3}';
+        expect(component.rule.tag_selectors[0].pattern).toEqual('v\\d{2,3}');
+        expect(component.tagsInput).toEqual('v\\d{2,3}');
+
+        component.repoKind = SELECTOR_KIND_REGEX;
+        component.repositories = 'library/(redis|harbor)';
+        expect(component.rule.scope_selectors.repository[0].pattern).toEqual(
+            'library/(redis|harbor)'
+        );
+    });
+
+    it('should keep whitespace in a regex pattern on save', () => {
+        component.rules = [];
+        component.repoKind = SELECTOR_KIND_REGEX;
+        component.tagsKind = SELECTOR_KIND_REGEX;
+        component.repositories = 'library/(a|b) c';
+        component.tagsInput = '[a-z ]+';
+
+        component.add();
+
+        expect(component.rule.scope_selectors.repository[0].pattern).toEqual(
+            'library/(a|b) c'
+        );
+        expect(component.rule.tag_selectors[0].pattern).toEqual('[a-z ]+');
+    });
+
+    it('should strip whitespace from a doublestar pattern on save', () => {
+        component.rules = [];
+        component.repositories = 'redis, harbor';
+        component.tagsInput = 'v1, v2';
+
+        component.add();
+
+        expect(component.rule.scope_selectors.repository[0].pattern).toEqual(
+            '{redis,harbor}'
+        );
+        expect(component.rule.tag_selectors[0].pattern).toEqual('{v1,v2}');
+    });
+
+    it('should treat rules differing only by engine as different', () => {
+        component.rules = [mockRules[0]];
+        expect(component.isExistingRule()).toBeTruthy();
+
+        component.tagsKind = SELECTOR_KIND_REGEX;
+        expect(component.isExistingRule()).toBeFalsy();
+    });
+
     it('should be validating repeat rule', () => {
         fixture.detectChanges();
         component.rules = [mockRules[0]];

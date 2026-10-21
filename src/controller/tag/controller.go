@@ -257,9 +257,18 @@ func (c *controller) assembleTag(ctx context.Context, tag *model_tag.Tag, option
 	return t
 }
 
+// populateImmutableStatus resolves whether the tag is protected by an immutability
+// rule. When the status cannot be determined the tag is reported as immutable:
+// every consumer of the flag treats false as permission to overwrite or delete, so
+// an unknown status has to deny the write. This trades availability for integrity
+// on purpose — a rule that cannot be evaluated blocks writes with a clear 412
+// instead of silently letting an immutable tag be replaced.
 func (c *controller) populateImmutableStatus(ctx context.Context, tag *Tag) {
 	artifact, err := c.artMgr.Get(ctx, tag.ArtifactID)
 	if err != nil {
+		log.G(ctx).Errorf("cannot determine the immutable status of tag %s: failed to get artifact %d: %v; reporting the tag as immutable",
+			tag.Name, tag.ArtifactID, err)
+		tag.Immutable = true
 		return
 	}
 	_, repoName := utils.ParseRepository(artifact.RepositoryName)
@@ -269,6 +278,9 @@ func (c *controller) populateImmutableStatus(ctx context.Context, tag *Tag) {
 		NamespaceID: artifact.ProjectID,
 	})
 	if err != nil {
+		log.G(ctx).Errorf("cannot determine the immutable status of tag %s in project %d: %v; reporting the tag as immutable",
+			tag.Name, artifact.ProjectID, err)
+		tag.Immutable = true
 		return
 	}
 	tag.Immutable = matched

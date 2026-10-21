@@ -22,6 +22,7 @@ import (
 
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/orm"
+	"github.com/goharbor/harbor/src/lib/selector/selectors/index"
 	pkg_artifact "github.com/goharbor/harbor/src/pkg/artifact"
 	_ "github.com/goharbor/harbor/src/pkg/config/inmemory"
 	"github.com/goharbor/harbor/src/pkg/tag/model/tag"
@@ -263,6 +264,83 @@ func (c *controllerTestSuite) TestAssembleTag() {
 	c.Equal(tag.ID, tg.ID)
 	c.Equal(true, tag.Immutable)
 	// TODO check signature
+}
+
+// TestAssembleTagUnknownImmutableStatus asserts a tag whose immutable status
+// cannot be determined is never reported as mutable. The push middleware, Ensure
+// and Delete all read this flag, and all three treat false as permission to
+// overwrite or delete the tag.
+func (c *controllerTestSuite) TestAssembleTagUnknownImmutableStatus() {
+	// the error a rule whose kind this build does not know produces, for example
+	// one written by a newer version and read back after a rollback
+	_, matchErr := index.Get("regexp", "matches", "**", "")
+	c.Require().Error(matchErr)
+
+	art := &pkg_artifact.Artifact{
+		ID:             1,
+		ProjectID:      1,
+		RepositoryID:   1,
+		RepositoryName: "library/hello-world",
+	}
+	tg := &tag.Tag{
+		ID:           1,
+		RepositoryID: 1,
+		ArtifactID:   1,
+		Name:         "latest",
+	}
+
+	c.artMgr.On("Get", mock.Anything, mock.Anything).Return(art, nil)
+	mock.OnAnything(c.immutableMtr, "Match").Return(false, matchErr)
+
+	tag := c.ctl.assembleTag(nil, tg, &Option{WithImmutableStatus: true})
+	c.Require().NotNil(tag)
+	c.True(tag.Immutable, "a tag whose immutable status cannot be determined must not be reported as mutable")
+}
+
+// TestAssembleTagUnknownImmutableStatusArtifactError covers the same contract for
+// the other way the status can end up unknown
+func (c *controllerTestSuite) TestAssembleTagUnknownImmutableStatusArtifactError() {
+	tg := &tag.Tag{
+		ID:           1,
+		RepositoryID: 1,
+		ArtifactID:   1,
+		Name:         "latest",
+	}
+
+	c.artMgr.On("Get", mock.Anything, mock.Anything).Return(nil, errors.New("db is down"))
+
+	tag := c.ctl.assembleTag(nil, tg, &Option{WithImmutableStatus: true})
+	c.Require().NotNil(tag)
+	c.True(tag.Immutable)
+}
+
+// TestEnsureRejectsTagWithUnknownImmutableStatus is the reachable consequence:
+// re-pushing a tag onto a different artifact is refused while its immutable
+// status cannot be evaluated, instead of silently overwriting it
+func (c *controllerTestSuite) TestEnsureRejectsTagWithUnknownImmutableStatus() {
+	_, matchErr := index.Get("regexp", "matches", "**", "")
+	c.Require().Error(matchErr)
+
+	c.tagMgr.On("List", mock.Anything, mock.Anything).Return([]*tag.Tag{
+		{
+			ID:           1,
+			RepositoryID: 1,
+			ArtifactID:   1,
+			Name:         "latest",
+		},
+	}, nil)
+	c.artMgr.On("Get", mock.Anything, mock.Anything).Return(&pkg_artifact.Artifact{
+		ID:             1,
+		ProjectID:      1,
+		RepositoryName: "library/hello-world",
+	}, nil)
+	mock.OnAnything(c.immutableMtr, "Match").Return(false, matchErr)
+
+	// artifact 2 differs from the artifact the tag points at, so this is an
+	// overwrite and has to go through the immutable check
+	_, err := c.ctl.Ensure(orm.NewContext(nil, &ormtesting.FakeOrmer{}), 1, 2, "latest")
+	c.Require().Error(err)
+	c.True(errors.IsErr(err, errors.PreconditionCode), "want a precondition failure, got %v", err)
 }
 
 func TestControllerTestSuite(t *testing.T) {
