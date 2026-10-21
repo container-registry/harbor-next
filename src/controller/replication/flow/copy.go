@@ -99,6 +99,7 @@ func (c *copyFlow) Run(ctx context.Context) error {
 
 func (c *copyFlow) getExecution(ctx context.Context) (*task.Execution, error) {
 	if c.executionMgr == nil {
+		// nolint:nilnil // no execution manager means nothing to look up
 		return nil, nil
 	}
 	return c.executionMgr.Get(ctx, c.executionID)
