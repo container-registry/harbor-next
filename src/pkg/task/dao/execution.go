@@ -268,8 +268,13 @@ func (e *executionDAO) refreshStatus(ctx context.Context, id int64) (bool, strin
 		return false, "", false, nil
 	}
 
+	// the execution-origin failure message is the stored one without the generated task summary
+	execMessage := stripTaskSummary(execution.StatusMessage, execution.TaskStatusMessage)
+	execFailed := execution.Status == job.ErrorStatus.String() && execMessage != ""
+
 	var status string
 	var statusMessage string
+	var taskMessage string
 	if metrics.PendingTaskCount > 0 || metrics.RunningTaskCount > 0 || metrics.ScheduledTaskCount > 0 {
 		status = job.RunningStatus.String()
 		statusMessage = ""
@@ -285,18 +290,19 @@ func (e *executionDAO) refreshStatus(ctx context.Context, id int64) (bool, strin
 		if err != nil {
 			return false, "", false, errors.Wrapf(err, "failed to list failed tasks for execution %d", id)
 		}
-		statusMessage = mergeStatusMessages(execution.StatusMessage, aggregateTaskStatusMessages(failedTasks, metrics.ErrorTaskCount))
+		taskMessage = aggregateTaskStatusMessages(failedTasks, metrics.ErrorTaskCount)
+		statusMessage = mergeStatusMessages(execMessage, taskMessage)
 	} else if metrics.StoppedTaskCount > 0 {
-		if execution.Status == job.ErrorStatus.String() {
+		if execFailed {
 			status = job.ErrorStatus.String()
 		} else {
 			status = job.StoppedStatus.String()
 		}
-		statusMessage = execution.StatusMessage
+		statusMessage = execMessage
 	} else if metrics.SuccessTaskCount > 0 {
-		if execution.Status == job.ErrorStatus.String() {
+		if execFailed {
 			status = job.ErrorStatus.String()
-			statusMessage = execution.StatusMessage
+			statusMessage = execMessage
 		} else {
 			status = job.SuccessStatus.String()
 			statusMessage = ""
@@ -308,9 +314,9 @@ func (e *executionDAO) refreshStatus(ctx context.Context, id int64) (bool, strin
 		return false, "", false, err
 	}
 
-	sql := `update execution set status = ?, status_message = ?, revision = revision+1, update_time = ?
+	sql := `update execution set status = ?, status_message = ?, task_status_message = ?, revision = revision+1, update_time = ?
 		where id = ? and revision = ?`
-	result, err := ormer.Raw(sql, status, statusMessage, time.Now(), id, execution.Revision).Exec()
+	result, err := ormer.Raw(sql, status, statusMessage, taskMessage, time.Now(), id, execution.Revision).Exec()
 	if err != nil {
 		return false, "", false, err
 	}
@@ -671,6 +677,19 @@ func aggregateTaskStatusMessages(tasks []*Task, totalCount ...int64) string {
 	}
 	const maxLen = 4096
 	return lib.TruncateUTF8(res, maxLen)
+}
+
+// stripTaskSummary removes the generated task summary from a stored status message
+func stripTaskSummary(msg, summary string) string {
+	msg = strings.TrimSpace(msg)
+	summary = strings.TrimSpace(summary)
+	if summary == "" {
+		return msg
+	}
+	if msg == summary {
+		return ""
+	}
+	return strings.TrimSuffix(msg, "\n"+summary)
 }
 
 // mergeStatusMessages merges the execution-level status message with the aggregated task status message.

@@ -269,13 +269,11 @@ func (bt *basicTracker) Stop() error {
 // Fail is final status, if failed to do, retry should be enforced.
 // Either one is failed, the final return will be marked as failed.
 func (bt *basicTracker) Fail(message ...string) error {
-	if len(message) > 0 && len(message[0]) > 0 {
-		if bt.jobStats != nil && bt.jobStats.Info != nil {
-			bt.jobStats.Info.StatusMessage = message[0]
-		}
-		_ = bt.Update("status_message", message[0])
+	var msg string
+	if len(message) > 0 {
+		msg = message[0]
 	}
-	if err := bt.setStatus(ErrorStatus); err != nil {
+	if err := bt.setStatus(ErrorStatus, msg); err != nil {
 		return errors.Wrap(err, "fail")
 	}
 
@@ -390,15 +388,20 @@ func (bt *basicTracker) Save() (err error) {
 // If update status failed, then retry if permitted.
 // Try best to do
 func (bt *basicTracker) UpdateStatusWithRetry(targetStatus Status) error {
-	err := bt.compareAndSet(targetStatus)
+	return bt.updateStatusWithRetry(targetStatus, "")
+}
+
+func (bt *basicTracker) updateStatusWithRetry(targetStatus Status, message string) error {
+	err := bt.compareAndSet(targetStatus, message)
 	if err != nil {
 		// Status mismatching error will be directly ignored as the status has already been outdated
 		if !errs.IsStatusMismatchError(err) {
 			// Push to the retrying daemon
 			bt.retryList.Push(SimpleStatusChange{
-				JobID:        bt.jobID,
-				TargetStatus: targetStatus.String(),
-				Revision:     bt.jobStats.Info.Revision,
+				JobID:         bt.jobID,
+				TargetStatus:  targetStatus.String(),
+				Revision:      bt.jobStats.Info.Revision,
+				StatusMessage: message,
 			})
 		}
 	}
@@ -447,10 +450,17 @@ func (bt *basicTracker) FireHook() error {
 }
 
 // setStatus sets the job status to the target status and fire status change hook
-func (bt *basicTracker) setStatus(status Status) error {
-	err := bt.UpdateStatusWithRetry(status)
+func (bt *basicTracker) setStatus(status Status, message ...string) error {
+	var msg string
+	if len(message) > 0 {
+		msg = message[0]
+	}
+	err := bt.updateStatusWithRetry(status, msg)
 	if !errs.IsStatusMismatchError(err) {
 		bt.refresh(status)
+		if msg != "" {
+			bt.jobStats.Info.StatusMessage = msg
+		}
 		if er := bt.fireHookEvent(status); er != nil {
 			// Add more error context
 			if err != nil {
@@ -505,7 +515,7 @@ func (bt *basicTracker) fireHookEvent(status Status, checkIn ...string) error {
 	return nil
 }
 
-func (bt *basicTracker) compareAndSet(targetStatus Status) error {
+func (bt *basicTracker) compareAndSet(targetStatus Status, message string) error {
 	conn := bt.pool.Get()
 	defer func() {
 		closeConn(conn)
@@ -521,6 +531,7 @@ func (bt *basicTracker) compareAndSet(targetStatus Status) error {
 		bt.jobStats.Info.Revision,
 		time.Now().Unix(),
 		bt.jobID,
+		message,
 	))
 	if err != nil {
 		return errors.Wrap(err, "compare and set status error")

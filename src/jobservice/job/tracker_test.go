@@ -155,6 +155,58 @@ func (suite *TrackerTestSuite) TestTracker() {
 	assert.Equal(suite.T(), StoppedStatus, st)
 }
 
+// TestStaleFailKeepsStatusMessage tests a rejected stale Fail leaves the current message unchanged
+func (suite *TrackerTestSuite) TestStaleFailKeepsStatusMessage() {
+	jobID := utils.MakeIdentifier()
+	rev := time.Now().Unix()
+	newTracker := func(info *StatsInfo) Tracker {
+		return NewBasicTrackerWithStats(
+			context.TODO(),
+			&Stats{Info: info},
+			suite.namespace,
+			suite.pool,
+			func(hookURL string, change *StatusChange) error { return nil },
+			list.New(),
+		)
+	}
+
+	current := newTracker(&StatsInfo{
+		JobID:         jobID,
+		Status:        RunningStatus.String(),
+		JobKind:       KindGeneric,
+		JobName:       SampleJob,
+		Revision:      rev,
+		StatusMessage: "current diagnostics",
+	})
+	require.NoError(suite.T(), current.Save())
+
+	stale := newTracker(&StatsInfo{
+		JobID:    jobID,
+		Status:   RunningStatus.String(),
+		JobKind:  KindGeneric,
+		JobName:  SampleJob,
+		Revision: rev - 10,
+	})
+	assert.Error(suite.T(), stale.Fail("stale failure"))
+
+	reloaded := NewBasicTrackerWithID(
+		context.TODO(),
+		jobID,
+		suite.namespace,
+		suite.pool,
+		func(hookURL string, change *StatusChange) error { return nil },
+		list.New(),
+	)
+	require.NoError(suite.T(), reloaded.Load())
+	assert.Equal(suite.T(), "current diagnostics", reloaded.Job().Info.StatusMessage)
+	assert.Equal(suite.T(), RunningStatus.String(), reloaded.Job().Info.Status)
+
+	// an accepted Fail persists its message
+	assert.NoError(suite.T(), current.Fail("real failure"))
+	require.NoError(suite.T(), reloaded.Load())
+	assert.Equal(suite.T(), "real failure", reloaded.Job().Info.StatusMessage)
+}
+
 // TestPeriodicTracker tests tracker of periodic
 func (suite *TrackerTestSuite) TestPeriodicTracker() {
 	jobID := utils.MakeIdentifier()

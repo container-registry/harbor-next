@@ -109,9 +109,10 @@ type StatusChange struct {
 
 // SimpleStatusChange only keeps job ID and the target status
 type SimpleStatusChange struct {
-	JobID        string `json:"job_id"`
-	TargetStatus string `json:"target_status"`
-	Revision     int64  `json:"revision"`
+	JobID         string `json:"job_id"`
+	TargetStatus  string `json:"target_status"`
+	Revision      int64  `json:"revision"`
+	StatusMessage string `json:"status_message,omitempty"`
 }
 
 // Validate the job stats

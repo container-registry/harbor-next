@@ -339,5 +339,14 @@ func TestExtractLastLinesFromLog(t *testing.T) {
 	err = os.WriteFile(path.Join(tempDir, fmt.Sprintf("%s.log", sameJobID)), []byte("same error\n"), 0644)
 	require.NoError(t, err)
 	assert.Equal(t, "same error", extractLastLinesFromLog(sameJobID, 3, errors.New("same error")))
-}
 
+	// 7. Combined text over 4096 bytes keeps the run error and the log tail
+	longJobID := "2123456789abcdef01234567"
+	longLog := strings.Repeat("x", 4070) + "\nlast failure detail\n"
+	err = os.WriteFile(path.Join(tempDir, fmt.Sprintf("%s.log", longJobID)), []byte(longLog), 0644)
+	require.NoError(t, err)
+	res := extractLastLinesFromLog(longJobID, 3, errors.New("execution failed"))
+	assert.True(t, len(res) <= 4096)
+	assert.True(t, strings.HasPrefix(res, "execution failed\n..."))
+	assert.True(t, strings.HasSuffix(res, "last failure detail"))
+}

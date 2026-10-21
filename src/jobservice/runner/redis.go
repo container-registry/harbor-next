@@ -306,9 +306,9 @@ func extractLastLinesFromLog(jobID string, maxLines int, runErr error) string {
 		if errStr == logMsg {
 			return errStr
 		}
-		res := fmt.Sprintf("%s\n%s", errStr, logMsg)
 		const maxLen = 4096
-		return lib.TruncateUTF8(res, maxLen)
+		// keep the run error whole and trim the log from its beginning
+		return fmt.Sprintf("%s\n%s", errStr, lib.TruncateUTF8Tail(logMsg, maxLen-len(errStr)-1))
 	}
 	if len(errStr) > 0 {
 		return errStr

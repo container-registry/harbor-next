@@ -29,6 +29,27 @@ func Truncate(str, suffix string, n int) string {
 	return s[:len(str)-(len(s)-n)] + suffix
 }
 
+// TruncateUTF8Tail truncates s to at most maxLen bytes keeping its end, prefixing "..." if truncated,
+// without breaking a multi-byte UTF-8 character.
+func TruncateUTF8Tail(s string, maxLen int) string {
+	s = strings.ToValidUTF8(s, "")
+	if len(s) <= maxLen {
+		return s
+	}
+	const prefix = "..."
+	if maxLen <= 0 {
+		return ""
+	}
+	if maxLen <= len(prefix) {
+		return prefix[:maxLen]
+	}
+	start := len(s) - (maxLen - len(prefix))
+	for start < len(s) && !utf8.RuneStart(s[start]) {
+		start++
+	}
+	return prefix + s[start:]
+}
+
 // TruncateUTF8 truncates s to at most maxLen bytes, ensuring that the truncation boundary
 // does not break a multi-byte UTF-8 character, and appends "..." if truncated.
 // If len(s) <= maxLen, s is returned unmodified.

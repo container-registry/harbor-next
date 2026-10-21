@@ -438,6 +438,54 @@ func (e *executionDAOTestSuite) TestRefreshStatus_PreserveExecutionError() {
 	e.Equal("orig error message\ntask failed error", exec.StatusMessage)
 }
 
+func (e *executionDAOTestSuite) TestRefreshStatus_TaskErrorRecovery() {
+	newTask := func(execID int64, status string, code int, msg string) int64 {
+		id, err := e.taskDao.Create(e.ctx, &Task{
+			ExecutionID:   execID,
+			Status:        status,
+			StatusCode:    code,
+			StatusMessage: msg,
+			ExtraAttrs:    "{}",
+			EndTime:       time.Now(),
+		})
+		e.Require().Nil(err)
+		return id
+	}
+	refresh := func(execID int64) *Execution {
+		_, _, err := e.executionDAO.RefreshStatus(e.ctx, execID)
+		e.Require().Nil(err)
+		exec, err := e.executionDAO.Get(e.ctx, execID)
+		e.Require().Nil(err)
+		return exec
+	}
+
+	execID, err := e.executionDAO.Create(e.ctx, &Execution{VendorType: "test", Trigger: "test", ExtraAttrs: "{}"})
+	e.Require().Nil(err)
+	defer e.executionDAO.Delete(e.ctx, execID)
+
+	t1 := newTask(execID, job.ErrorStatus.String(), job.ErrorStatus.Code(), "quota exceeded")
+	defer e.taskDao.Delete(e.ctx, t1)
+	t2 := newTask(execID, job.ErrorStatus.String(), job.ErrorStatus.Code(), "quota exceeded")
+	defer e.taskDao.Delete(e.ctx, t2)
+
+	exec := refresh(execID)
+	e.Equal(job.ErrorStatus.String(), exec.Status)
+	e.Equal("2 tasks failed with error: quota exceeded", exec.StatusMessage)
+
+	// partial recovery without an intermediate running refresh: the summary is replaced
+	e.Require().Nil(e.taskDao.Update(e.ctx, &Task{ID: t1, Status: job.SuccessStatus.String(), StatusCode: job.SuccessStatus.Code(), StatusMessage: ""}, "Status", "StatusCode", "StatusMessage"))
+	exec = refresh(execID)
+	e.Equal(job.ErrorStatus.String(), exec.Status)
+	e.Equal("quota exceeded", exec.StatusMessage)
+
+	// full recovery without an intermediate running refresh: the error is cleared
+	e.Require().Nil(e.taskDao.Update(e.ctx, &Task{ID: t2, Status: job.SuccessStatus.String(), StatusCode: job.SuccessStatus.Code(), StatusMessage: ""}, "Status", "StatusCode", "StatusMessage"))
+	exec = refresh(execID)
+	e.Equal(job.SuccessStatus.String(), exec.Status)
+	e.Empty(exec.StatusMessage)
+	e.Empty(exec.TaskStatusMessage)
+}
+
 func (e *executionDAOTestSuite) TestAsyncRefreshStatus() {
 	e.T().Setenv("_REDIS_URL_HARBOR", "redis://localhost:6379/0")
 	client, err := libredis.GetHarborClient()
@@ -745,4 +793,3 @@ func TestMergeStatusMessages(t *testing.T) {
 		t.Errorf("expected truncated string <= 4096 ending with ..., got length %d", len(gotLong))
 	}
 }
-

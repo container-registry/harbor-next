@@ -214,6 +214,10 @@ BEGIN
 END
 $$;
 
+-- Generated failed-task summary kept apart from the execution-origin status_message
+-- so a refresh can replace it when tasks recover.
+ALTER TABLE execution ADD COLUMN IF NOT EXISTS task_status_message TEXT NOT NULL DEFAULT '';
+
 -- Custom project roles (upstream goharbor/harbor#23804). Every project role,
 -- the five built-ins included, keeps its grants in
 -- permission_policy/role_permission (goharbor/harbor#24029); core seeds the

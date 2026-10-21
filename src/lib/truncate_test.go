@@ -79,3 +79,20 @@ func TestTruncateUTF8(t *testing.T) {
 	assert.Equal("", TruncateUTF8("hello", -1))
 }
 
+func TestTruncateUTF8Tail(t *testing.T) {
+	assert := assert.New(t)
+
+	assert.Equal("", TruncateUTF8Tail("", 10))
+	assert.Equal("hello", TruncateUTF8Tail("hello", 5))
+	assert.Equal("...world", TruncateUTF8Tail("hello world", 8))
+	assert.Equal("...", TruncateUTF8Tail("hello world", 3))
+	assert.Equal("", TruncateUTF8Tail("hello world", 0))
+
+	// 3-byte runes: the cut lands inside a rune, so it advances to the next rune start
+	res := TruncateUTF8Tail("你好世界", 8)
+	assert.Equal("...界", res)
+	assert.True(len(res) <= 8)
+
+	// invalid UTF-8 bytes are stripped
+	assert.Equal("...rld", TruncateUTF8Tail("hello\xff\xfe world", 6))
+}
