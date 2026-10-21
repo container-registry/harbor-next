@@ -15,11 +15,8 @@
 package main
 
 import (
-<<<<<<< HEAD
-	"math"
-=======
 	"errors"
->>>>>>> c10a0a62c (fix: ignore http.ErrServerClosed on graceful shutdown (#23296))
+	"math"
 	"net/http"
 	"os"
 	"os/signal"
@@ -108,11 +105,10 @@ func main() {
 		exporterOpt.CacheCleanInterval,
 	)
 	prometheus.MustRegister(harborExporter)
-<<<<<<< HEAD
 
 	errCh := make(chan error, 1)
 	go func() {
-		if err := harborExporter.ListenAndServe(); err != nil {
+		if err := harborExporter.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
 	}()
@@ -127,11 +123,6 @@ func main() {
 	case err := <-errCh:
 		log.Errorf("Harbor exporter failed: %v", err)
 		exitCode = 1
-=======
-	if err := harborExporter.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Errorf("Error starting Harbor exporter %s", err)
-		os.Exit(1)
->>>>>>> c10a0a62c (fix: ignore http.ErrServerClosed on graceful shutdown (#23296))
 	}
 
 	dao.ClosePool()
