@@ -49,8 +49,10 @@ type basicClient struct {
 func NewClient(ctx context.Context) Client {
 	// Create transport
 	transport := &http.Transport{
-		MaxIdleConns:    20,
-		IdleConnTimeout: 30 * time.Second,
+		MaxIdleConns: 20,
+		// hooks only target the core endpoint; the default per-host cap of 2 churns connections
+		MaxIdleConnsPerHost: 20,
+		IdleConnTimeout:     30 * time.Second,
 		DialContext: (&net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
