@@ -71,7 +71,7 @@ func (bs *basicScheduler) Schedule(p *Policy) (int64, error) {
 		return -1, errors.New("bad policy object: nil")
 	}
 
-	if err := p.Validate(); err != nil {
+	if err := p.ValidateForRegistration(); err != nil {
 		return -1, err
 	}
 
