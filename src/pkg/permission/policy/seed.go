@@ -180,7 +180,7 @@ func seedRoles(ctx context.Context, tx *sql.Tx) (int, error) {
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
-		return len(wanted), nil
+		return len(wanted), nil // nolint:nilerr // the count is informational, the grants committed
 	}
 	return int(n), nil
 }
