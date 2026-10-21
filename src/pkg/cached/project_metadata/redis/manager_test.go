@@ -25,12 +25,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/goharbor/harbor/src/lib/cache"
-<<<<<<< HEAD
-	"github.com/goharbor/harbor/src/lib/orm"
-=======
 	_ "github.com/goharbor/harbor/src/lib/cache/memory"
+	"github.com/goharbor/harbor/src/lib/orm"
 	"github.com/goharbor/harbor/src/pkg/project/metadata"
->>>>>>> 8414559ce (Improve project metadata cache consistency (#24139))
 	"github.com/goharbor/harbor/src/pkg/project/metadata/models"
 	testcache "github.com/goharbor/harbor/src/testing/lib/cache"
 	"github.com/goharbor/harbor/src/testing/mock"
@@ -147,22 +144,23 @@ func (m *managerTestSuite) TestFlushAll() {
 	m.NoError(err)
 }
 
-// TestCleanUpKeys_DoesNotSpinOnCanceledContext: under the old retry.Retry a
+// TestCleanUpAll_DoesNotSpinOnCanceledContext: under the old retry.Retry a
 // canceled context would keep the loop spinning for the full default timeout
 // while the enclosing DB transaction sat open holding row locks. Under the fix,
-// retry observes context.Canceled as terminal and cleanUpKeys returns promptly.
-func (m *managerTestSuite) TestCleanUpKeys_DoesNotSpinOnCanceledContext() {
-	m.cache.On("Delete", mock.Anything, mock.Anything).Return(context.Canceled)
+// retry observes context.Canceled as terminal and cleanUpAll returns promptly.
+func (m *managerTestSuite) TestCleanUpAll_DoesNotSpinOnCanceledContext() {
+	m.cache.On("Save", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(context.Canceled)
+	m.cache.On("Scan", mock.Anything, mock.Anything).Return(nil, context.Canceled)
 
 	canceled, cancel := context.WithCancel(context.Background())
 	cancel()
 
 	mgr := m.cachedManager.(*Manager)
 	start := time.Now()
-	mgr.cleanUpKeys(canceled, 100)
+	_ = mgr.cleanUpAll(canceled, 100)
 	elapsed := time.Since(start)
 
-	m.Less(elapsed.Seconds(), 1.0, "cleanUpKeys must return promptly on canceled ctx, elapsed=%s", elapsed)
+	m.Less(elapsed.Seconds(), 1.0, "cleanUpAll must return promptly on canceled ctx, elapsed=%s", elapsed)
 }
 
 // TestScheduleCleanUp_DefersViaAfterCommit verifies that when a hooks sink is on
@@ -172,15 +170,18 @@ func (m *managerTestSuite) TestScheduleCleanUp_DefersViaAfterCommit() {
 	ctx, drainHooks := orm.ContextWithAfterCommitHooksForTest(context.Background())
 
 	m.projectMetaMgr.On("Delete", mock.Anything, mock.Anything).Return(nil).Once()
-	m.cache.On("Delete", mock.Anything, mock.Anything).Return(nil)
+	m.cache.On("Save", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	m.cache.On("Scan", mock.Anything, mock.Anything).Return(m.iterator, nil)
+	m.iterator.On("Next", mock.Anything).Return(false)
+	m.iterator.On("Err").Return(nil)
 
 	err := m.cachedManager.Delete(ctx, 100)
 	m.NoError(err)
 
-	m.cache.AssertNotCalled(m.T(), "Delete", mock.Anything, mock.Anything)
+	m.cache.AssertNotCalled(m.T(), "Save", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 	drainHooks()
-	m.cache.AssertCalled(m.T(), "Delete", mock.Anything, mock.Anything)
+	m.cache.AssertCalled(m.T(), "Save", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestManager(t *testing.T) {
@@ -215,15 +216,6 @@ func (m *metadataStateManager) Update(ctx context.Context, id int64, values map[
 	return m.Add(ctx, id, values)
 }
 
-func (m *metadataStateManager) UpdateWithValidation(ctx context.Context, id int64, values map[string]string, validate metadata.Validator) error {
-	prospective := maps.Clone(m.values)
-	maps.Copy(prospective, values)
-	if err := validate(prospective); err != nil {
-		return err
-	}
-	return m.Update(ctx, id, values)
-}
-
 func (m *metadataStateManager) Delete(_ context.Context, _ int64, names ...string) error {
 	if len(names) == 0 {
 		clear(m.values)
@@ -235,7 +227,7 @@ func (m *metadataStateManager) Delete(_ context.Context, _ int64, names ...strin
 }
 
 func TestWritesInvalidateMetadataViews(t *testing.T) {
-	for _, operation := range []string{"add", "update", "update-with-validation", "delete", "delete-all"} {
+	for _, operation := range []string{"add", "update", "delete", "delete-all"} {
 		t.Run(operation, func(t *testing.T) {
 			ctx := context.Background()
 			store := &metadataStateManager{values: map[string]string{"public": "true", "reuse_sys_cve_allowlist": "false"}}
@@ -266,8 +258,6 @@ func TestWritesInvalidateMetadataViews(t *testing.T) {
 				err = manager.Add(ctx, 1, map[string]string{"auto_scan": "true"})
 			case "update":
 				err = manager.Update(ctx, 1, map[string]string{"public": "false"})
-			case "update-with-validation":
-				err = manager.UpdateWithValidation(ctx, 1, map[string]string{"public": "false"}, func(map[string]string) error { return nil })
 			case "delete":
 				err = manager.Delete(ctx, 1, "public")
 			case "delete-all":
@@ -306,7 +296,7 @@ func TestWriteReportsTerminalCacheScanFailure(t *testing.T) {
 }
 
 func TestWriteReportsCacheScanFailure(t *testing.T) {
-	for _, operation := range []string{"add", "update", "update-with-validation", "delete"} {
+	for _, operation := range []string{"add", "update", "delete"} {
 		t.Run(operation, func(t *testing.T) {
 			client := &testcache.Cache{}
 			scanErr := errors.New("cache scan failed")
@@ -320,8 +310,6 @@ func TestWriteReportsCacheScanFailure(t *testing.T) {
 				err = manager.Add(context.Background(), 1, map[string]string{"public": "true"})
 			case "update":
 				err = manager.Update(context.Background(), 1, map[string]string{"public": "false"})
-			case "update-with-validation":
-				err = manager.UpdateWithValidation(context.Background(), 1, map[string]string{"public": "false"}, func(map[string]string) error { return nil })
 			case "delete":
 				err = manager.Delete(context.Background(), 1, "public")
 			}

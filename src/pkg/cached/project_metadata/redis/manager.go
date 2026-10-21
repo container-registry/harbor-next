@@ -32,11 +32,8 @@ import (
 	"github.com/goharbor/harbor/src/pkg/project/metadata/models"
 )
 
-// cleanupCacheTimeout bounds a single cache-eviction attempt after the
-// enclosing transaction has committed. Cache invalidation is best-effort:
-// any stale entry expires via the configured TTL, and the next read from
-// the database repopulates it. We must not sit spinning in a retry loop
-// for the full default timeout.
+// cleanupCacheTimeout bounds one post-commit cache invalidation; stale entries
+// also expire via the configured TTL.
 const cleanupCacheTimeout = 3 * time.Second
 
 var _ CachedManager = &Manager{}
@@ -74,14 +71,7 @@ func (m *Manager) Add(ctx context.Context, projectID int64, meta map[string]stri
 	if err := m.delegator.Add(ctx, projectID, meta); err != nil {
 		return err
 	}
-<<<<<<< HEAD
-	// should cleanup cache when add metadata to project — deferred until the
-	// enclosing transaction commits so Redis does not hold the tx open.
-	m.scheduleCleanUp(ctx, projectID)
-	return nil
-=======
 	return m.invalidateAfterCommit(ctx, projectID)
->>>>>>> 8414559ce (Improve project metadata cache consistency (#24139))
 }
 
 func (m *Manager) List(ctx context.Context, name string, value string) ([]*models.ProjectMetadata, error) {
@@ -127,61 +117,37 @@ func (m *Manager) Delete(ctx context.Context, projectID int64, meta ...string) e
 	if err := m.delegator.Delete(ctx, projectID, meta...); err != nil {
 		return err
 	}
-<<<<<<< HEAD
-	// Defer cache invalidation until after the enclosing transaction commits,
-	// so Redis round-trips never hold the Postgres row locks open. When there
-	// is no enclosing transaction, AfterCommit runs the hook synchronously.
-	m.scheduleCleanUp(ctx, projectID, meta...)
-	return nil
-=======
 	return m.invalidateAfterCommit(ctx, projectID)
->>>>>>> 8414559ce (Improve project metadata cache consistency (#24139))
 }
 
 func (m *Manager) Update(ctx context.Context, projectID int64, meta map[string]string) error {
 	if err := m.delegator.Update(ctx, projectID, meta); err != nil {
 		return err
 	}
-<<<<<<< HEAD
-	// clean cache after commit: the scan + per-key deletes must not hold the
-	// transaction open across Redis round-trips.
-	prefix, err := m.keyBuilder.Format("projectID", projectID)
-=======
 	return m.invalidateAfterCommit(ctx, projectID)
 }
 
-// UpdateWithValidation atomically validates and updates metadata, then invalidates its cache.
-func (m *Manager) UpdateWithValidation(ctx context.Context, projectID int64, meta map[string]string, validate metadata.Validator) error {
-	if err := m.delegator.UpdateWithValidation(ctx, projectID, meta, validate); err != nil {
-		return err
-	}
-	return m.invalidateAfterCommit(ctx, projectID)
-}
-
+// invalidateAfterCommit invalidates the cache once the enclosing transaction
+// commits. Outside a transaction the hook runs inline and its error is returned.
 func (m *Manager) invalidateAfterCommit(ctx context.Context, projectID int64) error {
-	return orm.AfterCommit(ctx, func() error {
-		// A committed request context suppresses cache writes. The callback is
-		// already outside the transaction, so use a standalone context here.
-		return m.cleanUpAll(context.Background(), projectID)
+	var cleanupErr error
+	orm.AfterCommit(ctx, func() {
+		// The request context may be canceled or committed by now, so use a
+		// detached one.
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), cleanupCacheTimeout)
+		defer cancel()
+		if cleanupErr = m.cleanUpAll(cleanupCtx, projectID); cleanupErr != nil {
+			log.Warningf("invalidate project %d metadata cache error: %v", projectID, cleanupErr)
+		}
 	})
+	return cleanupErr
 }
 
 func (m *Manager) cacheVersion(ctx context.Context, projectID int64) (string, error) {
 	key, err := m.keyBuilder.Format("projectID", projectID, "version", "")
->>>>>>> 8414559ce (Improve project metadata cache consistency (#24139))
 	if err != nil {
 		return "", err
 	}
-<<<<<<< HEAD
-	orm.AfterCommit(ctx, func() {
-		cleanupCtx, cancel := context.WithTimeout(context.Background(), cleanupCacheTimeout)
-		defer cancel()
-		// lookup all keys with projectID prefix
-		iter, err := m.CacheClient(cleanupCtx).Scan(cleanupCtx, prefix)
-		if err != nil {
-			log.Warningf("scan project metadata cache keys with prefix %s error: %v", prefix, err)
-			return
-=======
 	var version string
 	if err := m.CacheClient(ctx).Fetch(ctx, key, &version); err == nil && version != "" {
 		return version, nil
@@ -215,7 +181,7 @@ func (m *Manager) cleanUpAll(ctx context.Context, projectID int64) error {
 	var cleanupErr error
 	if err := retry.Retry(func() error {
 		return m.CacheClient(ctx).Save(ctx, versionKey, uuid.NewString(), m.lifetime)
-	}); err != nil {
+	}, retry.Context(ctx), retry.Timeout(cleanupCacheTimeout)); err != nil {
 		cleanupErr = errors.Join(cleanupErr, err)
 	}
 
@@ -232,58 +198,12 @@ func (m *Manager) cleanUpAll(ctx context.Context, projectID int64) error {
 	// Attempt every deletion even after a failure, but report incomplete cleanup
 	// to the caller instead of treating the write as fully synchronized.
 	for iter.Next(ctx) {
-		if err = retry.Retry(func() error { return m.CacheClient(ctx).Delete(ctx, iter.Val()) }); err != nil {
+		if err = retry.Retry(func() error { return m.CacheClient(ctx).Delete(ctx, iter.Val()) },
+			retry.Context(ctx), retry.Timeout(cleanupCacheTimeout)); err != nil {
 			log.Errorf("delete project metadata cache key %s error: %v", iter.Val(), err)
 			cleanupErr = errors.Join(cleanupErr, err)
->>>>>>> 8414559ce (Improve project metadata cache consistency (#24139))
 		}
-		for iter.Next(cleanupCtx) {
-			key := iter.Val()
-			if err := retry.Retry(
-				func() error { return m.CacheClient(cleanupCtx).Delete(cleanupCtx, key) },
-				retry.Context(cleanupCtx),
-				retry.Timeout(cleanupCacheTimeout),
-			); err != nil {
-				log.Warningf("delete project metadata cache key %s error: %v", key, err)
-			}
-		}
-	})
-
-<<<<<<< HEAD
-	return nil
-}
-
-// scheduleCleanUp registers the cache invalidation for the project metadata to
-// run after the enclosing transaction commits. The meta slice is copied so the
-// hook is independent of the caller's backing array.
-func (m *Manager) scheduleCleanUp(ctx context.Context, projectID int64, meta ...string) {
-	metaCopy := append([]string(nil), meta...)
-	orm.AfterCommit(ctx, func() {
-		cleanupCtx, cancel := context.WithTimeout(context.Background(), cleanupCacheTimeout)
-		defer cancel()
-		m.cleanUpKeys(cleanupCtx, projectID, metaCopy...)
-	})
-}
-
-// cleanUpKeys best-effort deletes the project metadata cache entry. Called
-// after the enclosing transaction has committed with a detached context, so it
-// neither holds row locks nor observes a canceled request.
-func (m *Manager) cleanUpKeys(ctx context.Context, projectID int64, meta ...string) {
-	key, err := m.keyBuilder.Format("projectID", projectID, "meta", strings.Join(meta, ","))
-	if err != nil {
-		log.Errorf("format project metadata key error: %v", err)
-		return
 	}
-	// retry to avoid dirty data; capped retry + ctx-aware so we cannot block
-	// indefinitely on Redis hiccups.
-	if err = retry.Retry(
-		func() error { return m.CacheClient(ctx).Delete(ctx, key) },
-		retry.Context(ctx),
-		retry.Timeout(cleanupCacheTimeout),
-	); err != nil {
-		log.Warningf("delete project metadata cache key %s error: %v", key, err)
-	}
-=======
+
 	return errors.Join(cleanupErr, iter.Err())
->>>>>>> 8414559ce (Improve project metadata cache consistency (#24139))
 }
