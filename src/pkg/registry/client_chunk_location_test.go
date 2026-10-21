@@ -66,9 +66,13 @@ func TestPushBlobChunkRejectsCrossHostLocation(t *testing.T) {
 	if strings.Contains(loc, attacker.URL) {
 		t.Fatalf("rejected Location must not be handed back, got %q", loc)
 	}
+
 	if got := atomic.LoadInt64(&attackerHits); got != 0 {
 		t.Fatalf("attacker host was contacted %d time(s) with auth %q; cross-host upload Location must be refused (SSRF + credential leak)",
 			got, attackerAuth.Load())
+	}
+	if err == nil {
+		t.Fatalf("cross-host Location must fail closed, got nil error (location=%q)", loc)
 	}
 }
 
@@ -323,5 +327,13 @@ func TestParseUploadLocation_ErrorRedactsSecrets(t *testing.T) {
 		if msg := err.Error(); strings.Contains(msg, "s3cr3t") {
 			t.Fatalf("error leaks secret from Location %q: %s", location, msg)
 		}
+	}
+}
+
+func TestResolveUploadLocationRedactsOriginQuery(t *testing.T) {
+	origin, _ := url.Parse("https://registry.example.com/v2/repo/blobs/uploads/uuid?_state=secret")
+	_, err := resolveUploadLocation("https://registry.example.com", origin, "https://evil.example.com/x?_state=other")
+	if err == nil || strings.Contains(err.Error(), "secret") || strings.Contains(err.Error(), "other") {
+		t.Fatalf("want origin error without query tokens, got %v", err)
 	}
 }
