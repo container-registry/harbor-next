@@ -223,8 +223,9 @@
                     </div>
                 </div>
             </div>
-            @if (isSystemAdmin && enableProxyCache) {
-            <div class="clr-form-control mt-05">
+            <div
+                class="clr-form-control mt-05"
+                *ngIf="isSystemAdmin && enableProxyCache">
                 <label for="retentionDays" class="clr-control-label required">
                     {{ 'PROJECT.PROXY_CACHE_RETENTION_DAYS' | translate }}
                     <clr-tooltip>
@@ -257,20 +258,20 @@
                         step="1"
                         class="clr-input width-164 mr-10"
                         autocomplete="off" />
-                    @if (!isRetentionDaysValid) {
                     <clr-icon
+                        *ngIf="!isRetentionDaysValid"
                         class="clr-validate-icon"
                         shape="exclamation-circle"></clr-icon>
-                    <clr-control-error class="tooltip-content">
+                    <clr-control-error
+                        *ngIf="!isRetentionDaysValid"
+                        class="tooltip-content">
                         {{
                             'PROJECT.PROXY_CACHE_RETENTION_DAYS_INVALID'
                                 | translate
                         }}
                     </clr-control-error>
-                    }
                 </div>
             </div>
-            }
             <div
                 class="clr-form-control mt-05"
                 [ngStyle]="{
