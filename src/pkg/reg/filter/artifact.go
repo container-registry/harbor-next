@@ -16,6 +16,7 @@ package filter
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/goharbor/harbor/src/pkg/reg/model"
 	"github.com/goharbor/harbor/src/pkg/reg/util"
@@ -93,8 +94,6 @@ func (a ArtifactFilters) Filter(artifacts []*model.Artifact) ([]*model.Artifact,
 	return artifacts, nil
 }
 
-<<<<<<< HEAD
-=======
 type artifactTypeFilter struct {
 	types []string
 }
@@ -121,7 +120,6 @@ func (a *artifactTypeFilter) Filter(artifacts []*model.Artifact) ([]*model.Artif
 	return result, nil
 }
 
->>>>>>> a360e527a (fix(replication): make the image resource filter take effect again (#24176))
 // filter the artifacts according to the labels. Only the artifact contains all labels defined
 // in the filter is the valid one
 type artifactLabelFilter struct {
