@@ -18,6 +18,7 @@ package period
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
 	"testing"
 	"time"
@@ -195,6 +196,31 @@ func (suite *BasicSchedulerTestSuite) TestUnScheduleSkipsMalformedMember() {
 	assert.Equal(suite.T(), 2, n, "malformed members should be kept")
 }
 
+// TestUnScheduleLegacyUnreachablePolicy tests un-scheduling a stored unreachable policy without job stats
+func (suite *BasicSchedulerTestSuite) TestUnScheduleLegacyUnreachablePolicy() {
+	p := &Policy{
+		ID:       "legacy_unreachable_without_stats",
+		JobName:  job.SampleJob,
+		CronSpec: "0 0 3 30 2 *",
+	}
+	_, err := suite.scheduler.Schedule(p)
+	require.Error(suite.T(), err, "new unreachable policy should be rejected")
+
+	raw, err := p.Serialize()
+	require.NoError(suite.T(), err)
+	conn := suite.pool.Get()
+	defer func() {
+		_ = conn.Close()
+	}()
+	_, err = conn.Do("ZADD", rds.KeyPeriodicPolicy(suite.namespace), 1200, raw)
+	require.NoError(suite.T(), err, "zadd: nil error expected but got %s", err)
+	require.Contains(suite.T(), suite.policyIDs(), p.ID, "legacy policy should be loadable")
+
+	err = suite.scheduler.UnSchedule(p.ID)
+	require.NoError(suite.T(), err, "unschedule: nil error expected but got %s", err)
+	assert.NotContains(suite.T(), suite.policyIDs(), p.ID, "legacy policy should be removed")
+}
+
 // scheduleOnSharedScore schedules n policies and moves all of them to the given score.
 func (suite *BasicSchedulerTestSuite) scheduleOnSharedScore(prefix string, n int, score int64, withStats bool) []string {
 	conn := suite.pool.Get()
@@ -252,6 +278,36 @@ func (suite *BasicSchedulerTestSuite) policyIDs() []string {
 		ids = append(ids, p.ID)
 	}
 	return ids
+}
+
+// TestClearDirtyJobsNegativeEpoch verifies that clearDirtyJobs removes entries
+// with negative epoch scores (e.g. jobs enqueued for time.Time{}).
+func (suite *BasicSchedulerTestSuite) TestClearDirtyJobsNegativeEpoch() {
+	j := &work.Job{
+		Name:       job.SampleJob,
+		ID:         "negative_epoch_job",
+		EnqueuedAt: time.Time{}.Unix(),
+		Args:       map[string]any{},
+	}
+
+	rawJSON, err := utils.SerializeJob(j)
+	suite.NoError(err, "serialize job model")
+
+	conn := suite.pool.Get()
+	defer func() {
+		_ = conn.Close()
+	}()
+
+	key := rds.RedisKeyScheduled(suite.namespace)
+	_, err = conn.Do("ZADD", key, j.EnqueuedAt, rawJSON)
+	suite.NoError(err, "add negative-epoch scheduled job")
+
+	bs := suite.scheduler.(*basicScheduler)
+	bs.clearDirtyJobs()
+
+	remaining, err := rds.GetZsetByScore(conn, key, []int64{math.MinInt64, 0})
+	suite.NoError(err, "get negative-epoch entries")
+	suite.Empty(remaining, "clearDirtyJobs should remove negative-epoch entries")
 }
 
 // setupDirtyJobs adds dirty jobs for testing dirty jobs clear method in the Start()
