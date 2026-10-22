@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/lib/config"
@@ -28,6 +29,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/audit"
+	"github.com/goharbor/harbor/src/pkg/project"
 	"github.com/goharbor/harbor/src/pkg/user"
 )
 
@@ -142,7 +144,41 @@ func (c *controller) validateCfg(ctx context.Context, cfgs map[string]any) error
 	if err = verifyValueLengthCfg(ctx, cfgs); err != nil {
 		return err
 	}
+	// verify the registry mirror namespace mapping
+	if err = verifyRegistryMirrorCfg(cfgs); err != nil {
+		return err
+	}
 
+	return nil
+}
+
+// verifyRegistryMirrorCfg rejects a namespace mapping Harbor could not route
+// with: every entry has to name a namespace (or the "*" catch-all) and a legal
+// project name, otherwise mirror pulls would be rewritten onto a path no
+// project can serve.
+func verifyRegistryMirrorCfg(cfgs map[string]any) error {
+	v, exist := cfgs[common.RegistryMirrorNamespaces]
+	if !exist {
+		return nil
+	}
+	raw, ok := v.(string)
+	if !ok {
+		return errors.BadRequestError(nil).WithMessagef("the %s value must be a string", common.RegistryMirrorNamespaces)
+	}
+	for entry := range strings.SplitSeq(raw, ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		ns, name, found := strings.Cut(entry, "=")
+		ns, name = strings.TrimSpace(ns), strings.TrimSpace(name)
+		if !found || ns == "" || name == "" {
+			return errors.BadRequestError(nil).WithMessagef("the %s entry %q is not in the <namespace>=<project> form", common.RegistryMirrorNamespaces, entry)
+		}
+		if !project.IsValidName(name) {
+			return errors.BadRequestError(nil).WithMessagef("the %s entry %q does not name a valid project", common.RegistryMirrorNamespaces, entry)
+		}
+	}
 	return nil
 }
 
