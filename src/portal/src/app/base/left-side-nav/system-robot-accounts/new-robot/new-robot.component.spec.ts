@@ -56,6 +56,9 @@ describe('NewRobotComponent', () => {
         ListRobot() {
             return of([]).pipe(delay(0));
         },
+        CreateRobot() {
+            return of({});
+        },
     };
     const mockConfigurationService = {
         getConfiguration() {
@@ -127,5 +130,86 @@ describe('NewRobotComponent', () => {
         await fixture.whenStable();
         const nameInput = fixture.nativeElement.querySelector('#name');
         expect(nameInput.value).toEqual('robot1');
+    });
+
+    describe('provided secret', () => {
+        beforeEach(() => {
+            // this test module doesn't declare InlineAlertComponent, so the
+            // @ViewChild never resolves; stub it since open()/reset()/cancel()
+            // all call inlineAlertComponent.close()
+            component.inlineAlertComponent = { close: () => {} } as any;
+        });
+
+        it('should default to accepting no secret', () => {
+            expect(component.userProvidedSecret).toBe('');
+            expect(component.isProvidedSecretAcceptable).toBeTruthy();
+        });
+
+        it('should block creation when the shared secret input reports invalid', () => {
+            component.systemRobot.name = 'testsystemrobot';
+            component.coverAll = true;
+            component.permissionForCoverAll.access = [
+                { resource: Resource.ARTIFACT, action: Action.PULL },
+            ];
+            component.isProvidedSecretAcceptable = false;
+            fixture.detectChanges();
+            expect(component.canAdd()).toBeFalsy();
+        });
+
+        it('should allow creation when the shared secret input reports valid', () => {
+            component.systemRobot.name = 'testsystemrobot';
+            component.coverAll = true;
+            component.permissionForCoverAll.access = [
+                { resource: Resource.ARTIFACT, action: Action.PULL },
+            ];
+            component.isProvidedSecretAcceptable = true;
+            fixture.detectChanges();
+            expect(component.canAdd()).toBeTruthy();
+        });
+
+        it('should send the provided secret in the create request', () => {
+            const robotService = TestBed.inject(RobotService);
+            const createSpy = spyOn(
+                robotService,
+                'CreateRobot'
+            ).and.callThrough();
+            component.isEditMode = false;
+            component.systemRobot.name = 'testsystemrobot';
+            component.coverAll = true;
+            component.permissionForCoverAll.access = [
+                { resource: Resource.ARTIFACT, action: Action.PULL },
+            ];
+            component.userProvidedSecret = 'StrongPass123';
+            component.save();
+            expect(createSpy).toHaveBeenCalled();
+            const callArgs = createSpy.calls.mostRecent().args[0];
+            expect(callArgs.robot.secret).toBe('StrongPass123');
+        });
+
+        it('should not send a secret when none was provided', () => {
+            const robotService = TestBed.inject(RobotService);
+            const createSpy = spyOn(
+                robotService,
+                'CreateRobot'
+            ).and.callThrough();
+            component.isEditMode = false;
+            component.systemRobot.name = 'testsystemrobot';
+            component.coverAll = true;
+            component.permissionForCoverAll.access = [
+                { resource: Resource.ARTIFACT, action: Action.PULL },
+            ];
+            component.save();
+            expect(createSpy).toHaveBeenCalled();
+            const callArgs = createSpy.calls.mostRecent().args[0];
+            expect(callArgs.robot.secret).toBeFalsy();
+        });
+
+        it('should reset secret state on reset()', () => {
+            component.userProvidedSecret = 'StrongPass123';
+            component.isProvidedSecretAcceptable = false;
+            component.reset();
+            expect(component.userProvidedSecret).toBe('');
+            expect(component.isProvidedSecretAcceptable).toBeTruthy();
+        });
     });
 });
