@@ -316,7 +316,6 @@ func TestSingleConnectionPoolReadsDatabase(t *testing.T) {
 	saveAuthMode(t, "db_auth")
 }
 
-// a duplicate-key error on first creation would abort the transaction
 // restoreLDAPURL puts the properties row for common.LDAPURL back the way the
 // test found it. The tests here write that key directly, and the integration
 // database outlives the test binary, so without this a later test - or a
@@ -338,6 +337,7 @@ func restoreLDAPURL(t *testing.T) {
 	})
 }
 
+// a duplicate-key error on first creation would abort the transaction
 func TestConcurrentFirstSaveOfPropertySucceeds(t *testing.T) {
 	restoreLDAPURL(t)
 	ctx := orm.Context()
