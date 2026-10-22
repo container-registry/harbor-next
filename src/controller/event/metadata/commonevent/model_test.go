@@ -143,3 +143,25 @@ func TestMetadataMatchesResolverAgainstEntirePath(t *testing.T) {
 		})
 	}
 }
+
+// snapshotResolver also implements Snapshotter.
+type snapshotResolver struct{ stubResolver }
+
+func (snapshotResolver) Snapshot(c *Metadata) any {
+	return "before:" + c.RequestMethod
+}
+
+func TestMetadata_PreCheckMetadata_TakesSnapshot(t *testing.T) {
+	RegisterResolver(`^/test-metadata-snapshot$`, snapshotResolver{})
+	RegisterResolver(`^/test-metadata-no-snapshot$`, stubResolver{})
+
+	c := &Metadata{Ctx: context.Background(), RequestURL: "/test-metadata-snapshot", RequestMethod: "PUT"}
+	matched, _ := c.PreCheckMetadata()
+	require.True(t, matched)
+	assert.Equal(t, "before:PUT", c.Before)
+
+	c = &Metadata{Ctx: context.Background(), RequestURL: "/test-metadata-no-snapshot", RequestMethod: "PUT"}
+	matched, _ = c.PreCheckMetadata()
+	require.True(t, matched)
+	assert.Nil(t, c.Before)
+}

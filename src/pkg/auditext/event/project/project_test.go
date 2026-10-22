@@ -116,7 +116,7 @@ func TestProjectEventResolver_Resolve(t *testing.T) {
 		assert.Equal(t, "project", data.ResourceType)
 		assert.Equal(t, "test-proj", data.ResourceName)
 		assert.Equal(t, int64(123), data.ProjectID)
-		assert.Equal(t, "update project: test-proj", data.OperationDescription)
+		assert.Equal(t, `admin updated project "test-proj"`, data.OperationDescription)
 		assert.True(t, data.IsSuccessful)
 	})
 
@@ -139,7 +139,7 @@ func TestProjectEventResolver_Resolve(t *testing.T) {
 		assert.Equal(t, "project", data.ResourceType)
 		assert.Equal(t, "test-proj", data.ResourceName)
 		assert.Equal(t, int64(123), data.ProjectID)
-		assert.Equal(t, "update project: test-proj", data.OperationDescription)
+		assert.Equal(t, `admin updated project "test-proj"`, data.OperationDescription)
 		assert.True(t, data.IsSuccessful)
 	})
 

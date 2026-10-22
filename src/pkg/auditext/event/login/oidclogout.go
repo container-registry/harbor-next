@@ -20,11 +20,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/common/rbac"
 	ctlevent "github.com/goharbor/harbor/src/controller/event"
 	"github.com/goharbor/harbor/src/controller/event/metadata/commonevent"
 	"github.com/goharbor/harbor/src/controller/event/model"
 	"github.com/goharbor/harbor/src/lib/config"
+	"github.com/goharbor/harbor/src/pkg/auditext/desc"
 	"github.com/goharbor/harbor/src/pkg/notifier/event"
 )
 
@@ -33,18 +35,22 @@ type oidcLogoutResolver struct {
 
 func (o *oidcLogoutResolver) Resolve(ce *commonevent.Metadata, event *event.Event) error {
 	e := &model.CommonEvent{
-		Operator:             ce.Username,
-		ResourceType:         rbac.ResourceUser.String(),
-		ResourceName:         ce.Username,
-		OccurAt:              time.Now(),
-		Operation:            opLogout,
-		OperationDescription: opLogout,
-		IsSuccessful:         true,
+		Operator:     ce.Username,
+		ResourceType: rbac.ResourceUser.String(),
+		ResourceName: ce.Username,
+		OccurAt:      time.Now(),
+		Operation:    opLogout,
+		IsSuccessful: true,
 	}
 	// oidc logout response code requires redirect and response code is 3xx
 	if ce.ResponseCode >= http.StatusBadRequest {
 		e.IsSuccessful = false
 	}
+	d := desc.New(ce.Username, opLogout, rbac.ResourceUser.String()).Name(ce.Username).Set("auth_mode", common.OIDCAuth)
+	if !e.IsSuccessful {
+		d.Error(ce.ResponseCode, ce.ResponseBody)
+	}
+	e.OperationDescription = d.String()
 	event.Topic = ctlevent.TopicCommonEvent
 	event.Data = e
 	return nil
