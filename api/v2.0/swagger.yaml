@@ -9354,6 +9354,10 @@ definitions:
   NotifyType:
     type: string
     description: Webhook supported notify type.
+    enum:
+      - http
+      - slack
+      - amqp
     example: 'http'
   PayloadFormatType:
     type: string
