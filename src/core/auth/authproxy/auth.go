@@ -120,7 +120,7 @@ func (a *Auth) tokenReview(ctx context.Context, sessionID string) (*models.User,
 	if err != nil {
 		return nil, err
 	}
-	u, err := authproxy.UserFromReviewStatus(reviewStatus, httpAuthProxySetting.AdminGroups, httpAuthProxySetting.AdminUsernames)
+	u, err := authproxy.UserFromReviewStatus(ctx, reviewStatus, httpAuthProxySetting.AdminGroups, httpAuthProxySetting.AdminUsernames)
 	if err != nil {
 		return nil, err
 	}

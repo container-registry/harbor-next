@@ -62,10 +62,7 @@ func (r *resolver) Resolve(ce *commonevent.Metadata, evt *event.Event) error {
 		return fmt.Errorf("failed to parse project name or ID from URL: %s", ce.RequestURL)
 	}
 
-	ctx := ce.Ctx
-	if _, err := orm.FromContext(ctx); err == nil {
-		ctx = orm.Clone(ctx)
-	}
+	ctx := orm.ReuseContext(ce.Ctx)
 
 	proj, err := getProject(ctx, projStr, ce.IsResourceName)
 	if err != nil {

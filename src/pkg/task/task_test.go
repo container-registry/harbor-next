@@ -15,6 +15,7 @@
 package task
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -40,9 +41,10 @@ func (t *taskManagerTestSuite) SetupTest() {
 	t.execDAO = &mockExecutionDAO{}
 	t.jsClient = &mockJobserviceClient{}
 	t.mgr = &manager{
-		dao:      t.dao,
-		execDAO:  t.execDAO,
-		jsClient: t.jsClient,
+		dao:          t.dao,
+		execDAO:      t.execDAO,
+		jsClient:     t.jsClient,
+		submitClient: t.jsClient,
 	}
 }
 
@@ -82,6 +84,54 @@ func (t *taskManagerTestSuite) TestCreate() {
 	t.dao.AssertExpectations(t.T())
 	t.execDAO.AssertExpectations(t.T())
 	t.jsClient.AssertExpectations(t.T())
+}
+
+func (t *taskManagerTestSuite) TestCreateRecord() {
+	t.execDAO.On("Get", mock.Anything, int64(1)).Return(&dao.Execution{VendorType: "test"}, nil)
+	t.dao.On("Create", mock.Anything, mock.MatchedBy(func(task *dao.Task) bool {
+		return task.ExecutionID == 1 && task.Status == job.PendingStatus.String() && task.JobID == ""
+	})).Return(int64(1), nil)
+
+	id, err := t.mgr.CreateRecord(nil, 1, map[string]any{"a": "b"})
+	t.Require().Nil(err)
+	t.Equal(int64(1), id)
+	t.dao.AssertExpectations(t.T())
+	t.execDAO.AssertExpectations(t.T())
+	t.jsClient.AssertNotCalled(t.T(), "SubmitJob", mock.Anything)
+}
+
+func (t *taskManagerTestSuite) TestSubmit() {
+	// success: the job ID is stored on the task
+	t.jsClient.On("SubmitJob", mock.Anything).Return("job-1", nil)
+	t.dao.On("Update", mock.Anything, &dao.Task{ID: 1, JobID: "job-1"}, "JobID").Return(nil)
+
+	t.Require().Nil(t.mgr.Submit(context.Background(), 1, &Job{}))
+	t.dao.AssertExpectations(t.T())
+	t.jsClient.AssertExpectations(t.T())
+
+	// reset mock
+	t.SetupTest()
+
+	// failure: the committed task is marked as error rather than left pending
+	var postStatus string
+	t.Require().Nil(RegisterTaskStatusChangePostFunc("submit-test", func(_ context.Context, _ int64, status string) error {
+		postStatus = status
+		return nil
+	}))
+	defer delete(statusChangePostFuncRegistry, "submit-test")
+	t.jsClient.On("SubmitJob", mock.Anything).Return("", errors.New("error"))
+	t.dao.On("Get", mock.Anything, int64(1)).Return(&dao.Task{ID: 1, ExecutionID: 2, VendorType: "submit-test"}, nil)
+	t.dao.On("Update", mock.Anything, mock.MatchedBy(func(task *dao.Task) bool {
+		return task.ID == 1 && task.Status == job.ErrorStatus.String() && !task.EndTime.IsZero()
+	}), "Status", "StatusCode", "UpdateTime", "EndTime").Return(nil)
+	t.execDAO.On("RefreshStatus", mock.Anything, int64(2)).Return(true, job.ErrorStatus.String(), nil)
+
+	t.Require().NotNil(t.mgr.Submit(context.Background(), 1, &Job{}))
+	t.Equal(job.ErrorStatus.String(), postStatus)
+	t.dao.AssertExpectations(t.T())
+	t.execDAO.AssertExpectations(t.T())
+	t.jsClient.AssertExpectations(t.T())
+	t.dao.AssertNotCalled(t.T(), "Delete", mock.Anything, mock.Anything)
 }
 
 func (t *taskManagerTestSuite) TestStop() {

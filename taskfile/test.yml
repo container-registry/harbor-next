@@ -15,7 +15,7 @@ vars:
   DEFAULT_DB_EXCLUDE: '/controller/ldap$|/core/auth/ldap$|/pkg/ldap$|/core/api$|/core/controllers$|/server/middleware/security$|/controller/systeminfo$|/common/utils/email$|/jobservice/runner$|/jobservice/logger/getter$|/jobservice/logger/backend$|/jobservice/logger/sweeper$|/controller/usergroup/test$|/pkg/exporter$|/pkg/scan/dao/scan$|/pkg/scan/postprocessors$|/pkg/systemartifact$'
   # Packages excluded from the pure lane because they require Redis/Postgres
   # setup or have db-tagged tests that should only run in the DB lane.
-  DEFAULT_PURE_EXCLUDE: '/controller/ldap$|/core/auth/ldap$|/pkg/ldap$|/core/api$|/core/controllers$|/server/middleware/security$|/controller/systeminfo$|/common/utils/email$|/jobservice/runner$|/jobservice/logger/getter$|/jobservice/logger/backend$|/jobservice/logger/sweeper$|/controller/usergroup/test$|/pkg/exporter$|/pkg/scan/dao/scan$|/pkg/scan/postprocessors$|/pkg/systemartifact$|/core/session$|/jobservice/job/impl/gc$|/lib/cache/redis$|/pkg/jobmonitor$|/pkg/proxy/connection$|/pkg/scan/dao/scanner$|/pkg/scan/export$|/server/middleware/blob$'
+  DEFAULT_PURE_EXCLUDE: '/controller/ldap$|/core/auth/ldap$|/pkg/ldap$|/core/controllers$|/server/middleware/security$|/controller/systeminfo$|/common/utils/email$|/jobservice/runner$|/jobservice/logger/getter$|/jobservice/logger/backend$|/jobservice/logger/sweeper$|/controller/usergroup/test$|/pkg/exporter$|/pkg/scan/dao/scan$|/pkg/scan/postprocessors$|/pkg/systemartifact$|/core/session$|/jobservice/job/impl/gc$|/lib/cache/redis$|/pkg/jobmonitor$|/pkg/proxy/connection$|/pkg/scan/dao/scanner$|/pkg/scan/export$|/server/middleware/blob$'
   # These packages need Redis/Postgres-backed test setup but do not use
   # //go:build db test files, so we add them explicitly to the DB lane.
   DEFAULT_DB_EXTRA_PACKAGES: 'github.com/goharbor/harbor/src/core/session github.com/goharbor/harbor/src/jobservice/job/impl/gc github.com/goharbor/harbor/src/lib/cache/redis github.com/goharbor/harbor/src/pkg/jobmonitor github.com/goharbor/harbor/src/pkg/proxy/connection'
@@ -319,6 +319,19 @@ tasks:
       # which this one cannot reach by name.
       - task nightly:test
       - task release-notes:test
+      # notify:test needs jq, which a local checkout may lack. There it is
+      # skipped with a message so test:quick stays usable; on CI, where the
+      # workflow installs jq, a missing one is an error, never a quiet skip.
+      # IS_CI is the root Taskfile's shared CI detection.
+      - |
+        if command -v jq >/dev/null 2>&1; then
+          task notify:test
+        elif [ '{{.IS_CI}}' = true ]; then
+          echo "notify:test needs jq, and CI is expected to provide it" >&2
+          exit 1
+        else
+          echo "skipping notify:test: jq is not installed"
+        fi
 
   quick:
     desc: "Run API lint and unit tests only (fast validation)"

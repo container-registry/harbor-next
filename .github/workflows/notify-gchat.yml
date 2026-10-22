@@ -1,0 +1,131 @@
+name: Notify Google Chat
+
+# Posts a run's outcome to a Google Chat space as a card.
+#
+# Deliberately thin: the status, the card and the post all live in
+# `task notify:gchat`. The caller hands over its `needs` context as JSON and
+# the task derives the overall status from the job results in it, so the card
+# can never disagree with the run page.
+#
+# A missing webhook is a notice and a webhook outage is a warning; neither
+# turns the caller's run red. A fork or a dispatch without the secret is not a
+# broken nightly. Every step is continue-on-error for the same reason: a
+# runner without jq, or a Task download that fails, costs the card and leaves
+# an annotation, never a red nightly.
+
+on:
+  workflow_call:
+    inputs:
+      results:
+        description: The caller's needs context, as toJSON(needs)
+        required: true
+        type: string
+      title:
+        description: Card title, followed by the tag
+        required: false
+        type: string
+        default: Harbor Next nightly
+      version:
+        required: false
+        type: string
+        default: ""
+      tag:
+        required: false
+        type: string
+        default: ""
+      release_sha:
+        description: The release commit that was published, if any
+        required: false
+        type: string
+        default: ""
+      e2e_passed:
+        required: false
+        type: string
+        default: ""
+      e2e_failed:
+        required: false
+        type: string
+        default: ""
+      e2e_total:
+        required: false
+        type: string
+        default: ""
+    secrets:
+      # Embeds the space's key and token. Optional on purpose: see above.
+      GCHAT_WEBHOOK_URL:
+        required: false
+
+permissions: {}
+
+jobs:
+  notify:
+    name: Post to Google Chat
+    # always(): the caller only calls this when it wants a card, including
+    # after a cancellation, and a cancelled run skips every job without it.
+    if: ${{ always() }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      # !failure() rather than the implicit success(): it lets these steps run
+      # in a cancelled run too. continue-on-error keeps failure() false, so
+      # each step that needs an earlier one checks that step's outcome
+      # instead: a broken setup leaves one annotation, not a second one from
+      # a step that could never have worked.
+      - id: checkout
+        if: ${{ !failure() }}
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - id: task
+        if: ${{ !failure() && steps.checkout.outcome == 'success' }}
+        continue-on-error: true
+        uses: $/.github/actions/setup-task
+
+      # The task builds the card with jq. Hosted images ship it; a runner
+      # without it gets it here.
+      - name: Install jq
+        id: jq
+        if: ${{ !failure() }}
+        continue-on-error: true
+        run: |
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y jq
+          fi
+
+      - name: Post the outcome
+        if: ${{ !failure() && steps.task.outcome == 'success' && steps.jq.outcome == 'success' }}
+        continue-on-error: true
+        env:
+          GCHAT_WEBHOOK_URL: ${{ secrets.GCHAT_WEBHOOK_URL }}
+          RESULTS: ${{ inputs.results }}
+          TITLE: ${{ inputs.title }}
+          NIGHTLY_VERSION: ${{ inputs.version }}
+          NIGHTLY_TAG: ${{ inputs.tag }}
+          # The caller's commit: for a nightly, the head of main it was cut from.
+          HEAD_SHA: ${{ github.sha }}
+          RELEASE_SHA: ${{ inputs.release_sha }}
+          E2E_PASSED: ${{ inputs.e2e_passed }}
+          E2E_FAILED: ${{ inputs.e2e_failed }}
+          E2E_TOTAL: ${{ inputs.e2e_total }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        # -o interleaved: the root Taskfile prefixes output per task, and a
+        # prefixed ::warning:: line is not picked up as an annotation.
+        run: |
+          task -o interleaved notify:gchat \
+            RESULTS="${RESULTS}" \
+            TITLE="${TITLE}" \
+            NIGHTLY_VERSION="${NIGHTLY_VERSION}" \
+            NIGHTLY_TAG="${NIGHTLY_TAG}" \
+            HEAD_SHA="${HEAD_SHA}" \
+            RELEASE_SHA="${RELEASE_SHA}" \
+            E2E_PASSED="${E2E_PASSED}" \
+            E2E_FAILED="${E2E_FAILED}" \
+            E2E_TOTAL="${E2E_TOTAL}" \
+            RUN_URL="${RUN_URL}" \
+            REPO_URL="${REPO_URL}"

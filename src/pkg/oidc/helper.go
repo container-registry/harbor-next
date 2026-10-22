@@ -446,17 +446,18 @@ func groupsFromClaims(gp claimsProvider, k string) ([]string, bool) {
 	return res, false
 }
 
-type populate func(groupNames []string) ([]int, error)
+type populate func(ctx context.Context, groupNames []string) ([]int, error)
 
-func populateGroupsDB(groupNames []string) ([]int, error) {
-	ctx := orm.Context()
+func populateGroupsDB(ctx context.Context, groupNames []string) ([]int, error) {
+	// Reached inside the request transaction on every OIDC-authenticated write (#850).
+	ctx = orm.ReuseContext(ctx)
 	cfg, err := config.OIDCSetting(ctx)
 	if err != nil {
 		log.Errorf("failed to get OIDC config, error: %v", err)
 		return nil, err
 	}
 	log.Debugf("populateGroupsDB, group filter %v", cfg.GroupFilter)
-	return usergroup.Mgr.Populate(orm.Context(), model.UserGroupsFromName(filterGroup(groupNames, cfg.GroupFilter), common.OIDCGroupType))
+	return usergroup.Mgr.Populate(ctx, model.UserGroupsFromName(filterGroup(groupNames, cfg.GroupFilter), common.OIDCGroupType))
 }
 
 // filterGroup filter group with a regular expression filter
@@ -480,8 +481,8 @@ func filterGroup(groupNames []string, filter string) []string {
 }
 
 // InjectGroupsToUser populates the group to DB and inject the group IDs to user model.
-// The third optional param is for UT only.
-func InjectGroupsToUser(info *UserInfo, user *models.User, f ...populate) {
+// The fourth optional param is for UT only.
+func InjectGroupsToUser(ctx context.Context, info *UserInfo, user *models.User, f ...populate) {
 	if info == nil || user == nil {
 		log.Warningf("user info or user model is nil, skip the func")
 		return
@@ -492,7 +493,7 @@ func InjectGroupsToUser(info *UserInfo, user *models.User, f ...populate) {
 	} else {
 		populateGroups = f[0]
 	}
-	if gids, err := populateGroups(info.Groups); err != nil {
+	if gids, err := populateGroups(ctx, info.Groups); err != nil {
 		log.Warningf("failed to get group ID, error: %v, skip populating groups", err)
 	} else {
 		user.GroupIDs = gids

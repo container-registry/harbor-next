@@ -33,6 +33,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/q"
+	"github.com/goharbor/harbor/src/server/middleware/session"
 )
 
 // CommonController handles request from UI that doesn't expect a page, such as /SwitchLanguage /logout ...
@@ -142,6 +143,7 @@ func (cc *CommonController) LogOut() {
 		log.Errorf("Error occurred in LogOut: %v", err)
 		cc.CustomAbort(http.StatusInternalServerError, "Internal error.")
 	}
+	session.SecureDestroyedCookie(cc.Ctx.ResponseWriter)
 }
 
 // UserExists checks if user exists when user input value in sign in form.
@@ -154,7 +156,7 @@ func (cc *CommonController) UserExists() {
 	securityCtx, ok := security.FromContext(ctx)
 	isAdmin := ok && securityCtx.IsSysAdmin()
 	if !flag && !isAdmin {
-		cc.CustomAbort(http.StatusPreconditionFailed, "self registration deactivated, only sysadmin can check user existence")
+		cc.CustomAbort(http.StatusPreconditionFailed, "Self-registration is deactivated; only a system administrator can check user existence.")
 	}
 
 	target := cc.GetString("target")

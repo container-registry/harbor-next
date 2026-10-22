@@ -154,9 +154,6 @@ func (suite *SBOMTestSuite) SetupSuite() {
 		ArtifactControllerFunc: func() artifact.Controller { return suite.artifactCtl },
 		ScanControllerFunc:     func() sc.Controller { return suite.scanController },
 		ScannerControllerFunc:  func() scanner.Controller { return suite.scannerController },
-		cloneCtx: func(ctx context.Context) context.Context {
-			return ctx
-		},
 	}
 
 	suite.artifact = &artifact.Artifact{Artifact: art.Artifact{ID: 1}}

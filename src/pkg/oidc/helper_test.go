@@ -17,6 +17,7 @@
 package oidc
 
 import (
+	"context"
 	"encoding/json"
 	"net/url"
 	"os"
@@ -547,7 +548,7 @@ func TestInjectGroupsToUser(t *testing.T) {
 	}
 	for _, c := range cases {
 		u := c.old
-		InjectGroupsToUser(c.userInfo, u, mockPopulateGroups)
+		InjectGroupsToUser(context.Background(), c.userInfo, u, mockPopulateGroups)
 		assert.Equal(t, *c.new, *u)
 	}
 }

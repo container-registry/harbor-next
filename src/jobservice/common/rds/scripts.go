@@ -60,6 +60,7 @@ end
 // ARGV[2]: stats revision
 // ARGV[3]: update timestamp
 // ARGV[4]: job ID
+// ARGV[5]: optional status message
 var setStatusScriptText = fmt.Sprintf(`
 %s
 
@@ -76,6 +77,10 @@ if res then
   -- set same status repeatedly is allowed
   if rev < aRev or ( rev == aRev and (code < aCode or st == ARGV[1])) then
     redis.call('hmset', KEYS[1], 'status', ARGV[1], 'update_time', ARGV[3])
+    -- persist the optional status message only when the transition is accepted
+    if ARGV[5] and ARGV[5] ~= '' then
+      redis.call('hset', KEYS[1], 'status_message', ARGV[5])
+    end
     -- update inprogress track if necessary
     if aCode == 3 then
       -- final status

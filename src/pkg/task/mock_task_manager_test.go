@@ -77,6 +77,41 @@ func (_m *mockTaskManager) Create(ctx context.Context, executionID int64, job *J
 	return r0, r1
 }
 
+// CreateRecord provides a mock function with given fields: ctx, executionID, extraAttrs
+func (_m *mockTaskManager) CreateRecord(ctx context.Context, executionID int64, extraAttrs ...map[string]interface{}) (int64, error) {
+	_va := make([]interface{}, len(extraAttrs))
+	for _i := range extraAttrs {
+		_va[_i] = extraAttrs[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, executionID)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateRecord")
+	}
+
+	var r0 int64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, ...map[string]interface{}) (int64, error)); ok {
+		return rf(ctx, executionID, extraAttrs...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64, ...map[string]interface{}) int64); ok {
+		r0 = rf(ctx, executionID, extraAttrs...)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64, ...map[string]interface{}) error); ok {
+		r1 = rf(ctx, executionID, extraAttrs...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ExecutionIDsByVendorAndStatus provides a mock function with given fields: ctx, vendorType, status
 func (_m *mockTaskManager) ExecutionIDsByVendorAndStatus(ctx context.Context, vendorType string, status string) ([]int64, error) {
 	ret := _m.Called(ctx, vendorType, status)
@@ -304,6 +339,24 @@ func (_m *mockTaskManager) Stop(ctx context.Context, id int64) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
 		r0 = rf(ctx, id)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Submit provides a mock function with given fields: ctx, id, job
+func (_m *mockTaskManager) Submit(ctx context.Context, id int64, job *Job) error {
+	ret := _m.Called(ctx, id, job)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Submit")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, *Job) error); ok {
+		r0 = rf(ctx, id, job)
 	} else {
 		r0 = ret.Error(0)
 	}

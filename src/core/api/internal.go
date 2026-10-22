@@ -28,6 +28,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/orm"
+	"github.com/goharbor/harbor/src/server/middleware/session"
 )
 
 // InternalAPI handles request of harbor admin...
@@ -70,15 +71,17 @@ func (ia *InternalAPI) RenameAdmin() {
 		log.Errorf("failed to destroy session for admin user, error: %v", err)
 		return
 	}
+	session.SecureDestroyedCookie(ia.Ctx.ResponseWriter)
 }
 
 // SyncQuota ...
 func (ia *InternalAPI) SyncQuota() {
-	if !config.QuotaPerProjectEnable(orm.Context()) {
+	// Request's own connection; the goroutine below outlives the request and keeps its own (#850).
+	ctx := ia.Ctx.Request.Context()
+	if !config.QuotaPerProjectEnable(ctx) {
 		ia.SendError(errors.ForbiddenError(nil).WithMessage("quota per project is deactivated"))
 		return
 	}
-	ctx := orm.Context()
 	cur := config.ReadOnly(ctx)
 	cfgMgr := config.GetCfgManager(ctx)
 	if !cur {

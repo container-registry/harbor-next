@@ -434,6 +434,20 @@ func TestValidateCronString(t *testing.T) {
 			input:       "0 1 2 1 1 *",
 			hasErr:      false,
 		},
+
+		// cron expression that can never fire (Feb 30 does not exist)
+		{
+			description: "test case 5",
+			input:       "0 0 3 30 2 *",
+			hasErr:      true,
+		},
+
+		// Feb 29 (leap day) is valid and reachable — fires every leap year
+		{
+			description: "test case 6 - Feb 29 leap day is reachable",
+			input:       "0 0 0 29 2 *",
+			hasErr:      false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -466,6 +480,9 @@ func TestIsLocalPath(t *testing.T) {
 		{"other_site2", args{"https://www.myexample.com"}, false},
 		{"other_site", args{"http://www.myexample.com"}, false},
 		{"empty_path", args{""}, true},
+		{"backslash_other_site", args{"/\\www.myexample.com"}, false},
+		{"crlf", args{"/harbor\r\nLocation: //www.myexample.com"}, false},
+		{"tab", args{"/\t/www.myexample.com"}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

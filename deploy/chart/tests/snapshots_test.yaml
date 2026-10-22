@@ -29,6 +29,12 @@ suite: full-chart snapshots
 #   5. Trace + observability — jaeger + metrics + ServiceMonitor
 #   6. Ingress + cert-manager + multiple hosts (including wildcard)
 
+# Pinned so a release PR, which restamps only version and appVersion in
+# Chart.yaml, does not invalidate every snapshot.
+chart:
+  version: 9.9.9-test
+  appVersion: v9.9.9-test
+
 templates:
   - templates/core.configmap.yaml
   - templates/core.service.yaml

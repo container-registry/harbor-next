@@ -34,6 +34,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/pkg/notification"
 	"github.com/goharbor/harbor/src/pkg/oidc"
+	"github.com/goharbor/harbor/src/server/middleware/session"
 
 	"go.pinniped.dev/pkg/oidcclient/pkce"
 )
@@ -208,7 +209,7 @@ func (oc *OIDCController) Callback() {
 		oc.SendError(err)
 		return
 	}
-	oidc.InjectGroupsToUser(info, u)
+	oidc.InjectGroupsToUser(ctx, info, u)
 	um, err := ctluser.Ctl.Get(ctx, u.UserID, &ctluser.Option{WithOIDCInfo: true})
 	if err != nil {
 		oc.SendError(err)
@@ -254,6 +255,7 @@ func (oc *OIDCController) RedirectLogout() {
 		oc.SendInternalServerError(err)
 		return
 	}
+	session.SecureDestroyedCookie(oc.Ctx.ResponseWriter)
 	if sessionData == nil {
 		log.Warningf("OIDC session token not found.")
 		oc.Controller.Redirect("/account/sign-in", http.StatusFound)
@@ -266,8 +268,8 @@ func (oc *OIDCController) RedirectLogout() {
 		return
 	}
 	if oidcSettings == nil {
-		log.Error("OIDC settings is missing.")
-		oc.SendInternalServerError(fmt.Errorf("OIDC settings is missing"))
+		log.Error("OIDC settings are missing.")
+		oc.SendInternalServerError(fmt.Errorf("OIDC settings are missing"))
 		return
 	}
 	if !oidcSettings.Logout {
@@ -344,7 +346,7 @@ func userOnboard(ctx context.Context, oc *OIDCController, info *oidc.UserInfo, u
 		OIDCUserMeta: &oidcUser,
 		Comment:      oidcUserComment,
 	}
-	oidc.InjectGroupsToUser(info, user)
+	oidc.InjectGroupsToUser(ctx, info, user)
 
 	log.Debugf("User created: %v\n", user.Username)
 

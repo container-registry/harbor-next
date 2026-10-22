@@ -114,7 +114,7 @@ func ReversibleEncrypt(str, key string) (string, error) {
 		return "", err
 	}
 
-	cfb := cipher.NewCFBEncrypter(block, iv)
+	cfb := cipher.NewCFBEncrypter(block, iv) //nolint:gosec // G407 false positive: iv is filled from crypto/rand above
 	cfb.XORKeyStream(cipherText[aes.BlockSize:], []byte(str))
 	encrypted := EncryptHeaderV1 + base64.StdEncoding.EncodeToString(cipherText)
 	return encrypted, nil

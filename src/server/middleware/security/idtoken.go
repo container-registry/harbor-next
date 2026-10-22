@@ -63,7 +63,7 @@ func (i *idToken) Generate(req *http.Request) security.Context {
 		log.Errorf("Failed to get user info from ID token: %v", err)
 		return nil
 	}
-	oidc.InjectGroupsToUser(info, u)
+	oidc.InjectGroupsToUser(ctx, info, u)
 	log.Debugf("an ID token security context generated for request %s %s", req.Method, req.URL.Path)
 	return local.NewSecurityContext(u)
 }

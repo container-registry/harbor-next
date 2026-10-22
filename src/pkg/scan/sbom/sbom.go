@@ -57,7 +57,6 @@ func init() {
 		ArtifactControllerFunc: func() artifact.Controller { return artifact.Ctl },
 		ScanControllerFunc:     func() scanCtl.Controller { return scanCtl.DefaultController },
 		ScannerControllerFunc:  func() sc.Controller { return sc.DefaultController },
-		cloneCtx:               orm.Clone,
 	})
 }
 
@@ -69,7 +68,6 @@ type scanHandler struct {
 	ArtifactControllerFunc func() artifact.Controller
 	ScanControllerFunc     func() scanCtl.Controller
 	ScannerControllerFunc  func() sc.Controller
-	cloneCtx               func(ctx context.Context) context.Context
 }
 
 // RequestProducesMineTypes defines the mine types produced by the scan handler
@@ -225,7 +223,9 @@ func (h *scanHandler) MakePlaceHolder(ctx context.Context, art *artifact.Artifac
 // delete deletes the sbom report and accessory
 func (h *scanHandler) delete(ctx context.Context, art *artifact.Artifact, mimeTypes string, r *scanner.Registration) error {
 	mgr := h.SBOMMgrFunc()
-	sbomReports, err := mgr.GetBy(h.cloneCtx(ctx), art.ID, r.UUID, mimeTypes, sbomMediaTypeSpdx)
+	// On the caller's connection: delete runs inside the scan transaction, where an
+	// ORM of its own would need a second pool connection (#856).
+	sbomReports, err := mgr.GetBy(ctx, art.ID, r.UUID, mimeTypes, sbomMediaTypeSpdx)
 	if err != nil {
 		return err
 	}

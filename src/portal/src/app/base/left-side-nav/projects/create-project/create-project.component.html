@@ -225,6 +225,55 @@
             </div>
             <div
                 class="clr-form-control mt-05"
+                *ngIf="isSystemAdmin && enableProxyCache">
+                <label for="retentionDays" class="clr-control-label required">
+                    {{ 'PROJECT.PROXY_CACHE_RETENTION_DAYS' | translate }}
+                    <clr-tooltip>
+                        <clr-icon
+                            clrTooltipTrigger
+                            shape="info-circle"
+                            size="24"></clr-icon>
+                        <clr-tooltip-content
+                            clrPosition="bottom-left"
+                            clrSize="lg"
+                            *clrIfOpen>
+                            <span>{{
+                                'PROJECT.PROXY_CACHE_RETENTION_DAYS_TOOLTIP'
+                                    | translate
+                            }}</span>
+                        </clr-tooltip-content>
+                    </clr-tooltip>
+                </label>
+                <div
+                    class="clr-control-container"
+                    [class.clr-error]="!isRetentionDaysValid">
+                    <input
+                        type="number"
+                        id="retentionDays"
+                        name="retentionDays"
+                        [(ngModel)]="retentionDays"
+                        required
+                        min="0"
+                        [max]="maxRetentionDays"
+                        step="1"
+                        class="clr-input width-164 mr-10"
+                        autocomplete="off" />
+                    <clr-icon
+                        *ngIf="!isRetentionDaysValid"
+                        class="clr-validate-icon"
+                        shape="exclamation-circle"></clr-icon>
+                    <clr-control-error
+                        *ngIf="!isRetentionDaysValid"
+                        class="tooltip-content">
+                        {{
+                            'PROJECT.PROXY_CACHE_RETENTION_DAYS_INVALID'
+                                | translate
+                        }}
+                    </clr-control-error>
+                </div>
+            </div>
+            <div
+                class="clr-form-control mt-05"
                 [ngStyle]="{
                     visibility:
                         isSystemAdmin && enableProxyCache ? 'visible' : 'hidden'
