@@ -216,7 +216,16 @@ $$;
 
 -- Generated failed-task summary kept apart from the execution-origin status_message
 -- so a refresh can replace it when tasks recover.
-ALTER TABLE execution ADD COLUMN IF NOT EXISTS task_status_message TEXT NOT NULL DEFAULT '';
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_class
+        WHERE oid = to_regclass('execution') AND relkind IN ('r', 'p')
+    ) THEN
+        ALTER TABLE execution ADD COLUMN IF NOT EXISTS task_status_message TEXT NOT NULL DEFAULT '';
+    END IF;
+END
+$$;
 
 -- Custom project roles (upstream goharbor/harbor#23804). Every project role,
 -- the five built-ins included, keeps its grants in
