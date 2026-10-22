@@ -15,12 +15,18 @@
 package rbac
 
 import (
+<<<<<<< HEAD
 	"sync"
 
 	"github.com/casbin/casbin/v3"
 	"github.com/casbin/casbin/v3/model"
 
 	"github.com/goharbor/harbor/src/pkg/permission/policy"
+=======
+	"github.com/casbin/casbin/v3"
+	"github.com/casbin/casbin/v3/model"
+
+>>>>>>> f83b3ae75 (chore: Upgrade Casbin To v3 (#24189))
 	"github.com/goharbor/harbor/src/pkg/permission/types"
 )
 
@@ -37,10 +43,38 @@ func makeEnforcer(policies []*types.Policy, username string) (*casbin.Enforcer, 
 	}
 	m := base.Copy()
 
+<<<<<<< HEAD
 	e, err := casbin.NewEnforcer(m, &adapter{policies: policies, username: username})
 	if err != nil {
 		return nil, err
 	}
 	e.AddFunction(policy.KeyMatch2FuncName, policy.KeyMatch2Func)
+=======
+# Role definition
+[role_definition]
+g = _, _
+
+# Policy effect
+[policy_effect]
+e = some(where (p.eft == allow)) && !some(where (p.eft == deny))
+
+# Matchers
+[matchers]
+m = g(r.sub, p.sub) && harborKeyMatch2(r.obj, p.obj) && (r.act == p.act || p.act == '*')
+`
+
+func makeEnforcer(rbacUser types.RBACUser) (*casbin.Enforcer, error) {
+	m, err := model.NewModelFromString(modelText)
+	if err != nil {
+		return nil, err
+	}
+
+	e, err := casbin.NewEnforcer(m, &adapter{rbacUser: rbacUser})
+	if err != nil {
+		return nil, err
+	}
+	// not "keyMatch2": casbin v3 pre-registers that name and AddFunction never replaces it
+	e.AddFunction("harborKeyMatch2", keyMatch2Func)
+>>>>>>> f83b3ae75 (chore: Upgrade Casbin To v3 (#24189))
 	return e, nil
 }
