@@ -73,12 +73,12 @@ func init() {
 		secureOptions = append(secureOptions, commonhttp.WithInternalTLSConfig())
 	}
 	httpHelper.clients[secure] = &http.Client{
-		Transport:     commonhttp.NewPublicNetworkTransport(secureOptions...),
+		Transport:     commonhttp.NewEgressGuardedTransport(secureOptions...),
 		Timeout:       timeout,
 		CheckRedirect: blockRedirect,
 	}
 	httpHelper.clients[insecure] = &http.Client{
-		Transport:     commonhttp.NewPublicNetworkTransport(commonhttp.WithInsecureSkipVerify(true)),
+		Transport:     commonhttp.NewEgressGuardedTransport(commonhttp.WithInsecureSkipVerify(true)),
 		Timeout:       timeout,
 		CheckRedirect: blockRedirect,
 	}

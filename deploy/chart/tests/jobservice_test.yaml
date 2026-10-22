@@ -382,25 +382,49 @@ tests:
           path: spec.template.metadata.annotations["checksum/configmap-env"]
 
   # Pins: jobservice sends the notifications, so it must see the same setting as core.
-  - it: should block private-network webhook targets by default in jobservice
+  - it: should leave the webhook egress policy to Harbor by default in jobservice
     template: templates/jobservice.configmap-env.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
+    asserts:
+      - equal:
+          path: data.HARBOR_WEBHOOK_EGRESS_POLICY
+          value: ""
+      - equal:
+          path: data.HARBOR_WEBHOOK_EGRESS_ALLOWLIST
+          value: ""
+      - notExists:
+          path: data.HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
+
+  - it: should pass the webhook egress policy through to jobservice
+    template: templates/jobservice.configmap-env.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      network.webhookEgress.policy: public_only
+      network.webhookEgress.allowlist:
+        - 10.20.0.0/16
+        - "*.svc.cluster.local"
+    asserts:
+      - equal:
+          path: data.HARBOR_WEBHOOK_EGRESS_POLICY
+          value: public_only
+      - equal:
+          path: data.HARBOR_WEBHOOK_EGRESS_ALLOWLIST
+          value: 10.20.0.0/16,*.svc.cluster.local
+
+  # Pins: the deprecated value keeps reaching jobservice, including an explicit false.
+  - it: should pass the deprecated allowPrivateNetworkAccess through to jobservice
+    template: templates/jobservice.configmap-env.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      network.allowPrivateNetworkAccess: false
     asserts:
       - equal:
           path: data.HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
           value: "false"
-
-  - it: should pass network.allowPrivateNetworkAccess through to jobservice
-    template: templates/jobservice.configmap-env.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      network.allowPrivateNetworkAccess: true
-    asserts:
-      - equal:
-          path: data.HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
-          value: "true"
