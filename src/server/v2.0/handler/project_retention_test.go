@@ -227,7 +227,7 @@ func TestUpdateProjectRetention(t *testing.T) {
 						ProjectID: 42, Name: "test-project", RegistryID: projectType.registryID,
 						Metadata: map[string]string{"public": "false"},
 					}
-					projectCtl.On("Get", mock.Anything, int64(42)).Return(p, nil).Once()
+					projectCtl.On("Get", mock.Anything, int64(42), mock.Anything).Return(p, nil).Once()
 					projectCtl.On("Update", mock.Anything, p).Return(nil).Maybe()
 
 					sec := securitytesting.NewContext(t)

@@ -46,14 +46,6 @@ const (
 	// watcher's context and waits for the dispatch goroutine, so a database
 	// call that can neither finish nor be cancelled would hold shutdown open.
 	callbackTimeout = 60 * time.Second
-
-	// resyncEvery bounds how long this replica can hold a stale policy when no
-	// notification ever arrives. Harbor runs several cores against one
-	// database, and a notification is a best effort: the connection can drop
-	// between the write and the reconnect, Postgres can restart, this process
-	// can be paused past the message. The watcher is the fast path and this is
-	// the one that guarantees convergence.
-	resyncEvery = pingEvery
 )
 
 // Watcher tells this replica when the policy changed somewhere else.
