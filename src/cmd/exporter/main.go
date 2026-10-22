@@ -36,6 +36,10 @@ import (
 )
 
 func main() {
+	// Merge any mounted custom CA certificates into the trust store before
+	// any TLS connection is attempted.
+	commonthttp.LoadCustomCACertificates()
+
 	// Start pprof server
 	lib.StartPprof()
 
