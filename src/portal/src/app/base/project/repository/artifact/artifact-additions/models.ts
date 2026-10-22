@@ -28,6 +28,7 @@ export interface Addition {
 export enum ADDITIONS {
     VULNERABILITIES = 'vulnerabilities',
     BUILD_HISTORY = 'build_history',
+    DOCKERFILE = 'dockerfile',
     SUMMARY = 'readme.md',
     VALUES = 'values.yaml',
     DEPENDENCIES = 'dependencies',
