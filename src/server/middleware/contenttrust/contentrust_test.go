@@ -211,8 +211,13 @@ func (suite *ContentTrustMiddlewareTestSuite) TestSpoofedCosignUserAgentBlocked(
 	suite.Equal(http.StatusPreconditionFailed, rr.Code)
 }
 
+<<<<<<< HEAD
 // The legacy bootstrap allows the pull-before-first-signature exemption for content-trust, so
 // a cosign or notation client can create a first signature under an enabled policy.
+=======
+// The opt-in legacy bootstrap (CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED=true) restores the
+// pull-before-first-signature exemption for content-trust, for operators who need it.
+>>>>>>> f234c0cb6 (Merge commit from fork)
 func (suite *ContentTrustMiddlewareTestSuite) TestLegacySignerPullOptIn() {
 	suite.T().Setenv("CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED", "true")
 	mock.OnAnything(suite.artifactController, "GetByReference").Return(suite.artifact, nil)
@@ -251,6 +256,7 @@ func (suite *ContentTrustMiddlewareTestSuite) serveLegacySignerPull(userAgent st
 	return rr.Code
 }
 
+<<<<<<< HEAD
 func (suite *ContentTrustMiddlewareTestSuite) TestLegacySignerPullAllowedWhenUnset() {
 	suite.T().Setenv("CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED", "")
 	os.Unsetenv("CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED")
@@ -265,6 +271,11 @@ func (suite *ContentTrustMiddlewareTestSuite) TestLegacySignerPullDisabledWhenFa
 // A value neither true nor false fails closed rather than being read as either answer.
 func (suite *ContentTrustMiddlewareTestSuite) TestLegacySignerPullDisabledWhenMalformed() {
 	suite.T().Setenv("CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED", "flase")
+=======
+func (suite *ContentTrustMiddlewareTestSuite) TestLegacySignerPullDisabledWhenUnset() {
+	suite.T().Setenv("CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED", "")
+	os.Unsetenv("CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED")
+>>>>>>> f234c0cb6 (Merge commit from fork)
 	suite.Equal(http.StatusPreconditionFailed, suite.serveLegacySignerPull("cosign/2.4.0", true))
 }
 
