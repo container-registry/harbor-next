@@ -94,9 +94,13 @@ func (c *controller) validate(ctx context.Context, registry *model.Registry) err
 	if len(registry.Name) > 64 {
 		return errors.New(nil).WithCode(errors.BadRequestCode).WithMessage("the max length of name is 64")
 	}
+<<<<<<< HEAD
 	// a registry endpoint is only ever spoken to over HTTP; the default scheme
 	// set of ValidateURL also admits ftp/s3/sftp, which net/http cannot dial
 	url, err := lib.ValidateURL(registry.URL, "http", "https")
+=======
+	url, err := lib.NormalizeAndValidateHTTPURL(registry.URL)
+>>>>>>> 95b28b3cd (fix: make endpoint handling and validation case-insensitive (#23889))
 	if err != nil {
 		return err
 	}
