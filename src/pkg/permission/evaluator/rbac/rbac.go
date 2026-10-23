@@ -56,6 +56,7 @@ type Evaluator struct {
 
 // HasPermission returns true when the rbac user has action permission for the resource
 func (e *Evaluator) HasPermission(_ context.Context, resource types.Resource, action types.Action) bool {
+<<<<<<< HEAD
 	if e.rbacUser.GetUserName() == "" {
 		return false
 	}
@@ -106,6 +107,18 @@ func (e *Evaluator) directGrants(resource types.Resource, action types.Action) b
 		return false
 	}
 
+=======
+	e.once.Do(func() {
+		var err error
+		if e.enforcer, err = makeEnforcer(e.rbacUser); err != nil {
+			log.Errorf("failed to build the permission enforcer: %v", err)
+		}
+	})
+	if e.enforcer == nil {
+		return false
+	}
+
+>>>>>>> f83b3ae75 (chore: Upgrade Casbin To v3 (#24189))
 	granted, err := e.enforcer.Enforce(e.rbacUser.GetUserName(), resource.String(), action.String())
 	if err != nil {
 		log.Errorf("failed to evaluate the permission: %v", err)
