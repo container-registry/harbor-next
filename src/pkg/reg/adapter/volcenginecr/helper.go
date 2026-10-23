@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/docker/distribution/registry/client/auth/challenge"
 
@@ -28,12 +29,12 @@ import (
 )
 
 func getRegionRegistryName(url string) (string, string, error) {
-	reg := regexp.MustCompile(`https://(.*)\.cr\.volces|ivolces\.com`)
+	reg := regexp.MustCompile(`(?i)https://(.*)\.cr\.(?:volces|ivolces)\.com`)
 	rs := reg.FindStringSubmatch(url)
 	if rs == nil || len(rs) != 2 {
 		return "", "", errors.New("Invalid url")
 	}
-	registryNameRegion := rs[1]
+	registryNameRegion := strings.ToLower(rs[1])
 	for regionReg := range regionRegs {
 		reg = regexp.MustCompile(regionReg)
 		res := reg.FindStringSubmatch(registryNameRegion)

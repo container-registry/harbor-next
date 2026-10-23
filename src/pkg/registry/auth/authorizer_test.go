@@ -130,6 +130,14 @@ func TestIsTarget_WithPathPrefix(t *testing.T) {
 	assert.False(t, a.isTarget(req))
 }
 
+func TestIsTarget_HostCaseInsensitive(t *testing.T) {
+	a := &authorizer{}
+	a.url, _ = parseURL("http://registry.example.com/v2/")
+
+	req, _ := http.NewRequest(http.MethodGet, "http://Registry.Example.COM/v2/library/nginx/manifests/latest", nil)
+	assert.True(t, a.isTarget(req))
+}
+
 func parseURL(raw string) (*url.URL, error) {
 	return url.Parse(raw)
 }
