@@ -97,6 +97,7 @@ func SkipPolicyChecking(r *http.Request, projectID, artID int64) (bool, error) {
 	return false, nil
 }
 
+<<<<<<< HEAD
 // LegacySignerPullEnabled reports whether the legacy, User-Agent-based signer-pull exemption
 // for the content-trust policy is in effect. It is on by default.
 //
@@ -114,6 +115,19 @@ func LegacySignerPullEnabled() bool {
 	}
 	enabled, err := strconv.ParseBool(value)
 	return err == nil && enabled
+=======
+// LegacySignerPullEnabled reports whether the operator has opted in to the legacy,
+// User-Agent-based signer-pull exemption for the content-trust policy. It is off by default.
+//
+// The exemption exists so a signing client (cosign/notation) can pull an as-yet unsigned
+// subject manifest in order to create its first signature under an enabled content-trust
+// policy. Its only signal is the client-supplied User-Agent, which is spoofable (CWE-807);
+// it is therefore honoured only when an operator explicitly sets
+// CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED=true, and never for the vulnerability-prevention
+// policy.
+func LegacySignerPullEnabled() bool {
+	return os.Getenv("CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED") == "true"
+>>>>>>> f234c0cb6 (Merge commit from fork)
 }
 
 // LegacySignerBootstrapPull reports whether the request looks like a push-capable signing
