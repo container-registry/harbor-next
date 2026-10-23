@@ -1668,7 +1668,9 @@
     "USER": "Пользователь",
     "LDAPUSER": "LDAP Пользователь",
     "GROUP": "Группа пользователей",
-    "MEMBER": "Участник проекта"
+    "MEMBER": "Участник проекта",
+    "CONFIGURATION": "Configuration",
+    "OPERATE": "Operate"
   },
   "WEBHOOK": {
     "ENABLED_BUTTON": "ВКЛЮЧИТЬ",
