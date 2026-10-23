@@ -24,3 +24,6 @@ action originated from.
 */
 ALTER TABLE audit_log_ext ADD COLUMN IF NOT EXISTS client_address varchar(255) DEFAULT '';
 ALTER TABLE audit_log_ext ADD COLUMN IF NOT EXISTS user_agent varchar(1024) DEFAULT '';
+
+CREATE INDEX IF NOT EXISTS idx_sbom_report_sbom_digest
+  ON sbom_report (mime_type, ((report::jsonb ->> 'sbom_digest')));
