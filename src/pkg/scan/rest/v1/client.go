@@ -83,6 +83,8 @@ func NewClient(url, authType, accessCredential string, skipCertVerify bool) (Cli
 	transport := &http.Transport{
 		Proxy:        http.ProxyFromEnvironment,
 		MaxIdleConns: 100,
+		// one scanner adapter host per client; the default per-host cap of 2 churns connections
+		MaxIdleConnsPerHost: 100,
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: skipCertVerify,
 		},
