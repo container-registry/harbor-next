@@ -3,7 +3,7 @@ FROM oven/bun:1.4.0 AS bun
 # dockerfile/portal.dockerfile builds the portal with Alpine's Node 22, not NODE_VERSION from versions.env.
 FROM node:22.22.3-bookworm AS node
 
-FROM golang:1.27.2-bookworm
+FROM golang:1.27.3-bookworm
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
