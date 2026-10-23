@@ -17,6 +17,7 @@
 package security
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
@@ -24,8 +25,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/goharbor/harbor/src/common"
+	"github.com/goharbor/harbor/src/common/models"
+	"github.com/goharbor/harbor/src/core/auth"
 	_ "github.com/goharbor/harbor/src/core/auth/db"
 	"github.com/goharbor/harbor/src/lib"
+	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/orm"
 )
 
@@ -55,10 +59,34 @@ func TestBasicAuthNonDBMode(t *testing.T) {
 	userReq = userReq.WithContext(lib.WithAuthMode(orm.Context(), common.OIDCAuth))
 	assert.Nil(t, basicAuth.Generate(userReq), "non-admin basic auth must be skipped in OIDC mode")
 
+	// LDAP users have no other credential than their password, so basic auth
+	// must still reach the LDAP authenticator for them.
+	auth.Register(common.LDAPAuth, &fakeLDAPAuth{})
+	origMgr := config.DefaultCfgManager
+	t.Cleanup(func() { config.DefaultCfgManager = origMgr })
+	config.InitWithSettings(map[string]any{common.AUTHMode: common.LDAPAuth})
+	ldapReq, err := http.NewRequest(http.MethodGet, "http://127.0.0.1/api/projects/", nil)
+	require.Nil(t, err)
+	ldapReq.SetBasicAuth("ldap-user", "secret")
+	ldapReq = ldapReq.WithContext(lib.WithAuthMode(orm.Context(), common.LDAPAuth))
+	ldapCtx := basicAuth.Generate(ldapReq)
+	require.NotNil(t, ldapCtx, "LDAP users must authenticate via basic auth")
+	assert.Equal(t, "ldap-user", ldapCtx.GetUsername())
+
 	// empty auth mode is treated as DB auth, so the skip must not lock out basic auth.
 	emptyModeReq, err := http.NewRequest(http.MethodGet, "http://127.0.0.1/api/projects/", nil)
 	require.Nil(t, err)
 	emptyModeReq.SetBasicAuth("admin", "Harbor12345")
 	emptyModeReq = emptyModeReq.WithContext(orm.Context())
 	assert.NotNil(t, basicAuth.Generate(emptyModeReq), "admin must authenticate when auth mode is empty (treated as DB)")
+}
+
+// fakeLDAPAuth stands in for the LDAP backend: it accepts any credentials and
+// hands back the user without touching a directory.
+type fakeLDAPAuth struct {
+	auth.DefaultAuthenticateHelper
+}
+
+func (f *fakeLDAPAuth) Authenticate(_ context.Context, m models.AuthModel) (*models.User, error) {
+	return &models.User{UserID: 100, Username: m.Principal}, nil
 }
