@@ -97,7 +97,7 @@ func TestAuthProxy(t *testing.T) {
 
 	// With an empty admin allowlist the external identity must NOT inherit the
 	// colliding local account's sysadmin flag.
-	ctx := authProxy.Generate(req)
+	ctx := mustGenerate(t, authProxy, req)
 	require.NotNil(t, ctx)
 	assert.False(t, ctx.IsSysAdmin())
 
@@ -110,7 +110,7 @@ func TestAuthProxy(t *testing.T) {
 	})
 	c[common.HTTPAuthProxyAdminUsernames] = "administrator@vsphere.local"
 	config.Upload(c)
-	ctx = authProxy.Generate(req)
+	ctx = mustGenerate(t, authProxy, req)
 	require.NotNil(t, ctx)
 	assert.True(t, ctx.IsSysAdmin())
 	localCtx, ok := ctx.(*local.SecurityContext)

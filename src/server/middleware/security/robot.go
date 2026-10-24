@@ -15,6 +15,7 @@
 package security
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -30,14 +31,18 @@ import (
 
 type robot struct{}
 
-func (r *robot) Generate(req *http.Request) security.Context {
+func (r *robot) Generate(req *http.Request) (security.Context, error) {
 	log := log.G(req.Context())
 	name, secret, ok := req.BasicAuth()
 	if !ok {
-		return nil
+		return nil, nil
 	}
 	if !strings.HasPrefix(name, config.RobotPrefix(req.Context())) {
-		return nil
+		return nil, nil
+	}
+	if !queryable(name) {
+		log.Debugf("robot account name is not valid UTF-8 or contains NUL, rejecting")
+		return nil, nil
 	}
 	// The robot name can be used as the unique identifier to locate robot as it contains the project name.
 	robots, err := robot_ctl.Ctl.List(req.Context(), q.New(q.KeyWords{
@@ -46,28 +51,27 @@ func (r *robot) Generate(req *http.Request) security.Context {
 		WithPermission: true,
 	})
 	if err != nil {
-		log.Errorf("failed to list robots: %v", err)
-		return nil
+		return nil, fmt.Errorf("failed to list robots: %w", err)
 	}
 	if len(robots) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	robot := robots[0]
 	if utils.Encrypt(secret, robot.Salt, utils.SHA256) != robot.Secret {
 		log.Errorf("failed to authenticate robot account: %s", name)
-		return nil
+		return nil, nil
 	}
 	if robot.Disabled {
 		log.Errorf("failed to authenticate deactivated robot account: %s", name)
-		return nil
+		return nil, nil
 	}
 	now := time.Now().Unix()
 	if robot.ExpiresAt != -1 && robot.ExpiresAt <= now {
 		log.Errorf("the robot account is expired: %s", name)
-		return nil
+		return nil, nil
 	}
 
 	log.Debugf("a robot security context generated for request %s %s", req.Method, req.URL.Path)
-	return robotCtx.NewSecurityContext(robot)
+	return robotCtx.NewSecurityContext(robot), nil
 }

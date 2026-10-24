@@ -165,6 +165,16 @@ func TestPopulateArtifactInfo(t *testing.T) {
 			art: none,
 		},
 		{
+			req: httptest.NewRequest(http.MethodPost, "/v2/library/ubuntu/blobs/uploads/?mount=sha256:08e4a417ff4e3913d8723a05cc34055db01c2fd165b588e049c5bad16ce6094f&from=o%00ld/ubuntu", nil),
+			sc:  http.StatusBadRequest,
+			art: none,
+		},
+		{
+			req: httptest.NewRequest(http.MethodPost, "/v2/library/ubuntu/blobs/uploads/?mount=sha256:08e4a417ff4e3913d8723a05cc34055db01c2fd165b588e049c5bad16ce6094f&from=o%FFld/ubuntu", nil),
+			sc:  http.StatusBadRequest,
+			art: none,
+		},
+		{
 			req: httptest.NewRequest(http.MethodPost, "/v2/library/ubuntu/blobs/uploads/?from=old/ubuntu&mount=sha256:08e4a417ff4e3913d8723a05cc34055db01c2fd165b588e049c5bad16ce6094f", nil),
 			sc:  http.StatusOK,
 			art: lib.ArtifactInfo{

@@ -15,6 +15,7 @@
 package security
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -32,59 +33,56 @@ import (
 
 type authProxy struct{}
 
-func (a *authProxy) Generate(req *http.Request) security.Context {
+func (a *authProxy) Generate(req *http.Request) (security.Context, error) {
 	log := log.G(req.Context())
 	if lib.GetAuthMode(req.Context()) != common.HTTPAuth {
-		return nil
+		return nil, nil
 	}
 	// only support docker login
 	if !strings.HasPrefix(req.URL.Path, "/v2") {
-		return nil
+		return nil, nil
 	}
 	proxyUserName, proxyPwd, ok := req.BasicAuth()
 	if !ok {
-		return nil
+		return nil, nil
 	}
 	rawUserName, match := a.matchAuthProxyUserName(proxyUserName)
 	if !match {
 		log.Errorf("user name %s doesn't meet the auth proxy name pattern", proxyUserName)
-		return nil
+		return nil, nil
 	}
 	httpAuthProxyConf, err := config.HTTPAuthProxySetting(req.Context())
 	if err != nil {
-		log.Errorf("failed to get auth proxy settings: %v", err)
-		return nil
+		return nil, fmt.Errorf("failed to get auth proxy settings: %w", err)
 	}
 	tokenReviewStatus, err := authproxy.TokenReview(proxyPwd, httpAuthProxyConf)
 	if err != nil {
 		log.Errorf("failed to review token: %v", err)
-		return nil
+		return nil, nil
 	}
 	if rawUserName != tokenReviewStatus.User.Username {
 		log.Errorf("user name doesn't match with token: %s", rawUserName)
-		return nil
+		return nil, nil
 	}
 	user, err := pkguser.Mgr.GetByName(req.Context(), rawUserName)
 	if errors.IsNotFoundErr(err) {
 		// onboard user if it's not yet onboarded.
 		uid, err2 := auth.SearchAndOnBoardUser(req.Context(), rawUserName)
 		if err2 != nil {
-			log.Errorf("failed to search and onboard user %s: %v", rawUserName, err)
-			return nil
+			log.Errorf("failed to search and onboard user %s: %v", rawUserName, err2)
+			return nil, nil
 		}
 		user, err2 = pkguser.Mgr.Get(req.Context(), uid)
 		if err2 != nil {
-			log.Errorf("failed to get user, name: %s, ID: %d: %v", rawUserName, uid, err)
-			return nil
+			return nil, fmt.Errorf("failed to get user, name: %s, ID: %d: %w", rawUserName, uid, err2)
 		}
 	} else if err != nil {
-		log.Errorf("failed to get user %s: %v", rawUserName, err)
-		return nil
+		return nil, fmt.Errorf("failed to get user %s: %w", rawUserName, err)
 	}
 	u2, err := authproxy.UserFromReviewStatus(req.Context(), tokenReviewStatus, httpAuthProxyConf.AdminGroups, httpAuthProxyConf.AdminUsernames)
 	if err != nil {
 		log.Errorf("failed to get user information from token review status: %v", err)
-		return nil
+		return nil, nil
 	}
 	// Clear the local record's sysadmin flag: in http_auth mode admin authority must derive solely
 	// from AdminRoleInAuth (the reviewed identity vs the configured admin set), never from a local
@@ -93,7 +91,7 @@ func (a *authProxy) Generate(req *http.Request) security.Context {
 	user.GroupIDs = u2.GroupIDs
 	user.AdminRoleInAuth = u2.AdminRoleInAuth
 	log.Debugf("an auth proxy security context generated for request %s %s", req.Method, req.URL.Path)
-	return local.NewSecurityContext(user)
+	return local.NewSecurityContext(user), nil
 }
 
 func (a *authProxy) matchAuthProxyUserName(name string) (string, bool) {

@@ -17,7 +17,9 @@ package http
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	openapi "github.com/go-openapi/errors"
 
@@ -64,6 +66,20 @@ func SendError(w http.ResponseWriter, err error) {
 	}
 	w.WriteHeader(statusCode)
 	fmt.Fprintln(w, errPayload)
+}
+
+// retryAfter is the hint sent with a 503, sized for a database failover.
+const retryAfter = 5 * time.Second
+
+// SendServiceUnavailable responds 503 with a Retry-After hint, for a failure of
+// a dependency expected to be transient. It sends no cause and logs nothing, so
+// the caller logs the cause with the context it has.
+func SendServiceUnavailable(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())))
+	w.WriteHeader(http.StatusServiceUnavailable)
+	err := errors.New(nil).WithCode(errors.ServiceUnavailableCode).WithMessage("service unavailable")
+	fmt.Fprintln(w, errors.NewErrs(err).Error())
 }
 
 // generates the HTTP status code based on the specified error,

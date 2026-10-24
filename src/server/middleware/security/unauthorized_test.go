@@ -28,6 +28,6 @@ func TestUnauthorized(t *testing.T) {
 	unauthorized := &unauthorized{}
 	req, err := http.NewRequest(http.MethodGet, "http://127.0.0.1/api/projects/", nil)
 	require.Nil(t, err)
-	ctx := unauthorized.Generate(req)
+	ctx := mustGenerate(t, unauthorized, req)
 	assert.NotNil(t, ctx)
 }

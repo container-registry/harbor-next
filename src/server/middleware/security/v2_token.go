@@ -16,6 +16,7 @@ package security
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -29,6 +30,7 @@ import (
 	project_ctl "github.com/goharbor/harbor/src/controller/project"
 	svc_token "github.com/goharbor/harbor/src/core/service/token"
 	"github.com/goharbor/harbor/src/lib"
+	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/pkg/token"
 	v2 "github.com/goharbor/harbor/src/pkg/token/claims/v2"
@@ -41,54 +43,59 @@ type v2TokenClaims struct {
 
 type v2Token struct{}
 
-func (vt *v2Token) Generate(req *http.Request) security.Context {
+func (vt *v2Token) Generate(req *http.Request) (security.Context, error) {
 	logger := log.G(req.Context())
 	if !strings.HasPrefix(req.URL.Path, "/v2") {
-		return nil
+		return nil, nil
 	}
 	tokenStr := bearerToken(req)
 	if len(tokenStr) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	defaultOpt := token.DefaultTokenOptions()
 	if defaultOpt == nil {
 		logger.Warningf("failed to get default options")
-		return nil
+		return nil, nil
 	}
 	cl := &v2TokenClaims{}
 	t, err := token.Parse(defaultOpt, tokenStr, cl)
 	if err != nil {
 		logger.Warningf("failed to decode bearer token: %v", err)
-		return nil
+		return nil, nil
 	}
 	var v = jwt.NewValidator(jwt.WithLeeway(common.JwtLeeway), jwt.WithAudience(svc_token.Registry))
 	if err := v.Validate(t.Claims); err != nil {
 		logger.Warningf("failed to decode bearer token: %v", err)
-		return nil
+		return nil, nil
 	}
 	claims, ok := t.Claims.(*v2TokenClaims)
 	if !ok {
 		logger.Warningf("invalid token claims.")
-		return nil
+		return nil, nil
 	}
-	if !tokenIssuedAfterProjectCreation(req.Context(), logger, claims) {
-		return nil
+	valid, err := tokenIssuedAfterProjectCreation(req.Context(), logger, claims)
+	if err != nil {
+		return nil, err
 	}
-	return v2token.New(req.Context(), claims.Subject, claims.Access)
+	if !valid {
+		return nil, nil
+	}
+	return v2token.New(req.Context(), claims.Subject, claims.Access), nil
 }
 
 // tokenIssuedAfterProjectCreation prevents tokens from a deleted project
 // granting access to a new project recreated with the same name. It validates
 // every project the request is authorized against, including the source
-// project of a cross-repository blob mount.
-func tokenIssuedAfterProjectCreation(ctx context.Context, logger *log.Logger, claims *v2TokenClaims) bool {
+// project of a cross-repository blob mount. An error means a project could not
+// be looked up, which says nothing about the token.
+func tokenIssuedAfterProjectCreation(ctx context.Context, logger *log.Logger, claims *v2TokenClaims) (bool, error) {
 	// Fail closed: a token without an iat claim cannot be validated against the
 	// project creation time, and claims.IssuedAt is a pointer that would panic
 	// on dereference below.
 	if claims.IssuedAt == nil {
 		logger.Warningf("bearer token missing iat claim, rejecting")
-		return false
+		return false, nil
 	}
 	iat := claims.IssuedAt.Time
 
@@ -104,15 +111,18 @@ func tokenIssuedAfterProjectCreation(ctx context.Context, logger *log.Logger, cl
 			continue
 		}
 		p, err := project_ctl.Ctl.GetByName(ctx, projectName)
+		if errors.IsNotFoundErr(err) {
+			logger.Warningf("project %q for token validation not found: %v", projectName, err)
+			return false, nil
+		}
 		if err != nil {
-			logger.Warningf("failed to get project %q for token validation: %v", projectName, err)
-			return false
+			return false, fmt.Errorf("failed to get project %q for token validation: %w", projectName, err)
 		}
 		if iat.Add(common.JwtLeeway).Before(p.CreationTime) {
 			logger.Warningf("bearer token issued at %v is before project %q creation time %v, rejecting",
 				iat, projectName, p.CreationTime)
-			return false
+			return false, nil
 		}
 	}
-	return true
+	return true, nil
 }
