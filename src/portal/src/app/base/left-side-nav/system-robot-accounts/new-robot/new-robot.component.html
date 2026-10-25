@@ -122,6 +122,13 @@
                         name="description"
                         [(ngModel)]="systemRobot.description"></textarea>
                 </clr-textarea-container>
+                <robot-secret-input
+                    *ngIf="!isEditMode"
+                    [secret]="userProvidedSecret"
+                    (secretChange)="userProvidedSecret = $event"
+                    (validChange)="
+                        isProvidedSecretAcceptable = $event
+                    "></robot-secret-input>
                 <div class="clr-form-control mt-2">
                     <label class="clr-control-label required"
                         >{{ 'SYSTEM_ROBOT.EXPIRATION_TIME' | translate }}
