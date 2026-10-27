@@ -3,7 +3,7 @@ name: Harbor
 url: https://github.com/container-registry/harbor-next
 landingURL: https://github.com/container-registry/harbor-next
 isBasedOn: https://github.com/goharbor/harbor
-softwareVersion: 2.15.8
+softwareVersion: 2.15.8 # x-release-please-version
 releaseDate: 2026-08-26
 logo: docs/img/harbor_logo.png
 platforms:
