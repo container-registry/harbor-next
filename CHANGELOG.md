@@ -6,6 +6,13 @@ This changelog mirrors [GitHub Releases](https://github.com/container-registry/h
 
 ---
 
+## [2.15.14](https://github.com/container-registry/harbor-next/compare/v2.15.13...v2.15.14) (2026-10-23)
+
+
+### Bug Fixes
+
+* Bump Go to 1.27.3 to distrust compromised eMudhra CAs (backport [#1305](https://github.com/container-registry/harbor-next/issues/1305)) ([#1306](https://github.com/container-registry/harbor-next/issues/1306)) ([a636767](https://github.com/container-registry/harbor-next/commit/a636767cf352112e7a7937809103d8c490733da4))
+
 ## [2.15.13](https://github.com/container-registry/harbor-next/compare/v2.15.12...v2.15.13) (2026-10-19)
 
 
