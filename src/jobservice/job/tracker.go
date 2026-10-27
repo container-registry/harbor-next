@@ -91,7 +91,7 @@ type Tracker interface {
 	Stop() error
 
 	// Switch the status to error
-	Fail() error
+	Fail(message ...string) error
 
 	// Switch the status to success
 	Succeed() error
@@ -268,8 +268,12 @@ func (bt *basicTracker) Stop() error {
 // Fail job
 // Fail is final status, if failed to do, retry should be enforced.
 // Either one is failed, the final return will be marked as failed.
-func (bt *basicTracker) Fail() error {
-	if err := bt.setStatus(ErrorStatus); err != nil {
+func (bt *basicTracker) Fail(message ...string) error {
+	var msg string
+	if len(message) > 0 {
+		msg = message[0]
+	}
+	if err := bt.setStatus(ErrorStatus, msg); err != nil {
 		return errors.Wrap(err, "fail")
 	}
 
@@ -327,6 +331,10 @@ func (bt *basicTracker) Save() (err error) {
 		args = append(args, "die_at", stats.Info.DieAt)
 	}
 
+	if !utils.IsEmptyStr(stats.Info.StatusMessage) {
+		args = append(args, "status_message", stats.Info.StatusMessage)
+	}
+
 	if !utils.IsEmptyStr(stats.Info.UpstreamJobID) {
 		args = append(args, "upstream_job_id", stats.Info.UpstreamJobID)
 	}
@@ -380,15 +388,20 @@ func (bt *basicTracker) Save() (err error) {
 // If update status failed, then retry if permitted.
 // Try best to do
 func (bt *basicTracker) UpdateStatusWithRetry(targetStatus Status) error {
-	err := bt.compareAndSet(targetStatus)
+	return bt.updateStatusWithRetry(targetStatus, "")
+}
+
+func (bt *basicTracker) updateStatusWithRetry(targetStatus Status, message string) error {
+	err := bt.compareAndSet(targetStatus, message)
 	if err != nil {
 		// Status mismatching error will be directly ignored as the status has already been outdated
 		if !errs.IsStatusMismatchError(err) {
 			// Push to the retrying daemon
 			bt.retryList.Push(SimpleStatusChange{
-				JobID:        bt.jobID,
-				TargetStatus: targetStatus.String(),
-				Revision:     bt.jobStats.Info.Revision,
+				JobID:         bt.jobID,
+				TargetStatus:  targetStatus.String(),
+				Revision:      bt.jobStats.Info.Revision,
+				StatusMessage: message,
 			})
 		}
 	}
@@ -422,6 +435,8 @@ func (bt *basicTracker) Reset() error {
 	bt.jobStats.Info.UpdateTime = now
 	bt.jobStats.Info.CheckIn = ""
 	bt.jobStats.Info.CheckInAt = 0
+	bt.jobStats.Info.StatusMessage = ""
+	_ = bt.Update("status_message", "")
 
 	return nil
 }
@@ -435,10 +450,17 @@ func (bt *basicTracker) FireHook() error {
 }
 
 // setStatus sets the job status to the target status and fire status change hook
-func (bt *basicTracker) setStatus(status Status) error {
-	err := bt.UpdateStatusWithRetry(status)
+func (bt *basicTracker) setStatus(status Status, message ...string) error {
+	var msg string
+	if len(message) > 0 {
+		msg = message[0]
+	}
+	err := bt.updateStatusWithRetry(status, msg)
 	if !errs.IsStatusMismatchError(err) {
 		bt.refresh(status)
+		if msg != "" {
+			bt.jobStats.Info.StatusMessage = msg
+		}
 		if er := bt.fireHookEvent(status); er != nil {
 			// Add more error context
 			if err != nil {
@@ -477,6 +499,9 @@ func (bt *basicTracker) fireHookEvent(status Status, checkIn ...string) error {
 		Status:   status.String(),
 		Metadata: bt.jobStats.Info,
 	}
+	if bt.jobStats != nil && bt.jobStats.Info != nil {
+		change.StatusMessage = bt.jobStats.Info.StatusMessage
+	}
 
 	if len(checkIn) > 0 {
 		change.CheckIn = checkIn[0]
@@ -490,7 +515,7 @@ func (bt *basicTracker) fireHookEvent(status Status, checkIn ...string) error {
 	return nil
 }
 
-func (bt *basicTracker) compareAndSet(targetStatus Status) error {
+func (bt *basicTracker) compareAndSet(targetStatus Status, message string) error {
 	conn := bt.pool.Get()
 	defer func() {
 		closeConn(conn)
@@ -506,6 +531,7 @@ func (bt *basicTracker) compareAndSet(targetStatus Status) error {
 		bt.jobStats.Info.Revision,
 		time.Now().Unix(),
 		bt.jobID,
+		message,
 	))
 	if err != nil {
 		return errors.Wrap(err, "compare and set status error")
@@ -561,6 +587,8 @@ func (bt *basicTracker) retrieve() error {
 			res.Info.IsUnique = v
 		case "status":
 			res.Info.Status = value
+		case "status_message":
+			res.Info.StatusMessage = value
 		case "ref_link":
 			res.Info.RefLink = value
 		case "enqueue_time":

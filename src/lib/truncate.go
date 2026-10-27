@@ -14,6 +14,11 @@
 
 package lib
 
+import (
+	"strings"
+	"unicode/utf8"
+)
+
 // Truncate tries to append the "suffix" to the "str". If the length of the appended string exceeds "n",
 // the function truncates the "str" to make sure the "suffix" is appended
 func Truncate(str, suffix string, n int) string {
@@ -22,4 +27,47 @@ func Truncate(str, suffix string, n int) string {
 		return s
 	}
 	return s[:len(str)-(len(s)-n)] + suffix
+}
+
+// TruncateUTF8Tail truncates s to at most maxLen bytes keeping its end, prefixing "..." if truncated,
+// without breaking a multi-byte UTF-8 character.
+func TruncateUTF8Tail(s string, maxLen int) string {
+	s = strings.ToValidUTF8(s, "")
+	if len(s) <= maxLen {
+		return s
+	}
+	const prefix = "..."
+	if maxLen <= 0 {
+		return ""
+	}
+	if maxLen <= len(prefix) {
+		return prefix[:maxLen]
+	}
+	start := len(s) - (maxLen - len(prefix))
+	for start < len(s) && !utf8.RuneStart(s[start]) {
+		start++
+	}
+	return prefix + s[start:]
+}
+
+// TruncateUTF8 truncates s to at most maxLen bytes, ensuring that the truncation boundary
+// does not break a multi-byte UTF-8 character, and appends "..." if truncated.
+// If len(s) <= maxLen, s is returned unmodified.
+func TruncateUTF8(s string, maxLen int) string {
+	s = strings.ToValidUTF8(s, "")
+	if len(s) <= maxLen {
+		return s
+	}
+	const suffix = "..."
+	if maxLen <= 0 {
+		return ""
+	}
+	if maxLen <= len(suffix) {
+		return suffix[:maxLen]
+	}
+	target := maxLen - len(suffix)
+	for target > 0 && !utf8.RuneStart(s[target]) {
+		target--
+	}
+	return s[:target] + suffix
 }

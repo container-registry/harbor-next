@@ -187,6 +187,7 @@ func retry(conn redis.Conn, ns string, change job.SimpleStatusChange) error {
 		change.Revision,
 		time.Now().Unix(),
 		change.JobID,
+		change.StatusMessage,
 	))
 	if err != nil {
 		return errors.Wrap(err, "retry")

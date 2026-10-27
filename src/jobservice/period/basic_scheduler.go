@@ -16,6 +16,7 @@ package period
 
 import (
 	"context"
+	"math"
 	"math/rand"
 	"time"
 
@@ -70,7 +71,7 @@ func (bs *basicScheduler) Schedule(p *Policy) (int64, error) {
 		return -1, errors.New("bad policy object: nil")
 	}
 
-	if err := p.Validate(); err != nil {
+	if err := p.ValidateForRegistration(); err != nil {
 		return -1, err
 	}
 
@@ -217,7 +218,10 @@ func (bs *basicScheduler) clearDirtyJobs() {
 	nowEpoch := time.Now().Unix()
 	scope := nowEpoch - int64(enqueuerHorizon/time.Minute)*60
 
-	jobScores, err := rds.GetZsetByScore(conn, rds.RedisKeyScheduled(bs.namespace), []int64{0, scope})
+	// Use math.MinInt64 as lower bound to clean up negative-epoch entries
+	// left by versions before the unreachable-cron fix, where
+	// time.Time{}.Unix() was used as the ZADD score.
+	jobScores, err := rds.GetZsetByScore(conn, rds.RedisKeyScheduled(bs.namespace), []int64{math.MinInt64, scope})
 	if err != nil {
 		logger.Errorf("Get dirty jobs error: %s", err)
 		return
