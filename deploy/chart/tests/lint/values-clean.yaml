@@ -1,0 +1,52 @@
+# Lint fixture: a well-formed production values file — secrets via
+# pre-created Secret references, one expose method, consistent metrics.
+# Expected: zero findings (see report-clean.txt).
+externalURL: https://harbor.example.com
+existingSecretAdminPassword: harbor-admin
+existingSecretSecretKey: harbor-secret-key
+
+ingress:
+  enabled: true
+  className: nginx
+
+database:
+  host: pg.example.com
+  username: harbor
+  existingSecret: harbor-db
+
+valkey:
+  enabled: false
+externalRedis:
+  host: redis.example.com
+  existingSecret: harbor-redis
+
+registry:
+  config:
+    storage:
+      s3:
+        region: eu-central-1
+        bucket: harbor
+  storageCredentials:
+    s3:
+      existingSecret: harbor-s3
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+
+jobservice:
+  config:
+    metric:
+      enabled: true
+      path: /metrics
+      port: 8001
+
+core:
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+  pdb:
+    enabled: true
+    minAvailable: 1

@@ -1,0 +1,35 @@
+# Airlock Microgateway 5.1 Gateway for Harbor.
+# Apply AFTER the TLS secret `harbor-mgw-tls` exists (see README) and BEFORE / with
+# the Helm release. The operator provisions an Envoy Deployment + LoadBalancer
+# Service named `harbor` in this namespace when this Gateway is accepted.
+apiVersion: microgateway.airlock.com/v1alpha1
+kind: GatewayParameters
+metadata:
+  name: harbor-gw-params
+  namespace: harbor
+spec: {}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: harbor
+  namespace: harbor
+spec:
+  gatewayClassName: airlock-microgateway
+  infrastructure:
+    parametersRef:
+      group: microgateway.airlock.com
+      kind: GatewayParameters
+      name: harbor-gw-params
+  listeners:
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: harbor.mgw.local
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: harbor-mgw-tls
+      allowedRoutes:
+        namespaces:
+          from: Same
