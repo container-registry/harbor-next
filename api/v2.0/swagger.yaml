@@ -6571,7 +6571,7 @@ paths:
       summary: Get system or project level permissions info.
       operationId: getPermissions
       description: |
-        This endpoint is for retrieving resource and action info that only provides for admin user(system admin and project admin).
+        This endpoint is for retrieving resource and action info. Any authenticated user can read the project permissions; only a system admin gets the system and role permissions.
       tags:
         - permissions
       parameters:
@@ -6583,8 +6583,6 @@ paths:
             $ref: '#/definitions/Permissions'
         '401':
           $ref: '#/responses/401'
-        '403':
-          $ref: '#/responses/403'
         '404':
           $ref: '#/responses/404'
         '500':
