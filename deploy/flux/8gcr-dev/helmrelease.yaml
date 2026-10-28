@@ -137,6 +137,14 @@ spec:
         repository: 8gears.container-registry.com/8gcr/harbor-core
         tag: latest
       replicas: 1
+      # The chart default (512Mi) OOMKilled core twice during image pushes on
+      # 2026-10-28, failing the upload with 502 Bad Gateway.
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          memory: 1Gi
       # The chart's core ConfigMap hardcodes this to the OCI providers only, so
       # binding a project to an npm or Maven endpoint is rejected with
       # "unsupported registry type npm" even though the adapters are registered
