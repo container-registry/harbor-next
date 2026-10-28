@@ -42,6 +42,10 @@ var testcases = []struct {
 	{"http://127.0.0.%31/", "", false},
 	{"http://127.0.0.%31:8080/", "", false},
 	{"http://10.0.0.1/test.txt#/api/version", "http://10.0.0.1/test.txt", true},
+	{"http://HARBOR.FOO.COM", "http://harbor.foo.com", true},
+	{"http://HARBOR.FOO.COM:8080/MyPath", "http://harbor.foo.com:8080/MyPath", true},
+	{"HTTPS://My-Registry.Domain.COM/v2/Catalog", "https://my-registry.domain.com/v2/Catalog", true},
+	{"http://[FE80::1%25En0]:8080/Path", "http://[fe80::1%En0]:8080/Path", true},
 }
 
 func TestValidateURL(t *testing.T) {

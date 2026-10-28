@@ -48,5 +48,14 @@ func ValidateURL(s string, allowedSchemes ...string) (string, error) {
 		return "", errors.New(nil).WithCode(errors.BadRequestCode).WithMessagef("invalid scheme: %s", parsedURL.Scheme)
 	}
 	// To avoid SSRF security issue, refer to #3755 for more detail
-	return fmt.Sprintf("%s://%s%s", parsedURL.Scheme, parsedURL.Host, parsedURL.Path), nil
+	return fmt.Sprintf("%s://%s%s", parsedURL.Scheme, lowerHost(parsedURL.Host), parsedURL.Path), nil
+}
+
+// lowerHost lowercases a url.URL Host (host[:port]) but leaves an IPv6 zone suffix as is, since a
+// zone is a case-sensitive interface name.
+func lowerHost(host string) string {
+	if i := strings.IndexByte(host, '%'); i >= 0 {
+		return strings.ToLower(host[:i]) + host[i:]
+	}
+	return strings.ToLower(host)
 }

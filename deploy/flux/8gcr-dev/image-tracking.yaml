@@ -7,8 +7,7 @@ spec:
   image: 8gears.container-registry.com/8gcr/harbor-core
   interval: 1m
   provider: generic
-  secretRef:
-    name: harbor-system-pull
+  serviceAccountName: flux-oci-hz-cr-int
 ---
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
@@ -19,8 +18,7 @@ spec:
   image: 8gears.container-registry.com/8gcr/harbor-jobservice
   interval: 1m
   provider: generic
-  secretRef:
-    name: harbor-system-pull
+  serviceAccountName: flux-oci-hz-cr-int
 ---
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
@@ -31,8 +29,7 @@ spec:
   image: 8gears.container-registry.com/8gcr/harbor-registry
   interval: 1m
   provider: generic
-  secretRef:
-    name: harbor-system-pull
+  serviceAccountName: flux-oci-hz-cr-int
 ---
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
@@ -43,8 +40,7 @@ spec:
   image: 8gears.container-registry.com/8gcr/harbor-registryctl
   interval: 1m
   provider: generic
-  secretRef:
-    name: harbor-system-pull
+  serviceAccountName: flux-oci-hz-cr-int
 ---
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
@@ -55,8 +51,7 @@ spec:
   image: 8gears.container-registry.com/8gcr/harbor-portal
   interval: 1m
   provider: generic
-  secretRef:
-    name: harbor-system-pull
+  serviceAccountName: flux-oci-hz-cr-int
 ---
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
@@ -67,8 +62,7 @@ spec:
   image: 8gears.container-registry.com/8gcr/harbor-exporter
   interval: 1m
   provider: generic
-  secretRef:
-    name: harbor-system-pull
+  serviceAccountName: flux-oci-hz-cr-int
 ---
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
@@ -79,8 +73,7 @@ spec:
   image: 8gears.container-registry.com/8gcr/trivy-adapter
   interval: 1m
   provider: generic
-  secretRef:
-    name: harbor-system-pull
+  serviceAccountName: flux-oci-hz-cr-int
 ---
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImagePolicy

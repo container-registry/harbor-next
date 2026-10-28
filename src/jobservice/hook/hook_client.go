@@ -23,10 +23,12 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 	"time"
 
 	commonhttp "github.com/goharbor/harbor/src/common/http"
+	"github.com/goharbor/harbor/src/common/secret"
 	"github.com/goharbor/harbor/src/jobservice/config"
 	"github.com/goharbor/harbor/src/lib/log"
 )
@@ -47,8 +49,10 @@ type basicClient struct {
 func NewClient(ctx context.Context) Client {
 	// Create transport
 	transport := &http.Transport{
-		MaxIdleConns:    20,
-		IdleConnTimeout: 30 * time.Second,
+		MaxIdleConns: 20,
+		// hooks only target the core endpoint; the default per-host cap of 2 churns connections
+		MaxIdleConnsPerHost: 20,
+		IdleConnTimeout:     30 * time.Second,
 		DialContext: (&net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
@@ -69,6 +73,17 @@ func NewClient(ctx context.Context) Client {
 	client := &http.Client{
 		Timeout:   30 * time.Second,
 		Transport: transport,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			// Retain the normal redirect limit, and keep callbacks carrying service
+			// credentials within the configured core notification endpoint.
+			if len(via) >= 10 {
+				return errors.New("stopped after 10 redirects")
+			}
+			if len(via) > 0 && secret.FromRequest(via[0]) != "" && !isCoreNotificationURL(req.URL) {
+				return http.ErrUseLastResponse
+			}
+			return nil
+		},
 	}
 
 	return &basicClient{
@@ -98,6 +113,18 @@ func (bc *basicClient) SendEvent(evt *Event) error {
 	req, err := http.NewRequest(http.MethodPost, rebaseOnCore(evt.URL), strings.NewReader(string(data)))
 	if err != nil {
 		return err
+	}
+	// Core now requires an internal service identity for status callbacks. Add
+	// the jobservice credential only for its configured notification endpoint;
+	// other hook destinations retain their existing request headers.
+	if isCoreNotificationURL(req.URL) {
+		sharedSecret := config.GetAuthSecret()
+		if sharedSecret == "" {
+			return errors.New("jobservice callback credential is not configured")
+		}
+		if err := secret.AddToRequest(req, sharedSecret); err != nil {
+			return err
+		}
 	}
 
 	res, err := bc.client.Do(req)
@@ -153,4 +180,19 @@ func rebaseOnCore(raw string) string {
 // path-prefixed value cannot be spliced onto the hook path correctly.
 func isPlainOrigin(u *url.URL) bool {
 	return (u.Scheme == "http" || u.Scheme == "https") && u.Host != "" && (u.Path == "" || u.Path == "/")
+}
+
+// isCoreNotificationURL identifies callbacks to the configured core service.
+// Match scheme and authority (including port), reject URL user info, and require
+// a clean decoded path so dot segments cannot resolve outside notifications.
+func isCoreNotificationURL(target *url.URL) bool {
+	core, err := url.Parse(config.GetCoreURL())
+	if err != nil || target == nil || core.Host == "" || core.User != nil || target.User != nil {
+		return false
+	}
+	return (core.Scheme == "http" || core.Scheme == "https") &&
+		strings.EqualFold(target.Scheme, core.Scheme) &&
+		strings.EqualFold(target.Host, core.Host) &&
+		path.Clean(target.Path) == target.Path &&
+		strings.HasPrefix(target.Path, strings.TrimSuffix(core.Path, "/")+"/service/notifications/")
 }

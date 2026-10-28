@@ -25,6 +25,14 @@ services:
       - /tmp:size=256M,mode=1777
     volumes:
       - ./config/token_service_key.pem:/etc/core/token_service_key.pem:ro
+      # 16-byte AES key for stored credentials (registry endpoints, OIDC); Core reads /etc/core/key by default.
+      # Long syntax so a missing key fails the start instead of being created as an empty directory.
+      - type: bind
+        source: ./config/secret_key
+        target: /etc/core/key
+        read_only: true
+        bind:
+          create_host_path: false
     environment:
       # Database
       POSTGRESQL_HOST: postgresql
@@ -57,8 +65,9 @@ services:
       WITH_TRIVY: ${WITH_TRIVY:-true}
       PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr
-      # Lets push-authorized users skip content trust via a cosign/notation User-Agent (spoofable)
-      CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED: ${CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED:-false}
+      # On by default so cosign/notation can pull the unsigned image they are about to sign;
+      # the User-Agent it keys on is spoofable. Set to false to enforce content trust on every pull
+      CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED: ${CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED:-true}
       # Webhook targets on private, loopback or link-local addresses are rejected unless true
       HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: ${HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS:-false}
     depends_on:

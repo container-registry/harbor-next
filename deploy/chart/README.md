@@ -1,7 +1,5 @@
 # harbor
 
-![Version: 2.0.0](https://img.shields.io/badge/Version-2.0.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: v2.15.10](https://img.shields.io/badge/AppVersion-v2.15.10-informational?style=flat-square)
-
 A modern, production-ready Helm chart for [Harbor Next](https://github.com/container-registry/harbor-next) - the cloud-native container registry for Kubernetes.
 
 ## TL;DR
@@ -846,7 +844,7 @@ Kubernetes: `>=1.28.0-0`
 | exporter.podAnnotations | object | `{}` | Additional pod annotations for Exporter |
 | exporter.podLabels | object | `{}` | Additional pod labels for Exporter |
 | exporter.podSecurityContext | object | `{"fsGroup":10000}` | Pod security context for Exporter |
-| exporter.probes | object | See [values.yaml](values.yaml) | Container probes, rendered verbatim. See `core.probes` for the tuning rationale. |
+| exporter.probes | object | See [values.yaml](values.yaml) | Container probes, rendered verbatim; see `core.probes`. Timeouts are 5s because a `/metrics` request that misses the exporter cache (off by default) queries the database, which takes 1-2s on large registries. |
 | exporter.replicas | int | `1` | Number of Exporter replicas |
 | exporter.resources | object | `{"limits":{"memory":"256Mi"},"requests":{"cpu":"100m","memory":"128Mi"}}` | Exporter resource requests and limits |
 | exporter.secret | object | {} | Sensitive config for Exporter (converted to env vars in Secret) |

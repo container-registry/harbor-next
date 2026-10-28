@@ -13,15 +13,13 @@ A single environment doesn't justify a Kustomize base/overlay split yet; when a 
 | File | Purpose |
 |------|---------|
 | `namespace.yaml` | Namespace `8gcr-dev-main` (the cluster runs multiple Harbor instances; namespace is deployment-specific). |
-| `ocirepository.yaml` | Authenticated pull of the chart from `oci://8gears.container-registry.com/8gcr/charts/harbor`, tracking released versions via semver `>=2.0.0`, 5-min interval. |
+| `ocirepository.yaml` | Keyless pull of the chart from `oci://8gears.container-registry.com/8gcr/charts/harbor` as ServiceAccount `8gcr-dev-main/flux-oci` (Flux 2.10 object identity), tracking released versions via semver `>=2.0.0`, 5-min interval. |
 | `helmrelease.yaml` | Renders the chart with the 8gcr environment values; references the secrets below; provisions a CloudNativePG `Cluster` via the chart's `extraManifests` escape hatch. |
 | `image-tracking.yaml` | Flux image-reflector resources (`ImageRepository` + `ImagePolicy`) that resolve the digest behind each `8gcr/harbor-*:latest` tag in-cluster. No git write-back. |
 | `rollout-sync.yaml` | CronJob (+ ServiceAccount/RBAC) that copies each reflected digest into the workload's pod-template annotation, rolling the pods when a `latest` digest moves. Registry to cluster directly — no fluxcdbot commits, no bundle republish per image update. |
-| `pull-secret-flux-system.sops.yaml` | SOPS-encrypted `Secret` for `flux-system/harbor-system-pull`, used by Flux to pull `ops/hz-hopper/8gcr-rolling` and inspect `8gcr` images. |
-| `pull-secret-8gcr-dev-main.sops.yaml` | SOPS-encrypted `Secret` for `8gcr-dev-main/harbor-system-pull`, used by Flux and Harbor pods to pull the chart and component images from `8gcr`. |
 | `secrets.sops.yaml` | SOPS-encrypted `Secret` resources for the admin password, the Harbor↔Postgres password, and the CNPG bootstrap credentials. It does not contain registry pull credentials. Decrypted on the cluster by Flux using the existing `flux-system/sops-age` key. |
 | `kustomization.yaml` | Plain Kustomize index, lets the Flux Kustomization controller reconcile this directory. |
-| `bootstrap.yaml` | One-time `kubectl apply` target that creates the `OCIRepository` + `Kustomization` in `flux-system` to fetch and apply this bundle using the `harbor-system-pull` secret. Required only the first time per cluster. |
+| `bootstrap.yaml` | One-time `kubectl apply` target that creates the `OCIRepository` + `Kustomization` `harbor-8gcr-dev` in `flux-system` to fetch and apply this bundle as ServiceAccount `flux-system/flux-oci-hz-cr-int`. Required only the first time per cluster. |
 
 ## How it gets to the cluster
 
@@ -40,12 +38,14 @@ A single environment doesn't justify a Kustomize base/overlay split yet; when a 
 4. **Latest image tracking (gitless)** — image-reflector on hz-hopper watches each `8gcr/harbor-*:latest` tag by digest (`image-tracking.yaml`). The `rollout-sync` CronJob compares each `ImagePolicy` digest with the workload's pod-template annotation and patches it on change, restarting the pods (`imagePullPolicy: Always` re-pulls `latest`). Image updates never touch git or republish the bundle.
 5. **Reconcile** — Flux on hz-hopper pulls the published `ops/hz-hopper/8gcr-rolling:latest` bundle every 5 min, decrypts SOPS secrets, and applies everything. Chart releases roll out via the OCIRepository semver range; image updates roll out via `rollout-sync`.
 
-The manifests intentionally do not store plaintext registry credentials. Pull access is provided by SOPS-managed cluster secrets:
+Flux sources pull keylessly with Flux 2.10 object identity: source-controller and image-reflector-controller mint a token (audience `container-registry.com`) for the ServiceAccount the object names, and 8gears maps it to a federated robot on the cluster's trusted issuer:
 
-| Namespace | Secret | Used by |
+| Object | ServiceAccount | 8gears robot rule |
 |---|---|---|
-| `flux-system` | `harbor-system-pull` | Root `OCIRepository/harbor-8gcr` pulling `ops/hz-hopper/8gcr-rolling` and Flux image scanning for `8gcr/harbor-*`. |
-| `8gcr-dev-main` | `harbor-system-pull` | Chart `OCIRepository/harbor-chart` and Harbor component image pulls. |
+| `flux-system/OCIRepository/harbor-8gcr-dev` (`ops/hz-hopper/8gcr-rolling`), the `ImageRepository` objects (`8gcr/harbor-*`) | `flux-system/flux-oci-hz-cr-int` (owned by the cluster's core repo) | `sub == system:serviceaccount:flux-system:flux-oci-hz-cr-int`, pull on `ops`, `8gcr` |
+| `8gcr-dev-main/OCIRepository/harbor-chart` | `8gcr-dev-main/flux-oci` (`ocirepository.yaml`) | `kubernetes.io.namespace == 8gcr-dev-main`, pull on `8gcr` |
+
+Harbor component pods have no `imagePullSecrets`: the cluster's kubelet credential provider pulls `8gcr/*` images with the pod's ServiceAccount token, which 8gears maps by `kubernetes.io.namespace == 8gcr-dev-main` to the same robot as the chart source.
 
 ## One-time bootstrap
 
@@ -61,13 +61,13 @@ This creates an `OCIRepository` and a `Kustomization` in `flux-system` that reco
 Equivalent with the Flux CLI:
 
 ```sh
-flux create source oci harbor-8gcr \
+flux create source oci harbor-8gcr-dev \
   --url=oci://8gears.container-registry.com/ops/hz-hopper/8gcr-rolling \
   --tag=latest --interval=5m \
-  --secret-ref=harbor-system-pull
+  --provider=generic --service-account=flux-oci-hz-cr-int
 
-flux create kustomization harbor-8gcr \
-  --source=OCIRepository/harbor-8gcr \
+flux create kustomization harbor-8gcr-dev \
+  --source=OCIRepository/harbor-8gcr-dev \
   --path=./ --prune --wait --interval=5m --timeout=10m \
   --decryption-provider=sops --decryption-secret=sops-age \
   --depends-on=infrastructure-cert-manager \
@@ -81,8 +81,8 @@ Everything else this bundle needs is satisfied by hz-hopper's standing infrastru
 | Requirement | Source |
 |---|---|
 | FluxCD v2 (`source-controller`, `kustomize-controller`, `helm-controller`, `image-reflector-controller`) | Pre-installed on hz-hopper. image-reflector is required for mutable `latest` digest tracking; image-automation-controller is NOT used (no git write-back). |
-| `flux-system/harbor-system-pull` | SOPS-managed dockerconfigjson for pulling `ops/hz-hopper/8gcr-rolling` and scanning `8gcr/harbor-*` images. |
-| `8gcr-dev-main/harbor-system-pull` | SOPS-managed dockerconfigjson for pulling the chart and component images from `8gcr`. |
+| `flux-system/flux-oci-hz-cr-int` | ServiceAccount with the `credential.auth.fluxcd.io/*` annotations and a FluxInstance with `spec.cluster.objectIdentityRBAC` (flux-operator >= 0.62.0, Flux 2.10); pulls `ops/hz-hopper/8gcr-rolling` and scans `8gcr/harbor-*`. |
+| Kubelet credential provider | Node config matching `8gears.container-registry.com` with ServiceAccount token audience `container-registry.com`; serves the Harbor component image pulls. |
 | SOPS decryption key | `Secret/sops-age` in `flux-system` (already present; same key used by other Flux Kustomizations). Public key: `age18jfefmcak9zk6jrh7j59ap0rg3zxg577suvmlyrgm3sn0l28zq4slcu94r`. |
 | CloudNativePG operator | Pre-installed in `cnpg-system`. The chart's `extraManifests` renders a `Cluster.postgresql.cnpg.io/v1`; CNPG reconciles it into a Postgres pod + `harbor-db-rw` Service that the chart's `database.host` value points at. |
 | Cert-manager + `letsencrypt-prod` ClusterIssuer | Pre-installed; HelmRelease ingress is annotated to use it. |

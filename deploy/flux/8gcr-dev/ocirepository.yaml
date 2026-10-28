@@ -1,3 +1,16 @@
+# Flux 2.10 object identity: source-controller mints a token for this ServiceAccount
+# and Harbor maps it to a federated robot by its namespace claim. No pull secret.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: flux-oci
+  namespace: 8gcr-dev-main
+  annotations:
+    credential.auth.fluxcd.io/provider: kubernetes
+    credential.auth.fluxcd.io/type: jwt
+    credential.auth.fluxcd.io/audiences: container-registry.com
+    credential.auth.fluxcd.io/username: jwt
+---
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: OCIRepository
 metadata:
@@ -8,5 +21,5 @@ spec:
   url: oci://8gears.container-registry.com/8gcr/charts/harbor
   ref:
     semver: ">=2.0.0"
-  secretRef:
-    name: harbor-system-pull
+  provider: generic
+  serviceAccountName: flux-oci

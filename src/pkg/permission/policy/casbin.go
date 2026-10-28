@@ -12,12 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package models
+package policy
 
-// Role holds the details of a role.
-type Role struct {
-	RoleID   int    `orm:"pk;auto;column(role_id)" json:"role_id"`
-	RoleCode string `orm:"column(role_code)" json:"role_code"`
-	Name     string `orm:"column(name)" json:"role_name"`
-	RoleMask int    `orm:"column(role_mask)" json:"role_mask"`
-}
+// Model is Harbor's casbin model, used by both the role store and the
+// per-request enforcer in pkg/permission/evaluator/rbac.
+const Model = `
+[request_definition]
+r = sub, obj, act
+
+[policy_definition]
+p = sub, obj, act, eft
+
+[role_definition]
+g = _, _
+
+[policy_effect]
+e = some(where (p.eft == allow)) && !some(where (p.eft == deny))
+
+[matchers]
+m = g(r.sub, p.sub) && ` + KeyMatch2FuncName + `(r.obj, p.obj) && (r.act == p.act || p.act == '*')
+`

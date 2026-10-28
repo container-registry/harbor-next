@@ -15,6 +15,7 @@
 package project
 
 import (
+	"github.com/goharbor/harbor/src/common/rbac"
 	"github.com/goharbor/harbor/src/pkg/permission/types"
 	"github.com/goharbor/harbor/src/pkg/project/models"
 )
@@ -35,6 +36,17 @@ func (pru *rbacUser) GetUserName() string {
 func (pru *rbacUser) GetPolicies() []*types.Policy {
 	policies := pru.policies
 
+	// Visibility that comes with membership rather than with a role: anyone
+	// holding at least one role in a project can see the project exists. From
+	// #23804, where it stopped a custom role being unable to view the project
+	// it is scoped to.
+	if len(pru.projectRoles) > 0 {
+		policies = append(policies, &types.Policy{
+			Resource: NewNamespace(pru.project.ProjectID).Resource(rbac.ResourceSelf),
+			Action:   rbac.ActionRead,
+		})
+	}
+
 	if pru.project.IsPublic() {
 		policies = append(policies, getPoliciesForPublicProject(pru.project.ProjectID)...)
 	}
@@ -46,7 +58,7 @@ func (pru *rbacUser) GetPolicies() []*types.Policy {
 func (pru *rbacUser) GetRoles() []types.RBACRole {
 	roles := []types.RBACRole{}
 	for _, roleID := range pru.projectRoles {
-		roles = append(roles, &projectRBACRole{projectID: pru.project.ProjectID, roleID: roleID})
+		roles = append(roles, &projectRBACRole{projectID: pru.project.ProjectID, roleID: int64(roleID)})
 	}
 
 	return roles

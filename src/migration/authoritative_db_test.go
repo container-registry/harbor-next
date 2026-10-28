@@ -63,9 +63,12 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 	// declares foreign keys against or reconciles in place.
 	legacyDependencies := []string{
 		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
-		"CREATE TABLE project (project_id SERIAL PRIMARY KEY, owner_id INTEGER)",
-		"CREATE TABLE retention_policy (id SERIAL PRIMARY KEY, scope_level VARCHAR(20), scope_reference INTEGER, data TEXT)",
+		"CREATE TABLE project (project_id SERIAL PRIMARY KEY)",
 		"CREATE TABLE execution (id SERIAL PRIMARY KEY, revision INTEGER)",
+		"CREATE TABLE role (role_id SERIAL PRIMARY KEY, role_code VARCHAR(20), name VARCHAR(20))",
+		"CREATE TABLE project_member (id SERIAL PRIMARY KEY, project_id INTEGER, entity_id INTEGER, entity_type CHAR(1), role INTEGER)",
+		"CREATE TABLE role_permission (id BIGSERIAL PRIMARY KEY, role_type VARCHAR(255), role_id BIGINT, permission_policy_id BIGINT)",
+		"CREATE TABLE permission_policy (id BIGSERIAL PRIMARY KEY, scope VARCHAR(255), resource VARCHAR(255), action VARCHAR(255), effect VARCHAR(255))",
 	}
 	for _, statement := range legacyDependencies {
 		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
@@ -104,6 +107,7 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 		"idx_multi_format_version_pkg",
 		"idx_multi_project_reference_multi",
 		"idx_multi_project_reference_sub",
+		"policy_version",
 	}
 	for _, object := range objects {
 		var exists bool
@@ -116,12 +120,48 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 		}
 	}
 
+	var triggers int
+	if err := schemaPool.DB().QueryRowContext(ctx,
+		"SELECT count(*) FROM pg_trigger WHERE tgname LIKE '%_notify_%' AND tgrelid IN (to_regclass('role_permission'), to_regclass('permission_policy'))").
+		Scan(&triggers); err != nil {
+		t.Fatalf("count policy triggers: %v", err)
+	}
+	if triggers != 6 {
+		t.Errorf("policy notify triggers = %d after repeated runs, want 6", triggers)
+	}
+	policyVersion := func() int64 {
+		var v int64
+		if err := schemaPool.DB().QueryRowContext(ctx, "SELECT version FROM policy_version").Scan(&v); err != nil {
+			t.Fatalf("read policy_version: %v", err)
+		}
+		return v
+	}
+	before := policyVersion()
+	if _, err := schemaPool.DB().ExecContext(ctx, "INSERT INTO role_permission (role_type, role_id, permission_policy_id) VALUES ('robotaccount', 1, 1)"); err != nil {
+		t.Fatalf("insert robot grant: %v", err)
+	}
+	if got := policyVersion(); got != before {
+		t.Errorf("robot grant bumped policy_version to %d, want %d", got, before)
+	}
+	if _, err := schemaPool.DB().ExecContext(ctx, "INSERT INTO role_permission (role_type, role_id, permission_policy_id) VALUES ('project-role', 6, 1)"); err != nil {
+		t.Fatalf("insert project role grant: %v", err)
+	}
+	if got := policyVersion(); got != before+1 {
+		t.Errorf("project role grant left policy_version at %d, want %d", got, before+1)
+	}
+	if _, err := schemaPool.DB().ExecContext(ctx, "UPDATE role_permission SET role_type = 'robotaccount' WHERE role_type = 'project-role'"); err != nil {
+		t.Fatalf("move project role grant to a robot: %v", err)
+	}
+	if got := policyVersion(); got != before+2 {
+		t.Errorf("moving a grant off a project role left policy_version at %d, want %d", got, before+2)
+	}
+
 	columns := map[string][]string{
 		"branding": {
 			"id", "config", "update_time",
 		},
 		"identity_providers": {
-			"id", "name", "description", "issuer", "openid_config_url",
+			"id", "name", "description", "issuer", "audience", "openid_config_url",
 			"offline_validation", "supported_algorithms", "claims_supported",
 			"jwks_uri", "jwks_keys", "jwks_cached_at", "jwks_expires_at",
 			"jwks_last_fetch_attempt", "project_id", "creation_time", "update_time",
@@ -209,9 +249,12 @@ func TestExecutionRevisionGuardResolvesThroughSearchPath(t *testing.T) {
 	// current_schema() guard could not see
 	setup := []string{
 		fmt.Sprintf("CREATE TABLE %s.execution (id SERIAL PRIMARY KEY, revision INTEGER)", later),
+		fmt.Sprintf("CREATE TABLE %s.role (role_id SERIAL PRIMARY KEY, role_code VARCHAR(20), name VARCHAR(20))", later),
+		fmt.Sprintf("CREATE TABLE %s.project_member (id SERIAL PRIMARY KEY, project_id INTEGER, entity_id INTEGER, entity_type CHAR(1), role INTEGER)", later),
+		fmt.Sprintf("CREATE TABLE %s.role_permission (id BIGSERIAL PRIMARY KEY, role_type VARCHAR(255), role_id BIGINT, permission_policy_id BIGINT)", later),
+		fmt.Sprintf("CREATE TABLE %s.permission_policy (id BIGSERIAL PRIMARY KEY, scope VARCHAR(255), resource VARCHAR(255), action VARCHAR(255), effect VARCHAR(255))", later),
 		fmt.Sprintf("CREATE TABLE %s.robot (id BIGSERIAL PRIMARY KEY)", first),
-		fmt.Sprintf("CREATE TABLE %s.project (project_id SERIAL PRIMARY KEY, owner_id INTEGER)", first),
-		fmt.Sprintf("CREATE TABLE %s.retention_policy (id SERIAL PRIMARY KEY, scope_level VARCHAR(20), scope_reference INTEGER, data TEXT)", first),
+		fmt.Sprintf("CREATE TABLE %s.project (project_id SERIAL PRIMARY KEY)", first),
 	}
 	for _, statement := range setup {
 		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
@@ -291,8 +334,11 @@ func TestExecutionRevisionGuardIgnoresNonTableRelations(t *testing.T) {
 		"CREATE TABLE decoy (id BIGSERIAL PRIMARY KEY, revision INTEGER)",
 		"CREATE INDEX execution ON decoy (revision)",
 		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
-		"CREATE TABLE project (project_id SERIAL PRIMARY KEY, owner_id INTEGER)",
-		"CREATE TABLE retention_policy (id SERIAL PRIMARY KEY, scope_level VARCHAR(20), scope_reference INTEGER, data TEXT)",
+		"CREATE TABLE project (project_id SERIAL PRIMARY KEY)",
+		"CREATE TABLE role (role_id SERIAL PRIMARY KEY, role_code VARCHAR(20), name VARCHAR(20))",
+		"CREATE TABLE project_member (id SERIAL PRIMARY KEY, project_id INTEGER, entity_id INTEGER, entity_type CHAR(1), role INTEGER)",
+		"CREATE TABLE role_permission (id BIGSERIAL PRIMARY KEY, role_type VARCHAR(255), role_id BIGINT, permission_policy_id BIGINT)",
+		"CREATE TABLE permission_policy (id BIGSERIAL PRIMARY KEY, scope VARCHAR(255), resource VARCHAR(255), action VARCHAR(255), effect VARCHAR(255))",
 	} {
 		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
 			t.Fatalf("setup %q: %v", statement, err)
@@ -304,11 +350,13 @@ func TestExecutionRevisionGuardIgnoresNonTableRelations(t *testing.T) {
 	}
 }
 
-// Scheduled retention runs as the policy's execution_principal, so the schema
-// apply gives legacy project schedules the project owner. Only active project
-// schedules without a principal may change, and a repeat apply must not touch
-// what the first one wrote.
-func TestRetentionScheduleBackfillsExecutionPrincipal(t *testing.T) {
+// A trusted issuer is identified by issuer plus audience, and the application
+// keeps that pair unique. Databases created by the earlier revision of the
+// authoritative schema have identity_providers without the audience column and
+// with UNIQUE (issuer, project_id), which would block a second audience of one
+// issuer in a project. The schema apply must add the column and drop the
+// constraint, and the repeat must leave both as they are.
+func TestIdentityProvidersAudienceReconcilesLegacyTable(t *testing.T) {
 	ctx := context.Background()
 	cfg := authoritativeTestDatabaseConfig()
 	adminPool, err := dbpool.New(ctx, cfg)
@@ -317,7 +365,7 @@ func TestRetentionScheduleBackfillsExecutionPrincipal(t *testing.T) {
 	}
 	t.Cleanup(adminPool.Close)
 
-	schemaName := fmt.Sprintf("harbor_next_retention_%d", time.Now().UnixNano())
+	schemaName := fmt.Sprintf("harbor_next_audience_%d", time.Now().UnixNano())
 	if _, err := adminPool.DB().ExecContext(ctx, "CREATE SCHEMA "+schemaName); err != nil {
 		t.Fatalf("create test schema: %v", err)
 	}
@@ -336,70 +384,77 @@ func TestRetentionScheduleBackfillsExecutionPrincipal(t *testing.T) {
 	}
 	t.Cleanup(schemaPool.Close)
 
+	// identity_providers as the previous revision of harbor_next.sql created it
 	for _, statement := range []string{
 		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
 		"CREATE TABLE project (project_id SERIAL PRIMARY KEY, owner_id INTEGER)",
 		"CREATE TABLE retention_policy (id SERIAL PRIMARY KEY, scope_level VARCHAR(20), scope_reference INTEGER, data TEXT)",
 		"CREATE TABLE execution (id SERIAL PRIMARY KEY, revision INTEGER)",
+		"CREATE TABLE role (role_id SERIAL PRIMARY KEY, role_code VARCHAR(20), name VARCHAR(20))",
+		"CREATE TABLE project_member (id SERIAL PRIMARY KEY, project_id INTEGER, entity_id INTEGER, entity_type CHAR(1), role INTEGER)",
+		"CREATE TABLE role_permission (id BIGSERIAL PRIMARY KEY, role_type VARCHAR(255), role_id BIGINT, permission_policy_id BIGINT)",
+		"CREATE TABLE permission_policy (id BIGSERIAL PRIMARY KEY, scope VARCHAR(255), resource VARCHAR(255), action VARCHAR(255), effect VARCHAR(255))",
+		`CREATE TABLE identity_providers (
+			id                      SERIAL PRIMARY KEY,
+			name                    TEXT NOT NULL,
+			description             TEXT,
+			issuer                  TEXT NOT NULL,
+			openid_config_url       TEXT,
+			offline_validation      BOOLEAN NOT NULL DEFAULT FALSE,
+			supported_algorithms    TEXT,
+			claims_supported        TEXT,
+			jwks_uri                TEXT,
+			jwks_keys               JSONB,
+			jwks_cached_at          TIMESTAMP,
+			jwks_expires_at         TIMESTAMP,
+			jwks_last_fetch_attempt TIMESTAMP,
+			project_id              INT NOT NULL DEFAULT 0,
+			creation_time           TIMESTAMP DEFAULT NOW(),
+			update_time             TIMESTAMP DEFAULT NOW(),
+			UNIQUE (issuer, project_id)
+		)`,
+		"INSERT INTO identity_providers (name, issuer, project_id) VALUES ('legacy', 'https://issuer.example.com', 1)",
+		`CREATE TABLE claim_rules (
+			id                   SERIAL PRIMARY KEY,
+			identity_provider_id INT NOT NULL REFERENCES identity_providers(id) ON DELETE CASCADE,
+			robot_id             BIGINT NOT NULL DEFAULT 0,
+			claim_path           TEXT NOT NULL,
+			value                TEXT,
+			creation_time        TIMESTAMP DEFAULT NOW()
+		)`,
+		// audience kept as the issuer-level aud claim before the column existed
+		"INSERT INTO identity_providers (name, issuer, project_id) VALUES ('aud-claim', 'https://aud.example.com', 0)",
+		"INSERT INTO claim_rules (identity_provider_id, claim_path, value) SELECT id, 'aud', 'harbor' FROM identity_providers WHERE name = 'aud-claim'",
+		"INSERT INTO claim_rules (identity_provider_id, claim_path, value) SELECT id, 'sub', 'ci' FROM identity_providers WHERE name = 'aud-claim'",
+		// two issuer-level aud values cannot pick one audience
+		"INSERT INTO identity_providers (name, issuer, project_id) VALUES ('two-auds', 'https://two.example.com', 0)",
+		"INSERT INTO claim_rules (identity_provider_id, claim_path, value) SELECT id, 'aud', 'a' FROM identity_providers WHERE name = 'two-auds'",
+		"INSERT INTO claim_rules (identity_provider_id, claim_path, value) SELECT id, 'aud', 'b' FROM identity_providers WHERE name = 'two-auds'",
+		// a robot-level aud rule is not the trusted issuer's audience
+		"INSERT INTO identity_providers (name, issuer, project_id) VALUES ('robot-aud', 'https://robot.example.com', 0)",
+		"INSERT INTO claim_rules (identity_provider_id, robot_id, claim_path, value) SELECT id, 7, 'aud', 'robot' FROM identity_providers WHERE name = 'robot-aud'",
+		// one issuer URL in two projects with the same aud cannot both take it
+		"INSERT INTO identity_providers (name, issuer, project_id) VALUES ('shared-1', 'https://shared.example.com', 1)",
+		"INSERT INTO identity_providers (name, issuer, project_id) VALUES ('shared-2', 'https://shared.example.com', 2)",
+		"INSERT INTO claim_rules (identity_provider_id, claim_path, value) SELECT id, 'aud', 'shared' FROM identity_providers WHERE name LIKE 'shared-%'",
 	} {
 		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
 			t.Fatalf("setup %q: %v", statement, err)
 		}
 	}
 
-	policies := []struct {
-		name      string
-		projectID int
-		ownerID   int
-		data      string
-		want      string
-	}{
-		{
-			name:      "active schedule without principal",
-			projectID: 10, ownerID: 5,
-			data: `{"trigger":{"kind":"Schedule","settings":{"cron":"0 0 * * * *"}}}`,
-			want: `{"type":"local","id":5}`,
-		},
-		{
-			name:      "active schedule with null principal",
-			projectID: 11, ownerID: 6,
-			data: `{"trigger":{"kind":"Schedule","settings":{"cron":"0 0 * * * *"}},"execution_principal":null}`,
-			want: `{"type":"local","id":6}`,
-		},
-		{
-			name:      "active schedule with existing principal",
-			projectID: 12, ownerID: 7,
-			data: `{"trigger":{"kind":"Schedule","settings":{"cron":"0 0 * * * *"}},"execution_principal":{"type":"robot","id":42}}`,
-			want: `{"type":"robot","id":42}`,
-		},
-		{
-			name:      "inactive schedule",
-			projectID: 13, ownerID: 8,
-			data: `{"trigger":{"kind":"Schedule","settings":{"cron":""}}}`,
-			want: "",
-		},
-		{
-			name:      "manual trigger",
-			projectID: 14, ownerID: 9,
-			data: `{"trigger":{"kind":"Manual","settings":{}}}`,
-			want: "",
-		},
+	var legacyConstraint bool
+	if err := schemaPool.DB().QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM pg_constraint
+			WHERE conrelid = to_regclass('identity_providers')
+			  AND conname = 'identity_providers_issuer_project_id_key'
+		)`).Scan(&legacyConstraint); err != nil {
+		t.Fatalf("look up legacy constraint: %v", err)
 	}
-	for _, policy := range policies {
-		if _, err := schemaPool.DB().ExecContext(ctx,
-			"INSERT INTO project (project_id, owner_id) VALUES ($1, $2)", policy.projectID, policy.ownerID); err != nil {
-			t.Fatalf("seed project for %s: %v", policy.name, err)
-		}
-		if _, err := schemaPool.DB().ExecContext(ctx,
-			"INSERT INTO retention_policy (scope_level, scope_reference, data) VALUES ('project', $1, $2)",
-			policy.projectID, policy.data); err != nil {
-			t.Fatalf("seed retention policy for %s: %v", policy.name, err)
-		}
-	}
-	// a schedule outside the project scope has no owner to fall back to
-	if _, err := schemaPool.DB().ExecContext(ctx,
-		`INSERT INTO retention_policy (scope_level, scope_reference, data) VALUES ('system', 10, '{"trigger":{"kind":"Schedule","settings":{"cron":"0 0 * * * *"}}}')`); err != nil {
-		t.Fatalf("seed system retention policy: %v", err)
+	if !legacyConstraint {
+		t.Fatalf("legacy fixture does not carry identity_providers_issuer_project_id_key; the test proves nothing")
 	}
 
 	path := authoritativeTestSchemaPath()
@@ -408,40 +463,102 @@ func TestRetentionScheduleBackfillsExecutionPrincipal(t *testing.T) {
 			t.Fatalf("applyAuthoritativeSchema() pass %d: %v", pass, err)
 		}
 
-		for _, policy := range policies {
-			var principal string
-			if err := schemaPool.DB().QueryRowContext(ctx, `
-				SELECT COALESCE(data::jsonb -> 'execution_principal', 'null'::jsonb)::text
-				FROM retention_policy
-				WHERE scope_level = 'project' AND scope_reference = $1`, policy.projectID).Scan(&principal); err != nil {
-				t.Fatalf("pass %d: read %s: %v", pass, policy.name, err)
-			}
-			if policy.want == "" {
-				if principal != "null" {
-					t.Errorf("pass %d: %s got principal %s, want none", pass, policy.name, principal)
-				}
-				continue
-			}
-			var equal bool
+		var dataType, isNullable, columnDefault string
+		if err := schemaPool.DB().QueryRowContext(ctx, `
+			SELECT data_type, is_nullable, COALESCE(column_default, '')
+			FROM information_schema.columns
+			WHERE table_schema = current_schema()
+			  AND table_name = 'identity_providers'
+			  AND column_name = 'audience'`).Scan(&dataType, &isNullable, &columnDefault); err != nil {
+			t.Fatalf("pass %d: look up identity_providers.audience: %v", pass, err)
+		}
+		if dataType != "text" || isNullable != "NO" || columnDefault != "''::text" {
+			t.Errorf("pass %d: identity_providers.audience is %s nullable=%s default=%s, want text NOT NULL DEFAULT ''",
+				pass, dataType, isNullable, columnDefault)
+		}
+
+		var constraintExists bool
+		if err := schemaPool.DB().QueryRowContext(ctx, `
+			SELECT EXISTS (
+				SELECT 1
+				FROM pg_constraint
+				WHERE conrelid = to_regclass('identity_providers')
+				  AND conname = 'identity_providers_issuer_project_id_key'
+			)`).Scan(&constraintExists); err != nil {
+			t.Fatalf("pass %d: look up legacy constraint: %v", pass, err)
+		}
+		if constraintExists {
+			t.Errorf("pass %d: identity_providers_issuer_project_id_key still exists", pass)
+		}
+
+		// rows written before the column existed take their single issuer-level aud
+		// claim as the audience and otherwise keep the empty default
+		for name, want := range map[string]string{
+			"legacy":    "",
+			"aud-claim": "harbor",
+			"two-auds":  "",
+			"robot-aud": "",
+			"shared-1":  "",
+			"shared-2":  "",
+		} {
+			var audience string
 			if err := schemaPool.DB().QueryRowContext(ctx,
-				"SELECT $1::jsonb = $2::jsonb", principal, policy.want).Scan(&equal); err != nil {
-				t.Fatalf("pass %d: compare %s: %v", pass, policy.name, err)
+				"SELECT audience FROM identity_providers WHERE name = $1", name).Scan(&audience); err != nil {
+				t.Fatalf("pass %d: read %s row: %v", pass, name, err)
 			}
-			if !equal {
-				t.Errorf("pass %d: %s got principal %s, want %s", pass, policy.name, principal, policy.want)
+			if audience != want {
+				t.Errorf("pass %d: %s row audience is %q, want %q", pass, name, audience, want)
 			}
 		}
 
-		var systemPrincipal string
-		if err := schemaPool.DB().QueryRowContext(ctx, `
-			SELECT COALESCE(data::jsonb -> 'execution_principal', 'null'::jsonb)::text
-			FROM retention_policy
-			WHERE scope_level = 'system'`).Scan(&systemPrincipal); err != nil {
-			t.Fatalf("pass %d: read system policy: %v", pass, err)
+		// claims are left as they were
+		for name, want := range map[string]string{
+			"aud-claim": "aud,sub",
+			"two-auds":  "aud,aud",
+			"robot-aud": "aud",
+			"shared-1":  "aud",
+			"shared-2":  "aud",
+		} {
+			var paths string
+			if err := schemaPool.DB().QueryRowContext(ctx, `
+				SELECT COALESCE(string_agg(cr.claim_path, ',' ORDER BY cr.claim_path), '')
+				FROM claim_rules cr
+				JOIN identity_providers ip ON ip.id = cr.identity_provider_id
+				WHERE ip.name = $1`, name).Scan(&paths); err != nil {
+				t.Fatalf("pass %d: read %s claim rules: %v", pass, name, err)
+			}
+			if paths != want {
+				t.Errorf("pass %d: %s claim rules are %q, want %q", pass, name, paths, want)
+			}
 		}
-		if systemPrincipal != "null" {
-			t.Errorf("pass %d: system policy got principal %s, want none", pass, systemPrincipal)
+	}
+
+	// a legacy aud equal to the audience another trusted issuer of the same URL
+	// already has is not taken over
+	for _, statement := range []string{
+		"INSERT INTO identity_providers (name, issuer, project_id) VALUES ('late', 'https://aud.example.com', 3)",
+		"INSERT INTO claim_rules (identity_provider_id, claim_path, value) SELECT id, 'aud', 'harbor' FROM identity_providers WHERE name = 'late'",
+	} {
+		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
+			t.Fatalf("setup %q: %v", statement, err)
 		}
+	}
+	if err := applyAuthoritativeSchema(ctx, sqlSchemaDB{db: schemaPool.DB()}, path); err != nil {
+		t.Fatalf("applyAuthoritativeSchema() with a colliding legacy issuer: %v", err)
+	}
+	var lateAudience string
+	if err := schemaPool.DB().QueryRowContext(ctx,
+		"SELECT audience FROM identity_providers WHERE name = 'late'").Scan(&lateAudience); err != nil {
+		t.Fatalf("read late row: %v", err)
+	}
+	if lateAudience != "" {
+		t.Errorf("late row audience is %q, want it left empty next to aud-claim", lateAudience)
+	}
+
+	// two audiences of one issuer in one project, which the dropped constraint forbade
+	if _, err := schemaPool.DB().ExecContext(ctx,
+		"INSERT INTO identity_providers (name, issuer, audience, project_id) VALUES ('second', 'https://issuer.example.com', 'harbor', 1)"); err != nil {
+		t.Errorf("insert second audience of the same issuer in the same project: %v", err)
 	}
 }
 

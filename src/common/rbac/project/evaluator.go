@@ -41,16 +41,19 @@ func NewBuilderForUser(user *models.User, ctl project.Controller) RBACUserBuilde
 			}
 		}
 
-		roles, err := ctl.ListRoles(ctx, p.ProjectID, user)
+		roleIDs, err := ctl.ListRoles(ctx, p.ProjectID, user)
 		if err != nil {
 			log.Errorf("failed to list roles: %v", err)
 			return nil
 		}
 
+		// Every role is a row, so there is nothing to branch on here and
+		// nothing to load: the ids go through, and what they grant is already
+		// in memory.
 		return &rbacUser{
 			project:      p,
 			username:     user.Username,
-			projectRoles: roles,
+			projectRoles: roleIDs,
 		}
 	}
 }

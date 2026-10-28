@@ -21,13 +21,34 @@ openssl genpkey -algorithm RSA -outform PEM -pkeyopt rsa_keygen_bits:4096 \
   | openssl rsa -traditional -out config/token_service_key.pem
 chmod 644 config/token_service_key.pem   # container UID 10000 ≠ host UID → needs world-readable
 
-# 3. Start
+# 3. Generate the secret key Core uses to encrypt stored credentials (exactly 16 alphanumeric chars).
+#    Generated once; see "Secret Key" below before touching an existing one.
+[ -f config/secret_key ] || openssl rand -base64 32 | tr -dc 'A-Za-z0-9' | head -c 16 > config/secret_key
+chmod 644 config/secret_key
+
+# 4. Start
 docker compose up -d
 
-# 4. Verify
+# 5. Verify
 docker compose ps
 curl https://registry.example.com/api/v2.0/systeminfo
 ```
+
+## Secret Key
+
+`config/secret_key` is the AES key Core uses to encrypt credentials stored in
+the database (replication endpoints, scanner credentials, OIDC secrets). It
+belongs to the database for the lifetime of the install: back it up together
+with the `postgres-data` volume and never regenerate it while that volume
+exists. With a different key Harbor cannot decrypt the stored credentials, the
+same invariant the Helm chart documents for `secretKey` in
+[`deploy/chart/docs/MIGRATION.md`](../chart/docs/MIGRATION.md).
+
+**Upgrading an existing deployment.** Compose files before this one did not
+mount the key, so an existing install has no `config/secret_key`. Create it once
+with step 3 above before the first `docker compose up` on the new version, then
+keep it. The mount is declared with `create_host_path: false`, so a missing
+file fails the start instead of being created as an empty directory.
 
 ## TLS Certificates
 

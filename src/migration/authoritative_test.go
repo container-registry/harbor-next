@@ -19,7 +19,10 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 type fakeSchemaDB struct {
@@ -210,4 +213,96 @@ func writeSchema(t *testing.T, contents string) string {
 		t.Fatalf("write schema fixture: %v", err)
 	}
 	return path
+}
+
+// TestApplyAuthoritativeSchemaSerializesInstances simulates several core
+// replicas starting at once: the advisory-lock Exec blocks on a real mutex the
+// way pg_advisory_xact_lock blocks in PostgreSQL, released only by
+// Commit/Rollback. The schema statement must never run in two transactions at
+// the same time, and every instance must still apply successfully (idempotent
+// re-application, not skipping).
+func TestApplyAuthoritativeSchemaSerializesInstances(t *testing.T) {
+	const instances = 8
+	path := writeSchema(t, "CREATE TABLE IF NOT EXISTS example (id BIGINT PRIMARY KEY);\n")
+
+	var (
+		advisory sync.Mutex
+		inside   atomic.Int32
+		overlaps atomic.Int32
+		applied  atomic.Int32
+	)
+
+	newTx := func() schemaTx {
+		return &serializingTx{
+			lock: &advisory,
+			onSchema: func() {
+				if inside.Add(1) > 1 {
+					overlaps.Add(1)
+				}
+				time.Sleep(time.Millisecond)
+				inside.Add(-1)
+				applied.Add(1)
+			},
+		}
+	}
+	db := fakeSchemaDB{begin: func(context.Context) (schemaTx, error) { return newTx(), nil }}
+
+	var wg sync.WaitGroup
+	errs := make(chan error, instances)
+	for i := 0; i < instances; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errs <- applyAuthoritativeSchema(context.Background(), db, path)
+		}()
+	}
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		if err != nil {
+			t.Errorf("applyAuthoritativeSchema() returned error: %v", err)
+		}
+	}
+	if got := overlaps.Load(); got != 0 {
+		t.Errorf("schema statement ran concurrently in %d transactions; advisory lock must serialize instances", got)
+	}
+	if got := applied.Load(); got != instances {
+		t.Errorf("schema applied %d times, want %d (every instance re-applies idempotently)", got, instances)
+	}
+}
+
+// serializingTx emulates PostgreSQL transaction-scoped advisory locking for
+// the fake schema DB: Exec of the lock statement blocks until the current
+// holder finishes its transaction.
+type serializingTx struct {
+	lock     *sync.Mutex
+	held     bool
+	onSchema func()
+}
+
+func (tx *serializingTx) Exec(_ context.Context, query string, _ ...any) error {
+	if query == "SELECT pg_advisory_xact_lock($1)" {
+		tx.lock.Lock()
+		tx.held = true
+		return nil
+	}
+	tx.onSchema()
+	return nil
+}
+
+func (tx *serializingTx) Commit() error {
+	if tx.held {
+		tx.held = false
+		tx.lock.Unlock()
+	}
+	return nil
+}
+
+func (tx *serializingTx) Rollback() error {
+	if tx.held {
+		tx.held = false
+		tx.lock.Unlock()
+	}
+	return nil
 }
