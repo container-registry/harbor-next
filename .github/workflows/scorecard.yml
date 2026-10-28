@@ -16,7 +16,7 @@ jobs:
     # Scheduled runs are reserved for the canonical repository; forks retain push checks.
     if: github.event_name != 'schedule' || github.repository == 'container-registry/harbor-next'
     # Scorecard result publishing requires a single GitHub-hosted Ubuntu runner.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       # uploads the SARIF to the code-scanning dashboard
       security-events: write
