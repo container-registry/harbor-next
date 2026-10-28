@@ -21,8 +21,6 @@ import (
 
 	"github.com/goharbor/harbor/src/common/rbac"
 	"github.com/goharbor/harbor/src/common/security"
-	"github.com/goharbor/harbor/src/common/security/local"
-	"github.com/goharbor/harbor/src/controller/member"
 	"github.com/goharbor/harbor/src/controller/user"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/pkg/permission/types"
@@ -33,23 +31,21 @@ import (
 type permissionsAPI struct {
 	BaseAPI
 	uc user.Controller
-	mc member.Controller
 }
 
 func newPermissionsAPIAPI() *permissionsAPI {
 	return &permissionsAPI{
 		uc: user.Ctl,
-		mc: member.NewController(),
 	}
 }
 
 // GetPermissions returns the available permission catalog.
-// Restricted to system admins and project admins (matching pre-custom-roles
-// behavior): the catalog is read-only metadata (action names such as
-// repository:pull) used by project-level UI components (robot accounts,
-// webhooks, role management). A project admin sees only the project catalog; a
-// system admin additionally sees the system-level and role-level catalogs (the
-// latter drives the sysadmin-only custom-role editor).
+// Any authenticated caller may read it: the catalog is read-only metadata
+// (action names such as repository:pull) that project-level UI components such
+// as the robot account dialog need, and custom roles can grant robot creation to
+// users who are neither system nor project admins. Only a system admin also
+// gets the system-level and role-level catalogs (the latter drives the
+// sysadmin-only custom-role editor).
 func (p *permissionsAPI) GetPermissions(ctx context.Context, _ permissions.GetPermissionsParams) middleware.Responder {
 	secCtx, ok := security.FromContext(ctx)
 	if !ok {
@@ -60,27 +56,13 @@ func (p *permissionsAPI) GetPermissions(ctx context.Context, _ permissions.GetPe
 	}
 
 	isSystemAdmin := secCtx.IsSysAdmin()
-	isProjectAdmin := false
-	if !isSystemAdmin {
-		if sc, ok := secCtx.(*local.SecurityContext); ok {
-			user := sc.User()
-			var err error
-			isProjectAdmin, err = p.mc.IsProjectAdmin(ctx, *user)
-			if err != nil {
-				return p.SendError(ctx, err)
-			}
-		}
-	}
-	if !isSystemAdmin && !isProjectAdmin {
-		return p.SendError(ctx, errors.ForbiddenError(errors.New("Only administrators (system and project) can access permissions")))
-	}
 
 	provider := rbac.GetPermissionProvider()
 	sysPermissions := make([]*types.Policy, 0)
 	proPermissions := provider.GetPermissions(rbac.ScopeProject)
 	rolePermissions := make([]*types.Policy, 0)
 	if isSystemAdmin {
-		// project admins cannot see the system-level or role-level catalogs;
+		// other callers cannot see the system-level or role-level catalogs;
 		// custom-role management is sysadmin-only.
 		sysPermissions = provider.GetPermissions(rbac.ScopeSystem)
 		rolePermissions = provider.GetPermissions(rbac.ScopeRole)
