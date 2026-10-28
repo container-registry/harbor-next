@@ -6583,8 +6583,6 @@ paths:
             $ref: '#/definitions/Permissions'
         '401':
           $ref: '#/responses/401'
-        '403':
-          $ref: '#/responses/403'
         '404':
           $ref: '#/responses/404'
         '500':

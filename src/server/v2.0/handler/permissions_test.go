@@ -16,8 +16,11 @@ package handler
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/go-openapi/runtime"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/goharbor/harbor/src/common/security"
@@ -33,9 +36,9 @@ func TestGetPermissionsAccess(t *testing.T) {
 		status        int
 		wantSystem    bool
 	}{
-		{"anonymous is rejected", false, false, 401, false},
-		{"plain user gets the project catalog", true, false, 200, false},
-		{"system admin also gets the system catalog", true, true, 200, true},
+		{"anonymous is rejected", false, false, http.StatusUnauthorized, false},
+		{"plain user gets the project catalog", true, false, http.StatusOK, false},
+		{"system admin also gets the system and role catalogs", true, true, http.StatusOK, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -46,17 +49,20 @@ func TestGetPermissionsAccess(t *testing.T) {
 			ctx := security.NewContext(context.Background(), secCtx)
 
 			rsp := newPermissionsAPIAPI().GetPermissions(ctx, permissions.GetPermissionsParams{})
-			if tc.status == 200 {
-				ok, isOK := rsp.(*permissions.GetPermissionsOK)
-				if !assert.True(t, isOK) {
-					return
-				}
-				assert.NotEmpty(t, ok.Payload.Project)
-				assert.Equal(t, tc.wantSystem, len(ok.Payload.System) > 0)
+			rec := httptest.NewRecorder()
+			rsp.WriteResponse(rec, runtime.JSONProducer())
+			assert.Equal(t, tc.status, rec.Code)
+			if tc.status != http.StatusOK {
 				return
 			}
-			_, isOK := rsp.(*permissions.GetPermissionsOK)
-			assert.False(t, isOK)
+
+			ok, isOK := rsp.(*permissions.GetPermissionsOK)
+			if !assert.True(t, isOK) {
+				return
+			}
+			assert.NotEmpty(t, ok.Payload.Project)
+			assert.Equal(t, tc.wantSystem, len(ok.Payload.System) > 0)
+			assert.Equal(t, tc.wantSystem, len(ok.Payload.Role) > 0)
 		})
 	}
 }
