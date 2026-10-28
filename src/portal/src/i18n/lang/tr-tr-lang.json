@@ -1988,6 +1988,7 @@
         "PULL": "Çek",
         "CREATE_ROLE": "Rol oluştur",
         "CREATEROLE_SUMMARY": "Yeni rol için bir ad ve isteğe bağlı bir açıklama girin. İzinleri bir sonraki adımda seçeceksiniz.",
+        "REFRESH": "Yenile",
         "EDIT_ROLE": "Rolü düzenle",
         "EDIT_ROLE_SUMMARY": "Bu rolün açıklamasını veya izinlerini güncelleyin. Rol adı değiştirilemez.",
         "DELETE_ROLE_SUCCESS": "Roller başarıyla silindi",

@@ -13,22 +13,11 @@
 // limitations under the License.
 import {
     Component,
-    OnInit,
     Input,
-    OnDestroy,
     Output,
     EventEmitter,
     ViewChild,
 } from '@angular/core';
-import {
-    catchError,
-    debounceTime,
-    distinctUntilChanged,
-    filter,
-    finalize,
-    map,
-    switchMap,
-} from 'rxjs/operators';
 import { MessageHandlerService } from '../../../../shared/services/message-handler.service';
 import {
     NAMESPACE_ALL_PROJECTS,
@@ -39,7 +28,6 @@ import {
 import { Role } from '../../../../../../ng-swagger-gen/models/role';
 import { NgForm } from '@angular/forms';
 import { ClrLoadingState, ClrWizard } from '@clr/angular';
-import { of, Subject, Subscription } from 'rxjs';
 import { RoleService } from '../../../../../../ng-swagger-gen/services/role.service';
 import { OperationService } from '../../../../shared/components/operation/operation.service';
 import { clone, isSameArrayValue } from '../../../../shared/units/utils';
@@ -52,29 +40,24 @@ import { InlineAlertComponent } from '../../../../shared/components/inline-alert
 import { errorHandler } from '../../../../shared/units/shared.utils';
 import { PermissionSelectPanelModes } from '../../../../shared/components/role-permissions-panel/role-permissions-panel.component';
 import { Permissions } from '../../../../../../ng-swagger-gen/models/permissions';
-import { getAllRoles } from '../../../../shared/units/role-util';
 
 @Component({
     selector: 'add-role',
     templateUrl: './add-role.component.html',
     styleUrls: ['./add-role.component.scss'],
 })
-export class AddRoleComponent implements OnInit, OnDestroy {
+export class AddRoleComponent {
     isEditMode: boolean = false;
     originalRoleForEdit: Role;
     @Output()
     addSuccess: EventEmitter<Role> = new EventEmitter<Role>();
     addRoleOpened: boolean = false;
     role: Role = clone(NEW_EMPTY_ROLE);
-    isNameExisting: boolean = false;
     loading: boolean = false;
-    checkNameOnGoing: boolean = false;
     @ViewChild(InlineAlertComponent)
     inlineAlertComponent: InlineAlertComponent;
     @ViewChild('roleBasicForm', { static: true }) roleBasicForm: NgForm;
     saveBtnState: ClrLoadingState = ClrLoadingState.DEFAULT;
-    private _nameSubject: Subject<string> = new Subject<string>();
-    private _nameSubscription: Subscription;
 
     @Input()
     roleMetadata: Permissions;
@@ -87,67 +70,9 @@ export class AddRoleComponent implements OnInit, OnDestroy {
         private operationService: OperationService
     ) {}
 
-    ngOnInit(): void {
-        this.subscribeName();
-    }
-
-    ngOnDestroy() {
-        if (this._nameSubscription) {
-            this._nameSubscription.unsubscribe();
-            this._nameSubscription = null;
-        }
-    }
-
-    subscribeName() {
-        if (!this._nameSubscription) {
-            this._nameSubscription = this._nameSubject
-                .pipe(
-                    distinctUntilChanged(),
-                    filter(name => {
-                        if (
-                            this.isEditMode &&
-                            this.originalRoleForEdit &&
-                            this.originalRoleForEdit.name === name
-                        ) {
-                            return false;
-                        }
-                        return name?.length > 0;
-                    }),
-                    map(name => {
-                        this.checkNameOnGoing = !!name;
-                        return name;
-                    }),
-                    debounceTime(500),
-                    switchMap(name => {
-                        this.isNameExisting = false;
-                        this.checkNameOnGoing = true;
-                        // Compare names client side: `q` is a fuzzy/exact filter
-                        // expression that the backend decodes before parsing, so a
-                        // name such as `dev` would match `developer` and one
-                        // holding a comma would be a malformed query.
-                        return getAllRoles(this.roleService).pipe(
-                            map(roles =>
-                                (roles ?? []).some(r => r.name === name)
-                            ),
-                            // Recover here, not in the subscriber: an error that
-                            // reaches it would complete the subscription and leave
-                            // every later edit unchecked.
-                            catchError(error => {
-                                this.msgHandler.error(error);
-                                return of(false);
-                            }),
-                            finalize(() => (this.checkNameOnGoing = false))
-                        );
-                    })
-                )
-                .subscribe(exists => {
-                    this.isNameExisting = exists;
-                });
-        }
-    }
-
-    inputName() {
-        this._nameSubject.next(this.role.name);
+    // The backend caps the name at 255 bytes, not characters.
+    get nameTooLong(): boolean {
+        return new TextEncoder().encode(this.role.name ?? '').length > 255;
     }
 
     cancel() {
@@ -177,8 +102,6 @@ export class AddRoleComponent implements OnInit, OnDestroy {
     open(isEditMode: boolean) {
         this.isEditMode = isEditMode;
         this.addRoleOpened = true;
-        this.isNameExisting = false;
-        this._nameSubject.next('');
     }
 
     disabled(): boolean {
@@ -191,7 +114,8 @@ export class AddRoleComponent implements OnInit, OnDestroy {
     canAdd(): boolean {
         return (
             this.role?.permissions[0]?.access?.length > 0 &&
-            !this.roleBasicForm.invalid
+            !this.roleBasicForm.invalid &&
+            !this.nameTooLong
         );
     }
 

@@ -1988,6 +1988,7 @@
         "PULL": "Pull",
         "CREATE_ROLE": "Create Role",
         "CREATEROLE_SUMMARY": "Define a name and optional description for the new role. You will select its permissions in the next step.",
+        "REFRESH": "Refresh",
         "EDIT_ROLE": "Edit Role",
         "EDIT_ROLE_SUMMARY": "Update the description or permissions of this role. The role name cannot be changed.",
         "DELETE_ROLE_SUCCESS": "Deleted role(s) successfully",
@@ -2051,7 +2052,7 @@
         "DELETE_ROLE": "Delete Role",
         "UPDATE_ROLE": "Update Role",
         "UPDATE_ROLE_SUCCESSFULLY": "Updated role successfully",
-        "NAME_TOOLTIP": "Role name is required, must be at most 255 characters, and cannot contain the '+' character.",
+        "NAME_TOOLTIP": "Role name is required, must be at most 255 bytes (UTF-8), and cannot contain the '+' character.",
         "PUSH_PERMISSION_TOOLTIP": "The push permission also requires the pull permission.",
         "NOT_FOUND": "We couldn't find any roles!",
         "SEARCH_BY_NAME": "Search by name"

@@ -116,9 +116,7 @@ export class RolesComponent implements OnInit, OnDestroy {
                         };
                         this.searchKey = roleSearchName;
                         if (this.searchKey) {
-                            queryParam.q = encodeURIComponent(
-                                `name=~${this.searchKey}`
-                            );
+                            queryParam.q = this.nameQuery();
                         }
                         this.loading = true;
                         // Handle the error inside the inner observable: letting it
@@ -145,7 +143,9 @@ export class RolesComponent implements OnInit, OnDestroy {
                         response.headers.get('x-total-count'),
                         10
                     );
-                    this.roles = response.body as Role[];
+                    this.roles = (response.body as Role[]).filter(r =>
+                        this.matchesSearch(r)
+                    );
                 });
         }
         if (!this.subscription) {
@@ -180,9 +180,30 @@ export class RolesComponent implements OnInit, OnDestroy {
         this.permissionService
             .getPermissions()
             .pipe(finalize(() => (this.loadingData = false)))
-            .subscribe(res => {
-                this.roleMetadata = res;
+            .subscribe({
+                next: res => {
+                    this.roleMetadata = res;
+                },
+                // New and Edit stay disabled; refresh retries the request.
+                error: err => this.msgHandler.error(err),
             });
+    }
+
+    // `q` is split on commas after decoding, so a comma cannot be sent as part
+    // of a value. Query by the longest comma-free part and narrow client side.
+    private nameQuery(): string | undefined {
+        const part = this.searchKey
+            .split(',')
+            .reduce((a, b) => (b.length > a.length ? b : a), '');
+        return part ? encodeURIComponent(`name=~${part}`) : undefined;
+    }
+
+    private matchesSearch(role: Role): boolean {
+        return (
+            !this.searchKey ||
+            !this.searchKey.includes(',') ||
+            role.name.toLowerCase().includes(this.searchKey.toLowerCase())
+        );
     }
 
     clrLoad(state?: ClrDatagridStateInterface) {
@@ -200,7 +221,7 @@ export class RolesComponent implements OnInit, OnDestroy {
             sort: getSortingString(state),
         };
         if (this.searchKey) {
-            queryParam.q = encodeURIComponent(`name=~${this.searchKey}`);
+            queryParam.q = this.nameQuery();
         }
         this.loading = true;
         this.roleService
@@ -212,7 +233,9 @@ export class RolesComponent implements OnInit, OnDestroy {
                         response.headers.get('x-total-count'),
                         10
                     );
-                    this.roles = response.body as Role[];
+                    this.roles = (response.body as Role[]).filter(r =>
+                        this.matchesSearch(r)
+                    );
                 },
                 err => {
                     this.msgHandler.error(err);
@@ -230,6 +253,9 @@ export class RolesComponent implements OnInit, OnDestroy {
     refresh() {
         this.currentPage = 1;
         this.selectedRows = [];
+        if (!this.roleMetadata) {
+            this.getRolePermissions();
+        }
         this.clrLoad();
     }
     deleteRoles(roles: Role[]) {

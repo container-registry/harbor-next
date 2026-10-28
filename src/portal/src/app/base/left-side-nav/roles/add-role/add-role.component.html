@@ -34,8 +34,7 @@
     <!-- Page 1: Basic Info -->
     <clr-wizard-page
         [clrWizardPageNextDisabled]="
-            (!roleBasicForm.valid || checkNameOnGoing || isNameExisting) &&
-            !isEditMode
+            (!roleBasicForm.valid || nameTooLong) && !isEditMode
         ">
         <ng-template clrPageTitle>{{
             'ROLE.BASIC_INFO' | translate
@@ -50,8 +49,8 @@
                     <div
                         class="clr-control-container"
                         [class.clr-error]="
-                            ((name.dirty || name.touched) && name.invalid) ||
-                            isNameExisting
+                            (name.dirty || name.touched) &&
+                            (name.invalid || nameTooLong)
                         ">
                         <div class="clr-input-wrapper">
                             <input
@@ -61,42 +60,21 @@
                                 id="name"
                                 [(ngModel)]="role.name"
                                 required
-                                maxLengthExt="255"
                                 pattern="[^+]*"
                                 autocomplete="off"
                                 size="30"
                                 name="name"
-                                #name="ngModel"
-                                (keyup)="inputName()" />
+                                #name="ngModel" />
                             <clr-icon
                                 class="clr-validate-icon"
                                 shape="exclamation-circle"></clr-icon>
-                            <span
-                                class="spinner spinner-inline"
-                                [hidden]="!checkNameOnGoing"></span>
                         </div>
                         <clr-control-error
                             *ngIf="
-                                ((name.dirty || name.touched) &&
-                                    name.invalid) ||
-                                isNameExisting
+                                (name.dirty || name.touched) &&
+                                (name.invalid || nameTooLong)
                             ">
-                            <span
-                                *ngIf="
-                                    isNameExisting &&
-                                    !(
-                                        (name.dirty || name.touched) &&
-                                        name.invalid
-                                    )
-                                ">
-                                {{ 'ROLE.ACCOUNT_EXISTING' | translate }}
-                            </span>
-                            <span
-                                *ngIf="
-                                    (name.dirty || name.touched) && name.invalid
-                                ">
-                                {{ 'ROLE.NAME_TOOLTIP' | translate }}
-                            </span>
+                            {{ 'ROLE.NAME_TOOLTIP' | translate }}
                         </clr-control-error>
                     </div>
                 </div>

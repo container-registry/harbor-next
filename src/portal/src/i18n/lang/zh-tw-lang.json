@@ -2007,6 +2007,7 @@
         "PULL": "拉取",
         "CREATE_ROLE": "建立角色",
         "CREATEROLE_SUMMARY": "為新角色設定名稱與選填的描述，下一步選擇其權限。",
+        "REFRESH": "重新整理",
         "EDIT_ROLE": "編輯角色",
         "EDIT_ROLE_SUMMARY": "更新此角色的描述或權限。角色名稱無法變更。",
         "DELETE_ROLE_SUCCESS": "已成功刪除角色。",

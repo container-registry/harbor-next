@@ -1997,6 +1997,7 @@
         "PULL": "Pull",
         "CREATE_ROLE": "Criar função",
         "CREATEROLE_SUMMARY": "Defina um nome e uma descrição opcional para a nova função. As permissões serão escolhidas na próxima etapa.",
+        "REFRESH": "Atualizar",
         "EDIT_ROLE": "Editar função",
         "EDIT_ROLE_SUMMARY": "Atualize a descrição ou as permissões desta função. O nome da função não pode ser alterado.",
         "DELETE_ROLE_SUCCESS": "Função(ões) removida(s) com sucesso",

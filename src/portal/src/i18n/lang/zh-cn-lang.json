@@ -1990,6 +1990,7 @@
         "PULL": "拉取",
         "CREATE_ROLE": "创建角色",
         "CREATEROLE_SUMMARY": "为新角色设置名称和可选的描述，下一步选择其权限。",
+        "REFRESH": "刷新",
         "EDIT_ROLE": "编辑角色",
         "EDIT_ROLE_SUMMARY": "更新该角色的描述或权限。角色名称不可更改。",
         "DELETE_ROLE_SUCCESS": "成功删除角色",

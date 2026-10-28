@@ -10,16 +10,20 @@
                     filterPlaceholder="{{
                         'ROLE.SEARCH_BY_NAME' | translate
                     }}"></hbr-filter>
-                <span class="refresh-btn" (click)="refresh()">
+                <button
+                    type="button"
+                    class="btn btn-link btn-icon refresh-btn"
+                    [attr.aria-label]="'ROLE.REFRESH' | translate"
+                    (click)="refresh()">
                     <clr-icon shape="refresh"></clr-icon>
-                </span>
+                </button>
             </div>
         </div>
     </div>
     <div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
         <clr-dg-action-bar>
             <button
-                [disabled]="loadingData"
+                [disabled]="loadingData || !roleMetadata"
                 [clrLoading]="addBtnState"
                 class="btn btn-secondary"
                 (click)="openNewRoleModal(false)">
@@ -41,6 +45,7 @@
                     <button
                         [disabled]="
                             loadingData ||
+                            !roleMetadata ||
                             !(selectedRows && selectedRows.length === 1) ||
                             isBuiltinSelected()
                         "

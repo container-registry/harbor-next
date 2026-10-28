@@ -1988,6 +1988,7 @@
         "PULL": "풀(Pull)",
         "CREATE_ROLE": "역할 생성",
         "CREATEROLE_SUMMARY": "새 역할의 이름과 선택적 설명을 입력하세요. 권한은 다음 단계에서 선택합니다.",
+        "REFRESH": "새로 고침",
         "EDIT_ROLE": "역할 편집",
         "EDIT_ROLE_SUMMARY": "이 역할의 설명 또는 권한을 수정합니다. 역할 이름은 변경할 수 없습니다.",
         "DELETE_ROLE_SUCCESS": "역할을 성공적으로 삭제했습니다",

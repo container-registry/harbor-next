@@ -1988,6 +1988,7 @@
         "PULL": "Pull",
         "CREATE_ROLE": "Rolle erstellen",
         "CREATEROLE_SUMMARY": "Legen Sie einen Namen und optional eine Beschreibung für die neue Rolle fest. Die Berechtigungen wählen Sie im nächsten Schritt.",
+        "REFRESH": "Aktualisieren",
         "EDIT_ROLE": "Rolle bearbeiten",
         "EDIT_ROLE_SUMMARY": "Aktualisieren Sie die Beschreibung oder die Berechtigungen dieser Rolle. Der Rollenname kann nicht geändert werden.",
         "DELETE_ROLE_SUCCESS": "Rolle(n) erfolgreich gelöscht",

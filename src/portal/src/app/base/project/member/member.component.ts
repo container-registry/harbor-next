@@ -144,6 +144,19 @@ export class MemberComponent implements OnInit, OnDestroy {
         this.currentUser = this.session.getCurrentUser();
         // get member permission rule
         this.getMemberPermissionRule(this.projectId);
+        this.loadRoles();
+        if (this.appConfigService.isLdapMode()) {
+            this.isLdapMode = true;
+        }
+        if (this.appConfigService.isHttpAuthMode()) {
+            this.isHttpAuthMode = true;
+        }
+        if (this.appConfigService.isOidcMode()) {
+            this.isOidcMode = true;
+        }
+    }
+    // Also runs on refresh, so a new or deleted role shows up and a failed load can be retried.
+    loadRoles() {
         getAllRoles(this.roleService).subscribe({
             next: res => {
                 this.roles = res ?? [];
@@ -156,15 +169,6 @@ export class MemberComponent implements OnInit, OnDestroy {
                 this.errorHandlerEntity.error(err);
             },
         });
-        if (this.appConfigService.isLdapMode()) {
-            this.isLdapMode = true;
-        }
-        if (this.appConfigService.isHttpAuthMode()) {
-            this.isHttpAuthMode = true;
-        }
-        if (this.appConfigService.isOidcMode()) {
-            this.isOidcMode = true;
-        }
     }
     doSearch(searchMember: string) {
         this.searchMember = searchMember;
@@ -176,6 +180,7 @@ export class MemberComponent implements OnInit, OnDestroy {
         this.total = 0;
         this.selectedRow = [];
         this.searchMember = null;
+        this.loadRoles();
         this.retrieve('');
     }
     clrDgRefresh(state: ClrDatagridStateInterface) {

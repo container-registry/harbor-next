@@ -1994,6 +1994,7 @@
         "PULL": "Pull",
         "CREATE_ROLE": "Crear rol",
         "CREATEROLE_SUMMARY": "Defina un nombre y una descripción opcional para el nuevo rol. Seleccionará sus permisos en el siguiente paso.",
+        "REFRESH": "Actualizar",
         "EDIT_ROLE": "Editar rol",
         "EDIT_ROLE_SUMMARY": "Actualice la descripción o los permisos de este rol. El nombre del rol no se puede cambiar.",
         "DELETE_ROLE_SUCCESS": "Rol(es) eliminado(s) correctamente",
