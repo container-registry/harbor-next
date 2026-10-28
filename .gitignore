@@ -74,3 +74,4 @@ bin
 .mcp.json
 .claude
 src/portal/src/swagger.json
+.playwright-mcp

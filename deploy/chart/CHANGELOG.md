@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.1](https://github.com/container-registry/harbor-next/compare/chart-v2.1.0...chart-v2.1.1) (2026-10-27)
+
+
+### Bug Fixes
+
+* **chart:** Bump Chart appVersion To v2.15.14 ([#1336](https://github.com/container-registry/harbor-next/issues/1336)) ([2c3a3ff](https://github.com/container-registry/harbor-next/commit/2c3a3ff63317b1a9f1e01d1d39b2c648c244325a))
+* **chart:** Raise Exporter Probe Timeouts To 5s ([#1288](https://github.com/container-registry/harbor-next/issues/1288)) ([af6e5c0](https://github.com/container-registry/harbor-next/commit/af6e5c0f6905f306a5b08302c2a41ba647db7f7f))
+
 ## [2.1.0](https://github.com/container-registry/harbor-next/compare/chart-v2.0.0...chart-v2.1.0) (2026-10-19)
 
 

@@ -15,6 +15,7 @@
 package main
 
 import (
+	"errors"
 	"math"
 	"net/http"
 	"os"
@@ -107,7 +108,7 @@ func main() {
 
 	errCh := make(chan error, 1)
 	go func() {
-		if err := harborExporter.ListenAndServe(); err != nil {
+		if err := harborExporter.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
 	}()

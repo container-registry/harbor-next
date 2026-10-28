@@ -213,3 +213,140 @@ BEGIN
     END IF;
 END
 $$;
+
+-- Generated failed-task summary kept apart from the execution-origin status_message
+-- so a refresh can replace it when tasks recover.
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_class
+        WHERE oid = to_regclass('execution') AND relkind IN ('r', 'p')
+    ) THEN
+        ALTER TABLE execution ADD COLUMN IF NOT EXISTS task_status_message TEXT NOT NULL DEFAULT '';
+    END IF;
+END
+$$;
+
+-- Custom project roles (upstream goharbor/harbor#23804). Every project role,
+-- the five built-ins included, keeps its grants in
+-- permission_policy/role_permission (goharbor/harbor#24029); core seeds the
+-- built-in grants at startup.
+ALTER TABLE role ADD COLUMN IF NOT EXISTS is_builtin   BOOLEAN      NOT NULL DEFAULT FALSE;
+ALTER TABLE role ADD COLUMN IF NOT EXISTS description  TEXT;
+ALTER TABLE role ADD COLUMN IF NOT EXISTS modified     BOOLEAN      NOT NULL DEFAULT FALSE;
+ALTER TABLE role ADD COLUMN IF NOT EXISTS created_by   VARCHAR(255);
+ALTER TABLE role ADD COLUMN IF NOT EXISTS created_at   TIMESTAMP WITH TIME ZONE;
+ALTER TABLE role ADD COLUMN IF NOT EXISTS modified_by  VARCHAR(255);
+ALTER TABLE role ADD COLUMN IF NOT EXISTS modified_at  TIMESTAMP WITH TIME ZONE;
+
+-- Role names match the API/UI contract (was varchar(20)) and are unique
+-- case-insensitively, so "Maintainer" and "maintainer" cannot coexist.
+ALTER TABLE role ALTER COLUMN name TYPE varchar(255);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_role_name ON role (lower(name));
+
+-- Roles seeded by the numbered migrations are built-in and immutable.
+UPDATE role SET is_builtin = TRUE
+WHERE name IN ('projectAdmin', 'developer', 'guest', 'maintainer', 'limitedGuest')
+  AND is_builtin = FALSE;
+
+-- A role still assigned to a member cannot be deleted, which closes the
+-- count-then-delete race in the role Delete controller.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_project_member_role'
+    ) THEN
+        ALTER TABLE project_member
+            ADD CONSTRAINT fk_project_member_role
+            FOREIGN KEY (role) REFERENCES role (role_id) ON DELETE RESTRICT;
+    END IF;
+END
+$$;
+
+-- Policy change notification for the in-memory role policy store
+-- (goharbor/harbor#24029). Every core replica reloads its policy when this
+-- fires, and compares policy_version on a timer in case a NOTIFY is missed.
+-- The trigger sends NOTIFY inside the writing transaction, so a rollback sends
+-- nothing; the payload is only the new version and the writing replica.
+CREATE TABLE IF NOT EXISTS policy_version (
+  only_row    boolean   PRIMARY KEY DEFAULT TRUE,
+  version     bigint    NOT NULL DEFAULT 1,
+  update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT policy_version_single_row CHECK (only_row)
+);
+INSERT INTO policy_version (only_row) VALUES (TRUE) ON CONFLICT DO NOTHING;
+
+CREATE OR REPLACE FUNCTION harbor_policy_bump() RETURNS void AS $$
+DECLARE
+  v bigint;
+BEGIN
+  UPDATE policy_version
+     SET version = version + 1, update_time = CURRENT_TIMESTAMP
+   WHERE only_row
+  RETURNING version INTO v;
+
+  PERFORM pg_notify(
+    'harbor_policy',
+    v::text || ':' || coalesce(current_setting('harbor.origin', TRUE), '?'));
+END;
+$$ LANGUAGE plpgsql;
+
+-- Robots write to the same tables, so only rows linked to a project role
+-- bump the version; otherwise creating a robot would reload every replica.
+-- An UPDATE also checks the old rows: moving a grant away from a project role
+-- removes it from the policy.
+CREATE OR REPLACE FUNCTION harbor_role_permission_notify() RETURNS trigger AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM changed WHERE role_type = 'project-role') THEN
+    PERFORM harbor_policy_bump();
+  ELSIF TG_OP = 'UPDATE' THEN
+    -- a separate statement: "previous" exists only in the UPDATE trigger
+    IF EXISTS (SELECT 1 FROM previous WHERE role_type = 'project-role') THEN
+      PERFORM harbor_policy_bump();
+    END IF;
+  END IF;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION harbor_permission_policy_notify() RETURNS trigger AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+      FROM role_permission rp
+      JOIN changed c ON c.id = rp.permission_policy_id
+     WHERE rp.role_type = 'project-role'
+  ) THEN
+    PERFORM harbor_policy_bump();
+  END IF;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Statement-level triggers with transition tables, one per event. They are
+-- created only when missing: this file runs on every core start, and
+-- DROP/CREATE TRIGGER would take an exclusive lock on both tables each time.
+DO $$
+DECLARE
+  t record;
+BEGIN
+  FOR t IN SELECT * FROM (VALUES
+      ('role_permission',   'role_permission_notify_ins',   'INSERT', 'NEW', 'harbor_role_permission_notify'),
+      ('role_permission',   'role_permission_notify_upd',   'UPDATE', 'OLD TABLE AS previous NEW', 'harbor_role_permission_notify'),
+      ('role_permission',   'role_permission_notify_del',   'DELETE', 'OLD', 'harbor_role_permission_notify'),
+      ('permission_policy', 'permission_policy_notify_ins', 'INSERT', 'NEW', 'harbor_permission_policy_notify'),
+      ('permission_policy', 'permission_policy_notify_upd', 'UPDATE', 'NEW', 'harbor_permission_policy_notify'),
+      ('permission_policy', 'permission_policy_notify_del', 'DELETE', 'OLD', 'harbor_permission_policy_notify')
+    ) AS v(tbl, name, event, transition, fn)
+  LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_trigger
+       WHERE tgrelid = to_regclass(t.tbl) AND tgname = t.name
+    ) THEN
+      EXECUTE format(
+        'CREATE TRIGGER %I AFTER %s ON %I REFERENCING %s TABLE AS changed FOR EACH STATEMENT EXECUTE FUNCTION %I()',
+        t.name, t.event, t.tbl, t.transition, t.fn);
+    END IF;
+  END LOOP;
+END
+$$;

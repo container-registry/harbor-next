@@ -23,20 +23,27 @@ import (
 
 	"github.com/goharbor/harbor/src/common/rbac"
 	"github.com/goharbor/harbor/src/controller/member"
+	roleCtl "github.com/goharbor/harbor/src/controller/role"
 	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/errors"
 	memberModels "github.com/goharbor/harbor/src/pkg/member/models"
+	"github.com/goharbor/harbor/src/pkg/permission/policy"
+	"github.com/goharbor/harbor/src/pkg/permission/types"
 	"github.com/goharbor/harbor/src/server/v2.0/models"
 	operation "github.com/goharbor/harbor/src/server/v2.0/restapi/operations/member"
 )
 
 type memberAPI struct {
 	BaseAPI
-	ctl member.Controller
+	ctl     member.Controller
+	roleCtl roleCtl.Controller
 }
 
 func newMemberAPI() *memberAPI {
-	return &memberAPI{ctl: member.NewController()}
+	return &memberAPI{
+		ctl:     member.NewController(),
+		roleCtl: roleCtl.Ctl,
+	}
 }
 
 func (m *memberAPI) CreateProjectMember(ctx context.Context, params operation.CreateProjectMemberParams) middleware.Responder {
@@ -45,7 +52,10 @@ func (m *memberAPI) CreateProjectMember(ctx context.Context, params operation.Cr
 		return m.SendError(ctx, err)
 	}
 	if params.ProjectMember == nil {
-		return m.SendError(ctx, errors.BadRequestError(nil).WithMessage("the project member should provide"))
+		return m.SendError(ctx, errors.BadRequestError(nil).WithMessage("the project member should be provided"))
+	}
+	if err := m.checkNoEscalation(ctx, projectNameOrID, params.ProjectMember.RoleID); err != nil {
+		return m.SendError(ctx, err)
 	}
 	req, err := toMemberReq(params.ProjectMember)
 	if err != nil {
@@ -94,7 +104,7 @@ func (m *memberAPI) GetProjectMember(ctx context.Context, params operation.GetPr
 	}
 
 	if params.Mid == 0 {
-		return m.SendError(ctx, errors.BadRequestError(nil).WithMessage("the member id cannot be empty!"))
+		return m.SendError(ctx, errors.BadRequestError(nil).WithMessage("Member ID cannot be empty"))
 	}
 
 	member, err := m.ctl.Get(ctx, projectNameOrID, int(params.Mid))
@@ -164,10 +174,51 @@ func (m *memberAPI) UpdateProjectMember(ctx context.Context, params operation.Up
 	if params.Mid == 0 {
 		return m.SendError(ctx, errors.BadRequestError(nil).WithMessage("member id cannot be empty"))
 	}
+	if err := m.checkNoEscalation(ctx, projectNameOrID, params.Role.RoleID); err != nil {
+		return m.SendError(ctx, err)
+	}
 
 	err := m.ctl.UpdateRole(ctx, projectNameOrID, int(params.Mid), int(params.Role.RoleID))
 	if err != nil {
 		return m.SendError(ctx, err)
 	}
 	return operation.NewUpdateProjectMemberOK()
+}
+
+// checkNoEscalation rejects role assignments where the target role has permissions the caller lacks.
+func (m *memberAPI) checkNoEscalation(ctx context.Context, projectNameOrID any, roleID int64) error {
+	// Built-in roles stay grantable by anyone who may write members, project
+	// admin included: provisioning robots depend on it (#1137 and its revert
+	// #1227). The guard applies to custom roles, whose permission sets are
+	// arbitrary.
+	if policy.IsBuiltinRole(roleID) {
+		return nil
+	}
+	r, err := m.roleCtl.Get(ctx, roleID, &roleCtl.Option{WithPermission: true})
+	if err != nil {
+		return err
+	}
+	var accesses []*types.Policy
+	for _, perm := range r.Permissions {
+		accesses = append(accesses, perm.Access...)
+	}
+	for _, acc := range accesses {
+		// Deny entries restrict access rather than grant it, so the caller need
+		// not hold them; requiring them would wrongly block assigning a role that
+		// merely denies something. (Custom roles cannot carry deny today —
+		// validate() rejects any effect but "" / allow — this guards built-ins and
+		// any future deny support.)
+		if acc.Effect == types.EffectDeny {
+			continue
+		}
+		has, err := m.HasProjectPermission(ctx, projectNameOrID, acc.Action, acc.Resource)
+		if err != nil {
+			return err
+		}
+		if !has {
+			return errors.ForbiddenError(nil).WithMessagef(
+				"escalation not allowed: you lack %s:%s", acc.Resource, acc.Action)
+		}
+	}
+	return nil
 }
