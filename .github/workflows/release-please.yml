@@ -242,38 +242,18 @@ jobs:
           ref: ${{ github.ref_name }}
           persist-credentials: false
 
+      - name: Setup Node
+        if: ${{ steps.release.outputs['deploy/chart--release_created'] == 'true' }}
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
       - name: Drop the fulfilled release-as
-        # create-maintenance-branch pins the line's first chart version with
-        # a one-shot release-as. Once that version is tagged it has to go, or
-        # validate-release-ref fails every later run on this branch.
         if: ${{ steps.release.outputs['deploy/chart--release_created'] == 'true' }}
         env:
           CHART_VERSION: ${{ steps.release.outputs['deploy/chart--version'] }}
-        run: |
-          release_as=$(jq -r '.packages["deploy/chart"]["release-as"] // empty' release-please-config-chart.json)
-          if [ "${release_as}" != "${CHART_VERSION}" ]; then
-            exit 0
-          fi
-
-          askpass="${RUNNER_TEMP}/git-askpass"
-          cat > "${askpass}" <<'EOF'
-          #!/usr/bin/env bash
-          case "$1" in
-            *Username*) printf '%s\n' 'x-access-token' ;;
-            *Password*) printf '%s\n' "${GH_TOKEN}" ;;
-            *) exit 1 ;;
-          esac
-          EOF
-          chmod 700 "${askpass}"
-          export GIT_ASKPASS="${askpass}" GIT_TERMINAL_PROMPT=0
-
-          jq 'del(.packages["deploy/chart"]["release-as"])' release-please-config-chart.json > "${RUNNER_TEMP}/chart-config.json"
-          mv "${RUNNER_TEMP}/chart-config.json" release-please-config-chart.json
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add release-please-config-chart.json
-          git commit -s -m "ci: Drop the fulfilled chart release-as ${CHART_VERSION}"
-          git push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"
+        run: node .github/scripts/chart-release-line.mjs drop-release-as
 
   create-maintenance-branch:
     name: Create Maintenance Branch
@@ -302,70 +282,14 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Configure ephemeral Git authentication
-        run: |
-          askpass="${RUNNER_TEMP}/git-askpass"
-          cat > "${askpass}" <<'EOF'
-          #!/usr/bin/env bash
-          case "$1" in
-            *Username*) printf '%s\n' 'x-access-token' ;;
-            *Password*) printf '%s\n' "${GH_TOKEN}" ;;
-            *) exit 1 ;;
-          esac
-          EOF
-          chmod 700 "${askpass}"
-          echo "GIT_ASKPASS=${askpass}" >> "${GITHUB_ENV}"
-          echo "GIT_TERMINAL_PROMPT=0" >> "${GITHUB_ENV}"
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+          package-manager-cache: false
 
       - name: Create branch for patch releases
-        run: |
-          branch="release-${MAJOR}.${MINOR}"
-          if git ls-remote --exit-code --heads origin "${branch}" >/dev/null 2>&1; then
-            # A rerun after a failed dispatch lands here, so dispatch again;
-            # an extra release-please run on the branch is harmless.
-            echo "${branch} already exists"
-            gh workflow run release-please.yml --repo "${GITHUB_REPOSITORY}" --ref "${branch}"
-            exit 0
-          fi
-
-          git fetch --depth=1 origin "refs/tags/${TAG_NAME}:refs/tags/${TAG_NAME}"
-          sha=$(git rev-list -n 1 "${TAG_NAME}")
-          git switch --detach "${sha}"
-
-          printf '%s\n' "${VERSION}" > VERSION
-
-          # The branch owns the chart line for this app minor. The app
-          # release commit (${sha}) already stamped appVersion into
-          # Chart.yaml, so it opens the first chart release PR. Its version
-          # is the next chart minor, or the version set in Chart.yaml on main
-          # when that is higher (how a chart major is requested).
-          # last-release-sha is the newest chart tag or app minor release
-          # behind it, not its parent: chart changes merged on main since the
-          # previous line was cut ship in this release and belong in its notes.
-          latest_chart=$(git tag --list 'chart-v[0-9]*' --sort=-v:refname | head -n 1)
-          latest_chart="${latest_chart#chart-v}"
-          IFS=. read -r chart_major chart_minor _ <<< "${latest_chart:-0.0.0}"
-          chart_version="${chart_major}.$((chart_minor + 1)).0"
-          requested=$(sed -n 's/^version: *//p' deploy/chart/Chart.yaml | tr -d '"')
-          chart_version=$(printf '%s\n%s\n' "${chart_version}" "${requested}" | sort -V | tail -n 1)
-
-          anchor=$(git describe --tags --abbrev=0 --match 'chart-v*' --match 'v*.*.0' "${sha}^" 2>/dev/null || true)
-          jq --arg sha "$(git rev-parse "${anchor:-${sha}^}^{commit}")" --arg version "${chart_version}" \
-            '. + {"last-release-sha": $sha} | .packages["deploy/chart"]["release-as"] = $version' \
-            release-please-config-chart.json > "${RUNNER_TEMP}/chart-config.json"
-          mv "${RUNNER_TEMP}/chart-config.json" release-please-config-chart.json
-          if [ -n "${latest_chart}" ]; then
-            jq --arg version "${latest_chart}" '.["deploy/chart"] = $version' \
-              .release-please-manifest-chart.json > "${RUNNER_TEMP}/chart-manifest.json"
-            mv "${RUNNER_TEMP}/chart-manifest.json" .release-please-manifest-chart.json
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add VERSION release-please-config-chart.json .release-please-manifest-chart.json
-          git commit -s -m "chore: Initialize ${branch} version and chart ${chart_version} release line"
-          git push origin "HEAD:refs/heads/${branch}"
-          gh workflow run release-please.yml --repo "${GITHUB_REPOSITORY}" --ref "${branch}"
+        run: node .github/scripts/chart-release-line.mjs seed
 
   publish-images:
     name: Publish Release Images

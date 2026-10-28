@@ -9,7 +9,7 @@ tasks:
       - sh: test -n "${GH_TOKEN:-}"
         msg: "GH_TOKEN is required"
     cmds:
-      - .github/scripts/update-release-notes.sh
+      - node .github/scripts/update-release-notes.mjs
 
   previous-stable-tag:
     desc: "Print the greatest stable release tag below PREDECESSOR_FOR (empty when there is none)"
@@ -191,4 +191,4 @@ tasks:
       - sh: test -n "${GH_TOKEN:-}"
         msg: "GH_TOKEN is required"
     cmds:
-      - RELEASE_NOTES_DRY_RUN=true RELEASE_NOTES_OUTPUT="${RELEASE_NOTES_OUTPUT:-release-notes-${TAG_NAME}.md}" .github/scripts/update-release-notes.sh
+      - RELEASE_NOTES_DRY_RUN=true RELEASE_NOTES_OUTPUT="${RELEASE_NOTES_OUTPUT:-release-notes-${TAG_NAME}.md}" node .github/scripts/update-release-notes.mjs
