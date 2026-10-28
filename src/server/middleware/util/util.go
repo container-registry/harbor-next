@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/goharbor/harbor/src/common/api"
@@ -30,6 +31,12 @@ import (
 	"github.com/goharbor/harbor/src/pkg/accessory/model"
 	"github.com/goharbor/harbor/src/pkg/distribution"
 )
+
+// legacySignerPullEnv turns the content-trust signer-pull exemption off. Default (unset/empty)
+// is enabled, so that a cosign or notation client can still pull the unsigned manifest it is
+// about to sign. A malformed value fails closed. Set through the compose variable of the same
+// name, or the equivalent chart value.
+const legacySignerPullEnv = "CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED"
 
 // ParseProjectName parse project name from v2 and v2.0 API URL path
 func ParseProjectName(r *http.Request) string {
@@ -90,17 +97,23 @@ func SkipPolicyChecking(r *http.Request, projectID, artID int64) (bool, error) {
 	return false, nil
 }
 
-// LegacySignerPullEnabled reports whether the operator has opted in to the legacy,
-// User-Agent-based signer-pull exemption for the content-trust policy. It is off by default.
+// LegacySignerPullEnabled reports whether the legacy, User-Agent-based signer-pull exemption
+// for the content-trust policy is in effect. It is on by default.
 //
 // The exemption exists so a signing client (cosign/notation) can pull an as-yet unsigned
 // subject manifest in order to create its first signature under an enabled content-trust
-// policy. Its only signal is the client-supplied User-Agent, which is spoofable (CWE-807);
-// it is therefore honoured only when an operator explicitly sets
-// CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED=true, and never for the vulnerability-prevention
-// policy.
+// policy, which is how those clients have always worked; enforcing the policy on that pull
+// breaks signing on upgrade. Its only signal is the client-supplied User-Agent, which is
+// spoofable (CWE-807), so an operator who would rather no push-capable principal could read
+// unsigned manifests sets legacySignerPullEnv to false. A malformed value fails closed. The
+// exemption never applies to the vulnerability-prevention policy.
 func LegacySignerPullEnabled() bool {
-	return os.Getenv("CONTENT_TRUST_LEGACY_SIGNER_PULL_ENABLED") == "true"
+	value := strings.TrimSpace(os.Getenv(legacySignerPullEnv))
+	if value == "" {
+		return true
+	}
+	enabled, err := strconv.ParseBool(value)
+	return err == nil && enabled
 }
 
 // LegacySignerBootstrapPull reports whether the request looks like a push-capable signing

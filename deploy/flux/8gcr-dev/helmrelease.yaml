@@ -22,8 +22,6 @@ spec:
     logLevel: info
     image:
       pullPolicy: Always
-    imagePullSecrets:
-      - name: harbor-system-pull
     # Admin password provisioned by secrets.sops.yaml in this bundle.
     existingSecretAdminPassword: harbor-admin
     existingSecretAdminPasswordKey: HARBOR_ADMIN_PASSWORD
