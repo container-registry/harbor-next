@@ -17,8 +17,6 @@ A single environment doesn't justify a Kustomize base/overlay split yet; when a 
 | `helmrelease.yaml` | Renders the chart with the 8gcr environment values; references the secrets below; provisions a CloudNativePG `Cluster` via the chart's `extraManifests` escape hatch. |
 | `image-tracking.yaml` | Flux image-reflector resources (`ImageRepository` + `ImagePolicy`) that resolve the digest behind each `8gcr/harbor-*:latest` tag in-cluster. No git write-back. |
 | `rollout-sync.yaml` | CronJob (+ ServiceAccount/RBAC) that copies each reflected digest into the workload's pod-template annotation, rolling the pods when a `latest` digest moves. Registry to cluster directly — no fluxcdbot commits, no bundle republish per image update. |
-| `pull-secret-flux-system.sops.yaml` | SOPS-encrypted `Secret` for `flux-system/harbor-system-pull`. No longer referenced: the Flux sources pull keylessly. Kept only until the keyless sources are verified on the cluster, then removed. |
-| `pull-secret-8gcr-dev-main.sops.yaml` | SOPS-encrypted `Secret` for `8gcr-dev-main/harbor-system-pull`, used by the Harbor component pods (`helmrelease.yaml` `imagePullSecrets`). The chart source pulls keylessly. |
 | `secrets.sops.yaml` | SOPS-encrypted `Secret` resources for the admin password, the Harbor↔Postgres password, and the CNPG bootstrap credentials. It does not contain registry pull credentials. Decrypted on the cluster by Flux using the existing `flux-system/sops-age` key. |
 | `kustomization.yaml` | Plain Kustomize index, lets the Flux Kustomization controller reconcile this directory. |
 | `bootstrap.yaml` | One-time `kubectl apply` target that creates the `OCIRepository` + `Kustomization` `harbor-8gcr-dev` in `flux-system` to fetch and apply this bundle as ServiceAccount `flux-system/flux-oci-hz-cr-int`. Required only the first time per cluster. |
@@ -47,7 +45,7 @@ Flux sources pull keylessly with Flux 2.10 object identity: source-controller an
 | `flux-system/OCIRepository/harbor-8gcr-dev` (`ops/hz-hopper/8gcr-rolling`), the `ImageRepository` objects (`8gcr/harbor-*`) | `flux-system/flux-oci-hz-cr-int` (owned by the cluster's core repo) | `sub == system:serviceaccount:flux-system:flux-oci-hz-cr-int`, pull on `ops`, `8gcr` |
 | `8gcr-dev-main/OCIRepository/harbor-chart` | `8gcr-dev-main/flux-oci` (`ocirepository.yaml`) | `kubernetes.io.namespace == 8gcr-dev-main`, pull on `8gcr` |
 
-The SOPS-managed `8gcr-dev-main/harbor-system-pull` Secret still backs the Harbor component image pulls (`helmrelease.yaml`) until those move to the kubelet credential provider.
+Harbor component pods have no `imagePullSecrets`: the cluster's kubelet credential provider pulls `8gcr/*` images with the pod's ServiceAccount token, which 8gears maps by `kubernetes.io.namespace == 8gcr-dev-main` to the same robot as the chart source.
 
 ## One-time bootstrap
 
@@ -84,7 +82,7 @@ Everything else this bundle needs is satisfied by hz-hopper's standing infrastru
 |---|---|
 | FluxCD v2 (`source-controller`, `kustomize-controller`, `helm-controller`, `image-reflector-controller`) | Pre-installed on hz-hopper. image-reflector is required for mutable `latest` digest tracking; image-automation-controller is NOT used (no git write-back). |
 | `flux-system/flux-oci-hz-cr-int` | ServiceAccount with the `credential.auth.fluxcd.io/*` annotations and a FluxInstance with `spec.cluster.objectIdentityRBAC` (flux-operator >= 0.62.0, Flux 2.10); pulls `ops/hz-hopper/8gcr-rolling` and scans `8gcr/harbor-*`. |
-| `8gcr-dev-main/harbor-system-pull` | SOPS-managed dockerconfigjson for the Harbor component image pulls. |
+| Kubelet credential provider | Node config matching `8gears.container-registry.com` with ServiceAccount token audience `container-registry.com`; serves the Harbor component image pulls. |
 | SOPS decryption key | `Secret/sops-age` in `flux-system` (already present; same key used by other Flux Kustomizations). Public key: `age18jfefmcak9zk6jrh7j59ap0rg3zxg577suvmlyrgm3sn0l28zq4slcu94r`. |
 | CloudNativePG operator | Pre-installed in `cnpg-system`. The chart's `extraManifests` renders a `Cluster.postgresql.cnpg.io/v1`; CNPG reconciles it into a Postgres pod + `harbor-db-rw` Service that the chart's `database.host` value points at. |
 | Cert-manager + `letsencrypt-prod` ClusterIssuer | Pre-installed; HelmRelease ingress is annotated to use it. |
