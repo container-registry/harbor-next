@@ -1,5 +1,5 @@
 # container-registry/harbor-next: Go services (core, jobservice, registryctl, exporter, db migrator) and the Angular portal.
-FROM oven/bun:1.4.0 AS bun
+FROM oven/bun:1.4.3 AS bun
 # dockerfile/portal.dockerfile builds the portal with Alpine's Node 22, not NODE_VERSION from versions.env.
 FROM node:26.13.0-bookworm AS node
 
