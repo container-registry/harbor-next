@@ -89,7 +89,7 @@ func (n *webhookAPI) requireExecutionInPolicy(ctx context.Context, execID, polic
 		return err
 	}
 
-	if exec.VendorID == policyID && (exec.VendorType == job.WebhookJobVendorType || exec.VendorType == job.SlackJobVendorType) {
+	if exec.VendorID == policyID && (exec.VendorType == job.WebhookJobVendorType || exec.VendorType == job.SlackJobVendorType || exec.VendorType == job.AMQPJobVendorType) {
 		return nil
 	}
 
@@ -419,7 +419,11 @@ func (n *webhookAPI) validateTargets(ctx context.Context, policy *policy_model.P
 	defer cancel()
 	validatedHosts := map[string]struct{}{}
 	for i, target := range policy.Targets {
-		url, err := utils.ParseEndpoint(target.Address)
+		var allowedSchemes []string
+		if target.Type == "amqp" {
+			allowedSchemes = []string{"amqp", "amqps"}
+		}
+		url, err := utils.ParseEndpoint(target.Address, allowedSchemes...)
 		if err != nil {
 			return false, errors.New(err).WithCode(errors.BadRequestCode)
 		}
