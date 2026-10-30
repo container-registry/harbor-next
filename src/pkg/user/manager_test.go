@@ -130,6 +130,15 @@ func (m *mgrTestSuite) TestOnboard() {
 	}
 }
 
+func (m *mgrTestSuite) TestMatchLocalPasswordExternalUser() {
+	external := &models.User{UserID: 7, Username: "sso-user"}
+	m.dao.On("List", mock.Anything, mock.Anything).Return([]*models.User{external}, nil)
+
+	u, err := m.mgr.MatchLocalPassword(context.Background(), "sso-user", "cli-secret")
+	m.Nil(err)
+	m.Nil(u)
+}
+
 func TestManager(t *testing.T) {
 	suite.Run(t, &mgrTestSuite{})
 }
