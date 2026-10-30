@@ -94,8 +94,9 @@ func TestParseRepository(t *testing.T) {
 // OIDC, LDAP and UAA users have no local password, so their version is
 // empty; 2.15.3 hashed with a nil function here and panicked (harbor-next#571).
 func TestEncryptEmptyVersionUsesStrongScheme(t *testing.T) {
+	// PBKDF2-HMAC-SHA256, 600000 iterations, empty salt, computed outside Go.
 	got := Encrypt("cli-secret", "", "")
-	if want := Encrypt("cli-secret", "", PBKDF2SHA256); got != want {
+	if want := "522eeccd464573339b3bad9e67492a5f"; got != want {
 		t.Errorf("expected: %v, got: %v", want, got)
 	}
 }
