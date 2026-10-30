@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -45,11 +46,31 @@ var configManager *cfgPkg.CfgManager
 var testCtx context.Context
 
 func TestMain(m *testing.M) {
+	os.Exit(runTests(m))
+}
+
+func runTests(m *testing.M) int {
+	keyDir, err := os.MkdirTemp("", "cfg-db-test")
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(keyDir)
+	keyPath := filepath.Join(keyDir, "key")
+	if _, err := test.GenerateKey(keyPath); err != nil {
+		panic(err)
+	}
+	// Saving password items fails without a readable key.
+	if err := os.Setenv("KEY_PATH", keyPath); err != nil {
+		panic(err)
+	}
+
 	configManager = NewDBCfgManager()
 	test.InitDatabaseFromEnv()
 	testCtx = orm.Context()
-	configManager.UpdateConfig(testCtx, TestDBConfig)
-	os.Exit(m.Run())
+	if err := configManager.UpdateConfig(testCtx, TestDBConfig); err != nil {
+		panic(err)
+	}
+	return m.Run()
 }
 
 func TestLoadFromDatabase(t *testing.T) {
