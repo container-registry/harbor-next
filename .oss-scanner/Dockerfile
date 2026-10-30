@@ -10,12 +10,12 @@ COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -sf /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
-# PostgreSQL 16 matches POSTGRES_VERSION in versions.env; Redis stands in for Valkey. Several tests hardcode
+# PostgreSQL 18 matches POSTGRES_VERSION in versions.env; Redis stands in for Valkey. Several tests hardcode
 # redis://localhost:6379. Chromium runs the karma portal tests.
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git make gcc libc6-dev \
       postgresql-common redis-server chromium \
     && /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y \
-    && apt-get install -y --no-install-recommends postgresql-16 \
+    && apt-get install -y --no-install-recommends postgresql-18 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN archive="task_linux_$(dpkg --print-architecture).tar.gz" \
@@ -25,12 +25,12 @@ RUN archive="task_linux_$(dpkg --print-architecture).tar.gz" \
     && tar -xzf "/tmp/${archive}" -C /usr/local/bin task \
     && rm -f "/tmp/${archive}" /tmp/task_checksums.txt
 
-RUN pg_ctlcluster 16 main start \
+RUN pg_ctlcluster 18 main start \
     && su postgres -c "psql -c \"ALTER USER postgres PASSWORD 'root123'\"" \
     && su postgres -c "createdb registry" \
-    && pg_ctlcluster 16 main stop
+    && pg_ctlcluster 18 main stop
 RUN printf '%s\n' '#!/bin/sh' 'set -e' \
-      'pg_ctlcluster 16 main status >/dev/null 2>&1 || pg_ctlcluster 16 main start' \
+      'pg_ctlcluster 18 main status >/dev/null 2>&1 || pg_ctlcluster 18 main start' \
       'redis-cli ping >/dev/null 2>&1 || redis-server --daemonize yes --port 6379 --save "" --appendonly no' \
       'timeout 60 sh -c "until pg_isready -h localhost -q; do sleep 0.5; done"' \
       'timeout 30 sh -c "until redis-cli ping >/dev/null 2>&1; do sleep 0.5; done"' \
