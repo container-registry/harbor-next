@@ -22,6 +22,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/config/metadata"
 	"github.com/goharbor/harbor/src/lib/config/models"
 	"github.com/goharbor/harbor/src/lib/encrypt"
+	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/orm"
 	"github.com/goharbor/harbor/src/lib/q"
@@ -78,11 +79,11 @@ func (d *Database) Save(ctx context.Context, cfgs map[string]any) error {
 			strValue := utils.GetStrValueOfAnyType(value)
 			entry := &models.ConfigEntry{Key: key, Value: strValue}
 			if _, ok := item.ItemType.(*metadata.PasswordType); ok {
-				if encryptPassword, err := encrypt.Instance().Encrypt(strValue); err == nil {
-					entry.Value = encryptPassword
-				} else {
-					log.Errorf("encrypt password failed, error: %v", err)
+				encryptPassword, err := encrypt.Instance().Encrypt(strValue)
+				if err != nil {
+					return errors.Wrapf(err, "failed to encrypt %s", key)
 				}
+				entry.Value = encryptPassword
 			}
 			configEntries = append(configEntries, *entry)
 		} else {
