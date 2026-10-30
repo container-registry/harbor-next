@@ -102,6 +102,8 @@ services:
       HARBOR_GIT_COMMIT: ${HARBOR_GIT_COMMIT:-unknown}
       # Token signing key
       TOKEN_PRIVATE_KEY_PATH: devenv/token_service_key.pem
+      # Encrypts password settings; without it OIDC onboarding fails
+      KEY_PATH: devenv/secret_key
       # JobService
       JOBSERVICE_URL: http://jobservice:8888
       CORE_SECRET: devenv-secret-do-not-use-in-production
@@ -150,6 +152,7 @@ services:
       REDIS_URL: redis://redis:6379
       # Core
       CORE_URL: http://core:8080
+      KEY_PATH: devenv/secret_key
       CORE_SECRET: devenv-secret-do-not-use-in-production
       JOBSERVICE_SECRET: devenv-secret-do-not-use-in-production
       # Registry
