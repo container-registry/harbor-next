@@ -15,6 +15,8 @@ import {
     DEFAULT_PAGE_SIZE,
     delUrlParam,
     durationStr,
+    equalEndpoint,
+    lowerEndpointHost,
     getHiddenArrayFromLocalStorage,
     getPageSizeFromLocalStorage,
     getQueryString,
@@ -168,5 +170,73 @@ describe('functions in utils.ts should work', () => {
             true,
             true,
         ]);
+    });
+
+    it('function equalEndpoint() should work', () => {
+        expect(equalEndpoint(null, null)).toBe(true);
+        expect(equalEndpoint('', '')).toBe(true);
+        expect(
+            equalEndpoint(
+                'http://example.com:8080/v2',
+                'http://example.com:8080/v2'
+            )
+        ).toBe(true);
+        expect(
+            equalEndpoint(
+                'http://EXAMPLE.COM:8080/v2',
+                'http://example.com:8080/v2'
+            )
+        ).toBe(true);
+        expect(
+            equalEndpoint(
+                'http://example.com:8080/V2',
+                'http://example.com:8080/v2'
+            )
+        ).toBe(false);
+        expect(equalEndpoint('https://core:8080', 'https://CORE:8080')).toBe(
+            true
+        );
+        expect(equalEndpoint('http://example.com', 'https://example.com')).toBe(
+            false
+        );
+        expect(
+            equalEndpoint('http://example.com:8080', 'http://example.com:8081')
+        ).toBe(false);
+        expect(
+            equalEndpoint('http://example.com/foo', 'http://example.com/bar')
+        ).toBe(false);
+        expect(equalEndpoint('invalid-url-1', 'http://example.com')).toBe(
+            false
+        );
+        expect(equalEndpoint('http://example.com', null)).toBe(false);
+        expect(equalEndpoint('example.com', 'EXAMPLE.COM')).toBe(true);
+        expect(
+            equalEndpoint(
+                'http://example.com/prefix\\scanner',
+                'http://example.com/prefix/scanner'
+            )
+        ).toBe(false);
+        expect(
+            equalEndpoint(
+                'http://example.com/a?X=1',
+                'http://example.com/a?x=1'
+            )
+        ).toBe(false);
+    });
+
+    it('function lowerEndpointHost() should only lowercase the host', () => {
+        expect(lowerEndpointHost('')).toBe('');
+        expect(lowerEndpointHost('HTTP://EXAMPLE.COM:8080/Path')).toBe(
+            'http://example.com:8080/Path'
+        );
+        expect(lowerEndpointHost('Scanner.Example/V1')).toBe(
+            'scanner.example/V1'
+        );
+        expect(lowerEndpointHost('http://User@HOST/a\\B')).toBe(
+            'http://User@host/a\\B'
+        );
+        expect(lowerEndpointHost('http://[FE80::1%En0]:8080/X')).toBe(
+            'http://[fe80::1%En0]:8080/X'
+        );
     });
 });
