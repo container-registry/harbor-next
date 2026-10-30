@@ -67,6 +67,7 @@ devenv/
 ├── air.registryctl.toml       # Air hot-reload config for RegistryCtl
 ├── registry.passwd            # Registry HTTP basic auth credentials
 ├── token_service_key.pem      # Generated RSA key for token signing
+├── secret_key                 # Generated key core encrypts secrets with
 └── README.md                  # This file
 
 config/                        # Canonical service configs (shared by dev + compose)
