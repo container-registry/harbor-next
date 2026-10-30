@@ -7,6 +7,7 @@ vars:
   COMPOSE_LOCAL_FILE: deploy/compose/docker-compose.yaml
   COMPOSE_LOCAL_ENV: deploy/compose/example/local/.env.example
   TOKEN_KEY_FILE: devenv/token_service_key.pem
+  SECRET_KEY_FILE: devenv/secret_key
   TOKEN_KEY_FILE_LOCAL: deploy/compose/config/token_service_key.pem
 
   # Database (only vars used in task commands)
@@ -144,6 +145,16 @@ tasks:
       - chmod 644 {{.TOKEN_KEY_FILE}}
       - echo "Generated {{.TOKEN_KEY_FILE}}"
 
+  # Core encrypts password settings with this key, so it goes with the database volume.
+  gen:secret-key:
+    desc: Generate the 16-byte key core uses to encrypt secrets (skipped if exists)
+    status: ['test "$(wc -c < {{.SECRET_KEY_FILE}})" -eq 16']
+    cmds:
+      - openssl rand -base64 32 | tr -dc 'A-Za-z0-9' | head -c 16 > {{.SECRET_KEY_FILE}}.tmp
+      - test "$(wc -c < {{.SECRET_KEY_FILE}}.tmp)" -eq 16
+      - chmod 644 {{.SECRET_KEY_FILE}}.tmp
+      - mv {{.SECRET_KEY_FILE}}.tmp {{.SECRET_KEY_FILE}}
+
   # ---------------------------------------------------------------------------
   # Info
   # ---------------------------------------------------------------------------
@@ -189,7 +200,7 @@ tasks:
 
   up:
     desc: "Start backend containers and native Portal with hot reload (SKIP_TRIVY=true to exclude Trivy)"
-    deps: [require-docker, require-ports, gen:private-key]
+    deps: [require-docker, require-ports, gen:private-key, gen:secret-key]
     vars:
       TRIVY_PROFILE: '{{if ne .SKIP_TRIVY "true"}}--profile trivy{{end}}'
     cmds:
@@ -267,14 +278,16 @@ tasks:
 
   infra:remove:
     desc: Stop all containers and delete all named volumes
-    cmd: '{{.COMPOSE_CMD}} {{.ALL_PROFILES}} down -v'
+    cmds:
+      - '{{.COMPOSE_CMD}} {{.ALL_PROFILES}} down -v'
+      - rm -f {{.SECRET_KEY_FILE}}
 
   # ---------------------------------------------------------------------------
   # Backend Services (Containerized)
   # ---------------------------------------------------------------------------
   backend:up:
     desc: Build and start Core, JobService, RegistryCtl with hot reload
-    deps: [require-docker, require-ports, gen:private-key]
+    deps: [require-docker, require-ports, gen:private-key, gen:secret-key]
     cmds:
       - task: :build:gen-apis
       - '{{.COMPOSE_CMD}} --profile core --profile jobservice --profile registryctl up -d --build'
@@ -451,6 +464,7 @@ tasks:
       - rm -rf src/portal/node_modules
       - rm -f build-errors.log
       - rm -f {{.TOKEN_KEY_FILE}}
+      - rm -f {{.SECRET_KEY_FILE}}
       - rm -f {{.TOKEN_KEY_FILE_LOCAL}}
       - rmdir $(dirname {{.TOKEN_KEY_FILE_LOCAL}}) 2>/dev/null || true
 
