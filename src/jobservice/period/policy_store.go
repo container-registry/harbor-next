@@ -49,7 +49,7 @@ func (p *Policy) DeSerialize(rawJSON []byte) error {
 	return json.Unmarshal(rawJSON, p)
 }
 
-// Validate the policy
+// Validate the policy structure and cron syntax; it accepts unreachable cron specs so stored legacy policies stay discoverable.
 func (p *Policy) Validate() error {
 	if utils.IsEmptyStr(p.ID) {
 		return errors.New("missing ID in the periodic job policy object")
@@ -67,6 +67,23 @@ func (p *Policy) Validate() error {
 
 	if _, err := comUtils.CronParser().Parse(p.CronSpec); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+// ValidateForRegistration validates a new policy and rejects cron specs that can never fire.
+func (p *Policy) ValidateForRegistration() error {
+	if err := p.Validate(); err != nil {
+		return err
+	}
+
+	sched, err := comUtils.CronParser().Parse(p.CronSpec)
+	if err != nil {
+		return err
+	}
+	if !comUtils.IsCronReachable(sched) {
+		return fmt.Errorf("cron expression %q can never fire: no matching date exists", p.CronSpec)
 	}
 
 	return nil

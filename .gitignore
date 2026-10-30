@@ -62,8 +62,10 @@ tests/e2e_setup/robotvars.py
 .task/
 deploy/chart/charts/
 devenv/token_service_key.pem
+devenv/secret_key
 devenv/ports.env
 deploy/compose/config/*.pem
+deploy/compose/config/secret_key
 deploy/compose/config/certs/
 .env
 .env.local
@@ -73,3 +75,4 @@ bin
 .mcp.json
 .claude
 src/portal/src/swagger.json
+.playwright-mcp

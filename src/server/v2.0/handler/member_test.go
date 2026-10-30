@@ -16,28 +16,339 @@ package handler
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/go-openapi/runtime"
 	"github.com/stretchr/testify/assert"
+	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/goharbor/harbor/src/common"
 	commonmodels "github.com/goharbor/harbor/src/common/models"
 	"github.com/goharbor/harbor/src/common/rbac"
+	rbacProject "github.com/goharbor/harbor/src/common/rbac/project"
 	"github.com/goharbor/harbor/src/common/security"
 	"github.com/goharbor/harbor/src/common/security/local"
 	robotsec "github.com/goharbor/harbor/src/common/security/robot"
 	"github.com/goharbor/harbor/src/controller/member"
 	"github.com/goharbor/harbor/src/controller/project"
 	"github.com/goharbor/harbor/src/controller/robot"
-	liberrors "github.com/goharbor/harbor/src/lib/errors"
+	roleCtl "github.com/goharbor/harbor/src/controller/role"
+	"github.com/goharbor/harbor/src/lib/errors"
+	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/permission/types"
 	robotmodel "github.com/goharbor/harbor/src/pkg/robot/model"
 	"github.com/goharbor/harbor/src/server/v2.0/models"
+	memberop "github.com/goharbor/harbor/src/server/v2.0/restapi/operations/member"
 	operation "github.com/goharbor/harbor/src/server/v2.0/restapi/operations/member"
+	securityMock "github.com/goharbor/harbor/src/testing/common/security"
 	projecttesting "github.com/goharbor/harbor/src/testing/controller/project"
 	"github.com/goharbor/harbor/src/testing/mock"
 )
+
+// ---------------------------------------------------------------------------
+// Inline mock for roleCtl.Controller
+// Only Get needs real behaviour; the rest are no-ops for these tests.
+// ---------------------------------------------------------------------------
+
+type stubRoleCtl struct {
+	testifymock.Mock
+}
+
+func (s *stubRoleCtl) Get(ctx context.Context, id int64, option *roleCtl.Option) (*roleCtl.Role, error) {
+	args := s.Called(ctx, id, option)
+	r, _ := args.Get(0).(*roleCtl.Role)
+	return r, args.Error(1)
+}
+
+func (s *stubRoleCtl) Create(ctx context.Context, r *roleCtl.Role) (int64, error) { return 0, nil }
+func (s *stubRoleCtl) Delete(ctx context.Context, id int64, option ...*roleCtl.Option) error {
+	return nil
+}
+func (s *stubRoleCtl) Update(ctx context.Context, r *roleCtl.Role, option *roleCtl.Option) error {
+	return nil
+}
+func (s *stubRoleCtl) List(ctx context.Context, query *q.Query, option *roleCtl.Option) ([]*roleCtl.Role, error) {
+	return nil, nil
+}
+func (s *stubRoleCtl) Count(ctx context.Context, query *q.Query) (int64, error) { return 0, nil }
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const testProjectID int64 = 42
+
+// policyAccess builds a single-permission role for test fixtures.
+func policyAccess(resource rbac.Resource, action rbac.Action) []*types.Policy {
+	return []*types.Policy{{Resource: resource, Action: action}}
+}
+
+// projectResource returns the full RBAC resource string for a project subresource,
+// matching what HasProjectPermission builds internally.
+func projectResource(subresource rbac.Resource) rbac.Resource {
+	return rbacProject.NewNamespace(testProjectID).Resource(subresource)
+}
+
+// newCtxWithSecurity injects sc into a background context, mirroring what the
+// handler middleware does at request time.
+func newCtxWithSecurity(sc security.Context) context.Context {
+	return security.NewContext(context.Background(), sc)
+}
+
+// newAPI returns a memberAPI wired to the given role controller stub.
+func newAPI(rc *stubRoleCtl) *memberAPI {
+	return &memberAPI{roleCtl: rc}
+}
+
+// ---------------------------------------------------------------------------
+// Tests for checkNoEscalation
+// ---------------------------------------------------------------------------
+
+func TestCheckNoEscalation_RoleWithNoPermissions(t *testing.T) {
+	sc := &securityMock.Context{}
+	sc.On("IsSysAdmin").Return(false)
+	// Can() should never be called — role has zero permissions
+
+	rc := &stubRoleCtl{}
+	rc.On("Get", testifymock.Anything, int64(10), testifymock.Anything).
+		Return(&roleCtl.Role{}, nil)
+
+	err := newAPI(rc).checkNoEscalation(newCtxWithSecurity(sc), testProjectID, 10)
+	assert.NoError(t, err)
+	sc.AssertNotCalled(t, "Can")
+}
+
+func TestCheckNoEscalation_CallerHasAllPermissions(t *testing.T) {
+	sc := &securityMock.Context{}
+	sc.On("IsSysAdmin").Return(false)
+	// Caller holds repository:pull
+	sc.On("Can", testifymock.Anything,
+		rbac.ActionPull, projectResource(rbac.ResourceRepository)).
+		Return(true)
+
+	rc := &stubRoleCtl{}
+	rc.On("Get", testifymock.Anything, int64(20), testifymock.Anything).
+		Return(&roleCtl.Role{
+			Permissions: []*roleCtl.Permission{{
+				Access: policyAccess(rbac.ResourceRepository, rbac.ActionPull),
+			}},
+		}, nil)
+
+	err := newAPI(rc).checkNoEscalation(newCtxWithSecurity(sc), testProjectID, 20)
+	assert.NoError(t, err)
+}
+
+func TestCheckNoEscalation_CallerLacksPermission(t *testing.T) {
+	sc := &securityMock.Context{}
+	sc.On("IsSysAdmin").Return(false)
+	// Caller does NOT hold member:create
+	sc.On("Can", testifymock.Anything,
+		rbac.ActionCreate, projectResource(rbac.ResourceMember)).
+		Return(false)
+
+	rc := &stubRoleCtl{}
+	rc.On("Get", testifymock.Anything, int64(30), testifymock.Anything).
+		Return(&roleCtl.Role{
+			Permissions: []*roleCtl.Permission{{
+				Access: policyAccess(rbac.ResourceMember, rbac.ActionCreate),
+			}},
+		}, nil)
+
+	err := newAPI(rc).checkNoEscalation(newCtxWithSecurity(sc), testProjectID, 30)
+	assert.Error(t, err)
+	assert.Equal(t, errors.ForbiddenCode, errors.ErrCode(err), "expected ForbiddenError, got: %v", err)
+}
+
+// Built-in roles are grantable without holding their permissions (#1227).
+func TestCheckNoEscalation_BuiltinRoleExempt(t *testing.T) {
+	sc := &securityMock.Context{}
+	sc.On("IsSysAdmin").Return(false)
+	// Caller holds none of projectAdmin's permissions; built-in roles are
+	// still grantable (see #1227), so the role controller is never consulted.
+	sc.On("Can", testifymock.Anything, testifymock.Anything, testifymock.Anything).Return(false)
+
+	rc := &stubRoleCtl{}
+
+	err := newAPI(rc).checkNoEscalation(newCtxWithSecurity(sc), testProjectID, int64(common.RoleProjectAdmin))
+	assert.NoError(t, err, "built-in roles are exempt from the escalation guard")
+	rc.AssertNotCalled(t, "Get")
+}
+
+func TestCheckNoEscalation_FirstPermissionPassesSecondFails(t *testing.T) {
+	sc := &securityMock.Context{}
+	sc.On("IsSysAdmin").Return(false)
+	sc.On("Can", testifymock.Anything,
+		rbac.ActionPull, projectResource(rbac.ResourceRepository)).
+		Return(true)
+	sc.On("Can", testifymock.Anything,
+		rbac.ActionCreate, projectResource(rbac.ResourceMember)).
+		Return(false)
+
+	rc := &stubRoleCtl{}
+	rc.On("Get", testifymock.Anything, int64(40), testifymock.Anything).
+		Return(&roleCtl.Role{
+			Permissions: []*roleCtl.Permission{{
+				Access: []*types.Policy{
+					{Resource: rbac.ResourceRepository, Action: rbac.ActionPull},
+					{Resource: rbac.ResourceMember, Action: rbac.ActionCreate},
+				},
+			}},
+		}, nil)
+
+	err := newAPI(rc).checkNoEscalation(newCtxWithSecurity(sc), testProjectID, 40)
+	assert.Error(t, err)
+	assert.Equal(t, errors.ForbiddenCode, errors.ErrCode(err))
+}
+
+func TestCheckNoEscalation_RoleCtlGetError(t *testing.T) {
+	sc := &securityMock.Context{}
+	sc.On("IsSysAdmin").Return(false)
+
+	rc := &stubRoleCtl{}
+	rc.On("Get", testifymock.Anything, int64(50), testifymock.Anything).
+		Return(nil, fmt.Errorf("db error"))
+
+	err := newAPI(rc).checkNoEscalation(newCtxWithSecurity(sc), testProjectID, 50)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "db error")
+}
+
+func TestCheckNoEscalation_MultiplePermissionSetsAllowed(t *testing.T) {
+	sc := &securityMock.Context{}
+	sc.On("IsSysAdmin").Return(false)
+	sc.On("Can", testifymock.Anything,
+		rbac.ActionPull, projectResource(rbac.ResourceRepository)).Return(true)
+	sc.On("Can", testifymock.Anything,
+		rbac.ActionPush, projectResource(rbac.ResourceRepository)).Return(true)
+	sc.On("Can", testifymock.Anything,
+		rbac.ActionRead, projectResource(rbac.ResourceArtifact)).Return(true)
+
+	rc := &stubRoleCtl{}
+	rc.On("Get", testifymock.Anything, int64(60), testifymock.Anything).
+		Return(&roleCtl.Role{
+			Permissions: []*roleCtl.Permission{
+				{Access: policyAccess(rbac.ResourceRepository, rbac.ActionPull)},
+				{Access: policyAccess(rbac.ResourceRepository, rbac.ActionPush)},
+				{Access: policyAccess(rbac.ResourceArtifact, rbac.ActionRead)},
+			},
+		}, nil)
+
+	err := newAPI(rc).checkNoEscalation(newCtxWithSecurity(sc), testProjectID, 60)
+	assert.NoError(t, err)
+}
+
+func TestCheckNoEscalation_ProjectNameInsteadOfID(t *testing.T) {
+	// Passing a project name string follows a code path that looks up the project
+	// from DB (not available in unit tests), so we only verify that numeric IDs work.
+	// This test documents the expected behavior for coverage completeness.
+	sc := &securityMock.Context{}
+	sc.On("IsSysAdmin").Return(false)
+
+	rc := &stubRoleCtl{}
+	rc.On("Get", testifymock.Anything, int64(70), testifymock.Anything).
+		Return(&roleCtl.Role{}, nil)
+
+	// numeric int64 → no DB lookup → should work cleanly
+	err := newAPI(rc).checkNoEscalation(newCtxWithSecurity(sc), testProjectID, 70)
+	assert.NoError(t, err)
+}
+
+// ---------------------------------------------------------------------------
+// Handler-level escalation gate on the MODIFY path (UpdateProjectMember)
+// ---------------------------------------------------------------------------
+
+// TestUpdateProjectMember_EscalationBlocked proves that modifying a member's
+// role is subject to the anti-escalation check: a caller who may update members
+// but does NOT hold a permission granted by the target role is rejected with 403,
+// and the member controller's UpdateRole is never reached. This guards against a
+// regression that drops checkNoEscalation from the update (modification) path.
+func TestUpdateProjectMember_EscalationBlocked(t *testing.T) {
+	sc := &securityMock.Context{}
+	sc.On("IsSysAdmin").Return(false)
+	sc.On("IsAuthenticated").Return(true)
+	// caller may update members (passes RequireProjectAccess)...
+	sc.On("Can", testifymock.Anything,
+		rbac.ActionUpdate, projectResource(rbac.ResourceMember)).Return(true)
+	// ...but does NOT hold member:create, which the target role grants
+	sc.On("Can", testifymock.Anything,
+		rbac.ActionCreate, projectResource(rbac.ResourceMember)).Return(false)
+
+	rc := &stubRoleCtl{}
+	rc.On("Get", testifymock.Anything, int64(30), testifymock.Anything).
+		Return(&roleCtl.Role{
+			Permissions: []*roleCtl.Permission{{
+				Access: policyAccess(rbac.ResourceMember, rbac.ActionCreate),
+			}},
+		}, nil)
+
+	xFalse := false
+	params := memberop.UpdateProjectMemberParams{
+		ProjectNameOrID: fmt.Sprintf("%d", testProjectID),
+		XIsResourceName: &xFalse,
+		Mid:             7,
+		Role:            &models.RoleRequest{RoleID: 30},
+	}
+
+	// ctl (member controller) is intentionally nil: the escalation check must
+	// reject before UpdateRole is reached, so it is never dereferenced.
+	resp := newAPI(rc).UpdateProjectMember(newCtxWithSecurity(sc), params)
+
+	rr := httptest.NewRecorder()
+	resp.WriteResponse(rr, runtime.JSONProducer())
+	assert.Equal(t, http.StatusForbidden, rr.Code)
+	// reached checkNoEscalation (fetched the target role) before rejecting
+	rc.AssertCalled(t, "Get", testifymock.Anything, int64(30), testifymock.Anything)
+}
+
+// TestCreateProjectMember_EscalationBlocked proves the same anti-escalation guard
+// applies on the ASSIGN path: a caller allowed to create members but lacking a
+// permission the target role grants is rejected with 403, before the member
+// controller's Create is reached.
+func TestCreateProjectMember_EscalationBlocked(t *testing.T) {
+	sc := &securityMock.Context{}
+	sc.On("IsSysAdmin").Return(false)
+	sc.On("IsAuthenticated").Return(true)
+	// caller may create members (passes RequireProjectAccess)...
+	sc.On("Can", testifymock.Anything,
+		rbac.ActionCreate, projectResource(rbac.ResourceMember)).Return(true)
+	// ...but does NOT hold repository:push, which the target role grants
+	sc.On("Can", testifymock.Anything,
+		rbac.ActionPush, projectResource(rbac.ResourceRepository)).Return(false)
+
+	rc := &stubRoleCtl{}
+	rc.On("Get", testifymock.Anything, int64(30), testifymock.Anything).
+		Return(&roleCtl.Role{
+			Permissions: []*roleCtl.Permission{{
+				Access: policyAccess(rbac.ResourceRepository, rbac.ActionPush),
+			}},
+		}, nil)
+
+	xFalse := false
+	params := memberop.CreateProjectMemberParams{
+		ProjectNameOrID: fmt.Sprintf("%d", testProjectID),
+		XIsResourceName: &xFalse,
+		ProjectMember:   &models.ProjectMember{RoleID: 30},
+	}
+
+	// ctl (member controller) is intentionally nil: the escalation check must
+	// reject before Create is reached, so it is never dereferenced.
+	resp := newAPI(rc).CreateProjectMember(newCtxWithSecurity(sc), params)
+
+	rr := httptest.NewRecorder()
+	resp.WriteResponse(rr, runtime.JSONProducer())
+	assert.Equal(t, http.StatusForbidden, rr.Code)
+	rc.AssertCalled(t, "Get", testifymock.Anything, int64(30), testifymock.Anything)
+}
+
+// ---------------------------------------------------------------------------
+// Compile-time interface check — fails the build if stubRoleCtl drifts.
+// ---------------------------------------------------------------------------
+
+var _ roleCtl.Controller = (*stubRoleCtl)(nil)
 
 type recordingMemberController struct {
 	member.Controller
@@ -59,36 +370,56 @@ func (c *recordingMemberController) UpdateRole(
 	return nil
 }
 
-func TestProjectAdminGrantRequiresAdminRole(t *testing.T) {
+func memberWriteAccess() []*types.Policy {
+	return []*types.Policy{
+		{Resource: rbac.ResourceMember, Action: rbac.ActionCreate},
+		{Resource: rbac.ResourceMember, Action: rbac.ActionUpdate},
+	}
+}
+
+// Whoever may create and update members of a project may give them any
+// role, the project admin role included. There is no extra check for that
+// role, so provisioning robots keep working (see #1137 and its revert).
+func TestMemberWritesGrantProjectAdmin(t *testing.T) {
 	const projectID int64 = 1
+	// The robot context captures project.Ctl when it is built, so each case
+	// builds its context after the mock controller is in place.
 	tests := []struct {
-		name          string
-		user          *commonmodels.User
-		robot         bool
-		roles         []int
-		wantForbidden bool
+		name        string
+		securityCtx func() security.Context
 	}{
-		{name: "project robot", robot: true, wantForbidden: true},
 		{
-			name:          "maintainer",
-			user:          &commonmodels.User{UserID: 4, Username: "maintainer"},
-			roles:         []int{common.RoleMaintainer},
-			wantForbidden: true,
+			name: "project robot",
+			securityCtx: func() security.Context {
+				return robotsec.NewSecurityContext(&robot.Robot{
+					Robot: robotmodel.Robot{Name: "project-robot"},
+					Level: robot.LEVELPROJECT,
+					Permissions: []*robot.Permission{{
+						Scope:  "/project/1",
+						Access: memberWriteAccess(),
+					}},
+				})
+			},
 		},
 		{
-			name:          "non-member",
-			user:          &commonmodels.User{UserID: 5, Username: "non-member"},
-			wantForbidden: true,
-		},
-		{
-			name:  "project admin",
-			user:  &commonmodels.User{UserID: 2, Username: "project-admin"},
-			roles: []int{common.RoleProjectAdmin},
+			name: "system robot covering all projects",
+			securityCtx: func() security.Context {
+				return robotsec.NewSecurityContext(&robot.Robot{
+					Robot: robotmodel.Robot{Name: "system-robot"},
+					Level: robot.LEVELSYSTEM,
+					Permissions: []*robot.Permission{{
+						Scope:  robot.SCOPEALLPROJECT,
+						Access: memberWriteAccess(),
+					}},
+				})
+			},
 		},
 		{
 			name: "system admin",
-			user: &commonmodels.User{
-				UserID: 3, Username: "system-admin", SysAdminFlag: true,
+			securityCtx: func() security.Context {
+				return local.NewSecurityContext(&commonmodels.User{
+					UserID: 3, Username: "system-admin", SysAdminFlag: true,
+				})
 			},
 		},
 	}
@@ -100,43 +431,22 @@ func TestProjectAdminGrantRequiresAdminRole(t *testing.T) {
 			projectCtl.On("Get", mock.Anything, projectID, mock.Anything).
 				Return(p, nil).Maybe()
 			projectCtl.On("Get", mock.Anything, projectID).Return(p, nil).Maybe()
-			projectCtl.On("ListRoles", mock.Anything, projectID, mock.Anything).
-				Return(test.roles, nil).Maybe()
-
 			previousProjectCtl := project.Ctl
 			project.Ctl = projectCtl
 			t.Cleanup(func() {
 				project.Ctl = previousProjectCtl
 			})
 
-			var securityCtx security.Context
-			if test.robot {
-				securityCtx = robotsec.NewSecurityContext(&robot.Robot{
-					Robot: robotmodel.Robot{Name: "project-robot"},
-					Level: robot.LEVELPROJECT,
-					Permissions: []*robot.Permission{{
-						Scope: "/project/1",
-						Access: []*types.Policy{
-							{Resource: rbac.ResourceMember, Action: rbac.ActionCreate},
-							{Resource: rbac.ResourceMember, Action: rbac.ActionUpdate},
-						},
-					}},
-				})
-			} else {
-				securityCtx = local.NewSecurityContext(test.user)
-			}
-
 			controller := &recordingMemberController{}
 			api := newMemberAPI()
 			api.ctl = controller
-			ctx := security.NewContext(context.Background(), securityCtx)
-			if test.robot {
-				allowed, err := api.HasProjectPermission(
-					ctx, projectID, rbac.ActionCreate, rbac.ResourceMember,
-				)
-				require.NoError(t, err)
-				require.True(t, allowed)
-			}
+			ctx := security.NewContext(context.Background(), test.securityCtx())
+
+			allowed, err := api.HasProjectPermission(
+				ctx, projectID, rbac.ActionCreate, rbac.ResourceMember,
+			)
+			require.NoError(t, err)
+			require.True(t, allowed, "the caller must hold member:create")
 
 			createParams := operation.NewCreateProjectMemberParams()
 			createParams.ProjectNameOrID = "1"
@@ -151,44 +461,10 @@ func TestProjectAdminGrantRequiresAdminRole(t *testing.T) {
 			updateParams.Role = &models.RoleRequest{RoleID: common.RoleProjectAdmin}
 			updateResponder := api.UpdateProjectMember(ctx, updateParams)
 
-			if test.wantForbidden {
-				createError, ok := createResponder.(*ErrResponder)
-				require.True(t, ok)
-				assert.True(t, liberrors.IsErr(createError.err, liberrors.ForbiddenCode))
-				updateError, ok := updateResponder.(*ErrResponder)
-				require.True(t, ok)
-				assert.True(t, liberrors.IsErr(updateError.err, liberrors.ForbiddenCode))
-				assert.Empty(t, controller.createdRoles)
-				assert.Empty(t, controller.updatedRoles)
-				return
-			}
-
 			assert.IsType(t, &operation.CreateProjectMemberCreated{}, createResponder)
 			assert.IsType(t, &operation.UpdateProjectMemberOK{}, updateResponder)
 			assert.Equal(t, []int{common.RoleProjectAdmin}, controller.createdRoles)
 			assert.Equal(t, []int{common.RoleProjectAdmin}, controller.updatedRoles)
 		})
-	}
-}
-
-// The generic member permission check already stops local users without a
-// project-admin role, so drive requireProjectAdminGrant directly to prove its
-// own role check denies them too.
-func TestRequireProjectAdminGrantDeniesLocalNonAdmin(t *testing.T) {
-	const projectID int64 = 1
-	for _, roles := range [][]int{nil, {common.RoleDeveloper}, {common.RoleMaintainer}} {
-		projectCtl := projecttesting.NewController(t)
-		projectCtl.On("Get", mock.Anything, projectID).
-			Return(&project.Project{ProjectID: projectID}, nil)
-		projectCtl.On("ListRoles", mock.Anything, projectID, mock.Anything).
-			Return(roles, nil)
-
-		api := &memberAPI{projectCtl: projectCtl}
-		user := &commonmodels.User{UserID: 6, Username: "local-user"}
-		ctx := security.NewContext(context.Background(), local.NewSecurityContext(user))
-
-		err := api.requireProjectAdminGrant(ctx, projectID, common.RoleProjectAdmin)
-		assert.True(t, liberrors.IsErr(err, liberrors.ForbiddenCode), "roles %v", roles)
-		assert.NoError(t, api.requireProjectAdminGrant(ctx, projectID, common.RoleDeveloper))
 	}
 }

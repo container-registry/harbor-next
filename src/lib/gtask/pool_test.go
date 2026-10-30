@@ -67,8 +67,10 @@ func TestStartAndStop(t *testing.T) {
 		ctx1 := t.Context()
 		pool.Start(ctx1)
 
-		// Let it run for a bit
-		time.Sleep(300 * time.Millisecond)
+		// Wait for tasks to run
+		assert.Eventually(t, func() bool {
+			return len(ch1) == 1 && len(ch2) > 2
+		}, 1*time.Second, 10*time.Millisecond)
 		// ch1 should only have one element as it's a one time job
 		assert.Equal(t, 1, len(ch1))
 		// ch2 should have elements over 2 as sleep 300ms and interval is 100ms
@@ -85,7 +87,10 @@ func TestStartAndStop(t *testing.T) {
 		t1 := &task{
 			interval: 100 * time.Millisecond,
 			fn: func(ctx context.Context) {
-				ch1 <- struct{}{}
+				select {
+				case ch1 <- struct{}{}:
+				default:
+				}
 			},
 		}
 
@@ -93,8 +98,8 @@ func TestStartAndStop(t *testing.T) {
 		ctx1, cancel1 := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer cancel1()
 		pool.Start(ctx1)
-		// Let it run for a bit
-		time.Sleep(200 * time.Millisecond)
+		// the worker must exit on its own once the context times out
+		pool.wg.Wait()
 		assert.Equal(t, 1, len(ch1))
 		pool.Stop()
 		close(ch1)

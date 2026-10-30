@@ -19,6 +19,8 @@ Reports arrive at **Security → Advisories** as `Proposed` advisories: <https:/
 
 Notifications for new private reports go to repo admins and org security managers only. **Check the queue at least weekly** even if you saw no notification.
 
+Reports also arrive by email at `infosec@container-registry.com`, from reporters without a GitHub account and from Anthropic OSS Scanner. Scanner reports are model-generated and unreviewed, so triage them like any other report. For an email report that passes the sanity check below, open a draft advisory yourself (**Security → Advisories → New draft security advisory**), paste the report, and continue there. Acknowledge and follow up with the reporter by email, since they cannot see the advisory.
+
 Within **3 business days** of a report arriving:
 
 1. Reply in the advisory thread to acknowledge receipt. The reporter can see comments on the advisory; nothing else is needed to keep them informed.
@@ -118,5 +120,4 @@ Note: Dependabot alerts only reach consumers of Harbor Next **Go modules**, not 
 
 - **Security responder roster**: create a GitHub team with the org **security manager** role instead of relying on repo admins, so the roster is explicit and auditable.
 - **Distributor/operator embargo list**: upstream Harbor uses `cncf-harbor-distributors-announce`; Harbor Next has no equivalent yet. Decide if/when one is needed.
-- **Fallback intake for reporters without a GitHub account**: currently "contact a maintainer privately"; a dedicated alias would be cleaner.
 - **security.txt**: publish `/.well-known/security.txt` on the project website pointing at the GitHub report form (requires a website/domain decision, plus a yearly `Expires` refresh).

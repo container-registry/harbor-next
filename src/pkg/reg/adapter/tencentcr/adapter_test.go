@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -105,6 +106,28 @@ func TestAdapter_NewAdapter_Pingfailed(t *testing.T) {
 	})
 	assert.NotNil(t, err)
 	assert.Nil(t, adapter)
+}
+
+func TestAdapter_validateEndpoint(t *testing.T) {
+	for _, ep := range []string{
+		"https://my-registry.tencentcloudcr.com",
+		"https://my-registry.TencentCloudCR.com",
+		"https://my-registry.tencentcloudcr.com:443",
+	} {
+		host, ok := validateEndpoint(ep)
+		assert.True(t, ok, ep)
+		assert.Equal(t, strings.ToLower(host), host)
+	}
+	for _, ep := range []string{
+		"$$$",
+		"https://registry.tencentcloudcr.com.attacker.example",
+		"https://attacker.example/.tencentcloudcr.com",
+		"https://not-tencentcloudcr.com",
+		"https://.tencentcloudcr.com",
+	} {
+		_, ok := validateEndpoint(ep)
+		assert.False(t, ok, ep)
+	}
 }
 
 func TestAdapter_NewAdapter_InvalidAKSK(t *testing.T) {

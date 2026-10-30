@@ -19,22 +19,17 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/goharbor/harbor/src/common/models"
-	"github.com/goharbor/harbor/src/common/rbac"
-	rbacProject "github.com/goharbor/harbor/src/common/rbac/project"
-	"github.com/goharbor/harbor/src/common/security"
-	localSecurity "github.com/goharbor/harbor/src/common/security/local"
+	"github.com/goharbor/harbor/src/common/secret"
 	"github.com/goharbor/harbor/src/controller/event/operator"
-	robotCtl "github.com/goharbor/harbor/src/controller/robot"
 	"github.com/goharbor/harbor/src/jobservice/job"
 	"github.com/goharbor/harbor/src/jobservice/logger"
 	"github.com/goharbor/harbor/src/lib"
-	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/orm"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/lib/retry"
 	"github.com/goharbor/harbor/src/pkg"
 	"github.com/goharbor/harbor/src/pkg/project"
+	"github.com/goharbor/harbor/src/pkg/project/metadata"
 	"github.com/goharbor/harbor/src/pkg/repository"
 	"github.com/goharbor/harbor/src/pkg/retention"
 	"github.com/goharbor/harbor/src/pkg/retention/policy"
@@ -85,6 +80,7 @@ type defaultController struct {
 	taskMgr        task.Manager
 	launcher       retention.Launcher
 	projectManager project.Manager
+	projectMetaMgr metadata.Manager
 	repositoryMgr  repository.Manager
 	scheduler      scheduler.Scheduler
 	wp             *lib.WorkerPool
@@ -100,14 +96,7 @@ const (
 type TriggerParam struct {
 	PolicyID int64
 	Trigger  string
-}
-
-type localSecurityContext interface {
-	User() *models.User
-}
-
-type robotSecurityContext interface {
-	User() *robotCtl.Robot
+	Operator string
 }
 
 // GetRetention Get Retention
@@ -119,9 +108,6 @@ func (r *defaultController) GetRetention(ctx context.Context, id int64) (*policy
 func (r *defaultController) CreateRetention(ctx context.Context, p *policy.Metadata) (int64, error) {
 	err := p.ValidateRetentionPolicy()
 	if err != nil {
-		return 0, err
-	}
-	if err := setExecutionPrincipal(ctx, p); err != nil {
 		return 0, err
 	}
 	id, err := r.manager.CreatePolicy(ctx, p)
@@ -136,6 +122,8 @@ func (r *defaultController) CreateRetention(ctx context.Context, p *policy.Metad
 			if _, err = r.scheduler.Schedule(ctx, schedulerVendorType, id, "", cron.(string), SchedulerCallback, TriggerParam{
 				PolicyID: id,
 				Trigger:  retention.ExecutionTriggerSchedule,
+				// the operator of schedule job is harbor-jobservice
+				Operator: secret.JobserviceUser,
 			}, extras); err != nil {
 				return 0, err
 			}
@@ -149,9 +137,6 @@ func (r *defaultController) CreateRetention(ctx context.Context, p *policy.Metad
 func (r *defaultController) UpdateRetention(ctx context.Context, p *policy.Metadata) error {
 	err := p.ValidateRetentionPolicy()
 	if err != nil {
-		return err
-	}
-	if err := setExecutionPrincipal(ctx, p); err != nil {
 		return err
 	}
 	p0, err := r.manager.GetPolicy(ctx, p.ID)
@@ -203,6 +188,8 @@ func (r *defaultController) UpdateRetention(ctx context.Context, p *policy.Metad
 		_, err := r.scheduler.Schedule(ctx, schedulerVendorType, p.ID, "", p.Trigger.Settings[policy.TriggerSettingsCron].(string), SchedulerCallback, TriggerParam{
 			PolicyID: p.ID,
 			Trigger:  retention.ExecutionTriggerSchedule,
+			// the operator of schedule job is harbor-jobservice
+			Operator: secret.JobserviceUser,
 		}, extras)
 		if err != nil {
 			return err
@@ -210,69 +197,6 @@ func (r *defaultController) UpdateRetention(ctx context.Context, p *policy.Metad
 	}
 
 	return nil
-}
-
-func setExecutionPrincipal(ctx context.Context, p *policy.Metadata) error {
-	if !hasActiveSchedule(p) {
-		p.ExecutionPrincipal = nil
-		return nil
-	}
-
-	sc, ok := security.FromContext(ctx)
-	if !ok || !sc.IsAuthenticated() {
-		return fmt.Errorf("authenticated principal required for scheduled retention")
-	}
-
-	switch typed := sc.(type) {
-	case localSecurityContext:
-		user := typed.User()
-		if user == nil || user.UserID <= 0 {
-			return fmt.Errorf("local principal is unavailable for scheduled retention")
-		}
-		if !hasDurableArtifactDelete(ctx, p, user) {
-			return errors.ForbiddenError(nil).WithMessage(
-				"scheduled retention cannot revalidate external group or admin permissions; " +
-					"grant artifact deletion directly to the user",
-			)
-		}
-		p.ExecutionPrincipal = &policy.ExecutionPrincipal{
-			Type: policy.ExecutionPrincipalTypeLocal,
-			ID:   int64(user.UserID),
-		}
-	case robotSecurityContext:
-		robot := typed.User()
-		if robot == nil || robot.ID <= 0 {
-			return fmt.Errorf("robot principal is unavailable for scheduled retention")
-		}
-		p.ExecutionPrincipal = &policy.ExecutionPrincipal{
-			Type: policy.ExecutionPrincipalTypeRobot,
-			ID:   robot.ID,
-		}
-	default:
-		return fmt.Errorf("unsupported principal type %q for scheduled retention", sc.Name())
-	}
-
-	return nil
-}
-
-func hasDurableArtifactDelete(ctx context.Context, p *policy.Metadata, user *models.User) bool {
-	if len(user.GroupIDs) == 0 && !user.AdminRoleInAuth {
-		return true
-	}
-	durableUser := *user
-	durableUser.GroupIDs = nil
-	durableUser.AdminRoleInAuth = false
-	sc := localSecurity.NewSecurityContext(&durableUser)
-	resource := rbacProject.NewNamespace(p.Scope.Reference).Resource(rbac.ResourceArtifact)
-	return sc.Can(ctx, rbac.ActionDelete, resource)
-}
-
-func hasActiveSchedule(p *policy.Metadata) bool {
-	if p == nil || p.Trigger == nil || p.Trigger.Kind != policy.TriggerKindSchedule {
-		return false
-	}
-	cron, ok := p.Trigger.Settings[policy.TriggerSettingsCron].(string)
-	return ok && cron != ""
 }
 
 // DeleteRetention Delete Retention
@@ -523,7 +447,9 @@ func (r *defaultController) DeleteRetentionByProject(ctx context.Context, projec
 			return err
 		}
 	}
-	return nil
+	// the retention_id metadata references the policies just deleted. The retention DELETE
+	// API drops it in its own handler, so project deletion has to do it here.
+	return r.projectMetaMgr.Delete(ctx, projectID, "retention_id")
 }
 
 // NewController ...
@@ -536,6 +462,7 @@ func NewController() Controller {
 		taskMgr:        task.Mgr,
 		launcher:       retentionLauncher,
 		projectManager: pkg.ProjectMgr,
+		projectMetaMgr: pkg.ProjectMetaMgr,
 		repositoryMgr:  pkg.RepositoryMgr,
 		scheduler:      scheduler.Sched,
 		wp:             lib.NewWorkerPool(10),

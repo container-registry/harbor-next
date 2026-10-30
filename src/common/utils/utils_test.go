@@ -91,6 +91,16 @@ func TestParseRepository(t *testing.T) {
 	}
 }
 
+// OIDC, LDAP and UAA users have no local password, so their version is
+// empty; 2.15.3 hashed with a nil function here and panicked (harbor-next#571).
+func TestEncryptEmptyVersionUsesStrongScheme(t *testing.T) {
+	// PBKDF2-HMAC-SHA256, 600000 iterations, empty salt, computed outside Go.
+	got := Encrypt("cli-secret", "", "")
+	if want := "522eeccd464573339b3bad9e67492a5f"; got != want {
+		t.Errorf("expected: %v, got: %v", want, got)
+	}
+}
+
 func TestEncrypt(t *testing.T) {
 	tests := map[string]struct {
 		content string
@@ -155,11 +165,26 @@ func TestGenerateRandomString(t *testing.T) {
 	}
 }
 
+func TestGenerateRandomStringOrError(t *testing.T) {
+	str, err := GenerateRandomStringOrError()
+	assert.Nil(t, err)
+	assert.Equal(t, 32, len(str))
+	str2, err := GenerateRandomStringOrError()
+	assert.Nil(t, err)
+	assert.NotEqual(t, str, str2)
+}
+
 func TestGenerateRandomStringWithLen(t *testing.T) {
 	str := GenerateRandomStringWithLen(16)
 	if len(str) != 16 {
 		t.Errorf("Failed to generate random string with fixed length.")
 	}
+}
+
+func TestGenerateRandomStringWithLenAndError(t *testing.T) {
+	str, err := GenerateRandomStringWithLenAndError(16)
+	assert.Nil(t, err)
+	assert.Equal(t, 16, len(str))
 }
 
 func TestTestTCPConn(t *testing.T) {
@@ -432,6 +457,20 @@ func TestValidateCronString(t *testing.T) {
 		{
 			description: "test case 4",
 			input:       "0 1 2 1 1 *",
+			hasErr:      false,
+		},
+
+		// cron expression that can never fire (Feb 30 does not exist)
+		{
+			description: "test case 5",
+			input:       "0 0 3 30 2 *",
+			hasErr:      true,
+		},
+
+		// Feb 29 (leap day) is valid and reachable — fires every leap year
+		{
+			description: "test case 6 - Feb 29 leap day is reachable",
+			input:       "0 0 0 29 2 *",
 			hasErr:      false,
 		},
 	}
