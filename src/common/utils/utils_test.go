@@ -91,6 +91,15 @@ func TestParseRepository(t *testing.T) {
 	}
 }
 
+// OIDC, LDAP and UAA users have no local password, so their version is
+// empty; 2.15.3 hashed with a nil function here and panicked (harbor-next#571).
+func TestEncryptEmptyVersionUsesStrongScheme(t *testing.T) {
+	got := Encrypt("cli-secret", "", "")
+	if want := Encrypt("cli-secret", "", PBKDF2SHA256); got != want {
+		t.Errorf("expected: %v, got: %v", want, got)
+	}
+}
+
 func TestEncrypt(t *testing.T) {
 	tests := map[string]struct {
 		content string
