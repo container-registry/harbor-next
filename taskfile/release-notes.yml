@@ -9,7 +9,7 @@ tasks:
       - sh: test -n "${GH_TOKEN:-}"
         msg: "GH_TOKEN is required"
     cmds:
-      - .github/scripts/update-release-notes.sh
+      - node .github/scripts/update-release-notes.mjs
 
   dispatch-release-cut:
     desc: "Tell 8gcr a release shipped so it stamps changelog markers (TAG_NAME, TARGET_SHA, LINE, DISPATCH_TOKEN)"
@@ -48,4 +48,4 @@ tasks:
       - sh: test -n "${GH_TOKEN:-}"
         msg: "GH_TOKEN is required"
     cmds:
-      - RELEASE_NOTES_DRY_RUN=true RELEASE_NOTES_OUTPUT="${RELEASE_NOTES_OUTPUT:-release-notes-${TAG_NAME}.md}" .github/scripts/update-release-notes.sh
+      - RELEASE_NOTES_DRY_RUN=true RELEASE_NOTES_OUTPUT="${RELEASE_NOTES_OUTPUT:-release-notes-${TAG_NAME}.md}" node .github/scripts/update-release-notes.mjs

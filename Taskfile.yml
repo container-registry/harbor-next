@@ -55,6 +55,9 @@ includes:
     aliases: [d]
   docs:
     taskfile: ./taskfile/docs.yml
+  helm:
+    taskfile: ./taskfile/helm.yml
+    aliases: [h]
   release-ready:
     taskfile: ./taskfile/release-ready.yml
   release-images-local:

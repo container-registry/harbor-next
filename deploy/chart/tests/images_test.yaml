@@ -1,0 +1,116 @@
+# Image resolution: image.source preset, per-component overrides,
+# global.imageRegistry, and digest pinning, exercised through the
+# harbor.image helper. Per-component registry/repository/tag override
+# composition is covered in the component suites (core/portal/jobservice/trivy).
+suite: image resolution (source / global registry / digest)
+# checksum includes on the rendered workloads require their referenced
+# configmap/secret templates to be present in this suite (helm-unittest only
+# associates listed templates for `include`).
+templates:
+  - templates/core.deployment.yaml
+  - templates/core.configmap.yaml
+  - templates/core.secret.yaml
+  - templates/registry.deployment.yaml
+  - templates/registry.configmap.yaml
+  - templates/registry.secret.yaml
+  - templates/registryctl.configmap.yaml
+  - templates/registryctl.secret.yaml
+  - templates/trivy.statefulset.yaml
+  - templates/trivy.secret.yaml
+  - templates/trivy.configmap-env.yaml
+  - templates/trivy.secret-env.yaml
+set:
+  externalURL: https://harbor.example.com
+  database.host: postgres.example.com
+  harborAdminPassword: Harbor12345
+tests:
+  # Default source=8gcr: registry host + 8gcr namespace, tag = appVersion.
+  - it: should resolve 8gcr defaults when image.source is unset
+    template: templates/core.deployment.yaml
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: '^8gears\.container-registry\.com/8gcr/harbor-core:'
+
+  # source=upstream renames registry-photon (the registry container is
+  # containers[0]; registryctl is containers[1]).
+  - it: should resolve upstream registry-photon when source=upstream
+    template: templates/registry.deployment.yaml
+    set:
+      image.source: upstream
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: '^docker\.io/goharbor/registry-photon:'
+      - matchRegex:
+          path: spec.template.spec.containers[1].image
+          pattern: '^docker\.io/goharbor/harbor-registryctl:'
+
+  # source=upstream renames trivy-adapter-photon.
+  - it: should resolve upstream trivy-adapter-photon when source=upstream
+    template: templates/trivy.statefulset.yaml
+    set:
+      trivy.enabled: true
+      image.source: upstream
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: '^docker\.io/goharbor/trivy-adapter-photon:'
+
+  # global.imageRegistry overrides the host for all images (air-gap/mirror),
+  # preserving the source repository path. Wins over image.source registry.
+  - it: should let global.imageRegistry override the host (8gcr path preserved)
+    template: templates/core.deployment.yaml
+    set:
+      global.imageRegistry: mirror.internal
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: '^mirror\.internal/8gcr/harbor-core:'
+
+  - it: should let global.imageRegistry override the host on the upstream path
+    template: templates/core.deployment.yaml
+    set:
+      image.source: upstream
+      global.imageRegistry: mirror.internal
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: '^mirror\.internal/goharbor/harbor-core:'
+
+  # digest pins by @sha256 and drops the tag.
+  - it: should pin by digest instead of tag when image.digest is set
+    template: templates/core.deployment.yaml
+    set:
+      core.image.digest: sha256:deadbeefcafe
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: '@sha256:deadbeefcafe$'
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ':v[0-9]'
+
+  # Back-compat: a full-path repository (legacy / upstream-chart style, or the
+  # cdk8s deployment engine that sets `<registry>/8gcr/harbor-*`) is used
+  # verbatim — the source-map registry must NOT be prefixed onto a repository
+  # that already carries a host (first segment has a "." or ":").
+  - it: should use a full-path repository verbatim (no source-map prefix)
+    template: templates/core.deployment.yaml
+    set:
+      core.image.repository: ttl.sh/harbor-next/harbor-core
+      core.image.tag: "v2.15.0"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ttl.sh/harbor-next/harbor-core:v2.15.0
+  # A host:port registry in the repository is also treated as a host.
+  - it: should treat a host:port repository as already-qualified
+    template: templates/core.deployment.yaml
+    set:
+      core.image.repository: localhost:5000/harbor-core
+      core.image.tag: "v2.15.0"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: localhost:5000/harbor-core:v2.15.0

@@ -1,0 +1,232 @@
+# Harbor Helm Chart - OpenShift Deployment Values
+#
+# Prerequisites:
+#   - OpenShift cluster with gp3 storage class
+#   - Images pushed to ttl.sh (or another accessible registry)
+#
+# Usage:
+#   helm install harbor-next . -n vad1mo-dev -f example/openshift/values.yaml
+
+# -- External URL (OpenShift route)
+externalURL: "https://harbor-next-vad1mo-dev.apps.rm1.0a51.p1.openshiftapps.com"
+
+# -- Harbor admin password (REQUIRED - change this!)
+harborAdminPassword: "CHANGEME"
+
+# -- Ingress with OpenShift route annotations
+ingress:
+  enabled: true
+  # No className — OpenShift uses its own router
+  className: ""
+  annotations:
+    route.openshift.io/termination: edge
+  core: harbor-next-vad1mo-dev.apps.rm1.0a51.p1.openshiftapps.com
+  hosts:
+    - host: harbor-next-vad1mo-dev.apps.rm1.0a51.p1.openshiftapps.com
+      paths:
+        - path: /
+          pathType: Prefix
+  # TLS terminated at edge by OpenShift router
+  tls: []
+
+# -- TLS disabled (edge termination at router handles TLS)
+tls:
+  enabled: false
+
+# -- External PostgreSQL
+database:
+  host: postgres.vad1mo-dev.svc.cluster.local
+  port: 5432
+  username: harbor
+  password: CHANGEME
+  database: registry
+  sslmode: disable
+
+# -- Valkey (Redis-compatible)
+valkey:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+  dataStorage:
+    enabled: false
+  # OpenShift SCC manages UIDs — clear subchart defaults
+  podSecurityContext:
+    fsGroup: null
+    runAsUser: null
+    runAsGroup: null
+  securityContext:
+    readOnlyRootFilesystem: null
+    runAsNonRoot: null
+    runAsUser: null
+
+# -- Trivy scanner
+trivy:
+  enabled: true
+  securityContext:
+    runAsNonRoot: null
+    runAsUser: null
+    runAsGroup: null
+  podSecurityContext:
+    fsGroup: null
+  persistence:
+    enabled: true
+    storageClass: "gp3"
+    size: 5Gi
+
+# -- Metrics disabled
+metrics:
+  enabled: false
+
+# ============================================================================
+# Images — override to use ttl.sh ephemeral registry
+# Rebuild with: task image:all-images IMAGE_REGISTRY=ttl.sh IMAGE_NAMESPACE=harbor-next
+# ============================================================================
+
+core:
+  image:
+    repository: ttl.sh/harbor-next/harbor-core
+    tag: "v2.15.0"
+  # OpenShift SCC manages UIDs — null out hardcoded values
+  securityContext:
+    runAsNonRoot: null
+    runAsUser: null
+    runAsGroup: null
+    readOnlyRootFilesystem: null
+    allowPrivilegeEscalation: null
+    capabilities: null
+    seccompProfile: null
+  podSecurityContext:
+    fsGroup: null
+
+registry:
+  image:
+    repository: ttl.sh/harbor-next/harbor-registry
+    tag: "v2.15.0"
+  controller:
+    image:
+      repository: ttl.sh/harbor-next/harbor-registryctl
+      tag: "v2.15.0"
+  persistence:
+    enabled: true
+    storageClass: "gp3"
+    size: 10Gi
+  securityContext:
+    runAsNonRoot: null
+    runAsUser: null
+    runAsGroup: null
+    readOnlyRootFilesystem: null
+    allowPrivilegeEscalation: null
+    capabilities: null
+    seccompProfile: null
+  podSecurityContext:
+    fsGroup: null
+    fsGroupChangePolicy: null
+
+portal:
+  image:
+    repository: ttl.sh/harbor-next/harbor-portal
+    tag: "v2.15.0"
+  securityContext:
+    runAsNonRoot: null
+    runAsUser: null
+    runAsGroup: null
+    readOnlyRootFilesystem: null
+    allowPrivilegeEscalation: null
+    capabilities: null
+    seccompProfile: null
+  podSecurityContext:
+    fsGroup: null
+
+jobservice:
+  image:
+    repository: ttl.sh/harbor-next/harbor-jobservice
+    tag: "v2.15.0"
+  securityContext:
+    runAsNonRoot: null
+    runAsUser: null
+    runAsGroup: null
+    readOnlyRootFilesystem: null
+    allowPrivilegeEscalation: null
+    capabilities: null
+    seccompProfile: null
+  podSecurityContext:
+    fsGroup: null
+
+exporter:
+  image:
+    repository: ttl.sh/harbor-next/harbor-exporter
+    tag: "v2.15.0"
+  securityContext:
+    runAsNonRoot: null
+    runAsUser: null
+    runAsGroup: null
+    readOnlyRootFilesystem: null
+    allowPrivilegeEscalation: null
+    capabilities: null
+    seccompProfile: null
+  podSecurityContext:
+    fsGroup: null
+
+# ============================================================================
+# PostgreSQL — deployed alongside Harbor via extraManifests
+# Uses Red Hat PostgreSQL image which works natively with OpenShift SCCs
+# ============================================================================
+extraManifests:
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      name: postgres-secret
+    stringData:
+      POSTGRESQL_USER: harbor
+      POSTGRESQL_PASSWORD: CHANGEME
+      POSTGRESQL_DATABASE: registry
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: postgres-data
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      storageClassName: gp3
+      resources:
+        requests:
+          storage: 5Gi
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: postgres
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: postgres
+      template:
+        metadata:
+          labels:
+            app: postgres
+        spec:
+          containers:
+            - name: postgres
+              image: registry.redhat.io/rhel9/postgresql-16
+              ports:
+                - containerPort: 5432
+              envFrom:
+                - secretRef:
+                    name: postgres-secret
+              volumeMounts:
+                - name: data
+                  mountPath: /var/lib/pgsql/data
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: postgres-data
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: postgres
+    spec:
+      selector:
+        app: postgres
+      ports:
+        - port: 5432

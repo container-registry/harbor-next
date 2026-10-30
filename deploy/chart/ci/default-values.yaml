@@ -1,0 +1,5 @@
+# Minimal values required to pass schema validation
+externalURL: https://harbor.example.com
+database:
+  host: db.example.com
+harborAdminPassword: Harbor12345

@@ -21,8 +21,9 @@ const sectionNames = new Map([
   ['Performance Improvements', 'Updates'],
   ['Code Refactoring', 'Updates'],
   ['Documentation', 'Updates'],
+  ['Chart Changes', 'Updates'],
 ]);
-const sectionOrder = ['Commercial Features', 'Features', 'Fixes', 'Updates', 'Upstream', 'Reverts'];
+const sectionOrder = ['Harbor Releases', 'Commercial Features', 'Features', 'Fixes', 'Updates', 'Upstream', 'Reverts'];
 const sections = new Map(sectionOrder.map(section => [section, []]));
 const trailing = [];
 let currentSection = '';

@@ -1,0 +1,39 @@
+# Replace the example URL, database host and existing Secrets before installing.
+externalURL: https://harbor.example.com
+existingSecretAdminPassword: harbor-admin
+
+database:
+  host: postgres.example.com
+  existingSecret: harbor-db
+
+registry:
+  persistence:
+    enabled: true
+
+exporter:
+  enabled: true
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    labels:
+      # Match the ServiceMonitor selector of your Prometheus installation.
+      release: prometheus
+  grafanaDashboard:
+    # Enable on only one Harbor release per Grafana organization.
+    enabled: true
+    namespace: monitoring
+    labels:
+      grafana_dashboard: "1"
+    annotations:
+      grafana_folder: Harbor
+
+# Optional: requires an 8gcr build with PostgreSQL/pgx monitoring.
+core:
+  config:
+    postgresql:
+      metrics_enabled: "true"
+jobservice:
+  env:
+    POSTGRESQL_METRICS_ENABLED: "true"
