@@ -30,6 +30,14 @@ type Resolver interface {
 	PreCheck(ctx context.Context, url string, method string) (bool, string)
 }
 
+// Snapshotter is implemented by resolvers that need the resource state from
+// before the handler ran, so the audit description can carry from/to values.
+// Snapshot runs after PreCheck accepted the request and before the handler;
+// its result is handed back on Metadata.Before.
+type Snapshotter interface {
+	Snapshot(c *Metadata) any
+}
+
 var urlResolvers = map[string]Resolver{}
 
 var mu = &sync.Mutex{}
@@ -83,6 +91,12 @@ type Metadata struct {
 	UserAgent string
 	// ResponseLocation response location
 	ResponseLocation string
+	// ResponseBody is the start of the response body, captured only for
+	// failed requests so the error reason can be audited
+	ResponseBody string
+	// Before is the resource state captured by Snapshotter.Snapshot before the
+	// handler ran; nil when the resolver takes no snapshot
+	Before any
 	// ResourceName resource name
 	ResourceName string
 	// Payload request payload
@@ -110,10 +124,16 @@ func (c *Metadata) Resolve(event *event.Event) error {
 // PreCheck check if current event is matched and return the prefetched resource name when it is delete operation
 func (c *Metadata) PreCheckMetadata() (bool, string) {
 	resolver, metadata, ok := c.resolver()
-	if ok {
-		return resolver.PreCheck(metadata.Ctx, metadata.RequestURL, metadata.RequestMethod)
+	if !ok {
+		return false, ""
 	}
-	return false, ""
+	matched, name := resolver.PreCheck(metadata.Ctx, metadata.RequestURL, metadata.RequestMethod)
+	if matched {
+		if s, ok := resolver.(Snapshotter); ok {
+			c.Before = s.Snapshot(metadata)
+		}
+	}
+	return matched, name
 }
 
 func (c *Metadata) resolver() (Resolver, *Metadata, bool) {
