@@ -6,7 +6,7 @@ ARG HARBOR_SCANNER_TRIVY_VERSION=MISSING-BUILD-ARG
 ARG TRIVY_VERSION=MISSING-BUILD-ARG
 ARG TRIVY_BASE_IMAGE_VERSION=MISSING-BUILD-ARG
 ARG ALPINE_VERSION=MISSING-BUILD-ARG
-ARG LPROBE_VERSION=MISSING-BUILD-ARG
+ARG HEALTHPROBE_VERSION=MISSING-BUILD-ARG
 
 FROM golang:${GO_VERSION}-alpine AS builder
 ARG HARBOR_SCANNER_TRIVY_VERSION
@@ -21,11 +21,11 @@ RUN CGO_ENABLED=0 go build -o /scanner-trivy cmd/scanner-trivy/main.go
 
 FROM aquasec/trivy:${TRIVY_VERSION} AS trivy-binary
 FROM alpine:${ALPINE_VERSION} AS certs
-FROM ghcr.io/fivexl/lprobe:${LPROBE_VERSION} AS lprobe
+FROM 8gears.container-registry.com/healthprobe/healthprobe:${HEALTHPROBE_VERSION} AS healthprobe
 
 FROM aquasec/trivy:${TRIVY_BASE_IMAGE_VERSION}
 COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY --from=lprobe /lprobe /lprobe
+COPY --from=healthprobe /healthprobe-notls /healthprobe
 COPY --from=builder /scanner-trivy /home/scanner/bin/scanner-trivy
 COPY --from=trivy-binary /usr/local/bin/trivy /usr/local/bin/trivy
 
@@ -44,7 +44,7 @@ WORKDIR /
 
 EXPOSE 8080
 EXPOSE 8443
-HEALTHCHECK --interval=10s --timeout=5s --retries=5 CMD ["/lprobe", "-port", "8080", "-endpoint", "/probe/ready"]
+HEALTHCHECK --interval=10s --timeout=5s --retries=5 CMD ["/healthprobe", "-port", "8080", "-endpoint", "/probe/ready"]
 
 USER scanner
 ENTRYPOINT ["/home/scanner/bin/scanner-trivy"]
