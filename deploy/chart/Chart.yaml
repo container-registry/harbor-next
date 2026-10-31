@@ -7,7 +7,7 @@ type: application
 version: 2.1.1
 # appVersion is stamped by the app release commit through the marker below;
 # version is stamped by the chart release PR on the same release branch.
-appVersion: "v2.15.14"  # x-release-please-version
+appVersion: "v2.16.0"  # x-release-please-version
 kubeVersion: ">=1.28.0-0"
 
 home: https://github.com/container-registry/harbor-next
