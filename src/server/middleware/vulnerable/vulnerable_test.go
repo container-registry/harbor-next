@@ -175,6 +175,8 @@ func (suite *MiddlewareTestSuite) TestPreventionDisabled() {
 
 	Middleware()(suite.next).ServeHTTP(rr, req)
 	suite.Equal(rr.Code, http.StatusOK)
+	// the CVE allowlist must not be fetched when the prevention is deactivated
+	suite.projectController.AssertNumberOfCalls(suite.T(), "Get", 1)
 }
 
 func (suite *MiddlewareTestSuite) TestNonScannerPulling() {
@@ -209,6 +211,8 @@ func (suite *MiddlewareTestSuite) TestScannerPulling() {
 
 	Middleware()(suite.next).ServeHTTP(rr, req)
 	suite.Equal(rr.Code, http.StatusOK)
+	// the CVE allowlist must not be fetched for scanner pulls
+	suite.projectController.AssertNumberOfCalls(suite.T(), "Get", 1)
 }
 
 // A push-capable principal must NOT skip the vulnerability-prevention
@@ -338,6 +342,8 @@ func (suite *MiddlewareTestSuite) TestNoVulnerabilities() {
 
 	Middleware()(suite.next).ServeHTTP(rr, req)
 	suite.Equal(rr.Code, http.StatusOK)
+	// enforced path re-fetches the project with the effect CVE allowlist
+	suite.projectController.AssertNumberOfCalls(suite.T(), "Get", 2)
 }
 
 func (suite *MiddlewareTestSuite) TestAllowed() {
