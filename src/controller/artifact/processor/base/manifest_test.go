@@ -165,6 +165,28 @@ func (m *manifestTestSuite) TestUnmarshalConfig() {
 	m.regCli.AssertExpectations(m.T())
 }
 
+func (m *manifestTestSuite) TestConfigSize() {
+	size, err := m.processor.ConfigSize([]byte(manifest))
+	m.Require().Nil(err)
+	m.EqualValues(1510, size)
+}
+
+// TestConfigSizeErrors covers the failure modes callers depend on: a manifest
+// that isn't JSON, and one that omits the config descriptor. Both must return
+// an error rather than a zero size, because the Dockerfile addition path
+// treats the returned size as an allow/deny gate before pulling the blob.
+func (m *manifestTestSuite) TestConfigSizeErrors() {
+	// Not JSON at all.
+	size, err := m.processor.ConfigSize([]byte("this is not a manifest"))
+	m.Error(err)
+	m.EqualValues(0, size)
+
+	// Valid JSON, but no config descriptor, so there is no size to trust.
+	size, err = m.processor.ConfigSize([]byte(`{"schemaVersion":2,"layers":[]}`))
+	m.NoError(err)
+	m.EqualValues(0, size)
+}
+
 func TestManifestSuite(t *testing.T) {
 	suite.Run(t, &manifestTestSuite{})
 }
