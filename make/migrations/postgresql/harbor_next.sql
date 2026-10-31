@@ -149,3 +149,27 @@ BEGIN
     END IF;
 END
 $$;
+
+-- registry.access_key stayed varchar(255) while access_secret is varchar(4096),
+-- so long credentials such as cloud tokens could not be saved. Upstream widens it
+-- in 0190 (goharbor/harbor#23414). Guarded like the execution.revision block so a
+-- repeat run, or a column that is already wider or text, is left alone.
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM pg_attribute a
+        JOIN pg_class c ON c.oid = a.attrelid
+        WHERE a.attrelid = to_regclass('registry')
+          AND c.relkind IN ('r', 'p')
+          AND a.attname = 'access_key'
+          AND a.attnum > 0
+          AND NOT a.attisdropped
+          AND a.atttypid = 'varchar'::regtype
+          AND a.atttypmod > 0
+          AND a.atttypmod - 4 < 4096
+    ) THEN
+        ALTER TABLE registry ALTER COLUMN access_key TYPE varchar(4096);
+    END IF;
+END
+$$;
