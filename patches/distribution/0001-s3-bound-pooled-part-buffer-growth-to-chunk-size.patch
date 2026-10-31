@@ -1,0 +1,350 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Vadim Bauer <vb@container-registry.com>
+Date: Tue, 22 Sep 2026 16:58:40 +0200
+Subject: [PATCH 1/2] fix(s3): bound pooled part buffer growth to chunk size
+
+Every in-flight blob upload holds a pooled bytes.Buffer that fills to
+ChunkSize before a part is flushed. The pooled buffers start empty, so
+bytes.Buffer grows geometrically while filling and settles at roughly 2x
+ChunkSize of capacity, and a single Write larger than the remaining space
+grows it further still. Under concurrent pushes, per-upload memory is
+about twice what the chunksize configuration suggests.
+
+Grow the buffer manually instead: capacity grows by 8x as data arrives
+and is capped at ChunkSize, and Write splits its input at chunk
+boundaries so the buffer is flushed exactly when it reaches ChunkSize.
+The buffer never exceeds ChunkSize regardless of caller write sizes,
+small uploads do not reserve a full chunk, and the arithmetic cannot
+overflow on 32-bit platforms where ChunkSize may be math.MaxInt32.
+
+32 concurrent 100MB uploads at the default 10MiB chunksize against a
+local fake S3: peak heap 740MiB -> 371MiB, uploaded content verified
+byte-identical.
+
+Co-authored-by: Milos Gajdos <milosthegajdos@gmail.com>
+Signed-off-by: Milos Gajdos <milosthegajdos@gmail.com>
+Signed-off-by: Vadim Bauer <vb@container-registry.com>
+Upstream: https://github.com/distribution/distribution/pull/4919
+---
+ registry/storage/driver/s3-aws/s3.go      |  81 +++++++++-
+ registry/storage/driver/s3-aws/s3_test.go | 173 ++++++++++++++++++++++
+ 2 files changed, 246 insertions(+), 8 deletions(-)
+
+diff --git a/registry/storage/driver/s3-aws/s3.go b/registry/storage/driver/s3-aws/s3.go
+index 215ca0b9..ab28bbef 100644
+--- a/registry/storage/driver/s3-aws/s3.go
++++ b/registry/storage/driver/s3-aws/s3.go
+@@ -446,6 +446,12 @@ func getParameterAsBool(parameters map[string]any, name string, defaultValue boo
+ 	return defaultValue, nil
+ }
+ 
++func newBufferPool() *sync.Pool {
++	return &sync.Pool{
++		New: func() any { return &bytes.Buffer{} },
++	}
++}
++
+ // New constructs a new Driver with the given AWS credentials, region, encryption flag, and
+ // bucketName
+ func New(ctx context.Context, params DriverParameters) (*Driver, error) {
+@@ -532,9 +538,7 @@ func New(ctx context.Context, params DriverParameters) (*Driver, error) {
+ 		RootDirectory:               params.RootDirectory,
+ 		StorageClass:                params.StorageClass,
+ 		ObjectACL:                   params.ObjectACL,
+-		pool: &sync.Pool{
+-			New: func() any { return &bytes.Buffer{} },
+-		},
++		pool:                        newBufferPool(),
+ 	}
+ 
+ 	return &Driver{
+@@ -1363,7 +1367,7 @@ func (w *writer) Write(p []byte) (int, error) {
+ 
+ 			w.reset()
+ 
+-			if _, err := io.Copy(w.buf, resp.Body); err != nil {
++			if _, err := io.Copy(writerBuffer{w}, resp.Body); err != nil {
+ 				return 0, err
+ 			}
+ 		} else {
+@@ -1386,16 +1390,77 @@ func (w *writer) Write(p []byte) (int, error) {
+ 		}
+ 	}
+ 
+-	n, _ := w.buf.Write(p)
++	var n int
++	for len(p) > 0 {
++		remaining := w.driver.ChunkSize - w.buf.Len()
++		if remaining <= 0 {
++			return n, fmt.Errorf("invalid buffer length %d for chunk size %d", w.buf.Len(), w.driver.ChunkSize)
++		}
++
++		writeSize := min(len(p), remaining)
++		nn, err := w.writeBuffer(p[:writeSize])
++		n += nn
++		p = p[nn:]
++		if err != nil {
++			return n, err
++		}
++		if nn != writeSize {
++			return n, io.ErrShortWrite
++		}
+ 
+-	for w.buf.Len() >= w.driver.ChunkSize {
+-		if err := w.flush(); err != nil {
+-			return 0, fmt.Errorf("flush: %w", err)
++		if w.buf.Len() == w.driver.ChunkSize {
++			if err := w.flush(); err != nil {
++				return n, fmt.Errorf("flush: %w", err)
++			}
+ 		}
+ 	}
++
+ 	return n, nil
+ }
+ 
++type writerBuffer struct {
++	writer *writer
++}
++
++func (b writerBuffer) Write(p []byte) (int, error) {
++	return b.writer.writeBuffer(p)
++}
++
++// writeBuffer appends p without allowing the buffer capacity to exceed the
++// configured chunk size. Capacity grows only as data arrives, so empty and
++// small uploads do not reserve an entire chunk.
++func (w *writer) writeBuffer(p []byte) (int, error) {
++	// Grow aggressively to limit copies for full chunks, while keeping
++	// allocation proportional for small uploads.
++	const growthFactor = 8
++
++	remaining := w.driver.ChunkSize - w.buf.Len()
++	if len(p) > remaining {
++		return 0, io.ErrShortBuffer
++	}
++
++	required := w.buf.Len() + len(p)
++	if required > w.buf.Cap() {
++		capacity := w.buf.Cap()
++		if capacity == 0 {
++			capacity = required
++		} else if capacity > w.driver.ChunkSize/growthFactor {
++			capacity = w.driver.ChunkSize
++		} else {
++			capacity *= growthFactor
++		}
++		if capacity < required {
++			capacity = required
++		}
++
++		data := make([]byte, w.buf.Len(), capacity)
++		copy(data, w.buf.Bytes())
++		w.buf = bytes.NewBuffer(data)
++	}
++
++	return w.buf.Write(p)
++}
++
+ func (w *writer) Size() int64 {
+ 	return w.size
+ }
+diff --git a/registry/storage/driver/s3-aws/s3_test.go b/registry/storage/driver/s3-aws/s3_test.go
+index a4b303d3..7eada442 100644
+--- a/registry/storage/driver/s3-aws/s3_test.go
++++ b/registry/storage/driver/s3-aws/s3_test.go
+@@ -6,7 +6,9 @@ import (
+ 	"crypto/rand"
+ 	"errors"
+ 	"fmt"
++	"io"
+ 	"net/http"
++	"net/http/httptest"
+ 	"os"
+ 	"path"
+ 	"reflect"
+@@ -17,6 +19,8 @@ import (
+ 	"testing"
+ 
+ 	"github.com/aws/aws-sdk-go/aws"
++	"github.com/aws/aws-sdk-go/aws/credentials"
++	"github.com/aws/aws-sdk-go/aws/session"
+ 	"github.com/aws/aws-sdk-go/service/s3"
+ 	"github.com/distribution/distribution/v3/internal/dcontext"
+ 	storagedriver "github.com/distribution/distribution/v3/registry/storage/driver"
+@@ -177,6 +181,175 @@ func BenchmarkS3DriverSuite(b *testing.B) {
+ 	testsuites.BenchDriver(b, newDriverConstructor(b))
+ }
+ 
++func TestNewBufferPoolAllocatesLazily(t *testing.T) {
++	buf := newBufferPool().Get().(*bytes.Buffer)
++	if buf.Len() != 0 || buf.Cap() != 0 {
++		t.Fatalf("new pooled buffer has len %d and cap %d, want both zero", buf.Len(), buf.Cap())
++	}
++}
++
++func TestWriterWriteBufferGrowth(t *testing.T) {
++	const chunkSize = 1024
++
++	tests := []struct {
++		name    string
++		writes  [][]byte
++		wantLen int
++		wantCap int
++		wantErr error
++	}{
++		{
++			name:    "empty write does not allocate",
++			wantLen: 0,
++			wantCap: 0,
++		},
++		{
++			name:    "small write grows to data",
++			writes:  [][]byte{make([]byte, 100)},
++			wantLen: 100,
++			wantCap: 100,
++		},
++		{
++			name:    "subsequent write grows geometrically",
++			writes:  [][]byte{make([]byte, 100), make([]byte, 100)},
++			wantLen: 200,
++			wantCap: 800,
++		},
++		{
++			name:    "large write caps growth at chunk size",
++			writes:  [][]byte{make([]byte, 100), make([]byte, 100), make([]byte, 824)},
++			wantLen: chunkSize,
++			wantCap: chunkSize,
++		},
++		{
++			name:    "write past chunk is rejected",
++			writes:  [][]byte{make([]byte, chunkSize), {0}},
++			wantLen: chunkSize,
++			wantCap: chunkSize,
++			wantErr: io.ErrShortBuffer,
++		},
++	}
++
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			w := &writer{
++				driver: &driver{ChunkSize: chunkSize},
++				buf:    newBufferPool().Get().(*bytes.Buffer),
++			}
++
++			var err error
++			for _, data := range tt.writes {
++				if _, err = w.writeBuffer(data); err != nil {
++					break
++				}
++			}
++			if !errors.Is(err, tt.wantErr) {
++				t.Fatalf("writeBuffer() error = %v, want %v", err, tt.wantErr)
++			}
++			if w.buf.Len() != tt.wantLen {
++				t.Errorf("buffer length = %d, want %d", w.buf.Len(), tt.wantLen)
++			}
++			if w.buf.Cap() != tt.wantCap {
++				t.Errorf("buffer capacity = %d, want %d", w.buf.Cap(), tt.wantCap)
++			}
++		})
++	}
++}
++
++func TestWriterWriteBufferWithMaximumChunkSize(t *testing.T) {
++	maxInt := int(^uint(0) >> 1)
++	w := &writer{
++		driver: &driver{ChunkSize: maxInt},
++		buf:    newBufferPool().Get().(*bytes.Buffer),
++	}
++
++	n, err := w.writeBuffer([]byte{0})
++	if err != nil {
++		t.Fatalf("writeBuffer() error: %v", err)
++	}
++	if n != 1 {
++		t.Errorf("writeBuffer() wrote %d bytes, want 1", n)
++	}
++	if w.buf.Cap() != 1 {
++		t.Errorf("buffer capacity = %d, want 1", w.buf.Cap())
++	}
++}
++
++func TestWriterWriteBoundsBufferToChunkSize(t *testing.T) {
++	var uploadedPartSizes []int
++	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		part, err := io.ReadAll(r.Body)
++		if err != nil {
++			t.Errorf("reading uploaded part: %v", err)
++			w.WriteHeader(http.StatusInternalServerError)
++			return
++		}
++		uploadedPartSizes = append(uploadedPartSizes, len(part))
++		w.Header().Set("ETag", fmt.Sprintf(`"part-%d"`, len(uploadedPartSizes)))
++		w.WriteHeader(http.StatusOK)
++	}))
++	t.Cleanup(server.Close)
++
++	sess := session.Must(session.NewSession(&aws.Config{
++		Credentials:      credentials.NewStaticCredentials("access-key", "secret-key", ""),
++		DisableSSL:       aws.Bool(true),
++		Endpoint:         aws.String(server.URL),
++		Region:           aws.String("us-east-1"),
++		S3ForcePathStyle: aws.Bool(true),
++	}))
++
++	const chunkSize = 8
++	d := &driver{
++		S3:        s3.New(sess),
++		Bucket:    "bucket",
++		ChunkSize: chunkSize,
++		pool:      newBufferPool(),
++	}
++	w := d.newWriter(t.Context(), "key", "upload-id", nil).(*writer)
++
++	payload := bytes.Repeat([]byte{0xab}, 2*chunkSize+5)
++	n, err := w.Write(payload)
++	if err != nil {
++		t.Fatalf("Write() error: %v", err)
++	}
++	if n != len(payload) {
++		t.Fatalf("Write() wrote %d bytes, want %d", n, len(payload))
++	}
++	if w.buf.Cap() > chunkSize {
++		t.Errorf("buffer capacity = %d, want at most %d", w.buf.Cap(), chunkSize)
++	}
++
++	if err := w.Close(); err != nil {
++		t.Fatalf("Close() error: %v", err)
++	}
++
++	wantPartSizes := []int{chunkSize, chunkSize, 5}
++	if !slices.Equal(uploadedPartSizes, wantPartSizes) {
++		t.Errorf("uploaded part sizes = %v, want %v", uploadedPartSizes, wantPartSizes)
++	}
++}
++
++func BenchmarkWriterBufferGrowth(b *testing.B) {
++	const (
++		chunkSize = 10 * 1024 * 1024
++		writeSize = 32 * 1024
++	)
++	data := make([]byte, writeSize)
++
++	b.ReportAllocs()
++	for b.Loop() {
++		w := &writer{
++			driver: &driver{ChunkSize: chunkSize},
++			buf:    newBufferPool().Get().(*bytes.Buffer),
++		}
++		for w.buf.Len() < chunkSize {
++			if _, err := w.writeBuffer(data); err != nil {
++				b.Fatal(err)
++			}
++		}
++	}
++}
++
+ func TestGetS3LogLevelFromParam(t *testing.T) {
+ 	tests := []struct {
+ 		name     string
