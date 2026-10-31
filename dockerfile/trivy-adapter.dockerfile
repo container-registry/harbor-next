@@ -3,6 +3,8 @@
 
 ARG HARBOR_SCANNER_TRIVY_VERSION=MISSING-BUILD-ARG
 ARG TRIVY_BASE_IMAGE_VERSION=MISSING-BUILD-ARG
+ARG TRIVY_VERSION=MISSING-BUILD-ARG
+ARG TRIVY_COMMIT=unknown
 ARG ALPINE_VERSION=MISSING-BUILD-ARG
 
 FROM alpine:${ALPINE_VERSION} AS certs
@@ -20,6 +22,12 @@ RUN addgroup -S scanner && adduser -S -G scanner -h /home/scanner scanner && \
 
 ARG HARBOR_SCANNER_TRIVY_VERSION
 ENV SCANNER_VERSION=${HARBOR_SCANNER_TRIVY_VERSION}
+
+# Read by the scanner's GetScannerMetadata() and surfaced as Scanner.Version
+# in the Harbor UI; the commit suffix pins the exact Trivy source built.
+ARG TRIVY_VERSION
+ARG TRIVY_COMMIT
+ENV TRIVY_VERSION="${TRIVY_VERSION} (${TRIVY_COMMIT})"
 WORKDIR /
 
 EXPOSE 8080
