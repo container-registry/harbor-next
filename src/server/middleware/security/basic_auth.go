@@ -65,11 +65,13 @@ func (b *basicAuth) Generate(req *http.Request) security.Context {
 	if !ok {
 		return nil
 	}
-	// In OIDC mode only the admin uses basic auth: users carry CLI secrets and
-	// robots carry JWTs, both resolved by earlier generators, so skipping the
-	// rest spares a useless auth-backend round-trip for credential probes. LDAP
-	// and UAA users have no other way in: their password is their basic auth
-	// for the API and for docker login, so those modes are not skipped.
+
+	// In OIDC/LDAP/UAA modes only the admin uses basic auth; other principals are
+	// expected to use other credentials. That only holds for OIDC: users carry
+	// CLI secrets and robots carry robot secrets, both resolved by earlier
+	// generators, so skipping spares an auth-backend round-trip for credential
+	// probes. LDAP and UAA users have no other way in: their password is their
+	// basic auth for the API and for docker login, so those modes are not skipped.
 	authMode := lib.GetAuthMode(req.Context())
 	if authMode == common.OIDCAuth && !auth.IsSuperUser(req.Context(), username) {
 		log.Debugf("basic auth skipped for user %s, auth mode is %s", username, authMode)
