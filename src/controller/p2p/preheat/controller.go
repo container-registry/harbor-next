@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/goharbor/harbor/src/jobservice/job"
+	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/p2p/preheat/instance"
@@ -178,18 +179,22 @@ func (c *controller) CreateInstance(ctx context.Context, instance *providerModel
 		return 0, errors.New("nil instance object provided")
 	}
 
-	// Avoid duplicated endpoint
-	var query = &q.Query{
-		Keywords: map[string]any{
-			"endpoint": instance.Endpoint,
-		},
-	}
-	num, err := c.iManager.Count(ctx, query)
+	// normalize first so a host differing only in case is caught as a duplicate
+	endpoint, err := lib.ValidateURL(instance.Endpoint, "http", "https")
 	if err != nil {
 		return 0, err
 	}
-	if num > 0 {
-		return 0, ErrorConflict
+	instance.Endpoint = endpoint
+
+	// Avoid duplicated endpoint; older rows may still hold a mixed-case host, so normalize them too
+	existing, err := c.iManager.List(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	for _, ins := range existing {
+		if normalizeEndpoint(ins.Endpoint) == instance.Endpoint {
+			return 0, ErrorConflict
+		}
 	}
 
 	// !WARN: We don't check the health of the instance here.
@@ -198,6 +203,13 @@ func (c *controller) CreateInstance(ctx context.Context, instance *providerModel
 	instance.SetupTimestamp = time.Now().Unix()
 
 	return c.iManager.Save(ctx, instance)
+}
+
+func normalizeEndpoint(endpoint string) string {
+	if normalized, err := lib.ValidateURL(endpoint, "http", "https"); err == nil {
+		return normalized
+	}
+	return endpoint
 }
 
 // DeleteInstance implements @Controller.Delete
@@ -253,6 +265,14 @@ func (c *controller) UpdateInstance(ctx context.Context, instance *providerModel
 	// vendor type does not support change
 	if oldIns.Vendor != instance.Vendor {
 		return errors.Errorf("provider [%s] vendor cannot be changed", oldIns.Name)
+	}
+
+	if instance.Endpoint != "" {
+		endpoint, err := lib.ValidateURL(instance.Endpoint, "http", "https")
+		if err != nil {
+			return err
+		}
+		instance.Endpoint = endpoint
 	}
 
 	return c.iManager.Update(ctx, instance, properties...)
