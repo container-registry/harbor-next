@@ -13,8 +13,7 @@ spec:
   replicas: {{ .Values.exporter.replicas }}
   revisionHistoryLimit: {{ .Values.exporter.revisionHistoryLimit | default .Values.global.revisionHistoryLimit }}
   {{- with .Values.exporter.deploymentStrategy }}
-  strategy:
-    {{- toYaml . | nindent 4 }}
+  {{- include "harbor.deploymentStrategy" . | nindent 2 }}
   {{- end }}
   selector:
     matchLabels:

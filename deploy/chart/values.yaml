@@ -419,7 +419,7 @@ core:
     # preStop:
     #   exec:
     #     command: ["/bin/sh", "-c", "sleep 15"]
-  # -- Deployment strategy (empty = K8s default RollingUpdate)
+  # -- Deployment strategy (empty = K8s default RollingUpdate; type Recreate clears rollingUpdate)
   # @default -- {}
   deploymentStrategy: {}
   #   type: RollingUpdate
@@ -734,7 +734,7 @@ registry:
     # preStop:
     #   exec:
     #     command: ["/bin/sh", "-c", "sleep 15"]
-  # -- Deployment strategy (empty = K8s default RollingUpdate)
+  # -- Deployment strategy (empty = K8s default RollingUpdate; type Recreate clears rollingUpdate)
   # @default -- {}
   deploymentStrategy: {}
 
@@ -962,7 +962,7 @@ portal:
     # preStop:
     #   exec:
     #     command: ["/bin/sh", "-c", "sleep 15"]
-  # -- Deployment strategy (empty = K8s default RollingUpdate)
+  # -- Deployment strategy (empty = K8s default RollingUpdate; type Recreate clears rollingUpdate)
   # @default -- {}
   deploymentStrategy: {}
 
@@ -1185,7 +1185,7 @@ jobservice:
     # preStop:
     #   exec:
     #     command: ["/bin/sh", "-c", "sleep 15"]
-  # -- Deployment strategy (empty = K8s default RollingUpdate)
+  # -- Deployment strategy (empty = K8s default RollingUpdate; type Recreate clears rollingUpdate)
   # @default -- {}
   deploymentStrategy: {}
 
@@ -1382,7 +1382,7 @@ exporter:
     # preStop:
     #   exec:
     #     command: ["/bin/sh", "-c", "sleep 15"]
-  # -- Deployment strategy (empty = K8s default RollingUpdate)
+  # -- Deployment strategy (empty = K8s default RollingUpdate; type Recreate clears rollingUpdate)
   # @default -- {}
   deploymentStrategy: {}
 
