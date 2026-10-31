@@ -67,6 +67,10 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 		t.Fatalf("create execution dependency: %v", err)
 	}
 
+	if _, err := schemaPool.DB().ExecContext(ctx, "CREATE TABLE registry (id SERIAL PRIMARY KEY, access_key varchar(255))"); err != nil {
+		t.Fatalf("create registry dependency: %v", err)
+	}
+
 	path := authoritativeTestSchemaPath()
 	errCh := make(chan error, 2)
 	for range 2 {
@@ -153,6 +157,19 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 		t.Errorf("look up execution.revision type: %v", err)
 	} else if revisionType != "bigint" {
 		t.Errorf("execution.revision is %q, want bigint", revisionType)
+	}
+
+	var accessKeyLength int
+	err = schemaPool.DB().QueryRowContext(ctx, `
+		SELECT character_maximum_length
+		FROM information_schema.columns
+		WHERE table_schema = current_schema()
+		  AND table_name = 'registry'
+		  AND column_name = 'access_key'`).Scan(&accessKeyLength)
+	if err != nil {
+		t.Errorf("look up registry.access_key length: %v", err)
+	} else if accessKeyLength != 4096 {
+		t.Errorf("registry.access_key length is %d, want 4096", accessKeyLength)
 	}
 }
 
