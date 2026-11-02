@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.2](https://github.com/container-registry/harbor-next/compare/chart-v2.1.1...chart-v2.1.2) (2026-11-02)
+
+
+### Harbor Releases
+
+* release 2.15.15 ([#1371](https://github.com/container-registry/harbor-next/issues/1371)) ([600321e](https://github.com/container-registry/harbor-next/commit/600321e42d6e22a3a330ca677013e875e8d19d7b))
+
 ## [2.1.1](https://github.com/container-registry/harbor-next/compare/chart-v2.1.0...chart-v2.1.1) (2026-10-27)
 
 
