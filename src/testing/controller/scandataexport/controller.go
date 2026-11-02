@@ -124,6 +124,36 @@ func (_m *Controller) ListExecutions(ctx context.Context, userName string) ([]*e
 	return r0, r1
 }
 
+// ListRobotExecutions provides a mock function with given fields: ctx, robotID
+func (_m *Controller) ListRobotExecutions(ctx context.Context, robotID int64) ([]*export.Execution, error) {
+	ret := _m.Called(ctx, robotID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListRobotExecutions")
+	}
+
+	var r0 []*export.Execution
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) ([]*export.Execution, error)); ok {
+		return rf(ctx, robotID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) []*export.Execution); ok {
+		r0 = rf(ctx, robotID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*export.Execution)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(ctx, robotID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Start provides a mock function with given fields: ctx, criteria
 func (_m *Controller) Start(ctx context.Context, criteria export.Request) (int64, error) {
 	ret := _m.Called(ctx, criteria)
