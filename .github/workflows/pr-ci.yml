@@ -103,6 +103,7 @@ jobs:
           task build:binary:lprobe:${PLATFORM_PAIR}
           if [ "${COMPONENT}" = "trivy-adapter" ]; then
             task build:binary:trivy:${PLATFORM_PAIR}
+            echo "TRIVY_COMMIT=$(cat bin/${PLATFORM_PAIR}/.trivy-commit)" >> "$GITHUB_ENV"
           fi
 
       - uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4.1.0
@@ -134,6 +135,8 @@ jobs:
             GO_VERSION=${{ env.GO_VERSION }}
             DISTRIBUTION_VERSION=${{ env.DISTRIBUTION_VERSION }}
             LPROBE_VERSION=${{ env.LPROBE_VERSION }}
+            TRIVY_VERSION=${{ env.TRIVY_VERSION }}
+            TRIVY_COMMIT=${{ env.TRIVY_COMMIT }}
             TRIVY_BASE_IMAGE_VERSION=${{ env.TRIVY_BASE_IMAGE_VERSION }}
             HARBOR_SCANNER_TRIVY_VERSION=${{ env.HARBOR_SCANNER_TRIVY_VERSION }}
           tags: ${{ env.REGISTRY_ADDRESS }}/${{ env.PR_REGISTRY_PROJECT }}/${{ steps.prepare.outputs.image_name }}
