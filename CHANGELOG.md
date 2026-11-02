@@ -6,6 +6,27 @@ This changelog mirrors [GitHub Releases](https://github.com/container-registry/h
 
 ---
 
+## [2.15.15](https://github.com/container-registry/harbor-next/compare/v2.15.14...v2.15.15) (2026-11-02)
+
+
+### Bug Fixes
+
+* **auth:** Keep Basic Auth For LDAP And UAA Users (backport [#1275](https://github.com/container-registry/harbor-next/issues/1275)) ([#1372](https://github.com/container-registry/harbor-next/issues/1372)) ([3455616](https://github.com/container-registry/harbor-next/commit/3455616b8724028fe7371873a47b3e118108e56d))
+* **build:** Stamp Version Metadata Into Trivy Binaries (backport [#459](https://github.com/container-registry/harbor-next/issues/459)) ([#1380](https://github.com/container-registry/harbor-next/issues/1380)) ([88a7945](https://github.com/container-registry/harbor-next/commit/88a794548241d7d336413eeb0d6cd9f0b41b7144))
+* **config:** Refuse To Save A Secret That Cannot Be Encrypted (backport [#1359](https://github.com/container-registry/harbor-next/issues/1359)) ([#1370](https://github.com/container-registry/harbor-next/issues/1370)) ([1d54a2e](https://github.com/container-registry/harbor-next/commit/1d54a2e47fe39b10d5f86d4d773debb0fe47f70a))
+* **deps:** Bump The Registry To Distribution v3.1.2 ([#1373](https://github.com/container-registry/harbor-next/issues/1373)) ([e298000](https://github.com/container-registry/harbor-next/commit/e298000250cd0bab38e9d25831f458396d6c8a42))
+* **portal:** Make Log Rotation settings savable and surface no-op purge schedules (backport [#463](https://github.com/container-registry/harbor-next/issues/463)) ([#1379](https://github.com/container-registry/harbor-next/issues/1379)) ([0f1b010](https://github.com/container-registry/harbor-next/commit/0f1b0109f57a65d559f8109c4877a6d987bc3096))
+
+
+### Upstream
+
+* fix: make endpoint validation host case-insensitive (goharbor/harbor[#23889](https://github.com/container-registry/harbor-next/issues/23889)) ([#866](https://github.com/container-registry/harbor-next/issues/866)) ([27e8bcd](https://github.com/container-registry/harbor-next/commit/27e8bcd08b60ed6cbcd70efcc9f8428fa899260f))
+* fix(project): reject registry_id changes in UpdateProject (goharbor/harbor[#24162](https://github.com/container-registry/harbor-next/issues/24162)) (backport [#1334](https://github.com/container-registry/harbor-next/issues/1334)) ([ca2485b](https://github.com/container-registry/harbor-next/commit/ca2485bd92da75b57c873d317095b18c9878df0d))
+* fix(registry): validate upload Location against the request origin, n… (goharbor/harbor[#24113](https://github.com/container-registry/harbor-next/issues/24113)) ([#1202](https://github.com/container-registry/harbor-next/issues/1202)) ([0956a59](https://github.com/container-registry/harbor-next/commit/0956a594467ac904aff9f5153c50e57f68026b89))
+* fix(replication): keep type of multi-tier accessories (goharbor/harbor[#24200](https://github.com/container-registry/harbor-next/issues/24200)) (backport [#1304](https://github.com/container-registry/harbor-next/issues/1304)) ([6f4a682](https://github.com/container-registry/harbor-next/commit/6f4a682c6008dbbe3ce49b3fd74b56ee4097766a))
+* fix(replication): make the image resource filter take effect again (goharbor/harbor[#24176](https://github.com/container-registry/harbor-next/issues/24176)) ([#1279](https://github.com/container-registry/harbor-next/issues/1279)) ([ae2272c](https://github.com/container-registry/harbor-next/commit/ae2272ce590ae5fa92c8bab0af4d5c68a721ba09))
+* make hostname and endpoint comparisons case-insensitive (goharbor/harbor[#23827](https://github.com/container-registry/harbor-next/issues/23827), [#23842](https://github.com/container-registry/harbor-next/issues/23842)) ([#1308](https://github.com/container-registry/harbor-next/issues/1308)) ([5240af9](https://github.com/container-registry/harbor-next/commit/5240af912c1a0b7aa710268e8096d3d852bc9411))
+
 ## [2.15.14](https://github.com/container-registry/harbor-next/compare/v2.15.13...v2.15.14) (2026-10-23)
 
 
