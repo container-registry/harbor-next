@@ -44,6 +44,9 @@ type Request struct {
 	// UserName contains the name of the user initiating the export request
 	UserName string
 
+	// RobotID is the robot account initiating the export request, 0 for a user
+	RobotID int64
+
 	// JobName contains the name of the job as specified by the external client.
 	JobName string
 
@@ -106,6 +109,8 @@ type Execution struct {
 	JobName string
 	// Name of the user triggering the job
 	UserName string
+	// RobotID is the robot account that triggered the job, 0 for a user
+	RobotID int64
 	// FilePresent is true if file artifact is actually present, false otherwise
 	FilePresent bool
 }

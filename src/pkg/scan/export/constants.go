@@ -21,6 +21,7 @@ const (
 	ProjectIDsAttribute    = "project_ids"
 	JobNameAttribute       = "job_name"
 	UserNameAttribute      = "user_name"
+	RobotIDAttribute       = "robot_id"
 	StatusMessageAttribute = "status_message"
 	// the scan data is a temporary file, use /tmp directory to avoid the permission issue.
 	ScanDataExportDir  = "/tmp"
