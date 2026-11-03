@@ -11,6 +11,7 @@ import (
 
 	"github.com/goharbor/harbor/src/jobservice/job"
 	"github.com/goharbor/harbor/src/lib/orm"
+	q2 "github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/scan/export"
 	"github.com/goharbor/harbor/src/pkg/task"
 	ormtesting "github.com/goharbor/harbor/src/testing/lib/orm"
@@ -318,6 +319,53 @@ func (suite *ScanDataExportExecutionTestSuite) TestStartWithTaskManagerError() {
 		_, err := suite.ctl.Start(ctx, export.Request{JobName: "test-job", UserName: "test-user", Projects: []int64{1}})
 		suite.Error(err)
 	}
+}
+
+func (suite *ScanDataExportExecutionTestSuite) TestStartRecordsRobotOwner() {
+	suite.taskMgr = &testingTask.Manager{}
+	suite.execMgr = &testingTask.ExecutionManager{}
+	suite.ctl = &controller{
+		execMgr: suite.execMgr,
+		taskMgr: suite.taskMgr,
+		makeCtx: func() context.Context { return orm.NewContext(nil, &ormtesting.FakeOrmer{}) },
+	}
+	attrs := map[string]any{
+		export.ProjectIDsAttribute: []int64{1},
+		export.JobNameAttribute:    "test-job",
+		export.UserNameAttribute:   "robot$proj+ci",
+		export.RobotIDAttribute:    int64(42),
+	}
+	suite.execMgr.On("Create", mock.Anything, mock.Anything, int64(0), mock.Anything, attrs).Return(int64(10), nil)
+	suite.taskMgr.On("Create", mock.Anything, mock.Anything, mock.Anything).Return(int64(20), nil)
+	ctx := context.WithValue(context.Background(), export.CsvJobVendorIDKey, 0)
+	id, err := suite.ctl.Start(ctx, export.Request{Projects: []int64{1}, JobName: "test-job", UserName: "robot$proj+ci", RobotID: 42})
+	suite.NoError(err)
+	suite.Equal(int64(10), id)
+
+	// the attribute comes back as a JSON number once stored
+	mock.OnAnything(suite.execMgr, "Get").Return(&task.Execution{ID: 10, ExtraAttrs: map[string]any{
+		export.UserNameAttribute: "robot$proj+ci",
+		export.RobotIDAttribute:  float64(42),
+	}}, nil).Once()
+	exec, err := suite.ctl.GetExecution(context.TODO(), 10)
+	suite.NoError(err)
+	suite.Equal(int64(42), exec.RobotID)
+}
+
+func (suite *ScanDataExportExecutionTestSuite) TestListRobotExecutions() {
+	suite.execMgr = &testingTask.ExecutionManager{}
+	suite.sysArtifactMgr = &systemartifacttesting.Manager{}
+	suite.ctl = &controller{execMgr: suite.execMgr, sysArtifactMgr: suite.sysArtifactMgr}
+	byRobotID := testifymock.MatchedBy(func(query *q2.Query) bool {
+		return query.Keywords["VendorType"] == job.ScanDataExportVendorType &&
+			query.Keywords["ExtraAttrs."+export.RobotIDAttribute] == "42" &&
+			query.Keywords["ExtraAttrs."+export.UserNameAttribute] == nil
+	})
+	suite.execMgr.On("List", mock.Anything, byRobotID).Return([]*task.Execution{{ID: 1, ExtraAttrs: map[string]any{export.RobotIDAttribute: float64(42)}}}, nil).Once()
+	execs, err := suite.ctl.ListRobotExecutions(context.TODO(), 42)
+	suite.NoError(err)
+	suite.Require().Len(execs, 1)
+	suite.Equal(int64(42), execs[0].RobotID)
 }
 
 func (suite *ScanDataExportExecutionTestSuite) TearDownSuite() {
