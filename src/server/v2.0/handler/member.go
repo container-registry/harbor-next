@@ -22,6 +22,8 @@ import (
 	"github.com/go-openapi/runtime/middleware"
 
 	"github.com/goharbor/harbor/src/common/rbac"
+	"github.com/goharbor/harbor/src/common/security"
+	robotSec "github.com/goharbor/harbor/src/common/security/robot"
 	"github.com/goharbor/harbor/src/controller/member"
 	roleCtl "github.com/goharbor/harbor/src/controller/role"
 	"github.com/goharbor/harbor/src/lib"
@@ -185,13 +187,22 @@ func (m *memberAPI) UpdateProjectMember(ctx context.Context, params operation.Up
 	return operation.NewUpdateProjectMemberOK()
 }
 
+func isRobotCaller(ctx context.Context) bool {
+	secCtx, ok := security.FromContext(ctx)
+	if !ok {
+		return false
+	}
+	_, ok = secCtx.(*robotSec.SecurityContext)
+	return ok
+}
+
 // checkNoEscalation rejects role assignments where the target role has permissions the caller lacks.
 func (m *memberAPI) checkNoEscalation(ctx context.Context, projectNameOrID any, roleID int64) error {
-	// Built-in roles stay grantable by anyone who may write members, project
-	// admin included: provisioning robots depend on it (#1137 and its revert
-	// #1227). The guard applies to custom roles, whose permission sets are
-	// arbitrary.
-	if policy.IsBuiltinRole(roleID) {
+	// Robots may grant built-in roles with member write access alone:
+	// provisioning depends on it (#1137 and its revert #1227), and built-ins
+	// carry permissions no robot can hold. Humans get the full check, or a
+	// member:update holder could promote themselves to project admin.
+	if policy.IsBuiltinRole(roleID) && isRobotCaller(ctx) {
 		return nil
 	}
 	r, err := m.roleCtl.Get(ctx, roleID, &roleCtl.Option{WithPermission: true})

@@ -163,19 +163,33 @@ func TestCheckNoEscalation_CallerLacksPermission(t *testing.T) {
 	assert.Equal(t, errors.ForbiddenCode, errors.ErrCode(err), "expected ForbiddenError, got: %v", err)
 }
 
-// Built-in roles are grantable without holding their permissions (#1227).
-func TestCheckNoEscalation_BuiltinRoleExempt(t *testing.T) {
+// A human caller who may only update members cannot hand out project admin,
+// themselves included: built-in roles get the same check as custom ones.
+func TestCheckNoEscalation_BuiltinRoleCheckedForHumans(t *testing.T) {
 	sc := &securityMock.Context{}
 	sc.On("IsSysAdmin").Return(false)
-	// Caller holds none of projectAdmin's permissions; built-in roles are
-	// still grantable (see #1227), so the role controller is never consulted.
-	sc.On("Can", testifymock.Anything, testifymock.Anything, testifymock.Anything).Return(false)
+	sc.On("Can", testifymock.Anything,
+		rbac.ActionUpdate, projectResource(rbac.ResourceMember)).Return(true)
+	sc.On("Can", testifymock.Anything,
+		rbac.ActionDelete, projectResource(rbac.ResourceRepository)).Return(false)
 
 	rc := &stubRoleCtl{}
+	rc.On("Get", testifymock.Anything, int64(common.RoleProjectAdmin), testifymock.Anything).
+		Return(projectAdminRole(), nil)
 
 	err := newAPI(rc).checkNoEscalation(newCtxWithSecurity(sc), testProjectID, int64(common.RoleProjectAdmin))
-	assert.NoError(t, err, "built-in roles are exempt from the escalation guard")
-	rc.AssertNotCalled(t, "Get")
+	assert.Equal(t, errors.ForbiddenCode, errors.ErrCode(err), "expected ForbiddenError, got: %v", err)
+}
+
+func projectAdminRole() *roleCtl.Role {
+	return &roleCtl.Role{
+		Permissions: []*roleCtl.Permission{{
+			Access: []*types.Policy{
+				{Resource: rbac.ResourceMember, Action: rbac.ActionUpdate},
+				{Resource: rbac.ResourceRepository, Action: rbac.ActionDelete},
+			},
+		}},
+	}
 }
 
 func TestCheckNoEscalation_FirstPermissionPassesSecondFails(t *testing.T) {
@@ -377,9 +391,9 @@ func memberWriteAccess() []*types.Policy {
 	}
 }
 
-// Whoever may create and update members of a project may give them any
-// role, the project admin role included. There is no extra check for that
-// role, so provisioning robots keep working (see #1137 and its revert).
+// A robot that may create and update members of a project may give them any
+// built-in role, the project admin role included, so provisioning robots keep
+// working (see #1137 and its revert). A system admin holds every permission.
 func TestMemberWritesGrantProjectAdmin(t *testing.T) {
 	const projectID int64 = 1
 	// The robot context captures project.Ctl when it is built, so each case
@@ -437,9 +451,13 @@ func TestMemberWritesGrantProjectAdmin(t *testing.T) {
 				project.Ctl = previousProjectCtl
 			})
 
+			rc := &stubRoleCtl{}
+			rc.On("Get", testifymock.Anything, int64(common.RoleProjectAdmin), testifymock.Anything).
+				Return(projectAdminRole(), nil).Maybe()
 			controller := &recordingMemberController{}
 			api := newMemberAPI()
 			api.ctl = controller
+			api.roleCtl = rc
 			ctx := security.NewContext(context.Background(), test.securityCtx())
 
 			allowed, err := api.HasProjectPermission(
