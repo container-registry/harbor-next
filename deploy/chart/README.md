@@ -752,6 +752,7 @@ Kubernetes: `>=1.28.0-0`
 | Repository | Name | Version |
 |------------|------|---------|
 | oci://ghcr.io/valkey-io/valkey-helm | valkey | 0.12.1 |
+| oci://registry-1.docker.io/cloudpirates | postgresql(postgres) | 0.21.2 |
 
 ## Values
 
@@ -1023,6 +1024,10 @@ Kubernetes: `>=1.28.0-0`
 | portal.tolerations | list | `[]` | Tolerations for Portal pods |
 | portal.topologySpreadConstraints | list | `[]` | Topology spread constraints for pod scheduling |
 | portal.url | string | `""` | URL core uses to reach the portal (`PORTAL_URL`). Empty auto-derives the in-cluster portal service. Set this when `enabled: false` but the UI is hosted externally, so core can still proxy to it. |
+| postgresql.auth.database | string | `"registry"` | Database created at initialisation |
+| postgresql.enabled | bool | `false` | Deploy PostgreSQL in-cluster and point Harbor at it (`database.*` is then ignored). Any cloudpirates/postgres value can be set here. See docs/postgresql.md. |
+| postgresql.fullnameOverride | string | `"postgresql"` |  |
+| postgresql.initContainers | list | pgautoupgrade 18, see values.yaml | Runs pg_upgrade when the data is an older major, else exits at once. Keep its tag and PGDATA on the same major as `postgresql.image.tag`. |
 | proxy.components[0] | string | `"core"` |  |
 | proxy.components[1] | string | `"jobservice"` |  |
 | proxy.components[2] | string | `"trivy"` |  |

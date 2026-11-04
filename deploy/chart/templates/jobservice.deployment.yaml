@@ -112,7 +112,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ include "harbor.database.secretName" . }}
-                  key: {{ .Values.database.existingSecretKey | default "POSTGRESQL_PASSWORD" }}
+                  key: {{ include "harbor.database.secretKey" . }}
             {{- include "harbor.database.tlsEnv" . | nindent 12 }}
             {{- end }}
             {{- include "harbor.extraCA.env" . | nindent 12 }}

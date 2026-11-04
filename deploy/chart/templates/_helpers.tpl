@@ -566,8 +566,23 @@ Validate required values
 {{- if not .Values.externalURL }}
 {{- fail "externalURL is required. Please set externalURL in your values." }}
 {{- end }}
-{{- if not .Values.database.host }}
-{{- fail "database.host is required. Please set database.host in your values." }}
+{{- if and (not .Values.postgresql.enabled) (not .Values.database.host) }}
+{{- fail "database.host is required. Please set database.host in your values, or set postgresql.enabled=true." }}
+{{- end }}
+{{- if .Values.postgresql.enabled }}
+{{- if and (not .Values.autoGenSecrets) (not .Values.postgresql.auth.password) (not .Values.postgresql.auth.existingSecret) }}
+{{- fail "autoGenSecrets is false: set postgresql.auth.password or postgresql.auth.existingSecret" }}
+{{- end }}
+{{- $p := .Values.postgresql.persistence | default dict }}
+{{- $vol := $p.volumeName | default "data" }}
+{{- $sub := $p.subPath | default "" }}
+{{- range .Values.postgresql.initContainers }}
+{{- range .volumeMounts }}
+{{- if and (eq .mountPath "/var/lib/postgresql") (or (ne .name $vol) (ne (.subPath | default "") $sub)) }}
+{{- fail "postgresql.initContainers must mount the data volume like the subchart: match postgresql.persistence.volumeName and subPath, or set postgresql.initContainers: []" }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- end }}
 {{- if and (not .Values.harborAdminPassword) (not .Values.existingSecretAdminPassword) }}
 {{- fail "harborAdminPassword or existingSecretAdminPassword is required. Please set one in your values." }}

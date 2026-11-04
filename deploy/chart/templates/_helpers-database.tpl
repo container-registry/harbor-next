@@ -5,42 +5,87 @@ Database helpers
 */}}
 
 {{/*
+Name the postgresql subchart gives its Service (its postgresql.fullname)
+*/}}
+{{- define "harbor.postgresql.fullname" -}}
+{{- if .Values.postgresql.fullnameOverride -}}
+{{- .Values.postgresql.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- $name := .Values.postgresql.nameOverride | default "postgresql" -}}
+{{- if contains $name .Release.Name -}}
+{{- .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Return the database host
 */}}
 {{- define "harbor.database.host" -}}
+{{- if .Values.postgresql.enabled -}}
+{{- include "harbor.postgresql.fullname" . -}}
+{{- else -}}
 {{- .Values.database.host -}}
+{{- end -}}
 {{- end }}
 
 {{/*
 Return the database port
 */}}
 {{- define "harbor.database.port" -}}
+{{- if .Values.postgresql.enabled -}}
+{{- dig "service" "port" 5432 .Values.postgresql -}}
+{{- else -}}
 {{- .Values.database.port | default 5432 -}}
+{{- end -}}
 {{- end }}
 
 {{/*
 Return the database name
 */}}
 {{- define "harbor.database.database" -}}
+{{- if .Values.postgresql.enabled -}}
+{{- include "postgres.database" .Subcharts.postgresql -}}
+{{- else -}}
 {{- .Values.database.database | default "registry" -}}
+{{- end -}}
 {{- end }}
 
 {{/*
 Return the database username
 */}}
 {{- define "harbor.database.username" -}}
+{{- if .Values.postgresql.enabled -}}
+{{- include "postgres.username" .Subcharts.postgresql -}}
+{{- else -}}
 {{- .Values.database.username | default "postgres" -}}
+{{- end -}}
 {{- end }}
 
 {{/*
 Return the database password secret name
 */}}
 {{- define "harbor.database.secretName" -}}
-{{- if .Values.database.existingSecret }}
+{{- if .Values.postgresql.enabled }}
+{{- include "postgres.secretName" .Subcharts.postgresql }}
+{{- else if .Values.database.existingSecret }}
 {{- .Values.database.existingSecret }}
 {{- else }}
 {{- include "harbor.fullname" . }}-database
 {{- end }}
+{{- end }}
+
+{{/*
+Return the database password key in the secret
+*/}}
+{{- define "harbor.database.secretKey" -}}
+{{- if .Values.postgresql.enabled -}}
+{{- include "postgres.adminPasswordKey" .Subcharts.postgresql -}}
+{{- else -}}
+{{- .Values.database.existingSecretKey | default "POSTGRESQL_PASSWORD" -}}
+{{- end -}}
 {{- end }}
 
 {{/*
@@ -64,7 +109,11 @@ Negative values are rejected by values.schema.json, and again by the app.
 Return the database sslmode
 */}}
 {{- define "harbor.database.sslmode" -}}
+{{- if .Values.postgresql.enabled -}}
+disable
+{{- else -}}
 {{- .Values.database.sslmode | default "disable" -}}
+{{- end -}}
 {{- end }}
 
 {{/*
@@ -75,7 +124,7 @@ no way to inject sslrootcert/sslcert/sslkey because the chart only
 templated host/port/user/password/sslmode into env vars.
 */}}
 {{- define "harbor.database.tlsEnabled" -}}
-{{- if ne (.Values.database.existingTlsSecret | toString) "" -}}true{{- end -}}
+{{- if and (not .Values.postgresql.enabled) (ne (.Values.database.existingTlsSecret | toString) "") -}}true{{- end -}}
 {{- end -}}
 
 {{/*

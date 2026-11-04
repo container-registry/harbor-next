@@ -1,0 +1,95 @@
+suite: postgresql subchart wiring tests
+templates:
+  - templates/core.configmap.yaml
+  - templates/core.deployment.yaml
+  - templates/core.secret.yaml
+  - charts/postgresql/templates/statefulset.yaml
+  - templates/validate-values.yaml
+set:
+  externalURL: https://harbor.example.com
+  harborAdminPassword: Harbor12345
+  postgresql.enabled: true
+tests:
+  - it: should point core at the subchart service and database
+    template: templates/core.configmap.yaml
+    set:
+      database.host: db.example.com
+      database.sslmode: verify-full
+    asserts:
+      - equal:
+          path: data.POSTGRESQL_HOST
+          value: postgresql
+      - equal:
+          path: data.POSTGRESQL_PORT
+          value: "5432"
+      - equal:
+          path: data.POSTGRESQL_DATABASE
+          value: registry
+      - equal:
+          path: data.POSTGRESQL_USERNAME
+          value: postgres
+      - equal:
+          path: data.POSTGRESQL_SSLMODE
+          value: disable
+
+  - it: should read the password from the subchart Secret
+    template: templates/core.deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRESQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: postgresql
+                key: postgres-password
+
+  - it: should read the password from auth.existingSecret
+    template: templates/core.deployment.yaml
+    set:
+      postgresql.auth.existingSecret: my-pg
+      postgresql.auth.secretKeys.adminPasswordKey: pw
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRESQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: my-pg
+                key: pw
+
+  - it: should run pgautoupgrade once on the main container's data volume and PGDATA
+    template: charts/postgresql/templates/statefulset.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: pgautoupgrade
+      - equal:
+          path: spec.template.spec.initContainers[0].volumeMounts[0]
+          value:
+            name: data
+            mountPath: /var/lib/postgresql
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: PGAUTO_ONESHOT
+            value: "yes"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PGDATA
+            value: /var/lib/postgresql/18/docker
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: data
+            mountPath: /var/lib/postgresql
+
+  - it: should refuse a subPath the upgrader does not mount
+    template: templates/validate-values.yaml
+    set:
+      postgresql.persistence.subPath: pg
+    asserts:
+      - failedTemplate:
+          errorPattern: "postgresql.initContainers must mount the data volume like the subchart"
