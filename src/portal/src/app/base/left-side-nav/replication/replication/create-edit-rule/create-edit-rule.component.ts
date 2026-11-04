@@ -54,7 +54,23 @@ import {
 } from '../../replication';
 import { errorHandler as errorHandlerFn } from '../../../../../shared/units/shared.utils';
 import { ReplicationPolicy } from '../../../../../../../ng-swagger-gen/models/replication-policy';
-import { RegistryInfo } from 'ng-swagger-gen/models';
+import {
+    RegistryInfo,
+    RegistryPreview,
+    RegistryPreviewFile,
+} from 'ng-swagger-gen/models';
+import {
+    FileFilterValue,
+    fileIcon,
+    invalidFilePatterns,
+    isEmptyFileFilter,
+    isExactPattern,
+    matchFileFilter,
+    parseFileFilter,
+    safeGlobToRegExp,
+    splitPatterns,
+} from '../../../../../shared/units/file-filter';
+import { formatSize } from '../../../../../shared/units/utils';
 
 const PREFIX: string = '0 ';
 const PAGE_SIZE: number = 100;
@@ -121,6 +137,25 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
     showChunkOption: boolean = false;
     stringForLabelFilter: string = '';
     copyStringForLabelFilter: string = '';
+    // capabilities of the selected source; every model-specific control below
+    // is driven by them, never by the registry type
+    sourceInfo: RegistryInfo;
+    sourceOnlyTypes = new Set<string>();
+    fileInclude: string = '';
+    fileExclude: string = '';
+    copyFileInclude: string = '';
+    copyFileExclude: string = '';
+    previewRepositoryInput: string = '';
+    previewReferenceInput: string = '';
+    previewing: boolean = false;
+    previewSub: Subscription;
+    preview: RegistryPreview;
+    previewFor: { repository: string; reference: string; filterKey: string };
+    previewError: string;
+    previewFiles: RegistryPreviewFile[] = [];
+    previewMatchedFiles: number = 0;
+    previewMatchedSize: number = 0;
+    showAllPreviewFiles: boolean = false;
     constructor(
         private fb: UntypedFormBuilder,
         private repService: ReplicationService,
@@ -206,6 +241,7 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
     ngOnInit(): void {
         this.getAllLabels();
         this.getAllRegistries();
+        this.getSourceOnlyTypes();
         this.nameChecker
             .pipe(debounceTime(300))
             .pipe(distinctUntilChanged())
@@ -243,6 +279,21 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
             });
         this.initMaxJobWorkers();
     }
+    getSourceOnlyTypes(): void {
+        this.endpointService.listRegistryProviderInfos().subscribe({
+            next: infos => {
+                this.sourceOnlyTypes = new Set(
+                    Object.keys(infos || {}).filter(t => infos[t]?.source_only)
+                );
+            },
+        });
+    }
+
+    // registries that can only be a replication source are never offered as destination
+    get destinationList(): Registry[] {
+        return this.targetList.filter(r => !this.sourceOnlyTypes.has(r.type));
+    }
+
     trimText(event) {
         if (event.target.value) {
             event.target.value = event.target.value.replace(/\s+/g, '');
@@ -253,6 +304,7 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
     }
     pushModeChange(): void {
         this.setFilter([]);
+        this.setFileFilter(null);
         this.initRegistryInfo(0);
         this.checkChunkOption(this.ruleForm?.get('dest_registry')?.value?.id);
     }
@@ -261,6 +313,7 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
         let selectId = this.ruleForm.get('src_registry').value;
         if (selectId) {
             this.setFilter([]);
+            this.setFileFilter(null);
             this.initRegistryInfo(selectId.id);
         } else {
             this.checkChunkOption(0);
@@ -271,6 +324,8 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
         this.noSelectedEndpoint = false;
         let selectId = this.ruleForm.get('src_registry').value;
         this.setFilter([]);
+        this.setFileFilter(null);
+        this.resetPreview();
         this.initRegistryInfo(selectId.id);
     }
 
@@ -281,6 +336,7 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
         if (this.nameChecker) {
             this.nameChecker.unsubscribe();
         }
+        this.previewSub?.unsubscribe();
     }
 
     get isValid() {
@@ -290,6 +346,9 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
             }
         }
         if (this.ruleForm.controls['speed'].invalid) {
+            return false;
+        }
+        if (this.invalidFilePatterns.length) {
             return false;
         }
         let controlName = !!this.ruleForm.controls['name'].value;
@@ -335,6 +394,7 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
             speed: -1,
             copy_by_chunk: false,
             single_active_replication: false,
+            revision_tag: false,
         });
     }
 
@@ -369,11 +429,19 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
             speed: -1,
             copy_by_chunk: false,
             single_active_replication: false,
+            revision_tag: false,
         });
         this.isPushMode = true;
         this.selectedUnit = BandwidthUnit.KB;
         this.stringForLabelFilter = '';
         this.copyStringForLabelFilter = '';
+        this.setFileFilter(null);
+        this.copyFileInclude = this.fileInclude;
+        this.copyFileExclude = this.fileExclude;
+        this.sourceInfo = null;
+        this.previewRepositoryInput = '';
+        this.previewReferenceInput = '';
+        this.resetPreview();
     }
 
     updateRuleFormAndCopyUpdateForm(rule: ReplicationPolicy): void {
@@ -388,8 +456,13 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
                     );
                     this.copyStringForLabelFilter = this.stringForLabelFilter;
                 }
+                if (item.type === FilterType.FILE) {
+                    this.setFileFilter(item.value);
+                }
             });
         }
+        this.copyFileInclude = this.fileInclude;
+        this.copyFileExclude = this.fileExclude;
         this.isPushMode = rule.dest_registry.id !== 0;
         this.checkChunkOption(rule.dest_registry.id || rule.src_registry.id);
         setTimeout(() => {
@@ -413,6 +486,7 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
                 speed: speed,
                 copy_by_chunk: rule.copy_by_chunk,
                 single_active_replication: rule.single_active_replication,
+                revision_tag: !!rule.revision_tag,
             });
             let filtersArray = this.getFilterArray(rule);
             this.noSelectedEndpoint = false;
@@ -450,6 +524,10 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
                     decoration: filter.decoration || Decoration.MATCHES,
                     value: filter.value,
                 });
+            }
+            if (filter.type === FilterType.FILE) {
+                // edited through fileInclude/fileExclude, serialized on submit
+                return this.fb.group({ type: FilterType.FILE, value: '' });
             }
             return this.fb.group(filter);
         });
@@ -509,6 +587,12 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
             // label filter has been changed
             return true;
         }
+        if (
+            this.copyFileInclude !== this.fileInclude ||
+            this.copyFileExclude !== this.fileExclude
+        ) {
+            return true;
+        }
         return !isEmptyObject(this.hasChanges());
     }
 
@@ -553,6 +637,20 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
                 }
             });
         }
+        copyRuleForm.filters.forEach(item => {
+            if (item.type === FilterType.FILE) {
+                const f = this.fileFilter;
+                item.value = isEmptyFileFilter(f)
+                    ? ''
+                    : {
+                          ...(f.include.length && { include: f.include }),
+                          ...(f.exclude.length && { exclude: f.exclude }),
+                      };
+            }
+        });
+        if (!this.showRevisionTag) {
+            delete copyRuleForm.revision_tag;
+        }
         // remove the filters which user not set.
         for (let i = filters.length - 1; i >= 0; i--) {
             if (
@@ -586,7 +684,7 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
             );
         } else {
             this.repService
-                .updateReplicationRule(this.policyId, this.ruleForm.value)
+                .updateReplicationRule(this.policyId, copyRuleForm)
                 .subscribe(
                     () => {
                         this.translateService
@@ -663,6 +761,8 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
     }
 
     setFilterAndTrigger(adapter) {
+        this.sourceInfo = adapter;
+        this.resetPreview();
         this.supportedFilters = adapter.supported_resource_filters;
         this.filters.clear(); // clear before init
         this.supportedFilters.forEach(element => {
@@ -925,5 +1025,230 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
                 }
             },
         });
+    }
+
+    get supportsFileFilter(): boolean {
+        return !!this.supportedFilters?.some(f => f.type === FilterType.FILE);
+    }
+
+    get showRevisionTag(): boolean {
+        return !this.isPushMode && !!this.sourceInfo?.supported_revision_tag;
+    }
+
+    get showPreview(): boolean {
+        return !this.isPushMode && !!this.sourceInfo?.supported_preview;
+    }
+
+    filterLabel(filter: Filter): string {
+        if (filter?.label) {
+            return filter.label;
+        }
+        return this.translateService.instant(
+            'REPLICATION.' + filter?.type?.toUpperCase()
+        );
+    }
+
+    setFileFilter(value: any): void {
+        const f = parseFileFilter(value);
+        this.fileInclude = (f.include || []).join(', ');
+        this.fileExclude = (f.exclude || []).join(', ');
+    }
+
+    get fileFilter(): FileFilterValue {
+        return {
+            include: splitPatterns(this.fileInclude),
+            exclude: splitPatterns(this.fileExclude),
+        };
+    }
+
+    private filterValue(type: string): { value: string; decoration: string } {
+        const ctl = this.filters.controls.find(
+            c => c.get('type')?.value === type
+        );
+        return {
+            value: ((ctl?.get('value')?.value as string) || '').trim(),
+            decoration: ctl?.get('decoration')?.value || Decoration.MATCHES,
+        };
+    }
+
+    // The name filter doubles as the preview repository when it names exactly
+    // one repository; a pattern needs an explicit example.
+    get nameFilterIsExact(): boolean {
+        const name = this.filterValue(FilterType.NAME).value;
+        return !name || isExactPattern(name);
+    }
+
+    get tagFilterIsExact(): boolean {
+        const tag = this.filterValue(FilterType.TAG);
+        return (
+            tag.decoration === Decoration.MATCHES && isExactPattern(tag.value)
+        );
+    }
+
+    get previewRepository(): string {
+        return this.nameFilterIsExact
+            ? this.filterValue(FilterType.NAME).value
+            : this.previewRepositoryInput.trim();
+    }
+
+    get previewReference(): string {
+        return this.tagFilterIsExact
+            ? this.filterValue(FilterType.TAG).value
+            : this.previewReferenceInput.trim();
+    }
+
+    get previewStale(): boolean {
+        return (
+            !!this.previewFor &&
+            (this.previewFor.repository !== this.previewRepository ||
+                this.previewFor.reference !== this.previewReference)
+        );
+    }
+
+    // the digest is only valid for the filter it was computed with
+    get previewFilterChanged(): boolean {
+        return (
+            !!this.previewFor &&
+            this.previewFor.filterKey !== this.fileFilterKey()
+        );
+    }
+
+    private fileFilterKey(): string {
+        if (!this.supportsFileFilter) {
+            return '';
+        }
+        const f = this.fileFilter;
+        return JSON.stringify([
+            [...new Set(f.include)].sort(),
+            [...new Set(f.exclude)].sort(),
+        ]);
+    }
+
+    // tags the copy would get: the source tags kept by the tag filter, plus the
+    // revision tag when the policy asks for it
+    get previewTags(): string[] {
+        if (!this.preview) {
+            return [];
+        }
+        const tag = this.filterValue(FilterType.TAG);
+        let tags = this.preview.tags || [];
+        if (tag.value) {
+            const re = safeGlobToRegExp(tag.value);
+            tags = re
+                ? tags.filter(
+                      t =>
+                          re.test(t) === (tag.decoration === Decoration.MATCHES)
+                  )
+                : [];
+        }
+        if (
+            this.ruleForm.get('revision_tag').value &&
+            this.preview.revision_tag
+        ) {
+            tags = [...tags, this.preview.revision_tag];
+        }
+        return tags;
+    }
+
+    get displayedPreviewFiles(): RegistryPreviewFile[] {
+        return this.showAllPreviewFiles
+            ? this.previewFiles
+            : this.previewFiles.filter(f => f.matched);
+    }
+
+    resetPreview(): void {
+        // a response still in flight belongs to the previous source
+        this.previewSub?.unsubscribe();
+        this.previewSub = null;
+        this.preview = null;
+        this.previewFor = null;
+        this.previewError = null;
+        this.previewFiles = [];
+        this.previewMatchedFiles = 0;
+        this.previewMatchedSize = 0;
+    }
+
+    // re-match the files of the last preview locally, without a new request
+    rematchPreview(): void {
+        if (!this.preview?.files) {
+            return;
+        }
+        const f = this.fileFilter;
+        if (invalidFilePatterns(f).length) {
+            return;
+        }
+        this.previewFiles = this.preview.files.map(file => ({
+            ...file,
+            matched: matchFileFilter(f, file.path),
+        }));
+        const matched = this.previewFiles.filter(file => file.matched);
+        this.previewMatchedFiles = matched.length;
+        this.previewMatchedSize = matched.reduce(
+            (sum, file) => sum + (file.size || 0),
+            0
+        );
+    }
+
+    get invalidFilePatterns(): string[] {
+        return this.supportsFileFilter
+            ? invalidFilePatterns(this.fileFilter)
+            : [];
+    }
+
+    canPreview(): boolean {
+        return (
+            !this.previewing &&
+            !!this.ruleForm.get('src_registry').value?.id &&
+            !!this.previewRepository &&
+            !this.invalidFilePatterns.length
+        );
+    }
+
+    doPreview(): void {
+        if (!this.canPreview()) {
+            return;
+        }
+        const f = this.fileFilter;
+        const request = {
+            repository: this.previewRepository,
+            reference: this.previewReference,
+            filterKey: this.fileFilterKey(),
+        };
+        this.previewing = true;
+        this.previewError = null;
+        this.previewSub?.unsubscribe();
+        this.previewSub = this.endpointService
+            .previewRegistryArtifact({
+                id: this.ruleForm.get('src_registry').value.id,
+                preview: {
+                    repository: request.repository,
+                    reference: request.reference || undefined,
+                    file_filter:
+                        this.supportsFileFilter && !isEmptyFileFilter(f)
+                            ? f
+                            : undefined,
+                },
+            })
+            .pipe(finalize(() => (this.previewing = false)))
+            .subscribe({
+                next: res => {
+                    this.preview = res;
+                    this.previewFor = request;
+                    this.rematchPreview();
+                },
+                error: error => {
+                    this.preview = null;
+                    this.previewFor = null;
+                    this.previewError = errorHandlerFn(error);
+                },
+            });
+    }
+
+    fileIcon(file: RegistryPreviewFile): string {
+        return fileIcon(file.path, file.class);
+    }
+
+    size(bytes: number): string {
+        return formatSize(String(bytes || 0));
     }
 }
