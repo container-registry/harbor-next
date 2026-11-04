@@ -41,6 +41,9 @@ func TestFactory(t *testing.T) {
 	assert.Equal(t, model.EndpointPatternTypeList, p.EndpointPattern.EndpointType)
 	assert.Equal(t, hub.DefaultEndpoint, p.EndpointPattern.Endpoints[0].Value)
 	assert.Nil(t, p.CredentialPattern)
+	info, err := a.Info()
+	require.NoError(t, err)
+	assert.Equal(t, info.SourceOnly, p.SourceOnly, "type-level and instance-level source-only must agree")
 
 	_, err = f.Create(&model.Registry{URL: "not a url"})
 	assert.Error(t, err)
@@ -59,6 +62,8 @@ func TestInfo(t *testing.T) {
 	assert.Equal(t, model.FilterTypeFile, info.SupportedResourceFilters[2].Type)
 	assert.Equal(t, []string{model.TriggerTypeManual, model.TriggerTypeScheduled}, info.SupportedTriggers)
 	assert.True(t, info.SupportedCopyByChunk)
+	assert.True(t, info.SupportedRevisionTag)
+	assert.True(t, info.SourceOnly)
 }
 
 func TestHealthCheck(t *testing.T) {

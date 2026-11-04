@@ -27,6 +27,8 @@ import (
 const (
 	typeModelSource = "test-model-source"
 	typePlainSource = "test-plain-source"
+	typeSourceOnly  = "test-source-only"
+	typeRemote      = "test-remote"
 )
 
 type infoAdapter struct {
@@ -36,12 +38,23 @@ type infoAdapter struct {
 
 func (i *infoAdapter) Info() (*model.RegistryInfo, error) { return i.info, nil }
 
-type infoFactory struct{ info *model.RegistryInfo }
+type infoFactory struct {
+	info    *model.RegistryInfo
+	pattern *model.AdapterPattern
+}
 
 func (f infoFactory) Create(*model.Registry) (adapter.Adapter, error) {
 	return &infoAdapter{info: f.info}, nil
 }
-func (f infoFactory) AdapterPattern() *model.AdapterPattern { return nil }
+func (f infoFactory) AdapterPattern() *model.AdapterPattern { return f.pattern }
+
+// remoteFactory stands for an adapter whose creation reaches the remote registry.
+type remoteFactory struct{}
+
+func (remoteFactory) Create(*model.Registry) (adapter.Adapter, error) {
+	panic("the destination check must not create the adapter")
+}
+func (remoteFactory) AdapterPattern() *model.AdapterPattern { return nil }
 
 func init() {
 	_ = adapter.RegisterFactory(typeModelSource, infoFactory{info: &model.RegistryInfo{
@@ -51,6 +64,11 @@ func init() {
 	_ = adapter.RegisterFactory(typePlainSource, infoFactory{info: &model.RegistryInfo{
 		SupportedResourceFilters: []*model.FilterStyle{{Type: model.FilterTypeName}},
 	}})
+	_ = adapter.RegisterFactory(typeSourceOnly, infoFactory{
+		info:    &model.RegistryInfo{SourceOnly: true},
+		pattern: &model.AdapterPattern{SourceOnly: true},
+	})
+	_ = adapter.RegisterFactory(typeRemote, remoteFactory{})
 }
 
 func (r *replicationTestSuite) createPullPolicy(srcType string, filters ...*model.Filter) error {
