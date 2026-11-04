@@ -22,6 +22,11 @@ import (
 	"github.com/go-openapi/runtime/middleware"
 
 	"github.com/goharbor/harbor/src/common/rbac"
+<<<<<<< HEAD
+=======
+	rbacProject "github.com/goharbor/harbor/src/common/rbac/project"
+	robotSecurity "github.com/goharbor/harbor/src/common/security/robot"
+>>>>>>> e43834ca6 (fix: restore robot member role assignment compatibility (#24300))
 	"github.com/goharbor/harbor/src/controller/member"
 	roleCtl "github.com/goharbor/harbor/src/controller/role"
 	"github.com/goharbor/harbor/src/lib"
@@ -185,8 +190,10 @@ func (m *memberAPI) UpdateProjectMember(ctx context.Context, params operation.Up
 	return operation.NewUpdateProjectMemberOK()
 }
 
-// checkNoEscalation rejects role assignments where the target role has permissions the caller lacks.
+// checkNoEscalation rejects human role assignments that exceed the caller's permissions.
+// Robots delegate roles through the member:create/update permission checked by the handler.
 func (m *memberAPI) checkNoEscalation(ctx context.Context, projectNameOrID any, roleID int64) error {
+<<<<<<< HEAD
 	// Built-in roles stay grantable by anyone who may write members, project
 	// admin included: provisioning robots depend on it (#1137 and its revert
 	// #1227). The guard applies to custom roles, whose permission sets are
@@ -198,6 +205,24 @@ func (m *memberAPI) checkNoEscalation(ctx context.Context, projectNameOrID any, 
 	if err != nil {
 		return err
 	}
+=======
+	sc, err := m.GetSecurityContext(ctx)
+	if err != nil {
+		return err
+	}
+	if robot, ok := sc.(*robotSecurity.SecurityContext); ok && robot.IsAuthenticated() {
+		// Robot permissions cannot express all human role permissions. Requiring
+		// those permissions would break existing member-management robots. The
+		// member controller still validates the target role before persisting it.
+		return nil
+	}
+
+	// Collect the (resource, action) pairs the target role grants. Built-in roles
+	// (IDs 1-5) have no role_permission rows — their permissions live only in the
+	// compile-time policy map — so they must be synthesized here. Reading them from
+	// the DB would report a built-in role as permissionless and let a caller assign
+	// e.g. projectAdmin without holding its permissions.
+>>>>>>> e43834ca6 (fix: restore robot member role assignment compatibility (#24300))
 	var accesses []*types.Policy
 	for _, perm := range r.Permissions {
 		accesses = append(accesses, perm.Access...)
