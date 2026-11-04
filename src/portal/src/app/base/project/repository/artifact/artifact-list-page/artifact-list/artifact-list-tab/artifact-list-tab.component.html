@@ -278,6 +278,11 @@
                             title="{{ artifact.digest }}">
                             {{ artifact.digest | slice : 0 : 15 }}</a
                         >
+                        <span
+                            class="label label-purple model-badge"
+                            *ngIf="artifact.type === 'CNAI'"
+                            >{{ 'ARTIFACT.MODEL' | translate }}</span
+                        >
                         <clr-tooltip
                             class="fix-width"
                             *ngIf="
