@@ -657,4 +657,42 @@ describe('CreateEditEndpointComponent (inline template)', () => {
             expect(comp.target.name).toEqual('target_01');
         });
     });
+
+    const huggingfaceInfo = {
+        source_only: true,
+        credential_pattern: {
+            access_key_type: 'AccessKeyTypeFix',
+            access_key_data: 'token',
+            access_secret_type: 'AccessSecretTypePass',
+        },
+    };
+
+    it('fills the fixed access key of an adapter chosen before the metadata loaded', () => {
+        spyOn(http as any, 'get').and.returnValue(
+            of({ huggingface: huggingfaceInfo })
+        );
+        comp.target = comp.initEndpoint();
+        comp.target.type = 'huggingface';
+        comp.getAdapterInfo();
+        expect(comp.target.credential.access_key).toBe('token');
+    });
+
+    it('derives fixed access key, secret input and source-only from the credential pattern', () => {
+        comp.adapterInfo = {
+            'google-gcr': adapterInfoMockData['google-gcr'],
+            huggingface: huggingfaceInfo,
+            harbor: { credential_pattern: null },
+        };
+        comp.target.type = 'huggingface';
+        expect(comp.isFixedAccessKey()).toBeTrue();
+        expect(comp.isFileAccessSecret()).toBeFalse();
+        expect(comp.isSourceOnly()).toBeTrue();
+        comp.target.type = 'google-gcr';
+        expect(comp.isFixedAccessKey()).toBeTrue();
+        expect(comp.isFileAccessSecret()).toBeTrue();
+        expect(comp.isSourceOnly()).toBeFalse();
+        comp.target.type = 'harbor';
+        expect(comp.isFixedAccessKey()).toBeFalse();
+        expect(comp.isFileAccessSecret()).toBeFalse();
+    });
 });
