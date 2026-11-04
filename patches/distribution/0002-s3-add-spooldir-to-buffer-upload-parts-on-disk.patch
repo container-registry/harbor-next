@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Vadim Bauer <vb@container-registry.com>
 Date: Tue, 21 Jul 2026 16:30:15 +0200
-Subject: [PATCH 2/2] feat(registry/storage/driver/s3-aws): add spooldir to
+Subject: [PATCH 2/3] feat(registry/storage/driver/s3-aws): add spooldir to
  buffer upload parts on disk
 
 The S3 driver buffers one chunksize-sized part per in-flight blob
@@ -25,12 +25,12 @@ Upstream: https://github.com/distribution/distribution/pull/4920
 ---
  docs/content/about/configuration.md       |   2 +
  docs/content/storage-drivers/s3.md        |   3 +
- registry/storage/driver/s3-aws/s3.go      | 154 +++++++++++++++++++++-
- registry/storage/driver/s3-aws/s3_test.go |   2 +-
- 4 files changed, 153 insertions(+), 8 deletions(-)
+ registry/storage/driver/s3-aws/s3.go      | 142 +++++++++++++++++-
+ registry/storage/driver/s3-aws/s3_test.go | 167 ++++++++++++++++++++++
+ 4 files changed, 311 insertions(+), 3 deletions(-)
 
 diff --git a/docs/content/about/configuration.md b/docs/content/about/configuration.md
-index 604445e6..62262134 100644
+index 44399942..89552d3b 100644
 --- a/docs/content/about/configuration.md
 +++ b/docs/content/about/configuration.md
 @@ -157,6 +157,7 @@ storage:
@@ -41,7 +41,7 @@ index 604445e6..62262134 100644
      multipartcopychunksize: 33554432
      multipartcopymaxconcurrency: 100
      multipartcopythresholdsize: 33554432
-@@ -454,6 +455,7 @@ storage:
+@@ -456,6 +457,7 @@ storage:
      secure: true
      v4auth: true
      chunksize: 5242880
@@ -50,10 +50,10 @@ index 604445e6..62262134 100644
      multipartcopymaxconcurrency: 100
      multipartcopythresholdsize: 33554432
 diff --git a/docs/content/storage-drivers/s3.md b/docs/content/storage-drivers/s3.md
-index c1308f21..1267027e 100644
+index f23abc3c..0c77acd8 100644
 --- a/docs/content/storage-drivers/s3.md
 +++ b/docs/content/storage-drivers/s3.md
-@@ -26,6 +26,7 @@ Amazon S3 or S3 compatible services for object storage.
+@@ -27,6 +27,7 @@ Amazon S3 or S3 compatible services for object storage.
  | `skipverify`  | no  | Skips TLS verification when the value is set to `true`. The default is `false`. |
  | `v4auth`  | no | Indicates whether the registry uses Version 4 of AWS's authentication. The default is `true`. |
  | `chunksize`  | no | The S3 API requires multipart upload chunks to be at least 5MB. This value should be a number that is larger than 5 * 1024 * 1024.|
@@ -61,7 +61,7 @@ index c1308f21..1267027e 100644
  | `multipartcopychunksize` | no | Default chunk size for all but the last S3 Multipart Upload part when copying stored objects. |
  | `multipartcopymaxconcurrency` | no | Max number of concurrent S3 Multipart Upload operations when copying stored objects. |
  | `multipartcopythresholdsize` | no | Default object size above which S3 Multipart Upload will be used when copying stored objects. |
-@@ -61,6 +62,8 @@ Amazon S3 or S3 compatible services for object storage.
+@@ -65,6 +66,8 @@ Amazon S3 or S3 compatible services for object storage.
  
  `chunksize`: (optional) The default part size for multipart uploads (performed by WriteStream) to S3. The default is 10 MB. Keep in mind that the minimum part size for S3 is 5MB. Depending on the speed of your connection to S3, a larger chunk size may result in better performance; faster connections benefit from larger chunk sizes.
  
@@ -71,35 +71,35 @@ index c1308f21..1267027e 100644
  
  `multipartcopymaxconcurrency`: (optional) The default maximum number of concurrent Upload Part operations in the S3 Multipart Upload when copying stored objects. Default value is set to `100`.
 diff --git a/registry/storage/driver/s3-aws/s3.go b/registry/storage/driver/s3-aws/s3.go
-index ab28bbef..fe3b88ff 100644
+index bde42a68..267a038d 100644
 --- a/registry/storage/driver/s3-aws/s3.go
 +++ b/registry/storage/driver/s3-aws/s3.go
-@@ -20,6 +20,7 @@ import (
- 	"io"
+@@ -21,6 +21,7 @@ import (
  	"math"
  	"net/http"
+ 	"net/url"
 +	"os"
- 	"path/filepath"
+ 	"path"
  	"slices"
  	"sort"
-@@ -117,6 +118,7 @@ type DriverParameters struct {
- 	Accelerate                  bool
+@@ -119,6 +120,7 @@ type DriverParameters struct {
  	UseFIPSEndpoint             bool
  	LogLevel                    aws.LogLevelType
+ 	RedirectEndpoint            string
 +	SpoolDir                    string
  }
  
  func init() {
-@@ -165,6 +167,7 @@ type driver struct {
- 	RootDirectory               string
+@@ -168,6 +170,7 @@ type driver struct {
  	StorageClass                string
  	ObjectACL                   string
+ 	RedirectEndpoint            *url.URL
 +	SpoolDir                    string
  	pool                        *sync.Pool
  }
  
-@@ -335,6 +338,11 @@ func FromParameters(ctx context.Context, parameters map[string]any) (*Driver, er
- 		return nil, err
+@@ -343,6 +346,11 @@ func FromParameters(ctx context.Context, parameters map[string]any) (*Driver, er
+ 		redirectEndpoint = ""
  	}
  
 +	spoolDir := parameters["spooldir"]
@@ -110,15 +110,15 @@ index ab28bbef..fe3b88ff 100644
  	params := DriverParameters{
  		AccessKey:                   fmt.Sprint(accessKey),
  		SecretKey:                   fmt.Sprint(secretKey),
-@@ -360,6 +368,7 @@ func FromParameters(ctx context.Context, parameters map[string]any) (*Driver, er
- 		Accelerate:                  accelerateBool,
+@@ -369,6 +377,7 @@ func FromParameters(ctx context.Context, parameters map[string]any) (*Driver, er
  		UseFIPSEndpoint:             useFIPSEndpointBool,
  		LogLevel:                    getS3LogLevelFromParam(parameters["loglevel"]),
+ 		RedirectEndpoint:            fmt.Sprint(redirectEndpoint),
 +		SpoolDir:                    fmt.Sprint(spoolDir),
  	}
  
  	return New(ctx, params)
-@@ -538,6 +547,7 @@ func New(ctx context.Context, params DriverParameters) (*Driver, error) {
+@@ -547,6 +556,7 @@ func New(ctx context.Context, params DriverParameters) (*Driver, error) {
  		RootDirectory:               params.RootDirectory,
  		StorageClass:                params.StorageClass,
  		ObjectACL:                   params.ObjectACL,
@@ -126,71 +126,22 @@ index ab28bbef..fe3b88ff 100644
  		pool:                        newBufferPool(),
  	}
  
-@@ -605,6 +615,23 @@ func (d *driver) Reader(ctx context.Context, path string, offset int64) (io.Read
- // It returns storagedriver.Error when appending to paths
- // with non-zero committed content.
- func (d *driver) Writer(ctx context.Context, path string, appendMode bool) (storagedriver.FileWriter, error) {
-+	var spool *os.File
-+	if d.SpoolDir != "" {
-+		f, err := os.CreateTemp(d.SpoolDir, "s3-upload-*")
-+		if err != nil {
-+			return nil, fmt.Errorf("creating upload spool file: %w", err)
-+		}
-+		spool = f
-+	}
-+	fw, err := d.writer(ctx, path, appendMode, spool)
-+	if err != nil && spool != nil {
-+		_ = spool.Close()
-+		_ = os.Remove(spool.Name())
-+	}
-+	return fw, err
-+}
-+
-+func (d *driver) writer(ctx context.Context, path string, appendMode bool, spool *os.File) (storagedriver.FileWriter, error) {
- 	key := d.s3Path(path)
- 	if !appendMode {
- 		// TODO (brianbland): cancel other uploads at this path
-@@ -620,7 +647,7 @@ func (d *driver) Writer(ctx context.Context, path string, appendMode bool) (stor
- 		if err != nil {
- 			return nil, err
- 		}
--		return d.newWriter(ctx, key, *resp.UploadId, nil), nil
-+		return d.newWriter(ctx, key, *resp.UploadId, nil, spool), nil
- 	}
- 
- 	listMultipartUploadsInput := &s3.ListMultipartUploadsInput{
-@@ -655,7 +682,7 @@ func (d *driver) Writer(ctx context.Context, path string, appendMode bool) (stor
- 				if err != nil {
- 					return nil, err
- 				}
--				return d.newWriter(ctx, key, *resp.UploadId, nil), nil
-+				return d.newWriter(ctx, key, *resp.UploadId, nil, spool), nil
- 			}
- 			return nil, storagedriver.Error{
- 				DriverName: driverName,
-@@ -690,7 +717,7 @@ func (d *driver) Writer(ctx context.Context, path string, appendMode bool) (stor
- 				}
- 				allParts = append(allParts, partsList.Parts...)
- 			}
--			return d.newWriter(ctx, key, *multi.UploadId, allParts), nil
-+			return d.newWriter(ctx, key, *multi.UploadId, allParts, spool), nil
- 		}
- 
- 		// resp.NextUploadIdMarker must have at least one element or we would have returned not found
-@@ -1279,22 +1306,35 @@ type writer struct {
+@@ -1336,6 +1346,14 @@ type writer struct {
  	closed    bool
  	committed bool
  	cancelled bool
 +
-+	// spool replaces buf when the spooldir parameter is set, keeping
-+	// per-upload memory independent of ChunkSize.
++	// spoolDir set means pending part data lives in spool instead of buf,
++	// keeping per-upload memory independent of ChunkSize. The file is created
++	// on first write: handlers can open a writer and drop it without Close
++	// (e.g. a resume rejected for a stale offset), and that must not leak it.
++	spoolDir string
 +	spool    *os.File
 +	spoolLen int64
  }
  
--func (d *driver) newWriter(ctx context.Context, key, uploadID string, parts []*s3.Part) storagedriver.FileWriter {
-+func (d *driver) newWriter(ctx context.Context, key, uploadID string, parts []*s3.Part, spool *os.File) storagedriver.FileWriter {
- 	var size int64
+ func (d *driver) newWriter(ctx context.Context, key, uploadID string, parts []*s3.Part) storagedriver.FileWriter {
+@@ -1343,15 +1361,23 @@ func (d *driver) newWriter(ctx context.Context, key, uploadID string, parts []*s
  	for _, part := range parts {
  		size += *part.Size
  	}
@@ -203,9 +154,9 @@ index ab28bbef..fe3b88ff 100644
  		parts:    parts,
  		size:     size,
 -		buf:      d.pool.Get().(*bytes.Buffer),
-+		spool:    spool,
++		spoolDir: d.SpoolDir,
 +	}
-+	if spool != nil {
++	if w.spooling() {
 +		// spool mode rarely touches buf (small-object rewrite path only), so
 +		// don't claim a pooled buffer it won't use
 +		w.buf = &bytes.Buffer{}
@@ -216,33 +167,32 @@ index ab28bbef..fe3b88ff 100644
  }
  
  type completedParts []*s3.CompletedPart
-@@ -1370,6 +1410,14 @@ func (w *writer) Write(p []byte) (int, error) {
+@@ -1427,6 +1453,13 @@ func (w *writer) Write(p []byte) (int, error) {
  			if _, err := io.Copy(writerBuffer{w}, resp.Body); err != nil {
  				return 0, err
  			}
-+			if w.spool != nil {
++			if w.spooling() {
 +				// keep all pending data in one place: move it to the spool file
-+				if _, err := w.spool.WriteAt(w.buf.Bytes(), 0); err != nil {
++				if _, err := w.writeSpool(w.buf.Bytes()); err != nil {
 +					return 0, err
 +				}
-+				w.spoolLen = int64(w.buf.Len())
 +				w.buf.Reset()
 +			}
  		} else {
  			// Otherwise we can use the old file as the new first part
  			copyPartResp, err := w.driver.S3.UploadPartCopyWithContext(w.ctx, &s3.UploadPartCopyInput{
-@@ -1390,6 +1438,10 @@ func (w *writer) Write(p []byte) (int, error) {
+@@ -1447,6 +1480,10 @@ func (w *writer) Write(p []byte) (int, error) {
  		}
  	}
  
-+	if w.spool != nil {
++	if w.spooling() {
 +		return w.writeSpool(p)
 +	}
 +
  	var n int
  	for len(p) > 0 {
  		remaining := w.driver.ChunkSize - w.buf.Len()
-@@ -1461,6 +1513,32 @@ func (w *writer) writeBuffer(p []byte) (int, error) {
+@@ -1518,6 +1555,39 @@ func (w *writer) writeBuffer(p []byte) (int, error) {
  	return w.buf.Write(p)
  }
  
@@ -261,6 +211,13 @@ index ab28bbef..fe3b88ff 100644
 +		if len(p) == 0 {
 +			return n, nil
 +		}
++		if w.spool == nil {
++			f, err := os.CreateTemp(w.spoolDir, "s3-upload-*")
++			if err != nil {
++				return n, fmt.Errorf("creating upload spool file: %w", err)
++			}
++			w.spool = f
++		}
 +		k := min(int64(len(p)), chunkSize-w.spoolLen)
 +		nn, err := w.spool.WriteAt(p[:k], w.spoolLen)
 +		n += nn
@@ -275,7 +232,7 @@ index ab28bbef..fe3b88ff 100644
  func (w *writer) Size() int64 {
  	return w.size
  }
-@@ -1476,6 +1554,9 @@ func (w *writer) Close() error {
+@@ -1533,6 +1603,9 @@ func (w *writer) Close() error {
  
  	defer w.releaseBuffer()
  
@@ -285,21 +242,21 @@ index ab28bbef..fe3b88ff 100644
  	return w.flush()
  }
  
-@@ -1483,14 +1564,33 @@ func (w *writer) reset() {
+@@ -1540,14 +1613,37 @@ func (w *writer) reset() {
  	w.buf.Reset()
  	w.parts = nil
  	w.size = 0
 +	if w.spool != nil {
 +		_ = w.spool.Truncate(0)
-+		w.spoolLen = 0
 +	}
++	w.spoolLen = 0
  }
  
 -// releaseBuffer resets the buffer and returns it to the pool.
 +// releaseBuffer resets the buffer and returns it to the pool, or removes the
 +// spool file when spooling is enabled.
  func (w *writer) releaseBuffer() {
-+	if w.driver.SpoolDir != "" {
++	if w.spooling() {
 +		w.removeSpool()
 +		return // buf was never taken from the pool in spool mode
 +	}
@@ -307,6 +264,10 @@ index ab28bbef..fe3b88ff 100644
  	w.driver.pool.Put(w.buf)
  }
  
++func (w *writer) spooling() bool {
++	return w.spoolDir != ""
++}
++
 +func (w *writer) removeSpool() {
 +	if w.spool == nil {
 +		return
@@ -320,7 +281,7 @@ index ab28bbef..fe3b88ff 100644
  // Cancel aborts the multipart upload and closes the writer.
  func (w *writer) Cancel(ctx context.Context) error {
  	if err := w.done(); err != nil {
-@@ -1498,6 +1598,7 @@ func (w *writer) Cancel(ctx context.Context) error {
+@@ -1555,6 +1651,7 @@ func (w *writer) Cancel(ctx context.Context) error {
  	}
  
  	w.cancelled = true
@@ -328,18 +289,18 @@ index ab28bbef..fe3b88ff 100644
  	_, err := w.driver.S3.AbortMultipartUploadWithContext(ctx, &s3.AbortMultipartUploadInput{
  		Bucket:   aws.String(w.driver.Bucket),
  		Key:      aws.String(w.key),
-@@ -1578,6 +1679,10 @@ func (w *writer) Commit(ctx context.Context) error {
+@@ -1635,6 +1732,10 @@ func (w *writer) Commit(ctx context.Context) error {
  // called by [writer.Write] if the buffer is full, and always by [writer.Close]
  // and [writer.Commit].
  func (w *writer) flush() error {
-+	if w.spool != nil {
++	if w.spooling() {
 +		return w.flushSpool()
 +	}
 +
  	if w.buf.Len() == 0 {
  		return nil
  	}
-@@ -1609,6 +1714,41 @@ func (w *writer) flush() error {
+@@ -1666,6 +1767,41 @@ func (w *writer) flush() error {
  	return nil
  }
  
@@ -382,15 +343,180 @@ index ab28bbef..fe3b88ff 100644
  func (w *writer) done() error {
  	switch {
 diff --git a/registry/storage/driver/s3-aws/s3_test.go b/registry/storage/driver/s3-aws/s3_test.go
-index 7eada442..c5570735 100644
+index a86e1ac0..eba3c0c1 100644
 --- a/registry/storage/driver/s3-aws/s3_test.go
 +++ b/registry/storage/driver/s3-aws/s3_test.go
-@@ -305,7 +305,7 @@ func TestWriterWriteBoundsBufferToChunkSize(t *testing.T) {
- 		ChunkSize: chunkSize,
- 		pool:      newBufferPool(),
+@@ -329,6 +329,173 @@ func TestWriterWriteBoundsBufferToChunkSize(t *testing.T) {
  	}
--	w := d.newWriter(t.Context(), "key", "upload-id", nil).(*writer)
-+	w := d.newWriter(t.Context(), "key", "upload-id", nil, nil).(*writer)
+ }
  
- 	payload := bytes.Repeat([]byte{0xab}, 2*chunkSize+5)
- 	n, err := w.Write(payload)
++// newSpoolTestDriver returns a spooling driver backed by handler and its
++// spool directory.
++func newSpoolTestDriver(t *testing.T, chunkSize int, handler http.HandlerFunc) (*driver, string) {
++	t.Helper()
++	server := httptest.NewServer(handler)
++	t.Cleanup(server.Close)
++
++	sess := session.Must(session.NewSession(&aws.Config{
++		Credentials:      credentials.NewStaticCredentials("access-key", "secret-key", ""),
++		DisableSSL:       aws.Bool(true),
++		Endpoint:         aws.String(server.URL),
++		Region:           aws.String("us-east-1"),
++		S3ForcePathStyle: aws.Bool(true),
++		MaxRetries:       aws.Int(0),
++	}))
++
++	spoolDir := t.TempDir()
++	return &driver{
++		S3:        s3.New(sess),
++		Bucket:    "bucket",
++		ChunkSize: chunkSize,
++		SpoolDir:  spoolDir,
++		pool:      newBufferPool(),
++	}, spoolDir
++}
++
++func spoolFiles(t *testing.T, dir string) []string {
++	t.Helper()
++	entries, err := os.ReadDir(dir)
++	if err != nil {
++		t.Fatalf("reading spool dir: %v", err)
++	}
++	names := make([]string, 0, len(entries))
++	for _, e := range entries {
++		names = append(names, e.Name())
++	}
++	return names
++}
++
++func TestWriterSpoolUploadsChunkedParts(t *testing.T) {
++	var parts [][]byte
++	const chunkSize = 8
++	d, spoolDir := newSpoolTestDriver(t, chunkSize, func(w http.ResponseWriter, r *http.Request) {
++		part, err := io.ReadAll(r.Body)
++		if err != nil {
++			t.Errorf("reading uploaded part: %v", err)
++			w.WriteHeader(http.StatusInternalServerError)
++			return
++		}
++		parts = append(parts, part)
++		w.Header().Set("ETag", fmt.Sprintf(`"part-%d"`, len(parts)))
++		w.WriteHeader(http.StatusOK)
++	})
++	w := d.newWriter(t.Context(), "key", "upload-id", nil).(*writer)
++
++	payload := make([]byte, 2*chunkSize+5)
++	for i := range payload {
++		payload[i] = byte(i)
++	}
++	// Several writes fill the first part; the last one spans two part
++	// boundaries. A Write after a part was flushed would take the
++	// below-minChunkSize rewrite path, which this fake S3 does not serve.
++	for _, p := range [][]byte{payload[:3], payload[3:5], payload[5:]} {
++		if n, err := w.Write(p); err != nil || n != len(p) {
++			t.Fatalf("Write() = %d, %v; want %d, nil", n, err, len(p))
++		}
++	}
++	if w.buf.Cap() != 0 {
++		t.Errorf("buffer capacity = %d, want 0 in spool mode", w.buf.Cap())
++	}
++	if got := spoolFiles(t, spoolDir); len(got) != 1 {
++		t.Errorf("spool files before Close = %v, want exactly one", got)
++	}
++
++	if err := w.Close(); err != nil {
++		t.Fatalf("Close() error: %v", err)
++	}
++
++	if got := bytes.Join(parts, nil); !bytes.Equal(got, payload) {
++		t.Errorf("uploaded content = %v, want %v", got, payload)
++	}
++	wantSizes := []int{chunkSize, chunkSize, 5}
++	gotSizes := make([]int, 0, len(parts))
++	for _, p := range parts {
++		gotSizes = append(gotSizes, len(p))
++	}
++	if !slices.Equal(gotSizes, wantSizes) {
++		t.Errorf("uploaded part sizes = %v, want %v", gotSizes, wantSizes)
++	}
++	if w.Size() != int64(len(payload)) {
++		t.Errorf("Size() = %d, want %d", w.Size(), len(payload))
++	}
++	if got := spoolFiles(t, spoolDir); len(got) != 0 {
++		t.Errorf("spool files after Close = %v, want none", got)
++	}
++}
++
++func TestWriterSpoolCreatedOnFirstWrite(t *testing.T) {
++	d, spoolDir := newSpoolTestDriver(t, 8, func(w http.ResponseWriter, r *http.Request) {
++		w.WriteHeader(http.StatusOK)
++	})
++
++	// Handlers may drop a writer without closing it, e.g. when a resume is
++	// rejected for a stale offset, so opening one must not create a file.
++	_ = d.newWriter(t.Context(), "key", "upload-id", nil)
++	if got := spoolFiles(t, spoolDir); len(got) != 0 {
++		t.Fatalf("spool files after newWriter = %v, want none", got)
++	}
++
++	w := d.newWriter(t.Context(), "key", "upload-id", nil)
++	if err := w.Close(); err != nil {
++		t.Fatalf("Close() error: %v", err)
++	}
++	if got := spoolFiles(t, spoolDir); len(got) != 0 {
++		t.Errorf("spool files after empty Close = %v, want none", got)
++	}
++}
++
++func TestWriterSpoolRemovedOnCancel(t *testing.T) {
++	var aborted bool
++	d, spoolDir := newSpoolTestDriver(t, 8, func(w http.ResponseWriter, r *http.Request) {
++		aborted = aborted || r.Method == http.MethodDelete
++		w.WriteHeader(http.StatusOK)
++	})
++	w := d.newWriter(t.Context(), "key", "upload-id", nil)
++
++	if _, err := w.Write([]byte("pending")); err != nil {
++		t.Fatalf("Write() error: %v", err)
++	}
++	if err := w.Cancel(t.Context()); err != nil {
++		t.Fatalf("Cancel() error: %v", err)
++	}
++	if !aborted {
++		t.Error("Cancel() did not abort the multipart upload")
++	}
++	if got := spoolFiles(t, spoolDir); len(got) != 0 {
++		t.Errorf("spool files after Cancel = %v, want none", got)
++	}
++}
++
++func TestWriterSpoolUploadError(t *testing.T) {
++	const chunkSize = 8
++	d, spoolDir := newSpoolTestDriver(t, chunkSize, func(w http.ResponseWriter, r *http.Request) {
++		w.WriteHeader(http.StatusInternalServerError)
++	})
++	w := d.newWriter(t.Context(), "key", "upload-id", nil)
++
++	n, err := w.Write(bytes.Repeat([]byte{0xab}, chunkSize+3))
++	if err == nil {
++		t.Fatal("Write() error = nil, want upload failure")
++	}
++	// the first full chunk is accepted into the spool before its upload fails
++	if n != chunkSize {
++		t.Errorf("Write() accepted %d bytes, want %d", n, chunkSize)
++	}
++	if w.Size() != 0 {
++		t.Errorf("Size() = %d, want 0 after failed upload", w.Size())
++	}
++
++	if err := w.Close(); err == nil {
++		t.Error("Close() error = nil, want upload failure for pending data")
++	}
++	if got := spoolFiles(t, spoolDir); len(got) != 0 {
++		t.Errorf("spool files after failed Close = %v, want none", got)
++	}
++}
++
+ func BenchmarkWriterBufferGrowth(b *testing.B) {
+ 	const (
+ 		chunkSize = 10 * 1024 * 1024
