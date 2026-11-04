@@ -1,5 +1,6 @@
 <clr-modal
     [(clrModalOpen)]="createEditRuleOpened"
+    [clrModalSize]="showPreview ? 'lg' : 'md'"
     [clrModalStaticBackdrop]="true"
     [clrModalClosable]="false">
     <h3 class="modal-title">{{ headerTitle | translate }}</h3>
@@ -173,14 +174,13 @@
                         *ngFor="let filter of filters.controls; let i = index">
                         <div [formGroupName]="i" class="flex">
                             <label class="sub-label"
-                                >{{
-                                    'REPLICATION.' +
-                                        supportedFilters[i]?.type.toUpperCase()
-                                        | translate
-                                }}:</label
+                                >{{ filterLabel(supportedFilters[i]) }}:</label
                             >
                             <div
-                                *ngIf="supportedFilters[i]?.style === 'input'"
+                                *ngIf="
+                                    supportedFilters[i]?.style === 'input' &&
+                                    supportedFilters[i]?.type !== 'file'
+                                "
                                 class="flex">
                                 <div
                                     class="clr-select-wrapper mr-1"
@@ -216,11 +216,72 @@
                                         type="text"
                                         #filterValue
                                         size="14"
+                                        [attr.placeholder]="
+                                            supportedFilters[i]?.placeholder ||
+                                            null
+                                        "
                                         formControlName="value"
                                         id="{{
                                             'filter_' +
                                                 supportedFilters[i]?.type
                                         }}" />
+                                </div>
+                            </div>
+                            <div
+                                class="file-filter"
+                                *ngIf="supportedFilters[i]?.type === 'file'">
+                                <div class="clr-input-wrapper file-filter-row">
+                                    <span class="file-filter-key">{{
+                                        'REPLICATION.FILE_INCLUDE' | translate
+                                    }}</span>
+                                    <input
+                                        class="clr-input width-name-resource"
+                                        autocomplete="off"
+                                        type="text"
+                                        id="filter_file_include"
+                                        placeholder="e.g. *.json, *.safetensors"
+                                        [ngModel]="fileInclude"
+                                        (ngModelChange)="
+                                            fileInclude = $event;
+                                            rematchPreview()
+                                        "
+                                        [ngModelOptions]="{
+                                            standalone: true
+                                        }" />
+                                </div>
+                                <div class="clr-input-wrapper file-filter-row">
+                                    <span class="file-filter-key">{{
+                                        'REPLICATION.FILE_EXCLUDE' | translate
+                                    }}</span>
+                                    <input
+                                        class="clr-input width-name-resource"
+                                        autocomplete="off"
+                                        type="text"
+                                        id="filter_file_exclude"
+                                        placeholder="e.g. onnx/**, *.bin"
+                                        [ngModel]="fileExclude"
+                                        (ngModelChange)="
+                                            fileExclude = $event;
+                                            rematchPreview()
+                                        "
+                                        [ngModelOptions]="{
+                                            standalone: true
+                                        }" />
+                                </div>
+                                <div
+                                    class="alert-label"
+                                    id="file-filter-invalid"
+                                    *ngIf="invalidFilePatterns.length">
+                                    {{
+                                        'REPLICATION.FILE_FILTER_INVALID'
+                                            | translate
+                                                : {
+                                                      patterns:
+                                                          invalidFilePatterns.join(
+                                                              ', '
+                                                          )
+                                                  }
+                                    }}
                                 </div>
                             </div>
                             <div
@@ -360,7 +421,25 @@
                                     *clrIfOpen>
                                     <span
                                         class="tooltip-content"
+                                        *ngIf="supportedFilters[i]?.description"
+                                        >{{
+                                            supportedFilters[i]?.description
+                                        }}</span
+                                    >
+                                    <span
+                                        class="tooltip-content"
                                         *ngIf="
+                                            !supportedFilters[i]?.description &&
+                                            supportedFilters[i]?.type === 'file'
+                                        "
+                                        >{{
+                                            'TOOLTIP.FILE_FILTER' | translate
+                                        }}</span
+                                    >
+                                    <span
+                                        class="tooltip-content"
+                                        *ngIf="
+                                            !supportedFilters[i]?.description &&
                                             supportedFilters[i]?.type === 'name'
                                         "
                                         >{{
@@ -370,6 +449,7 @@
                                     <span
                                         class="tooltip-content"
                                         *ngIf="
+                                            !supportedFilters[i]?.description &&
                                             supportedFilters[i]?.type === 'tag'
                                         "
                                         >{{
@@ -403,6 +483,219 @@
                     </div>
                 </div>
             </div>
+            <!--preview, offered when the source can resolve a copy without copying-->
+            <div class="clr-form-control" *ngIf="showPreview">
+                <label class="clr-control-label">{{
+                    'REPLICATION.PREVIEW' | translate
+                }}</label>
+                <div class="clr-control-container preview-container">
+                    <div class="flex preview-inputs">
+                        <ng-container *ngIf="nameFilterIsExact">
+                            <code class="preview-target">{{
+                                previewRepository || '-'
+                            }}</code>
+                        </ng-container>
+                        <input
+                            *ngIf="!nameFilterIsExact"
+                            class="clr-input width-name-resource"
+                            autocomplete="off"
+                            id="preview_repository"
+                            [placeholder]="
+                                'REPLICATION.PREVIEW_REPOSITORY' | translate
+                            "
+                            [(ngModel)]="previewRepositoryInput"
+                            [ngModelOptions]="{ standalone: true }" />
+                        <span class="preview-at">@</span>
+                        <ng-container *ngIf="tagFilterIsExact">
+                            <code class="preview-target">{{
+                                previewReference
+                            }}</code>
+                        </ng-container>
+                        <input
+                            *ngIf="!tagFilterIsExact"
+                            class="clr-input width-tag-label"
+                            autocomplete="off"
+                            id="preview_reference"
+                            [placeholder]="
+                                'REPLICATION.PREVIEW_REFERENCE' | translate
+                            "
+                            [(ngModel)]="previewReferenceInput"
+                            [ngModelOptions]="{ standalone: true }" />
+                        <button
+                            type="button"
+                            id="rule_preview"
+                            class="btn btn-sm btn-outline preview-btn"
+                            [disabled]="!canPreview()"
+                            (click)="doPreview()">
+                            {{ 'REPLICATION.PREVIEW_BUTTON' | translate }}
+                        </button>
+                        <span
+                            class="spinner spinner-inline"
+                            [hidden]="!previewing"></span>
+                    </div>
+                    <div class="preview-hint" *ngIf="!nameFilterIsExact">
+                        {{ 'REPLICATION.PREVIEW_PATTERN_HINT' | translate }}
+                    </div>
+                    <div class="alert-label preview-error" *ngIf="previewError">
+                        {{ previewError }}
+                    </div>
+                    <div
+                        class="preview"
+                        *ngIf="preview"
+                        id="rule_preview_result">
+                        <div class="preview-stale" *ngIf="previewStale">
+                            {{ 'REPLICATION.PREVIEW_STALE' | translate }}
+                        </div>
+                        <div class="preview-row">
+                            <span class="preview-key">{{
+                                'REPLICATION.PREVIEW_REVISION' | translate
+                            }}</span>
+                            <a
+                                *ngIf="preview.source_url; else plainRevision"
+                                [href]="preview.source_url"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                [title]="preview.revision"
+                                ><code>{{
+                                    preview.revision | slice : 0 : 12
+                                }}</code></a
+                            >
+                            <ng-template #plainRevision
+                                ><code>{{
+                                    preview.revision | slice : 0 : 12
+                                }}</code></ng-template
+                            >
+                            <span
+                                class="preview-muted"
+                                *ngIf="preview.source_id"
+                                >{{ preview.source_id }}</span
+                            >
+                        </div>
+                        <div class="preview-row">
+                            <span class="preview-key">{{
+                                'REPLICATION.PREVIEW_TAGS' | translate
+                            }}</span>
+                            <span
+                                class="label label-info"
+                                *ngFor="let t of previewTags"
+                                >{{ t }}</span
+                            >
+                            <span
+                                class="preview-muted"
+                                *ngIf="!previewTags.length"
+                                >{{
+                                    'REPLICATION.PREVIEW_NO_TAGS' | translate
+                                }}</span
+                            >
+                        </div>
+                        <div
+                            class="preview-row"
+                            *ngIf="preview.licenses?.length">
+                            <span class="preview-key">{{
+                                'REPLICATION.PREVIEW_LICENSE' | translate
+                            }}</span>
+                            <span
+                                class="label"
+                                *ngFor="let l of preview.licenses"
+                                >{{ l }}</span
+                            >
+                        </div>
+                        <div class="preview-row" *ngIf="preview.task">
+                            <span class="preview-key">{{
+                                'REPLICATION.PREVIEW_TASK' | translate
+                            }}</span>
+                            <span>{{ preview.task }}</span>
+                        </div>
+                        <div class="preview-row">
+                            <span class="preview-key">{{
+                                'REPLICATION.PREVIEW_FILES' | translate
+                            }}</span>
+                            <span id="preview_counts">{{
+                                'REPLICATION.PREVIEW_MATCHED'
+                                    | translate
+                                        : {
+                                              matched: previewMatchedFiles,
+                                              matchedSize:
+                                                  size(previewMatchedSize),
+                                              total: preview.total_files,
+                                              totalSize: size(
+                                                  preview.total_size
+                                              )
+                                          }
+                            }}</span>
+                        </div>
+                        <div class="preview-row">
+                            <span class="preview-key">{{
+                                'REPLICATION.PREVIEW_DIGEST' | translate
+                            }}</span>
+                            <ng-container
+                                *ngIf="
+                                    !previewFilterChanged;
+                                    else digestChanged
+                                ">
+                                <code
+                                    *ngIf="preview.digest"
+                                    [title]="preview.digest"
+                                    >{{
+                                        preview.digest | slice : 0 : 19
+                                    }}…</code
+                                >
+                                <span
+                                    class="alert-label"
+                                    *ngIf="!preview.digest"
+                                    >{{
+                                        'REPLICATION.PREVIEW_NOTHING_MATCHES'
+                                            | translate
+                                    }}</span
+                                >
+                            </ng-container>
+                            <ng-template #digestChanged>
+                                <span class="preview-muted">{{
+                                    'REPLICATION.PREVIEW_FILTER_CHANGED'
+                                        | translate
+                                }}</span>
+                            </ng-template>
+                        </div>
+                        <div class="preview-files">
+                            <div
+                                class="preview-file"
+                                *ngFor="let f of displayedPreviewFiles"
+                                [class.unmatched]="!f.matched">
+                                <clr-icon
+                                    [attr.shape]="fileIcon(f)"
+                                    size="16"></clr-icon>
+                                <span class="file-path">{{ f.path }}</span>
+                                <span class="file-class">{{ f.class }}</span>
+                                <span class="file-size">{{
+                                    size(f.size)
+                                }}</span>
+                            </div>
+                            <div
+                                class="preview-muted"
+                                *ngIf="!displayedPreviewFiles.length">
+                                {{
+                                    'REPLICATION.PREVIEW_NOTHING_MATCHES'
+                                        | translate
+                                }}
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            class="btn btn-link btn-sm preview-toggle"
+                            *ngIf="previewFiles.length !== previewMatchedFiles"
+                            (click)="
+                                showAllPreviewFiles = !showAllPreviewFiles
+                            ">
+                            {{
+                                (showAllPreviewFiles
+                                    ? 'REPLICATION.PREVIEW_MATCHED_ONLY'
+                                    : 'REPLICATION.PREVIEW_ALL_FILES'
+                                ) | translate
+                            }}
+                        </button>
+                    </div>
+                </div>
+            </div>
             <!--destination registry-->
             <div *ngIf="isPushMode" class="clr-form-control">
                 <label class="clr-control-label required">{{
@@ -418,7 +711,7 @@
                             [compareWith]="equals">
                             <option class="display-none"></option>
                             <option
-                                *ngFor="let target of targetList"
+                                *ngFor="let target of destinationList"
                                 [ngValue]="target">
                                 {{ target.name }}-{{ target.url }}
                             </option>
@@ -808,6 +1101,31 @@
                                     *clrIfOpen>
                                     <span>{{
                                         'REPLICATION.COPY_BY_CHUNK_TIP'
+                                            | translate
+                                    }}</span>
+                                </clr-tooltip-content>
+                            </clr-tooltip>
+                        </label>
+                    </div>
+                    <div class="clr-checkbox-wrapper" *ngIf="showRevisionTag">
+                        <input
+                            type="checkbox"
+                            id="revision-tag"
+                            formControlName="revision_tag"
+                            class="clr-checkbox" />
+                        <label for="revision-tag" class="clr-control-label"
+                            >{{ 'REPLICATION.REVISION_TAG' | translate }}
+                            <clr-tooltip class="override-tooltip">
+                                <clr-icon
+                                    clrTooltipTrigger
+                                    shape="info-circle"
+                                    size="24"></clr-icon>
+                                <clr-tooltip-content
+                                    clrPosition="top-left"
+                                    clrSize="md"
+                                    *clrIfOpen>
+                                    <span>{{
+                                        'REPLICATION.REVISION_TAG_TIP'
                                             | translate
                                     }}</span>
                                 </clr-tooltip-content>
