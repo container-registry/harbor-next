@@ -441,3 +441,52 @@ tests:
       - equal:
           path: data.HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
           value: "true"
+
+  # Pins: with every core key externalized the generated Secret is skipped,
+  # so the envFrom secretRef must disappear with it.
+  - it: should drop the generated Secret envFrom when core is fully externalized
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      autoGenSecrets: false
+      existingSecretAdminPassword: harbor-admin
+      existingSecretSecretKey: enc-key
+      core.existingSecret: core-id
+      core.existingXsrfSecret: core-id
+      core.tokenSecretName: token-cert
+      registry.credentials.existingSecret: reg-creds
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: RELEASE-NAME-harbor-core
+
+  # Pins: with autogen on and no token cert supplied, the generated cert keeps
+  # the Secret rendered and the Deployment referencing it.
+  - it: should render the generated Secret and its envFrom when the token cert is not supplied
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      autoGenSecrets: true
+      existingSecretAdminPassword: harbor-admin
+      existingSecretSecretKey: enc-key
+      core.existingSecret: core-id
+      core.existingXsrfSecret: core-id
+      registry.credentials.existingSecret: reg-creds
+    asserts:
+      - template: templates/core.secret.yaml
+        documentIndex: 0
+        isKind:
+          of: Secret
+      - template: templates/core.secret.yaml
+        documentIndex: 0
+        exists:
+          path: data["tls.crt"]
+      - template: templates/core.deployment.yaml
+        contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: RELEASE-NAME-harbor-core
