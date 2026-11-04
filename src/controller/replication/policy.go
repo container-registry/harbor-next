@@ -204,9 +204,8 @@ func (c *controller) validatePolicy(ctx context.Context, policy *model.Policy) e
 		if err != nil {
 			return err
 		}
-		if dest != nil && dest.Type == regmodel.RegistryTypeHuggingFace {
-			return errors.New(nil).WithCode(errors.BadRequestCode).
-				WithMessagef("the %s registry %s can only be a replication source", dest.Type, dest.Name)
+		if err := validateDestination(ctx, dest); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -233,6 +232,26 @@ func supportsFilter(info *regmodel.RegistryInfo, filterType string) bool {
 		}
 	}
 	return false
+}
+
+// validateDestination rejects a source-only registry as destination. It reads the type-level
+// adapter pattern, not RegistryInfo: creating an adapter can reach the remote registry, and a
+// push policy to an unreachable registry must be saved without waiting for a timeout. An
+// unknown type is accepted as before; the replication itself fails later with the real cause.
+func validateDestination(ctx context.Context, dest *regmodel.Registry) error {
+	if dest == nil || dest.ID == 0 {
+		return nil
+	}
+	factory, err := adapter.GetFactory(dest.Type)
+	if err != nil {
+		log.GetLogger(ctx).Warningf("skip the source-only check of the destination registry %s: %v", dest.Name, err)
+		return nil
+	}
+	if pattern := factory.AdapterPattern(); pattern != nil && pattern.SourceOnly {
+		return errors.New(nil).WithCode(errors.BadRequestCode).
+			WithMessagef("the %s registry %s can only be a replication source", dest.Type, dest.Name)
+	}
+	return nil
 }
 
 // validateSourceOptions rejects source options the source registry cannot honor.
