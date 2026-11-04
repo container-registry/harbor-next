@@ -1,0 +1,28 @@
+<ng-container *ngIf="rows.length || licenses.length">
+    <h4 class="margin-bottom-075">{{ 'ARTIFACT.MODEL' | translate }}</h4>
+    <div class="model-metadata" id="model-metadata">
+        <div class="model-row" *ngIf="licenses.length">
+            <span class="model-key">{{
+                'ARTIFACT.MODEL_LICENSES' | translate
+            }}</span>
+            <span class="model-value">
+                <span class="label label-info" *ngFor="let l of licenses">{{
+                    l
+                }}</span>
+            </span>
+        </div>
+        <div class="model-row" *ngFor="let row of rows">
+            <span class="model-key">{{ row.key | translate }}</span>
+            <span class="model-value">
+                <a
+                    *ngIf="row.href; else text"
+                    [href]="row.href"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >{{ row.value }}</a
+                >
+                <ng-template #text>{{ row.value }}</ng-template>
+            </span>
+        </div>
+    </div>
+</ng-container>
