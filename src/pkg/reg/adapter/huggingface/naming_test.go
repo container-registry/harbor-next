@@ -67,6 +67,8 @@ func TestTagOf(t *testing.T) {
 		{strings.Repeat("a", 128), strings.Repeat("a", 128), true},
 		{strings.Repeat("a", 129), "", false},
 		{"0123456789abcdef0123456789abcdef01234567", "", false},
+		{"sha-0123456789ab", "", false},
+		{"sha-0123456789", "sha-0123456789", true},
 		{"", "", false},
 	}
 	for _, c := range cases {
