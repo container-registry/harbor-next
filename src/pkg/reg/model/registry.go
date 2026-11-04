@@ -144,6 +144,9 @@ type RegistryInfo struct {
 	SupportedTriggers                    []string       `json:"supported_triggers"`
 	SupportedRepositoryPathComponentType string         `json:"supported_repository_path_component_type"` // how many path components are allowed in the repository name
 	SupportedCopyByChunk                 bool           `json:"supported_copy_by_chunk,omitempty"`
+	// SourceOnly declares that the registry can only be a replication source, e.g. because its
+	// artifacts are synthesized from another protocol.
+	SourceOnly bool `json:"source_only,omitempty"`
 	// SupportedRevisionTag declares that the source honors SourceOptions.RevisionTag.
 	SupportedRevisionTag bool `json:"supported_revision_tag,omitempty"`
 }
@@ -152,6 +155,9 @@ type RegistryInfo struct {
 type AdapterPattern struct {
 	EndpointPattern   *EndpointPattern   `json:"endpoint_pattern"`
 	CredentialPattern *CredentialPattern `json:"credential_pattern"`
+	// SourceOnly mirrors RegistryInfo.SourceOnly at type level, so a UI can leave such registries
+	// out of destination pickers without creating an adapter per registry.
+	SourceOnly bool `json:"source_only,omitempty"`
 }
 
 // NewDefaultAdapterPattern ...

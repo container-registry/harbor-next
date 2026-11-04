@@ -91,11 +91,11 @@ func (r *replicationTestSuite) TestCreatePolicy() {
 	r.scheduler.AssertExpectations(r.T())
 }
 
-func (r *replicationTestSuite) TestCreatePolicyHuggingFaceDestination() {
+func (r *replicationTestSuite) TestCreatePolicySourceOnlyDestination() {
 	r.regMgr.On("Get", mock.Anything, int64(0)).Return(&model.Registry{ID: 0, Type: model.RegistryTypeHarbor}, nil)
-	r.regMgr.On("Get", mock.Anything, int64(2)).Return(&model.Registry{ID: 2, Name: "hf", Type: model.RegistryTypeHuggingFace}, nil)
+	r.regMgr.On("Get", mock.Anything, int64(2)).Return(&model.Registry{ID: 2, Name: "hf", Type: typeSourceOnly}, nil)
 	_, err := r.ctl.CreatePolicy(context.TODO(), &repmodel.Policy{
-		Name:         "push-to-hf",
+		Name:         "push-to-source-only",
 		SrcRegistry:  &model.Registry{ID: 0},
 		DestRegistry: &model.Registry{ID: 2},
 		Enabled:      true,
@@ -104,6 +104,19 @@ func (r *replicationTestSuite) TestCreatePolicyHuggingFaceDestination() {
 	r.True(errors.IsErr(err, errors.BadRequestCode))
 	r.Contains(err.Error(), "can only be a replication source")
 	r.repMgr.AssertNotCalled(r.T(), "Create", mock.Anything, mock.Anything)
+}
+
+func (r *replicationTestSuite) TestCreatePolicyDestinationCheckCreatesNoAdapter() {
+	r.regMgr.On("Get", mock.Anything, int64(0)).Return(&model.Registry{ID: 0, Type: model.RegistryTypeHarbor}, nil)
+	r.regMgr.On("Get", mock.Anything, int64(4)).Return(&model.Registry{ID: 4, Name: "remote", Type: typeRemote}, nil)
+	mock.OnAnything(r.repMgr, "Create").Return(int64(1), nil)
+	_, err := r.ctl.CreatePolicy(context.TODO(), &repmodel.Policy{
+		Name:         "push-to-remote",
+		SrcRegistry:  &model.Registry{ID: 0},
+		DestRegistry: &model.Registry{ID: 4},
+		Enabled:      true,
+	})
+	r.Require().NoError(err)
 }
 
 func (r *replicationTestSuite) TestUpdatePolicy() {
