@@ -842,7 +842,7 @@ func parseUploadLocation(location string) (*url.URL, error) {
 	}
 	u, err := url.Parse(location)
 	if err != nil {
-		return nil, err
+		return nil, uploadLocationParseError(err)
 	}
 	if u.User != nil {
 		return nil, fmt.Errorf("registry upload Location must not contain userinfo: %q", redactUploadLocation(u))
@@ -865,7 +865,7 @@ func parseUploadLocation(location string) (*url.URL, error) {
 func resolveUploadLocation(endpoint string, origin *url.URL, location string) (string, error) {
 	ref, err := url.Parse(location)
 	if err != nil {
-		return "", err
+		return "", uploadLocationParseError(err)
 	}
 	// userinfo has no legitimate use in an upload Location and makes the host ambiguous.
 	if ref.User != nil {
@@ -875,7 +875,7 @@ func resolveUploadLocation(endpoint string, origin *url.URL, location string) (s
 	if ref.Scheme == "" && ref.Host == "" && strings.HasPrefix(location, "/") && !strings.HasPrefix(location, "//") {
 		u, err := url.Parse(endpoint + location)
 		if err != nil {
-			return "", err
+			return "", uploadLocationParseError(err)
 		}
 		return u.String(), nil
 	}
@@ -903,6 +903,17 @@ func redactUploadLocation(u *url.URL) string {
 	return r.String()
 }
 
+<<<<<<< HEAD
+=======
+// uploadLocationParseError drops the Location from a parse error, which quotes it verbatim.
+func uploadLocationParseError(err error) error {
+	if urlErr, ok := err.(*url.Error); ok {
+		err = urlErr.Err
+	}
+	return fmt.Errorf("registry upload Location is not a valid URL: %w", err)
+}
+
+>>>>>>> 487b46aa0 (fix(registry): redact the upload Location in rejection errors (#24068))
 func sameRegistryOrigin(a, b *url.URL) bool {
 	return strings.EqualFold(a.Scheme, b.Scheme) &&
 		strings.EqualFold(a.Hostname(), b.Hostname()) &&
