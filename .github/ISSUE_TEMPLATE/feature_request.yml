@@ -39,7 +39,6 @@ body:
       options:
         - Core / Backend
         - JobService
-        - RegistryCtl
         - Portal / UI
         - API
         - Replication

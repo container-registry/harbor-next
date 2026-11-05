@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
-	common_regctl "github.com/goharbor/harbor/src/common/registryctl"
+	"github.com/goharbor/harbor/src/pkg/registry/gcclient"
 	"github.com/goharbor/harbor/src/controller/artifact"
 	"github.com/goharbor/harbor/src/controller/project"
 	"github.com/goharbor/harbor/src/jobservice/job"
@@ -43,33 +43,33 @@ import (
 	"github.com/goharbor/harbor/src/testing/mock"
 	trashtesting "github.com/goharbor/harbor/src/testing/pkg/artifactrash"
 	"github.com/goharbor/harbor/src/testing/pkg/blob"
-	"github.com/goharbor/harbor/src/testing/registryctl"
+	gcmock "github.com/goharbor/harbor/src/testing/pkg/registry/gcclient"
 )
 
 type gcTestSuite struct {
 	htesting.Suite
 	artifactCtl       *artifacttesting.Controller
 	artrashMgr        *trashtesting.Manager
-	registryCtlClient *registryctl.Client
+	gcClient *gcmock.Client
 	projectCtl        *projecttesting.Controller
 	blobMgr           *blob.Manager
 
 	originalProjectCtl project.Controller
 
-	regCtlInit func()
+	gcClientInit func()
 }
 
 func (suite *gcTestSuite) SetupTest() {
 	suite.artifactCtl = &artifacttesting.Controller{}
 	suite.artrashMgr = &trashtesting.Manager{}
-	suite.registryCtlClient = &registryctl.Client{}
+	suite.gcClient = &gcmock.Client{}
 	suite.blobMgr = &blob.Manager{}
 	suite.projectCtl = &projecttesting.Controller{}
 
 	suite.originalProjectCtl = project.Ctl
 	project.Ctl = suite.projectCtl
 
-	regCtlInit = func() { common_regctl.RegistryCtlClient = suite.registryCtlClient }
+	gcClientInit = func() { gcclient.Default = suite.gcClient }
 }
 
 func (suite *gcTestSuite) TearDownTest() {
@@ -162,7 +162,7 @@ func (suite *gcTestSuite) TestInit() {
 	ctx.On("GetLogger").Return(logger)
 
 	gc := &GarbageCollector{
-		registryCtlClient: suite.registryCtlClient,
+		gcClient: suite.gcClient,
 	}
 	params := map[string]any{
 		"delete_untagged": true,
@@ -172,7 +172,7 @@ func (suite *gcTestSuite) TestInit() {
 		"workers":         float64(3),
 	}
 
-	mock.OnAnything(gc.registryCtlClient, "Health").Return(nil)
+	mock.OnAnything(gc.gcClient, "Health").Return(nil)
 	suite.Nil(gc.init(ctx, params))
 	suite.True(gc.deleteUntagged)
 	suite.True(gc.deleteTag)
@@ -221,7 +221,7 @@ func (suite *gcTestSuite) TestStop() {
 	}, nil)
 
 	gc := &GarbageCollector{
-		registryCtlClient: suite.registryCtlClient,
+		gcClient: suite.gcClient,
 		artCtl:            suite.artifactCtl,
 		deleteUntagged:    true,
 		deleteTag:         true,
@@ -288,13 +288,13 @@ func (suite *gcTestSuite) TestRun() {
 
 	mock.OnAnything(suite.blobMgr, "Delete").Return(nil)
 
-	mock.OnAnything(suite.registryCtlClient, "Health").Return(nil)
+	mock.OnAnything(suite.gcClient, "Health").Return(nil)
 
 	gc := &GarbageCollector{
 		artCtl:            suite.artifactCtl,
 		artrashMgr:        suite.artrashMgr,
 		blobMgr:           suite.blobMgr,
-		registryCtlClient: suite.registryCtlClient,
+		gcClient: suite.gcClient,
 	}
 	params := map[string]any{
 		"delete_untagged": false,
@@ -303,7 +303,7 @@ func (suite *gcTestSuite) TestRun() {
 		"workers":         3,
 	}
 
-	mock.OnAnything(gc.registryCtlClient, "DeleteBlob").Return(nil)
+	mock.OnAnything(gc.gcClient, "DeleteBlob").Return(nil)
 	suite.Nil(gc.Run(ctx, params))
 }
 
@@ -390,7 +390,7 @@ func (suite *gcTestSuite) TestSweep() {
 		artCtl:            suite.artifactCtl,
 		artrashMgr:        suite.artrashMgr,
 		blobMgr:           suite.blobMgr,
-		registryCtlClient: suite.registryCtlClient,
+		gcClient: suite.gcClient,
 		deleteSet: []*pkg_blob.Blob{
 			{
 				ID:          1,
@@ -401,7 +401,7 @@ func (suite *gcTestSuite) TestSweep() {
 		workers: 3,
 	}
 
-	mock.OnAnything(gc.registryCtlClient, "DeleteBlob").Return(nil)
+	mock.OnAnything(gc.gcClient, "DeleteBlob").Return(nil)
 	suite.Nil(gc.sweep(ctx))
 }
 
@@ -419,7 +419,7 @@ func (suite *gcTestSuite) TestSweepBlobNotFound() {
 		artCtl:            suite.artifactCtl,
 		artrashMgr:        suite.artrashMgr,
 		blobMgr:           suite.blobMgr,
-		registryCtlClient: suite.registryCtlClient,
+		gcClient: suite.gcClient,
 		deleteSet: []*pkg_blob.Blob{
 			{
 				ID:          1,
@@ -432,7 +432,7 @@ func (suite *gcTestSuite) TestSweepBlobNotFound() {
 	}
 
 	// the blob is missing from the storage: the GC must still succeed, but must not count its size as freed
-	mock.OnAnything(gc.registryCtlClient, "DeleteBlob").Return(errors.NotFoundError(nil))
+	mock.OnAnything(gc.gcClient, "DeleteBlob").Return(errors.NotFoundError(nil))
 	suite.Nil(gc.sweep(ctx))
 	ctx.AssertCalled(suite.T(), "Checkin", `{"freed_space":0,"purged_blobs":1,"purged_manifests":0}`)
 }

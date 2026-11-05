@@ -46,8 +46,7 @@
         "./jobservice/...",
         "./lib/...",
         "./migration/...",
-        "./pkg/...",
-        "./registryctl/..."
+        "./pkg/..."
       ]
     },
     {

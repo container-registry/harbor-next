@@ -131,15 +131,6 @@ func GetPortalURL() string {
 	return url
 }
 
-// GetRegistryCtlURL returns the URL of registryctl
-func GetRegistryCtlURL() string {
-	url := os.Getenv("REGISTRY_CONTROLLER_URL")
-	if len(url) == 0 {
-		return common.DefaultRegistryCtlURL
-	}
-	return url
-}
-
 // GetPermittedRegistryTypesForProxyCache returns the permitted registry types for proxy cache
 func GetPermittedRegistryTypesForProxyCache() []string {
 	types := os.Getenv("PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE")

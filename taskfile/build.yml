@@ -28,7 +28,6 @@ tasks:
     deps:
       - task: 'binary:core:{{.PLATFORM}}'
       - task: 'binary:jobservice:{{.PLATFORM}}'
-      - task: 'binary:registryctl:{{.PLATFORM}}'
       - task: 'binary:exporter:{{.PLATFORM}}'
       - task: 'binary:registry:{{.PLATFORM}}'
       - task: 'binary:trivy-adapter:{{.PLATFORM}}'
@@ -109,24 +108,6 @@ tasks:
           MAIN_PATH: ./jobservice/main.go
           OUTPUT_NAME: jobservice
 
-  binary:registryctl:*:
-    desc: "Build registryctl binary"
-    sources:
-      - src/registryctl/**/*.go
-      - src/pkg/**/*.go
-      - src/lib/**/*.go
-      - src/go.mod
-      - src/go.sum
-    generates:
-      - bin/{{index .MATCH 0}}/registryctl
-    deps: [tidy]
-    cmds:
-      - task: _go-build
-        vars:
-          PLATFORM: '{{index .MATCH 0}}'
-          MAIN_PATH: ./registryctl/main.go
-          OUTPUT_NAME: registryctl
-
   binary:exporter:*:
     desc: "Build harbor-exporter binary"
     sources:
@@ -147,6 +128,13 @@ tasks:
 
   binary:registry:*:
     desc: "Build Distribution registry binary (cross-compiled from source)"
+    # Without sources Task rebuilds on every run, i.e. a fresh clone, vendor
+    # and compile on each `task dev:up`.
+    sources:
+      - versions.env
+      - Taskfile.yml
+      - taskfile/build.yml
+      - patches/distribution/*.patch
     generates:
       - bin/{{index .MATCH 0}}/registry
     vars:

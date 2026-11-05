@@ -30,7 +30,6 @@ tasks:
     deps:
       - core
       - jobservice
-      - registryctl
       - exporter
       - portal
       - registry
@@ -143,7 +142,7 @@ tasks:
         msg: "jq is required to verify pushed image manifests"
     cmds:
       - |
-        images="harbor-core harbor-jobservice harbor-registryctl harbor-exporter harbor-portal harbor-registry trivy-adapter"
+        images="harbor-core harbor-jobservice harbor-exporter harbor-portal harbor-registry trivy-adapter"
 
         for image in ${images}; do
           reference="{{.REGISTRY_ADDRESS}}/{{.REGISTRY_PROJECT}}/${image}:{{.IMAGE_TAG}}"
@@ -197,13 +196,6 @@ tasks:
       - task: _binary-image
         vars:
           SERVICE: jobservice
-
-  registryctl:
-    desc: "Build RegistryCtl image (compiles binary, then builds container)"
-    cmds:
-      - task: _binary-image
-        vars:
-          SERVICE: registryctl
 
   exporter:
     desc: "Build Exporter image (compiles binary, then builds container)"

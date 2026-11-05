@@ -26,8 +26,9 @@ chmod 644 config/token_service_key.pem   # container UID 10000 ≠ host UID → 
 [ -f config/secret_key ] || openssl rand -base64 32 | tr -dc 'A-Za-z0-9' | head -c 16 > config/secret_key
 chmod 644 config/secret_key
 
-# 4. Start
-docker compose up -d
+# 4. Start. --remove-orphans also stops the registryctl container left over
+#    from releases before the registry served the GC API itself.
+docker compose up -d --remove-orphans
 
 # 5. Verify
 docker compose ps
@@ -156,7 +157,7 @@ internal service names in `NO_PROXY`, for example:
 ```env
 HTTP_PROXY=http://proxy.example.com:8080
 HTTPS_PROXY=http://proxy.example.com:8080
-NO_PROXY=localhost,127.0.0.1,core,registry,registryctl
+NO_PROXY=localhost,127.0.0.1,core,registry
 ```
 
 ## Architecture
@@ -177,20 +178,19 @@ Portal (nginx) serves the Angular UI and reverse-proxies `/v2/`, `/api/`, `/serv
                               ┌────────────────┐
                               │     "Core"     │
                               │    ":8080"     │
-                              └──┬─────┬─────┬─┘
-                  ┌──────────────┘     │     └──────────────┐
-                  ▼                    ▼                    ▼
-          ┌───────────────┐   ┌───────────────┐   ┌────────────────┐
-          │ "JobService"  │   │  "Registry"   │   │ "RegistryCtl"  │
-          │    ":8888"    │   │    ":5000"    │   │    ":8080"     │
-          └───────────────┘   └───────┬───────┘   └───────┬────────┘
-                                      └───────────┬───────┘
-                                                  │
-                                                  ▼
-                                          ┌────────────────┐
-                                          │"registry-data" │
-                                          │   "(volume)"   │
-                                          └────────────────┘
+                              └──┬──────────┬──┘
+                  ┌──────────────┘          │
+                  ▼                         ▼
+          ┌───────────────┐         ┌───────────────┐
+          │ "JobService"  │-------->│  "Registry"   │
+          │    ":8888"    │         │    ":5000"    │
+          └───────────────┘         └───────┬───────┘
+                                            │
+                                            ▼
+                                    ┌────────────────┐
+                                    │"registry-data" │
+                                    │   "(volume)"   │
+                                    └────────────────┘
 
           ┌───────────────┐   ┌───────────────┐
           │    "Trivy"    │   │  "Exporter"   │
@@ -203,14 +203,13 @@ Portal (nginx) serves the Angular UI and reverse-proxies `/v2/`, `/api/`, `/serv
           └───────────────┘   └───────────────┘
 ```
 -->
-![Diagram](https://kroki.io/svgbob/svg/eNpTUMAFlKxMTIwVNDxCQgKCNRUU9BUUrCwMIHxNJS4FosCjKU3Eqpy2h4uQWT2PpjSQiCYQNLQJ7NeA_KKSxBwl4twM06SRl56ZV6GpRKSmKTjcuAa382cMs3BWUHLOL0pVUiAtnIHpzsKAeE1TcAcsLhFs4UxiOMxA8Sfu2CY6-IAxhSMCCccr6XE4gY660DwMCjMlr_yk4NSissxkUOqAhCKYVApKTc8sLimqVFJAFocLO5fkKKEnC0S6AQIlBRSNYHFTAwMDbOK40hmJsQlNDaTn-Bm0LyeI8cgaCm0hr2QirZSieYmF5gmlImiC001JLElUItFfkBSmpFGWn1Oam0pkjUF6xGHE10AUCVgyYkhRZlkleoZTcq0oANa6qUVKCtgzsJJjSmIBQh6pdMWVvKidTwd1wALbLMUl6UWpwYE-SuglWVBqSmaxkoICzpLR1MTYCFsJaGZsbqk0gAELAEZlQZE=)
+![Diagram](https://kroki.io/svgbob/svg/eNpTUMAFlKxMTIwVNDxCQgKCNRUU9BUUrCwMIHxNJS4FosCjKU3Eqpy2h4uQWT2PpjSQiCYQNLQJ7NeA_KKSxBwl4twM06SRl56ZV6GpRKSmKTjcuAa382cMs3BWUHLOL0pVUiAtnIHpzsKAeE1TiAhYNAXYwpnEcJhBKDaAIU9krJAeAxMo0cuFGuJKXvlJwalFZZnJoIgCiuhCgR04PpSCUtMzi0uKKjGTPSK-gEAJOdpRZE0NDAyw5DTcGYRwkJOeuYjNWaTmL2JzGQ3zGtzJSkXQqNJNSSxJVCLaF5CYUtIoy88pzU0lsnwjNxLBcUFx4qc82YN8HFKUWVaJlHAhCd61ogBYO6QW4UrwSo4piQUIebRkjy0BkZfUydA1GAIWWLcWl6QXpQYH-iihBRCwLEnJLMZaFsDKChNjI_QIAYmbGZtbKg1gwAIA5C6Weg==)
 
 - **Portal (nginx)** — serves the static Angular UI and reverse-proxies `/v2/*`, `/api/*`, `/service/*`, and `/c/*` to Core.
 - **Core** (`:8080`) — API gateway, authentication, and business logic.
 - **JobService** (`:8888`) — asynchronous jobs (scan, replication, GC, retention).
-- **Registry** (`:5000`) — `docker/distribution`; blob/manifest storage.
-- **RegistryCtl** (`:8080`) — direct storage operations (used by GC).
-- **registry-data** — Docker volume mounted at `/var/lib/registry`, shared by Registry and RegistryCtl.
+- **Registry** (`:5000`) — `distribution/distribution` with the patches in `patches/distribution`; blob/manifest storage, plus the GC delete API (`/api/registry/*`) that JobService calls.
+- **registry-data** — Docker volume mounted at `/var/lib/registry`.
 - **Trivy Adapter** — vulnerability scanner. **Exporter** — Prometheus `/metrics`.
 - **Infrastructure** — PostgreSQL (`:5432`) and Redis/Valkey (`:6379`) are shared by Core, JobService, Trivy, and Exporter.
 

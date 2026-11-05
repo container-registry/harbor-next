@@ -123,24 +123,21 @@ const (
 	OIDCUserClaim                    = "oidc_user_claim"
 	OIDCLogout                       = "oidc_logout"
 
-	CfgDriverDB                       = "db"
-	NewHarborAdminName                = "admin@harbor.local"
-	RegistryStorageProviderName       = "registry_storage_provider_name"
-	RegistryControllerURL             = "registry_controller_url"
-	UserMember                        = "u"
-	GroupMember                       = "g"
-	ReadOnly                          = "read_only"
-	TrivyAdapterURL                   = "trivy_adapter_url"
-	DefaultCoreEndpoint               = "http://core:8080"
-	LDAPGroupType                     = 1
-	HTTPGroupType                     = 2
-	OIDCGroupType                     = 3
-	LDAPGroupAdminDn                  = "ldap_group_admin_dn"
-	LDAPGroupMembershipAttribute      = "ldap_group_membership_attribute"
-	LDAPGroupAttachParallel           = "ldap_group_attach_parallel"
-	DefaultRegistryControllerEndpoint = "http://registryctl:8080"
-	DefaultPortalURL                  = "http://portal:8080"
-	DefaultRegistryCtlURL             = "http://registryctl:8080"
+	CfgDriverDB                  = "db"
+	NewHarborAdminName           = "admin@harbor.local"
+	RegistryStorageProviderName  = "registry_storage_provider_name"
+	UserMember                   = "u"
+	GroupMember                  = "g"
+	ReadOnly                     = "read_only"
+	TrivyAdapterURL              = "trivy_adapter_url"
+	DefaultCoreEndpoint          = "http://core:8080"
+	LDAPGroupType                = 1
+	HTTPGroupType                = 2
+	OIDCGroupType                = 3
+	LDAPGroupAdminDn             = "ldap_group_admin_dn"
+	LDAPGroupMembershipAttribute = "ldap_group_membership_attribute"
+	LDAPGroupAttachParallel      = "ldap_group_attach_parallel"
+	DefaultPortalURL             = "http://portal:8080"
 	// Use this prefix to distinguish harbor user, the prefix contains a special character($), so it cannot be registered as a harbor user.
 	RobotPrefix = "robot$"
 	// System admin defined the robot name prefix.
