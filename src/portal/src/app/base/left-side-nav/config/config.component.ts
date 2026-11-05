@@ -13,6 +13,7 @@
 // limitations under the License.
 import { Component, OnInit } from '@angular/core';
 import { ConfigService } from './config.service';
+import { featureToggles } from './features/optional-features';
 
 @Component({
     selector: 'config',
@@ -20,6 +21,8 @@ import { ConfigService } from './config.service';
     styleUrls: ['config.component.scss'],
 })
 export class ConfigurationComponent implements OnInit {
+    readonly hasFeatures = featureToggles().length > 0;
+
     get inProgress(): boolean {
         return this.conf.getLoadingConfigStatus();
     }

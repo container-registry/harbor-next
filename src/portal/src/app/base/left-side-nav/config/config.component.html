@@ -47,6 +47,16 @@
                     {{ 'CONFIG.AUDIT_LOG' | translate }}
                 </button>
             </li>
+            <li *ngIf="hasFeatures" role="presentation" class="nav-item">
+                <button
+                    id="config-features"
+                    class="btn btn-link nav-link"
+                    type="button"
+                    routerLink="features"
+                    routerLinkActive="active">
+                    {{ 'CONFIG.FEATURES' | translate }}
+                </button>
+            </li>
         </ul>
     </div>
 </div>
