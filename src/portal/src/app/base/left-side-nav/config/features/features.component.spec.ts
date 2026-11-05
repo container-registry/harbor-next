@@ -12,62 +12,80 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { ConfigureService } from 'ng-swagger-gen/services/configure.service';
+import { FeatureList } from 'ng-swagger-gen/models/feature-list';
 import { SharedTestingModule } from '../../../../shared/shared.module';
-import { ConfigurationService } from '../../../../services/config.service';
+import { AppConfigService } from '../../../../services/app-config.service';
 import { MessageHandlerService } from '../../../../shared/services/message-handler.service';
-import { BoolValueItem, Configuration } from '../config';
-import { ConfigService } from '../config.service';
 import { FeaturesComponent } from './features.component';
-import { OPTIONAL_FEATURES } from './optional-features';
-import { FeatureToggle } from './feature-toggle';
 
-const TEST_FEATURE: FeatureToggle = {
-    configKey: 'enable_test_feature',
-    envKey: 'HARBOR_ENABLE_TEST_FEATURE',
-    name: 'Test Feature',
-    description: 'A feature used by the spec.',
-    beta: true,
-};
+function featureList(): FeatureList {
+    return {
+        sections: [
+            {
+                id: 'licensed',
+                title: 'Licensed Features',
+                description: 'Needs an agreement.',
+                link_text: 'Request a license',
+                link: 'mailto:sales@example.com?body=Features%3A%20none',
+            },
+            { id: 'optional', title: 'CONFIG.OPTIONAL_FEATURES' },
+        ],
+        features: [
+            {
+                key: 'enable_test_feature',
+                section: 'optional',
+                name: 'Test Feature',
+                description: 'A feature used by the spec.',
+                beta: true,
+                enabled: false,
+                editable: true,
+                locked_by: '',
+            },
+            {
+                key: 'enable_locked_feature',
+                section: 'optional',
+                name: 'Locked Feature',
+                enabled: true,
+                editable: false,
+                locked_by: 'HARBOR_ENABLE_LOCKED_FEATURE',
+            },
+            {
+                key: 'enable_licensed_feature',
+                section: 'licensed',
+                name: 'Licensed Feature',
+                enabled: false,
+                editable: true,
+            },
+        ],
+    };
+}
 
 describe('FeaturesComponent', () => {
     let fixture: ComponentFixture<FeaturesComponent>;
     let component: FeaturesComponent;
-    let original: Configuration;
-    let current: Configuration;
-    let saveConfiguration: jasmine.Spy;
-    let updateConfig: jasmine.Spy;
-    let loading: boolean;
+    let listFeatures: jasmine.Spy;
+    let updateFeature: jasmine.Spy;
+    let appConfigLoad: jasmine.Spy;
 
-    function setup(features: FeatureToggle[], value?: BoolValueItem): void {
-        OPTIONAL_FEATURES.splice(0, OPTIONAL_FEATURES.length, ...features);
-        loading = false;
-        original = new Configuration();
-        if (value) {
-            original[TEST_FEATURE.configKey] = value;
-        }
-        current = JSON.parse(JSON.stringify(original));
-        saveConfiguration = jasmine
-            .createSpy('saveConfiguration')
+    function setup(list: Observable<FeatureList> = of(featureList())): void {
+        listFeatures = jasmine.createSpy('listFeatures').and.returnValue(list);
+        updateFeature = jasmine
+            .createSpy('updateFeature')
             .and.returnValue(of(null));
-        updateConfig = jasmine.createSpy('updateConfig');
+        appConfigLoad = jasmine.createSpy('load').and.returnValue(of({}));
         TestBed.configureTestingModule({
             imports: [SharedTestingModule],
             declarations: [FeaturesComponent],
             providers: [
                 {
-                    provide: ConfigService,
-                    useValue: {
-                        getConfig: () => current,
-                        getOriginalConfig: () => original,
-                        resetConfig: () => undefined,
-                        getLoadingConfigStatus: () => loading,
-                        updateConfig,
-                    },
+                    provide: ConfigureService,
+                    useValue: { listFeatures, updateFeature },
                 },
                 {
-                    provide: ConfigurationService,
-                    useValue: { saveConfiguration },
+                    provide: AppConfigService,
+                    useValue: { load: appConfigLoad },
                 },
                 {
                     provide: MessageHandlerService,
@@ -83,109 +101,122 @@ describe('FeaturesComponent', () => {
         fixture.detectChanges();
     }
 
-    function toggle(): HTMLInputElement {
-        return fixture.nativeElement.querySelector(
-            `input#${TEST_FEATURE.configKey}`
-        );
+    function toggle(key: string): HTMLInputElement {
+        return fixture.nativeElement.querySelector(`input#${key}`);
     }
 
-    afterEach(() => OPTIONAL_FEATURES.splice(0, OPTIONAL_FEATURES.length));
-
-    it('renders no optional section without registered features', () => {
-        setup([]);
-        expect(
-            fixture.nativeElement.querySelector('#optional-features')
-        ).toBeNull();
-    });
-
-    it('lists an optional feature with its beta badge', async () => {
-        setup([TEST_FEATURE], new BoolValueItem(false, true));
+    async function render(): Promise<void> {
         await fixture.whenStable();
         fixture.detectChanges();
-        const section: HTMLElement =
-            fixture.nativeElement.querySelector('#optional-features');
-        expect(section.textContent).toContain('Test Feature');
-        expect(section.querySelector('.beta-badge')).not.toBeNull();
-        expect(toggle().disabled).toBeFalse();
-        expect(toggle().checked).toBeFalse();
+    }
+
+    it('renders the sections in API order with their features', async () => {
+        setup();
+        await render();
+        const sections = Array.from(
+            fixture.nativeElement.querySelectorAll('form section')
+        ) as HTMLElement[];
+        expect(sections.map(section => section.id)).toEqual([
+            'feature-section-licensed',
+            'feature-section-optional',
+        ]);
+        expect(sections[0].textContent).toContain('Licensed Feature');
+        expect(sections[0].textContent).not.toContain('Test Feature');
+        const link: HTMLAnchorElement =
+            sections[0].querySelector('a.section-link');
+        expect(link.textContent.trim()).toBe('Request a license');
+        expect(link.getAttribute('href')).toBe(
+            'mailto:sales@example.com?body=Features%3A%20none'
+        );
+        expect(sections[1].querySelector('.beta-badge')).not.toBeNull();
+        expect(sections[1].querySelector('a.section-link')).toBeNull();
     });
 
-    it('saves only the changed feature key', () => {
-        setup([TEST_FEATURE], new BoolValueItem(false, true));
-        expect(component.hasChanges()).toBeFalse();
+    it('locks a feature the backend reports as not editable', async () => {
+        setup();
+        await render();
+        expect(toggle('enable_locked_feature').disabled).toBeTrue();
+        expect(toggle('enable_locked_feature').checked).toBeTrue();
+        expect(toggle('enable_test_feature').disabled).toBeFalse();
+    });
 
-        component.setEnabled(TEST_FEATURE, true);
+    it('saves only changed features and reloads the list and systeminfo', () => {
+        setup();
+        const [testFeature, , licensed] = component.features;
+        component.setEnabled(testFeature, true);
+        component.setEnabled(licensed, true);
+        component.setEnabled(licensed, false);
         expect(component.hasChanges()).toBeTrue();
+
         component.save();
 
-        expect(saveConfiguration).toHaveBeenCalledOnceWith({
-            [TEST_FEATURE.configKey]: true,
+        expect(updateFeature).toHaveBeenCalledOnceWith({
+            featureKey: 'enable_test_feature',
+            feature: { enabled: true },
         });
-        expect(updateConfig).toHaveBeenCalled();
-    });
-
-    it('locks a feature controlled by its environment variable', async () => {
-        setup([TEST_FEATURE], new BoolValueItem(true, false));
-        await fixture.whenStable();
-        fixture.detectChanges();
-        expect(toggle().disabled).toBeTrue();
-        expect(component.lockedBy(TEST_FEATURE)).toBe(TEST_FEATURE.envKey);
-    });
-
-    it('names CONFIG_OVERWRITE_JSON when every setting is locked', () => {
-        setup([TEST_FEATURE], new BoolValueItem(true, false));
-        current.token_expiration.editable = false;
-        expect(component.lockedBy(TEST_FEATURE)).toBe('CONFIG_OVERWRITE_JSON');
-    });
-
-    it('treats a feature missing from the API response as disabled', () => {
-        setup([TEST_FEATURE]);
-        expect(component.disabled(TEST_FEATURE)).toBeTrue();
-        expect(component.lockedBy(TEST_FEATURE)).toBe('');
+        expect(listFeatures).toHaveBeenCalledTimes(2);
+        expect(appConfigLoad).toHaveBeenCalled();
         expect(component.hasChanges()).toBeFalse();
+    });
+
+    it('reloads after a rejected change so the stored state is shown', () => {
+        setup();
+        updateFeature.and.returnValue(
+            throwError(() => new Error('controlled by env'))
+        );
+        component.setEnabled(component.features[0], true);
+        component.save();
+        expect(listFeatures).toHaveBeenCalledTimes(2);
+        expect(component.hasChanges()).toBeFalse();
+    });
+
+    it('cancel drops pending changes', () => {
+        setup();
+        component.setEnabled(component.features[0], true);
+        component.cancel();
+        expect(component.hasChanges()).toBeFalse();
+        expect(component.value(component.features[0])).toBeFalse();
+    });
+
+    it('keeps Save, Cancel and toggles disabled while the list loads', () => {
+        setup(NEVER);
+        component.features = featureList().features;
+        component.setEnabled(component.features[0], true);
+        fixture.detectChanges();
+        expect(
+            fixture.nativeElement.querySelector('#features-save').disabled
+        ).toBeTrue();
+        expect(
+            fixture.nativeElement.querySelector('#features-cancel').disabled
+        ).toBeTrue();
+        expect(component.disabled(component.features[0])).toBeTrue();
     });
 
     ['clr-icon', '.beta-badge'].forEach(hint =>
         it(`does not flip the toggle when ${hint} in the label is clicked`, async () => {
-            setup([TEST_FEATURE], new BoolValueItem(false, true));
-            await fixture.whenStable();
-            fixture.detectChanges();
+            setup();
+            await render();
             (
                 fixture.nativeElement.querySelector(
-                    `.label-hints ${hint}`
+                    `label[for=enable_test_feature] .label-hints ${hint}`
                 ) as HTMLElement
             ).click();
-            await fixture.whenStable();
-            expect(toggle().checked).toBeFalse();
+            await render();
+            expect(toggle('enable_test_feature').checked).toBeFalse();
             expect(component.hasChanges()).toBeFalse();
         })
     );
 
     it('still flips the toggle when the feature name is clicked', async () => {
-        setup([TEST_FEATURE], new BoolValueItem(false, true));
-        await fixture.whenStable();
-        fixture.detectChanges();
+        setup();
+        await render();
         (
             fixture.nativeElement.querySelector(
-                `label[for=${TEST_FEATURE.configKey}]`
+                'label[for=enable_test_feature]'
             ) as HTMLElement
         ).click();
-        await fixture.whenStable();
-        expect(toggle().checked).toBeTrue();
-    });
-
-    it('keeps Save, Cancel and toggles disabled while the config reloads', () => {
-        setup([TEST_FEATURE], new BoolValueItem(false, true));
-        component.setEnabled(TEST_FEATURE, true);
-        loading = true;
-        fixture.detectChanges();
-        const save: HTMLButtonElement =
-            fixture.nativeElement.querySelector('#features-save');
-        const cancel: HTMLButtonElement =
-            fixture.nativeElement.querySelector('#features-cancel');
-        expect(save.disabled).toBeTrue();
-        expect(cancel.disabled).toBeTrue();
-        expect(component.disabled(TEST_FEATURE)).toBeTrue();
-        expect(component.lockedBy(TEST_FEATURE)).toBe('');
+        await render();
+        expect(toggle('enable_test_feature').checked).toBeTrue();
+        expect(component.hasChanges()).toBeTrue();
     });
 });

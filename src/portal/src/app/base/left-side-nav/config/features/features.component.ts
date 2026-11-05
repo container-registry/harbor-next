@@ -12,109 +12,126 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 import { Component, OnInit } from '@angular/core';
-import { ConfigurationService } from '../../../../services/config.service';
+import { concat } from 'rxjs';
+import { finalize, toArray } from 'rxjs/operators';
+import { ConfigureService } from 'ng-swagger-gen/services/configure.service';
+import { Feature } from 'ng-swagger-gen/models/feature';
+import { FeatureSection } from 'ng-swagger-gen/models/feature-section';
+import { AppConfigService } from '../../../../services/app-config.service';
 import { MessageHandlerService } from '../../../../shared/services/message-handler.service';
-import { getChanges, isEmpty } from '../../../../shared/units/utils';
-import { BoolValueItem, Configuration } from '../config';
-import { ConfigService } from '../config.service';
-import { FeatureToggle } from './feature-toggle';
-import { OPTIONAL_FEATURES, featureToggles } from './optional-features';
 
+/**
+ * Renders every feature toggle the backend registered with
+ * src/pkg/feature, grouped into the sections it reports.
+ */
 @Component({
     selector: 'config-features',
     templateUrl: './features.component.html',
     styleUrls: ['./features.component.scss'],
 })
 export class FeaturesComponent implements OnInit {
+    sections: FeatureSection[] = [];
+    features: Feature[] = [];
+    private pending: { [key: string]: boolean } = {};
+    private loading = false;
     private onGoing = false;
-    readonly optionalFeatures: FeatureToggle[] = OPTIONAL_FEATURES;
-    readonly features: FeatureToggle[] = featureToggles();
 
     constructor(
-        private configService: ConfigurationService,
-        private config: ConfigService,
+        private configureService: ConfigureService,
+        private appConfigService: AppConfigService,
         private messageHandler: MessageHandlerService
     ) {}
 
-    // Covers the reload after a save too, so the snapshot cannot be edited
-    // or resubmitted while updateConfig() replaces it.
+    // Covers the reload after a save too, so nothing can be edited or
+    // resubmitted while the list is being replaced.
     get inProgress(): boolean {
-        return this.onGoing || this.config.getLoadingConfigStatus();
+        return this.loading || this.onGoing;
     }
 
     ngOnInit(): void {
-        this.config.resetConfig();
+        this.load();
     }
 
-    featureConfig(feature: FeatureToggle): BoolValueItem {
-        return this.config.getConfig()[feature.configKey] as BoolValueItem;
+    load(): void {
+        this.loading = true;
+        this.configureService
+            .listFeatures()
+            .pipe(finalize(() => (this.loading = false)))
+            .subscribe({
+                next: list => {
+                    this.sections = list?.sections || [];
+                    this.features = list?.features || [];
+                    this.pending = {};
+                },
+                error: error => this.messageHandler.handleError(error),
+            });
     }
 
-    disabled(feature: FeatureToggle): boolean {
-        const value = this.featureConfig(feature);
-        return !value || !value.editable || this.inProgress;
+    featuresOf(section: FeatureSection): Feature[] {
+        return this.features.filter(feature => feature.section === section.id);
     }
 
-    lockedBy(feature: FeatureToggle): string {
-        const value = this.featureConfig(feature);
-        if (!value || value.editable) {
-            return '';
-        }
-        // CONFIG_OVERWRITE_JSON locks every setting, not only this one.
-        if (this.config.getConfig().token_expiration?.editable === false) {
-            return 'CONFIG_OVERWRITE_JSON';
-        }
-        return feature.envKey;
+    value(feature: Feature): boolean {
+        return feature.key in this.pending
+            ? this.pending[feature.key]
+            : feature.enabled;
     }
 
-    setEnabled(feature: FeatureToggle, enabled: boolean): void {
-        const value = this.featureConfig(feature);
-        if (value) {
-            value.value = enabled;
+    disabled(feature: Feature): boolean {
+        return !feature.editable || this.inProgress;
+    }
+
+    setEnabled(feature: Feature, enabled: boolean): void {
+        if (enabled === feature.enabled) {
+            delete this.pending[feature.key];
+        } else {
+            this.pending[feature.key] = enabled;
         }
     }
 
     hasChanges(): boolean {
-        return !isEmpty(this.changes());
+        return Object.keys(this.pending).length > 0;
     }
 
     save(): void {
-        const changes = this.changes();
-        if (isEmpty(changes)) {
+        const keys = Object.keys(this.pending);
+        if (!keys.length) {
             return;
         }
         this.onGoing = true;
-        this.configService.saveConfiguration(changes).subscribe({
-            next: () => {
-                this.onGoing = false;
-                this.config.updateConfig();
-                this.messageHandler.showSuccess('CONFIG.SAVE_SUCCESS');
-            },
-            error: error => {
-                this.onGoing = false;
-                this.messageHandler.handleError(error);
-            },
-        });
+        // Sequential, so a rejected change (env lock, disable guard) stops
+        // the rest and the reload shows what was actually stored.
+        concat(
+            ...keys.map(key =>
+                this.configureService.updateFeature({
+                    featureKey: key,
+                    feature: { enabled: this.pending[key] },
+                })
+            )
+        )
+            .pipe(
+                toArray(),
+                finalize(() => (this.onGoing = false))
+            )
+            .subscribe({
+                next: () => {
+                    this.messageHandler.showSuccess('CONFIG.SAVE_SUCCESS');
+                    this.refresh();
+                },
+                error: error => {
+                    this.messageHandler.handleError(error);
+                    this.refresh();
+                },
+            });
     }
 
     cancel(): void {
-        this.config.resetConfig();
+        this.pending = {};
     }
 
-    private changes(): { [key: string]: boolean } {
-        const original = this.config.getOriginalConfig();
-        if (!original) {
-            return {};
-        }
-        const allChanges = getChanges(
-            original,
-            this.config.getConfig() as Configuration
-        );
-        return this.features.reduce((changes, feature) => {
-            if (allChanges[feature.configKey] !== undefined) {
-                changes[feature.configKey] = allChanges[feature.configKey];
-            }
-            return changes;
-        }, {} as { [key: string]: boolean });
+    private refresh(): void {
+        this.load();
+        // Other pages gate their UI on systeminfo features.
+        this.appConfigService.load().subscribe();
     }
 }
