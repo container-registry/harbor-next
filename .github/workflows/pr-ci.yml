@@ -70,6 +70,7 @@ jobs:
             ^LICENSE$
             ^VERSION$
             ^dockerfile/
+            ^patches/distribution/.*\.patch$
             ^versions\.env$
             ^Taskfile\.yml$
             ^taskfile/build\.yml$
