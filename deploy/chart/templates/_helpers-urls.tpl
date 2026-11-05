@@ -5,10 +5,11 @@ Internal URL helpers
 */}}
 
 {{/*
-Return the Core internal URL
+Return the Core internal URL. The port stays explicit: go-containerregistry
+reads a portless single-label host as a Docker Hub namespace (#790).
 */}}
 {{- define "harbor.core.url" -}}
-http://{{ include "harbor.fullname" . }}-core
+http://{{ include "harbor.fullname" . }}-core:{{ include "harbor.core.service.port" . }}
 {{- end }}
 
 {{/*
@@ -19,10 +20,10 @@ Container port
 {{- end }}
 
 {{/*
-Container port
+Core Service port (core.servicePort)
 */}}
 {{- define "harbor.core.service.port" -}}
-80
+{{- .Values.core.servicePort | default 80 -}}
 {{- end }}
 
 {{/* TOKEN_SERVICE_URL */}}

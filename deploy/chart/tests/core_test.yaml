@@ -38,6 +38,34 @@ tests:
           path: data.EXT_ENDPOINT
           value: "https://harbor.example.com"
 
+  # Pins: CORE_URL carries the core Service port, so the SBOM push path never
+  # sees a portless single-label host (#790).
+  - it: should render CORE_URL and TOKEN_SERVICE_URL with the core service port
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - equal:
+          path: data.CORE_URL
+          value: "http://RELEASE-NAME-harbor-core:80"
+      - equal:
+          path: data.TOKEN_SERVICE_URL
+          value: "http://RELEASE-NAME-harbor-core:80/service/token"
+
+  # Pins: the port in CORE_URL above is the one the core Service listens on.
+  - it: should expose the core Service on the port CORE_URL uses
+    template: templates/core.service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 80
+
   # Pins: HARBOR_ADMIN_PASSWORD in the Secret is base64-encoded from the raw input.
   - it: should base64-encode harborAdminPassword into the Secret
     template: templates/core.secret.yaml
@@ -490,3 +518,34 @@ tests:
           content:
             secretRef:
               name: RELEASE-NAME-harbor-core
+
+  # Pins: core.servicePort moves the Service and CORE_URL together (#790).
+  - it: should honor a non-default core.servicePort in the Service
+    template: templates/core.service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.servicePort: 8081
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 8081
+      - equal:
+          path: spec.ports[0].targetPort
+          value: 8080
+
+  - it: should honor a non-default core.servicePort in CORE_URL
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.servicePort: 8081
+    asserts:
+      - equal:
+          path: data.CORE_URL
+          value: "http://RELEASE-NAME-harbor-core:8081"
+      - equal:
+          path: data.TOKEN_SERVICE_URL
+          value: "http://RELEASE-NAME-harbor-core:8081/service/token"
