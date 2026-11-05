@@ -51,6 +51,7 @@ import (
 	"github.com/goharbor/harbor/src/pkg/audit"
 	"github.com/goharbor/harbor/src/pkg/auditext"
 	"github.com/goharbor/harbor/src/pkg/member"
+	pkgProject "github.com/goharbor/harbor/src/pkg/project"
 	"github.com/goharbor/harbor/src/pkg/project/metadata"
 	pkgModels "github.com/goharbor/harbor/src/pkg/project/models"
 	"github.com/goharbor/harbor/src/pkg/quota/types"
@@ -71,37 +72,41 @@ const (
 
 func newProjectAPI() *projectAPI {
 	return &projectAPI{
-		auditMgr:      audit.Mgr,
-		artCtl:        artifact.Ctl,
-		auditextMgr:   auditext.Mgr,
-		metadataMgr:   pkg.ProjectMetaMgr,
-		userCtl:       user.Ctl,
-		repositoryCtl: repository.Ctl,
-		projectCtl:    project.Ctl,
-		memberMgr:     member.Mgr,
-		quotaCtl:      quota.Ctl,
-		robotMgr:      robot.Mgr,
-		preheatCtl:    preheat.Ctl,
-		retentionCtl:  retention.Ctl,
-		scannerCtl:    scanner.DefaultController,
+		auditMgr:       audit.Mgr,
+		artCtl:         artifact.Ctl,
+		auditextMgr:    auditext.Mgr,
+		metadataMgr:    pkg.ProjectMetaMgr,
+		userCtl:        user.Ctl,
+		repositoryCtl:  repository.Ctl,
+		projectCtl:     project.Ctl,
+		memberMgr:      member.Mgr,
+		quotaCtl:       quota.Ctl,
+		robotMgr:       robot.Mgr,
+		preheatCtl:     preheat.Ctl,
+		retentionCtl:   retention.Ctl,
+		scannerCtl:     scanner.DefaultController,
+		defaultProject: config.StoredDefaultProjectName,
+		deleteLock:     pkgProject.WithDeleteLock,
 	}
 }
 
 type projectAPI struct {
 	BaseAPI
-	auditMgr      audit.Manager
-	auditextMgr   auditext.Manager
-	artCtl        artifact.Controller
-	metadataMgr   metadata.Manager
-	userCtl       user.Controller
-	repositoryCtl repository.Controller
-	projectCtl    project.Controller
-	memberMgr     member.Manager
-	quotaCtl      quota.Controller
-	robotMgr      robot.Manager
-	preheatCtl    preheat.Controller
-	retentionCtl  retention.Controller
-	scannerCtl    scanner.Controller
+	auditMgr       audit.Manager
+	auditextMgr    auditext.Manager
+	artCtl         artifact.Controller
+	metadataMgr    metadata.Manager
+	userCtl        user.Controller
+	repositoryCtl  repository.Controller
+	projectCtl     project.Controller
+	memberMgr      member.Manager
+	quotaCtl       quota.Controller
+	robotMgr       robot.Manager
+	preheatCtl     preheat.Controller
+	retentionCtl   retention.Controller
+	scannerCtl     scanner.Controller
+	defaultProject func(context.Context) (string, error)
+	deleteLock     func(context.Context, int64, func(context.Context) error) error
 }
 
 func (a *projectAPI) CreateProject(ctx context.Context, params operation.CreateProjectParams) middleware.Responder {
@@ -279,16 +284,22 @@ func (a *projectAPI) DeleteProject(ctx context.Context, params operation.DeleteP
 		return a.SendError(ctx, err)
 	}
 
-	p, result, err := a.deletable(ctx, projectNameOrID)
+	p, err := a.projectCtl.Get(ctx, projectNameOrID)
 	if err != nil {
 		return a.SendError(ctx, err)
 	}
-
-	if !result.Deletable {
-		return a.SendError(ctx, errors.PreconditionFailedError(errors.New(result.Message)))
-	}
-
-	if err := a.projectCtl.Delete(ctx, p.ProjectID); err != nil {
+	// only this project's row is locked, so deletes of other projects run in parallel
+	err = a.deleteLock(ctx, p.ProjectID, func(ctx context.Context) error {
+		_, result, err := a.deletable(ctx, p.ProjectID)
+		if err != nil {
+			return err
+		}
+		if !result.Deletable {
+			return errors.PreconditionFailedError(errors.New(result.Message))
+		}
+		return a.projectCtl.Delete(ctx, p.ProjectID)
+	})
+	if err != nil {
 		return a.SendError(ctx, err)
 	}
 
@@ -800,8 +811,15 @@ func (a *projectAPI) deletable(ctx context.Context, projectNameOrID any) (*proje
 		return nil, nil, err
 	}
 
+	defaultProject, err := a.defaultProject(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
 	result := &models.ProjectDeletable{Deletable: true}
-	if p.RepoCount > 0 {
+	if p.Name == defaultProject {
+		result.Deletable = false
+		result.Message = "the project is the default project for pushes without a project, change Default Project in System Settings first"
+	} else if p.RepoCount > 0 {
 		result.Deletable = false
 		result.Message = "the project contains repositories, cannot be deleted"
 	}

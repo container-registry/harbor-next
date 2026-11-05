@@ -33,13 +33,21 @@ import {
 } from '../../../../shared/units/utils';
 import { ConfigService } from '../config.service';
 import { AppConfigService } from '../../../../services/app-config.service';
-import { finalize } from 'rxjs/operators';
+import {
+    catchError,
+    debounceTime,
+    finalize,
+    map,
+    switchMap,
+} from 'rxjs/operators';
 import { MessageHandlerService } from '../../../../shared/services/message-handler.service';
 import {
     EventService,
     HarborEvent,
 } from '../../../../services/event-service/event.service';
-import { Subscription } from 'rxjs';
+import { Observable, Subject, Subscription, forkJoin, of } from 'rxjs';
+import { ProjectService } from '../../../../../../ng-swagger-gen/services/project.service';
+import { Project } from '../../../../../../ng-swagger-gen/models/project';
 
 @Component({
     selector: 'system-settings',
@@ -74,29 +82,54 @@ export class SystemSettingsComponent
     bannerRefreshSub: Subscription;
     currentDate: Date = new Date();
     @ViewChild('systemConfigFrom') systemSettingsForm: NgForm;
+    searchedProjects: Project[] = [];
+    // names confirmed missing, kept per name so a restored value keeps its state
+    missingDefaultProjects = new Set<string>();
+    pendingDefaultProject = '';
+    defaultProjectSearcher: Subject<string> = new Subject<string>();
+    defaultProjectSub: Subscription;
 
     constructor(
         private appConfigService: AppConfigService,
         private conf: ConfigService,
         private event: EventService,
         private errorHandler: MessageHandlerService,
-        private changeDetectorRef: ChangeDetectorRef
+        private changeDetectorRef: ChangeDetectorRef,
+        private projectService: ProjectService
     ) {
         this.downloadLink = CURRENT_BASE_HREF + '/systeminfo/getcert';
     }
 
     ngOnInit() {
         this.conf.resetConfig();
+        if (!this.defaultProjectSub) {
+            this.defaultProjectSub = this.defaultProjectSearcher
+                .pipe(
+                    debounceTime(300),
+                    switchMap(name => this.lookupDefaultProject(name))
+                )
+                .subscribe(result => {
+                    // drop answers for a value the admin has already changed
+                    if (result.name !== this.defaultProjectValue) {
+                        return;
+                    }
+                    this.pendingDefaultProject = '';
+                    this.searchedProjects = result.matches;
+                    this.markDefaultProject(result.name, result.exists);
+                });
+        }
         if (!this.bannerRefreshSub) {
             this.bannerRefreshSub = this.event?.subscribe(
                 HarborEvent.REFRESH_BANNER_MESSAGE,
                 () => {
                     this.setValueForBannerMessage();
+                    this.checkStoredDefaultProject();
                 }
             );
         }
         if (this.currentConfig.banner_message) {
             this.setValueForBannerMessage();
+            this.checkStoredDefaultProject();
         }
     }
 
@@ -105,6 +138,10 @@ export class SystemSettingsComponent
     }
 
     ngOnDestroy() {
+        if (this.defaultProjectSub) {
+            this.defaultProjectSub.unsubscribe();
+            this.defaultProjectSub = null;
+        }
         if (this.bannerRefreshSub) {
             this.bannerRefreshSub.unsubscribe();
             this.bannerRefreshSub = null;
@@ -175,7 +212,105 @@ export class SystemSettingsComponent
     }
 
     public isValid(): boolean {
-        return this.systemSettingsForm && this.systemSettingsForm.valid;
+        return (
+            this.systemSettingsForm &&
+            this.systemSettingsForm.valid &&
+            this.defaultProjectExists &&
+            !this.defaultProjectChecking
+        );
+    }
+
+    get defaultProjectValue(): string {
+        return this.currentConfig?.default_project_name?.value || '';
+    }
+
+    get defaultProjectExists(): boolean {
+        const name = this.defaultProjectValue;
+        return !name || !this.missingDefaultProjects.has(name);
+    }
+
+    get defaultProjectChecking(): boolean {
+        const name = this.defaultProjectValue;
+        return !!name && name === this.pendingDefaultProject;
+    }
+
+    handleDefaultProjectInput(name: string): void {
+        this.currentConfig.default_project_name.value = name;
+        this.pendingDefaultProject = name;
+        if (!name) {
+            this.searchedProjects = [];
+        }
+        this.defaultProjectSearcher.next(name);
+    }
+
+    // flags a stored default whose project was deleted behind the setting
+    checkStoredDefaultProject(): void {
+        const name = this.defaultProjectValue;
+        if (!name) {
+            return;
+        }
+        this.projectService
+            .listProjects({ q: encodeURIComponent(`name=${name}`) })
+            .subscribe({
+                next: exact => {
+                    if (name !== this.defaultProjectValue) {
+                        return;
+                    }
+                    this.markDefaultProject(name, !!exact?.length);
+                },
+                error: error => this.errorHandler.error(error),
+            });
+    }
+
+    lookupDefaultProject(
+        name: string
+    ): Observable<{ name: string; matches: Project[]; exists: boolean }> {
+        if (!name) {
+            return of({ name, matches: [], exists: true });
+        }
+        return forkJoin([
+            this.projectService.listProjects({
+                q: encodeURIComponent(`name=~${name}`),
+                page: 1,
+                pageSize: 10,
+            }),
+            this.projectService.listProjects({
+                q: encodeURIComponent(`name=${name}`),
+            }),
+        ]).pipe(
+            map(([matches, exact]) => ({
+                name,
+                matches: matches || [],
+                exists: !!exact?.length,
+            })),
+            catchError(error => {
+                // the backend still rejects a missing project on save
+                this.errorHandler.error(error);
+                return of({ name, matches: [], exists: true });
+            })
+        );
+    }
+
+    selectDefaultProject(name: string): void {
+        this.currentConfig.default_project_name.value = name;
+        this.searchedProjects = [];
+        this.pendingDefaultProject = '';
+        this.markDefaultProject(name, true);
+    }
+
+    markDefaultProject(name: string, exists: boolean): void {
+        if (!name) {
+            return;
+        }
+        if (exists) {
+            this.missingDefaultProjects.delete(name);
+        } else {
+            this.missingDefaultProjects.add(name);
+        }
+    }
+
+    leaveDefaultProjectInput(): void {
+        this.searchedProjects = [];
     }
 
     public hasChanges(): boolean {
@@ -210,6 +345,7 @@ export class SystemSettingsComponent
                 prop === 'token_expiration' ||
                 prop === 'read_only' ||
                 prop === 'project_creation_restriction' ||
+                prop === 'default_project_name' ||
                 prop === 'robot_token_duration' ||
                 prop === 'notification_enable' ||
                 prop === 'robot_name_prefix' ||

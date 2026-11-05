@@ -769,6 +769,7 @@ Kubernetes: `>=1.28.0-0`
 | core.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler configuration. When enabled the chart OMITS the static `replicas:` field on the Deployment so HPA owns the replica count. `maxReplicas` is REQUIRED. Tracks upstream goharbor/harbor-helm#1068. |
 | core.config | object | {} | Harbor Core application config (converted to env vars in ConfigMap) Any Harbor Core config can be set here without chart changes |
 | core.configureUserSettings | string | `""` | Initial user settings JSON applied on first boot |
+| core.defaultProjectName | string | `nil` | Project that receives pushes and pulls without a project in the path (DEFAULT_PROJECT_NAME). Applied on every start and locked in the UI; a missing project is created as private. "" turns the fallback off; null leaves it to the UI. |
 | core.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
 | core.existingSecret | string | `""` | Use existing secret for Core secret |
 | core.existingSecretKey | string | `"secret"` | Key in existing secret containing the Core secret |

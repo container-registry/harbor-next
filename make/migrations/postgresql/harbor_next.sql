@@ -350,3 +350,9 @@ BEGIN
   END LOOP;
 END
 $$;
+
+-- Seed default_project_name with library only if it exists and is still unset
+INSERT INTO properties (k, v)
+SELECT 'default_project_name', 'library'
+ WHERE EXISTS (SELECT 1 FROM project WHERE name = 'library' AND NOT deleted)
+ON CONFLICT (k) DO NOTHING;

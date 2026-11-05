@@ -131,16 +131,17 @@ func (c *controllerTestSuite) TestUpdateUserCfg() {
 	c.True(errors.IsErr(err2, errors.BadRequestCode))
 }
 
-/*func (c *controllerTestSuite) TestCheckUnmodifiable() {
-	conf := map[string]any{
-		"ldap_url":     "ldaps.myexample,com",
-		"ldap_base_dn": "dc=myexample,dc=com",
-		"auth_mode":    "ldap_auth",
+/*
+	func (c *controllerTestSuite) TestCheckUnmodifiable() {
+		conf := map[string]any{
+			"ldap_url":     "ldaps.myexample,com",
+			"ldap_base_dn": "dc=myexample,dc=com",
+			"auth_mode":    "ldap_auth",
+		}
+		failed := c.controller.checkUnmodifiable(ctx, conf, "auth_mode")
+		c.True(len(failed) > 0)
+		c.Equal(failed[0], "auth_mode")
 	}
-	failed := c.controller.checkUnmodifiable(ctx, conf, "auth_mode")
-	c.True(len(failed) > 0)
-	c.Equal(failed[0], "auth_mode")
-}
 */
 func TestControllerTestSuite(t *testing.T) {
 	suite.Run(t, &controllerTestSuite{})

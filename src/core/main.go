@@ -243,8 +243,18 @@ func main() {
 	if err := config.Load(ctx); err != nil {
 		log.Fatalf("failed to load config: %v", err)
 	}
+	defaultProject := newDefaultProjectInit()
+	if err := defaultProject.ensureForOverwrite(ctx); err != nil {
+		log.Fatalf("failed to create the default project named in CONFIG_OVERWRITE_JSON: %v", err)
+	}
 	if err := configCtl.Ctl.OverwriteConfig(ctx); err != nil {
 		log.Fatalf("failed to init config from CONFIG_OVERWRITE_JSON, error %v", err)
+	}
+	if err := defaultProject.applyEnv(ctx); err != nil {
+		log.Fatalf("failed to init default project from %s: %v", common.DefaultProjectNameEnv, err)
+	}
+	if err := defaultProject.reconcile(ctx); err != nil {
+		log.Fatalf("failed to reconcile the default project: %v", err)
 	}
 	password, err := config.InitialAdminPassword()
 	if err != nil {

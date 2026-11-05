@@ -57,6 +57,7 @@ export class Configuration {
     primary_auth_mode: BoolValueItem;
     unauthenticated_landing_page: StringValueItem;
     project_creation_restriction: StringValueItem;
+    default_project_name: StringValueItem;
     self_registration: BoolValueItem;
     ldap_base_dn: StringValueItem;
     ldap_filter?: StringValueItem;
@@ -128,6 +129,7 @@ export class Configuration {
             'everyone',
             true
         );
+        this.default_project_name = new StringValueItem('', true);
         this.self_registration = new BoolValueItem(false, true);
         this.ldap_base_dn = new StringValueItem('', true);
         this.ldap_filter = new StringValueItem('', true);
