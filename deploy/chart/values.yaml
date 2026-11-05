@@ -430,6 +430,10 @@ core:
   # -- Service annotations for Core service
   serviceAnnotations: {}
 
+  # -- Port the core Service listens on. CORE_URL, the token service URL,
+  # ingress, gateway, and exporter all follow it.
+  servicePort: 80
+
   # -- Core image settings
   image:
     # -- Registry host override; empty uses `image.source` (`global.imageRegistry` wins over both)

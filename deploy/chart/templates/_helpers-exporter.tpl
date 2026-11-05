@@ -34,7 +34,7 @@ Kubernetes rejects a non-string env value.
 - name: HARBOR_SERVICE_HOST
   value: {{ include "harbor.fullname" . }}-core
 - name: HARBOR_SERVICE_PORT
-  value: "80"
+  value: {{ include "harbor.core.service.port" . | quote }}
 - name: HARBOR_DATABASE_HOST
   value: {{ include "harbor.database.host" . | quote }}
 - name: HARBOR_DATABASE_PORT

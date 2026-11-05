@@ -16,7 +16,7 @@ Harbor has been installed!
 {{- end }}
 {{- else }}
    Harbor is not exposed externally. Use port-forwarding:
-   kubectl port-forward svc/{{ include "harbor.fullname" . }}-{{ if .Values.portal.enabled }}portal{{ else }}core{{ end }} 8080:80
+   kubectl port-forward svc/{{ include "harbor.fullname" . }}-{{ if .Values.portal.enabled }}portal 8080:80{{ else }}core 8080:{{ include "harbor.core.service.port" . }}{{ end }}
    Then access Harbor at: http://localhost:8080
 {{- end }}
 
