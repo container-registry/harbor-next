@@ -1,0 +1,32 @@
+# Argo CD Application for the harbor chart: published OCI chart + values
+# tracked in git (multi-source `$values` pattern).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: harbor
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: harbor
+  sources:
+    - repoURL: 8gears.container-registry.com/8gcr/charts
+      chart: harbor
+      # Pin an exact chart version; bump deliberately, never track latest.
+      targetRevision: 2.1.2
+      helm:
+        valueFiles:
+          - $values/deploy/chart/example/argocd/values.yaml
+    # Point at your own repo/revision in production. Pin a chart tag here
+    # once one ships this file.
+    - repoURL: https://github.com/container-registry/harbor-next
+      targetRevision: main
+      ref: values
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
