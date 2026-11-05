@@ -34,7 +34,7 @@ maintainers:
 
 dependencies:
   - name: valkey
-    version: "0.9.3"
+    version: "0.12.1"
     repository: "oci://ghcr.io/valkey-io/valkey-helm"
     condition: valkey.enabled
 
