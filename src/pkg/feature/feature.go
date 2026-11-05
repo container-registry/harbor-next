@@ -44,7 +44,7 @@ type DisableGuard func(context.Context) error
 var (
 	mu               sync.RWMutex
 	definitions      []Definition
-	guards           = map[Feature]DisableGuard{}
+	guards           = map[Feature][]DisableGuard{}
 	registryFeatures = map[string]Feature{}
 )
 
@@ -70,18 +70,26 @@ func Definitions() []Definition {
 	return append([]Definition(nil), definitions...)
 }
 
-// RegisterDisableGuard registers the check run before a feature can be disabled.
+// RegisterDisableGuard adds a check run before a feature can be disabled.
+// Several packages may guard the same feature; every guard must pass.
 func RegisterDisableGuard(feature Feature, guard DisableGuard) {
+	if guard == nil {
+		panic(fmt.Sprintf("nil disable guard for feature %q", feature))
+	}
 	mu.Lock()
 	defer mu.Unlock()
-	guards[feature] = guard
+	guards[feature] = append(guards[feature], guard)
 }
 
 // RegisterRegistryTypes associates registry provider types with a feature.
+// A registry type can belong to one feature only.
 func RegisterRegistryTypes(feature Feature, registryTypes ...string) {
 	mu.Lock()
 	defer mu.Unlock()
 	for _, registryType := range registryTypes {
+		if owner, ok := registryFeatures[registryType]; ok && owner != feature {
+			panic(fmt.Sprintf("registry type %q already gated by feature %q", registryType, owner))
+		}
 		registryFeatures[registryType] = feature
 	}
 }
@@ -158,9 +166,9 @@ func ValidateConfigUpdate(ctx context.Context, cfgs map[string]any) error {
 			continue
 		}
 		mu.RLock()
-		guard := guards[definition.Feature]
+		featureGuards := append([]DisableGuard(nil), guards[definition.Feature]...)
 		mu.RUnlock()
-		if guard != nil {
+		for _, guard := range featureGuards {
 			if err := guard(ctx); err != nil {
 				return err
 			}

@@ -2,40 +2,45 @@
     <clr-toggle-container *ngFor="let feature of features">
         <label [for]="feature.configKey">
             {{ feature.name | translate }}
-            <clr-tooltip *ngIf="feature.beta">
-                <span
-                    clrTooltipTrigger
-                    class="label label-blue beta-badge"
-                    role="img"
-                    tabindex="0"
-                    [attr.aria-label]="'CONFIG.FEATURE_BETA' | translate"
-                    >{{ 'CONFIG.FEATURE_BETA' | translate }}</span
-                >
-                <clr-tooltip-content
-                    clrPosition="top-right"
-                    clrSize="lg"
-                    *clrIfOpen>
-                    <span>{{ 'CONFIG.FEATURE_BETA_WARNING' | translate }}</span>
-                </clr-tooltip-content>
-            </clr-tooltip>
-            <clr-tooltip>
-                <clr-icon
-                    clrTooltipTrigger
-                    shape="info-circle"
-                    size="24"></clr-icon>
-                <clr-tooltip-content
-                    clrPosition="top-right"
-                    clrSize="lg"
-                    *clrIfOpen>
-                    <span>{{ feature.description | translate }}</span>
-                    <p *ngIf="lockedBy(feature)">
-                        {{
-                            'CONFIG.FEATURE_LOCKED_BY'
-                                | translate : { source: lockedBy(feature) }
-                        }}
-                    </p>
-                </clr-tooltip-content>
-            </clr-tooltip>
+            <!-- a click inside the label would otherwise flip the toggle -->
+            <span class="label-hints" (click)="$event.preventDefault()">
+                <clr-tooltip *ngIf="feature.beta">
+                    <span
+                        clrTooltipTrigger
+                        class="label label-blue beta-badge"
+                        role="img"
+                        tabindex="0"
+                        [attr.aria-label]="'CONFIG.FEATURE_BETA' | translate"
+                        >{{ 'CONFIG.FEATURE_BETA' | translate }}</span
+                    >
+                    <clr-tooltip-content
+                        clrPosition="top-right"
+                        clrSize="lg"
+                        *clrIfOpen>
+                        <span>{{
+                            'CONFIG.FEATURE_BETA_WARNING' | translate
+                        }}</span>
+                    </clr-tooltip-content>
+                </clr-tooltip>
+                <clr-tooltip>
+                    <clr-icon
+                        clrTooltipTrigger
+                        shape="info-circle"
+                        size="24"></clr-icon>
+                    <clr-tooltip-content
+                        clrPosition="top-right"
+                        clrSize="lg"
+                        *clrIfOpen>
+                        <span>{{ feature.description | translate }}</span>
+                        <p *ngIf="lockedBy(feature)">
+                            {{
+                                'CONFIG.FEATURE_LOCKED_BY'
+                                    | translate : { source: lockedBy(feature) }
+                            }}
+                        </p>
+                    </clr-tooltip-content>
+                </clr-tooltip>
+            </span>
         </label>
         <clr-toggle-wrapper>
             <input

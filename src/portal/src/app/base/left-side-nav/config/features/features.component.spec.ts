@@ -37,9 +37,11 @@ describe('FeaturesComponent', () => {
     let current: Configuration;
     let saveConfiguration: jasmine.Spy;
     let updateConfig: jasmine.Spy;
+    let loading: boolean;
 
     function setup(features: FeatureToggle[], value?: BoolValueItem): void {
         OPTIONAL_FEATURES.splice(0, OPTIONAL_FEATURES.length, ...features);
+        loading = false;
         original = new Configuration();
         if (value) {
             original[TEST_FEATURE.configKey] = value;
@@ -59,6 +61,7 @@ describe('FeaturesComponent', () => {
                         getConfig: () => current,
                         getOriginalConfig: () => original,
                         resetConfig: () => undefined,
+                        getLoadingConfigStatus: () => loading,
                         updateConfig,
                     },
                 },
@@ -140,5 +143,49 @@ describe('FeaturesComponent', () => {
         expect(component.disabled(TEST_FEATURE)).toBeTrue();
         expect(component.lockedBy(TEST_FEATURE)).toBe('');
         expect(component.hasChanges()).toBeFalse();
+    });
+
+    ['clr-icon', '.beta-badge'].forEach(hint =>
+        it(`does not flip the toggle when ${hint} in the label is clicked`, async () => {
+            setup([TEST_FEATURE], new BoolValueItem(false, true));
+            await fixture.whenStable();
+            fixture.detectChanges();
+            (
+                fixture.nativeElement.querySelector(
+                    `.label-hints ${hint}`
+                ) as HTMLElement
+            ).click();
+            await fixture.whenStable();
+            expect(toggle().checked).toBeFalse();
+            expect(component.hasChanges()).toBeFalse();
+        })
+    );
+
+    it('still flips the toggle when the feature name is clicked', async () => {
+        setup([TEST_FEATURE], new BoolValueItem(false, true));
+        await fixture.whenStable();
+        fixture.detectChanges();
+        (
+            fixture.nativeElement.querySelector(
+                `label[for=${TEST_FEATURE.configKey}]`
+            ) as HTMLElement
+        ).click();
+        await fixture.whenStable();
+        expect(toggle().checked).toBeTrue();
+    });
+
+    it('keeps Save, Cancel and toggles disabled while the config reloads', () => {
+        setup([TEST_FEATURE], new BoolValueItem(false, true));
+        component.setEnabled(TEST_FEATURE, true);
+        loading = true;
+        fixture.detectChanges();
+        const save: HTMLButtonElement =
+            fixture.nativeElement.querySelector('#features-save');
+        const cancel: HTMLButtonElement =
+            fixture.nativeElement.querySelector('#features-cancel');
+        expect(save.disabled).toBeTrue();
+        expect(cancel.disabled).toBeTrue();
+        expect(component.disabled(TEST_FEATURE)).toBeTrue();
+        expect(component.lockedBy(TEST_FEATURE)).toBe('');
     });
 });
