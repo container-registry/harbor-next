@@ -29,6 +29,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg"
+	"github.com/goharbor/harbor/src/pkg/feature"
 	"github.com/goharbor/harbor/src/pkg/project"
 	"github.com/goharbor/harbor/src/pkg/reg"
 	adp "github.com/goharbor/harbor/src/pkg/reg/adapter"
@@ -98,6 +99,9 @@ func (c *controller) validate(ctx context.Context, registry *model.Registry) err
 	}
 	if len(registry.Name) > 64 {
 		return errors.New(nil).WithCode(errors.BadRequestCode).WithMessage("the max length of name is 64")
+	}
+	if err := CheckTypeEnabled(ctx, registry.Type); err != nil {
+		return err
 	}
 	// a registry endpoint is only ever spoken to over HTTP; the default scheme
 	// set of ValidateURL also admits ftp/s3/sftp, which net/http cannot dial
@@ -179,6 +183,9 @@ func (c *controller) Delete(ctx context.Context, id int64) error {
 }
 
 func (c *controller) IsHealthy(ctx context.Context, registry *model.Registry) (bool, error) {
+	if err := CheckTypeEnabled(ctx, registry.Type); err != nil {
+		return false, err
+	}
 	// the Harbor adapter probes /api/version while the adapter is built, so an
 	// unreachable endpoint surfaces from CreateAdapter rather than HealthCheck
 	adapter, err := c.regMgr.CreateAdapter(ctx, registry)
@@ -226,6 +233,9 @@ func (c *controller) GetInfo(ctx context.Context, id int64) (*model.RegistryInfo
 	if err != nil {
 		return nil, err
 	}
+	if err := CheckTypeEnabled(ctx, registry.Type); err != nil {
+		return nil, err
+	}
 
 	adapter, err := c.regMgr.CreateAdapter(ctx, registry)
 	if err != nil {
@@ -254,6 +264,9 @@ func (c *controller) Preview(ctx context.Context, id int64, repository, referenc
 	}
 	registry, err := c.regMgr.Get(ctx, id)
 	if err != nil {
+		return nil, err
+	}
+	if err := CheckTypeEnabled(ctx, registry.Type); err != nil {
 		return nil, err
 	}
 	adapter, err := c.regMgr.CreateAdapter(ctx, registry)
@@ -291,7 +304,7 @@ func (c *controller) ListRegistryProviderTypes(ctx context.Context) ([]string, e
 	whitelistedAdapters := getWhitelistedAdapters(ctx)
 	var filtered []string
 	for _, t := range allAdapters {
-		if _, ok := whitelistedAdapters[t]; ok {
+		if _, ok := whitelistedAdapters[t]; ok && feature.RegistryTypeEnabled(ctx, t) {
 			filtered = append(filtered, t)
 		}
 	}
@@ -306,7 +319,7 @@ func (c *controller) ListRegistryProviderInfos(ctx context.Context) (map[string]
 	whitelistedAdapters := getWhitelistedAdapters(ctx)
 	filtered := make(map[string]*model.AdapterPattern)
 	for k, v := range allAdaptersInfo {
-		if _, ok := whitelistedAdapters[k]; ok {
+		if _, ok := whitelistedAdapters[k]; ok && feature.RegistryTypeEnabled(ctx, k) {
 			filtered[k] = v
 		}
 	}
@@ -329,6 +342,10 @@ func (c *controller) StartRegularHealthCheck(ctx context.Context, closing, done 
 				continue
 			}
 			for _, registry := range registries {
+				// a disabled type keeps its last status instead of logging an error every round
+				if !feature.RegistryTypeEnabled(ctx, registry.Type) {
+					continue
+				}
 				isHealthy, err := c.IsHealthy(ctx, registry)
 				if err != nil {
 					log.Errorf("failed to check health of registry %d: %v", registry.ID, err)

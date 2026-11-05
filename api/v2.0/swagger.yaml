@@ -9861,6 +9861,9 @@ definitions:
       skip_audit_log_database:
         $ref: '#/definitions/BoolConfigItem'
         description: Whether skip the audit log in database
+      enable_huggingface_model_import:
+        $ref: '#/definitions/BoolConfigItem'
+        description: Whether Hugging Face model import (beta) is enabled
       scanner_skip_update_pulltime:
         $ref: '#/definitions/BoolConfigItem'
         description: Whether or not to skip update the pull time for scanner
@@ -10165,6 +10168,11 @@ definitions:
       skip_audit_log_database:
         type: boolean
         description: Skip audit log database
+        x-omitempty: true
+        x-isnullable: true
+      enable_huggingface_model_import:
+        type: boolean
+        description: Enable Hugging Face model import (beta)
         x-omitempty: true
         x-isnullable: true
       session_timeout:

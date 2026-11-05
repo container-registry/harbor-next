@@ -841,18 +841,21 @@ func (a *projectAPI) validateProjectReq(ctx context.Context, req *models.Project
 			return errors.BadRequestError(fmt.Errorf("%d is invalid value of registry_id, it should be geater than 0", *req.RegistryID))
 		}
 
-		registry, err := registry.Ctl.Get(ctx, *req.RegistryID)
+		upstream, err := registry.Ctl.Get(ctx, *req.RegistryID)
 		if err != nil {
 			return fmt.Errorf("failed to get the registry %d: %v", *req.RegistryID, err)
 		}
 
 		permitted := false
-		if slices.Contains(config.GetPermittedRegistryTypesForProxyCache(), registry.Type) {
+		if slices.Contains(config.GetPermittedRegistryTypesForProxyCache(), upstream.Type) {
 			permitted = true
 		}
 
 		if !permitted {
-			return errors.BadRequestError(fmt.Errorf("unsupported registry type %s", registry.Type))
+			return errors.BadRequestError(fmt.Errorf("unsupported registry type %s", upstream.Type))
+		}
+		if err := registry.CheckTypeEnabled(ctx, upstream.Type); err != nil {
+			return err
 		}
 
 		// validate metadata.proxy_speed_kb. It should be an int32

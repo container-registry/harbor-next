@@ -17,7 +17,15 @@ import { FeatureToggle } from './feature-toggle';
  * Optional features registered in the backend with src/pkg/feature. Each
  * entry needs a matching config metadata item and swagger field.
  */
-export const OPTIONAL_FEATURES: FeatureToggle[] = [];
+export const OPTIONAL_FEATURES: FeatureToggle[] = [
+    {
+        configKey: 'enable_huggingface_model_import',
+        envKey: 'HARBOR_ENABLE_HUGGINGFACE_MODEL_IMPORT',
+        name: 'CONFIG.FEATURE_HUGGINGFACE_MODEL_IMPORT',
+        description: 'CONFIG.FEATURE_HUGGINGFACE_MODEL_IMPORT_INFO',
+        beta: true,
+    },
+];
 
 /** Every toggle on the Features page; the tab is hidden when it is empty. */
 export function featureToggles(): FeatureToggle[] {

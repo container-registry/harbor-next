@@ -868,6 +868,8 @@
         "FEATURE_BETA": "Beta",
         "FEATURE_BETA_WARNING": "Beta feature: behavior and stored data formats may still change between releases.",
         "FEATURE_LOCKED_BY": "Set by {{source}}",
+        "FEATURE_HUGGINGFACE_MODEL_IMPORT": "Hugging Face Model Import",
+        "FEATURE_HUGGINGFACE_MODEL_IMPORT_INFO": "Adds the Hugging Face registry type, so replication rules and proxy cache projects can import Hugging Face models as OCI artifacts. It cannot be turned off while Hugging Face registry endpoints exist.",
         "SKIP_SCANNER_PULL_TIME": "跳过扫描器对于拉取时间的更新",
         "TOOLTIP": {
             "SELF_REGISTRATION_ENABLE": "激活注册功能。",

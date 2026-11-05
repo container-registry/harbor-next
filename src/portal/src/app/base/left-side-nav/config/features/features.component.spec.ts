@@ -86,7 +86,10 @@ describe('FeaturesComponent', () => {
         );
     }
 
-    afterEach(() => OPTIONAL_FEATURES.splice(0, OPTIONAL_FEATURES.length));
+    const registered = [...OPTIONAL_FEATURES];
+    afterEach(() =>
+        OPTIONAL_FEATURES.splice(0, OPTIONAL_FEATURES.length, ...registered)
+    );
 
     it('renders no optional section without registered features', () => {
         setup([]);

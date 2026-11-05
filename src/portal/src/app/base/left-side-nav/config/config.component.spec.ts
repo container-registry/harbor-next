@@ -62,28 +62,42 @@ describe('ConfigurationComponent', () => {
         await fixture.whenStable();
         expect(initSpy.calls.count()).toEqual(1);
     });
+    function createWith(
+        features: typeof OPTIONAL_FEATURES
+    ): ComponentFixture<ConfigurationComponent> {
+        const registered = OPTIONAL_FEATURES.splice(
+            0,
+            OPTIONAL_FEATURES.length
+        );
+        OPTIONAL_FEATURES.push(...features);
+        try {
+            const created = TestBed.createComponent(ConfigurationComponent);
+            created.detectChanges();
+            return created;
+        } finally {
+            OPTIONAL_FEATURES.splice(
+                0,
+                OPTIONAL_FEATURES.length,
+                ...registered
+            );
+        }
+    }
     it('hides the Features tab without feature toggles', () => {
         expect(
-            fixture.nativeElement.querySelector('#config-features')
+            createWith([]).nativeElement.querySelector('#config-features')
         ).toBeNull();
     });
     it('shows the Features tab once a feature toggle exists', () => {
-        OPTIONAL_FEATURES.push({
-            configKey: 'enable_test_feature',
-            envKey: 'HARBOR_ENABLE_TEST_FEATURE',
-            name: 'Test Feature',
-            description: 'A feature used by the spec.',
-        });
-        try {
-            const withFeatures = TestBed.createComponent(
-                ConfigurationComponent
-            );
-            withFeatures.detectChanges();
-            expect(
-                withFeatures.nativeElement.querySelector('#config-features')
-            ).not.toBeNull();
-        } finally {
-            OPTIONAL_FEATURES.splice(0, OPTIONAL_FEATURES.length);
-        }
+        const withFeatures = createWith([
+            {
+                configKey: 'enable_test_feature',
+                envKey: 'HARBOR_ENABLE_TEST_FEATURE',
+                name: 'Test Feature',
+                description: 'A feature used by the spec.',
+            },
+        ]);
+        expect(
+            withFeatures.nativeElement.querySelector('#config-features')
+        ).not.toBeNull();
     });
 });
