@@ -6,7 +6,6 @@ Harbor Next is an independently maintained, downstream distribution of Harbor (g
 Go services (all under `src/`):
 - `core` (`src/core/`): REST API v2.0 (`src/server/v2.0/handler/`, generated from `api/v2.0/swagger.yaml`), the OCI Distribution API front (`src/server/registry/`) and the middleware chain in front of the registry (`src/server/middleware/`), the token service (`src/core/service/token/`), and authentication.
 - `jobservice` (`src/jobservice/`): async jobs (replication, GC, scan, retention, webhooks), driven through Redis.
-- `registryctl` (`src/registryctl/`): internal control API next to the registry.
 - `exporter` (`src/cmd/exporter/`) and the standalone DB migrator (`src/cmd/standalone-db-migrator/`).
 - The Angular portal (`src/portal/src/`).
 
@@ -38,7 +37,7 @@ Least / out of scope:
 - Issues that require system administrator privileges, unless they escape to the host or leak secrets that admins cannot otherwise read.
 
 ## How to exercise it
-- Binaries are built: `harbor-core`, `harbor-jobservice`, `harbor-registryctl`, `harbor-exporter`, `harbor-db-migrator` in `/usr/local/bin`. A full running Harbor stack is not provisioned in this image.
+- Binaries are built: `harbor-core`, `harbor-jobservice`, `harbor-exporter`, `harbor-db-migrator` in `/usr/local/bin`. A full running Harbor stack is not provisioned in this image.
 - Generated API server code is present in `src/server/v2.0`; `swagger` is installed.
 - Pure unit tests: `cd /src/src && go test ./pkg/permission/...` (no services needed). Many other packages, including `server/middleware/v2auth`, `server/middleware/security` and `server/middleware/csrf`, connect to PostgreSQL in `TestMain` and need `harbor-test-services` first.
 - DB/Redis tests: run `harbor-test-services` first (starts PostgreSQL 16 on localhost:5432 and Redis on localhost:6379; env vars are preset), then e.g. `cd /src/src && go test -tags db -p 1 ./pkg/robot/... ./controller/...`. Packages needing LDAP, SMTP or a full stack (`core/api`, `core/controllers`, `*/ldap`, `common/utils/email`) will fail and are not a signal.

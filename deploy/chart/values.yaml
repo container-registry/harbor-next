@@ -120,6 +120,11 @@ proxy:
   httpProxy:
   httpsProxy:
   noProxy: 127.0.0.1,localhost,.local,.internal
+  # -- Components that get HTTP_PROXY/HTTPS_PROXY/NO_PROXY. Valid entries:
+  # `core`, `jobservice`, `trivy`, `registry`. `registry` is upstream mode
+  # only (`image.source: upstream`): it applies to the registryctl sidecar,
+  # never to the registry container, which reaches storage directly.
+  # @default -- `[core, jobservice, trivy]`
   components:
     - core
     - jobservice
@@ -531,8 +536,9 @@ core:
 
 # --- Registry ---
 registry:
-  # -- Use an externally-managed ConfigMap containing `config.yml` and
-  # `ctl-config.yml` instead of generating one from `config:` below. When
+  # -- Use an externally-managed ConfigMap containing `config.yml` (plus
+  # `ctl-config.yml` with `image.source: upstream`) instead of generating
+  # one from `config:` below. When
   # set, the chart skips ConfigMap generation and the Deployment mounts
   # the named ConfigMap at /etc/registry. Chart-managed runtime values
   # (redis URL with auth, HTTP secret, storage credentials from
@@ -633,8 +639,8 @@ registry:
     #     bucket: <bucket>
 
   # -- BYO Secret references for storage credentials. The chart injects
-  # the credential as an env var on both `registry` and `registryctl`
-  # containers; distribution honors `REGISTRY_STORAGE_<BACKEND>_<KEY>`
+  # the credential as an env var on the `registry` container (and the
+  # `registryctl` sidecar with `image.source: upstream`); distribution honors `REGISTRY_STORAGE_<BACKEND>_<KEY>`
   # env overrides for any backend. Set the entry matching the backend you
   # configured in `config.storage`. Other entries stay empty.
   #
@@ -698,9 +704,9 @@ registry:
     htpasswdString: ""
 
   # -- Sensitive config for Registry. Each key is b64-encoded into the
-  # generated registry Secret and injected on both `registry` and
-  # `registryctl` containers via `envFrom`. Use for inline credentials,
-  # e.g.:
+  # generated registry Secret and injected on the `registry` container
+  # (and the `registryctl` sidecar with `image.source: upstream`) via
+  # `envFrom`. Use for inline credentials, e.g.:
   #
   #     secret:
   #       REGISTRY_STORAGE_S3_ACCESSKEY: <plaintext>
@@ -780,7 +786,11 @@ registry:
       failureThreshold: 3
       timeoutSeconds: 3
 
-  # -- Registryctl image settings
+  # -- Registryctl sidecar. Only used with `image.source: upstream`:
+  # vanilla goharbor jobservice runs GC deletes through it. Harbor Next
+  # registries (`image.source: 8gcr`) serve the deletion API themselves
+  # and render no sidecar, so this block is ignored there.
+  # @default -- See [values.yaml](values.yaml)
   controller:
     image:
       # -- Registry host override; empty uses `image.source` (`global.imageRegistry` wins over both)

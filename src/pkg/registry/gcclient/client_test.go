@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package client
+package gcclient
 
 import (
 	"fmt"
 	"net/http"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 
@@ -39,9 +40,34 @@ func (c *clientTestSuite) SetupTest() {
 	c.client = NewClient(server.URL, &Config{})
 }
 
-func (c *clientTestSuite) TesHealth() {
-	err := c.client.Health()
-	c.Require().Nil(err)
+func (c *clientTestSuite) TestHealth() {
+	c.Require().NoError(c.client.Health())
+}
+
+func (c *clientTestSuite) TestHealthFailsWithoutGCAPI() {
+	// An unpatched registry has no /api/health and answers 404.
+	server := test.NewServer(&test.RequestHandlerMapping{
+		Method:  http.MethodGet,
+		Pattern: "/v2/",
+		Handler: test.Handler(&test.Response{StatusCode: http.StatusOK}),
+	})
+	defer server.Close()
+
+	err := NewClient(server.URL, &Config{}).Health()
+	c.Require().ErrorContains(err, "does not serve the GC API")
+}
+
+func (c *clientTestSuite) TestHealthFailsWhenUnreachable() {
+	attempts, interval := healthAttempts, healthInterval
+	healthAttempts, healthInterval = 2, time.Millisecond
+	defer func() { healthAttempts, healthInterval = attempts, interval }()
+
+	server := test.NewServer()
+	url := server.URL
+	server.Close()
+
+	err := NewClient(url, nil).Health()
+	c.Require().ErrorContains(err, "unreachable")
 }
 
 func (c *clientTestSuite) TestDeleteManifest() {

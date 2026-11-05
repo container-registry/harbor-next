@@ -517,10 +517,13 @@ defn map-registry(legacy):
     rc =: reg.registry || {}
     ctl =: reg.controller || {}
     secret-string-advice reg: 'registry'
-    when present?(ctl.resources):
-      add-warn 'registry.controller.resources' 'registry.resources':
-        'Registry and registryctl share ONE resources block now —
-         controller-specific resources were dropped.'
+    when present?(dissoc(ctl 'extraEnvVars')):
+      add-warn 'registry.controller.*' nil:
+        'The migrated values target Harbor Next images (image.source 8gcr),
+         whose registry serves the GC deletion API itself, so no controller
+         sidecar runs. Controller image and resources were dropped;
+         controller.extraEnvVars moved to registry.extraEnv. Only if you
+         switch to image.source upstream, set registry.controller again.'
     when bool-of(reg.middleware.enabled false):
       add-error 'registry.middleware' 'registry.config.middleware':
         'CloudFront middleware is not auto-migrated. The distribution
@@ -531,7 +534,6 @@ defn map-registry(legacy):
     env-b =: ctl.extraEnvVars || []
     extra-env =: concat(env-a env-b):V
     reg-img =: image-block(rc 'registry')
-    ctl-img =: image-block(ctl 'registry.controller')
     up =: keep-if-not(reg.upload_purging registry-upload-purging-default)
     when present?(up):
       destination =: 'registry.config.storage.maintenance.uploadpurging'
@@ -547,9 +549,6 @@ defn map-registry(legacy):
          change it.'
     =>:::
       image: reg-img
-      :when ctl-img:::
-        controller:
-          image: ctl-img
       replicas: int-at(reg.replicas 'registry.replicas')
       resources: rc.resources
       nodeSelector: reg.nodeSelector

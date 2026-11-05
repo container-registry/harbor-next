@@ -426,3 +426,28 @@ tests:
           content:
             secretRef:
               name: RELEASE-NAME-harbor-jobservice
+
+  # GC deletes blobs/manifests through REGISTRY_CONTROLLER_URL; the registry
+  # serves that API itself, so it must be the registry URL.
+  - it: should point REGISTRY_CONTROLLER_URL at the registry
+    template: templates/jobservice.configmap-env.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - equal:
+          path: data.REGISTRY_CONTROLLER_URL
+          value: http://RELEASE-NAME-harbor-registry:5000
+
+  - it: upstream should point REGISTRY_CONTROLLER_URL at the registryctl sidecar
+    template: templates/jobservice.configmap-env.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      image.source: upstream
+    asserts:
+      - equal:
+          path: data.REGISTRY_CONTROLLER_URL
+          value: http://RELEASE-NAME-harbor-registry:8080

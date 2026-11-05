@@ -14,7 +14,7 @@ ERROR — will not render / cannot work (5)
   * registry.config.storage
       2 storage drivers configured (azure, s3) — distribution requires exactly one. helm template fails on this.
 
-WARN — review recommended (10)
+WARN — review recommended (12)
   * harborAdminPassword
       Plaintext credential in the values file — anyone with read access to the file or the release manifest can read it. Prefer existingSecretAdminPassword.
   * database.password
@@ -33,7 +33,11 @@ WARN — review recommended (10)
       metrics.enabled auto-enables the jobservice metric endpoint (chart-managed config.yml), but jobservice.config.metric.enabled is false here — the ServiceMonitor still scrapes jobservice, so its target stays dark. Remove the override or stop scraping jobservice.
   * valkey.enabled / externalRedis.host
       Both the valkey subchart and externalRedis.host are set — the chart uses the subchart and silently ignores externalRedis. Set valkey.enabled false to use the external Redis.
+  * proxy.components
+      "registry" has no effect: the registry reaches storage directly and serves GC itself; the proxy env was only ever applied to the registryctl sidecar, which upstream mode alone still runs.
+  * registry.controller
+      Ignored — the registryctl sidecar only runs with image.source upstream; Harbor Next registries serve the GC deletion API themselves. Remove the block.
   * database.existingTlsSecret
       sslmode verify-ca/verify-full usually needs the CA bundle Secret (database.existingTlsSecret) unless the PG certificate chains to a public CA.
 
-5 error(s), 10 warning(s).
+5 error(s), 12 warning(s).

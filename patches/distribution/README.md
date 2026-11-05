@@ -14,9 +14,17 @@ that the binary is not stock upstream.
 | `0001-s3-bound-pooled-part-buffer-growth-to-chunk-size.patch` | [distribution#4919](https://github.com/distribution/distribution/pull/4919) | S3 part buffer capped at `chunksize` instead of settling near 2x |
 | `0002-s3-add-spooldir-to-buffer-upload-parts-on-disk.patch` | [distribution#4920](https://github.com/distribution/distribution/pull/4920) | Optional `storage.s3.spooldir` keeps pending upload parts on disk instead of in memory |
 | `0003-storage-close-file-writer-when-hash-state-save-fails.patch` | [distribution#5064](https://github.com/distribution/distribution/pull/5064) | `blobWriter.Close` closes the driver writer even when saving hash state fails, so the `spooldir` file is not leaked |
+| `0004-registry-add-harbor-gc-delete-endpoints.patch` | none, Harbor specific | Serves the GC delete API that the `registryctl` sidecar used to provide (`/api/registry/...`, `Harbor-Secret` auth, enabled only when `JOBSERVICE_SECRET` is set) and clears the blob descriptor cache on delete |
 
 Each patch carries an `Upstream:` trailer. Drop a patch once the upstream PR
-is merged and released in the `DISTRIBUTION_VERSION` we build.
+is merged and released in the `DISTRIBUTION_VERSION` we build. Harbor
+specific patches (`Upstream: none`) stay for as long as Harbor needs them.
+
+With `storage.cache.blobdescriptor: inmemory`, 0004 can only clear the global
+cache entry: the in-memory provider keeps repository scoped entries
+separately, and they age out of the LRU. The Helm chart defaults to
+`layerinfo: redis`, where clearing the global entry is enough;
+`config/registry.yml` (compose, devenv) uses `inmemory`.
 
 ## Adding or refreshing a patch
 

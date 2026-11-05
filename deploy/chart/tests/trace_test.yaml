@@ -1,6 +1,6 @@
 suite: trace helper tests
 templates:
-  - templates/registryctl.configmap.yaml
+  - templates/jobservice.configmap-env.yaml
 tests:
   # Regression guard for 9979736de. Sprig `default 1` clobbers `0`
   # because Sprig treats 0 as empty. The helper now uses a hasKey
@@ -43,9 +43,9 @@ tests:
           path: data.TRACE_SAMPLE_RATE
           value: "1"
 
-  # Regression guard for c50cf9f27 (Fix #17). registryctl.configmap.yaml
-  # used `nindent 2` on a helper that already emits 2-space-indented
-  # keys, double-indenting them to 4 spaces — invalid YAML. helm install
+  # Regression guard for c50cf9f27 (Fix #17). A ConfigMap used
+  # `nindent 2` on a helper that already emits 2-space-indented keys,
+  # double-indenting them to 4 spaces — invalid YAML. helm install
   # failed with `did not find expected key` whenever trace.enabled=true.
   #
   # If the regression returns, helm-unittest fails to render the
@@ -60,16 +60,16 @@ tests:
       - isKind:
           of: ConfigMap
       - equal:
-          path: data._PLACEHOLDER
-          value: "true"
-      # TRACE_* keys must be siblings of _PLACEHOLDER under `data:`,
-      # not nested below _PLACEHOLDER (which is what the bug produced).
+          path: data.CORE_URL
+          value: http://RELEASE-NAME-harbor-core
+      # TRACE_* keys must be direct children of `data:`, not nested
+      # below the preceding key (which is what the bug produced).
       - equal:
           path: data.TRACE_ENABLED
           value: "true"
       - equal:
           path: data.TRACE_SERVICE_NAME
-          value: "harbor-registryctl"
+          value: "harbor-jobservice"
 
   - it: should not emit "<no value>" when optional trace fields are absent
     # Regression guard for 50d34a593 (Fix #22). Helm renders unset

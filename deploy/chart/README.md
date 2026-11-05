@@ -339,7 +339,7 @@ registry:
 
 **Credentials never go in `registry.config`** (they'd be visible in the rendered ConfigMap). Use one of:
 
-- **BYO Secret (recommended)** — `registry.storageCredentials.<backend>.existingSecret` references a pre-existing Secret. The chart injects `REGISTRY_STORAGE_<BACKEND>_<KEY>` env vars on both the registry container and the registryctl sidecar (registryctl runs garbage collection and needs the same creds). Distribution honors these env overrides for any config.yml field.
+- **BYO Secret (recommended)** — `registry.storageCredentials.<backend>.existingSecret` references a pre-existing Secret. The chart injects `REGISTRY_STORAGE_<BACKEND>_<KEY>` env vars on the registry container, and with `image.source: upstream` also on the registryctl sidecar (it runs the GC deletes there). Distribution honors these env overrides for any config.yml field.
 - **Inline (dev)** — `registry.secret: { REGISTRY_STORAGE_S3_ACCESSKEY: <plain> }` gets b64-encoded into the chart-generated Secret and injected via `envFrom`.
 
 ### S3 Storage Backend
@@ -416,7 +416,7 @@ For kustomize overlays, GitOps pipelines, or external config generators:
 
 ```yaml
 registry:
-  existingConfigMap: my-registry-config       # ConfigMap with config.yml + ctl-config.yml
+  existingConfigMap: my-registry-config       # config.yml (+ ctl-config.yml for image.source=upstream)
   storageCredentials:
     s3:
       existingSecret: my-s3-creds             # still wired even with external ConfigMap
@@ -533,7 +533,7 @@ core:
       exec:
         command: ["/bin/sh", "-c", "sleep 15"]
 
-registry:           # applied to both registry + registryctl containers
+registry:
   lifecycle:
     preStop:
       exec:
@@ -1023,9 +1023,7 @@ Kubernetes: `>=1.28.0-0`
 | portal.tolerations | list | `[]` | Tolerations for Portal pods |
 | portal.topologySpreadConstraints | list | `[]` | Topology spread constraints for pod scheduling |
 | portal.url | string | `""` | URL core uses to reach the portal (`PORTAL_URL`). Empty auto-derives the in-cluster portal service. Set this when `enabled: false` but the UI is hosted externally, so core can still proxy to it. |
-| proxy.components[0] | string | `"core"` |  |
-| proxy.components[1] | string | `"jobservice"` |  |
-| proxy.components[2] | string | `"trivy"` |  |
+| proxy.components | list | `[core, jobservice, trivy]` | Components that get HTTP_PROXY/HTTPS_PROXY/NO_PROXY. Valid entries: `core`, `jobservice`, `trivy`, `registry`. `registry` is upstream mode only (`image.source: upstream`): it applies to the registryctl sidecar, never to the registry container, which reaches storage directly. |
 | proxy.httpProxy | string | `nil` |  |
 | proxy.httpsProxy | string | `nil` |  |
 | proxy.noProxy | string | `"127.0.0.1,localhost,.local,.internal"` |  |
@@ -1033,7 +1031,7 @@ Kubernetes: `>=1.28.0-0`
 | registry.annotations | object | `{}` | Annotations for the Registry workload object (Deployment) |
 | registry.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler. See `core.autoscaling` for full docs. |
 | registry.config | object | See [values.yaml](values.yaml) | Full [distribution/distribution](https://distribution.github.io/distribution/about/configuration/) `config.yml` passed through verbatim. Used only when `existingConfigMap` is empty. Replace this entire block to switch storage backends or add any field distribution supports (notifications, health, custom middleware, etc.).  Chart-managed values injected via env-var override at runtime (these ALWAYS win over what's in this block — do not duplicate here):   - `http.addr`, `http.secret`, `http.debug.prometheus.enabled`   - `redis.*` (addr, password, db, tls)   - `log.level` (from `.Values.logLevel`)   - storage credentials when `storageCredentials.<backend>.existingSecret` is set  See `storageCredentials` below for the BYO-Secret pattern. For inline credentials use `registry.secret` (b64-encoded into the generated Secret) — do not put plaintext credentials in this block, they would be visible in the ConfigMap. |
-| registry.controller | object | `{"image":{"digest":"","registry":"","repository":"","tag":""},"probes":{"liveness":{"failureThreshold":3,"httpGet":{"path":"/api/health","port":8080},"periodSeconds":10,"timeoutSeconds":3},"readiness":{"failureThreshold":2,"httpGet":{"path":"/api/health","port":8080},"periodSeconds":5,"timeoutSeconds":2},"startup":{"failureThreshold":15,"httpGet":{"path":"/api/health","port":8080},"periodSeconds":2,"timeoutSeconds":2}},"resources":{}}` | Registryctl image settings |
+| registry.controller | object | See [values.yaml](values.yaml) | Registryctl sidecar. Only used with `image.source: upstream`: vanilla goharbor jobservice runs GC deletes through it. Harbor Next registries (`image.source: 8gcr`) serve the deletion API themselves and render no sidecar, so this block is ignored there. |
 | registry.controller.image.digest | string | `""` | Pin by digest (sha256:...); used instead of tag when set |
 | registry.controller.image.registry | string | `""` | Registry host override; empty uses `image.source` (`global.imageRegistry` wins over both) |
 | registry.controller.image.repository | string | `""` | Repository override (path WITHOUT registry host); empty uses `image.source` |
@@ -1045,7 +1043,7 @@ Kubernetes: `>=1.28.0-0`
 | registry.credentials.password | string | `""` |  |
 | registry.credentials.username | string | `"harbor_registry_user"` |  |
 | registry.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
-| registry.existingConfigMap | string | `""` | Use an externally-managed ConfigMap containing `config.yml` and `ctl-config.yml` instead of generating one from `config:` below. When set, the chart skips ConfigMap generation and the Deployment mounts the named ConfigMap at /etc/registry. Chart-managed runtime values (redis URL with auth, HTTP secret, storage credentials from `storageCredentials`, log level, ports) are still injected via env-var overrides on the Deployment, so they take precedence over whatever is in the external ConfigMap. Use this for kustomize/GitOps workflows where `config.yml` is owned by a separate manifest pipeline. |
+| registry.existingConfigMap | string | `""` | Use an externally-managed ConfigMap containing `config.yml` (plus `ctl-config.yml` with `image.source: upstream`) instead of generating one from `config:` below. When set, the chart skips ConfigMap generation and the Deployment mounts the named ConfigMap at /etc/registry. Chart-managed runtime values (redis URL with auth, HTTP secret, storage credentials from `storageCredentials`, log level, ports) are still injected via env-var overrides on the Deployment, so they take precedence over whatever is in the external ConfigMap. Use this for kustomize/GitOps workflows where `config.yml` is owned by a separate manifest pipeline. |
 | registry.existingSecret | string | `""` | Existing Secret that supplies `REGISTRY_HTTP_SECRET`. When set, the generated registry Secret omits `REGISTRY_HTTP_SECRET` and the deployment reads it from this Secret via env. Independent of `storageCredentials`. |
 | registry.existingSecretKey | string | `"REGISTRY_HTTP_SECRET"` | Key in `registry.existingSecret` that holds `REGISTRY_HTTP_SECRET`. |
 | registry.extraEnv | list | [] | Extra environment variables with valueFrom support |
@@ -1073,11 +1071,11 @@ Kubernetes: `>=1.28.0-0`
 | registry.probes | object | See [values.yaml](values.yaml) | Probes for the registry container. Full Kubernetes probe specs, rendered verbatim — see `core.probes` for the tuning rationale. |
 | registry.replicas | int | `1` | Number of Registry replicas (ignored when autoscaling.enabled=true) |
 | registry.resources | object | `{"limits":{"memory":"512Mi"},"requests":{"cpu":"100m","memory":"256Mi"}}` | Registry resource requests and limits |
-| registry.secret | object | {} | Sensitive config for Registry. Each key is b64-encoded into the generated registry Secret and injected on both `registry` and `registryctl` containers via `envFrom`. Use for inline credentials, e.g.:      secret:       REGISTRY_STORAGE_S3_ACCESSKEY: <plaintext>       REGISTRY_STORAGE_S3_SECRETKEY: <plaintext>  Prefer `storageCredentials.<backend>.existingSecret` for production (External-Secrets-Operator / Vault / SealedSecrets workflows). |
+| registry.secret | object | {} | Sensitive config for Registry. Each key is b64-encoded into the generated registry Secret and injected on the `registry` container (and the `registryctl` sidecar with `image.source: upstream`) via `envFrom`. Use for inline credentials, e.g.:      secret:       REGISTRY_STORAGE_S3_ACCESSKEY: <plaintext>       REGISTRY_STORAGE_S3_SECRETKEY: <plaintext>  Prefer `storageCredentials.<backend>.existingSecret` for production (External-Secrets-Operator / Vault / SealedSecrets workflows). |
 | registry.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsGroup":10000,"runAsNonRoot":true,"runAsUser":10000,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for Registry container |
 | registry.serviceAccount | object | `{"annotations":{},"automountServiceAccountToken":false,"create":true,"name":""}` | Service account settings for Registry |
 | registry.serviceAccount.automountServiceAccountToken | bool | `false` | Automount service account token |
-| registry.storageCredentials | object | See [values.yaml](values.yaml) | BYO Secret references for storage credentials. The chart injects the credential as an env var on both `registry` and `registryctl` containers; distribution honors `REGISTRY_STORAGE_<BACKEND>_<KEY>` env overrides for any backend. Set the entry matching the backend you configured in `config.storage`. Other entries stay empty.  Env injection is gated only on `existingSecret` being non-empty (not on which backend is active in `config:`). Setting credentials for an inactive backend is harmless — distribution ignores env vars not matching its active driver. |
+| registry.storageCredentials | object | See [values.yaml](values.yaml) | BYO Secret references for storage credentials. The chart injects the credential as an env var on the `registry` container (and the `registryctl` sidecar with `image.source: upstream`); distribution honors `REGISTRY_STORAGE_<BACKEND>_<KEY>` env overrides for any backend. Set the entry matching the backend you configured in `config.storage`. Other entries stay empty.  Env injection is gated only on `existingSecret` being non-empty (not on which backend is active in `config:`). Setting credentials for an inactive backend is harmless — distribution ignores env vars not matching its active driver. |
 | registry.storageCredentials.azure.existingSecret | string | `""` | Existing Secret containing the Azure storage account key. |
 | registry.storageCredentials.azure.existingSecretKey | string | `"REGISTRY_STORAGE_AZURE_ACCOUNTKEY"` | Key in `existingSecret` holding the account key. |
 | registry.storageCredentials.gcs.existingSecret | string | `""` | Existing Secret containing the GCS service-account keyfile. When set, mounted at /etc/registry/gcs/key.json — reference this path from `config.storage.gcs.keyfile`. Leave empty when using Workload Identity (set `serviceAccount.annotations` instead). |

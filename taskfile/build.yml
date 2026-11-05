@@ -28,7 +28,6 @@ tasks:
     deps:
       - task: 'binary:core:{{.PLATFORM}}'
       - task: 'binary:jobservice:{{.PLATFORM}}'
-      - task: 'binary:registryctl:{{.PLATFORM}}'
       - task: 'binary:exporter:{{.PLATFORM}}'
       - task: 'binary:registry:{{.PLATFORM}}'
       - task: 'binary:trivy-adapter:{{.PLATFORM}}'
@@ -108,24 +107,6 @@ tasks:
           PLATFORM: '{{index .MATCH 0}}'
           MAIN_PATH: ./jobservice/main.go
           OUTPUT_NAME: jobservice
-
-  binary:registryctl:*:
-    desc: "Build registryctl binary"
-    sources:
-      - src/registryctl/**/*.go
-      - src/pkg/**/*.go
-      - src/lib/**/*.go
-      - src/go.mod
-      - src/go.sum
-    generates:
-      - bin/{{index .MATCH 0}}/registryctl
-    deps: [tidy]
-    cmds:
-      - task: _go-build
-        vars:
-          PLATFORM: '{{index .MATCH 0}}'
-          MAIN_PATH: ./registryctl/main.go
-          OUTPUT_NAME: registryctl
 
   binary:exporter:*:
     desc: "Build harbor-exporter binary"
