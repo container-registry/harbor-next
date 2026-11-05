@@ -17,6 +17,7 @@ import { ConfigurationComponent } from './config.component';
 import { SharedTestingModule } from '../../../shared/shared.module';
 import { ConfigService } from './config.service';
 import { Configuration } from './config';
+import { OPTIONAL_FEATURES } from './features/optional-features';
 
 describe('ConfigurationComponent', () => {
     let component: ConfigurationComponent;
@@ -60,5 +61,43 @@ describe('ConfigurationComponent', () => {
     it('should init config', async () => {
         await fixture.whenStable();
         expect(initSpy.calls.count()).toEqual(1);
+    });
+    function createWith(
+        features: typeof OPTIONAL_FEATURES
+    ): ComponentFixture<ConfigurationComponent> {
+        const registered = OPTIONAL_FEATURES.splice(
+            0,
+            OPTIONAL_FEATURES.length
+        );
+        OPTIONAL_FEATURES.push(...features);
+        try {
+            const created = TestBed.createComponent(ConfigurationComponent);
+            created.detectChanges();
+            return created;
+        } finally {
+            OPTIONAL_FEATURES.splice(
+                0,
+                OPTIONAL_FEATURES.length,
+                ...registered
+            );
+        }
+    }
+    it('hides the Features tab without feature toggles', () => {
+        expect(
+            createWith([]).nativeElement.querySelector('#config-features')
+        ).toBeNull();
+    });
+    it('shows the Features tab once a feature toggle exists', () => {
+        const withFeatures = createWith([
+            {
+                configKey: 'enable_test_feature',
+                envKey: 'HARBOR_ENABLE_TEST_FEATURE',
+                name: 'Test Feature',
+                description: 'A feature used by the spec.',
+            },
+        ]);
+        expect(
+            withFeatures.nativeElement.querySelector('#config-features')
+        ).not.toBeNull();
     });
 });

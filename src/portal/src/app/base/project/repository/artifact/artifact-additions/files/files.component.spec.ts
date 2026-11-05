@@ -125,4 +125,19 @@ describe('FilesComponent', () => {
         const tables = fixture.nativeElement.getElementsByTagName('clr-tree');
         expect(tables.length).toEqual(1);
     });
+    it('classifies folders by type, also without children', () => {
+        expect(component.iconFor({ name: 'empty', type: 'directory' })).toBe(
+            'folder'
+        );
+        expect(
+            component.iconFor({
+                name: 'onnx',
+                type: 'directory',
+                expanded: true,
+            })
+        ).toBe('folder-open');
+        expect(component.iconFor({ name: 'README.md', type: 'file' })).toBe(
+            'note'
+        );
+    });
 });

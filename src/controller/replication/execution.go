@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/goharbor/harbor/src/controller/event/operator"
+	registryctl "github.com/goharbor/harbor/src/controller/registry"
 	"github.com/goharbor/harbor/src/controller/replication/flow"
 	replicationmodel "github.com/goharbor/harbor/src/controller/replication/model"
 	"github.com/goharbor/harbor/src/jobservice/job"
@@ -103,6 +104,14 @@ func (c *controller) Start(ctx context.Context, policy *replicationmodel.Policy,
 	if !policy.Enabled {
 		return 0, errors.New(nil).WithCode(errors.PreconditionCode).
 			WithMessagef("the policy %d is disabled", policy.ID)
+	}
+	for _, r := range []*model.Registry{policy.SrcRegistry, policy.DestRegistry} {
+		if r == nil {
+			continue
+		}
+		if err := registryctl.CheckTypeEnabled(ctx, r.Type); err != nil {
+			return 0, err
+		}
 	}
 	// create an execution record
 	extra := make(map[string]any)
