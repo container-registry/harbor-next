@@ -13,7 +13,7 @@
 // limitations under the License.
 import { Component, OnInit } from '@angular/core';
 import { ConfigService } from './config.service';
-import { featureToggles } from './features/optional-features';
+import { AppConfigService } from '../../../services/app-config.service';
 
 @Component({
     selector: 'config',
@@ -21,13 +21,18 @@ import { featureToggles } from './features/optional-features';
     styleUrls: ['config.component.scss'],
 })
 export class ConfigurationComponent implements OnInit {
-    readonly hasFeatures = featureToggles().length > 0;
-
     get inProgress(): boolean {
         return this.conf.getLoadingConfigStatus();
     }
 
-    constructor(private conf: ConfigService) {}
+    constructor(
+        private conf: ConfigService,
+        private appConfigService: AppConfigService
+    ) {}
+
+    get hasFeatures(): boolean {
+        return this.appConfigService.hasFeatures();
+    }
 
     ngOnInit(): void {
         // Refresh config every time when entering the configuration page

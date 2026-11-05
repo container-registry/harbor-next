@@ -8,6 +8,10 @@ h3 {
     width: min(64rem, 100%);
 }
 
+.section-description span + .section-link {
+    margin-left: 0.25em;
+}
+
 .clr-form-horizontal {
     .clr-form-control {
         & > .clr-control-label {
