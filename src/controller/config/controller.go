@@ -28,6 +28,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/audit"
+	"github.com/goharbor/harbor/src/pkg/feature"
 	"github.com/goharbor/harbor/src/pkg/project"
 	"github.com/goharbor/harbor/src/pkg/user"
 )
@@ -116,6 +117,9 @@ func (c *controller) updateLogEndpoint(ctx context.Context, cfgs map[string]any)
 func (c *controller) validateCfg(ctx context.Context, cfgs map[string]any) error {
 	mgr := config.GetCfgManager(ctx)
 
+	if err := feature.ValidateConfigUpdate(ctx, cfgs); err != nil {
+		return errors.BadRequestError(err)
+	}
 	// check if auth can be modified
 	if nv, ok := cfgs[common.AUTHMode]; ok {
 		if nv.(string) != mgr.Get(ctx, common.AUTHMode).GetString() {
@@ -272,9 +276,14 @@ func (c *controller) ConvertForGet(ctx context.Context, cfg map[string]any, inte
 			}
 			val = string(valByte)
 		}
+		editable := !readOnlyForAll
+		if enabled, overridden := feature.ConfigOverride(item.Name); overridden {
+			val = enabled
+			editable = false
+		}
 		result[item.Name] = &models.Value{
 			Val:      val,
-			Editable: !readOnlyForAll,
+			Editable: editable,
 		}
 	}
 

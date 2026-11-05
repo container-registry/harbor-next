@@ -17,6 +17,7 @@ import { ConfigurationComponent } from './config.component';
 import { SharedTestingModule } from '../../../shared/shared.module';
 import { ConfigService } from './config.service';
 import { Configuration } from './config';
+import { OPTIONAL_FEATURES } from './features/optional-features';
 
 describe('ConfigurationComponent', () => {
     let component: ConfigurationComponent;
@@ -60,5 +61,29 @@ describe('ConfigurationComponent', () => {
     it('should init config', async () => {
         await fixture.whenStable();
         expect(initSpy.calls.count()).toEqual(1);
+    });
+    it('hides the Features tab without feature toggles', () => {
+        expect(
+            fixture.nativeElement.querySelector('#config-features')
+        ).toBeNull();
+    });
+    it('shows the Features tab once a feature toggle exists', () => {
+        OPTIONAL_FEATURES.push({
+            configKey: 'enable_test_feature',
+            envKey: 'HARBOR_ENABLE_TEST_FEATURE',
+            name: 'Test Feature',
+            description: 'A feature used by the spec.',
+        });
+        try {
+            const withFeatures = TestBed.createComponent(
+                ConfigurationComponent
+            );
+            withFeatures.detectChanges();
+            expect(
+                withFeatures.nativeElement.querySelector('#config-features')
+            ).not.toBeNull();
+        } finally {
+            OPTIONAL_FEATURES.splice(0, OPTIONAL_FEATURES.length);
+        }
     });
 });

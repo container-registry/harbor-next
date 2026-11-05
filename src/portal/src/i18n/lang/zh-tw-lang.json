@@ -836,6 +836,11 @@
         "ROOT_CERT_LINK": "下載",
         "REGISTRY_CERTIFICATE": "Registry 憑證",
         "NO_CHANGE": "沒有任何變更，因此已中止儲存。",
+        "FEATURES": "Features",
+        "OPTIONAL_FEATURES": "Optional Features",
+        "FEATURE_BETA": "Beta",
+        "FEATURE_BETA_WARNING": "Beta feature: behavior and stored data formats may still change between releases.",
+        "FEATURE_LOCKED_BY": "Set by {{source}}",
         "SKIP_SCANNER_PULL_TIME": "掃描時保留映像檔的「上次拉取時間」",
         "TOOLTIP": {
             "SELF_REGISTRATION_ENABLE": "啟用註冊。",

@@ -837,6 +837,11 @@
         "ROOT_CERT_LINK": "Descargar",
         "REGISTRY_CERTIFICATE": "Certificado de registro",
         "NO_CHANGE": "Guardar abortado no hay cambios",
+        "FEATURES": "Features",
+        "OPTIONAL_FEATURES": "Optional Features",
+        "FEATURE_BETA": "Beta",
+        "FEATURE_BETA_WARNING": "Beta feature: behavior and stored data formats may still change between releases.",
+        "FEATURE_LOCKED_BY": "Set by {{source}}",
         "SKIP_SCANNER_PULL_TIME": "Conservar imagen \"tiempo último pull\" al escanear",
         "TOOLTIP": {
             "SELF_REGISTRATION_ENABLE": "Activar registro.",

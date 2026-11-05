@@ -834,6 +834,11 @@
         "ROOT_CERT_LINK": "다운로드",
         "REGISTRY_CERTIFICATE": "레지스트리 인증서",
         "NO_CHANGE": "변경된 사항이 없으므로 저장을 중단합니다.",
+        "FEATURES": "Features",
+        "OPTIONAL_FEATURES": "Optional Features",
+        "FEATURE_BETA": "Beta",
+        "FEATURE_BETA_WARNING": "Beta feature: behavior and stored data formats may still change between releases.",
+        "FEATURE_LOCKED_BY": "Set by {{source}}",
         "SKIP_SCANNER_PULL_TIME": "스캔시 이미지 \"마지막 풀(Pull) 시간\" 유지",
         "TOOLTIP": {
             "SELF_REGISTRATION_ENABLE": "가입을 활성화합니다.",

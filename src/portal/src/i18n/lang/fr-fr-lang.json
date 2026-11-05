@@ -836,6 +836,11 @@
         "ROOT_CERT_LINK": "Télécharger",
         "REGISTRY_CERTIFICATE": "Certificat du registre",
         "NO_CHANGE": "Enregistrement abandonné, rien n'a changé",
+        "FEATURES": "Features",
+        "OPTIONAL_FEATURES": "Optional Features",
+        "FEATURE_BETA": "Beta",
+        "FEATURE_BETA_WARNING": "Beta feature: behavior and stored data formats may still change between releases.",
+        "FEATURE_LOCKED_BY": "Set by {{source}}",
         "SKIP_SCANNER_PULL_TIME": "Conserver la date/heure de pull lors d'un scan",
         "TOOLTIP": {
             "SELF_REGISTRATION_ENABLE": "Activer l'inscription.",

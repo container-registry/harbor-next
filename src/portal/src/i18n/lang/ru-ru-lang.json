@@ -2089,6 +2089,11 @@
     "ROOT_CERT_LINK": "Скачать",
     "REGISTRY_CERTIFICATE": "Сертификат реестра",
     "NO_CHANGE": "Сохранение отменено, так как нет изменений",
+    "FEATURES": "Features",
+    "OPTIONAL_FEATURES": "Optional Features",
+    "FEATURE_BETA": "Beta",
+    "FEATURE_BETA_WARNING": "Beta feature: behavior and stored data formats may still change between releases.",
+    "FEATURE_LOCKED_BY": "Set by {{source}}",
     "SKIP_SCANNER_PULL_TIME": "Сохранять время \"последнего извлечения\" образа при сканировании",
     "TOOLTIP": {
       "SELF_REGISTRATION_ENABLE": "Включить регистрацию.",

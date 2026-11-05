@@ -836,6 +836,11 @@
         "ROOT_CERT_LINK": "下载",
         "REGISTRY_CERTIFICATE": "注册证书",
         "NO_CHANGE": "保存中止，因为没有变化",
+        "FEATURES": "Features",
+        "OPTIONAL_FEATURES": "Optional Features",
+        "FEATURE_BETA": "Beta",
+        "FEATURE_BETA_WARNING": "Beta feature: behavior and stored data formats may still change between releases.",
+        "FEATURE_LOCKED_BY": "Set by {{source}}",
         "SKIP_SCANNER_PULL_TIME": "跳过扫描器对于拉取时间的更新",
         "TOOLTIP": {
             "SELF_REGISTRATION_ENABLE": "激活注册功能。",
