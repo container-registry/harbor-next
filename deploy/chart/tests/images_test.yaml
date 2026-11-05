@@ -32,8 +32,7 @@ tests:
           path: spec.template.spec.containers[0].image
           pattern: '^8gears\.container-registry\.com/8gcr/harbor-core:'
 
-  # source=upstream renames registry-photon (the registry container is
-  # containers[0]; registryctl is containers[1]).
+  # source=upstream renames registry-photon.
   - it: should resolve upstream registry-photon when source=upstream
     template: templates/registry.deployment.yaml
     set:
@@ -42,9 +41,6 @@ tests:
       - matchRegex:
           path: spec.template.spec.containers[0].image
           pattern: '^docker\.io/goharbor/registry-photon:'
-      - matchRegex:
-          path: spec.template.spec.containers[1].image
-          pattern: '^docker\.io/goharbor/harbor-registryctl:'
 
   # source=upstream renames trivy-adapter-photon.
   - it: should resolve upstream trivy-adapter-photon when source=upstream
@@ -114,3 +110,34 @@ tests:
       - equal:
           path: spec.template.spec.containers[0].image
           value: localhost:5000/harbor-core:v2.15.0
+
+  - it: should resolve upstream harbor-registryctl sidecar when source=upstream
+    template: templates/registry.deployment.yaml
+    set:
+      image.source: upstream
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[1].image
+          pattern: '^docker\.io/goharbor/harbor-registryctl:'
+
+  - it: global.imageRegistry overrides the upstream registryctl sidecar host
+    template: templates/registry.deployment.yaml
+    set:
+      image.source: upstream
+      global.imageRegistry: mirror.internal
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[1].image
+          pattern: '^mirror\.internal/goharbor/harbor-registryctl:'
+
+  - it: registry.controller.image overrides apply to the upstream sidecar
+    template: templates/registry.deployment.yaml
+    set:
+      image.source: upstream
+      registry.controller.image.registry: example.com
+      registry.controller.image.repository: myproj/registryctl
+      registry.controller.image.tag: v2.15.0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[1].image
+          value: example.com/myproj/registryctl:v2.15.0

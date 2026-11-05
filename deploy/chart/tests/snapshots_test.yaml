@@ -28,6 +28,7 @@ suite: full-chart snapshots
 #   4. BYO secrets matrix — every existingSecret path set
 #   5. Trace + observability — jaeger + metrics + ServiceMonitor
 #   6. Ingress + cert-manager + multiple hosts (including wildcard)
+#   7. image.source=upstream — registryctl sidecar, REGISTRY_CONTROLLER_URL :8080
 
 # Pinned so a release PR, which restamps only version and appVersion in
 # Chart.yaml, does not invalidate every snapshot.
@@ -55,6 +56,7 @@ templates:
   - templates/registry.pvc.yaml
   - templates/registry.service.yaml
   - templates/registryctl.configmap.yaml
+  - templates/registryctl.secret.yaml
   - templates/serviceaccounts.yaml
   - templates/servicemonitor.yaml
   - templates/tls-certificates.yaml
@@ -160,5 +162,14 @@ tests:
           paths:
             - path: /
               pathType: Prefix
+    asserts:
+      - matchSnapshot: {}
+
+  - it: 7. image.source=upstream — registryctl sidecar wiring
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: changeme-snapshot-baseline
+      image.source: upstream
     asserts:
       - matchSnapshot: {}

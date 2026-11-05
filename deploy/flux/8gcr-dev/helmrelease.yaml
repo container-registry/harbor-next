@@ -181,10 +181,6 @@ spec:
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-registry
         tag: latest
-      controller:
-        image:
-          repository: 8gears.container-registry.com/8gcr/harbor-registryctl
-          tag: latest
       replicas: 1
       persistence:
         enabled: true

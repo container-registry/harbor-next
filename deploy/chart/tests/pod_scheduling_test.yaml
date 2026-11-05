@@ -175,11 +175,7 @@ tests:
       - notExists:
           path: spec.template.spec.containers[0].lifecycle
 
-  # Registry deployment has two containers (registry + registryctl). The
-  # same lifecycle value applies to BOTH — LB drain affects either pod
-  # the Service fronts. Splitting per container would require two new
-  # values, which adds surface area without a real use case.
-  - it: should render lifecycle on both registry containers
+  - it: should render lifecycle on the registry container
     template: templates/registry.deployment.yaml
     set:
       externalURL: https://harbor.example.com
@@ -193,6 +189,27 @@ tests:
       - equal:
           path: spec.template.spec.containers[0].lifecycle.preStop.exec.command
           value: ["/bin/sh", "-c", "sleep 30"]
+
+  # With image.source=upstream the pod also runs the registryctl sidecar;
+  # registry.lifecycle applies to both containers (LB drain hits either).
+  - it: upstream should render lifecycle on the registryctl sidecar too
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      image.source: upstream
+      registry.lifecycle:
+        preStop:
+          exec:
+            command: ["/bin/sh", "-c", "sleep 30"]
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].lifecycle.preStop.exec.command
+          value: ["/bin/sh", "-c", "sleep 30"]
+      - equal:
+          path: spec.template.spec.containers[1].name
+          value: registryctl
       - equal:
           path: spec.template.spec.containers[1].lifecycle.preStop.exec.command
           value: ["/bin/sh", "-c", "sleep 30"]

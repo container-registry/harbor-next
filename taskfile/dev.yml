@@ -23,11 +23,9 @@ vars:
   PORT_POSTGRES:     '{{ add 5432  (mul (atoi .SLOT) 100) }}'
   PORT_REDIS:        '{{ add 6379  (mul (atoi .SLOT) 100) }}'
   PORT_REGISTRY:     '{{ add 50000 (mul (atoi .SLOT) 100) }}'
-  PORT_REGISTRYCTL:  '{{ add 8085  (mul (atoi .SLOT) 100) }}'
   PORT_TRIVY:        '{{ add 8081  (mul (atoi .SLOT) 100) }}'
   PORT_DEBUG_CORE:   '{{ add 2345  (mul (atoi .SLOT) 100) }}'
   PORT_DEBUG_JOB:    '{{ add 2346  (mul (atoi .SLOT) 100) }}'
-  PORT_DEBUG_REGCTL: '{{ add 2347  (mul (atoi .SLOT) 100) }}'
 
   PROJECT_PREFIX: 'harbor-{{.SLOT}}'
 
@@ -35,9 +33,9 @@ vars:
   COMPOSE_CMD: 'docker compose -f {{.COMPOSE_FILE}} --env-file {{.VERSIONS_ENV}}'
 
   # Docker Compose profile strings (reused across multiple tasks)
-  ALL_PROFILES: "--profile portal --profile core --profile jobservice --profile registryctl --profile trivy"
-  APP_PROFILES: "--profile portal --profile core --profile jobservice --profile registryctl"
-  BACKEND_PROFILES: "--profile core --profile jobservice --profile registryctl"
+  ALL_PROFILES: "--profile portal --profile core --profile jobservice --profile trivy"
+  APP_PROFILES: "--profile portal --profile core --profile jobservice"
+  BACKEND_PROFILES: "--profile core --profile jobservice"
 
 env:
   COMPOSE_PROJECT_NAME:   '{{.PROJECT_PREFIX}}'
@@ -48,16 +46,16 @@ env:
     sh: go env GOMODCACHE 2>/dev/null || true
   HOST_GOCACHE:
     sh: go env GOCACHE 2>/dev/null || true
+  DEV_ARCH:
+    sh: go env GOARCH 2>/dev/null || true
   PORT_CORE:              '{{.PORT_CORE}}'
   PORT_PORTAL:            '{{.PORT_PORTAL}}'
   PORT_POSTGRES:          '{{.PORT_POSTGRES}}'
   PORT_REDIS:             '{{.PORT_REDIS}}'
   PORT_REGISTRY:          '{{.PORT_REGISTRY}}'
-  PORT_REGISTRYCTL:       '{{.PORT_REGISTRYCTL}}'
   PORT_TRIVY:             '{{.PORT_TRIVY}}'
   PORT_DEBUG_CORE:        '{{.PORT_DEBUG_CORE}}'
   PORT_DEBUG_JOBSERVICE:  '{{.PORT_DEBUG_JOB}}'
-  PORT_DEBUG_REGISTRYCTL: '{{.PORT_DEBUG_REGCTL}}'
   DEV_UID:
     sh: id -u
   DEV_GID:
@@ -122,7 +120,6 @@ tasks:
           "{{.PORT_CORE}}:Core" \
           "{{.PORT_PORTAL}}:Portal" \
           "{{.PORT_REGISTRY}}:Registry" \
-          "{{.PORT_REGISTRYCTL}}:RegistryCtl" \
           "{{.PORT_TRIVY}}:Trivy"; do
           port="${pair%%:*}"
           name="${pair##*:}"
@@ -177,7 +174,6 @@ tasks:
       echo "  PostgreSQL:   localhost:{{.PORT_POSTGRES}}"
       echo "  Redis:        localhost:{{.PORT_REDIS}}"
       echo "  Registry:     localhost:{{.PORT_REGISTRY}}"
-      echo "  RegistryCtl:  localhost:{{.PORT_REGISTRYCTL}}"
       echo "  Trivy:        localhost:{{.PORT_TRIVY}}"
       echo "  Prefix:       {{.PROJECT_PREFIX}}"
       echo ""
@@ -207,7 +203,7 @@ tasks:
 
   up:
     desc: "Start backend containers and native Portal with hot reload (SKIP_TRIVY=true to exclude Trivy)"
-    deps: [require-docker, require-ports, gen:private-key, gen:secret-key]
+    deps: [require-docker, require-ports, gen:private-key, gen:secret-key, registry:binary]
     vars:
       TRIVY_PROFILE: '{{if ne .SKIP_TRIVY "true"}}--profile trivy{{end}}'
     cmds:
@@ -264,9 +260,14 @@ tasks:
   # ---------------------------------------------------------------------------
   # Infrastructure (Docker Compose)
   # ---------------------------------------------------------------------------
+  registry:binary:
+    internal: true
+    cmds:
+      - task: ':build:binary:registry:linux-{{.DEV_ARCH}}'
+
   infra:up:
     desc: Start PostgreSQL, Redis, and Registry (waits for DB readiness)
-    deps: [require-docker, require-ports]
+    deps: [require-docker, require-ports, registry:binary]
     cmds:
       - '{{.COMPOSE_CMD}} up -d'
       - |
@@ -293,33 +294,33 @@ tasks:
   # Backend Services (Containerized)
   # ---------------------------------------------------------------------------
   backend:up:
-    desc: Build and start Core, JobService, RegistryCtl with hot reload
-    deps: [require-docker, require-ports, gen:private-key, gen:secret-key]
+    desc: Build and start Core and JobService with hot reload
+    deps: [require-docker, require-ports, gen:private-key, gen:secret-key, registry:binary]
     cmds:
       - task: :build:gen-apis
-      - '{{.COMPOSE_CMD}} --profile core --profile jobservice --profile registryctl up -d --build'
+      - '{{.COMPOSE_CMD}} --profile core --profile jobservice up -d --build'
       - |
         echo ""
         echo "API: http://localhost:{{.PORT_CORE}}/api/v2.0"
         echo ""
 
   backend:down:
-    desc: Stop and remove Core, JobService, RegistryCtl (keeps infra running)
+    desc: Stop and remove Core and JobService (keeps infra running)
     cmds:
-      - '{{.COMPOSE_CMD}} stop core jobservice registryctl'
-      - '{{.COMPOSE_CMD}} rm -f core jobservice registryctl'
+      - '{{.COMPOSE_CMD}} stop core jobservice'
+      - '{{.COMPOSE_CMD}} rm -f core jobservice'
 
   backend:logs:
-    desc: Tail logs from Core, JobService, and RegistryCtl
-    cmd: '{{.COMPOSE_CMD}} --profile core --profile jobservice --profile registryctl logs -f'
+    desc: Tail logs from Core and JobService
+    cmd: '{{.COMPOSE_CMD}} --profile core --profile jobservice logs -f'
 
   backend:logs:*:
-    desc: "Tail logs for a specific backend service (core, jobservice, registryctl)"
+    desc: "Tail logs for a specific backend service (core, jobservice)"
     cmd: '{{.COMPOSE_CMD}} logs -f {{index .MATCH 0}}'
 
   backend:restart:
-    desc: Restart Core, JobService, and RegistryCtl containers
-    cmd: '{{.COMPOSE_CMD}} restart core jobservice registryctl'
+    desc: Restart Core and JobService containers
+    cmd: '{{.COMPOSE_CMD}} restart core jobservice'
 
   _wait-core:
     internal: true

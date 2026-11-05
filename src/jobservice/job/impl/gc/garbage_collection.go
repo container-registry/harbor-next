@@ -27,7 +27,6 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/goharbor/harbor/src/common/registryctl"
 	"github.com/goharbor/harbor/src/controller/artifact"
 	"github.com/goharbor/harbor/src/controller/project"
 	"github.com/goharbor/harbor/src/jobservice/job"
@@ -40,13 +39,13 @@ import (
 	"github.com/goharbor/harbor/src/pkg/artifactrash/model"
 	"github.com/goharbor/harbor/src/pkg/blob"
 	blobModels "github.com/goharbor/harbor/src/pkg/blob/models"
+	"github.com/goharbor/harbor/src/pkg/registry/gcclient"
 	"github.com/goharbor/harbor/src/pkg/registry/interceptor/readonly"
-	"github.com/goharbor/harbor/src/registryctl/client"
 )
 
 var (
-	regCtlInit = registryctl.Init
-	errGcStop  = errors.New("stopped")
+	gcClientInit = gcclient.Init
+	errGcStop    = errors.New("stopped")
 )
 
 const (
@@ -59,15 +58,15 @@ const (
 
 // GarbageCollector is the struct to run registry's garbage collection
 type GarbageCollector struct {
-	artCtl            artifact.Controller
-	artrashMgr        artifactrash.Manager
-	blobMgr           blob.Manager
-	registryCtlClient client.Client
-	logger            logger.Interface
-	redisURL          string
-	deleteUntagged    bool
-	deleteTag         bool
-	dryRun            bool
+	artCtl         artifact.Controller
+	artrashMgr     artifactrash.Manager
+	blobMgr        blob.Manager
+	gcClient       gcclient.Client
+	logger         logger.Interface
+	redisURL       string
+	deleteUntagged bool
+	deleteTag      bool
+	dryRun         bool
 	// holds all of trashed artifacts' digest and repositories.
 	// The source data of trashedArts is the table ArtifactTrash and it's only used as a dictionary by sweep when to delete a manifest.
 	// As table blob has no repositories data, and the repositories are required when to delete a manifest, so use the table ArtifactTrash to capture them.
@@ -99,20 +98,20 @@ func (gc *GarbageCollector) Validate(_ job.Parameters) error {
 }
 
 func (gc *GarbageCollector) init(ctx job.Context, params job.Parameters) error {
-	regCtlInit()
+	gcClientInit()
 	gc.logger = ctx.GetLogger()
 	gc.deleteSet = make([]*blobModels.Blob, 0)
 	gc.trashedArts = make(map[string][]model.ArtifactTrash, 0)
 
 	// UT will use the mock client, ctl and mgr
 	if os.Getenv("UTTEST") != "true" {
-		gc.registryCtlClient = registryctl.RegistryCtlClient
+		gc.gcClient = gcclient.Default
 		gc.artCtl = artifact.Ctl
 		gc.artrashMgr = artifactrash.NewManager()
 		gc.blobMgr = blob.NewManager()
 	}
-	if err := gc.registryCtlClient.Health(); err != nil {
-		gc.logger.Errorf("failed to start gc as registry controller is unreachable: %v", err)
+	if err := gc.gcClient.Health(); err != nil {
+		gc.logger.Errorf("failed to start gc as the registry is unreachable: %v", err)
 		return err
 	}
 	gc.parseParams(params)
@@ -376,7 +375,7 @@ func (gc *GarbageCollector) sweep(ctx job.Context) error {
 						gc.logger.Infof("[%s][%d/%d] delete manifest from storage: %s", uid, localIndex, total, blob.Digest)
 						if err := retry.Retry(func() error {
 							return ignoreNotFound(func() error {
-								err := gc.registryCtlClient.DeleteManifest(art.RepositoryName, blob.Digest)
+								err := gc.gcClient.DeleteManifest(art.RepositoryName, blob.Digest)
 								// if the system is in read-only mode, return an Abort error to skip retrying
 								if err == readonly.Err {
 									return retry.Abort(err)
@@ -390,7 +389,7 @@ func (gc *GarbageCollector) sweep(ctx job.Context) error {
 							if err := ignoreNotFound(func() error {
 								return gc.markDeleteFailed(ctx, blob)
 							}); err != nil {
-								gc.logger.Errorf("[%s][%d/%d] failed to call gc.markDeleteFailed() after gc.registryCtlClient.DeleteManifest() error out: %s, %s, %v", uid, localIndex, total, art.RepositoryName, blob.Digest, err)
+								gc.logger.Errorf("[%s][%d/%d] failed to call gc.markDeleteFailed() after gc.gcClient.DeleteManifest() error out: %s, %s, %v", uid, localIndex, total, art.RepositoryName, blob.Digest, err)
 								return err
 							}
 							// if the system is set to read-only mode, return directly
@@ -433,7 +432,7 @@ func (gc *GarbageCollector) sweep(ctx job.Context) error {
 					notFound := false
 					if err := retry.Retry(func() error {
 						return ignoreNotFound(func() error {
-							err := gc.registryCtlClient.DeleteBlob(blob.Digest)
+							err := gc.gcClient.DeleteBlob(blob.Digest)
 							// if the system is in read-only mode, return an Abort error to skip retrying
 							if err == readonly.Err {
 								return retry.Abort(err)
@@ -448,7 +447,7 @@ func (gc *GarbageCollector) sweep(ctx job.Context) error {
 						if err := ignoreNotFound(func() error {
 							return gc.markDeleteFailed(ctx, blob)
 						}); err != nil {
-							gc.logger.Errorf("[%s][%d/%d] failed to call gc.markDeleteFailed() after gc.registryCtlClient.DeleteBlob() error out: %s, %v", uid, localIndex, total, blob.Digest, err)
+							gc.logger.Errorf("[%s][%d/%d] failed to call gc.markDeleteFailed() after gc.gcClient.DeleteBlob() error out: %s, %v", uid, localIndex, total, blob.Digest, err)
 							return err
 						}
 						// if the system is set to read-only mode, return directly
