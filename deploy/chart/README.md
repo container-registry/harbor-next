@@ -751,7 +751,7 @@ Kubernetes: `>=1.28.0-0`
 
 | Repository | Name | Version |
 |------------|------|---------|
-| oci://ghcr.io/valkey-io/valkey-helm | valkey | 0.9.3 |
+| oci://ghcr.io/valkey-io/valkey-helm | valkey | 0.12.1 |
 
 ## Values
 
