@@ -36,7 +36,24 @@ func newCfgMetaData() *CfgMetaData {
 
 // CfgMetaData ...
 type CfgMetaData struct {
+	mu      sync.RWMutex
 	metaMap map[string]Item
+}
+
+// Register adds a configuration item after package initialization, when
+// appending to ConfigList is too late because Instance() has already been
+// built by the config managers. It returns the existing item and false when
+// an item with the same name is already defined.
+func Register(item Item) (Item, bool) {
+	inst := Instance()
+	inst.mu.Lock()
+	defer inst.mu.Unlock()
+	if existing, ok := inst.metaMap[item.Name]; ok {
+		return existing, false
+	}
+	inst.metaMap[item.Name] = item
+	ConfigList = append(ConfigList, item)
+	return item, true
 }
 
 // init ...
@@ -46,6 +63,8 @@ func (c *CfgMetaData) init() {
 
 // initFromArray - Initial metadata from an array
 func (c *CfgMetaData) initFromArray(items []Item) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.metaMap = make(map[string]Item)
 	for _, item := range items {
 		c.metaMap[item.Name] = item
@@ -54,6 +73,8 @@ func (c *CfgMetaData) initFromArray(items []Item) {
 
 // GetByName - Get current metadata of current name, if not defined, return false in second params
 func (c *CfgMetaData) GetByName(name string) (*Item, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	if item, ok := c.metaMap[name]; ok {
 		return &item, true
 	}
@@ -62,6 +83,8 @@ func (c *CfgMetaData) GetByName(name string) (*Item, bool) {
 
 // GetAll - Get all metadata in current env
 func (c *CfgMetaData) GetAll() []Item {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	metaDataList := make([]Item, 0)
 	for _, value := range c.metaMap {
 		metaDataList = append(metaDataList, value)

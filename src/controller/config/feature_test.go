@@ -25,12 +25,13 @@ import (
 	testUser "github.com/goharbor/harbor/src/testing/pkg/user"
 )
 
-// A test feature cannot add config metadata after package init, so it
-// borrows the existing boolean read_only item.
-const featureTestEnvKey = "READ_ONLY"
+const (
+	featureTestKey    = "enable_controller_test_feature"
+	featureTestEnvKey = "HARBOR_ENABLE_CONTROLLER_TEST_FEATURE"
+)
 
 func init() {
-	feature.Register(feature.Definition{Feature: "controller_test_feature", ConfigKey: common.ReadOnly, EnvKey: featureTestEnvKey})
+	feature.Register(feature.Definition{Feature: "controller_test_feature", ConfigKey: featureTestKey, EnvKey: featureTestEnvKey})
 }
 
 func newFeatureTestController() *controller {
@@ -45,12 +46,12 @@ func TestConvertForGetReportsEnvironmentControlledFeature(t *testing.T) {
 
 		result, err := newFeatureTestController().ConvertForGet(t.Context(), map[string]any{
 			common.AUTHMode: common.DBAuth,
-			common.ReadOnly: !envValue,
+			featureTestKey:  !envValue,
 		}, false)
 		if err != nil {
 			t.Fatalf("ConvertForGet: %v", err)
 		}
-		got := result[common.ReadOnly]
+		got := result[featureTestKey]
 		if got.Val != envValue || got.Editable {
 			t.Errorf("env=%v: {value: %v, editable: %v}, want {%v, false}", envValue, got.Val, got.Editable, envValue)
 		}
@@ -65,12 +66,12 @@ func TestConvertForGetLeavesStoredFeatureEditable(t *testing.T) {
 
 	result, err := newFeatureTestController().ConvertForGet(t.Context(), map[string]any{
 		common.AUTHMode: common.DBAuth,
-		common.ReadOnly: true,
+		featureTestKey:  true,
 	}, false)
 	if err != nil {
 		t.Fatalf("ConvertForGet: %v", err)
 	}
-	got := result[common.ReadOnly]
+	got := result[featureTestKey]
 	if got.Val != true || !got.Editable {
 		t.Errorf("{value: %v, editable: %v}, want {true, true}", got.Val, got.Editable)
 	}
@@ -79,7 +80,7 @@ func TestConvertForGetLeavesStoredFeatureEditable(t *testing.T) {
 func TestValidateCfgRejectsEnvironmentControlledFeature(t *testing.T) {
 	t.Setenv(featureTestEnvKey, "true")
 
-	err := newFeatureTestController().validateCfg(t.Context(), map[string]any{common.ReadOnly: false})
+	err := newFeatureTestController().validateCfg(t.Context(), map[string]any{featureTestKey: false})
 	if !errors.IsErr(err, errors.BadRequestCode) {
 		t.Fatalf("validateCfg error = %v, want a bad request", err)
 	}

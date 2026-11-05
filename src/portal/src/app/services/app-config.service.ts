@@ -72,6 +72,14 @@ export class AppConfigService {
         return this.configurations;
     }
 
+    public featureEnabled(key: string): boolean {
+        return this.configurations?.features?.[key] === true;
+    }
+
+    public hasFeatures(): boolean {
+        return Object.keys(this.configurations?.features || {}).length > 0;
+    }
+
     public isLdapMode(): boolean {
         return (
             this.configurations &&

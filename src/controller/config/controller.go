@@ -95,6 +95,7 @@ func (c *controller) UpdateUserConfigs(ctx context.Context, conf map[string]any)
 		log.Errorf("failed to upload configurations: %v", err)
 		return fmt.Errorf("failed to validate configuration")
 	}
+	feature.NotifyChanged(conf)
 	// update the audit logger to point to the new endpoint
 	return c.updateLogEndpoint(ctx, conf)
 }
@@ -316,6 +317,11 @@ func (c *controller) OverwriteConfig(ctx context.Context) error {
 		readOnlyForAll = true
 	}
 	return nil
+}
+
+// OverwrittenByEnv reports whether CONFIG_OVERWRITE_JSON made every setting read-only.
+func OverwrittenByEnv() bool {
+	return readOnlyForAll
 }
 
 func (c *controller) authModeCanBeModified(ctx context.Context) (bool, error) {
