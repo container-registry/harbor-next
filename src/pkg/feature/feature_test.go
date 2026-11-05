@@ -119,12 +119,17 @@ func TestValidateConfigUpdateRejectsNonBoolean(t *testing.T) {
 func TestValidateConfigUpdateRunsDisableGuard(t *testing.T) {
 	unsetEnv(t, testEnvKey)
 	inUse := errors.New("feature still in use")
+	passed := 0
+	RegisterDisableGuard(testFeature, func(context.Context) error { passed++; return nil })
 	RegisterDisableGuard(testFeature, func(context.Context) error { return inUse })
-	t.Cleanup(func() { RegisterDisableGuard(testFeature, nil) })
+	t.Cleanup(func() { resetGuards(testFeature) })
 
 	storeEnabled(t, true)
 	if err := ValidateConfigUpdate(t.Context(), map[string]any{testConfigKey: false}); !errors.Is(err, inUse) {
-		t.Fatalf("disabling an enabled feature: error = %v, want guard error", err)
+		t.Fatalf("disabling an enabled feature: error = %v, want the second guard's error", err)
+	}
+	if passed != 1 {
+		t.Fatalf("first guard ran %d times, want 1: a later guard must not replace it", passed)
 	}
 	if err := ValidateConfigUpdate(t.Context(), map[string]any{testConfigKey: true}); err != nil {
 		t.Fatalf("enabling: unexpected error %v", err)
@@ -150,6 +155,33 @@ func TestRegistryTypeEnabled(t *testing.T) {
 	if !RegistryTypeEnabled(t.Context(), "ungated-registry") {
 		t.Fatal("expected ungated registry type to be enabled")
 	}
+}
+
+func resetGuards(feature Feature) {
+	mu.Lock()
+	defer mu.Unlock()
+	delete(guards, feature)
+}
+
+func TestRegisterDisableGuardRejectsNil(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected a nil guard to panic")
+		}
+	}()
+	RegisterDisableGuard(testFeature, nil)
+}
+
+func TestRegisterRegistryTypesRejectsSecondOwner(t *testing.T) {
+	const registryType = "test-owned-registry"
+	RegisterRegistryTypes(testFeature, registryType)
+	RegisterRegistryTypes(testFeature, registryType)
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected a registry type claimed by another feature to panic")
+		}
+	}()
+	RegisterRegistryTypes("other_feature", registryType)
 }
 
 func TestRegisterRejectsDuplicates(t *testing.T) {
