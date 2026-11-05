@@ -16,6 +16,8 @@ package handler
 
 import (
 	"context"
+	"sort"
+	"strings"
 
 	"github.com/go-openapi/runtime/middleware"
 
@@ -55,7 +57,12 @@ func (c *configAPI) UpdateFeature(ctx context.Context, params configure.UpdateFe
 }
 
 func featureList(ctx context.Context, overwritten bool) *models.FeatureList {
+	// Registration order follows Go package initialization, which users
+	// should not see; sort by display name for a stable list.
 	definitions := feature.Definitions()
+	sort.SliceStable(definitions, func(i, j int) bool {
+		return strings.ToLower(definitions[i].Name) < strings.ToLower(definitions[j].Name)
+	})
 	enabledBySection := map[string][]feature.Definition{}
 	features := make([]*models.Feature, 0, len(definitions))
 	for _, def := range definitions {

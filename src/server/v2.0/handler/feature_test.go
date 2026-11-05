@@ -47,6 +47,8 @@ func init() {
 	feature.Register(
 		feature.Definition{Feature: "handler_test_feature", ConfigKey: handlerFeatureKey, EnvKey: handlerFeatureEnvKey, Name: "Handler Test", Description: "d", Beta: true},
 		feature.Definition{Feature: "handler_test_linked", ConfigKey: handlerLinkedKey, EnvKey: handlerLinkedEnvKey, Section: handlerFeatureSection, Name: "Linked", Default: true},
+		// registered last, listed first
+		feature.Definition{Feature: "handler_test_first", ConfigKey: "enable_handler_test_first", EnvKey: "HARBOR_ENABLE_HANDLER_TEST_FIRST", Name: "A First"},
 	)
 	feature.RegisterSection(feature.Section{
 		ID: handlerFeatureSection, Title: "Test Section", LinkText: "Ask", Order: 10,
@@ -176,4 +178,14 @@ func (s *FeatureAPITestSuite) TestListAndUpdate() {
 
 func TestFeatureAPITestSuite(t *testing.T) {
 	suite.Run(t, &FeatureAPITestSuite{})
+}
+
+func TestFeatureListIsSortedByName(t *testing.T) {
+	unsetHandlerFeatureEnv(t)
+	features := featureList(t.Context(), false).Features
+	for i := 1; i < len(features); i++ {
+		if strings.ToLower(features[i-1].Name) > strings.ToLower(features[i].Name) {
+			t.Fatalf("%q listed before %q", features[i-1].Name, features[i].Name)
+		}
+	}
 }
