@@ -153,6 +153,28 @@ Browser login over plain HTTP needed no change: this base no longer uses gorilla
 `net/http.CrossOriginProtection`, and the browser sends `Sec-Fetch-Site: same-origin` through
 the ng serve proxy.
 
+## Feature gate
+
+The `huggingface` registry type is an optional feature (`src/pkg/feature`), off by default.
+Enable it under **Configuration > Features** (`enable_huggingface_model_import`) or with
+`HARBOR_ENABLE_HUGGINGFACE_MODEL_IMPORT=true` on core; the variable wins and locks the toggle.
+
+While it is off, core:
+
+- leaves `huggingface` out of `GET /replication/adapters` and `/replication/adapterinfos`
+- answers `400` to creating or updating a `huggingface` registry, to `POST /registries/{id}/preview`
+  for one, to creating a proxy cache project on one and to creating or updating a replication
+  policy that uses one
+- refuses to start a replication of such a policy, manual or scheduled
+- serves a `huggingface` proxy cache project from its local cache only, without upstream calls
+
+Switching it off is refused while `huggingface` registries exist. Policies and proxy cache
+projects reference a registry and block its deletion, so this also covers them. The variable
+bypasses that check; existing registries then stay listed and deletable but unusable.
+
+The generic extensions (file filter, preview API, revision tag, `source_only`, CNAI panel) are
+not gated: no other adapter declares them, so they stay inert while the type is off.
+
 ## Limitations
 
 - Filter labels, placeholders and descriptions come from the adapter in English; they bypass

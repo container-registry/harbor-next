@@ -20,6 +20,7 @@ import (
 
 	"github.com/goharbor/harbor/src/common/secret"
 	"github.com/goharbor/harbor/src/controller/event/operator"
+	registryctl "github.com/goharbor/harbor/src/controller/registry"
 	"github.com/goharbor/harbor/src/controller/replication/model"
 	"github.com/goharbor/harbor/src/jobservice/job"
 	"github.com/goharbor/harbor/src/lib/errors"
@@ -190,6 +191,9 @@ func (c *controller) validatePolicy(ctx context.Context, policy *model.Policy) e
 		if err != nil {
 			return err
 		}
+		if err := registryctl.CheckTypeEnabled(ctx, src.Type); err != nil {
+			return err
+		}
 		if err := validateSourceOptions(policy, src); err != nil {
 			return err
 		}
@@ -202,6 +206,9 @@ func (c *controller) validatePolicy(ctx context.Context, policy *model.Policy) e
 	if policy.DestRegistry != nil {
 		dest, err := c.regMgr.Get(ctx, policy.DestRegistry.ID)
 		if err != nil {
+			return err
+		}
+		if err := registryctl.CheckTypeEnabled(ctx, dest.Type); err != nil {
 			return err
 		}
 		if err := validateDestination(ctx, dest); err != nil {
