@@ -26,7 +26,7 @@ import { OPTIONAL_FEATURES, featureToggles } from './optional-features';
     styleUrls: ['./features.component.scss'],
 })
 export class FeaturesComponent implements OnInit {
-    inProgress = false;
+    private onGoing = false;
     readonly optionalFeatures: FeatureToggle[] = OPTIONAL_FEATURES;
     readonly features: FeatureToggle[] = featureToggles();
 
@@ -35,6 +35,12 @@ export class FeaturesComponent implements OnInit {
         private config: ConfigService,
         private messageHandler: MessageHandlerService
     ) {}
+
+    // Covers the reload after a save too, so the snapshot cannot be edited
+    // or resubmitted while updateConfig() replaces it.
+    get inProgress(): boolean {
+        return this.onGoing || this.config.getLoadingConfigStatus();
+    }
 
     ngOnInit(): void {
         this.config.resetConfig();
@@ -46,11 +52,12 @@ export class FeaturesComponent implements OnInit {
 
     disabled(feature: FeatureToggle): boolean {
         const value = this.featureConfig(feature);
-        return !value || !value.editable;
+        return !value || !value.editable || this.inProgress;
     }
 
     lockedBy(feature: FeatureToggle): string {
-        if (!this.featureConfig(feature) || !this.disabled(feature)) {
+        const value = this.featureConfig(feature);
+        if (!value || value.editable) {
             return '';
         }
         // CONFIG_OVERWRITE_JSON locks every setting, not only this one.
@@ -76,15 +83,15 @@ export class FeaturesComponent implements OnInit {
         if (isEmpty(changes)) {
             return;
         }
-        this.inProgress = true;
+        this.onGoing = true;
         this.configService.saveConfiguration(changes).subscribe({
             next: () => {
-                this.inProgress = false;
+                this.onGoing = false;
                 this.config.updateConfig();
                 this.messageHandler.showSuccess('CONFIG.SAVE_SUCCESS');
             },
             error: error => {
-                this.inProgress = false;
+                this.onGoing = false;
                 this.messageHandler.handleError(error);
             },
         });
