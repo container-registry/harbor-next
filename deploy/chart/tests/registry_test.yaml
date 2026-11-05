@@ -12,10 +12,9 @@ templates:
   - templates/registryctl.configmap.yaml
   - templates/registryctl.secret.yaml
 tests:
-  # Pins the two-container layout (registry + registryctl sidecar) and
-  # the container ordering that the REGISTRY_HTTP_SECRET tests below
-  # depend on (containers[0]=registry, containers[1]=registryctl).
-  - it: should have both registry and registryctl containers in order
+  # The controller sidecar is gone: GC deletion is served by the registry
+  # container itself, so the pod has exactly one container.
+  - it: should render a single registry container and no controller sidecar
     template: templates/registry.deployment.yaml
     set:
       externalURL: https://harbor.example.com
@@ -24,66 +23,80 @@ tests:
     asserts:
       - lengthEqual:
           path: spec.template.spec.containers
-          count: 2
+          count: 1
       - equal:
           path: spec.template.spec.containers[0].name
           value: registry
-      - equal:
-          path: spec.template.spec.containers[1].name
-          value: registryctl
 
-  # registryctl (containers[1]) can be sized independently of the registry
-  # container (containers[0]) they share a pod with.
-  - it: registryctl uses registry.controller.resources when set; registry keeps its own
+  # JOBSERVICE_SECRET switches on the registry's GC deletion API and is the
+  # Harbor-Secret jobservice authenticates with, so it must come from the
+  # same Secret/key jobservice reads its own JOBSERVICE_SECRET from.
+  - it: should inject JOBSERVICE_SECRET from the generated jobservice Secret
     template: templates/registry.deployment.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
-      registry.resources:
-        requests:
-          cpu: 100m
-          memory: 256Mi
-      registry.controller.resources:
-        requests:
-          cpu: 25m
-          memory: 64Mi
-        limits:
-          memory: 128Mi
     asserts:
-      - equal:
-          path: spec.template.spec.containers[0].resources.requests.cpu
-          value: 100m
-      - equal:
-          path: spec.template.spec.containers[1].resources.requests.cpu
-          value: 25m
-      - equal:
-          path: spec.template.spec.containers[1].resources.limits.memory
-          value: 128Mi
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: JOBSERVICE_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: RELEASE-NAME-harbor-jobservice
+                key: JOBSERVICE_SECRET
 
-  # When controller.resources is unset (default), the sidecar inherits
-  # registry.resources so existing values files keep their behavior.
-  - it: registryctl falls back to registry.resources when controller.resources unset
+  - it: should inject JOBSERVICE_SECRET from jobservice.existingSecret
     template: templates/registry.deployment.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
-      registry.resources:
-        requests:
-          cpu: 111m
-          memory: 222Mi
+      jobservice.existingSecret: my-js-secret
+      jobservice.existingSecretKey: js-key
     asserts:
-      - equal:
-          path: spec.template.spec.containers[1].resources.requests.cpu
-          value: 111m
-      - equal:
-          path: spec.template.spec.containers[1].resources.requests.memory
-          value: 222Mi
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: JOBSERVICE_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: my-js-secret
+                key: js-key
 
-  # Pins the hardcoded registry (5000) and registryctl (8080) ports and
-  # their port names — both names are consumed by Service selectors and
-  # the ingress/HTTPRoute backend.service.port.name references.
+  # The registry reaches storage directly: proxy env there would push all
+  # blob traffic through the proxy and break IMDS instance-role creds
+  # (169.254.169.254 is not in noProxy) and in-cluster S3 by short name.
+  - it: 8gcr should not set proxy env on registry even with registry in proxy.components
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      proxy.httpProxy: http://proxy.example.com:3128
+      proxy.components: [registry]
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HTTP_PROXY
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HTTPS_PROXY
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NO_PROXY
+          any: true
+
+  # Pins the hardcoded registry port and its name (consumed by the
+  # ingress/HTTPRoute backend.service.port.name references). The registry
+  # serves the GC deletion API on this same port, so there is no
+  # separate controller port.
   - it: should create registry service with correct ports
     template: templates/registry.service.yaml
     set:
@@ -97,12 +110,14 @@ tests:
       - equal:
           path: spec.ports[0].port
           value: 5000
-      - equal:
-          path: spec.ports[1].name
-          value: http-controller
-      - equal:
-          path: spec.ports[1].port
-          value: 8080
+      - notContains:
+          path: spec.ports
+          content:
+            name: http-controller
+          any: true
+      - lengthEqual:
+          path: spec.ports
+          count: 2
 
   # Pins the PVC-gating conditional: a PVC is rendered only when
   # persistence.enabled=true AND no existingClaim is set. The chart no
@@ -243,20 +258,6 @@ tests:
             configMap:
               name: my-external-cfg
 
-  - it: should reference existingConfigMap in registryctl envFrom
-    template: templates/registry.deployment.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      registry.existingConfigMap: my-external-cfg
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[1].envFrom
-          content:
-            configMapRef:
-              name: my-external-cfg
-
   # Storage credentials injection is independent of registry.config, so
   # existingConfigMap users still get correct credential wiring.
   - it: should still inject S3 env when existingConfigMap and storageCredentials.s3 are both set
@@ -315,11 +316,9 @@ tests:
   # Regression guards for facffbd3c (Fix #19) and 4fd719d7a.
   #
   # When `registry.existingSecret` is set, the generated `*-registry`
-  # Secret stops emitting REGISTRY_HTTP_SECRET. Two consumers must
-  # source it from the BYO Secret instead:
-  #   - the registry container (was missed in facffbd3c → fixed in
-  #     4fd719d7a — only had envFrom on the generated Secret)
-  #   - the registryctl sidecar (had an explicit env from facffbd3c)
+  # Secret stops emitting REGISTRY_HTTP_SECRET. The registry container
+  # must source it from the BYO Secret instead (was missed in facffbd3c →
+  # fixed in 4fd719d7a — only had envFrom on the generated Secret).
   # `existingSecretKey` defaults to REGISTRY_HTTP_SECRET so an unset
   # key value can't render `secretKeyRef.key: ""`.
   # ============================================================================
@@ -355,24 +354,7 @@ tests:
                 name: my-reg
                 key: REGISTRY_HTTP_SECRET
 
-  - it: should inject REGISTRY_HTTP_SECRET into the registryctl sidecar from existingSecret
-    template: templates/registry.deployment.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
-      registry.existingSecret: my-reg
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[1].env
-          content:
-            name: REGISTRY_HTTP_SECRET
-            valueFrom:
-              secretKeyRef:
-                name: my-reg
-                key: REGISTRY_HTTP_SECRET
-
-  - it: should honor a custom existingSecretKey in both containers
+  - it: should honor a custom existingSecretKey
     template: templates/registry.deployment.yaml
     set:
       externalURL: https://harbor.example.com
@@ -383,14 +365,6 @@ tests:
     asserts:
       - contains:
           path: spec.template.spec.containers[0].env
-          content:
-            name: REGISTRY_HTTP_SECRET
-            valueFrom:
-              secretKeyRef:
-                name: my-reg
-                key: customRegKey
-      - contains:
-          path: spec.template.spec.containers[1].env
           content:
             name: REGISTRY_HTTP_SECRET
             valueFrom:
@@ -410,7 +384,7 @@ tests:
   # env vars that don't match its active driver).
   # ============================================================================
 
-  - it: should inject S3 accesskey/secretkey on both containers from storageCredentials
+  - it: should inject S3 accesskey/secretkey from storageCredentials
     template: templates/registry.deployment.yaml
     set:
       externalURL: https://harbor.example.com
@@ -418,7 +392,6 @@ tests:
       harborAdminPassword: Harbor12345
       registry.storageCredentials.s3.existingSecret: my-s3-creds
     asserts:
-      # registry container (index 0)
       - contains:
           path: spec.template.spec.containers[0].env
           content:
@@ -435,15 +408,6 @@ tests:
               secretKeyRef:
                 name: my-s3-creds
                 key: REGISTRY_STORAGE_S3_SECRETKEY
-      # registryctl sidecar (index 1) — GC needs the creds too
-      - contains:
-          path: spec.template.spec.containers[1].env
-          content:
-            name: REGISTRY_STORAGE_S3_ACCESSKEY
-            valueFrom:
-              secretKeyRef:
-                name: my-s3-creds
-                key: REGISTRY_STORAGE_S3_ACCESSKEY
 
   - it: should honor custom S3 key names in the BYO Secret
     template: templates/registry.deployment.yaml
@@ -478,10 +442,6 @@ tests:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
-      # set extraEnv so env: block renders (otherwise path is null and notContains can't assert)
-      registry.extraEnv:
-        - name: SENTINEL_FOR_TEST
-          value: "x"
     asserts:
       - notContains:
           path: spec.template.spec.containers[0].env
@@ -489,7 +449,7 @@ tests:
             name: REGISTRY_STORAGE_S3_ACCESSKEY
           any: true
 
-  - it: should inject Azure accountkey on both containers from storageCredentials
+  - it: should inject Azure accountkey from storageCredentials
     template: templates/registry.deployment.yaml
     set:
       externalURL: https://harbor.example.com
@@ -506,16 +466,8 @@ tests:
               secretKeyRef:
                 name: my-azure-creds
                 key: AZURE_KEY
-      - contains:
-          path: spec.template.spec.containers[1].env
-          content:
-            name: REGISTRY_STORAGE_AZURE_ACCOUNTKEY
-            valueFrom:
-              secretKeyRef:
-                name: my-azure-creds
-                key: AZURE_KEY
 
-  - it: should inject OSS accesskeysecret on both containers from storageCredentials
+  - it: should inject OSS accesskeysecret from storageCredentials
     template: templates/registry.deployment.yaml
     set:
       externalURL: https://harbor.example.com
@@ -525,14 +477,6 @@ tests:
     asserts:
       - contains:
           path: spec.template.spec.containers[0].env
-          content:
-            name: REGISTRY_STORAGE_OSS_ACCESSKEYSECRET
-            valueFrom:
-              secretKeyRef:
-                name: my-oss-creds
-                key: REGISTRY_STORAGE_OSS_ACCESSKEYSECRET
-      - contains:
-          path: spec.template.spec.containers[1].env
           content:
             name: REGISTRY_STORAGE_OSS_ACCESSKEYSECRET
             valueFrom:
@@ -560,9 +504,6 @@ tests:
           value: 5
       - notExists:
           path: spec.template.spec.containers[0].readinessProbe.initialDelaySeconds
-      - equal:
-          path: spec.template.spec.containers[1].startupProbe.httpGet.path
-          value: /api/health
 
   - it: should coalesce a single probe override with the remaining defaults
     template: templates/registry.deployment.yaml
@@ -639,9 +580,8 @@ tests:
                   path: passwd
               secretName: reg-creds
 
-  # Pins: registry.existingSecret skips the generated Secret, so both
-  # containers must drop its secretRef; the default-empty registryctl
-  # Secret (tracing off) is likewise unreferenced.
+  # Pins: registry.existingSecret skips the generated Secret, so the
+  # registry container must drop its secretRef.
   - it: should drop generated Secret envFrom when registry is fully externalized
     template: templates/registry.deployment.yaml
     set:
@@ -652,23 +592,210 @@ tests:
     asserts:
       - notExists:
           path: spec.template.spec.containers[0].envFrom
-      - notContains:
-          path: spec.template.spec.containers[1].envFrom
-          content:
-            secretRef:
-              name: RELEASE-NAME-harbor-registry
-      - notContains:
-          path: spec.template.spec.containers[1].envFrom
-          content:
-            secretRef:
-              name: RELEASE-NAME-harbor-registryctl
 
-  - it: should reference the registryctl Secret when jaeger tracing is enabled
+  # ============================================================================
+  # image.source=upstream keeps the registryctl sidecar: vanilla goharbor
+  # jobservice deletes GC blobs through it, and registry-photon has no
+  # deletion API (a 404 there makes vanilla GC drop DB rows but keep blobs).
+  # ============================================================================
+
+  - it: upstream should render registry + registryctl containers in order
     template: templates/registry.deployment.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
+      image.source: upstream
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 2
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: registry
+      - equal:
+          path: spec.template.spec.containers[1].name
+          value: registryctl
+      - equal:
+          path: spec.template.spec.containers[1].ports[0].containerPort
+          value: 8080
+      - exists:
+          path: spec.template.metadata.annotations["checksum/registryctl-configmap"]
+      - exists:
+          path: spec.template.metadata.annotations["checksum/registryctl-secret"]
+      - contains:
+          path: spec.template.spec.containers[1].volumeMounts
+          content:
+            name: registry-config
+            mountPath: /etc/registryctl/config.yml
+            subPath: ctl-config.yml
+
+  - it: 8gcr should render no sidecar checksum annotations
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - notExists:
+          path: spec.template.metadata.annotations["checksum/registryctl-configmap"]
+      - notExists:
+          path: spec.template.metadata.annotations["checksum/registryctl-secret"]
+
+  # The sidecar holds the GC secrets; the vanilla registry container must
+  # not get JOBSERVICE_SECRET (it would not use it).
+  - it: upstream should put JOBSERVICE_SECRET and CORE_SECRET on the sidecar only
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      image.source: upstream
+      registry.extraEnv:
+        - name: SENTINEL_FOR_TEST
+          value: "x"
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: JOBSERVICE_SECRET
+          any: true
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: JOBSERVICE_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: RELEASE-NAME-harbor-jobservice
+                key: JOBSERVICE_SECRET
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: CORE_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: RELEASE-NAME-harbor-core
+                key: secret
+
+  - it: upstream sidecar uses registry.controller.resources when set
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      image.source: upstream
+      registry.resources:
+        requests:
+          cpu: 100m
+      registry.controller.resources:
+        requests:
+          cpu: 25m
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: 100m
+      - equal:
+          path: spec.template.spec.containers[1].resources.requests.cpu
+          value: 25m
+
+  - it: upstream sidecar falls back to registry.resources
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      image.source: upstream
+      registry.resources:
+        requests:
+          cpu: 111m
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[1].resources.requests.cpu
+          value: 111m
+
+  - it: upstream sidecar gets REGISTRY_HTTP_SECRET and S3 creds from BYO Secrets
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      image.source: upstream
+      registry.existingSecret: my-reg
+      registry.storageCredentials.s3.existingSecret: my-s3-creds
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: REGISTRY_HTTP_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: my-reg
+                key: REGISTRY_HTTP_SECRET
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: REGISTRY_STORAGE_S3_ACCESSKEY
+            valueFrom:
+              secretKeyRef:
+                name: my-s3-creds
+                key: REGISTRY_STORAGE_S3_ACCESSKEY
+      - notContains:
+          path: spec.template.spec.containers[1].envFrom
+          content:
+            secretRef:
+              name: RELEASE-NAME-harbor-registry
+
+  - it: upstream sidecar references existingConfigMap in envFrom
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      image.source: upstream
+      registry.existingConfigMap: my-external-cfg
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[1].envFrom
+          content:
+            configMapRef:
+              name: my-external-cfg
+
+  - it: upstream applies proxy env to the registryctl sidecar only
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      image.source: upstream
+      proxy.httpProxy: http://proxy.example.com:3128
+      proxy.components: [registry]
+      registry.extraEnv:
+        - name: SENTINEL_FOR_TEST
+          value: "x"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: HTTP_PROXY
+            value: http://proxy.example.com:3128
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: NO_PROXY
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HTTP_PROXY
+          any: true
+
+  - it: upstream sidecar references the registryctl Secret when jaeger tracing is enabled
+    template: templates/registry.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      image.source: upstream
       trace.enabled: true
       trace.provider: jaeger
     asserts:
@@ -677,3 +804,92 @@ tests:
           content:
             secretRef:
               name: RELEASE-NAME-harbor-registryctl
+
+  - it: upstream should render the registryctl Secret only when jaeger tracing is on
+    template: templates/registryctl.secret.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      image.source: upstream
+      trace.enabled: true
+      trace.provider: jaeger
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: 8gcr should render no registryctl Secret even with jaeger tracing
+    template: templates/registryctl.secret.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trace.enabled: true
+      trace.provider: jaeger
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: upstream should render the registryctl ConfigMap with its trace service name
+    template: templates/registryctl.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      image.source: upstream
+      trace.enabled: true
+    asserts:
+      - equal:
+          path: data._PLACEHOLDER
+          value: "true"
+      - equal:
+          path: data.TRACE_SERVICE_NAME
+          value: harbor-registryctl
+
+  - it: 8gcr should render no registryctl ConfigMap
+    template: templates/registryctl.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: upstream registry ConfigMap carries ctl-config.yml; 8gcr does not
+    template: templates/registry.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      image.source: upstream
+    asserts:
+      - matchRegex:
+          path: data["ctl-config.yml"]
+          pattern: 'port: 8080'
+
+  - it: 8gcr registry ConfigMap has no ctl-config.yml
+    template: templates/registry.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - notExists:
+          path: data["ctl-config.yml"]
+
+  - it: upstream registry Service exposes the http-controller port
+    template: templates/registry.service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      image.source: upstream
+    asserts:
+      - contains:
+          path: spec.ports
+          content:
+            name: http-controller
+            port: 8080
+            targetPort: 8080
+            protocol: TCP

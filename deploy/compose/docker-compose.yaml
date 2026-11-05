@@ -46,7 +46,6 @@ services:
       _REDIS_URL_REG: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}/1
       # Registry
       REGISTRY_URL: http://registry:5000
-      REGISTRY_CONTROLLER_URL: http://registryctl:8080
       REGISTRY_CREDENTIAL_USERNAME: ${REGISTRY_CREDENTIAL_USERNAME:-}
       REGISTRY_CREDENTIAL_PASSWORD: ${REGISTRY_CREDENTIAL_PASSWORD:-}
       # Core
@@ -103,7 +102,6 @@ services:
       CORE_SECRET: ${CORE_SECRET}
       JOBSERVICE_SECRET: ${JOBSERVICE_SECRET}
       REGISTRY_URL: http://registry:5000
-      REGISTRY_CONTROLLER_URL: http://registryctl:8080
       REGISTRY_CREDENTIAL_USERNAME: ${REGISTRY_CREDENTIAL_USERNAME:-}
       REGISTRY_CREDENTIAL_PASSWORD: ${REGISTRY_CREDENTIAL_PASSWORD:-}
       TOKEN_SERVICE_URL: http://core:8080/service/token
@@ -119,30 +117,6 @@ services:
       retries: 5
     restart: unless-stopped
 
-  registryctl:
-    image: ${IMAGE_REPO:-}harbor-registryctl:${HARBOR_TAG}
-    tmpfs:
-      - /tmp:size=256M,mode=1777
-    volumes:
-      - ../../config/registryctl.yml:/etc/registryctl/config.yml:ro
-      - ../../config/registry.yml:/etc/registry/config.yml:ro
-      - registry-data:/var/lib/registry
-    environment:
-      PORT: "8080"
-      LOG_LEVEL: ${LOG_LEVEL:-info}
-      REGISTRY_CONFIG: /etc/registry/config.yml
-      CORE_SECRET: ${CORE_SECRET}
-      JOBSERVICE_SECRET: ${JOBSERVICE_SECRET}
-    depends_on:
-      registry:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "/healthprobe", "-port", "8080", "-endpoint", "/api/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
   registry:
     image: ${IMAGE_REPO:-}harbor-registry:${HARBOR_TAG}
     volumes:
@@ -150,6 +124,7 @@ services:
       - registry-data:/var/lib/registry
     environment:
       REGISTRY_HTTP_SECRET: ${CORE_SECRET}
+      JOBSERVICE_SECRET: ${JOBSERVICE_SECRET}
       HTTP_PROXY: ${HTTP_PROXY:-}
       HTTPS_PROXY: ${HTTPS_PROXY:-}
       NO_PROXY: ${NO_PROXY:-}

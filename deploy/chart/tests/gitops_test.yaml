@@ -13,8 +13,8 @@ suite: gitops autoGenSecrets tests
 templates:
   - templates/core.secret.yaml
   - templates/registry.secret.yaml
-  - templates/jobservice.secret.yaml
   - templates/registryctl.secret.yaml
+  - templates/jobservice.secret.yaml
   - templates/ingress.secret.yaml
 tests:
   # ============================================================================
@@ -271,16 +271,6 @@ tests:
   - it: should render no jobservice Secret documents when fully externalized
     template: templates/jobservice.secret.yaml
     set: *fully-externalized
-    asserts:
-      - hasDocuments:
-          count: 0
-
-  - it: should render no registryctl Secret when tracing is off
-    template: templates/registryctl.secret.yaml
-    set:
-      externalURL: https://harbor.example.com
-      database.host: postgres.example.com
-      harborAdminPassword: Harbor12345
     asserts:
       - hasDocuments:
           count: 0

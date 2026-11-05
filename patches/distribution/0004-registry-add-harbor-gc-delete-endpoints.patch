@@ -1,0 +1,442 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Vadim Bauer <vb@container-registry.com>
+Date: Thu, 5 Nov 2026 16:00:40 +0100
+Subject: [PATCH] feat(registry/handlers): add Harbor GC delete endpoints
+
+Harbor's garbage collection removes blob data and manifest revisions that
+no repository references anymore. The v2 API cannot do that: DELETE
+/v2/<name>/blobs/<digest> only unlinks a blob from one repository. Harbor
+ran a separate registryctl sidecar for it, built against distribution
+v2.8.2 and its own copy of the storage driver configuration.
+
+Serve the same endpoints from the registry itself:
+
+  DELETE /api/registry/blob/<digest>
+  DELETE /api/registry/<name>/manifests/<digest>
+  GET    /api/health
+
+The delete routes require "Authorization: Harbor-Secret <JOBSERVICE_SECRET>".
+They are only registered when JOBSERVICE_SECRET is set, so a registry
+without it behaves like upstream.
+
+Deleting a blob also clears its blob descriptor cache entry. With the
+redis cache, repository scoped lookups read that global entry, so a
+re-push of the deleted content uploads the blob again instead of being
+answered from a stale cache entry.
+
+Signed-off-by: Vadim Bauer <vb@container-registry.com>
+Upstream: none, Harbor specific
+Signed-off-by: Vadim Bauer <vb@container-registry.com>
+---
+ registry/handlers/app.go         |   6 +
+ registry/handlers/harbor.go      | 126 ++++++++++++++++++
+ registry/handlers/harbor_test.go | 222 +++++++++++++++++++++++++++++++
+ 3 files changed, 354 insertions(+)
+ create mode 100644 registry/handlers/harbor.go
+ create mode 100644 registry/handlers/harbor_test.go
+
+diff --git a/registry/handlers/app.go b/registry/handlers/app.go
+index a647fd4..34e328b 100644
+--- a/registry/handlers/app.go
++++ b/registry/handlers/app.go
+@@ -33,6 +33,7 @@ import (
+ 	repositorymiddleware "github.com/distribution/distribution/v3/registry/middleware/repository"
+ 	"github.com/distribution/distribution/v3/registry/proxy"
+ 	"github.com/distribution/distribution/v3/registry/storage"
++	"github.com/distribution/distribution/v3/registry/storage/cache"
+ 	memorycache "github.com/distribution/distribution/v3/registry/storage/cache/memory"
+ 	rediscache "github.com/distribution/distribution/v3/registry/storage/cache/redis"
+ 	storagedriver "github.com/distribution/distribution/v3/registry/storage/driver"
+@@ -285,6 +286,7 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
+ 	}
+ 
+ 	// configure storage caches
++	var blobCache cache.BlobDescriptorCacheProvider
+ 	if cc, ok := config.Storage["cache"]; ok {
+ 		v, ok := cc["blobdescriptor"]
+ 		if !ok {
+@@ -301,6 +303,7 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
+ 				dcontext.GetLogger(app).Warnf("blobdescriptorsize parameter is not supported with redis cache")
+ 			}
+ 			cacheProvider := rediscache.NewRedisBlobDescriptorCacheProvider(app.redis)
++			blobCache = cacheProvider
+ 			localOptions := append(options, storage.BlobDescriptorCacheProvider(cacheProvider))
+ 			app.registry, err = storage.NewRegistry(app, app.driver, localOptions...)
+ 			if err != nil {
+@@ -319,6 +322,7 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
+ 			}
+ 
+ 			cacheProvider := memorycache.NewInMemoryBlobDescriptorCacheProvider(blobDescriptorSize)
++			blobCache = cacheProvider
+ 			localOptions := append(options, storage.BlobDescriptorCacheProvider(cacheProvider))
+ 			app.registry, err = storage.NewRegistry(app, app.driver, localOptions...)
+ 			if err != nil {
+@@ -340,6 +344,8 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
+ 		}
+ 	}
+ 
++	app.registerHarborRoutes(harborSecretFromEnv(), blobCache)
++
+ 	app.registry, err = applyRegistryMiddleware(app, app.registry, app.driver, config.Middleware["registry"])
+ 	if err != nil {
+ 		panic(err)
+diff --git a/registry/handlers/harbor.go b/registry/handlers/harbor.go
+new file mode 100644
+index 0000000..3cabaa3
+--- /dev/null
++++ b/registry/handlers/harbor.go
+@@ -0,0 +1,126 @@
++package handlers
++
++import (
++	"crypto/subtle"
++	"errors"
++	"fmt"
++	"net/http"
++	"os"
++	"strings"
++
++	"github.com/distribution/distribution/v3"
++	"github.com/distribution/distribution/v3/internal/dcontext"
++	"github.com/distribution/distribution/v3/registry/storage"
++	"github.com/distribution/distribution/v3/registry/storage/cache"
++	storagedriver "github.com/distribution/distribution/v3/registry/storage/driver"
++	"github.com/gorilla/mux"
++	"github.com/opencontainers/go-digest"
++)
++
++// Harbor's GC job removes blobs and manifest revisions that no repository
++// references anymore. The v2 API cannot do that: DELETE /v2/<name>/blobs/<d>
++// only unlinks a blob from one repository. These routes keep the paths, auth
++// and status codes of the former harbor registryctl sidecar.
++const (
++	harborSecretEnv    = "JOBSERVICE_SECRET"
++	harborSecretPrefix = "Harbor-Secret "
++)
++
++func (app *App) registerHarborRoutes(secret string, blobCache cache.BlobDescriptorCacheProvider) {
++	if secret == "" {
++		return
++	}
++	h := &harborGCHandler{driver: app.driver, cache: blobCache, secret: secret}
++	app.router.Path("/api/health").Methods(http.MethodGet).HandlerFunc(harborHealth)
++	app.router.Path("/api/registry/blob/{reference}").Methods(http.MethodDelete).Handler(h.auth(h.deleteBlob))
++	app.router.Path("/api/registry/{name:.*}/manifests/{reference}").Methods(http.MethodDelete).Handler(h.auth(h.deleteManifest))
++	dcontext.GetLogger(app).Info("harbor GC routes enabled under /api/registry")
++}
++
++type harborGCHandler struct {
++	driver storagedriver.StorageDriver
++	cache  cache.BlobDescriptorCacheProvider
++	secret string
++}
++
++func harborHealth(w http.ResponseWriter, _ *http.Request) {
++	w.Header().Set("Content-Type", "application/json")
++	_, _ = w.Write([]byte(`"healthy"`))
++}
++
++func (h *harborGCHandler) auth(next http.HandlerFunc) http.Handler {
++	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		got, ok := strings.CutPrefix(r.Header.Get("Authorization"), harborSecretPrefix)
++		if !ok || subtle.ConstantTimeCompare([]byte(got), []byte(h.secret)) != 1 {
++			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
++			return
++		}
++		next(w, r)
++	})
++}
++
++func (h *harborGCHandler) deleteBlob(w http.ResponseWriter, r *http.Request) {
++	ref := mux.Vars(r)["reference"]
++	dgst, err := digest.Parse(ref)
++	if err != nil {
++		harborError(w, r, http.StatusBadRequest, fmt.Errorf("invalid blob digest %q: %w", ref, err))
++		return
++	}
++	if err := storage.NewVacuum(r.Context(), h.driver).RemoveBlob(ref); err != nil {
++		harborStorageError(w, r, err)
++		return
++	}
++	// Repository scoped lookups also read the global entry, so clearing it
++	// stops every repository from serving a cached descriptor of the deleted
++	// blob, which would make a re-push skip the upload.
++	if h.cache != nil {
++		if err := h.cache.Clear(r.Context(), dgst); err != nil && !errors.Is(err, distribution.ErrBlobUnknown) {
++			dcontext.GetLogger(r.Context()).Warnf("harbor gc: clearing blob descriptor cache for %s: %v", dgst, err)
++		}
++	}
++}
++
++func (h *harborGCHandler) deleteManifest(w http.ResponseWriter, r *http.Request) {
++	name, ref := mux.Vars(r)["name"], mux.Vars(r)["reference"]
++	if name == "" {
++		harborError(w, r, http.StatusBadRequest, errors.New("no repository name specified"))
++		return
++	}
++	dgst, err := digest.Parse(ref)
++	if err != nil {
++		harborError(w, r, http.StatusBadRequest, fmt.Errorf("invalid manifest digest %q: %w", ref, err))
++		return
++	}
++	// Tags are left alone: Harbor removes them through DELETE /v2 first.
++	if err := storage.NewVacuum(r.Context(), h.driver).RemoveManifest(name, dgst, nil); err != nil {
++		harborStorageError(w, r, err)
++		return
++	}
++	if h.cache != nil {
++		scoped, err := h.cache.RepositoryScoped(name)
++		if err == nil {
++			err = scoped.Clear(r.Context(), dgst)
++		}
++		if err != nil && !errors.Is(err, distribution.ErrBlobUnknown) {
++			dcontext.GetLogger(r.Context()).Warnf("harbor gc: clearing descriptor cache for %s@%s: %v", name, dgst, err)
++		}
++	}
++}
++
++func harborStorageError(w http.ResponseWriter, r *http.Request, err error) {
++	var notFound storagedriver.PathNotFoundError
++	if errors.As(err, &notFound) {
++		harborError(w, r, http.StatusNotFound, err)
++		return
++	}
++	harborError(w, r, http.StatusInternalServerError, err)
++}
++
++func harborError(w http.ResponseWriter, r *http.Request, code int, err error) {
++	dcontext.GetLogger(r.Context()).Infof("harbor gc: %s %s: %v", r.Method, r.URL.Path, err)
++	http.Error(w, err.Error(), code)
++}
++
++func harborSecretFromEnv() string {
++	return os.Getenv(harborSecretEnv)
++}
+diff --git a/registry/handlers/harbor_test.go b/registry/handlers/harbor_test.go
+new file mode 100644
+index 0000000..01b5fb7
+--- /dev/null
++++ b/registry/handlers/harbor_test.go
+@@ -0,0 +1,222 @@
++package handlers
++
++import (
++	"context"
++	"errors"
++	"net/http"
++	"net/http/httptest"
++	"testing"
++
++	"github.com/alicebob/miniredis/v2"
++	"github.com/distribution/distribution/v3"
++	"github.com/distribution/distribution/v3/configuration"
++	v2 "github.com/distribution/distribution/v3/registry/api/v2"
++	"github.com/distribution/distribution/v3/registry/storage"
++	"github.com/distribution/distribution/v3/registry/storage/cache"
++	memorycache "github.com/distribution/distribution/v3/registry/storage/cache/memory"
++	rediscache "github.com/distribution/distribution/v3/registry/storage/cache/redis"
++	storagedriver "github.com/distribution/distribution/v3/registry/storage/driver"
++	"github.com/distribution/distribution/v3/registry/storage/driver/inmemory"
++	"github.com/distribution/reference"
++	"github.com/opencontainers/go-digest"
++	"github.com/redis/go-redis/v9"
++)
++
++const testHarborSecret = "s3cret"
++
++type harborFixture struct {
++	server *httptest.Server
++	driver storagedriver.StorageDriver
++	cache  cache.BlobDescriptorCacheProvider
++	repo   distribution.Repository
++}
++
++func newHarborFixture(t *testing.T, secret string) *harborFixture {
++	t.Helper()
++	return newHarborFixtureWithCache(t, secret, memorycache.NewInMemoryBlobDescriptorCacheProvider(0))
++}
++
++func newRedisCache(t *testing.T) cache.BlobDescriptorCacheProvider {
++	t.Helper()
++	server, err := miniredis.Run()
++	if err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(server.Close)
++	return rediscache.NewRedisBlobDescriptorCacheProvider(redis.NewClient(&redis.Options{Addr: server.Addr()}))
++}
++
++func newHarborFixtureWithCache(t *testing.T, secret string, blobCache cache.BlobDescriptorCacheProvider) *harborFixture {
++	t.Helper()
++	ctx := context.Background()
++	driver := inmemory.New()
++	registry, err := storage.NewRegistry(ctx, driver, storage.BlobDescriptorCacheProvider(blobCache), storage.EnableDelete)
++	if err != nil {
++		t.Fatal(err)
++	}
++	named, err := reference.WithName("library/app")
++	if err != nil {
++		t.Fatal(err)
++	}
++	repo, err := registry.Repository(ctx, named)
++	if err != nil {
++		t.Fatal(err)
++	}
++	app := &App{Config: &configuration.Configuration{}, Context: ctx, router: v2.RouterWithPrefix(""), driver: driver, registry: registry}
++	app.registerHarborRoutes(secret, blobCache)
++	server := httptest.NewServer(app)
++	t.Cleanup(server.Close)
++	return &harborFixture{server: server, driver: driver, cache: blobCache, repo: repo}
++}
++
++func (f *harborFixture) do(t *testing.T, method, path, secret string) int {
++	t.Helper()
++	req, err := http.NewRequest(method, f.server.URL+path, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if secret != "" {
++		req.Header.Set("Authorization", harborSecretPrefix+secret)
++	}
++	resp, err := http.DefaultClient.Do(req)
++	if err != nil {
++		t.Fatal(err)
++	}
++	resp.Body.Close()
++	return resp.StatusCode
++}
++
++func (f *harborFixture) putBlob(t *testing.T, content string) digest.Digest {
++	t.Helper()
++	desc, err := f.repo.Blobs(context.Background()).Put(context.Background(), "application/octet-stream", []byte(content))
++	if err != nil {
++		t.Fatal(err)
++	}
++	return desc.Digest
++}
++
++func exists(t *testing.T, d storagedriver.StorageDriver, path string) bool {
++	t.Helper()
++	_, err := d.Stat(context.Background(), path)
++	if err == nil {
++		return true
++	}
++	var notFound storagedriver.PathNotFoundError
++	if !errors.As(err, &notFound) {
++		t.Fatal(err)
++	}
++	return false
++}
++
++func blobDataPath(dgst digest.Digest) string {
++	return "/docker/registry/v2/blobs/" + dgst.Algorithm().String() + "/" + dgst.Hex()[:2] + "/" + dgst.Hex()
++}
++
++func revisionPath(repo string, dgst digest.Digest) string {
++	return "/docker/registry/v2/repositories/" + repo + "/_manifests/revisions/" + dgst.Algorithm().String() + "/" + dgst.Hex()
++}
++
++func TestHarborDeleteBlob(t *testing.T) {
++	f := newHarborFixture(t, testHarborSecret)
++	dgst := f.putBlob(t, "layer")
++	if _, err := f.cache.Stat(context.Background(), dgst); err != nil {
++		t.Fatalf("precondition: blob not cached: %v", err)
++	}
++
++	if code := f.do(t, http.MethodDelete, "/api/registry/blob/"+dgst.String(), testHarborSecret); code != http.StatusOK {
++		t.Fatalf("delete blob: got %d", code)
++	}
++	if exists(t, f.driver, blobDataPath(dgst)) {
++		t.Fatal("blob data still in storage")
++	}
++	if _, err := f.cache.Stat(context.Background(), dgst); !errors.Is(err, distribution.ErrBlobUnknown) {
++		t.Fatalf("blob descriptor still cached: %v", err)
++	}
++	if code := f.do(t, http.MethodDelete, "/api/registry/blob/"+dgst.String(), testHarborSecret); code != http.StatusNotFound {
++		t.Fatalf("second delete: got %d, want 404", code)
++	}
++}
++
++// With a stale descriptor in the cache, a re-push of deleted content skips
++// the upload and the registry then serves a manifest whose blobs are gone.
++func TestHarborDeleteBlobInvalidatesRedisRepositoryCache(t *testing.T) {
++	f := newHarborFixtureWithCache(t, testHarborSecret, newRedisCache(t))
++	ctx := context.Background()
++	dgst := f.putBlob(t, "layer")
++	if _, err := f.repo.Blobs(ctx).Stat(ctx, dgst); err != nil {
++		t.Fatalf("precondition: %v", err)
++	}
++
++	if code := f.do(t, http.MethodDelete, "/api/registry/blob/"+dgst.String(), testHarborSecret); code != http.StatusOK {
++		t.Fatalf("delete blob: got %d", code)
++	}
++	scoped, err := f.cache.RepositoryScoped("library/app")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if _, err := scoped.Stat(ctx, dgst); !errors.Is(err, distribution.ErrBlobUnknown) {
++		t.Fatalf("repository scoped cache still answers for the deleted blob: %v", err)
++	}
++	// The layer link survives, so a repository Stat now reaches storage and
++	// finds no blob data.
++	if _, err := f.repo.Blobs(ctx).Stat(ctx, dgst); err == nil {
++		t.Fatal("repository still resolves the deleted blob")
++	}
++}
++
++func TestHarborDeleteManifest(t *testing.T) {
++	f := newHarborFixture(t, testHarborSecret)
++	dgst := f.putBlob(t, `{"schemaVersion":2}`)
++	link := revisionPath("library/app", dgst) + "/link"
++	if err := f.driver.PutContent(context.Background(), link, []byte(dgst.String())); err != nil {
++		t.Fatal(err)
++	}
++
++	if code := f.do(t, http.MethodDelete, "/api/registry/library/app/manifests/"+dgst.String(), testHarborSecret); code != http.StatusOK {
++		t.Fatalf("delete manifest: got %d", code)
++	}
++	if exists(t, f.driver, revisionPath("library/app", dgst)) {
++		t.Fatal("manifest revision still in storage")
++	}
++	if !exists(t, f.driver, blobDataPath(dgst)) {
++		t.Fatal("manifest blob data must survive, GC deletes it separately")
++	}
++	if code := f.do(t, http.MethodDelete, "/api/registry/library/app/manifests/"+dgst.String(), testHarborSecret); code != http.StatusNotFound {
++		t.Fatalf("second delete: got %d, want 404", code)
++	}
++}
++
++func TestHarborRoutesRejectBadInput(t *testing.T) {
++	f := newHarborFixture(t, testHarborSecret)
++	dgst := digest.FromString("x").String()
++	cases := []struct {
++		name, method, path, secret string
++		want                       int
++	}{
++		{"health is open", http.MethodGet, "/api/health", "", http.StatusOK},
++		{"blob without secret", http.MethodDelete, "/api/registry/blob/" + dgst, "", http.StatusUnauthorized},
++		{"blob wrong secret", http.MethodDelete, "/api/registry/blob/" + dgst, "nope", http.StatusUnauthorized},
++		{"manifest wrong secret", http.MethodDelete, "/api/registry/a/manifests/" + dgst, "nope", http.StatusUnauthorized},
++		{"blob bad digest", http.MethodDelete, "/api/registry/blob/latest", testHarborSecret, http.StatusBadRequest},
++		{"manifest by tag", http.MethodDelete, "/api/registry/a/manifests/latest", testHarborSecret, http.StatusBadRequest},
++		{"blob GET not routed", http.MethodGet, "/api/registry/blob/" + dgst, testHarborSecret, http.StatusMethodNotAllowed},
++	}
++	for _, tc := range cases {
++		t.Run(tc.name, func(t *testing.T) {
++			if code := f.do(t, tc.method, tc.path, tc.secret); code != tc.want {
++				t.Fatalf("got %d, want %d", code, tc.want)
++			}
++		})
++	}
++}
++
++func TestHarborRoutesDisabledWithoutSecret(t *testing.T) {
++	f := newHarborFixture(t, "")
++	dgst := f.putBlob(t, "layer")
++	if code := f.do(t, http.MethodDelete, "/api/registry/blob/"+dgst.String(), ""); code != http.StatusNotFound {
++		t.Fatalf("got %d, want 404", code)
++	}
++	if !exists(t, f.driver, blobDataPath(dgst)) {
++		t.Fatal("blob deleted although harbor routes are disabled")
++	}
++}

@@ -203,6 +203,7 @@
         "noProxy": { "type": "string" },
         "components": {
           "type": "array",
+          "description": "Components that get proxy env. \"registry\" applies to the registryctl sidecar only, so it has an effect only with image.source=upstream.",
           "items": {
             "type": "string",
             "enum": ["core", "jobservice", "registry", "trivy"]
@@ -487,7 +488,7 @@
       "properties": {
         "existingSecret": {
           "type": "string",
-          "description": "Existing Secret supplying REGISTRY_HTTP_SECRET. When set, the generated registry Secret omits this key and both the registry container and registryctl sidecar source it from here via env."
+          "description": "Existing Secret supplying REGISTRY_HTTP_SECRET. When set, the generated registry Secret omits this key and the registry container (and the upstream-only registryctl sidecar) sources it from here via env."
         },
         "existingSecretKey": {
           "type": "string",
@@ -500,11 +501,11 @@
         },
         "existingConfigMap": {
           "type": "string",
-          "description": "Externally-managed ConfigMap with config.yml + ctl-config.yml. When set, the chart skips generating the registry ConfigMap and mounts this one instead."
+          "description": "Externally-managed ConfigMap with config.yml (plus ctl-config.yml when image.source=upstream). When set, the chart skips generating the registry ConfigMap and mounts this one instead."
         },
         "storageCredentials": {
           "type": "object",
-          "description": "BYO Secret references for storage credentials. The chart injects REGISTRY_STORAGE_<BACKEND>_<KEY> env vars on both the registry and registryctl containers (distribution honors these env overrides).",
+          "description": "BYO Secret references for storage credentials. The chart injects REGISTRY_STORAGE_<BACKEND>_<KEY> env vars on the registry container and, with image.source=upstream, the registryctl sidecar (distribution honors these env overrides).",
           "properties": {
             "s3": {
               "type": "object",
@@ -539,6 +540,7 @@
         },
         "controller": {
           "type": "object",
+          "description": "registryctl sidecar. Only used with image.source=upstream; ignored otherwise.",
           "properties": {
             "image": {
               "$ref": "#/$defs/imageSpec"

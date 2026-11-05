@@ -157,14 +157,6 @@ func registryHealthChecker() health.Checker {
 	return PeriodicHealthChecker(checker, period)
 }
 
-func registryCtlHealthChecker() health.Checker {
-	url := config.GetRegistryCtlURL() + "/api/health"
-	timeout := 60 * time.Second
-	period := 10 * time.Second
-	checker := HTTPStatusCodeHealthChecker(http.MethodGet, url, nil, timeout, http.StatusOK)
-	return PeriodicHealthChecker(checker, period)
-}
-
 func databaseHealthChecker() health.Checker {
 	period := 10 * time.Second
 	checker := health.CheckFunc(func() error {
@@ -199,7 +191,6 @@ func RegisterHealthCheckers() {
 	registry["portal"] = portalHealthChecker()
 	registry["jobservice"] = jobserviceHealthChecker()
 	registry["registry"] = registryHealthChecker()
-	registry["registryctl"] = registryCtlHealthChecker()
 	registry["database"] = databaseHealthChecker()
 	registry["redis"] = redisHealthChecker()
 	if config.WithTrivy() {

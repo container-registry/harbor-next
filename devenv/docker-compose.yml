@@ -35,17 +35,22 @@ services:
     volumes:
       - harbor-redis-data:/data
 
+  # Patched registry binary (patches/distribution), built by `task dev:up` / `task dev:infra:up`.
+  # It also serves the GC delete API under /api/registry.
   registry:
-    image: distribution/distribution:latest
+    image: alpine:${ALPINE_VERSION}
+    entrypoint: ["/usr/local/bin/registry", "serve", "/etc/registry/config.yml"]
     environment:
       OTEL_TRACES_EXPORTER: none
       OTEL_SDK_DISABLED: "true"
       REGISTRY_STORAGE_DELETE_ENABLED: "false"
+      JOBSERVICE_SECRET: devenv-secret-do-not-use-in-production
     ports:
       - "${PORT_REGISTRY:-50000}:5000"
     volumes:
       - harbor-registry-data:/var/lib/registry
       - ../config/registry.yml:/etc/registry/config.yml:ro
+      - ../bin/linux-${DEV_ARCH:?run through task dev:*}/registry:/usr/local/bin/registry:ro
 
   # Core API - starts with: docker compose --profile core up
   core:
@@ -87,7 +92,6 @@ services:
       _REDIS_URL_REG: redis://redis:6379/2
       # Registry
       REGISTRY_URL: http://registry:5000
-      REGISTRY_CONTROLLER_URL: http://registryctl:8080
       REGISTRY_CREDENTIAL_USERNAME: ""
       REGISTRY_CREDENTIAL_PASSWORD: ""
       # Core settings
@@ -157,7 +161,6 @@ services:
       JOBSERVICE_SECRET: devenv-secret-do-not-use-in-production
       # Registry
       REGISTRY_URL: http://registry:5000
-      REGISTRY_CONTROLLER_URL: http://registryctl:8080
       REGISTRY_CREDENTIAL_USERNAME: ""
       REGISTRY_CREDENTIAL_PASSWORD: ""
       TOKEN_SERVICE_URL: http://core:8080/service/token
@@ -169,32 +172,6 @@ services:
     command: air -c devenv/air.jobservice.toml
     depends_on:
       - core
-
-  # RegistryCtl - starts with: docker compose --profile registryctl up
-  registryctl:
-    image: harbor-dev-go
-    profiles: [registryctl]
-    user: "${DEV_CONTAINER_USER:-harbor}"
-    volumes:
-      - ..:/app
-      - ${HOST_GOMODCACHE:?}:/go/pkg/mod
-      - ${HOST_GOCACHE:?}:/home/harbor/.cache/go-build
-      - harbor-registry-data:/var/lib/registry
-      - ../config/registry.yml:/etc/registry/config.yml:ro
-    ports:
-      - "${PORT_REGISTRYCTL:-8085}:8080"
-      - "127.0.0.1:${PORT_DEBUG_REGISTRYCTL:-2347}:2347"
-    environment:
-      PORT: "8080"
-      LOG_LEVEL: debug
-      REGISTRY_CONFIG: /etc/registry/config.yml
-      CORE_SECRET: devenv-secret-do-not-use-in-production
-      JOBSERVICE_SECRET: devenv-secret-do-not-use-in-production
-      HEALTHCHECK_PORT: "8080"
-      HEALTHCHECK_ENDPOINT: /api/health
-    command: air -c devenv/air.registryctl.toml
-    depends_on:
-      - registry
 
   # Trivy scanner adapter - starts with: docker compose --profile trivy up
   trivy-adapter:

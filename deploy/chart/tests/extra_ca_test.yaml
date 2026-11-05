@@ -79,8 +79,7 @@ tests:
             mountPath: /etc/harbor/extra-ca
             readOnly: true
 
-  # Registry has two containers; both need the mount + env.
-  - it: should mount + env on both registry containers
+  - it: should mount + env on the registry container
     template: templates/registry.deployment.yaml
     asserts:
       - contains:
@@ -89,18 +88,7 @@ tests:
             name: SSL_CERT_DIR
             value: "/etc/ssl/certs:/etc/harbor/extra-ca"
       - contains:
-          path: spec.template.spec.containers[1].env
-          content:
-            name: SSL_CERT_DIR
-            value: "/etc/ssl/certs:/etc/harbor/extra-ca"
-      - contains:
           path: spec.template.spec.containers[0].volumeMounts
-          content:
-            name: extra-ca
-            mountPath: /etc/harbor/extra-ca
-            readOnly: true
-      - contains:
-          path: spec.template.spec.containers[1].volumeMounts
           content:
             name: extra-ca
             mountPath: /etc/harbor/extra-ca
