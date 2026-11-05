@@ -215,3 +215,54 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+
+  # Pins: core routes follow core.servicePort; / stays on the portal port.
+  - it: should route ingress core paths to core.servicePort
+    template: templates/ingress.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.servicePort: 8081
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.port.number
+          value: 8081
+      - equal:
+          path: spec.rules[0].http.paths[4].backend.service.port.number
+          value: 8081
+      - equal:
+          path: spec.rules[0].http.paths[5].backend.service.port.number
+          value: 80
+
+  - it: should route ingress / to core.servicePort when the portal is disabled
+    template: templates/ingress.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.servicePort: 8081
+      portal.enabled: false
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[5].backend.service.port.number
+          value: 8081
+
+  - it: should route HTTPRoute core paths to core.servicePort
+    template: templates/gateway-httproute.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      ingress.enabled: false
+      gateway.enabled: true
+      gateway.parentRefs:
+        - name: my-gateway
+      core.servicePort: 8081
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs[0].port
+          value: 8081
+      - equal:
+          path: spec.rules[1].backendRefs[0].port
+          value: 80

@@ -475,6 +475,12 @@
           "type": "object",
           "additionalProperties": { "type": "string" },
           "description": "Annotations for the core Service."
+        },
+        "servicePort": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Port the core Service listens on; CORE_URL, ingress, gateway, and exporter follow it."
         }
       }
     },
