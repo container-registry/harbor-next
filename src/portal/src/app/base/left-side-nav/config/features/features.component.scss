@@ -1,0 +1,36 @@
+h3 {
+    margin-top: 1.5rem;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.section-description {
+    width: min(64rem, 100%);
+}
+
+.clr-form-horizontal {
+    .clr-form-control {
+        & > .clr-control-label {
+            width: 15rem;
+            white-space: nowrap;
+        }
+    }
+}
+
+.beta-badge {
+    cursor: help;
+    font-size: 10px;
+    height: auto;
+    margin: 0 0 0 4px;
+    padding: 1px 6px;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
+.beta-warning {
+    color: #aa4500;
+}
+
+.features-actions {
+    margin-top: 1.5rem;
+}

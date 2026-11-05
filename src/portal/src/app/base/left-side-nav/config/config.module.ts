@@ -21,6 +21,7 @@ import { RouterModule, Routes } from '@angular/router';
 import { ConfigService } from './config.service';
 import { SecurityComponent } from './security/security.component';
 import { AuditLogConfigurationComponent } from './audit-log/audit-log.component';
+import { FeaturesComponent } from './features/features.component';
 
 const routes: Routes = [
     {
@@ -44,6 +45,10 @@ const routes: Routes = [
                 component: AuditLogConfigurationComponent,
             },
             {
+                path: 'features',
+                component: FeaturesComponent,
+            },
+            {
                 path: '',
                 redirectTo: 'auth',
                 pathMatch: 'full',
@@ -59,6 +64,7 @@ const routes: Routes = [
         SystemSettingsComponent,
         SecurityComponent,
         AuditLogConfigurationComponent,
+        FeaturesComponent,
     ],
     providers: [ConfigService],
 })

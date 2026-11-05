@@ -1,0 +1,86 @@
+<ng-template #toggleList let-features>
+    <clr-toggle-container *ngFor="let feature of features">
+        <label [for]="feature.configKey">
+            {{ feature.name | translate }}
+            <clr-tooltip *ngIf="feature.beta">
+                <span
+                    clrTooltipTrigger
+                    class="label label-blue beta-badge"
+                    role="img"
+                    tabindex="0"
+                    [attr.aria-label]="'CONFIG.FEATURE_BETA' | translate"
+                    >{{ 'CONFIG.FEATURE_BETA' | translate }}</span
+                >
+                <clr-tooltip-content
+                    clrPosition="top-right"
+                    clrSize="lg"
+                    *clrIfOpen>
+                    <span>{{ 'CONFIG.FEATURE_BETA_WARNING' | translate }}</span>
+                </clr-tooltip-content>
+            </clr-tooltip>
+            <clr-tooltip>
+                <clr-icon
+                    clrTooltipTrigger
+                    shape="info-circle"
+                    size="24"></clr-icon>
+                <clr-tooltip-content
+                    clrPosition="top-right"
+                    clrSize="lg"
+                    *clrIfOpen>
+                    <span>{{ feature.description | translate }}</span>
+                    <p *ngIf="lockedBy(feature)">
+                        {{
+                            'CONFIG.FEATURE_LOCKED_BY'
+                                | translate : { source: lockedBy(feature) }
+                        }}
+                    </p>
+                </clr-tooltip-content>
+            </clr-tooltip>
+        </label>
+        <clr-toggle-wrapper>
+            <input
+                clrToggle
+                type="checkbox"
+                [id]="feature.configKey"
+                [name]="feature.configKey"
+                [disabled]="disabled(feature)"
+                [ngModel]="featureConfig(feature)?.value"
+                (ngModelChange)="setEnabled(feature, $event)" />
+        </clr-toggle-wrapper>
+        <clr-control-helper *ngIf="feature.beta">
+            <span class="beta-warning">{{
+                'CONFIG.FEATURE_BETA_WARNING' | translate
+            }}</span>
+        </clr-control-helper>
+    </clr-toggle-container>
+</ng-template>
+
+<form class="clr-form clr-form-horizontal">
+    <section *ngIf="optionalFeatures.length" id="optional-features">
+        <h3>{{ 'CONFIG.OPTIONAL_FEATURES' | translate }}</h3>
+        <ng-container
+            *ngTemplateOutlet="
+                toggleList;
+                context: { $implicit: optionalFeatures }
+            "></ng-container>
+    </section>
+</form>
+
+<div class="features-actions">
+    <button
+        id="features-save"
+        type="button"
+        class="btn btn-primary"
+        [disabled]="inProgress || !hasChanges()"
+        (click)="save()">
+        {{ 'BUTTON.SAVE' | translate }}
+    </button>
+    <button
+        id="features-cancel"
+        type="button"
+        class="btn btn-outline"
+        [disabled]="inProgress || !hasChanges()"
+        (click)="cancel()">
+        {{ 'BUTTON.CANCEL' | translate }}
+    </button>
+</div>
