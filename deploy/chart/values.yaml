@@ -343,6 +343,11 @@ core:
   # -- Initial user settings JSON applied on first boot
   configureUserSettings: ""
 
+  # -- Project that receives pushes and pulls without a project in the path
+  # (DEFAULT_PROJECT_NAME). Applied on every start and locked in the UI; a missing
+  # project is created as private. "" turns the fallback off; null leaves it to the UI.
+  defaultProjectName: null
+
   # -- Quota update provider (db or redis)
   quotaUpdateProvider: db
 

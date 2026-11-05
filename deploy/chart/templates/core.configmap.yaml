@@ -1,3 +1,7 @@
+{{- $coreConfigEnv := "" }}
+{{- if .Values.core.config }}
+{{- $coreConfigEnv = include "harbor.toEnvVars" (dict "values" .Values.core.config "prefix" "" "isSecret" false) }}
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -75,6 +79,18 @@ data:
   {{- if .Values.core.configureUserSettings }}
   CONFIG_OVERWRITE_JSON: {{ .Values.core.configureUserSettings | quote }}
   {{- end }}
+  {{- if not (kindIs "invalid" .Values.core.defaultProjectName) }}
+  {{- $inExtraEnv := false }}
+  {{- range .Values.core.extraEnv }}{{ if eq .name "DEFAULT_PROJECT_NAME" }}{{ $inExtraEnv = true }}{{ end }}{{ end }}
+  {{- $coreSecretEnv := "" }}
+  {{- if .Values.core.secret }}
+  {{- $coreSecretEnv = include "harbor.toEnvVars" (dict "values" .Values.core.secret "prefix" "" "isSecret" false) }}
+  {{- end }}
+  {{- if or $inExtraEnv (regexMatch "(?m)^DEFAULT_PROJECT_NAME:" (print $coreConfigEnv "\n" $coreSecretEnv)) }}
+  {{- fail "set core.defaultProjectName or DEFAULT_PROJECT_NAME in core.config/core.secret/core.extraEnv, not both" }}
+  {{- end }}
+  DEFAULT_PROJECT_NAME: {{ .Values.core.defaultProjectName | quote }}
+  {{- end }}
   {{- if .Values.core.quotaUpdateProvider }}
   QUOTA_UPDATE_PROVIDER: {{ .Values.core.quotaUpdateProvider | quote }}
   {{- end }}
@@ -87,6 +103,6 @@ data:
   {{- end }}
 
   # Config via toEnvVars
-  {{- if .Values.core.config }}
-  {{- include "harbor.toEnvVars" (dict "values" .Values.core.config "prefix" "" "isSecret" false) | nindent 2 }}
+  {{- if $coreConfigEnv }}
+  {{- $coreConfigEnv | nindent 2 }}
   {{- end }}

@@ -278,6 +278,16 @@ func DefaultProjectName(ctx context.Context) string {
 	return DefaultMgr().Get(ctx, common.DefaultProjectName).GetString()
 }
 
+// StoredDefaultProjectName reads default_project_name from the database, not this replica's cache
+func StoredDefaultProjectName(ctx context.Context) (string, error) {
+	cfgs, err := GetCfgManager(ctx).GetItemFromDriver(ctx, common.DefaultProjectName)
+	if err != nil {
+		return "", err
+	}
+	name, _ := cfgs[common.DefaultProjectName].(string)
+	return name, nil
+}
+
 // AuditLogEventEnabled returns the audit log enabled setting for a specific event_type, such as delete_user, create_user
 func AuditLogEventEnabled(ctx context.Context, eventType string) bool {
 	if DefaultMgr() == nil || DefaultMgr().Get(ctx, common.AuditLogEventsDisabled) == nil {
