@@ -175,6 +175,7 @@ func mustHost(t *testing.T, raw string) string {
 	return u.Host
 }
 
+<<<<<<< HEAD
 // TestResolveNextLinkErrorRedactsSecrets keeps credentials and tokens carried in a rejected
 // Link out of the returned error, which callers log.
 func TestResolveNextLinkErrorRedactsSecrets(t *testing.T) {
@@ -196,6 +197,8 @@ func TestResolveNextLinkErrorRedactsSecrets(t *testing.T) {
 	}
 }
 
+=======
+>>>>>>> 46d05cbfc (fix(http): compare the IPv6 zone identifier exactly in SameOrigin (#24071))
 // TestSameOriginIPv6Zone treats the IPv6 zone identifier as case-sensitive, since it names
 // a network interface, while the address itself still compares case-insensitively.
 func TestSameOriginIPv6Zone(t *testing.T) {
