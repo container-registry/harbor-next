@@ -70,7 +70,7 @@ to them (`values*-next.yaml`, `report*.txt`).
 
 | Change | 2.x | This chart | What you must do |
 |---|---|---|---|
-| Internal PostgreSQL | `database.type: internal` (StatefulSet) | **Removed** — external DB only | Provision PostgreSQL (managed PG, CloudNativePG, etc.) and `pg_dump`/restore if you keep your data |
+| Internal PostgreSQL | `database.type: internal` (StatefulSet) | `postgresql.enabled: true` (cloudpirates subchart) or external DB | Reuse the old PVC, see [postgresql.md](postgresql.md#moving-from-goharborharbor-helm-with-the-internal-database) |
 | Internal Redis | `redis.type: internal` | Valkey subchart (`valkey.enabled: true`, default) or `externalRedis` | Nothing — Redis holds caches and job queues; starting fresh is safe |
 | nginx proxy | `nginx.*` deployment in front of core/portal | **Removed** — Ingress/Gateway/Service points at core directly | Drop all `nginx.*` values |
 | Required values | Defaults for everything | `externalURL`, `database.host`, and `harborAdminPassword` (or `existingSecretAdminPassword`) are **required** — install fails without them | Set them explicitly |
