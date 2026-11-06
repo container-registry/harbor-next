@@ -147,7 +147,7 @@ jobs:
           # hardcodes localhost for postgres; they all respect POSTGRESQL_HOST.
           docker run -d --name "${PREFIX}-postgres" \
             -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=root123 -e POSTGRES_DB=registry \
-            -p 0:5432 postgres:16-alpine
+            -p 0:5432 postgres:18-alpine
           # Resolve postgres host: shared DinD uses its service FQDN, local Docker uses localhost
           if [ -n "$DOCKER_HOST" ] && echo "$DOCKER_HOST" | grep -qv localhost; then
             PG_HOST=$(echo "$DOCKER_HOST" | sed 's|tcp://||;s|:.*||')

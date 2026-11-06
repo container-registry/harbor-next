@@ -50,6 +50,17 @@ with step 3 above before the first `docker compose up` on the new version, then
 keep it. The mount is declared with `create_host_path: false`, so a missing
 file fails the start instead of being created as an empty directory.
 
+## PostgreSQL 18
+
+The bundled database runs PostgreSQL 18, and the `postgres-data` volume is
+mounted at `/var/lib/postgresql` (the data lives in `18/docker` inside it). A
+volume created by PostgreSQL 16 cannot be reused: the container refuses to
+start on it. Before upgrading, dump the database with the old version
+(`docker compose exec postgresql pg_dumpall -U postgres > harbor.sql`), then
+remove the volume, start the new `postgresql` service and restore the dump.
+Setting `POSTGRES_VERSION=16` alone does not bring the old setup back, since
+the mount path changed too. Keep the previous compose file until you migrate.
+
 ## TLS Certificates
 
 TLS is enabled by default. Set `TLS_CERT` and `TLS_KEY` in `.env` to absolute paths on the host:

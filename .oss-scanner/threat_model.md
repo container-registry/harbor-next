@@ -41,7 +41,7 @@ Least / out of scope:
 - Binaries are built: `harbor-core`, `harbor-jobservice`, `harbor-registryctl`, `harbor-exporter`, `harbor-db-migrator` in `/usr/local/bin`. A full running Harbor stack is not provisioned in this image.
 - Generated API server code is present in `src/server/v2.0`; `swagger` is installed.
 - Pure unit tests: `cd /src/src && go test ./pkg/permission/...` (no services needed). Many other packages, including `server/middleware/v2auth`, `server/middleware/security` and `server/middleware/csrf`, connect to PostgreSQL in `TestMain` and need `harbor-test-services` first.
-- DB/Redis tests: run `harbor-test-services` first (starts PostgreSQL 16 on localhost:5432 and Redis on localhost:6379; env vars are preset), then e.g. `cd /src/src && go test -tags db -p 1 ./pkg/robot/... ./controller/...`. Packages needing LDAP, SMTP or a full stack (`core/api`, `core/controllers`, `*/ldap`, `common/utils/email`) will fail and are not a signal.
+- DB/Redis tests: run `harbor-test-services` first (starts PostgreSQL 18 on localhost:5432 and Redis on localhost:6379; env vars are preset), then e.g. `cd /src/src && go test -tags db -p 1 ./pkg/robot/... ./controller/...`. Packages needing LDAP, SMTP or a full stack (`core/api`, `core/controllers`, `*/ldap`, `common/utils/email`) will fail and are not a signal.
 - Portal: `cd /src/src/portal`, dependencies installed with `bun install` and a production build in `dist/`. Karma unit tests run headless with the installed Chromium: `node node_modules/@angular/cli/bin/ng test --watch=false`.
 - `task` is installed; `task test:unit:pure` and `task test:unit:db` (after `harbor-test-services`) run the same lanes as CI. DB-dependent tests carry the `db` build tag: `go test -tags db -p 1 ./...`.
 

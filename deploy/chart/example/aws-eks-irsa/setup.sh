@@ -262,7 +262,7 @@ kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply
 
 kubectl run pg-setup --rm -i --restart=Never \
   -n "${NAMESPACE}" \
-  --image=postgres:16-alpine \
+  --image=postgres:18-alpine \
   --env="PGPASSWORD=${DB_MASTER_PASSWORD}" \
   -- psql -h "${DB_ENDPOINT}" -U "${DB_MASTER_USER}" -d "${DB_NAME}" <<SQL
 CREATE USER ${DB_IAM_USER} WITH LOGIN;
