@@ -2,5 +2,8 @@ dependencies:
 - name: valkey
   repository: oci://ghcr.io/valkey-io/valkey-helm
   version: 0.12.1
-digest: sha256:314e7ee37b18fb3d3d92c32bc423548d4c058e744663a3b5eaa659780626bd75
-generated: "2026-11-05T14:02:34.826936474+05:30"
+- name: harbor-scanner-trivy
+  repository: oci://8gears.container-registry.com/8gcr/charts
+  version: 1.0.1
+digest: sha256:7ec073aeeb4f231f6f0c02ea2bc1c6f16d5e8bbc36d0d4f3b0bf74428cdbf2aa
+generated: "2026-11-05T14:53:52.943307795+05:30"
