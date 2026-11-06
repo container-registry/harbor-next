@@ -16,21 +16,31 @@ package user //nolint:revive
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/goharbor/harbor/src/common/models"
 	"github.com/goharbor/harbor/src/common/rbac"
 	"github.com/goharbor/harbor/src/controller/event/metadata/commonevent"
 	"github.com/goharbor/harbor/src/controller/event/model"
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/orm"
+	"github.com/goharbor/harbor/src/pkg/auditext/desc"
 	"github.com/goharbor/harbor/src/pkg/auditext/event"
-	notifierevent "github.com/goharbor/harbor/src/pkg/notifier/event"
 	pkgUser "github.com/goharbor/harbor/src/pkg/user"
 )
 
 const urlPattern = `^/api/v2.0/users/(\d+)(/password|/sysadmin)?$`
+
+var urlRe = regexp.MustCompile(urlPattern)
+
+// getUserFn reads a user on the request's own connection; overridable for tests
+var getUserFn = func(ctx context.Context, id int) (*models.User, error) {
+	return pkgUser.Mgr.Get(orm.ReuseContext(ctx), id)
+}
 
 func init() {
 	var userResolver = &userEventResolver{
@@ -43,6 +53,7 @@ func init() {
 			ResourceIDPattern:   urlPattern,
 		},
 	}
+	userResolver.Details = userResolver.details
 	commonevent.RegisterResolver(`^/api/v2\.0/users$`, userResolver)
 	commonevent.RegisterResolver(urlPattern, userResolver)
 }
@@ -60,32 +71,125 @@ func userIDToName(ctx context.Context, userID string) string {
 	}
 	// Runs inside the request transaction before a delete, so it must not take a
 	// second pool connection (#850).
-	user, err := pkgUser.Mgr.Get(orm.ReuseContext(ctx), int(id))
+	user, err := getUserFn(ctx, int(id))
 	if err != nil {
-		log.Errorf("failed to parse userID: %v to int, err %v", userID, err)
+		log.Errorf("failed to get user %v, err %v", userID, err)
 		return ""
 	}
 	return user.Username
 }
 
-func (u *userEventResolver) Resolve(ce *commonevent.Metadata, event *notifierevent.Event) error {
-	if err := u.Resolver.Resolve(ce, event); err != nil {
-		return err
-	}
-	if ce.RequestMethod != http.MethodPut {
+// Snapshot loads the user before an update or delete so the description can
+// carry the old values.
+func (u *userEventResolver) Snapshot(c *commonevent.Metadata) any {
+	if c.RequestMethod != http.MethodPut && c.RequestMethod != http.MethodDelete {
 		return nil
 	}
-	// base resolver leaves Data nil for a PUT that isn't on a specific user (e.g. the /users collection)
-	commonEvent, ok := event.Data.(*model.CommonEvent)
-	if !ok || commonEvent == nil {
+	id, ok := userIDFrom(c.RequestURL)
+	if !ok {
 		return nil
 	}
-	// update operation description for update user password and add/remove user as system administrator
-	origin := commonEvent.OperationDescription
-	if strings.HasSuffix(ce.RequestURL, "/sysadmin") {
-		commonEvent.OperationDescription = origin + ", add/remove user as system administrator"
-	} else if strings.HasSuffix(ce.RequestURL, "/password") {
-		commonEvent.OperationDescription = origin + ", change user password"
+	user, err := getUserFn(c.Ctx, id)
+	if err != nil {
+		log.Errorf("failed to snapshot user %d before %s: %v", id, c.RequestMethod, err)
+		return nil
 	}
-	return nil
+	return user
+}
+
+func (u *userEventResolver) details(ce *commonevent.Metadata, evt *model.CommonEvent, d *desc.Description) {
+	before, _ := ce.Before.(*models.User)
+	switch ce.RequestMethod {
+	case http.MethodPost:
+		if !evt.IsSuccessful {
+			// no Location header on failure: the requested name is only in the body
+			var req struct {
+				Username string `json:"username"`
+			}
+			if json.Unmarshal([]byte(ce.RequestPayload), &req) == nil {
+				d.Name(req.Username)
+			}
+			return
+		}
+		if id, ok := userIDFrom(ce.ResponseLocation); ok {
+			if user, err := getUserFn(ce.Ctx, id); err == nil {
+				d.Set("id", user.UserID).Set("email", user.Email).Set("realname", user.Realname).Set("sysadmin", user.SysAdminFlag)
+			}
+		}
+	case http.MethodDelete:
+		if before != nil {
+			d.Set("id", before.UserID).Set("email", before.Email).Set("sysadmin", before.SysAdminFlag)
+		}
+	case http.MethodPut:
+		switch {
+		case strings.HasSuffix(ce.RequestURL, "/password"):
+			// never the value, and nothing at all when the change was rejected
+			if evt.IsSuccessful {
+				d.Secret("password")
+			}
+		case strings.HasSuffix(ce.RequestURL, "/sysadmin"):
+			var req struct {
+				SysadminFlag bool `json:"sysadmin_flag"`
+			}
+			if json.Unmarshal([]byte(ce.RequestPayload), &req) != nil {
+				return
+			}
+			if before != nil {
+				d.Changed("sysadmin", before.SysAdminFlag, req.SysadminFlag)
+			} else {
+				d.Set("sysadmin", req.SysadminFlag)
+			}
+		default:
+			u.profileChanges(ce, evt, d, before)
+		}
+	}
+}
+
+// profileChanges diffs email, realname and comment. The new values come from
+// the stored user on success and from the request body on failure.
+func (u *userEventResolver) profileChanges(ce *commonevent.Metadata, evt *model.CommonEvent, d *desc.Description, before *models.User) {
+	var req map[string]any
+	if json.Unmarshal([]byte(ce.RequestPayload), &req) != nil {
+		return
+	}
+	to := map[string]any{}
+	for _, k := range []string{"email", "realname", "comment"} {
+		if v, ok := req[k]; ok {
+			to[k] = v
+		}
+	}
+	if evt.IsSuccessful {
+		if id, ok := userIDFrom(ce.RequestURL); ok {
+			if after, err := getUserFn(ce.Ctx, id); err == nil {
+				to = map[string]any{"email": after.Email, "realname": after.Realname, "comment": after.Comment}
+			}
+		}
+	}
+	from := map[string]any{}
+	if before != nil {
+		from = map[string]any{"email": before.Email, "realname": before.Realname, "comment": before.Comment}
+	}
+	for _, k := range []string{"email", "realname", "comment"} {
+		v, ok := to[k]
+		if !ok {
+			continue
+		}
+		if before != nil {
+			d.Changed(k, from[k], v)
+		} else {
+			d.Set(k, v)
+		}
+	}
+}
+
+func userIDFrom(url string) (int, bool) {
+	m := urlRe.FindStringSubmatch(url)
+	if len(m) < 2 {
+		return 0, false
+	}
+	id, err := strconv.Atoi(m[1])
+	if err != nil {
+		return 0, false
+	}
+	return id, true
 }

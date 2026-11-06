@@ -16,6 +16,7 @@ package member
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -32,8 +33,10 @@ import (
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/orm"
 	"github.com/goharbor/harbor/src/pkg"
+	"github.com/goharbor/harbor/src/pkg/auditext/desc"
 	ext "github.com/goharbor/harbor/src/pkg/auditext/event"
 	pkgMember "github.com/goharbor/harbor/src/pkg/member"
+	"github.com/goharbor/harbor/src/pkg/member/models"
 	"github.com/goharbor/harbor/src/pkg/notifier/event"
 )
 
@@ -48,9 +51,27 @@ var extractRe = regexp.MustCompile(extractPattern)
 // overridable for testing
 var (
 	lookupMemberFn      = lookupMember
+	getMemberFn         = getMember
 	resolveProjectFn    = resolveProject
 	auditEventEnabledFn = auditLogMemberEventEnabled
 )
+
+// roleNames mirrors projectRBACRole.GetRoleName so the description carries a
+// name a reviewer recognises rather than a role id
+var roleNames = map[int]string{
+	common.RoleProjectAdmin: "projectAdmin",
+	common.RoleMaintainer:   "maintainer",
+	common.RoleDeveloper:    "developer",
+	common.RoleGuest:        "guest",
+	common.RoleLimitedGuest: "limitedGuest",
+}
+
+func roleName(id int) string {
+	if n, ok := roleNames[id]; ok {
+		return n
+	}
+	return strconv.Itoa(id)
+}
 
 func auditLogMemberEventEnabled(ctx context.Context, operation string) bool {
 	if len(operation) == 0 {
@@ -94,6 +115,19 @@ func (r *resolver) PreCheck(ctx context.Context, url string, method string) (boo
 	return true, ""
 }
 
+// Snapshot loads the member before an update or delete so the description
+// can carry the old role.
+func (r *resolver) Snapshot(c *commonevent.Metadata) any {
+	if c.RequestMethod != http.MethodPut && c.RequestMethod != http.MethodDelete {
+		return nil
+	}
+	m := extractRe.FindStringSubmatch(c.RequestURL)
+	if len(m) < 3 || len(m[2]) == 0 {
+		return nil
+	}
+	return getMemberFn(c.Ctx, m[1], m[2])
+}
+
 func (r *resolver) Resolve(ce *commonevent.Metadata, evt *event.Event) error {
 	if ce == nil || evt == nil {
 		return fmt.Errorf("metadata or event is nil")
@@ -118,12 +152,44 @@ func (r *resolver) Resolve(ce *commonevent.Metadata, evt *event.Event) error {
 		IsSuccessful: true,
 	}
 
+	before, _ := ce.Before.(*models.Member)
+	var req struct {
+		RoleID     int `json:"role_id"`
+		MemberUser struct {
+			UserID   int    `json:"user_id"`
+			Username string `json:"username"`
+		} `json:"member_user"`
+		MemberGroup struct {
+			ID          int    `json:"id"`
+			GroupName   string `json:"group_name"`
+			LdapGroupDN string `json:"ldap_group_dn"`
+		} `json:"member_group"`
+	}
+	_ = json.Unmarshal([]byte(ce.RequestPayload), &req)
+
 	var entityName, entityType string
+	var after *models.Member
 	switch operation {
 	case "create":
 		e.IsSuccessful = ce.ResponseCode == http.StatusCreated
 		if m := extractRe.FindStringSubmatch(ce.ResponseLocation); len(m) >= 3 && len(m[2]) > 0 {
 			entityName, entityType = lookupMemberFn(ce.Ctx, m[1], m[2])
+			after = getMemberFn(ce.Ctx, m[1], m[2])
+		}
+		if entityName == "" {
+			// rejected create: the requested member is only in the body
+			switch {
+			case req.MemberUser.Username != "":
+				entityName, entityType = req.MemberUser.Username, common.UserMember
+			case req.MemberGroup.GroupName != "":
+				entityName, entityType = req.MemberGroup.GroupName, common.GroupMember
+			case req.MemberGroup.LdapGroupDN != "":
+				entityName, entityType = req.MemberGroup.LdapGroupDN, common.GroupMember
+			case req.MemberUser.UserID != 0:
+				entityName, entityType = strconv.Itoa(req.MemberUser.UserID), common.UserMember
+			case req.MemberGroup.ID != 0:
+				entityName, entityType = strconv.Itoa(req.MemberGroup.ID), common.GroupMember
+			}
 		}
 	case "delete":
 		e.IsSuccessful = ce.ResponseCode == http.StatusOK
@@ -132,33 +198,55 @@ func (r *resolver) Resolve(ce *commonevent.Metadata, evt *event.Event) error {
 		e.IsSuccessful = ce.ResponseCode == http.StatusOK
 		if e.IsSuccessful && len(matches) >= 3 && len(matches[2]) > 0 {
 			entityName, entityType = lookupMemberFn(ce.Ctx, matches[1], matches[2])
+			after = getMemberFn(ce.Ctx, matches[1], matches[2])
 		} else if len(matches) >= 3 && len(matches[2]) > 0 {
 			entityName = matches[2]
+		}
+		if before != nil && entityName == matches[2] {
+			entityName, entityType = before.Entityname, before.EntityType
 		}
 	}
 
 	e.ResourceName = entityName
-	label := "member"
-	noun := ""
-	if entityType == common.GroupMember {
-		label = "group"
-		noun = " member"
-	} else if entityType == common.UserMember {
-		label = "user"
-		noun = " member"
+	d := desc.New(ce.Username, operation, rbac.ResourceMember.String()).Name(entityName).Project(projectName)
+	switch entityType {
+	case common.GroupMember:
+		d.Set("type", "group")
+	case common.UserMember:
+		d.Set("type", "user")
 	}
-	preposition := "in"
-	if operation == "delete" {
-		preposition = "from"
+	switch operation {
+	case "create":
+		if after != nil {
+			d.Set("id", after.ID).Set("role", roleName(after.Role))
+		} else if req.RoleID != 0 {
+			d.Set("role", roleName(req.RoleID))
+		}
+	case "update":
+		to := ""
+		if after != nil {
+			to = roleName(after.Role)
+		} else if req.RoleID != 0 {
+			to = roleName(req.RoleID)
+		}
+		// no target role when the body was empty or unreadable: nothing to diff
+		if to == "" {
+			break
+		}
+		if before != nil {
+			d.Changed("role", roleName(before.Role), to)
+		} else {
+			d.Set("role", to)
+		}
+	case "delete":
+		if before != nil {
+			d.Set("id", before.ID).Set("role", roleName(before.Role))
+		}
 	}
-	resourceTarget := fmt.Sprintf("%s%s", label, noun)
-	if len(entityName) > 0 {
-		resourceTarget = fmt.Sprintf("%s %s", resourceTarget, entityName)
-	} else if len(matches) >= 3 && len(matches[2]) > 0 {
-		resourceTarget = fmt.Sprintf("%s ID %s", resourceTarget, matches[2])
+	if !e.IsSuccessful {
+		d.Error(ce.ResponseCode, ce.ResponseBody)
 	}
-	e.OperationDescription = fmt.Sprintf("%s %s %s project %s",
-		operation, resourceTarget, preposition, projectName)
+	e.OperationDescription = d.String()
 
 	evt.Topic = ctlevent.TopicCommonEvent
 	evt.Data = e
@@ -166,21 +254,31 @@ func (r *resolver) Resolve(ce *commonevent.Metadata, evt *event.Event) error {
 }
 
 func lookupMember(ctx context.Context, projectNameOrID, memberIDStr string) (string, string) {
+	m := getMemberFn(ctx, projectNameOrID, memberIDStr)
+	if m == nil {
+		return memberIDStr, ""
+	}
+	return m.Entityname, m.EntityType
+}
+
+// getMember loads a project member; nil when the project or member cannot be
+// resolved.
+func getMember(ctx context.Context, projectNameOrID, memberIDStr string) *models.Member {
 	ormCtx := orm.ReuseContext(ctx)
 	projectID, _ := resolveProjectFn(ormCtx, projectNameOrID)
 	if projectID == 0 {
-		return memberIDStr, ""
+		return nil
 	}
 	memberID, err := strconv.Atoi(memberIDStr)
 	if err != nil {
-		return memberIDStr, ""
+		return nil
 	}
 	m, err := pkgMember.Mgr.Get(ormCtx, projectID, memberID)
 	if err != nil {
 		log.Errorf("failed to get member %d in project %d: %v", memberID, projectID, err)
-		return memberIDStr, ""
+		return nil
 	}
-	return m.Entityname, m.EntityType
+	return m
 }
 
 // resolveProject resolves a project name or ID string to (projectID, projectName).

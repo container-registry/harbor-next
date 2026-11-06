@@ -21,6 +21,7 @@ import (
 	"github.com/goharbor/harbor/src/common/rbac"
 	"github.com/goharbor/harbor/src/lib/selector"
 	"github.com/goharbor/harbor/src/pkg/artifact"
+	"github.com/goharbor/harbor/src/pkg/auditext/desc"
 	"github.com/goharbor/harbor/src/pkg/auditext/model"
 	proModels "github.com/goharbor/harbor/src/pkg/project/models"
 	robotModel "github.com/goharbor/harbor/src/pkg/robot/model"
@@ -76,7 +77,7 @@ func (c *CreateProjectEvent) ResolveToAuditLog() (*model.AuditLogExt, error) {
 		Username:             c.Operator,
 		ResourceType:         ResourceTypeProject,
 		IsSuccessful:         true,
-		OperationDescription: fmt.Sprintf("create project: %s", c.Project),
+		OperationDescription: desc.New(c.Operator, "create", ResourceTypeProject).Name(c.Project).Set("id", c.ProjectID).String(),
 		Resource:             c.Project}
 	return auditLog, nil
 }
@@ -104,7 +105,7 @@ func (d *DeleteProjectEvent) ResolveToAuditLog() (*model.AuditLogExt, error) {
 		Username:             d.Operator,
 		ResourceType:         ResourceTypeProject,
 		IsSuccessful:         true,
-		OperationDescription: fmt.Sprintf("delete project: %s", d.Project),
+		OperationDescription: desc.New(d.Operator, "delete", ResourceTypeProject).Name(d.Project).Set("id", d.ProjectID).String(),
 		Resource:             d.Project}
 	return auditLog, nil
 }
@@ -132,7 +133,7 @@ func (d *DeleteRepositoryEvent) ResolveToAuditLog() (*model.AuditLogExt, error) 
 		Username:             d.Operator,
 		ResourceType:         ResourceTypeRepository,
 		IsSuccessful:         true,
-		OperationDescription: fmt.Sprintf("delete repository: %s", d.Repository),
+		OperationDescription: desc.New(d.Operator, "delete", ResourceTypeRepository).Name(d.Repository).String(),
 		Resource:             d.Repository,
 	}
 	return auditLog, nil
@@ -167,6 +168,14 @@ func (a *ArtifactEvent) String() string {
 		a.OccurAt.Format("2006-01-02 15:04:05"))
 }
 
+// resource names the artifact by its first tag, or by digest when untagged
+func (a *ArtifactEvent) resource() string {
+	if len(a.Tags) == 0 {
+		return fmt.Sprintf("%s@%s", a.Artifact.RepositoryName, a.Artifact.Digest)
+	}
+	return fmt.Sprintf("%s:%s", a.Artifact.RepositoryName, a.Tags[0])
+}
+
 // PushArtifactEvent is the pushing artifact event
 type PushArtifactEvent struct {
 	*ArtifactEvent
@@ -174,24 +183,18 @@ type PushArtifactEvent struct {
 
 // ResolveToAuditLog ...
 func (p *PushArtifactEvent) ResolveToAuditLog() (*model.AuditLogExt, error) {
+	resource := p.ArtifactEvent.resource()
 	auditLog := &model.AuditLogExt{
 		ProjectID:            p.Artifact.ProjectID,
 		OpTime:               p.OccurAt,
 		Operation:            rbac.ActionCreate.String(),
 		Username:             p.Operator,
 		IsSuccessful:         true,
-		OperationDescription: fmt.Sprintf("push artifact: %s@%s", p.Artifact.RepositoryName, p.Artifact.Digest),
+		OperationDescription: desc.New(p.Operator, "push", ResourceTypeArtifact).Name(resource).Set("digest", p.Artifact.Digest).Set("type", p.Artifact.Type).Set("size", p.Artifact.Size).String(),
 		ResourceType:         ResourceTypeArtifact,
+		Resource:             resource,
 		ClientAddress:        p.ClientAddress,
 		UserAgent:            p.UserAgent}
-
-	if len(p.Tags) == 0 {
-		auditLog.Resource = fmt.Sprintf("%s@%s",
-			p.Artifact.RepositoryName, p.Artifact.Digest)
-	} else {
-		auditLog.Resource = fmt.Sprintf("%s:%s",
-			p.Artifact.RepositoryName, p.Tags[0])
-	}
 
 	return auditLog, nil
 }
@@ -207,31 +210,23 @@ type PullArtifactEvent struct {
 
 // ResolveToAuditLog ...
 func (p *PullArtifactEvent) ResolveToAuditLog() (*model.AuditLogExt, error) {
+	resource := p.ArtifactEvent.resource()
+	// for pull public resource
+	username := p.Operator
+	if username == "" {
+		username = "anonymous"
+	}
 	auditLog := &model.AuditLogExt{
 		ProjectID:            p.Artifact.ProjectID,
 		OpTime:               p.OccurAt,
 		Operation:            rbac.ActionPull.String(),
-		Username:             p.Operator,
+		Username:             username,
 		IsSuccessful:         true,
-		OperationDescription: fmt.Sprintf("pull artifact: %s@%s", p.Artifact.RepositoryName, p.Artifact.Digest),
+		OperationDescription: desc.New(username, "pull", ResourceTypeArtifact).Name(resource).Set("digest", p.Artifact.Digest).String(),
 		ResourceType:         ResourceTypeArtifact,
+		Resource:             resource,
 		ClientAddress:        p.ClientAddress,
 		UserAgent:            p.UserAgent}
-
-	if len(p.Tags) == 0 {
-		auditLog.Resource = fmt.Sprintf("%s@%s",
-			p.Artifact.RepositoryName, p.Artifact.Digest)
-	} else {
-		auditLog.Resource = fmt.Sprintf("%s:%s",
-			p.Artifact.RepositoryName, p.Tags[0])
-	}
-
-	// for pull public resource
-	if p.Operator == "" {
-		auditLog.Username = "anonymous"
-	} else {
-		auditLog.Username = p.Operator
-	}
 
 	return auditLog, nil
 }
@@ -254,7 +249,7 @@ func (d *DeleteArtifactEvent) ResolveToAuditLog() (*model.AuditLogExt, error) {
 		Username:             d.Operator,
 		ResourceType:         ResourceTypeArtifact,
 		IsSuccessful:         true,
-		OperationDescription: fmt.Sprintf("delete artifact: %s@%s", d.Artifact.RepositoryName, d.Artifact.Digest),
+		OperationDescription: desc.New(d.Operator, "delete", ResourceTypeArtifact).Name(d.Artifact.RepositoryName+"@"+d.Artifact.Digest).Set("tags", d.Tags).Set("labels", d.Labels).Set("size", d.Artifact.Size).String(),
 		Resource:             fmt.Sprintf("%s@%s", d.Artifact.RepositoryName, d.Artifact.Digest),
 		ClientAddress:        d.ClientAddress,
 		UserAgent:            d.UserAgent}
@@ -285,7 +280,7 @@ func (c *CreateTagEvent) ResolveToAuditLog() (*model.AuditLogExt, error) {
 		Username:             c.Operator,
 		ResourceType:         ResourceTypeTag,
 		IsSuccessful:         true,
-		OperationDescription: fmt.Sprintf("create tag: %s:%s", c.Repository, c.Tag),
+		OperationDescription: desc.New(c.Operator, "create", ResourceTypeTag).Name(c.Repository+":"+c.Tag).Set("digest", c.AttachedArtifact.Digest).String(),
 		Resource:             fmt.Sprintf("%s:%s", c.Repository, c.Tag)}
 	return auditLog, nil
 }
@@ -316,7 +311,7 @@ func (d *DeleteTagEvent) ResolveToAuditLog() (*model.AuditLogExt, error) {
 		Username:             d.Operator,
 		ResourceType:         ResourceTypeTag,
 		IsSuccessful:         true,
-		OperationDescription: fmt.Sprintf("delete tag: %s:%s", d.Repository, d.Tag),
+		OperationDescription: desc.New(d.Operator, "delete", ResourceTypeTag).Name(d.Repository+":"+d.Tag).Set("digest", d.AttachedArtifact.Digest).String(),
 		Resource:             fmt.Sprintf("%s:%s", d.Repository, d.Tag)}
 	return auditLog, nil
 }
@@ -428,7 +423,7 @@ func (c *CreateRobotEvent) ResolveToAuditLog() (*model.AuditLogExt, error) {
 		Username:             c.Operator,
 		ResourceType:         ResourceTypeRobot,
 		IsSuccessful:         true,
-		OperationDescription: fmt.Sprintf("create robot: %s", c.Robot.Name),
+		OperationDescription: desc.New(c.Operator, "create", ResourceTypeRobot).Name(c.Robot.Name).Set("id", c.Robot.ID).Set("level", robotLevel(c.Robot)).String(),
 		Resource:             c.Robot.Name}
 	return auditLog, nil
 }
@@ -436,6 +431,14 @@ func (c *CreateRobotEvent) ResolveToAuditLog() (*model.AuditLogExt, error) {
 func (c *CreateRobotEvent) String() string {
 	return fmt.Sprintf("Name-%s Operator-%s OccurAt-%s",
 		c.Robot.Name, c.Operator, c.OccurAt.Format("2006-01-02 15:04:05"))
+}
+
+// robotLevel names the scope of a robot the way the API does
+func robotLevel(r *robotModel.Robot) string {
+	if r.ProjectID == 0 {
+		return "system"
+	}
+	return "project"
 }
 
 // DeleteRobotEvent is the deleting robot event
@@ -455,7 +458,7 @@ func (c *DeleteRobotEvent) ResolveToAuditLog() (*model.AuditLogExt, error) {
 		Username:             c.Operator,
 		ResourceType:         ResourceTypeRobot,
 		IsSuccessful:         true,
-		OperationDescription: fmt.Sprintf("delete robot: %s", c.Robot.Name),
+		OperationDescription: desc.New(c.Operator, "delete", ResourceTypeRobot).Name(c.Robot.Name).Set("id", c.Robot.ID).Set("level", robotLevel(c.Robot)).String(),
 		Resource:             c.Robot.Name}
 	return auditLog, nil
 }
