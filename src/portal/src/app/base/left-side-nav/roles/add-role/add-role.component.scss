@@ -58,3 +58,14 @@
 .align-center {
   align-items: center;
 }
+<<<<<<< HEAD
+=======
+
+:host::ng-deep.modal-dialog {
+  width: 52rem;
+}
+
+:host ::ng-deep .clr-wizard-main-content > .clr-wizard-body-wrapper {
+  overflow-x: auto;
+}
+>>>>>>> 189cf90a2 (fix(portal): prevent resource names from wrapping in permissions panel (#24284))
