@@ -69,3 +69,263 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+
+  # Regression: multi-document strings in extraTemplateManifests previously
+  # dropped every document after the first --- separator (issue #667).
+  - it: should render all documents from a multi-document extraTemplateManifests entry
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      extraTemplateManifests:
+        - |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: first
+          ---
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: second
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  - it: should render first document from a multi-document extraTemplateManifests entry
+    documentIndex: 0
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      extraTemplateManifests:
+        - |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: first
+          ---
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: second
+    asserts:
+      - equal:
+          path: metadata.name
+          value: first
+
+  - it: should render second document from a multi-document extraTemplateManifests entry
+    documentIndex: 1
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      extraTemplateManifests:
+        - |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: first
+          ---
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: second
+    asserts:
+      - equal:
+          path: metadata.name
+          value: second
+
+  # Regression: multi-document string entries in extraManifests previously
+  # failed with a type error because the static branch always called deepCopy
+  # on the raw string value before checking its kind.
+  - it: should render first document from a multi-document extraManifests string entry
+    documentIndex: 0
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      extraManifests:
+        - |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: alpha
+          ---
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: beta
+    asserts:
+      - equal:
+          path: metadata.name
+          value: alpha
+
+  - it: should render second document from a multi-document extraManifests string entry
+    documentIndex: 1
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      extraManifests:
+        - |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: alpha
+          ---
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: beta
+    asserts:
+      - equal:
+          path: metadata.name
+          value: beta
+
+  # Regression: tpl() applied to a full multi-document entry that contains
+  # template directives spanning a --- boundary must resolve correctly before
+  # the rendered output is split into individual documents.
+  - it: should interpolate templates in first document of multi-document extraTemplateManifests entries
+    documentIndex: 0
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      extraTemplateManifests:
+        - |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: {{ .Release.Name }}-first
+          ---
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: {{ .Release.Name }}-second
+    asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-first
+
+  - it: should interpolate templates in second document of multi-document extraTemplateManifests entries
+    documentIndex: 1
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      extraTemplateManifests:
+        - |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: {{ .Release.Name }}-first
+          ---
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: {{ .Release.Name }}-second
+    asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-second
+
+  # Pins: tpl runs on the whole entry before it is split, so a variable set
+  # in the first document still resolves in the second.
+  - it: should resolve a template variable defined before a --- separator
+    documentIndex: 1
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      extraTemplateManifests:
+        - |
+          {{- $prefix := printf "%s-shared" .Release.Name }}
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: {{ $prefix }}-first
+          {{- if .Values.externalURL }}
+          ---
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: {{ $prefix }}-second
+          {{- end }}
+    asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-shared-second
+
+  # Pins: a single-document string entry in extraManifests renders on its own.
+  - it: should render a single-document extraManifests string entry
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      extraManifests:
+        - |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: solo
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: solo
+
+  # Pins: adjacent entries from both lists stay separate documents, so the
+  # separator and trailing newline between them are not chomped.
+  - it: should keep adjacent entries from both lists as separate documents
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      extraManifests:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: map-entry
+        - |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: string-entry
+      extraTemplateManifests:
+        - |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: tpl-one
+          ---
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: tpl-two
+    asserts:
+      - hasDocuments:
+          count: 4
+      - equal:
+          path: metadata.name
+          value: tpl-two
+        documentIndex: 3
+
+  # Pins: invalid YAML in a templated entry fails the render instead of
+  # silently dropping the document.
+  - it: should fail on invalid YAML in extraTemplateManifests
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      extraTemplateManifests:
+        - |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: broken
+          data: {k: [unclosed}
+    asserts:
+      - failedTemplate:
+          errorPattern: invalid YAML in extraTemplateManifests
