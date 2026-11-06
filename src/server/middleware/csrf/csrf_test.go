@@ -98,6 +98,15 @@ func TestMiddlewareAllows(t *testing.T) {
 			headers: map[string]string{"Origin": "http://" + host + ":8099"},
 		},
 		{
+<<<<<<< HEAD
+=======
+			name:    "HTTPS on a non-default port without Sec-Fetch-Site, Origin matches Host",
+			method:  http.MethodPost,
+			host:    host + ":8443",
+			headers: map[string]string{"Origin": "https://" + host + ":8443"},
+		},
+		{
+>>>>>>> 5822576c2 (fix(csrf): replace gorilla/csrf with net/http.CrossOriginProtection (#23915))
 			name:    "plain HTTP to an IPv6 literal, Origin matches exactly",
 			method:  http.MethodPost,
 			host:    "[::1]:8099",
@@ -194,6 +203,20 @@ func TestMiddlewareRejects(t *testing.T) {
 	}
 }
 
+<<<<<<< HEAD
+=======
+// TestMiddlewareRejectsProxyDroppedPort covers a proxy that forwards Host
+// without the port the browser used, so the Origin fallback cannot match.
+func TestMiddlewareRejectsProxyDroppedPort(t *testing.T) {
+	headers := map[string]string{"Origin": "https://" + host + ":8443"}
+
+	code, called := serve(t, http.MethodPost, host, "/c/login", headers, false)
+
+	assert.Equal(t, http.StatusForbidden, code)
+	assert.False(t, called, "request should not have reached the handler")
+}
+
+>>>>>>> 5822576c2 (fix(csrf): replace gorilla/csrf with net/http.CrossOriginProtection (#23915))
 // TestMiddlewareSessionCarryingWrite drives a logged-in browser write through
 // the full middleware on a route csrfSkipper does not skip: same-origin passes,
 // cross-origin is refused, with the session present the whole way through.
