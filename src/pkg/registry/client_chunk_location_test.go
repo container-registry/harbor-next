@@ -294,15 +294,25 @@ func TestBuildBlobUploadURL(t *testing.T) {
 	}
 }
 
+<<<<<<< HEAD
 // TestResolveUploadLocation_ErrorRedactsSecrets keeps credentials and signed upload tokens carried
 // in a rejected Location out of the returned error, which replication logs verbatim.
 func TestResolveUploadLocation_ErrorRedactsSecrets(t *testing.T) {
 	const endpoint = "http://good-registry.example:5000"
 	origin, _ := url.Parse(endpoint + "/v2/foo/blobs/uploads/")
+=======
+// TestUploadLocationErrorsRedactSecrets keeps credentials and signed upload tokens carried in a
+// rejected Location out of the returned error, which replication logs verbatim. Go's URL parse
+// error quotes the whole input, so malformed Locations are covered too.
+func TestUploadLocationErrorsRedactSecrets(t *testing.T) {
+	const endpoint = "http://good-registry.example:5000"
+	origin, _ := url.Parse(endpoint + "/v2/repo/blobs/uploads/")
+>>>>>>> 487b46aa0 (fix(registry): redact the upload Location in rejection errors (#24068))
 	for _, location := range []string{
 		"http://evil.attacker.com/steal?token=s3cr3t-token",
 		"http://user:s3cr3t-pass@evil.attacker.com/steal",
 		"http://good-registry.example:5000@evil.attacker.com/steal?token=s3cr3t-token",
+<<<<<<< HEAD
 	} {
 		_, err := resolveUploadLocation(endpoint, origin, location)
 		if err == nil {
@@ -337,3 +347,37 @@ func TestResolveUploadLocationRedactsOriginQuery(t *testing.T) {
 		t.Fatalf("want origin error without query tokens, got %v", err)
 	}
 }
+=======
+		"http://evil.attacker.com/%zz?token=s3cr3t-token",
+		"/v2/repo/%zz?token=s3cr3t-token",
+	} {
+		_, err := resolveUploadLocation(endpoint, origin, location)
+		if err == nil {
+			t.Fatalf("resolve: expected rejection for %q", location)
+		}
+		if msg := err.Error(); strings.Contains(msg, "s3cr3t") {
+			t.Fatalf("resolve: error leaks secret from Location %q: %s", location, msg)
+		}
+	}
+	// chunked uploads resolve against the previous Location, which can carry a signed token
+	tokenOrigin, _ := url.Parse(endpoint + "/v2/repo/blobs/uploads/uuid?_state=s3cr3t-state")
+	if _, err := resolveUploadLocation(endpoint, tokenOrigin, "http://evil.attacker.com/steal"); err == nil {
+		t.Fatal("resolve: expected cross-origin rejection")
+	} else if strings.Contains(err.Error(), "s3cr3t") {
+		t.Fatalf("resolve: error leaks secret from origin: %s", err)
+	}
+	for _, location := range []string{
+		"/v2/relative?token=s3cr3t-token",
+		"https://user:s3cr3t-pass@evil.attacker.com/steal",
+		"https://evil.attacker.com/%zz?token=s3cr3t-token",
+	} {
+		_, err := parseUploadLocation(location)
+		if err == nil {
+			t.Fatalf("parse: expected rejection for %q", location)
+		}
+		if msg := err.Error(); strings.Contains(msg, "s3cr3t") {
+			t.Fatalf("parse: error leaks secret from Location %q: %s", location, msg)
+		}
+	}
+}
+>>>>>>> 487b46aa0 (fix(registry): redact the upload Location in rejection errors (#24068))
