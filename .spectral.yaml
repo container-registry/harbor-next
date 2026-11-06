@@ -52,6 +52,7 @@ rules:
 
   no-host:
     description: must not declare host; clients use relative paths.
+    formats: [oas2]
     given: $
     severity: error
     then:
@@ -59,13 +60,19 @@ rules:
       function: undefined
 
   https-only-schemes:
-    description: schemes must not advertise plaintext http.
-    given: $.schemes[*]
+    description: schemes must be exactly [https].
+    formats: [oas2]
+    given: $
     severity: error
     then:
-      function: enumeration
+      field: schemes
+      function: schema
       functionOptions:
-        values: [https]
+        schema:
+          type: array
+          minItems: 1
+          items:
+            const: https
 
   integer-format-values:
     description: integer format must be int32 or int64.
