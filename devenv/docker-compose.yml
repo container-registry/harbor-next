@@ -35,8 +35,19 @@ services:
     volumes:
       - harbor-redis-data:/data
 
+  # One-shot init service: ensures /var/lib/registry is owned by the user running
+  # registry and registryctl so GC unlinking succeeds.
+  registry-init:
+    image: distribution/distribution:latest
+    user: "0:0"
+    volumes:
+      - harbor-registry-data:/var/lib/registry
+    entrypoint: ["sh", "-c", "chown -R ${DEV_REGISTRY_USER:-1000:1000} /var/lib/registry"]
+    restart: "no"
+
   registry:
     image: distribution/distribution:latest
+    user: "${DEV_REGISTRY_USER:-1000:1000}"
     environment:
       OTEL_TRACES_EXPORTER: none
       OTEL_SDK_DISABLED: "true"
@@ -46,6 +57,9 @@ services:
     volumes:
       - harbor-registry-data:/var/lib/registry
       - ../config/registry.yml:/etc/registry/config.yml:ro
+    depends_on:
+      registry-init:
+        condition: service_completed_successfully
 
   # Core API - starts with: docker compose --profile core up
   core:

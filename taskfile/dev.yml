@@ -75,6 +75,20 @@ env:
       else
         echo "harbor"
       fi
+  # Registry runs distribution/distribution:latest which has no 'harbor' user in
+  # /etc/passwd. Use numeric UID:GID on rootful engines and 0:0 on rootless ones
+  # so it matches registryctl's identity and allows GC unlinking.
+  DEV_REGISTRY_USER:
+    sh: |
+      if command -v podman >/dev/null 2>&1 && \
+        [ "$(podman info --format '{{"{{.Host.Security.Rootless}}"}}' 2>/dev/null)" = "true" ]; then
+        echo "0:0"
+      elif command -v docker >/dev/null 2>&1 && \
+        docker info --format '{{"{{.SecurityOptions}}"}}' 2>/dev/null | grep -q "name=rootless"; then
+        echo "0:0"
+      else
+        echo "$(id -u):$(id -g)"
+      fi
 
 tasks:
   # ---------------------------------------------------------------------------
