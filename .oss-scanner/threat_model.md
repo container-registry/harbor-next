@@ -1,7 +1,11 @@
 # Threat model
 
 ## What this project does and where untrusted input enters
+<<<<<<< HEAD
 Harbor Next is an independently maintained, downstream distribution of Harbor (goharbor/harbor), a cloud native OCI registry. It stores and distributes container images, Helm charts and other OCI artifacts, and adds projects, RBAC, robot accounts, replication, proxy cache, vulnerability scanning, signing/SBOM accessories, webhooks, quotas, retention and immutability on top of the embedded distribution registry.
+=======
+Harbor is a cloud native OCI registry. It stores and distributes container images, Helm charts and other OCI artifacts, and adds projects, RBAC, robot accounts, replication, proxy cache, vulnerability scanning, signing/SBOM accessories, webhooks, quotas, retention and immutability on top of the embedded distribution registry.
+>>>>>>> 8c00164bd (Add OSS Scanner build and threat model (#24165))
 
 Go services (all under `src/`):
 - `core` (`src/core/`): REST API v2.0 (`src/server/v2.0/handler/`, generated from `api/v2.0/swagger.yaml`), the OCI Distribution API front (`src/server/registry/`) and the middleware chain in front of the registry (`src/server/middleware/`), the token service (`src/core/service/token/`), and authentication.
@@ -13,7 +17,11 @@ Go services (all under `src/`):
 Untrusted input:
 - Every HTTP request to core from anonymous users, authenticated users of any role, and robot accounts: REST API, `/v2/` registry API, `/service/token`, `/c/` login and OIDC callback.
 - Artifact content pushed by users: manifests, indexes, configs, layers, and artifact-type specific processing (`src/controller/artifact/processor/`), accessories such as signatures and SBOMs (`src/pkg/accessory/`).
+<<<<<<< HEAD
 - Responses from remote registries during replication (`src/pkg/reg/adapter/`, including the Harbor Satellite adapter `src/pkg/reg/adapter/harborsatellite/`) and proxy cache (`src/controller/proxy/`, `src/server/middleware/repoproxy/`). A remote registry may be malicious.
+=======
+- Responses from remote registries during replication (`src/pkg/reg/adapter/`) and proxy cache (`src/controller/proxy/`, `src/server/middleware/repoproxy/`). A remote registry may be malicious.
+>>>>>>> 8c00164bd (Add OSS Scanner build and threat model (#24165))
 - Responses from external scanners (`src/pkg/scan/rest/`), OIDC providers (`src/pkg/oidc/`, `src/core/auth/oidc/`), LDAP (`src/core/auth/ldap/`), UAA and auth proxy (`src/core/auth/uaa/`, `src/core/auth/authproxy/`).
 - Webhook target URLs configured by project admins (`src/pkg/notifier/`, `src/controller/event/handler/webhook/`), and replication/proxy endpoint URLs configured by admins.
 - Query parameters that become SQL (`src/lib/q/`, `src/lib/orm/`).
@@ -31,7 +39,11 @@ Most:
 - Portal XSS from artifact metadata, labels, repository descriptions and scan results.
 
 Least / out of scope:
+<<<<<<< HEAD
 - `tests/`, `make/` (packaging, installer and photon images), `tools/`, `taskfile/`, `.github/`, the Helm chart.
+=======
+- `tests/`, `make/` (packaging, installer and photon images), `tools/`, `.github/`.
+>>>>>>> 8c00164bd (Add OSS Scanner build and threat model (#24165))
 - The embedded upstream registry (distribution/distribution) itself, unless Harbor's integration with it is at fault.
 - Trivy and other scanner adapters (separate repositories).
 - Generated code in `src/server/v2.0/models` and `src/server/v2.0/restapi` (report the swagger spec or template instead).
@@ -41,9 +53,14 @@ Least / out of scope:
 - Binaries are built: `harbor-core`, `harbor-jobservice`, `harbor-registryctl`, `harbor-exporter`, `harbor-db-migrator` in `/usr/local/bin`. A full running Harbor stack is not provisioned in this image.
 - Generated API server code is present in `src/server/v2.0`; `swagger` is installed.
 - Pure unit tests: `cd /src/src && go test ./pkg/permission/...` (no services needed). Many other packages, including `server/middleware/v2auth`, `server/middleware/security` and `server/middleware/csrf`, connect to PostgreSQL in `TestMain` and need `harbor-test-services` first.
+<<<<<<< HEAD
 - DB/Redis tests: run `harbor-test-services` first (starts PostgreSQL 16 on localhost:5432 and Redis on localhost:6379; env vars are preset), then e.g. `cd /src/src && go test -tags db -p 1 ./pkg/robot/... ./controller/...`. Packages needing LDAP, SMTP or a full stack (`core/api`, `core/controllers`, `*/ldap`, `common/utils/email`) will fail and are not a signal.
 - Portal: `cd /src/src/portal`, dependencies installed with `bun install` and a production build in `dist/`. Karma unit tests run headless with the installed Chromium: `node node_modules/@angular/cli/bin/ng test --watch=false`.
 - `task` is installed; `task test:unit:pure` and `task test:unit:db` (after `harbor-test-services`) run the same lanes as CI. DB-dependent tests carry the `db` build tag: `go test -tags db -p 1 ./...`.
+=======
+- DB/Redis tests: run `harbor-test-services` first (starts PostgreSQL 18 on localhost:5432 and Redis on localhost:6379; env vars are preset), then e.g. `cd /src/src && go test -p 1 ./pkg/robot/... ./controller/...`. Packages needing LDAP, SMTP or a full stack (`core/api`, `core/controllers`, `*/ldap`, `common/utils/email`) will fail and are not a signal.
+- Portal: `cd /src/src/portal`, dependencies installed with `npm ci` and a production build in `dist/`. Karma unit tests run headless with the installed Chromium: `npm run test:headless`.
+>>>>>>> 8c00164bd (Add OSS Scanner build and threat model (#24165))
 
 ## How you rate severity
 The trust boundary is between a Harbor user (anonymous, project guest, developer, maintainer, project admin, robot account) and anything that user is not granted.
