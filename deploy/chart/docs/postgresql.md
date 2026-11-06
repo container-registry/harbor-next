@@ -47,7 +47,9 @@ The old chart cannot be upgraded in place (Deployment selectors differ), so
 uninstall it and install this chart under the same release name. The data
 stays on the old `database-data-<release>-database-0` PVC. The init container
 moves the old data directory to `18/docker` and upgrades it to PostgreSQL 18
-when it is older.
+when it is older. The old image used another glibc, so on the first start it
+also runs `reindexdb --all` and `ALTER DATABASE ... REFRESH COLLATION VERSION`.
+Later starts find nothing to do.
 
 | Harbor | harbor-helm | PostgreSQL | Data directory on the PVC |
 |---|---|---|---|
@@ -84,16 +86,6 @@ Check yours with
        password: <POSTGRES_PASSWORD>
      persistence:
        existingClaim: database-data-harbor-database-0
-   ```
-
-4. The old image used another glibc, so PostgreSQL warns `database "registry"
-   has a collation version mismatch`. Fix it once:
-
-   ```sh
-   kubectl -n harbor exec postgresql-0 -c postgresql -- sh -ec '
-     reindexdb -h 127.0.0.1 -U postgres --all
-     for d in postgres template1 registry; do
-       psql -h 127.0.0.1 -U postgres -d $d -c "ALTER DATABASE $d REFRESH COLLATION VERSION"; done'
    ```
 
 ## Going back to goharbor/harbor-helm
