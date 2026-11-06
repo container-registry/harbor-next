@@ -1585,13 +1585,24 @@ postgresql:
       image: docker.io/pgautoupgrade/pgautoupgrade:18-trixie@sha256:45057d4974340c88a88c807e1a425f48e944cd78b1e01bd0951137153a3abf70
       workingDir: /var/lib/postgresql
       command: ["bash", "-c"]
-      # Moves a pre-18 layout (pgdata, or harbor-helm pgdata/pgNN) to PGDATA first
+      # Moves a pre-18 layout (pgdata, or harbor-helm pgdata/pgNN) to PGDATA
+      # first, then rebuilds indexes once if the data came from another glibc
       args:
         - |
           for d in pgdata pgdata/pg[0-9]*; do
             if [ ! -e 18/docker ] && [ -s "$d/PG_VERSION" ]; then mkdir -p 18 && mv "$d" 18/docker || exit 1; fi
           done
-          exec docker-entrypoint.sh postgres
+          docker-entrypoint.sh postgres || exit 1
+          [ -s "$PGDATA/PG_VERSION" ] || exit 0
+          echo 'local all all trust' > /tmp/hba
+          pg_ctl -w -o "-c listen_addresses= -k /tmp -c hba_file=/tmp/hba" start || exit 1
+          q() { psql -h /tmp -U "${POSTGRES_USER:-postgres}" -d postgres -Atc "$1"; }
+          dbs=$(q "SELECT datname FROM pg_database WHERE datcollversion <> pg_database_collation_actual_version(oid)") || exit 1
+          if [ -n "$dbs" ]; then
+            reindexdb -h /tmp -U "${POSTGRES_USER:-postgres}" --all || exit 1
+            printf '%s\n' "$dbs" | while IFS= read -r d; do q "ALTER DATABASE \"${d//\"/\"\"}\" REFRESH COLLATION VERSION" || exit 1; done || exit 1
+          fi
+          pg_ctl -w -m fast stop
       env:
         - name: PGDATA
           value: /var/lib/postgresql/18/docker
