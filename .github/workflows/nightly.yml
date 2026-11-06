@@ -259,6 +259,7 @@ jobs:
     secrets:
       SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
       REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+      DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
 
   annotate:
     name: Annotate the Rolling Pre-Release
