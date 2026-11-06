@@ -16,6 +16,8 @@ package task
 
 import (
 	"encoding/json"
+	"math"
+	"strconv"
 	"time"
 
 	"github.com/goharbor/harbor/src/jobservice/job"
@@ -158,6 +160,40 @@ func (t *Task) GetNumFromExtraAttrs(key string) float64 {
 		return 0
 	}
 	return v
+}
+
+// Int64FromAny converts a JSON-decoded value to int64 without losing
+// precision, returns false if the value cannot be represented as an int64
+func Int64FromAny(value any) (int64, bool) {
+	switch v := value.(type) {
+	case int64:
+		return v, true
+	case int:
+		return int64(v), true
+	case int32:
+		return int64(v), true
+	case json.Number:
+		if i, err := v.Int64(); err == nil {
+			return i, true
+		}
+	case string:
+		if i, err := strconv.ParseInt(v, 10, 64); err == nil {
+			return i, true
+		}
+	case float64:
+		// for values decoded without UseNumber, check bounds and integral round-trip
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			return 0, false
+		}
+		if v < float64(math.MinInt64) || v >= 9223372036854775808.0 {
+			return 0, false
+		}
+		i := int64(v)
+		if float64(i) == v {
+			return i, true
+		}
+	}
+	return 0, false
 }
 
 // Job is the model represents the requested jobservice job
