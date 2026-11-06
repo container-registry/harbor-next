@@ -343,6 +343,11 @@ core:
   # -- Initial user settings JSON applied on first boot
   configureUserSettings: ""
 
+  # -- Project that receives pushes and pulls without a project in the path
+  # (DEFAULT_PROJECT_NAME). Applied on every start and locked in the UI; a missing
+  # project is created as private. "" turns the fallback off; null leaves it to the UI.
+  defaultProjectName: null
+
   # -- Quota update provider (db or redis)
   quotaUpdateProvider: db
 
@@ -1561,6 +1566,58 @@ database:
   # Set to true only when PG is configured to require client certificate
   # authentication. libpq fails if `sslcert` is set but the file is missing.
   clientCertEnabled: false
+
+# --- PostgreSQL subchart (cloudpirates/postgres, official postgres image) ---
+postgresql:
+  # -- Deploy PostgreSQL in-cluster and point Harbor at it (`database.*` is
+  # then ignored). Any cloudpirates/postgres value can be set here. See
+  # docs/postgresql.md.
+  enabled: false
+  fullnameOverride: "postgresql"
+  auth:
+    # -- Database created at initialisation
+    database: registry
+  # -- Runs pg_upgrade when the data is an older major, else exits at once.
+  # Keep its tag and PGDATA on the same major as `postgresql.image.tag`.
+  # @default -- pgautoupgrade 18, see values.yaml
+  initContainers:
+    - name: pgautoupgrade
+      image: docker.io/pgautoupgrade/pgautoupgrade:18-trixie@sha256:45057d4974340c88a88c807e1a425f48e944cd78b1e01bd0951137153a3abf70
+      workingDir: /var/lib/postgresql
+      command: ["bash", "-c"]
+      # Moves a pre-18 layout (pgdata, or harbor-helm pgdata/pgNN) to PGDATA
+      # first, then rebuilds indexes once if the data came from another glibc
+      args:
+        - |
+          for d in pgdata pgdata/pg[0-9]*; do
+            if [ ! -e 18/docker ] && [ -s "$d/PG_VERSION" ]; then mkdir -p 18 && mv "$d" 18/docker || exit 1; fi
+          done
+          docker-entrypoint.sh postgres || exit 1
+          [ -s "$PGDATA/PG_VERSION" ] || exit 0
+          echo 'local all all trust' > /tmp/hba
+          pg_ctl -w -o "-c listen_addresses= -k /tmp -c hba_file=/tmp/hba" start || exit 1
+          q() { psql -h /tmp -U "${POSTGRES_USER:-postgres}" -d postgres -Atc "$1"; }
+          dbs=$(q "SELECT datname FROM pg_database WHERE datcollversion <> pg_database_collation_actual_version(oid)") || exit 1
+          if [ -n "$dbs" ]; then
+            reindexdb -h /tmp -U "${POSTGRES_USER:-postgres}" --all || exit 1
+            printf '%s\n' "$dbs" | while IFS= read -r d; do q "ALTER DATABASE \"${d//\"/\"\"}\" REFRESH COLLATION VERSION" || exit 1; done || exit 1
+          fi
+          pg_ctl -w -m fast stop
+      env:
+        - name: PGDATA
+          value: /var/lib/postgresql/18/docker
+        - name: PGAUTO_ONESHOT
+          value: "yes"
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        capabilities:
+          drop: [ALL]
+      volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql
 
 # --- Valkey (Redis-compatible) ---
 valkey:

@@ -45,7 +45,7 @@ Kubernetes rejects a non-string env value.
   valueFrom:
     secretKeyRef:
       name: {{ include "harbor.database.secretName" . }}
-      key: {{ .Values.database.existingSecretKey | default "POSTGRESQL_PASSWORD" }}
+      key: {{ include "harbor.database.secretKey" . }}
 - name: HARBOR_DATABASE_DBNAME
   value: {{ include "harbor.database.database" . | quote }}
 - name: HARBOR_DATABASE_SSLMODE

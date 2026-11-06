@@ -63,7 +63,9 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 	// declares foreign keys against or reconciles in place.
 	legacyDependencies := []string{
 		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
-		"CREATE TABLE project (project_id SERIAL PRIMARY KEY)",
+		"CREATE TABLE project (project_id SERIAL PRIMARY KEY, name VARCHAR(255), deleted BOOLEAN NOT NULL DEFAULT false)",
+		"INSERT INTO project (name) VALUES ('library')",
+		"CREATE TABLE properties (id SERIAL PRIMARY KEY, k VARCHAR(64) NOT NULL UNIQUE, v VARCHAR(128) NOT NULL)",
 		"CREATE TABLE execution (id SERIAL PRIMARY KEY, revision INTEGER)",
 		"CREATE TABLE role (role_id SERIAL PRIMARY KEY, role_code VARCHAR(20), name VARCHAR(20))",
 		"CREATE TABLE project_member (id SERIAL PRIMARY KEY, project_id INTEGER, entity_id INTEGER, entity_type CHAR(1), role INTEGER)",
@@ -118,6 +120,26 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 		if !exists {
 			t.Errorf("authoritative schema object %q does not exist", object)
 		}
+	}
+
+	defaultProject := func() string {
+		var v string
+		if err := schemaPool.DB().QueryRowContext(ctx, "SELECT v FROM properties WHERE k = 'default_project_name'").Scan(&v); err != nil {
+			t.Fatalf("read default_project_name: %v", err)
+		}
+		return v
+	}
+	if got := defaultProject(); got != "library" {
+		t.Errorf("default_project_name = %q, want library seeded", got)
+	}
+	if _, err := schemaPool.DB().ExecContext(ctx, "UPDATE properties SET v = '' WHERE k = 'default_project_name'"); err != nil {
+		t.Fatalf("clear default_project_name: %v", err)
+	}
+	if err := applyAuthoritativeSchema(ctx, sqlSchemaDB{db: schemaPool.DB()}, path); err != nil {
+		t.Fatalf("applyAuthoritativeSchema() rerun returned error: %v", err)
+	}
+	if got := defaultProject(); got != "" {
+		t.Errorf("default_project_name = %q after rerun, want admin-cleared value kept", got)
 	}
 
 	var triggers int
@@ -254,7 +276,8 @@ func TestExecutionRevisionGuardResolvesThroughSearchPath(t *testing.T) {
 		fmt.Sprintf("CREATE TABLE %s.role_permission (id BIGSERIAL PRIMARY KEY, role_type VARCHAR(255), role_id BIGINT, permission_policy_id BIGINT)", later),
 		fmt.Sprintf("CREATE TABLE %s.permission_policy (id BIGSERIAL PRIMARY KEY, scope VARCHAR(255), resource VARCHAR(255), action VARCHAR(255), effect VARCHAR(255))", later),
 		fmt.Sprintf("CREATE TABLE %s.robot (id BIGSERIAL PRIMARY KEY)", first),
-		fmt.Sprintf("CREATE TABLE %s.project (project_id SERIAL PRIMARY KEY)", first),
+		fmt.Sprintf("CREATE TABLE %s.project (project_id SERIAL PRIMARY KEY, name VARCHAR(255), deleted BOOLEAN NOT NULL DEFAULT false)", first),
+		fmt.Sprintf("CREATE TABLE %s.properties (id SERIAL PRIMARY KEY, k VARCHAR(64) NOT NULL UNIQUE, v VARCHAR(128) NOT NULL)", first),
 	}
 	for _, statement := range setup {
 		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
@@ -334,7 +357,8 @@ func TestExecutionRevisionGuardIgnoresNonTableRelations(t *testing.T) {
 		"CREATE TABLE decoy (id BIGSERIAL PRIMARY KEY, revision INTEGER)",
 		"CREATE INDEX execution ON decoy (revision)",
 		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
-		"CREATE TABLE project (project_id SERIAL PRIMARY KEY)",
+		"CREATE TABLE project (project_id SERIAL PRIMARY KEY, name VARCHAR(255), deleted BOOLEAN NOT NULL DEFAULT false)",
+		"CREATE TABLE properties (id SERIAL PRIMARY KEY, k VARCHAR(64) NOT NULL UNIQUE, v VARCHAR(128) NOT NULL)",
 		"CREATE TABLE role (role_id SERIAL PRIMARY KEY, role_code VARCHAR(20), name VARCHAR(20))",
 		"CREATE TABLE project_member (id SERIAL PRIMARY KEY, project_id INTEGER, entity_id INTEGER, entity_type CHAR(1), role INTEGER)",
 		"CREATE TABLE role_permission (id BIGSERIAL PRIMARY KEY, role_type VARCHAR(255), role_id BIGINT, permission_policy_id BIGINT)",
@@ -387,7 +411,8 @@ func TestIdentityProvidersAudienceReconcilesLegacyTable(t *testing.T) {
 	// identity_providers as the previous revision of harbor_next.sql created it
 	for _, statement := range []string{
 		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
-		"CREATE TABLE project (project_id SERIAL PRIMARY KEY, owner_id INTEGER)",
+		"CREATE TABLE project (project_id SERIAL PRIMARY KEY, owner_id INTEGER, name VARCHAR(255), deleted BOOLEAN NOT NULL DEFAULT false)",
+		"CREATE TABLE properties (id SERIAL PRIMARY KEY, k VARCHAR(64) NOT NULL UNIQUE, v VARCHAR(128) NOT NULL)",
 		"CREATE TABLE retention_policy (id SERIAL PRIMARY KEY, scope_level VARCHAR(20), scope_reference INTEGER, data TEXT)",
 		"CREATE TABLE execution (id SERIAL PRIMARY KEY, revision INTEGER)",
 		"CREATE TABLE role (role_id SERIAL PRIMARY KEY, role_code VARCHAR(20), name VARCHAR(20))",

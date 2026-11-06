@@ -442,6 +442,12 @@
           "type": "string",
           "description": "Initial user settings JSON applied on first boot (CONFIG_OVERWRITE_JSON)."
         },
+        "defaultProjectName": {
+          "type": ["string", "null"],
+          "pattern": "^([a-z0-9]+(?:[._-][a-z0-9]+)*)?$",
+          "maxLength": 255,
+          "description": "Project for pushes and pulls without a project in the path (DEFAULT_PROJECT_NAME). Empty disables the fallback; null leaves it to the UI."
+        },
         "quotaUpdateProvider": {
           "type": "string",
           "enum": ["db", "redis"],
@@ -627,13 +633,11 @@
     },
     "database": {
       "type": "object",
-      "description": "External database configuration (required)",
-      "required": ["host"],
+      "description": "External database configuration (required unless postgresql.enabled)",
       "properties": {
         "host": {
           "type": "string",
-          "description": "Database host",
-          "minLength": 1
+          "description": "Database host"
         },
         "port": {
           "type": "integer",
@@ -688,6 +692,13 @@
         "connMaxLifetime": {
           "type": "string"
         }
+      }
+    },
+    "postgresql": {
+      "type": "object",
+      "description": "PostgreSQL subchart (cloudpirates/postgres), passed through",
+      "properties": {
+        "enabled": { "type": "boolean", "default": false }
       }
     },
     "valkey": {

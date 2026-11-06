@@ -235,6 +235,7 @@ The [`example/`](example/) directory contains one directory per scenario, each w
 | [`openshift/`](example/openshift/) | OpenShift deployment with edge-terminated routes |
 | [`aws-eks-irsa/`](example/aws-eks-irsa/) | AWS EKS with IRSA for S3 storage and RDS IAM Auth |
 | [`flux/`](example/flux/) | FluxCD GitOps: HelmRelease + drift detection + pinned secrets (`autoGenSecrets: false`), works for Argo CD too |
+| [`argocd/`](example/argocd/) | Argo CD Application: OCI chart + `$values` git source, pinned secrets (`autoGenSecrets: false` is mandatory under client-side rendering) |
 
 ```bash
 helm install harbor . -n harbor --create-namespace -f example/k3d-local/values.yaml
@@ -719,6 +720,9 @@ ingress:
 
 Notes:
 
+- Chart-managed component Secrets that would end up empty (everything
+  externalized) are skipped entirely, together with their `envFrom`
+  references — a fully pinned install creates no empty Secrets.
 - A complete Flux setup (GitRepository + HelmRelease with drift detection
   + prerequisite Secret manifests with generation commands) lives at
   [`example/flux/`](example/flux/). The same values work unchanged in an
@@ -747,7 +751,8 @@ Kubernetes: `>=1.28.0-0`
 
 | Repository | Name | Version |
 |------------|------|---------|
-| oci://ghcr.io/valkey-io/valkey-helm | valkey | 0.9.3 |
+| oci://ghcr.io/valkey-io/valkey-helm | valkey | 0.12.1 |
+| oci://registry-1.docker.io/cloudpirates | postgresql(postgres) | 0.21.2 |
 
 ## Values
 
@@ -765,6 +770,7 @@ Kubernetes: `>=1.28.0-0`
 | core.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler configuration. When enabled the chart OMITS the static `replicas:` field on the Deployment so HPA owns the replica count. `maxReplicas` is REQUIRED. Tracks upstream goharbor/harbor-helm#1068. |
 | core.config | object | {} | Harbor Core application config (converted to env vars in ConfigMap) Any Harbor Core config can be set here without chart changes |
 | core.configureUserSettings | string | `""` | Initial user settings JSON applied on first boot |
+| core.defaultProjectName | string | `nil` | Project that receives pushes and pulls without a project in the path (DEFAULT_PROJECT_NAME). Applied on every start and locked in the UI; a missing project is created as private. "" turns the fallback off; null leaves it to the UI. |
 | core.deploymentStrategy | object | {} | Deployment strategy (empty = K8s default RollingUpdate) |
 | core.existingSecret | string | `""` | Use existing secret for Core secret |
 | core.existingSecretKey | string | `"secret"` | Key in existing secret containing the Core secret |
@@ -1018,6 +1024,10 @@ Kubernetes: `>=1.28.0-0`
 | portal.tolerations | list | `[]` | Tolerations for Portal pods |
 | portal.topologySpreadConstraints | list | `[]` | Topology spread constraints for pod scheduling |
 | portal.url | string | `""` | URL core uses to reach the portal (`PORTAL_URL`). Empty auto-derives the in-cluster portal service. Set this when `enabled: false` but the UI is hosted externally, so core can still proxy to it. |
+| postgresql.auth.database | string | `"registry"` | Database created at initialisation |
+| postgresql.enabled | bool | `false` | Deploy PostgreSQL in-cluster and point Harbor at it (`database.*` is then ignored). Any cloudpirates/postgres value can be set here. See docs/postgresql.md. |
+| postgresql.fullnameOverride | string | `"postgresql"` |  |
+| postgresql.initContainers | list | pgautoupgrade 18, see values.yaml | Runs pg_upgrade when the data is an older major, else exits at once. Keep its tag and PGDATA on the same major as `postgresql.image.tag`. |
 | proxy.components[0] | string | `"core"` |  |
 | proxy.components[1] | string | `"jobservice"` |  |
 | proxy.components[2] | string | `"trivy"` |  |

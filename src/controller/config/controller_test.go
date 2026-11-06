@@ -16,11 +16,13 @@ package config
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/config/metadata"
+	"github.com/goharbor/harbor/src/lib/errors"
 	testCfg "github.com/goharbor/harbor/src/testing/lib/config"
 	"github.com/goharbor/harbor/src/testing/mock"
 )
@@ -118,5 +120,49 @@ func Test_verifyValueLengthCfg(t *testing.T) {
 				t.Errorf("verifyMaxLengthCfg() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestVerifyDefaultProjectNameCfg(t *testing.T) {
+	existing := map[string]bool{"library": true, "a": true}
+	c := &controller{projectExists: func(_ context.Context, name string) (bool, error) {
+		if name == "dberr" {
+			return false, errors.New("db down")
+		}
+		return existing[name], nil
+	}}
+	tests := []struct {
+		name    string
+		cfgs    map[string]any
+		wantErr bool
+	}{
+		{name: "absent", cfgs: map[string]any{}, wantErr: false},
+		{name: "empty disables fallback", cfgs: map[string]any{common.DefaultProjectName: ""}, wantErr: false},
+		{name: "existing project", cfgs: map[string]any{common.DefaultProjectName: "library"}, wantErr: false},
+		{name: "missing project", cfgs: map[string]any{common.DefaultProjectName: "missing"}, wantErr: true},
+		{name: "lookup error", cfgs: map[string]any{common.DefaultProjectName: "dberr"}, wantErr: true},
+		{name: "uppercase", cfgs: map[string]any{common.DefaultProjectName: "Library"}, wantErr: true},
+		{name: "contains slash", cfgs: map[string]any{common.DefaultProjectName: "a/b"}, wantErr: true},
+		{name: "contains space", cfgs: map[string]any{common.DefaultProjectName: "a b"}, wantErr: true},
+		{name: "leading separator", cfgs: map[string]any{common.DefaultProjectName: "_lib"}, wantErr: true},
+		{name: "single char", cfgs: map[string]any{common.DefaultProjectName: "a"}, wantErr: false},
+		{name: "over max length", cfgs: map[string]any{common.DefaultProjectName: strings.Repeat("a", 256)}, wantErr: true},
+		{name: "not a string", cfgs: map[string]any{common.DefaultProjectName: 42}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := c.verifyDefaultProjectNameCfg(context.TODO(), tt.cfgs); (err != nil) != tt.wantErr {
+				t.Errorf("verifyDefaultProjectNameCfg() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestDefaultProjectPinnedByEnv(t *testing.T) {
+	t.Setenv(common.DefaultProjectNameEnv, "library")
+	c := &controller{}
+	err := c.UpdateUserConfigs(context.TODO(), map[string]any{common.DefaultProjectName: "other"})
+	if !errors.IsErr(err, errors.ForbiddenCode) {
+		t.Errorf("UpdateUserConfigs() error = %v, want forbidden while %s is set", err, common.DefaultProjectNameEnv)
 	}
 }

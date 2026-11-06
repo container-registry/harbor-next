@@ -28,6 +28,8 @@ import (
 	"github.com/go-openapi/strfmt"
 
 	"github.com/goharbor/harbor/src/common/rbac"
+	"github.com/goharbor/harbor/src/common/security"
+	robotSec "github.com/goharbor/harbor/src/common/security/robot"
 	"github.com/goharbor/harbor/src/controller/project"
 	"github.com/goharbor/harbor/src/controller/scandataexport"
 	"github.com/goharbor/harbor/src/jobservice/job"
@@ -81,27 +83,17 @@ func (se *scanDataExportAPI) ExportScanData(ctx context.Context, params operatio
 	scanDataExportJob := new(models.ScanDataExportJob)
 
 	secContext, err := se.GetSecurityContext(ctx)
-
 	if err != nil {
 		return se.SendError(ctx, err)
 	}
 
-	// vendor id associated with the job == the user id
-	usr, err := se.userMgr.GetByName(ctx, secContext.GetUsername())
-
+	owner, err := se.exportOwner(ctx, secContext)
 	if err != nil {
 		return se.SendError(ctx, err)
 	}
 
-	if usr == nil {
-		err := &models.Error{Message: fmt.Sprintf("User : %s not found", secContext.GetUsername())}
-		errors := &models.Errors{Errors: []*models.Error{err}}
-		return operation.NewExportScanDataForbidden().WithPayload(errors)
-	}
-
-	userContext := context.WithValue(ctx, export.CsvJobVendorIDKey, usr.UserID)
-
-	jobID, err := se.scanDataExportCtl.Start(userContext, se.convertToCriteria(params.Criteria, secContext.GetUsername(), usr.UserID))
+	userContext := context.WithValue(ctx, export.CsvJobVendorIDKey, owner.UserID)
+	jobID, err := se.scanDataExportCtl.Start(userContext, se.convertToCriteria(params.Criteria, owner))
 	if err != nil {
 		return se.SendError(ctx, err)
 	}
@@ -129,9 +121,8 @@ func (se *scanDataExportAPI) GetScanDataExportExecution(ctx context.Context, par
 	if err != nil {
 		return se.SendError(ctx, err)
 	}
-	if secContext.GetUsername() != execution.UserName {
-		err = errors.New(nil).WithCode(errors.ForbiddenCode)
-		return se.SendError(ctx, err)
+	if !ownsExport(secContext, execution) {
+		return se.SendError(ctx, errors.ForbiddenError(nil).WithMessage("only the account that started this export can read it"))
 	}
 
 	sdeExec := models.ScanDataExportExecution{
@@ -179,7 +170,7 @@ func (se *scanDataExportAPI) DownloadScanData(ctx context.Context, params operat
 		return se.SendError(ctx, err)
 	}
 
-	if secContext.GetUsername() != execution.UserName {
+	if !ownsExport(secContext, execution) {
 		return middleware.ResponderFunc(func(writer http.ResponseWriter, _ runtime.Producer) {
 			writer.WriteHeader(http.StatusForbidden)
 		})
@@ -223,7 +214,12 @@ func (se *scanDataExportAPI) GetScanDataExportExecutionList(ctx context.Context,
 		return se.SendError(ctx, err)
 	}
 
-	executions, err := se.scanDataExportCtl.ListExecutions(ctx, secContext.GetUsername())
+	var executions []*export.Execution
+	if r, ok := secContext.(*robotSec.SecurityContext); ok && r.User() != nil {
+		executions, err = se.scanDataExportCtl.ListRobotExecutions(ctx, r.User().ID)
+	} else {
+		executions, err = se.scanDataExportCtl.ListExecutions(ctx, secContext.GetUsername())
+	}
 	if err != nil {
 		return se.SendError(ctx, err)
 	}
@@ -231,6 +227,9 @@ func (se *scanDataExportAPI) GetScanDataExportExecutionList(ctx context.Context,
 	projectSet := make(map[int64]struct{})
 	execs := make([]*models.ScanDataExportExecution, 0)
 	for _, execution := range executions {
+		if !ownsExport(secContext, execution) {
+			continue
+		}
 		sdeExec := &models.ScanDataExportExecution{
 			EndTime:     strfmt.DateTime(execution.EndTime),
 			ID:          execution.ID,
@@ -268,10 +267,11 @@ func (se *scanDataExportAPI) GetScanDataExportExecutionList(ctx context.Context,
 	return operation.NewGetScanDataExportExecutionListOK().WithPayload(&sdeExecList)
 }
 
-func (se *scanDataExportAPI) convertToCriteria(requestCriteria *models.ScanDataExportRequest, userName string, userID int) export.Request {
+func (se *scanDataExportAPI) convertToCriteria(requestCriteria *models.ScanDataExportRequest, owner exportPrincipal) export.Request {
 	return export.Request{
-		UserID:       userID,
-		UserName:     userName,
+		UserID:       owner.UserID,
+		UserName:     owner.Name,
+		RobotID:      owner.RobotID,
 		JobName:      requestCriteria.JobName,
 		CVEIds:       requestCriteria.CVEIds,
 		Labels:       requestCriteria.Labels,
@@ -279,6 +279,39 @@ func (se *scanDataExportAPI) convertToCriteria(requestCriteria *models.ScanDataE
 		Repositories: requestCriteria.Repositories,
 		Tags:         requestCriteria.Tags,
 	}
+}
+
+// exportPrincipal is the identity an export execution is recorded under.
+type exportPrincipal struct {
+	Name    string
+	UserID  int
+	RobotID int64
+}
+
+// exportOwner resolves the caller to a local user, or to its robot account when it authenticated as one.
+func (se *scanDataExportAPI) exportOwner(ctx context.Context, secContext security.Context) (exportPrincipal, error) {
+	if r, ok := secContext.(*robotSec.SecurityContext); ok {
+		if r.User() == nil || r.User().ID == 0 {
+			return exportPrincipal{}, errors.UnauthorizedError(nil).WithMessage("robot account not resolved")
+		}
+		return exportPrincipal{Name: r.User().Name, RobotID: r.User().ID}, nil
+	}
+	usr, err := se.userMgr.GetByName(ctx, secContext.GetUsername())
+	if err != nil {
+		return exportPrincipal{}, err
+	}
+	if usr == nil {
+		return exportPrincipal{}, errors.ForbiddenError(nil).WithMessagef("User : %s not found", secContext.GetUsername())
+	}
+	return exportPrincipal{Name: usr.Username, UserID: usr.UserID}, nil
+}
+
+// ownsExport reports whether the caller started the execution; robots match by account ID so a same-named user cannot claim it.
+func ownsExport(secContext security.Context, execution *export.Execution) bool {
+	if r, ok := secContext.(*robotSec.SecurityContext); ok {
+		return r.User() != nil && execution.RobotID != 0 && execution.RobotID == r.User().ID
+	}
+	return execution.RobotID == 0 && secContext.GetUsername() == execution.UserName
 }
 
 func (se *scanDataExportAPI) cleanUpArtifact(ctx context.Context, repositoryName, digest string, execID int64, file io.ReadCloser) {

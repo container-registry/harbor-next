@@ -17,6 +17,7 @@ package scandataexport
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,6 +37,7 @@ type Controller interface {
 	Start(ctx context.Context, criteria export.Request) (executionID int64, err error)
 	GetExecution(ctx context.Context, executionID int64) (*export.Execution, error)
 	ListExecutions(ctx context.Context, userName string) ([]*export.Execution, error)
+	ListRobotExecutions(ctx context.Context, robotID int64) ([]*export.Execution, error)
 	GetTask(ctx context.Context, executionID int64) (*task.Task, error)
 	DeleteExecution(ctx context.Context, executionID int64) error
 }
@@ -57,9 +59,18 @@ type controller struct {
 }
 
 func (c *controller) ListExecutions(ctx context.Context, userName string) ([]*export.Execution, error) {
+	return c.listExecutions(ctx, export.UserNameAttribute, userName)
+}
+
+// ListRobotExecutions lists by robot ID, which survives a robot name prefix change.
+func (c *controller) ListRobotExecutions(ctx context.Context, robotID int64) ([]*export.Execution, error) {
+	return c.listExecutions(ctx, export.RobotIDAttribute, strconv.FormatInt(robotID, 10))
+}
+
+func (c *controller) listExecutions(ctx context.Context, attr, value string) ([]*export.Execution, error) {
 	keywords := make(map[string]any)
 	keywords["VendorType"] = job.ScanDataExportVendorType
-	keywords[fmt.Sprintf("ExtraAttrs.%s", export.UserNameAttribute)] = userName
+	keywords[fmt.Sprintf("ExtraAttrs.%s", attr)] = value
 
 	q := q2.New(q2.KeyWords{})
 	q.Keywords = keywords
@@ -130,6 +141,9 @@ func (c *controller) Start(ctx context.Context, request export.Request) (executi
 	extraAttrs[export.ProjectIDsAttribute] = request.Projects
 	extraAttrs[export.JobNameAttribute] = request.JobName
 	extraAttrs[export.UserNameAttribute] = request.UserName
+	if request.RobotID != 0 {
+		extraAttrs[export.RobotIDAttribute] = request.RobotID
+	}
 	id, err := c.execMgr.Create(ctx, job.ScanDataExportVendorType, vendorID, task.ExecutionTriggerManual, extraAttrs)
 	logger.Infof("Created an execution record with id : %d for vendorID: %d", id, vendorID)
 	if err != nil {
@@ -201,6 +215,9 @@ func (c *controller) convertToExportExecStatus(ctx context.Context, exec *task.E
 	}
 	if userName, ok := exec.ExtraAttrs[export.UserNameAttribute]; ok {
 		execStatus.UserName = userName.(string)
+	}
+	if robotID, ok := exec.ExtraAttrs[export.RobotIDAttribute]; ok {
+		execStatus.RobotID, _ = task.Int64FromAny(robotID)
 	}
 	if statusMessage, ok := exec.ExtraAttrs[export.StatusMessageAttribute]; ok {
 		execStatus.StatusMessage = statusMessage.(string)

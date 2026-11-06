@@ -1,0 +1,125 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Vadim Bauer <vb@container-registry.com>
+Date: Wed, 4 Nov 2026 15:55:16 +0100
+Subject: [PATCH 3/3] fix(registry/storage): close the file writer when saving
+ hash state fails
+
+blobWriter.Close returned early when storeHashState failed, so the
+storage driver's FileWriter was never closed. Resumable digests are
+enabled by default and storeHashState writes to the backend, so a
+backend error during request cleanup left whatever the driver holds for
+the upload unreleased, such as the s3 driver's spool file.
+
+Always close the file writer and return both errors.
+
+Signed-off-by: Vadim Bauer <vb@container-registry.com>
+Upstream: https://github.com/distribution/distribution/pull/5064
+---
+ registry/storage/blobwriter.go            |  7 ++-
+ registry/storage/blobwriter_close_test.go | 76 +++++++++++++++++++++++
+ 2 files changed, 81 insertions(+), 2 deletions(-)
+ create mode 100644 registry/storage/blobwriter_close_test.go
+
+diff --git a/registry/storage/blobwriter.go b/registry/storage/blobwriter.go
+index afa0ac80..39325360 100644
+--- a/registry/storage/blobwriter.go
++++ b/registry/storage/blobwriter.go
+@@ -152,11 +152,14 @@ func (bw *blobWriter) Close() error {
+ 		return errors.New("blobwriter close after commit")
+ 	}
+ 
++	// Close the file writer even when saving the hash state fails, so the
++	// driver can release what it holds for the upload (e.g. a spool file).
++	var hashErr error
+ 	if err := bw.storeHashState(bw.blobStore.ctx); err != nil && err != errResumableDigestNotAvailable {
+-		return err
++		hashErr = err
+ 	}
+ 
+-	return bw.fileWriter.Close()
++	return errors.Join(hashErr, bw.fileWriter.Close())
+ }
+ 
+ // validateBlob checks the data against the digest, returning an error if it
+diff --git a/registry/storage/blobwriter_close_test.go b/registry/storage/blobwriter_close_test.go
+new file mode 100644
+index 00000000..8c24c3a7
+--- /dev/null
++++ b/registry/storage/blobwriter_close_test.go
+@@ -0,0 +1,76 @@
++package storage
++
++import (
++	"context"
++	"errors"
++	"strings"
++	"testing"
++
++	"github.com/distribution/distribution/v3/registry/storage/cache/memory"
++	storagedriver "github.com/distribution/distribution/v3/registry/storage/driver"
++	"github.com/distribution/distribution/v3/registry/storage/driver/inmemory"
++	"github.com/distribution/reference"
++)
++
++var errHashStatePut = errors.New("hash state put failed")
++
++// hashStateFailingDriver fails hash state writes and records whether the
++// upload file writers it handed out were closed.
++type hashStateFailingDriver struct {
++	storagedriver.StorageDriver
++	closed int
++}
++
++func (d *hashStateFailingDriver) PutContent(ctx context.Context, path string, content []byte) error {
++	if strings.Contains(path, "/hashstates/") {
++		return errHashStatePut
++	}
++	return d.StorageDriver.PutContent(ctx, path, content)
++}
++
++func (d *hashStateFailingDriver) Writer(ctx context.Context, path string, append bool) (storagedriver.FileWriter, error) {
++	fw, err := d.StorageDriver.Writer(ctx, path, append)
++	if err != nil {
++		return nil, err
++	}
++	return &closeRecordingFileWriter{FileWriter: fw, driver: d}, nil
++}
++
++type closeRecordingFileWriter struct {
++	storagedriver.FileWriter
++	driver *hashStateFailingDriver
++}
++
++func (w *closeRecordingFileWriter) Close() error {
++	w.driver.closed++
++	return w.FileWriter.Close()
++}
++
++func TestBlobWriterCloseClosesFileWriterWhenHashStateFails(t *testing.T) {
++	ctx := context.Background()
++	driver := &hashStateFailingDriver{StorageDriver: inmemory.New()}
++	registry, err := NewRegistry(ctx, driver, BlobDescriptorCacheProvider(memory.NewInMemoryBlobDescriptorCacheProvider(memory.UnlimitedSize)))
++	if err != nil {
++		t.Fatalf("error creating registry: %v", err)
++	}
++	imageName, _ := reference.WithName("foo/bar")
++	repository, err := registry.Repository(ctx, imageName)
++	if err != nil {
++		t.Fatalf("unexpected error getting repo: %v", err)
++	}
++
++	upload, err := repository.Blobs(ctx).Create(ctx)
++	if err != nil {
++		t.Fatalf("unexpected error starting upload: %v", err)
++	}
++	if _, err := upload.Write([]byte{1, 2, 3}); err != nil {
++		t.Fatalf("unexpected error writing upload: %v", err)
++	}
++
++	if err := upload.Close(); !errors.Is(err, errHashStatePut) {
++		t.Errorf("Close() error = %v, want %v", err, errHashStatePut)
++	}
++	if driver.closed != 1 {
++		t.Errorf("file writer closed %d times, want 1", driver.closed)
++	}
++}

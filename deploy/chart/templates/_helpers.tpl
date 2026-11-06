@@ -512,6 +512,49 @@ Resolution order:
 
 {{/*
 =============================================================================
+Secret content predicates
+=============================================================================
+"harbor.secretData" renders a component's secretData define (the single
+source of truth, colocated with the Secret template) once per release
+render and caches it on the root context, so the Secret, the pod checksum
+and the predicates share one set of generated material instead of each
+calling genCA/randAlphaNum again.
+Usage: {{ include "harbor.secretData" (dict "root" . "component" "core") }}
+*/}}
+{{- define "harbor.secretData" -}}
+{{- if not (hasKey .root "harborSecretData") }}
+{{- $_ := set .root "harborSecretData" dict }}
+{{- end }}
+{{- $cache := .root.harborSecretData }}
+{{- if not (hasKey $cache .component) }}
+{{- $_ := set $cache .component (include (printf "harbor.%s.secretData" .component) .root) }}
+{{- end }}
+{{- index $cache .component }}
+{{- end -}}
+
+{{/*
+Each returns "true" only when its component's secretData is non-empty, so
+a fully externalized (GitOps) install creates no empty Secrets and no
+dangling secretRefs.
+*/}}
+{{- define "harbor.core.secretHasData" -}}
+{{- if include "harbor.secretData" (dict "root" . "component" "core") | trim -}}true{{- end -}}
+{{- end -}}
+
+{{- define "harbor.registry.secretHasData" -}}
+{{- if include "harbor.secretData" (dict "root" . "component" "registry") | trim -}}true{{- end -}}
+{{- end -}}
+
+{{- define "harbor.jobservice.secretHasData" -}}
+{{- if include "harbor.secretData" (dict "root" . "component" "jobservice") | trim -}}true{{- end -}}
+{{- end -}}
+
+{{- define "harbor.registryctl.secretHasData" -}}
+{{- if include "harbor.secretData" (dict "root" . "component" "registryctl") | trim -}}true{{- end -}}
+{{- end -}}
+
+{{/*
+=============================================================================
 Validation helpers
 =============================================================================
 */}}
@@ -523,8 +566,23 @@ Validate required values
 {{- if not .Values.externalURL }}
 {{- fail "externalURL is required. Please set externalURL in your values." }}
 {{- end }}
-{{- if not .Values.database.host }}
-{{- fail "database.host is required. Please set database.host in your values." }}
+{{- if and (not .Values.postgresql.enabled) (not .Values.database.host) }}
+{{- fail "database.host is required. Please set database.host in your values, or set postgresql.enabled=true." }}
+{{- end }}
+{{- if .Values.postgresql.enabled }}
+{{- if and (not .Values.autoGenSecrets) (not .Values.postgresql.auth.password) (not .Values.postgresql.auth.existingSecret) }}
+{{- fail "autoGenSecrets is false: set postgresql.auth.password or postgresql.auth.existingSecret" }}
+{{- end }}
+{{- $p := .Values.postgresql.persistence | default dict }}
+{{- $vol := $p.volumeName | default "data" }}
+{{- $sub := $p.subPath | default "" }}
+{{- range .Values.postgresql.initContainers }}
+{{- range .volumeMounts }}
+{{- if and (eq .mountPath "/var/lib/postgresql") (or (ne .name $vol) (ne (.subPath | default "") $sub)) }}
+{{- fail "postgresql.initContainers must mount the data volume like the subchart: match postgresql.persistence.volumeName and subPath, or set postgresql.initContainers: []" }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- end }}
 {{- if and (not .Values.harborAdminPassword) (not .Values.existingSecretAdminPassword) }}
 {{- fail "harborAdminPassword or existingSecretAdminPassword is required. Please set one in your values." }}

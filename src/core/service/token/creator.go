@@ -26,8 +26,10 @@ import (
 	"github.com/goharbor/harbor/src/common/models"
 	"github.com/goharbor/harbor/src/common/rbac"
 	rbac_project "github.com/goharbor/harbor/src/common/rbac/project"
+	"github.com/goharbor/harbor/src/common/rbac/system"
 	"github.com/goharbor/harbor/src/common/security"
 	"github.com/goharbor/harbor/src/controller/project"
+	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
 )
@@ -134,8 +136,7 @@ func (reg registryFilter) filter(ctx context.Context, _ project.Controller,
 	}
 
 	secCtx, ok := security.FromContext(ctx)
-	if !ok || !secCtx.IsSysAdmin() {
-		// Set the actions to empty is the user is not admin
+	if !ok || !(secCtx.IsSysAdmin() || secCtx.Can(ctx, rbac.ActionRead, system.NewNamespace().Resource(rbac.ResourceCatalog))) {
 		a.Actions = []string{}
 	}
 	return nil
@@ -214,11 +215,30 @@ func (g generalCreator) Create(r *http.Request) (*models.Token, error) {
 		}
 	}
 	access := GetResourceActions(scopes)
+	rewriteBareRepositoryScopes(r.Context(), access)
 	err = filterAccess(r.Context(), access, project.Ctl, g.filterMap)
 	if err != nil {
 		return nil, err
 	}
 	return MakeToken(r.Context(), ctx.GetUsername(), g.service, access)
+}
+
+// rewriteBareRepositoryScopes qualifies repository scopes that lack a project
+// segment with the configured default project, so a client-computed scope like
+// "repository:alpine:push,pull" grants access on "<default>/alpine". Clients
+// build the scope from the repository reference they were given, hence a bare
+// push produces a bare scope even though the URL rewrite in the artifactinfo
+// middleware already qualified the request path.
+func rewriteBareRepositoryScopes(ctx context.Context, access []*token.ResourceActions) {
+	dp := config.DefaultProjectName(ctx)
+	if dp == "" {
+		return
+	}
+	for _, a := range access {
+		if a.Type == "repository" && a.Name != "" && !strings.Contains(a.Name, "/") {
+			a.Name = dp + "/" + a.Name
+		}
+	}
 }
 
 func parseScopes(u *url.URL) []string {

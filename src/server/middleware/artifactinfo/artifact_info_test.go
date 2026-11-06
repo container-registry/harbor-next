@@ -23,8 +23,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/lib"
+	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/errors"
+	_ "github.com/goharbor/harbor/src/pkg/config/inmemory"
 )
 
 func TestParseURL(t *testing.T) {
@@ -199,4 +202,62 @@ func TestPopulateArtifactInfo(t *testing.T) {
 			assert.Equal(t, tt.art, a)
 		}
 	}
+}
+
+func TestDefaultProjectRewrite(t *testing.T) {
+	prev := config.DefaultCfgManager
+	config.InitWithSettings(map[string]any{common.DefaultProjectName: "library"})
+	defer func() {
+		// the inmemory manager is a shared singleton — restore its value too
+		_ = config.DefaultMgr().UpdateConfig(context.Background(), map[string]any{common.DefaultProjectName: "library"})
+		config.DefaultCfgManager = prev
+	}()
+
+	next := &handler{}
+	mw := Middleware()(next)
+
+	// bare manifest reference lands in the default project
+	req := httptest.NewRequest(http.MethodPut, "/v2/hello-world/manifests/latest", nil)
+	rec := httptest.NewRecorder()
+	mw.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "/v2/library/hello-world/manifests/latest", req.URL.Path)
+	art := lib.GetArtifactInfo(next.ctx)
+	assert.Equal(t, "library/hello-world", art.Repository)
+	assert.Equal(t, "library", art.ProjectName)
+	assert.Equal(t, "latest", art.Tag)
+
+	// bare blob upload
+	req = httptest.NewRequest(http.MethodPost, "/v2/busybox/blobs/uploads/", nil)
+	rec = httptest.NewRecorder()
+	mw.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "/v2/library/busybox/blobs/uploads/", req.URL.Path)
+	assert.Equal(t, "library/busybox", lib.GetArtifactInfo(next.ctx).Repository)
+
+	// bare blob mount source is qualified as well
+	req = httptest.NewRequest(http.MethodPost, "/v2/library/ubuntu/blobs/uploads/?mount=sha256:08e4a417ff4e3913d8723a05cc34055db01c2fd165b588e049c5bad16ce6094f&from=no-project", nil)
+	rec = httptest.NewRecorder()
+	mw.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	art = lib.GetArtifactInfo(next.ctx)
+	assert.Equal(t, "library/no-project", art.BlobMountRepository)
+	assert.Equal(t, "library", art.BlobMountProjectName)
+	assert.Equal(t, "library/no-project", req.URL.Query().Get("from"))
+
+	// qualified repository is untouched
+	req = httptest.NewRequest(http.MethodDelete, "/v2/dev/img/manifests/latest", nil)
+	rec = httptest.NewRecorder()
+	mw.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "/v2/dev/img/manifests/latest", req.URL.Path)
+	assert.Equal(t, "dev/img", lib.GetArtifactInfo(next.ctx).Repository)
+
+	// empty setting disables the rewrite and restores the legacy rejection
+	assert.NoError(t, config.DefaultMgr().UpdateConfig(context.Background(), map[string]any{common.DefaultProjectName: ""}))
+	req = httptest.NewRequest(http.MethodPut, "/v2/hello-world/manifests/latest", nil)
+	rec = httptest.NewRecorder()
+	mw.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Equal(t, "/v2/hello-world/manifests/latest", req.URL.Path)
 }

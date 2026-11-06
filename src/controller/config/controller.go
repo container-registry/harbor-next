@@ -26,8 +26,10 @@ import (
 	"github.com/goharbor/harbor/src/lib/config/models"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
+	"github.com/goharbor/harbor/src/lib/orm"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/audit"
+	"github.com/goharbor/harbor/src/pkg/project"
 	"github.com/goharbor/harbor/src/pkg/user"
 )
 
@@ -56,12 +58,13 @@ type Controller interface {
 }
 
 type controller struct {
-	userManager user.Manager
+	userManager   user.Manager
+	projectExists func(context.Context, string) (bool, error)
 }
 
 // NewController ...
 func NewController() Controller {
-	return &controller{userManager: user.Mgr}
+	return &controller{userManager: user.Mgr, projectExists: project.ExistsLocked}
 }
 
 func (c *controller) UserConfigs(ctx context.Context) (map[string]*models.Value, error) {
@@ -80,18 +83,32 @@ func (c *controller) UpdateUserConfigs(ctx context.Context, conf map[string]any)
 	if readOnlyForAll {
 		return errors.ForbiddenError(nil).WithMessage("current config is init by env variable: CONFIG_OVERWRITE_JSON, it cannot be updated")
 	}
+	if _, ok := conf[common.DefaultProjectName]; ok && defaultProjectPinned() {
+		return errors.ForbiddenError(nil).WithMessagef("%s is set by env variable %s, it cannot be updated", common.DefaultProjectName, common.DefaultProjectNameEnv)
+	}
 	mgr := config.GetCfgManager(ctx)
 	err := mgr.Load(ctx)
 	if err != nil {
 		return err
 	}
-	err = c.validateCfg(ctx, conf)
+	apply := func(ctx context.Context) error {
+		if err := c.validateCfg(ctx, conf); err != nil {
+			return err
+		}
+		if err := mgr.UpdateConfig(ctx, conf); err != nil {
+			log.Errorf("failed to upload configurations: %v", err)
+			return fmt.Errorf("failed to validate configuration")
+		}
+		return nil
+	}
+	if _, ok := conf[common.DefaultProjectName]; ok {
+		// the existence check share-locks the project row until the write commits
+		err = orm.WithTransaction(apply)(ctx)
+	} else {
+		err = apply(ctx)
+	}
 	if err != nil {
 		return err
-	}
-	if err := mgr.UpdateConfig(ctx, conf); err != nil {
-		log.Errorf("failed to upload configurations: %v", err)
-		return fmt.Errorf("failed to validate configuration")
 	}
 	// update the audit logger to point to the new endpoint
 	return c.updateLogEndpoint(ctx, conf)
@@ -143,6 +160,43 @@ func (c *controller) validateCfg(ctx context.Context, cfgs map[string]any) error
 		return err
 	}
 
+	// verify the default project name cfg
+	if err = c.verifyDefaultProjectNameCfg(ctx, cfgs); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func defaultProjectPinned() bool {
+	_, ok := os.LookupEnv(common.DefaultProjectNameEnv)
+	return ok
+}
+
+// verifyDefaultProjectNameCfg rejects a default_project_name that is not an
+// existing project; empty disables the fallback.
+func (c *controller) verifyDefaultProjectNameCfg(ctx context.Context, cfgs map[string]any) error {
+	v, exist := cfgs[common.DefaultProjectName]
+	if !exist {
+		return nil
+	}
+	name, ok := v.(string)
+	if !ok {
+		return errors.BadRequestError(nil).WithMessagef("the %s value must be a string", common.DefaultProjectName)
+	}
+	if name == "" {
+		return nil
+	}
+	if !project.IsValidName(name) {
+		return errors.BadRequestError(nil).WithMessagef("the %s value %q is not a valid project name", common.DefaultProjectName, name)
+	}
+	exists, err := c.projectExists(ctx, name)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return errors.BadRequestError(nil).WithMessagef("the %s value %q is not an existing project", common.DefaultProjectName, name)
+	}
 	return nil
 }
 
@@ -265,6 +319,9 @@ func (c *controller) ConvertForGet(ctx context.Context, cfg map[string]any, inte
 		return nil, err
 	}
 	result[common.AUTHMode].Editable = canBeModified && !readOnlyForAll
+	if v, ok := result[common.DefaultProjectName]; ok && defaultProjectPinned() {
+		v.Editable = false
+	}
 
 	return result, nil
 }
@@ -275,6 +332,10 @@ func (c *controller) OverwriteConfig(ctx context.Context) error {
 		err := json.Unmarshal([]byte(v), &cfgMap)
 		if err != nil {
 			return err
+		}
+		if _, ok := cfgMap[common.DefaultProjectName]; ok && defaultProjectPinned() {
+			log.Infof("ignoring %s in %s, %s takes precedence", common.DefaultProjectName, configOverwriteJSON, common.DefaultProjectNameEnv)
+			delete(cfgMap, common.DefaultProjectName)
 		}
 		err = c.UpdateUserConfigs(ctx, cfgMap)
 		if err != nil {

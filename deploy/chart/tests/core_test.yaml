@@ -38,6 +38,97 @@ tests:
           path: data.EXT_ENDPOINT
           value: "https://harbor.example.com"
 
+  # Pins: DEFAULT_PROJECT_NAME is omitted when core.defaultProjectName is null.
+  - it: should omit DEFAULT_PROJECT_NAME by default
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - notExists:
+          path: data.DEFAULT_PROJECT_NAME
+
+  # Pins: a set core.defaultProjectName reaches the core env.
+  - it: should render DEFAULT_PROJECT_NAME from core.defaultProjectName
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.defaultProjectName: catchall
+    asserts:
+      - equal:
+          path: data.DEFAULT_PROJECT_NAME
+          value: catchall
+
+  # Pins: an empty core.defaultProjectName is kept, since it disables the fallback.
+  - it: should render an empty DEFAULT_PROJECT_NAME
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.defaultProjectName: ""
+    asserts:
+      - equal:
+          path: data.DEFAULT_PROJECT_NAME
+          value: ""
+
+  # Pins: core.defaultProjectName and a DEFAULT_PROJECT_NAME in core.config cannot both render.
+  - it: should fail when core.config also sets DEFAULT_PROJECT_NAME
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.defaultProjectName: catchall
+      core.config.default_project_name: other
+    asserts:
+      - failedTemplate:
+          errorMessage: set core.defaultProjectName or DEFAULT_PROJECT_NAME in core.config/core.secret/core.extraEnv, not both
+
+  # Pins: core.defaultProjectName and a DEFAULT_PROJECT_NAME in core.extraEnv cannot both render.
+  - it: should fail when core.extraEnv also sets DEFAULT_PROJECT_NAME
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.defaultProjectName: catchall
+      core.extraEnv:
+        - name: DEFAULT_PROJECT_NAME
+          value: other
+    asserts:
+      - failedTemplate:
+          errorMessage: set core.defaultProjectName or DEFAULT_PROJECT_NAME in core.config/core.secret/core.extraEnv, not both
+
+  # Pins: a DEFAULT_PROJECT_NAME in core.secret conflicts too, whatever the key case.
+  - it: should fail when core.secret also sets DEFAULT_PROJECT_NAME
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.defaultProjectName: catchall
+      core.secret.default_project_name: other
+    asserts:
+      - failedTemplate:
+          errorMessage: set core.defaultProjectName or DEFAULT_PROJECT_NAME in core.config/core.secret/core.extraEnv, not both
+
+  # Pins: DEFAULT_PROJECT_NAME from core.config alone still renders.
+  - it: should keep DEFAULT_PROJECT_NAME from core.config when core.defaultProjectName is unset
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.config.DEFAULT_PROJECT_NAME: other
+    asserts:
+      - equal:
+          path: data.DEFAULT_PROJECT_NAME
+          value: other
+
   # Pins: HARBOR_ADMIN_PASSWORD in the Secret is base64-encoded from the raw input.
   - it: should base64-encode harborAdminPassword into the Secret
     template: templates/core.secret.yaml
@@ -441,3 +532,52 @@ tests:
       - equal:
           path: data.HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
           value: "true"
+
+  # Pins: with every core key externalized the generated Secret is skipped,
+  # so the envFrom secretRef must disappear with it.
+  - it: should drop the generated Secret envFrom when core is fully externalized
+    template: templates/core.deployment.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      autoGenSecrets: false
+      existingSecretAdminPassword: harbor-admin
+      existingSecretSecretKey: enc-key
+      core.existingSecret: core-id
+      core.existingXsrfSecret: core-id
+      core.tokenSecretName: token-cert
+      registry.credentials.existingSecret: reg-creds
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: RELEASE-NAME-harbor-core
+
+  # Pins: with autogen on and no token cert supplied, the generated cert keeps
+  # the Secret rendered and the Deployment referencing it.
+  - it: should render the generated Secret and its envFrom when the token cert is not supplied
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      autoGenSecrets: true
+      existingSecretAdminPassword: harbor-admin
+      existingSecretSecretKey: enc-key
+      core.existingSecret: core-id
+      core.existingXsrfSecret: core-id
+      registry.credentials.existingSecret: reg-creds
+    asserts:
+      - template: templates/core.secret.yaml
+        documentIndex: 0
+        isKind:
+          of: Secret
+      - template: templates/core.secret.yaml
+        documentIndex: 0
+        exists:
+          path: data["tls.crt"]
+      - template: templates/core.deployment.yaml
+        contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: RELEASE-NAME-harbor-core

@@ -36,6 +36,82 @@
                 </option>
             </select>
         </clr-select-container>
+        <div class="clr-form-control">
+            <label for="defaultProjectName" class="clr-control-label"
+                >{{ 'CONFIG.DEFAULT_PROJECT' | translate }}
+                <clr-tooltip>
+                    <clr-icon
+                        clrTooltipTrigger
+                        shape="info-circle"
+                        size="24"></clr-icon>
+                    <clr-tooltip-content
+                        clrPosition="top-right"
+                        clrSize="lg"
+                        *clrIfOpen>
+                        <span>{{
+                            'CONFIG.TOOLTIP.DEFAULT_PROJECT' | translate
+                        }}</span>
+                    </clr-tooltip-content>
+                </clr-tooltip>
+            </label>
+            <div
+                class="clr-control-container"
+                [class.clr-error]="
+                    defaultProjectName.invalid || !defaultProjectExists
+                ">
+                <div
+                    class="clr-input-wrapper"
+                    (mouseleave)="leaveDefaultProjectInput()">
+                    <input
+                        class="clr-input"
+                        name="defaultProjectName"
+                        type="text"
+                        #defaultProjectName="ngModel"
+                        [ngModel]="currentConfig.default_project_name.value"
+                        (ngModelChange)="handleDefaultProjectInput($event)"
+                        pattern="^[a-z0-9]+(?:[._\-][a-z0-9]+)*$"
+                        maxlength="255"
+                        autocomplete="off"
+                        id="defaultProjectName"
+                        size="20"
+                        [disabled]="
+                            disabled(currentConfig.default_project_name)
+                        " />
+                    <clr-icon
+                        class="clr-validate-icon"
+                        shape="exclamation-circle"></clr-icon>
+                    <span
+                        class="spinner spinner-inline"
+                        [hidden]="!defaultProjectChecking"></span>
+                    <div
+                        class="selectBox project-options"
+                        [style.display]="
+                            searchedProjects.length ? 'block' : 'none'
+                        ">
+                        <ul role="listbox">
+                            <li role="none" *ngFor="let p of searchedProjects">
+                                <button
+                                    type="button"
+                                    role="option"
+                                    class="project-option"
+                                    (click)="selectDefaultProject(p.name)">
+                                    {{ p.name }}
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <clr-control-error *ngIf="defaultProjectName.invalid">{{
+                    'PROJECT.NAME_TOOLTIP' | translate
+                }}</clr-control-error>
+                <clr-control-error
+                    *ngIf="defaultProjectName.valid && !defaultProjectExists"
+                    >{{
+                        'CONFIG.DEFAULT_PROJECT_NOT_FOUND' | translate
+                    }}</clr-control-error
+                >
+            </div>
+        </div>
         <clr-input-container>
             <label for="tokenExpiration" class="required"
                 >{{ 'CONFIG.TOKEN_EXPIRATION' | translate }}
@@ -435,7 +511,7 @@
         id="config_system_cancel"
         class="btn btn-outline"
         (click)="cancel()"
-        [disabled]="!isValid() || !hasChanges() || inProgress">
+        [disabled]="!hasChanges() || inProgress">
         {{ 'BUTTON.CANCEL' | translate }}
     </button>
 </div>

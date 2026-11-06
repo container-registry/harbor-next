@@ -220,3 +220,32 @@ $message-type-width: 12rem;
     min-width: 7rem;
   }
 }
+
+.project-options {
+  position: absolute;
+  min-width: $input-width;
+  border: 1px solid rgb(0 0 0 / 15%);
+  border-radius: 6px;
+  box-shadow: 0 5px 10px rgb(0 0 0 / 20%);
+  z-index: 100;
+
+  ul li {
+    list-style: none;
+  }
+
+  .project-option {
+    width: 100%;
+    padding: 3px 20px;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      background-color: rgb(0 0 0 / 10%);
+    }
+  }
+}

@@ -238,6 +238,12 @@ const (
 	// Customized banner message
 	BannerMessage = "banner_message"
 
+	// DefaultProjectName is the project that receives repositories pushed/pulled
+	// without a project segment; empty disables the fallback
+	DefaultProjectName = "default_project_name"
+	// DefaultProjectNameEnv pins default_project_name at core start and locks it
+	DefaultProjectNameEnv = "DEFAULT_PROJECT_NAME"
+
 	// UnauthenticatedLandingPage controls which page unauthenticated users see
 	UnauthenticatedLandingPage = "unauthenticated_landing_page"
 	LandingPageLogin           = "login"

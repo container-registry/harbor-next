@@ -18,6 +18,10 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	commonmodels "github.com/goharbor/harbor/src/common/models"
+	"github.com/goharbor/harbor/src/common/security"
+	robotSec "github.com/goharbor/harbor/src/common/security/robot"
+	"github.com/goharbor/harbor/src/controller/robot"
+	robotmodel "github.com/goharbor/harbor/src/pkg/robot/model"
 	"github.com/goharbor/harbor/src/pkg/scan/export"
 	v1 "github.com/goharbor/harbor/src/pkg/scan/rest/v1"
 	"github.com/goharbor/harbor/src/server/v2.0/models"
@@ -658,6 +662,56 @@ func (suite *ScanExportTestSuite) TestGetScanDataExportExecutionListFilterNotOwn
 	json.NewDecoder(res.Body).Decode(&respData)
 	suite.Equal(1, len(respData.Items))
 	suite.Equal(int64(100), respData.Items[0].ID)
+}
+
+func (suite *ScanExportTestSuite) TestExportOwner() {
+	api := &scanDataExportAPI{userMgr: suite.userMgr}
+	ctx := context.TODO()
+
+	r := &robot.Robot{Robot: robotmodel.Robot{ID: 42, Name: "robot$proj+ci"}}
+	owner, err := api.exportOwner(ctx, robotSec.NewSecurityContext(r))
+	suite.NoError(err)
+	suite.Equal(exportPrincipal{Name: "robot$proj+ci", RobotID: 42}, owner)
+	suite.userMgr.AssertNotCalled(suite.T(), "GetByName", mock.Anything, mock.Anything)
+
+	suite.Security.On("GetUsername").Return("test-user")
+	suite.userMgr.On("GetByName", mock.Anything, "test-user").Return(&commonmodels.User{UserID: 7, Username: "test-user"}, nil).Once()
+	owner, err = api.exportOwner(ctx, suite.Security)
+	suite.NoError(err)
+	suite.Equal(exportPrincipal{Name: "test-user", UserID: 7}, owner)
+}
+
+func (suite *ScanExportTestSuite) TestOwnsExport() {
+	robotCtx := robotSec.NewSecurityContext(&robot.Robot{Robot: robotmodel.Robot{ID: 42, Name: "robot$proj+ci"}})
+	suite.Security.On("GetUsername").Return("robot$proj+ci")
+
+	byRobot := &export.Execution{UserName: "robot$proj+ci", RobotID: 42}
+	byOtherRobot := &export.Execution{UserName: "robot$proj+ci", RobotID: 43}
+	byUser := &export.Execution{UserName: "robot$proj+ci", UserID: 7}
+
+	suite.True(ownsExport(robotCtx, byRobot))
+	suite.False(ownsExport(robotCtx, byOtherRobot), "a recreated robot with the same name must not read the old one's exports")
+	suite.False(ownsExport(robotCtx, byUser), "a robot must not read a user's export")
+	suite.False(ownsExport(suite.Security, byRobot), "a user named like the robot must not read its export")
+	suite.True(ownsExport(suite.Security, byUser))
+}
+
+func (suite *ScanExportTestSuite) TestRobotListSurvivesPrefixChange() {
+	api := &scanDataExportAPI{scanDataExportCtl: suite.scanExportCtl}
+	// the robot was renamed by a robot_name_prefix change after it started the export
+	r := &robot.Robot{Robot: robotmodel.Robot{ID: 42, Name: "bot-proj+ci"}}
+	ctx := security.NewContext(context.TODO(), robotSec.NewSecurityContext(r))
+	suite.scanExportCtl.On("ListRobotExecutions", mock.Anything, int64(42)).Return([]*export.Execution{
+		{ID: 1, UserName: "robot$proj+ci", RobotID: 42},
+		{ID: 2, UserName: "robot$proj+ci", RobotID: 43},
+	}, nil).Once()
+
+	res := api.GetScanDataExportExecutionList(ctx, operation.GetScanDataExportExecutionListParams{})
+	ok, isOK := res.(*operation.GetScanDataExportExecutionListOK)
+	suite.Require().True(isOK)
+	suite.Require().Len(ok.Payload.Items, 1)
+	suite.Equal(int64(1), ok.Payload.Items[0].ID)
+	suite.scanExportCtl.AssertNotCalled(suite.T(), "ListExecutions", mock.Anything, mock.Anything)
 }
 
 func TestScanExportTestSuite(t *testing.T) {

@@ -15,6 +15,7 @@
 package handler
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -27,6 +28,7 @@ import (
 	v1 "github.com/goharbor/harbor/src/pkg/scan/rest/v1"
 	"github.com/goharbor/harbor/src/server/v2.0/restapi"
 	projecttesting "github.com/goharbor/harbor/src/testing/controller/project"
+	repositorytesting "github.com/goharbor/harbor/src/testing/controller/repository"
 	scannertesting "github.com/goharbor/harbor/src/testing/controller/scanner"
 	"github.com/goharbor/harbor/src/testing/mock"
 	htesting "github.com/goharbor/harbor/src/testing/server/v2.0/handler"
@@ -36,6 +38,7 @@ type ProjectTestSuite struct {
 	htesting.Suite
 
 	projectCtl *projecttesting.Controller
+	repoCtl    *repositorytesting.Controller
 	scannerCtl *scannertesting.Controller
 	project    *models.Project
 	reg        *scanner.Registration
@@ -55,12 +58,18 @@ func (suite *ProjectTestSuite) SetupSuite() {
 	}
 
 	suite.projectCtl = &projecttesting.Controller{}
+	suite.repoCtl = &repositorytesting.Controller{}
 	suite.scannerCtl = &scannertesting.Controller{}
 
 	suite.Config = &restapi.Config{
 		ProjectAPI: &projectAPI{
-			projectCtl: suite.projectCtl,
-			scannerCtl: suite.scannerCtl,
+			projectCtl:     suite.projectCtl,
+			repositoryCtl:  suite.repoCtl,
+			scannerCtl:     suite.scannerCtl,
+			defaultProject: func(context.Context) (string, error) { return "library", nil },
+			deleteLock: func(ctx context.Context, _ int64, f func(context.Context) error) error {
+				return f(ctx)
+			},
 		},
 	}
 	suite.metadata = &v1.ScannerAdapterMetadata{
@@ -295,6 +304,61 @@ func (suite *ProjectTestSuite) TestUpdateProjectRegistryID() {
 		res, err := suite.PutJSON("/projects/1", map[string]any{"registry_id": 0})
 		suite.NoError(err)
 		suite.Equal(200, res.StatusCode)
+	}
+}
+
+func (suite *ProjectTestSuite) TestDeleteDefaultProject() {
+	// later tests register narrower Can expectations that this catch-all would shadow
+	defer func() { suite.Security.ExpectedCalls = nil }()
+	suite.Security.On("IsAuthenticated").Return(true)
+	suite.Security.On("Can", mock.Anything, mock.Anything, mock.Anything).Return(true)
+
+	{
+		// the default project is reported as not deletable
+		mock.OnAnything(suite.projectCtl, "Get").Return(suite.project, nil).Once()
+		mock.OnAnything(suite.repoCtl, "Count").Return(int64(0), nil).Once()
+
+		var result map[string]any
+		res, err := suite.GetJSON("/projects/1/_deletable", &result)
+		suite.NoError(err)
+		suite.Equal(200, res.StatusCode)
+		suite.Nil(result["deletable"])
+		suite.Contains(result["message"], "default project")
+	}
+
+	{
+		// deleting the default project is rejected
+		mock.OnAnything(suite.projectCtl, "Get").Return(suite.project, nil).Twice()
+		mock.OnAnything(suite.repoCtl, "Count").Return(int64(0), nil).Once()
+
+		res, err := suite.Delete("/projects/1")
+		suite.NoError(err)
+		suite.Equal(412, res.StatusCode)
+	}
+
+	{
+		// a default project with repositories still names the default project as the blocker
+		mock.OnAnything(suite.projectCtl, "Get").Return(suite.project, nil).Once()
+		mock.OnAnything(suite.repoCtl, "Count").Return(int64(2), nil).Once()
+
+		var result map[string]any
+		res, err := suite.GetJSON("/projects/1/_deletable", &result)
+		suite.NoError(err)
+		suite.Equal(200, res.StatusCode)
+		suite.Contains(result["message"], "default project")
+	}
+
+	{
+		// any other empty project stays deletable
+		other := &models.Project{ProjectID: 3, Name: "other"}
+		mock.OnAnything(suite.projectCtl, "Get").Return(other, nil).Once()
+		mock.OnAnything(suite.repoCtl, "Count").Return(int64(0), nil).Once()
+
+		var result map[string]any
+		res, err := suite.GetJSON("/projects/3/_deletable", &result)
+		suite.NoError(err)
+		suite.Equal(200, res.StatusCode)
+		suite.Equal(true, result["deletable"])
 	}
 }
 
