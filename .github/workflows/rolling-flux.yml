@@ -36,12 +36,12 @@ jobs:
         run: echo "ROLLING_TAG=${GITHUB_REF_NAME}-${GITHUB_SHA:0:7}" >> "$GITHUB_ENV"
 
       - name: Setup ORAS
-        uses: oras-project/setup-oras@005458ad77f1c8facd38a094e4af2e69e5607ff4 # v2.0.2
+        uses: oras-project/setup-oras@5e2f2482b30b0cb3e14e67f89a80c88c659a7c63 # v2.0.3
         with:
           version: 1.2.0
 
       - name: Setup Flux CLI
-        uses: fluxcd/flux2/action@b9c17924adb533d3617ec7de97a7b0f4acc07b39 # v2.9.6
+        uses: fluxcd/flux2/action@3fa784edd773d56630bb9f62645e08f70c2cff0a # v2.10.0
         with:
           version: 2.4.0
 
