@@ -63,6 +63,7 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 	// declares foreign keys against or reconciles in place.
 	legacyDependencies := []string{
 		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
+		"CREATE TABLE audit_log_ext (id BIGSERIAL PRIMARY KEY)",
 		"CREATE TABLE project (project_id SERIAL PRIMARY KEY, name VARCHAR(255), deleted BOOLEAN NOT NULL DEFAULT false)",
 		"INSERT INTO project (name) VALUES ('library')",
 		"CREATE TABLE properties (id SERIAL PRIMARY KEY, k VARCHAR(64) NOT NULL UNIQUE, v VARCHAR(128) NOT NULL)",
@@ -194,6 +195,9 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 		"claim_rules": {
 			"id", "identity_provider_id", "robot_id", "claim_path", "value", "creation_time",
 		},
+		"audit_log_ext": {
+			"client_address", "user_agent",
+		},
 	}
 	for table, tableColumns := range columns {
 		for _, column := range tableColumns {
@@ -276,6 +280,7 @@ func TestExecutionRevisionGuardResolvesThroughSearchPath(t *testing.T) {
 		fmt.Sprintf("CREATE TABLE %s.role_permission (id BIGSERIAL PRIMARY KEY, role_type VARCHAR(255), role_id BIGINT, permission_policy_id BIGINT)", later),
 		fmt.Sprintf("CREATE TABLE %s.permission_policy (id BIGSERIAL PRIMARY KEY, scope VARCHAR(255), resource VARCHAR(255), action VARCHAR(255), effect VARCHAR(255))", later),
 		fmt.Sprintf("CREATE TABLE %s.robot (id BIGSERIAL PRIMARY KEY)", first),
+		fmt.Sprintf("CREATE TABLE %s.audit_log_ext (id BIGSERIAL PRIMARY KEY)", first),
 		fmt.Sprintf("CREATE TABLE %s.project (project_id SERIAL PRIMARY KEY, name VARCHAR(255), deleted BOOLEAN NOT NULL DEFAULT false)", first),
 		fmt.Sprintf("CREATE TABLE %s.properties (id SERIAL PRIMARY KEY, k VARCHAR(64) NOT NULL UNIQUE, v VARCHAR(128) NOT NULL)", first),
 	}
@@ -357,6 +362,7 @@ func TestExecutionRevisionGuardIgnoresNonTableRelations(t *testing.T) {
 		"CREATE TABLE decoy (id BIGSERIAL PRIMARY KEY, revision INTEGER)",
 		"CREATE INDEX execution ON decoy (revision)",
 		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
+		"CREATE TABLE audit_log_ext (id BIGSERIAL PRIMARY KEY)",
 		"CREATE TABLE project (project_id SERIAL PRIMARY KEY, name VARCHAR(255), deleted BOOLEAN NOT NULL DEFAULT false)",
 		"CREATE TABLE properties (id SERIAL PRIMARY KEY, k VARCHAR(64) NOT NULL UNIQUE, v VARCHAR(128) NOT NULL)",
 		"CREATE TABLE role (role_id SERIAL PRIMARY KEY, role_code VARCHAR(20), name VARCHAR(20))",
@@ -411,6 +417,7 @@ func TestIdentityProvidersAudienceReconcilesLegacyTable(t *testing.T) {
 	// identity_providers as the previous revision of harbor_next.sql created it
 	for _, statement := range []string{
 		"CREATE TABLE robot (id BIGSERIAL PRIMARY KEY)",
+		"CREATE TABLE audit_log_ext (id BIGSERIAL PRIMARY KEY)",
 		"CREATE TABLE project (project_id SERIAL PRIMARY KEY, owner_id INTEGER, name VARCHAR(255), deleted BOOLEAN NOT NULL DEFAULT false)",
 		"CREATE TABLE properties (id SERIAL PRIMARY KEY, k VARCHAR(64) NOT NULL UNIQUE, v VARCHAR(128) NOT NULL)",
 		"CREATE TABLE retention_policy (id SERIAL PRIMARY KEY, scope_level VARCHAR(20), scope_reference INTEGER, data TEXT)",

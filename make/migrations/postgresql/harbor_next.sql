@@ -227,6 +227,11 @@ BEGIN
 END
 $$;
 
+-- Client address and User-Agent of the request behind an audit log entry. Formerly
+-- in numbered migration 0190; a database that already ran 0190 never got them.
+ALTER TABLE audit_log_ext ADD COLUMN IF NOT EXISTS client_address varchar(255) DEFAULT '';
+ALTER TABLE audit_log_ext ADD COLUMN IF NOT EXISTS user_agent varchar(1024) DEFAULT '';
+
 -- Custom project roles (upstream goharbor/harbor#23804). Every project role,
 -- the five built-ins included, keeps its grants in
 -- permission_policy/role_permission (goharbor/harbor#24029); core seeds the
