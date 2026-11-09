@@ -227,43 +227,27 @@ BEGIN
 END
 $$;
 
--- Client address and User-Agent of the request behind an audit log entry. Formerly
--- in numbered migration 0190; a database that already ran 0190 never got them.
-ALTER TABLE audit_log_ext ADD COLUMN IF NOT EXISTS client_address varchar(255) DEFAULT '';
-ALTER TABLE audit_log_ext ADD COLUMN IF NOT EXISTS user_agent varchar(1024) DEFAULT '';
-
--- Custom project roles (upstream goharbor/harbor#23804). Every project role,
--- the five built-ins included, keeps its grants in
--- permission_policy/role_permission (goharbor/harbor#24029); core seeds the
--- built-in grants at startup.
-ALTER TABLE role ADD COLUMN IF NOT EXISTS is_builtin   BOOLEAN      NOT NULL DEFAULT FALSE;
-ALTER TABLE role ADD COLUMN IF NOT EXISTS description  TEXT;
-ALTER TABLE role ADD COLUMN IF NOT EXISTS modified     BOOLEAN      NOT NULL DEFAULT FALSE;
-ALTER TABLE role ADD COLUMN IF NOT EXISTS created_by   VARCHAR(255);
-ALTER TABLE role ADD COLUMN IF NOT EXISTS created_at   TIMESTAMP WITH TIME ZONE;
-ALTER TABLE role ADD COLUMN IF NOT EXISTS modified_by  VARCHAR(255);
-ALTER TABLE role ADD COLUMN IF NOT EXISTS modified_at  TIMESTAMP WITH TIME ZONE;
-
--- Role names match the API/UI contract (was varchar(20)) and are unique
--- case-insensitively, so "Maintainer" and "maintainer" cannot coexist.
-ALTER TABLE role ALTER COLUMN name TYPE varchar(255);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_role_name ON role (lower(name));
-
--- Roles seeded by the numbered migrations are built-in and immutable.
-UPDATE role SET is_builtin = TRUE
-WHERE name IN ('projectAdmin', 'developer', 'guest', 'maintainer', 'limitedGuest')
-  AND is_builtin = FALSE;
-
--- A role still assigned to a member cannot be deleted, which closes the
--- count-then-delete race in the role Delete controller.
+-- Client address and User-Agent of the request behind an audit log entry. Upstream
+-- v2.16.0 migration 0190 and the harbor-next 0190 from before #701 lack them, so
+-- a database that already ran either never gets them. Guarded on the catalog so
+-- a repeat run takes no ACCESS EXCLUSIVE lock on audit_log_ext.
 DO $$
 BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint WHERE conname = 'fk_project_member_role'
-    ) THEN
-        ALTER TABLE project_member
-            ADD CONSTRAINT fk_project_member_role
-            FOREIGN KEY (role) REFERENCES role (role_id) ON DELETE RESTRICT;
+    IF to_regclass('audit_log_ext') IS NOT NULL THEN
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_attribute
+            WHERE attrelid = to_regclass('audit_log_ext')
+              AND attname = 'client_address' AND NOT attisdropped
+        ) THEN
+            ALTER TABLE audit_log_ext ADD COLUMN client_address varchar(255) DEFAULT '';
+        END IF;
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_attribute
+            WHERE attrelid = to_regclass('audit_log_ext')
+              AND attname = 'user_agent' AND NOT attisdropped
+        ) THEN
+            ALTER TABLE audit_log_ext ADD COLUMN user_agent varchar(1024) DEFAULT '';
+        END IF;
     END IF;
 END
 $$;
