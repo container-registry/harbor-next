@@ -1057,6 +1057,49 @@ export function durationStr(distance: number): string {
     return result ? result : '0';
 }
 
+/**
+ * Lowercase only the scheme and host of an endpoint, as the backend stores it.
+ * Userinfo, port, path, query and an IPv6 zone suffix are left as is.
+ */
+export function lowerEndpointHost(endpoint: string): string {
+    if (!endpoint) {
+        return endpoint;
+    }
+    const m = endpoint.match(/^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)?([^/?#]*)(.*)$/s);
+    if (!m) {
+        return endpoint;
+    }
+    const scheme = (m[1] || '').toLowerCase();
+    const at = m[2].lastIndexOf('@') + 1;
+    const userinfo = m[2].slice(0, at);
+    let host = m[2].slice(at);
+    const zone = host.indexOf('%');
+    host =
+        zone >= 0
+            ? host.slice(0, zone).toLowerCase() + host.slice(zone)
+            : host.toLowerCase();
+    return scheme + userinfo + host + m[3];
+}
+
+/**
+ * Compare two endpoints, ignoring host case only.
+ * A scheme-less endpoint is treated as http.
+ */
+export function equalEndpoint(endpoint1: string, endpoint2: string): boolean {
+    if (endpoint1 === endpoint2) {
+        return true;
+    }
+    if (!endpoint1 || !endpoint2) {
+        return false;
+    }
+    const withScheme = (ep: string) =>
+        ep.includes('://') ? ep : `http://${ep}`;
+    return (
+        lowerEndpointHost(withScheme(endpoint1.trim())) ===
+        lowerEndpointHost(withScheme(endpoint2.trim()))
+    );
+}
+
 export enum PageSizeMapKeys {
     LIST_PROJECT_COMPONENT = 'ListProjectComponent',
     REPOSITORY_GRIDVIEW_COMPONENT = 'RepositoryGridviewComponent',

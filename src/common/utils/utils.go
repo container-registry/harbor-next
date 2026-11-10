@@ -51,7 +51,21 @@ func ParseEndpoint(endpoint string) (*url.URL, error) {
 		endpoint = "http://" + endpoint
 	}
 
-	return url.ParseRequestURI(endpoint)
+	u, err := url.ParseRequestURI(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	u.Host = LowerHost(u.Host)
+	return u, nil
+}
+
+// LowerHost lowercases a url.URL Host (host[:port]) but leaves an IPv6 zone suffix as is, since a
+// zone is a case-sensitive interface name.
+func LowerHost(host string) string {
+	if i := strings.IndexByte(host, '%'); i >= 0 {
+		return strings.ToLower(host[:i]) + host[i:]
+	}
+	return strings.ToLower(host)
 }
 
 // ParseRepository splits a repository into two parts: project and rest

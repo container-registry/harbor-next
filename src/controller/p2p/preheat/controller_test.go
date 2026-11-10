@@ -147,6 +147,13 @@ func (s *preheatSuite) TestCreateInstance() {
 	s.Equal(ErrorConflict, err)
 	s.Empty(id)
 
+	// Case: same endpoint with a mixed-case host, expect conflict.
+	id, err = s.controller.CreateInstance(s.ctx, &providerModel.Instance{
+		Endpoint: "http://LOCALHOST",
+	})
+	s.Equal(ErrorConflict, err)
+	s.Empty(id)
+
 	// Case: instance with invalid provider, expect error.
 	id, err = s.controller.CreateInstance(s.ctx, &providerModel.Instance{
 		Endpoint: "http://foo.bar",
@@ -172,6 +179,24 @@ func (s *preheatSuite) TestCreateInstance() {
 	})
 	s.NoError(err)
 	s.Equal(int64(1), id)
+}
+
+func TestCreateInstanceLegacyMixedCaseEndpoint(t *testing.T) {
+	mgr := &instance.Manager{}
+	mgr.On("List", mock.Anything, mock.Anything).Return([]*providerModel.Instance{
+		{ID: 1, Endpoint: "http://LOCALHOST:8080/Path"},
+	}, nil)
+	mgr.On("Save", mock.Anything, mock.Anything).Return(int64(2), nil)
+	c := &controller{iManager: mgr}
+	ctx := orm.NewContext(context.TODO(), &ormtesting.FakeOrmer{})
+
+	id, err := c.CreateInstance(ctx, &providerModel.Instance{Endpoint: "http://localhost:8080/Path"})
+	assert.Equal(t, ErrorConflict, err)
+	assert.Empty(t, id)
+
+	id, err = c.CreateInstance(ctx, &providerModel.Instance{Endpoint: "http://localhost:8080/path"})
+	assert.NoError(t, err)
+	assert.Equal(t, int64(2), id)
 }
 
 func (s *preheatSuite) TestDeleteInstance() {

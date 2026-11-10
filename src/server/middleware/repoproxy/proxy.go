@@ -565,7 +565,7 @@ func ProxyReferrerMiddleware() func(http.Handler) http.Handler {
 	return middleware.New(func(w http.ResponseWriter, r *http.Request, next http.Handler) {
 		ctx := r.Context()
 		art := lib.GetArtifactInfo(ctx)
-		p, err := project.Ctl.GetByName(ctx, art.ProjectName)
+		p, err := project.Ctl.GetByName(ctx, art.ProjectName, project.Metadata(true))
 		if err != nil {
 			httpLib.SendError(w, err)
 			return
@@ -578,6 +578,12 @@ func ProxyReferrerMiddleware() func(http.Handler) http.Handler {
 		if !p.ProxyReferrerAPI() {
 			log.Debug("the proxy referrer API is not enabled for current project, fallback to local registry")
 			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Apply repository filter: if proxy_cache_filter_pattern is set, the repository must match
+		if err := checkRepositoryFilter(p, art); err != nil {
+			httpLib.SendError(w, err)
 			return
 		}
 

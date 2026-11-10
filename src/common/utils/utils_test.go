@@ -37,6 +37,10 @@ func TestParseEndpoint(t *testing.T) {
 		{"ftp://example.com", true, ""},
 		{"http://example.com", false, "http://example.com"},
 		{"https://example.com", false, "https://example.com"},
+		{"http://EXAMPLE.COM", false, "http://example.com"},
+		{"https://EXAMPLE.COM:8080/Path", false, "https://example.com:8080/Path"},
+		{" MIXED.case.com/path/ ", false, "http://mixed.case.com/path"},
+		{"http://[FE80::1%25En0]:8080/", false, "http://[fe80::1%25En0]:8080"},
 		{"http://example!@#!?//#", true, ""},
 	}
 
