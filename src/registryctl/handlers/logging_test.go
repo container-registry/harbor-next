@@ -80,6 +80,23 @@ func TestCommonLogLine(t *testing.T) {
 			want:   `10.1.2.3 - jobservice [14/Sep/2026:06:34:23 +0200] "GET /api/health HTTP/1.1" 401 13` + "\n",
 		},
 		{
+			name: "a newline in the authuser cannot forge a log line",
+			request: func() *http.Request {
+				r := httptest.NewRequest(http.MethodGet, "/api/health", nil)
+				r.RemoteAddr = "10.1.2.3:52918"
+				r.RequestURI = "/api/health"
+				return r
+			},
+			reqURL: func(r *http.Request) url.URL {
+				u := *r.URL
+				u.User = url.User("a\nb")
+				return u
+			},
+			status: http.StatusOK,
+			size:   0,
+			want:   `10.1.2.3 - a\nb [14/Sep/2026:06:34:23 +0200] "GET /api/health HTTP/1.1" 200 0` + "\n",
+		},
+		{
 			name: "a quote in the URI cannot break out of the request field",
 			request: func() *http.Request {
 				r := httptest.NewRequest(http.MethodGet, "/api/health", nil)

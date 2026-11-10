@@ -36,6 +36,9 @@ func loggingHandler(out io.Writer, next http.Handler) http.Handler {
 		reqURL := *r.URL
 
 		m := httpsnoop.CaptureMetrics(next, w, r)
+		if r.MultipartForm != nil {
+			_ = r.MultipartForm.RemoveAll()
+		}
 
 		_, _ = out.Write(commonLogLine(r, reqURL, start, m.Code, m.Written))
 	})
@@ -68,7 +71,7 @@ func commonLogLine(r *http.Request, reqURL url.URL, ts time.Time, status int, si
 	var buf []byte
 	buf = append(buf, host...)
 	buf = append(buf, " - "...)
-	buf = append(buf, username...)
+	buf = append(buf, escapeQuoted(username)...)
 	buf = append(buf, " ["...)
 	buf = ts.AppendFormat(buf, clfTimeLayout)
 	buf = append(buf, `] "`...)
