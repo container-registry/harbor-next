@@ -662,6 +662,26 @@ func (s *ProxyReferrerMiddlewareSuite) TestProxyReferrerAPIDisabled() {
 	s.True(s.nextCalled, "next handler should be called when proxy referrer API is disabled")
 }
 
+func (s *ProxyReferrerMiddlewareSuite) TestProxyReferrerAPIBlockedByFilter() {
+	proj := &proModels.Project{
+		ProjectID:  3,
+		Name:       "testproject",
+		RegistryID: 1,
+		Metadata: map[string]string{
+			proModels.ProMetaProxyReferrerAPI:        "true",
+			proModels.ProMetaProxyCacheFilterPattern: "allow-*",
+			proModels.ProMetaProxyCacheFilterKind:    "doublestar",
+		},
+	}
+	testingmock.OnAnything(s.projectCtl, "GetByName").Return(proj, nil)
+
+	w := httptest.NewRecorder()
+	ProxyReferrerMiddleware()(s.next).ServeHTTP(w, s.makeRequest())
+
+	s.False(s.nextCalled, "next handler should not be called when repository is blocked by filter")
+	s.Equal(http.StatusNotFound, w.Code)
+}
+
 func TestProxyReferrerMiddlewareSuite(t *testing.T) {
 	suite.Run(t, new(ProxyReferrerMiddlewareSuite))
 }
