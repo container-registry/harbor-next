@@ -303,6 +303,8 @@ func TestResolveUploadLocation_ErrorRedactsSecrets(t *testing.T) {
 		"http://evil.attacker.com/steal?token=s3cr3t-token",
 		"http://user:s3cr3t-pass@evil.attacker.com/steal",
 		"http://good-registry.example:5000@evil.attacker.com/steal?token=s3cr3t-token",
+		"http://evil.attacker.com/%zz?token=s3cr3t-token",
+		"/v2/foo/%zz?token=s3cr3t-token",
 	} {
 		_, err := resolveUploadLocation(endpoint, origin, location)
 		if err == nil {
@@ -314,11 +316,13 @@ func TestResolveUploadLocation_ErrorRedactsSecrets(t *testing.T) {
 	}
 }
 
-// TestParseUploadLocation_ErrorRedactsSecrets covers the non-absolute error path of the builders.
+// TestParseUploadLocation_ErrorRedactsSecrets covers the non-absolute, userinfo and malformed error paths.
 func TestParseUploadLocation_ErrorRedactsSecrets(t *testing.T) {
 	for _, location := range []string{
 		"/v2/foo/blobs/uploads/uuid?token=s3cr3t-token#s3cr3t-frag",
 		"v2/foo?token=s3cr3t-token",
+		"https://user:s3cr3t-pass@evil.attacker.com/steal",
+		"https://evil.attacker.com/%zz?token=s3cr3t-token",
 	} {
 		_, err := parseUploadLocation(location)
 		if err == nil {
