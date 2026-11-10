@@ -71,6 +71,31 @@ a {
   padding: 0;
 }
 
+// Fit permission matrices; the .modal step outranks Clarity theme sizes
+.permission-matrix-modal .modal .modal-dialog {
+  width: min(52rem, calc(100vw - 2rem));
+  max-width: none;
+}
+
+// always show the vertical scrollbar so rows below the fold are discoverable
+.permission-matrix-modal .modal .modal-body-wrapper {
+  overflow-y: scroll;
+}
+
+.permission-matrix-modal.clr-wizard .modal {
+  .modal-dialog {
+    height: calc(100vh - 2rem);
+    max-height: none;
+  }
+
+  // narrow viewports: give the table room by shrinking the step list
+  @media (max-width: 1080px) {
+    .clr-wizard-stepnav-wrapper {
+      max-width: 12rem;
+    }
+  }
+}
+
 .rotate-90 {
   transform: rotate(-90deg);
 }

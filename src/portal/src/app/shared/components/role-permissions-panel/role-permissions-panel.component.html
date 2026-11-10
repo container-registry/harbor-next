@@ -3,6 +3,7 @@
         <ng-content select="[modal]"></ng-content>
     </div>
     <clr-modal
+        class="permission-matrix-modal"
         [clrModalSize]="'lg'"
         [(clrModalOpen)]="modalOpen"
         [clrModalStaticBackdrop]="false">
@@ -52,8 +53,7 @@
             #dropdownMenu
             class="dropdown-menu p-1"
             clrPosition="{{ dropdownPosition }}"
-            [style.position]="usedInDatagrid ? 'fixed' : 'absolute'"
-            [style.transform]="usedInDatagrid ? getTransform() : 'unset'"
+            [class.centered]="usedInDatagrid"
             *clrIfOpen>
             <div>
                 <button

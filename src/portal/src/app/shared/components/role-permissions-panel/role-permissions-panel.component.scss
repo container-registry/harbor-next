@@ -13,6 +13,15 @@
   max-width: unset;
 }
 
+// in a datagrid, centre the matrix on screen; !important beats Clarity's inline popover position
+.dropdown-menu.centered {
+  position: fixed !important;
+  inset: 50% auto auto 50% !important;
+  transform: translate(-50%, -50%) !important;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+}
+
 :host::ng-deep.trigger clr-icon {
   padding: 0;
   position: unset !important;
