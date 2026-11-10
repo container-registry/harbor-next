@@ -16,7 +16,10 @@ DEFERRED_LABEL="${DEFERRED_LABEL:-upstream-deferred}"
 DEFERRED_TITLE="${DEFERRED_TITLE:-Upstream cherry-picks needing manual resolution}"
 
 # Picks parked on a branch instead of opened as a PR, reported once per run.
-deferred=()
+deferred_shas=()
+deferred_branches=()
+deferred_reasons=()
+deferred_titles=()
 
 require() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -309,23 +312,35 @@ defer_pick() {
   local title=$3
   local reason=$4
 
-  deferred+=("${sha}|${branch}|${reason}|${title}")
-
   if [ "${DRY_RUN}" = "true" ]; then
     echo "dry-run: would park ${branch} (${reason}), no PR"
-    return 0
+  else
+    push_branch "${branch}"
+    echo "parked ${branch} (${reason})"
   fi
 
-  push_branch "${branch}"
-  echo "parked ${branch} (${reason})"
+  deferred_shas+=("${sha}")
+  deferred_branches+=("${branch}")
+  deferred_reasons+=("${reason}")
+  deferred_titles+=("${title}")
+}
+
+# Escapes a value for one Markdown table cell.
+md_cell() {
+  local value=${1//$'\n'/ }
+  printf '%s' "${value//|/\\|}"
 }
 
 deferred_issue_number() {
   local number
   local url
 
-  number=$(gh issue list --repo "${GH_REPO}" --state open --label "${DEFERRED_LABEL}" \
-    --limit 1 --json number --jq '.[0].number // empty' 2>/dev/null || true)
+  # A failed lookup must not be read as "no issue yet", or every API hiccup
+  # opens another tracking issue.
+  if ! number=$(gh issue list --repo "${GH_REPO}" --state open --label "${DEFERRED_LABEL}" \
+    --limit 1 --json number --jq '.[0].number // empty'); then
+    return 1
+  fi
   if [ -n "${number}" ]; then
     printf '%s\n' "${number}"
     return 0
@@ -333,47 +348,86 @@ deferred_issue_number() {
 
   gh label create "${DEFERRED_LABEL}" --repo "${GH_REPO}" --color ededed \
     --description "Upstream picks parked on a branch, not opened as a PR" >/dev/null 2>&1 || true
-  url=$(gh issue create --repo "${GH_REPO}" --title "${DEFERRED_TITLE}" --label "${DEFERRED_LABEL}" \
-    --body "Upstream commits the cherry-pick workflow parked instead of opening a PR for. Each run appends the picks it parked. The branch holds the commit with its conflict markers, so resolve it there and open a PR by hand if the change is wanted. Leave the branch in place either way: it is what stops the same commit being picked again on the next run." 2>/dev/null || true)
+  if ! url=$(gh issue create --repo "${GH_REPO}" --title "${DEFERRED_TITLE}" --label "${DEFERRED_LABEL}" \
+    --body "$(deferred_issue_body)"); then
+    return 1
+  fi
   printf '%s\n' "${url##*/}"
 }
 
-report_deferred() {
-  local entry
-  local number
-  local body_file
+deferred_issue_body() {
+  cat <<'BODY'
+Upstream commits the cherry-pick workflow parked instead of opening a PR for. Each run appends the picks it parked.
+
+- **conflicted pick**: the branch holds the commit with its conflict markers. Resolve them there and open a PR by hand if the change is wanted.
+- **`.github/` only**: the branch holds only a patch file under `upstream-patches/`. Apply the patch to `.github/` by hand if the change is wanted.
+
+Leave the branch in place either way: it is what stops the same commit being picked again on the next run.
+BODY
+}
+
+render_deferred() {
+  local i
+  local verb="Parked"
+  local count=${#deferred_shas[@]}
   local run_url="${GITHUB_SERVER_URL:-https://github.com}/${GH_REPO}/actions/runs/${GITHUB_RUN_ID:-local}"
 
-  if [ "${#deferred[@]}" -eq 0 ]; then
+  if [ "${DRY_RUN}" = "true" ]; then
+    verb="Would park"
+  fi
+
+  printf '%s %s upstream pick(s) in [this run](%s).\n\n' "${verb}" "${count}" "${run_url}"
+  printf '| Upstream commit | Branch | Reason | Title |\n|---|---|---|---|\n'
+  for (( i = 0; i < count; i++ )); do
+    printf '| [`%s`](https://github.com/%s/commit/%s) | `%s` | %s | %s |\n' \
+      "${deferred_shas[i]}" "${UPSTREAM_REPO}" "${deferred_shas[i]}" \
+      "$(md_cell "${deferred_branches[i]}")" \
+      "$(md_cell "${deferred_reasons[i]}")" \
+      "$(md_cell "${deferred_titles[i]}")"
+  done
+}
+
+# Returns non-zero when parked picks could not reach the tracking issue, so
+# the run goes red and the summary is the place to find them.
+report_deferred() {
+  local number
+  local body_file
+  local rc=0
+
+  if [ "${#deferred_shas[@]}" -eq 0 ]; then
     return 0
   fi
 
   body_file=$(tmp_file)
-  {
-    printf 'Parked %s upstream pick(s) in [this run](%s).\n\n' "${#deferred[@]}" "${run_url}"
-    printf '| Upstream commit | Branch | Reason | Title |\n|---|---|---|---|\n'
-    for entry in "${deferred[@]}"; do
-      printf '| [`%s`](https://github.com/%s/commit/%s) | `%s` | %s | %s |\n' \
-        "${entry%%|*}" "${UPSTREAM_REPO}" "${entry%%|*}" \
-        "$(cut -d'|' -f2 <<<"${entry}")" \
-        "$(cut -d'|' -f3 <<<"${entry}")" \
-        "$(cut -d'|' -f4- <<<"${entry}")"
-    done
-  } >"${body_file}"
-
+  render_deferred >"${body_file}"
   cat "${body_file}" >>"${GITHUB_STEP_SUMMARY:-/dev/null}" || true
 
   if [ "${DRY_RUN}" != "true" ]; then
-    number=$(deferred_issue_number)
-    if [ -n "${number}" ]; then
-      gh issue comment "${number}" --repo "${GH_REPO}" --body-file "${body_file}" >/dev/null \
-        && echo "reported ${#deferred[@]} parked pick(s) on issue #${number}"
+    if ! number=$(deferred_issue_number) || [ -z "${number}" ]; then
+      echo "::error::could not find or open the ${DEFERRED_LABEL} issue; parked picks are in the run summary only"
+      rc=1
+    elif ! gh issue comment "${number}" --repo "${GH_REPO}" --body-file "${body_file}" >/dev/null; then
+      echo "::error::could not comment on issue #${number}; parked picks are in the run summary only"
+      rc=1
     else
-      echo "::warning::could not find or open the ${DEFERRED_LABEL} issue; parked picks are in the run summary only"
+      echo "reported ${#deferred_shas[@]} parked pick(s) on issue #${number}"
     fi
   fi
 
   rm -f "${body_file}"
+  return "${rc}"
+}
+
+# Runs on every exit, so picks parked before a later failure are still
+# reported once their branch exists.
+finish() {
+  local rc=$?
+
+  trap - EXIT
+  if ! report_deferred && [ "${rc}" -eq 0 ]; then
+    rc=1
+  fi
+  exit "${rc}"
 }
 
 open_pr() {
@@ -526,6 +580,8 @@ main() {
     git remote add "${UPSTREAM_REMOTE}" "https://github.com/${UPSTREAM_REPO}.git"
   fi
 
+  trap finish EXIT
+
   git fetch "${TARGET_REMOTE}" "${BASE_BRANCH}" --prune
   git fetch "${UPSTREAM_REMOTE}" "${UPSTREAM_BRANCH}" --prune
   git switch -C "${BASE_BRANCH}" "${TARGET_REMOTE}/${BASE_BRANCH}"
@@ -546,8 +602,9 @@ main() {
     fi
     cherry_pick_commit "${sha}"
   done
-
-  report_deferred
 }
 
-main "$@"
+# Sourcing the script (as the tests do) defines the functions without a run.
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  main "$@"
+fi
