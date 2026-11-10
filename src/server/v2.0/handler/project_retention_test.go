@@ -36,6 +36,7 @@ import (
 	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/config"
 	configmetadata "github.com/goharbor/harbor/src/lib/config/metadata"
+	"github.com/goharbor/harbor/src/lib/errors"
 	regmodel "github.com/goharbor/harbor/src/pkg/reg/model"
 	"github.com/goharbor/harbor/src/pkg/retention/policy"
 	"github.com/goharbor/harbor/src/server/v2.0/models"
@@ -159,6 +160,21 @@ func TestCreateProjectRetention(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCreateProjectMissingRegistry(t *testing.T) {
+	registryCtl := registrytesting.NewController(t)
+	originalRegistry := registry.Ctl
+	registry.Ctl = registryCtl
+	t.Cleanup(func() { registry.Ctl = originalRegistry })
+	registryCtl.On("Get", mock.Anything, int64(99)).Return(nil, errors.NotFoundError(nil).WithMessage("registry 99 not found"))
+
+	err := (&projectAPI{}).validateProjectReq(context.Background(), &models.ProjectReq{
+		ProjectName: "proxy-project",
+		RegistryID:  swag.Int64(99),
+		Metadata:    &models.ProjectMetadata{},
+	})
+	require.True(t, errors.IsErr(err, errors.BadRequestCode), "got %v", err)
 }
 
 func TestProjectRetentionRequestValidation(t *testing.T) {
