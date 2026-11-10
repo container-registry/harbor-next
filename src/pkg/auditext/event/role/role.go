@@ -15,6 +15,7 @@
 package role // nolint:revive
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
@@ -43,15 +44,14 @@ func init() {
 // roleIDToName resolves a role id to its name. It is used so create/update log
 // the current name (including after a rename) and delete can record the name
 // before the row is gone.
-func roleIDToName(roleID string) string {
+func roleIDToName(ctx context.Context, roleID string) string {
 	id, err := strconv.ParseInt(roleID, 10, 64)
 	if err != nil {
 		log.Errorf("failed to parse roleID: %v to int", roleID)
 		return ""
 	}
-	// Use a fresh ORM context so the role is visible before the request
-	// transaction commits.
-	r, err := pkgRole.Mgr.Get(orm.Context(), id)
+	// Reuse the request's connection so a pre-delete lookup does not take a second one (#850).
+	r, err := pkgRole.Mgr.Get(orm.ReuseContext(ctx), id)
 	if err != nil {
 		log.Errorf("failed to get role by id: %v, err: %v", roleID, err)
 		return ""
