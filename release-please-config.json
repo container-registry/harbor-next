@@ -26,7 +26,8 @@
   "packages": {
     ".": {
       "extra-files": [
-        {"type": "generic", "path": "deploy/chart/Chart.yaml"}
+        {"type": "generic", "path": "deploy/chart/Chart.yaml"},
+        {"type": "generic", "path": "publiccode.yml"}
       ]
     }
   }
