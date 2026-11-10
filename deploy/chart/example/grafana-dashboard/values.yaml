@@ -10,9 +10,6 @@ registry:
   persistence:
     enabled: true
 
-exporter:
-  enabled: true
-
 metrics:
   enabled: true
   serviceMonitor:

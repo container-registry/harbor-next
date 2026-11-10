@@ -56,17 +56,6 @@ spec:
 apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
 metadata:
-  name: harbor-exporter
-  namespace: flux-system
-spec:
-  image: 8gears.container-registry.com/8gcr/harbor-exporter
-  interval: 1m
-  provider: generic
-  serviceAccountName: flux-oci-hz-cr-int
----
-apiVersion: image.toolkit.fluxcd.io/v1
-kind: ImageRepository
-metadata:
   name: trivy-adapter
   namespace: flux-system
 spec:
@@ -147,22 +136,6 @@ metadata:
 spec:
   imageRepositoryRef:
     name: harbor-portal
-  filterTags:
-    pattern: ^latest$
-  policy:
-    alphabetical:
-      order: asc
-  digestReflectionPolicy: Always
-  interval: 1m
----
-apiVersion: image.toolkit.fluxcd.io/v1
-kind: ImagePolicy
-metadata:
-  name: harbor-exporter
-  namespace: flux-system
-spec:
-  imageRepositoryRef:
-    name: harbor-exporter
   filterTags:
     pattern: ^latest$
   policy:

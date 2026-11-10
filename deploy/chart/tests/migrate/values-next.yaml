@@ -57,10 +57,6 @@ jobservice:
     type: Recreate
   persistence:
     enabled: true
-exporter:
-  deploymentStrategy:
-    type: Recreate
-  enabled: true
 trivy:
   enabled: true
   persistence:

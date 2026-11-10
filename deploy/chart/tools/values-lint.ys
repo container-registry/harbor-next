@@ -17,7 +17,7 @@
 
 advice =: atom([])
 
-components =: qw(core portal registry jobservice exporter trivy)
+components =: qw(core portal registry jobservice trivy)
 storage-drivers =: qw(filesystem s3 azure gcs oss swift inmemory)
 
 defn main(values-file):

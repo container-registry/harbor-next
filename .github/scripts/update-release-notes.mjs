@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 // RELEASE_NOTES_PREVIEW_PR_NUMBER (rewrite a release PR's preview instead),
 // RELEASE_NOTES_COMPONENT, RELEASE_NOTES_DRY_RUN and RELEASE_NOTES_OUTPUT.
 
-const IMAGES = ['core', 'jobservice', 'registryctl', 'exporter', 'portal', 'registry', 'trivy-adapter'];
+const IMAGES = ['core', 'jobservice', 'registryctl', 'portal', 'registry', 'trivy-adapter'];
 const SERIES = 'taskfile/commercial-patches';
 const PATCHES_REMOTE = 'https://x-access-token@github.com/container-registry/8gcr';
 const FENCE = '```';

@@ -143,6 +143,5 @@ spec:
                   sync deployment  harbor-registry   harbor-registry      "$rev"
                   sync deployment  harbor-registry   harbor-registryctl   deploy.8gears.io/registryctl-image-revision
                   sync deployment  harbor-portal     harbor-portal        "$rev"
-                  sync deployment  harbor-exporter   harbor-exporter      "$rev"
                   sync statefulset harbor-trivy      trivy-adapter        "$rev"
                   exit "$fail"

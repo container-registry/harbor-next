@@ -150,7 +150,6 @@ After some time we now see all the pods and our installation running:
 kubectl get pods -n my-container-registry
 NAME                                        READY   STATUS    RESTARTS      AGE
 test-1-harbor-core-754c57dd77-xqfkb         1/1     Running   0             61s
-test-1-harbor-exporter-867746db74-5pgmn     1/1     Running   0             61s
 test-1-harbor-jobservice-67bc99bd86-7bvlp   0/1     Running   3 (35s ago)   61s
 test-1-harbor-portal-57f7894ff7-hfs8h       1/1     Running   0             60s
 test-1-harbor-registry-5bd8d59648-9fqs5     1/1     Running   0             61s
