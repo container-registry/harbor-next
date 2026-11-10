@@ -20,6 +20,7 @@ import (
 	"log/syslog"
 	"os"
 
+	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/log"
 )
@@ -40,6 +41,8 @@ func (a *LoggerManager) Init(_ context.Context, logEndpoint string) {
 	w, err := syslog.Dial("tcp", logEndpoint,
 		syslog.LOG_INFO, "audit")
 	a.initialized = true
+	// an empty cached endpoint makes the next call retry the connection
+	a.endpoint = ""
 	if err != nil {
 		if len(logEndpoint) > 0 {
 			log.Errorf("failed to create audit log, error %v", err)
@@ -49,12 +52,15 @@ func (a *LoggerManager) Init(_ context.Context, logEndpoint string) {
 	}
 	a.remoteLogger = log.New(w, log.NewTextFormatter(), log.InfoLevel, 3)
 	a.remoteLogger.SetFallback(log.DefaultLogger())
+	if err == nil {
+		a.endpoint = logEndpoint
+	}
 }
 
 // DefaultLogger ...
 func (a *LoggerManager) DefaultLogger(ctx context.Context) *log.Logger {
 	endpoint := config.AuditLogForwardEndpoint(ctx)
-	if a.endpoint != endpoint {
+	if !utils.EqualHost(a.endpoint, endpoint) {
 		a.Init(ctx, endpoint)
 		a.initialized = true
 	}

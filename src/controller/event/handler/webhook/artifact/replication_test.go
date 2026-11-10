@@ -17,6 +17,8 @@
 package artifact
 
 import (
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -140,6 +142,16 @@ func TestIsLocalRegistry(t *testing.T) {
 		URL:  config.InternalCoreURL(),
 	}
 	assert.True(t, isLocalRegistry(reg1))
+	// local registry whose URL differs only in host case should return true
+	coreURL, err := url.Parse(config.InternalCoreURL())
+	require.NoError(t, err)
+	coreURL.Host = strings.ToUpper(coreURL.Host)
+	reg1MixedCase := &rpModel.Registry{
+		Type: "harbor",
+		Name: "Local",
+		URL:  coreURL.String(),
+	}
+	assert.True(t, isLocalRegistry(reg1MixedCase))
 	// non-local registry should return false
 	reg2 := &rpModel.Registry{
 		Type: "docker-registry",
