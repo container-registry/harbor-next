@@ -73,13 +73,31 @@ func setupMemberDelegationProject(t *testing.T) *projectMock.Controller {
 	pc.On("Get", testifymock.Anything, testProjectID, testifymock.Anything).Return(p, nil)
 	pc.On("Get", testifymock.Anything, "library", testifymock.Anything).Return(p, nil)
 	pc.On("GetByName", testifymock.Anything, "library").Return(p, nil)
-	rc := &stubRoleCtl{}
+	rc := &stubRoleCtl{roles: rolesFromGrants(grants)}
 	rc.On("Get", testifymock.Anything, int64(100), testifymock.Anything).Return(&role.Role{
 		Role:        roleModels.Role{ID: 100, Name: "member-manager"},
 		Permissions: []*role.Permission{{Access: memberManagerAccess()}},
 	}, nil)
 	role.Ctl = rc
 	return pc
+}
+
+// rolesFromGrants is what the role controller lists for these grants.
+func rolesFromGrants(grants []policy.Grant) []*role.Role {
+	byID := map[int64]*role.Role{}
+	var roles []*role.Role
+	for _, g := range grants {
+		r, ok := byID[g.RoleID]
+		if !ok {
+			r = &role.Role{Role: roleModels.Role{ID: g.RoleID}, Permissions: []*role.Permission{{}}}
+			byID[g.RoleID] = r
+			roles = append(roles, r)
+		}
+		r.Permissions[0].Access = append(r.Permissions[0].Access, &types.Policy{
+			Resource: types.Resource(g.Resource), Action: types.Action(g.Action), Effect: types.Effect(g.Effect),
+		})
+	}
+	return roles
 }
 
 func memberManagerAccess() []*types.Policy {
@@ -159,7 +177,7 @@ func TestHumanRobotMemberDelegation(t *testing.T) {
 					if caller.allowed {
 						want = http.StatusOK
 					} else {
-						assert.Contains(t, rr.Body.String(), "only system or project administrators")
+						assert.Contains(t, rr.Body.String(), "requires every permission a project role can grant")
 						rc.AssertNotCalled(t, "Create", testifymock.Anything, testifymock.Anything)
 						rc.AssertNotCalled(t, "Update", testifymock.Anything, testifymock.Anything, testifymock.Anything)
 					}
@@ -232,7 +250,10 @@ func TestRobotMemberDelegationRequiresAdminForEveryProject(t *testing.T) {
 	pc := setupMemberDelegationProject(t)
 	user := &commonModels.User{UserID: 7, Username: "delegator"}
 	pc.On("ListRoles", testifymock.Anything, testProjectID, user).Return([]int{common.RoleProjectAdmin}, nil)
-	pc.On("GetByName", testifymock.Anything, "other").Return(&projectModels.Project{ProjectID: testProjectID + 1}, nil)
+	other := &projectModels.Project{ProjectID: testProjectID + 1, Name: "other"}
+	pc.On("GetByName", testifymock.Anything, "other").Return(other, nil)
+	pc.On("Get", testifymock.Anything, "other", testifymock.Anything).Return(other, nil)
+	pc.On("Get", testifymock.Anything, testProjectID+1, testifymock.Anything).Return(other, nil)
 	pc.On("ListRoles", testifymock.Anything, testProjectID+1, user).Return([]int{100}, nil)
 	ctx := newCtxWithSecurity(local.NewSecurityContext(user))
 	permissions := append(robotPerm("library", "member", "update"), robotPerm("other", "member", "create")...)
@@ -242,10 +263,10 @@ func TestRobotMemberDelegationRequiresAdminForEveryProject(t *testing.T) {
 }
 
 func TestRobotMemberDelegationRoleLookupFailure(t *testing.T) {
-	pc := setupMemberDelegationProject(t)
+	setupMemberDelegationProject(t)
 	user := &commonModels.User{UserID: 7, Username: "delegator"}
 	lookupErr := fmt.Errorf("role lookup failed")
-	pc.On("ListRoles", testifymock.Anything, testProjectID, user).Return(nil, lookupErr)
+	role.Ctl = &stubRoleCtl{listErr: lookupErr}
 	err := (&robotAPI{}).validateNoEscalation(newCtxWithSecurity(local.NewSecurityContext(user)), robotPerm("library", "member", "update"))
 	assert.ErrorIs(t, err, lookupErr)
 }
@@ -304,4 +325,68 @@ func TestRobotMemberUpdateStillValidatesRole(t *testing.T) {
 			assert.Contains(t, rr.Body.String(), "invalid role")
 		})
 	}
+}
+
+func TestRobotMemberDelegationRequiresEveryRolePermission(t *testing.T) {
+	const fullRoleID = 101
+	for _, tc := range []struct {
+		name      string
+		sysAdmin  bool
+		roles     []int
+		dropAdmin bool
+		allowed   bool
+	}{
+		{name: "system administrator", sysAdmin: true, allowed: true},
+		{name: "project administrator", roles: []int{common.RoleProjectAdmin}, allowed: true},
+		{name: "custom role holding every permission", roles: []int{fullRoleID}, allowed: true},
+		{name: "custom role holding every permission, built-in admin role deleted", roles: []int{fullRoleID}, dropAdmin: true, allowed: true},
+		{name: "maintainer", roles: []int{common.RoleMaintainer}},
+		{name: "custom role with member:update only", roles: []int{100}},
+		{name: "no role in the project"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pc := setupMemberDelegationProject(t)
+			grants := policy.Shipped()
+			for _, acc := range memberManagerAccess() {
+				grants = append(grants, policy.Grant{RoleID: 100, Resource: acc.Resource.String(), Action: acc.Action.String()})
+			}
+			if tc.dropAdmin {
+				kept := grants[:0]
+				for _, g := range grants {
+					if g.RoleID != common.RoleProjectAdmin {
+						kept = append(kept, g)
+					}
+				}
+				grants = kept
+			}
+			for _, r := range rolesFromGrants(grants) {
+				for _, acc := range r.Permissions[0].Access {
+					grants = append(grants, policy.Grant{RoleID: fullRoleID, Resource: acc.Resource.String(), Action: acc.Action.String()})
+				}
+			}
+			store, err := policy.NewInMemory(grants)
+			require.NoError(t, err)
+			oldStore := policy.SetDefault(store)
+			t.Cleanup(func() { policy.SetDefault(oldStore) })
+			role.Ctl = &stubRoleCtl{roles: rolesFromGrants(grants)}
+
+			user := &commonModels.User{UserID: 7, Username: "delegator", SysAdminFlag: tc.sysAdmin}
+			pc.On("ListRoles", testifymock.Anything, testProjectID, user).Return(tc.roles, nil)
+			err = (&robotAPI{}).requireMemberDelegation(newCtxWithSecurity(local.NewSecurityContext(user)), "library")
+			if tc.allowed {
+				assert.NoError(t, err)
+			} else {
+				assert.Equal(t, errors.ForbiddenCode, errors.ErrCode(err))
+			}
+		})
+	}
+}
+
+func TestRobotMemberDelegationDeniesWithoutRoleGrants(t *testing.T) {
+	pc := setupMemberDelegationProject(t)
+	role.Ctl = &stubRoleCtl{}
+	user := &commonModels.User{UserID: 7, Username: "delegator"}
+	pc.On("ListRoles", testifymock.Anything, testProjectID, user).Return([]int{common.RoleProjectAdmin}, nil)
+	err := (&robotAPI{}).requireMemberDelegation(newCtxWithSecurity(local.NewSecurityContext(user)), "library")
+	assert.Equal(t, errors.ForbiddenCode, errors.ErrCode(err))
 }
