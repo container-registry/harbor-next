@@ -202,8 +202,20 @@ func (m *memberAPI) UpdateProjectMember(ctx context.Context, params operation.Up
 // maxCreatorDepth bounds the robot-created-by-robot chain walked for built-in grants.
 const maxCreatorDepth = 3
 
-// checkNoEscalation rejects role assignments where the target role has permissions the caller lacks.
+// checkNoEscalation rejects human role assignments that exceed the caller's permissions.
+// Robots delegate roles through the member:create/update permission checked by the handler.
 func (m *memberAPI) checkNoEscalation(ctx context.Context, projectNameOrID any, roleID int64) error {
+	sc, err := m.GetSecurityContext(ctx)
+	if err != nil {
+		return err
+	}
+	if rc, ok := sc.(*robotSec.SecurityContext); ok && rc.IsAuthenticated() {
+		// Robot permissions cannot express all human role permissions. Requiring
+		// those permissions would break existing member-management robots. The
+		// member controller still validates the target role before persisting it.
+		return nil
+	}
+
 	r, err := m.roleCtl.Get(ctx, roleID, &roleCtl.Option{WithPermission: true})
 	if err != nil {
 		return err
