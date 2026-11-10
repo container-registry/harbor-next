@@ -21,6 +21,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/pkg/usergroup/model"
 	htesting "github.com/goharbor/harbor/src/testing"
 )
@@ -64,6 +65,9 @@ func (s *DaoTestSuite) TestCRUDUsergroup() {
 
 	err5 := s.dao.Delete(ctx, id)
 	s.Nil(err5)
+
+	err6 := s.dao.Delete(ctx, id)
+	s.True(errors.IsNotFoundErr(err6))
 }
 
 func (s *DaoTestSuite) TestSearchByName() {

@@ -125,15 +125,16 @@ func (d *dao) Delete(ctx context.Context, id int) error {
 	if err != nil {
 		return err
 	}
-	_, err = o.Delete(&userGroup)
-	if err == nil {
-		// Delete all related project members
-		sql := `delete from project_member where entity_id = ? and entity_type='g'`
-		_, err := o.Raw(sql, id).Exec()
-		if err != nil {
-			return err
-		}
+	n, err := o.Delete(&userGroup)
+	if err != nil {
+		return err
 	}
+	if n == 0 {
+		return errors.NotFoundError(nil).WithMessagef("the user group with id %v is not found", id)
+	}
+	// Delete all related project members
+	sql := `delete from project_member where entity_id = ? and entity_type='g'`
+	_, err = o.Raw(sql, id).Exec()
 	return err
 }
 
