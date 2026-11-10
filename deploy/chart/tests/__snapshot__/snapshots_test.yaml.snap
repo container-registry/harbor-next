@@ -6,7 +6,7 @@
       CHART_CACHE_DRIVER: redis
       CONFIG_PATH: /etc/core/app.conf
       CORE_LOCAL_URL: http://127.0.0.1:8080
-      CORE_URL: http://harbor-core
+      CORE_URL: http://harbor-core:80
       DATABASE_TYPE: postgresql
       EXT_ENDPOINT: https://harbor.example.com
       GDPR_AUDIT_LOGS: "false"
@@ -35,7 +35,7 @@
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
       REGISTRY_URL: http://harbor-registry:5000
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
-      TOKEN_SERVICE_URL: http://harbor-core/service/token
+      TOKEN_SERVICE_URL: http://harbor-core:80/service/token
       TRIVY_ADAPTER_URL: http://harbor-trivy:8080
       WITH_TRIVY: "false"
       app.conf: |
@@ -167,7 +167,7 @@
     apiVersion: v1
     data:
       CACHE_ENABLED: "false"
-      CORE_URL: http://harbor-core
+      CORE_URL: http://harbor-core:80
       HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
@@ -176,7 +176,7 @@
       REGISTRY_CONTROLLER_URL: http://harbor-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_URL: http://harbor-registry:5000
-      TOKEN_SERVICE_URL: http://harbor-core/service/token
+      TOKEN_SERVICE_URL: http://harbor-core:80/service/token
     kind: ConfigMap
     metadata:
       labels:
@@ -521,7 +521,7 @@
       CHART_CACHE_DRIVER: redis
       CONFIG_PATH: /etc/core/app.conf
       CORE_LOCAL_URL: http://127.0.0.1:8080
-      CORE_URL: http://harbor-core
+      CORE_URL: http://harbor-core:80
       DATABASE_TYPE: postgresql
       EXT_ENDPOINT: https://harbor.example.com
       GDPR_AUDIT_LOGS: "false"
@@ -550,7 +550,7 @@
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
       REGISTRY_URL: http://harbor-registry:5000
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
-      TOKEN_SERVICE_URL: http://harbor-core/service/token
+      TOKEN_SERVICE_URL: http://harbor-core:80/service/token
       TRIVY_ADAPTER_URL: http://harbor-trivy:8080
       WITH_TRIVY: "false"
       app.conf: |
@@ -682,7 +682,7 @@
     apiVersion: v1
     data:
       CACHE_ENABLED: "false"
-      CORE_URL: http://harbor-core
+      CORE_URL: http://harbor-core:80
       HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
@@ -691,7 +691,7 @@
       REGISTRY_CONTROLLER_URL: http://harbor-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_URL: http://harbor-registry:5000
-      TOKEN_SERVICE_URL: http://harbor-core/service/token
+      TOKEN_SERVICE_URL: http://harbor-core:80/service/token
     kind: ConfigMap
     metadata:
       labels:
@@ -1036,7 +1036,7 @@
       CHART_CACHE_DRIVER: redis
       CONFIG_PATH: /etc/core/app.conf
       CORE_LOCAL_URL: http://127.0.0.1:8080
-      CORE_URL: http://harbor-core
+      CORE_URL: http://harbor-core:80
       DATABASE_TYPE: postgresql
       EXT_ENDPOINT: https://harbor.example.com
       GDPR_AUDIT_LOGS: "false"
@@ -1065,7 +1065,7 @@
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
       REGISTRY_URL: http://harbor-registry:5000
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
-      TOKEN_SERVICE_URL: http://harbor-core/service/token
+      TOKEN_SERVICE_URL: http://harbor-core:80/service/token
       TRIVY_ADAPTER_URL: http://harbor-trivy:8080
       WITH_TRIVY: "false"
       app.conf: |
@@ -1197,7 +1197,7 @@
     apiVersion: v1
     data:
       CACHE_ENABLED: "false"
-      CORE_URL: http://harbor-core
+      CORE_URL: http://harbor-core:80
       HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
@@ -1206,7 +1206,7 @@
       REGISTRY_CONTROLLER_URL: http://harbor-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_URL: http://harbor-registry:5000
-      TOKEN_SERVICE_URL: http://harbor-core/service/token
+      TOKEN_SERVICE_URL: http://harbor-core:80/service/token
     kind: ConfigMap
     metadata:
       labels:
@@ -1552,7 +1552,7 @@
       CHART_CACHE_DRIVER: redis
       CONFIG_PATH: /etc/core/app.conf
       CORE_LOCAL_URL: http://127.0.0.1:8080
-      CORE_URL: http://harbor-core
+      CORE_URL: http://harbor-core:80
       DATABASE_TYPE: postgresql
       EXT_ENDPOINT: https://harbor.example.com
       GDPR_AUDIT_LOGS: "false"
@@ -1581,7 +1581,7 @@
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
       REGISTRY_URL: http://harbor-registry:5000
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
-      TOKEN_SERVICE_URL: http://harbor-core/service/token
+      TOKEN_SERVICE_URL: http://harbor-core:80/service/token
       TRIVY_ADAPTER_URL: http://harbor-trivy:8080
       WITH_TRIVY: "false"
       app.conf: |
@@ -1713,7 +1713,7 @@
     apiVersion: v1
     data:
       CACHE_ENABLED: "false"
-      CORE_URL: http://harbor-core
+      CORE_URL: http://harbor-core:80
       HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
@@ -1722,7 +1722,7 @@
       REGISTRY_CONTROLLER_URL: http://harbor-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_URL: http://harbor-registry:5000
-      TOKEN_SERVICE_URL: http://harbor-core/service/token
+      TOKEN_SERVICE_URL: http://harbor-core:80/service/token
     kind: ConfigMap
     metadata:
       labels:
@@ -2067,7 +2067,7 @@
       CHART_CACHE_DRIVER: redis
       CONFIG_PATH: /etc/core/app.conf
       CORE_LOCAL_URL: http://127.0.0.1:8080
-      CORE_URL: http://harbor-core
+      CORE_URL: http://harbor-core:80
       DATABASE_TYPE: postgresql
       EXT_ENDPOINT: https://harbor.example.com
       GDPR_AUDIT_LOGS: "false"
@@ -2101,7 +2101,7 @@
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
       REGISTRY_URL: http://harbor-registry:5000
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
-      TOKEN_SERVICE_URL: http://harbor-core/service/token
+      TOKEN_SERVICE_URL: http://harbor-core:80/service/token
       TRIVY_ADAPTER_URL: http://harbor-trivy:8080
       WITH_TRIVY: "false"
       app.conf: |
@@ -2233,7 +2233,7 @@
     apiVersion: v1
     data:
       CACHE_ENABLED: "false"
-      CORE_URL: http://harbor-core
+      CORE_URL: http://harbor-core:80
       HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
@@ -2244,7 +2244,7 @@
       REGISTRY_CONTROLLER_URL: http://harbor-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_URL: http://harbor-registry:5000
-      TOKEN_SERVICE_URL: http://harbor-core/service/token
+      TOKEN_SERVICE_URL: http://harbor-core:80/service/token
       TRACE_ENABLED: "true"
       TRACE_JAEGER_ENDPOINT: http://jaeger-collector.observability:14268/api/traces
       TRACE_NAMESPACE: harbor-traces
@@ -2640,7 +2640,7 @@
       CHART_CACHE_DRIVER: redis
       CONFIG_PATH: /etc/core/app.conf
       CORE_LOCAL_URL: http://127.0.0.1:8080
-      CORE_URL: http://harbor-core
+      CORE_URL: http://harbor-core:80
       DATABASE_TYPE: postgresql
       EXT_ENDPOINT: https://harbor.example.com
       GDPR_AUDIT_LOGS: "false"
@@ -2669,7 +2669,7 @@
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
       REGISTRY_URL: http://harbor-registry:5000
       REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
-      TOKEN_SERVICE_URL: http://harbor-core/service/token
+      TOKEN_SERVICE_URL: http://harbor-core:80/service/token
       TRIVY_ADAPTER_URL: http://harbor-trivy:8080
       WITH_TRIVY: "false"
       app.conf: |
@@ -2891,7 +2891,7 @@
     apiVersion: v1
     data:
       CACHE_ENABLED: "false"
-      CORE_URL: http://harbor-core
+      CORE_URL: http://harbor-core:80
       HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
@@ -2900,7 +2900,7 @@
       REGISTRY_CONTROLLER_URL: http://harbor-registry:8080
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_URL: http://harbor-registry:5000
-      TOKEN_SERVICE_URL: http://harbor-core/service/token
+      TOKEN_SERVICE_URL: http://harbor-core:80/service/token
     kind: ConfigMap
     metadata:
       labels:

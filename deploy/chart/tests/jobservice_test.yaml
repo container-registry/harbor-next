@@ -426,3 +426,27 @@ tests:
           content:
             secretRef:
               name: RELEASE-NAME-harbor-jobservice
+
+  # Pins: jobservice hands CORE_URL with the core Service port to scanners (#790).
+  - it: should render CORE_URL with the core service port
+    template: templates/jobservice.configmap-env.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - equal:
+          path: data.CORE_URL
+          value: "http://RELEASE-NAME-harbor-core:80"
+
+  - it: should honor a non-default core.servicePort in CORE_URL
+    template: templates/jobservice.configmap-env.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.servicePort: 8081
+    asserts:
+      - equal:
+          path: data.CORE_URL
+          value: "http://RELEASE-NAME-harbor-core:8081"
