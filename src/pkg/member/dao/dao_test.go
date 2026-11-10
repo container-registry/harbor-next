@@ -25,6 +25,7 @@ import (
 
 	"github.com/goharbor/harbor/src/common"
 	testDao "github.com/goharbor/harbor/src/common/dao"
+	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/orm"
 	"github.com/goharbor/harbor/src/pkg"
 	"github.com/goharbor/harbor/src/pkg/member/models"
@@ -150,7 +151,8 @@ func (s *DaoTestSuite) TestUpdateProjectMemberRole() {
 
 	pmid, err := s.dao.AddProjectMember(ctx, member)
 	s.Nil(err)
-	s.dao.UpdateProjectMemberRole(ctx, proj.ProjectID, pmid, common.RoleDeveloper)
+	s.Nil(s.dao.UpdateProjectMemberRole(ctx, proj.ProjectID, pmid, common.RoleDeveloper))
+	s.True(errors.IsNotFoundErr(s.dao.UpdateProjectMemberRole(ctx, proj.ProjectID, -1, common.RoleDeveloper)))
 
 	queryMember := models.Member{
 		ProjectID:  proj.ProjectID,
@@ -267,8 +269,8 @@ func (s *DaoTestSuite) TestDeleteProjectMember() {
 	s.Nil(err)
 
 	// not exist
-	err = s.dao.DeleteProjectMemberByID(ctx, s.projectID, -1)
-	s.Nil(err)
+	err = s.dao.DeleteProjectMemberByID(ctx, s.projectID, pmid)
+	s.True(errors.IsNotFoundErr(err))
 
 }
 
