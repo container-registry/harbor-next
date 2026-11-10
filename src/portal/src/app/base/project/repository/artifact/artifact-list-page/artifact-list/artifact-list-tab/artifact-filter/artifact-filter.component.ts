@@ -46,6 +46,24 @@ export class ArtifactFilterComponent implements OnInit, OnDestroy {
     selectedValue: string | Label;
     @Output()
     filterEvent = new EventEmitter<ArtifactFilterEvent>();
+    // Shows a filter that the list already applied, e.g. one restored from the URL.
+    @Input()
+    set initialFilter(filter: ArtifactFilterEvent) {
+        if (!filter) {
+            return;
+        }
+        this.opened = true;
+        this.dropdownOpened = false;
+        this.filterByType = filter.type;
+        if (filter.isLabel) {
+            this.selectedValue = filter.label?.name ? filter.label : null;
+        } else if (filter.isInputTag) {
+            this.selectedValue = null;
+            this.inputTag = filter.stringValue;
+        } else {
+            this.selectedValue = filter.stringValue;
+        }
+    }
     readonly searchId: string = 'search-btn';
     readonly typeSelectId: string = 'type-select';
     inputTag: string;

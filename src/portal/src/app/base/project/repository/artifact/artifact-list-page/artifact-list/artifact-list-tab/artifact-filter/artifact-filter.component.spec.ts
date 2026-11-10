@@ -60,4 +60,45 @@ describe('ArtifactFilterComponent', () => {
         );
         expect(!!selector).toBeFalse();
     });
+
+    it('shows a restored tag search without emitting', () => {
+        const emitted = spyOn(component.filterEvent, 'emit');
+        component.initialFilter = {
+            type: 'tags',
+            isLabel: false,
+            isInputTag: true,
+            stringValue: 'v1',
+        };
+        fixture.detectChanges();
+        expect(component.opened).toBeTrue();
+        expect(component.filterByType).toBe('tags');
+        expect(component.inputTag).toBe('v1');
+        expect(component.selectedValue).toBeNull();
+        expect(emitted).not.toHaveBeenCalled();
+    });
+
+    it('shows a restored fixed value', () => {
+        component.initialFilter = {
+            type: 'type',
+            isLabel: false,
+            stringValue: 'IMAGE',
+        };
+        expect(component.filterByType).toBe('type');
+        expect(component.selectedValue).toBe('IMAGE');
+    });
+
+    it('shows a restored label only once its name is known', () => {
+        component.initialFilter = {
+            type: 'labels',
+            isLabel: true,
+            label: { id: 3 },
+        };
+        expect(component.selectedValue).toBeNull();
+        component.initialFilter = {
+            type: 'labels',
+            isLabel: true,
+            label: { id: 3, name: 'prod' },
+        };
+        expect((component.selectedValue as any).name).toBe('prod');
+    });
 });

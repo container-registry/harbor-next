@@ -1,0 +1,16 @@
+<button
+    *ngIf="enabled"
+    type="button"
+    class="btn btn-link btn-icon bookmark-toggle"
+    [class.bookmarked]="!!bookmark"
+    [attr.aria-pressed]="!!bookmark"
+    [title]="(bookmark ? 'BOOKMARKS.REMOVE' : addTitleKey) | translate"
+    [attr.aria-label]="
+        (bookmark ? 'BOOKMARKS.REMOVE' : addTitleKey) | translate
+    "
+    (click)="toggle($event)">
+    <clr-icon
+        shape="star"
+        [attr.size]="size"
+        [class.is-solid]="!!bookmark"></clr-icon>
+</button>

@@ -154,6 +154,19 @@
     "TOP_NAV": {
         "DATETIME_RENDERING_DEFAULT": "Défaut"
     },
+    "BOOKMARKS": {
+        "TITLE": "Favoris",
+        "ADD": "Ajouter aux favoris",
+        "ADD_FILTER": "Ajouter ce filtre aux favoris",
+        "REMOVE": "Retirer des favoris",
+        "RENAME": "Renommer",
+        "DELETE": "Supprimer",
+        "MISSING": "Introuvable. Il a peut-être été supprimé.",
+        "FORBIDDEN": "Introuvable, ou vous n'y avez pas accès.",
+        "ADD_FAILED": "Impossible d'enregistrer le favori.",
+        "LIMIT_REACHED": "Vous avez 100 favoris. Supprimez-en un pour en ajouter un autre.",
+        "LABEL_MISSING": "Le label de ce filtre n'existe plus."
+    },
     "SIDE_NAV": {
         "PROJECTS": "Projets",
         "SYSTEM_MGMT": {

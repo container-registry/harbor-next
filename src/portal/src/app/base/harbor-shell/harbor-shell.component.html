@@ -37,6 +37,15 @@
                     {{ 'SIDE_NAV.LOGS' | translate }}
                 </a>
                 <clr-vertical-nav-group
+                    *ngIf="hasBookmarks"
+                    class="sidebar-bookmarks">
+                    <clr-icon shape="star" clrVerticalNavIcon></clr-icon>
+                    {{ 'BOOKMARKS.TITLE' | translate }}
+                    <clr-vertical-nav-group-children *clrIfExpanded="true">
+                        <sidebar-bookmarks></sidebar-bookmarks>
+                    </clr-vertical-nav-group-children>
+                </clr-vertical-nav-group>
+                <clr-vertical-nav-group
                     *ngIf="isSystemAdmin"
                     routerLinkActive="active">
                     <clr-icon

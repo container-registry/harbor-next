@@ -1,0 +1,64 @@
+<ng-container *ngFor="let group of groups; trackBy: trackGroup">
+    <div class="bookmark-group-title" [title]="group.projectName">
+        {{ group.projectName }}
+    </div>
+    <div
+        *ngFor="let b of group.items; trackBy: trackBookmark"
+        class="bookmark-row"
+        [class.dragging]="draggingId === b.id"
+        [class.drop-before]="dropTargetId === b.id && !dropAfter"
+        [class.drop-after]="dropTargetId === b.id && dropAfter"
+        [attr.draggable]="editingId ? null : 'true'"
+        (dragstart)="onDragStart($event, b)"
+        (dragover)="onDragOver($event, b)"
+        (drop)="onDrop($event, b)"
+        (dragend)="onDragEnd()">
+        <ng-container *ngIf="editingId !== b.id; else editTpl">
+            <a
+                clrVerticalNavLink
+                class="bookmark-link"
+                [class.active]="activeId === b.id"
+                [href]="hrefOf(b)"
+                [title]="b.label"
+                (click)="open($event, b)">
+                <clr-icon [attr.shape]="icon(b)" clrVerticalNavIcon></clr-icon>
+                <span class="bookmark-label">{{ b.label }}</span>
+                <span
+                    *ngIf="isBroken(b)"
+                    class="bookmark-broken"
+                    [title]="brokenMessageKey(b) | translate"
+                    >?</span
+                >
+            </a>
+            <span class="bookmark-actions">
+                <button
+                    type="button"
+                    class="btn btn-link btn-icon bookmark-action"
+                    [title]="'BOOKMARKS.RENAME' | translate"
+                    [attr.aria-label]="'BOOKMARKS.RENAME' | translate"
+                    (click)="startEdit(b)">
+                    <clr-icon shape="pencil" size="14"></clr-icon>
+                </button>
+                <button
+                    type="button"
+                    class="btn btn-link btn-icon bookmark-action"
+                    [title]="'BOOKMARKS.DELETE' | translate"
+                    [attr.aria-label]="'BOOKMARKS.DELETE' | translate"
+                    (click)="remove(b)">
+                    <clr-icon shape="trash" size="14"></clr-icon>
+                </button>
+            </span>
+        </ng-container>
+        <ng-template #editTpl>
+            <input
+                #editInput
+                class="clr-input bookmark-edit"
+                [attr.maxlength]="maxLabelLength"
+                [attr.aria-label]="'BOOKMARKS.RENAME' | translate"
+                [(ngModel)]="editLabel"
+                (keydown.enter)="onEditKey($event, true)"
+                (keydown.escape)="onEditKey($event, false)"
+                (blur)="saveEdit()" />
+        </ng-template>
+    </div>
+</ng-container>

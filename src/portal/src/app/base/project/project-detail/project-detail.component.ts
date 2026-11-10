@@ -29,6 +29,10 @@ import {
     USERSTATICPERMISSION,
 } from '../../../shared/services';
 import { ErrorHandler } from '../../../shared/units/error-handler';
+import {
+    BookmarkKind,
+    BookmarkTarget,
+} from '../../../shared/services/bookmark.service';
 import { debounceTime } from 'rxjs/operators';
 import { DOWN, SHOW_ELLIPSIS_WIDTH, UP } from './project-detail.const';
 import { ProjectService } from '../../../../../ng-swagger-gen/services/project.service';
@@ -61,6 +65,7 @@ export class ProjectDetailComponent
 {
     hasSignedIn: boolean;
     currentProject: Project;
+    projectBookmark: BookmarkTarget;
 
     isMember: boolean;
     roleName: string;
@@ -173,6 +178,12 @@ export class ProjectDetailComponent
         this.hasSignedIn = this.sessionService.getCurrentUser() !== null;
         this.route.data.subscribe(data => {
             this.currentProject = <Project>data['projectResolver'];
+            this.projectBookmark = {
+                kind: BookmarkKind.PROJECT,
+                projectId: this.currentProject.project_id,
+                projectName: this.currentProject.name,
+                defaultLabel: this.currentProject.name,
+            };
             if (this.currentProject.registry_id) {
                 this.isProxyCacheProject = true;
             }

@@ -15,6 +15,7 @@ import { NgModule } from '@angular/core';
 import { SharedModule } from '../shared/shared.module';
 import { RouterModule, Routes } from '@angular/router';
 import { HarborShellComponent } from './harbor-shell/harbor-shell.component';
+import { SidebarBookmarksComponent } from './harbor-shell/sidebar-bookmarks/sidebar-bookmarks.component';
 import { SystemAdminGuard } from '../shared/router-guard/system-admin-activate.service';
 import { MemberGuard } from '../shared/router-guard/member-guard-activate.service';
 import { ProjectRoutingResolver } from '../services/routing-resolvers/project-routing-resolver.service';
@@ -176,6 +177,7 @@ const routes: Routes = [
     imports: [SharedModule, RouterModule.forChild(routes)],
     declarations: [
         HarborShellComponent,
+        SidebarBookmarksComponent,
         PasswordSettingComponent,
         AccountSettingsModalComponent,
         ForgotPasswordComponent,

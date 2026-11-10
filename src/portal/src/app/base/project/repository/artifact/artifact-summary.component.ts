@@ -122,6 +122,10 @@ export class ArtifactSummaryComponent implements OnInit {
                     this.isProxyCacheProject = true;
                 }
                 this.artifact = <Artifact>resolverData['artifactResolver'][0];
+                // Links from bookmarks and other pages carry no sbomDigest query param.
+                this.sbomDigest =
+                    this.sbomDigest ||
+                    this.artifact?.sbom_overview?.sbom_digest;
                 this.getIconFromBackEnd();
             }
         }

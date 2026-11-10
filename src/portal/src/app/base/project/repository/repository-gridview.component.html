@@ -31,6 +31,12 @@
                             'REPOSITORY.FILTER_FOR_REPOSITORIES' | translate
                         }}"
                         [currentValue]="lastFilteredRepoName"></hbr-filter>
+                    <bookmark-toggle
+                        *ngIf="filterBookmark"
+                        class="filter-bookmark"
+                        [size]="18"
+                        addTitleKey="BOOKMARKS.ADD_FILTER"
+                        [target]="filterBookmark"></bookmark-toggle>
                     <span
                         class="card-btn"
                         (click)="showCard(true)"

@@ -24,7 +24,7 @@ import {
 } from '../../../shared/services';
 import { delay } from 'rxjs/operators';
 import { ErrorHandler } from '../../../shared/units/error-handler';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { Repository as NewRepository } from '../../../../../ng-swagger-gen/models/repository';
 import { SharedTestingModule } from '../../../shared/shared.module';
 import { GridViewComponent } from './gridview/grid-view.component';
@@ -99,7 +99,9 @@ describe('RepositoryComponentGridview (inline template)', () => {
         },
     };
     const fakedActivatedRoute = {
+        queryParamMap: of(convertToParamMap({})),
         snapshot: {
+            queryParams: {},
             parent: {
                 parent: {
                     params: {

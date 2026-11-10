@@ -154,6 +154,19 @@
     "TOP_NAV": {
         "DATETIME_RENDERING_DEFAULT": "預設"
     },
+    "BOOKMARKS": {
+        "TITLE": "書籤",
+        "ADD": "新增書籤",
+        "ADD_FILTER": "將此篩選條件加入書籤",
+        "REMOVE": "移除書籤",
+        "RENAME": "重新命名",
+        "DELETE": "刪除",
+        "MISSING": "找不到，可能已被刪除。",
+        "FORBIDDEN": "找不到，或您沒有存取權限。",
+        "ADD_FAILED": "無法儲存書籤。",
+        "LIMIT_REACHED": "您已有 100 個書籤，請先移除一個再新增。",
+        "LABEL_MISSING": "此篩選條件中的標籤已不存在。"
+    },
     "SIDE_NAV": {
         "PROJECTS": "專案",
         "SYSTEM_MGMT": {

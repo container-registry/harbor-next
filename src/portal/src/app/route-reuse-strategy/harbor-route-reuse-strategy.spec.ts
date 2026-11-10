@@ -29,4 +29,32 @@ describe('HarborRouteReuseStrategy', () => {
             harborRouteReuseStrategy.shouldReuseRoute(future, curr)
         ).toBeTruthy();
     });
+    it('reuses list routes when only the filter query changes', () => {
+        const config = {};
+        const snapshot = (url: string): ActivatedRouteSnapshot => {
+            const s: any = new ActivatedRouteSnapshot();
+            s.routeConfig = config;
+            s._routerState = { url };
+            return s;
+        };
+        const list = '/harbor/projects/1/repositories';
+        expect(
+            harborRouteReuseStrategy.shouldReuseRoute(
+                snapshot(`${list}?name=a`),
+                snapshot(`${list}?name=b`)
+            )
+        ).toBeTrue();
+        expect(
+            harborRouteReuseStrategy.shouldReuseRoute(
+                snapshot(`${list}/team%2Fapp/artifacts-tab?q=tags%3D*`),
+                snapshot(`${list}/team%2Fapp/artifacts-tab`)
+            )
+        ).toBeTrue();
+        expect(
+            harborRouteReuseStrategy.shouldReuseRoute(
+                snapshot(list),
+                snapshot(list)
+            )
+        ).toBeFalse();
+    });
 });

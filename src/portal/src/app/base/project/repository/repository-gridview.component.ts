@@ -30,6 +30,7 @@ import {
     distinctUntilChanged,
     finalize,
     map,
+    skip,
     switchMap,
 } from 'rxjs/operators';
 import { TranslateService } from '@ngx-translate/core';
@@ -72,6 +73,12 @@ import { ConfirmationDialogComponent } from '../../../shared/components/confirma
 import { OperationService } from '../../../shared/components/operation/operation.service';
 import { Project } from '../project';
 import { ActivatedRoute, Router } from '@angular/router';
+import {
+    BookmarkKind,
+    BookmarkTarget,
+    REPOSITORY_FILTER_PARAM,
+    replaceQueryParam,
+} from '../../../shared/services/bookmark.service';
 import { SessionService } from '../../../shared/services/session.service';
 import { GridViewComponent } from './gridview/grid-view.component';
 import { Repository as NewRepository } from '../../../../../ng-swagger-gen/models/repository';
@@ -135,6 +142,9 @@ export class RepositoryGridviewComponent
     filterComponent: FilterComponent;
     searchSub: Subscription;
     isProxyCacheProject: boolean = false;
+    filterBookmark: BookmarkTarget;
+    private queryParamSub: Subscription;
+    private destroyed = false;
 
     constructor(
         private errorHandlerService: ErrorHandler,
@@ -203,10 +213,28 @@ export class RepositoryGridviewComponent
         this.hasSignedIn = this.session.getCurrentUser() !== null;
         // Get system info for tag views
         this.getSystemInfo();
-        if (this.isCardView) {
-            this.doSearchRepoNames('', true);
+        const initialFilter: string =
+            this.route.snapshot.queryParams?.[REPOSITORY_FILTER_PARAM] || '';
+        if (initialFilter) {
+            this.filterComponent.isExpanded = true;
         }
-        this.lastFilteredRepoName = '';
+        if (this.isCardView) {
+            this.doSearchRepoNames(initialFilter, true);
+        }
+        this.lastFilteredRepoName = initialFilter;
+        this.updateFilterBookmark();
+        // A filter bookmark opened while this list is on screen only changes the query.
+        this.queryParamSub = this.route.queryParamMap
+            .pipe(skip(1))
+            .subscribe(params => {
+                const name = params.get(REPOSITORY_FILTER_PARAM) || '';
+                if (name !== (this.lastFilteredRepoName || '')) {
+                    if (name) {
+                        this.filterComponent.isExpanded = true;
+                    }
+                    this.doSearchRepoNames(name, false, false);
+                }
+            });
         this.getHelmChartVersionPermission(this.projectId);
         if (!this.searchSub) {
             this.searchSub = this.filterComponent.filterTerms
@@ -215,6 +243,7 @@ export class RepositoryGridviewComponent
                     distinctUntilChanged(),
                     switchMap(repoName => {
                         this.lastFilteredRepoName = repoName as string;
+                        this.updateFilterBookmark(true);
                         this.currentPage = 1;
                         // Pagination
                         let params: NewRepositoryService.ListRepositoriesParams =
@@ -245,6 +274,30 @@ export class RepositoryGridviewComponent
                 );
         }
     }
+    private updateFilterBookmark(syncUrl: boolean = false): void {
+        const name = this.lastFilteredRepoName || '';
+        // Late callbacks, such as a finished delete, must not rewrite the next page's URL.
+        if (syncUrl && !this.destroyed) {
+            replaceQueryParam(
+                this.router,
+                this.route,
+                REPOSITORY_FILTER_PARAM,
+                name
+            );
+        }
+        if (this.filterBookmark?.query === name) {
+            return;
+        }
+        this.filterBookmark = name
+            ? {
+                  kind: BookmarkKind.REPOSITORY_FILTER,
+                  projectId: +this.projectId,
+                  projectName: this.projectName,
+                  query: name,
+                  defaultLabel: `${this.projectName} · ${name}`,
+              }
+            : null;
+    }
     getSystemInfo() {
         this.systemInfoService.getSystemInfo().subscribe(
             systemInfo => (this.systemInfo = systemInfo),
@@ -252,6 +305,8 @@ export class RepositoryGridviewComponent
         );
     }
     ngOnDestroy() {
+        this.destroyed = true;
+        this.queryParamSub?.unsubscribe();
         if (this.searchSub) {
             this.searchSub.unsubscribe();
             this.searchSub = null;
@@ -338,8 +393,13 @@ export class RepositoryGridviewComponent
             );
     }
 
-    doSearchRepoNames(repoName: string, isFirstLoadingGridView?: boolean) {
+    doSearchRepoNames(
+        repoName: string,
+        isFirstLoadingGridView?: boolean,
+        syncUrl: boolean = !isFirstLoadingGridView
+    ) {
         this.lastFilteredRepoName = repoName;
+        this.updateFilterBookmark(syncUrl);
         this.currentPage = 1;
         let st: ClrDatagridStateInterface = this.currentState;
         if (!st || !st.page) {

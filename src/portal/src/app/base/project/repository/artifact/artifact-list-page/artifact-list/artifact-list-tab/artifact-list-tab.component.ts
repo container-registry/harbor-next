@@ -13,7 +13,7 @@
 // limitations under the License.
 import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { forkJoin, Observable, of, Subscription } from 'rxjs';
-import { catchError, finalize, map } from 'rxjs/operators';
+import { catchError, finalize, map, skip } from 'rxjs/operators';
 import { TranslateService } from '@ngx-translate/core';
 import {
     ClrDatagridComparatorInterface,
@@ -21,6 +21,17 @@ import {
     ClrLoadingState,
 } from '@clr/angular';
 import { ActivatedRoute, Router } from '@angular/router';
+import {
+    ARTIFACT_FILTER_PARAM,
+    BookmarkKind,
+    BookmarkTarget,
+    replaceQueryParam,
+} from '../../../../../../../shared/services/bookmark.service';
+import {
+    BookmarkHealthService,
+    BookmarkStatus,
+} from '../../../../../../../shared/services/bookmark-health.service';
+import { LabelService as NewLabelService } from '../../../../../../../../../ng-swagger-gen/services/label.service';
 import { Comparator } from '../../../../../../../shared/services';
 import {
     calculatePage,
@@ -57,8 +68,11 @@ import {
     AccessoryType,
     artifactDefault,
     ArtifactFilterEvent,
+    artifactFilterQuery,
+    parseArtifactFilterQuery,
     ArtifactFront as Artifact,
     ArtifactFront,
+    multipleFilter,
 } from '../../../artifact';
 import { Project } from '../../../../../project';
 import { ArtifactService as NewArtifactService } from '../../../../../../../../../ng-swagger-gen/services/artifact.service';
@@ -181,6 +195,8 @@ export class ArtifactListTabComponent implements OnInit, OnDestroy {
     depth: string;
     // could Pagination filter
     filters: string[];
+    initialFilter: ArtifactFilterEvent;
+    filterBookmark: BookmarkTarget;
     scanFinishedArtifactLength: number = 0;
     onScanArtifactsLength: number = 0;
     sbomFinishedArtifactLength: number = 0;
@@ -207,6 +223,7 @@ export class ArtifactListTabComponent implements OnInit, OnDestroy {
     );
     deleteAccessorySub: Subscription;
     copyDigestSub: Subscription;
+    private queryParamSub: Subscription;
     @ViewChild('datagrid')
     datagrid;
     constructor(
@@ -219,7 +236,9 @@ export class ArtifactListTabComponent implements OnInit, OnDestroy {
         private activatedRoute: ActivatedRoute,
         private router: Router,
         private appConfigService: AppConfigService,
-        private artifactListPageService: ArtifactListPageService
+        private artifactListPageService: ArtifactListPageService,
+        private labelService: NewLabelService,
+        private bookmarkHealth: BookmarkHealthService
     ) {}
     initRouterData() {
         this.projectId =
@@ -247,6 +266,18 @@ export class ArtifactListTabComponent implements OnInit, OnDestroy {
         const appConfig = this.appConfigService.getConfig();
         this.registryUrl = appConfig.registry_url;
         this.initRouterData();
+        this.initFilterFromUrl(
+            this.activatedRoute.snapshot.queryParams?.[ARTIFACT_FILTER_PARAM]
+        );
+        // A filter bookmark opened while this list is on screen only changes the query.
+        this.queryParamSub = this.activatedRoute.queryParamMap
+            .pipe(skip(1))
+            .subscribe(params => {
+                const query = params.get(ARTIFACT_FILTER_PARAM) || '';
+                if (!this.depth && query !== (this.filters?.[0] || '')) {
+                    this.applyFilterFromUrl(query);
+                }
+            });
         if (!this.updateArtifactSub) {
             this.updateArtifactSub = this.eventService.subscribe(
                 HarborEvent.UPDATE_VULNERABILITY_INFO,
@@ -297,6 +328,7 @@ export class ArtifactListTabComponent implements OnInit, OnDestroy {
     }
 
     ngOnDestroy() {
+        this.queryParamSub?.unsubscribe();
         if (this.updateArtifactSub) {
             this.updateArtifactSub.unsubscribe();
             this.updateArtifactSub = null;
@@ -1005,22 +1037,114 @@ export class ArtifactListTabComponent implements OnInit, OnDestroy {
     }
 
     filterEvent(e: ArtifactFilterEvent) {
-        this.filters = [];
-        if (e?.isLabel) {
-            if (e?.label?.name) {
-                this.filters.push(`${e.type}=(${e?.label?.id})`);
-            }
-        } else {
-            if (e?.stringValue) {
-                if (e?.isInputTag) {
-                    // for input tag, use fuzzy match
-                    this.filters.push(`${e.type}=~${e?.stringValue}`);
-                } else {
-                    this.filters.push(`${e.type}=${e?.stringValue}`);
-                }
+        const query = artifactFilterQuery(e);
+        this.filters = query ? [query] : [];
+        if (!this.depth) {
+            replaceQueryParam(
+                this.router,
+                this.activatedRoute,
+                ARTIFACT_FILTER_PARAM,
+                query
+            );
+        }
+        this.updateFilterBookmark(e);
+        this.refresh();
+    }
+
+    private applyFilterFromUrl(query: string): void {
+        if (!this.initFilterFromUrl(query)) {
+            const previous = this.initialFilter;
+            this.filters = [];
+            this.filterBookmark = null;
+            if (previous) {
+                this.initialFilter = {
+                    ...previous,
+                    stringValue: '',
+                    label: null,
+                };
             }
         }
         this.refresh();
+    }
+
+    private initFilterFromUrl(q: string): boolean {
+        const filter = parseArtifactFilterQuery(q);
+        if (!filter) {
+            return false;
+        }
+        this.filters = [artifactFilterQuery(filter)];
+        this.initialFilter = filter;
+        this.updateFilterBookmark(filter);
+        if (filter.isLabel) {
+            const query = this.filters[0];
+            // On failure the filter keeps working by label id; only the chip name is missing.
+            const target = this.filterBookmark;
+            this.labelService
+                .GetLabelByID({ labelId: filter.label.id })
+                .pipe(
+                    catchError(error => {
+                        // Other failures leave the filter working by label id.
+                        if (error?.status === 404) {
+                            this.bookmarkHealth.report(
+                                target,
+                                BookmarkStatus.MISSING
+                            );
+                            if (this.filters?.[0] === query) {
+                                this.errorHandlerService.error(
+                                    'BOOKMARKS.LABEL_MISSING'
+                                );
+                            }
+                        }
+                        return of(null);
+                    })
+                )
+                .subscribe(label => {
+                    if (!label || this.filters?.[0] !== query) {
+                        return;
+                    }
+                    const withLabel = { ...filter, label };
+                    this.initialFilter = withLabel;
+                    this.updateFilterBookmark(withLabel);
+                });
+        }
+        return true;
+    }
+
+    private updateFilterBookmark(e: ArtifactFilterEvent): void {
+        const query = artifactFilterQuery(e);
+        this.filterBookmark =
+            query && !this.depth
+                ? {
+                      kind: BookmarkKind.ARTIFACT_FILTER,
+                      projectId: +this.projectId,
+                      projectName: this.projectName,
+                      repoName: this.repoName,
+                      query,
+                      defaultLabel: `${this.repoName} · ${this.describeFilter(
+                          e
+                      )}`,
+                  }
+                : null;
+    }
+
+    private describeFilter(e: ArtifactFilterEvent): string {
+        if (e.isLabel) {
+            return (
+                e.label?.name ||
+                `${this.translateService.instant('LABEL.LABEL')} #${
+                    e.label?.id
+                }`
+            );
+        }
+        if (e.isInputTag) {
+            return e.stringValue;
+        }
+        const option = multipleFilter
+            .find(f => f.filterBy === e.type)
+            ?.listItem.find(o => o.filterText === e.stringValue);
+        return option
+            ? this.translateService.instant(option.showItem)
+            : e.stringValue;
     }
 
     updateArtifact(from: Artifact, to: Artifact) {
