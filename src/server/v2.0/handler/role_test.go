@@ -18,14 +18,19 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/go-openapi/runtime"
+	"github.com/go-openapi/strfmt"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 
+	commonmodels "github.com/goharbor/harbor/src/common/models"
+	"github.com/goharbor/harbor/src/common/security/local"
 	roleCtl "github.com/goharbor/harbor/src/controller/role"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/pkg/permission/types"
+	roleModel "github.com/goharbor/harbor/src/pkg/role/model"
 	"github.com/goharbor/harbor/src/server/v2.0/models"
 	operation "github.com/goharbor/harbor/src/server/v2.0/restapi/operations/role"
 	securityMock "github.com/goharbor/harbor/src/testing/common/security"
@@ -67,6 +72,40 @@ func TestCreateRole_NonSysAdminForbidden(t *testing.T) {
 	rr := httptest.NewRecorder()
 	resp.WriteResponse(rr, runtime.JSONProducer())
 	assert.Equal(t, http.StatusForbidden, rr.Code)
+}
+
+// A created role reports its creation time instead of the zero time.
+func TestCreateRole_ReturnsCreationTime(t *testing.T) {
+	createdAt := time.Date(2026, 11, 11, 4, 0, 0, 0, time.UTC)
+	rc := &stubRoleCtl{}
+	rc.On("Get", testifymock.Anything, int64(0), testifymock.Anything).
+		Return(&roleCtl.Role{Role: roleModel.Role{ID: 6, Name: "r1", CreatedAt: createdAt}}, nil)
+
+	sc := local.NewSecurityContext(&commonmodels.User{Username: "admin", SysAdminFlag: true})
+	params := operation.CreateRoleParams{
+		HTTPRequest: httptest.NewRequest(http.MethodPost, "/api/v2.0/roles", nil),
+		Role: &models.RoleCreate{
+			Name: "r1",
+			Permissions: []*models.RolePermission{
+				{
+					Kind:      roleCtl.LEVELROLE,
+					Namespace: "*",
+					Access: []*models.Access{
+						{Resource: "repository", Action: "pull"},
+						{Resource: "repository", Action: "list"},
+					},
+				},
+			},
+		},
+	}
+
+	resp := (&roleAPI{roleCtl: rc}).CreateRole(newCtxWithSecurity(sc), params)
+
+	created, ok := resp.(*operation.CreateRoleCreated)
+	if !assert.True(t, ok, "expected 201, got %T", resp) {
+		return
+	}
+	assert.Equal(t, strfmt.DateTime(createdAt), created.Payload.CreationTime)
 }
 
 // ---------------------------------------------------------------------------
