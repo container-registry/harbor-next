@@ -105,6 +105,7 @@ func (l *Logger) clone() *Logger {
 		skipLine:  l.skipLine,
 		fields:    l.fields,
 		fieldsStr: l.fieldsStr,
+		fallback:  l.fallback,
 		mu:        l.mu,
 	}
 }

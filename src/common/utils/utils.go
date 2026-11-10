@@ -66,6 +66,35 @@ func ParseRepository(repository string) (project, rest string) {
 	return
 }
 
+// EqualURL reports whether two URLs are equal, matching the host case-insensitively per RFC 1035.
+func EqualURL(rawURL1, rawURL2 string) bool {
+	if rawURL1 == rawURL2 {
+		return true
+	}
+	u1, err1 := url.Parse(rawURL1)
+	u2, err2 := url.Parse(rawURL2)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	u1.Host = lowerHost(u1.Host)
+	u2.Host = lowerHost(u2.Host)
+	return u1.String() == u2.String()
+}
+
+// EqualHost reports whether two host[:port] values are equal, ignoring case except in an IPv6 zone.
+func EqualHost(host1, host2 string) bool {
+	return lowerHost(host1) == lowerHost(host2)
+}
+
+// lowerHost lowercases a url.URL Host but keeps an IPv6 zone suffix as is, since a zone is a
+// case-sensitive interface name.
+func lowerHost(host string) string {
+	if i := strings.IndexByte(host, '%'); i >= 0 {
+		return strings.ToLower(host[:i]) + host[i:]
+	}
+	return strings.ToLower(host)
+}
+
 // GenerateRandomStringWithLenAndError generates a random string with length or returns an error if entropy cannot be read
 func GenerateRandomStringWithLenAndError(length int) (string, error) {
 	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
