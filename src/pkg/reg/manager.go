@@ -19,6 +19,7 @@ import (
 
 	commonthttp "github.com/goharbor/harbor/src/common/http"
 	"github.com/goharbor/harbor/src/lib/config"
+	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/reg/adapter"
 	"github.com/goharbor/harbor/src/pkg/reg/dao"
@@ -150,7 +151,7 @@ func (m *manager) Delete(ctx context.Context, id int64) error {
 func (m *manager) CreateAdapter(_ context.Context, registry *model.Registry) (adapter.Adapter, error) {
 	factory, err := adapter.GetFactory(registry.Type)
 	if err != nil {
-		return nil, err
+		return nil, errors.BadRequestError(nil).WithMessagef("unsupported registry type %q", registry.Type)
 	}
 	return factory.Create(registry)
 }
