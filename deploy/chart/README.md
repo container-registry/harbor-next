@@ -806,6 +806,7 @@ Kubernetes: `>=1.28.0-0`
 | core.serviceAccount.create | bool | `true` | Create a service account for Core |
 | core.serviceAccount.name | string | `""` | Service account name (auto-generated if empty) |
 | core.serviceAnnotations | object | `{}` | Service annotations for Core service |
+| core.servicePort | int | `80` | Port the core Service listens on. CORE_URL, the token service URL, ingress, gateway, and exporter all follow it. |
 | core.tokenCert | string | `""` | Token certificate (PEM, signed by tokenKey) |
 | core.tokenKey | string | `""` | Token private key (PEM). Auto-generated if both tokenKey and tokenCert are empty and tokenSecretName is empty. |
 | core.tokenSecretName | string | `""` | Existing secret for token service key/cert (must contain keys: tls.key, tls.crt) |
