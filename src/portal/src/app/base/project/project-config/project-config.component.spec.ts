@@ -18,7 +18,6 @@ import { SessionService } from '../../../shared/services/session.service';
 import { of } from 'rxjs';
 import { ProjectConfigComponent } from './project-config.component';
 import { SharedTestingModule } from '../../../shared/shared.module';
-import { CommonRoutes } from '../../../shared/entities/shared.const';
 
 describe('ProjectConfigComponent', () => {
     let component: ProjectConfigComponent;
@@ -72,32 +71,5 @@ describe('ProjectConfigComponent', () => {
 
     it('should create', () => {
         expect(component).toBeTruthy();
-    });
-
-    describe('role-based redirect', () => {
-        let navigate: jasmine.Spy;
-        const runWithRoleIds = (ids: number[]) => {
-            const route = TestBed.inject(ActivatedRoute);
-            route.snapshot.parent.parent.data = {
-                projectResolver: { current_user_role_ids: ids },
-            };
-            component.ngOnInit();
-        };
-        beforeEach(() => {
-            navigate = jasmine.createSpy('navigate');
-            (component as any).router = { navigate };
-        });
-
-        it('redirects guest-only members', () => {
-            runWithRoleIds([5]);
-            expect(navigate).toHaveBeenCalledWith([
-                CommonRoutes.HARBOR_DEFAULT,
-            ]);
-        });
-
-        it('keeps members with a custom or stronger role', () => {
-            runWithRoleIds([5, 1]);
-            expect(navigate).not.toHaveBeenCalled();
-        });
     });
 });

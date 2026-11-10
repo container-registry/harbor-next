@@ -15,7 +15,7 @@ import { HttpHeaders, HttpResponse } from '@angular/common/http';
 import { of } from 'rxjs';
 import { Role } from '../../../../ng-swagger-gen/models/role';
 import { RoleService } from '../../../../ng-swagger-gen/services/role.service';
-import { getAllRoles, isGuestOnlyMember, roleDisplayName } from './role-util';
+import { getAllRoles, roleDisplayName } from './role-util';
 
 function role(id: number): Role {
     return { id, name: `role-${id}`, is_builtin: false };
@@ -139,35 +139,5 @@ describe('role-util', () => {
                 })
             ).toBe('BUTTON.DELETE');
         });
-    });
-});
-
-describe('isGuestOnlyMember', () => {
-    it('is true when every held role is Guest or Limited Guest', () => {
-        expect(isGuestOnlyMember({ current_user_role_ids: [3] })).toBeTrue();
-        expect(isGuestOnlyMember({ current_user_role_ids: [5, 3] })).toBeTrue();
-        expect(isGuestOnlyMember({ current_user_role_id: 5 })).toBeTrue();
-    });
-
-    it('is false when a custom or stronger role is also held', () => {
-        expect(
-            isGuestOnlyMember({ current_user_role_ids: [3, 42] })
-        ).toBeFalse();
-        expect(isGuestOnlyMember({ current_user_role_ids: [42] })).toBeFalse();
-        expect(
-            isGuestOnlyMember({ current_user_role_ids: [5, 2] })
-        ).toBeFalse();
-    });
-
-    it('is false for system admins, non-members and missing projects', () => {
-        expect(
-            isGuestOnlyMember({
-                role_name: 'MEMBER.SYS_ADMIN',
-                current_user_role_ids: [3],
-            })
-        ).toBeFalse();
-        expect(isGuestOnlyMember({ current_user_role_id: 0 })).toBeFalse();
-        expect(isGuestOnlyMember({})).toBeFalse();
-        expect(isGuestOnlyMember(null)).toBeFalse();
     });
 });

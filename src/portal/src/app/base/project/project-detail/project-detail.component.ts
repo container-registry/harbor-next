@@ -44,7 +44,6 @@ import {
     getSizeNumber,
     getSizeUnit,
 } from '../../../shared/units/utils';
-import { isGuestOnlyMember } from '../../../shared/units/role-util';
 import {
     EventService,
     HarborEvent,
@@ -72,23 +71,15 @@ export class ProjectDetailComponent
     hasLabelListPermission: boolean;
     hasLabelCreatePermission: boolean;
     hasLogListPermission: boolean;
-    hasConfigurationListPermission: boolean;
+    hasConfigurationUpdatePermission: boolean;
     hasRobotListPermission: boolean;
     hasTagRetentionPermission: boolean;
     hasTagImmutablePermission: boolean;
     hasWebhookListPermission: boolean;
     hasScannerReadPermission: boolean;
+    hasScannerCreatePermission: boolean;
     hasP2pProviderReadPermission: boolean;
     hasQuotaReadPermission: boolean = false;
-
-    // Check if current user role is Limited Guest or Guest
-    isLimitedGuestOrGuest(): boolean {
-        // Refreshed projects lack the resolver's SYS_ADMIN role_name, so ask the session.
-        return (
-            !this.sessionService.getCurrentUser()?.has_admin_role &&
-            isGuestOnlyMember(this.currentProject)
-        );
-    }
 
     tabLinkNavList = [
         {
@@ -121,7 +112,8 @@ export class ProjectDetailComponent
             tabLinkInOverflow: false,
             showTabName: 'SCANNER.SCANNER',
             permissions: () =>
-                this.hasScannerReadPermission && !this.isLimitedGuestOrGuest(),
+                this.hasScannerReadPermission &&
+                this.hasScannerCreatePermission,
         },
         {
             linkName: 'p2p-provider',
@@ -160,9 +152,7 @@ export class ProjectDetailComponent
             tabLinkInOverflow: false,
             showTabName: 'PROJECT_DETAIL.CONFIG',
             permissions: () =>
-                this.isSessionValid &&
-                this.hasConfigurationListPermission &&
-                !this.isLimitedGuestOrGuest(),
+                this.isSessionValid && this.hasConfigurationUpdatePermission,
         },
     ];
     previousWindowWidth: number;
@@ -260,7 +250,7 @@ export class ProjectDetailComponent
             this.userPermissionService.getPermission(
                 projectId,
                 USERSTATICPERMISSION.CONFIGURATION.KEY,
-                USERSTATICPERMISSION.CONFIGURATION.VALUE.READ
+                USERSTATICPERMISSION.CONFIGURATION.VALUE.UPDATE
             )
         );
         permissionsList.push(
@@ -329,6 +319,13 @@ export class ProjectDetailComponent
         permissionsList.push(
             this.userPermissionService.getPermission(
                 projectId,
+                USERSTATICPERMISSION.SCANNER.KEY,
+                USERSTATICPERMISSION.SCANNER.VALUE.CREATE
+            )
+        );
+        permissionsList.push(
+            this.userPermissionService.getPermission(
+                projectId,
                 USERSTATICPERMISSION.P2P_PROVIDER.KEY,
                 USERSTATICPERMISSION.P2P_PROVIDER.VALUE.READ
             )
@@ -346,7 +343,7 @@ export class ProjectDetailComponent
                 [
                     this.hasProjectReadPermission,
                     this.hasLogListPermission,
-                    this.hasConfigurationListPermission,
+                    this.hasConfigurationUpdatePermission,
                     this.hasMemberListPermission,
                     this.hasLabelListPermission,
                     this.hasRepositoryListPermission,
@@ -356,6 +353,7 @@ export class ProjectDetailComponent
                     this.hasTagImmutablePermission,
                     this.hasWebhookListPermission,
                     this.hasScannerReadPermission,
+                    this.hasScannerCreatePermission,
                     this.hasP2pProviderReadPermission,
                     this.hasQuotaReadPermission,
                 ] = Rules;

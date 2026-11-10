@@ -13,10 +13,8 @@
 // limitations under the License.
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { CommonRoutes } from 'src/app/shared/entities/shared.const';
-import { isGuestOnlyMember } from 'src/app/shared/units/role-util';
-import { SessionUser } from '../../../shared/entities/session-user';
 import { SessionService } from '../../../shared/services/session.service';
+import { SessionUser } from '../../../shared/entities/session-user';
 import { Project } from '../project';
 
 @Component({
@@ -46,13 +44,6 @@ export class ProjectConfigComponent implements OnInit {
             this.projectName = pro.name;
             if (pro.registry_id) {
                 this.isProxyCacheProject = true;
-            }
-
-            // Check user role and redirect if Limited Guest or Guest
-            if (isGuestOnlyMember(pro)) {
-                // Redirect to repositories page
-                this.router.navigate([CommonRoutes.HARBOR_DEFAULT]);
-                return;
             }
         }
     }

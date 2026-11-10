@@ -100,7 +100,6 @@ export class RepositoryGridviewComponent
     downloadLink: string;
     @Input() urlPrefix: string;
     projectId: number;
-    hasProjectAdminRole: boolean;
     hasSignedIn: boolean;
     projectName: string;
     mode = 'standalone';
@@ -131,6 +130,7 @@ export class RepositoryGridviewComponent
     @ViewChild('gridView') gridView: GridViewComponent;
     hasCreateRepositoryPermission: boolean;
     hasDeleteRepositoryPermission: boolean;
+    hasUpdateRepositoryPermission: boolean;
     @ViewChild(FilterComponent, { static: true })
     filterComponent: FilterComponent;
     searchSub: Subscription;
@@ -161,6 +161,13 @@ export class RepositoryGridviewComponent
     }
     public get withAdmiral(): boolean {
         return this.mode === 'admiral';
+    }
+
+    get canOpenActions(): boolean {
+        return (
+            this.hasDeleteRepositoryPermission ||
+            (this.withAdmiral && this.hasUpdateRepositoryPermission)
+        );
     }
 
     get canDownloadCert(): boolean {
@@ -194,7 +201,6 @@ export class RepositoryGridviewComponent
         let resolverData = this.route.snapshot.parent.parent.data;
         if (resolverData) {
             let pro: Project = <Project>resolverData['projectResolver'];
-            this.hasProjectAdminRole = pro.has_project_admin_role;
             this.projectName = pro.name;
             if (pro.registry_id) {
                 this.isProxyCacheProject = true;
@@ -586,6 +592,7 @@ export class RepositoryGridviewComponent
         ) {
             this.hasCreateRepositoryPermission = false;
             this.hasDeleteRepositoryPermission = false;
+            this.hasUpdateRepositoryPermission = false;
             return;
         }
 
@@ -601,13 +608,21 @@ export class RepositoryGridviewComponent
                 USERSTATICPERMISSION.REPOSITORY.KEY,
                 USERSTATICPERMISSION.REPOSITORY.VALUE.DELETE
             );
+        let hasUpdateRepositoryPermission =
+            this.userPermissionService.getPermission(
+                this.projectId,
+                USERSTATICPERMISSION.REPOSITORY.KEY,
+                USERSTATICPERMISSION.REPOSITORY.VALUE.UPDATE
+            );
         forkJoin(
             hasCreateRepositoryPermission,
-            hasDeleteRepositoryPermission
+            hasDeleteRepositoryPermission,
+            hasUpdateRepositoryPermission
         ).subscribe(
             permissions => {
                 this.hasCreateRepositoryPermission = permissions[0] as boolean;
                 this.hasDeleteRepositoryPermission = permissions[1] as boolean;
+                this.hasUpdateRepositoryPermission = permissions[2] as boolean;
             },
             error => this.errorHandlerService.error(error)
         );

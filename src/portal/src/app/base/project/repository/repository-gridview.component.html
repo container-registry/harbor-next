@@ -210,7 +210,7 @@
                                 $event.stopPropagation();
                                 $event.preventDefault()
                             "
-                            [disabled]="!hasDeleteRepositoryPermission"
+                            [disabled]="!canOpenActions"
                             clrDropdownTrigger>
                             {{ 'REPOSITORY.ACTION' | translate }}
                             <clr-icon shape="caret down"></clr-icon>
@@ -226,7 +226,7 @@
                                     $event.stopPropagation();
                                     $event.preventDefault()
                                 "
-                                [disabled]="!hasProjectAdminRole">
+                                [disabled]="!hasUpdateRepositoryPermission">
                                 {{ 'REPOSITORY.ADDITIONAL_INFO' | translate }}
                             </button>
                             <button

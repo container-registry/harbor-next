@@ -100,6 +100,7 @@ describe('RepositoryComponentGridview (inline template)', () => {
     };
     const fakedActivatedRoute = {
         snapshot: {
+            queryParams: {},
             parent: {
                 parent: {
                     params: {
@@ -148,7 +149,7 @@ describe('RepositoryComponentGridview (inline template)', () => {
         compRepo = fixtureRepo.componentInstance;
         compRepo.projectId = 1;
         compRepo.mode = '';
-        compRepo.hasProjectAdminRole = true;
+        compRepo.hasUpdateRepositoryPermission = true;
         compRepo.isCardView = false;
         fixtureRepo.detectChanges();
     });
@@ -185,5 +186,14 @@ describe('RepositoryComponentGridview (inline template)', () => {
         const listView =
             fixtureRepo.nativeElement.querySelector('clr-datagrid');
         expect(listView).toBeTruthy();
+    });
+    it('opens the action menu for Additional Info with repository:update', () => {
+        compRepo.hasDeleteRepositoryPermission = false;
+        compRepo.hasUpdateRepositoryPermission = true;
+        expect(compRepo.canOpenActions).toBeFalse();
+        compRepo.mode = 'admiral';
+        expect(compRepo.canOpenActions).toBeTrue();
+        compRepo.hasUpdateRepositoryPermission = false;
+        expect(compRepo.canOpenActions).toBeFalse();
     });
 });
