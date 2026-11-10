@@ -45,8 +45,14 @@ import (
 )
 
 const (
-	googleEndpoint = "https://accounts.google.com"
+	googleHost = "accounts.google.com"
 )
+
+// isGoogleEndpoint reports whether authURL points at the Google OIDC host, ignoring host case.
+func isGoogleEndpoint(authURL string) bool {
+	u, err := url.Parse(authURL)
+	return err == nil && u.Scheme == "https" && strings.EqualFold(u.Hostname(), googleHost)
+}
 
 type claimsProvider interface {
 	Claims(v any) error
@@ -146,7 +152,7 @@ func getOauthConf(ctx context.Context) (*oauth2.Config, error) {
 	}
 	scopes := make([]string, 0)
 	for _, sc := range setting.Scope {
-		if strings.HasPrefix(p.Endpoint().AuthURL, googleEndpoint) && sc == gooidc.ScopeOfflineAccess {
+		if isGoogleEndpoint(p.Endpoint().AuthURL) && sc == gooidc.ScopeOfflineAccess {
 			log.Warningf("Dropped unsupported scope: %s ", sc)
 			continue
 		}
@@ -179,7 +185,7 @@ func AuthCodeURL(ctx context.Context, state string, pkceCode pkce.Code) (string,
 	for k, v := range setting.ExtraRedirectParms {
 		options = append(options, oauth2.SetAuthURLParam(k, v))
 	}
-	if strings.HasPrefix(conf.Endpoint.AuthURL, googleEndpoint) { // make sure the refresh token will be returned
+	if isGoogleEndpoint(conf.Endpoint.AuthURL) { // make sure the refresh token will be returned
 		options = append(options, oauth2.AccessTypeOffline)
 		options = append(options, oauth2.SetAuthURLParam("prompt", "consent"))
 	}

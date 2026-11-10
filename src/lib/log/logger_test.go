@@ -231,3 +231,21 @@ func enter() *bytes.Buffer {
 func exit() {
 	logger.SetOutput(os.Stdout)
 }
+
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) {
+	return 0, os.ErrClosed
+}
+
+func TestClonedLoggerKeepsFallback(t *testing.T) {
+	buf := &bytes.Buffer{}
+	l := New(failingWriter{}, NewTextFormatter(), InfoLevel)
+	l.SetFallback(New(buf, NewTextFormatter(), InfoLevel))
+
+	l.WithField("operator", "admin").Info(message)
+
+	if !strings.Contains(buf.String(), message) {
+		t.Errorf("expected fallback to receive %q, got %q", message, buf.String())
+	}
+}
