@@ -17,6 +17,7 @@ package handler
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -608,7 +609,21 @@ func (a *projectAPI) UpdateProject(ctx context.Context, params operation.UpdateP
 	// see https://github.com/goharbor/harbor/issues/12940 to get more info
 	if params.Project.Metadata != nil && p.IsProxy() {
 		params.Project.Metadata.EnableContentTrust = nil
-		if err := validateProxyCacheRepositoryFilter(params.Project.Metadata); err != nil {
+	}
+	// the filter keys are validated against the stored ones and written under the project row lock
+	filterMeta := takeProxyCacheFilter(params.Project.Metadata)
+	if len(filterMeta) > 0 {
+		// reject an invalid filter before any other change is saved; the locked write below re-checks it
+		stored, err := a.metadataMgr.Get(ctx, p.ProjectID, pkgModels.ProMetaProxyCacheFilterPattern, pkgModels.ProMetaProxyCacheFilterKind)
+		if err != nil {
+			return a.SendError(ctx, err)
+		}
+		effective := maps.Clone(stored)
+		if effective == nil {
+			effective = map[string]string{}
+		}
+		maps.Copy(effective, filterMeta)
+		if err := validateProxyCacheFilterMetadata(effective); err != nil {
 			return a.SendError(ctx, err)
 		}
 	}
@@ -630,6 +645,13 @@ func (a *projectAPI) UpdateProject(ctx context.Context, params operation.UpdateP
 
 	if err := a.projectCtl.Update(ctx, p); err != nil {
 		return a.SendError(ctx, err)
+	}
+	// write the filter last: projectCtl.Update reads metadata through the cache, which
+	// must not see the uncommitted filter of a request that may still be rolled back
+	if len(filterMeta) > 0 {
+		if err := a.metadataMgr.UpdateWithValidation(ctx, p.ProjectID, filterMeta, validateProxyCacheFilterMetadata); err != nil {
+			return a.SendError(ctx, err)
+		}
 	}
 
 	return operation.NewUpdateProjectOK()
@@ -923,6 +945,23 @@ func validateProxyCacheRepositoryFilter(metadata *models.ProjectMetadata) error 
 			WithMessagef("metadata.proxy_cache_filter_pattern is invalid for kind %q: %v", filterKind, err)
 	}
 	return nil
+}
+
+// takeProxyCacheFilter removes the filter fields from metadata and returns them as metadata keys.
+func takeProxyCacheFilter(metadata *models.ProjectMetadata) map[string]string {
+	filter := map[string]string{}
+	if metadata == nil {
+		return filter
+	}
+	if metadata.ProxyCacheFilterPattern != nil {
+		filter[pkgModels.ProMetaProxyCacheFilterPattern] = *metadata.ProxyCacheFilterPattern
+		metadata.ProxyCacheFilterPattern = nil
+	}
+	if metadata.ProxyCacheFilterKind != nil {
+		filter[pkgModels.ProMetaProxyCacheFilterKind] = *metadata.ProxyCacheFilterKind
+		metadata.ProxyCacheFilterKind = nil
+	}
+	return filter
 }
 
 func (a *projectAPI) populateProperties(ctx context.Context, p *project.Project) error {

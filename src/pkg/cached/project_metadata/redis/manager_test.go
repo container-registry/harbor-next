@@ -216,6 +216,33 @@ func (m *metadataStateManager) Update(ctx context.Context, id int64, values map[
 	return m.Add(ctx, id, values)
 }
 
+func (m *metadataStateManager) AddWithValidation(ctx context.Context, id int64, values map[string]string, validate metadata.Validator) error {
+	return m.UpdateWithValidation(ctx, id, values, validate)
+}
+
+func (m *metadataStateManager) DeleteWithValidation(ctx context.Context, id int64, validate metadata.Validator, names ...string) error {
+	effective := maps.Clone(m.values)
+	if len(names) == 0 {
+		clear(effective)
+	}
+	for _, name := range names {
+		delete(effective, name)
+	}
+	if err := validate(effective); err != nil {
+		return err
+	}
+	return m.Delete(ctx, id, names...)
+}
+
+func (m *metadataStateManager) UpdateWithValidation(ctx context.Context, id int64, values map[string]string, validate metadata.Validator) error {
+	effective := maps.Clone(m.values)
+	maps.Copy(effective, values)
+	if err := validate(effective); err != nil {
+		return err
+	}
+	return m.Add(ctx, id, values)
+}
+
 func (m *metadataStateManager) Delete(_ context.Context, _ int64, names ...string) error {
 	if len(names) == 0 {
 		clear(m.values)
@@ -227,7 +254,7 @@ func (m *metadataStateManager) Delete(_ context.Context, _ int64, names ...strin
 }
 
 func TestWritesInvalidateMetadataViews(t *testing.T) {
-	for _, operation := range []string{"add", "update", "delete", "delete-all"} {
+	for _, operation := range []string{"add", "update", "update-validated", "delete", "delete-validated", "delete-all"} {
 		t.Run(operation, func(t *testing.T) {
 			ctx := context.Background()
 			store := &metadataStateManager{values: map[string]string{"public": "true", "reuse_sys_cve_allowlist": "false"}}
@@ -258,8 +285,12 @@ func TestWritesInvalidateMetadataViews(t *testing.T) {
 				err = manager.Add(ctx, 1, map[string]string{"auto_scan": "true"})
 			case "update":
 				err = manager.Update(ctx, 1, map[string]string{"public": "false"})
+			case "update-validated":
+				err = manager.UpdateWithValidation(ctx, 1, map[string]string{"public": "false"}, func(map[string]string) error { return nil })
 			case "delete":
 				err = manager.Delete(ctx, 1, "public")
+			case "delete-validated":
+				err = manager.DeleteWithValidation(ctx, 1, func(map[string]string) error { return nil }, "public")
 			case "delete-all":
 				err = manager.Delete(ctx, 1)
 			}
@@ -279,6 +310,34 @@ func TestWritesInvalidateMetadataViews(t *testing.T) {
 	}
 }
 
+// TestRejectedValidatedUpdateLeavesNothing: with a cold cache inside a
+// transaction, a rejected validated update must not reach the store or the
+// cache, while ordinary reads in the same transaction are still cached.
+func TestRejectedValidatedUpdateLeavesNothing(t *testing.T) {
+	ctx, drainHooks := orm.ContextWithAfterCommitHooksForTest(context.Background())
+	client, err := cache.New(cache.Memory)
+	require.NoError(t, err)
+	store := &metadataStateManager{values: map[string]string{"public": "true"}}
+	manager := NewManager(store)
+	manager.WithCacheClient(client)
+
+	validateErr := errors.New("invalid metadata")
+	err = manager.UpdateWithValidation(ctx, 1, map[string]string{"public": "false"}, func(map[string]string) error { return validateErr })
+	require.ErrorIs(t, err, validateErr)
+	drainHooks()
+	require.Equal(t, "true", store.values["public"])
+	iter, err := client.Scan(ctx, "project_metadata:projectID:1:meta:")
+	require.NoError(t, err)
+	require.False(t, iter.Next(ctx), "a rejected update must not populate the cache")
+
+	result, err := manager.Get(ctx, 1)
+	require.NoError(t, err)
+	require.Equal(t, map[string]string{"public": "true"}, result)
+	iter, err = client.Scan(ctx, "project_metadata:projectID:1:meta:")
+	require.NoError(t, err)
+	require.True(t, iter.Next(ctx), "reads inside a transaction still use the cache")
+}
+
 func TestWriteReportsTerminalCacheScanFailure(t *testing.T) {
 	client := &testcache.Cache{}
 	iterator := &testcache.Iterator{}
@@ -296,7 +355,7 @@ func TestWriteReportsTerminalCacheScanFailure(t *testing.T) {
 }
 
 func TestWriteReportsCacheScanFailure(t *testing.T) {
-	for _, operation := range []string{"add", "update", "delete"} {
+	for _, operation := range []string{"add", "update", "update-validated", "delete"} {
 		t.Run(operation, func(t *testing.T) {
 			client := &testcache.Cache{}
 			scanErr := errors.New("cache scan failed")
@@ -310,6 +369,8 @@ func TestWriteReportsCacheScanFailure(t *testing.T) {
 				err = manager.Add(context.Background(), 1, map[string]string{"public": "true"})
 			case "update":
 				err = manager.Update(context.Background(), 1, map[string]string{"public": "false"})
+			case "update-validated":
+				err = manager.UpdateWithValidation(context.Background(), 1, map[string]string{"public": "false"}, func(map[string]string) error { return nil })
 			case "delete":
 				err = manager.Delete(context.Background(), 1, "public")
 			}

@@ -127,6 +127,30 @@ func (m *Manager) Update(ctx context.Context, projectID int64, meta map[string]s
 	return m.invalidateAfterCommit(ctx, projectID)
 }
 
+// AddWithValidation atomically validates and adds metadata, then invalidates its cache.
+func (m *Manager) AddWithValidation(ctx context.Context, projectID int64, meta map[string]string, validate metadata.Validator) error {
+	if err := m.delegator.AddWithValidation(ctx, projectID, meta, validate); err != nil {
+		return err
+	}
+	return m.invalidateAfterCommit(ctx, projectID)
+}
+
+// DeleteWithValidation atomically validates and deletes metadata, then invalidates its cache.
+func (m *Manager) DeleteWithValidation(ctx context.Context, projectID int64, validate metadata.Validator, meta ...string) error {
+	if err := m.delegator.DeleteWithValidation(ctx, projectID, validate, meta...); err != nil {
+		return err
+	}
+	return m.invalidateAfterCommit(ctx, projectID)
+}
+
+// UpdateWithValidation atomically validates and updates metadata, then invalidates its cache.
+func (m *Manager) UpdateWithValidation(ctx context.Context, projectID int64, meta map[string]string, validate metadata.Validator) error {
+	if err := m.delegator.UpdateWithValidation(ctx, projectID, meta, validate); err != nil {
+		return err
+	}
+	return m.invalidateAfterCommit(ctx, projectID)
+}
+
 // invalidateAfterCommit invalidates the cache once the enclosing transaction
 // commits. Outside a transaction the hook runs inline and its error is returned.
 func (m *Manager) invalidateAfterCommit(ctx context.Context, projectID int64) error {
