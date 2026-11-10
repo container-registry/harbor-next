@@ -15,6 +15,7 @@ import { forkJoin, Observable, of } from 'rxjs';
 import { map, switchMap } from 'rxjs/operators';
 import { RoleService } from '../../../../ng-swagger-gen/services/role.service';
 import { Role } from '../../../../ng-swagger-gen/models/role';
+import { Roles } from '../entities/shared.const';
 
 const ROLE_PAGE_SIZE = 100;
 // Built-ins keep their historical order (Project Admin first), customs follow.
@@ -78,4 +79,21 @@ export function getAllRoles(roleService: RoleService): Observable<Role[]> {
                 );
             })
         );
+}
+
+export interface ProjectRoleInfo {
+    role_name?: string;
+    current_user_role_id?: number;
+    current_user_role_ids?: number[];
+}
+
+// Every held role is Guest/Limited Guest; any custom or stronger role keeps the tabs.
+export function isGuestOnlyMember(project: ProjectRoleInfo): boolean {
+    if (!project || project.role_name === 'MEMBER.SYS_ADMIN') {
+        return false;
+    }
+    const ids = project.current_user_role_ids?.length
+        ? project.current_user_role_ids
+        : [project.current_user_role_id];
+    return ids.every(id => id === Roles.GUEST || id === Roles.LIMITED_GUEST);
 }
