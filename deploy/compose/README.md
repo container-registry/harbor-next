@@ -50,6 +50,53 @@ with step 3 above before the first `docker compose up` on the new version, then
 keep it. The mount is declared with `create_host_path: false`, so a missing
 file fails the start instead of being created as an empty directory.
 
+## PostgreSQL 18
+
+The bundled database runs `postgres:18-alpine`. The `postgres-data` volume is
+mounted at `/var/lib/postgresql` and the data lives in `18/docker` inside it,
+the layout the PostgreSQL 18 image expects. The version is fixed in the compose
+file and `POSTGRES_VERSION` is no longer read, because an older image on this
+mount would ignore the existing data and start an empty database.
+
+Swapping the image does not upgrade a data directory. On a volume created by an
+earlier compose file (PostgreSQL 16, or 15 if you pinned it), the PostgreSQL 18
+container refuses to start and logs that it found data from an older version.
+Move the data over with a dump and restore before you update the compose file:
+
+```bash
+cd deploy/compose
+
+# 1. With the OLD compose file: stop Harbor, keep only the database running
+docker compose down
+docker compose up -d --wait postgresql
+
+# 2. Dump the Harbor database as the configured user (DB_USER, DB_NAME)
+docker compose exec -T postgresql \
+  sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > harbor.sql
+grep -q -- '-- PostgreSQL database dump complete' harbor.sql && echo "dump OK"
+
+# 3. Remove the old volume, guarded so it only happens after a complete dump
+project=$(docker compose config | sed -n 's/^name: //p')
+docker compose down
+grep -q -- '-- PostgreSQL database dump complete' harbor.sql \
+  && docker volume rm "${project}_postgres-data"
+
+# 4. Update to the new compose file, then restore into the fresh PostgreSQL 18
+docker compose up -d --wait postgresql
+docker compose exec -T postgresql \
+  sh -c 'psql -v ON_ERROR_STOP=1 -q -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < harbor.sql > /dev/null \
+  && echo "restore OK"
+
+# 5. Start Harbor
+docker compose up -d
+```
+
+Remove the old volume only after step 2 printed `dump OK`. Without it, keep
+the old volume and the old compose file and look into the error first. If step
+4 does not print `restore OK`, run `docker compose down`, remove the new volume
+the same way as in step 3 and repeat step 4. Keep `harbor.sql` and
+`config/secret_key` together until the upgraded Harbor works.
+
 ## TLS Certificates
 
 TLS is enabled by default. Set `TLS_CERT` and `TLS_KEY` in `.env` to absolute paths on the host:
