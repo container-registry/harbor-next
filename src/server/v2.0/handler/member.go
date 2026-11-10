@@ -18,12 +18,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/go-openapi/runtime/middleware"
 
+	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/common/rbac"
+	"github.com/goharbor/harbor/src/common/security"
+	"github.com/goharbor/harbor/src/common/security/local"
+	robotSec "github.com/goharbor/harbor/src/common/security/robot"
 	"github.com/goharbor/harbor/src/controller/member"
+	"github.com/goharbor/harbor/src/controller/robot"
 	roleCtl "github.com/goharbor/harbor/src/controller/role"
+	"github.com/goharbor/harbor/src/controller/user"
 	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/errors"
 	memberModels "github.com/goharbor/harbor/src/pkg/member/models"
@@ -35,14 +42,21 @@ import (
 
 type memberAPI struct {
 	BaseAPI
-	ctl     member.Controller
-	roleCtl roleCtl.Controller
+	ctl      member.Controller
+	roleCtl  roleCtl.Controller
+	robotCtl robot.Controller
+	userCtl  user.Controller
 }
+
+// robotCreatorType is the creator type a robot-created robot records, the robot security context's name.
+const robotCreatorType = "robot"
 
 func newMemberAPI() *memberAPI {
 	return &memberAPI{
-		ctl:     member.NewController(),
-		roleCtl: roleCtl.Ctl,
+		ctl:      member.NewController(),
+		roleCtl:  roleCtl.Ctl,
+		robotCtl: robot.Ctl,
+		userCtl:  user.Ctl,
 	}
 }
 
@@ -185,15 +199,11 @@ func (m *memberAPI) UpdateProjectMember(ctx context.Context, params operation.Up
 	return operation.NewUpdateProjectMemberOK()
 }
 
+// maxCreatorDepth bounds the robot-created-by-robot chain walked for built-in grants.
+const maxCreatorDepth = 3
+
 // checkNoEscalation rejects role assignments where the target role has permissions the caller lacks.
 func (m *memberAPI) checkNoEscalation(ctx context.Context, projectNameOrID any, roleID int64) error {
-	// Built-in roles stay grantable by anyone who may write members, project
-	// admin included: provisioning robots depend on it (#1137 and its revert
-	// #1227). The guard applies to custom roles, whose permission sets are
-	// arbitrary.
-	if policy.IsBuiltinRole(roleID) {
-		return nil
-	}
 	r, err := m.roleCtl.Get(ctx, roleID, &roleCtl.Option{WithPermission: true})
 	if err != nil {
 		return err
@@ -201,6 +211,21 @@ func (m *memberAPI) checkNoEscalation(ctx context.Context, projectNameOrID any, 
 	var accesses []*types.Policy
 	for _, perm := range r.Permissions {
 		accesses = append(accesses, perm.Access...)
+	}
+	return m.checkGrant(ctx, projectNameOrID, roleID, accesses, "you lack", 0)
+}
+
+func (m *memberAPI) checkGrant(ctx context.Context, projectNameOrID any, roleID int64, accesses []*types.Policy, subject string, depth int) error {
+	// Built-ins hold permissions no robot can, so the robot's creator must hold them (#1137, #1227).
+	if r := robotCaller(ctx); r != nil && policy.IsBuiltinRole(roleID) {
+		if depth >= maxCreatorDepth {
+			return errors.ForbiddenError(nil).WithMessage("escalation not allowed: robot creator chain too deep")
+		}
+		creator, err := m.creatorContext(ctx, r)
+		if err != nil {
+			return err
+		}
+		return m.checkGrant(security.NewContext(ctx, creator), projectNameOrID, roleID, accesses, creatorLacks(ctx), depth+1)
 	}
 	for _, acc := range accesses {
 		// Deny entries restrict access rather than grant it, so the caller need
@@ -217,8 +242,58 @@ func (m *memberAPI) checkNoEscalation(ctx context.Context, projectNameOrID any, 
 		}
 		if !has {
 			return errors.ForbiddenError(nil).WithMessagef(
-				"escalation not allowed: you lack %s:%s", acc.Resource, acc.Action)
+				"escalation not allowed: %s %s:%s", subject, acc.Resource, acc.Action)
 		}
 	}
 	return nil
+}
+
+func robotCaller(ctx context.Context) *robot.Robot {
+	secCtx, ok := security.FromContext(ctx)
+	if !ok {
+		return nil
+	}
+	rc, ok := secCtx.(*robotSec.SecurityContext)
+	if !ok {
+		return nil
+	}
+	return rc.User()
+}
+
+// creatorContext builds a security context for whoever created r, from their current state.
+func (m *memberAPI) creatorContext(ctx context.Context, r *robot.Robot) (security.Context, error) {
+	switch r.CreatorType {
+	case local.ContextName:
+		u, err := m.userCtl.Get(ctx, int(r.CreatorRef), nil)
+		if err != nil {
+			return nil, creatorLookupError(err)
+		}
+		return local.NewSecurityContext(u), nil
+	case robotCreatorType:
+		c, err := m.robotCtl.Get(ctx, r.CreatorRef, &robot.Option{WithPermission: true})
+		if err != nil {
+			return nil, creatorLookupError(err)
+		}
+		if c.Disabled || (c.ExpiresAt != -1 && c.ExpiresAt <= time.Now().Unix()) {
+			return nil, errors.ForbiddenError(nil).WithMessage("escalation not allowed: the robot's creator is inactive")
+		}
+		return robotSec.NewSecurityContext(c), nil
+	default:
+		return nil, errors.ForbiddenError(nil).WithMessage("escalation not allowed: the robot has no known creator")
+	}
+}
+
+// creatorLacks words the denial; admin rights an external provider grants at login are not stored, so robots cannot inherit them.
+func creatorLacks(ctx context.Context) string {
+	if mode := lib.GetAuthMode(ctx); mode != "" && mode != common.DBAuth {
+		return "the robot's creator lacks (admin rights granted by the external auth provider are not honoured for robots; set the system admin flag on the creator)"
+	}
+	return "the robot's creator lacks"
+}
+
+func creatorLookupError(err error) error {
+	if errors.IsNotFoundErr(err) {
+		return errors.ForbiddenError(nil).WithMessage("escalation not allowed: the robot's creator no longer exists")
+	}
+	return err
 }
