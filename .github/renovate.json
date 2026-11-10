@@ -22,7 +22,8 @@
     "docker-compose",
     "dockerfile",
     "github-actions",
-    "gomod"
+    "gomod",
+    "helmv3"
   ],
   "vulnerabilityAlerts": {
     "labels": [
@@ -165,6 +166,29 @@
       "matchStrings": [
         "#\\s*renovate:\\s+datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(?:\\s+versioning=(?<versioning>\\S+))?(?:\\s+extractVersion=(?<extractVersion>\\S+))?\\s*\\n[A-Z_]+=(?<currentValue>[^\\s@]+)(?:@(?<currentDigest>sha256:[a-f0-9]{64}))?"
       ]
+    },
+    {
+      "customType": "regex",
+      "description": "Update the built-in Trivy adapter image tag default in the chart image source map",
+      "managerFilePatterns": [
+        "/deploy/chart/templates/_helpers\\.tpl$/"
+      ],
+      "matchStrings": [
+        "#\\s*renovate:\\s+datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(?:\\s+versioning=(?<versioning>\\S+))?\\s*\\n\\s*trivy:\\s*(?<currentValue>\\S+)"
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "Keep the compose Trivy adapter tag default on the same release as versions.env",
+      "managerFilePatterns": [
+        "/^deploy/compose/docker-compose\\.yaml$/",
+        "/^deploy/compose/\\.env\\.example$/"
+      ],
+      "matchStrings": [
+        "TRIVY_ADAPTER_TAG(?::-|=)(?<currentValue>v[^}\\s]+)"
+      ],
+      "datasourceTemplate": "github-tags",
+      "depNameTemplate": "container-registry/harbor-scanner-trivy"
     }
   ]
 }

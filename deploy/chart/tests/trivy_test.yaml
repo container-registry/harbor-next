@@ -194,6 +194,23 @@ tests:
             name: HTTPS_PROXY
             value: "https://proxy.example.com:8443"
 
+  # proxy.components ships with trivy listed, so setting the proxy alone must
+  # reach the built-in adapter (vulnerability DB downloads).
+  - it: should set proxy env vars from the default proxy.components
+    template: templates/trivy.statefulset.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      trivy.enabled: true
+      proxy.httpProxy: http://proxy.example.com:8080
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HTTP_PROXY
+            value: "http://proxy.example.com:8080"
+
   - it: should create VolumeClaimTemplate when persistence enabled
     template: templates/trivy.statefulset.yaml
     set:

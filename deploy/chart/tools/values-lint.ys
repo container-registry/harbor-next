@@ -132,6 +132,8 @@ defn check-secret-hygiene(vals):
     warn-inline vals ['secretKey']: 'existingSecretSecretKey'
   warn-inline vals ['trivy' 'gitHubToken']:
     'trivy.secret via an extraEnv valueFrom'
+  warn-inline vals ['harbor-scanner-trivy' 'trivy' 'gitHubToken']:
+    'harbor-scanner-trivy.trivy.existingSecret (subchart Secret for the GitHub token)'
   warn-inline vals ['imageCredentials' 'password']:
     'imagePullSecrets with a pre-created Secret'
   warn-inline vals ['valkey' 'auth' 'password']:
