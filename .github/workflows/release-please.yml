@@ -299,6 +299,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # The release tag, not the event SHA: a queued run can publish a
+          # release whose changelog section the event commit lacks.
+          ref: ${{ needs.release-please.outputs.tag_name }}
           persist-credentials: false
 
       - name: Setup Node
