@@ -1058,6 +1058,7 @@ export function durationStr(distance: number): string {
 }
 
 /**
+<<<<<<< HEAD
  * Lowercase only the scheme and host of an endpoint, as the backend stores it.
  * Userinfo, port, path, query and an IPv6 zone suffix are left as is.
  */
@@ -1084,6 +1085,10 @@ export function lowerEndpointHost(endpoint: string): string {
 /**
  * Compare two endpoints, ignoring host case only.
  * A scheme-less endpoint is treated as http.
+=======
+ * Compare two URL endpoints with case-insensitive host matching per RFC 1035.
+ * Returns true if both endpoints point to the same location, ignoring host casing.
+>>>>>>> 95b28b3cd (fix: make endpoint handling and validation case-insensitive (#23889))
  */
 export function equalEndpoint(endpoint1: string, endpoint2: string): boolean {
     if (endpoint1 === endpoint2) {
@@ -1092,12 +1097,32 @@ export function equalEndpoint(endpoint1: string, endpoint2: string): boolean {
     if (!endpoint1 || !endpoint2) {
         return false;
     }
+<<<<<<< HEAD
     const withScheme = (ep: string) =>
         ep.includes('://') ? ep : `http://${ep}`;
     return (
         lowerEndpointHost(withScheme(endpoint1.trim())) ===
         lowerEndpointHost(withScheme(endpoint2.trim()))
     );
+=======
+    const ep1 = endpoint1.trim();
+    const ep2 = endpoint2.trim();
+    if (ep1 === ep2) {
+        return true;
+    }
+    try {
+        const hasScheme1 = ep1.includes('://');
+        const hasScheme2 = ep2.includes('://');
+        if (hasScheme1 !== hasScheme2) {
+            return false;
+        }
+        const u1 = new URL(hasScheme1 ? ep1 : `http://${ep1}`);
+        const u2 = new URL(hasScheme2 ? ep2 : `http://${ep2}`);
+        return u1.href === u2.href;
+    } catch {
+        return false;
+    }
+>>>>>>> 95b28b3cd (fix: make endpoint handling and validation case-insensitive (#23889))
 }
 
 export enum PageSizeMapKeys {

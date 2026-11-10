@@ -40,7 +40,10 @@ func TestParseEndpoint(t *testing.T) {
 		{"http://EXAMPLE.COM", false, "http://example.com"},
 		{"https://EXAMPLE.COM:8080/Path", false, "https://example.com:8080/Path"},
 		{" MIXED.case.com/path/ ", false, "http://mixed.case.com/path"},
+<<<<<<< HEAD
 		{"http://[FE80::1%25En0]:8080/", false, "http://[fe80::1%25En0]:8080"},
+=======
+>>>>>>> 95b28b3cd (fix: make endpoint handling and validation case-insensitive (#23889))
 		{"http://example!@#!?//#", true, ""},
 	}
 

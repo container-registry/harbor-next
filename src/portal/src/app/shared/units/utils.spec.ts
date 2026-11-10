@@ -16,7 +16,10 @@ import {
     delUrlParam,
     durationStr,
     equalEndpoint,
+<<<<<<< HEAD
     lowerEndpointHost,
+=======
+>>>>>>> 95b28b3cd (fix: make endpoint handling and validation case-insensitive (#23889))
     getHiddenArrayFromLocalStorage,
     getPageSizeFromLocalStorage,
     getQueryString,
@@ -210,6 +213,7 @@ describe('functions in utils.ts should work', () => {
         );
         expect(equalEndpoint('http://example.com', null)).toBe(false);
         expect(equalEndpoint('example.com', 'EXAMPLE.COM')).toBe(true);
+<<<<<<< HEAD
         expect(
             equalEndpoint(
                 'http://example.com/prefix\\scanner',
@@ -238,5 +242,7 @@ describe('functions in utils.ts should work', () => {
         expect(lowerEndpointHost('http://[FE80::1%En0]:8080/X')).toBe(
             'http://[fe80::1%En0]:8080/X'
         );
+=======
+>>>>>>> 95b28b3cd (fix: make endpoint handling and validation case-insensitive (#23889))
     });
 });

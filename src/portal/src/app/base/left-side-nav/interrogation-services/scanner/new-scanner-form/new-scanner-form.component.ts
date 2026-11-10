@@ -33,10 +33,14 @@ import {
     switchMap,
 } from 'rxjs/operators';
 import { ScannerService } from '../../../../../../../ng-swagger-gen/services/scanner.service';
+<<<<<<< HEAD
 import {
     equalEndpoint,
     lowerEndpointHost,
 } from '../../../../../shared/units/utils';
+=======
+import { equalEndpoint } from '../../../../../shared/units/utils';
+>>>>>>> 95b28b3cd (fix: make endpoint handling and validation case-insensitive (#23889))
 
 @Component({
     selector: 'new-scanner-form',

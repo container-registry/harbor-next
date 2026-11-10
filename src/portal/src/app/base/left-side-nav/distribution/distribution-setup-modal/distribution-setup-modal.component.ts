@@ -26,11 +26,15 @@ import { TranslateService } from '@ngx-translate/core';
 import { PreheatService } from '../../../../../../ng-swagger-gen/services/preheat.service';
 import { Instance } from '../../../../../../ng-swagger-gen/models/instance';
 import { AuthMode, FrontInstance } from '../distribution-interface';
+<<<<<<< HEAD
 import {
     clone,
     equalEndpoint,
     lowerEndpointHost,
 } from '../../../../shared/units/utils';
+=======
+import { clone, equalEndpoint } from '../../../../shared/units/utils';
+>>>>>>> 95b28b3cd (fix: make endpoint handling and validation case-insensitive (#23889))
 import { ClrLoadingState } from '@clr/angular';
 import { Metadata } from '../../../../../../ng-swagger-gen/models/metadata';
 import {

@@ -147,7 +147,11 @@ func (s *preheatSuite) TestCreateInstance() {
 	s.Equal(ErrorConflict, err)
 	s.Empty(id)
 
+<<<<<<< HEAD:src/controller/p2p/preheat/controller_test.go
 	// Case: same endpoint with a mixed-case host, expect conflict.
+=======
+	// Case: instance with mixed-case already existed endpoint, expect conflict.
+>>>>>>> 95b28b3cd (fix: make endpoint handling and validation case-insensitive (#23889)):src/controller/p2p/preheat/controllor_test.go
 	id, err = s.controller.CreateInstance(s.ctx, &providerModel.Instance{
 		Endpoint: "http://LOCALHOST",
 	})

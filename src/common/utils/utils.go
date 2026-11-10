@@ -52,11 +52,18 @@ func ParseEndpoint(endpoint string) (*url.URL, error) {
 	}
 
 	u, err := url.ParseRequestURI(endpoint)
+<<<<<<< HEAD
 	if err != nil {
 		return nil, err
 	}
 	u.Host = LowerHost(u.Host)
 	return u, nil
+=======
+	if err == nil && u != nil {
+		u.Host = strings.ToLower(u.Host)
+	}
+	return u, err
+>>>>>>> 95b28b3cd (fix: make endpoint handling and validation case-insensitive (#23889))
 }
 
 // LowerHost lowercases a url.URL Host (host[:port]) but leaves an IPv6 zone suffix as is, since a

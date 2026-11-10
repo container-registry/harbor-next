@@ -60,7 +60,11 @@ func (kd *KrakenDriver) GetHealth() (*DriverStatus, error) {
 	}
 
 	url := fmt.Sprintf("%s%s", strings.TrimSuffix(kd.instance.Endpoint, "/"), krakenHealthPath)
+<<<<<<< HEAD
 	url, err := lib.ValidateURL(url, "http", "https")
+=======
+	url, err := lib.NormalizeAndValidateHTTPURL(url)
+>>>>>>> 95b28b3cd (fix: make endpoint handling and validation case-insensitive (#23889))
 	if err != nil {
 		return nil, err
 	}

@@ -179,8 +179,25 @@ func (c *controller) CreateInstance(ctx context.Context, instance *providerModel
 		return 0, errors.New("nil instance object provided")
 	}
 
+<<<<<<< HEAD
 	// normalize first so a host differing only in case is caught as a duplicate
 	endpoint, err := lib.ValidateURL(instance.Endpoint, "http", "https")
+=======
+	// Normalize endpoint host via NormalizeAndValidateHTTPURL before checking duplicate
+	normEndpoint, err := lib.NormalizeAndValidateHTTPURL(instance.Endpoint)
+	if err != nil {
+		return 0, err
+	}
+	instance.Endpoint = normEndpoint
+
+	// Avoid duplicated endpoint
+	var query = &q.Query{
+		Keywords: map[string]any{
+			"endpoint": instance.Endpoint,
+		},
+	}
+	num, err := c.iManager.Count(ctx, query)
+>>>>>>> 95b28b3cd (fix: make endpoint handling and validation case-insensitive (#23889))
 	if err != nil {
 		return 0, err
 	}
@@ -268,11 +285,19 @@ func (c *controller) UpdateInstance(ctx context.Context, instance *providerModel
 	}
 
 	if instance.Endpoint != "" {
+<<<<<<< HEAD
 		endpoint, err := lib.ValidateURL(instance.Endpoint, "http", "https")
 		if err != nil {
 			return err
 		}
 		instance.Endpoint = endpoint
+=======
+		normEndpoint, err := lib.NormalizeAndValidateHTTPURL(instance.Endpoint)
+		if err != nil {
+			return err
+		}
+		instance.Endpoint = normEndpoint
+>>>>>>> 95b28b3cd (fix: make endpoint handling and validation case-insensitive (#23889))
 	}
 
 	return c.iManager.Update(ctx, instance, properties...)
