@@ -143,17 +143,16 @@ export class ListProjectComponent implements OnDestroy {
         return account != null && account.has_admin_role;
     }
 
+    // Whether the caller may delete every selected project, from the
+    // permissions their roles grant there; refreshed in selectionChanged.
+    canDeleteSelected: boolean = false;
+    private deleteCheck = 0;
+
     public get canDelete(): boolean {
         if (!this.selectedRow.length) {
             return false;
         }
-
-        return (
-            this.isSystemAdmin ||
-            this.selectedRow.every(
-                (pro: Project) => pro.current_user_role_id === 1
-            )
-        );
+        return this.isSystemAdmin || this.canDeleteSelected;
     }
 
     ngOnDestroy(): void {
@@ -402,6 +401,24 @@ export class ListProjectComponent implements OnDestroy {
     }
     selectionChanged() {
         this.hasPermission = false;
+        this.canDeleteSelected = false;
+        // A slow answer for an earlier selection must not land on a later one.
+        const check = ++this.deleteCheck;
+        if (this.selectedRow?.length && !this.isSystemAdmin) {
+            forkJoin(
+                this.selectedRow.map(item =>
+                    this.permissionService.getPermission(
+                        item.project_id,
+                        USERSTATICPERMISSION.PROJECT.KEY,
+                        USERSTATICPERMISSION.PROJECT.VALUE.DELETE
+                    )
+                )
+            ).subscribe(res => {
+                if (check === this.deleteCheck) {
+                    this.canDeleteSelected = res.every(item => item);
+                }
+            });
+        }
         if (
             this.selectedRow?.length &&
             this.selectedRow?.length <= MAX_PROJECTS_NUM

@@ -238,6 +238,14 @@ func (rAPI *roleAPI) validate(permissions []*models.RolePermission) error {
 			polices := provider.GetPermissions(rbac.ScopeRole)
 
 			for _, acc := range perm.Access {
+				// Every shipped role carries the project's own read (resource "")
+				// and hands it back on GET. Accept it on the way in so a built-in
+				// role can be edited; it is implied by membership, so granting it
+				// to a custom role changes nothing.
+				if acc.Resource == rbac.ResourceSelf.String() && acc.Action == rbac.ActionRead.String() {
+					granted = append(granted, &types.Policy{Resource: rbac.ResourceSelf, Action: rbac.ActionRead})
+					continue
+				}
 				if !containsAccess(polices, acc) {
 					return errors.New(nil).WithMessagef("bad request permission: %s:%s", acc.Resource, acc.Action).WithCode(errors.BadRequestCode)
 				}

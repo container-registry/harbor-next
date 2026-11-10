@@ -128,25 +128,32 @@ describe('RolesComponent', () => {
         expect(panel.textContent).toContain('2');
     });
 
-    describe('isBuiltinSelected', () => {
+    describe('isProtectedSelected', () => {
+        const maintainer: Role = {
+            id: 4,
+            name: 'maintainer',
+            is_builtin: true,
+            permissions: [],
+        };
+
         it('returns false when nothing is selected', () => {
             component.selectedRows = [];
-            expect(component.isBuiltinSelected()).toBeFalse();
+            expect(component.isProtectedSelected()).toBeFalse();
         });
 
-        it('returns false when only custom roles are selected', () => {
-            component.selectedRows = [customRole];
-            expect(component.isBuiltinSelected()).toBeFalse();
+        it('returns false for custom roles and deletable built-ins', () => {
+            component.selectedRows = [customRole, maintainer];
+            expect(component.isProtectedSelected()).toBeFalse();
         });
 
-        it('returns true when a built-in role is selected', () => {
+        it('returns true when project admin is selected', () => {
             component.selectedRows = [builtinRole];
-            expect(component.isBuiltinSelected()).toBeTrue();
+            expect(component.isProtectedSelected()).toBeTrue();
         });
 
-        it('returns true when a mix of built-in and custom roles is selected', () => {
-            component.selectedRows = [builtinRole, customRole];
-            expect(component.isBuiltinSelected()).toBeTrue();
+        it('returns true when project admin is among the selection', () => {
+            component.selectedRows = [maintainer, builtinRole, customRole];
+            expect(component.isProtectedSelected()).toBeTrue();
         });
     });
 
@@ -191,6 +198,23 @@ describe('RolesComponent', () => {
         it('delete button is disabled when a mix of built-in and custom roles is selected', async () => {
             component.selectedRows = [builtinRole, customRole];
             expect((await actionButton('role-delete')).disabled).toBeTrue();
+        });
+
+        const maintainer: Role = {
+            id: 4,
+            name: 'maintainer',
+            is_builtin: true,
+            permissions: [],
+        };
+
+        it('edit button is enabled for a built-in role other than project admin', async () => {
+            component.selectedRows = [maintainer];
+            expect((await actionButton('role-edit')).disabled).toBeFalse();
+        });
+
+        it('delete button is enabled for a built-in role other than project admin', async () => {
+            component.selectedRows = [maintainer];
+            expect((await actionButton('role-delete')).disabled).toBeFalse();
         });
     });
 });

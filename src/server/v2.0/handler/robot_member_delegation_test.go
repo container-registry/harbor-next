@@ -328,7 +328,14 @@ func TestRobotMemberUpdateStillValidatesRole(t *testing.T) {
 }
 
 func TestRobotMemberDelegationRequiresEveryRolePermission(t *testing.T) {
-	const fullRoleID = 101
+	// A custom role cannot be given the project's own update and delete
+	// through the role API today, so grantableRoleID is as close as one gets
+	// and still falls short; a role that could hold everything passes.
+	const (
+		fullRoleID      = 101 // every grant any role holds, project self grants included
+		grantableRoleID = 102 // every grant a custom role can actually be given
+		almostRoleID    = 103 // grantableRoleID minus repository:delete
+	)
 	for _, tc := range []struct {
 		name      string
 		sysAdmin  bool
@@ -340,6 +347,8 @@ func TestRobotMemberDelegationRequiresEveryRolePermission(t *testing.T) {
 		{name: "project administrator", roles: []int{common.RoleProjectAdmin}, allowed: true},
 		{name: "custom role holding every permission", roles: []int{fullRoleID}, allowed: true},
 		{name: "custom role holding every permission, built-in admin role deleted", roles: []int{fullRoleID}, dropAdmin: true, allowed: true},
+		{name: "custom role holding every grantable permission still lacks the project's own update and delete", roles: []int{grantableRoleID}},
+		{name: "custom role missing one grantable permission", roles: []int{almostRoleID}},
 		{name: "maintainer", roles: []int{common.RoleMaintainer}},
 		{name: "custom role with member:update only", roles: []int{100}},
 		{name: "no role in the project"},
@@ -359,9 +368,21 @@ func TestRobotMemberDelegationRequiresEveryRolePermission(t *testing.T) {
 				}
 				grants = kept
 			}
+			grantable := map[string]bool{}
+			for _, p := range rbac.GetPermissionProvider().GetPermissions(rbac.ScopeRole) {
+				grantable[p.Resource.String()+":"+p.Action.String()] = true
+			}
 			for _, r := range rolesFromGrants(grants) {
 				for _, acc := range r.Permissions[0].Access {
+					key := acc.Resource.String() + ":" + acc.Action.String()
 					grants = append(grants, policy.Grant{RoleID: fullRoleID, Resource: acc.Resource.String(), Action: acc.Action.String()})
+					if !grantable[key] {
+						continue
+					}
+					grants = append(grants, policy.Grant{RoleID: grantableRoleID, Resource: acc.Resource.String(), Action: acc.Action.String()})
+					if key != "repository:delete" {
+						grants = append(grants, policy.Grant{RoleID: almostRoleID, Resource: acc.Resource.String(), Action: acc.Action.String()})
+					}
 				}
 			}
 			store, err := policy.NewInMemory(grants)

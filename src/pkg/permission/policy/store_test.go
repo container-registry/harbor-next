@@ -161,3 +161,37 @@ func TestADenyGrantIsNotTurnedIntoAnAllow(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, granted, "the deny wins over the allow on the same permission")
 }
+
+// A built-in role's grants are rows like any other role's. Replacing them,
+// which is what editing the role does, changes what a member holding it may do
+// the moment the store reads the new rows.
+func TestEditingABuiltinRoleChangesWhatItsMembersMayDo(t *testing.T) {
+	const maintainer = int64(4)
+	before, err := policy.NewInMemory(policy.Shipped())
+	require.NoError(t, err)
+
+	granted, err := before.Enforce(policy.Subject(maintainer), policy.Object("member"), "create")
+	require.NoError(t, err)
+	assert.False(t, granted, "maintainer does not add members as shipped")
+
+	var edited []policy.Grant
+	for _, g := range policy.Shipped() {
+		if g.RoleID == maintainer && g.Resource == "repository" && g.Action == "delete" {
+			continue // the admin took this one away
+		}
+		edited = append(edited, g)
+	}
+	edited = append(edited, policy.Grant{RoleID: maintainer, Resource: "member", Action: "create"})
+	after, err := policy.NewInMemory(edited)
+	require.NoError(t, err)
+
+	granted, err = after.Enforce(policy.Subject(maintainer), policy.Object("member"), "create")
+	require.NoError(t, err)
+	assert.True(t, granted, "the added grant is live")
+	granted, err = after.Enforce(policy.Subject(maintainer), policy.Object("repository"), "delete")
+	require.NoError(t, err)
+	assert.False(t, granted, "the removed grant is gone")
+	granted, err = after.Enforce(policy.Subject(maintainer), policy.Object("repository"), "push")
+	require.NoError(t, err)
+	assert.True(t, granted, "untouched grants stay")
+}

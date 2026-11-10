@@ -38,6 +38,7 @@ import {
 } from '../../../../shared/components/operation/operate';
 import { InlineAlertComponent } from '../../../../shared/components/inline-alert/inline-alert.component';
 import { errorHandler } from '../../../../shared/units/shared.utils';
+import { isProtectedRole } from '../../../../shared/units/role-util';
 import { PermissionSelectPanelModes } from '../../../../shared/components/role-permissions-panel/role-permissions-panel.component';
 import { Permissions } from '../../../../../../ng-swagger-gen/models/permissions';
 
@@ -87,7 +88,7 @@ export class AddRoleComponent {
     }
 
     resetForEdit(role: Role) {
-        if (role.is_builtin) {
+        if (isProtectedRole(role)) {
             return;
         }
         this.open(true);

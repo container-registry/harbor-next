@@ -157,6 +157,27 @@ func TestValidate_NilAccess(t *testing.T) {
 	assert.Equal(t, errors.BadRequestCode, errors.ErrCode(err))
 }
 
+// Every shipped role reads the project itself (resource ""), and GET hands
+// that grant back. Editing a built-in posts it again, so it must pass; the
+// project's own update and delete stay out of reach.
+func TestValidate_ProjectSelfRead(t *testing.T) {
+	err := (&roleAPI{}).validate([]*models.RolePermission{
+		{Kind: roleCtl.LEVELROLE, Access: []*models.Access{
+			{Resource: "", Action: "read"},
+			{Resource: "repository", Action: "pull"},
+		}},
+	})
+	assert.NoError(t, err)
+
+	for _, action := range []string{"update", "delete"} {
+		err := (&roleAPI{}).validate([]*models.RolePermission{
+			{Kind: roleCtl.LEVELROLE, Access: []*models.Access{{Resource: "", Action: action}}},
+		})
+		assert.Error(t, err, action)
+		assert.Equal(t, errors.BadRequestCode, errors.ErrCode(err), action)
+	}
+}
+
 func TestValidate_WrongKind(t *testing.T) {
 	err := (&roleAPI{}).validate([]*models.RolePermission{
 		{Kind: "system", Access: []*models.Access{{Resource: "member", Action: "create"}}},

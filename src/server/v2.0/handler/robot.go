@@ -568,6 +568,9 @@ func (rAPI *robotAPI) requireMemberDelegation(ctx context.Context, namespace str
 	if err != nil {
 		return err
 	}
+	// Every grant counts, the project's own update and delete included: a
+	// robot with member:update can hand its holder any role, so the caller
+	// must already hold everything any role could give them.
 	checked := map[string]bool{}
 	for _, r := range roles {
 		for _, perm := range r.Permissions {

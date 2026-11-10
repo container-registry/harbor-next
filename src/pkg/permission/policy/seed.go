@@ -44,12 +44,6 @@ var builtinRoles = map[int64]string{
 	5: "limitedGuest",
 }
 
-// IsBuiltinRole reports whether roleID is one of the roles Harbor ships.
-func IsBuiltinRole(roleID int64) bool {
-	_, ok := builtinRoles[roleID]
-	return ok
-}
-
 // EnsureSeeded writes the grants of the roles Harbor ships, the first time a
 // Harbor starts against a database that does not have them yet.
 //
@@ -185,16 +179,24 @@ func seedRoles(ctx context.Context, tx *sql.Tx) (int, error) {
 	return int(n), nil
 }
 
-// roleNeedsSeeding reports whether this shipped role exists and has no grants.
-// Whatever is already there wins, so an operator who edited one keeps it.
+// roleNeedsSeeding reports whether this shipped role exists, was never edited,
+// and has no grants. Whatever is already there wins, so an operator who edited
+// one keeps it: a deleted role is not recreated, and a role an admin stripped
+// of every grant is not refilled. The row is locked for the rest of the
+// seeding transaction, so an edit or delete committing at the same moment
+// waits and is not overwritten.
 func roleNeedsSeeding(ctx context.Context, tx *sql.Tx, roleID int64) (bool, error) {
-	var exists bool
-	if err := tx.QueryRowContext(ctx,
-		`SELECT EXISTS (SELECT 1 FROM role WHERE role_id = $1)`, roleID).Scan(&exists); err != nil {
+	var modified bool
+	err := tx.QueryRowContext(ctx,
+		`SELECT modified FROM role WHERE role_id = $1 FOR UPDATE`, roleID).Scan(&modified)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil // deleted, or a deployment that never had this id
+	}
+	if err != nil {
 		return false, errors.Wrapf(err, "failed to look for role %d", roleID)
 	}
-	if !exists {
-		return false, nil // not every deployment has every id
+	if modified {
+		return false, nil
 	}
 
 	var have int
