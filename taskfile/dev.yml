@@ -149,9 +149,13 @@ tasks:
       - echo "Generated {{.TOKEN_KEY_FILE}}"
 
   # Core encrypts password settings with this key, so it goes with the database volume.
+  # Accepts any valid AES key length (16, 24, or 32 bytes) if one already exists.
   gen:secret-key:
-    desc: Generate the 16-byte key core uses to encrypt secrets (skipped if exists)
-    status: ['test "$(wc -c < {{.SECRET_KEY_FILE}})" -eq 16']
+    desc: Generate the 16-byte key core uses to encrypt secrets (skipped if valid key exists)
+    status:
+      - |
+        len=$(wc -c < {{.SECRET_KEY_FILE}} 2>/dev/null || echo 0)
+        test "$len" -eq 16 -o "$len" -eq 24 -o "$len" -eq 32
     cmds:
       - openssl rand -base64 32 | tr -dc 'A-Za-z0-9' | head -c 16 > {{.SECRET_KEY_FILE}}.tmp
       - test "$(wc -c < {{.SECRET_KEY_FILE}}.tmp)" -eq 16
@@ -423,9 +427,13 @@ tasks:
 
   # The key encrypts credentials in the release:up database volume, so it is
   # only removed together with that volume (release:down:clean), never by clean.
+  # Accepts any valid AES key length (16, 24, or 32 bytes) if one already exists.
   gen:secret-key:local:
     internal: true
-    status: ['test "$(wc -c < {{.SECRET_KEY_FILE_LOCAL}})" -eq 16']
+    status:
+      - |
+        len=$(wc -c < {{.SECRET_KEY_FILE_LOCAL}} 2>/dev/null || echo 0)
+        test "$len" -eq 16 -o "$len" -eq 24 -o "$len" -eq 32
     cmds:
       - mkdir -p $(dirname {{.SECRET_KEY_FILE_LOCAL}})
       - openssl rand -base64 32 | tr -dc 'A-Za-z0-9' | head -c 16 > {{.SECRET_KEY_FILE_LOCAL}}.tmp
