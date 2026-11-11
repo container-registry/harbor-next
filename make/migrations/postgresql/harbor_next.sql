@@ -102,7 +102,14 @@ WHERE ip.audience = ''
                      WHERE sc.identity_provider_id = same.id
                        AND sc.robot_id = 0
                        AND sc.claim_path = 'aud'
-                       AND sc.value = cr.value)))
+                       AND sc.value = cr.value)
+                 AND NOT EXISTS (
+                     SELECT 1
+                     FROM claim_rules other_sc
+                     WHERE other_sc.identity_provider_id = same.id
+                       AND other_sc.robot_id = 0
+                       AND other_sc.claim_path = 'aud'
+                       AND other_sc.value <> cr.value)))
   );
 
 CREATE INDEX IF NOT EXISTS idx_identity_providers_jwks_cache
