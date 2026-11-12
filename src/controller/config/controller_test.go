@@ -16,6 +16,7 @@ package config
 
 import (
 	"context"
+	"net"
 	"strings"
 	"testing"
 
@@ -63,6 +64,27 @@ func Test_verifySkipAuditLogCfg(t *testing.T) {
 				t.Errorf("verifySkipAuditLogCfg() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func Test_verifyAuditLogEndpointCfg(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+
+	if err := verifyAuditLogEndpointCfg(map[string]any{common.AuditLogForwardEndpoint: l.Addr().String()}); err != nil {
+		t.Errorf("reachable endpoint: unexpected error %v", err)
+	}
+	if err := verifyAuditLogEndpointCfg(map[string]any{common.AuditLogForwardEndpoint: "no-port"}); err == nil {
+		t.Error("unreachable endpoint: expected an error")
+	}
+	if err := verifyAuditLogEndpointCfg(map[string]any{common.AuditLogForwardEndpoint: ""}); err != nil {
+		t.Errorf("empty endpoint: unexpected error %v", err)
+	}
+	if err := verifyAuditLogEndpointCfg(map[string]any{}); err != nil {
+		t.Errorf("no endpoint: unexpected error %v", err)
 	}
 }
 

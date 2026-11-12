@@ -115,16 +115,20 @@ func (c *controller) UpdateUserConfigs(ctx context.Context, conf map[string]any)
 }
 
 func (c *controller) updateLogEndpoint(ctx context.Context, cfgs map[string]any) error {
-	// check if the audit log forward endpoint updated
-	if _, ok := cfgs[common.AuditLogForwardEndpoint]; ok {
-		auditEP := config.AuditLogForwardEndpoint(ctx)
-		if len(auditEP) == 0 {
-			return nil
-		}
-		if !audit.CheckEndpointActive(auditEP) {
-			return errors.BadRequestError(fmt.Errorf("could not connect to the audit endpoint: %v", auditEP))
-		}
-		audit.LogMgr.Init(ctx, auditEP)
+	// point the audit logger at the new endpoint; the config store only
+	// reflects it after commit, so read it from the request
+	if auditEP, _ := cfgs[common.AuditLogForwardEndpoint].(string); len(auditEP) > 0 {
+		orm.AfterCommit(ctx, func() { audit.LogMgr.Init(ctx, auditEP) })
+	}
+	return nil
+}
+
+// verifyAuditLogEndpointCfg rejects an audit log forward endpoint that cannot
+// be reached, before it is saved.
+func verifyAuditLogEndpointCfg(cfgs map[string]any) error {
+	auditEP, _ := cfgs[common.AuditLogForwardEndpoint].(string)
+	if len(auditEP) > 0 && !audit.CheckEndpointActive(auditEP) {
+		return errors.BadRequestError(fmt.Errorf("could not connect to the audit endpoint: %v", auditEP))
 	}
 	return nil
 }
@@ -153,6 +157,9 @@ func (c *controller) validateCfg(ctx context.Context, cfgs map[string]any) error
 
 	// verify the skip audit log related cfgs
 	if err = verifySkipAuditLogCfg(ctx, cfgs, mgr); err != nil {
+		return err
+	}
+	if err = verifyAuditLogEndpointCfg(cfgs); err != nil {
 		return err
 	}
 	// verify the value length related cfgs
