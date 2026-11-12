@@ -33,8 +33,7 @@ var _ adp.ArtifactResolver = (*adapter)(nil)
 // revision listing, and the download of every selected non-LFS file whose hash is not cached
 // yet. The refs are cached like those of a pull. The resulting digests are indexed, so a
 // following copy or proxy pull reuses them.
-func (a *adapter) Resolve(repository, reference string, filter *model.FileFilter) (*model.ResolveResult, error) {
-	ctx := context.Background()
+func (a *adapter) Resolve(ctx context.Context, repository, reference string, filter *model.FileFilter) (*model.ResolveResult, error) {
 	if err := filter.Validate(); err != nil {
 		return nil, err
 	}

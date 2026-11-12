@@ -367,6 +367,79 @@ func (suite *FetchOrSaveTestSuite) TestConcurrentCallersShareResult() {
 	}
 }
 
+func (suite *FetchOrSaveTestSuite) TestWithContextWaiterStopsOnItsContext() {
+	c := &mockCache{}
+	mock.OnAnything(c, "Fetch").Return(ErrNotFound)
+	mock.OnAnything(c, "Save").Return(nil)
+
+	started, release := make(chan struct{}), make(chan struct{})
+	leaderDone := make(chan error, 1)
+	var leaderValue string
+	go func() {
+		leaderDone <- FetchOrSave(suite.ctx, c, "stalled", &leaderValue, func() (any, error) {
+			close(started)
+			<-release
+			return "late", nil
+		})
+	}()
+	<-started
+
+	ctx, cancel := context.WithTimeout(suite.ctx, 50*time.Millisecond)
+	defer cancel()
+	waiterDone := make(chan error, 1)
+	go func() {
+		var v string
+		waiterDone <- FetchOrSaveWithContext(ctx, c, "stalled", &v, func() (any, error) { return "unused", nil })
+	}()
+	select {
+	case err := <-waiterDone:
+		suite.ErrorIs(err, context.DeadlineExceeded)
+	case <-time.After(5 * time.Second):
+		suite.Fail("the waiter kept waiting after its context ended")
+	}
+
+	close(release)
+	suite.NoError(<-leaderDone)
+	suite.Equal("late", leaderValue, "the build the waiter left still completes")
+}
+
+func (suite *FetchOrSaveTestSuite) TestWaiterRebuildsWhenTheLeaderLeaves() {
+	c := &mockCache{}
+	mock.OnAnything(c, "Fetch").Return(ErrNotFound)
+	mock.OnAnything(c, "Save").Return(nil)
+
+	ctx, cancel := context.WithCancel(suite.ctx)
+	started := make(chan struct{})
+	leaderDone := make(chan error, 1)
+	go func() {
+		var v string
+		leaderDone <- FetchOrSaveWithContext(ctx, c, "abandoned", &v, func() (any, error) {
+			close(started)
+			<-ctx.Done()
+			return nil, fmt.Errorf("hub request aborted")
+		})
+	}()
+	<-started
+
+	waiterDone := make(chan error, 1)
+	var waiterValue string
+	go func() {
+		waiterDone <- FetchOrSave(suite.ctx, c, "abandoned", &waiterValue, func() (any, error) { return "rebuilt", nil })
+	}()
+	// Let the waiter join the leader's build before the leader leaves.
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+
+	suite.ErrorIs(<-leaderDone, context.Canceled)
+	select {
+	case err := <-waiterDone:
+		suite.NoError(err)
+		suite.Equal("rebuilt", waiterValue)
+	case <-time.After(5 * time.Second):
+		suite.Fail("the waiter did not finish")
+	}
+}
+
 func TestFetchOrSaveTestSuite(t *testing.T) {
 	suite.Run(t, new(FetchOrSaveTestSuite))
 }

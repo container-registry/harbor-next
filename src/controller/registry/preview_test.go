@@ -16,6 +16,7 @@ package registry
 
 import (
 	"context"
+	"time"
 
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
@@ -29,7 +30,7 @@ type resolvingAdapter struct {
 	filter                *model.FileFilter
 }
 
-func (a *resolvingAdapter) Resolve(repository, reference string, filter *model.FileFilter) (*model.ResolveResult, error) {
+func (a *resolvingAdapter) Resolve(_ context.Context, repository, reference string, filter *model.FileFilter) (*model.ResolveResult, error) {
 	a.repository, a.reference, a.filter = repository, reference, filter
 	return &model.ResolveResult{Repository: repository, Reference: reference, Revision: "abc"}, nil
 }
@@ -81,4 +82,33 @@ func (r *registryTestSuite) TestPreviewRejectsBadInput() {
 	_, err = r.ctl.Preview(context.TODO(), 1, "org/model", "main", &model.FileFilter{Include: []string{"[a"}})
 	r.True(errors.IsErr(err, errors.BadRequestCode))
 	r.regMgr.AssertNotCalled(r.T(), "Get", mock.Anything, mock.Anything)
+}
+
+type blockingResolver struct {
+	*testingadapter.Adapter
+}
+
+func (a *blockingResolver) Resolve(ctx context.Context, _, _ string, _ *model.FileFilter) (*model.ResolveResult, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func (r *registryTestSuite) TestPreviewTimesOut() {
+	defer func(d time.Duration) { previewTimeout = d }(previewTimeout)
+	previewTimeout = 10 * time.Millisecond
+	mock.OnAnything(r.regMgr, "Get").Return(&model.Registry{ID: 2, Name: "resolver"}, nil).Once()
+	mock.OnAnything(r.regMgr, "CreateAdapter").Return(&blockingResolver{Adapter: &testingadapter.Adapter{}}, nil).Once()
+	_, err := r.ctl.Preview(context.TODO(), 2, "org/model", "main", nil)
+	r.Require().Error(err)
+	r.Contains(err.Error(), "did not finish within 10ms")
+}
+
+func (r *registryTestSuite) TestPreviewKeepsTheCallerDeadline() {
+	mock.OnAnything(r.regMgr, "Get").Return(&model.Registry{ID: 2, Name: "resolver"}, nil).Once()
+	mock.OnAnything(r.regMgr, "CreateAdapter").Return(&blockingResolver{Adapter: &testingadapter.Adapter{}}, nil).Once()
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Millisecond)
+	defer cancel()
+	_, err := r.ctl.Preview(ctx, 2, "org/model", "main", nil)
+	r.Require().ErrorIs(err, context.DeadlineExceeded)
+	r.NotContains(err.Error(), "did not finish within")
 }

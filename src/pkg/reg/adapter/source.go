@@ -15,6 +15,7 @@
 package adapter
 
 import (
+	"context"
 	"errors"
 
 	"github.com/goharbor/harbor/src/pkg/reg/model"
@@ -42,7 +43,7 @@ func ConfigureSource(a any, opts *model.SourceOptions) error {
 
 // ArtifactResolver is implemented by source adapters that can preview a copy: which revision a
 // reference resolves to, which files a file filter selects and which digest the copy produces,
-// without copying anything.
+// without copying anything. Cancelling ctx stops the Hub calls and downloads it makes.
 type ArtifactResolver interface {
-	Resolve(repository, reference string, filter *model.FileFilter) (*model.ResolveResult, error)
+	Resolve(ctx context.Context, repository, reference string, filter *model.FileFilter) (*model.ResolveResult, error)
 }

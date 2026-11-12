@@ -157,10 +157,13 @@ func (a *adapter) commitOf(ctx context.Context, repository, tag string) (string,
 // refs returns the refs of a repository, cached for refsTTL.
 func (a *adapter) refs(ctx context.Context, repository string) ([]hub.Ref, error) {
 	var refs []hub.Ref
-	err := cache.FetchOrSave(ctx, a.locator.cache, a.locator.refsKey(repository), &refs, func() (any, error) {
+	err := cache.FetchOrSaveWithContext(ctx, a.locator.cache, a.locator.refsKey(repository), &refs, func() (any, error) {
 		return a.hub.Refs(ctx, a.locator.modelID(ctx, repository))
 	}, refsTTL)
-	return refs, err
+	if err != nil {
+		return nil, err
+	}
+	return refs, nil
 }
 
 // artifact synthesizes the artifact of a commit with the files selected by filter, indexes its
@@ -185,7 +188,7 @@ func (a *adapter) artifact(ctx context.Context, repository, commit string, filte
 // snapshot returns the Hub file listing of a commit, cached for snapshotTTL.
 func (a *adapter) snapshot(ctx context.Context, repository, commit string) (*hub.Snapshot, error) {
 	s := &hub.Snapshot{}
-	err := cache.FetchOrSave(ctx, a.locator.cache, a.locator.snapshotKey(repository, commit), s, func() (any, error) {
+	err := cache.FetchOrSaveWithContext(ctx, a.locator.cache, a.locator.snapshotKey(repository, commit), s, func() (any, error) {
 		snapshot, err := a.hub.Snapshot(ctx, a.locator.modelID(ctx, repository), commit)
 		if err != nil {
 			return nil, err
@@ -211,16 +214,12 @@ func (a *adapter) contentDigests(ctx context.Context, s *hub.Snapshot, filter *m
 			continue
 		}
 		g.Go(func() error {
-			var d string
-			err := cache.FetchOrSave(gctx, a.locator.cache, a.locator.blobKey(f.BlobID), &d, func() (any, error) {
-				dg, err := a.hub.ContentDigest(gctx, s.ModelID, s.Commit, f)
-				return dg.String(), err
-			}, blobTTL)
+			d, err := a.contentDigest(gctx, s, f)
 			if err != nil {
 				return err
 			}
 			mu.Lock()
-			digests[f.Path] = digest.Digest(d)
+			digests[f.Path] = d
 			mu.Unlock()
 			return nil
 		})
@@ -229,6 +228,20 @@ func (a *adapter) contentDigests(ctx context.Context, s *hub.Snapshot, filter *m
 		return nil, err
 	}
 	return digests, nil
+}
+
+// contentDigest returns the cached sha256 of a non-LFS file, hashing it on a miss. It stops
+// waiting when ctx ends, also while another caller, such as a proxy pull, hashes the same file.
+func (a *adapter) contentDigest(ctx context.Context, s *hub.Snapshot, f hub.File) (digest.Digest, error) {
+	var d string
+	err := cache.FetchOrSaveWithContext(ctx, a.locator.cache, a.locator.blobKey(f.BlobID), &d, func() (any, error) {
+		dg, err := a.hub.ContentDigest(ctx, s.ModelID, s.Commit, f)
+		return dg.String(), err
+	}, blobTTL)
+	if err != nil {
+		return "", err
+	}
+	return digest.Digest(d), nil
 }
 
 // find locates a digest. On a cache miss it synthesizes the head of every ref of the
