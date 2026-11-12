@@ -50,8 +50,12 @@ func main() {
 	lib.StartPprof()
 
 	cfgLib.DefaultCfgManager = common.RestCfgManager
+	mgr := cfgLib.DefaultMgr()
+	if mgr == nil {
+		panic("failed to initialize config manager - check CORE_URL and JOBSERVICE_SECRET env vars")
+	}
 	if err := retry.Retry(func() error {
-		return cfgLib.DefaultMgr().Load(context.Background())
+		return mgr.Load(context.Background())
 	},
 		retry.InitialInterval(500*time.Millisecond),
 		retry.MaxInterval(10*time.Second),
