@@ -66,6 +66,24 @@
       ]
     },
     {
+      "description": "goharbor/work v0.5.1-patch is newer than v0.5.1 (the 2018 fork point) and carries the MAX_JOB_DURATION_SECONDS job status expiry, but semver sorts the -patch pre-release lower, so Renovate proposed v0.5.1 as an upgrade (#802). Never update it.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "github.com/goharbor/work"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "A Go module pinned to a -patch suffixed version is a fork carrying fixes on top of that release; semver ranks it below the plain tag, so any update Renovate proposes from it is a downgrade.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchCurrentValue": "/-patch$/",
+      "enabled": false
+    },
+    {
       "description": "Update Go dependencies weekly for major releases, one PR per module: a Go major is usually a module-path rewrite plus an API migration, so grouping them produces a PR nobody can make green",
       "matchManagers": [
         "gomod"
