@@ -57,4 +57,39 @@ describe('HarborRouteReuseStrategy', () => {
             )
         ).toBeFalse();
     });
+    it('does not reuse list routes across targets when a query is present', () => {
+        const config = {};
+        const snapshot = (url: string): ActivatedRouteSnapshot => {
+            const s: any = new ActivatedRouteSnapshot();
+            s.routeConfig = config;
+            s._routerState = { url };
+            return s;
+        };
+        expect(
+            harborRouteReuseStrategy.shouldReuseRoute(
+                snapshot('/harbor/projects/2/repositories?name=a'),
+                snapshot('/harbor/projects/1/repositories?name=a')
+            )
+        ).toBeFalse();
+        expect(
+            harborRouteReuseStrategy.shouldReuseRoute(
+                snapshot(
+                    '/harbor/projects/1/repositories/team%2Fapp/artifacts-tab?q=tags%3D~v'
+                ),
+                snapshot(
+                    '/harbor/projects/1/repositories/nginx/artifacts-tab?q=tags%3D~v'
+                )
+            )
+        ).toBeFalse();
+        expect(
+            harborRouteReuseStrategy.shouldReuseRoute(
+                snapshot(
+                    '/harbor/projects/1/repositories/team%2Fapp/artifacts-tab'
+                ),
+                snapshot(
+                    '/harbor/projects/1/repositories/nginx/artifacts-tab?q=tags%3D~v'
+                )
+            )
+        ).toBeFalse();
+    });
 });

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, from, Observable, of } from 'rxjs';
+import { BehaviorSubject, from, Observable, of, throwError } from 'rxjs';
 import {
     catchError,
     map,
@@ -25,6 +25,7 @@ import { RepositoryService } from '../../../../ng-swagger-gen/services/repositor
 import { ArtifactService } from '../../../../ng-swagger-gen/services/artifact.service';
 import { LabelService } from '../../../../ng-swagger-gen/services/label.service';
 import { Project } from '../../../../ng-swagger-gen/models/project';
+import { Label } from '../../../../ng-swagger-gen/models/label';
 import {
     SkipSessionRenewalService,
     skipSessionRenewal,
@@ -59,6 +60,33 @@ export function statusFromError(error: any): BookmarkStatus {
         default:
             return BookmarkStatus.UNKNOWN;
     }
+}
+
+// Non-admins get 403 on a global label they can still filter by; the global list allows them.
+export function getLabelById(
+    labelService: LabelService,
+    labelId: number,
+    wrap: <T>(request: Observable<T>) => Observable<T> = r => r
+): Observable<Label> {
+    return wrap(labelService.GetLabelByID({ labelId })).pipe(
+        catchError(error =>
+            error?.status !== 403
+                ? throwError(() => error)
+                : wrap(
+                      labelService.ListLabels({
+                          scope: 'g',
+                          q: encodeURIComponent(`id=${labelId}`),
+                      })
+                  ).pipe(
+                      map(labels => {
+                          if (!labels?.length) {
+                              throw error;
+                          }
+                          return labels[0];
+                      })
+                  )
+        )
+    );
 }
 
 @Injectable({
@@ -199,8 +227,8 @@ export class BookmarkHealthService {
                 if (!label) {
                     return this.repositoryExists(b);
                 }
-                return this.background(
-                    this.labelService.GetLabelByID({ labelId: +label[1] })
+                return getLabelById(this.labelService, +label[1], r =>
+                    this.background(r)
                 ).pipe(switchMap(() => this.repositoryExists(b)));
             }
             case BookmarkKind.TAG:

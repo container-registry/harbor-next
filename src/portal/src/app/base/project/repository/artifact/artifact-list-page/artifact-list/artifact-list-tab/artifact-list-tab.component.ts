@@ -30,6 +30,7 @@ import {
 import {
     BookmarkHealthService,
     BookmarkStatus,
+    getLabelById,
 } from '../../../../../../../shared/services/bookmark-health.service';
 import { LabelService as NewLabelService } from '../../../../../../../../../ng-swagger-gen/services/label.service';
 import { Comparator } from '../../../../../../../shared/services';
@@ -197,6 +198,10 @@ export class ArtifactListTabComponent implements OnInit, OnDestroy {
     filters: string[];
     initialFilter: ArtifactFilterEvent;
     filterBookmark: BookmarkTarget;
+    // The filter on screen, whether picked in the controls or restored from the URL.
+    private activeFilter: ArtifactFilterEvent;
+    // Only the latest list request may fill the grid.
+    private loadSub: Subscription;
     scanFinishedArtifactLength: number = 0;
     onScanArtifactsLength: number = 0;
     sbomFinishedArtifactLength: number = 0;
@@ -329,6 +334,7 @@ export class ArtifactListTabComponent implements OnInit, OnDestroy {
 
     ngOnDestroy() {
         this.queryParamSub?.unsubscribe();
+        this.loadSub?.unsubscribe();
         if (this.updateArtifactSub) {
             this.updateArtifactSub.unsubscribe();
             this.updateArtifactSub = null;
@@ -366,6 +372,7 @@ export class ArtifactListTabComponent implements OnInit, OnDestroy {
     }
 
     clrLoad(state: ClrDatagridStateInterface): void {
+        this.loadSub?.unsubscribe();
         this.artifactList = [];
         this.loading = true;
         if (!state || !state.page) {
@@ -422,75 +429,84 @@ export class ArtifactListTabComponent implements OnInit, OnDestroy {
                 XAcceptVulnerabilities: DEFAULT_SUPPORTED_MIME_TYPES,
                 withAccessory: false,
             };
-            this.newArtifactService.getArtifact(artifactParam).subscribe(
-                res => {
-                    let observableLists: Observable<Artifact>[] = [];
-                    let platFormAttr: { platform: Platform }[] = [];
-                    this.totalCount = res.references.length;
-                    res.references.forEach((child, index) => {
-                        if (
-                            index >= (pageNumber - 1) * this.pageSize &&
-                            index < pageNumber * this.pageSize
-                        ) {
-                            let childParams: NewArtifactService.GetArtifactParams =
-                                {
-                                    repositoryName: dbEncodeURIComponent(
-                                        this.repoName
-                                    ),
-                                    projectName: this.projectName,
-                                    reference: child.child_digest,
-                                    withImmutableStatus: true,
-                                    withLabel: true,
-                                    withScanOverview: true,
-                                    withSbomOverview: true,
-                                    withTag: false,
-                                    XAcceptVulnerabilities:
-                                        DEFAULT_SUPPORTED_MIME_TYPES,
-                                    // ask for both kinds of accessory here: a child of this
-                                    // index may be covered by a signature on the index
-                                    // itself, and having them inline saves a request per
-                                    // child compared with looking the direct ones up after
-                                    withAccessory: true,
-                                    withInheritedAccessory: true,
-                                };
-                            platFormAttr.push({ platform: child.platform });
-                            observableLists.push(
-                                this.newArtifactService.getArtifact(childParams)
-                            );
-                        }
-                    });
-                    forkJoin(observableLists)
-                        .pipe(
-                            finalize(() => {
-                                this.loading = false;
-                            })
-                        )
-                        .subscribe(
-                            artifacts => {
-                                this.artifactList = artifacts;
-                                this.artifactList = doSorting<ArtifactFront>(
-                                    this.artifactList,
-                                    state
+            this.loadSub = this.newArtifactService
+                .getArtifact(artifactParam)
+                .subscribe(
+                    res => {
+                        let observableLists: Observable<Artifact>[] = [];
+                        let platFormAttr: { platform: Platform }[] = [];
+                        this.totalCount = res.references.length;
+                        res.references.forEach((child, index) => {
+                            if (
+                                index >= (pageNumber - 1) * this.pageSize &&
+                                index < pageNumber * this.pageSize
+                            ) {
+                                let childParams: NewArtifactService.GetArtifactParams =
+                                    {
+                                        repositoryName: dbEncodeURIComponent(
+                                            this.repoName
+                                        ),
+                                        projectName: this.projectName,
+                                        reference: child.child_digest,
+                                        withImmutableStatus: true,
+                                        withLabel: true,
+                                        withScanOverview: true,
+                                        withSbomOverview: true,
+                                        withTag: false,
+                                        XAcceptVulnerabilities:
+                                            DEFAULT_SUPPORTED_MIME_TYPES,
+                                        // ask for both kinds of accessory here: a child of this
+                                        // index may be covered by a signature on the index
+                                        // itself, and having them inline saves a request per
+                                        // child compared with looking the direct ones up after
+                                        withAccessory: true,
+                                        withInheritedAccessory: true,
+                                    };
+                                platFormAttr.push({ platform: child.platform });
+                                observableLists.push(
+                                    this.newArtifactService.getArtifact(
+                                        childParams
+                                    )
                                 );
-                                this.artifactList.forEach((artifact, index) => {
-                                    artifact.platform = clone(
-                                        platFormAttr[index].platform
-                                    );
-                                });
-                                this.getArtifactTagsAsync(this.artifactList);
-                                this.getAccessoriesAsync(this.artifactList);
-                                this.checkCosignAndSbom(this.artifactList);
-                                this.getIconsFromBackEnd();
-                            },
-                            error => {
-                                this.errorHandlerService.error(error);
                             }
-                        );
-                },
-                error => {
-                    this.loading = false;
-                }
-            );
+                        });
+                        this.loadSub = forkJoin(observableLists)
+                            .pipe(
+                                finalize(() => {
+                                    this.loading = false;
+                                })
+                            )
+                            .subscribe(
+                                artifacts => {
+                                    this.artifactList = artifacts;
+                                    this.artifactList =
+                                        doSorting<ArtifactFront>(
+                                            this.artifactList,
+                                            state
+                                        );
+                                    this.artifactList.forEach(
+                                        (artifact, index) => {
+                                            artifact.platform = clone(
+                                                platFormAttr[index].platform
+                                            );
+                                        }
+                                    );
+                                    this.getArtifactTagsAsync(
+                                        this.artifactList
+                                    );
+                                    this.getAccessoriesAsync(this.artifactList);
+                                    this.checkCosignAndSbom(this.artifactList);
+                                    this.getIconsFromBackEnd();
+                                },
+                                error => {
+                                    this.errorHandlerService.error(error);
+                                }
+                            );
+                    },
+                    error => {
+                        this.loading = false;
+                    }
+                );
         } else {
             let listArtifactParams: NewArtifactService.ListArtifactsParams = {
                 projectName: this.projectName,
@@ -504,7 +520,7 @@ export class ArtifactListTabComponent implements OnInit, OnDestroy {
                 withAccessory: false,
             };
             Object.assign(listArtifactParams, params);
-            this.newArtifactService
+            this.loadSub = this.newArtifactService
                 .listArtifactsResponse(listArtifactParams)
                 .pipe(finalize(() => (this.loading = false)))
                 .subscribe(
@@ -532,13 +548,16 @@ export class ArtifactListTabComponent implements OnInit, OnDestroy {
 
     refresh() {
         this.currentPage = 1;
-        let st: ClrDatagridStateInterface = this.currentState;
-        if (!st) {
-            st = { page: {} };
-            st.page.size = this.pageSize;
-            st.page.from = 0;
-            st.page.to = this.pageSize - 1;
-        }
+        // A new filter starts on page 1, not on the page the old one was on.
+        const st: ClrDatagridStateInterface = {
+            ...this.currentState,
+            page: {
+                ...this.currentState?.page,
+                size: this.pageSize,
+                from: 0,
+                to: this.pageSize - 1,
+            },
+        };
         this.clrLoad(st);
     }
 
@@ -1039,6 +1058,7 @@ export class ArtifactListTabComponent implements OnInit, OnDestroy {
     filterEvent(e: ArtifactFilterEvent) {
         const query = artifactFilterQuery(e);
         this.filters = query ? [query] : [];
+        this.activeFilter = e;
         if (!this.depth) {
             replaceQueryParam(
                 this.router,
@@ -1053,7 +1073,8 @@ export class ArtifactListTabComponent implements OnInit, OnDestroy {
 
     private applyFilterFromUrl(query: string): void {
         if (!this.initFilterFromUrl(query)) {
-            const previous = this.initialFilter;
+            const previous = this.activeFilter;
+            this.activeFilter = null;
             this.filters = [];
             this.filterBookmark = null;
             if (previous) {
@@ -1074,13 +1095,13 @@ export class ArtifactListTabComponent implements OnInit, OnDestroy {
         }
         this.filters = [artifactFilterQuery(filter)];
         this.initialFilter = filter;
+        this.activeFilter = filter;
         this.updateFilterBookmark(filter);
         if (filter.isLabel) {
             const query = this.filters[0];
             // On failure the filter keeps working by label id; only the chip name is missing.
             const target = this.filterBookmark;
-            this.labelService
-                .GetLabelByID({ labelId: filter.label.id })
+            getLabelById(this.labelService, filter.label.id)
                 .pipe(
                     catchError(error => {
                         // Other failures leave the filter working by label id.

@@ -144,6 +144,9 @@ export class RepositoryGridviewComponent
     isProxyCacheProject: boolean = false;
     filterBookmark: BookmarkTarget;
     private queryParamSub: Subscription;
+    // Only the latest list request may fill the grid.
+    private loadSub: Subscription;
+    private nextPageSub: Subscription;
     private destroyed = false;
 
     constructor(
@@ -307,6 +310,8 @@ export class RepositoryGridviewComponent
     ngOnDestroy() {
         this.destroyed = true;
         this.queryParamSub?.unsubscribe();
+        this.loadSub?.unsubscribe();
+        this.nextPageSub?.unsubscribe();
         if (this.searchSub) {
             this.searchSub.unsubscribe();
             this.searchSub = null;
@@ -484,8 +489,9 @@ export class RepositoryGridviewComponent
         if (this.lastFilteredRepoName) {
             params.q = encodeURIComponent(`name=~${this.lastFilteredRepoName}`);
         }
+        this.nextPageSub?.unsubscribe();
         this.loading = true;
-        this.newRepoService
+        this.nextPageSub = this.newRepoService
             .listRepositoriesResponse(params)
             .pipe(finalize(() => (this.loading = false)))
             .subscribe(
@@ -509,6 +515,8 @@ export class RepositoryGridviewComponent
         if (!state || !state.page) {
             return;
         }
+        this.loadSub?.unsubscribe();
+        this.nextPageSub?.unsubscribe();
         this.pageSize = state.page.size;
         setPageSizeToLocalStorage(
             PageSizeMapKeys.REPOSITORY_GRIDVIEW_COMPONENT,
@@ -544,7 +552,7 @@ export class RepositoryGridviewComponent
         if (isFirstLoadingGridView) {
             this.isFirstLoadingGridView = true;
         }
-        this.newRepoService
+        this.loadSub = this.newRepoService
             .listRepositoriesResponse(params)
             .pipe(
                 finalize(() => {

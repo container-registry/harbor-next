@@ -79,7 +79,11 @@ describe('BookmarkHealthService', () => {
             'getArtifact',
         ]);
         artifactService.getArtifact.and.returnValue(of({} as any));
-        labelService = jasmine.createSpyObj('LabelService', ['GetLabelByID']);
+        labelService = jasmine.createSpyObj('LabelService', [
+            'GetLabelByID',
+            'ListLabels',
+        ]);
+        labelService.ListLabels.and.returnValue(of([]));
         labelService.GetLabelByID.and.returnValue(of({} as any));
         skip = new SkipSessionRenewalService();
         owner = new BehaviorSubject('harbor-bookmarks:1');
@@ -162,6 +166,29 @@ describe('BookmarkHealthService', () => {
         expect(labelService.GetLabelByID).toHaveBeenCalledWith({ labelId: 3 });
         expect(service.statusOf(statuses, labelFilter)).toBe(
             BookmarkStatus.MISSING
+        );
+    });
+
+    it('accepts a global label a non-admin may only list', () => {
+        labelService.GetLabelByID.and.returnValue(
+            throwError(new HttpErrorResponse({ status: 403 }))
+        );
+        labelService.ListLabels.and.returnValue(of([{ id: 3 } as any]));
+        service.checkAll([labelFilter], true);
+        expect(labelService.ListLabels).toHaveBeenCalledWith({
+            scope: 'g',
+            q: encodeURIComponent('id=3'),
+        });
+        expect(service.statusOf(statuses, labelFilter)).toBe(BookmarkStatus.OK);
+    });
+
+    it('keeps 403 when the label is not a visible global label', () => {
+        labelService.GetLabelByID.and.returnValue(
+            throwError(new HttpErrorResponse({ status: 403 }))
+        );
+        service.checkAll([labelFilter], true);
+        expect(service.statusOf(statuses, labelFilter)).toBe(
+            BookmarkStatus.FORBIDDEN
         );
     });
 
