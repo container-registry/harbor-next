@@ -76,11 +76,6 @@
                     [ngModel]="value(feature)"
                     (ngModelChange)="setEnabled(feature, $event)" />
             </clr-toggle-wrapper>
-            <clr-control-helper *ngIf="feature.beta">
-                <span class="beta-warning">{{
-                    'CONFIG.FEATURE_BETA_WARNING' | translate
-                }}</span>
-            </clr-control-helper>
         </clr-toggle-container>
     </section>
 </form>
