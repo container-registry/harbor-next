@@ -268,9 +268,9 @@ func (s *DaoTestSuite) TestDeleteProjectMember() {
 	err = s.dao.DeleteProjectMemberByID(ctx, s.projectID, pmid)
 	s.Nil(err)
 
-	// not exist
+	// deleting a missing member is a no-op
 	err = s.dao.DeleteProjectMemberByID(ctx, s.projectID, pmid)
-	s.True(errors.IsNotFoundErr(err))
+	s.Nil(err)
 
 }
 
