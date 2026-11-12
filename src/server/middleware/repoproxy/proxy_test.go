@@ -43,6 +43,7 @@ import (
 	liberrors "github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/q"
 	proModels "github.com/goharbor/harbor/src/pkg/project/models"
+	"github.com/goharbor/harbor/src/pkg/reg"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
 	pkgRobot "github.com/goharbor/harbor/src/pkg/robot/model"
 	projecttesting "github.com/goharbor/harbor/src/testing/controller/project"
@@ -51,6 +52,7 @@ import (
 	robotmock "github.com/goharbor/harbor/src/testing/controller/robot"
 	testingcache "github.com/goharbor/harbor/src/testing/lib/cache"
 	testingmock "github.com/goharbor/harbor/src/testing/mock"
+	regtesting "github.com/goharbor/harbor/src/testing/pkg/reg"
 )
 
 func TestIsProxySession(t *testing.T) {
@@ -682,6 +684,37 @@ func (s *ProxyReferrerMiddlewareSuite) TestProxyReferrerAPIBlockedByFilter() {
 	s.Equal(http.StatusNotFound, w.Code)
 }
 
+func (s *ProxyReferrerMiddlewareSuite) TestUnhealthyRegistryServesCachedIndex() {
+	s.Require().NoError(libCache.Initialize(libCache.Memory, ""))
+	origRegMgr := reg.Mgr
+	regMgr := &regtesting.Manager{}
+	reg.Mgr = regMgr
+	defer func() { reg.Mgr = origRegMgr }()
+
+	proj := &proModels.Project{
+		ProjectID:  4,
+		Name:       "testproject",
+		RegistryID: 1,
+		Metadata:   map[string]string{proModels.ProMetaProxyReferrerAPI: "true"},
+	}
+	testingmock.OnAnything(s.projectCtl, "GetByName").Return(proj, nil)
+	testingmock.OnAnything(regMgr, "Get").Return(&model.Registry{ID: 1, Status: "unhealthy"}, nil)
+
+	cached := referrerCache{
+		Content: []byte(`{"schemaVersion":2,"manifests":[{"artifactType":"application/vnd.sbom"}]}`),
+		Header:  map[string][]string{"Content-Type": {"application/vnd.oci.image.index.v1+json"}},
+	}
+	key := referrerCacheKey("/v2/testproject/image/referrers/sha256:aaaa")
+	s.Require().NoError(libCache.Default().Save(context.Background(), key, cached))
+
+	w := httptest.NewRecorder()
+	ProxyReferrerMiddleware()(s.next).ServeHTTP(w, s.makeRequest())
+
+	s.False(s.nextCalled, "cached index should be served instead of the local registry")
+	s.Equal(http.StatusOK, w.Code)
+	s.Equal(string(cached.Content), w.Body.String())
+}
+
 func TestProxyReferrerMiddlewareSuite(t *testing.T) {
 	suite.Run(t, new(ProxyReferrerMiddlewareSuite))
 }
@@ -868,6 +901,23 @@ func (s *ProxyReferrerGetSuite) TestUnhealthyRegistryCacheMiss() {
 	err := proxyReferrerGet(req, w, s.art, s.mockRemote, 1)
 
 	s.Error(err, "should return error when registry is unhealthy and cache is empty")
+}
+
+func (s *ProxyReferrerGetSuite) TestCacheKeyUsesRewrittenPath() {
+	healthyReg := &model.Registry{ID: 1, Status: model.Healthy}
+	testingmock.OnAnything(s.registryCtl, "Get").Return(healthyReg, nil)
+	upstreamIndex := &ocispec.Index{Manifests: []ocispec.Descriptor{{ArtifactType: "application/vnd.example.sbom"}}}
+	testingmock.OnAnything(s.mockRemote, "ListReferrers").Return(upstreamIndex, map[string][]string{}, nil)
+
+	// a bare "app" request rewritten to the default project keeps the raw RequestURI
+	req := httptest.NewRequest(http.MethodGet, "/v2/app/referrers/sha256:bbbb", nil)
+	req.URL.Path = "/v2/proxy-cache/app/referrers/sha256:bbbb"
+	req = req.WithContext(lib.WithArtifactInfo(req.Context(), s.art))
+
+	s.Require().NoError(proxyReferrerGet(req, httptest.NewRecorder(), s.art, s.mockRemote, 1))
+
+	s.True(libCache.Default().Contains(context.Background(), referrerCacheKey("/v2/proxy-cache/app/referrers/sha256:bbbb")))
+	s.False(libCache.Default().Contains(context.Background(), referrerCacheKey("/v2/app/referrers/sha256:bbbb")))
 }
 
 func TestProxyReferrerGetSuite(t *testing.T) {

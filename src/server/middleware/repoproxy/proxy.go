@@ -590,6 +590,10 @@ func ProxyReferrerMiddleware() func(http.Handler) http.Handler {
 		log.Debug("current project is a harbor proxy cache project, will proxy the referrer API to the upstream")
 		remote, err := proxy.NewRemoteHelper(r.Context(), p.RegistryID, proxy.WithSpeed(p.ProxyCacheSpeed()))
 		if err != nil {
+			// NewRemoteHelper refuses unhealthy registries, so this is where the cached index is served
+			if serveCachedReferrers(ctx, w, referrerCacheKey(r.URL.RequestURI())) == nil {
+				return
+			}
 			log.Errorf("failed to proxy the referrer API to upstream, error %v, fallback to local registry", err)
 			next.ServeHTTP(w, r)
 			return
@@ -755,7 +759,8 @@ func proxyReferrerGet(r *http.Request, w http.ResponseWriter, art lib.ArtifactIn
 	if err != nil {
 		return err
 	}
-	key := referrerCacheKey(r.RequestURI)
+	// URL carries the default-project rewrite; RequestURI is the raw client path
+	key := referrerCacheKey(r.URL.RequestURI())
 	// if registry is unhealthy, try to get from cache
 	if reg.Status != model.Healthy {
 		return serveCachedReferrers(ctx, w, key)
