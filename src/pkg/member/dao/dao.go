@@ -16,8 +16,10 @@ package dao
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
+	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/orm"
 	"github.com/goharbor/harbor/src/lib/q"
@@ -188,8 +190,11 @@ func (d *dao) UpdateProjectMemberRole(ctx context.Context, projectID int64, pmID
 		return err
 	}
 	sql := "update project_member set role = ? where project_id = ? and id = ?  "
-	_, err = o.Raw(sql, role, projectID, pmID).Exec()
-	return err
+	res, err := o.Raw(sql, role, projectID, pmID).Exec()
+	if err != nil {
+		return err
+	}
+	return memberAffected(res, pmID)
 }
 
 func (d *dao) DeleteProjectMemberByID(ctx context.Context, projectID int64, pmid int) error {
@@ -198,8 +203,20 @@ func (d *dao) DeleteProjectMemberByID(ctx context.Context, projectID int64, pmid
 		return err
 	}
 	sql := "delete from project_member where project_id = ? and id = ?"
-	if _, err := o.Raw(sql, projectID, pmid).Exec(); err != nil {
+	res, err := o.Raw(sql, projectID, pmid).Exec()
+	if err != nil {
 		return err
+	}
+	return memberAffected(res, pmid)
+}
+
+func memberAffected(res sql.Result, pmid int) error {
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return errors.NotFoundError(nil).WithMessagef("project member %d not found", pmid)
 	}
 	return nil
 }
