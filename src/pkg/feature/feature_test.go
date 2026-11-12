@@ -191,9 +191,10 @@ func TestValidateConfigUpdateRunsDisableGuards(t *testing.T) {
 	if err := ValidateConfigUpdate(t.Context(), map[string]any{testConfigKey: true}); err != nil {
 		t.Fatalf("enabling: unexpected error %v", err)
 	}
+	// a replica may still read false after another one enabled the feature
 	storeEnabled(t, false)
-	if err := ValidateConfigUpdate(t.Context(), map[string]any{testConfigKey: false}); err != nil {
-		t.Fatalf("disabling an already disabled feature: unexpected error %v", err)
+	if err := ValidateConfigUpdate(t.Context(), map[string]any{testConfigKey: false}); !errors.Is(err, inUse) {
+		t.Fatalf("disabling with a stale false: error = %v, want the guards to run", err)
 	}
 }
 
