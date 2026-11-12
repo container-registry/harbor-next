@@ -54,6 +54,8 @@ func init() {
 	// p2p preheat
 	_ = notifier.Subscribe(event.TopicPushArtifact, &p2p.Handler{})
 	_ = notifier.Subscribe(event.TopicScanningCompleted, &p2p.Handler{})
+	_ = notifier.Subscribe(event.TopicScanningFailed, &p2p.Handler{})
+	_ = notifier.Subscribe(event.TopicScanningStopped, &p2p.Handler{})
 	_ = notifier.Subscribe(event.TopicArtifactLabeled, &p2p.Handler{})
 
 	// audit logs
