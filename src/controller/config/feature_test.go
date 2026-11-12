@@ -19,7 +19,9 @@ import (
 	"testing"
 
 	"github.com/goharbor/harbor/src/common"
+	libcfg "github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/errors"
+	_ "github.com/goharbor/harbor/src/pkg/config/inmemory"
 	"github.com/goharbor/harbor/src/pkg/feature"
 	"github.com/goharbor/harbor/src/testing/mock"
 	testUser "github.com/goharbor/harbor/src/testing/pkg/user"
@@ -83,5 +85,16 @@ func TestValidateCfgRejectsEnvironmentControlledFeature(t *testing.T) {
 	err := newFeatureTestController().validateCfg(t.Context(), map[string]any{featureTestKey: false})
 	if !errors.IsErr(err, errors.BadRequestCode) {
 		t.Fatalf("validateCfg error = %v, want a bad request", err)
+	}
+}
+
+func TestOverwriteConfigSkipsEnvironmentControlledFeature(t *testing.T) {
+	libcfg.InitWithSettings(map[string]any{common.AUTHMode: common.DBAuth})
+	t.Setenv(featureTestEnvKey, "true")
+	t.Setenv(configOverwriteJSON, `{"`+featureTestKey+`": false}`)
+	t.Cleanup(func() { readOnlyForAll = false })
+
+	if err := newFeatureTestController().OverwriteConfig(t.Context()); err != nil {
+		t.Fatalf("OverwriteConfig: %v", err)
 	}
 }
