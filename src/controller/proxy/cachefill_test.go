@@ -56,3 +56,16 @@ func TestGoCacheFillBoundsConcurrency(t *testing.T) {
 		t.Fatal("scheduled task did not run")
 	}
 }
+
+func TestStartFillParksDuplicatesForTheOwner(t *testing.T) {
+	require.True(t, startFill("k", pullEvent{tag: "owner"}))
+	for i := 0; i < maxPendingPullEvents+5; i++ {
+		require.False(t, startFill("k", pullEvent{tag: "dup"}))
+	}
+	require.Len(t, endFill("k"), maxPendingPullEvents)
+
+	// the key is free again: the next caller owns a new fill with nothing parked
+	require.True(t, startFill("k", pullEvent{tag: "next"}))
+	require.Empty(t, endFill("k"))
+	require.Empty(t, fills.m)
+}
