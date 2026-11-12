@@ -17,6 +17,7 @@
 package huggingface
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"testing"
@@ -39,7 +40,7 @@ func TestResolveLive(t *testing.T) {
 	filter, err := model.ParseFileFilter(os.Getenv("HF_FILTER"))
 	require.NoError(t, err)
 	a := newTestAdapter(t, &model.Registry{ID: -1, Type: model.RegistryTypeHuggingFace, URL: hub.DefaultEndpoint}, newMemoryCache())
-	r, err := a.Resolve(modelID, os.Getenv("HF_REF"), filter)
+	r, err := a.Resolve(context.Background(), modelID, os.Getenv("HF_REF"), filter)
 	require.NoError(t, err)
 	out, err := json.MarshalIndent(r, "", "  ")
 	require.NoError(t, err)

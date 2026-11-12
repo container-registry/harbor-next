@@ -15,6 +15,7 @@
 package huggingface
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -74,7 +75,7 @@ func TestPullByRevisionTag(t *testing.T) {
 	_, _, err := a.PullManifest(repoTiny, "sha-cccccccccccc")
 	assert.True(t, errors.IsNotFoundErr(err), "a commit no ref points at has no revision tag lookup")
 
-	r, err := a.Resolve(repoTiny, "main", nil)
+	r, err := a.Resolve(context.Background(), repoTiny, "main", nil)
 	require.NoError(t, err)
 	assert.Equal(t, revisionTagMain, r.RevisionTag)
 }

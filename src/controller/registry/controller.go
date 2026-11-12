@@ -41,6 +41,9 @@ import (
 var Ctl = NewController()
 var regularHealthCheckInterval = 5 * time.Minute
 
+// previewTimeout bounds a preview, which runs inside the API request and may download files.
+var previewTimeout = 5 * time.Minute
+
 // Controller defines the registry related operations
 type Controller interface {
 	// Create the registry
@@ -278,7 +281,13 @@ func (c *controller) Preview(ctx context.Context, id int64, repository, referenc
 		return nil, errors.New(nil).WithCode(errors.BadRequestCode).
 			WithMessagef("the registry %s does not support previews", registry.Name)
 	}
-	return resolver.Resolve(repository, reference, filter)
+	previewCtx, cancel := context.WithTimeout(ctx, previewTimeout)
+	defer cancel()
+	res, err := resolver.Resolve(previewCtx, repository, reference, filter)
+	if err != nil && ctx.Err() == nil && stderrors.Is(previewCtx.Err(), context.DeadlineExceeded) {
+		return nil, errors.New(err).WithMessagef("the preview did not finish within %s", previewTimeout)
+	}
+	return res, err
 }
 
 func getWhitelistedAdapters(ctx context.Context) map[string]struct{} {

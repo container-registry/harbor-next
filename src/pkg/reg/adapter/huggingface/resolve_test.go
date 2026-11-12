@@ -15,9 +15,16 @@
 package huggingface
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"net/http"
+	"net/http/httptest"
+	"net/http/httputil"
+	neturl "net/url"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -39,7 +46,7 @@ func TestResolve(t *testing.T) {
 	defer h.Close()
 	a := newTestAdapter(t, hubRegistry(h, 1, ""), newMemoryCache())
 
-	r, err := a.Resolve("Org/Tiny-Model", "", nil)
+	r, err := a.Resolve(context.Background(), "Org/Tiny-Model", "", nil)
 	require.NoError(t, err)
 	assert.Equal(t, repoTiny, r.Repository)
 	assert.Equal(t, "Org/Tiny-Model", r.SourceID)
@@ -75,7 +82,7 @@ func TestResolveWithFileFilter(t *testing.T) {
 	a := newTestAdapter(t, hubRegistry(h, 1, ""), newMemoryCache())
 	jsonOnly := &model.FileFilter{Include: []string{"*.json"}}
 
-	r, err := a.Resolve(repoTiny, "main", jsonOnly)
+	r, err := a.Resolve(context.Background(), repoTiny, "main", jsonOnly)
 	require.NoError(t, err)
 	assert.Equal(t, 4, r.TotalFiles)
 	assert.Equal(t, 1, r.MatchedFiles)
@@ -93,7 +100,7 @@ func TestResolveWithFileFilter(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, pulled, r.Digest)
 
-	none, err := a.Resolve(repoTiny, "main", &model.FileFilter{Include: []string{"*.gguf"}})
+	none, err := a.Resolve(context.Background(), repoTiny, "main", &model.FileFilter{Include: []string{"*.gguf"}})
 	require.NoError(t, err)
 	assert.Zero(t, none.MatchedFiles)
 	assert.Empty(t, none.Digest)
@@ -104,22 +111,117 @@ func TestResolveReferences(t *testing.T) {
 	defer h.Close()
 	a := newTestAdapter(t, hubRegistry(h, 1, ""), newMemoryCache())
 
-	r, err := a.Resolve(repoTiny, "v1", nil)
+	r, err := a.Resolve(context.Background(), repoTiny, "v1", nil)
 	require.NoError(t, err)
 	assert.Equal(t, commitV1, r.Revision)
 	assert.Equal(t, []string{"v1"}, r.Tags)
 
-	r, err = a.Resolve(repoTiny, commitNew, nil)
+	r, err = a.Resolve(context.Background(), repoTiny, commitNew, nil)
 	require.NoError(t, err)
 	assert.Equal(t, commitNew, r.Revision)
 	assert.Equal(t, []string{}, r.Tags, "a commit no ref points at has no tags")
 
-	_, err = a.Resolve(repoTiny, "nope", nil)
+	_, err = a.Resolve(context.Background(), repoTiny, "nope", nil)
 	assert.True(t, errors.IsNotFoundErr(err))
 
-	_, err = a.Resolve("no-slash", "main", nil)
+	_, err = a.Resolve(context.Background(), "no-slash", "main", nil)
 	assert.True(t, errors.IsErr(err, errors.BadRequestCode))
 
-	_, err = a.Resolve(repoTiny, "main", &model.FileFilter{Include: []string{"[a"}})
+	_, err = a.Resolve(context.Background(), repoTiny, "main", &model.FileFilter{Include: []string{"[a"}})
 	assert.True(t, errors.IsErr(err, errors.BadRequestCode))
+}
+
+// stalls is what a stallingHub observed: a value on stalled per stalled request, and on
+// cancelled per stalled request whose client went away.
+type stalls struct {
+	stalled, cancelled chan struct{}
+}
+
+// stallingHub serves the Hub through h but stalls the body of every request whose path contains
+// part after one byte, until the client cancels or the test ends.
+func stallingHub(t *testing.T, h *hubtest.Hub, part string) (string, *stalls) {
+	t.Helper()
+	target, err := neturl.Parse(h.URL)
+	require.NoError(t, err)
+	proxy := httputil.NewSingleHostReverseProxy(target)
+	release := make(chan struct{})
+	st := &stalls{stalled: make(chan struct{}, 16), cancelled: make(chan struct{}, 16)}
+	front := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.Path, part) {
+			proxy.ServeHTTP(w, r)
+			return
+		}
+		w.Header().Set("Content-Length", "1000")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("{"))
+		w.(http.Flusher).Flush()
+		st.stalled <- struct{}{}
+		select {
+		case <-r.Context().Done():
+			st.cancelled <- struct{}{}
+		case <-release:
+		}
+	}))
+	t.Cleanup(front.Close)
+	t.Cleanup(func() { close(release) })
+	return front.URL, st
+}
+
+func resolveWithin(t *testing.T, a *adapter, reference string, timeout time.Duration) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		_, err := a.Resolve(ctx, repoTiny, reference, nil)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		require.Error(t, err)
+	case <-time.After(10 * time.Second):
+		t.Fatal("Resolve kept waiting after its context was cancelled")
+	}
+}
+
+func TestResolveStopsStalledDownloadOnCancel(t *testing.T) {
+	h := hubtest.New(tinyModel())
+	defer h.Close()
+	reg := hubRegistry(h, 1, "")
+	var st *stalls
+	reg.URL, st = stallingHub(t, h, "/resolve/")
+	resolveWithin(t, newTestAdapter(t, reg, newMemoryCache()), "main", 200*time.Millisecond)
+	select {
+	case <-st.cancelled:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the stalled download was not cancelled")
+	}
+}
+
+// A pull runs without a context. A preview that joins its stalled Hub call stops waiting at its
+// own deadline, for the file hashes, the refs and the revision listing alike.
+func TestResolveStopsWaitingForStalledPull(t *testing.T) {
+	for _, tc := range []struct{ name, part, pullRef, previewRef string }{
+		{name: "file", part: "/resolve/", pullRef: "main", previewRef: "main"},
+		{name: "refs", part: "/refs", pullRef: "main", previewRef: "main"},
+		{name: "revision", part: "/revision/", pullRef: commitMain, previewRef: commitMain},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := hubtest.New(tinyModel())
+			defer h.Close()
+			reg := hubRegistry(h, 1, "")
+			var st *stalls
+			reg.URL, st = stallingHub(t, h, tc.part)
+			a := newTestAdapter(t, reg, newMemoryCache())
+
+			go func() { _, _, _ = a.PullManifest(repoTiny, tc.pullRef) }()
+			<-st.stalled
+			resolveWithin(t, a, tc.previewRef, 200*time.Millisecond)
+			select {
+			case <-st.cancelled:
+				t.Fatal("the preview cancelled the pull's request")
+			default:
+			}
+		})
+	}
 }
