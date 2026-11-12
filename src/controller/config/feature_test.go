@@ -15,6 +15,7 @@
 package config
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -99,5 +100,31 @@ func TestOverwriteConfigSkipsEnvironmentControlledFeature(t *testing.T) {
 	}
 	if !libcfg.DefaultMgr().Get(t.Context(), featureTestKey).GetBool() {
 		t.Errorf("stored %s = false, want the overwrite skipped and true kept", featureTestKey)
+	}
+}
+
+var guardRefuses bool
+
+func init() {
+	feature.RegisterDisableGuard("controller_test_feature", func(context.Context) error {
+		if guardRefuses {
+			return errors.New(nil).WithCode(errors.PreconditionCode).WithMessage("still in use")
+		}
+		return nil
+	})
+}
+
+func TestValidateCfgKeepsTheDisableGuardError(t *testing.T) {
+	libcfg.InitWithSettings(map[string]any{common.AUTHMode: common.DBAuth, featureTestKey: true})
+	t.Setenv(featureTestEnvKey, "")
+	if err := os.Unsetenv(featureTestEnvKey); err != nil {
+		t.Fatal(err)
+	}
+	guardRefuses = true
+	t.Cleanup(func() { guardRefuses = false })
+
+	err := newFeatureTestController().validateCfg(t.Context(), map[string]any{featureTestKey: false})
+	if !errors.IsErr(err, errors.PreconditionCode) || err.Error() != "still in use" {
+		t.Fatalf("validateCfg error = %v, want the guard's precondition error unchanged", err)
 	}
 }
