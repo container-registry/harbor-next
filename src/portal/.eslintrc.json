@@ -46,10 +46,10 @@
     {
       "files": ["src/**/*.ts"],
       "plugins": [
-        "header"
+        "@tony.ganchev/header"
       ],
       "rules": {
-        "header/header": [2, "./copyright.tmpl.js"]
+        "@tony.ganchev/header/header": [2, "./copyright.tmpl.js"]
       }
     }
   ]
