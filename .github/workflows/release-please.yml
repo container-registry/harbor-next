@@ -139,12 +139,21 @@ jobs:
             next_version="${major}.$((minor + 1)).0"
             printf '%s\n' "${next_version}" > VERSION
 
-            if git diff --quiet -- VERSION; then
-              echo "VERSION already targets ${next_version}"
+            # release-please stamps softwareVersion in publiccode.yml through
+            # extra-files; it has no updater for the release date. Refreshed
+            # on every run, so it lands on the date of the last release PR push.
+            if ! grep -q '^releaseDate: ' publiccode.yml; then
+              echo "::error file=publiccode.yml::publiccode.yml has no releaseDate field to stamp"
+              exit 1
+            fi
+            sed -i "s/^releaseDate: .*/releaseDate: $(date -u +%F)/" publiccode.yml
+
+            if git diff --quiet -- VERSION publiccode.yml; then
+              echo "VERSION already targets ${next_version}, publiccode.yml releaseDate current"
               exit 0
             fi
 
-            git add VERSION
+            git add VERSION publiccode.yml
             git commit -s -m "chore: target next development version ${next_version}"
             if git push origin "HEAD:refs/heads/${RELEASE_BRANCH}"; then
               exit 0
