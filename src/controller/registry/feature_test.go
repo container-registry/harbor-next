@@ -21,8 +21,11 @@ import (
 	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/errors"
+	"github.com/goharbor/harbor/src/lib/orm"
+	"github.com/goharbor/harbor/src/pkg/feature"
 	"github.com/goharbor/harbor/src/pkg/reg/adapter/huggingface"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
+	ormtesting "github.com/goharbor/harbor/src/testing/lib/orm"
 	"github.com/goharbor/harbor/src/testing/mock"
 )
 
@@ -114,4 +117,24 @@ func (r *registryTestSuite) TestDisableGuardRefusesWhileRegistriesExist() {
 
 	mock.OnAnything(r.regMgr, "Count").Return(int64(0), nil).Once()
 	r.NoError(guard(context.TODO()))
+}
+
+// A switch-off another instance committed while Create waited for the
+// feature lock must win, even when the local configuration cache still
+// reports the feature on.
+func (r *registryTestSuite) TestCreateRechecksTypeUnderFeatureLock() {
+	r.setHuggingFace(true)
+	mock.OnAnything(r.regMgr, "CreateAdapter").Return(r.adapter, nil)
+	mock.OnAnything(r.adapter, "HealthCheck").Return(model.Healthy, nil)
+	var locked feature.Feature
+	r.ctl.lockFeature = func(_ context.Context, f feature.Feature) (bool, error) {
+		locked = f
+		return false, nil
+	}
+
+	ctx := orm.NewContext(context.TODO(), &ormtesting.FakeOrmer{})
+	_, err := r.ctl.Create(ctx, &model.Registry{Name: "hf", Type: model.RegistryTypeHuggingFace, URL: "https://huggingface.co"})
+	r.True(errors.IsErr(err, errors.BadRequestCode), "error = %v", err)
+	r.Equal(huggingface.Feature, locked)
+	r.regMgr.AssertNotCalled(r.T(), "Create", mock.Anything, mock.Anything)
 }

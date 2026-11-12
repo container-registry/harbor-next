@@ -27,6 +27,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/errors"
 	_ "github.com/goharbor/harbor/src/pkg/config/inmemory"
+	"github.com/goharbor/harbor/src/pkg/feature"
 	"github.com/goharbor/harbor/src/pkg/reg"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
 	"github.com/goharbor/harbor/src/testing/mock"
@@ -54,6 +55,9 @@ func (r *registryTestSuite) SetupTest() {
 		repMgr: r.repMgr,
 		regMgr: r.regMgr,
 		proMgr: r.proMgr,
+		lockFeature: func(context.Context, feature.Feature) (bool, error) {
+			return true, nil
+		},
 	}
 }
 

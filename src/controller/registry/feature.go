@@ -35,6 +35,10 @@ func CheckTypeEnabled(ctx context.Context, registryType string) error {
 	if feature.RegistryTypeEnabled(ctx, registryType) {
 		return nil
 	}
+	return typeDisabledError(registryType)
+}
+
+func typeDisabledError(registryType string) error {
 	return errors.New(nil).WithCode(errors.BadRequestCode).
 		WithMessagef("the registry type %s is disabled by an optional feature, see Configuration > Features", registryType)
 }

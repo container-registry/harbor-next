@@ -32,6 +32,9 @@ import (
 	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/config/metadata"
 	"github.com/goharbor/harbor/src/lib/log"
+	"github.com/goharbor/harbor/src/lib/orm"
+	"github.com/goharbor/harbor/src/lib/q"
+	"github.com/goharbor/harbor/src/pkg/config/db/dao"
 )
 
 // Feature identifies a gated capability.
@@ -191,6 +194,62 @@ func RegisterDisableGuard(feature Feature, guard DisableGuard) {
 	guards[feature] = append(guards[feature], guard)
 }
 
+// LockState serializes the disable guards of feature with code that starts
+// using it, such as creating a registry of a gated type, and returns the
+// feature state read from the database under the lock. The configuration
+// cache may lag behind a switch-off saved by another instance, so code
+// holding the lock must decide on this value. It takes a transaction-scoped
+// lock, so ctx must carry a transaction.
+func LockState(ctx context.Context, feature Feature) (bool, error) {
+	definition, ok := definitionFor(func(d Definition) bool { return d.Feature == feature })
+	if !ok {
+		return false, fmt.Errorf("feature %q is not registered", feature)
+	}
+	if err := lockState(ctx, feature); err != nil {
+		return false, err
+	}
+	if enabled, _, overridden := environmentOverride(definition); overridden {
+		return enabled, nil
+	}
+	value, stored, err := storedValue(ctx, definition.ConfigKey)
+	if err != nil {
+		return false, err
+	}
+	if !stored {
+		return definition.Default, nil
+	}
+	if enabled, perr := strconv.ParseBool(value); perr == nil {
+		return enabled, nil
+	}
+	return definition.Default, nil
+}
+
+var lockState = func(ctx context.Context, feature Feature) error {
+	o, err := orm.FromContext(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = o.Raw("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", "feature:"+string(feature)).Exec()
+	return err
+}
+
+var storedValue = func(ctx context.Context, configKey string) (string, bool, error) {
+	entries, err := dao.New().GetConfigItem(ctx, q.New(q.KeyWords{"k": configKey}))
+	if err != nil || len(entries) == 0 || entries[0].Value == "" {
+		return "", false, err
+	}
+	return entries[0].Value, true, nil
+}
+
+// Updates reports whether cfgs sets any registered feature.
+func Updates(cfgs map[string]any) bool {
+	_, ok := definitionFor(func(d Definition) bool {
+		_, set := cfgs[d.ConfigKey]
+		return set
+	})
+	return ok
+}
+
 // RegisterRegistryTypes associates registry provider types with a feature.
 // A registry type can belong to one feature only.
 func RegisterRegistryTypes(feature Feature, registryTypes ...string) {
@@ -335,7 +394,9 @@ func environmentOverride(definition Definition) (enabled bool, envKey string, ov
 }
 
 // ValidateConfigUpdate rejects changes to environment-controlled features and
-// runs the disable guards on every update that switches a feature off.
+// runs the disable guards on every update that switches a feature off. The
+// guards run under LockState, so ctx must carry the transaction that saves
+// the update.
 func ValidateConfigUpdate(ctx context.Context, cfgs map[string]any) error {
 	for _, definition := range Definitions() {
 		value, updated := cfgs[definition.ConfigKey]
@@ -355,6 +416,13 @@ func ValidateConfigUpdate(ctx context.Context, cfgs map[string]any) error {
 		mu.RLock()
 		featureGuards := append([]DisableGuard(nil), guards[definition.Feature]...)
 		mu.RUnlock()
+		if len(featureGuards) == 0 {
+			continue
+		}
+		// a usage created while the guards run must wait for this update
+		if _, err := LockState(ctx, definition.Feature); err != nil {
+			return err
+		}
 		for _, guard := range featureGuards {
 			if err := guard(ctx); err != nil {
 				return err
