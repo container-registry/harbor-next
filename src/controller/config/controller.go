@@ -141,7 +141,7 @@ func (c *controller) validateCfg(ctx context.Context, cfgs map[string]any) error
 	if err := feature.ValidateConfigUpdate(ctx, cfgs); err != nil {
 		// a disable guard's error already carries its own code and message
 		var coded *errors.Error
-		if errors.As(err, &coded) {
+		if errors.As(err, &coded) && coded.Code != "" {
 			return err
 		}
 		return errors.BadRequestError(err)
