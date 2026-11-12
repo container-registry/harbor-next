@@ -91,5 +91,12 @@ describe('HarborRouteReuseStrategy', () => {
                 )
             )
         ).toBeFalse();
+        // Leaving a list for another project tab keeps the shared project shell.
+        expect(
+            harborRouteReuseStrategy.shouldReuseRoute(
+                snapshot('/harbor/projects/1/summary'),
+                snapshot('/harbor/projects/1/repositories?name=a')
+            )
+        ).toBeTrue();
     });
 });

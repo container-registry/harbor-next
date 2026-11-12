@@ -126,7 +126,8 @@ export class HarborRouteReuseStrategy implements RouteReuseStrategy {
         const currPath = pathOf(currUrl);
         const futurePath = pathOf(futureUrl);
         if (
-            (testRoute(currPath) || testRoute(futurePath)) &&
+            testRoute(currPath) &&
+            testRoute(futurePath) &&
             currPath !== futurePath
         ) {
             return false;

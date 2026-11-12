@@ -11,7 +11,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import {
+    ComponentFixture,
+    discardPeriodicTasks,
+    fakeAsync,
+    TestBed,
+    tick,
+} from '@angular/core/testing';
 import { of } from 'rxjs';
 import { RepositoryService as NewRepositoryService } from '../../../../../ng-swagger-gen/services/repository.service';
 import { RepositoryGridviewComponent } from './repository-gridview.component';
@@ -177,6 +183,23 @@ describe('RepositoryComponentGridview (inline template)', () => {
             fixtureRepo.nativeElement.querySelector('hbr-gridview');
         expect(cordView).toBeTruthy();
     });
+    it('drops a typed term that a URL filter overtook', fakeAsync(() => {
+        const spy = spyOn(
+            fakedRepositoryService,
+            'listRepositoriesResponse'
+        ).and.callThrough();
+        compRepo.filterComponent.filterTerms.next('old');
+        (compRepo as any).searchReset.next();
+        tick(500);
+        expect(compRepo.lastFilteredRepoName).not.toBe('old');
+        expect(spy).not.toHaveBeenCalledWith(
+            jasmine.objectContaining({ q: encodeURIComponent('name=~old') })
+        );
+        compRepo.filterComponent.filterTerms.next('nginx');
+        tick(500);
+        expect(compRepo.lastFilteredRepoName).toBe('nginx');
+        discardPeriodicTasks();
+    }));
     it('should be list view', async () => {
         const listViewButton =
             fixtureRepo.nativeElement.querySelector('.list-btn');

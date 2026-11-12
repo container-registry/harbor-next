@@ -11,7 +11,12 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import {
+    ComponentFixture,
+    fakeAsync,
+    TestBed,
+    tick,
+} from '@angular/core/testing';
 import { ArtifactFilterComponent } from './artifact-filter.component';
 import { SharedTestingModule } from '../../../../../../../../shared/shared.module';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
@@ -60,6 +65,26 @@ describe('ArtifactFilterComponent', () => {
         );
         expect(!!selector).toBeFalse();
     });
+
+    it('drops typed text that a restored filter replaced', fakeAsync(() => {
+        const emitted = [];
+        component.filterEvent.subscribe(e => emitted.push(e));
+        component.filterByType = 'tags';
+        component.inputTag = 'old';
+        component.searchByInputTag();
+        component.initialFilter = {
+            type: 'tags',
+            isLabel: false,
+            isInputTag: true,
+            stringValue: 'new',
+        };
+        tick(500);
+        expect(emitted).toEqual([]);
+        component.inputTag = 'newer';
+        component.searchByInputTag();
+        tick(500);
+        expect(emitted.map(e => e.stringValue)).toEqual(['newer']);
+    }));
 
     it('shows a restored tag search without emitting', () => {
         const emitted = spyOn(component.filterEvent, 'emit');

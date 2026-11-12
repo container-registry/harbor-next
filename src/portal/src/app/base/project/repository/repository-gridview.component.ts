@@ -23,15 +23,17 @@ import {
     SimpleChanges,
     ViewChild,
 } from '@angular/core';
-import { forkJoin, Observable, of, Subscription } from 'rxjs';
+import { forkJoin, Observable, of, Subject, Subscription } from 'rxjs';
 import {
     catchError,
     debounceTime,
     distinctUntilChanged,
     finalize,
     map,
+    repeat,
     skip,
     switchMap,
+    takeUntil,
 } from 'rxjs/operators';
 import { TranslateService } from '@ngx-translate/core';
 import { ClrDatagridStateInterface } from '@clr/angular';
@@ -147,6 +149,7 @@ export class RepositoryGridviewComponent
     // Only the latest list request may fill the grid.
     private loadSub: Subscription;
     private nextPageSub: Subscription;
+    private readonly searchReset = new Subject<void>();
     private destroyed = false;
 
     constructor(
@@ -235,6 +238,7 @@ export class RepositoryGridviewComponent
                     if (name) {
                         this.filterComponent.isExpanded = true;
                     }
+                    this.searchReset.next();
                     this.doSearchRepoNames(name, false, false);
                 }
             });
@@ -245,6 +249,8 @@ export class RepositoryGridviewComponent
                     debounceTime(500),
                     distinctUntilChanged(),
                     switchMap(repoName => {
+                        this.loadSub?.unsubscribe();
+                        this.nextPageSub?.unsubscribe();
                         this.lastFilteredRepoName = repoName as string;
                         this.updateFilterBookmark(true);
                         this.currentPage = 1;
@@ -264,7 +270,10 @@ export class RepositoryGridviewComponent
                         return this.newRepoService
                             .listRepositoriesResponse(params)
                             .pipe(finalize(() => (this.loading = false)));
-                    })
+                    }),
+                    // A filter from the URL drops a pending typed term and its request.
+                    takeUntil(this.searchReset),
+                    repeat()
                 )
                 .subscribe(
                     (repo: __StrictHttpResponse<Array<NewRepository>>) => {

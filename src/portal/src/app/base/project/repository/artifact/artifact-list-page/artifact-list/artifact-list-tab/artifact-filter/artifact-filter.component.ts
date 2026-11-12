@@ -25,7 +25,7 @@ import {
 import { ArtifactFilterEvent, multipleFilter } from '../../../../artifact';
 import { Label } from '../../../../../../../../../../ng-swagger-gen/models/label';
 import { Subject, Subscription } from 'rxjs';
-import { debounceTime } from 'rxjs/operators';
+import { debounceTime, filter, map } from 'rxjs/operators';
 
 @Component({
     selector: 'app-artifact-filter',
@@ -52,6 +52,8 @@ export class ArtifactFilterComponent implements OnInit, OnDestroy {
         if (!filter) {
             return;
         }
+        // Text typed before this filter arrived must not replace it.
+        this.inputGeneration++;
         this.opened = true;
         this.dropdownOpened = false;
         this.filterByType = filter.type;
@@ -68,6 +70,7 @@ export class ArtifactFilterComponent implements OnInit, OnDestroy {
     readonly typeSelectId: string = 'type-select';
     inputTag: string;
     private _keyupEventSubject: Subject<string> = new Subject();
+    private inputGeneration = 0;
     private _keyupEventSubscription: Subscription;
     constructor(private renderer: Renderer2) {
         // click  outside, then close dropdown
@@ -86,7 +89,15 @@ export class ArtifactFilterComponent implements OnInit, OnDestroy {
     ngOnInit(): void {
         if (!this._keyupEventSubscription) {
             this._keyupEventSubscription = this._keyupEventSubject
-                .pipe(debounceTime(500))
+                .pipe(
+                    map(inputTag => ({
+                        inputTag,
+                        generation: this.inputGeneration,
+                    })),
+                    debounceTime(500),
+                    filter(e => e.generation === this.inputGeneration),
+                    map(e => e.inputTag)
+                )
                 .subscribe(inputTag => {
                     this.filterEvent.emit({
                         type: this.filterByType,
