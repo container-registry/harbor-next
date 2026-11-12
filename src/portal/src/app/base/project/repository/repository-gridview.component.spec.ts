@@ -100,6 +100,7 @@ describe('RepositoryComponentGridview (inline template)', () => {
     };
     const fakedActivatedRoute = {
         snapshot: {
+            queryParams: {},
             parent: {
                 parent: {
                     params: {
