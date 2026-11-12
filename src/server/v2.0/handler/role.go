@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/go-openapi/runtime/middleware"
+	"github.com/go-openapi/strfmt"
 
 	"github.com/goharbor/harbor/src/common/rbac"
 	"github.com/goharbor/harbor/src/common/security/local"
@@ -98,8 +99,9 @@ func (rAPI *roleAPI) CreateRole(ctx context.Context, params operation.CreateRole
 
 	location := fmt.Sprintf("%s/%d", strings.TrimSuffix(params.HTTPRequest.URL.Path, "/"), created.ID)
 	return operation.NewCreateRoleCreated().WithLocation(location).WithPayload(&models.RoleCreated{
-		ID:   created.ID,
-		Name: created.Name,
+		ID:           created.ID,
+		Name:         created.Name,
+		CreationTime: strfmt.DateTime(created.CreatedAt),
 	})
 }
 
