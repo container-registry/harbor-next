@@ -93,35 +93,42 @@ func (suite *WebhookTestSuite) TestCreateWebhookPolicyOfProject() {
 	url := fmt.Sprintf("/projects/%d/webhook/policies", projectID)
 	{
 		// invalid event type should got 400
-		resp, err := suite.PostJSON(url, &models.WebhookPolicy{EventTypes: []string{"INVALID"}})
+		resp, err := suite.PostJSON(url, &models.WebhookPolicy{Name: "hook", EventTypes: []string{"INVALID"}})
 		suite.NoError(err)
 		suite.Equal(400, resp.StatusCode)
 	}
 
 	{
 		// invalid target type should got 400
-		resp, err := suite.PostJSON(url, &models.WebhookPolicy{EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "invalid"}}})
+		resp, err := suite.PostJSON(url, &models.WebhookPolicy{Name: "hook", EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "invalid"}}})
 		suite.NoError(err)
 		suite.Equal(400, resp.StatusCode)
 	}
 
 	{
 		// SSRF: a loopback target must be rejected
-		resp, err := suite.PostJSON(url, &models.WebhookPolicy{EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "http", Address: "http://127.0.0.1"}}})
+		resp, err := suite.PostJSON(url, &models.WebhookPolicy{Name: "hook", EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "http", Address: "http://127.0.0.1"}}})
 		suite.NoError(err)
 		suite.Equal(400, resp.StatusCode)
 	}
 
 	{
 		// SSRF: the cloud metadata endpoint must be rejected
-		resp, err := suite.PostJSON(url, &models.WebhookPolicy{EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "http", Address: "http://169.254.169.254/latest/meta-data/"}}})
+		resp, err := suite.PostJSON(url, &models.WebhookPolicy{Name: "hook", EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "http", Address: "http://169.254.169.254/latest/meta-data/"}}})
+		suite.NoError(err)
+		suite.Equal(400, resp.StatusCode)
+	}
+
+	{
+		// a policy without a name should get 400
+		resp, err := suite.PostJSON(url, &models.WebhookPolicy{Name: " ", EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "http", Address: "http://hooks.example.com/notify"}}})
 		suite.NoError(err)
 		suite.Equal(400, resp.StatusCode)
 	}
 
 	{
 		// valid policy targeting a public address should get 201
-		resp, err := suite.PostJSON(url, &models.WebhookPolicy{EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "http", Address: "http://hooks.example.com/notify"}}})
+		resp, err := suite.PostJSON(url, &models.WebhookPolicy{Name: "hook", EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "http", Address: "http://hooks.example.com/notify"}}})
 		suite.NoError(err)
 		suite.Equal(201, resp.StatusCode)
 	}
@@ -136,28 +143,35 @@ func (suite *WebhookTestSuite) TestUpdateWebhookPolicyOfProject() {
 	url := fmt.Sprintf("/projects/%d/webhook/policies/%d", projectID, policyID)
 	{
 		// invalid event type should got 400
-		resp, err := suite.PutJSON(url, &models.WebhookPolicy{EventTypes: []string{"INVALID"}})
+		resp, err := suite.PutJSON(url, &models.WebhookPolicy{Name: "hook", EventTypes: []string{"INVALID"}})
 		suite.NoError(err)
 		suite.Equal(400, resp.StatusCode)
 	}
 
 	{
 		// invalid target type should got 400
-		resp, err := suite.PutJSON(url, &models.WebhookPolicy{EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "invalid"}}})
+		resp, err := suite.PutJSON(url, &models.WebhookPolicy{Name: "hook", EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "invalid"}}})
 		suite.NoError(err)
 		suite.Equal(400, resp.StatusCode)
 	}
 
 	{
 		// SSRF: a loopback target must be rejected on update too
-		resp, err := suite.PutJSON(url, &models.WebhookPolicy{EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "http", Address: "http://127.0.0.1"}}})
+		resp, err := suite.PutJSON(url, &models.WebhookPolicy{Name: "hook", EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "http", Address: "http://127.0.0.1"}}})
+		suite.NoError(err)
+		suite.Equal(400, resp.StatusCode)
+	}
+
+	{
+		// a policy without a name should get 400
+		resp, err := suite.PutJSON(url, &models.WebhookPolicy{Name: " ", EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "http", Address: "http://hooks.example.com/notify"}}})
 		suite.NoError(err)
 		suite.Equal(400, resp.StatusCode)
 	}
 
 	{
 		// valid policy targeting a public address should get 200
-		resp, err := suite.PutJSON(url, &models.WebhookPolicy{EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "http", Address: "http://hooks.example.com/notify"}}})
+		resp, err := suite.PutJSON(url, &models.WebhookPolicy{Name: "hook", EventTypes: []string{"PUSH_ARTIFACT"}, Targets: []*models.WebhookTargetObject{{Type: "http", Address: "http://hooks.example.com/notify"}}})
 		suite.NoError(err)
 		suite.Equal(200, resp.StatusCode)
 	}
