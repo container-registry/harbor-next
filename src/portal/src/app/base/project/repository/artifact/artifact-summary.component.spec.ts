@@ -22,6 +22,7 @@ import { AppConfigService } from '../../../../services/app-config.service';
 import { Project } from '../../project';
 import { ArtifactService } from './artifact.service';
 import { SharedTestingModule } from '../../../../shared/shared.module';
+import { ArtifactService as NewArtifactService } from '../../../../../../ng-swagger-gen/services/artifact.service';
 
 describe('ArtifactSummaryComponent', () => {
     const mockedArtifact: Artifact = {
@@ -115,5 +116,22 @@ describe('ArtifactSummaryComponent', () => {
         expect(component).toBeTruthy();
         await fixture.whenStable();
         expect(component.artifact.type).toEqual('IMAGE');
+    });
+
+    it('finds an SBOM that exists only as an accessory', () => {
+        const service = TestBed.inject(NewArtifactService);
+        spyOn(service, 'listAccessories').and.returnValue(
+            of([{ digest: 'sha256:sbom' }] as any)
+        );
+        component.sbomDigest = undefined;
+        component.artifact = { digest: 'sha256:image' };
+        (component as any).findSbomAccessory();
+        expect(service.listAccessories).toHaveBeenCalledWith(
+            jasmine.objectContaining({
+                reference: 'sha256:image',
+                q: encodeURIComponent('type=sbom.harbor'),
+            })
+        );
+        expect(component.sbomDigest).toBe('sha256:sbom');
     });
 });

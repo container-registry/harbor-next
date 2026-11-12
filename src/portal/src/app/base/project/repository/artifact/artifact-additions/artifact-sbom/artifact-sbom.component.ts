@@ -11,7 +11,14 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import { Component, Input, OnDestroy, OnInit } from '@angular/core';
+import {
+    Component,
+    Input,
+    OnChanges,
+    OnDestroy,
+    OnInit,
+    SimpleChanges,
+} from '@angular/core';
 import { ClrDatagridStateInterface, ClrLoadingState } from '@clr/angular';
 import { finalize } from 'rxjs/operators';
 import {
@@ -53,7 +60,7 @@ import {
     templateUrl: './artifact-sbom.component.html',
     styleUrls: ['./artifact-sbom.component.scss'],
 })
-export class ArtifactSbomComponent implements OnInit, OnDestroy {
+export class ArtifactSbomComponent implements OnInit, OnChanges, OnDestroy {
     @Input()
     projectName: string;
     @Input()
@@ -110,6 +117,14 @@ export class ArtifactSbomComponent implements OnInit, OnDestroy {
         setTimeout(() => {
             this.hasViewInitWithDelay = true;
         }, 0);
+    }
+
+    // The digest can arrive after init, e.g. from an accessory lookup.
+    ngOnChanges(changes: SimpleChanges): void {
+        const digest = changes['sbomDigest'];
+        if (digest && !digest.firstChange && digest.currentValue) {
+            this.getSbom();
+        }
     }
 
     ngOnDestroy() {
