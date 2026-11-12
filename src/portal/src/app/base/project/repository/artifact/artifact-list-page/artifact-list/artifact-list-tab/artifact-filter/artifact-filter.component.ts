@@ -57,6 +57,9 @@ export class ArtifactFilterComponent implements OnInit, OnDestroy {
         this.opened = true;
         this.dropdownOpened = false;
         this.filterByType = filter.type;
+        if (!filter.isInputTag) {
+            this.inputTag = '';
+        }
         if (filter.isLabel) {
             this.selectedValue = filter.label?.name ? filter.label : null;
         } else if (filter.isInputTag) {

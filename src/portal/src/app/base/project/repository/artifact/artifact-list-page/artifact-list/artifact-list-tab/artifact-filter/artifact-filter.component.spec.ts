@@ -66,6 +66,16 @@ describe('ArtifactFilterComponent', () => {
         expect(!!selector).toBeFalse();
     });
 
+    it('clears typed text when a non-input filter is restored', () => {
+        component.inputTag = 'v1';
+        component.initialFilter = {
+            type: 'type',
+            isLabel: false,
+            stringValue: '',
+        };
+        expect(component.inputTag).toBe('');
+    });
+
     it('drops typed text that a restored filter replaced', fakeAsync(() => {
         const emitted = [];
         component.filterEvent.subscribe(e => emitted.push(e));

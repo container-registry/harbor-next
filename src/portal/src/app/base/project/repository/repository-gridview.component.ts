@@ -238,7 +238,6 @@ export class RepositoryGridviewComponent
                     if (name) {
                         this.filterComponent.isExpanded = true;
                     }
-                    this.searchReset.next();
                     this.doSearchRepoNames(name, false, false);
                 }
             });
@@ -271,7 +270,7 @@ export class RepositoryGridviewComponent
                             .listRepositoriesResponse(params)
                             .pipe(finalize(() => (this.loading = false)));
                     }),
-                    // A filter from the URL drops a pending typed term and its request.
+                    // An explicit load drops a pending typed term and its request.
                     takeUntil(this.searchReset),
                     repeat()
                 )
@@ -526,6 +525,7 @@ export class RepositoryGridviewComponent
         }
         this.loadSub?.unsubscribe();
         this.nextPageSub?.unsubscribe();
+        this.searchReset.next();
         this.pageSize = state.page.size;
         setPageSizeToLocalStorage(
             PageSizeMapKeys.REPOSITORY_GRIDVIEW_COMPONENT,
