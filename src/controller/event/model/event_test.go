@@ -43,3 +43,21 @@ func TestCommonEvent_ResolveToAuditLog(t *testing.T) {
 	assert.Equal(t, "admin", auditLog.Username)
 	assert.Equal(t, "library/hello-world", auditLog.Resource)
 }
+
+// op_desc is copied as-is: rows written with the old wording and rows
+// written with the new template are the same plain string column.
+func TestCommonEvent_ResolveToAuditLog_DescriptionVerbatim(t *testing.T) {
+	for _, d := range []string{
+		"update project with name: library",
+		`admin updated project "library": public false -> true`,
+		"",
+	} {
+		c := &CommonEvent{Operator: "admin", OccurAt: time.Unix(0, 0), Operation: "update", ResourceType: "project", ResourceName: "library", OperationDescription: d, IsSuccessful: false}
+		auditLog, err := c.ResolveToAuditLog()
+		require.NoError(t, err)
+		assert.Equal(t, d, auditLog.OperationDescription)
+		assert.Equal(t, "update", auditLog.Operation)
+		assert.Equal(t, time.Unix(0, 0), auditLog.OpTime)
+		assert.False(t, auditLog.IsSuccessful)
+	}
+}

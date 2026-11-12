@@ -26,6 +26,8 @@ import (
 	"github.com/goharbor/harbor/src/controller/event/metadata/commonevent"
 	"github.com/goharbor/harbor/src/controller/event/model"
 	"github.com/goharbor/harbor/src/lib/config"
+	"github.com/goharbor/harbor/src/lib/orm"
+	"github.com/goharbor/harbor/src/pkg/auditext/desc"
 	"github.com/goharbor/harbor/src/pkg/notifier/event"
 )
 
@@ -46,18 +48,30 @@ const (
 	payloadPattern = `principal=(.*?)&password`
 )
 
+// authModeFn reads the configured auth mode; overridable for tests
+var authModeFn = func(_ context.Context) string {
+	if config.DefaultMgr() == nil {
+		return ""
+	}
+	// a fresh ORM context: the event is resolved after the request finished
+	mode, err := config.AuthMode(orm.Context())
+	if err != nil {
+		return ""
+	}
+	return mode
+}
+
 type loginResolver struct {
 }
 
 func (l *loginResolver) Resolve(ce *commonevent.Metadata, event *event.Event) error {
 	e := &model.CommonEvent{
-		Operator:             ce.Username,
-		ResourceType:         rbac.ResourceUser.String(),
-		ResourceName:         ce.Username,
-		OccurAt:              time.Now(),
-		Operation:            opLogin,
-		OperationDescription: opLogin,
-		IsSuccessful:         ce.ResponseCode <= http.StatusTemporaryRedirect,
+		Operator:     ce.Username,
+		ResourceType: rbac.ResourceUser.String(),
+		ResourceName: ce.Username,
+		OccurAt:      time.Now(),
+		Operation:    opLogin,
+		IsSuccessful: ce.ResponseCode <= http.StatusTemporaryRedirect,
 	}
 
 	// Extract the username from payload
@@ -73,6 +87,11 @@ func (l *loginResolver) Resolve(ce *commonevent.Metadata, event *event.Event) er
 		e.Operator = ce.Username
 		e.ResourceName = ce.Username
 	}
+	d := desc.New(e.Operator, opLogin, rbac.ResourceUser.String()).Name(e.ResourceName).Set("auth_mode", authModeFn(ce.Ctx))
+	if !e.IsSuccessful {
+		d.Error(ce.ResponseCode, ce.ResponseBody)
+	}
+	e.OperationDescription = d.String()
 	event.Topic = ctlevent.TopicCommonEvent
 	event.Data = e
 	return nil

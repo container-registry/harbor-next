@@ -15,6 +15,7 @@
 package log //nolint:revive
 
 import (
+	"bytes"
 	"net/http"
 	"strconv"
 
@@ -82,6 +83,7 @@ func Middleware() func(http.Handler) http.Handler {
 			e.ResourceName = resName
 			e.RequestPayload = requestContent
 			e.ResponseCode = rw.statusCode
+			e.ResponseBody = rw.body.String()
 
 			// Need to parse the Location header to get the resource ID on creating resource
 			if e.RequestMethod == http.MethodPost {
@@ -95,11 +97,24 @@ func Middleware() func(http.Handler) http.Handler {
 	})
 }
 
+// maxErrorBodySize bounds the response body kept for the audit error reason
+const maxErrorBodySize = 4096
+
 // ResponseWriter wrapper to HTTP response to get the statusCode and response content
 type ResponseWriter struct {
 	http.ResponseWriter
 	statusCode int
 	header     http.Header
+	body       bytes.Buffer
+}
+
+// Write passes the body through and keeps the start of error responses
+func (rw *ResponseWriter) Write(b []byte) (int, error) {
+	if rw.statusCode >= http.StatusBadRequest && rw.body.Len() < maxErrorBodySize {
+		n := min(len(b), maxErrorBodySize-rw.body.Len())
+		rw.body.Write(b[:n])
+	}
+	return rw.ResponseWriter.Write(b)
 }
 
 // WriteHeader write header info

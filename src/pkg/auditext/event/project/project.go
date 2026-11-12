@@ -16,9 +16,11 @@ package project
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
+	"sort"
 	"strconv"
 	"time"
 
@@ -27,7 +29,9 @@ import (
 	"github.com/goharbor/harbor/src/controller/event/model"
 	"github.com/goharbor/harbor/src/controller/project"
 	"github.com/goharbor/harbor/src/lib/config"
+	"github.com/goharbor/harbor/src/lib/log"
 	"github.com/goharbor/harbor/src/lib/orm"
+	"github.com/goharbor/harbor/src/pkg/auditext/desc"
 	"github.com/goharbor/harbor/src/pkg/notifier/event"
 	"github.com/goharbor/harbor/src/pkg/project/models"
 )
@@ -56,15 +60,28 @@ func init() {
 type resolver struct {
 }
 
+// Snapshot loads the project with its metadata before the handler runs, so
+// Resolve can diff it against the stored state afterwards.
+func (r *resolver) Snapshot(c *commonevent.Metadata) any {
+	projStr := getProjectNameOrID(c.RequestURL)
+	if projStr == "" {
+		return nil
+	}
+	proj, err := getProject(orm.ReuseContext(c.Ctx), projStr, c.IsResourceName)
+	if err != nil {
+		log.Errorf("failed to snapshot project %s before %s: %v", projStr, c.RequestMethod, err)
+		return nil
+	}
+	return proj
+}
+
 func (r *resolver) Resolve(ce *commonevent.Metadata, evt *event.Event) error {
 	projStr := getProjectNameOrID(ce.RequestURL)
 	if projStr == "" {
 		return fmt.Errorf("failed to parse project name or ID from URL: %s", ce.RequestURL)
 	}
 
-	ctx := orm.ReuseContext(ce.Ctx)
-
-	proj, err := getProject(ctx, projStr, ce.IsResourceName)
+	proj, err := getProject(orm.ReuseContext(ce.Ctx), projStr, ce.IsResourceName)
 	if err != nil {
 		return fmt.Errorf("failed to get project: %v", err)
 	}
@@ -76,11 +93,25 @@ func (r *resolver) Resolve(ce *commonevent.Metadata, evt *event.Event) error {
 	e.ResourceName = proj.Name
 	e.ProjectID = proj.ProjectID
 	e.OccurAt = time.Now()
-	e.OperationDescription = fmt.Sprintf("update project: %s", proj.Name)
-
 	if ce.ResponseCode == http.StatusOK {
 		e.IsSuccessful = true
 	}
+
+	d := desc.New(ce.Username, "update", "project").Name(proj.Name)
+	if before, ok := ce.Before.(*models.Project); ok && before != nil {
+		after := proj.Metadata
+		if !e.IsSuccessful {
+			after = attemptedMetadata(ce, before.Metadata)
+		}
+		// TODO storage_limit (quota table) and cve_allowlist are updated by the
+		// same PUT but are not diffed here yet
+		diffMetadata(d, before.Metadata, after)
+	}
+	if !e.IsSuccessful {
+		d.Error(ce.ResponseCode, ce.ResponseBody)
+	}
+	e.OperationDescription = d.String()
+
 	evt.Topic = ctlevent.TopicCommonEvent
 	evt.Data = e
 	return nil
@@ -96,6 +127,78 @@ func (r *resolver) PreCheck(ctx context.Context, url string, method string) (boo
 	}
 
 	return config.AuditLogEventEnabled(ctx, "update_project"), ""
+}
+
+// attemptedMetadata is the metadata the request asked for, used when the
+// handler rejected it and the stored state did not change.
+func attemptedMetadata(ce *commonevent.Metadata, before map[string]string) map[string]string {
+	after := map[string]string{}
+	for k, v := range before {
+		after[k] = v
+	}
+	url := ce.RequestURL
+	switch {
+	case ce.RequestMethod == http.MethodDelete && projectMetaKeyReg.MatchString(url):
+		delete(after, projectMetaKeyReg.FindStringSubmatch(url)[2])
+	case projectMetaKeyReg.MatchString(url), projectMetaReg.MatchString(url):
+		var req map[string]any
+		if json.Unmarshal([]byte(ce.RequestPayload), &req) == nil {
+			for k, v := range req {
+				after[k] = fmt.Sprint(v)
+			}
+		}
+	default:
+		var req struct {
+			Metadata map[string]any `json:"metadata"`
+			Public   *bool          `json:"public"`
+		}
+		if json.Unmarshal([]byte(ce.RequestPayload), &req) == nil {
+			for k, v := range req.Metadata {
+				after[k] = fmt.Sprint(v)
+			}
+			if req.Public != nil {
+				after["public"] = strconv.FormatBool(*req.Public)
+			}
+		}
+	}
+	return after
+}
+
+// diffMetadata records every key that was changed, added or removed.
+func diffMetadata(d *desc.Description, before, after map[string]string) {
+	keys := map[string]struct{}{}
+	for k := range before {
+		keys[k] = struct{}{}
+	}
+	for k := range after {
+		keys[k] = struct{}{}
+	}
+	sorted := make([]string, 0, len(keys))
+	for k := range keys {
+		sorted = append(sorted, k)
+	}
+	sort.Strings(sorted)
+	for _, k := range sorted {
+		bv, bok := before[k]
+		av, aok := after[k]
+		switch {
+		case bok && aok:
+			d.Changed(k, typed(bv), typed(av))
+		case aok:
+			d.Added(k, typed(av))
+		default:
+			d.Removed(k, typed(bv))
+		}
+	}
+}
+
+// typed turns the "true"/"false" strings project metadata is stored as into
+// booleans so the JSON reads naturally.
+func typed(v string) any {
+	if b, err := strconv.ParseBool(v); err == nil && (v == "true" || v == "false") {
+		return b
+	}
+	return v
 }
 
 func getProjectNameOrID(url string) string {
