@@ -354,6 +354,12 @@ func (c *controller) OverwriteConfig(ctx context.Context) error {
 			log.Infof("ignoring %s in %s, %s takes precedence", common.DefaultProjectName, configOverwriteJSON, common.DefaultProjectNameEnv)
 			delete(cfgMap, common.DefaultProjectName)
 		}
+		for key := range cfgMap {
+			if envKey, overridden := feature.EnvironmentKey(key); overridden {
+				log.Infof("ignoring %s in %s, %s takes precedence", key, configOverwriteJSON, envKey)
+				delete(cfgMap, key)
+			}
+		}
 		err = c.UpdateUserConfigs(ctx, cfgMap)
 		if err != nil {
 			return err
