@@ -157,7 +157,42 @@ func (sm *sweepManager) ListCandidates(ctx context.Context, vendorType string, r
 		}
 	}
 
+	if vendorType == job.ImageScanJobVendorType {
+		orphans, err := sm.listOrphanArtifactExecutions(ctx, vendorType)
+		if err != nil {
+			return nil, err
+		}
+		listed := make(map[int64]struct{}, len(execIDs))
+		for _, id := range execIDs {
+			listed[id] = struct{}{}
+		}
+		for _, id := range orphans {
+			if _, ok := listed[id]; !ok {
+				execIDs = append(execIDs, id)
+			}
+		}
+	}
+
 	return execIDs, nil
+}
+
+// listOrphanArtifactExecutions lists final executions whose artifact is gone and whose tasks back no live artifact's report.
+func (sm *sweepManager) listOrphanArtifactExecutions(ctx context.Context, vendorType string) ([]int64, error) {
+	ormer, err := orm.FromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var ids []int64
+	sql := `SELECT e.id FROM execution e WHERE e.vendor_type = ? AND e.status IN (?,?,?)
+		AND NOT EXISTS (SELECT 1 FROM artifact a WHERE a.id = COALESCE(CASE WHEN jsonb_typeof(e.extra_attrs::jsonb->'artifact'->'id') = 'number'
+			THEN (e.extra_attrs::jsonb->'artifact'->>'id')::bigint END, e.vendor_id))
+		AND NOT EXISTS (SELECT 1 FROM task t JOIN scan_report r ON (t.extra_attrs::jsonb->'report_uuids') @> jsonb_build_array(r.uuid)
+			JOIN artifact a ON a.digest = r.digest WHERE t.execution_id = e.id)`
+	if _, err = ormer.Raw(sql, vendorType, job.ErrorStatus.String(), job.SuccessStatus.String(),
+		job.StoppedStatus.String()).QueryRows(&ids); err != nil {
+		return nil, errors.Wrapf(err, "failed to list executions of deleted artifacts, vendor type: %s", vendorType)
+	}
+	return ids, nil
 }
 
 func (sm *sweepManager) Clean(ctx context.Context, execIDs []int64) error {
