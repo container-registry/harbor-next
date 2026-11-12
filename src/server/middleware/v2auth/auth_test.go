@@ -35,6 +35,7 @@ import (
 	"github.com/goharbor/harbor/src/controller/project"
 	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/config"
+	"github.com/goharbor/harbor/src/lib/errors"
 	_ "github.com/goharbor/harbor/src/pkg/config/inmemory"
 	"github.com/goharbor/harbor/src/pkg/permission/types"
 	proModels "github.com/goharbor/harbor/src/pkg/project/models"
@@ -50,9 +51,12 @@ func TestMain(m *testing.M) {
 	mockGet := func(ctx context.Context,
 		projectIDOrName any, options ...project.Option) (*proModels.Project, error) {
 		name := projectIDOrName.(string)
+		if name == "dbdown" {
+			return nil, fmt.Errorf("failed to connect to the database")
+		}
 		id, _ := strconv.Atoi(strings.TrimPrefix(name, "project_"))
 		if id == 0 {
-			return nil, fmt.Errorf("%s not found", name)
+			return nil, errors.NotFoundError(nil).WithMessagef("%s not found", name)
 		}
 		return &proModels.Project{
 			ProjectID: int64(id),
@@ -165,6 +169,8 @@ func TestMiddleware(t *testing.T) {
 	req5, _ := http.NewRequest(http.MethodPost, "/v2/project_1/ubuntu/blobs/uploads/mount=?mount=sha256:08e4a417ff4e3913d8723a05cc34055db01c2fd165b588e049c5bad16ce6094f&from=project_3/ubuntu", nil)
 	req6, _ := http.NewRequest(http.MethodPost, "/v2/project_1/ubuntu/blobs/uploads/mount=?mount=sha256:08e4a417ff4e3913d8723a05cc34055db01c2fd165b588e049c5bad16ce6094f&from=project_0/ubuntu", nil)
 	req7, _ := http.NewRequest(http.MethodPost, "/v2/uploads/mount=?mount=sha256:08e4a417ff4e3913d8723a05cc34055db01c2fd165b588e049c5bad16ce6094f&from=project_0/ubuntu", nil)
+	req8, _ := http.NewRequest(http.MethodPost, "/v2/dbdown/ubuntu/blobs/uploads/", nil)
+	ctx8 := lib.WithArtifactInfo(baseCtx, lib.ArtifactInfo{Repository: "dbdown/ubuntu", ProjectName: "dbdown"})
 
 	cases := []struct {
 		input  *http.Request
@@ -213,6 +219,10 @@ func TestMiddleware(t *testing.T) {
 		{
 			input:  req7.WithContext(ctx5),
 			status: http.StatusUnauthorized,
+		},
+		{
+			input:  req8.WithContext(ctx8),
+			status: http.StatusInternalServerError,
 		},
 	}
 	for _, c := range cases {
