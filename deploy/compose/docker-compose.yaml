@@ -99,6 +99,9 @@ services:
       POSTGRESQL_DATABASE: ${DB_NAME:-registry}
       POSTGRESQL_SSLMODE: ${DB_SSLMODE:-disable}
       REDIS_URL: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}
+      # Same cache layer as core, so jobs that delete artifacts (GC) evict core's cached copies
+      CACHE_ENABLED: ${CACHE_ENABLED:-true}
+      _REDIS_URL_CORE: redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}/0
       CORE_URL: http://core:8080
       CORE_SECRET: ${CORE_SECRET}
       JOBSERVICE_SECRET: ${JOBSERVICE_SECRET}
