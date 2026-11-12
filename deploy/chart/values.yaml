@@ -424,7 +424,7 @@ core:
     # preStop:
     #   exec:
     #     command: ["/bin/sh", "-c", "sleep 15"]
-  # -- Deployment strategy (empty = K8s default RollingUpdate)
+  # -- Deployment strategy. Unset renders RollingUpdate with maxSurge/maxUnavailable 25%; unset rollingUpdate keys default to 25%. `type: Recreate` must not set `rollingUpdate`. Releases from older charts: see Troubleshooting before switching to Recreate.
   # @default -- {}
   deploymentStrategy: {}
   #   type: RollingUpdate
@@ -743,7 +743,7 @@ registry:
     # preStop:
     #   exec:
     #     command: ["/bin/sh", "-c", "sleep 15"]
-  # -- Deployment strategy (empty = K8s default RollingUpdate)
+  # -- Deployment strategy. Unset renders RollingUpdate with maxSurge/maxUnavailable 25%; unset rollingUpdate keys default to 25%. `type: Recreate` must not set `rollingUpdate`. Releases from older charts: see Troubleshooting before switching to Recreate.
   # @default -- {}
   deploymentStrategy: {}
 
@@ -971,7 +971,7 @@ portal:
     # preStop:
     #   exec:
     #     command: ["/bin/sh", "-c", "sleep 15"]
-  # -- Deployment strategy (empty = K8s default RollingUpdate)
+  # -- Deployment strategy. Unset renders RollingUpdate with maxSurge/maxUnavailable 25%; unset rollingUpdate keys default to 25%. `type: Recreate` must not set `rollingUpdate`. Releases from older charts: see Troubleshooting before switching to Recreate.
   # @default -- {}
   deploymentStrategy: {}
 
@@ -1194,7 +1194,7 @@ jobservice:
     # preStop:
     #   exec:
     #     command: ["/bin/sh", "-c", "sleep 15"]
-  # -- Deployment strategy (empty = K8s default RollingUpdate)
+  # -- Deployment strategy. Unset renders RollingUpdate with maxSurge/maxUnavailable 25%; unset rollingUpdate keys default to 25%. `type: Recreate` must not set `rollingUpdate`. Releases from older charts: see Troubleshooting before switching to Recreate.
   # @default -- {}
   deploymentStrategy: {}
 
@@ -1391,7 +1391,7 @@ exporter:
     # preStop:
     #   exec:
     #     command: ["/bin/sh", "-c", "sleep 15"]
-  # -- Deployment strategy (empty = K8s default RollingUpdate)
+  # -- Deployment strategy. Unset renders RollingUpdate with maxSurge/maxUnavailable 25%; unset rollingUpdate keys default to 25%. `type: Recreate` must not set `rollingUpdate`. Releases from older charts: see Troubleshooting before switching to Recreate.
   # @default -- {}
   deploymentStrategy: {}
 

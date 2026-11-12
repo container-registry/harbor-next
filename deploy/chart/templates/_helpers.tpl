@@ -190,6 +190,30 @@ hostAliases:
 {{- end }}
 
 {{/*
+Deployment strategy, always rendered with the K8s rollingUpdate defaults so
+helm owns those fields and server-side apply can drop them on Recreate.
+*/}}
+{{- define "harbor.deploymentStrategy" -}}
+{{- $type := .type | default "RollingUpdate" -}}
+{{- if eq $type "Recreate" -}}
+{{- if .rollingUpdate -}}
+{{- fail "deploymentStrategy.rollingUpdate may not be set when type is Recreate" -}}
+{{- end -}}
+strategy:
+  type: Recreate
+{{- else -}}
+{{- $ru := dict "maxSurge" "25%" "maxUnavailable" "25%" -}}
+{{- range $k, $v := .rollingUpdate | default dict }}
+{{- $_ := set $ru $k $v -}}
+{{- end -}}
+strategy:
+  type: {{ $type }}
+  rollingUpdate:
+    {{- toYaml $ru | nindent 4 }}
+{{- end -}}
+{{- end }}
+
+{{/*
 =============================================================================
 Probe helpers
 =============================================================================
