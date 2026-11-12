@@ -288,6 +288,7 @@ func TestErrorCodes(t *testing.T) {
 		status int
 		code   string
 	}{
+		{http.StatusBadRequest, errors.BadRequestCode},
 		{http.StatusUnauthorized, errors.UnAuthorizedCode}, // carries X-Error-Code
 		{http.StatusForbidden, errors.ForbiddenCode},
 		{http.StatusNotFound, errors.NotFoundCode},

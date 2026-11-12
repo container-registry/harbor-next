@@ -46,6 +46,8 @@ func statusError(resp *http.Response, hasToken bool) error {
 
 func codeOf(status int) string {
 	switch status {
+	case http.StatusBadRequest:
+		return errors.BadRequestCode
 	case http.StatusUnauthorized:
 		return errors.UnAuthorizedCode
 	case http.StatusForbidden:
