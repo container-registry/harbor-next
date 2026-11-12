@@ -101,6 +101,20 @@
       ]
     },
     {
+      "description": "Hold go-swagger below v0.34: newer releases drop the `comment` template func that tools/swagger/templates uses, so build:gen-apis fails",
+      "matchDepNames": [
+        "go-swagger/go-swagger"
+      ],
+      "allowedVersions": "<0.34.0"
+    },
+    {
+      "description": "Hold yamlscript below 0.3: 0.3.x no longer resolves yaml/load, which compose:check-env and helm:schema-check use",
+      "matchDepNames": [
+        "yaml/yamlscript"
+      ],
+      "allowedVersions": "<0.3.0"
+    },
+    {
       "description": "Update Taskfile version pins weekly for major releases",
       "matchManagers": [
         "custom.regex"
