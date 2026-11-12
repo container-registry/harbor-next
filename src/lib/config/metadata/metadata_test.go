@@ -50,6 +50,11 @@ func TestCfgMetaData_Init(t *testing.T) {
 }
 
 func TestRegisterAfterInstanceIsBuilt(t *testing.T) {
+	saved := ConfigList
+	t.Cleanup(func() {
+		ConfigList = saved
+		Instance().init()
+	})
 	Instance().init()
 	item := Item{Name: "registered_after_init", Scope: UserScope, Group: BasicGroup, DefaultValue: "true", ItemType: &BoolType{}, Editable: true}
 

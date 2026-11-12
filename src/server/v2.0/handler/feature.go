@@ -60,8 +60,12 @@ func featureList(ctx context.Context, overwritten bool) *models.FeatureList {
 	// Registration order follows Go package initialization, which users
 	// should not see; sort by display name for a stable list.
 	definitions := feature.Definitions()
-	sort.SliceStable(definitions, func(i, j int) bool {
-		return strings.ToLower(definitions[i].Name) < strings.ToLower(definitions[j].Name)
+	sort.Slice(definitions, func(i, j int) bool {
+		a, b := strings.ToLower(definitions[i].Name), strings.ToLower(definitions[j].Name)
+		if a != b {
+			return a < b
+		}
+		return definitions[i].ConfigKey < definitions[j].ConfigKey
 	})
 	enabledBySection := map[string][]feature.Definition{}
 	features := make([]*models.Feature, 0, len(definitions))
