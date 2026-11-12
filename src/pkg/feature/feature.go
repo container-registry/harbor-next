@@ -335,7 +335,7 @@ func environmentOverride(definition Definition) (enabled bool, envKey string, ov
 }
 
 // ValidateConfigUpdate rejects changes to environment-controlled features and
-// runs the disable guards before an enabled feature is switched off.
+// runs the disable guards on every update that switches a feature off.
 func ValidateConfigUpdate(ctx context.Context, cfgs map[string]any) error {
 	for _, definition := range Definitions() {
 		value, updated := cfgs[definition.ConfigKey]
@@ -349,7 +349,7 @@ func ValidateConfigUpdate(ctx context.Context, cfgs map[string]any) error {
 		if _, envKey, overridden := environmentOverride(definition); overridden {
 			return fmt.Errorf("%s is controlled by %s", definition.ConfigKey, envKey)
 		}
-		if enabled || !Enabled(ctx, definition.Feature) {
+		if enabled {
 			continue
 		}
 		mu.RLock()
