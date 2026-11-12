@@ -174,7 +174,23 @@ func resetGuards(feature Feature) {
 	delete(guards, feature)
 }
 
+func stubLockState(t *testing.T, lock func(context.Context, Feature) error) {
+	t.Helper()
+	orig := lockState
+	lockState = lock
+	t.Cleanup(func() { lockState = orig })
+}
+
+func stubStoredValue(t *testing.T, value string, stored bool) {
+	t.Helper()
+	orig := storedValue
+	storedValue = func(context.Context, string) (string, bool, error) { return value, stored, nil }
+	t.Cleanup(func() { storedValue = orig })
+}
+
 func TestValidateConfigUpdateRunsDisableGuards(t *testing.T) {
+	stubLockState(t, func(context.Context, Feature) error { return nil })
+	stubStoredValue(t, "true", true)
 	inUse := errors.New("feature still in use")
 	passed := 0
 	RegisterDisableGuard(testFeature, func(context.Context) error { passed++; return nil })
@@ -195,6 +211,63 @@ func TestValidateConfigUpdateRunsDisableGuards(t *testing.T) {
 	storeEnabled(t, false)
 	if err := ValidateConfigUpdate(t.Context(), map[string]any{testConfigKey: false}); !errors.Is(err, inUse) {
 		t.Fatalf("disabling with a stale false: error = %v, want the guards to run", err)
+	}
+}
+
+func TestValidateConfigUpdateRunsDisableGuardsUnderLock(t *testing.T) {
+	stubStoredValue(t, "true", true)
+	var events []string
+	stubLockState(t, func(_ context.Context, f Feature) error {
+		events = append(events, "lock "+string(f))
+		return nil
+	})
+	RegisterDisableGuard(testFeature, func(context.Context) error { events = append(events, "guard"); return nil })
+	t.Cleanup(func() { resetGuards(testFeature) })
+
+	storeEnabled(t, true)
+	if err := ValidateConfigUpdate(t.Context(), map[string]any{testConfigKey: false}); err != nil {
+		t.Fatalf("disabling: unexpected error %v", err)
+	}
+	if want := []string{"lock " + string(testFeature), "guard"}; strings.Join(events, ",") != strings.Join(want, ",") {
+		t.Fatalf("events = %v, want %v", events, want)
+	}
+
+	lockErr := errors.New("lock failed")
+	stubLockState(t, func(context.Context, Feature) error { return lockErr })
+	if err := ValidateConfigUpdate(t.Context(), map[string]any{testConfigKey: false}); !errors.Is(err, lockErr) {
+		t.Fatalf("error = %v, want the lock error", err)
+	}
+}
+
+// The cache may still say on after another instance saved off.
+func TestLockStateReadsTheStoredValue(t *testing.T) {
+	stubLockState(t, func(context.Context, Feature) error { return nil })
+	storeEnabled(t, true)
+
+	stubStoredValue(t, "false", true)
+	if enabled, err := LockState(t.Context(), testFeature); err != nil || enabled {
+		t.Fatalf("LockState = %v, %v, want the stored false", enabled, err)
+	}
+	stubStoredValue(t, "", false)
+	if enabled, err := LockState(t.Context(), defaultOnFeature); err != nil || !enabled {
+		t.Fatalf("LockState = %v, %v, want the default for a never saved key", enabled, err)
+	}
+	t.Setenv(testEnvKey, "true")
+	stubStoredValue(t, "false", true)
+	if enabled, err := LockState(t.Context(), testFeature); err != nil || !enabled {
+		t.Fatalf("LockState = %v, %v, want the environment override", enabled, err)
+	}
+	if _, err := LockState(t.Context(), "unknown"); err == nil {
+		t.Fatal("LockState of an unregistered feature must fail")
+	}
+}
+
+func TestUpdates(t *testing.T) {
+	if !Updates(map[string]any{testConfigKey: true, "auth_mode": "db_auth"}) {
+		t.Fatal("a map with a feature key must report an update")
+	}
+	if Updates(map[string]any{"auth_mode": "db_auth"}) {
+		t.Fatal("a map without feature keys must not report an update")
 	}
 }
 

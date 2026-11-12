@@ -102,8 +102,9 @@ func (c *controller) UpdateUserConfigs(ctx context.Context, conf map[string]any)
 		}
 		return nil
 	}
-	if _, ok := conf[common.DefaultProjectName]; ok {
-		// the existence check share-locks the project row until the write commits
+	if _, ok := conf[common.DefaultProjectName]; ok || feature.Updates(conf) {
+		// the default project check share-locks the project row and the
+		// feature disable guards hold their lock until the write commits
 		err = orm.WithTransaction(apply)(ctx)
 	} else {
 		err = apply(ctx)

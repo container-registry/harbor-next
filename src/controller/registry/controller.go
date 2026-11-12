@@ -27,6 +27,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
+	"github.com/goharbor/harbor/src/lib/orm"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg"
 	"github.com/goharbor/harbor/src/pkg/feature"
@@ -74,23 +75,43 @@ type Controller interface {
 // NewController creates an instance of the registry controller
 func NewController() Controller {
 	return &controller{
-		regMgr: reg.Mgr,
-		repMgr: replication.Mgr,
-		proMgr: pkg.ProjectMgr,
+		regMgr:      reg.Mgr,
+		repMgr:      replication.Mgr,
+		proMgr:      pkg.ProjectMgr,
+		lockFeature: feature.LockState,
 	}
 }
 
 type controller struct {
-	regMgr reg.Manager
-	repMgr replication.Manager
-	proMgr project.Manager
+	regMgr      reg.Manager
+	repMgr      replication.Manager
+	proMgr      project.Manager
+	lockFeature func(context.Context, feature.Feature) (bool, error)
 }
 
 func (c *controller) Create(ctx context.Context, registry *model.Registry) (int64, error) {
 	if err := c.validate(ctx, registry); err != nil {
 		return 0, err
 	}
-	return c.regMgr.Create(ctx, registry)
+	gate, gated := feature.RegistryTypeFeature(registry.Type)
+	if !gated {
+		return c.regMgr.Create(ctx, registry)
+	}
+	var id int64
+	err := orm.WithTransaction(func(ctx context.Context) error {
+		// recheck under the lock the disable guard takes, so a concurrent
+		// switch-off cannot slip in after validate
+		enabled, err := c.lockFeature(ctx, gate)
+		if err != nil {
+			return err
+		}
+		if !enabled {
+			return typeDisabledError(registry.Type)
+		}
+		id, err = c.regMgr.Create(ctx, registry)
+		return err
+	})(ctx)
+	return id, err
 }
 
 func (c *controller) validate(ctx context.Context, registry *model.Registry) error {
