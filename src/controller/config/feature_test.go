@@ -103,7 +103,7 @@ func TestOverwriteConfigSkipsEnvironmentControlledFeature(t *testing.T) {
 	}
 }
 
-var guardRefuses, guardUncoded bool
+var guardRefuses, guardUncoded, guardWrapped bool
 
 func init() {
 	feature.RegisterDisableGuard("controller_test_feature", func(context.Context) error {
@@ -112,6 +112,9 @@ func init() {
 		}
 		if guardUncoded {
 			return errors.New("still in use")
+		}
+		if guardWrapped {
+			return errors.Wrap(errors.New(nil).WithCode(errors.PreconditionCode).WithMessage("still in use"), "guard failed")
 		}
 		return nil
 	})
@@ -144,5 +147,20 @@ func TestValidateCfgWrapsAnUncodedGuardError(t *testing.T) {
 	err := newFeatureTestController().validateCfg(t.Context(), map[string]any{featureTestKey: false})
 	if !errors.IsErr(err, errors.BadRequestCode) {
 		t.Fatalf("validateCfg error = %v, want a bad request", err)
+	}
+}
+
+func TestValidateCfgKeepsACodedCauseBehindAWrapper(t *testing.T) {
+	libcfg.InitWithSettings(map[string]any{common.AUTHMode: common.DBAuth, featureTestKey: true})
+	t.Setenv(featureTestEnvKey, "")
+	if err := os.Unsetenv(featureTestEnvKey); err != nil {
+		t.Fatal(err)
+	}
+	guardWrapped = true
+	t.Cleanup(func() { guardWrapped = false })
+
+	err := newFeatureTestController().validateCfg(t.Context(), map[string]any{featureTestKey: false})
+	if errors.ErrCode(err) != errors.PreconditionCode {
+		t.Fatalf("validateCfg error = %v, want the wrapped precondition code", err)
 	}
 }
