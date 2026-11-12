@@ -592,6 +592,12 @@ func ProxyReferrerMiddleware() func(http.Handler) http.Handler {
 			return
 		}
 
+		if reg, err := registry.Ctl.Get(ctx, p.RegistryID); err == nil && !feature.RegistryTypeEnabled(ctx, reg.Type) {
+			log.Debugf("the registry type %s is disabled, serve the referrers of project %s locally", reg.Type, p.Name)
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		log.Debug("current project is a harbor proxy cache project, will proxy the referrer API to the upstream")
 		remote, err := proxy.NewRemoteHelper(r.Context(), p.RegistryID, proxy.WithSpeed(p.ProxyCacheSpeed()))
 		if err != nil {
