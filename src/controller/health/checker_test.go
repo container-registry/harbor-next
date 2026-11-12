@@ -15,6 +15,7 @@
 package health
 
 import (
+	"context"
 	"errors"
 	"net"
 	"net/http"
@@ -22,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/distribution/health"
+	"github.com/distribution/distribution/v3/health"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -38,9 +39,9 @@ func TestStringOfHealthy(t *testing.T) {
 
 func TestUpdater(t *testing.T) {
 	updater := &updater{}
-	assert.Equal(t, nil, updater.Check())
+	assert.Equal(t, nil, updater.Check(context.Background()))
 	updater.status = errors.New("unhealthy")
-	assert.Equal(t, "unhealthy", updater.Check().Error())
+	assert.Equal(t, "unhealthy", updater.Check(context.Background()).Error())
 }
 
 func TestHTTPStatusCodeHealthChecker(t *testing.T) {
@@ -59,11 +60,11 @@ func TestHTTPStatusCodeHealthChecker(t *testing.T) {
 		http.MethodGet, url, map[string][]string{
 			"key": {"value"},
 		}, 5*time.Second, http.StatusOK)
-	assert.Equal(t, nil, checker.Check())
+	assert.Equal(t, nil, checker.Check(context.Background()))
 
 	checker = HTTPStatusCodeHealthChecker(
 		http.MethodGet, url, nil, 5*time.Second, http.StatusUnauthorized)
-	assert.NotEqual(t, nil, checker.Check())
+	assert.NotEqual(t, nil, checker.Check(context.Background()))
 }
 
 func TestPortalHealthCheckerDoesNotFollowRedirect(t *testing.T) {
@@ -79,10 +80,10 @@ func TestPortalHealthCheckerDoesNotFollowRedirect(t *testing.T) {
 
 	t.Setenv("PORTAL_URL", portal.URL)
 	checker := portalHealthChecker()
-	assert.Eventually(t, func() bool { return checker.Check() == nil }, 5*time.Second, 50*time.Millisecond)
+	assert.Eventually(t, func() bool { return checker.Check(context.Background()) == nil }, 5*time.Second, 50*time.Millisecond)
 
 	portal.Close()
-	assert.Error(t, portalHTTPChecker(portal.URL, time.Second).Check())
+	assert.Error(t, portalHTTPChecker(portal.URL, time.Second).Check(context.Background()))
 }
 
 func TestPortalHTTPCheckerStatuses(t *testing.T) {
@@ -100,7 +101,7 @@ func TestPortalHTTPCheckerStatuses(t *testing.T) {
 			w.Header().Set("Location", "https://127.0.0.1:1/")
 			w.WriteHeader(code)
 		}))
-		err := portalHTTPChecker(portal.URL, time.Second).Check()
+		err := portalHTTPChecker(portal.URL, time.Second).Check(context.Background())
 		portal.Close()
 		assert.Equal(t, healthy, err == nil, "status %d", code)
 	}
@@ -108,7 +109,7 @@ func TestPortalHTTPCheckerStatuses(t *testing.T) {
 
 func TestPeriodicHealthChecker(t *testing.T) {
 	firstCheck := true
-	checkFunc := func() error {
+	checkFunc := func(_ context.Context) error {
 		time.Sleep(2 * time.Second)
 		if firstCheck {
 			firstCheck = false
@@ -118,14 +119,14 @@ func TestPeriodicHealthChecker(t *testing.T) {
 	}
 
 	checker := PeriodicHealthChecker(health.CheckFunc(checkFunc), 1*time.Second)
-	assert.Equal(t, "unknown status", checker.Check().Error())
+	assert.Equal(t, "unknown status", checker.Check(context.Background()).Error())
 	time.Sleep(3 * time.Second)
-	assert.Equal(t, nil, checker.Check())
+	assert.Equal(t, nil, checker.Check(context.Background()))
 	time.Sleep(3 * time.Second)
-	assert.Equal(t, "unhealthy", checker.Check().Error())
+	assert.Equal(t, "unhealthy", checker.Check(context.Background()).Error())
 }
 
 func TestCoreHealthChecker(t *testing.T) {
 	checker := coreHealthChecker()
-	assert.Equal(t, nil, checker.Check())
+	assert.Equal(t, nil, checker.Check(context.Background()))
 }

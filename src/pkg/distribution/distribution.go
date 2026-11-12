@@ -18,29 +18,40 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/docker/distribution"
+	"github.com/distribution/distribution/v3"
 	// manifestlist
-	_ "github.com/docker/distribution/manifest/manifestlist"
+	_ "github.com/distribution/distribution/v3/manifest/manifestlist"
 	// oci schema
-	_ "github.com/docker/distribution/manifest/ocischema"
-	// docker schema1 manifest
-	_ "github.com/docker/distribution/manifest/schema1"
+	_ "github.com/distribution/distribution/v3/manifest/ocischema"
 	// docker schema2 manifest
-	_ "github.com/docker/distribution/manifest/schema2"
-	ref "github.com/docker/distribution/reference"
+	_ "github.com/distribution/distribution/v3/manifest/schema2"
+	ref "github.com/distribution/reference"
 	"github.com/opencontainers/go-digest"
 
 	"github.com/goharbor/harbor/src/common/utils"
 )
 
-// Descriptor alias type of github.com/docker/distribution.Descriptor
+// Descriptor alias type of github.com/distribution/distribution/v3.Descriptor
 type Descriptor = distribution.Descriptor
 
-// Manifest alias type of github.com/docker/distribution.Manifest
+// Manifest alias type of github.com/distribution/distribution/v3.Manifest
 type Manifest = distribution.Manifest
 
+// Docker schema1 manifests are no longer parsed or stored. The media types stay
+// so code can recognise them: GC still deletes rows from before the v3 registry
+// and copies refuse them up front.
+const (
+	MediaTypeSchema1Manifest       = "application/vnd.docker.distribution.manifest.v1+json"
+	MediaTypeSchema1SignedManifest = "application/vnd.docker.distribution.manifest.v1+prettyjws"
+)
+
+// IsSchema1 reports whether the media type is a Docker schema1 manifest.
+func IsSchema1(mediaType string) bool {
+	return mediaType == MediaTypeSchema1Manifest || mediaType == MediaTypeSchema1SignedManifest
+}
+
 var (
-	// UnmarshalManifest alias func from `github.com/docker/distribution`
+	// UnmarshalManifest alias func from `github.com/distribution/distribution/v3`
 	UnmarshalManifest = distribution.UnmarshalManifest
 )
 

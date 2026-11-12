@@ -18,34 +18,19 @@ import (
 	"context"
 	"testing"
 
-	"github.com/docker/distribution/manifest/schema1"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/goharbor/harbor/src/pkg/artifact"
-	"github.com/goharbor/harbor/src/pkg/blob"
 	"github.com/goharbor/harbor/src/testing/mock"
 	tart "github.com/goharbor/harbor/src/testing/pkg/artifact"
-	tblob "github.com/goharbor/harbor/src/testing/pkg/blob"
 	tregistry "github.com/goharbor/harbor/src/testing/pkg/registry"
 )
 
 // Driving each abstractor directly with mocks is what the exported constructors are for.
 
 const (
-	v1ManifestContent = `{
-   "schemaVersion": 1,
-   "name": "library/hello-world",
-   "tag": "latest",
-   "architecture": "amd64",
-   "fsLayers": [
-      {"blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"},
-      {"blobSum": "sha256:1b930d010525941c1d56ec53b97bd057a67ae1865eebf042686d2a2d18271ced"}
-   ],
-   "history": []
-}`
-
 	v2ManifestContent = `{
    "schemaVersion": 2,
    "mediaType": "application/vnd.oci.image.manifest.v1+json",
@@ -77,19 +62,6 @@ const (
    ]
 }`
 )
-
-func TestV1AbstractorUsesInjectedBlobManager(t *testing.T) {
-	blobMgr := &tblob.Manager{}
-	mock.OnAnything(blobMgr, "List").Return([]*blob.Blob{{Size: 10}, {Size: 20}}, nil)
-
-	art := &artifact.Artifact{ID: 1}
-	require.NoError(t, NewV1(blobMgr).Abstract(context.Background(), art, []byte(v1ManifestContent)))
-
-	assert.Equal(t, schema1.MediaTypeSignedManifest, art.ManifestMediaType)
-	assert.Equal(t, schema1.MediaTypeSignedManifest, art.MediaType)
-	// there is no layer size in a v1 manifest, so it is summed from the blobs
-	assert.Equal(t, int64(30+len(v1ManifestContent)), art.Size)
-}
 
 func TestV2Abstractor(t *testing.T) {
 	art := &artifact.Artifact{ID: 1}
@@ -164,18 +136,9 @@ func TestV2AbstractorReadsArtifactType(t *testing.T) {
 	assert.Equal(t, "application/vnd.example.sbom", art.ArtifactType)
 }
 
-func TestV1AbstractorPropagatesBlobListError(t *testing.T) {
-	blobMgr := &tblob.Manager{}
-	mock.OnAnything(blobMgr, "List").Return(nil, assert.AnError)
-
-	art := &artifact.Artifact{ID: 1}
-	assert.Error(t, NewV1(blobMgr).Abstract(context.Background(), art, []byte(v1ManifestContent)))
-}
-
 func TestAbstractorsRejectMalformedContent(t *testing.T) {
 	malformed := []byte("{not json")
 
-	assert.Error(t, NewV1(&tblob.Manager{}).Abstract(context.Background(), &artifact.Artifact{}, malformed))
 	assert.Error(t, NewV2().Abstract(context.Background(), &artifact.Artifact{}, malformed))
 	assert.Error(t, NewIndex(&tart.Manager{}, &tregistry.Client{}).Abstract(context.Background(), &artifact.Artifact{}, malformed))
 }

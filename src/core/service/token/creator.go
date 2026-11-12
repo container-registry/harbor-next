@@ -21,7 +21,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/docker/distribution/registry/auth/token"
+	"github.com/distribution/distribution/v3/registry/auth/token"
 
 	"github.com/goharbor/harbor/src/common/models"
 	"github.com/goharbor/harbor/src/common/rbac"

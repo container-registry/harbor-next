@@ -21,9 +21,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/manifest/manifestlist"
-	"github.com/docker/distribution/manifest/schema2"
+	"github.com/distribution/distribution/v3"
+	"github.com/distribution/distribution/v3/manifest/manifestlist"
+	"github.com/distribution/distribution/v3/manifest/ocischema"
+	"github.com/distribution/distribution/v3/manifest/schema2"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 
@@ -109,20 +110,34 @@ func (m *ManifestListCache) cacheTrimmedDigest(ctx context.Context, newDig strin
 func (m *ManifestListCache) updateManifestList(ctx context.Context, repo string, manifest distribution.Manifest) (distribution.Manifest, error) {
 	switch v := manifest.(type) {
 	case *manifestlist.DeserializedManifestList:
-		existMans := make([]manifestlist.ManifestDescriptor, 0)
-		for _, ma := range v.Manifests {
-			art := lib.ArtifactInfo{Repository: repo, Digest: string(ma.Digest)}
-			a, err := m.local.GetManifest(ctx, art)
-			if err != nil {
-				return nil, err
-			}
-			if a != nil {
-				existMans = append(existMans, ma)
-			}
+		existMans, err := presentDescriptors(ctx, m.local, repo, v.Manifests, func(d manifestlist.ManifestDescriptor) digest.Digest { return d.Digest })
+		if err != nil {
+			return nil, err
 		}
 		return manifestlist.FromDescriptors(existMans)
+	case *ocischema.DeserializedImageIndex:
+		existMans, err := presentDescriptors(ctx, m.local, repo, v.Manifests, func(d v1.Descriptor) digest.Digest { return d.Digest })
+		if err != nil {
+			return nil, err
+		}
+		return ocischema.FromDescriptors(existMans, v.Annotations)
 	}
 	return nil, fmt.Errorf("current manifest list type is unknown, manifest type[%T], content [%+v]", manifest, manifest)
+}
+
+// presentDescriptors keeps the descriptors whose manifest already exists locally.
+func presentDescriptors[T any](ctx context.Context, local localInterface, repo string, descs []T, dig func(T) digest.Digest) ([]T, error) {
+	exist := make([]T, 0, len(descs))
+	for _, d := range descs {
+		a, err := local.GetManifest(ctx, lib.ArtifactInfo{Repository: repo, Digest: string(dig(d))})
+		if err != nil {
+			return nil, err
+		}
+		if a != nil {
+			exist = append(exist, d)
+		}
+	}
+	return exist, nil
 }
 
 func (m *ManifestListCache) push(ctx context.Context, repo, reference string, man distribution.Manifest) error {
