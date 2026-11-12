@@ -148,6 +148,10 @@ func migratorDSN(database *models.PostGreSQL) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("parse database URL: %w", err)
 	}
+	// libpq key-value DSNs parse cleanly with no scheme; golang-migrate cannot use them
+	if u.Scheme == "" || u.Host == "" {
+		return "", fmt.Errorf("database URL must be a postgres:// URL with a host; key-value DSNs are not supported by the migrator")
+	}
 	u.Scheme = "pgx5"
 	return u.String(), nil
 }
