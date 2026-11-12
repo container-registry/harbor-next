@@ -697,6 +697,9 @@
         },
         "connMaxLifetime": {
           "type": "string"
+        },
+        "statementTimeout": {
+          "type": "string"
         }
       }
     },

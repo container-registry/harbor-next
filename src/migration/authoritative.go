@@ -106,6 +106,11 @@ func applyAuthoritativeSchema(ctx context.Context, db schemaDB, path string) err
 		}
 	}()
 
+	// The pool's statement_timeout would kill a replica waiting on the advisory
+	// lock or a long DDL run, so lift it for this transaction before both.
+	if err := tx.Exec(ctx, "SET LOCAL statement_timeout = 0"); err != nil {
+		return fmt.Errorf("disable statement_timeout for authoritative Harbor Next schema: %w", err)
+	}
 	if err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", authoritativeSchemaLockID); err != nil {
 		return fmt.Errorf("lock authoritative Harbor Next schema: %w", err)
 	}
