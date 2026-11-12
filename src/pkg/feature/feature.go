@@ -31,6 +31,7 @@ import (
 
 	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/config/metadata"
+	"github.com/goharbor/harbor/src/lib/log"
 )
 
 // Feature identifies a gated capability.
@@ -274,6 +275,10 @@ func resolve(ctx context.Context, definition Definition) (bool, Source) {
 	mgr := config.DefaultMgr()
 	if mgr == nil {
 		return definition.Default, SourceDefault
+	}
+	// pick up a toggle another replica stored; a failed refresh keeps the last value
+	if err := mgr.Load(ctx); err != nil {
+		log.Warningf("failed to refresh the configuration for feature %s: %v", definition.ConfigKey, err)
 	}
 	// A key never saved comes back as an empty value, not the item default,
 	// because the item may have been registered after the defaults loaded.
