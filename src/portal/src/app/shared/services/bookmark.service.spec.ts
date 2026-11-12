@@ -91,6 +91,24 @@ describe('BookmarkService', () => {
         expect(service.add(project)).toBeNull();
     });
 
+    it('keeps entries missing their kind fields out of the list but in storage', () => {
+        const broken = {
+            ...tag,
+            tag: undefined,
+            id: 'x',
+            label: 'x',
+            createdAt: 1,
+        };
+        localStorage.setItem(
+            BOOKMARK_STORAGE_PREFIX + 1,
+            JSON.stringify({ v: 1, items: [broken] })
+        );
+        service.load();
+        expect(service.bookmarks).toEqual([]);
+        service.add(project);
+        expect(stored('alice').items.length).toBe(2);
+    });
+
     it('does not duplicate an existing target', () => {
         const first = service.add(tag);
         const second = service.add({ ...tag, defaultLabel: 'other' });

@@ -122,6 +122,23 @@ export function replaceQueryParam(
     });
 }
 
+// Links are built from these fields; an entry without them cannot be shown.
+function hasKindFields(b: any): boolean {
+    const str = (v: unknown) => typeof v === 'string' && v !== '';
+    switch (b.kind) {
+        case BookmarkKind.REPOSITORY:
+            return str(b.repoName);
+        case BookmarkKind.TAG:
+            return str(b.repoName) && str(b.tag);
+        case BookmarkKind.REPOSITORY_FILTER:
+            return str(b.query);
+        case BookmarkKind.ARTIFACT_FILTER:
+            return str(b.repoName) && str(b.query);
+        default:
+            return true;
+    }
+}
+
 function isValidBookmark(b: any): b is Bookmark {
     return (
         !!b &&
@@ -130,7 +147,8 @@ function isValidBookmark(b: any): b is Bookmark {
         Number.isFinite(b.projectId) &&
         typeof b.projectName === 'string' &&
         typeof b.label === 'string' &&
-        typeof b.defaultLabel === 'string'
+        typeof b.defaultLabel === 'string' &&
+        hasKindFields(b)
     );
 }
 
