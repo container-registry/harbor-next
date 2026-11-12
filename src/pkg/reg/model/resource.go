@@ -66,6 +66,9 @@ type Artifact struct {
 	Tags       []string `json:"tags"`
 	IsAcc      bool     `json:"-"` // indicate whether it is an accessory artifact
 	ParentTags []string `json:"-"` // the tags belong to the artifact which the accessory is attached.
+	// Revision, when set, is the source reference the tags pointed at when they were listed.
+	// The source is pulled by it, so a tag moving before the copy cannot change the content.
+	Revision string `json:"revision,omitempty"`
 }
 
 func (r *ResourceMetadata) String() string {

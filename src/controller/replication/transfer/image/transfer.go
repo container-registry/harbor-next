@@ -72,6 +72,16 @@ func init() {
 type repository struct {
 	repository string
 	tags       []string
+	// refs holds the source reference of each tag when it differs from the tag itself.
+	refs []string
+}
+
+// ref returns the reference tags[i] is pulled by on the source.
+func (r *repository) ref(i int) string {
+	if i < len(r.refs) && r.refs[i] != "" {
+		return r.refs[i]
+	}
+	return r.tags[i]
 }
 
 func factory(logger trans.Logger, stopFunc trans.StopFunc) (trans.Transfer, error) {
@@ -114,12 +124,16 @@ func (t *transfer) convert(resource *model.Resource) *repository {
 	}
 	for _, artifact := range resource.Metadata.Artifacts {
 		if len(artifact.Tags) > 0 {
-			repository.tags = append(repository.tags, artifact.Tags...)
+			for _, tag := range artifact.Tags {
+				repository.tags = append(repository.tags, tag)
+				repository.refs = append(repository.refs, artifact.Revision)
+			}
 			continue
 		}
 		// no tags
 		if len(artifact.Digest) > 0 {
 			repository.tags = append(repository.tags, artifact.Digest)
+			repository.refs = append(repository.refs, "")
 		}
 	}
 	if len(repository.tags) > 0 {
@@ -204,7 +218,7 @@ func (t *transfer) copy(src *repository, dst *repository, override bool, opts *t
 
 	var err error
 	for i := range src.tags {
-		if e := t.copyArtifact(srcRepo, src.tags[i], dstRepo, dst.tags[i], override, opts); e != nil {
+		if e := t.copyArtifact(srcRepo, src.ref(i), dstRepo, dst.tags[i], override, opts); e != nil {
 			if e == errStopped {
 				return nil
 			}

@@ -198,3 +198,21 @@ func TestDelete(t *testing.T) {
 	err := tr.delete(repo)
 	require.Nil(t, err)
 }
+
+func TestConvertPullsPinnedRevision(t *testing.T) {
+	tr := &transfer{}
+	repo := tr.convert(&model.Resource{Metadata: &model.ResourceMetadata{
+		Repository: &model.Repository{Name: "org/model"},
+		Artifacts: []*model.Artifact{
+			{Tags: []string{"main", "sha-aaaaaaaaaaaa"}, Revision: "aaaa"},
+			{Tags: []string{"v1"}},
+			{Digest: "sha256:abc"},
+		},
+	}})
+	assert.Equal(t, []string{"main", "sha-aaaaaaaaaaaa", "v1", "sha256:abc"}, repo.tags)
+	var refs []string
+	for i := range repo.tags {
+		refs = append(refs, repo.ref(i))
+	}
+	assert.Equal(t, []string{"aaaa", "aaaa", "v1", "sha256:abc"}, refs)
+}
