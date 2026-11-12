@@ -218,6 +218,8 @@ services:
   postgresql:
     # Pinned: an older image on this mount starts an empty database. See README.
     image: docker.io/library/postgres:18-alpine
+    # Stock 100 fits a single 100-conn core pool and nothing else; 1024 matches upstream harbor-db
+    command: ["postgres", "-c", "max_connections=1024"]
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
