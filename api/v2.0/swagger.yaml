@@ -5392,13 +5392,11 @@ paths:
           description: Retention ID.
       responses:
         '200':
-          description: Update Retention Policy successfully.
+          description: Delete Retention Policy successfully, or it does not exist.
         '401':
           $ref: '#/responses/401'
         '403':
           $ref: '#/responses/403'
-        '404':
-          $ref: '#/responses/404'
         '500':
           $ref: '#/responses/500'
 

@@ -203,11 +203,8 @@ func (d *dao) DeleteProjectMemberByID(ctx context.Context, projectID int64, pmid
 		return err
 	}
 	sql := "delete from project_member where project_id = ? and id = ?"
-	res, err := o.Raw(sql, projectID, pmid).Exec()
-	if err != nil {
-		return err
-	}
-	return memberAffected(res, pmid)
+	_, err = o.Raw(sql, projectID, pmid).Exec()
+	return err
 }
 
 func memberAffected(res sql.Result, pmid int) error {

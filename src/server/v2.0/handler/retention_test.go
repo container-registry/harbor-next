@@ -25,18 +25,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/goharbor/harbor/src/common/security"
 	"github.com/goharbor/harbor/src/lib/errors"
+	"github.com/goharbor/harbor/src/pkg/retention/policy"
 	operation "github.com/goharbor/harbor/src/server/v2.0/restapi/operations/retention"
+	securitytesting "github.com/goharbor/harbor/src/testing/common/security"
 	retentiontesting "github.com/goharbor/harbor/src/testing/controller/retention"
+	metadatatesting "github.com/goharbor/harbor/src/testing/pkg/project/metadata"
 )
 
 func TestRetentionMissingPolicyReturnsNotFound(t *testing.T) {
 	cases := map[string]func(*retentionAPI, context.Context) middleware.Responder{
 		"get": func(api *retentionAPI, ctx context.Context) middleware.Responder {
 			return api.GetRetention(ctx, operation.GetRetentionParams{ID: 99})
-		},
-		"delete": func(api *retentionAPI, ctx context.Context) middleware.Responder {
-			return api.DeleteRetention(ctx, operation.DeleteRetentionParams{ID: 99})
 		},
 		"trigger": func(api *retentionAPI, ctx context.Context) middleware.Responder {
 			return api.TriggerRetentionExecution(ctx, operation.TriggerRetentionExecutionParams{ID: 99})
@@ -51,6 +52,63 @@ func TestRetentionMissingPolicyReturnsNotFound(t *testing.T) {
 			rr := httptest.NewRecorder()
 			call(&retentionAPI{retentionCtl: ctl}, context.Background()).WriteResponse(rr, runtime.JSONProducer())
 			assert.Equal(t, http.StatusNotFound, rr.Code)
+		})
+	}
+}
+
+func TestDeleteMissingRetentionPolicy(t *testing.T) {
+	cases := map[string]struct {
+		authenticated bool
+		want          int
+	}{
+		"repeated delete": {authenticated: true, want: http.StatusOK},
+		"anonymous":       {authenticated: false, want: http.StatusUnauthorized},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctl := retentiontesting.NewController(t)
+			ctl.On("GetRetention", mock.Anything, int64(99)).
+				Return(nil, errors.NotFoundError(nil).WithMessage("no such Retention policy with id 99"))
+			secCtx := &securitytesting.Context{}
+			secCtx.On("IsAuthenticated").Return(tc.authenticated)
+			ctx := security.NewContext(context.Background(), secCtx)
+
+			rr := httptest.NewRecorder()
+			api := &retentionAPI{retentionCtl: ctl}
+			api.DeleteRetention(ctx, operation.DeleteRetentionParams{ID: 99}).WriteResponse(rr, runtime.JSONProducer())
+			assert.Equal(t, tc.want, rr.Code)
+		})
+	}
+}
+
+func TestDeleteRetentionNotFoundOnDelete(t *testing.T) {
+	notFound := errors.NotFoundError(nil).WithMessage("not found")
+	p := &policy.Metadata{ID: 99, Scope: &policy.Scope{Level: "system", Reference: 1}}
+	cases := map[string]struct {
+		recheck    *policy.Metadata
+		recheckErr error
+		want       int
+	}{
+		"removed concurrently": {recheckErr: notFound, want: http.StatusOK},
+		"policy still exists":  {recheck: p, want: http.StatusNotFound},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctl := retentiontesting.NewController(t)
+			ctl.On("GetRetention", mock.Anything, int64(99)).Return(p, nil).Once()
+			ctl.On("DeleteRetention", mock.Anything, int64(99)).Return(notFound)
+			ctl.On("GetRetention", mock.Anything, int64(99)).Return(tc.recheck, tc.recheckErr).Once()
+			metaMgr := &metadatatesting.Manager{}
+			secCtx := &securitytesting.Context{}
+			secCtx.On("IsAuthenticated").Return(true)
+			secCtx.On("Can", mock.Anything, mock.Anything, mock.Anything).Return(true)
+			ctx := security.NewContext(context.Background(), secCtx)
+
+			rr := httptest.NewRecorder()
+			api := &retentionAPI{retentionCtl: ctl, proMetaMgr: metaMgr}
+			api.DeleteRetention(ctx, operation.DeleteRetentionParams{ID: 99}).WriteResponse(rr, runtime.JSONProducer())
+			assert.Equal(t, tc.want, rr.Code)
+			metaMgr.AssertNotCalled(t, "Delete", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
 }
