@@ -202,6 +202,7 @@ export class ArtifactListTabComponent implements OnInit, OnDestroy {
     private activeFilter: ArtifactFilterEvent;
     // Only the latest list request may fill the grid.
     private loadSub: Subscription;
+    private labelSub: Subscription;
     scanFinishedArtifactLength: number = 0;
     onScanArtifactsLength: number = 0;
     sbomFinishedArtifactLength: number = 0;
@@ -335,6 +336,7 @@ export class ArtifactListTabComponent implements OnInit, OnDestroy {
     ngOnDestroy() {
         this.queryParamSub?.unsubscribe();
         this.loadSub?.unsubscribe();
+        this.labelSub?.unsubscribe();
         if (this.updateArtifactSub) {
             this.updateArtifactSub.unsubscribe();
             this.updateArtifactSub = null;
@@ -1101,7 +1103,8 @@ export class ArtifactListTabComponent implements OnInit, OnDestroy {
             const query = this.filters[0];
             // On failure the filter keeps working by label id; only the chip name is missing.
             const target = this.filterBookmark;
-            getLabelById(this.labelService, filter.label.id)
+            this.labelSub?.unsubscribe();
+            this.labelSub = getLabelById(this.labelService, filter.label.id)
                 .pipe(
                     catchError(error => {
                         // Other failures leave the filter working by label id.

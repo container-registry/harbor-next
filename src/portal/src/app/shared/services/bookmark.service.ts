@@ -155,6 +155,8 @@ export class BookmarkService implements OnDestroy {
     private foreign: unknown[] = [];
     // A store written by a newer release is never overwritten by this one.
     private readOnly = false;
+    // The stored text this tab last read or wrote.
+    private lastRaw: string | null = null;
 
     // A null key means another tab called localStorage.clear().
     private readonly onStorage = (e: StorageEvent) => {
@@ -210,6 +212,7 @@ export class BookmarkService implements OnDestroy {
         if (!this.load()) {
             return null;
         }
+        this.sync();
         const existing = this.find(target);
         if (existing) {
             return existing;
@@ -233,6 +236,7 @@ export class BookmarkService implements OnDestroy {
     }
 
     remove(id: string): void {
+        this.sync();
         this.write(this.items.value.filter(b => b.id !== id));
     }
 
@@ -240,6 +244,7 @@ export class BookmarkService implements OnDestroy {
         const trimmed = (label || '')
             .trim()
             .substring(0, MAX_BOOKMARK_LABEL_LENGTH);
+        this.sync();
         this.write(
             this.items.value.map(b =>
                 b.id === id ? { ...b, label: trimmed || b.defaultLabel } : b
@@ -249,6 +254,7 @@ export class BookmarkService implements OnDestroy {
 
     // Applies a new order; ids that do not match the current list are ignored.
     reorder(ids: string[]): void {
+        this.sync();
         const byId = new Map(this.items.value.map(b => [b.id, b]));
         const items = ids.map(id => byId.get(id)).filter(b => !!b);
         if (
@@ -260,12 +266,30 @@ export class BookmarkService implements OnDestroy {
         }
     }
 
+    // Another tab may have written after our last storage event; edit its list.
+    private sync(): void {
+        if (!this.storageKey) {
+            return;
+        }
+        let raw: string | null;
+        try {
+            raw = localStorage.getItem(this.storageKey);
+        } catch (e) {
+            // Blocked storage: read() yields an empty list and write() fails.
+            return;
+        }
+        if (raw !== this.lastRaw) {
+            this.items.next(this.read());
+        }
+    }
+
     private read(): Bookmark[] {
         this.foreign = [];
         this.readOnly = false;
         let parsed: any;
         try {
-            parsed = JSON.parse(localStorage.getItem(this.storageKey));
+            this.lastRaw = localStorage.getItem(this.storageKey);
+            parsed = JSON.parse(this.lastRaw);
         } catch (e) {
             return [];
         }
@@ -287,13 +311,12 @@ export class BookmarkService implements OnDestroy {
             return false;
         }
         try {
-            localStorage.setItem(
-                this.storageKey,
-                JSON.stringify({
-                    v: BOOKMARK_STORAGE_VERSION,
-                    items: [...items, ...this.foreign],
-                })
-            );
+            const raw = JSON.stringify({
+                v: BOOKMARK_STORAGE_VERSION,
+                items: [...items, ...this.foreign],
+            });
+            localStorage.setItem(this.storageKey, raw);
+            this.lastRaw = raw;
         } catch (e) {
             return false;
         }

@@ -72,6 +72,25 @@ describe('BookmarkService', () => {
         expect(stored('bob')).toBeNull();
     });
 
+    it('keeps a bookmark another tab wrote before its storage event', () => {
+        service.add(project);
+        const other = new BookmarkService(session);
+        other.add(tag);
+        other.ngOnDestroy();
+        service.rename(service.bookmarks[0].id, 'mine');
+        expect(stored('alice').items.map(b => b.label)).toEqual([
+            'mine',
+            'team/app:latest',
+        ]);
+    });
+
+    it('returns null instead of throwing when storage is blocked', () => {
+        service.load();
+        spyOn(localStorage, 'getItem').and.throwError('SecurityError');
+        spyOn(localStorage, 'setItem').and.throwError('SecurityError');
+        expect(service.add(project)).toBeNull();
+    });
+
     it('does not duplicate an existing target', () => {
         const first = service.add(tag);
         const second = service.add({ ...tag, defaultLabel: 'other' });
