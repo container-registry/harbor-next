@@ -78,17 +78,29 @@ Container port
 {{- end }}
 
 {{/*
-Return the Registry controller internal URL
+The registryctl sidecar exists only for image.source=upstream: vanilla
+goharbor jobservice deletes GC blobs through it, and the vanilla registry
+image has no deletion API. On 404 vanilla GC drops the DB rows and keeps
+the blobs, so pointing it at the registry would lose data silently.
+Harbor Next registries serve the deletion API themselves.
 */}}
-{{- define "harbor.registryctl.url" -}}
-http://{{ include "harbor.fullname" . }}-registry:{{ include "harbor.registryctl.port" . }}
+{{- define "harbor.registryctl.enabled" -}}
+{{- if eq (.Values.image.source | default "8gcr") "upstream" -}}true{{- end -}}
+{{- end }}
+
+{{- define "harbor.registryctl.port" -}}
+8080
 {{- end }}
 
 {{/*
-Registryctl container port
+REGISTRY_CONTROLLER_URL for core and jobservice
 */}}
-{{- define "harbor.registryctl.port" -}}
-8080
+{{- define "harbor.registryController.url" -}}
+{{- if include "harbor.registryctl.enabled" . -}}
+http://{{ include "harbor.fullname" . }}-registry:{{ include "harbor.registryctl.port" . }}
+{{- else -}}
+{{ include "harbor.registry.url" . }}
+{{- end -}}
 {{- end }}
 
 {{/*
@@ -122,10 +134,6 @@ Component name helpers (used by noProxy and other cross-component references)
 
 {{- define "harbor.registry" -}}
   {{- printf "%s-registry" (include "harbor.fullname" .) -}}
-{{- end -}}
-
-{{- define "harbor.registryCtl" -}}
-  {{- printf "%s-registryctl" (include "harbor.fullname" .) -}}
 {{- end -}}
 
 {{- define "harbor.database" -}}

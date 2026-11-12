@@ -569,13 +569,12 @@ packages:
       Operator:
         config:
           dir: testing/pkg/chart
-  # registryctl related mocks
-  github.com/goharbor/harbor/src/registryctl/client:
+  github.com/goharbor/harbor/src/pkg/registry/gcclient:
     interfaces:
       Client:
         config:
-          dir: testing/registryctl
-          outpkg: registryctl
+          dir: testing/pkg/registry/gcclient
+          outpkg: gcclient
   # remote interfaces
   github.com/docker/distribution:
     interfaces:

@@ -1,5 +1,5 @@
 # Lint fixture: every class of finding the doctor knows, in one file.
-# Expected: see report-tripwire.txt (5 errors, 10 warnings).
+# Expected: see report-tripwire.txt (5 errors, 12 warnings).
 externalURL: https://harbor.example.com
 harborAdminPassword: hunter2-inline
 secretKey: 0123456789abcdef
@@ -37,6 +37,10 @@ registry:
   secret:
     REGISTRY_STORAGE_S3_ACCESSKEY: AKIAINLINE
     REGISTRY_STORAGE_S3_SECRETKEY: inline-secret
+  # sidecar-only setting; ignored unless image.source is upstream
+  controller:
+    image:
+      tag: v2.14.0
 
 # metrics on, but jobservice's metric endpoint explicitly disabled while the
 # ServiceMonitor still scrapes jobservice (its scrape target stays dark)
@@ -58,3 +62,7 @@ core:
     enabled: true
     minAvailable: 1
     maxUnavailable: 1
+
+# proxy for the registry only reaches the upstream-only registryctl sidecar
+proxy:
+  components: [core, registry]

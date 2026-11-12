@@ -272,8 +272,8 @@ http:
 {{- end }}
 
 {{/*
-Filesystem rootdirectory honored by the storage volumeMount on the
-registry/registryctl containers. Reads from .Values.registry.config.storage.filesystem.rootdirectory
+Filesystem rootdirectory honored by the storage volumeMount on
+the registry container. Reads from .Values.registry.config.storage.filesystem.rootdirectory
 with fallback to /storage.
 */}}
 {{- define "harbor.registry.storageMountPath" -}}
@@ -374,7 +374,6 @@ swap — keep it in sync with goharbor/harbor-helm on appVersion bumps.
     core: 8gcr/harbor-core
     jobservice: 8gcr/harbor-jobservice
     registry: 8gcr/harbor-registry
-    registryctl: 8gcr/harbor-registryctl
     portal: 8gcr/harbor-portal
     trivy: 8gcr/trivy-adapter
     exporter: 8gcr/harbor-exporter

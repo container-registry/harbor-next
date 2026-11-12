@@ -181,8 +181,8 @@ Jobservice config moved into a verbatim `config.yml` passthrough
 | 2.x | This chart | Notes |
 |---|---|---|
 | `registry.registry.image.*` | `registry.image.*` | One nesting level removed |
-| `registry.controller.image.*` | `registry.controller.image.*` | Same |
-| `registry.registry.resources` / `registry.controller.resources` | `registry.resources` | Single block for both containers |
+| `registry.controller.image.*`, `registry.controller.resources` | `image.source: 8gcr` (the migrator default): dropped. `image.source: upstream`: `registry.controller.*` | The migrator targets 8gcr, whose registry serves the GC deletion API itself, so it drops these keys. If you switch to `image.source: upstream`, set `registry.controller.*` again: the registryctl sidecar runs only in that mode |
+| `registry.registry.resources` | `registry.resources` | |
 | `registry.registry.extraEnvVars` / `controller.extraEnvVars` | `registry.extraEnv` | Single list |
 | `registry.relativeurls` | `registry.config.http.relativeurls` | Native distribution syntax |
 | `registry.upload_purging.*` | `registry.config.storage.maintenance.uploadpurging.*` | Already in the chart default `config` |

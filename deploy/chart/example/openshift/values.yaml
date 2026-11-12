@@ -103,10 +103,6 @@ registry:
   image:
     repository: ttl.sh/harbor-next/harbor-registry
     tag: "v2.15.0"
-  controller:
-    image:
-      repository: ttl.sh/harbor-next/harbor-registryctl
-      tag: "v2.15.0"
   persistence:
     enabled: true
     storageClass: "gp3"

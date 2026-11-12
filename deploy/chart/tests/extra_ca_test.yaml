@@ -79,17 +79,11 @@ tests:
             mountPath: /etc/harbor/extra-ca
             readOnly: true
 
-  # Registry has two containers; both need the mount + env.
-  - it: should mount + env on both registry containers
+  - it: should mount + env on the registry container
     template: templates/registry.deployment.yaml
     asserts:
       - contains:
           path: spec.template.spec.containers[0].env
-          content:
-            name: SSL_CERT_DIR
-            value: "/etc/ssl/certs:/etc/harbor/extra-ca"
-      - contains:
-          path: spec.template.spec.containers[1].env
           content:
             name: SSL_CERT_DIR
             value: "/etc/ssl/certs:/etc/harbor/extra-ca"
@@ -99,6 +93,22 @@ tests:
             name: extra-ca
             mountPath: /etc/harbor/extra-ca
             readOnly: true
+
+  # image.source=upstream adds the registryctl sidecar; it talks to Redis
+  # and storage too, so it needs the same mount + env.
+  - it: upstream should mount + env on the registryctl sidecar
+    template: templates/registry.deployment.yaml
+    set:
+      image.source: upstream
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[1].name
+          value: registryctl
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: SSL_CERT_DIR
+            value: "/etc/ssl/certs:/etc/harbor/extra-ca"
       - contains:
           path: spec.template.spec.containers[1].volumeMounts
           content:

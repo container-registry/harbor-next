@@ -12,27 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package client
+package gcclient
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	common_http "github.com/goharbor/harbor/src/common/http"
 	"github.com/goharbor/harbor/src/common/http/modifier/auth"
-	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/pkg/registry/interceptor"
 )
 
 // const definition
 const (
-	UserAgent = "harbor-registryctl-client"
+	UserAgent = "harbor-gc-client"
 )
 
-// Client defines methods that an Registry client should implement
+// Vars rather than consts so tests can shorten the wait. The client has no
+// timeout of its own, so each attempt is bounded to keep a hung registry from
+// blocking GC startup indefinitely.
+var (
+	healthAttempts       = 60
+	healthInterval       = 2 * time.Second
+	healthAttemptTimeout = 5 * time.Second
+)
+
+// Client calls the GC delete API that the patched registry serves under /api/registry
 type Client interface {
 	// Health tests the connection with registry server
 	Health() error
@@ -64,19 +74,31 @@ func NewClient(baseURL string, cfg *Config, interceptors ...interceptor.Intercep
 		interceptors: interceptors,
 	}
 	if cfg != nil {
-		authorizer := auth.NewSecretAuthorizer(cfg.Secret)
-		client.client = common_http.NewClient(nil, authorizer)
+		client.client = common_http.NewClient(nil, auth.NewSecretAuthorizer(cfg.Secret))
+	} else {
+		client.client = common_http.NewClient(nil)
 	}
 	return client
 }
 
-// Health ...
+// Health fails unless the registry serves the GC API. An unpatched registry
+// answers 404 to every GC call, and GC treats 404 as already deleted, so it
+// would drop the database records and leave the data in storage.
 func (c *client) Health() error {
-	addr := strings.Split(c.baseURL, "://")[1]
-	if !strings.Contains(addr, ":") {
-		addr = addr + ":80"
+	var lastErr error
+	for range healthAttempts {
+		code, err := c.healthStatus()
+		if err != nil {
+			lastErr = err
+			time.Sleep(healthInterval)
+			continue
+		}
+		if code != http.StatusOK {
+			return errors.Errorf("registry at %s does not serve the GC API: GET /api/health returned %d; it needs the patched registry with JOBSERVICE_SECRET set", c.baseURL, code)
+		}
+		return nil
 	}
-	return utils.TestTCPConn(addr, 60, 2)
+	return errors.Wrapf(lastErr, "registry at %s is unreachable", c.baseURL)
 }
 
 // DeleteBlob ...
@@ -145,4 +167,19 @@ func buildManifestURL(endpoint, repository, reference string) string {
 
 func buildBlobURL(endpoint, reference string) string {
 	return fmt.Sprintf("%s/api/registry/blob/%s", endpoint, reference)
+}
+
+func (c *client) healthStatus() (int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), healthAttemptTimeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/api/health", nil)
+	if err != nil {
+		return 0, err
+	}
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	resp.Body.Close()
+	return resp.StatusCode, nil
 }

@@ -1,11 +1,16 @@
 version: 0.1
 storage:
   cache:
-    blobdescriptor: inmemory
+    # redis, not inmemory: GC invalidates deleted blobs in the global entry,
+    # which the in-memory provider's repository scoped entries never consult.
+    blobdescriptor: redis
   filesystem:
     rootdirectory: /var/lib/registry
   delete:
     enabled: true
+redis:
+  addrs: [redis:6379]
+  db: 1
 http:
   addr: :5000
   secret: set-via-REGISTRY_HTTP_SECRET-env
