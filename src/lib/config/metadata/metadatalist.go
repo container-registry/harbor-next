@@ -210,6 +210,8 @@ var (
 
 		{Name: common.BannerMessage, Scope: UserScope, Group: BasicGroup, EnvKey: "BANNER_MESSAGE", DefaultValue: "", ItemType: &StringType{}, Editable: true, Description: `The customized banner message for the UI`},
 		{Name: common.DefaultProjectName, Scope: UserScope, Group: BasicGroup, DefaultValue: "", ItemType: &StringType{}, Editable: true, Description: `The existing project that catches repositories pushed or pulled without a project segment, e.g. "registry.example.com/alpine" lands in this project. Empty disables the fallback and rejects such requests. Seeded with "library" when that project exists.`},
+		{Name: common.RegistryMirrorEnabled, Scope: UserScope, Group: BasicGroup, DefaultValue: "false", ItemType: &BoolType{}, Editable: true, Description: `Serve pulls that arrive without a project segment from a proxy cache project, so Harbor can be used as a registry mirror`},
+		{Name: common.RegistryMirrorNamespaces, Scope: UserScope, Group: BasicGroup, DefaultValue: "", ItemType: &StringType{}, Editable: true, Description: `Comma separated <namespace>=<project> pairs mapping an upstream registry to the proxy cache project serving it, "*" is the catch-all`},
 		{Name: common.QuotaUpdateProvider, Scope: SystemScope, Group: BasicGroup, EnvKey: "QUOTA_UPDATE_PROVIDER", DefaultValue: "db", ItemType: &StringType{}, Editable: false, Description: `The provider for updating quota, 'db' or 'redis' is supported`},
 
 		{Name: common.BeegoMaxMemoryBytes, Scope: SystemScope, Group: BasicGroup, EnvKey: "BEEGO_MAX_MEMORY_BYTES", DefaultValue: fmt.Sprintf("%d", common.DefaultBeegoMaxMemoryBytes), ItemType: &Int64Type{}, Editable: false, Description: `The bytes for limiting the beego max memory, default is 128GB`},

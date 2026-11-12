@@ -269,6 +269,24 @@ func BannerMessage(ctx context.Context) string {
 	return DefaultMgr().Get(ctx, common.BannerMessage).GetString()
 }
 
+// RegistryMirrorEnabled returns whether Harbor serves project-less pulls from
+// a proxy cache project, i.e. acts as a registry mirror
+func RegistryMirrorEnabled(ctx context.Context) bool {
+	if DefaultMgr() == nil {
+		return false
+	}
+	return DefaultMgr().Get(ctx, common.RegistryMirrorEnabled).GetBool()
+}
+
+// RegistryMirrorNamespaces returns the raw <namespace>=<project> mapping used
+// to route mirror pulls to a proxy cache project
+func RegistryMirrorNamespaces(ctx context.Context) string {
+	if DefaultMgr() == nil {
+		return ""
+	}
+	return DefaultMgr().Get(ctx, common.RegistryMirrorNamespaces).GetString()
+}
+
 // DefaultProjectName returns the project that catches repositories pushed or
 // pulled without a project segment; empty disables the fallback
 func DefaultProjectName(ctx context.Context) string {
