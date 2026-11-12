@@ -141,3 +141,41 @@ func (m *managerTestingSuite) TestDeleteImmutableRule() {
 	m.mockImmutableDao.AssertCalled(m.t, "DeleteImmutableRule", mock.Anything, mock.Anything)
 	m.require.Nil(err)
 }
+
+func (m *managerTestingSuite) TestRuleDefaultsOnWrite() {
+	saved := ""
+	m.mockImmutableDao.On("CreateImmutableRule", mock.Anything, mock.Anything).Return(int64(1), nil).
+		Run(func(args mock.Arguments) { saved = args.Get(1).(*dao_model.ImmutableRule).TagFilter })
+	_, err := Mgr.CreateImmutableRule(context.Background(), &model.Metadata{})
+	m.require.Nil(err)
+	m.assert.Contains(saved, `"action":"immutable"`)
+	m.assert.Contains(saved, `"template":"immutable_template"`)
+
+	saved = ""
+	m.mockImmutableDao.On("UpdateImmutableRule", mock.Anything, mock.Anything, mock.Anything).Return(nil).
+		Run(func(args mock.Arguments) { saved = args.Get(2).(*dao_model.ImmutableRule).TagFilter })
+	m.require.Nil(Mgr.UpdateImmutableRule(context.Background(), 1, &model.Metadata{ID: 1}))
+	m.assert.Contains(saved, `"action":"immutable"`)
+	m.assert.Contains(saved, `"template":"immutable_template"`)
+}
+
+func (m *managerTestingSuite) TestRuleDefaultsOnRead() {
+	legacy := &dao_model.ImmutableRule{
+		ID:        1,
+		ProjectID: 1,
+		TagFilter: `{"tag_selectors":[{"kind":"doublestar","decoration":"matches","pattern":"x"}]}`,
+	}
+	m.mockImmutableDao.On("GetImmutableRule", mock.Anything, mock.Anything).Return(legacy, nil)
+	m.mockImmutableDao.On("ListImmutableRules", mock.Anything, mock.Anything).Return([]*dao_model.ImmutableRule{legacy}, nil)
+
+	ir, err := Mgr.GetImmutableRule(context.Background(), 1)
+	m.require.Nil(err)
+	m.assert.Equal("immutable", ir.Action)
+	m.assert.Equal("immutable_template", ir.Template)
+
+	irs, err := Mgr.ListImmutableRules(context.Background(), q.New(q.KeyWords{"ProjectID": 1}))
+	m.require.Nil(err)
+	m.require.Len(irs, 1)
+	m.assert.Equal("immutable", irs[0].Action)
+	m.assert.Equal("immutable_template", irs[0].Template)
+}

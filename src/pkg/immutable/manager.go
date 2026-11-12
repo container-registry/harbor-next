@@ -56,6 +56,7 @@ func (drm *defaultRuleManager) CreateImmutableRule(ctx context.Context, ir *mode
 	daoRule := &dao_model.ImmutableRule{}
 	daoRule.Disabled = ir.Disabled
 	daoRule.ProjectID = ir.ProjectID
+	setRuleDefaults(ir)
 	data, _ := json.Marshal(ir)
 	daoRule.TagFilter = string(data)
 	return drm.dao.CreateImmutableRule(ctx, daoRule)
@@ -63,6 +64,7 @@ func (drm *defaultRuleManager) CreateImmutableRule(ctx context.Context, ir *mode
 
 func (drm *defaultRuleManager) UpdateImmutableRule(ctx context.Context, projectID int64, ir *model.Metadata) error {
 	daoRule := &dao_model.ImmutableRule{}
+	setRuleDefaults(ir)
 	data, _ := json.Marshal(ir)
 	daoRule.ID = ir.ID
 	daoRule.TagFilter = string(data)
@@ -86,6 +88,7 @@ func (drm *defaultRuleManager) GetImmutableRule(ctx context.Context, id int64) (
 	if err = json.Unmarshal([]byte(daoRule.TagFilter), rule); err != nil {
 		return nil, err
 	}
+	setRuleDefaults(rule)
 	rule.ID = daoRule.ID
 	rule.Disabled = daoRule.Disabled
 	return rule, nil
@@ -102,6 +105,7 @@ func (drm *defaultRuleManager) ListImmutableRules(ctx context.Context, query *q.
 		if err = json.Unmarshal([]byte(daoRule.TagFilter), &rule); err != nil {
 			return nil, err
 		}
+		setRuleDefaults(&rule)
 		rule.ID = daoRule.ID
 		rule.Disabled = daoRule.Disabled
 		rules = append(rules, &rule)
@@ -118,6 +122,17 @@ func (drm *defaultRuleManager) Count(ctx context.Context, query *q.Query) (int64
 
 func (drm *defaultRuleManager) DeleteImmutableRule(ctx context.Context, id int64) error {
 	return drm.dao.DeleteImmutableRule(ctx, id)
+}
+
+// setRuleDefaults fills the action and template the matcher needs; rules
+// stored without them by older versions were never enforced.
+func setRuleDefaults(m *model.Metadata) {
+	if m.Action == "" {
+		m.Action = "immutable"
+	}
+	if m.Template == "" {
+		m.Template = "immutable_template"
+	}
 }
 
 // NewDefaultRuleManager return a new instance of defaultRuleManager
