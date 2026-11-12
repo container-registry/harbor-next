@@ -18,6 +18,14 @@ import { Role } from '../../../../ng-swagger-gen/models/role';
 import { Roles } from '../entities/shared.const';
 
 const ROLE_PAGE_SIZE = 100;
+
+// Built-in roles that stay read-only and undeletable in the UI. Mirrors
+// protectedRoles in src/controller/role; change both to open or close a role.
+const PROTECTED_ROLE_IDS: number[] = [Roles.PROJECT_ADMIN];
+
+export function isProtectedRole(role: Role): boolean {
+    return PROTECTED_ROLE_IDS.includes(role?.id);
+}
 // Built-ins keep their historical order (Project Admin first), customs follow.
 const ROLE_SORT = 'role_id';
 
@@ -79,21 +87,4 @@ export function getAllRoles(roleService: RoleService): Observable<Role[]> {
                 );
             })
         );
-}
-
-export interface ProjectRoleInfo {
-    role_name?: string;
-    current_user_role_id?: number;
-    current_user_role_ids?: number[];
-}
-
-// Every held role is Guest/Limited Guest; any custom or stronger role keeps the tabs.
-export function isGuestOnlyMember(project: ProjectRoleInfo): boolean {
-    if (!project || project.role_name === 'MEMBER.SYS_ADMIN') {
-        return false;
-    }
-    const ids = project.current_user_role_ids?.length
-        ? project.current_user_role_ids
-        : [project.current_user_role_id];
-    return ids.every(id => id === Roles.GUEST || id === Roles.LIMITED_GUEST);
 }

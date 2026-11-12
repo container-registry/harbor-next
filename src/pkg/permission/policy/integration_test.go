@@ -305,3 +305,58 @@ func TestIntegrationARobotWriteLeavesTheFleetAlone(t *testing.T) {
 	})
 	waitFor(t, 5*time.Second, func() bool { return reader.Generation() > generation })
 }
+
+// An admin may edit or delete every shipped role but project admin. Seeding
+// runs on every boot and must not undo that: a role marked modified keeps
+// whatever grants it has, even none, and a deleted role is not recreated.
+func TestIntegrationSeedingLeavesEditedAndDeletedRolesAlone(t *testing.T) {
+	conn := dsn(t)
+	db := open(t, conn, "test-seed-edited")
+	store := deaf(t, conn, "test-seed-edited")
+	require.NoError(t, store.EnsureSeeded(context.Background()))
+
+	const maintainer, guest = 4, 3
+	// The admin strips maintainer of everything and marks it modified, as the
+	// role controller's Update does.
+	_, err := db.Exec(`DELETE FROM role_permission WHERE role_type = $1 AND role_id = $2`, policy.RoleType, maintainer)
+	require.NoError(t, err)
+	_, err = db.Exec(`UPDATE role SET modified = TRUE WHERE role_id = $1`, maintainer)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = db.Exec(`UPDATE role SET modified = FALSE WHERE role_id = $1`, maintainer)
+		_, _ = db.Exec(`DELETE FROM role_permission WHERE role_type = $1 AND role_id = $2`, policy.RoleType, maintainer)
+		_ = store.EnsureSeeded(context.Background())
+	})
+
+	require.NoError(t, store.EnsureSeeded(context.Background()))
+	var have int
+	require.NoError(t, db.QueryRow(
+		`SELECT count(*) FROM role_permission WHERE role_type = $1 AND role_id = $2`, policy.RoleType, maintainer).Scan(&have))
+	assert.Zero(t, have, "a modified role is not refilled on boot")
+	granted, err := store.Enforce(policy.Subject(maintainer), policy.Object("repository"), "push")
+	require.NoError(t, err)
+	assert.False(t, granted)
+
+	// Guest keeps its untouched grants, so the guard is per role.
+	granted, err = store.Enforce(policy.Subject(guest), policy.Object("repository"), "pull")
+	require.NoError(t, err)
+	assert.True(t, granted)
+
+	// A deleted role stays deleted: no row comes back, no grants either.
+	const limitedGuest = 5
+	_, err = db.Exec(`DELETE FROM role_permission WHERE role_type = $1 AND role_id = $2`, policy.RoleType, limitedGuest)
+	require.NoError(t, err)
+	_, err = db.Exec(`DELETE FROM role WHERE role_id = $1`, limitedGuest)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = db.Exec(`INSERT INTO role (role_id, role_code, name, is_builtin) VALUES ($1, 'LRS', 'limitedGuest', TRUE) ON CONFLICT DO NOTHING`, limitedGuest)
+		_ = store.EnsureSeeded(context.Background())
+	})
+	require.NoError(t, store.EnsureSeeded(context.Background()))
+	var rows int
+	require.NoError(t, db.QueryRow(`SELECT count(*) FROM role WHERE role_id = $1`, limitedGuest).Scan(&rows))
+	assert.Zero(t, rows, "seeding does not recreate a deleted role")
+	require.NoError(t, db.QueryRow(
+		`SELECT count(*) FROM role_permission WHERE role_type = $1 AND role_id = $2`, policy.RoleType, limitedGuest).Scan(&have))
+	assert.Zero(t, have, "nor its grants")
+}

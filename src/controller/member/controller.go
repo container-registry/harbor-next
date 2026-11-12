@@ -22,6 +22,7 @@ import (
 	commonmodels "github.com/goharbor/harbor/src/common/models"
 	"github.com/goharbor/harbor/src/core/auth"
 	"github.com/goharbor/harbor/src/lib/errors"
+	"github.com/goharbor/harbor/src/lib/orm"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg"
 	"github.com/goharbor/harbor/src/pkg/member"
@@ -76,7 +77,7 @@ type UserGroup struct {
 var ErrDuplicateProjectMember = errors.ConflictError(nil).WithMessage("The project member specified already exist")
 
 // ErrInvalidRole ...
-var ErrInvalidRole = errors.BadRequestError(nil).WithMessage("invalid role: must be a built-in project role (1-5) or an existing custom role")
+var ErrInvalidRole = errors.BadRequestError(nil).WithMessage("invalid role: must be an existing project role")
 
 type controller struct {
 	userManager  user.Manager
@@ -110,7 +111,10 @@ func (c *controller) UpdateRole(ctx context.Context, projectNameOrID any, member
 	if err := c.validateRole(ctx, role); err != nil {
 		return err
 	}
-	return c.mgr.UpdateRole(ctx, p.ProjectID, memberID, role)
+	if err := c.mgr.UpdateRole(ctx, p.ProjectID, memberID, role); err != nil {
+		return roleGoneError(err, role)
+	}
+	return nil
 }
 
 func (c *controller) Get(ctx context.Context, projectNameOrID any, memberID int) (*models.Member, error) {
@@ -231,23 +235,28 @@ func (c *controller) Create(ctx context.Context, projectNameOrID any, req Reques
 	if err := c.validateRole(ctx, member.Role); err != nil {
 		return 0, err
 	}
-	return c.mgr.AddProjectMember(ctx, member)
+	id, err := c.mgr.AddProjectMember(ctx, member)
+	if err != nil {
+		return 0, roleGoneError(err, member.Role)
+	}
+	return id, nil
 }
 
-// validateRole ensures a member's role is real: a built-in role (1-5), or a
-// custom role that exists in the database. Unknown IDs are rejected so a member
-// can never be assigned a non-existent role.
-func (c *controller) validateRole(ctx context.Context, roleID int) error {
-	switch roleID {
-	case common.RoleProjectAdmin,
-		common.RoleMaintainer,
-		common.RoleDeveloper,
-		common.RoleGuest,
-		common.RoleLimitedGuest:
-		return nil
+// roleGoneError maps the project_member role foreign key failure to the
+// invalid-role response. The lookup in validateRole is a preflight; a role
+// deleted between it and the write trips the key instead.
+func roleGoneError(err error, roleID int) error {
+	if e := orm.AsForeignKeyError(err, "invalid role %d: it no longer exists", roleID); e != nil {
+		return ErrInvalidRole
 	}
-	// Custom role IDs are assigned by the DB sequence above the built-in range.
-	if roleID <= common.RoleLimitedGuest {
+	return err
+}
+
+// validateRole ensures a member's role exists in the database. Built-in roles
+// other than project admin can be deleted, so every ID is looked up; an unknown
+// one is rejected before the project_member foreign key would turn it into a 500.
+func (c *controller) validateRole(ctx context.Context, roleID int) error {
+	if roleID <= 0 {
 		return ErrInvalidRole
 	}
 	if _, err := c.roleMgr.Get(ctx, int64(roleID)); err != nil {

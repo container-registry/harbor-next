@@ -149,7 +149,7 @@ describe('RepositoryComponentGridview (inline template)', () => {
         compRepo = fixtureRepo.componentInstance;
         compRepo.projectId = 1;
         compRepo.mode = '';
-        compRepo.hasProjectAdminRole = true;
+        compRepo.hasUpdateRepositoryPermission = true;
         compRepo.isCardView = false;
         fixtureRepo.detectChanges();
     });

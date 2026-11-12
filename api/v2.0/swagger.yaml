@@ -8426,7 +8426,7 @@ definitions:
           $ref: '#/definitions/RolePermission'
       is_builtin:
         type: boolean
-        description: Whether this is a built-in role that cannot be modified or deleted
+        description: Whether this is a role Harbor ships. Project admin (role 1) can be neither modified nor deleted. The other built-in roles can be edited like custom roles and deleted while no project member holds them.
       description:
         type: string
         description: Human-readable description of the role

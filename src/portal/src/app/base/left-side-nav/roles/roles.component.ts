@@ -37,7 +37,10 @@ import {
 } from 'rxjs/operators';
 import { MessageHandlerService } from '../../../shared/services/message-handler.service';
 import { FrontRole, getRoleAccess } from './roles-util';
-import { roleDisplayName } from '../../../shared/units/role-util';
+import {
+    isProtectedRole,
+    roleDisplayName,
+} from '../../../shared/units/role-util';
 import { forkJoin, Observable, of, Subscription } from 'rxjs';
 import { FilterComponent } from '../../../shared/components/filter/filter.component';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -322,8 +325,8 @@ export class RolesComponent implements OnInit, OnDestroy {
         this.refresh();
     }
 
-    isBuiltinSelected(): boolean {
-        return this.selectedRows.some(r => r.is_builtin);
+    isProtectedSelected(): boolean {
+        return this.selectedRows.some(r => isProtectedRole(r));
     }
 
     getRoleName(r: Role): string {

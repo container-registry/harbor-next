@@ -47,7 +47,7 @@
                             loadingData ||
                             !roleMetadata ||
                             !(selectedRows && selectedRows.length === 1) ||
-                            isBuiltinSelected()
+                            isProtectedSelected()
                         "
                         clrDropdownItem
                         (click)="openNewRoleModal(true)">
@@ -61,7 +61,7 @@
                         [disabled]="
                             loadingData ||
                             !(selectedRows && selectedRows.length >= 1) ||
-                            isBuiltinSelected()
+                            isProtectedSelected()
                         "
                         clrDropdownItem
                         (click)="openDeleteRolesDialog()">

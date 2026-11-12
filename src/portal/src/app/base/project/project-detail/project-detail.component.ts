@@ -44,7 +44,6 @@ import {
     getSizeNumber,
     getSizeUnit,
 } from '../../../shared/units/utils';
-import { isGuestOnlyMember } from '../../../shared/units/role-util';
 import {
     EventService,
     HarborEvent,
@@ -81,15 +80,6 @@ export class ProjectDetailComponent
     hasP2pProviderReadPermission: boolean;
     hasQuotaReadPermission: boolean = false;
 
-    // Check if current user role is Limited Guest or Guest
-    isLimitedGuestOrGuest(): boolean {
-        // Refreshed projects lack the resolver's SYS_ADMIN role_name, so ask the session.
-        return (
-            !this.sessionService.getCurrentUser()?.has_admin_role &&
-            isGuestOnlyMember(this.currentProject)
-        );
-    }
-
     tabLinkNavList = [
         {
             linkName: 'summary',
@@ -120,8 +110,7 @@ export class ProjectDetailComponent
             linkName: 'scanner',
             tabLinkInOverflow: false,
             showTabName: 'SCANNER.SCANNER',
-            permissions: () =>
-                this.hasScannerReadPermission && !this.isLimitedGuestOrGuest(),
+            permissions: () => this.hasScannerReadPermission,
         },
         {
             linkName: 'p2p-provider',
@@ -160,9 +149,7 @@ export class ProjectDetailComponent
             tabLinkInOverflow: false,
             showTabName: 'PROJECT_DETAIL.CONFIG',
             permissions: () =>
-                this.isSessionValid &&
-                this.hasConfigurationListPermission &&
-                !this.isLimitedGuestOrGuest(),
+                this.isSessionValid && this.hasConfigurationListPermission,
         },
     ];
     previousWindowWidth: number;

@@ -19,6 +19,7 @@ import { of } from 'rxjs';
 import { ProjectConfigComponent } from './project-config.component';
 import { SharedTestingModule } from '../../../shared/shared.module';
 import { CommonRoutes } from '../../../shared/entities/shared.const';
+import { UserPermissionService } from '../../../shared/services';
 
 describe('ProjectConfigComponent', () => {
     let component: ProjectConfigComponent;
@@ -29,8 +30,13 @@ describe('ProjectConfigComponent', () => {
         },
     };
     let fakeRouter = null;
+    let canReadConfiguration = true;
+    const fakePermissionService = {
+        getPermission: () => of(canReadConfiguration),
+    };
 
     beforeEach(() => {
+        canReadConfiguration = true;
         TestBed.configureTestingModule({
             declarations: [ProjectConfigComponent],
             schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -60,6 +66,10 @@ describe('ProjectConfigComponent', () => {
                 },
                 { provide: Router, useValue: fakeRouter },
                 { provide: SessionService, useValue: fakeSessionService },
+                {
+                    provide: UserPermissionService,
+                    useValue: fakePermissionService,
+                },
             ],
         }).compileComponents();
     });
@@ -74,29 +84,23 @@ describe('ProjectConfigComponent', () => {
         expect(component).toBeTruthy();
     });
 
-    describe('role-based redirect', () => {
+    describe('permission-based redirect', () => {
         let navigate: jasmine.Spy;
-        const runWithRoleIds = (ids: number[]) => {
-            const route = TestBed.inject(ActivatedRoute);
-            route.snapshot.parent.parent.data = {
-                projectResolver: { current_user_role_ids: ids },
-            };
-            component.ngOnInit();
-        };
         beforeEach(() => {
             navigate = jasmine.createSpy('navigate');
             (component as any).router = { navigate };
         });
 
-        it('redirects guest-only members', () => {
-            runWithRoleIds([5]);
+        it('redirects members without configuration:read', () => {
+            canReadConfiguration = false;
+            component.ngOnInit();
             expect(navigate).toHaveBeenCalledWith([
                 CommonRoutes.HARBOR_DEFAULT,
             ]);
         });
 
-        it('keeps members with a custom or stronger role', () => {
-            runWithRoleIds([5, 1]);
+        it('keeps members whose role grants configuration:read', () => {
+            component.ngOnInit();
             expect(navigate).not.toHaveBeenCalled();
         });
     });
