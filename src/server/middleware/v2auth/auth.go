@@ -69,6 +69,10 @@ func (rc *reqChecker) check(req *http.Request) (string, error) {
 			pn := strings.Split(a.name, "/")[0]
 			pid, err := rc.projectID(req.Context(), pn)
 			if err != nil {
+				// an uncoded error is not an authorization failure, e.g. the database is unreachable
+				if errors.ErrCode(err) == errors.GeneralCode {
+					return "", errors.UnknownError(err)
+				}
 				return "", err
 			}
 			resource := rbac_project.NewNamespace(pid).Resource(rbac.ResourceRepository)
@@ -176,6 +180,10 @@ func Middleware() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 			if challenge, err := checker.check(req); err != nil {
+				if errors.IsErr(err, errors.GeneralCode) {
+					lib_http.SendError(rw, err)
+					return
+				}
 				// the header is needed for "docker manifest" commands: https://github.com/docker/cli/issues/989
 				rw.Header().Set("Docker-Distribution-Api-Version", "registry/2.0")
 				rw.Header().Set("Www-Authenticate", challenge)
