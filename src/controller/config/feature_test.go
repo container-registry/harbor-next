@@ -15,7 +15,9 @@
 package config
 
 import (
+	"context"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/goharbor/harbor/src/common"
@@ -99,5 +101,70 @@ func TestOverwriteConfigSkipsEnvironmentControlledFeature(t *testing.T) {
 	}
 	if !libcfg.DefaultMgr().Get(t.Context(), featureTestKey).GetBool() {
 		t.Errorf("stored %s = false, want the overwrite skipped and true kept", featureTestKey)
+	}
+}
+
+var guardRefuses, guardUncoded, guardWrapped bool
+
+func init() {
+	feature.RegisterDisableGuard("controller_test_feature", func(context.Context) error {
+		if guardRefuses {
+			return errors.New(nil).WithCode(errors.PreconditionCode).WithMessage("still in use")
+		}
+		if guardUncoded {
+			return errors.New("still in use")
+		}
+		if guardWrapped {
+			return errors.Wrap(errors.New(nil).WithCode(errors.PreconditionCode).WithMessage("still in use"), "guard failed")
+		}
+		return nil
+	})
+}
+
+func TestValidateCfgKeepsTheDisableGuardError(t *testing.T) {
+	libcfg.InitWithSettings(map[string]any{common.AUTHMode: common.DBAuth, featureTestKey: true})
+	t.Setenv(featureTestEnvKey, "")
+	if err := os.Unsetenv(featureTestEnvKey); err != nil {
+		t.Fatal(err)
+	}
+	guardRefuses = true
+	t.Cleanup(func() { guardRefuses = false })
+
+	err := newFeatureTestController().validateCfg(t.Context(), map[string]any{featureTestKey: false})
+	if !errors.IsErr(err, errors.PreconditionCode) || err.Error() != "still in use" {
+		t.Fatalf("validateCfg error = %v, want the guard's precondition error unchanged", err)
+	}
+}
+
+func TestValidateCfgWrapsAnUncodedGuardError(t *testing.T) {
+	libcfg.InitWithSettings(map[string]any{common.AUTHMode: common.DBAuth, featureTestKey: true})
+	t.Setenv(featureTestEnvKey, "")
+	if err := os.Unsetenv(featureTestEnvKey); err != nil {
+		t.Fatal(err)
+	}
+	guardUncoded = true
+	t.Cleanup(func() { guardUncoded = false })
+
+	err := newFeatureTestController().validateCfg(t.Context(), map[string]any{featureTestKey: false})
+	if !errors.IsErr(err, errors.BadRequestCode) {
+		t.Fatalf("validateCfg error = %v, want a bad request", err)
+	}
+}
+
+func TestValidateCfgKeepsACodedCauseBehindAWrapper(t *testing.T) {
+	libcfg.InitWithSettings(map[string]any{common.AUTHMode: common.DBAuth, featureTestKey: true})
+	t.Setenv(featureTestEnvKey, "")
+	if err := os.Unsetenv(featureTestEnvKey); err != nil {
+		t.Fatal(err)
+	}
+	guardWrapped = true
+	t.Cleanup(func() { guardWrapped = false })
+
+	err := newFeatureTestController().validateCfg(t.Context(), map[string]any{featureTestKey: false})
+	if errors.ErrCode(err) != errors.PreconditionCode {
+		t.Fatalf("validateCfg error = %v, want the wrapped precondition code", err)
+	}
+	if body := errors.NewErrs(err).Error(); !strings.Contains(body, `"code":"PRECONDITION"`) {
+		t.Fatalf("response body = %s, want the precondition code", body)
 	}
 }
