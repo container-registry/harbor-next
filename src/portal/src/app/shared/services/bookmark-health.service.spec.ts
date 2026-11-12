@@ -192,6 +192,20 @@ describe('BookmarkHealthService', () => {
         );
     });
 
+    it('drops a probe result that a newer probe of the bookmark replaced', () => {
+        const slow = new Subject<any>();
+        repositoryService.listRepositories.and.returnValues(
+            slow.asObservable(),
+            of([{} as any])
+        );
+        service.checkAll([repo], true);
+        service.checkAll([repo], true);
+        expect(service.statusOf(statuses, repo)).toBe(BookmarkStatus.OK);
+        slow.next([]);
+        slow.complete();
+        expect(service.statusOf(statuses, repo)).toBe(BookmarkStatus.OK);
+    });
+
     it('marks probes as background requests', () => {
         let skipped: boolean;
         projectService.getProject.and.callFake(() => {

@@ -101,6 +101,9 @@ export class BookmarkHealthService {
     private lastFullCheck = 0;
     // Probes started for a previous user must not write into the new user's statuses.
     private generation = 0;
+    // Latest probe per bookmark; an older result for the same key is dropped.
+    private readonly probeIds = new Map<string, number>();
+    private nextProbeId = 0;
     // null until the signed-in user's list arrives; that list is covered by checkAll.
     private known: Set<string> | null = null;
 
@@ -165,7 +168,10 @@ export class BookmarkHealthService {
         const removed = [...previous].filter(k => !keys.has(k));
         if (removed.some(k => this.statuses.value.has(k))) {
             const next = new Map(this.statuses.value);
-            removed.forEach(k => next.delete(k));
+            removed.forEach(k => {
+                next.delete(k);
+                this.probeIds.delete(k);
+            });
             this.statuses.next(next);
         }
         if (added.length) {
@@ -189,10 +195,16 @@ export class BookmarkHealthService {
             }
             return projects.get(id);
         };
-        from(bookmarks)
+        const probes = bookmarks.map(b => {
+            const key = bookmarkKey(b);
+            const id = ++this.nextProbeId;
+            this.probeIds.set(key, id);
+            return { b, key, id };
+        });
+        from(probes)
             .pipe(
                 mergeMap(
-                    b =>
+                    ({ b, key, id }) =>
                         projectOf(b.projectId).pipe(
                             // Links use the id; a project re-created under the old
                             // name gets a new id, so the name must match too.
@@ -202,13 +214,16 @@ export class BookmarkHealthService {
                                     : of(BookmarkStatus.MISSING)
                             ),
                             catchError(error => of(statusFromError(error))),
-                            map(status => ({ key: bookmarkKey(b), status }))
+                            map(status => ({ key, id, status }))
                         ),
                     PROBE_CONCURRENCY
                 )
             )
-            .subscribe(({ key, status }) => {
-                if (generation === this.generation) {
+            .subscribe(({ key, id, status }) => {
+                if (
+                    generation === this.generation &&
+                    this.probeIds.get(key) === id
+                ) {
                     this.set(key, status);
                 }
             });

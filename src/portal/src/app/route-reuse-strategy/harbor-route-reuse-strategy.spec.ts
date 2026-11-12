@@ -91,6 +91,13 @@ describe('HarborRouteReuseStrategy', () => {
                 )
             )
         ).toBeFalse();
+        // Re-opening the same filtered list rebuilds it, dropping pending input.
+        expect(
+            harborRouteReuseStrategy.shouldReuseRoute(
+                snapshot('/harbor/projects/1/repositories?name=a'),
+                snapshot('/harbor/projects/1/repositories?name=a')
+            )
+        ).toBeFalse();
         // Leaving a list for another project tab keeps the shared project shell.
         expect(
             harborRouteReuseStrategy.shouldReuseRoute(
