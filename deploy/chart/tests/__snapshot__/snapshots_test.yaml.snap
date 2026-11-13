@@ -19,7 +19,7 @@
       JOBSERVICE_URL: http://harbor-jobservice
       LOG_LEVEL: info
       NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
-      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
+      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory,huggingface
       PORT: "8080"
       PORTAL_URL: http://harbor-portal
       POSTGRESQL_CONN_MAX_IDLE_TIME: 300s
@@ -36,7 +36,7 @@
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
       REGISTRY_URL: http://harbor-registry:5000
-      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
+      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,huggingface,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
       TOKEN_SERVICE_URL: http://harbor-core:80/service/token
       TRIVY_ADAPTER_URL: http://harbor-trivy:8080
       WITH_TRIVY: "false"
@@ -538,7 +538,7 @@
       JOBSERVICE_URL: http://harbor-jobservice
       LOG_LEVEL: info
       NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
-      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
+      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory,huggingface
       PORT: "8080"
       PORTAL_URL: http://harbor-portal
       POSTGRESQL_CONN_MAX_IDLE_TIME: 300s
@@ -555,7 +555,7 @@
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
       REGISTRY_URL: http://harbor-registry:5000
-      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
+      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,huggingface,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
       TOKEN_SERVICE_URL: http://harbor-core:80/service/token
       TRIVY_ADAPTER_URL: http://harbor-trivy:8080
       WITH_TRIVY: "false"
@@ -1057,7 +1057,7 @@
       JOBSERVICE_URL: http://harbor-jobservice
       LOG_LEVEL: info
       NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
-      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
+      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory,huggingface
       PORT: "8080"
       PORTAL_URL: http://harbor-portal
       POSTGRESQL_CONN_MAX_IDLE_TIME: 300s
@@ -1074,7 +1074,7 @@
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
       REGISTRY_URL: http://harbor-registry:5000
-      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
+      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,huggingface,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
       TOKEN_SERVICE_URL: http://harbor-core:80/service/token
       TRIVY_ADAPTER_URL: http://harbor-trivy:8080
       WITH_TRIVY: "false"
@@ -1577,7 +1577,7 @@
       JOBSERVICE_URL: http://harbor-jobservice
       LOG_LEVEL: info
       NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
-      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
+      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory,huggingface
       PORT: "8080"
       PORTAL_URL: http://harbor-portal
       POSTGRESQL_CONN_MAX_IDLE_TIME: 300s
@@ -1594,7 +1594,7 @@
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
       REGISTRY_URL: http://harbor-registry:5000
-      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
+      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,huggingface,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
       TOKEN_SERVICE_URL: http://harbor-core:80/service/token
       TRIVY_ADAPTER_URL: http://harbor-trivy:8080
       WITH_TRIVY: "false"
@@ -2101,7 +2101,7 @@
       METRIC_PORT: "8001"
       METRIC_SUBSYSTEM: core
       NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
-      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
+      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory,huggingface
       PORT: "8080"
       PORTAL_URL: http://harbor-portal
       POSTGRESQL_CONN_MAX_IDLE_TIME: 300s
@@ -2118,7 +2118,7 @@
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
       REGISTRY_URL: http://harbor-registry:5000
-      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
+      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,huggingface,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
       TOKEN_SERVICE_URL: http://harbor-core:80/service/token
       TRIVY_ADAPTER_URL: http://harbor-trivy:8080
       WITH_TRIVY: "false"
@@ -2673,7 +2673,7 @@
       JOBSERVICE_URL: http://harbor-jobservice
       LOG_LEVEL: info
       NO_PROXY: harbor-core,harbor-jobservice,harbor-database,harbor-registry,harbor-portal,harbor-trivy,harbor-exporter,127.0.0.1,localhost,.local,.internal
-      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
+      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory,huggingface
       PORT: "8080"
       PORTAL_URL: http://harbor-portal
       POSTGRESQL_CONN_MAX_IDLE_TIME: 300s
@@ -2690,7 +2690,7 @@
       REGISTRY_CREDENTIAL_USERNAME: harbor_registry_user
       REGISTRY_STORAGE_PROVIDER_NAME: filesystem
       REGISTRY_URL: http://harbor-registry:5000
-      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
+      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,huggingface,jfrog-artifactory,tencent-tcr,volcengine-cr,sftp,harbor-satellite
       TOKEN_SERVICE_URL: http://harbor-core:80/service/token
       TRIVY_ADAPTER_URL: http://harbor-trivy:8080
       WITH_TRIVY: "false"

@@ -129,8 +129,8 @@ services:
       HEALTHCHECK_PORT: "8080"
       HEALTHCHECK_ENDPOINT: /api/v2.0/ping
       # Proxy cache and replication
-      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory
-      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,jfrog-artifactory,tencent-tcr,volcengine-cr
+      PERMITTED_REGISTRY_TYPES_FOR_PROXY_CACHE: docker-hub,harbor,azure-acr,ali-acr,aws-ecr,google-gcr,docker-registry,github-ghcr,jfrog-artifactory,huggingface
+      REPLICATION_ADAPTER_WHITELIST: ali-acr,aws-ecr,azure-acr,docker-hub,docker-registry,github-ghcr,google-gcr,harbor,huawei-SWR,huggingface,jfrog-artifactory,tencent-tcr,volcengine-cr
     command: air -c devenv/air.core.toml
     depends_on:
       postgresql:

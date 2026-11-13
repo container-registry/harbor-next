@@ -42,6 +42,9 @@
                         </option>
                     </ng-container>
                 </select>
+                <clr-control-helper *ngIf="isSourceOnly()">{{
+                    'DESTINATION.SOURCE_ONLY_HELPER' | translate
+                }}</clr-control-helper>
             </clr-select-container>
             <!-- Endpoint name -->
             <clr-input-container>
@@ -168,7 +171,11 @@
                     placeholder="Access ID"
                     id="destination_access_key"
                     [disabled]="testOngoing"
-                    [readonly]="target.type === 'google-gcr' || !editable"
+                    [readonly]="
+                        isFixedAccessKey() ||
+                        target.type === 'google-gcr' ||
+                        !editable
+                    "
                     [(ngModel)]="target.credential.access_key"
                     size="30"
                     name="access_key"
@@ -184,7 +191,7 @@
                         <input
                             autocomplete="off"
                             class="clr-input"
-                            *ngIf="isNormalCredential(); else gcr_secret"
+                            *ngIf="!isFileAccessSecret(); else gcr_secret"
                             type="password"
                             placeholder="Access Secret"
                             id="destination_password"

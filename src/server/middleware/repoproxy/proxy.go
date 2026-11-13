@@ -52,6 +52,7 @@ import (
 	"github.com/goharbor/harbor/src/pkg"
 	"github.com/goharbor/harbor/src/pkg/accessory"
 	accModel "github.com/goharbor/harbor/src/pkg/accessory/model"
+	"github.com/goharbor/harbor/src/pkg/feature"
 	proModels "github.com/goharbor/harbor/src/pkg/project/models"
 	"github.com/goharbor/harbor/src/pkg/proxy/connection"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
@@ -414,6 +415,10 @@ func canProxy(ctx context.Context, p *proModels.Project) bool {
 		log.Errorf("failed to get registry, error:%v", err)
 		return false
 	}
+	if !feature.RegistryTypeEnabled(ctx, reg.Type) {
+		log.Debugf("the registry type %s is disabled, serve project %s from the local cache only", reg.Type, p.Name)
+		return false
+	}
 	if reg.Status != model.Healthy {
 		log.Errorf("current registry is unhealthy, regID:%v, Name:%v, Status: %v", reg.ID, reg.Name, reg.Status)
 	}
@@ -584,6 +589,12 @@ func ProxyReferrerMiddleware() func(http.Handler) http.Handler {
 		// Apply repository filter: if proxy_cache_filter_pattern is set, the repository must match
 		if err := checkRepositoryFilter(p, art); err != nil {
 			httpLib.SendError(w, err)
+			return
+		}
+
+		if reg, err := registry.Ctl.Get(ctx, p.RegistryID); err == nil && !feature.RegistryTypeEnabled(ctx, reg.Type) {
+			log.Debugf("the registry type %s is disabled, serve the referrers of project %s locally", reg.Type, p.Name)
+			next.ServeHTTP(w, r)
 			return
 		}
 

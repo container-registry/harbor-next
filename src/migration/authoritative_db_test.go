@@ -70,6 +70,7 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 		"CREATE TABLE execution (id SERIAL PRIMARY KEY, revision INTEGER)",
 		"CREATE TABLE role_permission (id BIGSERIAL PRIMARY KEY, role_type VARCHAR(255), role_id BIGINT, permission_policy_id BIGINT)",
 		"CREATE TABLE permission_policy (id BIGSERIAL PRIMARY KEY, scope VARCHAR(255), resource VARCHAR(255), action VARCHAR(255), effect VARCHAR(255))",
+		"CREATE TABLE replication_policy (id SERIAL PRIMARY KEY)",
 	}
 	for _, statement := range legacyDependencies {
 		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
@@ -196,6 +197,9 @@ func TestAuthoritativeSchemaAgainstPostgreSQL(t *testing.T) {
 		"audit_log_ext": {
 			"client_address", "user_agent",
 		},
+		"replication_policy": {
+			"revision_tag",
+		},
 	}
 	for table, tableColumns := range columns {
 		for _, column := range tableColumns {
@@ -275,6 +279,7 @@ func TestExecutionRevisionGuardResolvesThroughSearchPath(t *testing.T) {
 		fmt.Sprintf("CREATE TABLE %s.execution (id SERIAL PRIMARY KEY, revision INTEGER)", later),
 		fmt.Sprintf("CREATE TABLE %s.role_permission (id BIGSERIAL PRIMARY KEY, role_type VARCHAR(255), role_id BIGINT, permission_policy_id BIGINT)", later),
 		fmt.Sprintf("CREATE TABLE %s.permission_policy (id BIGSERIAL PRIMARY KEY, scope VARCHAR(255), resource VARCHAR(255), action VARCHAR(255), effect VARCHAR(255))", later),
+		fmt.Sprintf("CREATE TABLE %s.replication_policy (id SERIAL PRIMARY KEY)", later),
 		fmt.Sprintf("CREATE TABLE %s.robot (id BIGSERIAL PRIMARY KEY)", first),
 		fmt.Sprintf("CREATE TABLE %s.audit_log_ext (id BIGSERIAL PRIMARY KEY)", first),
 		fmt.Sprintf("CREATE TABLE %s.project (project_id SERIAL PRIMARY KEY, name VARCHAR(255), deleted BOOLEAN NOT NULL DEFAULT false)", first),
@@ -363,6 +368,7 @@ func TestExecutionRevisionGuardIgnoresNonTableRelations(t *testing.T) {
 		"CREATE TABLE properties (id SERIAL PRIMARY KEY, k VARCHAR(64) NOT NULL UNIQUE, v VARCHAR(128) NOT NULL)",
 		"CREATE TABLE role_permission (id BIGSERIAL PRIMARY KEY, role_type VARCHAR(255), role_id BIGINT, permission_policy_id BIGINT)",
 		"CREATE TABLE permission_policy (id BIGSERIAL PRIMARY KEY, scope VARCHAR(255), resource VARCHAR(255), action VARCHAR(255), effect VARCHAR(255))",
+		"CREATE TABLE replication_policy (id SERIAL PRIMARY KEY)",
 	} {
 		if _, err := schemaPool.DB().ExecContext(ctx, statement); err != nil {
 			t.Fatalf("setup %q: %v", statement, err)
@@ -418,6 +424,7 @@ func TestIdentityProvidersAudienceReconcilesLegacyTable(t *testing.T) {
 		"CREATE TABLE execution (id SERIAL PRIMARY KEY, revision INTEGER)",
 		"CREATE TABLE role_permission (id BIGSERIAL PRIMARY KEY, role_type VARCHAR(255), role_id BIGINT, permission_policy_id BIGINT)",
 		"CREATE TABLE permission_policy (id BIGSERIAL PRIMARY KEY, scope VARCHAR(255), resource VARCHAR(255), action VARCHAR(255), effect VARCHAR(255))",
+		"CREATE TABLE replication_policy (id SERIAL PRIMARY KEY)",
 		`CREATE TABLE identity_providers (
 			id                      SERIAL PRIMARY KEY,
 			name                    TEXT NOT NULL,
