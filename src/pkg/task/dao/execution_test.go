@@ -563,6 +563,54 @@ func (e *executionDAOTestSuite) TestScanAndRefreshOutdateStatus() {
 	e.Equal(job.ErrorStatus.String(), exec2.Status)
 }
 
+func (e *executionDAOTestSuite) TestScanAndRefreshRequeuesStaleExecutions() {
+	e.T().Setenv("_REDIS_URL_HARBOR", "redis://localhost:6379/0")
+	// a Running execution whose only task finished, with no refresh member left in redis
+	id, err := e.executionDAO.Create(e.ctx, &Execution{
+		VendorType: "test",
+		Status:     job.RunningStatus.String(),
+		Trigger:    "test",
+		ExtraAttrs: `{}`,
+	})
+	e.Require().NoError(err)
+	defer e.executionDAO.Delete(e.ctx, id)
+	tid, err := e.taskDao.Create(e.ctx, &Task{
+		ExecutionID: id,
+		Status:      job.SuccessStatus.String(),
+		StatusCode:  job.SuccessStatus.Code(),
+		ExtraAttrs:  `{}`,
+	})
+	e.Require().NoError(err)
+	defer e.taskDao.Delete(e.ctx, tid)
+
+	lastStaleRequeue.Store(0)
+	scanAndRefreshOutdateStatus(e.ctx)
+
+	exec, err := e.executionDAO.Get(e.ctx, id)
+	e.Require().NoError(err)
+	e.Equal(job.SuccessStatus.String(), exec.Status)
+	e.NotZero(lastStaleRequeue.Load())
+
+	// a later loss, e.g. another core dying during a rolling restart
+	id2, err := e.executionDAO.Create(e.ctx, &Execution{VendorType: "test", Status: job.RunningStatus.String(), Trigger: "test", ExtraAttrs: `{}`})
+	e.Require().NoError(err)
+	defer e.executionDAO.Delete(e.ctx, id2)
+	tid2, err := e.taskDao.Create(e.ctx, &Task{ExecutionID: id2, Status: job.SuccessStatus.String(), StatusCode: job.SuccessStatus.Code(), ExtraAttrs: `{}`})
+	e.Require().NoError(err)
+	defer e.taskDao.Delete(e.ctx, tid2)
+
+	scanAndRefreshOutdateStatus(e.ctx)
+	exec, err = e.executionDAO.Get(e.ctx, id2)
+	e.Require().NoError(err)
+	e.Equal(job.RunningStatus.String(), exec.Status, "recovery must not rerun before the interval")
+
+	lastStaleRequeue.Store(time.Now().Add(-staleRequeueInterval).UnixNano())
+	scanAndRefreshOutdateStatus(e.ctx)
+	exec, err = e.executionDAO.Get(e.ctx, id2)
+	e.Require().NoError(err)
+	e.Equal(job.SuccessStatus.String(), exec.Status)
+}
+
 func TestExecutionDAOSuite(t *testing.T) {
 	suite.Run(t, &executionDAOTestSuite{})
 }

@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -559,6 +560,14 @@ func scanAndRefreshOutdateStatus(ctx context.Context) {
 		return
 	}
 
+	if time.Since(time.Unix(0, lastStaleRequeue.Load())) >= staleRequeueInterval {
+		if err := requeueStaleExecutions(ctx, client); err != nil {
+			log.Errorf("failed to requeue executions whose status refresh was lost, will retry next round, error: %v", err)
+		} else {
+			lastStaleRequeue.Store(time.Now().UnixNano())
+		}
+	}
+
 	var succeed, failed int64
 	for {
 		members, err := client.SPopN(ctx, execStatusOutdateSetKey, int64(execStatusOutdateBatchSize)).Result()
@@ -615,6 +624,42 @@ func scanAndRefreshOutdateStatus(ctx context.Context) {
 	if succeed+failed > 0 {
 		log.Infof("refresh outdate execution status done, %d succeed, %d failed", succeed, failed)
 	}
+}
+
+// staleRequeueInterval bounds how often requeueStaleExecutions scans the execution table.
+const staleRequeueInterval = 10 * time.Minute
+
+var lastStaleRequeue atomic.Int64
+
+// requeueStaleExecutions re-marks non-final executions whose tasks are all final, since SPOP loses members popped by a core that dies mid-batch.
+func requeueStaleExecutions(ctx context.Context, client *redis.Client) error {
+	ormer, err := orm.FromContext(ctx)
+	if err != nil {
+		return err
+	}
+	var stale []*struct {
+		ID         int64  `orm:"column(id)"`
+		VendorType string `orm:"column(vendor_type)"`
+	}
+	sql := `select e.id, e.vendor_type from execution e
+		where e.status in ('Pending', 'Running')
+		and exists (select 1 from task t where t.execution_id = e.id)
+		and not exists (select 1 from task t where t.execution_id = e.id and t.status not in (?, ?, ?))`
+	if _, err = ormer.Raw(sql, job.SuccessStatus.String(), job.ErrorStatus.String(), job.StoppedStatus.String()).QueryRows(&stale); err != nil {
+		return err
+	}
+	if len(stale) == 0 {
+		return nil
+	}
+	args := make([]any, 0, len(stale))
+	for _, e := range stale {
+		args = append(args, buildExecStatusOutdateMember(e.ID, e.VendorType))
+	}
+	if err = client.SAdd(ctx, execStatusOutdateSetKey, args...).Err(); err != nil {
+		return err
+	}
+	log.Infof("requeued %d executions whose tasks are all final for status refresh", len(stale))
+	return nil
 }
 
 func aggregateTaskStatusMessages(tasks []*Task, totalCount ...int64) string {
