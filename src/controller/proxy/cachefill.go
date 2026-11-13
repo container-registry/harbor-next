@@ -17,6 +17,7 @@ package proxy
 import (
 	"os"
 	"strconv"
+	"sync"
 
 	"github.com/goharbor/harbor/src/lib/log"
 )
@@ -76,4 +77,38 @@ func GoCacheFill(label string, fn func()) bool {
 		fn()
 	}()
 	return true
+}
+
+// maxPendingPullEvents caps the pull events parked on one fill; further duplicates are not recorded.
+const maxPendingPullEvents = 100
+
+type pullEvent struct{ tag, op, ip, ua string }
+
+// fills tracks the running fill per key and the pull events parked on it by duplicate requests.
+var fills = struct {
+	sync.Mutex
+	m map[string][]pullEvent
+}{m: map[string][]pullEvent{}}
+
+// startFill makes the caller the owner of the fill for key, or parks ev on the fill already running.
+func startFill(key string, ev pullEvent) bool {
+	fills.Lock()
+	defer fills.Unlock()
+	if events, running := fills.m[key]; running {
+		if len(events) < maxPendingPullEvents {
+			fills.m[key] = append(events, ev)
+		}
+		return false
+	}
+	fills.m[key] = nil
+	return true
+}
+
+// endFill is called once by the owner; it unregisters key and returns the events parked on it.
+func endFill(key string) []pullEvent {
+	fills.Lock()
+	defer fills.Unlock()
+	events := fills.m[key]
+	delete(fills.m, key)
+	return events
 }
