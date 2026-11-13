@@ -139,9 +139,10 @@ func (c *controller) validateCfg(ctx context.Context, cfgs map[string]any) error
 	mgr := config.GetCfgManager(ctx)
 
 	if err := feature.ValidateConfigUpdate(ctx, cfgs); err != nil {
-		// a disable guard's error already carries its own code and message
-		if errors.ErrCode(err) != errors.GeneralCode {
-			return err
+		// a disable guard's error already carries its own code and message;
+		// flatten it so the response reports that code, not UNKNOWN
+		if code := errors.ErrCode(err); code != errors.GeneralCode {
+			return errors.New(nil).WithCode(code).WithMessage(err.Error())
 		}
 		return errors.BadRequestError(err)
 	}

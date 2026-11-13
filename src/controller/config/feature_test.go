@@ -17,6 +17,7 @@ package config
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/goharbor/harbor/src/common"
@@ -162,5 +163,8 @@ func TestValidateCfgKeepsACodedCauseBehindAWrapper(t *testing.T) {
 	err := newFeatureTestController().validateCfg(t.Context(), map[string]any{featureTestKey: false})
 	if errors.ErrCode(err) != errors.PreconditionCode {
 		t.Fatalf("validateCfg error = %v, want the wrapped precondition code", err)
+	}
+	if body := errors.NewErrs(err).Error(); !strings.Contains(body, `"code":"PRECONDITION"`) {
+		t.Fatalf("response body = %s, want the precondition code", body)
 	}
 }
