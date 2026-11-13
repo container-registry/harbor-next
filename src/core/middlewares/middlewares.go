@@ -75,6 +75,7 @@ var (
 	readonlySkippers = []middleware.Skipper{
 		middleware.MethodAndPathSkipper(http.MethodPut, match("^/api/v2.0/configurations")),
 		middleware.MethodAndPathSkipper(http.MethodPut, match("^/api/internal/configurations")),
+		middleware.MethodAndPathSkipper(http.MethodPut, match("^/api/v2.0/features/")),
 		middleware.MethodAndPathSkipper(http.MethodPost, match("^/c/login")),
 		middleware.MethodAndPathSkipper(http.MethodPost, match("^/c/userExists")),
 		middleware.MethodAndPathSkipper(http.MethodPost, match("^/c/oidc/onboard")),

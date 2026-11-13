@@ -1,0 +1,100 @@
+<form class="clr-form clr-form-horizontal">
+    <section
+        *ngFor="let section of sections"
+        class="feature-section"
+        [id]="'feature-section-' + section.id">
+        <h3>{{ section.title | translate }}</h3>
+        <p
+            *ngIf="section.description || section.link"
+            class="p7 mt-0 section-description">
+            <span *ngIf="section.description">{{
+                section.description | translate
+            }}</span>
+            <a
+                *ngIf="section.link"
+                class="section-link"
+                [href]="section.link"
+                >{{ section.link_text || section.link | translate }}</a
+            >
+        </p>
+        <clr-toggle-container *ngFor="let feature of featuresOf(section)">
+            <label [for]="feature.key">
+                {{ feature.name | translate }}
+                <!-- a click inside the label would otherwise flip the toggle -->
+                <span class="label-hints" (click)="$event.preventDefault()">
+                    <clr-tooltip *ngIf="feature.beta">
+                        <span
+                            clrTooltipTrigger
+                            class="label label-blue beta-badge"
+                            role="img"
+                            tabindex="0"
+                            [attr.aria-label]="
+                                'CONFIG.FEATURE_BETA' | translate
+                            "
+                            >{{ 'CONFIG.FEATURE_BETA' | translate }}</span
+                        >
+                        <clr-tooltip-content
+                            clrPosition="top-right"
+                            clrSize="lg"
+                            *clrIfOpen>
+                            <span>{{
+                                'CONFIG.FEATURE_BETA_WARNING' | translate
+                            }}</span>
+                        </clr-tooltip-content>
+                    </clr-tooltip>
+                    <clr-tooltip
+                        *ngIf="feature.description || feature.locked_by">
+                        <clr-icon
+                            clrTooltipTrigger
+                            shape="info-circle"
+                            size="24"></clr-icon>
+                        <clr-tooltip-content
+                            clrPosition="top-right"
+                            clrSize="lg"
+                            *clrIfOpen>
+                            <span *ngIf="feature.description">{{
+                                feature.description | translate
+                            }}</span>
+                            <p *ngIf="feature.locked_by">
+                                {{
+                                    'CONFIG.FEATURE_LOCKED_BY'
+                                        | translate
+                                            : { source: feature.locked_by }
+                                }}
+                            </p>
+                        </clr-tooltip-content>
+                    </clr-tooltip>
+                </span>
+            </label>
+            <clr-toggle-wrapper>
+                <input
+                    clrToggle
+                    type="checkbox"
+                    [id]="feature.key"
+                    [name]="feature.key"
+                    [disabled]="disabled(feature)"
+                    [ngModel]="value(feature)"
+                    (ngModelChange)="setEnabled(feature, $event)" />
+            </clr-toggle-wrapper>
+        </clr-toggle-container>
+    </section>
+</form>
+
+<div class="features-actions">
+    <button
+        id="features-save"
+        type="button"
+        class="btn btn-primary"
+        [disabled]="inProgress || !hasChanges()"
+        (click)="save()">
+        {{ 'BUTTON.SAVE' | translate }}
+    </button>
+    <button
+        id="features-cancel"
+        type="button"
+        class="btn btn-outline"
+        [disabled]="inProgress || !hasChanges()"
+        (click)="cancel()">
+        {{ 'BUTTON.CANCEL' | translate }}
+    </button>
+</div>

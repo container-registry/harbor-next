@@ -29,6 +29,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/orm"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/audit"
+	"github.com/goharbor/harbor/src/pkg/feature"
 	"github.com/goharbor/harbor/src/pkg/project"
 	"github.com/goharbor/harbor/src/pkg/user"
 )
@@ -110,6 +111,7 @@ func (c *controller) UpdateUserConfigs(ctx context.Context, conf map[string]any)
 	if err != nil {
 		return err
 	}
+	orm.AfterCommit(ctx, func() { feature.NotifyChanged(conf) })
 	// update the audit logger to point to the new endpoint
 	return c.updateLogEndpoint(ctx, conf)
 }
@@ -136,6 +138,9 @@ func verifyAuditLogEndpointCfg(cfgs map[string]any) error {
 func (c *controller) validateCfg(ctx context.Context, cfgs map[string]any) error {
 	mgr := config.GetCfgManager(ctx)
 
+	if err := feature.ValidateConfigUpdate(ctx, cfgs); err != nil {
+		return errors.BadRequestError(err)
+	}
 	// check if auth can be modified
 	if nv, ok := cfgs[common.AUTHMode]; ok {
 		if nv.(string) != mgr.Get(ctx, common.AUTHMode).GetString() {
@@ -309,9 +314,14 @@ func (c *controller) ConvertForGet(ctx context.Context, cfg map[string]any, inte
 			}
 			val = string(valByte)
 		}
+		editable := !readOnlyForAll
+		if enabled, overridden := feature.ConfigOverride(item.Name); overridden {
+			val = enabled
+			editable = false
+		}
 		result[item.Name] = &models.Value{
 			Val:      val,
-			Editable: !readOnlyForAll,
+			Editable: editable,
 		}
 	}
 
@@ -344,6 +354,12 @@ func (c *controller) OverwriteConfig(ctx context.Context) error {
 			log.Infof("ignoring %s in %s, %s takes precedence", common.DefaultProjectName, configOverwriteJSON, common.DefaultProjectNameEnv)
 			delete(cfgMap, common.DefaultProjectName)
 		}
+		for key := range cfgMap {
+			if envKey, overridden := feature.EnvironmentKey(key); overridden {
+				log.Infof("ignoring %s in %s, %s takes precedence", key, configOverwriteJSON, envKey)
+				delete(cfgMap, key)
+			}
+		}
 		err = c.UpdateUserConfigs(ctx, cfgMap)
 		if err != nil {
 			return err
@@ -351,6 +367,11 @@ func (c *controller) OverwriteConfig(ctx context.Context) error {
 		readOnlyForAll = true
 	}
 	return nil
+}
+
+// OverwrittenByEnv reports whether CONFIG_OVERWRITE_JSON made every setting read-only.
+func OverwrittenByEnv() bool {
+	return readOnlyForAll
 }
 
 func (c *controller) authModeCanBeModified(ctx context.Context) (bool, error) {

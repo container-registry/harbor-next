@@ -289,6 +289,62 @@ paths:
           $ref: '#/responses/422'
         '500':
           $ref: '#/responses/500'
+  /features:
+    get:
+      summary: List feature toggles.
+      operationId: listFeatures
+      description: |
+        Lists the registered feature toggles with their effective state, grouped into sections. Only for system administrators.
+      tags:
+        - configure
+      parameters:
+        - $ref: '#/parameters/requestId'
+      responses:
+        '200':
+          description: The feature toggles.
+          schema:
+            $ref: '#/definitions/FeatureList'
+        '401':
+          $ref: '#/responses/401'
+        '403':
+          $ref: '#/responses/403'
+        '500':
+          $ref: '#/responses/500'
+  /features/{feature_key}:
+    put:
+      summary: Switch a feature on or off.
+      operationId: updateFeature
+      description: |
+        Stores the state of a feature toggle. A feature controlled by its environment variable or by CONFIG_OVERWRITE_JSON cannot be changed.
+      tags:
+        - configure
+      parameters:
+        - $ref: '#/parameters/requestId'
+        - name: feature_key
+          in: path
+          required: true
+          type: string
+          description: The configuration key of the feature, for example enable_huggingface_model_import.
+        - name: feature
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/FeatureUpdate'
+      responses:
+        '200':
+          description: The feature state was stored.
+        '400':
+          $ref: '#/responses/400'
+        '401':
+          $ref: '#/responses/401'
+        '403':
+          $ref: '#/responses/403'
+        '404':
+          $ref: '#/responses/404'
+        '422':
+          $ref: '#/responses/422'
+        '500':
+          $ref: '#/responses/500'
   /projects:
     get:
       summary: List projects
@@ -8540,9 +8596,78 @@ definitions:
         type: integer
         format: int64
         description: Free volume size.
+  FeatureList:
+    type: object
+    properties:
+      sections:
+        type: array
+        items:
+          $ref: '#/definitions/FeatureSection'
+      features:
+        type: array
+        items:
+          $ref: '#/definitions/Feature'
+  FeatureSection:
+    type: object
+    properties:
+      id:
+        type: string
+      title:
+        type: string
+        description: Display title, an i18n key or plain text.
+      description:
+        type: string
+        description: Display description, an i18n key or plain text.
+      link_text:
+        type: string
+      link:
+        type: string
+        description: Link resolved for the current state, for example a prefilled mailto URL.
+  Feature:
+    type: object
+    properties:
+      key:
+        type: string
+        description: The configuration key, also used as the flag key.
+      section:
+        type: string
+      name:
+        type: string
+        description: Display name, an i18n key or plain text.
+      description:
+        type: string
+        description: Display description, an i18n key or plain text.
+      beta:
+        type: boolean
+        x-omitempty: false
+      enabled:
+        type: boolean
+        x-omitempty: false
+        description: The effective state.
+      editable:
+        type: boolean
+        x-omitempty: false
+      locked_by:
+        type: string
+        description: The environment variable or CONFIG_OVERWRITE_JSON when the feature cannot be changed in Harbor.
+  FeatureUpdate:
+    type: object
+    required:
+      - enabled
+    properties:
+      enabled:
+        type: boolean
+        x-nullable: true
   GeneralInfo:
     type: object
     properties:
+      features:
+        type: object
+        x-nullable: true
+        x-omitempty: true
+        description: The effective state of every registered feature toggle, keyed by configuration key.
+        additionalProperties:
+          type: boolean
       banner_message:
         type: string
         x-nullable: true

@@ -17,6 +17,8 @@ import { ConfigurationComponent } from './config.component';
 import { SharedTestingModule } from '../../../shared/shared.module';
 import { ConfigService } from './config.service';
 import { Configuration } from './config';
+import { AppConfigService } from '../../../services/app-config.service';
+import { AppConfig } from '../../../services/app-config';
 
 describe('ConfigurationComponent', () => {
     let component: ConfigurationComponent;
@@ -34,6 +36,7 @@ describe('ConfigurationComponent', () => {
         updateConfig() {},
     };
     let initSpy: jasmine.Spy;
+    let appConfig: AppConfig;
     beforeEach(() => {
         TestBed.configureTestingModule({
             imports: [SharedTestingModule],
@@ -41,11 +44,19 @@ describe('ConfigurationComponent', () => {
             declarations: [ConfigurationComponent],
             providers: [
                 { provide: ConfigService, useValue: fakeConfigService },
+                {
+                    provide: AppConfigService,
+                    useValue: {
+                        hasFeatures: () =>
+                            Object.keys(appConfig.features || {}).length > 0,
+                    },
+                },
             ],
         }).compileComponents();
     });
 
     beforeEach(() => {
+        appConfig = new AppConfig();
         initSpy = spyOn(fakeConfigService, 'updateConfig').and.returnValue(
             undefined
         );
@@ -60,5 +71,19 @@ describe('ConfigurationComponent', () => {
     it('should init config', async () => {
         await fixture.whenStable();
         expect(initSpy.calls.count()).toEqual(1);
+    });
+    it('hides the Features tab without registered features', () => {
+        appConfig.features = {};
+        fixture.detectChanges();
+        expect(
+            fixture.nativeElement.querySelector('#config-features')
+        ).toBeNull();
+    });
+    it('shows the Features tab once a feature is registered', () => {
+        appConfig.features = { enable_test_feature: false };
+        fixture.detectChanges();
+        expect(
+            fixture.nativeElement.querySelector('#config-features')
+        ).not.toBeNull();
     });
 });

@@ -13,6 +13,7 @@
 // limitations under the License.
 import { Component, OnInit } from '@angular/core';
 import { ConfigService } from './config.service';
+import { AppConfigService } from '../../../services/app-config.service';
 
 @Component({
     selector: 'config',
@@ -24,7 +25,14 @@ export class ConfigurationComponent implements OnInit {
         return this.conf.getLoadingConfigStatus();
     }
 
-    constructor(private conf: ConfigService) {}
+    constructor(
+        private conf: ConfigService,
+        private appConfigService: AppConfigService
+    ) {}
+
+    get hasFeatures(): boolean {
+        return this.appConfigService.hasFeatures();
+    }
 
     ngOnInit(): void {
         // Refresh config every time when entering the configuration page
