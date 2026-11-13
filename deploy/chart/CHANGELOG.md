@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.3](https://github.com/container-registry/harbor-next/compare/chart-v2.1.2...chart-v2.1.3) (2026-11-13)
+
+
+### Bug Fixes
+
+* **chart:** Add Webhook Egress Policy Levels And Allowlist (backport [#1185](https://github.com/container-registry/harbor-next/issues/1185)) ([#1474](https://github.com/container-registry/harbor-next/issues/1474)) ([5271363](https://github.com/container-registry/harbor-next/commit/5271363ea21eeae164658a9516bd6c5c85bd131e))
+
 ## [2.1.2](https://github.com/container-registry/harbor-next/compare/chart-v2.1.1...chart-v2.1.2) (2026-11-02)
 
 
