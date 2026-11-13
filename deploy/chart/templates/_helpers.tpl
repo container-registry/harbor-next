@@ -571,3 +571,16 @@ Validate required values
 {{- define "imagePullSecret" }}
 {{- printf "{\"auths\":{\"%s\":{\"auth\":\"%s\"}}}" .Values.imageCredentials.registry (printf "%s:%s" .Values.imageCredentials.username .Values.imageCredentials.password | b64enc) | b64enc }}
 {{- end }}
+
+{{/*
+Webhook and Slack egress env for core and jobservice. An empty policy leaves
+the choice to the deprecated allowPrivateNetworkAccess, which the configmaps
+render (default false: public_only, true: allow_all), so 2.15 upgrades keep
+their egress and extraEnv overrides of that variable keep working.
+*/}}
+{{- define "harbor.webhookEgressEnv" -}}
+{{- /* --reuse-values from a release before webhookEgress existed has no such key */ -}}
+{{- $egress := .Values.network.webhookEgress | default dict -}}
+HARBOR_WEBHOOK_EGRESS_POLICY: {{ $egress.policy | default "" | quote }}
+HARBOR_WEBHOOK_EGRESS_ALLOWLIST: {{ join "," ($egress.allowlist | default list) | quote }}
+{{- end -}}

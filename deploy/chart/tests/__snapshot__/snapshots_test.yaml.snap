@@ -12,6 +12,8 @@
       GDPR_AUDIT_LOGS: "false"
       GDPR_DELETE_USER: "false"
       HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ""
+      HARBOR_WEBHOOK_EGRESS_POLICY: ""
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       JOBSERVICE_URL: http://harbor-jobservice
@@ -169,6 +171,8 @@
       CACHE_ENABLED: "false"
       CORE_URL: http://harbor-core
       HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ""
+      HARBOR_WEBHOOK_EGRESS_POLICY: ""
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
@@ -527,6 +531,8 @@
       GDPR_AUDIT_LOGS: "false"
       GDPR_DELETE_USER: "false"
       HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ""
+      HARBOR_WEBHOOK_EGRESS_POLICY: ""
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       JOBSERVICE_URL: http://harbor-jobservice
@@ -684,6 +690,8 @@
       CACHE_ENABLED: "false"
       CORE_URL: http://harbor-core
       HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ""
+      HARBOR_WEBHOOK_EGRESS_POLICY: ""
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
@@ -1042,6 +1050,8 @@
       GDPR_AUDIT_LOGS: "false"
       GDPR_DELETE_USER: "false"
       HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ""
+      HARBOR_WEBHOOK_EGRESS_POLICY: ""
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       JOBSERVICE_URL: http://harbor-jobservice
@@ -1199,6 +1209,8 @@
       CACHE_ENABLED: "false"
       CORE_URL: http://harbor-core
       HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ""
+      HARBOR_WEBHOOK_EGRESS_POLICY: ""
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
@@ -1558,6 +1570,8 @@
       GDPR_AUDIT_LOGS: "false"
       GDPR_DELETE_USER: "false"
       HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ""
+      HARBOR_WEBHOOK_EGRESS_POLICY: ""
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       JOBSERVICE_URL: http://harbor-jobservice
@@ -1715,6 +1729,8 @@
       CACHE_ENABLED: "false"
       CORE_URL: http://harbor-core
       HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ""
+      HARBOR_WEBHOOK_EGRESS_POLICY: ""
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
@@ -2073,6 +2089,8 @@
       GDPR_AUDIT_LOGS: "false"
       GDPR_DELETE_USER: "false"
       HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ""
+      HARBOR_WEBHOOK_EGRESS_POLICY: ""
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       JOBSERVICE_URL: http://harbor-jobservice
@@ -2235,6 +2253,8 @@
       CACHE_ENABLED: "false"
       CORE_URL: http://harbor-core
       HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ""
+      HARBOR_WEBHOOK_EGRESS_POLICY: ""
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
@@ -2646,6 +2666,8 @@
       GDPR_AUDIT_LOGS: "false"
       GDPR_DELETE_USER: "false"
       HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ""
+      HARBOR_WEBHOOK_EGRESS_POLICY: ""
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       JOBSERVICE_URL: http://harbor-jobservice
@@ -2893,6 +2915,8 @@
       CACHE_ENABLED: "false"
       CORE_URL: http://harbor-core
       HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS: "false"
+      HARBOR_WEBHOOK_EGRESS_ALLOWLIST: ""
+      HARBOR_WEBHOOK_EGRESS_POLICY: ""
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       LOG_LEVEL: info
