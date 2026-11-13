@@ -89,12 +89,15 @@ func TestValidateCfgRejectsEnvironmentControlledFeature(t *testing.T) {
 }
 
 func TestOverwriteConfigSkipsEnvironmentControlledFeature(t *testing.T) {
-	libcfg.InitWithSettings(map[string]any{common.AUTHMode: common.DBAuth})
+	libcfg.InitWithSettings(map[string]any{common.AUTHMode: common.DBAuth, featureTestKey: true})
 	t.Setenv(featureTestEnvKey, "true")
 	t.Setenv(configOverwriteJSON, `{"`+featureTestKey+`": false}`)
 	t.Cleanup(func() { readOnlyForAll = false })
 
 	if err := newFeatureTestController().OverwriteConfig(t.Context()); err != nil {
 		t.Fatalf("OverwriteConfig: %v", err)
+	}
+	if !libcfg.DefaultMgr().Get(t.Context(), featureTestKey).GetBool() {
+		t.Errorf("stored %s = false, want the overwrite skipped and true kept", featureTestKey)
 	}
 }
