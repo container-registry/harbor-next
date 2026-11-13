@@ -1,0 +1,9 @@
+# Both modes on: the subchart must win.
+externalURL: https://harbor.example.com
+database:
+  host: db.example.com
+harborAdminPassword: Harbor12345
+trivy:
+  enabled: true
+harbor-scanner-trivy:
+  enabled: true

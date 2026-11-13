@@ -1753,7 +1753,7 @@ trivy:
     registry: ""
     # -- Repository override (path WITHOUT registry host); empty uses `image.source`
     repository: ""
-    # -- Trivy adapter image tag (defaults to appVersion)
+    # -- Trivy adapter image tag (defaults to the `image.source` pin, else appVersion)
     tag: ""
     # -- Pin by digest (sha256:...); used instead of tag when set
     digest: ""
@@ -1891,6 +1891,20 @@ trivy:
     existingClaim: ""
     # -- Annotations for PVC
     annotations: {}
+
+# Opt-in harbor-scanner-trivy subchart, passed through verbatim; wins over `trivy.enabled`.
+harbor-scanner-trivy:
+  # -- Deploy the Trivy adapter via the harbor-scanner-trivy subchart instead of the built-in `trivy.*` templates
+  enabled: false
+  nameOverride: trivy
+  # -- Cannot inherit `externalRedis` or Valkey auth; set it for those setups
+  redis:
+    url: redis://valkey:6379/5
+  persistence:
+    enabled: false
+  trivy:
+    dbRepository: mirror.gcr.io/aquasec/trivy-db,ghcr.io/aquasecurity/trivy-db
+    javaDBRepository: mirror.gcr.io/aquasec/trivy-java-db,ghcr.io/aquasecurity/trivy-java-db
 
 # ============================================================================
 # 5. TLS CONFIGURATION

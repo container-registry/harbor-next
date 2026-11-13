@@ -5,5 +5,8 @@ dependencies:
 - name: postgres
   repository: oci://registry-1.docker.io/cloudpirates
   version: 0.21.2
-digest: sha256:658b500a1da7908e16f867fa1d37b3409f2685fb4957b3654bdb712451295672
-generated: "2026-11-06T14:46:28.51679177+05:30"
+- name: harbor-scanner-trivy
+  repository: oci://8gears.container-registry.com/8gcr/charts
+  version: 1.0.1
+digest: sha256:f16b227aab37ea87a3584799704ccafbbf6f32b290e51c0e174f09f87972730b
+generated: "2026-11-10T18:08:16.35336334+05:30"

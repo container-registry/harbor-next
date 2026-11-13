@@ -503,6 +503,10 @@ tls:
     renewBefore: 360h  # 15 days
 ```
 
+### Trivy Scanner Subchart Mode
+
+`harbor-scanner-trivy.enabled: true` deploys the Trivy adapter from the [harbor-scanner-trivy](https://github.com/container-registry/harbor-scanner-trivy/tree/main/deploy/chart) subchart instead of the built-in `trivy.*` templates; it wins when both are enabled. Its values follow that chart's shape, and its Redis URL defaults to the bundled Valkey, so set `harbor-scanner-trivy.redis.url` for external Redis or Valkey auth. Key map: [MIGRATION-REFERENCE](docs/MIGRATION-REFERENCE.md).
+
 ### HPA / Autoscaling
 
 Per-component HPAs target the matching Deployment (or the trivy StatefulSet) and the controller template OMITS `replicas:` whenever `autoscaling.enabled=true` — otherwise each `helm upgrade` would reset the count and fight the HPA. Available on `core`, `jobservice`, `registry`, `portal`, and `trivy`.
@@ -751,6 +755,7 @@ Kubernetes: `>=1.28.0-0`
 
 | Repository | Name | Version |
 |------------|------|---------|
+| oci://8gears.container-registry.com/8gcr/charts | harbor-scanner-trivy | 1.0.1 |
 | oci://ghcr.io/valkey-io/valkey-helm | valkey | 0.12.1 |
 | oci://registry-1.docker.io/cloudpirates | postgresql(postgres) | 0.21.2 |
 
@@ -921,6 +926,12 @@ Kubernetes: `>=1.28.0-0`
 | global.imageRegistry | string | `""` | Override the registry host for ALL component images at once (air-gap / mirror). When set it wins over per-component `image.registry` and `image.source`. Repository paths are preserved, so a flat mirror works (`global.imageRegistry=mirror.io` -> `mirror.io/8gcr/harbor-core`). Propagated to subcharts; the valkey subchart image must be mirrored/overridden separately (it may not honor this). |
 | global.priorityClassName | string | `""` | Priority class name for all component pods |
 | global.revisionHistoryLimit | int | `3` | Number of old ReplicaSets to retain (K8s default is 10) |
+| harbor-scanner-trivy.enabled | bool | `false` | Deploy the Trivy adapter via the harbor-scanner-trivy subchart instead of the built-in `trivy.*` templates |
+| harbor-scanner-trivy.nameOverride | string | `"trivy"` |  |
+| harbor-scanner-trivy.persistence.enabled | bool | `false` |  |
+| harbor-scanner-trivy.redis | object | `{"url":"redis://valkey:6379/5"}` | Cannot inherit `externalRedis` or Valkey auth; set it for those setups |
+| harbor-scanner-trivy.trivy.dbRepository | string | `"mirror.gcr.io/aquasec/trivy-db,ghcr.io/aquasecurity/trivy-db"` |  |
+| harbor-scanner-trivy.trivy.javaDBRepository | string | `"mirror.gcr.io/aquasec/trivy-java-db,ghcr.io/aquasecurity/trivy-java-db"` |  |
 | harborAdminPassword | string | `""` | Harbor admin password (initial setup). **REQUIRED** unless `existingSecretAdminPassword` is set. Do not use the legacy default `Harbor12345` — it is publicly known. For production reference a pre-created Secret via `existingSecretAdminPassword` rather than passing the value here. Rotate from the Harbor UI after first login. |
 | image | object | `{"pullPolicy":"IfNotPresent","source":"8gcr"}` | Global image settings |
 | image.pullPolicy | string | `"IfNotPresent"` | Image pull policy for all Harbor components |
@@ -1129,7 +1140,7 @@ Kubernetes: `>=1.28.0-0`
 | trivy.image.digest | string | `""` | Pin by digest (sha256:...); used instead of tag when set |
 | trivy.image.registry | string | `""` | Registry host override; empty uses `image.source` (`global.imageRegistry` wins over both) |
 | trivy.image.repository | string | `""` | Repository override (path WITHOUT registry host); empty uses `image.source` |
-| trivy.image.tag | string | `""` | Trivy adapter image tag (defaults to appVersion) |
+| trivy.image.tag | string | `""` | Trivy adapter image tag (defaults to the `image.source` pin, else appVersion) |
 | trivy.initContainers | list | `[]` | Init containers (run before main containers) |
 | trivy.insecure | bool | `false` | Skip verifying registry certificate |
 | trivy.javaDBRepository[0] | string | `"mirror.gcr.io/aquasec/trivy-java-db"` |  |
