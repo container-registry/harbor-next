@@ -216,6 +216,27 @@
       "properties": {
         "allowPrivateNetworkAccess": {
           "type": "boolean"
+        },
+        "webhookEgress": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "policy": {
+              "type": "string",
+              "enum": [
+                "",
+                "allow_all",
+                "block_restricted",
+                "public_only"
+              ]
+            },
+            "allowlist": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
     },
