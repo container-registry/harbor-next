@@ -158,17 +158,22 @@ func (a *adapter) listArtifacts(ctx context.Context, modelID string, filters []*
 		artifacts = append(artifacts, &model.Artifact{Tags: byCommit[c]})
 	}
 	artifacts, err = filter.DoFilterArtifacts(artifacts, filters)
-	if err != nil || !a.opts.RevisionTag {
-		return artifacts, err
+	if err != nil {
+		return nil, err
 	}
-	// The revision tag is added after the tag filter: it follows the moving tags the filter
-	// selected rather than being matched itself.
 	for _, art := range artifacts {
 		if len(art.Tags) == 0 {
 			continue
 		}
-		if tag := model.RevisionTag(idx.commits[art.Tags[0]]); tag != "" {
-			art.Tags = append(art.Tags, tag)
+		// Pin the copy to the listed commit: a branch moving before the job runs must not
+		// change the content or orphan the revision tag.
+		art.Revision = idx.commits[art.Tags[0]]
+		// The revision tag is added after the tag filter: it follows the moving tags the filter
+		// selected rather than being matched itself.
+		if a.opts.RevisionTag {
+			if tag := model.RevisionTag(art.Revision); tag != "" {
+				art.Tags = append(art.Tags, tag)
+			}
 		}
 	}
 	return artifacts, nil

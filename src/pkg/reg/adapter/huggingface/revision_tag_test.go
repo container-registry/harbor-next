@@ -136,3 +136,50 @@ func TestReplicationTransferWithRevisionTag(t *testing.T) {
 	require.True(t, exist)
 	assert.Equal(t, mainDesc.Digest, revDesc.Digest)
 }
+
+func TestReplicationTransferPinsListedCommit(t *testing.T) {
+	m := tinyModel()
+	h := hubtest.New(m)
+	defer h.Close()
+	destination.reset()
+	clearProcessCache(t)
+
+	a := newTestAdapter(t, hubRegistry(h, 10, ""), newMemoryCache())
+	opts := &model.SourceOptions{RevisionTag: true}
+	require.NoError(t, a.ConfigureSource(opts))
+	listed := manifestDigest(t, a, "main")
+	res, err := a.FetchArtifacts([]*model.Filter{
+		{Type: model.FilterTypeName, Value: "org/tiny-model"},
+		{Type: model.FilterTypeTag, Value: "main"},
+	})
+	require.NoError(t, err)
+	srcRes := res[0]
+	require.Equal(t, commitMain, srcRes.Metadata.Artifacts[0].Revision)
+
+	// Both branches on the listed commit move before the job runs.
+	h.SetBranch(m.ID, "main", commitNew)
+	h.SetBranch(m.ID, "feature/x", commitNew)
+
+	srcRes.Registry = hubRegistry(h, 10, "")
+	srcRes.SourceOptions = opts
+	dstRes := &model.Resource{
+		Type:     srcRes.Type,
+		Registry: &model.Registry{Type: memoryRegistryType},
+		Metadata: &model.ResourceMetadata{
+			Repository: &model.Repository{Name: "library/tiny-model"},
+			Artifacts:  srcRes.Metadata.Artifacts,
+		},
+	}
+	tf, err := trans.GetFactory(srcRes.Type)
+	require.NoError(t, err)
+	tr, err := tf(log.DefaultLogger(), func() bool { return false })
+	require.NoError(t, err)
+	require.NoError(t, tr.Transfer(srcRes, dstRes, &trans.Options{}))
+
+	for _, tag := range []string{"main", revisionTagMain} {
+		exist, desc, err := destination.ManifestExist("library/tiny-model", tag)
+		require.NoError(t, err)
+		require.True(t, exist, tag)
+		assert.Equal(t, listed, desc.Digest, "%s holds the listed commit", tag)
+	}
+}
