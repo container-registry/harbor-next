@@ -215,7 +215,32 @@
       "additionalProperties": false,
       "properties": {
         "allowPrivateNetworkAccess": {
-          "type": "boolean"
+          "enum": [
+            true,
+            false,
+            ""
+          ]
+        },
+        "webhookEgress": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "policy": {
+              "type": "string",
+              "enum": [
+                "",
+                "allow_all",
+                "block_restricted",
+                "public_only"
+              ]
+            },
+            "allowlist": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
     },
