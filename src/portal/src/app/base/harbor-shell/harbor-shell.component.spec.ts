@@ -15,6 +15,10 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { RouterTestingModule } from '@angular/router/testing';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { SessionService } from '../../shared/services/session.service';
+import {
+    Bookmark,
+    BookmarkService,
+} from '../../shared/services/bookmark.service';
 import { CUSTOM_ELEMENTS_SCHEMA, NO_ERRORS_SCHEMA } from '@angular/core';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { SearchTriggerService } from '../../shared/components/global-search/search-trigger.service';
@@ -163,6 +167,22 @@ describe('HarborShellComponent', () => {
 
     it('should create', () => {
         expect(component).toBeTruthy();
+    });
+
+    it('shows the bookmarks group only when bookmarks exist', async () => {
+        const bookmarkService = TestBed.inject(BookmarkService);
+        expect(
+            fixture.nativeElement.querySelector('.sidebar-bookmarks')
+        ).toBeNull();
+        spyOn(bookmarkService, 'load').and.returnValue(true);
+        spyOnProperty(bookmarkService, 'bookmarks', 'get').and.returnValue([
+            {} as Bookmark,
+        ]);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(
+            fixture.nativeElement.querySelector('.sidebar-bookmarks')
+        ).toBeTruthy();
     });
 
     it('should open users profile', async () => {

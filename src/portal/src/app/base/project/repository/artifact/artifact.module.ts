@@ -38,6 +38,7 @@ import { HistogramChartComponent } from './vulnerability-scanning/histogram-char
 import { ArtifactInfoComponent } from './artifact-list-page/artifact-list/artifact-info/artifact-info.component';
 import { SubAccessoriesComponent } from './artifact-list-page/artifact-list/artifact-list-tab/sub-accessories/sub-accessories.component';
 import { ArtifactListPageService } from './artifact-list-page/artifact-list-page.service';
+import { TagRedirectComponent } from './tag-redirect/tag-redirect.component';
 import { CopyArtifactComponent } from './artifact-list-page/artifact-list/artifact-list-tab/copy-artifact/copy-artifact.component';
 import { CopyDigestComponent } from './artifact-list-page/artifact-list/artifact-list-tab/copy-digest/copy-digest.component';
 import { ArtifactFilterComponent } from './artifact-list-page/artifact-list/artifact-list-tab/artifact-filter/artifact-filter.component';
@@ -45,6 +46,10 @@ import { PullCommandComponent } from './artifact-list-page/artifact-list/artifac
 import { SbomTipHistogramComponent } from './sbom-scanning/sbom-tip-histogram/sbom-tip-histogram.component';
 
 const routes: Routes = [
+    {
+        path: ':repo/artifacts-tab/tags/:tag',
+        component: TagRedirectComponent,
+    },
     {
         path: ':repo',
         component: ArtifactListPageComponent,
@@ -113,6 +118,7 @@ const routes: Routes = [
         CopyDigestComponent,
         ArtifactFilterComponent,
         PullCommandComponent,
+        TagRedirectComponent,
     ],
     imports: [RouterModule.forChild(routes), SharedModule],
     providers: [

@@ -16,9 +16,11 @@ import { Artifact } from '../../../../../../ng-swagger-gen/models/artifact';
 import { Label } from '../../../../../../ng-swagger-gen/models/label';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Project } from '../../project';
-import { artifactDefault } from './artifact';
+import { AccessoryType, artifactDefault } from './artifact';
 import { SafeUrl } from '@angular/platform-browser';
 import { ArtifactService } from './artifact.service';
+import { ArtifactService as NewArtifactService } from '../../../../../../ng-swagger-gen/services/artifact.service';
+import { dbEncodeURIComponent } from '../../../../shared/units/utils';
 import {
     EventService,
     HarborEvent,
@@ -52,6 +54,7 @@ export class ArtifactSummaryComponent implements OnInit {
         private route: ActivatedRoute,
         private router: Router,
         private frontEndArtifactService: ArtifactService,
+        private newArtifactService: NewArtifactService,
         private event: EventService
     ) {}
 
@@ -122,12 +125,41 @@ export class ArtifactSummaryComponent implements OnInit {
                     this.isProxyCacheProject = true;
                 }
                 this.artifact = <Artifact>resolverData['artifactResolver'][0];
+                // Links from bookmarks and other pages carry no sbomDigest query param.
+                this.sbomDigest =
+                    this.sbomDigest ||
+                    this.artifact?.sbom_overview?.sbom_digest;
+                if (!this.sbomDigest) {
+                    this.findSbomAccessory();
+                }
                 this.getIconFromBackEnd();
             }
         }
         // scroll to the top for harbor container HTML element
         this.event.publish(HarborEvent.SCROLL_TO_POSITION, 0);
     }
+    // An SBOM pushed as an accessory has no sbom_overview; the list finds it the same way.
+    private findSbomAccessory(): void {
+        if (!this.artifact?.digest) {
+            return;
+        }
+        this.newArtifactService
+            .listAccessories({
+                projectName: this.projectName,
+                repositoryName: dbEncodeURIComponent(this.repositoryName),
+                reference: this.artifact.digest,
+                page: 1,
+                pageSize: 1,
+                q: encodeURIComponent(`type=${AccessoryType.SBOM}`),
+            })
+            .subscribe({
+                next: accessories =>
+                    (this.sbomDigest =
+                        this.sbomDigest || accessories?.[0]?.digest),
+                error: () => {},
+            });
+    }
+
     onBack(): void {
         this.backEvt.emit(this.repositoryName);
     }

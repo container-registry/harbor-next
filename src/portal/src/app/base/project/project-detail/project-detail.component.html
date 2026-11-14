@@ -29,6 +29,7 @@
                 shape="organization"
                 size="30"></clr-icon>
             <span class="ml-05 project-name">{{ currentProject.name }}</span>
+            <bookmark-toggle [target]="projectBookmark"></bookmark-toggle>
             <div class="divider filter-divider" *ngIf="isMember"></div>
             <span class="role-label" *ngIf="isMember">{{
                 roleName | translate

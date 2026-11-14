@@ -11,7 +11,12 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import {
+    ComponentFixture,
+    fakeAsync,
+    TestBed,
+    tick,
+} from '@angular/core/testing';
 import { ArtifactFilterComponent } from './artifact-filter.component';
 import { SharedTestingModule } from '../../../../../../../../shared/shared.module';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
@@ -59,5 +64,76 @@ describe('ArtifactFilterComponent', () => {
             `#${component.typeSelectId}`
         );
         expect(!!selector).toBeFalse();
+    });
+
+    it('clears typed text when a non-input filter is restored', () => {
+        component.inputTag = 'v1';
+        component.initialFilter = {
+            type: 'type',
+            isLabel: false,
+            stringValue: '',
+        };
+        expect(component.inputTag).toBe('');
+    });
+
+    it('drops typed text that a restored filter replaced', fakeAsync(() => {
+        const emitted = [];
+        component.filterEvent.subscribe(e => emitted.push(e));
+        component.filterByType = 'tags';
+        component.inputTag = 'old';
+        component.searchByInputTag();
+        component.initialFilter = {
+            type: 'tags',
+            isLabel: false,
+            isInputTag: true,
+            stringValue: 'new',
+        };
+        tick(500);
+        expect(emitted).toEqual([]);
+        component.inputTag = 'newer';
+        component.searchByInputTag();
+        tick(500);
+        expect(emitted.map(e => e.stringValue)).toEqual(['newer']);
+    }));
+
+    it('shows a restored tag search without emitting', () => {
+        const emitted = spyOn(component.filterEvent, 'emit');
+        component.initialFilter = {
+            type: 'tags',
+            isLabel: false,
+            isInputTag: true,
+            stringValue: 'v1',
+        };
+        fixture.detectChanges();
+        expect(component.opened).toBeTrue();
+        expect(component.filterByType).toBe('tags');
+        expect(component.inputTag).toBe('v1');
+        expect(component.selectedValue).toBeNull();
+        expect(emitted).not.toHaveBeenCalled();
+    });
+
+    it('shows a restored fixed value', () => {
+        component.initialFilter = {
+            type: 'type',
+            isLabel: false,
+            stringValue: 'IMAGE',
+        };
+        expect(component.filterByType).toBe('type');
+        expect(component.selectedValue).toBe('IMAGE');
+    });
+
+    it('shows a restored label only once its name is known', () => {
+        component.initialFilter = {
+            type: 'labels',
+            isLabel: true,
+            label: { id: 3 },
+        };
+        expect(component.selectedValue).toBeNull();
+        component.initialFilter = {
+            type: 'labels',
+            isLabel: true,
+            label: { id: 3, name: 'prod' },
+        };
+        expect((component.selectedValue as any).name).toBe('prod');
     });
 });

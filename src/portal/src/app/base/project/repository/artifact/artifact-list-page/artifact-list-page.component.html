@@ -20,6 +20,7 @@
             <div class="title-block">
                 <h2 sub-header-title class="custom-h2" *ngIf="!artifactDigest">
                     {{ repoName }}
+                    <bookmark-toggle [target]="repoBookmark"></bookmark-toggle>
                 </h2>
                 <h2 sub-header-title class="custom-h2" *ngIf="artifactDigest">
                     {{ artifactDigest | slice : 0 : 15 }}

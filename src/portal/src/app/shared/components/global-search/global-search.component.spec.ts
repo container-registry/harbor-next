@@ -22,6 +22,8 @@ import { SearchTriggerService } from './search-trigger.service';
 import { AppConfigService } from '../../../services/app-config.service';
 import { SkinableConfig } from '../../../services/skinable-config.service';
 import { SharedTestingModule } from '../../shared.module';
+import { Location } from '@angular/common';
+import { Router } from '@angular/router';
 
 describe('GlobalSearchComponent', () => {
     let component: GlobalSearchComponent;
@@ -97,4 +99,43 @@ describe('GlobalSearchComponent', () => {
         await fixture.whenStable();
         expect(spy.calls.count()).toEqual(1);
     }));
+
+    describe('URL sync', () => {
+        let location: Location;
+        let router: Router;
+        beforeEach(() => {
+            location = TestBed.inject(Location);
+            router = TestBed.inject(Router);
+            spyOn(location, 'replaceState');
+            spyOn(router, 'createUrlTree').and.callFake(
+                (_commands, extras) =>
+                    ({
+                        toString: () => JSON.stringify(extras.queryParams),
+                    } as any)
+            );
+        });
+
+        it('leaves the URL alone when an empty search is cleared', () => {
+            component.searchTerm = '';
+            component.searchTerm = undefined;
+            expect(location.replaceState).not.toHaveBeenCalled();
+        });
+
+        it('keeps the other query params when the term changes', () => {
+            component.searchTerm = 'nginx';
+            expect(router.createUrlTree).toHaveBeenCalledWith(
+                [],
+                jasmine.objectContaining({
+                    queryParams: { globalSearch: 'nginx' },
+                    queryParamsHandling: 'merge',
+                })
+            );
+            component.searchTerm = '';
+            expect(
+                (router.createUrlTree as jasmine.Spy).calls.mostRecent().args[1]
+                    .queryParams
+            ).toEqual({ globalSearch: null });
+            expect(location.replaceState).toHaveBeenCalledTimes(2);
+        });
+    });
 });

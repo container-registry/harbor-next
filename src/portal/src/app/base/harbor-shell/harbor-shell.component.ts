@@ -42,6 +42,7 @@ import {
     EventService,
     HarborEvent,
 } from '../../services/event-service/event.service';
+import { BookmarkService } from '../../shared/services/bookmark.service';
 
 const HAS_STYLE_MODE: string = 'styleModeLocal';
 
@@ -84,7 +85,8 @@ export class HarborShellComponent implements OnInit, OnDestroy {
         private appConfigService: AppConfigService,
         public theme: ThemeService,
         private event: EventService,
-        private cd: ChangeDetectorRef
+        private cd: ChangeDetectorRef,
+        private bookmarkService: BookmarkService
     ) {}
 
     ngOnInit() {
@@ -162,6 +164,13 @@ export class HarborShellComponent implements OnInit, OnDestroy {
     public get isSystemAdmin(): boolean {
         let account = this.session.getCurrentUser();
         return account != null && account.has_admin_role;
+    }
+
+    public get hasBookmarks(): boolean {
+        return (
+            this.bookmarkService.load() &&
+            this.bookmarkService.bookmarks.length > 0
+        );
     }
 
     public get isUserExisting(): boolean {

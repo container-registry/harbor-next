@@ -140,6 +140,9 @@
                         [projectName]="projectName"
                         [repoName]="repositoryName"
                         [selectedTag]="tag.name"></app-pull-command>
+                    <bookmark-toggle
+                        [size]="16"
+                        [target]="tagBookmark(tag.name)"></bookmark-toggle>
                 </div>
             </div>
         </clr-dg-cell>

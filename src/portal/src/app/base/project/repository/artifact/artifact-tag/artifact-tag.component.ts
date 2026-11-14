@@ -62,6 +62,10 @@ import { ConfirmationDialogComponent } from '../../../../../shared/components/co
 import { ConfirmationMessage } from '../../../../global-confirmation-dialog/confirmation-message';
 import { ConfirmationAcknowledgement } from '../../../../global-confirmation-dialog/confirmation-state-message';
 import { ActivatedRoute } from '@angular/router';
+import {
+    BookmarkKind,
+    BookmarkTarget,
+} from '../../../../../shared/services/bookmark.service';
 
 class InitTag {
     name = '';
@@ -98,6 +102,7 @@ export class ArtifactTagComponent implements OnInit, OnDestroy {
     );
     currentPage = 1;
     tagNameChecker: Subject<string> = new Subject<string>();
+    private tagBookmarks = new Map<string, BookmarkTarget>();
     tagNameCheckSub: Subscription;
     tagNameCheckOnGoing = false;
     systemInfo: SystemInfo;
@@ -212,6 +217,24 @@ export class ArtifactTagComponent implements OnInit, OnDestroy {
                 }
             );
     }
+    // Cached so the bookmark toggle receives a stable input across change detection.
+    tagBookmark(tagName: string): BookmarkTarget {
+        const key = `${this.projectId}|${this.repositoryName}|${tagName}`;
+        let target = this.tagBookmarks.get(key);
+        if (!target) {
+            target = {
+                kind: BookmarkKind.TAG,
+                projectId: +this.projectId,
+                projectName: this.projectName,
+                repoName: this.repositoryName,
+                tag: tagName,
+                defaultLabel: `${this.repositoryName}:${tagName}`,
+            };
+            this.tagBookmarks.set(key, target);
+        }
+        return target;
+    }
+
     getImagePermissionRule(projectId: number): void {
         const permissions = [
             {

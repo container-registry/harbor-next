@@ -154,6 +154,19 @@
     "TOP_NAV": {
         "DATETIME_RENDERING_DEFAULT": "Default"
     },
+    "BOOKMARKS": {
+        "TITLE": "Marcadores",
+        "ADD": "Añadir marcador",
+        "ADD_FILTER": "Guardar este filtro como marcador",
+        "REMOVE": "Quitar marcador",
+        "RENAME": "Renombrar",
+        "DELETE": "Eliminar",
+        "MISSING": "No encontrado. Puede que se haya eliminado.",
+        "FORBIDDEN": "No encontrado, o no tiene acceso.",
+        "ADD_FAILED": "No se pudo guardar el marcador.",
+        "LIMIT_REACHED": "Tiene 100 marcadores. Quite uno para añadir otro.",
+        "LABEL_MISSING": "La etiqueta de este filtro ya no existe."
+    },
     "SIDE_NAV": {
         "PROJECTS": "Proyectos",
         "SYSTEM_MGMT": {

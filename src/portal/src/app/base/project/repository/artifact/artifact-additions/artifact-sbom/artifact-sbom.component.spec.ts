@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+import { SimpleChange } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ArtifactSbomComponent } from './artifact-sbom.component';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
@@ -204,5 +205,13 @@ describe('ArtifactSbomComponent', () => {
         const scanBtn: HTMLButtonElement =
             fixture.nativeElement.querySelector('#sbom-btn');
         expect(scanBtn.innerText).toContain('SBOM.DOWNLOAD');
+    });
+
+    it('loads the SBOM when the digest arrives after init', () => {
+        const spy = spyOn(component, 'getSbom');
+        component.ngOnChanges({
+            sbomDigest: new SimpleChange(undefined, 'sha256:late', false),
+        });
+        expect(spy).toHaveBeenCalled();
     });
 });
