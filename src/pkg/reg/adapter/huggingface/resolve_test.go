@@ -114,6 +114,11 @@ func TestResolveReferences(t *testing.T) {
 	assert.Equal(t, commitNew, r.Revision)
 	assert.Equal(t, []string{}, r.Tags, "a commit no ref points at has no tags")
 
+	r, err = a.Resolve(repoTiny, "feature/x", nil)
+	require.NoError(t, err, "a branch resolves by its Hub name")
+	assert.Equal(t, "feature-x", r.Reference)
+	assert.Contains(t, r.Tags, "feature-x")
+
 	_, err = a.Resolve(repoTiny, "nope", nil)
 	assert.True(t, errors.IsNotFoundErr(err))
 

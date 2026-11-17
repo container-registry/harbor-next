@@ -80,12 +80,18 @@ export function formatFileFilters(filters: string[]): string {
     return (filters || []).join(', ');
 }
 
+// revisionTag maps a Hub branch or tag to the tag its copy gets, like the adapter does:
+// characters invalid in a tag, such as the "/" of "feature/x", become "-".
+export function revisionTag(revision: string): string {
+    return revision.trim().replace(/[^\w.-]/g, '-');
+}
+
 export function toReplicationPolicy(p: ModelSyncPolicy): ReplicationPolicy {
     const filters: ReplicationFilter[] = [
         { type: FILTER_NAME, value: p.src_repository },
         {
             type: FILTER_TAG,
-            value: p.src_revision || DEFAULT_REVISION,
+            value: revisionTag(p.src_revision || DEFAULT_REVISION),
             decoration: 'matches',
         },
     ];

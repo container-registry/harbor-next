@@ -126,6 +126,11 @@ func (p *Policy) Validate() error {
 		return errors.New(nil).WithCode(errors.BadRequestCode).
 			WithMessagef("invalid destination repository %q: it must be a single path component", p.DestRepository)
 	}
+	if len(p.DestRepository) > 0 && !namesOneRepository(p.Filters) {
+		// a rename merges every matched repository into one, also across event-triggered runs
+		return errors.New(nil).WithCode(errors.BadRequestCode).
+			WithMessage("a destination repository needs a name filter that names exactly one source repository")
+	}
 
 	// valid trigger
 	if p.Trigger != nil {
@@ -391,4 +396,16 @@ func parseScheduleParamToCron(param *scheduleParam) string {
 		return fmt.Sprintf("%d %d %d * * %d", second, minute, hour, param.Weekday%7)
 	}
 	return fmt.Sprintf("%d %d %d * * *", second, minute, hour)
+}
+
+// namesOneRepository reports whether the name filter is a single literal repository name.
+func namesOneRepository(filters []*model.Filter) bool {
+	for _, f := range filters {
+		if f.Type != model.FilterTypeName {
+			continue
+		}
+		name, _ := f.Value.(string)
+		return name != "" && !strings.ContainsAny(name, "*?[]{}")
+	}
+	return false
 }

@@ -313,13 +313,27 @@ func TestValidateFileFilter(t *testing.T) {
 
 func TestValidateDestRepository(t *testing.T) {
 	base := func(name string) *Policy {
-		return &Policy{Name: "p", SrcRegistry: &model.Registry{ID: 1}, DestRepository: name}
+		return &Policy{
+			Name: "p", SrcRegistry: &model.Registry{ID: 1}, DestRepository: name,
+			Filters: []*model.Filter{{Type: model.FilterTypeName, Value: "HuggingFaceTB/SmolLM2-135M"}},
+		}
 	}
 	assert.NoError(t, base("").Validate())
 	assert.NoError(t, base("smollm2-135m").Validate())
 	for _, name := range []string{"a/b", "Upper", "-x", "x-", "a..b"} {
 		assert.Error(t, base(name).Validate(), name)
 	}
+}
+
+func TestValidateDestRepositoryNeedsOneSource(t *testing.T) {
+	policy := func(filters ...*model.Filter) *Policy {
+		return &Policy{Name: "p", SrcRegistry: &model.Registry{ID: 1}, DestRepository: "renamed", Filters: filters}
+	}
+	assert.Error(t, policy().Validate())
+	for _, name := range []string{"project/**", "org/*", "org/model?", "org/{a,b}", "org/[ab]"} {
+		assert.Error(t, policy(&model.Filter{Type: model.FilterTypeName, Value: name}).Validate(), name)
+	}
+	assert.NoError(t, policy(&model.Filter{Type: model.FilterTypeName, Value: "org/model"}).Validate())
 }
 
 func TestPolicyDestRepositoryRoundTrip(t *testing.T) {

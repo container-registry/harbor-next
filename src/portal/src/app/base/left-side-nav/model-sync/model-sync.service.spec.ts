@@ -19,6 +19,7 @@ import { RegistryService } from '../../../../../ng-swagger-gen/services/registry
 import { ModelSyncService } from './model-sync.service';
 import {
     destRepository,
+    revisionTag,
     fromReplicationPolicy,
     ModelSyncPolicy,
     toReplicationPolicy,
@@ -113,6 +114,11 @@ describe('ModelSyncService', () => {
         expect(back).toEqual(jasmine.objectContaining(policy));
     });
 
+    it('filters a branch by the tag its copy gets', () => {
+        expect(revisionTag('feature/x')).toEqual('feature-x');
+        expect(revisionTag(' v1.0 ')).toEqual('v1.0');
+    });
+
     it('always sends a revision so a rule never copies every branch', () => {
         const r = toReplicationPolicy({
             ...policy,
@@ -164,6 +170,16 @@ describe('ModelSyncService', () => {
             ).not.toHaveBeenCalled();
             done();
         });
+    });
+
+    it('asks for the source types on every call', () => {
+        const infos = spyOn(
+            TestBed.inject(RegistryService),
+            'listRegistryProviderInfos'
+        ).and.callThrough();
+        service.sourceTypes().subscribe();
+        service.sourceTypes().subscribe();
+        expect(infos).toHaveBeenCalledTimes(2);
     });
 
     it('asks the server for model source registries only', done => {

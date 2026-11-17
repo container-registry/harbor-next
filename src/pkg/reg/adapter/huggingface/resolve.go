@@ -46,6 +46,10 @@ func (a *adapter) Resolve(repository, reference string, filter *model.FileFilter
 	}
 	commit := reference
 	if !hub.IsCommit(reference) {
+		// a branch such as "feature/x" is copied under its tag "feature-x"
+		if tag, ok := tagOf(reference); ok {
+			reference = tag
+		}
 		var err error
 		if commit, err = a.commitOf(ctx, repo, reference); err != nil {
 			return nil, err

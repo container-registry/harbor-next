@@ -13,7 +13,7 @@
 // limitations under the License.
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
-import { map, shareReplay, switchMap } from 'rxjs/operators';
+import { map, switchMap } from 'rxjs/operators';
 import { ReplicationService } from '../../../../../ng-swagger-gen/services/replication.service';
 import { RegistryService } from '../../../../../ng-swagger-gen/services/registry.service';
 import { Registry } from '../../../../../ng-swagger-gen/models/registry';
@@ -51,28 +51,21 @@ function total(headers: { get(name: string): string | null }): number {
 // the replication ones, the preview is POST /registries/{id}/preview.
 @Injectable({ providedIn: 'root' })
 export class ModelSyncService {
-    private sourceTypes$: Observable<string[]>;
-
     constructor(
         private replicationService: ReplicationService,
         private registryService: RegistryService
     ) {}
 
-    // sourceTypes lists the registry types that can be a model sync source.
+    // sourceTypes lists the registry types that can be a model sync source. It is not
+    // cached: the list changes when the Model Sync feature is switched.
     sourceTypes(): Observable<string[]> {
-        if (!this.sourceTypes$) {
-            this.sourceTypes$ = this.registryService
-                .listRegistryProviderInfos()
-                .pipe(
-                    map(infos =>
-                        Object.keys(infos || {})
-                            .filter(type => infos[type]?.supported_preview)
-                            .sort()
-                    ),
-                    shareReplay(1)
-                );
-        }
-        return this.sourceTypes$;
+        return this.registryService.listRegistryProviderInfos().pipe(
+            map(infos =>
+                Object.keys(infos || {})
+                    .filter(type => infos[type]?.supported_preview)
+                    .sort()
+            )
+        );
     }
 
     isSourceType(type: string): Observable<boolean> {
