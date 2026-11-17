@@ -37,10 +37,8 @@ import (
 	"github.com/goharbor/harbor/src/controller/project"
 	"github.com/goharbor/harbor/src/controller/robot"
 	roleCtl "github.com/goharbor/harbor/src/controller/role"
-	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/q"
-	"github.com/goharbor/harbor/src/pkg/permission/policy"
 	"github.com/goharbor/harbor/src/pkg/permission/types"
 	robotmodel "github.com/goharbor/harbor/src/pkg/robot/model"
 	"github.com/goharbor/harbor/src/server/v2.0/models"
@@ -48,8 +46,6 @@ import (
 	operation "github.com/goharbor/harbor/src/server/v2.0/restapi/operations/member"
 	securityMock "github.com/goharbor/harbor/src/testing/common/security"
 	projecttesting "github.com/goharbor/harbor/src/testing/controller/project"
-	robottesting "github.com/goharbor/harbor/src/testing/controller/robot"
-	usertesting "github.com/goharbor/harbor/src/testing/controller/user"
 	"github.com/goharbor/harbor/src/testing/mock"
 )
 
@@ -60,6 +56,8 @@ import (
 
 type stubRoleCtl struct {
 	testifymock.Mock
+	roles   []*roleCtl.Role
+	listErr error
 }
 
 func (s *stubRoleCtl) Get(ctx context.Context, id int64, option *roleCtl.Option) (*roleCtl.Role, error) {
@@ -76,7 +74,7 @@ func (s *stubRoleCtl) Update(ctx context.Context, r *roleCtl.Role, option *roleC
 	return nil
 }
 func (s *stubRoleCtl) List(ctx context.Context, query *q.Query, option *roleCtl.Option) ([]*roleCtl.Role, error) {
-	return nil, nil
+	return s.roles, s.listErr
 }
 func (s *stubRoleCtl) Count(ctx context.Context, query *q.Query) (int64, error) { return 0, nil }
 
@@ -466,13 +464,9 @@ func TestMemberWritesGrantProjectAdmin(t *testing.T) {
 			rc.On("Get", testifymock.Anything, int64(common.RoleProjectAdmin), testifymock.Anything).
 				Return(projectAdminRole(), nil).Maybe()
 			controller := &recordingMemberController{}
-			userCtl := usertesting.NewController(t)
-			userCtl.On("Get", mock.Anything, int(sysAdminID), mock.Anything).
-				Return(&commonmodels.User{UserID: int(sysAdminID), Username: "admin", SysAdminFlag: true}, nil).Maybe()
 			api := newMemberAPI()
 			api.ctl = controller
 			api.roleCtl = rc
-			api.userCtl = userCtl
 			ctx := security.NewContext(context.Background(), test.securityCtx())
 
 			allowed, err := api.HasProjectPermission(
@@ -486,125 +480,6 @@ func TestMemberWritesGrantProjectAdmin(t *testing.T) {
 			createParams.ProjectMember = &models.ProjectMember{
 				RoleID: common.RoleProjectAdmin,
 			}
-			createResponder := api.CreateProjectMember(ctx, createParams)
-
-			updateParams := operation.NewUpdateProjectMemberParams()
-			updateParams.ProjectNameOrID = "1"
-			updateParams.Mid = 1
-			updateParams.Role = &models.RoleRequest{RoleID: common.RoleProjectAdmin}
-			updateResponder := api.UpdateProjectMember(ctx, updateParams)
-
-			assert.IsType(t, &operation.CreateProjectMemberCreated{}, createResponder)
-			assert.IsType(t, &operation.UpdateProjectMemberOK{}, updateResponder)
-			assert.Equal(t, []int{common.RoleProjectAdmin}, controller.createdRoles)
-			assert.Equal(t, []int{common.RoleProjectAdmin}, controller.updatedRoles)
-		})
-	}
-}
-
-// A robot granting a built-in role skips the escalation check (goharbor/harbor#24300):
-// its creator's state no longer matters, member:create/update is the guard.
-func TestRobotBuiltinGrantIgnoresCreator(t *testing.T) {
-	const (
-		projectID      int64 = 1
-		projectAdminID int64 = 10
-		memberAdminID  int64 = 11
-		goneUserID     int64 = 12
-		customRoleID   int64 = 100
-	)
-	creatorRobot := func(id int64, creatorType string, creatorRef int64) *robot.Robot {
-		return &robot.Robot{
-			Robot: robotmodel.Robot{
-				ID: id, Name: fmt.Sprintf("robot-%d", id), ExpiresAt: -1,
-				CreatorType: creatorType, CreatorRef: creatorRef,
-			},
-			Level: robot.LEVELPROJECT,
-			Permissions: []*robot.Permission{{
-				Scope:  "/project/1",
-				Access: memberWriteAccess(),
-			}},
-		}
-	}
-	tests := []struct {
-		name   string
-		caller *robot.Robot
-	}{
-		{name: "created by system admin", caller: creatorRobot(1, local.ContextName, sysAdminID)},
-		{name: "created by project admin", caller: creatorRobot(1, local.ContextName, projectAdminID)},
-		{name: "created by member updater", caller: creatorRobot(1, local.ContextName, memberAdminID)},
-		{name: "creator deleted", caller: creatorRobot(1, local.ContextName, goneUserID)},
-		{name: "unknown creator type", caller: creatorRobot(1, "", 0)},
-		{name: "created by robot created by system admin", caller: creatorRobot(1, "robot", 2)},
-		{name: "created by robot created by member updater", caller: creatorRobot(1, "robot", 4)},
-		{name: "robot creator chain too deep", caller: creatorRobot(1, "robot", 5)},
-		{name: "created by disabled robot", caller: creatorRobot(1, "robot", 8)},
-		{name: "created by expired robot", caller: creatorRobot(1, "robot", 9)},
-		{name: "creator ref zero", caller: creatorRobot(1, local.ContextName, 0)},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			grants := append(policy.Shipped(),
-				policy.Grant{RoleID: customRoleID, Resource: rbac.ResourceMember.String(), Action: rbac.ActionUpdate.String()},
-				policy.Grant{RoleID: customRoleID, Resource: rbac.ResourceRobot.String(), Action: rbac.ActionCreate.String()},
-			)
-			store, err := policy.NewInMemory(grants)
-			require.NoError(t, err)
-			previousStore := policy.SetDefault(store)
-			t.Cleanup(func() { policy.SetDefault(previousStore) })
-
-			projectCtl := projecttesting.NewController(t)
-			p := &project.Project{ProjectID: projectID}
-			projectCtl.On("Get", mock.Anything, projectID, mock.Anything).Return(p, nil).Maybe()
-			projectCtl.On("ListRoles", mock.Anything, projectID, mock.MatchedBy(func(u *commonmodels.User) bool {
-				return int64(u.UserID) == projectAdminID
-			})).Return([]int{common.RoleProjectAdmin}, nil).Maybe()
-			projectCtl.On("ListRoles", mock.Anything, projectID, mock.Anything).
-				Return([]int{int(customRoleID)}, nil).Maybe()
-			previousProjectCtl := project.Ctl
-			project.Ctl = projectCtl
-			t.Cleanup(func() { project.Ctl = previousProjectCtl })
-
-			userCtl := usertesting.NewController(t)
-			for _, u := range []*commonmodels.User{
-				{UserID: int(sysAdminID), Username: "admin", SysAdminFlag: true},
-				{UserID: int(projectAdminID), Username: "project-admin"},
-				{UserID: int(memberAdminID), Username: "member-updater"},
-			} {
-				userCtl.On("Get", mock.Anything, u.UserID, mock.Anything).Return(u, nil).Maybe()
-			}
-			userCtl.On("Get", mock.Anything, int(goneUserID), mock.Anything).
-				Return(nil, errors.NotFoundError(nil)).Maybe()
-			userCtl.On("Get", mock.Anything, 0, mock.Anything).
-				Return(nil, errors.NotFoundError(nil)).Maybe()
-
-			robotCtl := robottesting.NewController(t)
-			disabledCreator := creatorRobot(8, local.ContextName, sysAdminID)
-			disabledCreator.Disabled = true
-			expiredCreator := creatorRobot(9, local.ContextName, sysAdminID)
-			expiredCreator.ExpiresAt = 1
-			for _, r := range []*robot.Robot{
-				disabledCreator,
-				expiredCreator,
-				creatorRobot(2, local.ContextName, sysAdminID),
-				creatorRobot(4, local.ContextName, memberAdminID),
-				creatorRobot(5, "robot", 6),
-				creatorRobot(6, "robot", 7),
-				creatorRobot(7, local.ContextName, sysAdminID),
-			} {
-				robotCtl.On("Get", mock.Anything, r.ID, mock.Anything).Return(r, nil).Maybe()
-			}
-
-			rc := &stubRoleCtl{}
-			rc.On("Get", testifymock.Anything, int64(common.RoleProjectAdmin), testifymock.Anything).
-				Return(projectAdminRole(), nil).Maybe()
-			controller := &recordingMemberController{}
-			api := &memberAPI{ctl: controller, roleCtl: rc, robotCtl: robotCtl, userCtl: userCtl}
-			ctx := security.NewContext(context.Background(), robotsec.NewSecurityContext(test.caller))
-
-			createParams := operation.NewCreateProjectMemberParams()
-			createParams.ProjectNameOrID = "1"
-			createParams.ProjectMember = &models.ProjectMember{RoleID: common.RoleProjectAdmin}
 			createResponder := api.CreateProjectMember(ctx, createParams)
 
 			updateParams := operation.NewUpdateProjectMemberParams()
@@ -641,15 +516,11 @@ func TestRobotCustomRoleSkipsEscalationCheck(t *testing.T) {
 			project.Ctl = projectCtl
 			t.Cleanup(func() { project.Ctl = previousProjectCtl })
 
-			userCtl := usertesting.NewController(t)
-			userCtl.On("Get", mock.Anything, int(sysAdminID), mock.Anything).
-				Return(&commonmodels.User{UserID: int(sysAdminID), SysAdminFlag: true}, nil).Maybe()
-
 			const customRoleID int64 = 100
 			rc := &stubRoleCtl{}
 			rc.On("Get", testifymock.Anything, customRoleID, testifymock.Anything).
 				Return(&roleCtl.Role{Permissions: []*roleCtl.Permission{{Access: test.access}}}, nil).Maybe()
-			api := &memberAPI{roleCtl: rc, userCtl: userCtl, robotCtl: robottesting.NewController(t)}
+			api := &memberAPI{roleCtl: rc}
 			caller := &robot.Robot{
 				Robot: robotmodel.Robot{
 					ID: 1, Name: "robot-1", ExpiresAt: -1, CreatorType: local.ContextName, CreatorRef: sysAdminID,
@@ -662,12 +533,6 @@ func TestRobotCustomRoleSkipsEscalationCheck(t *testing.T) {
 			require.NoError(t, api.checkNoEscalation(ctx, projectID, customRoleID))
 		})
 	}
-}
-
-func TestCreatorLacksHintsAtExternalAuth(t *testing.T) {
-	assert.Equal(t, "the robot's creator lacks", creatorLacks(context.Background()))
-	assert.Equal(t, "the robot's creator lacks", creatorLacks(lib.WithAuthMode(context.Background(), common.DBAuth)))
-	assert.Contains(t, creatorLacks(lib.WithAuthMode(context.Background(), common.LDAPAuth)), "system admin flag")
 }
 
 type stubMemberController struct {

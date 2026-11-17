@@ -17,6 +17,7 @@ package role
 import (
 	"context"
 
+	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/common/security"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
@@ -56,6 +57,26 @@ type Controller interface {
 
 	// List ...
 	List(ctx context.Context, query *q.Query, option *Option) ([]*Role, error)
+}
+
+// protectedRoles are the built-in roles that stay read-only and undeletable.
+// Project admin is here because project creation hands it to the owner
+// (pkg/project/dao). Every other built-in role can be edited and deleted like
+// a custom role. Change this set to open or close a role.
+var protectedRoles = map[int64]bool{
+	common.RoleProjectAdmin: true,
+}
+
+// IsProtected reports whether the role can be neither modified nor deleted.
+func IsProtected(id int64) bool {
+	return protectedRoles[id]
+}
+
+func requireUnprotected(r *model.Role) error {
+	if IsProtected(r.ID) {
+		return errors.ForbiddenError(nil).WithMessagef("cannot modify or delete built-in role %d (%s)", r.ID, r.Name)
+	}
+	return nil
 }
 
 // controller is the DB-backed implementation of Controller.
@@ -134,8 +155,8 @@ func (d *controller) Delete(ctx context.Context, id int64, _ ...*Option) error {
 	if err != nil {
 		return err
 	}
-	if rDelete.IsBuiltin {
-		return errors.ForbiddenError(nil).WithMessagef("cannot delete built-in role %d", id)
+	if err := requireUnprotected(rDelete); err != nil {
+		return err
 	}
 	// A role assigned to project members cannot be deleted. The count guard below
 	// covers the common case; the fk_project_member_role foreign key (ON DELETE
@@ -181,8 +202,8 @@ func (d *controller) Update(ctx context.Context, r *Role, option *Option) error 
 	if err != nil {
 		return err
 	}
-	if existing.IsBuiltin {
-		return errors.ForbiddenError(nil).WithMessagef("cannot modify built-in role %d", r.ID)
+	if err := requireUnprotected(existing); err != nil {
+		return err
 	}
 	// update role record fields, including the modification audit columns
 	modifiedBy := ""

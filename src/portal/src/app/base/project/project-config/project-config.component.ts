@@ -14,9 +14,12 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonRoutes } from 'src/app/shared/entities/shared.const';
-import { isGuestOnlyMember } from 'src/app/shared/units/role-util';
 import { SessionUser } from '../../../shared/entities/session-user';
 import { SessionService } from '../../../shared/services/session.service';
+import {
+    UserPermissionService,
+    USERSTATICPERMISSION,
+} from '../../../shared/services';
 import { Project } from '../project';
 
 @Component({
@@ -33,7 +36,8 @@ export class ProjectConfigComponent implements OnInit {
     constructor(
         private route: ActivatedRoute,
         private router: Router,
-        private session: SessionService
+        private session: SessionService,
+        private userPermissionService: UserPermissionService
     ) {}
 
     ngOnInit() {
@@ -47,13 +51,18 @@ export class ProjectConfigComponent implements OnInit {
             if (pro.registry_id) {
                 this.isProxyCacheProject = true;
             }
-
-            // Check user role and redirect if Limited Guest or Guest
-            if (isGuestOnlyMember(pro)) {
-                // Redirect to repositories page
-                this.router.navigate([CommonRoutes.HARBOR_DEFAULT]);
-                return;
-            }
         }
+        // The page is for whoever may read the configuration, whatever role grants it.
+        this.userPermissionService
+            .getPermission(
+                this.projectId,
+                USERSTATICPERMISSION.CONFIGURATION.KEY,
+                USERSTATICPERMISSION.CONFIGURATION.VALUE.READ
+            )
+            .subscribe(canRead => {
+                if (!canRead) {
+                    this.router.navigate([CommonRoutes.HARBOR_DEFAULT]);
+                }
+            });
     }
 }

@@ -26,12 +26,14 @@ import (
 	"github.com/goharbor/harbor/src/pkg/member"
 	"github.com/goharbor/harbor/src/pkg/project"
 	"github.com/goharbor/harbor/src/pkg/project/models"
+	roleModel "github.com/goharbor/harbor/src/pkg/role/model"
 	"github.com/goharbor/harbor/src/pkg/user"
 	"github.com/goharbor/harbor/src/pkg/usergroup"
 	modelGroup "github.com/goharbor/harbor/src/pkg/usergroup/model"
 	"github.com/goharbor/harbor/src/testing/mock"
 	mockMember "github.com/goharbor/harbor/src/testing/pkg/member"
 	mockProject "github.com/goharbor/harbor/src/testing/pkg/project"
+	mockRole "github.com/goharbor/harbor/src/testing/pkg/role"
 	mockUser "github.com/goharbor/harbor/src/testing/pkg/user"
 	mockUsergroup "github.com/goharbor/harbor/src/testing/pkg/usergroup"
 )
@@ -42,6 +44,7 @@ type MemberControllerTestSuite struct {
 	memberManager member.Manager
 	projectMgr    project.Manager
 	groupManager  usergroup.Manager
+	roleManager   *mockRole.Manager
 	controller    *controller
 }
 
@@ -50,12 +53,39 @@ func (suite *MemberControllerTestSuite) SetupSuite() {
 	suite.memberManager = &mockMember.Manager{}
 	suite.projectMgr = &mockProject.Manager{}
 	suite.groupManager = &mockUsergroup.Manager{}
+	suite.roleManager = &mockRole.Manager{}
+	// Role 1 exists; role 4 (a deleted built-in) and role 100 do not.
+	suite.roleManager.On("Get", mock.Anything, int64(1)).Return(&roleModel.Role{ID: 1, Name: "projectAdmin", IsBuiltin: true}, nil)
+	suite.roleManager.On("Get", mock.Anything, int64(4)).Return(nil, errors.NotFoundError(nil).WithMessage("role 4 not found"))
+	suite.roleManager.On("Get", mock.Anything, int64(100)).Return(nil, errors.NotFoundError(nil).WithMessage("role 100 not found"))
 	suite.controller = &controller{
 		userManager:  suite.userManager,
 		mgr:          suite.memberManager,
 		projectMgr:   suite.projectMgr,
 		groupManager: suite.groupManager,
+		roleMgr:      suite.roleManager,
 	}
+}
+
+// Every role id is looked up: a built-in that was deleted is as invalid as a
+// custom role that never existed, and both fail before the project_member
+// foreign key could.
+func (suite *MemberControllerTestSuite) TestValidateRole() {
+	ctx := context.Background()
+	suite.NoError(suite.controller.validateRole(ctx, 1))
+	for _, id := range []int{0, -1, 4, 100} {
+		err := suite.controller.validateRole(ctx, id)
+		suite.Require().Error(err, "role %d", id)
+		suite.True(errors.IsErr(err, errors.BadRequestCode), "role %d", id)
+	}
+}
+
+func (suite *MemberControllerTestSuite) TestUpdateRoleToDeletedBuiltin() {
+	mock.OnAnything(suite.projectMgr, "Get").Return(&models.Project{ProjectID: 1}, nil)
+	err := suite.controller.UpdateRole(context.Background(), 1, 7, 4)
+	suite.Require().Error(err)
+	suite.True(errors.IsErr(err, errors.BadRequestCode))
+	suite.memberManager.(*mockMember.Manager).AssertNotCalled(suite.T(), "UpdateRole", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
 func (suite *MemberControllerTestSuite) TearDownSuite() {

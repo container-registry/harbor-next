@@ -119,13 +119,20 @@ describe('ProjectDetailComponent', () => {
         expect(component).toBeTruthy();
     });
 
-    it('hides guest-only tabs unless the user is a system admin', () => {
-        // A refreshed project has no resolver role_name.
+    it('shows the scanner and config tabs on permissions, not role ids', () => {
         component.currentProject = { current_user_role_ids: [3] } as any;
-        const session = spyOn(mockSessionService, 'getCurrentUser');
-        session.and.returnValue({ has_admin_role: false } as any);
-        expect(component.isLimitedGuestOrGuest()).toBeTrue();
-        session.and.returnValue({ has_admin_role: true } as any);
-        expect(component.isLimitedGuestOrGuest()).toBeFalse();
+        spyOn(mockSessionService, 'getCurrentUser').and.returnValue({
+            has_admin_role: false,
+        } as any);
+        component.hasScannerReadPermission = true;
+        component.hasConfigurationListPermission = true;
+        const tab = (name: string) =>
+            component.tabLinkNavList.find(t => t.linkName === name);
+        expect(tab('scanner').permissions()).toBeTrue();
+        expect(tab('configs').permissions()).toBeTrue();
+        component.hasScannerReadPermission = false;
+        component.hasConfigurationListPermission = false;
+        expect(tab('scanner').permissions()).toBeFalse();
+        expect(tab('configs').permissions()).toBeFalse();
     });
 });

@@ -10,6 +10,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/orm"
 	"github.com/goharbor/harbor/src/pkg/permission/types"
+	rbac_model "github.com/goharbor/harbor/src/pkg/rbac/model"
 	"github.com/goharbor/harbor/src/pkg/role/model"
 	ormtesting "github.com/goharbor/harbor/src/testing/lib/orm"
 	"github.com/goharbor/harbor/src/testing/mock"
@@ -55,6 +56,33 @@ func (suite *ControllerTestSuite) TestDeleteBuiltinRole() {
 	err := suite.c.Delete(suite.ctx, int64(1))
 	suite.Require().NotNil(err)
 	suite.True(errors.IsErr(err, errors.ForbiddenCode))
+	suite.roleMgr.AssertNotCalled(suite.T(), "Delete", mock.Anything, mock.Anything)
+}
+
+// Every built-in role except project admin is deletable, under the same
+// "still assigned" guard a custom role gets.
+func (suite *ControllerTestSuite) TestDeleteBuiltinRoleOtherThanProjectAdmin() {
+	for _, id := range []int64{2, 3, 4, 5} {
+		suite.SetupTest()
+		suite.roleMgr.On("Get", mock.Anything, id).Return(&model.Role{ID: id, Name: "builtin", IsBuiltin: true}, nil)
+		suite.memberMgr.On("GetTotalOfProjectMembersByRole", mock.Anything, int(id)).Return(0, nil)
+		suite.roleMgr.On("Delete", mock.Anything, id).Return(nil)
+		suite.rbacMgr.On("DeletePermissionsByRole", mock.Anything, ROLETYPE, id).Return(nil)
+
+		suite.NoError(suite.c.Delete(suite.ctx, id), "role %d", id)
+		suite.roleMgr.AssertExpectations(suite.T())
+		suite.memberMgr.AssertExpectations(suite.T())
+		suite.rbacMgr.AssertExpectations(suite.T())
+	}
+}
+
+func (suite *ControllerTestSuite) TestDeleteAssignedBuiltinRoleRejected() {
+	suite.roleMgr.On("Get", mock.Anything, int64(4)).Return(&model.Role{ID: 4, Name: "maintainer", IsBuiltin: true}, nil)
+	suite.memberMgr.On("GetTotalOfProjectMembersByRole", mock.Anything, 4).Return(3, nil)
+
+	err := suite.c.Delete(suite.ctx, int64(4))
+	suite.Require().NotNil(err)
+	suite.True(errors.IsErr(err, errors.PreconditionCode))
 	suite.roleMgr.AssertNotCalled(suite.T(), "Delete", mock.Anything, mock.Anything)
 }
 
@@ -125,6 +153,39 @@ func (suite *ControllerTestSuite) TestUpdateBuiltinRole() {
 	suite.Require().NotNil(err)
 	suite.True(errors.IsErr(err, errors.ForbiddenCode))
 	suite.rbacMgr.AssertNotCalled(suite.T(), "DeletePermissionsByRole", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// Editing a built-in role other than project admin replaces its grants exactly
+// like a custom role, so members holding it get the new permissions.
+func (suite *ControllerTestSuite) TestUpdateBuiltinRoleOtherThanProjectAdmin() {
+	suite.roleMgr.On("Get", mock.Anything, int64(4)).Return(&model.Role{ID: 4, Name: "maintainer", IsBuiltin: true}, nil)
+	suite.roleMgr.On("Update", mock.Anything, mock.MatchedBy(func(r *model.Role) bool {
+		return r.ID == 4 && r.Name == "release-manager" && r.Modified
+	}), "name", "description", "modified", "modified_by", "modified_at").Return(nil)
+	suite.rbacMgr.On("DeletePermissionsByRole", mock.Anything, ROLETYPE, int64(4)).Return(nil)
+	suite.rbacMgr.On("CreateRbacPolicy", mock.Anything, mock.MatchedBy(func(p *rbac_model.PermissionPolicy) bool {
+		return p.Resource == "member" && p.Action == "create"
+	})).Return(int64(9), nil)
+	suite.rbacMgr.On("CreatePermission", mock.Anything, mock.MatchedBy(func(p *rbac_model.RolePermission) bool {
+		return p.RoleID == 4 && p.PermissionPolicyID == 9
+	})).Return(int64(1), nil)
+
+	err := suite.c.Update(suite.ctx, &Role{
+		Role: model.Role{ID: 4, Name: "release-manager"},
+		Permissions: []*Permission{
+			{Access: []*types.Policy{{Resource: "member", Action: "create"}}},
+		},
+	}, &Option{WithPermission: true})
+	suite.NoError(err)
+	suite.roleMgr.AssertExpectations(suite.T())
+	suite.rbacMgr.AssertExpectations(suite.T())
+}
+
+func (suite *ControllerTestSuite) TestIsProtected() {
+	suite.True(IsProtected(1))
+	for _, id := range []int64{2, 3, 4, 5, 100} {
+		suite.False(IsProtected(id), "role %d", id)
+	}
 }
 
 func (suite *ControllerTestSuite) TestUpdateCustomRole() {

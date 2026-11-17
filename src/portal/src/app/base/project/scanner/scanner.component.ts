@@ -18,7 +18,6 @@ import { TranslateService } from '@ngx-translate/core';
 import { forkJoin, Observable } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 import { CommonRoutes } from 'src/app/shared/entities/shared.const';
-import { isGuestOnlyMember } from 'src/app/shared/units/role-util';
 import { Project } from '../../../../../ng-swagger-gen/models/project';
 import { ProjectService } from '../../../../../ng-swagger-gen/services/project.service';
 import { InlineAlertComponent } from '../../../shared/components/inline-alert/inline-alert.component';
@@ -58,19 +57,21 @@ export class ScannerComponent implements OnInit {
     ) {}
     ngOnInit() {
         this.projectId = +this.route.snapshot.parent.parent.params['id'];
-
-        // Check user role and redirect if Limited Guest or Guest
-        const resolverData = this.route.snapshot.parent.parent.data;
-        if (resolverData && resolverData['projectResolver']) {
-            if (isGuestOnlyMember(resolverData['projectResolver'])) {
-                // Redirect to repositories page
-                this.router.navigate([CommonRoutes.HARBOR_DEFAULT]);
-                return;
-            }
-        }
-
-        this.getPermission();
-        this.init();
+        // The page is for whoever may read the scanner, whatever role grants it.
+        this.userPermissionService
+            .getPermission(
+                this.projectId,
+                USERSTATICPERMISSION.SCANNER.KEY,
+                USERSTATICPERMISSION.SCANNER.VALUE.READ
+            )
+            .subscribe(canRead => {
+                if (!canRead) {
+                    this.router.navigate([CommonRoutes.HARBOR_DEFAULT]);
+                    return;
+                }
+                this.getPermission();
+                this.init();
+            });
     }
     getPermission() {
         if (this.projectId) {

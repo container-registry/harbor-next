@@ -25,12 +25,13 @@ import (
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/go-openapi/strfmt"
 
-	"github.com/goharbor/harbor/src/common"
 	"github.com/goharbor/harbor/src/common/rbac"
+	rbac_project "github.com/goharbor/harbor/src/common/rbac/project"
 	"github.com/goharbor/harbor/src/common/security/local"
 	robotSc "github.com/goharbor/harbor/src/common/security/robot"
 	"github.com/goharbor/harbor/src/common/utils"
 	"github.com/goharbor/harbor/src/controller/robot"
+	roleCtl "github.com/goharbor/harbor/src/controller/role"
 	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
@@ -545,8 +546,7 @@ func (rAPI *robotAPI) validateNoEscalation(ctx context.Context, permissions []*m
 
 // requireMemberDelegation protects create, update and secret refresh: controlling
 // a robot with member:create/update allows assigning any role in that project.
-// A human with a restricted custom role must not use a robot to bypass their own
-// role-assignment checks, even if they hold the same member permission.
+// So the caller must hold every permission any role grants, whichever roles exist.
 func (rAPI *robotAPI) requireMemberDelegation(ctx context.Context, namespace string) error {
 	sc, err := rAPI.GetSecurityContext(ctx)
 	if err != nil {
@@ -555,23 +555,42 @@ func (rAPI *robotAPI) requireMemberDelegation(ctx context.Context, namespace str
 	if sc.IsSysAdmin() {
 		return nil
 	}
-	if user, ok := sc.(*local.SecurityContext); ok && user.IsAuthenticated() && namespace != "*" {
-		p, err := baseProjectCtl.GetByName(ctx, namespace)
-		if err != nil {
-			return err
-		}
-		roles, err := baseProjectCtl.ListRoles(ctx, p.ProjectID, user.User())
-		if err != nil {
-			return err
-		}
-		for _, role := range roles {
-			if role == common.RoleProjectAdmin {
-				return nil
+	if user, ok := sc.(*local.SecurityContext); !ok || !user.IsAuthenticated() || namespace == "*" {
+		return errors.ForbiddenError(nil).WithMessagef(
+			"only system administrators can grant control of a robot with member:create or member:update in project %s", namespace)
+	}
+	p, err := baseProjectCtl.Get(ctx, namespace)
+	if err != nil {
+		return err
+	}
+	ns := rbac_project.NewNamespace(p.ProjectID)
+	roles, err := roleCtl.Ctl.List(ctx, nil, &roleCtl.Option{WithPermission: true})
+	if err != nil {
+		return err
+	}
+	// Every grant counts, the project's own update and delete included: a
+	// robot with member:update can hand its holder any role, so the caller
+	// must already hold everything any role could give them.
+	checked := map[string]bool{}
+	for _, r := range roles {
+		for _, perm := range r.Permissions {
+			for _, acc := range perm.Access {
+				if acc.Effect == types.EffectDeny || checked[acc.String()] {
+					continue
+				}
+				checked[acc.String()] = true
+				if !rAPI.HasPermission(ctx, acc.Action, ns.Resource(acc.Resource)) {
+					return errors.ForbiddenError(nil).WithMessagef(
+						"granting a robot member:create or member:update in project %s requires every permission a project role can grant; you lack %s:%s",
+						namespace, acc.Resource, acc.Action)
+				}
 			}
 		}
 	}
-	return errors.ForbiddenError(nil).WithMessagef(
-		"only system or project administrators can grant control of a robot with member:create or member:update in project %s", namespace)
+	if len(checked) == 0 {
+		return errors.ForbiddenError(nil).WithMessage("no project role grants found to compare against")
+	}
+	return nil
 }
 
 // isValidPermissionScope checks if permission slice A is a subset of permission slice B

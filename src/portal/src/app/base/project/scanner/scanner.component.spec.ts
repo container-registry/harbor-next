@@ -21,6 +21,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { CommonRoutes } from '../../../shared/entities/shared.const';
 import { Scanner } from '../../left-side-nav/interrogation-services/scanner/scanner';
 import { ErrorHandler } from '../../../shared/units/error-handler';
+import { UserPermissionService } from '../../../shared/services';
 import { ProjectService } from '../../../../../ng-swagger-gen/services/project.service';
 import { HttpHeaders, HttpResponse } from '@angular/common/http';
 import { Registry } from '../../../../../ng-swagger-gen/models/registry';
@@ -80,7 +81,12 @@ describe('ScannerComponent', () => {
             },
         },
     };
+    let canReadScanner = true;
+    const fakedPermissionService = {
+        getPermission: () => of(canReadScanner),
+    };
     beforeEach(() => {
+        canReadScanner = true;
         TestBed.configureTestingModule({
             imports: [SharedTestingModule],
             declarations: [ScannerComponent],
@@ -90,6 +96,10 @@ describe('ScannerComponent', () => {
                 ErrorHandler,
                 { provide: ActivatedRoute, useValue: fakedRoute },
                 { provide: ProjectService, useValue: fakedProjectService },
+                {
+                    provide: UserPermissionService,
+                    useValue: fakedPermissionService,
+                },
             ],
         }).compileComponents();
     });
@@ -123,22 +133,17 @@ describe('ScannerComponent', () => {
         fixture.detectChanges();
         expect(component.opened).toBeFalsy();
     });
-    describe('role-based redirect', () => {
+    describe('permission-based redirect', () => {
         let navigate: jasmine.Spy;
         let init: jasmine.Spy;
-        const setRoleIds = (ids: number[]) =>
-            ((fakedRoute.snapshot.parent.parent as any).data = {
-                projectResolver: { current_user_role_ids: ids },
-            });
         beforeEach(() => {
             navigate = spyOn(TestBed.inject(Router), 'navigate');
             init = spyOn(component, 'init');
             (component.getPermission as jasmine.Spy).calls.reset();
         });
-        afterEach(() => delete (fakedRoute.snapshot.parent.parent as any).data);
 
-        it('redirects guest-only members and skips loading', () => {
-            setRoleIds([3, 5]);
+        it('redirects members without scanner:read and skips loading', () => {
+            canReadScanner = false;
             component.ngOnInit();
             expect(navigate).toHaveBeenCalledWith([
                 CommonRoutes.HARBOR_DEFAULT,
@@ -147,8 +152,7 @@ describe('ScannerComponent', () => {
             expect(init).not.toHaveBeenCalled();
         });
 
-        it('keeps members with a custom or stronger role', () => {
-            setRoleIds([3, 42]);
+        it('keeps members whose role grants scanner:read', () => {
             component.ngOnInit();
             expect(navigate).not.toHaveBeenCalled();
             expect(component.getPermission).toHaveBeenCalled();
