@@ -563,6 +563,10 @@ Validation helpers
 Validate required values
 */}}
 {{- define "harbor.validateValues" -}}
+{{- /* --reuse-values from a 2.15 chart reuses its defaults, which lack postgresql.enabled. */}}
+{{- if not (hasKey (.Values.postgresql | default dict) "enabled") }}
+{{- fail "Upgrading from a harbor-next 2.15 chart with --reuse-values is not supported: it drops the new chart defaults. Pass your values file (helm upgrade -f values.yaml) or use --reset-then-reuse-values." }}
+{{- end }}
 {{- if not .Values.externalURL }}
 {{- fail "externalURL is required. Please set externalURL in your values." }}
 {{- end }}

@@ -1,0 +1,31 @@
+suite: reuse-values guard tests
+templates:
+  - templates/validate-values.yaml
+set:
+  externalURL: https://harbor.example.com
+  harborAdminPassword: Harbor12345
+  database.host: db.example.com
+tests:
+  - it: should refuse values without a postgresql block (2.15 chart --reuse-values)
+    set:
+      postgresql: null
+    asserts:
+      - failedTemplate:
+          errorPattern: "Upgrading from a harbor-next 2.15 chart with --reuse-values is not supported"
+
+  - it: should render with chart defaults
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: should render when the user values carry no postgresql block
+    set:
+      core.replicas: 2
+      database.password: secret
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: should render with the bundled postgresql enabled
+    set:
+      postgresql.enabled: true
+    asserts:
+      - notFailedTemplate: {}
