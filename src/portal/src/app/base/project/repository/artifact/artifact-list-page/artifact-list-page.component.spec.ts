@@ -17,6 +17,7 @@ import { of } from 'rxjs';
 import { ActivatedRoute } from '@angular/router';
 import { SharedTestingModule } from '../../../../../shared/shared.module';
 import { ArtifactListPageService } from './artifact-list-page.service';
+import { AppConfigService } from '../../../../../services/app-config.service';
 
 describe('ArtifactListPageComponent', () => {
     let component: ArtifactListPageComponent;
@@ -59,6 +60,10 @@ describe('ArtifactListPageComponent', () => {
             declarations: [ArtifactListPageComponent],
             providers: [
                 ArtifactListPageService,
+                {
+                    provide: AppConfigService,
+                    useValue: { featureEnabled: () => true },
+                },
                 { provide: ActivatedRoute, useValue: mockActivatedRoute },
             ],
         }).compileComponents();

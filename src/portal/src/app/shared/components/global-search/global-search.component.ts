@@ -123,21 +123,19 @@ export class GlobalSearchComponent implements OnInit, OnDestroy {
         return this._searchTerm;
     }
     set searchTerm(s) {
-        let url: string;
-        if (s) {
-            url = this.router
-                .createUrlTree([], {
-                    relativeTo: this.activatedRoute,
-                    queryParams: { [SEARCH_KEY]: s },
-                })
-                .toString();
-        } else {
-            url = this.router
-                .createUrlTree([], {
-                    relativeTo: this.activatedRoute,
-                })
-                .toString();
+        // Guards clear the search on every navigation, before the router commits;
+        // rewriting the URL then would strip the query of the page being left.
+        if ((s || '') === (this._searchTerm || '')) {
+            this._searchTerm = s;
+            return;
         }
+        const url = this.router
+            .createUrlTree([], {
+                relativeTo: this.activatedRoute,
+                queryParams: { [SEARCH_KEY]: s || null },
+                queryParamsHandling: 'merge',
+            })
+            .toString();
         this.location.replaceState(url);
         this._searchTerm = s;
     }

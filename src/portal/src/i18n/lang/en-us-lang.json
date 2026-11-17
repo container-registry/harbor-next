@@ -154,6 +154,19 @@
     "TOP_NAV": {
         "DATETIME_RENDERING_DEFAULT": "Default"
     },
+    "BOOKMARKS": {
+        "TITLE": "Bookmarks",
+        "ADD": "Add bookmark",
+        "ADD_FILTER": "Bookmark this filter",
+        "REMOVE": "Remove bookmark",
+        "RENAME": "Rename",
+        "DELETE": "Delete",
+        "MISSING": "Not found. It may have been deleted.",
+        "FORBIDDEN": "Not found, or you have no access to it.",
+        "ADD_FAILED": "Could not save the bookmark.",
+        "LIMIT_REACHED": "You have 100 bookmarks. Remove one to add another.",
+        "LABEL_MISSING": "The label in this filter no longer exists."
+    },
     "SIDE_NAV": {
         "PROJECTS": "Projects",
         "SYSTEM_MGMT": {

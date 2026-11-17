@@ -11,8 +11,14 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
+import {
+    ComponentFixture,
+    discardPeriodicTasks,
+    fakeAsync,
+    TestBed,
+    tick,
+} from '@angular/core/testing';
+import { BehaviorSubject, of } from 'rxjs';
 import { RepositoryService as NewRepositoryService } from '../../../../../ng-swagger-gen/services/repository.service';
 import { RepositoryGridviewComponent } from './repository-gridview.component';
 import {
@@ -24,7 +30,7 @@ import {
 } from '../../../shared/services';
 import { delay } from 'rxjs/operators';
 import { ErrorHandler } from '../../../shared/units/error-handler';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, ParamMap } from '@angular/router';
 import { Repository as NewRepository } from '../../../../../ng-swagger-gen/models/repository';
 import { SharedTestingModule } from '../../../shared/shared.module';
 import { GridViewComponent } from './gridview/grid-view.component';
@@ -98,7 +104,11 @@ describe('RepositoryComponentGridview (inline template)', () => {
             return of(true);
         },
     };
+    let queryParamMap: BehaviorSubject<ParamMap>;
     const fakedActivatedRoute = {
+        get queryParamMap() {
+            return queryParamMap;
+        },
         snapshot: {
             queryParams: {},
             parent: {
@@ -108,9 +118,11 @@ describe('RepositoryComponentGridview (inline template)', () => {
                     },
                 },
             },
+            queryParamMap: convertToParamMap({}),
         },
     };
     beforeEach(() => {
+        queryParamMap = new BehaviorSubject(convertToParamMap({}));
         let store = {};
         spyOn(localStorage, 'getItem').and.callFake(key => {
             return store[key];
@@ -176,6 +188,33 @@ describe('RepositoryComponentGridview (inline template)', () => {
             fixtureRepo.nativeElement.querySelector('hbr-gridview');
         expect(cordView).toBeTruthy();
     });
+    it('drops a typed term that a URL filter overtook', fakeAsync(() => {
+        const spy = spyOn(
+            fakedRepositoryService,
+            'listRepositoriesResponse'
+        ).and.callThrough();
+        compRepo.filterComponent.filterTerms.next('old');
+        queryParamMap.next(convertToParamMap({ name: 'redis' }));
+        tick(500);
+        expect(compRepo.lastFilteredRepoName).toBe('redis');
+        expect(compRepo.lastFilteredRepoName).not.toBe('old');
+        expect(spy).not.toHaveBeenCalledWith(
+            jasmine.objectContaining({ q: encodeURIComponent('name=~old') })
+        );
+        compRepo.filterComponent.filterTerms.next('nginx');
+        tick(500);
+        expect(compRepo.lastFilteredRepoName).toBe('nginx');
+        discardPeriodicTasks();
+    }));
+    it('shows the applied filter again when a load drops a typed term', fakeAsync(() => {
+        compRepo.filterComponent.currentValue = 'ngi';
+        compRepo.filterComponent.filterTerms.next('ngi');
+        compRepo.clrLoad({ page: { from: 0, to: 14, size: 15 } });
+        tick(500);
+        expect(compRepo.filterComponent.currentValue).toBe('');
+        expect(compRepo.lastFilteredRepoName).not.toBe('ngi');
+        discardPeriodicTasks();
+    }));
     it('should be list view', async () => {
         const listViewButton =
             fixtureRepo.nativeElement.querySelector('.list-btn');

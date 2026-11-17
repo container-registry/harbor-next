@@ -92,6 +92,7 @@ import {
 } from 'echarts/components';
 import { LabelLayout, UniversalTransition } from 'echarts/features';
 import { CanvasRenderer } from 'echarts/renderers';
+import { BookmarkToggleComponent } from './components/bookmark-toggle/bookmark-toggle.component';
 import { RobotPermissionsPanelComponent } from './components/robot-permissions-panel/robot-permissions-panel.component';
 import { PreferenceSettingsComponent } from '../base/preference-settings/preference-settings.component';
 
@@ -198,6 +199,7 @@ ClarityIcons.add({
         LabelSelectorComponent,
         AppLevelAlertsComponent,
         RobotPermissionsPanelComponent,
+        BookmarkToggleComponent,
     ],
     exports: [
         TranslateModule,
@@ -243,6 +245,7 @@ ClarityIcons.add({
         LabelSelectorComponent,
         AppLevelAlertsComponent,
         RobotPermissionsPanelComponent,
+        BookmarkToggleComponent,
     ],
     providers: [
         { provide: EndpointService, useClass: EndpointDefaultService },

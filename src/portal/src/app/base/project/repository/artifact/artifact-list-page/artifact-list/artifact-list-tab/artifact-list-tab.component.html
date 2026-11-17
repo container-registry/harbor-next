@@ -188,8 +188,15 @@
                         class="mr-1"></app-pull-command>
                     <app-artifact-filter
                         [withDivider]="true"
+                        [initialFilter]="initialFilter"
                         (filterEvent)="filterEvent($event)"
                         [projectId]="projectId"></app-artifact-filter>
+                    <bookmark-toggle
+                        *ngIf="filterBookmark"
+                        class="filter-bookmark"
+                        [size]="18"
+                        addTitleKey="BOOKMARKS.ADD_FILTER"
+                        [target]="filterBookmark"></bookmark-toggle>
                     <span class="refresh-btn" (click)="refresh()">
                         <clr-icon shape="refresh"></clr-icon>
                     </span>

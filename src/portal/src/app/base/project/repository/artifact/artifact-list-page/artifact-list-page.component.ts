@@ -16,6 +16,10 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Project } from '../../../project';
 import { ArtifactListPageService } from './artifact-list-page.service';
 import { Subscription } from 'rxjs';
+import {
+    BookmarkKind,
+    BookmarkTarget,
+} from '../../../../../shared/services/bookmark.service';
 
 @Component({
     selector: 'artifact-list-page',
@@ -29,6 +33,7 @@ export class ArtifactListPageComponent implements OnDestroy {
     referArtifactNameArray: string[] = [];
     depth: string;
     artifactDigest: string;
+    repoBookmark: BookmarkTarget;
     routeParamsSub: Subscription;
     constructor(
         private route: ActivatedRoute,
@@ -64,6 +69,13 @@ export class ArtifactListPageComponent implements OnDestroy {
             this.projectName = (<Project>resolverData['projectResolver']).name;
         }
         this.repoName = this.route.snapshot.params['repo'];
+        this.repoBookmark = {
+            kind: BookmarkKind.REPOSITORY,
+            projectId: +this.projectId,
+            projectName: this.projectName,
+            repoName: this.repoName,
+            defaultLabel: this.repoName,
+        };
         this.artifactListPageService.init(+this.projectId);
     }
     watchGoBackEvt(projectId: string | number): void {
