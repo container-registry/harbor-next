@@ -63,7 +63,11 @@ export class FeaturesComponent implements OnInit {
                     this.features = list?.features || [];
                     this.pending = {};
                 },
-                error: error => this.messageHandler.handleError(error),
+                error: error => {
+                    // fall back to the last stored state, not the rejected request
+                    this.pending = {};
+                    this.messageHandler.handleError(error);
+                },
             });
     }
 

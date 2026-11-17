@@ -65,8 +65,17 @@ func TestRegisterAfterInstanceIsBuilt(t *testing.T) {
 	if _, ok := Instance().GetByName(item.Name); !ok {
 		t.Fatal("registered item is not visible through Instance()")
 	}
-	if _, added := Register(Item{Name: item.Name, ItemType: &StringType{}}); added {
+	existing, added := Register(Item{Name: item.Name, ItemType: &StringType{}})
+	if added {
 		t.Fatal("a second item with the same name must not replace the first")
+	}
+	if _, ok := existing.ItemType.(*BoolType); !ok {
+		t.Fatalf("Register returned %T, want the original BoolType item", existing.ItemType)
+	}
+	if live, _ := Instance().GetByName(item.Name); live == nil {
+		t.Fatal("registered item missing after a duplicate registration")
+	} else if _, ok := live.ItemType.(*BoolType); !ok {
+		t.Fatalf("live item became %T after a duplicate registration", live.ItemType)
 	}
 	Instance().init()
 	if _, ok := Instance().GetByName(item.Name); !ok {

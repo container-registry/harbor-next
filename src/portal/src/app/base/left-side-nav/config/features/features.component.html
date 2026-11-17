@@ -13,6 +13,8 @@
             <a
                 *ngIf="section.link"
                 class="section-link"
+                target="_blank"
+                rel="noopener noreferrer"
                 [href]="section.link"
                 >{{ section.link_text || section.link | translate }}</a
             >
