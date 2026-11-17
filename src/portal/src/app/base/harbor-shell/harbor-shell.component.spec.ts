@@ -267,4 +267,14 @@ describe('HarborShellComponent', () => {
             ).toBeNull();
         });
     });
+
+    it('should show model sync only when the feature is enabled', () => {
+        const appConfigService = TestBed.inject(AppConfigService);
+        const featureEnabled = spyOn(appConfigService, 'featureEnabled');
+        featureEnabled.and.returnValue(false);
+        expect(component.modelSyncEnabled).toBeFalse();
+
+        featureEnabled.and.callFake(key => key === 'enable_model_sync');
+        expect(component.modelSyncEnabled).toBeTrue();
+    });
 });

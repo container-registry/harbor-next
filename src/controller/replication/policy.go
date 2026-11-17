@@ -190,6 +190,9 @@ func (c *controller) validatePolicy(ctx context.Context, policy *model.Policy) e
 		if err != nil {
 			return err
 		}
+		if err := checkRegistryTypeEnabled(ctx, src); err != nil {
+			return err
+		}
 		if err := validateSourceOptions(policy, src); err != nil {
 			return err
 		}
@@ -202,6 +205,9 @@ func (c *controller) validatePolicy(ctx context.Context, policy *model.Policy) e
 	if policy.DestRegistry != nil {
 		dest, err := c.regMgr.Get(ctx, policy.DestRegistry.ID)
 		if err != nil {
+			return err
+		}
+		if err := checkRegistryTypeEnabled(ctx, dest); err != nil {
 			return err
 		}
 		if err := validateDestination(ctx, dest); err != nil {

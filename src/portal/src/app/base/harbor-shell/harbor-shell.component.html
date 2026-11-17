@@ -110,6 +110,7 @@
                             {{ 'SIDE_NAV.SYSTEM_MGMT.REPLICATION' | translate }}
                         </a>
                         <a
+                            *ngIf="modelSyncEnabled"
                             clrVerticalNavLink
                             routerLink="/harbor/model-sync"
                             routerLinkActive="active">

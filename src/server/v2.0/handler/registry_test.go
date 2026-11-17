@@ -16,6 +16,8 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -226,6 +228,7 @@ func (suite *RegistryTestSuite) TestUpdateRegistryStorageSchemeURLRejected() {
 }
 
 func (suite *RegistryTestSuite) TestPreviewRegistryArtifact() {
+	suite.T().Setenv("HARBOR_ENABLE_MODEL_SYNC", "true")
 	suite.Security.On("IsAuthenticated").Return(true).Once()
 	suite.Security.On("Can", mock.Anything, mock.Anything, mock.Anything).Return(true).Once()
 
@@ -265,6 +268,7 @@ func (suite *RegistryTestSuite) TestPreviewRegistryArtifact() {
 }
 
 func (suite *RegistryTestSuite) TestPreviewRegistryArtifactUnsupported() {
+	suite.T().Setenv("HARBOR_ENABLE_MODEL_SYNC", "true")
 	suite.Security.On("IsAuthenticated").Return(true).Once()
 	suite.Security.On("Can", mock.Anything, mock.Anything, mock.Anything).Return(true).Once()
 	suite.regCtl.On("Preview", mock.Anything, int64(1), "library/nginx", "", (*model.FileFilter)(nil)).
@@ -288,6 +292,7 @@ func (suite *RegistryTestSuite) TestPreviewRegistryArtifactRequiresRepository() 
 func (suite *RegistryTestSuite) TestGetRegistryInfoCapabilities() {
 	suite.Security.On("IsAuthenticated").Return(true).Once()
 	suite.Security.On("Can", mock.Anything, mock.Anything, mock.Anything).Return(true).Once()
+	mock.OnAnything(suite.regCtl, "Get").Return(&model.Registry{ID: 1, Type: "x"}, nil).Once()
 	mock.OnAnything(suite.regCtl, "GetInfo").Return(&model.RegistryInfo{
 		Type:       "x",
 		SourceOnly: true, SupportedPreview: true,
@@ -299,6 +304,88 @@ func (suite *RegistryTestSuite) TestGetRegistryInfoCapabilities() {
 	suite.Equal(200, res.StatusCode)
 	suite.Equal(true, body["supported_preview"])
 	suite.Equal(true, body["source_only"])
+}
+
+func (suite *RegistryTestSuite) allowRequest() {
+	suite.Security.On("IsAuthenticated").Return(true).Maybe()
+	suite.Security.On("Can", mock.Anything, mock.Anything, mock.Anything).Return(true).Maybe()
+}
+
+func (suite *RegistryTestSuite) TestPreviewRegistryArtifactModelSyncDisabled() {
+	suite.T().Setenv("HARBOR_ENABLE_MODEL_SYNC", "false")
+	suite.allowRequest()
+
+	res, err := suite.PostJSON("/registries/3/preview", &models.RegistryPreviewRequest{Repository: suite.ptrStr("Org/Model")})
+	suite.Require().NoError(err)
+	suite.Equal(404, res.StatusCode)
+	suite.regCtl.AssertNotCalled(suite.T(), "Preview", testifymock.Anything, testifymock.Anything, testifymock.Anything, testifymock.Anything, testifymock.Anything)
+}
+
+func (suite *RegistryTestSuite) TestCreateRegistryModelSyncGate() {
+	for _, enabled := range []string{"false", "true"} {
+		suite.SetupTest()
+		suite.T().Setenv("HARBOR_ENABLE_MODEL_SYNC", enabled)
+		suite.allowRequest()
+		suite.regCtl.On("Create", mock.Anything, mock.Anything).Return(int64(7), nil).Maybe()
+
+		res, err := suite.PostJSON("/registries", &models.Registry{
+			Name: "hf", Type: model.RegistryTypeHuggingFace, URL: "https://huggingface.co",
+		})
+		suite.Require().NoError(err)
+		if enabled == "true" {
+			suite.Equal(201, res.StatusCode)
+			continue
+		}
+		suite.Equal(403, res.StatusCode)
+		suite.regCtl.AssertNotCalled(suite.T(), "Create", testifymock.Anything, testifymock.Anything)
+	}
+}
+
+func (suite *RegistryTestSuite) TestRegistryInfoAndPingModelSyncDisabled() {
+	suite.T().Setenv("HARBOR_ENABLE_MODEL_SYNC", "false")
+	suite.allowRequest()
+	hf := &model.Registry{ID: 4, Type: model.RegistryTypeHuggingFace, URL: "https://huggingface.co"}
+	mock.OnAnything(suite.regCtl, "Get").Return(hf, nil)
+
+	res, err := suite.GetJSON("/registries/4/info", &map[string]any{})
+	suite.Require().NoError(err)
+	suite.Equal(403, res.StatusCode)
+	suite.regCtl.AssertNotCalled(suite.T(), "GetInfo", testifymock.Anything, testifymock.Anything)
+
+	id := int64(4)
+	res, err = suite.PostJSON("/registries/ping", &models.RegistryPing{ID: &id})
+	suite.Require().NoError(err)
+	suite.Equal(403, res.StatusCode)
+	suite.regCtl.AssertNotCalled(suite.T(), "IsHealthy", testifymock.Anything, testifymock.Anything)
+}
+
+func (suite *RegistryTestSuite) TestProviderListsHideDisabledRegistryType() {
+	for _, enabled := range []bool{false, true} {
+		suite.SetupTest()
+		suite.T().Setenv("HARBOR_ENABLE_MODEL_SYNC", fmt.Sprint(enabled))
+		suite.allowRequest()
+		mock.OnAnything(suite.regCtl, "ListRegistryProviderTypes").
+			Return([]string{model.RegistryTypeHarbor, model.RegistryTypeHuggingFace}, nil).Once()
+		mock.OnAnything(suite.regCtl, "ListRegistryProviderInfos").Return(map[string]*model.AdapterPattern{
+			model.RegistryTypeHarbor:      {},
+			model.RegistryTypeHuggingFace: {SupportedPreview: true},
+		}, nil).Once()
+
+		var types []string
+		res, err := suite.GetJSON("/replication/adapters", &types)
+		suite.Require().NoError(err)
+		suite.Equal(200, res.StatusCode)
+		suite.Equal(enabled, slices.Contains(types, model.RegistryTypeHuggingFace))
+		suite.Contains(types, model.RegistryTypeHarbor)
+
+		infos := map[string]any{}
+		res, err = suite.GetJSON("/replication/adapterinfos", &infos)
+		suite.Require().NoError(err)
+		suite.Equal(200, res.StatusCode)
+		_, hasHF := infos[model.RegistryTypeHuggingFace]
+		suite.Equal(enabled, hasHF)
+		suite.Contains(infos, model.RegistryTypeHarbor)
+	}
 }
 
 func TestRegistryTestSuite(t *testing.T) {
