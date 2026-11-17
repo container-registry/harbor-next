@@ -7,44 +7,17 @@
                 [hidden]="inProgress === false"></span>
         </h2>
         <ul class="nav" role="tablist">
-            <li role="presentation" class="nav-item">
+            <li
+                *ngFor="let tab of tabs; trackBy: trackTab"
+                role="presentation"
+                class="nav-item">
                 <button
-                    id="config-auth"
+                    [id]="tab.id"
                     class="btn btn-link nav-link"
                     type="button"
-                    routerLink="auth"
+                    [routerLink]="tab.route"
                     routerLinkActive="active">
-                    {{ 'CONFIG.AUTH' | translate }}
-                </button>
-            </li>
-            <li role="presentation" class="nav-item">
-                <button
-                    id="config-security"
-                    class="btn btn-link nav-link"
-                    type="button"
-                    routerLink="security"
-                    routerLinkActive="active">
-                    {{ 'CONFIG.SECURITY' | translate }}
-                </button>
-            </li>
-            <li role="presentation" class="nav-item">
-                <button
-                    id="config-system"
-                    class="btn btn-link nav-link"
-                    type="button"
-                    routerLink="setting"
-                    routerLinkActive="active">
-                    {{ 'CONFIG.SYSTEM' | translate }}
-                </button>
-            </li>
-            <li role="presentation" class="nav-item">
-                <button
-                    id="config-audit-log"
-                    class="btn btn-link nav-link"
-                    type="button"
-                    routerLink="audit-log"
-                    routerLinkActive="active">
-                    {{ 'CONFIG.AUDIT_LOG' | translate }}
+                    {{ tab.label | translate }}
                 </button>
             </li>
         </ul>

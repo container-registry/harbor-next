@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 import { Component, OnInit } from '@angular/core';
+import { TranslateService } from '@ngx-translate/core';
 import { ConfigService } from './config.service';
+import { AppConfigService } from '../../../services/app-config.service';
+import { ConfigTab, configTabs } from './config-tabs';
 
 @Component({
     selector: 'config',
@@ -24,7 +27,24 @@ export class ConfigurationComponent implements OnInit {
         return this.conf.getLoadingConfigStatus();
     }
 
-    constructor(private conf: ConfigService) {}
+    constructor(
+        private conf: ConfigService,
+        private appConfigService: AppConfigService,
+        private translate: TranslateService
+    ) {}
+
+    // Tabs come from upstream and from features that add their own, so list
+    // them by translated label; DOM order then matches what is shown.
+    get tabs(): ConfigTab[] {
+        const label = (tab: ConfigTab) => this.translate.instant(tab.label);
+        return configTabs()
+            .filter(tab => !tab.visible || tab.visible(this.appConfigService))
+            .sort((a, b) => label(a).localeCompare(label(b)));
+    }
+
+    trackTab(_: number, tab: ConfigTab): string {
+        return tab.id;
+    }
 
     ngOnInit(): void {
         // Refresh config every time when entering the configuration page

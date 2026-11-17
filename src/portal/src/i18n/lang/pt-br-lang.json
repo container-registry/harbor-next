@@ -839,6 +839,11 @@
         "ROOT_CERT_LINK": "Download",
         "REGISTRY_CERTIFICATE": "Certificado do Repositório",
         "NO_CHANGE": "Sem alterações para salvar.",
+        "FEATURES": "Features",
+        "OPTIONAL_FEATURES": "Optional Features",
+        "FEATURE_BETA": "Beta",
+        "FEATURE_BETA_WARNING": "Beta feature: behavior and stored data formats may still change between releases.",
+        "FEATURE_LOCKED_BY": "Set by {{source}}",
         "SKIP_SCANNER_PULL_TIME": "Retain image \"last pull time\" on scanning",
         "TOOLTIP": {
             "SELF_REGISTRATION_ENABLE": "Habilitar cadastro de usuários.",

@@ -28,6 +28,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/config/models"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/log"
+	"github.com/goharbor/harbor/src/pkg/feature"
 	"github.com/goharbor/harbor/src/pkg/systeminfo"
 	"github.com/goharbor/harbor/src/pkg/systeminfo/imagestorage"
 	"github.com/goharbor/harbor/src/pkg/version"
@@ -63,6 +64,7 @@ type protectedData struct {
 	RegistryStorageProviderName string
 	ReadOnly                    bool
 	NotificationEnable          bool
+	Features                    map[string]bool
 }
 
 // Options provide a set of attributes to control what info should be returned
@@ -137,8 +139,18 @@ func (c *controller) GetInfo(ctx context.Context, opt Options) (*Data, error) {
 		ProjectCreationRestrict:     utils.SafeCastString(cfg[common.ProjectCreationRestriction]),
 		RegistryStorageProviderName: utils.SafeCastString(cfg[common.RegistryStorageProviderName]),
 		NotificationEnable:          utils.SafeCastBool(cfg[common.NotificationEnable]),
+		Features:                    enabledFeatures(ctx),
 	}
 	return res, nil
+}
+
+func enabledFeatures(ctx context.Context) map[string]bool {
+	result := map[string]bool{}
+	for _, def := range feature.Definitions() {
+		enabled, _, _ := feature.Resolve(ctx, def.ConfigKey)
+		result[def.ConfigKey] = enabled
+	}
+	return result
 }
 
 func OIDCProviderName(cfg map[string]any) string {
