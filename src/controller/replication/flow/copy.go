@@ -91,7 +91,11 @@ func (c *copyFlow) Run(ctx context.Context) error {
 	srcResources = assembleSourceResources(srcResources, c.policy)
 	if !srcOptions.IsEmpty() {
 		for _, r := range srcResources {
-			r.SourceOptions = srcOptions
+			opts := *srcOptions
+			if r.SourceOptions != nil {
+				opts.Revisions = r.SourceOptions.Revisions
+			}
+			r.SourceOptions = &opts
 		}
 	}
 	info, err := dstAdapter.Info()

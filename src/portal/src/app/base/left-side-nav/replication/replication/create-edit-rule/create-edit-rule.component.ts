@@ -88,6 +88,9 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
     isRuleNameValid = true;
     nameChecker: Subject<string> = new Subject<string>();
     policyId: number;
+    // preservedFields are rule settings this form has no control for, such as the
+    // Model Sync rename; an update sends them back unchanged
+    preservedFields: Partial<ReplicationPolicy> = {};
     confirmSub: Subscription;
     ruleForm: UntypedFormGroup;
     copyUpdateForm: ReplicationPolicy;
@@ -586,7 +589,10 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
             );
         } else {
             this.repService
-                .updateReplicationRule(this.policyId, this.ruleForm.value)
+                .updateReplicationRule(this.policyId, {
+                    ...this.ruleForm.value,
+                    ...this.preservedFields,
+                })
                 .subscribe(
                     () => {
                         this.translateService
@@ -605,6 +611,13 @@ export class CreateEditRuleComponent implements OnInit, OnDestroy {
     }
     openCreateEditRule(rule?: ReplicationPolicy): void {
         this.formReset();
+        this.preservedFields = {};
+        if (rule?.dest_repository) {
+            this.preservedFields.dest_repository = rule.dest_repository;
+        }
+        if (rule?.revision_tag) {
+            this.preservedFields.revision_tag = rule.revision_tag;
+        }
         this.copyUpdateForm = clone(this.ruleForm.value);
         this.inlineAlert.close();
         this.noSelectedEndpoint = true;

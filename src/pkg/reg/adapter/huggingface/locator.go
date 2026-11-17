@@ -111,11 +111,6 @@ func (l *locator) refsKey(repository string) string {
 	return l.prefix() + "refs:" + repository
 }
 
-// revisionKey maps a revision tag to its full commit, which the Hub cannot look up by short sha.
-func (l *locator) revisionKey(repository, tag string) string {
-	return l.prefix() + "revision:" + repository + ":" + tag
-}
-
 // scannedKey marks that every ref head of a repository was synthesized with filter and indexed,
 // so a digest still missing from the index is not in any of them.
 func (l *locator) scannedKey(repository string, filter *model.FileFilter) string {
@@ -164,23 +159,6 @@ func (l *locator) put(ctx context.Context, repository string, d digest.Digest, l
 	if err := l.cache.Save(ctx, l.digestKey(repository, d), loc, digestTTL); err != nil {
 		log.Warningf("failed to save %s to cache: %v", l.digestKey(repository, d), err)
 	}
-}
-
-// pinRevision remembers the commit of a revision tag seen while listing, so a copy queued
-// behind it still resolves the tag after its branch moved on.
-func (l *locator) pinRevision(ctx context.Context, repository, tag, commit string) {
-	key := l.revisionKey(repository, tag)
-	if err := l.cache.Save(ctx, key, commit, snapshotTTL); err != nil {
-		log.Warningf("failed to save %s to cache: %v", key, err)
-	}
-}
-
-func (l *locator) pinnedRevision(ctx context.Context, repository, tag string) (string, bool) {
-	var commit string
-	if err := l.cache.Fetch(ctx, l.revisionKey(repository, tag), &commit); err != nil || commit == "" {
-		return "", false
-	}
-	return commit, true
 }
 
 func (l *locator) scanned(ctx context.Context, repository string, filter *model.FileFilter) bool {

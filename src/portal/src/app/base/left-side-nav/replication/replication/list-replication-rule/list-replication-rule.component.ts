@@ -253,14 +253,26 @@ export class ListReplicationRuleComponent implements OnInit, OnDestroy {
         );
     }
 
+    // editRule asks for the model source types before choosing the editor, so a lookup still
+    // pending or failed never sends a Model Sync rule to the generic form
     editRule(rule: ReplicationPolicy) {
-        if (this.isModelRule(rule)) {
-            this.router.navigate(['harbor', 'model-sync'], {
-                queryParams: { edit: rule.id },
-            });
+        const type = rule?.src_registry?.type;
+        if (!type) {
+            this.editOne.emit(rule);
             return;
         }
-        this.editOne.emit(rule);
+        this.modelSyncService.isSourceType(type).subscribe(
+            isModel => {
+                if (isModel) {
+                    this.router.navigate(['harbor', 'model-sync'], {
+                        queryParams: { edit: rule.id },
+                    });
+                    return;
+                }
+                this.editOne.emit(rule);
+            },
+            error => this.errorHandlerEntity.error(error)
+        );
     }
 
     deleteRule(rule: ReplicationPolicy) {

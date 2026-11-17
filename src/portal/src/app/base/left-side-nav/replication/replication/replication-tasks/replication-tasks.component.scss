@@ -1,7 +1,7 @@
 .replication-tasks {
     .overview-section {
         .title-wrapper {
-            .onback{
+            .onback {
                 color: #007cbb;
                 font-size: 14px;
                 cursor: pointer;
@@ -11,12 +11,12 @@
                 display: flex;
                 align-items: center;
 
-                >div:first-child {
+                > div:first-child {
                     min-width: 250px;
                     margin-right: 5px;
                 }
 
-                >div:nth-child(2) {
+                > div:nth-child(2) {
                     width: 150px;
 
                     span {
@@ -64,19 +64,19 @@
                     }
 
                     .num-failed {
-                        background-color: #C92101;
+                        background-color: #c92101;
                     }
 
                     .num-progress {
-                        background-color: #1C5898;
+                        background-color: #1c5898;
                     }
 
                     .num-stopped {
-                        background-color: #A1A1A1;
+                        background-color: #a1a1a1;
                     }
 
                     .detail-span {
-                        flex:0 0 150px;
+                        flex: 0 0 150px;
                         margin: 10px 0 0 10px;
                     }
 
@@ -95,7 +95,7 @@
                     width: 140px;
                 }
                 /* stylelint-disable */
-                >div {
+                > div {
                     margin-top: 10px;
                 }
             }
@@ -122,7 +122,7 @@
             }
 
             .refresh-btn:hover {
-                color: #007CBB;
+                color: #007cbb;
             }
         }
 
@@ -144,4 +144,3 @@
     margin-top: 16px;
     margin-left: -5px;
 }
-

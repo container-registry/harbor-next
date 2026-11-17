@@ -153,7 +153,7 @@ func (a *adapter) commitOf(ctx context.Context, repository, tag string) (string,
 	}
 	commit, err := newRefIndex(refs).commit(tag)
 	if errors.IsNotFoundErr(err) && model.IsRevisionTag(tag) {
-		if pinned, ok := a.locator.pinnedRevision(ctx, repository, tag); ok {
+		if pinned, ok := a.opts.Revisions[tag]; ok {
 			return pinned, nil
 		}
 	}

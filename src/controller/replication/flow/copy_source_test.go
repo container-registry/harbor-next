@@ -73,6 +73,7 @@ func TestCopyFlowCarriesSourceOptions(t *testing.T) {
 			Repository: &model.Repository{Name: "org/model"},
 			Artifacts:  []*model.Artifact{{Tags: []string{"main"}}},
 		},
+		SourceOptions: &model.SourceOptions{Revisions: map[string]string{"sha-aaaaaaaaaaaa": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},
 	}}, nil)
 	adp.On("PrepareForPush", mock.Anything).Return(nil)
 
@@ -90,6 +91,9 @@ func TestCopyFlowCarriesSourceOptions(t *testing.T) {
 
 	want := &model.SourceOptions{FileFilter: &model.FileFilter{Include: []string{"*.json"}}}
 	assert.Equal(t, want, adp.got, "the adapter that fetches the artifacts is configured")
-	assert.Equal(t, want, src.SourceOptions, "the transfer gets the options with the source resource")
+	assert.Equal(t, &model.SourceOptions{
+		FileFilter: want.FileFilter,
+		Revisions:  map[string]string{"sha-aaaaaaaaaaaa": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+	}, src.SourceOptions, "the transfer gets the options and the listed revisions with the source resource")
 	assert.Nil(t, dst.SourceOptions)
 }

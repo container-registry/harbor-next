@@ -53,7 +53,7 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 				log.Warningf("skip hugging face model %s: its lowercase form is not a valid repository name", modelID)
 				return nil
 			}
-			artifacts, err := a.listArtifacts(ctx, modelID, filters)
+			artifacts, revisions, err := a.listArtifacts(ctx, modelID, filters)
 			if err != nil {
 				return err
 			}
@@ -67,6 +67,9 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 					Repository: &model.Repository{Name: repository},
 					Artifacts:  artifacts,
 				},
+			}
+			if len(revisions) > 0 {
+				resources[i].SourceOptions = &model.SourceOptions{Revisions: revisions}
 			}
 			return nil
 		})
@@ -138,10 +141,12 @@ func (a *adapter) listModelIDs(ctx context.Context, pattern string) ([]string, e
 	return ids, nil
 }
 
-func (a *adapter) listArtifacts(ctx context.Context, modelID string, filters []*model.Filter) ([]*model.Artifact, error) {
+// listArtifacts returns the artifacts of a model and, with revision tags on, the full commit of
+// each revision tag it added.
+func (a *adapter) listArtifacts(ctx context.Context, modelID string, filters []*model.Filter) ([]*model.Artifact, map[string]string, error) {
 	refs, err := a.hub.Refs(ctx, modelID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	idx := newRefIndex(refs)
 	for tag, names := range idx.collisions {
@@ -159,11 +164,16 @@ func (a *adapter) listArtifacts(ctx context.Context, modelID string, filters []*
 	}
 	artifacts, err = filter.DoFilterArtifacts(artifacts, filters)
 	if err != nil || !a.opts.RevisionTag {
-		return artifacts, err
+		return artifacts, nil, err
 	}
+	// two ref heads whose commits share the 12-character prefix would share a revision tag
+	revisionCommits := map[string]int{}
+	for _, c := range commits {
+		revisionCommits[model.RevisionTag(c)]++
+	}
+	revisions := map[string]string{}
 	// The revision tag is added after the tag filter: it follows the moving tags the filter
 	// selected rather than being matched itself.
-	repository, _ := repositoryOf(modelID)
 	for _, art := range artifacts {
 		if len(art.Tags) == 0 {
 			continue
@@ -180,8 +190,12 @@ func (a *adapter) listArtifacts(ctx context.Context, modelID string, filters []*
 				continue
 			}
 		}
-		a.locator.pinRevision(ctx, repository, tag, commit)
+		if revisionCommits[tag] > 1 {
+			log.Warningf("skip revision tag %s of hugging face model %s: several ref heads share it", tag, modelID)
+			continue
+		}
+		revisions[tag] = commit
 		art.Tags = append(art.Tags, tag)
 	}
-	return artifacts, nil
+	return artifacts, revisions, nil
 }

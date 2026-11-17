@@ -15,7 +15,6 @@
 package huggingface
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -83,25 +82,32 @@ func TestPullByRevisionTag(t *testing.T) {
 func TestRevisionTagResolvesAfterBranchMoves(t *testing.T) {
 	h := hubtest.New(tinyModel())
 	defer h.Close()
-	c := newMemoryCache()
-	a := newTestAdapter(t, hubRegistry(h, 1, ""), c)
-	require.NoError(t, a.ConfigureSource(&model.SourceOptions{RevisionTag: true}))
+	reg := hubRegistry(h, 1, "")
+	lister := newTestAdapter(t, reg, newMemoryCache())
+	require.NoError(t, lister.ConfigureSource(&model.SourceOptions{RevisionTag: true}))
 
-	res, err := a.FetchArtifacts([]*model.Filter{
+	res, err := lister.FetchArtifacts([]*model.Filter{
 		{Type: model.FilterTypeName, Value: "org/tiny-model"},
 		{Type: model.FilterTypeTag, Value: "main"},
 	})
 	require.NoError(t, err)
 	require.Equal(t, []string{"main", revisionTagMain}, res[0].Metadata.Artifacts[0].Tags)
-	listed := manifestDigest(t, a, "main")
+	require.NotNil(t, res[0].SourceOptions)
+	assert.Equal(t, map[string]string{revisionTagMain: commitMain}, res[0].SourceOptions.Revisions)
+	listed := manifestDigest(t, lister, "main")
 
-	// main moves on before the copy runs
+	// every ref leaves the listed commit before the worker copies it
 	h.SetBranch("Org/Tiny-Model", "main", commitNew)
 	h.SetBranch("Org/Tiny-Model", "feature/x", commitNew)
-	require.NoError(t, c.Delete(context.Background(), a.locator.refsKey(repoTiny)))
 
-	assert.Equal(t, listed, manifestDigest(t, a, revisionTagMain), "the revision tag keeps the listed commit")
-	assert.NotEqual(t, listed, manifestDigest(t, a, "main"))
+	// the worker runs in another process with its own cache and gets the pins in the payload
+	worker := newTestAdapter(t, reg, newMemoryCache())
+	_, _, err = worker.PullManifest(repoTiny, revisionTagMain)
+	assert.True(t, errors.IsNotFoundErr(err), "without the listed commit the revision tag is gone")
+
+	require.NoError(t, worker.ConfigureSource(&model.SourceOptions{RevisionTag: true, Revisions: res[0].SourceOptions.Revisions}))
+	assert.Equal(t, listed, manifestDigest(t, worker, revisionTagMain), "the revision tag keeps the listed commit")
+	assert.NotEqual(t, listed, manifestDigest(t, worker, "main"))
 }
 
 func TestRevisionTagSkippedWhenARefHasItsName(t *testing.T) {

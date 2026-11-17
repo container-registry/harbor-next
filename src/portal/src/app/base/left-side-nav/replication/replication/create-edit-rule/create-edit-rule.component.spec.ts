@@ -295,6 +295,20 @@ describe('CreateEditRuleComponent (inline template)', () => {
         expect(ruleNameInput.value.trim()).toEqual('sync_01');
     }));
 
+    it('Should keep settings it has no control for', () => {
+        comp.openCreateEditRule({
+            ...mockRule,
+            dest_repository: 'renamed',
+            revision_tag: true,
+        } as any);
+        expect(comp.preservedFields).toEqual({
+            dest_repository: 'renamed',
+            revision_tag: true,
+        });
+        comp.openCreateEditRule();
+        expect(comp.preservedFields).toEqual({});
+    });
+
     it('List all Registries Response', fakeAsync(() => {
         fixture.detectChanges();
         comp.ngOnInit();

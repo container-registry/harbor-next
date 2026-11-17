@@ -249,6 +249,7 @@ describe('ModelSyncService', () => {
         expect(sent.filters).toContain({ type: 'label', value: ['keep'] });
         expect(sent.filters).toContain({ type: 'name', value: 'Org/New' });
         expect(sent.filters).not.toContain({ type: 'name', value: 'Org/Old' });
+        expect(sent.dest_namespace_replace_count).toEqual(-1);
     });
 
     it('toggles only the enabled flag of the stored rule', () => {

@@ -125,6 +125,23 @@ describe('ModelSyncExecutionTasksComponent', () => {
         discardPeriodicTasks();
     }));
 
+    it('should keep the sort on a manual refresh', fakeAsync(() => {
+        const listTasks = spyOn(
+            mockService as any,
+            'listTasks'
+        ).and.callThrough();
+        const sort = { by: 'start_time', reverse: true };
+        component.clrLoadTasks(true, { page: { size: 15 }, sort } as any);
+        tick();
+        component.refresh();
+        tick();
+        expect((listTasks.calls.mostRecent().args as any[])[1].sort).toEqual(
+            '-start_time'
+        );
+        component.ngOnDestroy();
+        discardPeriodicTasks();
+    }));
+
     it('should not poll again once destroyed', fakeAsync(() => {
         component.loadExecution();
         tick();

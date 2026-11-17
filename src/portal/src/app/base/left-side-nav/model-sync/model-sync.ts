@@ -148,6 +148,7 @@ const MANAGED_FIELDS: (keyof ReplicationPolicy)[] = [
     'description',
     'src_registry',
     'dest_namespace',
+    'dest_namespace_replace_count',
     'dest_repository',
     'trigger',
     'enabled',

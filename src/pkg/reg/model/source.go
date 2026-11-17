@@ -214,6 +214,10 @@ type SourceOptions struct {
 	// RevisionTag adds RevisionTag(revision) to the tags of every fetched artifact, so the copy
 	// keeps an immutable tag next to the moving ones.
 	RevisionTag bool `json:"revision_tag,omitempty"`
+	// Revisions maps each revision tag a source resource lists to its full commit. The source
+	// adapter fills it while listing; the copy carries it to the transfer, which may run after
+	// the branch moved on and the Hub can no longer resolve the short commit.
+	Revisions map[string]string `json:"revisions,omitempty"`
 }
 
 // IsEmpty reports whether the options change nothing.

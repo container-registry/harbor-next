@@ -162,7 +162,7 @@ export class ModelSyncExecutionTasksComponent implements OnInit, OnDestroy {
     refresh(): void {
         this.currentPage = 1;
         this.loadExecution();
-        this.clrLoadTasks(true, { page: {} });
+        this.clrLoadTasks(true, { ...this.lastState, page: {} });
     }
 
     canStop(): boolean {

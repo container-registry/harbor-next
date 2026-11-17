@@ -16,7 +16,8 @@ import { ConfirmationDialogComponent } from '../../../../../shared/components/co
 import { ListReplicationRuleComponent } from './list-replication-rule.component';
 import { ErrorHandler } from '../../../../../shared/units/error-handler';
 import { OperationService } from '../../../../../shared/components/operation/operation.service';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
+import { ModelSyncService } from '../../../model-sync/model-sync.service';
 import { delay } from 'rxjs/operators';
 import { HttpHeaders, HttpResponse } from '@angular/common/http';
 import { SharedTestingModule } from '../../../../../shared/shared.module';
@@ -82,6 +83,9 @@ describe('ListReplicationRuleComponent (inline template)', () => {
     };
     const fakedErrorHandler = {
         info() {
+            return undefined;
+        },
+        error() {
             return undefined;
         },
     };
@@ -187,6 +191,9 @@ describe('ListReplicationRuleComponent (inline template)', () => {
         const navigate = spyOn(router, 'navigate').and.resolveTo(true);
         const edited = spyOn(comp.editOne, 'emit');
         comp.modelSourceTypes = ['huggingface'];
+        spyOn(TestBed.inject(ModelSyncService), 'isSourceType').and.callFake(
+            type => of(type === 'huggingface')
+        );
         const model: ReplicationPolicy = {
             id: 9,
             name: 'smollm',
@@ -207,5 +214,21 @@ describe('ListReplicationRuleComponent (inline template)', () => {
         expect(comp.isModelRule(image)).toBeFalse();
         comp.editRule(image);
         expect(edited).toHaveBeenCalledWith(image);
+    });
+
+    it('should open no editor while the model source types cannot be read', () => {
+        const router = TestBed.inject(Router);
+        const navigate = spyOn(router, 'navigate').and.resolveTo(true);
+        const edited = spyOn(comp.editOne, 'emit');
+        spyOn(TestBed.inject(ModelSyncService), 'isSourceType').and.returnValue(
+            throwError(() => new Error('down'))
+        );
+        comp.editRule({
+            id: 9,
+            name: 'smollm',
+            src_registry: { id: 2, type: 'huggingface' },
+        });
+        expect(navigate).not.toHaveBeenCalled();
+        expect(edited).not.toHaveBeenCalled();
     });
 });
