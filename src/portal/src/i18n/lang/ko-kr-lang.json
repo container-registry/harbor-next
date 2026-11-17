@@ -539,6 +539,7 @@
         "MEMBERS": "프로젝트 멤버",
         "ROBOTS": "로봇",
         "ARTIFACTS": "아티팩트",
+        "TAGS": "Tags",
         "PROJECTS": "프로젝트",
         "CONFIGURATION": "Configuration",
         "REPOSITORIES": "저장소"

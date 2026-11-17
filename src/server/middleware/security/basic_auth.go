@@ -59,6 +59,9 @@ func GetClientIP(r *http.Request) string {
 			return truncateRunes(ip.String(), maxClientIPLen)
 		}
 	}
+	if ip := parseIP(r.RemoteAddr); ip != nil {
+		return ip.String()
+	}
 	return truncateRunes(r.RemoteAddr, maxClientIPLen)
 }
 

@@ -30,9 +30,27 @@ type Resolver interface {
 	PreCheck(ctx context.Context, url string, method string) (bool, string)
 }
 
+// Snapshotter is implemented by resolvers that need state from before the
+// request is handled, such as the values an update overwrites.
+type Snapshotter interface {
+	Snapshot(ctx context.Context, payload string) any
+}
+
 var urlResolvers = map[string]Resolver{}
 
 var mu = &sync.Mutex{}
+
+// compiledPatterns caches resolver URL patterns; the log middleware matches
+// every request against all of them.
+var compiledPatterns sync.Map
+
+func patternRegexp(urlPattern string) *regexp.Regexp {
+	if re, ok := compiledPatterns.Load(urlPattern); ok {
+		return re.(*regexp.Regexp)
+	}
+	re, _ := compiledPatterns.LoadOrStore(urlPattern, regexp.MustCompile(urlPattern))
+	return re.(*regexp.Regexp)
+}
 
 // RegisterResolver register a resolver for a specific URL pattern
 func RegisterResolver(urlPattern string, resolver Resolver) {
@@ -87,6 +105,8 @@ type Metadata struct {
 	ResourceName string
 	// Payload request payload
 	Payload string
+	// Before is what the resolver's Snapshot captured before the request ran
+	Before any
 }
 
 // Resolve parse the audit information from CommonEventMetadata
@@ -116,6 +136,17 @@ func (c *Metadata) PreCheckMetadata() (bool, string) {
 	return false, ""
 }
 
+// Snapshot lets the matched resolver capture state before the request is handled.
+func (c *Metadata) Snapshot(payload string) {
+	resolver, metadata, ok := c.resolver()
+	if !ok {
+		return
+	}
+	if s, ok := resolver.(Snapshotter); ok {
+		c.Before = s.Snapshot(metadata.Ctx, payload)
+	}
+}
+
 func (c *Metadata) resolver() (Resolver, *Metadata, bool) {
 	metadata := *c
 	if requestURL, err := url.Parse(c.RequestURL); err == nil {
@@ -123,7 +154,7 @@ func (c *Metadata) resolver() (Resolver, *Metadata, bool) {
 	}
 
 	for urlPattern, resolver := range Resolvers() {
-		match := regexp.MustCompile(urlPattern).FindStringIndex(metadata.RequestURL)
+		match := patternRegexp(urlPattern).FindStringIndex(metadata.RequestURL)
 		if match != nil && match[0] == 0 && match[1] == len(metadata.RequestURL) {
 			return resolver, &metadata, true
 		}

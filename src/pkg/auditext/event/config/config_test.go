@@ -16,7 +16,10 @@ package config
 
 import (
 	"context"
+	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/goharbor/harbor/src/controller/event/metadata/commonevent"
 	"github.com/goharbor/harbor/src/controller/event/model"
@@ -105,5 +108,69 @@ func TestConfigureEventResolver_PreCheck(t *testing.T) {
 				t.Errorf("ConfigureEventResolver.PreCheck() got1 = %v, want %v", got1, tt.wantTopic)
 			}
 		})
+	}
+}
+
+func TestDescribeChangesShowsOldAndNew(t *testing.T) {
+	before := map[string]string{"auth_mode": "db_auth", "ldap_url": "ldap://a", "self_registration": "true", "ldap_timeout": "5"}
+	assert.Equal(t, []string{"auth_mode db_auth -> ldap_auth", "ldap_timeout 5 -> 10", "ldap_url ldap://a -> ldap://b", "self_registration true -> false"},
+		describeChanges(`{"ldap_url":"ldap://b","auth_mode":"ldap_auth","self_registration":false,"ldap_timeout":10}`, before))
+	assert.Equal(t, []string{"auth_mode db_auth -> ldap_auth"}, describeChanges(`{"auth_mode":"ldap_auth","no_such_key":1,"ldap_url":"ldap://a"}`, before),
+		"unknown keys are ignored by the API and unchanged values are left out")
+	assert.Equal(t, []string{"ldap_base_dn -> dc=example"}, describeChanges(`{"ldap_base_dn":"dc=example"}`, nil), "no old value read")
+	assert.Equal(t, []string{`ldap_filter "" -> "(objectClass=person), x"`}, describeChanges(`{"ldap_filter":"(objectClass=person), x"}`, map[string]string{"ldap_filter": ""}))
+	assert.Empty(t, describeChanges("not json", nil))
+	assert.Empty(t, describeChanges(`{}`, nil))
+}
+
+func TestDescribeChangesTruncatesLongValues(t *testing.T) {
+	got := describeChanges(`{"ldap_base_dn":"`+strings.Repeat("a", 500)+`"}`, map[string]string{"ldap_base_dn": "dc=x"})
+	assert.Len(t, got, 1)
+	assert.Equal(t, "ldap_base_dn dc=x -> "+strings.Repeat("a", maxValueLength-3)+"...", got[0])
+}
+
+func TestDescribeChangesNeverShowsSecrets(t *testing.T) {
+	payload := `{"ldap_search_password":"hunter2","oidc_client_secret":"s3cr3t","robot_token_duration":30,"uaa_client_secret":"x","auth_mode":"oidc_auth"}`
+	before := map[string]string{"auth_mode": "db_auth", "ldap_search_password": "old-hunter2"}
+	got := describeChanges(payload, before)
+	assert.Equal(t, []string{"auth_mode db_auth -> oidc_auth", "ldap_search_password changed", "oidc_client_secret changed", "robot_token_duration changed", "uaa_client_secret changed"}, got)
+	joined := strings.Join(got, ", ")
+	for _, secret := range []string{"hunter2", "s3cr3t", "30"} {
+		assert.NotContains(t, joined, secret)
+	}
+}
+
+func TestDescribeChangesNormalizesLikeTheAPI(t *testing.T) {
+	assert.Empty(t, describeChanges(`{"robot_name_prefix":" robot$ "}`, map[string]string{"robot_name_prefix": "robot$"}),
+		"the API trims the prefix, so nothing changed")
+	assert.Equal(t, []string{"self_registration false -> true"},
+		describeChanges(`{"core_url":"http://elsewhere","self_registration":true,"ldap_url":null}`, map[string]string{"self_registration": "false", "ldap_url": "ldap://a"}),
+		"the update API ignores core_url and nulls")
+}
+
+func TestResolveRecordsTheRequestNotTheLiveConfig(t *testing.T) {
+	evt := &event.Event{}
+	ce := &commonevent.Metadata{Username: "admin", RequestURL: "/api/v2.0/configurations", RequestMethod: "PUT", ResponseCode: 200,
+		RequestPayload: `{"ldap_url":"ldap://mine"}`, Before: map[string]string{"ldap_url": "ldap://a"}}
+	assert.NoError(t, (&resolver{}).Resolve(ce, evt))
+	assert.Equal(t, "update configuration: ldap_url ldap://a -> ldap://mine", evt.Data.(*model.CommonEvent).OperationDescription)
+}
+
+func TestDescribeChangesHidesStructuredValues(t *testing.T) {
+	got := describeChanges(`{"oidc_extra_redirect_parms":"{\"client_assertion\":\"s3cr3t\"}"}`, nil)
+	assert.Equal(t, []string{"oidc_extra_redirect_parms changed"}, got)
+}
+
+func TestDescribeChangesQuotesControlCharacters(t *testing.T) {
+	assert.Equal(t, []string{`ldap_base_dn dc=a -> "dc=b\nadmin deleted everything"`},
+		describeChanges(`{"ldap_base_dn":"dc=b\nadmin deleted everything"}`, map[string]string{"ldap_base_dn": "dc=a"}))
+}
+
+func TestSensitive(t *testing.T) {
+	for _, k := range []string{"ldap_search_password", "oidc_client_secret", "ldap_verify_cert", "robot_token_duration", "some_api_key", "x_credentials", "oidc_extra_redirect_parms"} {
+		assert.True(t, sensitive(k), k)
+	}
+	for _, k := range []string{"auth_mode", "ldap_url", "self_registration", "ldap_base_dn"} {
+		assert.False(t, sensitive(k), k)
 	}
 }

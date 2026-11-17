@@ -539,6 +539,7 @@
         "MEMBERS": "项目成员",
         "ROBOTS": "机器人",
         "ARTIFACTS": "Artifacts",
+        "TAGS": "Tags",
         "PROJECTS": "项目",
         "CONFIGURATION": "Configuration",
         "REPOSITORIES": "仓库"

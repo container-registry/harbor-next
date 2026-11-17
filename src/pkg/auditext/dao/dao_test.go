@@ -18,6 +18,7 @@ package dao
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -158,6 +159,29 @@ func (d *daoTestSuite) TestCreate() {
 	}
 	_, err := d.dao.Create(d.ctx, audit)
 	d.Require().Nil(err)
+}
+
+func (d *daoTestSuite) TestUpdateUsernameMasksTheSummary() {
+	create := func(desc string) int64 {
+		id, err := d.dao.Create(d.ctx, &model.AuditLogExt{
+			Operation: "pull", ResourceType: "artifact", Resource: "bob/bob-app:1",
+			Username: "bob", OperationDescription: desc, IsSuccessful: true, OpTime: time.Now(),
+		})
+		d.Require().Nil(err)
+		return id
+	}
+	summary := create("bob pulled artifact bob/bob-app:1")
+	long := create("bob " + strings.Repeat("x", 1020))
+	d.Require().Nil(d.dao.UpdateUsername(d.ctx, "bob", "8a7c1e2f"))
+
+	audit, err := d.dao.Get(d.ctx, summary)
+	d.Require().Nil(err)
+	d.Equal("8a7c1e2f", audit.Username)
+	d.Equal("8a7c1e2f pulled artifact bob/bob-app:1", audit.OperationDescription, "only the actor is masked")
+	audit, err = d.dao.Get(d.ctx, long)
+	d.Require().Nil(err)
+	d.Equal("8a7c1e2f", audit.Username)
+	d.Len(audit.OperationDescription, 1024, "the masked summary still fits the column")
 }
 
 func (d *daoTestSuite) TestPurge() {

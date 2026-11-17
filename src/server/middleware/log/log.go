@@ -72,6 +72,7 @@ func Middleware() func(http.Handler) http.Handler {
 			if secCtx, ok := security.FromContext(r.Context()); ok {
 				e.Username = secCtx.GetUsername()
 			}
+			e.Snapshot(requestContent)
 			rw := &ResponseWriter{
 				ResponseWriter: w,
 				statusCode:     http.StatusOK,
