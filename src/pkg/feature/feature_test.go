@@ -267,7 +267,7 @@ func TestSectionsAreOrderedAndOnlyNonEmpty(t *testing.T) {
 	if strings.Contains(strings.Join(ids, ","), "test_empty") {
 		t.Fatalf("empty section listed: %v", ids)
 	}
-	want := []string{"test_section", OptionalSection}
+	want := []string{OptionalSection, "test_section"}
 	got := []string{}
 	for _, id := range ids {
 		if id == "test_section" || id == OptionalSection {

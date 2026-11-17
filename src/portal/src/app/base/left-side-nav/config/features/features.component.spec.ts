@@ -30,7 +30,7 @@ function featureList(): FeatureList {
                 link_text: 'Request a license',
                 link: 'mailto:sales@example.com?body=Features%3A%20none',
             },
-            { id: 'optional', title: 'CONFIG.OPTIONAL_FEATURES' },
+            { id: 'optional' },
         ],
         features: [
             {
@@ -130,6 +130,18 @@ describe('FeaturesComponent', () => {
         );
         expect(sections[1].querySelector('.beta-badge')).not.toBeNull();
         expect(sections[1].querySelector('a.section-link')).toBeNull();
+    });
+
+    it('shows a heading only for sections that have a title', async () => {
+        setup();
+        await render();
+        const sections = Array.from(
+            fixture.nativeElement.querySelectorAll('form section')
+        ) as HTMLElement[];
+        expect(sections[0].querySelector('h3')?.textContent).toContain(
+            'Licensed Features'
+        );
+        expect(sections[1].querySelector('h3')).toBeNull();
     });
 
     it('locks a feature the backend reports as not editable', async () => {

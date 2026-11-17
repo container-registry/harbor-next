@@ -3,7 +3,7 @@
         *ngFor="let section of sections"
         class="feature-section"
         [id]="'feature-section-' + section.id">
-        <h3>{{ section.title | translate }}</h3>
+        <h3 *ngIf="section.title">{{ section.title | translate }}</h3>
         <p
             *ngIf="section.description || section.link"
             class="p7 mt-0 section-description">

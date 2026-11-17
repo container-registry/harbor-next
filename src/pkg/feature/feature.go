@@ -104,7 +104,8 @@ var (
 )
 
 func init() {
-	RegisterSection(Section{ID: OptionalSection, Title: "CONFIG.OPTIONAL_FEATURES", Order: 100})
+	// optional features lead the page and need no heading of their own
+	RegisterSection(Section{ID: OptionalSection})
 }
 
 // Register adds feature definitions and their boolean configuration items.
