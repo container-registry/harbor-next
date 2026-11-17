@@ -111,7 +111,6 @@ describe('RepositoryComponentGridview (inline template)', () => {
         },
         snapshot: {
             queryParams: {},
-            queryParamMap: convertToParamMap({}),
             parent: {
                 parent: {
                     params: {
@@ -119,6 +118,7 @@ describe('RepositoryComponentGridview (inline template)', () => {
                     },
                 },
             },
+            queryParamMap: convertToParamMap({}),
         },
     };
     beforeEach(() => {
