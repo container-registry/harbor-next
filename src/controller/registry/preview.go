@@ -43,5 +43,5 @@ func (c *controller) Preview(ctx context.Context, id int64, repository, referenc
 		return nil, errors.New(nil).WithCode(errors.BadRequestCode).
 			WithMessagef("the registry %s does not support previews", registry.Name)
 	}
-	return resolver.Resolve(repository, reference, filter)
+	return resolver.Resolve(ctx, repository, reference, filter)
 }

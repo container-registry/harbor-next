@@ -29,7 +29,7 @@ type resolvingAdapter struct {
 	filter                *model.FileFilter
 }
 
-func (a *resolvingAdapter) Resolve(repository, reference string, filter *model.FileFilter) (*model.ResolveResult, error) {
+func (a *resolvingAdapter) Resolve(_ context.Context, repository, reference string, filter *model.FileFilter) (*model.ResolveResult, error) {
 	a.repository, a.reference, a.filter = repository, reference, filter
 	return &model.ResolveResult{Repository: repository, Reference: reference, Revision: "abc"}, nil
 }

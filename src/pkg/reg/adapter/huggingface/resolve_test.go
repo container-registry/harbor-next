@@ -15,6 +15,7 @@
 package huggingface
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"testing"
@@ -39,7 +40,7 @@ func TestResolve(t *testing.T) {
 	defer h.Close()
 	a := newTestAdapter(t, hubRegistry(h, 1, ""), newMemoryCache())
 
-	r, err := a.Resolve("Org/Tiny-Model", "", nil)
+	r, err := a.Resolve(t.Context(), "Org/Tiny-Model", "", nil)
 	require.NoError(t, err)
 	assert.Equal(t, repoTiny, r.Repository)
 	assert.Equal(t, "Org/Tiny-Model", r.SourceID)
@@ -75,7 +76,7 @@ func TestResolveWithFileFilter(t *testing.T) {
 	a := newTestAdapter(t, hubRegistry(h, 1, ""), newMemoryCache())
 	jsonOnly := &model.FileFilter{Include: []string{"*.json"}}
 
-	r, err := a.Resolve(repoTiny, "main", jsonOnly)
+	r, err := a.Resolve(t.Context(), repoTiny, "main", jsonOnly)
 	require.NoError(t, err)
 	assert.Equal(t, 4, r.TotalFiles)
 	assert.Equal(t, 1, r.MatchedFiles)
@@ -93,7 +94,7 @@ func TestResolveWithFileFilter(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, pulled, r.Digest)
 
-	none, err := a.Resolve(repoTiny, "main", &model.FileFilter{Include: []string{"*.gguf"}})
+	none, err := a.Resolve(t.Context(), repoTiny, "main", &model.FileFilter{Include: []string{"*.gguf"}})
 	require.NoError(t, err)
 	assert.Zero(t, none.MatchedFiles)
 	assert.Empty(t, none.Digest)
@@ -104,27 +105,39 @@ func TestResolveReferences(t *testing.T) {
 	defer h.Close()
 	a := newTestAdapter(t, hubRegistry(h, 1, ""), newMemoryCache())
 
-	r, err := a.Resolve(repoTiny, "v1", nil)
+	r, err := a.Resolve(t.Context(), repoTiny, "v1", nil)
 	require.NoError(t, err)
 	assert.Equal(t, commitV1, r.Revision)
 	assert.Equal(t, []string{"v1"}, r.Tags)
 
-	r, err = a.Resolve(repoTiny, commitNew, nil)
+	r, err = a.Resolve(t.Context(), repoTiny, commitNew, nil)
 	require.NoError(t, err)
 	assert.Equal(t, commitNew, r.Revision)
 	assert.Equal(t, []string{}, r.Tags, "a commit no ref points at has no tags")
 
-	r, err = a.Resolve(repoTiny, "feature/x", nil)
+	r, err = a.Resolve(t.Context(), repoTiny, "feature/x", nil)
 	require.NoError(t, err, "a branch resolves by its Hub name")
 	assert.Equal(t, "feature-x", r.Reference)
 	assert.Contains(t, r.Tags, "feature-x")
 
-	_, err = a.Resolve(repoTiny, "nope", nil)
+	_, err = a.Resolve(t.Context(), repoTiny, "nope", nil)
 	assert.True(t, errors.IsNotFoundErr(err))
 
-	_, err = a.Resolve("no-slash", "main", nil)
+	_, err = a.Resolve(t.Context(), "no-slash", "main", nil)
 	assert.True(t, errors.IsErr(err, errors.BadRequestCode))
 
-	_, err = a.Resolve(repoTiny, "main", &model.FileFilter{Include: []string{"[a"}})
+	_, err = a.Resolve(t.Context(), repoTiny, "main", &model.FileFilter{Include: []string{"[a"}})
 	assert.True(t, errors.IsErr(err, errors.BadRequestCode))
+}
+
+func TestResolveStopsWhenCanceled(t *testing.T) {
+	h := hubtest.New(tinyModel())
+	defer h.Close()
+	a := newTestAdapter(t, hubRegistry(h, 1, ""), newMemoryCache())
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	_, err := a.Resolve(ctx, repoTiny, "main", nil)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled)
 }

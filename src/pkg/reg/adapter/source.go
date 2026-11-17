@@ -15,6 +15,7 @@
 package adapter
 
 import (
+	"context"
 	"errors"
 
 	"github.com/goharbor/harbor/src/pkg/reg/model"
@@ -60,5 +61,5 @@ func IsSourceOnly(registryType string) bool {
 // reference resolves to, which files a file filter selects and which digest the copy produces,
 // without copying anything.
 type ArtifactResolver interface {
-	Resolve(repository, reference string, filter *model.FileFilter) (*model.ResolveResult, error)
+	Resolve(ctx context.Context, repository, reference string, filter *model.FileFilter) (*model.ResolveResult, error)
 }

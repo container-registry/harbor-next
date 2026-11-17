@@ -32,8 +32,8 @@ var _ adp.ArtifactResolver = (*adapter)(nil)
 // calls of a manifest pull: the refs (unless reference is a commit), the revision listing,
 // and the download of every selected non-LFS file whose hash is not cached yet. The resulting
 // digests are indexed, so a following copy or proxy pull reuses them.
-func (a *adapter) Resolve(repository, reference string, filter *model.FileFilter) (*model.ResolveResult, error) {
-	ctx := context.Background()
+// Resolve stops its Hub calls and downloads when ctx is canceled, e.g. by the preview request.
+func (a *adapter) Resolve(ctx context.Context, repository, reference string, filter *model.FileFilter) (*model.ResolveResult, error) {
 	if err := filter.Validate(); err != nil {
 		return nil, err
 	}
