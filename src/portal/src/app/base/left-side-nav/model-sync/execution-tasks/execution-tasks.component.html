@@ -15,32 +15,35 @@
                     <h2 class="custom-h2 h2-style">{{ executionId }}</h2>
                 </div>
                 <div class="margin-top-16px">
-                    @if (execution && execution.status === 'InProgress') {
-                    <div class="status-progress">
+                    <div
+                        *ngIf="execution && execution.status === 'InProgress'"
+                        class="status-progress">
                         <span class="spinner spinner-inline"></span>
                         <span>{{ 'REPLICATION.IN_PROGRESS' | translate }}</span>
                     </div>
-                    } @if (execution && execution.status === 'Succeed') {
-                    <div class="status-success">
+                    <div
+                        *ngIf="execution && execution.status === 'Succeed'"
+                        class="status-success">
                         <clr-icon
                             size="18"
                             shape="success-standard"
                             class="color-green"></clr-icon>
                         <span>{{ 'REPLICATION.SUCCESS' | translate }}</span>
                     </div>
-                    } @if (execution && execution.status === 'Failed') {
-                    <div class="status-failed">
+                    <div
+                        *ngIf="execution && execution.status === 'Failed'"
+                        class="status-failed">
                         <clr-icon
                             size="18"
                             shape="error-standard"
                             class="color-red"></clr-icon>
                         <span>{{ 'REPLICATION.FAILURE' | translate }}</span>
                     </div>
-                    } @if (execution && execution.status === 'Stopped') {
-                    <div class="status-stopped">
+                    <div
+                        *ngIf="execution && execution.status === 'Stopped'"
+                        class="status-stopped">
                         <span>{{ 'REPLICATION.STOPPED' | translate }}</span>
                     </div>
-                    }
                 </div>
                 <div class="button-stop">
                     <button
@@ -71,12 +74,10 @@
                         execution?.start_time | harborDatetime : 'short'
                     }}</span>
                 </div>
-                @if (execution?.status_text) {
-                <div>
+                <div *ngIf="execution?.status_text">
                     <label>{{ 'MODEL_SYNC.MESSAGE' | translate }} :</label>
                     <span>{{ execution.status_text }}</span>
                 </div>
-                }
             </div>
             <div class="flex-block">
                 <section class="execution-detail-label">
@@ -155,15 +156,13 @@
             <clr-dg-placeholder>{{
                 'MODEL_SYNC.TASKS_PLACEHOLDER' | translate
             }}</clr-dg-placeholder>
-            @for (t of tasks; track t) {
-            <clr-dg-row>
+            <clr-dg-row *ngFor="let t of tasks">
                 <clr-dg-cell>{{ t.id }}</clr-dg-cell>
                 <clr-dg-cell class="mono">{{ t.src_resource }}</clr-dg-cell>
                 <clr-dg-cell class="mono">{{ t.dst_resource }}</clr-dg-cell>
                 <clr-dg-cell>
                     {{ getStatusStr(t.status) }}
-                    @if (t.status_message) {
-                    <clr-tooltip>
+                    <clr-tooltip *ngIf="t.status_message">
                         <clr-icon
                             clrTooltipTrigger
                             shape="info-circle"
@@ -175,7 +174,6 @@
                             <span>{{ t.status_message }}</span>
                         </clr-tooltip-content>
                     </clr-tooltip>
-                    }
                 </clr-dg-cell>
                 <clr-dg-cell>{{
                     t.start_time | harborDatetime : 'short'
@@ -192,7 +190,6 @@
                     </a>
                 </clr-dg-cell>
             </clr-dg-row>
-            }
             <clr-dg-footer>
                 <clr-dg-pagination
                     #pagination
@@ -205,13 +202,11 @@
                             'PAGINATION.PAGE_SIZE' | translate
                         }}</clr-dg-page-size
                     >
-                    @if (totalCount) {
-                    <span
+                    <span *ngIf="totalCount"
                         >{{ pagination.firstItem + 1 }} -
                         {{ pagination.lastItem + 1 }}
-                        {{ 'REPLICATION.OF' | translate }}
-                    </span>
-                    }{{ totalCount }} {{ 'REPLICATION.ITEMS' | translate }}
+                        {{ 'REPLICATION.OF' | translate }} </span
+                    >{{ totalCount }} {{ 'REPLICATION.ITEMS' | translate }}
                 </clr-dg-pagination>
             </clr-dg-footer>
         </clr-datagrid>

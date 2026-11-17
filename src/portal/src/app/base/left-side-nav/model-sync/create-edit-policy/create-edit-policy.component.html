@@ -36,11 +36,9 @@
                             class="clr-validate-icon"
                             shape="exclamation-circle"></clr-icon>
                     </div>
-                    @if (fieldInvalid('name')) {
-                    <clr-control-error>{{
+                    <clr-control-error *ngIf="fieldInvalid('name')">{{
                         'MODEL_SYNC.NAME_REQUIRED' | translate
                     }}</clr-control-error>
-                    }
                 </div>
             </div>
             <!-- description -->
@@ -68,24 +66,25 @@
                             <option
                                 class="display-none"
                                 [ngValue]="null"></option>
-                            @for (r of registries; track r) {
-                            <option [ngValue]="r.id">
+                            <option
+                                *ngFor="let r of registries"
+                                [ngValue]="r.id">
                                 {{ r.name }}-{{ r.url }}
                             </option>
-                            }
                         </select>
                     </div>
                     <div class="space-between">
-                        @if (!loadingOptions && registries.length === 0) {
-                        <span class="alert-label">{{
-                            'MODEL_SYNC.NO_REGISTRY_HINT' | translate
-                        }}</span>
-                        <span
-                            class="alert-label go-link"
-                            (click)="goRegistry()"
-                            >{{ 'REPLICATION.ENDPOINTS' | translate }}</span
-                        >
-                        }
+                        <ng-container
+                            *ngIf="!loadingOptions && registries.length === 0">
+                            <span class="alert-label">{{
+                                'MODEL_SYNC.NO_REGISTRY_HINT' | translate
+                            }}</span>
+                            <span
+                                class="alert-label go-link"
+                                (click)="goRegistry()"
+                                >{{ 'REPLICATION.ENDPOINTS' | translate }}</span
+                            >
+                        </ng-container>
                     </div>
                 </div>
             </div>
@@ -127,11 +126,11 @@
                             </clr-tooltip>
                         </div>
                     </div>
-                    @if (fieldInvalid('src_repository')) {
-                    <clr-control-error class="margin-left-90px">
+                    <clr-control-error
+                        *ngIf="fieldInvalid('src_repository')"
+                        class="margin-left-90px">
                         {{ 'MODEL_SYNC.MODEL_INVALID' | translate }}
                     </clr-control-error>
-                    }
                     <div class="filter-select">
                         <div class="flex">
                             <label class="sub-label"
@@ -239,15 +238,13 @@
                                 [hidden]="!previewing"></span>
                         </div>
                     </div>
-                    @if (previewError) {
-                    <div class="flex">
+                    <div *ngIf="previewError" class="flex">
                         <label class="sub-label"></label>
                         <span class="alert-label">{{
                             previewError | translate
                         }}</span>
                     </div>
-                    } @if (preview) {
-                    <div class="flex">
+                    <div *ngIf="preview" class="flex">
                         <label class="sub-label"></label>
                         <div class="preview">
                             <div class="preview-row">
@@ -257,20 +254,25 @@
                                     rel="noopener noreferrer"
                                     >{{ preview.revision | slice : 0 : 12 }}</a
                                 >
-                                @for (t of preview.tags; track t) {
-                                <span class="label">{{ t }}</span>
-                                }
+                                <span
+                                    *ngFor="let t of preview.tags"
+                                    class="label"
+                                    >{{ t }}</span
+                                >
                             </div>
                             <div class="preview-row">
                                 <span class="preview-key">{{
                                     'MODEL_SYNC.DIGEST' | translate
                                 }}</span>
-                                @if (digestStale) {
-                                <span class="stale" id="ms_digest_stale">{{
-                                    'MODEL_SYNC.DIGEST_STALE' | translate
-                                }}</span>
-                                } @else {
                                 <span
+                                    *ngIf="digestStale"
+                                    class="stale"
+                                    id="ms_digest_stale"
+                                    >{{
+                                        'MODEL_SYNC.DIGEST_STALE' | translate
+                                    }}</span
+                                ><span
+                                    *ngIf="!digestStale"
                                     class="mono"
                                     id="ms_digest"
                                     [title]="preview.digest || ''"
@@ -281,10 +283,10 @@
                                               | translate)
                                     }}</span
                                 >
-                                }
                             </div>
-                            @if (preview.revision_tag) {
-                            <div class="preview-row">
+                            <div
+                                *ngIf="preview.revision_tag"
+                                class="preview-row">
                                 <span class="preview-key">{{
                                     'MODEL_SYNC.REVISION_TAG' | translate
                                 }}</span>
@@ -292,21 +294,20 @@
                                     preview.revision_tag
                                 }}</span>
                             </div>
-                            } @if (preview.task) {
-                            <div class="preview-row">
+                            <div *ngIf="preview.task" class="preview-row">
                                 <span class="preview-key">{{
                                     'MODEL_SYNC.TASK' | translate
                                 }}</span>
                                 <span>{{ preview.task }}</span>
                             </div>
-                            } @if (preview.licenses?.length) {
-                            <div class="preview-row">
+                            <div
+                                *ngIf="preview.licenses?.length"
+                                class="preview-row">
                                 <span class="preview-key">{{
                                     'MODEL_SYNC.LICENSE' | translate
                                 }}</span>
                                 <span>{{ preview.licenses.join(', ') }}</span>
                             </div>
-                            }
                             <div class="preview-row">
                                 <span>{{
                                     'MODEL_SYNC.MATCHED_OF_TOTAL'
@@ -336,8 +337,8 @@
                                 </a>
                             </div>
                             <div class="preview-files">
-                                @for (f of displayedFiles; track f) {
                                 <div
+                                    *ngFor="let f of displayedFiles"
                                     class="preview-file"
                                     [class.unmatched]="!f.matched">
                                     <span class="file-path">{{ f.path }}</span>
@@ -346,11 +347,9 @@
                                         {{ size(f.size) }}</span
                                     >
                                 </div>
-                                }
                             </div>
                         </div>
                     </div>
-                    }
                 </div>
             </div>
             <!-- destination -->
@@ -376,11 +375,11 @@
                                     <option
                                         class="display-none"
                                         [ngValue]="null"></option>
-                                    @for (p of projects; track p) {
-                                    <option [ngValue]="p.name">
+                                    <option
+                                        *ngFor="let p of projects"
+                                        [ngValue]="p.name">
                                         {{ p.name }}
                                     </option>
-                                    }
                                 </select>
                             </div>
                         </div>
@@ -415,11 +414,11 @@
                                             'MODEL_SYNC.DEST_REPOSITORY_HINT'
                                                 | translate
                                         }}
-                                        @if (destinationPreview) {
-                                        <span class="mono">{{
-                                            destinationPreview
-                                        }}</span>
-                                        }
+                                        <span
+                                            *ngIf="destinationPreview"
+                                            class="mono"
+                                            >{{ destinationPreview }}</span
+                                        >
                                     </span>
                                 </clr-tooltip-content>
                             </clr-tooltip>
@@ -438,13 +437,11 @@
                             class="clr-select width-input"
                             id="ms_trigger"
                             formControlName="trigger_type">
-                            @for (t of triggerTypes; track t) {
-                            <option [value]="t">
+                            <option *ngFor="let t of triggerTypes" [value]="t">
                                 {{
                                     'REPLICATION.' + t.toUpperCase() | translate
                                 }}
                             </option>
-                            }
                         </select>
                     </div>
                     <div class="flex" [hidden]="!isScheduled">
@@ -477,11 +474,9 @@
                                     </clr-tooltip-content>
                                 </clr-tooltip>
                             </div>
-                            @if (cronShouldShowError()) {
-                            <clr-control-error>
+                            <clr-control-error *ngIf="cronShouldShowError()">
                                 {{ 'REPLICATION.CRON_ERROR_TIP' | translate }}
                             </clr-control-error>
-                            }
                         </div>
                     </div>
                 </div>
