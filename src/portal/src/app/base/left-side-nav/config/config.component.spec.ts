@@ -88,6 +88,18 @@ describe('ConfigurationComponent', () => {
             fixture.nativeElement.querySelector('#config-features')
         ).not.toBeNull();
     });
+    it('orders the tabs alphabetically by label', () => {
+        appConfig.features = { enable_test_feature: false };
+        fixture.detectChanges();
+        const items = Array.from(
+            fixture.nativeElement.querySelectorAll('ul.nav > li')
+        ) as HTMLElement[];
+        const labels = items
+            .sort((a, b) => Number(a.style.order) - Number(b.style.order))
+            .map(item => item.textContent.trim());
+        expect(labels.length).toBeGreaterThan(1);
+        expect(labels).toEqual([...labels].sort((a, b) => a.localeCompare(b)));
+    });
     it('reports the effective state of a feature', () => {
         appConfig.features = { enable_on: true, enable_off: false };
         expect(component.featureEnabled('enable_on')).toBeTrue();

@@ -11,7 +11,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import { Component, OnInit } from '@angular/core';
+import {
+    AfterViewChecked,
+    Component,
+    ElementRef,
+    OnInit,
+    ViewChild,
+} from '@angular/core';
 import { ConfigService } from './config.service';
 import { AppConfigService } from '../../../services/app-config.service';
 
@@ -20,7 +26,9 @@ import { AppConfigService } from '../../../services/app-config.service';
     templateUrl: 'config.component.html',
     styleUrls: ['config.component.scss'],
 })
-export class ConfigurationComponent implements OnInit {
+export class ConfigurationComponent implements OnInit, AfterViewChecked {
+    @ViewChild('tabs', { static: true }) tabs: ElementRef<HTMLElement>;
+
     get inProgress(): boolean {
         return this.conf.getLoadingConfigStatus();
     }
@@ -42,5 +50,18 @@ export class ConfigurationComponent implements OnInit {
     ngOnInit(): void {
         // Refresh config every time when entering the configuration page
         this.conf.updateConfig();
+    }
+
+    // Tabs come from upstream and from optional features, so sort them by
+    // their translated label instead of relying on where each was added.
+    ngAfterViewChecked(): void {
+        const items = Array.from(
+            this.tabs.nativeElement.children
+        ) as HTMLElement[];
+        items
+            .sort((a, b) =>
+                a.textContent.trim().localeCompare(b.textContent.trim())
+            )
+            .forEach((item, index) => (item.style.order = String(index)));
     }
 }
