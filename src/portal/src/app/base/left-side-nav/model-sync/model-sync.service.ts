@@ -27,7 +27,7 @@ import {
     toReplicationPolicy,
 } from './model-sync';
 
-// registries are listed with a large page; a Harbor rarely has more model hubs than that
+// registries are filtered by source type on the server, one page holds every model hub
 const REGISTRY_PAGE_SIZE = 100;
 
 export interface Page<T> {
@@ -82,15 +82,22 @@ export class ModelSyncService {
     sourceRegistries(): Observable<Registry[]> {
         return this.sourceTypes().pipe(
             switchMap(types =>
-                this.registryService
-                    .listRegistries({ pageSize: REGISTRY_PAGE_SIZE })
-                    .pipe(
-                        map(registries =>
-                            (registries || []).filter(r =>
-                                types.includes(r.type)
-                            )
-                        )
-                    )
+                types.length
+                    ? this.registryService
+                          .listRegistries({
+                              q: encodeURIComponent(
+                                  `type={${types.join(' ')}}`
+                              ),
+                              pageSize: REGISTRY_PAGE_SIZE,
+                          })
+                          .pipe(
+                              map(registries =>
+                                  (registries || []).filter(r =>
+                                      types.includes(r.type)
+                                  )
+                              )
+                          )
+                    : of([])
             )
         );
     }
@@ -143,6 +150,19 @@ export class ModelSyncService {
             id,
             policy: toReplicationPolicy(policy),
         });
+    }
+
+    // setEnabled changes only the enabled flag of the stored rule, so settings the model
+    // form does not manage survive a toggle.
+    setEnabled(id: number, enabled: boolean): Observable<null> {
+        return this.replicationService.getReplicationPolicy({ id }).pipe(
+            switchMap(policy =>
+                this.replicationService.updateReplicationPolicy({
+                    id,
+                    policy: { ...policy, enabled },
+                })
+            )
+        );
     }
 
     deletePolicy(id: number): Observable<null> {

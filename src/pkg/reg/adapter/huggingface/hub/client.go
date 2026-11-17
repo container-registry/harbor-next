@@ -64,10 +64,10 @@ type Client struct {
 func New(endpoint string, opts Options) (*Client, error) {
 	u, err := url.Parse(strings.TrimSuffix(endpoint, "/"))
 	if err != nil {
-		return nil, fmt.Errorf("invalid hugging face endpoint %q: %v", endpoint, err)
+		return nil, errors.New("invalid hugging face endpoint: the URL cannot be parsed")
 	}
 	if u.Scheme == "" || u.Host == "" {
-		return nil, fmt.Errorf("invalid hugging face endpoint %q", endpoint)
+		return nil, fmt.Errorf("invalid hugging face endpoint %q: scheme and host are required", u.Redacted())
 	}
 	transport := common_http.GetHTTPTransport(
 		common_http.WithInsecure(opts.Insecure),
@@ -342,10 +342,10 @@ func (c *Client) nextLink(h http.Header) (string, error) {
 			}
 			u, err := c.endpoint.Parse(link.URL)
 			if err != nil {
-				return "", fmt.Errorf("invalid next link %q: %v", link.URL, err)
+				return "", errors.New("invalid next link: the URL cannot be parsed")
 			}
 			if u.Scheme != c.endpoint.Scheme || u.Host != c.endpoint.Host {
-				return "", fmt.Errorf("next link %q leaves the hub endpoint", u.Redacted())
+				return "", fmt.Errorf("next link to %s://%s leaves the hub endpoint", u.Scheme, u.Host)
 			}
 			return u.String(), nil
 		}

@@ -54,6 +54,8 @@ describe('ModelSyncService', () => {
         replication = jasmine.createSpyObj('ReplicationService', [
             'listReplicationPoliciesResponse',
             'startReplication',
+            'getReplicationPolicy',
+            'updateReplicationPolicy',
         ]);
         replication.listReplicationPoliciesResponse.and.returnValue(
             of(
@@ -161,6 +163,37 @@ describe('ModelSyncService', () => {
                 replication.listReplicationPoliciesResponse
             ).not.toHaveBeenCalled();
             done();
+        });
+    });
+
+    it('asks the server for model source registries only', done => {
+        const listRegistries = spyOn(
+            TestBed.inject(RegistryService),
+            'listRegistries'
+        ).and.callThrough();
+        service.sourceRegistries().subscribe(registries => {
+            expect(registries.map(r => r.id)).toEqual([2, 4]);
+            expect(
+                decodeURIComponent(listRegistries.calls.mostRecent().args[0].q)
+            ).toEqual('type={huggingface}');
+            done();
+        });
+    });
+
+    it('toggles only the enabled flag of the stored rule', () => {
+        const stored = {
+            id: 7,
+            name: 'smol',
+            enabled: true,
+            deletion: true,
+            override: false,
+        };
+        replication.getReplicationPolicy.and.returnValue(of(stored) as any);
+        replication.updateReplicationPolicy.and.returnValue(of(null));
+        service.setEnabled(7, false).subscribe();
+        expect(replication.updateReplicationPolicy).toHaveBeenCalledWith({
+            id: 7,
+            policy: { ...stored, enabled: false },
         });
     });
 

@@ -95,6 +95,15 @@ describe('ModelSyncExecutionTasksComponent', () => {
         component.ngOnDestroy();
     }));
 
+    it('should not poll again once destroyed', fakeAsync(() => {
+        component.loadExecution();
+        tick();
+        component.clrLoadTasks(true, { page: { size: 15 } });
+        component.ngOnDestroy();
+        tick();
+        expect(component.refreshTimeout).toBeFalsy();
+    }));
+
     it('should format helpers', () => {
         expect(component.viewLog(11)).toContain(
             '/replication/executions/10/tasks/11/log'

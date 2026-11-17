@@ -60,6 +60,7 @@ export class ModelSyncExecutionTasksComponent implements OnInit, OnDestroy {
     );
     totalCount: number = 0;
     refreshTimeout: any;
+    private destroyed = false;
 
     constructor(
         private route: ActivatedRoute,
@@ -75,6 +76,7 @@ export class ModelSyncExecutionTasksComponent implements OnInit, OnDestroy {
     }
 
     ngOnDestroy(): void {
+        this.destroyed = true;
         this.clearRefresh();
     }
 
@@ -123,8 +125,9 @@ export class ModelSyncExecutionTasksComponent implements OnInit, OnDestroy {
                     this.totalCount = res.total;
                     this.tasks = res.items;
                     if (
-                        this.tasks.some(t => isTaskInProgress(t)) ||
-                        isExecutionInProgress(this.execution)
+                        !this.destroyed &&
+                        (this.tasks.some(t => isTaskInProgress(t)) ||
+                            isExecutionInProgress(this.execution))
                     ) {
                         this.refreshTimeout = setTimeout(() => {
                             this.loadExecution();

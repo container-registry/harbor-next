@@ -349,12 +349,8 @@ export class ModelSyncPolicyListComponent implements OnInit, OnDestroy {
 
     togglePolicy(policy: ModelSyncPolicy): void {
         this.policyOperating = true;
-        const updated: ModelSyncPolicy = {
-            ...policy,
-            enabled: !policy.enabled,
-        };
         this.modelSyncService
-            .updatePolicy(policy.id, updated)
+            .setEnabled(policy.id, !policy.enabled)
             .pipe(finalize(() => (this.policyOperating = false)))
             .subscribe(
                 () => {

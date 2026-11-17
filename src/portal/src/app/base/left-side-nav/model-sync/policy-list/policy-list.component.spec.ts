@@ -64,6 +64,7 @@ describe('ModelSyncPolicyListComponent', () => {
         start: () => of(null),
         deletePolicy: () => of(null),
         updatePolicy: () => of(null),
+        setEnabled: jasmine.createSpy('setEnabled').and.returnValue(of(null)),
         stop: () => of(null),
     };
     const mockRouter = { navigate: jasmine.createSpy('navigate') };
@@ -150,6 +151,14 @@ describe('ModelSyncPolicyListComponent', () => {
         expect(component.canStop()).toBeFalse();
         component.selectedExecutions = [{ ...execution, status: 'InProgress' }];
         expect(component.canStop()).toBeTrue();
+    });
+
+    it('should toggle a policy without rewriting it', () => {
+        component.togglePolicy(policy);
+        expect(mockService.setEnabled).toHaveBeenCalledWith(
+            policy.id,
+            !policy.enabled
+        );
     });
 
     it('should open the form of the rule named by ?edit', () => {
