@@ -543,7 +543,8 @@
         "ARTIFACTS": "Artefacts",
         "PROJECTS": "Projets",
         "CONFIGURATION": "Configuration",
-        "REPOSITORIES": "Dépôts"
+        "REPOSITORIES": "Dépôts",
+        "FEATURES": "Features"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Déclencheur",

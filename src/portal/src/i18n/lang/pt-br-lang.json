@@ -541,7 +541,8 @@
         "ARTIFACTS": "Artifacts",
         "PROJECTS": "Projetos",
         "CONFIGURATION": "Configuration",
-        "REPOSITORIES": "Repositórios"
+        "REPOSITORIES": "Repositórios",
+        "FEATURES": "Features"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Gatilho",

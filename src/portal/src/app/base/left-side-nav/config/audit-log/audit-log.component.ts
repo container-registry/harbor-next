@@ -80,6 +80,12 @@ const AUDIT_EVENT_CATEGORIES: Omit<AuditEventCategory, 'events'>[] = [
         icon: 'storage',
         resourceTypes: ['repository'],
     },
+    {
+        id: 'features',
+        labelKey: 'AUDIT_LOG_CONFIG.FEATURES',
+        icon: 'flag',
+        resourceTypes: ['feature'],
+    },
 ];
 
 @Component({

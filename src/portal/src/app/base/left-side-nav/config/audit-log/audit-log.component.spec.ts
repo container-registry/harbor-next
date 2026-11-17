@@ -36,6 +36,7 @@ const DEFAULT_EVENT_TYPES = [
     { event_type: 'create_robot' },
     { event_type: 'delete_robot' },
     { event_type: 'update_configuration' },
+    { event_type: 'update_feature' },
 ];
 
 describe('AuditLogConfigurationComponent', () => {
@@ -106,6 +107,7 @@ describe('AuditLogConfigurationComponent', () => {
             'projects',
             'configuration',
             'repositories',
+            'features',
         ]);
         expect(
             component.categories

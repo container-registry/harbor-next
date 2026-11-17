@@ -541,7 +541,8 @@
         "ARTIFACTS": "Artifacts",
         "PROJECTS": "Projects",
         "CONFIGURATION": "Configuration",
-        "REPOSITORIES": "Repositories"
+        "REPOSITORIES": "Repositories",
+        "FEATURES": "Features"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Trigger",
