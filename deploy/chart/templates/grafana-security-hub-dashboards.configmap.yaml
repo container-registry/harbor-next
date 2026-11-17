@@ -1,0 +1,25 @@
+{{- if .Values.metrics.grafanaDashboard.securityHub.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "harbor.fullname" . }}-grafana-security-hub-dashboards
+  {{- if .Values.metrics.grafanaDashboard.namespace }}
+  namespace: {{ .Values.metrics.grafanaDashboard.namespace }}
+  {{- end }}
+  labels:
+    {{- include "harbor.labels" . | nindent 4 }}
+    {{- with .Values.metrics.grafanaDashboard.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with (include "harbor.annotations" (dict "root" . "local" .Values.metrics.grafanaDashboard.annotations)) }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+data:
+  {{- range $path, $_ := .Files.Glob "dashboards/harbor-security-hub*.json" }}
+  {{- $dashboard := $.Files.Get $path }}
+  {{- $_ := mustFromJson $dashboard }}
+  {{ base $path }}: |-
+    {{- $dashboard | nindent 4 }}
+  {{- end }}
+{{- end }}

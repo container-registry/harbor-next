@@ -54,6 +54,7 @@ We're developing Harbor Next as a [community proposal](https://github.com/goharb
 * **Image signing & verification**: Released images are signed with keyless [cosign](https://github.com/sigstore/cosign) signatures — see [docs/signature-verification.md](docs/signature-verification.md).
 * **Graphical user portal**: Browse, search repositories, and manage projects from the web UI.
 * **Auditing**: All repository operations are tracked through logs.
+* **Grafana dashboards**: A [Harbor metrics dashboard](contrib/grafana-dashboard/README.md) and [Security Hub vulnerability dashboards](contrib/grafana-dashboard/security-hub.md), shippable with the Helm chart.
 * **RESTful API**: REST APIs for administrative operations and integration, with an embedded Swagger UI for exploring and testing.
 * **Easy deployment**: Deploy via Docker/Podman Compose or the Harbor Next Helm chart.
 

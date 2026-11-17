@@ -971,7 +971,15 @@
             "enabled": {"type": "boolean", "default": false},
             "namespace": {"type": "string"},
             "labels": {"type": "object", "additionalProperties": {"type": "string"}},
-            "annotations": {"type": "object", "additionalProperties": {"type": "string"}}
+            "annotations": {"type": "object", "additionalProperties": {"type": "string"}},
+            "securityHub": {
+              "type": "object",
+              "description": "Ship the Harbor Security Hub dashboards (Infinity datasource) as a second ConfigMap",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {"type": "boolean", "default": false}
+              }
+            }
           }
         }
       }

@@ -661,6 +661,23 @@ metrics:
       grafana_folder: Harbor  # Optional, sidecar folder annotation
 ```
 
+#### Security Hub dashboards
+
+`metrics.grafanaDashboard.securityHub.enabled: true` ships three linked vulnerability
+dashboards (`dashboards/harbor-security-hub*.json`) in a second ConfigMap with the same
+namespace, labels and annotations. They query the Harbor Security Hub API through the
+Infinity datasource plugin instead of Prometheus, so they need neither `metrics.enabled`
+nor a ServiceMonitor. They do need the plugin installed in Grafana and an Infinity
+datasource that authenticates as a robot account with Security Hub read access; the chart
+creates neither. See the [Security Hub dashboard guide](../../contrib/grafana-dashboard/security-hub.md).
+
+```yaml
+metrics:
+  grafanaDashboard:
+    securityHub:
+      enabled: true
+```
+
 ### CloudNativePG via extraManifests
 
 ```yaml
@@ -979,11 +996,13 @@ Kubernetes: `>=1.28.0-0`
 | jobservice.topologySpreadConstraints | list | `[]` | Topology spread constraints for pod scheduling |
 | logLevel | string | `"info"` | Log level for all components (debug, info, warning, error, fatal) |
 | metrics.enabled | bool | `false` | Enable metrics endpoints on all components |
-| metrics.grafanaDashboard | object | `{"annotations":{},"enabled":false,"labels":{"grafana_dashboard":"1"},"namespace":""}` | Ship the Harbor Grafana dashboard (dashboards/harbor.json) as a ConfigMap picked up by a Grafana dashboard sidecar (for example, kube-prometheus-stack) |
+| metrics.grafanaDashboard | object | `{"annotations":{},"enabled":false,"labels":{"grafana_dashboard":"1"},"namespace":"","securityHub":{"enabled":false}}` | Ship the Harbor Grafana dashboard (dashboards/harbor.json) as a ConfigMap picked up by a Grafana dashboard sidecar (for example, kube-prometheus-stack) |
 | metrics.grafanaDashboard.annotations | object | `{}` | Annotations, e.g. grafana_folder for the sidecar folder annotation |
 | metrics.grafanaDashboard.enabled | bool | `false` | Create the dashboard ConfigMap |
 | metrics.grafanaDashboard.labels | object | `{"grafana_dashboard":"1"}` | Labels the Grafana sidecar selects on |
 | metrics.grafanaDashboard.namespace | string | `""` | ConfigMap namespace (defaults to release namespace) |
+| metrics.grafanaDashboard.securityHub | object | `{"enabled":false}` | Also ship the Harbor Security Hub dashboards (dashboards/harbor-security-hub*.json) in a second ConfigMap with the same namespace, labels and annotations. They need the Infinity datasource plugin and a robot account with Security Hub read access, not Prometheus. |
+| metrics.grafanaDashboard.securityHub.enabled | bool | `false` | Create the Security Hub dashboards ConfigMap |
 | metrics.serviceMonitor | object | `{"enabled":false,"honorLabels":true,"interval":"30s","labels":{},"namespace":"","scrapeTimeout":"10s"}` | Enable Prometheus ServiceMonitor |
 | metrics.serviceMonitor.enabled | bool | `false` | Create ServiceMonitor resource |
 | metrics.serviceMonitor.honorLabels | bool | `true` | Honor labels |
