@@ -54,23 +54,29 @@ func tagOf(ref string) (string, bool) {
 // refIndex maps the tags of a model's refs to commits.
 type refIndex struct {
 	commits map[string]string
-	// collisions holds tags that more than one ref sanitizes to.
+	// collisions holds tags that refs of different commits sanitize to.
 	collisions map[string][]string
 }
 
 func newRefIndex(refs []hub.Ref) *refIndex {
 	idx := &refIndex{commits: map[string]string{}, collisions: map[string][]string{}}
 	names := map[string][]string{}
+	commits := map[string]map[string]bool{}
 	for _, r := range refs {
 		tag, ok := tagOf(r.Name)
 		if !ok {
 			continue
 		}
 		names[tag] = append(names[tag], r.Name)
+		if commits[tag] == nil {
+			commits[tag] = map[string]bool{}
+		}
+		commits[tag][r.Commit] = true
 		idx.commits[tag] = r.Commit
 	}
+	// refs that share a tag are only ambiguous when they point at different commits
 	for tag, n := range names {
-		if len(n) > 1 {
+		if len(commits[tag]) > 1 {
 			sort.Strings(n)
 			idx.collisions[tag] = n
 			delete(idx.commits, tag)

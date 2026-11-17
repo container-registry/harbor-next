@@ -40,6 +40,22 @@ func ConfigureSource(a any, opts *model.SourceOptions) error {
 	return c.ConfigureSource(opts)
 }
 
+// SourceOnlyFactory is implemented by factories of registry types that can only be a replication
+// source, so a caller can tell without creating an adapter, which may call the remote.
+type SourceOnlyFactory interface {
+	SourceOnly() bool
+}
+
+// IsSourceOnly reports whether registryType can only be a replication source.
+func IsSourceOnly(registryType string) bool {
+	factory, err := GetFactory(registryType)
+	if err != nil {
+		return false
+	}
+	s, ok := factory.(SourceOnlyFactory)
+	return ok && s.SourceOnly()
+}
+
 // ArtifactResolver is implemented by source adapters that can preview a copy: which revision a
 // reference resolves to, which files a file filter selects and which digest the copy produces,
 // without copying anything.

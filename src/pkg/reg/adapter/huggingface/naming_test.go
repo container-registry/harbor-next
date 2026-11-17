@@ -106,3 +106,16 @@ func TestRefIndex(t *testing.T) {
 	_, err = idx.commit("missing")
 	assert.True(t, errors.IsNotFoundErr(err), err)
 }
+
+func TestRefIndexSameCommitIsNotAmbiguous(t *testing.T) {
+	idx := newRefIndex([]hub.Ref{
+		{Name: "v1", Commit: commitV1},
+		{Name: "v1", Commit: commitV1},
+		{Name: "a/b", Commit: commitMain},
+		{Name: "a-b", Commit: commitMain},
+	})
+	assert.Equal(t, []string{"a-b", "v1"}, idx.tags())
+	c, err := idx.commit("a-b")
+	require.NoError(t, err)
+	assert.Equal(t, commitMain, c)
+}

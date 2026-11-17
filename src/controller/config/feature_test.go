@@ -106,6 +106,20 @@ func TestOverwriteConfigSkipsEnvironmentControlledFeature(t *testing.T) {
 
 var guardRefuses, guardUncoded, guardWrapped bool
 
+func TestOverwriteConfigSkipsAGuardedDisable(t *testing.T) {
+	libcfg.InitWithSettings(map[string]any{common.AUTHMode: common.DBAuth, featureTestKey: true})
+	t.Setenv(configOverwriteJSON, `{"`+featureTestKey+`": false}`)
+	guardRefuses = true
+	t.Cleanup(func() { readOnlyForAll = false; guardRefuses = false })
+
+	if err := newFeatureTestController().OverwriteConfig(t.Context()); err != nil {
+		t.Fatalf("OverwriteConfig: %v, want the guarded disable skipped so core still starts", err)
+	}
+	if !libcfg.DefaultMgr().Get(t.Context(), featureTestKey).GetBool() {
+		t.Errorf("stored %s = false, want the guarded disable skipped", featureTestKey)
+	}
+}
+
 func init() {
 	feature.RegisterDisableGuard("controller_test_feature", func(context.Context) error {
 		if guardRefuses {

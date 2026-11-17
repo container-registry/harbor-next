@@ -74,7 +74,8 @@ func (a *adapter) FetchArtifacts(filters []*model.Filter) ([]*model.Resource, er
 			return nil
 		})
 	}
-	// A partial listing is never returned: a silently shorter artifact list is worse than a failed run.
+	// A failed lookup fails the run: a silently shorter artifact list is worse than a failed run.
+	// Models whose name can never be a repository are skipped above by design, with a warning.
 	if err := runner.Wait(); err != nil {
 		return nil, err
 	}

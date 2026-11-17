@@ -295,19 +295,32 @@ describe('CreateEditRuleComponent (inline template)', () => {
         expect(ruleNameInput.value.trim()).toEqual('sync_01');
     }));
 
-    it('Should keep settings it has no control for', () => {
+    it('Should send back settings it has no control for on update', fakeAsync(() => {
+        fixture.detectChanges();
+        const update = jasmine
+            .createSpy('updateReplicationRule')
+            .and.returnValue(of(null));
+        (TestBed.inject(ReplicationService) as any).updateReplicationRule =
+            update;
+        (TestBed.inject(ErrorHandler) as any).info = () => {};
         comp.openCreateEditRule({
             ...mockRule,
             dest_repository: 'renamed',
             revision_tag: true,
         } as any);
-        expect(comp.preservedFields).toEqual({
-            dest_repository: 'renamed',
-            revision_tag: true,
-        });
+        fixture.detectChanges();
+        tick(5000);
+        comp.onSubmit();
+        tick();
+        expect(update).toHaveBeenCalled();
+        const [, sent] = update.calls.mostRecent().args;
+        expect(sent.dest_repository).toEqual('renamed');
+        expect(sent.revision_tag).toBeTrue();
+
         comp.openCreateEditRule();
         expect(comp.preservedFields).toEqual({});
-    });
+        tick(5000);
+    }));
 
     it('List all Registries Response', fakeAsync(() => {
         fixture.detectChanges();

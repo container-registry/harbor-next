@@ -131,3 +131,8 @@ func TestTokenNeedsAccessID(t *testing.T) {
 		assert.NoError(t, err)
 	}
 }
+
+func TestFactoryIsSourceOnly(t *testing.T) {
+	assert.True(t, adp.IsSourceOnly(model.RegistryTypeHuggingFace), "the type is source-only without building an adapter")
+	assert.False(t, adp.IsSourceOnly(model.RegistryTypeHarbor))
+}

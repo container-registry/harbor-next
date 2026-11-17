@@ -14,8 +14,8 @@
 import { Component, EventEmitter, Output, ViewChild } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { TranslateService } from '@ngx-translate/core';
-import { forkJoin } from 'rxjs';
-import { finalize } from 'rxjs/operators';
+import { forkJoin, Observable, of } from 'rxjs';
+import { finalize, map, switchMap } from 'rxjs/operators';
 import { ProjectService } from '../../../../../../ng-swagger-gen/services/project.service';
 import { RegistryPreview } from '../../../../../../ng-swagger-gen/models/registry-preview';
 import { Registry } from '../../../../../../ng-swagger-gen/models/registry';
@@ -66,6 +66,8 @@ export class CreateEditModelSyncPolicyComponent {
     previewing: boolean = false;
     preview: RegistryPreview;
     previewError: string;
+    // previewRequest numbers the preview calls; a response for an older one is dropped
+    private previewRequest = 0;
     showAllFiles: boolean = false;
     // the digest is computed by the backend for the filters sent with the
     // preview; a local re-match after a filter change cannot update it
@@ -185,13 +187,7 @@ export class CreateEditModelSyncPolicyComponent {
 
     loadOptions(): void {
         this.loadingOptions = true;
-        forkJoin([
-            this.modelSyncService.sourceRegistries(),
-            this.projectService.listProjects({
-                pageSize: LIST_PAGE_SIZE,
-                withDetail: false,
-            }),
-        ])
+        forkJoin([this.modelSyncService.sourceRegistries(), this.allProjects()])
             .pipe(finalize(() => (this.loadingOptions = false)))
             .subscribe(
                 ([registries, projects]) => {
@@ -203,6 +199,32 @@ export class CreateEditModelSyncPolicyComponent {
                 },
                 error => this.errorHandler.error(error)
             );
+    }
+
+    // allProjects pages through the projects, so a destination past the first page is listed
+    allProjects(): Observable<Project[]> {
+        const page = (n: number) =>
+            this.projectService.listProjectsResponse({
+                page: n,
+                pageSize: LIST_PAGE_SIZE,
+                withDetail: false,
+            });
+        return page(1).pipe(
+            switchMap(first => {
+                const total = +(first.headers.get('X-Total-Count') || 0);
+                const pages = Math.ceil(total / LIST_PAGE_SIZE);
+                const rest = [];
+                for (let n = 2; n <= pages; n++) {
+                    rest.push(page(n).pipe(map(res => res.body || [])));
+                }
+                const firstPage = first.body || [];
+                return rest.length
+                    ? forkJoin(rest).pipe(
+                          map(more => firstPage.concat(...more))
+                      )
+                    : of(firstPage);
+            })
+        );
     }
 
     // ---------- helpers ----------
@@ -273,6 +295,8 @@ export class CreateEditModelSyncPolicyComponent {
     // ---------- preview ----------
 
     resetPreview(): void {
+        this.previewRequest++;
+        this.previewing = false;
         this.preview = null;
         this.previewError = null;
         this.showAllFiles = false;
@@ -307,6 +331,8 @@ export class CreateEditModelSyncPolicyComponent {
         }
         this.previewing = true;
         this.previewError = null;
+        const request = ++this.previewRequest;
+        const current = () => request === this.previewRequest;
         this.modelSyncService
             .preview(
                 +this.form.get('registry_id').value,
@@ -316,14 +342,26 @@ export class CreateEditModelSyncPolicyComponent {
                 parseFileFilters(this.form.get('file_filters').value),
                 parseFileFilters(this.form.get('file_excludes').value)
             )
-            .pipe(finalize(() => (this.previewing = false)))
+            .pipe(
+                finalize(() => {
+                    if (current()) {
+                        this.previewing = false;
+                    }
+                })
+            )
             .subscribe(
                 res => {
+                    if (!current()) {
+                        return;
+                    }
                     this.preview = res;
                     this.showAllFiles = false;
                     this.digestStale = false;
                 },
                 error => {
+                    if (!current()) {
+                        return;
+                    }
                     this.preview = null;
                     this.previewError =
                         error?.error?.errors?.[0]?.message ||

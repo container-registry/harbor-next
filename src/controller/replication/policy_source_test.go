@@ -43,6 +43,7 @@ func (f infoFactory) Create(*model.Registry) (adapter.Adapter, error) {
 	return &infoAdapter{info: f.info}, nil
 }
 func (f infoFactory) AdapterPattern() *model.AdapterPattern { return nil }
+func (f infoFactory) SourceOnly() bool                      { return f.info.SourceOnly }
 
 func init() {
 	_ = adapter.RegisterFactory(typeModelSource, infoFactory{info: &model.RegistryInfo{

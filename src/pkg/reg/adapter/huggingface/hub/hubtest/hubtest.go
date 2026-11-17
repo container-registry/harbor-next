@@ -204,7 +204,11 @@ func (h *Hub) modelAPI(w http.ResponseWriter, r *http.Request, rest string) {
 	}
 	switch {
 	case kind == "refs" && len(parts) == 3:
-		writeJSON(w, map[string]any{"branches": refs(m.Branches), "tags": refs(m.Tags), "converts": []any{}})
+		// SetBranch and SetTag write the maps under the lock
+		h.mu.Lock()
+		branches, tags := refs(m.Branches), refs(m.Tags)
+		h.mu.Unlock()
+		writeJSON(w, map[string]any{"branches": branches, "tags": tags, "converts": []any{}})
 	case kind == "revision" && len(parts) == 4:
 		rev, err := url.PathUnescape(parts[3])
 		if err != nil {

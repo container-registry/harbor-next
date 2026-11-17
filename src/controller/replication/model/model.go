@@ -17,7 +17,6 @@ package model
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
@@ -28,9 +27,6 @@ import (
 	"github.com/goharbor/harbor/src/pkg/reg/model"
 	replicationmodel "github.com/goharbor/harbor/src/pkg/replication/model"
 )
-
-// destRepositoryRe is one path component of a repository name, see reference.NameRegexp.
-var destRepositoryRe = regexp.MustCompile(`^[a-z0-9]+(?:(?:[._]|__|[-]+)[a-z0-9]+)*$`)
 
 // maxDestRepositoryLen is the size of the replication_policy.dest_repository column.
 const maxDestRepositoryLen = 256
@@ -129,7 +125,8 @@ func (p *Policy) Validate() error {
 		return errors.New(nil).WithCode(errors.BadRequestCode).
 			WithMessagef("the destination repository is longer than %d characters", maxDestRepositoryLen)
 	}
-	if len(p.DestRepository) > 0 && !destRepositoryRe.MatchString(p.DestRepository) {
+	// one path component of a repository name
+	if len(p.DestRepository) > 0 && (strings.Contains(p.DestRepository, "/") || !lib.RepositoryNameRe.MatchString(p.DestRepository)) {
 		return errors.New(nil).WithCode(errors.BadRequestCode).
 			WithMessagef("invalid destination repository %q: it must be a single path component", p.DestRepository)
 	}

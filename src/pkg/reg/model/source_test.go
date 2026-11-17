@@ -29,6 +29,10 @@ func TestParseFileFilter(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, &FileFilter{Include: []string{"*.json", "*.safetensors"}, Exclude: []string{"onnx/**", "*.bin"}}, f)
 
+	f, err = ParseFileFilter("*.{json,md}, !onnx/{a,b}/** *.txt")
+	require.NoError(t, err)
+	assert.Equal(t, &FileFilter{Include: []string{"*.{json,md}", "*.txt"}, Exclude: []string{"onnx/{a,b}/**"}}, f, "commas inside braces stay in the pattern")
+
 	var value any
 	require.NoError(t, json.Unmarshal([]byte(`{"include":["*.json"],"exclude":["x/**"]}`), &value))
 	f, err = ParseFileFilter(value)

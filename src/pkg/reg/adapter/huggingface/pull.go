@@ -260,8 +260,9 @@ func (a *adapter) find(ctx context.Context, repository string, d digest.Digest) 
 	}
 	for _, commit := range headsMainFirst(refs) {
 		art, modelID, err := a.artifact(ctx, repository, commit, filter)
-		if errors.IsNotFoundErr(err) {
-			// The ref moved after the refs were listed; its old head is gone.
+		// NotFound: the ref moved after the refs were listed. BadRequest: the filter selects no
+		// file of this head. Neither can hold the digest, later heads still can.
+		if errors.IsNotFoundErr(err) || errors.IsErr(err, errors.BadRequestCode) {
 			log.Warningf("skip commit %s of %s while locating %s: %v", commit, repository, d, err)
 			continue
 		}

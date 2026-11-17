@@ -705,6 +705,7 @@
         "DEST_PROJECT": "Project",
         "DEST_REPOSITORY": "Repository",
         "DEST_REPOSITORY_HINT": "Defaults to the lower-cased source repository. Destination:",
+        "DEST_REPOSITORY_INVALID": "Use one lowercase path component: letters, digits and . _ - separators.",
         "DIGEST": "Digest",
         "DIGEST_STALE": "Filters changed, resolve the source again to update the digest",
         "DISABLE_SUMMARY": "Do you want to disable the policy {{param}}? Scheduled syncs will be skipped.",

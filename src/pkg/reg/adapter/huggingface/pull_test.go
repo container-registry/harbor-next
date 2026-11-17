@@ -30,6 +30,7 @@ import (
 	"github.com/goharbor/harbor/src/pkg/reg/adapter/huggingface/hub"
 	"github.com/goharbor/harbor/src/pkg/reg/adapter/huggingface/hub/hubtest"
 	"github.com/goharbor/harbor/src/pkg/reg/adapter/huggingface/synth"
+	regmodel "github.com/goharbor/harbor/src/pkg/reg/model"
 )
 
 func readAll(t *testing.T, size int64, r io.ReadCloser, err error) []byte {
@@ -379,6 +380,26 @@ func TestMissPathSkipsVanishedHead(t *testing.T) {
 	h.SetTag(model.ID, "v1", "dddddddddddddddddddddddddddddddddddddddd")
 	a := newTestAdapter(t, hubRegistry(h, 1, ""), newMemoryCache())
 	exist, _, err := a.ManifestExist(repoTiny, want.String())
+	require.NoError(t, err)
+	assert.True(t, exist)
+}
+
+func TestMissPathSkipsHeadWithoutFilteredFiles(t *testing.T) {
+	m := tinyModel()
+	m.Commits[commitV1].Files["extra.txt"] = hubtest.File{Content: []byte("only in v1\n")}
+	h := hubtest.New(m)
+	defer h.Close()
+	opts := &regmodel.SourceOptions{FileFilter: &regmodel.FileFilter{Include: []string{"extra.txt"}}}
+
+	lister := newTestAdapter(t, hubRegistry(h, 1, ""), newMemoryCache())
+	require.NoError(t, lister.ConfigureSource(opts))
+	_, d, err := lister.PullManifest(repoTiny, "v1")
+	require.NoError(t, err)
+
+	// main comes first and the filter selects none of its files; v1 still holds the digest
+	a := newTestAdapter(t, hubRegistry(h, 1, ""), newMemoryCache())
+	require.NoError(t, a.ConfigureSource(opts))
+	exist, _, err := a.ManifestExist(repoTiny, d)
 	require.NoError(t, err)
 	assert.True(t, exist)
 }

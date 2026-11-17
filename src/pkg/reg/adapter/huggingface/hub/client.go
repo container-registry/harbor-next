@@ -216,7 +216,7 @@ func (c *Client) Open(ctx context.Context, modelID, commit, path string, offset,
 		if err == nil {
 			resp.Body.Close()
 		}
-		err = fmt.Errorf("timed out after %s waiting for response headers from hub for %s of model %s: %v", downloadHeaderTimeout, path, modelID, err)
+		err = fmt.Errorf("timed out after %s waiting for response headers from hub for %s of model %s", downloadHeaderTimeout, path, modelID)
 	}
 	if err != nil {
 		cancel()

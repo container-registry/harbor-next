@@ -384,7 +384,9 @@
                             </div>
                         </div>
                     </div>
-                    <div class="filter-select">
+                    <div
+                        class="filter-select"
+                        [class.clr-error]="fieldInvalid('dest_repository')">
                         <div class="flex">
                             <label class="sub-label"
                                 >{{
@@ -423,6 +425,14 @@
                                 </clr-tooltip-content>
                             </clr-tooltip>
                         </div>
+                        <span
+                            class="clr-subtext"
+                            id="ms_dest_repo_error"
+                            *ngIf="fieldInvalid('dest_repository')"
+                            >{{
+                                'MODEL_SYNC.DEST_REPOSITORY_INVALID' | translate
+                            }}</span
+                        >
                     </div>
                 </div>
             </div>

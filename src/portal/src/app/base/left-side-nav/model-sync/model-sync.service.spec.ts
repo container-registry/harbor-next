@@ -21,6 +21,7 @@ import {
     destRepository,
     revisionTag,
     parseFileFilter,
+    parseFileFilters,
     fromReplicationPolicy,
     ModelSyncPolicy,
     toReplicationPolicy,
@@ -194,6 +195,18 @@ describe('ModelSyncService', () => {
                 decodeURIComponent(listRegistries.calls.mostRecent().args[0].q)
             ).toEqual('type={huggingface}');
             done();
+        });
+    });
+
+    it('keeps brace alternations in one pattern', () => {
+        expect(parseFileFilters('*.{json,md}, onnx/**\n*.txt')).toEqual([
+            '*.{json,md}',
+            'onnx/**',
+            '*.txt',
+        ]);
+        expect(parseFileFilter('*.{json,md} !x/{a,b}/**')).toEqual({
+            include: ['*.{json,md}'],
+            exclude: ['x/{a,b}/**'],
         });
     });
 

@@ -85,8 +85,8 @@ clr-modal {
     margin-top: 0.25rem;
     width: 12rem;
     flex: 0 0 12rem;
-    font-size: 0.55rem;
-    line-height: 0.9rem;
+    font-size: 12px;
+    line-height: 18px;
 
     .preview-row {
         display: flex;
@@ -111,9 +111,9 @@ clr-modal {
     }
 
     .label {
-        font-size: 0.45rem;
-        height: 0.8rem;
-        line-height: 0.75rem;
+        font-size: 11px;
+        height: auto;
+        line-height: 16px;
         padding: 0 0.3rem;
     }
 

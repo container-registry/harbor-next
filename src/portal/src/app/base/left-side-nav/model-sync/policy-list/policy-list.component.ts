@@ -95,6 +95,8 @@ export class ModelSyncPolicyListComponent implements OnInit, OnDestroy {
     stopOnGoing: boolean = false;
     isOpenFilterTag: boolean = false;
     currentTerm: string = '';
+    // executionsState keeps the datagrid sort for reloads the page starts itself
+    private executionsState: ClrDatagridStateInterface = { page: {} };
     defaultFilter: string = 'trigger';
 
     @ViewChild(CreateEditModelSyncPolicyComponent)
@@ -192,7 +194,7 @@ export class ModelSyncPolicyListComponent implements OnInit, OnDestroy {
         this.executionsPage = 1;
         this.clearExecutionsTimeout();
         if (policy) {
-            this.clrLoadExecutions(true, { page: {} });
+            this.clrLoadExecutions(true, { ...this.executionsState, page: {} });
         } else {
             this.executions = [];
             this.executionsTotal = 0;
@@ -322,7 +324,10 @@ export class ModelSyncPolicyListComponent implements OnInit, OnDestroy {
                         .subscribe(res => this.errorHandler.info(res));
                     this.selectedPolicy = policy;
                     this.executionsPage = 1;
-                    this.clrLoadExecutions(true, { page: {} });
+                    this.clrLoadExecutions(true, {
+                        ...this.executionsState,
+                        page: {},
+                    });
                 },
                 error => this.errorHandler.error(error)
             );
@@ -372,6 +377,7 @@ export class ModelSyncPolicyListComponent implements OnInit, OnDestroy {
         if (!this.selectedPolicy || !state || !state.page) {
             return;
         }
+        this.executionsState = state;
         if (state.page.size) {
             this.executionsPageSize = state.page.size;
             setPageSizeToLocalStorage(
@@ -417,7 +423,10 @@ export class ModelSyncPolicyListComponent implements OnInit, OnDestroy {
                     this.executions = res.items;
                     if (this.executions.some(e => isExecutionInProgress(e))) {
                         this.executionsTimeout = setTimeout(() => {
-                            this.clrLoadExecutions(false, { page: {} });
+                            this.clrLoadExecutions(false, {
+                                ...this.executionsState,
+                                page: {},
+                            });
                         }, REFRESH_TIME_DIFFERENCE);
                     }
                 },
@@ -428,13 +437,13 @@ export class ModelSyncPolicyListComponent implements OnInit, OnDestroy {
     refreshExecutions(): void {
         this.executionsPage = 1;
         this.currentTerm = '';
-        this.clrLoadExecutions(true, { page: {} });
+        this.clrLoadExecutions(true, { ...this.executionsState, page: {} });
     }
 
     doSearchExecutions(terms: string): void {
         this.currentTerm = (terms || '').trim();
         this.executionsPage = 1;
-        this.clrLoadExecutions(true, { page: {} });
+        this.clrLoadExecutions(true, { ...this.executionsState, page: {} });
     }
 
     doFilterExecutions($event: any): void {
@@ -527,7 +536,11 @@ export class ModelSyncPolicyListComponent implements OnInit, OnDestroy {
                         if (remaining <= 0) {
                             this.stopOnGoing = false;
                             this.selectedExecutions = [];
-                            this.refreshExecutions();
+                            // keep the search term, unlike the refresh button
+                            this.clrLoadExecutions(true, {
+                                ...this.executionsState,
+                                page: {},
+                            });
                         }
                     })
                 )

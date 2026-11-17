@@ -240,20 +240,14 @@ func supportsFilter(info *regmodel.RegistryInfo, filterType string) bool {
 	return false
 }
 
-// validateDestination rejects a source-only registry as destination. The local Harbor (ID 0) is
-// skipped: it is never source-only and its adapter calls the core API on creation. When the
-// capabilities cannot be read, e.g. the registry is unreachable, the policy is accepted as
-// before; the replication itself fails later with the real cause.
-func validateDestination(ctx context.Context, dest *regmodel.Registry) error {
+// validateDestination rejects a source-only registry as destination. It asks the adapter
+// factory, so no adapter is built: building one can call the remote, e.g. GET /api/version for
+// a Harbor destination.
+func validateDestination(_ context.Context, dest *regmodel.Registry) error {
 	if dest == nil || dest.ID == 0 {
 		return nil
 	}
-	info, err := registryInfo(dest)
-	if err != nil {
-		log.GetLogger(ctx).Warningf("skip the source-only check of the destination registry %s: %v", dest.Name, err)
-		return nil
-	}
-	if info.SourceOnly {
+	if adapter.IsSourceOnly(dest.Type) {
 		return errors.New(nil).WithCode(errors.BadRequestCode).
 			WithMessagef("the %s registry %s can only be a replication source", dest.Type, dest.Name)
 	}

@@ -46,6 +46,9 @@ var revisionTagRe = regexp.MustCompile(`^sha-[0-9a-f]{12}$`)
 
 // RevisionTag returns the immutable tag of a source revision: "sha-" and the first 12 hex
 // characters. It returns "" for a revision that does not start with 12 lowercase hex characters.
+// The tag names the revision, not the content: the file filter is part of the digest, so two
+// policies that copy one revision with different filters into one repository give the tag
+// different digests. Keep one filter per destination repository.
 func RevisionTag(revision string) string {
 	if len(revision) < revisionTagHexLen {
 		return ""
@@ -88,9 +91,7 @@ func ParseFileFilter(value any) (*FileFilter, error) {
 	case FileFilter:
 		*f = v
 	case string:
-		for _, p := range strings.FieldsFunc(v, func(r rune) bool {
-			return r == ',' || r == ' ' || r == '\n' || r == '\t' || r == '\r'
-		}) {
+		for _, p := range splitPatterns(v) {
 			if strings.HasPrefix(p, "!") {
 				f.Exclude = append(f.Exclude, p[1:])
 			} else {
@@ -271,4 +272,32 @@ type ResolvedFile struct {
 	// when it was hashed to compute the digest.
 	SHA256  string `json:"sha256,omitempty"`
 	Matched bool   `json:"matched"`
+}
+
+// splitPatterns splits the string form of a file filter on commas and whitespace, but keeps
+// the commas of a brace alternation such as "*.{json,md}" inside its pattern.
+func splitPatterns(v string) []string {
+	var patterns []string
+	var current strings.Builder
+	depth := 0
+	flush := func() {
+		if current.Len() > 0 {
+			patterns = append(patterns, current.String())
+			current.Reset()
+		}
+	}
+	for _, r := range v {
+		switch {
+		case r == '{':
+			depth++
+		case r == '}' && depth > 0:
+			depth--
+		case depth == 0 && (r == ',' || r == ' ' || r == '\n' || r == '\t' || r == '\r'):
+			flush()
+			continue
+		}
+		current.WriteRune(r)
+	}
+	flush()
+	return patterns
 }

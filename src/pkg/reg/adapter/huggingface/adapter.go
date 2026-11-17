@@ -49,6 +49,11 @@ func (f *factory) Create(r *model.Registry) (adp.Adapter, error) {
 	return newAdapter(r, defaultCache())
 }
 
+// SourceOnly ...
+func (f *factory) SourceOnly() bool {
+	return true
+}
+
 // AdapterPattern ...
 func (f *factory) AdapterPattern() *model.AdapterPattern {
 	return getAdapterPattern()

@@ -65,15 +65,31 @@ export function isTaskInProgress(task: ModelSyncTask): boolean {
     );
 }
 
+// splitPatterns splits on the separators, except inside a brace alternation such as
+// "*.{json,md}", like the backend does
+function splitPatterns(input: string, separator: RegExp): string[] {
+    const patterns: string[] = [];
+    let current = '';
+    let depth = 0;
+    for (const ch of input || '') {
+        if (ch === '{') {
+            depth++;
+        } else if (ch === '}' && depth > 0) {
+            depth--;
+        } else if (depth === 0 && separator.test(ch)) {
+            patterns.push(current.trim());
+            current = '';
+            continue;
+        }
+        current += ch;
+    }
+    patterns.push(current.trim());
+    return patterns.filter(p => p.length > 0);
+}
+
 // convert "a, b\n c" style user input into a filter array
 export function parseFileFilters(input: string): string[] {
-    if (!input) {
-        return [];
-    }
-    return input
-        .split(/[\n,]/)
-        .map(item => item.trim())
-        .filter(item => item.length > 0);
+    return splitPatterns(input, /[\n,]/);
 }
 
 export function formatFileFilters(filters: string[]): string {
@@ -129,7 +145,7 @@ export function parseFileFilter(value: any): {
     exclude: string[];
 } {
     if (typeof value === 'string') {
-        const patterns = value.split(/[,\s]+/).filter(p => p.length > 0);
+        const patterns = splitPatterns(value, /[,\s]/);
         return {
             include: patterns.filter(p => !p.startsWith('!')),
             exclude: patterns

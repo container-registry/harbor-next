@@ -13,7 +13,8 @@
 // limitations under the License.
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
+import { HttpHeaders, HttpResponse } from '@angular/common/http';
 import { SharedTestingModule } from '../../../../shared/shared.module';
 import { ModelSyncService } from '../model-sync.service';
 import { ProjectService } from '../../../../../../ng-swagger-gen/services/project.service';
@@ -70,16 +71,25 @@ describe('CreateEditModelSyncPolicyComponent', () => {
             .createSpy('updatePolicy')
             .and.returnValue(of(null)),
     };
+    const defaultProjects = () =>
+        of(
+            new HttpResponse({
+                body: [
+                    { project_id: 1, name: 'library' },
+                    { project_id: 2, name: 'proxy', registry_id: 5 },
+                ],
+                headers: new HttpHeaders({ 'X-Total-Count': '2' }),
+            })
+        );
     const mockProject = {
-        listProjects: () =>
-            of([
-                { project_id: 1, name: 'library' },
-                { project_id: 2, name: 'proxy', registry_id: 5 },
-            ]),
+        listProjectsResponse: jasmine
+            .createSpy('listProjectsResponse')
+            .and.callFake(defaultProjects),
     };
     const mockErrorHandler = { error: () => {}, info: () => {} };
 
     beforeEach(async () => {
+        mockProject.listProjectsResponse.and.callFake(defaultProjects);
         await TestBed.configureTestingModule({
             schemas: [CUSTOM_ELEMENTS_SCHEMA],
             imports: [SharedTestingModule],
@@ -232,6 +242,65 @@ describe('CreateEditModelSyncPolicyComponent', () => {
         expect(mockModelSync.createPolicy).toHaveBeenCalled();
         expect(saved).toBeTrue();
         expect(component.opened).toBeFalse();
+    });
+
+    it('should update an edited policy', () => {
+        mockModelSync.updatePolicy.calls.reset();
+        mockModelSync.createPolicy.calls.reset();
+        component.openEdit({
+            id: 7,
+            name: 'p',
+            registry_id: 2,
+            src_repository: 'a/b',
+            dest_project_name: 'library',
+            trigger: { type: 'manual' },
+            enabled: true,
+        });
+        component.form.patchValue({ description: 'changed' });
+        component.onSave();
+        expect(mockModelSync.updatePolicy).toHaveBeenCalledWith(
+            7,
+            jasmine.objectContaining({ name: 'p', description: 'changed' })
+        );
+        expect(mockModelSync.createPolicy).not.toHaveBeenCalled();
+    });
+
+    it('should list projects past the first page', done => {
+        mockProject.listProjectsResponse.and.callFake(
+            (params: { page: number }) =>
+                of(
+                    new HttpResponse({
+                        body: [
+                            {
+                                project_id: params.page,
+                                name: `p${params.page}`,
+                            },
+                        ],
+                        headers: new HttpHeaders({ 'X-Total-Count': '150' }),
+                    })
+                )
+        );
+        component.allProjects().subscribe(projects => {
+            expect(projects.map(p => p.name)).toEqual(['p1', 'p2']);
+            done();
+        });
+    });
+
+    it('should drop a preview answer for a superseded request', () => {
+        const late = new Subject<any>();
+        mockModelSync.preview.and.returnValue(late);
+        component.openCreate();
+        component.form.patchValue({
+            registry_id: 2,
+            src_repository: 'Qwen/Qwen3-8B',
+        });
+        component.doPreview();
+        component.resetPreview();
+        late.next(preview);
+        late.complete();
+        expect(component.preview).toBeNull();
+        expect(component.previewing).toBeFalse();
+        mockModelSync.preview.and.returnValue(of(preview));
     });
 
     it('should match globs like the backend', () => {
