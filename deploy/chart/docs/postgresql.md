@@ -16,6 +16,16 @@ generates that password unless you set `postgresql.auth.password` or
 `postgresql.auth.existingSecret`. `database.*` is ignored. Any other
 cloudpirates/postgres value can be set under `postgresql:`.
 
+## Upgrading from a 2.15 chart
+
+A release installed from a harbor-next 2.15 chart stores values with no
+`postgresql.enabled`. With `helm upgrade --reuse-values`, Helm keeps those old
+values and skips the new chart defaults, so Helm would deploy the subchart
+nobody asked for. The chart refuses that upgrade with an error. Pass your
+values file (`helm upgrade -f values.yaml`) or use `--reset-then-reuse-values`
+(Helm 3.14+); both pick up the new defaults, including
+`postgresql.enabled: false`.
+
 ## Major upgrades
 
 An init container runs [pgautoupgrade](https://github.com/pgautoupgrade/docker-pgautoupgrade)
