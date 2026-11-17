@@ -13,6 +13,7 @@
 // limitations under the License.
 import {
     ComponentFixture,
+    discardPeriodicTasks,
     fakeAsync,
     TestBed,
     tick,
@@ -93,6 +94,35 @@ describe('ModelSyncExecutionTasksComponent', () => {
         // in progress execution schedules a refresh
         expect(component.refreshTimeout).toBeTruthy();
         component.ngOnDestroy();
+    }));
+
+    it('should poll when the execution arrives after the tasks', fakeAsync(() => {
+        component.execution = undefined;
+        component.clrLoadTasks(true, { page: { size: 15 } });
+        tick();
+        component.clearRefresh();
+        component.loadExecution();
+        tick();
+        expect(component.refreshTimeout).toBeTruthy();
+        component.ngOnDestroy();
+    }));
+
+    it('should keep the sort on automatic refreshes', fakeAsync(() => {
+        const listTasks = spyOn(
+            mockService as any,
+            'listTasks'
+        ).and.callThrough();
+        const sort = { by: 'start_time', reverse: true };
+        component.loadExecution();
+        tick();
+        component.clrLoadTasks(true, { page: { size: 15 }, sort } as any);
+        tick();
+        tick(10000);
+        expect((listTasks.calls.mostRecent().args as any[])[1].sort).toEqual(
+            '-start_time'
+        );
+        component.ngOnDestroy();
+        discardPeriodicTasks();
     }));
 
     it('should not poll again once destroyed', fakeAsync(() => {

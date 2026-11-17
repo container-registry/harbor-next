@@ -20,6 +20,7 @@ import { ModelSyncService } from './model-sync.service';
 import {
     destRepository,
     revisionTag,
+    parseFileFilter,
     fromReplicationPolicy,
     ModelSyncPolicy,
     toReplicationPolicy,
@@ -194,6 +195,60 @@ describe('ModelSyncService', () => {
             ).toEqual('type={huggingface}');
             done();
         });
+    });
+
+    it('reads both wire forms of a file filter', () => {
+        expect(parseFileFilter('*.json, !onnx/** *.md')).toEqual({
+            include: ['*.json', '*.md'],
+            exclude: ['onnx/**'],
+        });
+        expect(parseFileFilter({ include: ['a'] })).toEqual({
+            include: ['a'],
+            exclude: [],
+        });
+        expect(parseFileFilter(undefined)).toEqual({
+            include: [],
+            exclude: [],
+        });
+    });
+
+    it('keeps the settings the form does not manage on update', () => {
+        const stored = {
+            id: 7,
+            name: 'old',
+            override: false,
+            deletion: true,
+            speed: 512,
+            copy_by_chunk: true,
+            filters: [
+                { type: 'name', value: 'Org/Old' },
+                { type: 'label', value: ['keep'] },
+            ],
+        };
+        replication.getReplicationPolicy.and.returnValue(of(stored) as any);
+        replication.updateReplicationPolicy.and.returnValue(of(null));
+        service
+            .updatePolicy(7, {
+                name: 'new',
+                registry_id: 2,
+                src_repository: 'Org/New',
+                src_revision: 'main',
+                dest_project_name: 'library',
+                enabled: true,
+                trigger: { type: 'manual' },
+            })
+            .subscribe();
+        const sent =
+            replication.updateReplicationPolicy.calls.mostRecent().args[0]
+                .policy;
+        expect(sent.name).toEqual('new');
+        expect(sent.override).toBeFalse();
+        expect(sent.deletion).toBeTrue();
+        expect(sent.speed).toEqual(512);
+        expect(sent.copy_by_chunk).toBeTrue();
+        expect(sent.filters).toContain({ type: 'label', value: ['keep'] });
+        expect(sent.filters).toContain({ type: 'name', value: 'Org/New' });
+        expect(sent.filters).not.toContain({ type: 'name', value: 'Org/Old' });
     });
 
     it('toggles only the enabled flag of the stored rule', () => {

@@ -15,6 +15,7 @@
 package model
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -320,9 +321,10 @@ func TestValidateDestRepository(t *testing.T) {
 	}
 	assert.NoError(t, base("").Validate())
 	assert.NoError(t, base("smollm2-135m").Validate())
-	for _, name := range []string{"a/b", "Upper", "-x", "x-", "a..b"} {
+	for _, name := range []string{"a/b", "Upper", "-x", "x-", "a..b", strings.Repeat("a", 257)} {
 		assert.Error(t, base(name).Validate(), name)
 	}
+	assert.NoError(t, base(strings.Repeat("a", 256)).Validate())
 }
 
 func TestValidateDestRepositoryNeedsOneSource(t *testing.T) {

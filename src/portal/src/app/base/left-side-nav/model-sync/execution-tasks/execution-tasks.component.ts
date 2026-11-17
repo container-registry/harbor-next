@@ -61,6 +61,8 @@ export class ModelSyncExecutionTasksComponent implements OnInit, OnDestroy {
     totalCount: number = 0;
     refreshTimeout: any;
     private destroyed = false;
+    // lastState keeps the datagrid sort for the automatic refreshes
+    private lastState: ClrDatagridStateInterface = { page: {} };
 
     constructor(
         private route: ActivatedRoute,
@@ -93,15 +95,37 @@ export class ModelSyncExecutionTasksComponent implements OnInit, OnDestroy {
             .getExecution(this.executionId)
             .pipe(finalize(() => (this.executionLoading = false)))
             .subscribe(
-                res => (this.execution = res),
+                res => {
+                    this.execution = res;
+                    // the tasks may have arrived first and seen no execution yet
+                    if (
+                        isExecutionInProgress(res) &&
+                        !this.refreshTimeout &&
+                        !this.loading
+                    ) {
+                        this.scheduleRefresh();
+                    }
+                },
                 error => this.errorHandler.error(error)
             );
+    }
+
+    scheduleRefresh(): void {
+        if (this.destroyed) {
+            return;
+        }
+        this.clearRefresh();
+        this.refreshTimeout = setTimeout(() => {
+            this.loadExecution();
+            this.clrLoadTasks(false, { ...this.lastState, page: {} });
+        }, REFRESH_TIME_DIFFERENCE);
     }
 
     clrLoadTasks(withLoading: boolean, state: ClrDatagridStateInterface): void {
         if (!state || !state.page || !this.executionId) {
             return;
         }
+        this.lastState = state;
         if (state.page.size) {
             this.pageSize = state.page.size;
             setPageSizeToLocalStorage(
@@ -125,14 +149,10 @@ export class ModelSyncExecutionTasksComponent implements OnInit, OnDestroy {
                     this.totalCount = res.total;
                     this.tasks = res.items;
                     if (
-                        !this.destroyed &&
-                        (this.tasks.some(t => isTaskInProgress(t)) ||
-                            isExecutionInProgress(this.execution))
+                        this.tasks.some(t => isTaskInProgress(t)) ||
+                        isExecutionInProgress(this.execution)
                     ) {
-                        this.refreshTimeout = setTimeout(() => {
-                            this.loadExecution();
-                            this.clrLoadTasks(false, { page: {} });
-                        }, REFRESH_TIME_DIFFERENCE);
+                        this.scheduleRefresh();
                     }
                 },
                 error => this.errorHandler.error(error)

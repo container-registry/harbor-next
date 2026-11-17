@@ -21,6 +21,7 @@ import { RegistryPreview } from '../../../../../ng-swagger-gen/models/registry-p
 import { CURRENT_BASE_HREF } from '../../../shared/units/utils';
 import {
     fromReplicationPolicy,
+    mergeManaged,
     ModelSyncExecution,
     ModelSyncPolicy,
     ModelSyncTask,
@@ -138,11 +139,17 @@ export class ModelSyncService {
         });
     }
 
+    // updatePolicy changes what the form manages and keeps the other settings of the
+    // stored rule, such as override, deletion and bandwidth.
     updatePolicy(id: number, policy: ModelSyncPolicy): Observable<null> {
-        return this.replicationService.updateReplicationPolicy({
-            id,
-            policy: toReplicationPolicy(policy),
-        });
+        return this.replicationService.getReplicationPolicy({ id }).pipe(
+            switchMap(stored =>
+                this.replicationService.updateReplicationPolicy({
+                    id,
+                    policy: mergeManaged(stored, toReplicationPolicy(policy)),
+                })
+            )
+        );
     }
 
     // setEnabled changes only the enabled flag of the stored rule, so settings the model

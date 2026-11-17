@@ -163,13 +163,25 @@ func (a *adapter) listArtifacts(ctx context.Context, modelID string, filters []*
 	}
 	// The revision tag is added after the tag filter: it follows the moving tags the filter
 	// selected rather than being matched itself.
+	repository, _ := repositoryOf(modelID)
 	for _, art := range artifacts {
 		if len(art.Tags) == 0 {
 			continue
 		}
-		if tag := model.RevisionTag(idx.commits[art.Tags[0]]); tag != "" {
-			art.Tags = append(art.Tags, tag)
+		commit := idx.commits[art.Tags[0]]
+		tag := model.RevisionTag(commit)
+		if tag == "" {
+			continue
 		}
+		// a real ref with the revision tag's name would make the tag point elsewhere
+		if _, taken := idx.commits[tag]; taken || len(idx.collisions[tag]) > 0 {
+			if idx.commits[tag] != commit {
+				log.Warningf("skip revision tag %s of hugging face model %s: a ref of that name points elsewhere", tag, modelID)
+				continue
+			}
+		}
+		a.locator.pinRevision(ctx, repository, tag, commit)
+		art.Tags = append(art.Tags, tag)
 	}
 	return artifacts, nil
 }

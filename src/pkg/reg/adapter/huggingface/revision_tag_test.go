@@ -15,6 +15,7 @@
 package huggingface
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -77,6 +78,46 @@ func TestPullByRevisionTag(t *testing.T) {
 	r, err := a.Resolve(repoTiny, "main", nil)
 	require.NoError(t, err)
 	assert.Equal(t, revisionTagMain, r.RevisionTag)
+}
+
+func TestRevisionTagResolvesAfterBranchMoves(t *testing.T) {
+	h := hubtest.New(tinyModel())
+	defer h.Close()
+	c := newMemoryCache()
+	a := newTestAdapter(t, hubRegistry(h, 1, ""), c)
+	require.NoError(t, a.ConfigureSource(&model.SourceOptions{RevisionTag: true}))
+
+	res, err := a.FetchArtifacts([]*model.Filter{
+		{Type: model.FilterTypeName, Value: "org/tiny-model"},
+		{Type: model.FilterTypeTag, Value: "main"},
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"main", revisionTagMain}, res[0].Metadata.Artifacts[0].Tags)
+	listed := manifestDigest(t, a, "main")
+
+	// main moves on before the copy runs
+	h.SetBranch("Org/Tiny-Model", "main", commitNew)
+	h.SetBranch("Org/Tiny-Model", "feature/x", commitNew)
+	require.NoError(t, c.Delete(context.Background(), a.locator.refsKey(repoTiny)))
+
+	assert.Equal(t, listed, manifestDigest(t, a, revisionTagMain), "the revision tag keeps the listed commit")
+	assert.NotEqual(t, listed, manifestDigest(t, a, "main"))
+}
+
+func TestRevisionTagSkippedWhenARefHasItsName(t *testing.T) {
+	m := tinyModel()
+	m.Branches[revisionTagMain] = commitV1
+	h := hubtest.New(m)
+	defer h.Close()
+	a := newTestAdapter(t, hubRegistry(h, 1, ""), newMemoryCache())
+	require.NoError(t, a.ConfigureSource(&model.SourceOptions{RevisionTag: true}))
+
+	res, err := a.FetchArtifacts([]*model.Filter{
+		{Type: model.FilterTypeName, Value: "org/tiny-model"},
+		{Type: model.FilterTypeTag, Value: "main"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"main"}, res[0].Metadata.Artifacts[0].Tags, "the branch named like the revision tag points at another commit")
 }
 
 func TestReplicationTransferWithRevisionTag(t *testing.T) {

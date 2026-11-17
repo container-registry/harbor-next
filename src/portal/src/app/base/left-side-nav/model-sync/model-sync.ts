@@ -122,13 +122,58 @@ export function toReplicationPolicy(p: ModelSyncPolicy): ReplicationPolicy {
     };
 }
 
+// parseFileFilter reads both wire forms of a file filter, like the backend: an object
+// {include, exclude}, or a string of patterns where a leading "!" marks an exclude.
+export function parseFileFilter(value: any): {
+    include: string[];
+    exclude: string[];
+} {
+    if (typeof value === 'string') {
+        const patterns = value.split(/[,\s]+/).filter(p => p.length > 0);
+        return {
+            include: patterns.filter(p => !p.startsWith('!')),
+            exclude: patterns
+                .filter(p => p.startsWith('!'))
+                .map(p => p.slice(1)),
+        };
+    }
+    return { include: value?.include || [], exclude: value?.exclude || [] };
+}
+
+// MANAGED_FILTER_TYPES and MANAGED_FIELDS are what the Model Sync form edits; an update
+// keeps every other setting of the stored rule.
+const MANAGED_FILTER_TYPES = [FILTER_NAME, FILTER_TAG, FILTER_FILE];
+const MANAGED_FIELDS: (keyof ReplicationPolicy)[] = [
+    'name',
+    'description',
+    'src_registry',
+    'dest_namespace',
+    'dest_repository',
+    'trigger',
+    'enabled',
+];
+
+export function mergeManaged(
+    stored: ReplicationPolicy,
+    form: ReplicationPolicy
+): ReplicationPolicy {
+    const merged: ReplicationPolicy = { ...stored };
+    for (const field of MANAGED_FIELDS) {
+        (merged as any)[field] = form[field];
+    }
+    merged.filters = [
+        ...(form.filters || []),
+        ...(stored.filters || []).filter(
+            f => !MANAGED_FILTER_TYPES.includes(f.type)
+        ),
+    ];
+    return merged;
+}
+
 export function fromReplicationPolicy(r: ReplicationPolicy): ModelSyncPolicy {
     const filter = (type: string) =>
         (r.filters || []).find(f => f.type === type)?.value;
-    const file = filter(FILTER_FILE) as {
-        include?: string[];
-        exclude?: string[];
-    };
+    const file = parseFileFilter(filter(FILTER_FILE));
     return {
         id: r.id,
         name: r.name,
@@ -138,8 +183,8 @@ export function fromReplicationPolicy(r: ReplicationPolicy): ModelSyncPolicy {
         registry: r.src_registry,
         src_repository: (filter(FILTER_NAME) as string) || '',
         src_revision: (filter(FILTER_TAG) as string) || '',
-        file_filters: file?.include || [],
-        file_excludes: file?.exclude || [],
+        file_filters: file.include,
+        file_excludes: file.exclude,
         dest_project_name: r.dest_namespace,
         dest_repository: r.dest_repository || '',
         trigger: {

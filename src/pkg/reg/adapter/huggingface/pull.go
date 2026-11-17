@@ -151,7 +151,13 @@ func (a *adapter) commitOf(ctx context.Context, repository, tag string) (string,
 	if err != nil {
 		return "", err
 	}
-	return newRefIndex(refs).commit(tag)
+	commit, err := newRefIndex(refs).commit(tag)
+	if errors.IsNotFoundErr(err) && model.IsRevisionTag(tag) {
+		if pinned, ok := a.locator.pinnedRevision(ctx, repository, tag); ok {
+			return pinned, nil
+		}
+	}
+	return commit, err
 }
 
 // refs returns the refs of a repository, cached for refsTTL.
