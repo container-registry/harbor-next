@@ -38,7 +38,8 @@ through instead of scrolling:
 
 - A **CVE** opens a menu: **Where is this CVE?** opens the CVE lookup for it,
   **Open in NVD** opens the NVD entry.
-- A **Repository** opens the Project dashboard for its project at Critical.
+- A **Repository** opens the Project dashboard for its project, at the severity
+  of the finding in the CVE lookup and at Critical from the overview.
 - The link bar at the top switches between the three dashboards. The selected
   data source is carried along.
 
@@ -158,8 +159,11 @@ classic dashboard JSON back. Before saving an export:
   link bar and the data links depend on them.
 - Keep `${datasource}` in every target and in the data links
   (`var-datasource=${datasource}`).
-- Keep the ten page queries (refIds `A` to `J`) and the `merge` transformation in
-  each table.
+- Keep the ten page queries (refIds `A` to `J`) in the first table of the CVE
+  lookup and Project dashboards. The second table reuses them through the
+  `-- Dashboard --` datasource, so each dashboard fetches every page once. Keep
+  the `merge` transformation in both tables.
+- Keep `${cve:percentencode}` in the CVE lookup URLs.
 - Remove the Grafana database `id` and revision `version`, and clear every
   variable's `current` to `{}` and `options` to `[]`.
 
