@@ -34,8 +34,10 @@ import (
 type Suite struct {
 	suite.Suite
 
-	Config   *restapi.Config
-	Security *securitytesting.Context
+	Config *restapi.Config
+	// Middlewares are registered per operation, as handler.New does
+	Middlewares map[string]func(http.Handler) http.Handler
+	Security    *securitytesting.Context
 	ts       *httptest.Server
 	tc       *http.Client
 }
@@ -43,6 +45,9 @@ type Suite struct {
 // SetupSuite ...
 func (suite *Suite) SetupSuite() {
 	h, api, _ := restapi.HandlerAPI(*suite.Config)
+	for operation, builder := range suite.Middlewares {
+		api.RegisterMiddleware(operation, builder)
+	}
 
 	api.ServeError = func(rw http.ResponseWriter, r *http.Request, err error) {
 		lib.SendError(rw, err)

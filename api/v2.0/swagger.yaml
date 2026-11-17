@@ -266,6 +266,7 @@ paths:
       operationId: updateConfigurations
       description: |
         This endpoint is for modifying system configurations that only provides for admin user.
+        Feature toggles are not configurations here: a body naming a feature key returns 400, use PUT /features/{feature_key} instead.
       tags:
         - configure
       parameters:
@@ -280,7 +281,13 @@ paths:
         '200':
           description: Modify system configurations successfully.
         '400':
-          $ref: '#/responses/400'
+          description: Bad request, including a body that names a feature key.
+          headers:
+            X-Request-Id:
+              description: The ID of the corresponding request for the response
+              type: string
+          schema:
+            $ref: '#/definitions/Errors'
         '401':
           $ref: '#/responses/401'
         '403':
