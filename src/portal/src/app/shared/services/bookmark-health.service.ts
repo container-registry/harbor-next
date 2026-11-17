@@ -166,12 +166,11 @@ export class BookmarkHealthService {
         }
         const added = bookmarks.filter(b => !previous.has(bookmarkKey(b)));
         const removed = [...previous].filter(k => !keys.has(k));
+        // A probe still in flight must not bring a removed bookmark's status back.
+        removed.forEach(k => this.probeIds.delete(k));
         if (removed.some(k => this.statuses.value.has(k))) {
             const next = new Map(this.statuses.value);
-            removed.forEach(k => {
-                next.delete(k);
-                this.probeIds.delete(k);
-            });
+            removed.forEach(k => next.delete(k));
             this.statuses.next(next);
         }
         if (added.length) {

@@ -526,6 +526,10 @@ export class RepositoryGridviewComponent
         this.loadSub?.unsubscribe();
         this.nextPageSub?.unsubscribe();
         this.searchReset.next();
+        // The dropped term must not stay in the box as if it were applied.
+        if (this.filterComponent) {
+            this.filterComponent.currentValue = this.lastFilteredRepoName || '';
+        }
         this.pageSize = state.page.size;
         setPageSizeToLocalStorage(
             PageSizeMapKeys.REPOSITORY_GRIDVIEW_COMPONENT,

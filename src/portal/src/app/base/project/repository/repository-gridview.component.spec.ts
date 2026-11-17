@@ -200,6 +200,15 @@ describe('RepositoryComponentGridview (inline template)', () => {
         expect(compRepo.lastFilteredRepoName).toBe('nginx');
         discardPeriodicTasks();
     }));
+    it('shows the applied filter again when a load drops a typed term', fakeAsync(() => {
+        compRepo.filterComponent.currentValue = 'ngi';
+        compRepo.filterComponent.filterTerms.next('ngi');
+        compRepo.clrLoad({ page: { from: 0, to: 14, size: 15 } });
+        tick(500);
+        expect(compRepo.filterComponent.currentValue).toBe('');
+        expect(compRepo.lastFilteredRepoName).not.toBe('ngi');
+        discardPeriodicTasks();
+    }));
     it('should be list view', async () => {
         const listViewButton =
             fixtureRepo.nativeElement.querySelector('.list-btn');

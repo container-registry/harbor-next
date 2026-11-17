@@ -245,6 +245,18 @@ describe('BookmarkHealthService', () => {
         expect(service.statusOf(statuses, repo)).toBe(BookmarkStatus.OK);
     });
 
+    it('drops a pending probe result of a removed bookmark', () => {
+        owner.next('harbor-bookmarks:1');
+        bookmarks.next([project]);
+        const pending = new Subject<any>();
+        repositoryService.listRepositories.and.returnValue(pending);
+        bookmarks.next([project, repo]);
+        bookmarks.next([project]);
+        pending.next([]);
+        pending.complete();
+        expect(statuses.size).toBe(0);
+    });
+
     it('forgets statuses and the throttle when the user changes', () => {
         service.checkAll([project], true);
         expect(service.statusOf(statuses, project)).toBe(BookmarkStatus.OK);
