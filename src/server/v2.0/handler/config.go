@@ -17,14 +17,19 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"sort"
 
 	"github.com/go-openapi/runtime/middleware"
 
 	"github.com/goharbor/harbor/src/common/rbac"
 	"github.com/goharbor/harbor/src/common/security"
 	"github.com/goharbor/harbor/src/controller/config"
+	"github.com/goharbor/harbor/src/lib"
 	cfgModels "github.com/goharbor/harbor/src/lib/config/models"
 	"github.com/goharbor/harbor/src/lib/errors"
+	lib_http "github.com/goharbor/harbor/src/lib/http"
+	"github.com/goharbor/harbor/src/pkg/feature"
 	"github.com/goharbor/harbor/src/server/v2.0/models"
 	"github.com/goharbor/harbor/src/server/v2.0/restapi/operations/configure"
 )
@@ -79,6 +84,10 @@ func (c *configAPI) UpdateConfigurations(ctx context.Context, params configure.U
 	if params.Configurations == nil {
 		return c.SendError(ctx, errors.BadRequestError(nil).WithMessage("Missing configuration item"))
 	}
+	if keys, _ := ctx.Value(featureKeysKey{}).([]string); len(keys) > 0 {
+		return c.SendError(ctx, errors.BadRequestError(nil).
+			WithMessagef("%s is a feature toggle: use PUT /api/v2.0/features/%s", keys[0], keys[0]))
+	}
 	conf := params.Configurations
 	cfgMap, err := toCfgMap(conf)
 	if err != nil {
@@ -89,6 +98,38 @@ func (c *configAPI) UpdateConfigurations(ctx context.Context, params configure.U
 		return c.SendError(ctx, err)
 	}
 	return configure.NewUpdateConfigurationsOK()
+}
+
+type featureKeysKey struct{}
+
+// maxConfigBodySize is far above any real configuration update.
+const maxConfigBodySize = 1 << 20
+
+// captureFeatureKeys records the feature keys a configuration update names,
+// since binding the typed body would drop them and answer 200.
+func captureFeatureKeys(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := lib.ReadRequestBody(r, maxConfigBodySize)
+		if err != nil {
+			lib_http.SendError(w, err)
+			return
+		}
+		// a malformed body is left to the binding to report
+		var raw map[string]json.RawMessage
+		if json.Unmarshal(body, &raw) == nil {
+			var keys []string
+			for _, def := range feature.Definitions() {
+				if _, ok := raw[def.ConfigKey]; ok {
+					keys = append(keys, def.ConfigKey)
+				}
+			}
+			if len(keys) > 0 {
+				sort.Strings(keys)
+				r = r.WithContext(context.WithValue(r.Context(), featureKeysKey{}, keys))
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func toCfgMap(conf *models.Configurations) (map[string]any, error) {

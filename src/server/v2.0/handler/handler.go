@@ -79,6 +79,7 @@ func New() http.Handler {
 	api.RegisterMiddleware("CopyArtifact", middleware.Chain(quota.CopyArtifactMiddleware(), blob.CopyArtifactMiddleware()))
 	api.RegisterMiddleware("DeleteArtifact", quota.RefreshForProjectMiddleware())
 	api.RegisterMiddleware("DeleteRepository", quota.RefreshForProjectMiddleware())
+	api.RegisterMiddleware("UpdateConfigurations", captureFeatureKeys)
 
 	api.BeforePrepare = beforePrepare
 	api.ServeError = serveError
