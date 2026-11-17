@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 import { HttpErrorResponse } from '@angular/common/http';
-import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
+import { BehaviorSubject, defer, of, Subject, throwError } from 'rxjs';
 import { ProjectService } from '../../../../ng-swagger-gen/services/project.service';
 import { RepositoryService } from '../../../../ng-swagger-gen/services/repository.service';
 import { ArtifactService } from '../../../../ng-swagger-gen/services/artifact.service';
@@ -139,8 +139,12 @@ describe('BookmarkHealthService', () => {
     });
 
     it('applies a project error to all of its bookmarks', () => {
+        let requests = 0;
         projectService.getProject.and.returnValue(
-            throwError(new HttpErrorResponse({ status: 403 }))
+            defer(() => {
+                requests++;
+                return throwError(new HttpErrorResponse({ status: 403 }));
+            })
         );
         service.checkAll([project, tag], true);
         expect(service.statusOf(statuses, project)).toBe(
@@ -148,6 +152,7 @@ describe('BookmarkHealthService', () => {
         );
         expect(service.statusOf(statuses, tag)).toBe(BookmarkStatus.FORBIDDEN);
         expect(artifactService.getArtifact).not.toHaveBeenCalled();
+        expect(requests).toBe(1);
     });
 
     it('treats a project re-created under the same id as missing', () => {

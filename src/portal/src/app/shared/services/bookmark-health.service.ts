@@ -89,6 +89,8 @@ export function getLabelById(
     );
 }
 
+type ProjectLookup = { project: Project } | { error: unknown };
+
 @Injectable({
     providedIn: 'root',
 })
@@ -180,7 +182,7 @@ export class BookmarkHealthService {
 
     private probeAll(bookmarks: Bookmark[]): void {
         const generation = this.generation;
-        const projects = new Map<number, Observable<Project>>();
+        const projects = new Map<number, Observable<ProjectLookup>>();
         const projectOf = (id: number) => {
             if (!projects.has(id)) {
                 projects.set(
@@ -189,10 +191,23 @@ export class BookmarkHealthService {
                         this.projectService.getProject({
                             projectNameOrId: String(id),
                         })
-                    ).pipe(shareReplay(1))
+                    ).pipe(
+                        // shareReplay resubscribes after an error, so the error is shared as a value.
+                        map(project => ({ project })),
+                        catchError(error => of({ error })),
+                        shareReplay(1)
+                    )
                 );
             }
-            return projects.get(id);
+            return projects
+                .get(id)
+                .pipe(
+                    switchMap(lookup =>
+                        'error' in lookup
+                            ? throwError(() => lookup.error)
+                            : of(lookup.project)
+                    )
+                );
         };
         const probes = bookmarks.map(b => {
             const key = bookmarkKey(b);
