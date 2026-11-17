@@ -208,10 +208,16 @@ describe('ArtifactSbomComponent', () => {
     });
 
     it('loads the SBOM when the digest arrives after init', () => {
-        const spy = spyOn(component, 'getSbom');
+        const spy = spyOn<any>(
+            fakedArtifactService,
+            'getAddition'
+        ).and.callThrough();
+        component.sbomDigest = 'sha256:late';
         component.ngOnChanges({
             sbomDigest: new SimpleChange(undefined, 'sha256:late', false),
         });
-        expect(spy).toHaveBeenCalled();
+        expect(spy).toHaveBeenCalledWith(
+            jasmine.objectContaining({ reference: 'sha256:late' })
+        );
     });
 });

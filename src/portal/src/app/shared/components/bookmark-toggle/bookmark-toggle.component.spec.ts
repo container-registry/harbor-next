@@ -101,6 +101,8 @@ describe('BookmarkToggleComponent', () => {
         setTarget(target);
         expect(button()).toBeNull();
         user = { username: 'alice', user_id: 7 };
+        setTarget(target);
+        expect(button()).toBeTruthy();
         setTarget(null);
         expect(button()).toBeNull();
     });

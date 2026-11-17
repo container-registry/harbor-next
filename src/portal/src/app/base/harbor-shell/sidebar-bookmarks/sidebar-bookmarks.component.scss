@@ -60,6 +60,19 @@
     }
 }
 
+// Touch screens have no hover, so the actions stay visible there.
+@media (hover: none) {
+    .bookmark-row {
+        .bookmark-actions {
+            display: flex;
+        }
+
+        .bookmark-link {
+            padding-right: 2.6rem;
+        }
+    }
+}
+
 .bookmark-label {
     flex: 1 1 auto;
     min-width: 0;

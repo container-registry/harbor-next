@@ -18,7 +18,7 @@ import {
     TestBed,
     tick,
 } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { BehaviorSubject, of } from 'rxjs';
 import { RepositoryService as NewRepositoryService } from '../../../../../ng-swagger-gen/services/repository.service';
 import { RepositoryGridviewComponent } from './repository-gridview.component';
 import {
@@ -30,7 +30,7 @@ import {
 } from '../../../shared/services';
 import { delay } from 'rxjs/operators';
 import { ErrorHandler } from '../../../shared/units/error-handler';
-import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, ParamMap } from '@angular/router';
 import { Repository as NewRepository } from '../../../../../ng-swagger-gen/models/repository';
 import { SharedTestingModule } from '../../../shared/shared.module';
 import { GridViewComponent } from './gridview/grid-view.component';
@@ -104,8 +104,11 @@ describe('RepositoryComponentGridview (inline template)', () => {
             return of(true);
         },
     };
+    let queryParamMap: BehaviorSubject<ParamMap>;
     const fakedActivatedRoute = {
-        queryParamMap: of(convertToParamMap({})),
+        get queryParamMap() {
+            return queryParamMap;
+        },
         snapshot: {
             queryParams: {},
             parent: {
@@ -118,6 +121,7 @@ describe('RepositoryComponentGridview (inline template)', () => {
         },
     };
     beforeEach(() => {
+        queryParamMap = new BehaviorSubject(convertToParamMap({}));
         let store = {};
         spyOn(localStorage, 'getItem').and.callFake(key => {
             return store[key];
@@ -189,8 +193,9 @@ describe('RepositoryComponentGridview (inline template)', () => {
             'listRepositoriesResponse'
         ).and.callThrough();
         compRepo.filterComponent.filterTerms.next('old');
-        (compRepo as any).searchReset.next();
+        queryParamMap.next(convertToParamMap({ name: 'redis' }));
         tick(500);
+        expect(compRepo.lastFilteredRepoName).toBe('redis');
         expect(compRepo.lastFilteredRepoName).not.toBe('old');
         expect(spy).not.toHaveBeenCalledWith(
             jasmine.objectContaining({ q: encodeURIComponent('name=~old') })
