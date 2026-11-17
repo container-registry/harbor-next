@@ -49,6 +49,8 @@ describe('ConfigurationComponent', () => {
                     useValue: {
                         hasFeatures: () =>
                             Object.keys(appConfig.features || {}).length > 0,
+                        featureEnabled: (key: string) =>
+                            appConfig.features?.[key] === true,
                     },
                 },
             ],
@@ -85,5 +87,11 @@ describe('ConfigurationComponent', () => {
         expect(
             fixture.nativeElement.querySelector('#config-features')
         ).not.toBeNull();
+    });
+    it('reports the effective state of a feature', () => {
+        appConfig.features = { enable_on: true, enable_off: false };
+        expect(component.featureEnabled('enable_on')).toBeTrue();
+        expect(component.featureEnabled('enable_off')).toBeFalse();
+        expect(component.featureEnabled('enable_unknown')).toBeFalse();
     });
 });

@@ -34,6 +34,11 @@ export class ConfigurationComponent implements OnInit {
         return this.appConfigService.hasFeatures();
     }
 
+    // Tabs that belong to one feature show only while it is enabled.
+    featureEnabled(key: string): boolean {
+        return this.appConfigService.featureEnabled(key);
+    }
+
     ngOnInit(): void {
         // Refresh config every time when entering the configuration page
         this.conf.updateConfig();
