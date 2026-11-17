@@ -154,6 +154,19 @@
     "TOP_NAV": {
         "DATETIME_RENDERING_DEFAULT": "默认"
     },
+    "BOOKMARKS": {
+        "TITLE": "书签",
+        "ADD": "添加书签",
+        "ADD_FILTER": "将此筛选条件加入书签",
+        "REMOVE": "移除书签",
+        "RENAME": "重命名",
+        "DELETE": "删除",
+        "MISSING": "未找到，可能已被删除。",
+        "FORBIDDEN": "未找到，或您没有访问权限。",
+        "ADD_FAILED": "无法保存书签。",
+        "LIMIT_REACHED": "您已有 100 个书签，请先移除一个再添加。",
+        "LABEL_MISSING": "此过滤器中的标签已不存在。"
+    },
     "SIDE_NAV": {
         "PROJECTS": "项目",
         "SYSTEM_MGMT": {

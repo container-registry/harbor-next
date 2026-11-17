@@ -19,7 +19,7 @@ import {
 } from '@angular/router';
 import { Project } from '../../base/project/project';
 import { SessionService } from '../../shared/services/session.service';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { ProjectService } from '../../shared/services';
 import { RoleInfo, Roles } from '../../shared/entities/shared.const';
@@ -44,36 +44,34 @@ export class ProjectRoutingResolver {
             projectId = route.queryParams['project_id'];
         }
         return this.projectService.getProjectFromCache(projectId).pipe(
-            map(
-                (project: Project) => {
-                    if (project) {
-                        let currentUser = this.sessionService.getCurrentUser();
-                        if (currentUser) {
-                            if (currentUser.has_admin_role) {
-                                project.has_project_admin_role = true;
-                                project.is_member = true;
-                                project.role_name = 'MEMBER.SYS_ADMIN';
-                            } else {
-                                project.has_project_admin_role =
-                                    project.current_user_role_id ===
-                                    Roles.PROJECT_ADMIN;
-                                project.is_member =
-                                    project.current_user_role_id > 0;
-                                project.role_name =
-                                    RoleInfo[project.current_user_role_id];
-                            }
+            map((project: Project) => {
+                if (project) {
+                    let currentUser = this.sessionService.getCurrentUser();
+                    if (currentUser) {
+                        if (currentUser.has_admin_role) {
+                            project.has_project_admin_role = true;
+                            project.is_member = true;
+                            project.role_name = 'MEMBER.SYS_ADMIN';
+                        } else {
+                            project.has_project_admin_role =
+                                project.current_user_role_id ===
+                                Roles.PROJECT_ADMIN;
+                            project.is_member =
+                                project.current_user_role_id > 0;
+                            project.role_name =
+                                RoleInfo[project.current_user_role_id];
                         }
-                        return project;
-                    } else {
-                        this.router.navigate(['/harbor', 'projects']);
-                        return null;
                     }
-                },
-                catchError(error => {
+                    return project;
+                } else {
                     this.router.navigate(['/harbor', 'projects']);
                     return null;
-                })
-            )
+                }
+            }),
+            catchError(() => {
+                this.router.navigate(['/harbor', 'projects']);
+                return of(null);
+            })
         );
     }
 }

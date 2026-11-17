@@ -12,3 +12,14 @@
     color: #007cbb;
     font-size: 16px;
 }
+
+// The heading's top margin moves to the block so the star centers on the title.
+.title-block {
+    display: flex;
+    align-items: center;
+    margin-top: 24px;
+
+    h2 {
+        margin-top: 0;
+    }
+}

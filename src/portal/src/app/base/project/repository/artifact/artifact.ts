@@ -187,6 +187,43 @@ export interface ArtifactFilterEvent {
     label?: Label;
 }
 
+export function artifactFilterQuery(e: ArtifactFilterEvent): string {
+    if (e?.isLabel) {
+        return e?.label?.id ? `${e.type}=(${e.label.id})` : '';
+    }
+    if (!e?.stringValue) {
+        return '';
+    }
+    // for input tag, use fuzzy match
+    return e.isInputTag
+        ? `${e.type}=~${e.stringValue}`
+        : `${e.type}=${e.stringValue}`;
+}
+
+// Inverse of artifactFilterQuery; returns null for anything the filter UI cannot show.
+export function parseArtifactFilterQuery(q: string): ArtifactFilterEvent {
+    const m = /^(type|tags|labels)=(~?)(.+)$/.exec(q || '');
+    if (!m) {
+        return null;
+    }
+    const [, type, fuzzy, value] = m;
+    if (type === 'labels') {
+        const id = /^\((\d+)\)$/.exec(value);
+        return id && !fuzzy
+            ? { type, isLabel: true, label: { id: +id[1] } }
+            : null;
+    }
+    if (fuzzy) {
+        return type === 'tags'
+            ? { type, isLabel: false, isInputTag: true, stringValue: value }
+            : null;
+    }
+    const options = multipleFilter.find(f => f.filterBy === type).listItem;
+    return options.some(o => o.filterText === value)
+        ? { type, isLabel: false, stringValue: value }
+        : null;
+}
+
 export enum Clients {
     DOCKER = 'docker',
     PODMAN = 'podman',

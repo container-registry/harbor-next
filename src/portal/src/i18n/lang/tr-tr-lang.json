@@ -154,6 +154,19 @@
     "TOP_NAV": {
         "DATETIME_RENDERING_DEFAULT": "Default"
     },
+    "BOOKMARKS": {
+        "TITLE": "Yer İmleri",
+        "ADD": "Yer imi ekle",
+        "ADD_FILTER": "Bu filtreyi yer imlerine ekle",
+        "REMOVE": "Yer imini kaldır",
+        "RENAME": "Yeniden adlandır",
+        "DELETE": "Sil",
+        "MISSING": "Bulunamadı. Silinmiş olabilir.",
+        "FORBIDDEN": "Bulunamadı veya erişim izniniz yok.",
+        "ADD_FAILED": "Yer imi kaydedilemedi.",
+        "LIMIT_REACHED": "100 yer iminiz var. Yeni eklemek için birini kaldırın.",
+        "LABEL_MISSING": "Bu filtredeki etiket artık mevcut değil."
+    },
     "SIDE_NAV": {
         "PROJECTS": "Projeler",
         "SYSTEM_MGMT": {

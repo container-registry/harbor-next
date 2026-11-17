@@ -154,6 +154,19 @@
     "TOP_NAV": {
         "DATETIME_RENDERING_DEFAULT": "Standard"
     },
+    "BOOKMARKS": {
+        "TITLE": "Lesezeichen",
+        "ADD": "Lesezeichen hinzufügen",
+        "ADD_FILTER": "Diesen Filter als Lesezeichen speichern",
+        "REMOVE": "Lesezeichen entfernen",
+        "RENAME": "Umbenennen",
+        "DELETE": "Löschen",
+        "MISSING": "Nicht gefunden. Möglicherweise wurde es gelöscht.",
+        "FORBIDDEN": "Nicht gefunden, oder Sie haben keinen Zugriff darauf.",
+        "ADD_FAILED": "Lesezeichen konnte nicht gespeichert werden.",
+        "LIMIT_REACHED": "Sie haben 100 Lesezeichen. Entfernen Sie eines, um ein neues hinzuzufügen.",
+        "LABEL_MISSING": "Das Label in diesem Filter existiert nicht mehr."
+    },
     "SIDE_NAV": {
         "PROJECTS": "Projekte",
         "SYSTEM_MGMT": {

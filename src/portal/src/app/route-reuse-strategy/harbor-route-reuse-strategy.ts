@@ -50,6 +50,10 @@ function testRoute(url: string) {
     return flag;
 }
 
+function pathOf(url: string): string {
+    return (url || '').split(/[?#]/)[0];
+}
+
 export class HarborRouteReuseStrategy implements RouteReuseStrategy {
     /**
      * 1.for each routing action, cache will be removed by default
@@ -113,9 +117,18 @@ export class HarborRouteReuseStrategy implements RouteReuseStrategy {
         curr: ActivatedRouteSnapshot
     ): boolean {
         this.shouldKeepCache(future, curr);
+        const currUrl: string = curr['_routerState']?.url;
+        const futureUrl: string = future['_routerState']?.url;
+        if (testRoute(currUrl) && testRoute(futureUrl)) {
+            return false;
+        }
+        // A list is reused only when the filter query alone changes.
+        const currPath = pathOf(currUrl);
+        const futurePath = pathOf(futureUrl);
         if (
-            testRoute(curr['_routerState']?.url) &&
-            testRoute(future['_routerState']?.url)
+            testRoute(currPath) &&
+            testRoute(futurePath) &&
+            (currPath !== futurePath || currUrl === futureUrl)
         ) {
             return false;
         }

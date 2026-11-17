@@ -17,7 +17,7 @@ import { ArtifactListTabComponent } from './artifact-list-tab.component';
 import { of } from 'rxjs';
 import { delay } from 'rxjs/operators';
 import { HttpHeaders, HttpResponse } from '@angular/common/http';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import {
     ArtifactDefaultService,
     ArtifactService,
@@ -52,6 +52,7 @@ describe('ArtifactListTabComponent', () => {
         version: 'v1.2',
     };
     const mockActivatedRoute = {
+        queryParamMap: of(convertToParamMap({})),
         snapshot: {
             params: {
                 parent: {
