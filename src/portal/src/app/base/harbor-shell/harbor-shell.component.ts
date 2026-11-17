@@ -42,7 +42,10 @@ import {
     EventService,
     HarborEvent,
 } from '../../services/event-service/event.service';
-import { BookmarkService } from '../../shared/services/bookmark.service';
+import {
+    BookmarkService,
+    BOOKMARKS_FEATURE_KEY,
+} from '../../shared/services/bookmark.service';
 
 const HAS_STYLE_MODE: string = 'styleModeLocal';
 
@@ -168,6 +171,7 @@ export class HarborShellComponent implements OnInit, OnDestroy {
 
     public get hasBookmarks(): boolean {
         return (
+            this.appConfigService.featureEnabled(BOOKMARKS_FEATURE_KEY) &&
             this.bookmarkService.load() &&
             this.bookmarkService.bookmarks.length > 0
         );

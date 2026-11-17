@@ -48,6 +48,8 @@ export interface BookmarkLink {
     queryParams?: Params;
 }
 
+// Configuration > Features gate; stored bookmarks stay put while it is off.
+export const BOOKMARKS_FEATURE_KEY = 'enable_portal_bookmarks';
 export const BOOKMARK_STORAGE_PREFIX = 'harbor-bookmarks:';
 export const BOOKMARK_STORAGE_VERSION = 1;
 export const MAX_BOOKMARKS = 100;

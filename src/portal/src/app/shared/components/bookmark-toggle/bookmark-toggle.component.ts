@@ -23,9 +23,11 @@ import {
     Bookmark,
     BookmarkService,
     BookmarkTarget,
+    BOOKMARKS_FEATURE_KEY,
     bookmarkKey,
 } from '../../services/bookmark.service';
 import { ErrorHandler } from '../../units/error-handler';
+import { AppConfigService } from '../../../services/app-config.service';
 
 @Component({
     selector: 'bookmark-toggle',
@@ -43,8 +45,16 @@ export class BookmarkToggleComponent implements OnChanges, OnDestroy {
 
     constructor(
         private bookmarkService: BookmarkService,
-        private errorHandler: ErrorHandler
+        private errorHandler: ErrorHandler,
+        private appConfigService: AppConfigService
     ) {}
+
+    get visible(): boolean {
+        return (
+            this.enabled &&
+            this.appConfigService.featureEnabled(BOOKMARKS_FEATURE_KEY)
+        );
+    }
 
     ngOnChanges(changes: SimpleChanges): void {
         if (changes['target']) {

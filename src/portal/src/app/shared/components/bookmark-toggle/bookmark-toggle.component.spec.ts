@@ -23,12 +23,14 @@ import {
 } from '../../services/bookmark.service';
 import { SessionService } from '../../services/session.service';
 import { ErrorHandler } from '../../units/error-handler';
+import { AppConfigService } from '../../../services/app-config.service';
 
 describe('BookmarkToggleComponent', () => {
     let fixture: ComponentFixture<BookmarkToggleComponent>;
     let component: BookmarkToggleComponent;
     let service: BookmarkService;
     let user: any;
+    let featureOn: boolean;
     const errorHandler = jasmine.createSpyObj('ErrorHandler', ['error']);
     const target: BookmarkTarget = {
         kind: BookmarkKind.REPOSITORY,
@@ -51,6 +53,7 @@ describe('BookmarkToggleComponent', () => {
     beforeEach(async () => {
         localStorage.removeItem(BOOKMARK_STORAGE_PREFIX + '7');
         user = { username: 'alice', user_id: 7 };
+        featureOn = true;
         await TestBed.configureTestingModule({
             imports: [SharedTestingModule],
             providers: [
@@ -59,6 +62,10 @@ describe('BookmarkToggleComponent', () => {
                     useValue: { getCurrentUser: () => user },
                 },
                 { provide: ErrorHandler, useValue: errorHandler },
+                {
+                    provide: AppConfigService,
+                    useValue: { featureEnabled: () => featureOn },
+                },
             ],
         }).compileComponents();
         fixture = TestBed.createComponent(BookmarkToggleComponent);
@@ -96,6 +103,22 @@ describe('BookmarkToggleComponent', () => {
         user = { username: 'alice', user_id: 7 };
         setTarget(null);
         expect(button()).toBeNull();
+    });
+
+    it('is hidden while the bookmarks feature is off and keeps stored bookmarks', () => {
+        setTarget(target);
+        button().click();
+        const stored = localStorage.getItem(BOOKMARK_STORAGE_PREFIX + '7');
+        featureOn = false;
+        fixture.detectChanges();
+        expect(button()).toBeNull();
+        expect(localStorage.getItem(BOOKMARK_STORAGE_PREFIX + '7')).toBe(
+            stored
+        );
+
+        featureOn = true;
+        fixture.detectChanges();
+        expect(button().getAttribute('aria-pressed')).toBe('true');
     });
 
     it('reports the limit separately from a failed save', () => {

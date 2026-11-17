@@ -73,8 +73,8 @@ import {
     parseArtifactFilterQuery,
     ArtifactFront as Artifact,
     ArtifactFront,
-    multipleFilter,
 } from '../../../artifact';
+import { multipleFilter } from '../../../artifact';
 import { Project } from '../../../../../project';
 import { ArtifactService as NewArtifactService } from '../../../../../../../../../ng-swagger-gen/services/artifact.service';
 import { ADDITIONS } from '../../../artifact-additions/models';

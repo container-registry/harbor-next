@@ -16,9 +16,10 @@ import { Artifact } from '../../../../../../ng-swagger-gen/models/artifact';
 import { Label } from '../../../../../../ng-swagger-gen/models/label';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Project } from '../../project';
-import { AccessoryType, artifactDefault } from './artifact';
+import { artifactDefault } from './artifact';
 import { SafeUrl } from '@angular/platform-browser';
 import { ArtifactService } from './artifact.service';
+import { AccessoryType } from './artifact';
 import { ArtifactService as NewArtifactService } from '../../../../../../ng-swagger-gen/services/artifact.service';
 import { dbEncodeURIComponent } from '../../../../shared/units/utils';
 import {
@@ -53,8 +54,8 @@ export class ArtifactSummaryComponent implements OnInit {
     constructor(
         private route: ActivatedRoute,
         private router: Router,
-        private frontEndArtifactService: ArtifactService,
         private newArtifactService: NewArtifactService,
+        private frontEndArtifactService: ArtifactService,
         private event: EventService
     ) {}
 

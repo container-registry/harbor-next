@@ -18,6 +18,7 @@ import { SessionService } from '../../shared/services/session.service';
 import {
     Bookmark,
     BookmarkService,
+    BOOKMARKS_FEATURE_KEY,
 } from '../../shared/services/bookmark.service';
 import { CUSTOM_ELEMENTS_SCHEMA, NO_ERRORS_SCHEMA } from '@angular/core';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -101,6 +102,12 @@ const fakedUserService = {
     },
 };
 
+// Feature gates the fake does not define stay off.
+const appConfigService = {
+    featureEnabled: (key: string) => false,
+    ...fakeAppConfigService,
+};
+
 describe('HarborShellComponent', () => {
     let component: HarborShellComponent;
     let fixture: ComponentFixture<HarborShellComponent>;
@@ -129,7 +136,7 @@ describe('HarborShellComponent', () => {
                     provide: SearchTriggerService,
                     useValue: fakeSearchTriggerService,
                 },
-                { provide: AppConfigService, useValue: fakeAppConfigService },
+                { provide: AppConfigService, useValue: appConfigService },
                 {
                     provide: MessageHandlerService,
                     useValue: mockMessageHandlerService,
@@ -167,22 +174,6 @@ describe('HarborShellComponent', () => {
 
     it('should create', () => {
         expect(component).toBeTruthy();
-    });
-
-    it('shows the bookmarks group only when bookmarks exist', async () => {
-        const bookmarkService = TestBed.inject(BookmarkService);
-        expect(
-            fixture.nativeElement.querySelector('.sidebar-bookmarks')
-        ).toBeNull();
-        spyOn(bookmarkService, 'load').and.returnValue(true);
-        spyOnProperty(bookmarkService, 'bookmarks', 'get').and.returnValue([
-            {} as Bookmark,
-        ]);
-        fixture.detectChanges();
-        await fixture.whenStable();
-        expect(
-            fixture.nativeElement.querySelector('.sidebar-bookmarks')
-        ).toBeTruthy();
     });
 
     it('should open users profile', async () => {
@@ -223,5 +214,57 @@ describe('HarborShellComponent', () => {
         const aboutVersionEl =
             fixture.nativeElement.querySelector('.about-version');
         expect(aboutVersionEl).toBeTruthy();
+    });
+
+    // The fake is shared by every test, so the bookmarks gate is stubbed per test.
+    async function withBookmarksFeature(
+        on: boolean,
+        check: () => Promise<void>
+    ): Promise<void> {
+        const appConfig = TestBed.inject(AppConfigService);
+        const featureEnabled = appConfig.featureEnabled;
+        appConfig.featureEnabled = (key: string) =>
+            key === BOOKMARKS_FEATURE_KEY
+                ? on
+                : !!featureEnabled?.call(appConfig, key);
+        try {
+            await check();
+        } finally {
+            appConfig.featureEnabled = featureEnabled;
+        }
+    }
+
+    it('shows the bookmarks group only when bookmarks exist', async () => {
+        await withBookmarksFeature(true, async () => {
+            const bookmarkService = TestBed.inject(BookmarkService);
+            fixture.detectChanges();
+            expect(
+                fixture.nativeElement.querySelector('.sidebar-bookmarks')
+            ).toBeNull();
+            spyOn(bookmarkService, 'load').and.returnValue(true);
+            spyOnProperty(bookmarkService, 'bookmarks', 'get').and.returnValue([
+                {} as Bookmark,
+            ]);
+            fixture.detectChanges();
+            await fixture.whenStable();
+            expect(
+                fixture.nativeElement.querySelector('.sidebar-bookmarks')
+            ).toBeTruthy();
+        });
+    });
+
+    it('hides the bookmarks group while the bookmarks feature is off', async () => {
+        await withBookmarksFeature(false, async () => {
+            const bookmarkService = TestBed.inject(BookmarkService);
+            spyOn(bookmarkService, 'load').and.returnValue(true);
+            spyOnProperty(bookmarkService, 'bookmarks', 'get').and.returnValue([
+                {} as Bookmark,
+            ]);
+            fixture.detectChanges();
+            await fixture.whenStable();
+            expect(
+                fixture.nativeElement.querySelector('.sidebar-bookmarks')
+            ).toBeNull();
+        });
     });
 });
