@@ -89,6 +89,7 @@ func assembleDestinationResources(resources []*model.Resource,
 	policy *repctlmodel.Policy, dstRepoComponentPathType string,
 ) ([]*model.Resource, error) {
 	var result []*model.Resource
+	srcRepository := ""
 	for _, resource := range resources {
 		var registry *model.Registry
 		var repositoryName string
@@ -110,7 +111,18 @@ func assembleDestinationResources(resources []*model.Resource,
 		} else {
 			// Assemble destination resources
 			registry = policy.DestRegistry
-			repositoryName, err = replaceNamespace(resource.Metadata.Repository.Name, policy.DestNamespace, policy.DestNamespaceReplaceCount, dstRepoComponentPathType)
+			repository := resource.Metadata.Repository.Name
+			if policy.DestRepository != "" {
+				// renaming several source repositories to one name would merge them
+				if srcRepository != "" && srcRepository != repository {
+					return nil, errors.New(nil).WithCode(errors.BadRequestCode).
+						WithMessagef("the destination repository %q is set, but the policy matches more than one source repository: %s, %s",
+							policy.DestRepository, srcRepository, repository)
+				}
+				srcRepository = repository
+				repository = path.Join(path.Dir(repository), policy.DestRepository)
+			}
+			repositoryName, err = replaceNamespace(repository, policy.DestNamespace, policy.DestNamespaceReplaceCount, dstRepoComponentPathType)
 			if err != nil {
 				return nil, err
 			}

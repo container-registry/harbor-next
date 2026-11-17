@@ -359,10 +359,20 @@ func (c *controller) OverwriteConfig(ctx context.Context) error {
 			log.Infof("ignoring %s in %s, %s takes precedence", common.DefaultProjectName, configOverwriteJSON, common.DefaultProjectNameEnv)
 			delete(cfgMap, common.DefaultProjectName)
 		}
-		for key := range cfgMap {
+		for key, value := range cfgMap {
 			if envKey, overridden := feature.EnvironmentKey(key); overridden {
 				log.Infof("ignoring %s in %s, %s takes precedence", key, configOverwriteJSON, envKey)
 				delete(cfgMap, key)
+				continue
+			}
+			// a feature that cannot be switched off yet must not stop core from starting
+			if enabled, ok := value.(bool); ok && !enabled {
+				if _, _, known := feature.Resolve(ctx, key); known {
+					if err := feature.ValidateConfigUpdate(ctx, map[string]any{key: false}); err != nil {
+						log.Warningf("ignoring %s=false in %s: %v", key, configOverwriteJSON, err)
+						delete(cfgMap, key)
+					}
+				}
 			}
 		}
 		err = c.UpdateUserConfigs(ctx, cfgMap)

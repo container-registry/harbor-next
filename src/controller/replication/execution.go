@@ -104,6 +104,11 @@ func (c *controller) Start(ctx context.Context, policy *replicationmodel.Policy,
 		return 0, errors.New(nil).WithCode(errors.PreconditionCode).
 			WithMessagef("the policy %d is disabled", policy.ID)
 	}
+	for _, registry := range []*model.Registry{policy.SrcRegistry, policy.DestRegistry} {
+		if err := checkRegistryTypeEnabled(ctx, registry); err != nil {
+			return 0, err
+		}
+	}
 	// create an execution record
 	extra := make(map[string]any)
 	if op := operator.FromContext(ctx); op != "" {

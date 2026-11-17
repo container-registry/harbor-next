@@ -897,6 +897,9 @@ func (a *projectAPI) validateProjectReq(ctx context.Context, req *models.Project
 		if !permitted {
 			return errors.BadRequestError(fmt.Errorf("unsupported registry type %s", registry.Type))
 		}
+		if err := requireRegistryType(ctx, registry.Type); err != nil {
+			return err
+		}
 
 		// validate metadata.proxy_speed_kb. It should be an int32
 		if ps := req.Metadata.ProxySpeedKb; ps != nil {

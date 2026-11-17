@@ -17,6 +17,7 @@ import { RouterModule, Routes } from '@angular/router';
 import { HarborShellComponent } from './harbor-shell/harbor-shell.component';
 import { SidebarBookmarksComponent } from './harbor-shell/sidebar-bookmarks/sidebar-bookmarks.component';
 import { SystemAdminGuard } from '../shared/router-guard/system-admin-activate.service';
+import { FeatureGuard } from '../shared/router-guard/feature-guard-activate.service';
 import { MemberGuard } from '../shared/router-guard/member-guard-activate.service';
 import { ProjectRoutingResolver } from '../services/routing-resolvers/project-routing-resolver.service';
 import { PasswordSettingComponent } from './password-setting/password-setting.component';
@@ -91,6 +92,15 @@ const routes: Routes = [
                     import(
                         './left-side-nav/replication/replication.module'
                     ).then(m => m.ReplicationModule),
+            },
+            {
+                path: 'model-sync',
+                canActivate: [SystemAdminGuard, FeatureGuard],
+                data: { feature: 'enable_model_sync' },
+                loadChildren: () =>
+                    import('./left-side-nav/model-sync/model-sync.module').then(
+                        m => m.ModelSyncModule
+                    ),
             },
             {
                 path: 'distribution',

@@ -82,7 +82,8 @@ func (s *sysInfoCtlTestSuite) TestGetInfo() {
 					RegistryStorageProviderName: "filesystem",
 					ReadOnly:                    false,
 					NotificationEnable:          false,
-					Features:                    map[string]bool{},
+					// optional features are always reported, enabled or not
+					Features: map[string]bool{"enable_model_sync": false},
 				},
 			},
 		},

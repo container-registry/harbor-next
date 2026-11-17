@@ -28,6 +28,9 @@ import (
 	replicationmodel "github.com/goharbor/harbor/src/pkg/replication/model"
 )
 
+// maxDestRepositoryLen is the size of the replication_policy.dest_repository column.
+const maxDestRepositoryLen = 256
+
 // Policy defines the structure of a replication policy
 type Policy struct {
 	ID                        int64           `json:"id"`
@@ -48,6 +51,12 @@ type Policy struct {
 	Speed                     int32           `json:"speed"`
 	CopyByChunk               bool            `json:"copy_by_chunk"`
 	SingleActiveReplication   bool            `json:"single_active_replication"`
+	// RevisionTag makes every copy also tag the artifact with the immutable tag of its source
+	// revision (model.RevisionTag), on sources that declare SupportedRevisionTag.
+	RevisionTag bool `json:"revision_tag"`
+	// DestRepository, when set, replaces the last path component of the source repository, the
+	// one the namespace rewrite keeps, so a single repository can be copied under another name.
+	DestRepository string `json:"dest_repository"`
 }
 
 // IsScheduledTrigger returns true when the policy is scheduled trigger and enabled
@@ -59,6 +68,15 @@ func (p *Policy) IsScheduledTrigger() bool {
 		return false
 	}
 	return p.Trigger.Type == model.TriggerTypeScheduled
+}
+
+// SourceOptions returns the settings of the policy that the source adapter must honor.
+func (p *Policy) SourceOptions() (*model.SourceOptions, error) {
+	fileFilter, err := model.FileFilterOf(p.Filters)
+	if err != nil {
+		return nil, err
+	}
+	return &model.SourceOptions{FileFilter: fileFilter, RevisionTag: p.RevisionTag}, nil
 }
 
 // Validate the policy
@@ -82,10 +100,17 @@ func (p *Policy) Validate() error {
 	}
 
 	// valid the filters
+	fileFilters := 0
 	for _, f := range p.Filters {
 		if err := f.Validate(); err != nil {
 			return err
 		}
+		if f.Type == model.FilterTypeFile {
+			fileFilters++
+		}
+	}
+	if fileFilters > 1 {
+		return errors.New(nil).WithCode(errors.BadRequestCode).WithMessage("at most one file filter is allowed")
 	}
 
 	// valid the destination namespace
@@ -94,6 +119,21 @@ func (p *Policy) Validate() error {
 			return errors.New(nil).WithCode(errors.BadRequestCode).
 				WithMessagef("invalid destination namespace: %s", p.DestNamespace)
 		}
+	}
+
+	if len(p.DestRepository) > maxDestRepositoryLen {
+		return errors.New(nil).WithCode(errors.BadRequestCode).
+			WithMessagef("the destination repository is longer than %d characters", maxDestRepositoryLen)
+	}
+	// one path component of a repository name
+	if len(p.DestRepository) > 0 && (strings.Contains(p.DestRepository, "/") || !lib.RepositoryNameRe.MatchString(p.DestRepository)) {
+		return errors.New(nil).WithCode(errors.BadRequestCode).
+			WithMessagef("invalid destination repository %q: it must be a single path component", p.DestRepository)
+	}
+	if len(p.DestRepository) > 0 && !namesOneRepository(p.Filters) {
+		// a rename merges every matched repository into one, also across event-triggered runs
+		return errors.New(nil).WithCode(errors.BadRequestCode).
+			WithMessage("a destination repository needs a name filter that names exactly one source repository")
 	}
 
 	// valid trigger
@@ -148,6 +188,8 @@ func (p *Policy) From(policy *replicationmodel.Policy) error {
 	p.Speed = policy.Speed
 	p.CopyByChunk = policy.CopyByChunk
 	p.SingleActiveReplication = policy.SingleActiveReplication
+	p.RevisionTag = policy.RevisionTag
+	p.DestRepository = policy.DestRepository
 
 	if policy.SrcRegistryID > 0 {
 		p.SrcRegistry = &model.Registry{
@@ -194,6 +236,8 @@ func (p *Policy) To() (*replicationmodel.Policy, error) {
 		Speed:                     p.Speed,
 		CopyByChunk:               p.CopyByChunk,
 		SingleActiveReplication:   p.SingleActiveReplication,
+		RevisionTag:               p.RevisionTag,
+		DestRepository:            p.DestRepository,
 	}
 	if p.SrcRegistry != nil {
 		policy.SrcRegistryID = p.SrcRegistry.ID
@@ -356,4 +400,16 @@ func parseScheduleParamToCron(param *scheduleParam) string {
 		return fmt.Sprintf("%d %d %d * * %d", second, minute, hour, param.Weekday%7)
 	}
 	return fmt.Sprintf("%d %d %d * * *", second, minute, hour)
+}
+
+// namesOneRepository reports whether the name filter is a single literal repository name.
+func namesOneRepository(filters []*model.Filter) bool {
+	for _, f := range filters {
+		if f.Type != model.FilterTypeName {
+			continue
+		}
+		name, _ := f.Value.(string)
+		return name != "" && !strings.ContainsAny(name, "*?[]{}")
+	}
+	return false
 }

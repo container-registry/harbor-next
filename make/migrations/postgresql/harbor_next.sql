@@ -345,3 +345,27 @@ INSERT INTO properties (k, v)
 SELECT 'default_project_name', 'library'
  WHERE EXISTS (SELECT 1 FROM project WHERE name = 'library' AND NOT deleted)
 ON CONFLICT (k) DO NOTHING;
+
+-- Replication: tag each copy with its source revision (revision_tag) and
+-- optionally rename the copied repository (dest_repository). Checked through
+-- pg_attribute so a repeat run takes no ACCESS EXCLUSIVE lock on replication_policy.
+DO $$
+BEGIN
+    IF to_regclass('replication_policy') IS NOT NULL THEN
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_attribute
+            WHERE attrelid = to_regclass('replication_policy')
+              AND attname = 'revision_tag' AND NOT attisdropped
+        ) THEN
+            ALTER TABLE replication_policy ADD COLUMN revision_tag BOOLEAN NOT NULL DEFAULT FALSE;
+        END IF;
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_attribute
+            WHERE attrelid = to_regclass('replication_policy')
+              AND attname = 'dest_repository' AND NOT attisdropped
+        ) THEN
+            ALTER TABLE replication_policy ADD COLUMN dest_repository VARCHAR(256) NOT NULL DEFAULT '';
+        END IF;
+    END IF;
+END
+$$;

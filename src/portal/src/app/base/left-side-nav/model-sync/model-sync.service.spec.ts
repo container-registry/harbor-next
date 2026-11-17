@@ -1,0 +1,292 @@
+// Copyright Project Harbor Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+import { TestBed } from '@angular/core/testing';
+import { HttpHeaders, HttpResponse } from '@angular/common/http';
+import { of } from 'rxjs';
+import { ReplicationService } from '../../../../../ng-swagger-gen/services/replication.service';
+import { RegistryService } from '../../../../../ng-swagger-gen/services/registry.service';
+import { ModelSyncService } from './model-sync.service';
+import {
+    destRepository,
+    revisionTag,
+    parseFileFilter,
+    parseFileFilters,
+    fromReplicationPolicy,
+    ModelSyncPolicy,
+    toReplicationPolicy,
+} from './model-sync';
+
+describe('ModelSyncService', () => {
+    const policy: ModelSyncPolicy = {
+        id: 1,
+        name: 'smollm',
+        description: 'd',
+        enabled: true,
+        registry_id: 2,
+        src_repository: 'HuggingFaceTB/SmolLM2-135M',
+        src_revision: 'main',
+        file_filters: ['*.json'],
+        file_excludes: ['onnx/**'],
+        dest_project_name: 'models',
+        dest_repository: 'smollm2',
+        trigger: {
+            type: 'scheduled',
+            trigger_settings: { cron: '0 0 * * * *' },
+        },
+    };
+    const rule = {
+        ...toReplicationPolicy(policy),
+        id: 1,
+        src_registry: { id: 2, name: 'hf', type: 'huggingface' },
+    };
+    let replication: jasmine.SpyObj<ReplicationService>;
+    let service: ModelSyncService;
+
+    beforeEach(() => {
+        replication = jasmine.createSpyObj('ReplicationService', [
+            'listReplicationPoliciesResponse',
+            'startReplication',
+            'getReplicationPolicy',
+            'updateReplicationPolicy',
+        ]);
+        replication.listReplicationPoliciesResponse.and.returnValue(
+            of(
+                new HttpResponse({
+                    body: [rule],
+                    headers: new HttpHeaders({ 'X-Total-Count': '1' }),
+                })
+            ) as any
+        );
+        const registry = {
+            listRegistryProviderInfos: () =>
+                of({
+                    huggingface: { supported_preview: true },
+                    'docker-hub': {},
+                }),
+            listRegistries: () =>
+                of([
+                    { id: 2, type: 'huggingface' },
+                    { id: 3, type: 'docker-hub' },
+                    { id: 4, type: 'huggingface' },
+                ]),
+        };
+        TestBed.configureTestingModule({
+            providers: [
+                ModelSyncService,
+                { provide: ReplicationService, useValue: replication },
+                { provide: RegistryService, useValue: registry },
+            ],
+        });
+        service = TestBed.inject(ModelSyncService);
+    });
+
+    it('maps a policy to a replication rule and back', () => {
+        const r = toReplicationPolicy(policy);
+        expect(r.src_registry).toEqual({ id: 2 });
+        expect(r.dest_registry).toBeUndefined();
+        expect(r.dest_namespace).toEqual('models');
+        expect(r.dest_namespace_replace_count).toEqual(-1);
+        expect(r.dest_repository).toEqual('smollm2');
+        expect(r.revision_tag).toBeTrue();
+        expect(r.override).toBeTrue();
+        expect(r.filters).toEqual([
+            { type: 'name', value: 'HuggingFaceTB/SmolLM2-135M' },
+            { type: 'tag', value: 'main', decoration: 'matches' },
+            {
+                type: 'file',
+                value: { include: ['*.json'], exclude: ['onnx/**'] },
+            },
+        ]);
+        const back = fromReplicationPolicy({
+            ...r,
+            id: 1,
+            src_registry: rule.src_registry,
+        });
+        expect(back).toEqual(jasmine.objectContaining(policy));
+    });
+
+    it('filters a branch by the tag its copy gets', () => {
+        expect(revisionTag('feature/x')).toEqual('feature-x');
+        expect(revisionTag(' v1.0 ')).toEqual('v1.0');
+    });
+
+    it('always sends a revision so a rule never copies every branch', () => {
+        const r = toReplicationPolicy({
+            ...policy,
+            src_revision: '',
+            file_filters: [],
+            file_excludes: [],
+        });
+        expect(r.filters).toEqual([
+            { type: 'name', value: 'HuggingFaceTB/SmolLM2-135M' },
+            { type: 'tag', value: 'main', decoration: 'matches' },
+        ]);
+    });
+
+    it('derives the destination like the replication rewrite', () => {
+        expect(destRepository(policy)).toEqual('models/smollm2');
+        expect(destRepository({ ...policy, dest_repository: '' })).toEqual(
+            'models/smollm2-135m'
+        );
+        expect(
+            destRepository({ dest_project_name: 'm', src_repository: 'gpt2' })
+        ).toEqual('m/gpt2');
+    });
+
+    it('lists only rules of model sources', done => {
+        service
+            .listPolicies({ page: 1, pageSize: 5 }, 'smol')
+            .subscribe(page => {
+                expect(page.total).toEqual(1);
+                expect(page.items[0].src_repository).toEqual(
+                    'HuggingFaceTB/SmolLM2-135M'
+                );
+                const params =
+                    replication.listReplicationPoliciesResponse.calls.mostRecent()
+                        .args[0];
+                expect(decodeURIComponent(params.q)).toEqual(
+                    'src_registry_id={2 4},name=~smol'
+                );
+                done();
+            });
+    });
+
+    it('lists nothing without a model source registry', done => {
+        TestBed.inject(RegistryService).listRegistries = (() =>
+            of([{ id: 3, type: 'docker-hub' }])) as any;
+        service.listPolicies({ page: 1, pageSize: 5 }).subscribe(page => {
+            expect(page).toEqual({ items: [], total: 0 });
+            expect(
+                replication.listReplicationPoliciesResponse
+            ).not.toHaveBeenCalled();
+            done();
+        });
+    });
+
+    it('asks for the source types on every call', () => {
+        const infos = spyOn(
+            TestBed.inject(RegistryService),
+            'listRegistryProviderInfos'
+        ).and.callThrough();
+        service.sourceTypes().subscribe();
+        service.sourceTypes().subscribe();
+        expect(infos).toHaveBeenCalledTimes(2);
+    });
+
+    it('asks the server for model source registries only', done => {
+        const listRegistries = spyOn(
+            TestBed.inject(RegistryService),
+            'listRegistries'
+        ).and.callThrough();
+        service.sourceRegistries().subscribe(registries => {
+            expect(registries.map(r => r.id)).toEqual([2, 4]);
+            expect(
+                decodeURIComponent(listRegistries.calls.mostRecent().args[0].q)
+            ).toEqual('type={huggingface}');
+            done();
+        });
+    });
+
+    it('keeps brace alternations in one pattern', () => {
+        expect(parseFileFilters('*.{json,md}, onnx/**\n*.txt')).toEqual([
+            '*.{json,md}',
+            'onnx/**',
+            '*.txt',
+        ]);
+        expect(parseFileFilter('*.{json,md} !x/{a,b}/**')).toEqual({
+            include: ['*.{json,md}'],
+            exclude: ['x/{a,b}/**'],
+        });
+    });
+
+    it('reads both wire forms of a file filter', () => {
+        expect(parseFileFilter('*.json, !onnx/** *.md')).toEqual({
+            include: ['*.json', '*.md'],
+            exclude: ['onnx/**'],
+        });
+        expect(parseFileFilter({ include: ['a'] })).toEqual({
+            include: ['a'],
+            exclude: [],
+        });
+        expect(parseFileFilter(undefined)).toEqual({
+            include: [],
+            exclude: [],
+        });
+    });
+
+    it('keeps the settings the form does not manage on update', () => {
+        const stored = {
+            id: 7,
+            name: 'old',
+            override: false,
+            deletion: true,
+            speed: 512,
+            copy_by_chunk: true,
+            filters: [
+                { type: 'name', value: 'Org/Old' },
+                { type: 'label', value: ['keep'] },
+            ],
+        };
+        replication.getReplicationPolicy.and.returnValue(of(stored) as any);
+        replication.updateReplicationPolicy.and.returnValue(of(null));
+        service
+            .updatePolicy(7, {
+                name: 'new',
+                registry_id: 2,
+                src_repository: 'Org/New',
+                src_revision: 'main',
+                dest_project_name: 'library',
+                enabled: true,
+                trigger: { type: 'manual' },
+            })
+            .subscribe();
+        const sent =
+            replication.updateReplicationPolicy.calls.mostRecent().args[0]
+                .policy;
+        expect(sent.name).toEqual('new');
+        expect(sent.override).toBeFalse();
+        expect(sent.deletion).toBeTrue();
+        expect(sent.speed).toEqual(512);
+        expect(sent.copy_by_chunk).toBeTrue();
+        expect(sent.filters).toContain({ type: 'label', value: ['keep'] });
+        expect(sent.filters).toContain({ type: 'name', value: 'Org/New' });
+        expect(sent.filters).not.toContain({ type: 'name', value: 'Org/Old' });
+        expect(sent.dest_namespace_replace_count).toEqual(-1);
+    });
+
+    it('toggles only the enabled flag of the stored rule', () => {
+        const stored = {
+            id: 7,
+            name: 'smol',
+            enabled: true,
+            deletion: true,
+            override: false,
+        };
+        replication.getReplicationPolicy.and.returnValue(of(stored) as any);
+        replication.updateReplicationPolicy.and.returnValue(of(null));
+        service.setEnabled(7, false).subscribe();
+        expect(replication.updateReplicationPolicy).toHaveBeenCalledWith({
+            id: 7,
+            policy: { ...stored, enabled: false },
+        });
+    });
+
+    it('starts a replication execution', () => {
+        replication.startReplication.and.returnValue(of(null));
+        service.start(1).subscribe();
+        expect(replication.startReplication).toHaveBeenCalledWith({
+            execution: { policy_id: 1 },
+        });
+    });
+});

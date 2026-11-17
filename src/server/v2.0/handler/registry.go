@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/go-openapi/runtime/middleware"
+	"github.com/go-openapi/strfmt"
 
 	commonhttp "github.com/goharbor/harbor/src/common/http"
 	"github.com/goharbor/harbor/src/common/rbac"
@@ -27,6 +28,7 @@ import (
 	"github.com/goharbor/harbor/src/lib"
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/q"
+	"github.com/goharbor/harbor/src/pkg/feature"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
 	"github.com/goharbor/harbor/src/server/v2.0/models"
 	operation "github.com/goharbor/harbor/src/server/v2.0/restapi/operations/registry"
@@ -68,6 +70,9 @@ func (r *registryAPI) CreateRegistry(ctx context.Context, params operation.Creat
 		}
 	}
 
+	if err := requireRegistryType(ctx, registry.Type); err != nil {
+		return r.SendError(ctx, err)
+	}
 	id, err := r.ctl.Create(ctx, registry)
 	if err != nil {
 		return r.SendError(ctx, err)
@@ -140,6 +145,9 @@ func (r *registryAPI) UpdateRegistry(ctx context.Context, params operation.Updat
 	if err != nil {
 		return r.SendError(ctx, err)
 	}
+	if err := requireRegistryType(ctx, registry.Type); err != nil {
+		return r.SendError(ctx, err)
+	}
 	storedURL := registry.URL
 	if params.Registry != nil {
 		if params.Registry.Name != nil {
@@ -194,6 +202,13 @@ func (r *registryAPI) GetRegistryInfo(ctx context.Context, params operation.GetR
 		return r.SendError(ctx, err)
 	}
 
+	reg, err := r.ctl.Get(ctx, params.ID)
+	if err != nil {
+		return r.SendError(ctx, err)
+	}
+	if err := requireRegistryType(ctx, reg.Type); err != nil {
+		return r.SendError(ctx, err)
+	}
 	info, err := r.ctl.GetInfo(ctx, params.ID)
 	if err != nil {
 		return r.SendError(ctx, err)
@@ -218,6 +233,15 @@ func (r *registryAPI) GetRegistryInfo(ctx context.Context, params operation.GetR
 	if info.SupportedCopyByChunk {
 		in.SupportedCopyByChunk = &info.SupportedCopyByChunk
 	}
+	if info.SupportedRevisionTag {
+		in.SupportedRevisionTag = &info.SupportedRevisionTag
+	}
+	if info.SourceOnly {
+		in.SourceOnly = &info.SourceOnly
+	}
+	if info.SupportedPreview {
+		in.SupportedPreview = &info.SupportedPreview
+	}
 
 	return operation.NewGetRegistryInfoOK().WithPayload(in)
 }
@@ -232,7 +256,13 @@ func (r *registryAPI) ListRegistryProviderTypes(ctx context.Context, _ operation
 		return r.SendError(ctx, err)
 	}
 
-	return operation.NewListRegistryProviderTypesOK().WithPayload(types)
+	enabled := make([]string, 0, len(types))
+	for _, t := range types {
+		if feature.RegistryTypeEnabled(ctx, t) {
+			enabled = append(enabled, t)
+		}
+	}
+	return operation.NewListRegistryProviderTypesOK().WithPayload(enabled)
 }
 
 func (r *registryAPI) PingRegistry(ctx context.Context, params operation.PingRegistryParams) middleware.Responder {
@@ -295,6 +325,9 @@ func (r *registryAPI) PingRegistry(ctx context.Context, params operation.PingReg
 		return r.SendError(ctx, errors.New(nil).WithCode(errors.BadRequestCode).WithMessage("type or url cannot be empty"))
 	}
 
+	if err := requireRegistryType(ctx, registry.Type); err != nil {
+		return r.SendError(ctx, err)
+	}
 	healthy, err := r.ctl.IsHealthy(ctx, registry)
 	if err != nil {
 		return r.SendError(ctx, err)
@@ -319,7 +352,10 @@ func (r *registryAPI) ListRegistryProviderInfos(ctx context.Context, _ operation
 
 	result := map[string]models.RegistryProviderInfo{}
 	for key, info := range infos {
-		item := models.RegistryProviderInfo{}
+		if !feature.RegistryTypeEnabled(ctx, key) {
+			continue
+		}
+		item := models.RegistryProviderInfo{SupportedPreview: info.SupportedPreview}
 		if info.CredentialPattern != nil {
 			item.CredentialPattern = &models.RegistryProviderCredentialPattern{
 				AccessKeyData:    info.CredentialPattern.AccessKeyData,
@@ -343,4 +379,60 @@ func (r *registryAPI) ListRegistryProviderInfos(ctx context.Context, _ operation
 	}
 
 	return operation.NewListRegistryProviderInfosOK().WithPayload(result)
+}
+
+func (r *registryAPI) PreviewRegistryArtifact(ctx context.Context, params operation.PreviewRegistryArtifactParams) middleware.Responder {
+	if err := r.RequireSystemAccess(ctx, rbac.ActionRead, rbac.ResourceRegistry); err != nil {
+		return r.SendError(ctx, err)
+	}
+	if !feature.Enabled(ctx, feature.ModelSync) {
+		return r.SendError(ctx, errors.NotFoundError(nil).WithMessage("requested capability is not enabled"))
+	}
+	req := params.Preview
+	var filter *model.FileFilter
+	if req.FileFilter != nil {
+		filter = &model.FileFilter{Include: req.FileFilter.Include, Exclude: req.FileFilter.Exclude}
+	}
+	res, err := r.ctl.Preview(ctx, params.ID, *req.Repository, req.Reference, filter)
+	if err != nil {
+		return r.SendError(ctx, err)
+	}
+	return operation.NewPreviewRegistryArtifactOK().WithPayload(convertResolveResult(res))
+}
+
+func convertResolveResult(res *model.ResolveResult) *models.RegistryPreview {
+	out := &models.RegistryPreview{
+		Repository:   res.Repository,
+		SourceID:     res.SourceID,
+		Reference:    res.Reference,
+		Revision:     res.Revision,
+		RevisionTag:  res.RevisionTag,
+		SourceURL:    res.SourceURL,
+		Tags:         res.Tags,
+		Digest:       res.Digest,
+		Licenses:     res.Licenses,
+		Task:         res.Task,
+		TotalFiles:   int64(res.TotalFiles),
+		TotalSize:    res.TotalSize,
+		MatchedFiles: int64(res.MatchedFiles),
+		MatchedSize:  res.MatchedSize,
+		Files:        []*models.RegistryPreviewFile{},
+	}
+	if out.Tags == nil {
+		out.Tags = []string{}
+	}
+	if res.LastModified != nil {
+		t := strfmt.DateTime(*res.LastModified)
+		out.LastModified = &t
+	}
+	for _, f := range res.Files {
+		out.Files = append(out.Files, &models.RegistryPreviewFile{
+			Path:    f.Path,
+			Size:    f.Size,
+			Class:   f.Class,
+			Sha256:  f.SHA256,
+			Matched: f.Matched,
+		})
+	}
+	return out
 }

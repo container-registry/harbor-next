@@ -154,6 +154,10 @@ export class HarborShellComponent implements OnInit, OnDestroy {
         }
     }
 
+    public get modelSyncEnabled(): boolean {
+        return this.appConfigService.featureEnabled('enable_model_sync');
+    }
+
     public get shouldOverrideContent(): boolean {
         return this.router.routerState.snapshot.url
             .toString()

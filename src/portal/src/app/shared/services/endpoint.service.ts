@@ -35,6 +35,7 @@ export const ADAPTERS_MAP = {
     'google-gcr': 'Google GCR',
     harbor: 'Harbor',
     'harbor-satellite': 'Harbor Satellite',
+    huggingface: 'Hugging Face',
     'helm-hub': 'Helm Hub',
     'artifact-hub': 'Artifact Hub',
     'huawei-SWR': 'Huawei SWR',

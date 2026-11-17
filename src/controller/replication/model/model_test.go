@@ -15,9 +15,11 @@
 package model
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/pkg/reg/model"
@@ -285,4 +287,63 @@ func TestValidate(t *testing.T) {
 	}
 	err = policy.Validate()
 	assert.Nil(err)
+}
+
+func TestValidateFileFilter(t *testing.T) {
+	base := func(filters ...*model.Filter) *Policy {
+		return &Policy{Name: "p", SrcRegistry: &model.Registry{ID: 1}, Filters: filters}
+	}
+	assert.NoError(t, base(&model.Filter{Type: model.FilterTypeFile, Value: "*.json"}).Validate())
+	err := base(&model.Filter{Type: model.FilterTypeFile, Value: "*.json"}, &model.Filter{Type: model.FilterTypeFile, Value: "*.md"}).Validate()
+	assert.True(t, errors.IsErr(err, errors.BadRequestCode))
+	err = base(&model.Filter{Type: model.FilterTypeFile, Value: "[a"}).Validate()
+	assert.True(t, errors.IsErr(err, errors.BadRequestCode))
+
+	opts, err := base(&model.Filter{Type: model.FilterTypeName, Value: "org/**"}, &model.Filter{Type: model.FilterTypeFile, Value: "*.json,!x.json"}).SourceOptions()
+	assert.NoError(t, err)
+	assert.Equal(t, &model.FileFilter{Include: []string{"*.json"}, Exclude: []string{"x.json"}}, opts.FileFilter)
+	opts, err = base().SourceOptions()
+	assert.NoError(t, err)
+	assert.True(t, opts.IsEmpty())
+	p := base()
+	p.RevisionTag = true
+	opts, err = p.SourceOptions()
+	assert.NoError(t, err)
+	assert.True(t, opts.RevisionTag)
+}
+
+func TestValidateDestRepository(t *testing.T) {
+	base := func(name string) *Policy {
+		return &Policy{
+			Name: "p", SrcRegistry: &model.Registry{ID: 1}, DestRepository: name,
+			Filters: []*model.Filter{{Type: model.FilterTypeName, Value: "HuggingFaceTB/SmolLM2-135M"}},
+		}
+	}
+	assert.NoError(t, base("").Validate())
+	assert.NoError(t, base("smollm2-135m").Validate())
+	for _, name := range []string{"a/b", "Upper", "-x", "x-", "a..b", strings.Repeat("a", 257)} {
+		assert.Error(t, base(name).Validate(), name)
+	}
+	assert.NoError(t, base(strings.Repeat("a", 256)).Validate())
+}
+
+func TestValidateDestRepositoryNeedsOneSource(t *testing.T) {
+	policy := func(filters ...*model.Filter) *Policy {
+		return &Policy{Name: "p", SrcRegistry: &model.Registry{ID: 1}, DestRepository: "renamed", Filters: filters}
+	}
+	assert.Error(t, policy().Validate())
+	for _, name := range []string{"project/**", "org/*", "org/model?", "org/{a,b}", "org/[ab]"} {
+		assert.Error(t, policy(&model.Filter{Type: model.FilterTypeName, Value: name}).Validate(), name)
+	}
+	assert.NoError(t, policy(&model.Filter{Type: model.FilterTypeName, Value: "org/model"}).Validate())
+}
+
+func TestPolicyDestRepositoryRoundTrip(t *testing.T) {
+	p := &Policy{Name: "p", DestRepository: "my-model"}
+	dao, err := p.To()
+	require.NoError(t, err)
+	assert.Equal(t, "my-model", dao.DestRepository)
+	back := &Policy{}
+	require.NoError(t, back.From(dao))
+	assert.Equal(t, "my-model", back.DestRepository)
 }
