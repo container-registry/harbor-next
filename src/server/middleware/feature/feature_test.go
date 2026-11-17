@@ -17,6 +17,7 @@ package feature
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/goharbor/harbor/src/lib/config"
@@ -36,6 +37,10 @@ func init() {
 }
 
 func TestRequire(t *testing.T) {
+	t.Setenv(testEnvKey, "")
+	if err := os.Unsetenv(testEnvKey); err != nil {
+		t.Fatal(err)
+	}
 	handler := Require(testFeature)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -56,4 +61,13 @@ func TestRequire(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRequirePanicsOnUnregisteredFeature(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected Require to panic for an unregistered feature")
+		}
+	}()
+	Require("not_registered")
 }

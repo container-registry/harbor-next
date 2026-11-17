@@ -100,12 +100,15 @@ var (
 	// refreshInterval bounds how often a feature check reloads the settings, so
 	// gates on request paths do not turn into one settings read per request.
 	refreshInterval = 5 * time.Second
-	lastRefresh     atomic.Int64
+	// lastRefresh is monotonic time since clockStart, so a wall-clock step
+	// cannot stall refreshes; zero means never refreshed.
+	clockStart  = time.Now()
+	lastRefresh atomic.Int64
 )
 
 func init() {
 	// optional features lead the page and need no heading of their own
-	RegisterSection(Section{ID: OptionalSection})
+	RegisterSection(Section{ID: OptionalSection, Order: -1})
 }
 
 // Register adds feature definitions and their boolean configuration items.
@@ -317,9 +320,9 @@ func resolve(ctx context.Context, definition Definition) (bool, Source) {
 // refreshSettings picks up a toggle another replica stored, at most once per
 // refreshInterval; a failed refresh keeps the last value.
 func refreshSettings(ctx context.Context, mgr config.Manager, configKey string) {
-	now := time.Now().UnixNano()
+	now := int64(time.Since(clockStart))
 	last := lastRefresh.Load()
-	if now-last < int64(refreshInterval) || !lastRefresh.CompareAndSwap(last, now) {
+	if (last != 0 && now-last < int64(refreshInterval)) || !lastRefresh.CompareAndSwap(last, now) {
 		return
 	}
 	if err := mgr.Load(ctx); err != nil {

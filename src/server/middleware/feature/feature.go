@@ -16,6 +16,7 @@
 package feature
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/goharbor/harbor/src/lib/errors"
@@ -26,7 +27,12 @@ import (
 
 // Require answers 404 for routes of a disabled feature, so a switched-off
 // capability looks absent rather than forbidden.
+// It panics for a feature nobody registered, which would otherwise hide the
+// routes for good without any error.
 func Require(feature featuregate.Feature) middleware.Middleware {
+	if !registered(feature) {
+		panic(fmt.Sprintf("feature %q is not registered", feature))
+	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !featuregate.Enabled(r.Context(), feature) {
@@ -36,4 +42,13 @@ func Require(feature featuregate.Feature) middleware.Middleware {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func registered(feature featuregate.Feature) bool {
+	for _, def := range featuregate.Definitions() {
+		if def.Feature == feature {
+			return true
+		}
+	}
+	return false
 }

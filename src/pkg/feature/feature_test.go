@@ -258,6 +258,9 @@ func TestRegisterRejectsDuplicatesAndIncompleteDefinitions(t *testing.T) {
 
 func TestSectionsAreOrderedAndOnlyNonEmpty(t *testing.T) {
 	RegisterSection(Section{ID: "test_empty", Title: "Empty", Order: 1})
+	// a section left at the zero Order must still follow the optional one
+	RegisterSection(Section{ID: "a_test_zero", Title: "Zero"})
+	Register(Definition{Feature: "test_zero_section", ConfigKey: "enable_test_zero_section", EnvKey: "HARBOR_ENABLE_TEST_ZERO_SECTION", Section: "a_test_zero"})
 	RegisterSection(Section{ID: "test_section", Title: "Test Section", Order: 50})
 
 	var ids []string
@@ -267,10 +270,10 @@ func TestSectionsAreOrderedAndOnlyNonEmpty(t *testing.T) {
 	if strings.Contains(strings.Join(ids, ","), "test_empty") {
 		t.Fatalf("empty section listed: %v", ids)
 	}
-	want := []string{OptionalSection, "test_section"}
+	want := []string{OptionalSection, "a_test_zero", "test_section"}
 	got := []string{}
 	for _, id := range ids {
-		if id == "test_section" || id == OptionalSection {
+		if id == "test_section" || id == OptionalSection || id == "a_test_zero" {
 			got = append(got, id)
 		}
 	}
@@ -401,7 +404,7 @@ func TestResolveRefreshesSettingsAtMostOncePerInterval(t *testing.T) {
 	if counting.loads != 1 {
 		t.Fatalf("settings loaded %d times, want 1", counting.loads)
 	}
-	lastRefresh.Store(time.Now().Add(-2 * time.Hour).UnixNano())
+	lastRefresh.Store(int64(time.Since(clockStart) - 2*time.Hour))
 	Enabled(t.Context(), testFeature)
 	if counting.loads != 2 {
 		t.Fatalf("settings loaded %d times after the interval, want 2", counting.loads)
