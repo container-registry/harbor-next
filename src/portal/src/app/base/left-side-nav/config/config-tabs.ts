@@ -16,7 +16,9 @@ import { AppConfigService } from '../../../services/app-config.service';
 /**
  * A tab of the Configuration page. A feature that brings its own settings
  * page calls registerConfigTab from its own file, next to its route, so no
- * two features edit the same template.
+ * two features edit the same template. That file must be imported by the
+ * configuration module itself (for example the component it declares); a call
+ * inside a separately lazy-loaded module runs too late to show the tab.
  */
 export interface ConfigTab {
     // element id of the tab button

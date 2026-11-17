@@ -128,6 +128,9 @@ describe('FeaturesComponent', () => {
         expect(link.getAttribute('href')).toBe(
             'mailto:sales@example.com?body=Features%3A%20none'
         );
+        // opens apart so unsaved toggles on this page survive
+        expect(link.getAttribute('target')).toBe('_blank');
+        expect(link.getAttribute('rel')).toBe('noopener noreferrer');
         expect(sections[1].querySelector('.beta-badge')).not.toBeNull();
         expect(sections[1].querySelector('a.section-link')).toBeNull();
     });
@@ -169,6 +172,20 @@ describe('FeaturesComponent', () => {
         expect(listFeatures).toHaveBeenCalledTimes(2);
         expect(appConfigLoad).toHaveBeenCalled();
         expect(component.hasChanges()).toBeFalse();
+    });
+
+    it('drops pending changes when the reload after a rejected save fails too', () => {
+        setup();
+        updateFeature.and.returnValue(
+            throwError(() => new Error('controlled by env'))
+        );
+        component.setEnabled(component.features[0], true);
+        listFeatures.and.returnValue(throwError(() => new Error('down')));
+        component.save();
+        expect(component.hasChanges()).toBeFalse();
+        expect(component.value(component.features[0])).toBe(
+            component.features[0].enabled
+        );
     });
 
     it('reloads after a rejected change so the stored state is shown', () => {
