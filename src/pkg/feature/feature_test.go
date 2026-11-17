@@ -20,6 +20,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/config/metadata"
@@ -310,5 +311,99 @@ func TestLegacyEnvironmentKey(t *testing.T) {
 	t.Setenv(defaultOnEnvKey, "true")
 	if !Enabled(t.Context(), defaultOnFeature) {
 		t.Fatal("the current variable must win over the legacy one")
+	}
+}
+
+func TestEnvironmentOverrideByFeature(t *testing.T) {
+	unsetEnv(t, testEnvKey)
+	if _, overridden := EnvironmentOverride(testFeature); overridden {
+		t.Fatal("expected no override without the variable")
+	}
+	t.Setenv(testEnvKey, "true")
+	if enabled, overridden := EnvironmentOverride(testFeature); !enabled || !overridden {
+		t.Fatalf("EnvironmentOverride = (%v, %v), want (true, true)", enabled, overridden)
+	}
+	if _, overridden := EnvironmentOverride("not_registered"); overridden {
+		t.Fatal("expected an unregistered feature to have no override")
+	}
+}
+
+func TestValidateConfigUpdateRunsRegisteredValidators(t *testing.T) {
+	rejected := errors.New("setting needs the feature")
+	var seen map[string]any
+	RegisterConfigUpdateValidator(func(_ context.Context, cfgs map[string]any) error {
+		seen = cfgs
+		if _, ok := cfgs["test_dependent_setting"]; ok {
+			return rejected
+		}
+		return nil
+	})
+	t.Cleanup(func() {
+		mu.Lock()
+		validators = validators[:len(validators)-1]
+		mu.Unlock()
+	})
+	unsetEnv(t, testEnvKey)
+
+	if err := ValidateConfigUpdate(t.Context(), map[string]any{"auth_mode": "db_auth"}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if _, ok := seen["auth_mode"]; !ok {
+		t.Fatal("validator did not see an update without feature keys")
+	}
+	if err := ValidateConfigUpdate(t.Context(), map[string]any{"test_dependent_setting": "x"}); !errors.Is(err, rejected) {
+		t.Fatalf("error = %v, want the validator's error", err)
+	}
+	t.Setenv(testEnvKey, "true")
+	seen = nil
+	if err := ValidateConfigUpdate(t.Context(), map[string]any{testConfigKey: false}); err == nil || seen != nil {
+		t.Fatalf("an env-locked feature must fail before the validators run: err=%v seen=%v", err, seen)
+	}
+}
+
+func TestRegisterConfigUpdateValidatorRejectsNil(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected a nil validator to panic")
+		}
+	}()
+	RegisterConfigUpdateValidator(nil)
+}
+
+type countingManager struct {
+	config.Manager
+	loads int
+}
+
+func (m *countingManager) Load(ctx context.Context) error {
+	m.loads++
+	return m.Manager.Load(ctx)
+}
+
+func TestResolveRefreshesSettingsAtMostOncePerInterval(t *testing.T) {
+	storeConfig(t, map[string]any{testConfigKey: true})
+	counting := &countingManager{Manager: config.DefaultMgr()}
+	config.Register("test-counting", counting)
+	previousMgr, previousInterval := config.DefaultCfgManager, refreshInterval
+	config.DefaultCfgManager = "test-counting"
+	refreshInterval = time.Hour
+	lastRefresh.Store(0)
+	t.Cleanup(func() {
+		config.DefaultCfgManager, refreshInterval = previousMgr, previousInterval
+		lastRefresh.Store(0)
+	})
+
+	for range 100 {
+		if !Enabled(t.Context(), testFeature) {
+			t.Fatal("expected the stored value")
+		}
+	}
+	if counting.loads != 1 {
+		t.Fatalf("settings loaded %d times, want 1", counting.loads)
+	}
+	lastRefresh.Store(time.Now().Add(-2 * time.Hour).UnixNano())
+	Enabled(t.Context(), testFeature)
+	if counting.loads != 2 {
+		t.Fatalf("settings loaded %d times after the interval, want 2", counting.loads)
 	}
 }

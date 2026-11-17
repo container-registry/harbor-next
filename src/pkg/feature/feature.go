@@ -28,6 +28,8 @@ import (
 	"sort"
 	"strconv"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/config/metadata"
@@ -82,6 +84,10 @@ const (
 // DisableGuard returns an error when persisted feature state prevents disabling it.
 type DisableGuard func(context.Context) error
 
+// ConfigUpdateValidator checks a configuration update for one feature's rules,
+// such as settings that only apply while the feature is enabled.
+type ConfigUpdateValidator func(ctx context.Context, cfgs map[string]any) error
+
 var (
 	mu               sync.RWMutex
 	definitions      []Definition
@@ -89,6 +95,12 @@ var (
 	guards           = map[Feature][]DisableGuard{}
 	registryFeatures = map[string]Feature{}
 	listeners        []func(configKey string)
+	validators       []ConfigUpdateValidator
+
+	// refreshInterval bounds how often a feature check reloads the settings, so
+	// gates on request paths do not turn into one settings read per request.
+	refreshInterval = 5 * time.Second
+	lastRefresh     atomic.Int64
 )
 
 func init() {
@@ -191,6 +203,17 @@ func RegisterDisableGuard(feature Feature, guard DisableGuard) {
 	guards[feature] = append(guards[feature], guard)
 }
 
+// RegisterConfigUpdateValidator adds a check run by ValidateConfigUpdate on
+// every configuration update, after the feature checks.
+func RegisterConfigUpdateValidator(validator ConfigUpdateValidator) {
+	if validator == nil {
+		panic("nil config update validator")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	validators = append(validators, validator)
+}
+
 // RegisterRegistryTypes associates registry provider types with a feature.
 // A registry type can belong to one feature only.
 func RegisterRegistryTypes(feature Feature, registryTypes ...string) {
@@ -276,10 +299,7 @@ func resolve(ctx context.Context, definition Definition) (bool, Source) {
 	if mgr == nil {
 		return definition.Default, SourceDefault
 	}
-	// pick up a toggle another replica stored; a failed refresh keeps the last value
-	if err := mgr.Load(ctx); err != nil {
-		log.Warningf("failed to refresh the configuration for feature %s: %v", definition.ConfigKey, err)
-	}
+	refreshSettings(ctx, mgr, definition.ConfigKey)
 	// A key never saved comes back as an empty value, not the item default,
 	// because the item may have been registered after the defaults loaded.
 	value := mgr.Get(ctx, definition.ConfigKey)
@@ -291,6 +311,31 @@ func resolve(ctx context.Context, definition Definition) (bool, Source) {
 		return definition.Default, SourceDefault
 	}
 	return enabled, SourceConfig
+}
+
+// refreshSettings picks up a toggle another replica stored, at most once per
+// refreshInterval; a failed refresh keeps the last value.
+func refreshSettings(ctx context.Context, mgr config.Manager, configKey string) {
+	now := time.Now().UnixNano()
+	last := lastRefresh.Load()
+	if now-last < int64(refreshInterval) || !lastRefresh.CompareAndSwap(last, now) {
+		return
+	}
+	if err := mgr.Load(ctx); err != nil {
+		log.Warningf("failed to refresh the configuration for feature %s: %v", configKey, err)
+	}
+}
+
+// EnvironmentOverride returns the environment value controlling feature, if
+// any. Code that runs before the configuration is loaded, such as database
+// bootstrap, can only honor this part of the gate.
+func EnvironmentOverride(feature Feature) (enabled bool, overridden bool) {
+	definition, ok := definitionFor(func(d Definition) bool { return d.Feature == feature })
+	if !ok {
+		return false, false
+	}
+	enabled, _, overridden = environmentOverride(definition)
+	return enabled, overridden
 }
 
 // ConfigOverride returns the environment value controlling configKey, if any.
@@ -334,8 +379,9 @@ func environmentOverride(definition Definition) (enabled bool, envKey string, ov
 	return enabled, envKey, true
 }
 
-// ValidateConfigUpdate rejects changes to environment-controlled features and
-// runs the disable guards on every update that switches a feature off.
+// ValidateConfigUpdate rejects changes to environment-controlled features,
+// runs the disable guards on every update that switches a feature off, then
+// runs the registered config update validators.
 func ValidateConfigUpdate(ctx context.Context, cfgs map[string]any) error {
 	for _, definition := range Definitions() {
 		value, updated := cfgs[definition.ConfigKey]
@@ -359,6 +405,14 @@ func ValidateConfigUpdate(ctx context.Context, cfgs map[string]any) error {
 			if err := guard(ctx); err != nil {
 				return err
 			}
+		}
+	}
+	mu.RLock()
+	current := append([]ConfigUpdateValidator(nil), validators...)
+	mu.RUnlock()
+	for _, validator := range current {
+		if err := validator(ctx, cfgs); err != nil {
+			return err
 		}
 	}
 	return nil
