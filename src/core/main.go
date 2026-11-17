@@ -292,7 +292,7 @@ func main() {
 
 	closing := make(chan struct{})
 	done := make(chan struct{})
-	go gracefulShutdown(closing, done, shutdownTracerProvider, stopSettingsSync, dao.ClosePool)
+	go gracefulShutdown(closing, done, append(shutdownHooks, shutdownTracerProvider, stopSettingsSync, dao.ClosePool)...)
 	// Start health checker for registries
 	go registry.Ctl.StartRegularHealthCheck(orm.Context(), closing, done)
 	// Init audit log
