@@ -541,7 +541,8 @@
         "ARTIFACTS": "Artifact",
         "PROJECTS": "專案",
         "CONFIGURATION": "組態設定",
-        "REPOSITORIES": "儲存庫"
+        "REPOSITORIES": "儲存庫",
+        "FEATURES": "Features"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "觸發器",

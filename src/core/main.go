@@ -70,6 +70,7 @@ import (
 	_ "github.com/goharbor/harbor/src/pkg/accessory/model/subject"
 	"github.com/goharbor/harbor/src/pkg/audit"
 	_ "github.com/goharbor/harbor/src/pkg/auditext/event/config"
+	_ "github.com/goharbor/harbor/src/pkg/auditext/event/feature"
 	_ "github.com/goharbor/harbor/src/pkg/auditext/event/login"
 	_ "github.com/goharbor/harbor/src/pkg/auditext/event/member"
 	_ "github.com/goharbor/harbor/src/pkg/auditext/event/project"

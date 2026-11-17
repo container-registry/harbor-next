@@ -541,7 +541,8 @@
         "ARTIFACTS": "Artifacts",
         "PROJECTS": "项目",
         "CONFIGURATION": "Configuration",
-        "REPOSITORIES": "仓库"
+        "REPOSITORIES": "仓库",
+        "FEATURES": "Features"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "触发器",

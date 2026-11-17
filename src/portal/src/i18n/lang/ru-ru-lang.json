@@ -668,7 +668,8 @@
         "ARTIFACTS": "Артефакты",
         "PROJECTS": "Проекты",
         "CONFIGURATION": "Конфигурация",
-        "REPOSITORIES": "Репозитории"
+        "REPOSITORIES": "Репозитории",
+        "FEATURES": "Features"
     },
     "REPLICATION": {
         "YES": "Да",

@@ -541,7 +541,8 @@
         "ARTIFACTS": "아티팩트",
         "PROJECTS": "프로젝트",
         "CONFIGURATION": "Configuration",
-        "REPOSITORIES": "저장소"
+        "REPOSITORIES": "저장소",
+        "FEATURES": "Features"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "트리거",

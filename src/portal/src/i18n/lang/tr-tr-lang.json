@@ -541,7 +541,8 @@
         "ARTIFACTS": "Artifacts",
         "PROJECTS": "Projeler",
         "CONFIGURATION": "Configuration",
-        "REPOSITORIES": "Depolar"
+        "REPOSITORIES": "Depolar",
+        "FEATURES": "Features"
     },
     "REPLICATION": {
         "REPLICATION_TRIGGER": "Tetikleyici",
