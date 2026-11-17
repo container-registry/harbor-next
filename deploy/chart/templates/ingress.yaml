@@ -45,35 +45,35 @@ spec:
               service:
                 name: {{ include "harbor.fullname" $ }}-core
                 port:
-                  number: 80
+                  number: {{ include "harbor.core.service.port" $ }}
           - path: /service/
             pathType: Prefix
             backend:
               service:
                 name: {{ include "harbor.fullname" $ }}-core
                 port:
-                  number: 80
+                  number: {{ include "harbor.core.service.port" $ }}
           - path: /v2/
             pathType: Prefix
             backend:
               service:
                 name: {{ include "harbor.fullname" $ }}-core
                 port:
-                  number: 80
+                  number: {{ include "harbor.core.service.port" $ }}
           - path: /chartrepo/
             pathType: Prefix
             backend:
               service:
                 name: {{ include "harbor.fullname" $ }}-core
                 port:
-                  number: 80
+                  number: {{ include "harbor.core.service.port" $ }}
           - path: /c/
             pathType: Prefix
             backend:
               service:
                 name: {{ include "harbor.fullname" $ }}-core
                 port:
-                  number: 80
+                  number: {{ include "harbor.core.service.port" $ }}
           # Portal (default) — falls back to core when the portal is disabled
           - path: /
             pathType: Prefix
@@ -81,6 +81,6 @@ spec:
               service:
                 name: {{ include "harbor.fullname" $ }}-{{ if $.Values.portal.enabled }}portal{{ else }}core{{ end }}
                 port:
-                  number: 80
+                  number: {{ ternary 80 (include "harbor.core.service.port" $) $.Values.portal.enabled }}
     {{- end }}
 {{- end }}

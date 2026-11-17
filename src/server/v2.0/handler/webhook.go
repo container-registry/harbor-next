@@ -157,6 +157,9 @@ func (n *webhookAPI) CreateWebhookPolicyOfProject(ctx context.Context, params we
 		log.Warningf("failed to call JSONCopy on notification policy when CreateWebhookPolicyOfProject, error: %v", err)
 	}
 
+	if strings.TrimSpace(policy.Name) == "" {
+		return n.SendError(ctx, errors.BadRequestError(nil).WithMessage("the webhook policy name is required"))
+	}
 	if ok, err := n.validateEventTypes(policy); !ok {
 		return n.SendError(ctx, err)
 	}
@@ -196,6 +199,9 @@ func (n *webhookAPI) UpdateWebhookPolicyOfProject(ctx context.Context, params we
 		log.Warningf("failed to call JSONCopy on notification policy when UpdateWebhookPolicyOfProject, error: %v", err)
 	}
 
+	if strings.TrimSpace(policy.Name) == "" {
+		return n.SendError(ctx, errors.BadRequestError(nil).WithMessage("the webhook policy name is required"))
+	}
 	if ok, err := n.validateEventTypes(policy); !ok {
 		return n.SendError(ctx, err)
 	}

@@ -629,3 +629,20 @@ Validate required values
 {{- define "imagePullSecret" }}
 {{- printf "{\"auths\":{\"%s\":{\"auth\":\"%s\"}}}" .Values.imageCredentials.registry (printf "%s:%s" .Values.imageCredentials.username .Values.imageCredentials.password | b64enc) | b64enc }}
 {{- end }}
+
+{{/*
+Webhook and Slack egress env for core and jobservice. An empty policy renders
+block_restricted unless the deprecated allowPrivateNetworkAccess is set, which
+Harbor then maps (true: allow_all, false: public_only). The deprecated value is
+rendered by the configmaps themselves; empty means unset to Harbor.
+*/}}
+{{- define "harbor.webhookEgressEnv" -}}
+{{- $network := .Values.network -}}
+{{- $legacy := $network.allowPrivateNetworkAccess -}}
+{{- $legacySet := and (not (kindIs "invalid" $legacy)) (ne (toString $legacy) "") -}}
+{{- /* --reuse-values from a release before webhookEgress existed has no such key */ -}}
+{{- $egress := $network.webhookEgress | default dict -}}
+{{- $policy := $egress.policy | default (ternary "" "block_restricted" $legacySet) -}}
+HARBOR_WEBHOOK_EGRESS_POLICY: {{ $policy | quote }}
+HARBOR_WEBHOOK_EGRESS_ALLOWLIST: {{ join "," ($egress.allowlist | default list) | quote }}
+{{- end -}}

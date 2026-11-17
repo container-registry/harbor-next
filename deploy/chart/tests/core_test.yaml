@@ -129,6 +129,34 @@ tests:
           path: data.DEFAULT_PROJECT_NAME
           value: other
 
+  # Pins: CORE_URL carries the core Service port, so the SBOM push path never
+  # sees a portless single-label host (#790).
+  - it: should render CORE_URL and TOKEN_SERVICE_URL with the core service port
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - equal:
+          path: data.CORE_URL
+          value: "http://RELEASE-NAME-harbor-core:80"
+      - equal:
+          path: data.TOKEN_SERVICE_URL
+          value: "http://RELEASE-NAME-harbor-core:80/service/token"
+
+  # Pins: the port in CORE_URL above is the one the core Service listens on.
+  - it: should expose the core Service on the port CORE_URL uses
+    template: templates/core.service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 80
+
   # Pins: HARBOR_ADMIN_PASSWORD in the Secret is base64-encoded from the raw input.
   - it: should base64-encode harborAdminPassword into the Secret
     template: templates/core.secret.yaml
@@ -509,8 +537,8 @@ tests:
           path: data.POSTGRESQL_MIN_CONNS
           value: "8"
 
-  # Pins: webhook targets on private networks stay blocked unless explicitly allowed.
-  - it: should block private-network webhook targets by default
+  # Pins: block_restricted by default, not Harbor's built-in allow_all; no legacy variable.
+  - it: should default the webhook egress policy to block_restricted
     template: templates/core.configmap.yaml
     set:
       externalURL: https://harbor.example.com
@@ -518,20 +546,82 @@ tests:
       harborAdminPassword: Harbor12345
     asserts:
       - equal:
+          path: data.HARBOR_WEBHOOK_EGRESS_POLICY
+          value: block_restricted
+      - equal:
+          path: data.HARBOR_WEBHOOK_EGRESS_ALLOWLIST
+          value: ""
+      - equal:
+          path: data.HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
+          value: ""
+
+  - it: should pass the webhook egress policy through to core
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      network.webhookEgress.policy: public_only
+      network.webhookEgress.allowlist:
+        - 10.20.0.0/16
+        - "*.svc.cluster.local"
+    asserts:
+      - equal:
+          path: data.HARBOR_WEBHOOK_EGRESS_POLICY
+          value: public_only
+      - equal:
+          path: data.HARBOR_WEBHOOK_EGRESS_ALLOWLIST
+          value: 10.20.0.0/16,*.svc.cluster.local
+
+  # Pins: the deprecated value keeps reaching core, including an explicit false.
+  - it: should pass the deprecated allowPrivateNetworkAccess through to core
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      network.allowPrivateNetworkAccess: false
+    asserts:
+      - equal:
           path: data.HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
           value: "false"
+      - equal:
+          path: data.HARBOR_WEBHOOK_EGRESS_POLICY
+          value: ""
 
-  - it: should pass network.allowPrivateNetworkAccess through to core
+  # Pins: values reused from a release without network.webhookEgress still render.
+  - it: should render the legacy values shape without webhookEgress in core
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      network.webhookEgress: null
+      network.allowPrivateNetworkAccess: true
+    asserts:
+      - equal:
+          path: data.HARBOR_WEBHOOK_EGRESS_POLICY
+          value: ""
+      - equal:
+          path: data.HARBOR_WEBHOOK_EGRESS_ALLOWLIST
+          value: ""
+      - equal:
+          path: data.HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
+          value: "true"
+
+  # Pins: an explicit policy wins over the deprecated value.
+  - it: should render an explicit policy next to the deprecated value in core
     template: templates/core.configmap.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
       harborAdminPassword: Harbor12345
       network.allowPrivateNetworkAccess: true
+      network.webhookEgress.policy: public_only
     asserts:
       - equal:
-          path: data.HARBOR_ALLOW_PRIVATE_NETWORK_ACCESS
-          value: "true"
+          path: data.HARBOR_WEBHOOK_EGRESS_POLICY
+          value: public_only
 
   # Pins: with every core key externalized the generated Secret is skipped,
   # so the envFrom secretRef must disappear with it.
@@ -581,3 +671,34 @@ tests:
           content:
             secretRef:
               name: RELEASE-NAME-harbor-core
+
+  # Pins: core.servicePort moves the Service and CORE_URL together (#790).
+  - it: should honor a non-default core.servicePort in the Service
+    template: templates/core.service.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.servicePort: 8081
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 8081
+      - equal:
+          path: spec.ports[0].targetPort
+          value: 8080
+
+  - it: should honor a non-default core.servicePort in CORE_URL
+    template: templates/core.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      core.servicePort: 8081
+    asserts:
+      - equal:
+          path: data.CORE_URL
+          value: "http://RELEASE-NAME-harbor-core:8081"
+      - equal:
+          path: data.TOKEN_SERVICE_URL
+          value: "http://RELEASE-NAME-harbor-core:8081/service/token"

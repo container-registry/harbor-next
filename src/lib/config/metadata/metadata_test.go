@@ -48,3 +48,28 @@ func TestCfgMetaData_Init(t *testing.T) {
 		t.Errorf("Can not initial metadata, size %v", len(metaDataInstance.metaMap))
 	}
 }
+
+func TestRegisterAfterInstanceIsBuilt(t *testing.T) {
+	saved := ConfigList
+	t.Cleanup(func() {
+		ConfigList = saved
+		Instance().init()
+	})
+	Instance().init()
+	item := Item{Name: "registered_after_init", Scope: UserScope, Group: BasicGroup, DefaultValue: "true", ItemType: &BoolType{}, Editable: true}
+
+	got, added := Register(item)
+	if !added || got.Name != item.Name {
+		t.Fatalf("Register = (%v, %v), want the new item added", got.Name, added)
+	}
+	if _, ok := Instance().GetByName(item.Name); !ok {
+		t.Fatal("registered item is not visible through Instance()")
+	}
+	if _, added := Register(Item{Name: item.Name, ItemType: &StringType{}}); added {
+		t.Fatal("a second item with the same name must not replace the first")
+	}
+	Instance().init()
+	if _, ok := Instance().GetByName(item.Name); !ok {
+		t.Fatal("registered item lost when the metadata is rebuilt from ConfigList")
+	}
+}

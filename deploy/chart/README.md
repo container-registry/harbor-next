@@ -806,6 +806,7 @@ Kubernetes: `>=1.28.0-0`
 | core.serviceAccount.create | bool | `true` | Create a service account for Core |
 | core.serviceAccount.name | string | `""` | Service account name (auto-generated if empty) |
 | core.serviceAnnotations | object | `{}` | Service annotations for Core service |
+| core.servicePort | int | `80` | Port the core Service listens on. CORE_URL, the token service URL, ingress, gateway, and exporter all follow it. |
 | core.tokenCert | string | `""` | Token certificate (PEM, signed by tokenKey) |
 | core.tokenKey | string | `""` | Token private key (PEM). Auto-generated if both tokenKey and tokenCert are empty and tokenSecretName is empty. |
 | core.tokenSecretName | string | `""` | Existing secret for token service key/cert (must contain keys: tls.key, tls.crt) |
@@ -991,8 +992,10 @@ Kubernetes: `>=1.28.0-0`
 | metrics.serviceMonitor.namespace | string | `""` | ServiceMonitor namespace (defaults to release namespace) |
 | metrics.serviceMonitor.scrapeTimeout | string | `"10s"` | Scrape timeout |
 | nameOverride | string | `""` | Override the chart name |
-| network | object | `{"allowPrivateNetworkAccess":false}` | Outbound network policy for webhook and Slack notification targets |
-| network.allowPrivateNetworkAccess | bool | `false` | Allow webhook and Slack notification targets on private, loopback, link-local and cloud-metadata addresses. These are rejected by default; enable only to deliver webhooks to a trusted internal endpoint. |
+| network | object | `{"allowPrivateNetworkAccess":"","webhookEgress":{"allowlist":[],"policy":""}}` | Outbound network policy for webhook and Slack notification targets |
+| network.allowPrivateNetworkAccess | bool | unset | Deprecated, use network.webhookEgress.policy. Only used while the policy is empty: true means allow_all, false means public_only. |
+| network.webhookEgress.allowlist | list | `[]` | Destinations always allowed, whatever the policy: IPs, CIDRs, hostnames and "*.domain" suffixes. Allowlisted hostnames are trusted wherever DNS points them. |
+| network.webhookEgress.policy | string | `""` | Destinations webhook and Slack notifications may reach. allow_all: no checks. block_restricted: private networks allowed; loopback, link-local and cloud metadata blocked. public_only: public addresses only. Empty means block_restricted, or the deprecated allowPrivateNetworkAccess when that is set. |
 | portal.affinity | object | `{}` | Affinity rules for Portal pods |
 | portal.annotations | object | `{}` | Annotations for the Portal workload object (Deployment) |
 | portal.autoscaling | object | See [values.yaml](values.yaml) | HorizontalPodAutoscaler. See `core.autoscaling` for full docs. |

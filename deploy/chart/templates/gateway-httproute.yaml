@@ -25,10 +25,12 @@ spec:
          / .extraRules — never the routing itself. Group keys are `core` and
          `default`. */}}
   {{- $core := printf "%s-core" (include "harbor.fullname" .) }}
+  {{- $corePort := include "harbor.core.service.port" . }}
   {{- $default := printf "%s-%s" (include "harbor.fullname" .) (ternary "portal" "core" .Values.portal.enabled) }}
+  {{- $defaultPort := ternary "80" $corePort .Values.portal.enabled }}
   {{- $rules := list
-        (dict "key" "core"    "paths" (list "/api/" "/service/" "/v2/" "/chartrepo/" "/c/") "backend" $core)
-        (dict "key" "default" "paths" (list "/")                                             "backend" $default) }}
+        (dict "key" "core"    "paths" (list "/api/" "/service/" "/v2/" "/chartrepo/" "/c/") "backend" $core    "port" $corePort)
+        (dict "key" "default" "paths" (list "/")                                             "backend" $default "port" $defaultPort) }}
   {{- $overrides := .Values.gateway.routeOverrides | default dict }}
   rules:
   {{- range $r := $rules }}
@@ -40,7 +42,7 @@ spec:
         {{- end }}
       backendRefs:
         - name: {{ $r.backend }}
-          port: 80
+          port: {{ $r.port }}
       {{- /* Per-group timeouts merge over the global default (group wins);
              per-group filters replace the global list for that group. */}}
       {{- $timeouts := merge (deepCopy (dig $r.key "timeouts" dict $overrides)) ($.Values.gateway.timeouts | default dict) }}

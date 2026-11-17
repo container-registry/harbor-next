@@ -26,9 +26,14 @@ import {
     TIMEOUT,
 } from './retention';
 import { finalize } from 'rxjs/operators';
+import { forkJoin } from 'rxjs';
 import { CronScheduleComponent } from '../../../../shared/components/cron-schedule';
 import { ErrorHandler } from '../../../../shared/units/error-handler';
-import { OriginCron } from '../../../../shared/services';
+import {
+    OriginCron,
+    UserPermissionService,
+    USERSTATICPERMISSION,
+} from '../../../../shared/services';
 import {
     clone,
     getPageSizeFromLocalStorage,
@@ -91,13 +96,18 @@ export class TagRetentionComponent implements OnInit, OnDestroy {
     cronScheduleComponent: CronScheduleComponent;
     @ViewChild('addRule') addRuleComponent: AddRuleComponent;
     executionTimeout;
+    hasCreatePermission: boolean = false;
+    hasUpdatePermission: boolean = false;
+    // retentionId is only known once the project has loaded
+    projectLoaded: boolean = false;
     constructor(
         private route: ActivatedRoute,
         private tagRetentionService: TagRetentionService,
         private retentionService: RetentionService,
         private errorHandler: ErrorHandler,
         private projectService: ProjectService,
-        private skipSessionRenewalService: SkipSessionRenewalService
+        private skipSessionRenewalService: SkipSessionRenewalService,
+        private userPermissionService: UserPermissionService
     ) {}
     originCron(): OriginCron {
         let originCron: OriginCron = {
@@ -127,6 +137,39 @@ export class TagRetentionComponent implements OnInit, OnDestroy {
         };
         this.refreshAfterCreatRetention();
         this.getMetadata();
+        this.getPermissions();
+    }
+
+    // the first rule creates the policy, later changes update it
+    get canAddRule(): boolean {
+        if (!this.projectLoaded) {
+            return false;
+        }
+        return this.retentionId
+            ? this.hasUpdatePermission
+            : this.hasCreatePermission;
+    }
+
+    getPermissions() {
+        const { KEY, VALUE } = USERSTATICPERMISSION.TAG_RETENTION;
+        forkJoin([
+            this.userPermissionService.getPermission(
+                this.projectId,
+                KEY,
+                VALUE.CREATE
+            ),
+            this.userPermissionService.getPermission(
+                this.projectId,
+                KEY,
+                VALUE.UPDATE
+            ),
+        ]).subscribe(
+            ([create, update]) => {
+                this.hasCreatePermission = create;
+                this.hasUpdatePermission = update;
+            },
+            error => this.errorHandler.error(error)
+        );
     }
     ngOnDestroy() {
         if (this.executionTimeout) {
@@ -501,6 +544,7 @@ export class TagRetentionComponent implements OnInit, OnDestroy {
             .subscribe({
                 next: res => {
                     this.retentionId = +res.metadata.retention_id;
+                    this.projectLoaded = true;
                     this.refreshList();
                     this.getRetention();
                 },

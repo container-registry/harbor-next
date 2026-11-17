@@ -304,8 +304,15 @@ func (r *retentionAPI) checkRuleConflict(p *policy.Metadata) error {
 
 func (r *retentionAPI) DeleteRetention(ctx context.Context, params operation.DeleteRetentionParams) middleware.Responder {
 	p, err := r.retentionCtl.GetRetention(ctx, params.ID)
+	if errors.IsNotFoundErr(err) {
+		// DELETE is idempotent: an already missing policy is not an error
+		if err := r.RequireAuthenticated(ctx); err != nil {
+			return r.SendError(ctx, err)
+		}
+		return operation.NewDeleteRetentionOK()
+	}
 	if err != nil {
-		return r.SendError(ctx, errors.BadRequestError(err))
+		return r.SendError(ctx, err)
 	}
 	err = r.requireAccess(ctx, p, rbac.ActionDelete)
 	if err != nil {
@@ -313,6 +320,12 @@ func (r *retentionAPI) DeleteRetention(ctx context.Context, params operation.Del
 	}
 
 	if err = r.retentionCtl.DeleteRetention(ctx, params.ID); err != nil {
+		// policy gone now: a concurrent delete won and owns the metadata cleanup
+		if errors.IsNotFoundErr(err) {
+			if _, getErr := r.retentionCtl.GetRetention(ctx, params.ID); errors.IsNotFoundErr(getErr) {
+				return operation.NewDeleteRetentionOK()
+			}
+		}
 		return r.SendError(ctx, err)
 	}
 	// delete retention data in project_metadata
@@ -325,7 +338,7 @@ func (r *retentionAPI) DeleteRetention(ctx context.Context, params operation.Del
 func (r *retentionAPI) TriggerRetentionExecution(ctx context.Context, params operation.TriggerRetentionExecutionParams) middleware.Responder {
 	p, err := r.retentionCtl.GetRetention(ctx, params.ID)
 	if err != nil {
-		return r.SendError(ctx, errors.BadRequestError(err))
+		return r.SendError(ctx, err)
 	}
 	err = r.requireAccess(ctx, p, rbac.ActionUpdate)
 	if err != nil {
@@ -347,7 +360,7 @@ func (r *retentionAPI) OperateRetentionExecution(ctx context.Context, params ope
 	}
 	p, err := r.retentionCtl.GetRetention(ctx, params.ID)
 	if err != nil {
-		return r.SendError(ctx, errors.BadRequestError(err))
+		return r.SendError(ctx, err)
 	}
 	if p == nil {
 		return r.SendError(ctx, errors.New("retention policy is not found").WithCode(errors.NotFoundCode))
@@ -374,7 +387,7 @@ func (r *retentionAPI) ListRetentionExecutions(ctx context.Context, params opera
 	}
 	p, err := r.retentionCtl.GetRetention(ctx, params.ID)
 	if err != nil {
-		return r.SendError(ctx, errors.BadRequestError(err))
+		return r.SendError(ctx, err)
 	}
 	err = r.requireAccess(ctx, p, rbac.ActionList)
 	if err != nil {
@@ -404,7 +417,7 @@ func (r *retentionAPI) ListRetentionTasks(ctx context.Context, params operation.
 	}
 	p, err := r.retentionCtl.GetRetention(ctx, params.ID)
 	if err != nil {
-		return r.SendError(ctx, errors.BadRequestError(err))
+		return r.SendError(ctx, err)
 	}
 	if p == nil {
 		return r.SendError(ctx, errors.New("retention policy is not found").WithCode(errors.NotFoundCode))
@@ -438,7 +451,7 @@ func (r *retentionAPI) ListRetentionTasks(ctx context.Context, params operation.
 func (r *retentionAPI) GetRetentionTaskLog(ctx context.Context, params operation.GetRetentionTaskLogParams) middleware.Responder {
 	p, err := r.retentionCtl.GetRetention(ctx, params.ID)
 	if err != nil {
-		return r.SendError(ctx, errors.BadRequestError(err))
+		return r.SendError(ctx, err)
 	}
 	if p == nil {
 		return r.SendError(ctx, errors.New("retention policy is not found").WithCode(errors.NotFoundCode))

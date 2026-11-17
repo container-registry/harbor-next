@@ -131,6 +131,9 @@ func (suite *DaoTestSuite) TestUpdate() {
 	err := suite.dao.Update(orm.Context(), r)
 	suite.Nil(err)
 
+	r = &model.Role{ID: suite.roleID4, Name: "test1"}
+	err = suite.dao.Update(orm.Context(), r, "Name")
+	suite.True(errors.IsErr(err, errors.ConflictCode))
 }
 
 func TestDaoTestSuite(t *testing.T) {

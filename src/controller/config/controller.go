@@ -29,6 +29,7 @@ import (
 	"github.com/goharbor/harbor/src/lib/orm"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/audit"
+	"github.com/goharbor/harbor/src/pkg/feature"
 	"github.com/goharbor/harbor/src/pkg/project"
 	"github.com/goharbor/harbor/src/pkg/user"
 )
@@ -110,21 +111,26 @@ func (c *controller) UpdateUserConfigs(ctx context.Context, conf map[string]any)
 	if err != nil {
 		return err
 	}
+	orm.AfterCommit(ctx, func() { feature.NotifyChanged(conf) })
 	// update the audit logger to point to the new endpoint
 	return c.updateLogEndpoint(ctx, conf)
 }
 
 func (c *controller) updateLogEndpoint(ctx context.Context, cfgs map[string]any) error {
-	// check if the audit log forward endpoint updated
-	if _, ok := cfgs[common.AuditLogForwardEndpoint]; ok {
-		auditEP := config.AuditLogForwardEndpoint(ctx)
-		if len(auditEP) == 0 {
-			return nil
-		}
-		if !audit.CheckEndpointActive(auditEP) {
-			return errors.BadRequestError(fmt.Errorf("could not connect to the audit endpoint: %v", auditEP))
-		}
-		audit.LogMgr.Init(ctx, auditEP)
+	// point the audit logger at the new endpoint; the config store only
+	// reflects it after commit, so read it from the request
+	if auditEP, _ := cfgs[common.AuditLogForwardEndpoint].(string); len(auditEP) > 0 {
+		orm.AfterCommit(ctx, func() { audit.LogMgr.Init(ctx, auditEP) })
+	}
+	return nil
+}
+
+// verifyAuditLogEndpointCfg rejects an audit log forward endpoint that cannot
+// be reached, before it is saved.
+func verifyAuditLogEndpointCfg(cfgs map[string]any) error {
+	auditEP, _ := cfgs[common.AuditLogForwardEndpoint].(string)
+	if len(auditEP) > 0 && !audit.CheckEndpointActive(auditEP) {
+		return errors.BadRequestError(fmt.Errorf("could not connect to the audit endpoint: %v", auditEP))
 	}
 	return nil
 }
@@ -132,6 +138,14 @@ func (c *controller) updateLogEndpoint(ctx context.Context, cfgs map[string]any)
 func (c *controller) validateCfg(ctx context.Context, cfgs map[string]any) error {
 	mgr := config.GetCfgManager(ctx)
 
+	if err := feature.ValidateConfigUpdate(ctx, cfgs); err != nil {
+		// a disable guard's error already carries its own code and message;
+		// flatten it so the response reports that code, not UNKNOWN
+		if code := errors.ErrCode(err); code != errors.GeneralCode {
+			return errors.New(nil).WithCode(code).WithMessage(err.Error())
+		}
+		return errors.BadRequestError(err)
+	}
 	// check if auth can be modified
 	if nv, ok := cfgs[common.AUTHMode]; ok {
 		if nv.(string) != mgr.Get(ctx, common.AUTHMode).GetString() {
@@ -153,6 +167,9 @@ func (c *controller) validateCfg(ctx context.Context, cfgs map[string]any) error
 
 	// verify the skip audit log related cfgs
 	if err = verifySkipAuditLogCfg(ctx, cfgs, mgr); err != nil {
+		return err
+	}
+	if err = verifyAuditLogEndpointCfg(cfgs); err != nil {
 		return err
 	}
 	// verify the value length related cfgs
@@ -302,9 +319,14 @@ func (c *controller) ConvertForGet(ctx context.Context, cfg map[string]any, inte
 			}
 			val = string(valByte)
 		}
+		editable := !readOnlyForAll
+		if enabled, overridden := feature.ConfigOverride(item.Name); overridden {
+			val = enabled
+			editable = false
+		}
 		result[item.Name] = &models.Value{
 			Val:      val,
-			Editable: !readOnlyForAll,
+			Editable: editable,
 		}
 	}
 
@@ -337,6 +359,12 @@ func (c *controller) OverwriteConfig(ctx context.Context) error {
 			log.Infof("ignoring %s in %s, %s takes precedence", common.DefaultProjectName, configOverwriteJSON, common.DefaultProjectNameEnv)
 			delete(cfgMap, common.DefaultProjectName)
 		}
+		for key := range cfgMap {
+			if envKey, overridden := feature.EnvironmentKey(key); overridden {
+				log.Infof("ignoring %s in %s, %s takes precedence", key, configOverwriteJSON, envKey)
+				delete(cfgMap, key)
+			}
+		}
 		err = c.UpdateUserConfigs(ctx, cfgMap)
 		if err != nil {
 			return err
@@ -344,6 +372,11 @@ func (c *controller) OverwriteConfig(ctx context.Context) error {
 		readOnlyForAll = true
 	}
 	return nil
+}
+
+// OverwrittenByEnv reports whether CONFIG_OVERWRITE_JSON made every setting read-only.
+func OverwrittenByEnv() bool {
+	return readOnlyForAll
 }
 
 func (c *controller) authModeCanBeModified(ctx context.Context) (bool, error) {

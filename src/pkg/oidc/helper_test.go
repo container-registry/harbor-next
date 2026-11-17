@@ -121,7 +121,7 @@ func TestAuthCodeURL(t *testing.T) {
 
 func TestTestEndpoint(t *testing.T) {
 	c1 := Conn{
-		URL:        googleEndpoint,
+		URL:        "https://" + googleHost,
 		VerifyCert: true,
 	}
 	c2 := Conn{

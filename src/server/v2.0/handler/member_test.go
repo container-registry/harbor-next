@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/go-openapi/runtime"
-	"github.com/go-openapi/runtime/middleware"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -503,9 +502,9 @@ func TestMemberWritesGrantProjectAdmin(t *testing.T) {
 	}
 }
 
-// A robot granting a built-in role is vouched for by its creator: the creator,
-// as they stand now, must hold every permission of that role in the project.
-func TestRobotBuiltinGrantCheckedAgainstCreator(t *testing.T) {
+// A robot granting a built-in role skips the escalation check (goharbor/harbor#24300):
+// its creator's state no longer matters, member:create/update is the guard.
+func TestRobotBuiltinGrantIgnoresCreator(t *testing.T) {
 	const (
 		projectID      int64 = 1
 		projectAdminID int64 = 10
@@ -527,16 +526,15 @@ func TestRobotBuiltinGrantCheckedAgainstCreator(t *testing.T) {
 		}
 	}
 	tests := []struct {
-		name    string
-		caller  *robot.Robot
-		allowed bool
+		name   string
+		caller *robot.Robot
 	}{
-		{name: "created by system admin", caller: creatorRobot(1, local.ContextName, sysAdminID), allowed: true},
-		{name: "created by project admin", caller: creatorRobot(1, local.ContextName, projectAdminID), allowed: true},
+		{name: "created by system admin", caller: creatorRobot(1, local.ContextName, sysAdminID)},
+		{name: "created by project admin", caller: creatorRobot(1, local.ContextName, projectAdminID)},
 		{name: "created by member updater", caller: creatorRobot(1, local.ContextName, memberAdminID)},
 		{name: "creator deleted", caller: creatorRobot(1, local.ContextName, goneUserID)},
 		{name: "unknown creator type", caller: creatorRobot(1, "", 0)},
-		{name: "created by robot created by system admin", caller: creatorRobot(1, "robot", 2), allowed: true},
+		{name: "created by robot created by system admin", caller: creatorRobot(1, "robot", 2)},
 		{name: "created by robot created by member updater", caller: creatorRobot(1, "robot", 4)},
 		{name: "robot creator chain too deep", caller: creatorRobot(1, "robot", 5)},
 		{name: "created by disabled robot", caller: creatorRobot(1, "robot", 8)},
@@ -599,7 +597,7 @@ func TestRobotBuiltinGrantCheckedAgainstCreator(t *testing.T) {
 
 			rc := &stubRoleCtl{}
 			rc.On("Get", testifymock.Anything, int64(common.RoleProjectAdmin), testifymock.Anything).
-				Return(projectAdminRole(), nil)
+				Return(projectAdminRole(), nil).Maybe()
 			controller := &recordingMemberController{}
 			api := &memberAPI{ctl: controller, roleCtl: rc, robotCtl: robotCtl, userCtl: userCtl}
 			ctx := security.NewContext(context.Background(), robotsec.NewSecurityContext(test.caller))
@@ -615,34 +613,24 @@ func TestRobotBuiltinGrantCheckedAgainstCreator(t *testing.T) {
 			updateParams.Role = &models.RoleRequest{RoleID: common.RoleProjectAdmin}
 			updateResponder := api.UpdateProjectMember(ctx, updateParams)
 
-			if test.allowed {
-				assert.IsType(t, &operation.CreateProjectMemberCreated{}, createResponder)
-				assert.IsType(t, &operation.UpdateProjectMemberOK{}, updateResponder)
-				return
-			}
-			for _, resp := range []middleware.Responder{createResponder, updateResponder} {
-				rr := httptest.NewRecorder()
-				resp.WriteResponse(rr, runtime.JSONProducer())
-				assert.Equal(t, http.StatusForbidden, rr.Code, rr.Body.String())
-				assert.Contains(t, rr.Body.String(), "escalation not allowed")
-			}
-			assert.Empty(t, controller.createdRoles)
-			assert.Empty(t, controller.updatedRoles)
+			assert.IsType(t, &operation.CreateProjectMemberCreated{}, createResponder)
+			assert.IsType(t, &operation.UpdateProjectMemberOK{}, updateResponder)
+			assert.Equal(t, []int{common.RoleProjectAdmin}, controller.createdRoles)
+			assert.Equal(t, []int{common.RoleProjectAdmin}, controller.updatedRoles)
 		})
 	}
 }
 
-// A robot granting a custom role is checked as itself, never through its
-// creator: the creator (a system admin) holds robot:create, the robot does not.
-func TestRobotCustomRoleCheckedAgainstRobotItself(t *testing.T) {
+// A robot granting a custom role skips the escalation check (goharbor/harbor#24300),
+// even when the role holds permissions the robot itself lacks.
+func TestRobotCustomRoleSkipsEscalationCheck(t *testing.T) {
 	const projectID int64 = 1
 	tests := []struct {
-		name    string
-		access  []*types.Policy
-		allowed bool
+		name   string
+		access []*types.Policy
 	}{
-		{name: "robot holds the permission", access: policyAccess(rbac.ResourceMember, rbac.ActionUpdate), allowed: true},
-		{name: "only the creator holds the permission", access: policyAccess(rbac.ResourceRobot, rbac.ActionCreate)},
+		{name: "robot holds the permission", access: policyAccess(rbac.ResourceMember, rbac.ActionUpdate)},
+		{name: "robot lacks the permission", access: policyAccess(rbac.ResourceRobot, rbac.ActionCreate)},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -660,7 +648,7 @@ func TestRobotCustomRoleCheckedAgainstRobotItself(t *testing.T) {
 			const customRoleID int64 = 100
 			rc := &stubRoleCtl{}
 			rc.On("Get", testifymock.Anything, customRoleID, testifymock.Anything).
-				Return(&roleCtl.Role{Permissions: []*roleCtl.Permission{{Access: test.access}}}, nil)
+				Return(&roleCtl.Role{Permissions: []*roleCtl.Permission{{Access: test.access}}}, nil).Maybe()
 			api := &memberAPI{roleCtl: rc, userCtl: userCtl, robotCtl: robottesting.NewController(t)}
 			caller := &robot.Robot{
 				Robot: robotmodel.Robot{
@@ -671,14 +659,7 @@ func TestRobotCustomRoleCheckedAgainstRobotItself(t *testing.T) {
 			}
 			ctx := security.NewContext(context.Background(), robotsec.NewSecurityContext(caller))
 
-			err := api.checkNoEscalation(ctx, projectID, customRoleID)
-			if test.allowed {
-				require.NoError(t, err)
-				return
-			}
-			require.Error(t, err)
-			assert.True(t, errors.IsErr(err, errors.ForbiddenCode))
-			assert.Contains(t, err.Error(), "you lack")
+			require.NoError(t, api.checkNoEscalation(ctx, projectID, customRoleID))
 		})
 	}
 }
@@ -687,4 +668,100 @@ func TestCreatorLacksHintsAtExternalAuth(t *testing.T) {
 	assert.Equal(t, "the robot's creator lacks", creatorLacks(context.Background()))
 	assert.Equal(t, "the robot's creator lacks", creatorLacks(lib.WithAuthMode(context.Background(), common.DBAuth)))
 	assert.Contains(t, creatorLacks(lib.WithAuthMode(context.Background(), common.LDAPAuth)), "system admin flag")
+}
+
+type stubMemberController struct {
+	member.Controller
+	testifymock.Mock
+}
+
+func (s *stubMemberController) Create(ctx context.Context, projectNameOrID any, req member.Request) (int, error) {
+	args := s.Called(ctx, projectNameOrID, req)
+	return args.Int(0), args.Error(1)
+}
+
+func (s *stubMemberController) UpdateRole(ctx context.Context, projectNameOrID any, memberID, roleID int) error {
+	return s.Called(ctx, projectNameOrID, memberID, roleID).Error(0)
+}
+
+func TestRobotMemberRoleAssignment(t *testing.T) {
+	for _, level := range []string{robot.LEVELPROJECT, robot.LEVELSYSTEM} {
+		for _, action := range []rbac.Action{rbac.ActionCreate, rbac.ActionUpdate} {
+			for _, roleID := range []int{common.RoleProjectAdmin, common.RoleDeveloper, common.RoleGuest, common.RoleMaintainer, common.RoleLimitedGuest, 100} {
+				t.Run(fmt.Sprintf("%s/%s/role-%d", level, action, roleID), func(t *testing.T) {
+					pc := &projecttesting.Controller{}
+					old := project.Ctl
+					project.Ctl = pc
+					t.Cleanup(func() { project.Ctl = old })
+					pc.On("Get", testifymock.Anything, testProjectID, testifymock.Anything).
+						Return(&project.Project{ProjectID: testProjectID}, nil)
+					sc := robotsec.NewSecurityContext(&robot.Robot{
+						Robot: robotmodel.Robot{Name: "robot$library+member-updater", ProjectID: testProjectID},
+						Level: level,
+						Permissions: []*robot.Permission{{
+							Kind: robot.LEVELPROJECT, Namespace: "library", Scope: fmt.Sprintf("/project/%d", testProjectID),
+							Access: policyAccess(rbac.ResourceMember, action),
+						}},
+					})
+					rc := &stubRoleCtl{}
+					rc.On("Get", testifymock.Anything, int64(100), testifymock.Anything).
+						Return(&roleCtl.Role{Permissions: []*roleCtl.Permission{{Access: policyAccess(rbac.ResourceRepository, rbac.ActionPush)}}}, nil).Maybe()
+					mc := &stubMemberController{}
+					api := &memberAPI{ctl: mc, roleCtl: rc}
+					xFalse := false
+					rr := httptest.NewRecorder()
+					ctx := newCtxWithSecurity(sc)
+					if action == rbac.ActionCreate {
+						mc.On("Create", ctx, testProjectID, member.Request{Role: roleID, MemberUser: member.User{Username: "mike01"}}).Return(2, nil).Once()
+						api.CreateProjectMember(ctx, memberop.CreateProjectMemberParams{
+							ProjectNameOrID: fmt.Sprint(testProjectID), XIsResourceName: &xFalse,
+							ProjectMember: &models.ProjectMember{RoleID: int64(roleID), MemberUser: &models.UserEntity{Username: "mike01"}},
+						}).WriteResponse(rr, runtime.JSONProducer())
+						assert.Equal(t, http.StatusCreated, rr.Code, rr.Body.String())
+					} else {
+						mc.On("UpdateRole", ctx, testProjectID, 2, roleID).Return(nil).Once()
+						api.UpdateProjectMember(ctx, memberop.UpdateProjectMemberParams{
+							ProjectNameOrID: fmt.Sprint(testProjectID), XIsResourceName: &xFalse, Mid: 2,
+							Role: &models.RoleRequest{RoleID: int64(roleID)},
+						}).WriteResponse(rr, runtime.JSONProducer())
+						assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+					}
+					mc.AssertExpectations(t)
+				})
+			}
+		}
+	}
+}
+
+func TestRobotMemberAccessRequired(t *testing.T) {
+	for _, level := range []string{robot.LEVELPROJECT, robot.LEVELSYSTEM} {
+		for _, tc := range []struct {
+			name   string
+			scope  string
+			action rbac.Action
+		}{
+			{"wrong action", fmt.Sprintf("/project/%d", testProjectID), rbac.ActionList},
+			{"wrong project", fmt.Sprintf("/project/%d", testProjectID+1), rbac.ActionUpdate},
+		} {
+			t.Run(level+"/"+tc.name, func(t *testing.T) {
+				pc := &projecttesting.Controller{}
+				old := project.Ctl
+				project.Ctl = pc
+				t.Cleanup(func() { project.Ctl = old })
+				pc.On("Get", testifymock.Anything, testProjectID, testifymock.Anything).
+					Return(&project.Project{ProjectID: testProjectID}, nil)
+				sc := robotsec.NewSecurityContext(&robot.Robot{
+					Robot: robotmodel.Robot{Name: "robot$library+restricted"}, Level: level,
+					Permissions: []*robot.Permission{{Scope: tc.scope, Access: policyAccess(rbac.ResourceMember, tc.action)}},
+				})
+				xFalse := false
+				rr := httptest.NewRecorder()
+				(&memberAPI{}).UpdateProjectMember(newCtxWithSecurity(sc), memberop.UpdateProjectMemberParams{
+					ProjectNameOrID: fmt.Sprint(testProjectID), XIsResourceName: &xFalse, Mid: 2,
+					Role: &models.RoleRequest{RoleID: common.RoleLimitedGuest},
+				}).WriteResponse(rr, runtime.JSONProducer())
+				assert.Equal(t, http.StatusForbidden, rr.Code, rr.Body.String())
+			})
+		}
+	}
 }

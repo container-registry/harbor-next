@@ -5,6 +5,7 @@ package metadata
 import (
 	context "context"
 
+	metadata "github.com/goharbor/harbor/src/pkg/project/metadata"
 	models "github.com/goharbor/harbor/src/pkg/project/metadata/models"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -32,6 +33,24 @@ func (_m *Manager) Add(ctx context.Context, projectID int64, meta map[string]str
 	return r0
 }
 
+// AddWithValidation provides a mock function with given fields: ctx, projectID, meta, validate
+func (_m *Manager) AddWithValidation(ctx context.Context, projectID int64, meta map[string]string, validate metadata.Validator) error {
+	ret := _m.Called(ctx, projectID, meta, validate)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AddWithValidation")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, map[string]string, metadata.Validator) error); ok {
+		r0 = rf(ctx, projectID, meta, validate)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Delete provides a mock function with given fields: ctx, projectID, meta
 func (_m *Manager) Delete(ctx context.Context, projectID int64, meta ...string) error {
 	_va := make([]interface{}, len(meta))
@@ -50,6 +69,31 @@ func (_m *Manager) Delete(ctx context.Context, projectID int64, meta ...string) 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, int64, ...string) error); ok {
 		r0 = rf(ctx, projectID, meta...)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// DeleteWithValidation provides a mock function with given fields: ctx, projectID, validate, meta
+func (_m *Manager) DeleteWithValidation(ctx context.Context, projectID int64, validate metadata.Validator, meta ...string) error {
+	_va := make([]interface{}, len(meta))
+	for _i := range meta {
+		_va[_i] = meta[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, projectID, validate)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteWithValidation")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, metadata.Validator, ...string) error); ok {
+		r0 = rf(ctx, projectID, validate, meta...)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -135,6 +179,24 @@ func (_m *Manager) Update(ctx context.Context, projectID int64, meta map[string]
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, int64, map[string]string) error); ok {
 		r0 = rf(ctx, projectID, meta)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UpdateWithValidation provides a mock function with given fields: ctx, projectID, meta, validate
+func (_m *Manager) UpdateWithValidation(ctx context.Context, projectID int64, meta map[string]string, validate metadata.Validator) error {
+	ret := _m.Called(ctx, projectID, meta, validate)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateWithValidation")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64, map[string]string, metadata.Validator) error); ok {
+		r0 = rf(ctx, projectID, meta, validate)
 	} else {
 		r0 = ret.Error(0)
 	}

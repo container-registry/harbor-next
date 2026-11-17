@@ -17,20 +17,26 @@ package handler
 import (
 	"context"
 	"fmt"
+	"maps"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
 	"github.com/goharbor/harbor/src/common/rbac"
 	"github.com/goharbor/harbor/src/common/rbac/system"
+	"github.com/goharbor/harbor/src/lib/errors"
+	"github.com/goharbor/harbor/src/lib/pattern"
+	pkgmetadata "github.com/goharbor/harbor/src/pkg/project/metadata"
 	"github.com/goharbor/harbor/src/pkg/project/models"
 	"github.com/goharbor/harbor/src/pkg/scan/dao/scanner"
 	v1 "github.com/goharbor/harbor/src/pkg/scan/rest/v1"
+	apiModels "github.com/goharbor/harbor/src/server/v2.0/models"
 	"github.com/goharbor/harbor/src/server/v2.0/restapi"
 	projecttesting "github.com/goharbor/harbor/src/testing/controller/project"
 	repositorytesting "github.com/goharbor/harbor/src/testing/controller/repository"
 	scannertesting "github.com/goharbor/harbor/src/testing/controller/scanner"
 	"github.com/goharbor/harbor/src/testing/mock"
+	metadatatesting "github.com/goharbor/harbor/src/testing/pkg/project/metadata"
 	htesting "github.com/goharbor/harbor/src/testing/server/v2.0/handler"
 )
 
@@ -40,6 +46,7 @@ type ProjectTestSuite struct {
 	projectCtl *projecttesting.Controller
 	repoCtl    *repositorytesting.Controller
 	scannerCtl *scannertesting.Controller
+	metaMgr    *metadatatesting.Manager
 	project    *models.Project
 	reg        *scanner.Registration
 	metadata   *v1.ScannerAdapterMetadata
@@ -60,12 +67,14 @@ func (suite *ProjectTestSuite) SetupSuite() {
 	suite.projectCtl = &projecttesting.Controller{}
 	suite.repoCtl = &repositorytesting.Controller{}
 	suite.scannerCtl = &scannertesting.Controller{}
+	suite.metaMgr = &metadatatesting.Manager{}
 
 	suite.Config = &restapi.Config{
 		ProjectAPI: &projectAPI{
 			projectCtl:     suite.projectCtl,
 			repositoryCtl:  suite.repoCtl,
 			scannerCtl:     suite.scannerCtl,
+			metadataMgr:    suite.metaMgr,
 			defaultProject: func(context.Context) (string, error) { return "library", nil },
 			deleteLock: func(ctx context.Context, _ int64, f func(context.Context) error) error {
 				return f(ctx)
@@ -79,6 +88,115 @@ func (suite *ProjectTestSuite) SetupSuite() {
 		},
 	}
 	suite.Suite.SetupSuite()
+}
+
+func (suite *ProjectTestSuite) TestUpdateProjectProxyCacheFilter() {
+	proxy := &models.Project{ProjectID: 2, Name: "proxy", RegistryID: 1, Metadata: map[string]string{}}
+	suite.Security.On("IsAuthenticated").Return(true)
+	suite.Security.On("Can", mock.Anything, mock.Anything, mock.Anything).Return(true)
+
+	// validate the request against stored metadata with the validator the handler passes
+	withStored := func(stored map[string]string) func(context.Context, int64, map[string]string, pkgmetadata.Validator) error {
+		return func(_ context.Context, _ int64, meta map[string]string, validate pkgmetadata.Validator) error {
+			effective := maps.Clone(stored)
+			maps.Copy(effective, meta)
+			return validate(effective)
+		}
+	}
+	regexStored := map[string]string{
+		models.ProMetaProxyCacheFilterPattern: "^foo/.*$",
+		models.ProMetaProxyCacheFilterKind:    pattern.KindRegex,
+	}
+	globStored := map[string]string{
+		models.ProMetaProxyCacheFilterPattern: "*",
+		models.ProMetaProxyCacheFilterKind:    pattern.KindDoublestar,
+	}
+
+	tests := []struct {
+		name   string
+		stored map[string]string
+		req    *apiModels.ProjectMetadata
+		filter map[string]string
+		status int
+	}{
+		{
+			name:   "pattern-only update incompatible with stored kind",
+			stored: regexStored,
+			req:    &apiModels.ProjectMetadata{ProxyCacheFilterPattern: stringPtr("*")},
+			filter: map[string]string{models.ProMetaProxyCacheFilterPattern: "*"},
+			status: 400,
+		},
+		{
+			name:   "kind-only update incompatible with stored pattern",
+			stored: globStored,
+			req:    &apiModels.ProjectMetadata{ProxyCacheFilterKind: stringPtr(pattern.KindRegex)},
+			filter: map[string]string{models.ProMetaProxyCacheFilterKind: pattern.KindRegex},
+			status: 400,
+		},
+		{
+			name:   "compatible pattern-only update",
+			stored: regexStored,
+			req:    &apiModels.ProjectMetadata{ProxyCacheFilterPattern: stringPtr("^bar/.*$"), Public: "true"},
+			filter: map[string]string{models.ProMetaProxyCacheFilterPattern: "^bar/.*$"},
+			status: 200,
+		},
+	}
+	for _, tt := range tests {
+		suite.Run(tt.name, func() {
+			mock.OnAnything(suite.projectCtl, "Get").Return(proxy, nil).Once()
+			suite.metaMgr.On("Get", mock.Anything, int64(2), models.ProMetaProxyCacheFilterPattern, models.ProMetaProxyCacheFilterKind).
+				Return(tt.stored, nil).Once()
+			if tt.status == 200 {
+				// the filter keys are written by UpdateWithValidation only, after projectCtl.Update
+				suite.projectCtl.On("Update", mock.Anything, mock.MatchedBy(func(p *models.Project) bool {
+					_, hasPattern := p.Metadata[models.ProMetaProxyCacheFilterPattern]
+					_, hasKind := p.Metadata[models.ProMetaProxyCacheFilterKind]
+					return !hasPattern && !hasKind
+				})).Return(nil).Once()
+				suite.metaMgr.On("UpdateWithValidation", mock.Anything, int64(2), tt.filter, mock.Anything).
+					Return(withStored(tt.stored)).Once()
+			}
+
+			res, err := suite.PutJSON("/projects/2", &apiModels.ProjectReq{Metadata: tt.req})
+			suite.NoError(err)
+			suite.Equal(tt.status, res.StatusCode)
+		})
+	}
+
+	{
+		// a failed project update stops before the filter is written
+		mock.OnAnything(suite.projectCtl, "Get").Return(proxy, nil).Once()
+		suite.metaMgr.On("Get", mock.Anything, int64(2), models.ProMetaProxyCacheFilterPattern, models.ProMetaProxyCacheFilterKind).
+			Return(regexStored, nil).Once()
+		mock.OnAnything(suite.projectCtl, "Update").Return(errors.BadRequestError(nil).WithMessage("invalid allowlist")).Once()
+
+		res, err := suite.PutJSON("/projects/2", &apiModels.ProjectReq{
+			Metadata: &apiModels.ProjectMetadata{ProxyCacheFilterPattern: stringPtr("^baz/.*$")},
+		})
+		suite.NoError(err)
+		suite.Equal(400, res.StatusCode)
+	}
+
+	{
+		// unrelated metadata skips the filter validation
+		mock.OnAnything(suite.projectCtl, "Get").Return(proxy, nil).Once()
+		suite.projectCtl.On("Update", mock.Anything, mock.MatchedBy(func(p *models.Project) bool {
+			return p.Metadata[models.ProMetaAutoScan] == "true"
+		})).Return(nil).Once()
+
+		res, err := suite.PutJSON("/projects/2", &apiModels.ProjectReq{
+			Metadata: &apiModels.ProjectMetadata{AutoScan: stringPtr("true")},
+		})
+		suite.NoError(err)
+		suite.Equal(200, res.StatusCode)
+	}
+
+	suite.metaMgr.AssertExpectations(suite.T())
+	suite.projectCtl.AssertExpectations(suite.T())
+}
+
+func stringPtr(value string) *string {
+	return &value
 }
 
 func (suite *ProjectTestSuite) TestGetScannerOfProject() {

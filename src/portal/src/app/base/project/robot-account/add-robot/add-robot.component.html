@@ -1,7 +1,8 @@
 <clr-wizard
     #wizard
+    class="permission-matrix-modal"
     [(clrWizardOpen)]="addRobotOpened"
-    [clrWizardSize]="'lg'"
+    [clrWizardSize]="'xl'"
     (clrWizardOnCancel)="cancel()">
     <clr-wizard-title
         ><h3 *ngIf="!isEditMode" class="modal-title">

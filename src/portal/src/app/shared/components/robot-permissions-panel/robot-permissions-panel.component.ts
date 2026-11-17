@@ -14,15 +14,12 @@
 import {
     AfterViewInit,
     Component,
-    DoCheck,
-    ElementRef,
     EventEmitter,
     Input,
     OnChanges,
     OnInit,
     Output,
     SimpleChanges,
-    ViewChild,
 } from '@angular/core';
 import {
     convertKey,
@@ -37,7 +34,7 @@ import { Permission } from '../../../../../ng-swagger-gen/models/permission';
     templateUrl: './robot-permissions-panel.component.html',
     styleUrls: ['./robot-permissions-panel.component.scss'],
 })
-export class RobotPermissionsPanelComponent implements OnChanges, DoCheck {
+export class RobotPermissionsPanelComponent implements OnChanges {
     modalOpen: boolean = false;
 
     @Input()
@@ -60,37 +57,10 @@ export class RobotPermissionsPanelComponent implements OnChanges, DoCheck {
     @Output()
     permissionsModelChange = new EventEmitter<Access[]>();
 
-    @ViewChild('dropdownMenu')
-    dropdownMenu: any;
-
-    @ViewChild('dropdown')
-    dropdown: ElementRef;
-
-    // to avoid ng check error, getTransform() should always return 'unset' before dropdownMenu appears
-    dropdownMenuAppeared: boolean = false;
-    getTransform(): string {
-        if (
-            this.dropdownMenuAppeared &&
-            this.dropdownMenu?.el &&
-            this.dropdown
-        ) {
-            const width = this.dropdownMenu.el.nativeElement.offsetWidth;
-            const height = this.dropdownMenu.el.nativeElement.offsetHeight;
-            const bcr = this.dropdown.nativeElement.getBoundingClientRect();
-            return `translateX(${bcr.x - width}px) translateY(${
-                bcr.y - height / 2
-            }px)`;
-        }
-        return 'unset';
-    }
-
     ngOnChanges(changes: SimpleChanges) {
         if (changes && changes['candidatePermissions']) {
             this.initCandidates();
         }
-    }
-    ngDoCheck() {
-        this.dropdownMenuAppeared = !!this.dropdownMenu;
     }
 
     initCandidates() {

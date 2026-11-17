@@ -16,12 +16,17 @@ package metadata
 
 import (
 	"context"
+	"maps"
 
+	"github.com/goharbor/harbor/src/lib/errors"
 	"github.com/goharbor/harbor/src/lib/orm"
 	"github.com/goharbor/harbor/src/lib/q"
 	"github.com/goharbor/harbor/src/pkg/project/metadata/dao"
 	"github.com/goharbor/harbor/src/pkg/project/metadata/models"
 )
+
+// Validator validates the effective project metadata before a write.
+type Validator func(map[string]string) error
 
 // Manager defines the operations that a project metadata manager should implement
 type Manager interface {
@@ -33,6 +38,15 @@ type Manager interface {
 
 	// Update metadatas
 	Update(ctx context.Context, projectID int64, meta map[string]string) error
+
+	// AddWithValidation atomically validates and adds metadatas.
+	AddWithValidation(ctx context.Context, projectID int64, meta map[string]string, validate Validator) error
+
+	// DeleteWithValidation atomically validates the remaining metadatas and deletes meta.
+	DeleteWithValidation(ctx context.Context, projectID int64, validate Validator, meta ...string) error
+
+	// UpdateWithValidation atomically validates and updates metadatas, creating the missing ones.
+	UpdateWithValidation(ctx context.Context, projectID int64, meta map[string]string, validate Validator) error
 
 	// Get metadatas whose keys are specified in parameter meta, if it is absent, get all
 	Get(ctx context.Context, projectID int64, meta ...string) (map[string]string, error)
@@ -85,6 +99,90 @@ func (m *manager) Update(ctx context.Context, projectID int64, meta map[string]s
 	}
 
 	return orm.WithTransaction(h)(orm.SetTransactionOpNameToContext(ctx, "tx-delete-project"))
+}
+
+// AddWithValidation atomically validates and adds metadatas.
+func (m *manager) AddWithValidation(ctx context.Context, projectID int64, meta map[string]string, validate Validator) error {
+	return m.writeWithValidation(ctx, projectID, validate, func(effective map[string]string) { maps.Copy(effective, meta) }, func(ctx context.Context, _ map[string]string) error {
+		for name, value := range meta {
+			if _, err := m.dao.Create(ctx, projectID, name, value); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// DeleteWithValidation atomically validates the metadata left after deleting meta and deletes it.
+func (m *manager) DeleteWithValidation(ctx context.Context, projectID int64, validate Validator, meta ...string) error {
+	return m.writeWithValidation(ctx, projectID, validate, func(effective map[string]string) {
+		if len(meta) == 0 {
+			clear(effective)
+		}
+		for _, name := range meta {
+			delete(effective, name)
+		}
+	}, func(ctx context.Context, _ map[string]string) error {
+		return m.Delete(ctx, projectID, meta...)
+	})
+}
+
+// UpdateWithValidation atomically validates and updates metadatas, creating the missing ones.
+func (m *manager) UpdateWithValidation(ctx context.Context, projectID int64, meta map[string]string, validate Validator) error {
+	return m.writeWithValidation(ctx, projectID, validate, func(effective map[string]string) { maps.Copy(effective, meta) }, func(ctx context.Context, current map[string]string) error {
+		for name, value := range meta {
+			var err error
+			if _, ok := current[name]; ok {
+				err = m.dao.Update(ctx, projectID, name, value)
+			} else {
+				_, err = m.dao.Create(ctx, projectID, name, value)
+			}
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// writeWithValidation validates the stored metadata after change and runs write
+// while holding the project row lock.
+func (m *manager) writeWithValidation(ctx context.Context, projectID int64, validate Validator,
+	change func(effective map[string]string), write func(ctx context.Context, current map[string]string) error) error {
+	h := func(ctx context.Context) error {
+		o, err := orm.FromContext(ctx)
+		if err != nil {
+			return err
+		}
+
+		// Lock the parent row because metadata rows may not exist yet. All
+		// validated metadata writes for a project serialize on this row. NO KEY
+		// UPDATE still admits the KEY SHARE locks taken by metadata inserts
+		// earlier in the same transactions, which FOR UPDATE would deadlock on.
+		var ids []int64
+		if _, err := o.Raw("SELECT project_id FROM project WHERE project_id = ? FOR NO KEY UPDATE", projectID).QueryRows(&ids); err != nil {
+			return err
+		}
+		if len(ids) == 0 {
+			return errors.NotFoundError(nil).WithMessagef("project %d not found", projectID)
+		}
+
+		current, err := m.Get(ctx, projectID)
+		if err != nil {
+			return err
+		}
+		effective := maps.Clone(current)
+		if effective == nil {
+			effective = map[string]string{}
+		}
+		change(effective)
+		if err := validate(effective); err != nil {
+			return err
+		}
+		return write(ctx, current)
+	}
+
+	return orm.WithTransaction(h)(orm.SetTransactionOpNameToContext(ctx, "tx-update-project-metadata"))
 }
 
 // Get metadatas whose keys are specified in parameter meta, if it is absent, get all

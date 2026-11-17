@@ -17,7 +17,8 @@ import { TranslateService } from '@ngx-translate/core';
 import { MessageHandlerService } from '../../../shared/services/message-handler.service';
 import { ScannerComponent } from './scanner.component';
 import { SharedTestingModule } from '../../../shared/shared.module';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { CommonRoutes } from '../../../shared/entities/shared.const';
 import { Scanner } from '../../left-side-nav/interrogation-services/scanner/scanner';
 import { ErrorHandler } from '../../../shared/units/error-handler';
 import { ProjectService } from '../../../../../ng-swagger-gen/services/project.service';
@@ -121,5 +122,37 @@ describe('ScannerComponent', () => {
         saveButton.click();
         fixture.detectChanges();
         expect(component.opened).toBeFalsy();
+    });
+    describe('role-based redirect', () => {
+        let navigate: jasmine.Spy;
+        let init: jasmine.Spy;
+        const setRoleIds = (ids: number[]) =>
+            ((fakedRoute.snapshot.parent.parent as any).data = {
+                projectResolver: { current_user_role_ids: ids },
+            });
+        beforeEach(() => {
+            navigate = spyOn(TestBed.inject(Router), 'navigate');
+            init = spyOn(component, 'init');
+            (component.getPermission as jasmine.Spy).calls.reset();
+        });
+        afterEach(() => delete (fakedRoute.snapshot.parent.parent as any).data);
+
+        it('redirects guest-only members and skips loading', () => {
+            setRoleIds([3, 5]);
+            component.ngOnInit();
+            expect(navigate).toHaveBeenCalledWith([
+                CommonRoutes.HARBOR_DEFAULT,
+            ]);
+            expect(component.getPermission).not.toHaveBeenCalled();
+            expect(init).not.toHaveBeenCalled();
+        });
+
+        it('keeps members with a custom or stronger role', () => {
+            setRoleIds([3, 42]);
+            component.ngOnInit();
+            expect(navigate).not.toHaveBeenCalled();
+            expect(component.getPermission).toHaveBeenCalled();
+            expect(init).toHaveBeenCalled();
+        });
     });
 });

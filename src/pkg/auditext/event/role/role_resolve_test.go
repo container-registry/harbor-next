@@ -15,6 +15,7 @@
 package role
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
@@ -36,7 +37,7 @@ func newResolver() *event.Resolver {
 		ResourceType:      rbac.ResourceRole.String(),
 		SucceedCodes:      []int{http.StatusCreated, http.StatusOK},
 		ShouldResolveName: true,
-		IDToNameFunc:      func(string) string { return "myrole" },
+		IDToNameFunc:      func(context.Context, string) string { return "myrole" },
 		ResourceIDPattern: urlPattern,
 	}
 }

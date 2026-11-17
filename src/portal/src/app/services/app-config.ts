@@ -33,6 +33,8 @@ export class AppConfig {
     current_time: string;
     oidc_provider_name: string;
     unauthenticated_landing_page: string;
+    // Effective state of every registered feature toggle, by config key.
+    features?: { [key: string]: boolean };
 
     constructor() {
         // Set default value
