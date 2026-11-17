@@ -19,6 +19,15 @@ import { ConfigService } from './config.service';
 import { Configuration } from './config';
 import { AppConfigService } from '../../../services/app-config.service';
 import { AppConfig } from '../../../services/app-config';
+import { registerConfigTab } from './config-tabs';
+
+// a tab a feature adds from its own file, as a commercial patch would
+registerConfigTab({
+    id: 'config-test-feature',
+    route: 'test-feature',
+    label: 'Branding Test',
+    visible: appConfig => appConfig.featureEnabled('enable_test_tab'),
+});
 
 describe('ConfigurationComponent', () => {
     let component: ConfigurationComponent;
@@ -88,22 +97,39 @@ describe('ConfigurationComponent', () => {
             fixture.nativeElement.querySelector('#config-features')
         ).not.toBeNull();
     });
-    it('orders the tabs alphabetically by label', () => {
+    function tabLabels(): string[] {
+        return Array.from(
+            fixture.nativeElement.querySelectorAll('ul.nav > li')
+        ).map((item: HTMLElement) => item.textContent.trim());
+    }
+    it('lists the tabs alphabetically in DOM order', () => {
         appConfig.features = { enable_test_feature: false };
         fixture.detectChanges();
-        const items = Array.from(
-            fixture.nativeElement.querySelectorAll('ul.nav > li')
-        ) as HTMLElement[];
-        const labels = items
-            .sort((a, b) => Number(a.style.order) - Number(b.style.order))
-            .map(item => item.textContent.trim());
+        const labels = tabLabels();
         expect(labels.length).toBeGreaterThan(1);
         expect(labels).toEqual([...labels].sort((a, b) => a.localeCompare(b)));
     });
-    it('reports the effective state of a feature', () => {
-        appConfig.features = { enable_on: true, enable_off: false };
-        expect(component.featureEnabled('enable_on')).toBeTrue();
-        expect(component.featureEnabled('enable_off')).toBeFalse();
-        expect(component.featureEnabled('enable_unknown')).toBeFalse();
+    it('shows a registered feature tab only while its feature is on', () => {
+        appConfig.features = { enable_test_tab: false };
+        fixture.detectChanges();
+        expect(
+            fixture.nativeElement.querySelector('#config-test-feature')
+        ).toBeNull();
+        appConfig.features = { enable_test_tab: true };
+        fixture.detectChanges();
+        expect(
+            fixture.nativeElement.querySelector('#config-test-feature')
+        ).not.toBeNull();
+        const labels = tabLabels();
+        expect(labels).toEqual([...labels].sort((a, b) => a.localeCompare(b)));
+    });
+    it('rejects a tab registered twice', () => {
+        expect(() =>
+            registerConfigTab({
+                id: 'config-test-feature',
+                route: 'x',
+                label: 'x',
+            })
+        ).toThrowError();
     });
 });

@@ -11,57 +11,43 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import {
-    AfterViewChecked,
-    Component,
-    ElementRef,
-    OnInit,
-    ViewChild,
-} from '@angular/core';
+import { Component, OnInit } from '@angular/core';
+import { TranslateService } from '@ngx-translate/core';
 import { ConfigService } from './config.service';
 import { AppConfigService } from '../../../services/app-config.service';
+import { ConfigTab, configTabs } from './config-tabs';
 
 @Component({
     selector: 'config',
     templateUrl: 'config.component.html',
     styleUrls: ['config.component.scss'],
 })
-export class ConfigurationComponent implements OnInit, AfterViewChecked {
-    @ViewChild('tabs', { static: true }) tabs: ElementRef<HTMLElement>;
-
+export class ConfigurationComponent implements OnInit {
     get inProgress(): boolean {
         return this.conf.getLoadingConfigStatus();
     }
 
     constructor(
         private conf: ConfigService,
-        private appConfigService: AppConfigService
+        private appConfigService: AppConfigService,
+        private translate: TranslateService
     ) {}
 
-    get hasFeatures(): boolean {
-        return this.appConfigService.hasFeatures();
+    // Tabs come from upstream and from features that add their own, so list
+    // them by translated label; DOM order then matches what is shown.
+    get tabs(): ConfigTab[] {
+        const label = (tab: ConfigTab) => this.translate.instant(tab.label);
+        return configTabs()
+            .filter(tab => !tab.visible || tab.visible(this.appConfigService))
+            .sort((a, b) => label(a).localeCompare(label(b)));
     }
 
-    // Tabs that belong to one feature show only while it is enabled.
-    featureEnabled(key: string): boolean {
-        return this.appConfigService.featureEnabled(key);
+    trackTab(_: number, tab: ConfigTab): string {
+        return tab.id;
     }
 
     ngOnInit(): void {
         // Refresh config every time when entering the configuration page
         this.conf.updateConfig();
-    }
-
-    // Tabs come from upstream and from optional features, so sort them by
-    // their translated label instead of relying on where each was added.
-    ngAfterViewChecked(): void {
-        const items = Array.from(
-            this.tabs.nativeElement.children
-        ) as HTMLElement[];
-        items
-            .sort((a, b) =>
-                a.textContent.trim().localeCompare(b.textContent.trim())
-            )
-            .forEach((item, index) => (item.style.order = String(index)));
     }
 }
