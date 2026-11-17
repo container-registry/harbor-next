@@ -138,27 +138,20 @@ func (r *resolver) Resolve(ce *commonevent.Metadata, evt *event.Event) error {
 	}
 
 	e.ResourceName = entityName
+	if len(entityName) == 0 && len(matches) >= 3 && len(matches[2]) > 0 {
+		e.ResourceName = "ID " + matches[2]
+	}
 	label := "member"
-	noun := ""
 	if entityType == common.GroupMember {
 		label = "group"
-		noun = " member"
 	} else if entityType == common.UserMember {
 		label = "user"
-		noun = " member"
 	}
 	preposition := "in"
 	if operation == "delete" {
 		preposition = "from"
 	}
-	resourceTarget := fmt.Sprintf("%s%s", label, noun)
-	if len(entityName) > 0 {
-		resourceTarget = fmt.Sprintf("%s %s", resourceTarget, entityName)
-	} else if len(matches) >= 3 && len(matches[2]) > 0 {
-		resourceTarget = fmt.Sprintf("%s ID %s", resourceTarget, matches[2])
-	}
-	e.OperationDescription = fmt.Sprintf("%s %s %s project %s",
-		operation, resourceTarget, preposition, projectName)
+	e.OperationDescription = fmt.Sprintf("%s %s project %s", label, preposition, projectName)
 
 	evt.Topic = ctlevent.TopicCommonEvent
 	evt.Data = e

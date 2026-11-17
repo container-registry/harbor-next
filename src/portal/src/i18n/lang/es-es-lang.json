@@ -526,6 +526,7 @@
         "MEMBERS": "Miembros del Proyecto",
         "ROBOTS": "Robots",
         "ARTIFACTS": "Artefactos",
+        "TAGS": "Etiquetas",
         "PROJECTS": "Proyectos",
         "CONFIGURATION": "Configuration",
         "REPOSITORIES": "Repositories"

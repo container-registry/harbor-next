@@ -143,3 +143,31 @@ func TestMetadataMatchesResolverAgainstEntirePath(t *testing.T) {
 		})
 	}
 }
+
+type snapshotResolver struct{ stubResolver }
+
+func (snapshotResolver) Snapshot(_ context.Context, payload string) any {
+	return "before " + payload
+}
+
+// registerForTest registers a resolver and removes it when the test ends.
+func registerForTest(t *testing.T, pattern string, resolver Resolver) {
+	RegisterResolver(pattern, resolver)
+	t.Cleanup(func() {
+		mu.Lock()
+		defer mu.Unlock()
+		delete(urlResolvers, pattern)
+	})
+}
+
+func TestMetadataSnapshotRunsTheResolverSnapshot(t *testing.T) {
+	registerForTest(t, `^/test-metadata-snapshot$`, snapshotResolver{})
+	c := &Metadata{Ctx: context.Background(), RequestURL: "/test-metadata-snapshot"}
+	c.Snapshot("{}")
+	assert.Equal(t, "before {}", c.Before)
+
+	registerForTest(t, `^/test-metadata-snapshot-plain$`, stubResolver{})
+	plain := &Metadata{Ctx: context.Background(), RequestURL: "/test-metadata-snapshot-plain"}
+	plain.Snapshot("{}")
+	assert.Nil(t, plain.Before, "resolvers without Snapshot capture nothing")
+}

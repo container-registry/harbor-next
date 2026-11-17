@@ -665,6 +665,7 @@
         "MEMBERS": "Участники проекта",
         "ROBOTS": "Роботы",
         "ARTIFACTS": "Артефакты",
+        "TAGS": "Tags",
         "PROJECTS": "Проекты",
         "CONFIGURATION": "Конфигурация",
         "REPOSITORIES": "Репозитории"
@@ -1786,6 +1787,7 @@
     "MEMBERS": "Участники проекта",
     "ROBOTS": "Роботы",
     "ARTIFACTS": "Артефакты",
+    "TAGS": "Tags",
     "PROJECTS": "Проекты",
     "CONFIGURATION": "Конфигурация",
     "REPOSITORIES": "Репозитории"

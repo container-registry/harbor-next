@@ -63,6 +63,12 @@ const AUDIT_EVENT_CATEGORIES: Omit<AuditEventCategory, 'events'>[] = [
         resourceTypes: ['artifact'],
     },
     {
+        id: 'tags',
+        labelKey: 'AUDIT_LOG_CONFIG.TAGS',
+        icon: 'tag',
+        resourceTypes: ['tag'],
+    },
+    {
         id: 'projects',
         labelKey: 'AUDIT_LOG_CONFIG.PROJECTS',
         icon: 'folder',

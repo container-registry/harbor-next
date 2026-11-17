@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"regexp"
 	"time"
 
@@ -46,6 +47,8 @@ const (
 	payloadPattern = `principal=(.*?)&password`
 )
 
+var payloadRe = regexp.MustCompile(payloadPattern)
+
 type loginResolver struct {
 }
 
@@ -61,12 +64,15 @@ func (l *loginResolver) Resolve(ce *commonevent.Metadata, event *event.Event) er
 	}
 
 	// Extract the username from payload
-	re := regexp.MustCompile(payloadPattern)
 	if len(ce.RequestPayload) > 0 {
-		match := re.FindStringSubmatch(ce.RequestPayload)
+		match := payloadRe.FindStringSubmatch(ce.RequestPayload)
 		if len(match) > 1 {
-			e.ResourceName = match[1]
-			e.Operator = match[1]
+			principal := match[1]
+			if decoded, err := url.QueryUnescape(principal); err == nil {
+				principal = decoded
+			}
+			e.ResourceName = principal
+			e.Operator = principal
 		}
 	} else if ce.RequestMethod == http.MethodGet {
 		e.IsSuccessful = true // for OIDC login event, always success

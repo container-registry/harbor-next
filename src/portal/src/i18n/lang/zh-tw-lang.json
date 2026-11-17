@@ -525,6 +525,7 @@
         "MEMBERS": "專案成員",
         "ROBOTS": "機器人",
         "ARTIFACTS": "Artifact",
+        "TAGS": "Tags",
         "PROJECTS": "專案",
         "CONFIGURATION": "組態設定",
         "REPOSITORIES": "儲存庫"

@@ -36,6 +36,8 @@ const DEFAULT_EVENT_TYPES = [
     { event_type: 'create_robot' },
     { event_type: 'delete_robot' },
     { event_type: 'update_configuration' },
+    { event_type: 'create_tag' },
+    { event_type: 'delete_tag' },
 ];
 
 describe('AuditLogConfigurationComponent', () => {
@@ -103,6 +105,7 @@ describe('AuditLogConfigurationComponent', () => {
             'members',
             'robots',
             'artifacts',
+            'tags',
             'projects',
             'configuration',
             'repositories',
@@ -112,6 +115,14 @@ describe('AuditLogConfigurationComponent', () => {
                 .find(category => category.id === 'members')
                 ?.events.map(event => event.value)
         ).toEqual(['create_member', 'update_member', 'delete_member']);
+    });
+
+    it('lists tag events in their own row', () => {
+        expect(
+            component.categories
+                .find(category => category.id === 'tags')
+                ?.events.map(event => event.value)
+        ).toEqual(['create_tag', 'delete_tag']);
     });
 
     it('stores disabled event types when an event toggle is switched off', () => {

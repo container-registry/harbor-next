@@ -58,7 +58,13 @@ func (d *dao) UpdateUsername(ctx context.Context, username string, usernameRepla
 	if err != nil {
 		return err
 	}
-	_, err = o.Raw("UPDATE audit_log_ext SET username = ? WHERE username = ?", usernameReplace, username).Exec()
+	// the summary in op_desc starts with the actor; mask only that, within
+	// the column width
+	_, err = o.Raw(`UPDATE audit_log_ext SET username = ?,
+		op_desc = CASE WHEN left(op_desc, char_length(?) + 1) = ? || ' '
+			THEN left(? || substr(op_desc, char_length(?) + 1), 1024) ELSE op_desc END
+		WHERE username = ?`,
+		usernameReplace, username, username, usernameReplace, username, username).Exec()
 	return err
 }
 
