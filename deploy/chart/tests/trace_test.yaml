@@ -1,5 +1,6 @@
 suite: trace helper tests
 templates:
+  - templates/jobservice.configmap-env.yaml
   - templates/registryctl.configmap.yaml
 tests:
   # Regression guard for 9979736de. Sprig `default 1` clobbers `0`
@@ -7,6 +8,7 @@ tests:
   # check so an explicit `trace.sample_rate: 0` (sample nothing,
   # useful in load tests or staging) renders as "0".
   - it: should preserve explicit trace.sample_rate=0
+    template: templates/jobservice.configmap-env.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
@@ -19,6 +21,7 @@ tests:
           value: "0"
 
   - it: should preserve fractional trace.sample_rate
+    template: templates/jobservice.configmap-env.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
@@ -31,6 +34,7 @@ tests:
           value: "0.25"
 
   - it: should fall back to 1 when trace.sample_rate is unset
+    template: templates/jobservice.configmap-env.yaml
     # Values.yaml default is 1; this guards against accidental removal
     # of the helper fallback that would render "<no value>" or "".
     set:
@@ -43,14 +47,15 @@ tests:
           path: data.TRACE_SAMPLE_RATE
           value: "1"
 
-  # Regression guard for c50cf9f27 (Fix #17). registryctl.configmap.yaml
-  # used `nindent 2` on a helper that already emits 2-space-indented
-  # keys, double-indenting them to 4 spaces — invalid YAML. helm install
+  # Regression guard for c50cf9f27 (Fix #17). A ConfigMap used
+  # `nindent 2` on a helper that already emits 2-space-indented keys,
+  # double-indenting them to 4 spaces — invalid YAML. helm install
   # failed with `did not find expected key` whenever trace.enabled=true.
   #
   # If the regression returns, helm-unittest fails to render the
   # ConfigMap at all and these asserts cannot resolve their paths.
   - it: should render valid YAML with trace.enabled=true (P0 install-breaker guard)
+    template: templates/jobservice.configmap-env.yaml
     set:
       externalURL: https://harbor.example.com
       database.host: postgres.example.com
@@ -60,18 +65,19 @@ tests:
       - isKind:
           of: ConfigMap
       - equal:
-          path: data._PLACEHOLDER
-          value: "true"
-      # TRACE_* keys must be siblings of _PLACEHOLDER under `data:`,
-      # not nested below _PLACEHOLDER (which is what the bug produced).
+          path: data.CORE_URL
+          value: "http://RELEASE-NAME-harbor-core:80"
+      # TRACE_* keys must be direct children of `data:`, not nested
+      # below the preceding key (which is what the bug produced).
       - equal:
           path: data.TRACE_ENABLED
           value: "true"
       - equal:
           path: data.TRACE_SERVICE_NAME
-          value: "harbor-registryctl"
+          value: "harbor-jobservice"
 
   - it: should not emit "<no value>" when optional trace fields are absent
+    template: templates/jobservice.configmap-env.yaml
     # Regression guard for 50d34a593 (Fix #22). Helm renders unset
     # template vars as the literal `<no value>` inside quotes; the
     # helper now wraps optional fields in `{{- with }}` so missing
@@ -91,3 +97,37 @@ tests:
       - notMatchRegex:
           path: data.TRACE_JAEGER_ENDPOINT
           pattern: "<no value>"
+
+  # Regression guard for c50cf9f27 (Fix #17). registryctl.configmap.yaml
+  # used `nindent 2` on a helper that already emits 2-space-indented
+  # keys, double-indenting them to 4 spaces — invalid YAML. helm install
+  # failed with `did not find expected key` whenever trace.enabled=true.
+  # The ConfigMap renders only with image.source=upstream.
+  #
+  # If the regression returns, helm-unittest fails to render the
+  # ConfigMap at all and these asserts cannot resolve their paths.
+  - it: should render valid registryctl YAML with trace.enabled=true (P0 install-breaker guard)
+    template: templates/registryctl.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      image.source: upstream
+      trace.enabled: true
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: data._PLACEHOLDER
+          value: "true"
+      # TRACE_* keys must be siblings of _PLACEHOLDER under `data:`,
+      # not nested below _PLACEHOLDER (which is what the bug produced).
+      - equal:
+          path: data.TRACE_ENABLED
+          value: "true"
+      - equal:
+          path: data.TRACE_SAMPLE_RATE
+          value: "1"
+      - equal:
+          path: data.TRACE_SERVICE_NAME
+          value: "harbor-registryctl"

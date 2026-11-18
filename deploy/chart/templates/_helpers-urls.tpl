@@ -78,17 +78,55 @@ Container port
 {{- end }}
 
 {{/*
-Return the Registry controller internal URL
+The registryctl sidecar exists for registry images without the GC deletion
+API: vanilla goharbor (image.source=upstream) and Harbor Next releases before
+2.17.0. Their jobservice deletes GC blobs through registryctl, and on 404 it
+drops the DB rows and keeps the blobs, so pointing it at such a registry
+would leak storage silently. Harbor Next 2.17.0+ registries serve the
+deletion API themselves.
 */}}
-{{- define "harbor.registryctl.url" -}}
-http://{{ include "harbor.fullname" . }}-registry:{{ include "harbor.registryctl.port" . }}
+{{- define "harbor.registryctl.enabled" -}}
+{{- if or (eq (.Values.image.source | default "8gcr") "upstream") (include "harbor.registry.preGCAPI" .) -}}true{{- end -}}
 {{- end }}
 
 {{/*
-Registryctl container port
+True when the 8gcr registry image is a release older than 2.17.0, the first
+with the GC deletion API (pinned tags, or the 2.16 appVersion on main before
+the 2.17 release). Digests and non-release tags are taken as current builds.
 */}}
+{{- define "harbor.registry.preGCAPI" -}}
+{{- $img := .Values.registry.image | default dict -}}
+{{- if and (ne (.Values.image.source | default "8gcr") "upstream") (not $img.digest) -}}
+{{- $tag := $img.tag | default .Chart.AppVersion | toString -}}
+{{- if and (regexMatch "^v?[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$" $tag) (semverCompare "<2.17.0-0" $tag) -}}true{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+registryctl image. Pre-2.17 Harbor Next sidecars follow the registry tag so a
+pinned registry.image.tag keeps a matching registryctl.
+*/}}
+{{- define "harbor.registryctl.image" -}}
+{{- $img := deepCopy (.Values.registry.controller.image | default dict) -}}
+{{- if and (include "harbor.registry.preGCAPI" .) (not $img.tag) (not $img.digest) -}}
+{{- $_ := set $img "tag" (.Values.registry.image.tag | default .Chart.AppVersion) -}}
+{{- end -}}
+{{- include "harbor.image" (dict "imageRoot" $img "component" "registryctl" "root" .) -}}
+{{- end }}
+
 {{- define "harbor.registryctl.port" -}}
 8080
+{{- end }}
+
+{{/*
+REGISTRY_CONTROLLER_URL for core and jobservice
+*/}}
+{{- define "harbor.registryController.url" -}}
+{{- if include "harbor.registryctl.enabled" . -}}
+http://{{ include "harbor.fullname" . }}-registry:{{ include "harbor.registryctl.port" . }}
+{{- else -}}
+{{ include "harbor.registry.url" . }}
+{{- end -}}
 {{- end }}
 
 {{/*
@@ -122,10 +160,6 @@ Component name helpers (used by noProxy and other cross-component references)
 
 {{- define "harbor.registry" -}}
   {{- printf "%s-registry" (include "harbor.fullname" .) -}}
-{{- end -}}
-
-{{- define "harbor.registryCtl" -}}
-  {{- printf "%s-registryctl" (include "harbor.fullname" .) -}}
 {{- end -}}
 
 {{- define "harbor.database" -}}

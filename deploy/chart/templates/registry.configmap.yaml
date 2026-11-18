@@ -33,10 +33,12 @@ metadata:
 data:
   config.yml: |+
 {{ toYaml $merged | indent 4 }}
+  {{- if include "harbor.registryctl.enabled" . }}
   ctl-config.yml: |+
     ---
     protocol: "http"
-    port: 8080
+    port: {{ include "harbor.registryctl.port" . }}
     log_level: {{ .Values.logLevel }}
     registry_config: "/etc/registry/config.yml"
+  {{- end }}
 {{- end }}

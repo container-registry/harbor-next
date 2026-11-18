@@ -340,7 +340,7 @@ registry:
 
 **Credentials never go in `registry.config`** (they'd be visible in the rendered ConfigMap). Use one of:
 
-- **BYO Secret (recommended)** — `registry.storageCredentials.<backend>.existingSecret` references a pre-existing Secret. The chart injects `REGISTRY_STORAGE_<BACKEND>_<KEY>` env vars on both the registry container and the registryctl sidecar (registryctl runs garbage collection and needs the same creds). Distribution honors these env overrides for any config.yml field.
+- **BYO Secret (recommended)** — `registry.storageCredentials.<backend>.existingSecret` references a pre-existing Secret. The chart injects `REGISTRY_STORAGE_<BACKEND>_<KEY>` env vars on the registry container, and with `image.source: upstream` also on the registryctl sidecar (it runs the GC deletes there). Distribution honors these env overrides for any config.yml field.
 - **Inline (dev)** — `registry.secret: { REGISTRY_STORAGE_S3_ACCESSKEY: <plain> }` gets b64-encoded into the chart-generated Secret and injected via `envFrom`.
 
 ### S3 Storage Backend
@@ -417,7 +417,7 @@ For kustomize overlays, GitOps pipelines, or external config generators:
 
 ```yaml
 registry:
-  existingConfigMap: my-registry-config       # ConfigMap with config.yml + ctl-config.yml
+  existingConfigMap: my-registry-config       # config.yml (+ ctl-config.yml for image.source=upstream)
   storageCredentials:
     s3:
       existingSecret: my-s3-creds             # still wired even with external ConfigMap
@@ -534,7 +534,7 @@ core:
       exec:
         command: ["/bin/sh", "-c", "sleep 15"]
 
-registry:           # applied to both registry + registryctl containers
+registry:
   lifecycle:
     preStop:
       exec:

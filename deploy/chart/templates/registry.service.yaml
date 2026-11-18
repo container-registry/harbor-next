@@ -15,10 +15,12 @@ spec:
       port: {{ include "harbor.registry.port" . }}
       targetPort: {{ include "harbor.registry.port" . }}
       protocol: TCP
+    {{- if include "harbor.registryctl.enabled" . }}
     - name: http-controller
       port: {{ include "harbor.registryctl.port" . }}
       targetPort: {{ include "harbor.registryctl.port" . }}
       protocol: TCP
+    {{- end }}
     - name: {{ include "harbor.metrics.portName" . | quote }}
       port: {{ include "harbor.metrics.port" . }}
       targetPort: {{ include "harbor.metrics.port" . }}

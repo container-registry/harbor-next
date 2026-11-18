@@ -14,7 +14,7 @@ data:
   TOKEN_SERVICE_URL: {{ include "harbor.token.service.url" . | quote }}
   REGISTRY_CREDENTIAL_USERNAME: "{{ .Values.registry.credentials.username }}"
   REGISTRY_URL: {{ include "harbor.registry.url" . | quote }}
-  REGISTRY_CONTROLLER_URL: {{ include "harbor.registryctl.url" . | quote }}
+  REGISTRY_CONTROLLER_URL: {{ include "harbor.registryController.url" . | quote }}
 
   # Redis configuration. The _REDIS_URL_* values live as explicit env on
   # the Deployment, NOT here: they embed $(REDIS_PASSWORD) when Redis
