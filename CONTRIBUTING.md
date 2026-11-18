@@ -29,7 +29,98 @@ All changes go through PRs. Never push directly to `main`.
 
 ### 1. Branch Naming
 
+<<<<<<< HEAD
 Use a short, descriptive branch name prefixed by the change type:
+=======
+
+Ensure your GOPATH and PATH have been configured in accordance with the Go environment instructions.
+
+#### Web
+
+Harbor web UI is built based on [Clarity](https://clarity.design/) and [Angular](https://angular.io/) web framework. To setup a web UI development environment, please make sure that the [npm](https://www.npmjs.com/get-npm) tool is installed first.
+
+|  Harbor  |  Requires Angular  |  Requires Clarity  |
+|----------|--------------------|--------------------|
+|   1.1    |      2.4.1         |       0.8.7        |
+|   1.2    |      4.1.3         |       0.9.8        |
+|   1.3    |      4.3.0         |       0.10.17      |
+|   1.4    |      4.3.0         |       0.10.17      |
+|   1.5    |      4.3.0         |       0.10.27      |
+|   1.6    |      4.3.0         |       0.10.27      |
+|   1.7    |      6.0.3         |       0.12.10      |
+|   1.8    |      7.1.3         |       1.0.0        |
+|   1.9    |      7.1.3         |       1.0.0        |
+|   1.10   |      8.2.0         |       2.2.0        |
+|   2.0    |      8.2.0         |       2.3.8        |
+|   2.1    |      8.2.0         |       2.3.8        |
+|   2.2    |      10.1.2        |       4.0.2        |
+|   2.3    |      10.1.2        |       4.0.2        |
+|   2.4    |      12.0.3        |       5.3.0        |
+
+To run the Web UI code, please refer to the UI [start](https://github.com/goharbor/harbor/tree/main/src/portal) guideline.
+
+To run the code, please refer to the [build](https://goharbor.io/docs/edge/build-customize-contribute/compile-guide/) guideline.
+
+## Contribute Workflow
+
+PR are always welcome, even if they only contain small fixes like typos or a few lines of code. If there will be a significant effort, please document it as an issue and get a discussion going before starting to work on it.
+
+Please submit a PR broken down into small changes bit by bit. A PR consisting of a lot of features and code changes may be hard to review. It is recommended to submit PRs in an incremental fashion.
+
+Note: If you split your pull request to small changes, please make sure any of the changes goes to `main` will not break anything. Otherwise, it can not be merged until this feature completed.
+
+### Fork and clone
+
+Fork the Harbor repository and clone the code to your local workspace. Per Go's [workspace instructions](https://golang.org/doc/code.html#Workspaces), place Harbor's code on your `GOPATH`. Refer to section [Fork Repository](#fork-repository) for details.
+
+Define a local working directory:
+```sh
+working_dir=$GOPATH/src/github.com/goharbor
+```
+
+Set user to match your github profile name:
+```sh
+user={your github profile name}
+```
+
+Both `$working_dir` and `$user` are mentioned in the figure above.
+
+### Branch
+Changes should be made on your own fork in a new branch. The branch should be named  `XXX-description` where XXX is the number of the issue. PR should be rebased on top of `main` without multiple branches mixed into the PR. If your PR do not merge cleanly, use commands listed below to get it up to date.
+
+```sh
+#goharbor is the origin upstream
+
+cd $working_dir/harbor
+git fetch goharbor
+git checkout main
+git rebase goharbor/main
+```
+
+Branch from the updated `main` branch:
+
+```sh
+git checkout -b my_feature main
+```
+
+### Develop, Build and Test
+
+Write code on the new branch in your fork. The coding style used in Harbor is suggested by the Golang community. See the [style doc](https://github.com/golang/go/wiki/CodeReviewComments) for details.
+
+Try to limit column width to 120 characters for both code and markdown documents such as this one.
+
+As we are enforcing standards set by [golint](https://github.com/golang/lint), please always run golint on source code before committing your changes. If it reports an issue, in general, the preferred action is to fix the code to comply with the linter's recommendation
+because golint gives suggestions according to the stylistic conventions listed in [Effective Go](https://golang.org/doc/effective_go.html) and the [CodeReviewComments](https://github.com/golang/go/wiki/CodeReviewComments).
+```sh
+#Install fgt and golint
+
+go install golang.org/x/lint/golint@latest
+go install github.com/GeertJohan/fgt@latest
+
+#In the #working_dir/harbor, run
+
+go list ./... | grep -v -E 'tests' | xargs -L1 fgt golint
+>>>>>>> 966747bd5 (docs: fix the dead Clarity link in CONTRIBUTING (#24433))
 
 ```
 feat/oidc-federated-login
