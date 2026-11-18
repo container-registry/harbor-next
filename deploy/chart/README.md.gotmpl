@@ -450,7 +450,7 @@ applied to the generated rules:
 
 - `gateway.timeouts` / `gateway.filters` apply to every rule.
 - `gateway.routeOverrides` targets a single route group: `core` (the `/api/`,
-  `/service/`, `/v2/`, `/chartrepo/`, `/c/` API and data paths) or `default`
+  `/pkg/`, `/service/`, `/v2/`, `/chartrepo/`, `/c/` API and data paths) or `default`
   (the portal / catch-all). Per-group `timeouts` merge over `gateway.timeouts`
   (group wins); per-group `filters` replace `gateway.filters` for that group.
 - `gateway.extraRules` appends raw HTTPRoute rules after the chart-managed ones.
