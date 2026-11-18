@@ -11,9 +11,10 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import { Component, Input, ViewChild } from '@angular/core';
-import { CopyInputComponent } from './copy-input.component';
+import { Component, Input, OnChanges, ViewChild } from '@angular/core';
 import { InlineAlertComponent } from '../inline-alert/inline-alert.component';
+import { AppConfigService } from '../../../services/app-config.service';
+import { PushSection, pushSections } from './push-sections';
 
 @Component({
     selector: 'hbr-push-image-button',
@@ -22,64 +23,33 @@ import { InlineAlertComponent } from '../inline-alert/inline-alert.component';
 
     providers: [],
 })
-export class PushImageButtonComponent {
+export class PushImageButtonComponent implements OnChanges {
     @Input() registryUrl: string = 'unknown';
     @Input() projectName: string = 'unknown';
 
-    @ViewChild('tagCopyImage') tagCopyImageInput: CopyInputComponent;
-    @ViewChild('pushCopyImage') pushCopImageyInput: CopyInputComponent;
-    @ViewChild('tagCopyChart') tagCopyChartInput: CopyInputComponent;
-    @ViewChild('pushCopyChart') pushCopyChartInput: CopyInputComponent;
-    @ViewChild('pushCopyCnab') pushCopCnabyInput: CopyInputComponent;
+    sections: PushSection[] = [];
+    opened: boolean = false;
+    activeId: string;
+
     @ViewChild('copyAlert') copyAlert: InlineAlertComponent;
 
-    public get tagCommandImage(): string {
-        return `docker tag SOURCE_IMAGE[:TAG] ${this.registryUrl}/${this.projectName}/REPOSITORY[:TAG]`;
+    constructor(private appConfigService: AppConfigService) {}
+
+    ngOnChanges(): void {
+        this.sections = pushSections(this.registryUrl, this.projectName, key =>
+            this.appConfigService.featureEnabled(key)
+        );
     }
 
-    public get pushCommandImage(): string {
-        return `docker push ${this.registryUrl}/${this.projectName}/REPOSITORY[:TAG]`;
-    }
-
-    public get podmanPushCommand(): string {
-        return `podman push IMAGE_ID ${this.registryUrl}/${this.projectName}/REPOSITORY[:TAG]`;
-    }
-
-    public get tagCommandChart(): string {
-        return `helm package CHART_PATH`;
-    }
-
-    public get pushCommandChart(): string {
-        return `helm push CHART_PACKAGE oci://${this.registryUrl}/${this.projectName}`;
-    }
-
-    public get pushCommandCnab(): string {
-        return `cnab-to-oci push CNAB_PATH --target ${this.registryUrl}/${this.projectName}/REPOSITORY[:TAG] --auto-update-bundle`;
-    }
-
-    onclick(): void {
-        if (this.tagCopyImageInput) {
-            this.tagCopyImageInput.reset();
-        }
-
-        if (this.pushCopImageyInput) {
-            this.pushCopImageyInput.reset();
-        }
-        if (this.tagCopyChartInput) {
-            this.tagCopyChartInput.reset();
-        }
-
-        if (this.pushCopyChartInput) {
-            this.pushCopyChartInput.reset();
-        }
-
-        if (this.pushCopCnabyInput) {
-            this.pushCopCnabyInput.reset();
-        }
-
+    // Opens the dialog on the given section, or on the first one.
+    open(id?: string): void {
+        const section =
+            this.sections.find(s => s.id === id) || this.sections[0];
+        this.activeId = section?.id;
         if (this.copyAlert) {
             this.copyAlert.close();
         }
+        this.opened = true;
     }
 
     onCpError($event: any): void {

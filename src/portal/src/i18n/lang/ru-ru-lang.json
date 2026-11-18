@@ -1284,6 +1284,7 @@
         "HELM": "Helm",
         "CNAB": "CNAB",
         "TAG_COMMAND_CHART": "Упаковать чарт для этого проекта:",
+        "DIALOG_TITLE": "Push to {{project}}",
         "PUSH_COMMAND_CHART": "Отправить чарт в этот проект:",
         "PUSH_COMMAND_CNAB": "Отправить CNAB в этот проект:",
         "TOOLTIP": "Ссылки на команды для отправки артефакта в этот проект.",
