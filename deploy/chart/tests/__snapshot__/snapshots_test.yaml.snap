@@ -135,6 +135,13 @@
                     name: harbor-core
                     port:
                       number: 80
+                path: /pkg/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-core
+                    port:
+                      number: 80
                 path: /service/
                 pathType: Prefix
               - backend:
@@ -654,6 +661,13 @@
                     name: harbor-core
                     port:
                       number: 80
+                path: /pkg/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-core
+                    port:
+                      number: 80
                 path: /service/
                 pathType: Prefix
               - backend:
@@ -1167,6 +1181,13 @@
                     port:
                       number: 80
                 path: /api/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-core
+                    port:
+                      number: 80
+                path: /pkg/
                 pathType: Prefix
               - backend:
                   service:
@@ -1693,6 +1714,13 @@
                     name: harbor-core
                     port:
                       number: 80
+                path: /pkg/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-core
+                    port:
+                      number: 80
                 path: /service/
                 pathType: Prefix
               - backend:
@@ -2211,6 +2239,13 @@
                     port:
                       number: 80
                 path: /api/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-core
+                    port:
+                      number: 80
+                path: /pkg/
                 pathType: Prefix
               - backend:
                   service:
@@ -2789,6 +2824,13 @@
                     name: harbor-core
                     port:
                       number: 80
+                path: /pkg/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-core
+                    port:
+                      number: 80
                 path: /service/
                 pathType: Prefix
               - backend:
@@ -2834,6 +2876,13 @@
                     name: harbor-core
                     port:
                       number: 80
+                path: /pkg/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-core
+                    port:
+                      number: 80
                 path: /service/
                 pathType: Prefix
               - backend:
@@ -2873,6 +2922,13 @@
                     port:
                       number: 80
                 path: /api/
+                pathType: Prefix
+              - backend:
+                  service:
+                    name: harbor-core
+                    port:
+                      number: 80
+                path: /pkg/
                 pathType: Prefix
               - backend:
                   service:
