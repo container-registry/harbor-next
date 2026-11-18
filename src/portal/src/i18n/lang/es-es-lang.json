@@ -1163,6 +1163,7 @@
         "HELM": "Helm",
         "CNAB": "CNAB",
         "TAG_COMMAND_CHART": "Empaquetar un chart para este proyecto:",
+        "DIALOG_TITLE": "Push to {{project}}",
         "PUSH_COMMAND_CHART": "Push a un chart para este proyecto:",
         "PUSH_COMMAND_CNAB": "Push a CNAB para este proyecto:",
         "TOOLTIP": "Referencias de comandos para enviar un artefacto a este proyecto.",

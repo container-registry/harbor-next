@@ -13,15 +13,79 @@
 // limitations under the License.
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { PushImageButtonComponent } from './push-image.component';
+import {
+    containerPushSections,
+    PUSH_SECTION_SOURCES,
+    PushSection,
+} from './push-sections';
+import { AppConfigService } from '../../../services/app-config.service';
 import { CopyInputComponent } from './copy-input.component';
 import { InlineAlertComponent } from '../inline-alert/inline-alert.component';
 import { ErrorHandler } from '../../units/error-handler';
 import { SharedTestingModule } from '../../shared.module';
-import { Component } from '@angular/core';
+import { Component, ViewChild } from '@angular/core';
+
+describe('containerPushSections', () => {
+    it('keeps the commands the push menu always showed', () => {
+        const sections = containerPushSections('c8n.io', 'bupd');
+        expect(sections.map(s => s.id)).toEqual([
+            'docker',
+            'podman',
+            'helm',
+            'cnab',
+        ]);
+        expect(sections.map(s => s.steps.map(step => step.command))).toEqual([
+            [
+                'docker tag SOURCE_IMAGE[:TAG] c8n.io/bupd/REPOSITORY[:TAG]',
+                'docker push c8n.io/bupd/REPOSITORY[:TAG]',
+            ],
+            ['podman push IMAGE_ID c8n.io/bupd/REPOSITORY[:TAG]'],
+            [
+                'helm package CHART_PATH',
+                'helm push CHART_PACKAGE oci://c8n.io/bupd',
+            ],
+            [
+                'cnab-to-oci push CNAB_PATH --target c8n.io/bupd/REPOSITORY[:TAG] --auto-update-bundle',
+            ],
+        ]);
+    });
+});
 
 describe('PushImageButtonComponent (inline template)', () => {
     let component: TestHostComponent;
     let fixture: ComponentFixture<TestHostComponent>;
+
+    async function settle(): Promise<void> {
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+    }
+
+    function commands(): string[] {
+        return Array.from(
+            fixture.nativeElement.querySelectorAll(
+                '.command-input'
+            ) as NodeListOf<HTMLInputElement>
+        ).map(input => input.value.trim());
+    }
+
+    const enabledFeatures: string[] = [];
+    const extra = (id: string, more: Partial<PushSection>): PushSection => ({
+        id,
+        titleKey: id,
+        steps: [{ labelKey: 'step', command: `${id} publish` }],
+        ...more,
+    });
+    const extraSource = () => [
+        extra('gated', { feature: 'gated_feature' }),
+        extra('labelled', { badgeKey: 'BADGE', hintKey: 'HINT' }),
+    ];
+
+    function tabs(): HTMLButtonElement[] {
+        return Array.from(
+            fixture.nativeElement.querySelectorAll('button[clrTabLink]')
+        );
+    }
 
     beforeEach(async () => {
         await TestBed.configureTestingModule({
@@ -32,8 +96,25 @@ describe('PushImageButtonComponent (inline template)', () => {
                 PushImageButtonComponent,
                 TestHostComponent,
             ],
-            providers: [ErrorHandler],
+            providers: [
+                ErrorHandler,
+                {
+                    provide: AppConfigService,
+                    useValue: {
+                        featureEnabled: (key: string) =>
+                            enabledFeatures.includes(key),
+                    },
+                },
+            ],
         }).compileComponents();
+    });
+
+    afterEach(() => {
+        enabledFeatures.length = 0;
+        const at = PUSH_SECTION_SOURCES.indexOf(extraSource);
+        if (at >= 0) {
+            PUSH_SECTION_SOURCES.splice(at, 1);
+        }
     });
 
     beforeEach(() => {
@@ -46,23 +127,88 @@ describe('PushImageButtonComponent (inline template)', () => {
         expect(component).toBeTruthy();
     });
 
-    it('should open the drop-down panel', async () => {
-        fixture.detectChanges();
-        await fixture.whenStable();
-        let el: HTMLElement = fixture.nativeElement.querySelector('button');
+    it('should stay closed until the button is clicked', async () => {
+        await settle();
+        expect(tabs().length).toEqual(0);
+        expect(commands().length).toEqual(0);
+    });
+
+    it('should open the dialog on the Docker tab', async () => {
+        await settle();
+        const el: HTMLElement = fixture.nativeElement.querySelector('button');
         expect(el).not.toBeNull();
         el.click();
-        fixture.detectChanges();
-        await fixture.whenStable();
-        let copyInputs: HTMLInputElement[] =
-            fixture.nativeElement.querySelectorAll('.command-input');
-        expect(copyInputs.length).toEqual(6);
-        expect(copyInputs[0].value.trim()).toEqual(
-            `docker tag SOURCE_IMAGE[:TAG] https://testing.harbor.com/testing/REPOSITORY[:TAG]`
+        await settle();
+        expect(tabs().map(tab => tab.textContent.trim())).toEqual([
+            'PUSH_IMAGE.DOCKER',
+            'PUSH_IMAGE.PODMAN',
+            'PUSH_IMAGE.HELM',
+            'PUSH_IMAGE.CNAB',
+        ]);
+        expect(commands()).toEqual([
+            `docker tag SOURCE_IMAGE[:TAG] https://testing.harbor.com/testing/REPOSITORY[:TAG]`,
+            `docker push https://testing.harbor.com/testing/REPOSITORY[:TAG]`,
+        ]);
+    });
+
+    it('should open on the requested tab', async () => {
+        await settle();
+        component.pushButton.open('helm');
+        await settle();
+        expect(commands()).toEqual([
+            'helm package CHART_PATH',
+            'helm push CHART_PACKAGE oci://https://testing.harbor.com/testing',
+        ]);
+    });
+
+    it('should switch commands with the tab', async () => {
+        await settle();
+        component.pushButton.open();
+        await settle();
+        tabs()[1].click();
+        await settle();
+        expect(commands()).toEqual([
+            'podman push IMAGE_ID https://testing.harbor.com/testing/REPOSITORY[:TAG]',
+        ]);
+    });
+
+    it('should fall back to the first tab for an unknown section', async () => {
+        await settle();
+        component.pushButton.open('homebrew');
+        await settle();
+        expect(commands()[0]).toContain('docker tag');
+    });
+
+    it('should render whatever the section list holds', async () => {
+        PUSH_SECTION_SOURCES.unshift(extraSource);
+        enabledFeatures.push('gated_feature');
+        fixture = TestBed.createComponent(TestHostComponent);
+        component = fixture.componentInstance;
+        await settle();
+        component.pushButton.open();
+        await settle();
+        expect(tabs().length).toEqual(6);
+        expect(commands()).toEqual(['gated publish']);
+        expect(tabs()[1].querySelector('.label').textContent.trim()).toEqual(
+            'BADGE'
         );
-        expect(copyInputs[1].value.trim()).toEqual(
-            `docker push https://testing.harbor.com/testing/REPOSITORY[:TAG]`
-        );
+        expect(tabs()[0].querySelector('.label')).toBeNull();
+        tabs()[1].click();
+        await settle();
+        expect(
+            fixture.nativeElement.querySelector('.alert-text').textContent
+        ).toContain('HINT');
+    });
+
+    it('should leave out sections whose feature is off', async () => {
+        PUSH_SECTION_SOURCES.unshift(extraSource);
+        fixture = TestBed.createComponent(TestHostComponent);
+        component = fixture.componentInstance;
+        await settle();
+        component.pushButton.open();
+        await settle();
+        expect(tabs().length).toEqual(5);
+        expect(commands()).toEqual(['labelled publish']);
     });
 });
 
@@ -73,4 +219,6 @@ describe('PushImageButtonComponent (inline template)', () => {
         [registryUrl]="'https://testing.harbor.com'">
     </hbr-push-image-button>`,
 })
-class TestHostComponent {}
+class TestHostComponent {
+    @ViewChild(PushImageButtonComponent) pushButton: PushImageButtonComponent;
+}
