@@ -309,6 +309,18 @@ export class ProjectPolicyConfigComponent implements OnInit {
             );
     }
 
+    // project members read the project's own endpoint from its summary
+    getProjectRegistry() {
+        this.projectService.getProjectSummary(this.projectId).subscribe(
+            summary => {
+                if (summary?.registry) {
+                    this.registries = [summary.registry];
+                }
+            },
+            error => this.errorHandler.error(error)
+        );
+    }
+
     getSystemAllowlist() {
         this.systemInfoService.getSystemAllowlist().subscribe(
             systemAllowlist => {
@@ -342,7 +354,11 @@ export class ProjectPolicyConfigComponent implements OnInit {
                 this.hasChangeConfigRole = permissins as boolean;
                 this.allowUpdateProxyCacheConfiguration =
                     this.hasChangeConfigRole;
-                if (this.allowUpdateProxyCacheConfiguration) {
+                // listing registries is a system permission
+                if (
+                    this.allowUpdateProxyCacheConfiguration &&
+                    this.isSystemAdmin
+                ) {
                     this.getRegistries();
                 }
             });
@@ -358,6 +374,9 @@ export class ProjectPolicyConfigComponent implements OnInit {
             response => {
                 this.orgProjectPolicy.initByProject(response);
                 this.projectPolicy.initByProject(response);
+                if (response.registry_id && !this.isSystemAdmin) {
+                    this.getProjectRegistry();
+                }
                 // get projectAllowlist
                 if (!response.cve_allowlist) {
                     response.cve_allowlist = {
