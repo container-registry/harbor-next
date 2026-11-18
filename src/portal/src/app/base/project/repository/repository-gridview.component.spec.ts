@@ -161,14 +161,21 @@ describe('RepositoryComponentGridview (inline template)', () => {
         }).compileComponents();
     });
 
-    beforeEach(async () => {
+    function createComponent(cardView: boolean = false): void {
         fixtureRepo = TestBed.createComponent(RepositoryGridviewComponent);
         compRepo = fixtureRepo.componentInstance;
         compRepo.projectId = 1;
         compRepo.mode = '';
         compRepo.hasProjectAdminRole = true;
-        compRepo.isCardView = false;
+        compRepo.isCardView = cardView;
         fixtureRepo.detectChanges();
+    }
+
+    beforeEach(async () => {
+        createComponent();
+    });
+    afterEach(() => {
+        mockRepo = mockRepoData;
     });
     let originalTimeout;
     beforeEach(function () {
@@ -230,5 +237,104 @@ describe('RepositoryComponentGridview (inline template)', () => {
         const listView =
             fixtureRepo.nativeElement.querySelector('clr-datagrid');
         expect(listView).toBeTruthy();
+    });
+
+    describe('empty project push guide', () => {
+        async function createEmpty(cardView: boolean = false): Promise<void> {
+            fixtureRepo.destroy();
+            mockRepo = [];
+            createComponent(cardView);
+            await settle();
+        }
+
+        async function settle(): Promise<void> {
+            fixtureRepo.detectChanges();
+            await fixtureRepo.whenStable();
+            fixtureRepo.detectChanges();
+        }
+
+        function guide(): HTMLElement {
+            return fixtureRepo.nativeElement.querySelector('.push-guide');
+        }
+
+        function formats(): string[] {
+            return Array.from(
+                guide().querySelectorAll('.btn') as NodeListOf<HTMLElement>
+            ).map(button => button.textContent.trim());
+        }
+
+        it('offers the container clients in the datagrid', async () => {
+            await createEmpty();
+            expect(guide().closest('clr-dg-placeholder')).toBeTruthy();
+            expect(guide().textContent).toContain('REPOSITORY.EMPTY_TITLE');
+            expect(formats()).toEqual([
+                'PUSH_IMAGE.DOCKER',
+                'PUSH_IMAGE.PODMAN',
+                'PUSH_IMAGE.HELM',
+                'PUSH_IMAGE.CNAB',
+            ]);
+            expect(guide().textContent).toContain(
+                'REPOSITORY.EMPTY_CONTAINERS'
+            );
+        });
+
+        it('opens the push dialog on the picked format', async () => {
+            await createEmpty();
+            const helm = Array.from(
+                guide().querySelectorAll('.btn') as NodeListOf<HTMLElement>
+            )[2];
+            helm.click();
+            await settle();
+            expect(compRepo.pushButton.opened).toBeTrue();
+            expect(compRepo.pushButton.activeId).toEqual('helm');
+        });
+
+        it('shows the guide in card view', async () => {
+            await createEmpty(true);
+            expect(guide().closest('hbr-gridview')).toBeTruthy();
+            expect(formats().length).toEqual(4);
+            expect(
+                fixtureRepo.nativeElement.querySelector('.content-empty')
+                    .textContent
+            ).not.toContain('REPOSITORY.NO_ITEMS');
+        });
+
+        it('keeps the plain text when a filter matches nothing', async () => {
+            await createEmpty();
+            compRepo.lastFilteredRepoName = 'nothing';
+            await settle();
+            expect(guide()).toBeNull();
+            expect(
+                fixtureRepo.nativeElement.querySelector('clr-dg-placeholder')
+                    .textContent
+            ).toContain('REPOSITORY.PLACEHOLDER');
+        });
+
+        it('keeps the plain text on a proxy cache project', async () => {
+            await createEmpty();
+            compRepo.isProxyCacheProject = true;
+            await settle();
+            expect(guide()).toBeNull();
+        });
+
+        it('keeps the plain text without push permission', async () => {
+            await createEmpty(true);
+            compRepo.hasCreateRepositoryPermission = false;
+            await settle();
+            expect(guide()).toBeNull();
+            expect(
+                fixtureRepo.nativeElement.querySelector('.content-empty')
+                    .textContent
+            ).toContain('REPOSITORY.NO_ITEMS');
+        });
+
+        it('does not show the guide once the project has repositories', async () => {
+            compRepo.projectName = 'library';
+            await settle();
+            expect(
+                fixtureRepo.nativeElement.querySelectorAll('clr-dg-row').length
+            ).toEqual(mockRepoData.length);
+            expect(guide()).toBeNull();
+        });
     });
 });

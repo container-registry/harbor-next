@@ -20,6 +20,8 @@ export interface PushStep {
 export interface PushSection {
     id: string;
     titleKey: string;
+    // i18n key of the heading the section is listed under outside the dialog.
+    groupKey: string;
     steps: PushStep[];
     // i18n key of a label shown next to the tab title.
     badgeKey?: string;
@@ -29,10 +31,18 @@ export interface PushSection {
     feature?: string;
 }
 
+// Sections that share a heading, in list order.
+export interface PushSectionGroup {
+    titleKey: string;
+    sections: PushSection[];
+}
+
 export type PushSectionSource = (
     registryUrl: string,
     project: string
 ) => PushSection[];
+
+const CONTAINER_GROUP = 'REPOSITORY.EMPTY_CONTAINERS';
 
 // Push commands for the OCI clients, one section per client.
 export function containerPushSections(
@@ -44,6 +54,7 @@ export function containerPushSections(
         {
             id: 'docker',
             titleKey: 'PUSH_IMAGE.DOCKER',
+            groupKey: CONTAINER_GROUP,
             steps: [
                 {
                     labelKey: 'PUSH_IMAGE.TAG_COMMAND',
@@ -58,6 +69,7 @@ export function containerPushSections(
         {
             id: 'podman',
             titleKey: 'PUSH_IMAGE.PODMAN',
+            groupKey: CONTAINER_GROUP,
             steps: [
                 {
                     labelKey: 'PUSH_IMAGE.PUSH_COMMAND',
@@ -68,6 +80,7 @@ export function containerPushSections(
         {
             id: 'helm',
             titleKey: 'PUSH_IMAGE.HELM',
+            groupKey: CONTAINER_GROUP,
             steps: [
                 {
                     labelKey: 'PUSH_IMAGE.TAG_COMMAND_CHART',
@@ -82,6 +95,7 @@ export function containerPushSections(
         {
             id: 'cnab',
             titleKey: 'PUSH_IMAGE.CNAB',
+            groupKey: CONTAINER_GROUP,
             steps: [
                 {
                     labelKey: 'PUSH_IMAGE.PUSH_COMMAND_CNAB',
@@ -107,4 +121,18 @@ export function pushSections(
         (all, source) => all.concat(source(registryUrl, project)),
         []
     ).filter(section => !section.feature || featureEnabled(section.feature));
+}
+
+// Groups sections by heading; groups keep the order they first appear in.
+export function groupPushSections(sections: PushSection[]): PushSectionGroup[] {
+    const groups: PushSectionGroup[] = [];
+    for (const section of sections) {
+        let group = groups.find(g => g.titleKey === section.groupKey);
+        if (!group) {
+            group = { titleKey: section.groupKey, sections: [] };
+            groups.push(group);
+        }
+        group.sections.push(section);
+    }
+    return groups;
 }

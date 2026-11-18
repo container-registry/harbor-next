@@ -57,6 +57,13 @@ import {
     setPageSizeToLocalStorage,
 } from '../../../shared/units/utils';
 import { ErrorHandler } from '../../../shared/units/error-handler';
+import { PushImageButtonComponent } from '../../../shared/components/push-image/push-image.component';
+import {
+    groupPushSections,
+    PushSectionGroup,
+    pushSections,
+} from '../../../shared/components/push-image/push-sections';
+import { AppConfigService } from '../../../services/app-config.service';
 import {
     CARD_VIEW_LOCALSTORAGE_KEY,
     ConfirmationButtons,
@@ -144,6 +151,8 @@ export class RepositoryGridviewComponent
     filterComponent: FilterComponent;
     searchSub: Subscription;
     isProxyCacheProject: boolean = false;
+    @ViewChild(PushImageButtonComponent) pushButton: PushImageButtonComponent;
+    pushGuideGroups: PushSectionGroup[] = [];
     filterBookmark: BookmarkTarget;
     private queryParamSub: Subscription;
     // Only the latest list request may fill the grid.
@@ -163,7 +172,8 @@ export class RepositoryGridviewComponent
         private session: SessionService,
         private router: Router,
         private event: EventService,
-        private cd: ChangeDetectorRef
+        private cd: ChangeDetectorRef,
+        private appConfigService: AppConfigService
     ) {
         if (localStorage) {
             this.isCardView =
@@ -216,6 +226,7 @@ export class RepositoryGridviewComponent
                 this.isProxyCacheProject = true;
             }
         }
+        this.pushGuideGroups = this.buildPushGuideGroups();
         this.hasSignedIn = this.session.getCurrentUser() !== null;
         // Get system info for tag views
         this.getSystemInfo();
@@ -658,6 +669,28 @@ export class RepositoryGridviewComponent
         } else {
             return this.listHover;
         }
+    }
+
+    // The guide replaces the empty text only where a first push makes sense.
+    get showPushGuide(): boolean {
+        return (
+            !!this.hasCreateRepositoryPermission &&
+            !this.isProxyCacheProject &&
+            !this.lastFilteredRepoName
+        );
+    }
+
+    // Same sections and order as the push dialog; only ids and titles are used.
+    private buildPushGuideGroups(): PushSectionGroup[] {
+        return groupPushSections(
+            pushSections('', this.projectName, key =>
+                this.appConfigService.featureEnabled(key)
+            )
+        );
+    }
+
+    openPushDialog(id: string): void {
+        this.pushButton?.open(id);
     }
 
     getHelmChartVersionPermission(projectId: number): void {

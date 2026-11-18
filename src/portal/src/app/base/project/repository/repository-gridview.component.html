@@ -102,9 +102,15 @@
                 <clr-dg-column [clrDgSortBy]="'update_time'">{{
                     'REPOSITORY.LAST_MODIFIED' | translate
                 }}</clr-dg-column>
-                <clr-dg-placeholder>{{
-                    'REPOSITORY.PLACEHOLDER' | translate
-                }}</clr-dg-placeholder>
+                <clr-dg-placeholder>
+                    <ng-container *ngIf="showPushGuide; else noRepositories">
+                        <ng-container
+                            [ngTemplateOutlet]="pushGuide"></ng-container>
+                    </ng-container>
+                    <ng-template #noRepositories>{{
+                        'REPOSITORY.PLACEHOLDER' | translate
+                    }}</ng-template>
+                </clr-dg-placeholder>
                 <clr-dg-row *ngFor="let r of repositories" [clrDgItem]="r">
                     <clr-dg-cell>
                         <a
@@ -158,6 +164,7 @@
         [totalCount]="totalCount"
         [expectScrollPercent]="90"
         [withAdmiral]="withAdmiral"
+        [emptyTmpl]="showPushGuide ? pushGuide : null"
         (loadNextPageEvent)="loadNextPage()">
         <ng-template let-item="item">
             <a
@@ -256,6 +263,30 @@
     <div *ngIf="isFirstLoadingGridView && isCardView" class="first-loading">
         <div class="spinner"></div>
     </div>
+
+    <ng-template #pushGuide>
+        <div class="push-guide">
+            <h4 class="mt-0">
+                {{
+                    'REPOSITORY.EMPTY_TITLE'
+                        | translate : { project: projectName }
+                }}
+            </h4>
+            <p class="mt-0">{{ 'REPOSITORY.EMPTY_HINT' | translate }}</p>
+            <ng-container *ngFor="let group of pushGuideGroups">
+                <p>{{ group.titleKey | translate }}</p>
+                <div class="btn-group btn-outline btn-sm">
+                    <button
+                        type="button"
+                        class="btn"
+                        *ngFor="let section of group.sections"
+                        (click)="openPushDialog(section.id)">
+                        {{ section.titleKey | translate }}
+                    </button>
+                </div>
+            </ng-container>
+        </div>
+    </ng-template>
 
     <confirmation-dialog
         #confirmationDialog

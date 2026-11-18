@@ -15,6 +15,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { PushImageButtonComponent } from './push-image.component';
 import {
     containerPushSections,
+    groupPushSections,
     PUSH_SECTION_SOURCES,
     PushSection,
 } from './push-sections';
@@ -51,6 +52,27 @@ describe('containerPushSections', () => {
     });
 });
 
+describe('groupPushSections', () => {
+    it('keeps sections under their heading in list order', () => {
+        const section = (id: string, groupKey: string): PushSection => ({
+            id,
+            titleKey: id,
+            groupKey,
+            steps: [],
+        });
+        const groups = groupPushSections([
+            section('a', 'first'),
+            section('b', 'second'),
+            section('c', 'first'),
+        ]);
+        expect(groups.map(g => g.titleKey)).toEqual(['first', 'second']);
+        expect(groups.map(g => g.sections.map(s => s.id))).toEqual([
+            ['a', 'c'],
+            ['b'],
+        ]);
+    });
+});
+
 describe('PushImageButtonComponent (inline template)', () => {
     let component: TestHostComponent;
     let fixture: ComponentFixture<TestHostComponent>;
@@ -73,6 +95,7 @@ describe('PushImageButtonComponent (inline template)', () => {
     const extra = (id: string, more: Partial<PushSection>): PushSection => ({
         id,
         titleKey: id,
+        groupKey: 'extra',
         steps: [{ labelKey: 'step', command: `${id} publish` }],
         ...more,
     });
