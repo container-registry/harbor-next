@@ -153,6 +153,8 @@ export class RepositoryGridviewComponent
     isProxyCacheProject: boolean = false;
     @ViewChild(PushImageButtonComponent) pushButton: PushImageButtonComponent;
     pushGuideGroups: PushSectionGroup[] = [];
+    // Set once the server has answered a list request.
+    private listLoaded = false;
     filterBookmark: BookmarkTarget;
     private queryParamSub: Subscription;
     // Only the latest list request may fill the grid.
@@ -288,6 +290,7 @@ export class RepositoryGridviewComponent
                 .subscribe(
                     (repo: __StrictHttpResponse<Array<NewRepository>>) => {
                         this.totalCount = +repo.headers.get('x-total-count');
+                        this.listLoaded = true;
                         this.repositories = repo.body;
                     },
                     error => {
@@ -516,6 +519,7 @@ export class RepositoryGridviewComponent
             .subscribe(
                 (repo: __StrictHttpResponse<Array<NewRepository>>) => {
                     this.totalCount = +repo.headers.get('x-total-count');
+                    this.listLoaded = true;
                     this.repositoriesCopy = repo.body;
                     this.repositories = this.repositories.concat(
                         this.repositoriesCopy
@@ -587,6 +591,7 @@ export class RepositoryGridviewComponent
             .subscribe(
                 (repo: __StrictHttpResponse<Array<NewRepository>>) => {
                     this.totalCount = +repo.headers.get('x-total-count');
+                    this.listLoaded = true;
                     this.repositories = repo.body;
                     // Do customising filtering and sorting
                     this.repositories = doFiltering<NewRepository>(
@@ -671,12 +676,15 @@ export class RepositoryGridviewComponent
         }
     }
 
-    // The guide replaces the empty text only where a first push makes sense.
+    // The guide shows only for a project the server reported as empty, unfiltered.
     get showPushGuide(): boolean {
         return (
             !!this.hasCreateRepositoryPermission &&
             !this.isProxyCacheProject &&
-            !this.lastFilteredRepoName
+            this.listLoaded &&
+            this.totalCount === 0 &&
+            !this.lastFilteredRepoName &&
+            !this.currentState?.filters?.length
         );
     }
 

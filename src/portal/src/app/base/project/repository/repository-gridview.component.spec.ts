@@ -19,7 +19,7 @@ import {
     TestBed,
     tick,
 } from '@angular/core/testing';
-import { BehaviorSubject, of } from 'rxjs';
+import { BehaviorSubject, of, throwError, timer } from 'rxjs';
 import { RepositoryService as NewRepositoryService } from '../../../../../ng-swagger-gen/services/repository.service';
 import { RepositoryGridviewComponent } from './repository-gridview.component';
 import {
@@ -29,7 +29,7 @@ import {
     SystemInfoService,
     UserPermissionService,
 } from '../../../shared/services';
-import { delay } from 'rxjs/operators';
+import { delay, switchMap } from 'rxjs/operators';
 import { ErrorHandler } from '../../../shared/units/error-handler';
 import { ActivatedRoute, convertToParamMap, ParamMap } from '@angular/router';
 import { Repository as NewRepository } from '../../../../../ng-swagger-gen/models/repository';
@@ -97,7 +97,10 @@ describe('RepositoryComponentGridview (inline template)', () => {
             if (params.q === encodeURIComponent(`name=~nginx`)) {
                 return of({ headers: new Map(), body: mockNginxRepo });
             }
-            return of({ headers: new Map(), body: mockRepo }).pipe(delay(0));
+            return of({
+                headers: new Map([['x-total-count', `${mockRepo.length}`]]),
+                body: mockRepo,
+            }).pipe(delay(0));
         },
     };
     const fakedUserPermissionService = {
@@ -302,6 +305,36 @@ describe('RepositoryComponentGridview (inline template)', () => {
         it('keeps the plain text when a filter matches nothing', async () => {
             await createEmpty();
             compRepo.lastFilteredRepoName = 'nothing';
+            await settle();
+            expect(guide()).toBeNull();
+            expect(
+                fixtureRepo.nativeElement.querySelector('clr-dg-placeholder')
+                    .textContent
+            ).toContain('REPOSITORY.PLACEHOLDER');
+        });
+
+        it('keeps the plain text when a column filter matches nothing', async () => {
+            await createEmpty();
+            compRepo.currentState = {
+                page: { from: 0, to: 14, size: 15 },
+                filters: [{ property: 'name', value: 'nothing' }],
+            };
+            await settle();
+            expect(guide()).toBeNull();
+        });
+
+        it('keeps the plain text when the list failed to load', async () => {
+            fixtureRepo.destroy();
+            mockRepo = [];
+            spyOn(
+                fakedRepositoryService,
+                'listRepositoriesResponse'
+            ).and.returnValue(
+                timer(0).pipe(
+                    switchMap(() => throwError(() => new Error('down')))
+                )
+            );
+            createComponent();
             await settle();
             expect(guide()).toBeNull();
             expect(
