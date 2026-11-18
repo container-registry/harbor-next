@@ -202,6 +202,14 @@ describe('PushImageButtonComponent (inline template)', () => {
         expect(commands()[0]).toContain('docker tag');
     });
 
+    it('should offer the sections without bound inputs', () => {
+        const bare = TestBed.createComponent(PushImageButtonComponent);
+        bare.detectChanges();
+        bare.componentInstance.open();
+        expect(bare.componentInstance.sections.length).toEqual(4);
+        expect(bare.componentInstance.activeId).toEqual('docker');
+    });
+
     it('should render whatever the section list holds', async () => {
         PUSH_SECTION_SOURCES.unshift(extraSource);
         enabledFeatures.push('gated_feature');
