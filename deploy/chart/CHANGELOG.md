@@ -1,5 +1,34 @@
 # Changelog
 
+## [2.2.0](https://github.com/container-registry/harbor-next/compare/chart-v2.1.2...chart-v2.2.0) (2026-11-18)
+
+
+### Features
+
+* Add Default Project To System Settings ([#1405](https://github.com/container-registry/harbor-next/issues/1405)) ([a851d11](https://github.com/container-registry/harbor-next/commit/a851d113145cc85c8ee410910312f25f50fef8f1))
+* Add Model Sync As Beta Feature ([#1478](https://github.com/container-registry/harbor-next/issues/1478)) ([32e1f88](https://github.com/container-registry/harbor-next/commit/32e1f88f155f18532b19339fb2c1b068727088a5))
+* **chart:** Add Optional In-Cluster PostgreSQL Subchart ([#1404](https://github.com/container-registry/harbor-next/issues/1404)) ([f5d7d1d](https://github.com/container-registry/harbor-next/commit/f5d7d1d721ff5861c7f756ae264b71ab9b03fea5))
+* **chart:** Add Webhook Egress Policy Levels And Allowlist ([#1185](https://github.com/container-registry/harbor-next/issues/1185)) ([ba299a8](https://github.com/container-registry/harbor-next/commit/ba299a85a625f5cdb6fa17e4ae87f564491dbc34))
+
+
+### Bug Fixes
+
+* **chart:** extraTemplateManifests silently drops every document after the first ([#687](https://github.com/container-registry/harbor-next/issues/687)) ([a20dcfc](https://github.com/container-registry/harbor-next/commit/a20dcfc56809d01b2cce4a4d890857a00ab3c23e))
+* **chart:** include service port in harbor.core.url helper ([#790](https://github.com/container-registry/harbor-next/issues/790)) ([#847](https://github.com/container-registry/harbor-next/issues/847)) ([43221eb](https://github.com/container-registry/harbor-next/commit/43221eb1aa31be10a572826fd3510891dc2d8a9d))
+* **chart:** Rebuild Indexes On PostgreSQL Collation Version Mismatch ([#1413](https://github.com/container-registry/harbor-next/issues/1413)) ([133d1ea](https://github.com/container-registry/harbor-next/commit/133d1eafcc65a10f9a2747ad0e403f65370caafc))
+* **chart:** Stop --reuse-values Upgrades From 2.15 Charts ([#1482](https://github.com/container-registry/harbor-next/issues/1482)) ([9713de5](https://github.com/container-registry/harbor-next/commit/9713de5b8f66c58c2092c921ad5f35d589cb3666))
+* Skip empty component Secrets when identity is fully externalized ([#835](https://github.com/container-registry/harbor-next/issues/835)) ([cdeadab](https://github.com/container-registry/harbor-next/commit/cdeadab735008bfda0dd792eb00fd6b25e2d2a32))
+
+
+### Harbor Releases
+
+* release 2.16.0 ([#268](https://github.com/container-registry/harbor-next/issues/268)) ([2862ead](https://github.com/container-registry/harbor-next/commit/2862ead965368458e1192268828f524262cf8122))
+
+
+### Chart Changes
+
+* Add Argo CD example with pinned-secret Application setup ([#836](https://github.com/container-registry/harbor-next/issues/836)) ([af4898b](https://github.com/container-registry/harbor-next/commit/af4898bd2640af33f0e28b00a8b1b5dc77e783b0))
+
 ## [2.1.1](https://github.com/container-registry/harbor-next/compare/chart-v2.1.0...chart-v2.1.1) (2026-10-27)
 
 
