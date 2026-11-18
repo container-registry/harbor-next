@@ -58,8 +58,7 @@
       "package-name": "harbor",
       "component": "chart",
       "include-component-in-tag": true,
-      "changelog-path": "CHANGELOG.md",
-      "release-as": "2.2.0"
+      "changelog-path": "CHANGELOG.md"
     }
   },
   "last-release-sha": "238dcf6f7a614470cb05f2fe0ef6a1e44b03e463"
