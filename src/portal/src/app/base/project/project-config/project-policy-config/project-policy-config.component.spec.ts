@@ -25,6 +25,8 @@ import { ErrorHandler } from '../../../../shared/units/error-handler';
 import { MessageHandlerService } from '../../../../shared/services/message-handler.service';
 import { SessionService } from '../../../../shared/services/session.service';
 import { Component, ViewChild } from '@angular/core';
+import { HttpHeaders, HttpResponse } from '@angular/common/http';
+import { RegistryService } from 'ng-swagger-gen/services';
 
 const mockSystemInfo: SystemInfo[] = [
     {
@@ -68,6 +70,7 @@ const mockProjectPolicies: Project[] | any[] = [
     },
     {
         project_id: 2,
+        registry_id: 3,
         owner_id: 1,
         name: 'test',
         creation_time: '2017-11-03T02:37:24Z',
@@ -93,9 +96,18 @@ const mockSystemAllowlist: SystemCVEAllowlist = {
     items: [],
     project_id: 0,
 };
+const mockRegistry = {
+    id: 3,
+    name: 'hub',
+    type: 'docker-hub',
+    url: 'https://hub.docker.com',
+};
 const projectService = {
     getProject() {
         return of(mockProjectPolicies[1]);
+    },
+    getProjectSummary(_projectId: number) {
+        return of({ registry: mockRegistry });
     },
 };
 
@@ -114,11 +126,21 @@ const userPermissionService = {
     },
 };
 
+let isSystemAdmin = false;
 const sessionService = {
     getCurrentUser() {
-        return of({
-            has_admin_role: true,
-        });
+        return { has_admin_role: isSystemAdmin };
+    },
+};
+
+const registryService = {
+    listRegistriesResponse() {
+        return of(
+            new HttpResponse({
+                headers: new HttpHeaders({ 'X-Total-Count': '1' }),
+                body: [mockRegistry],
+            })
+        );
     },
 };
 describe('ProjectPolicyConfigComponent', () => {
@@ -137,6 +159,7 @@ describe('ProjectPolicyConfigComponent', () => {
                 { provide: ProjectService, useValue: projectService },
                 { provide: SystemInfoService, useValue: systemInfoService },
                 { provide: SessionService, useValue: sessionService },
+                { provide: RegistryService, useValue: registryService },
                 {
                     provide: UserPermissionService,
                     useValue: userPermissionService,
@@ -145,6 +168,7 @@ describe('ProjectPolicyConfigComponent', () => {
         }).compileComponents();
     });
     beforeEach(() => {
+        isSystemAdmin = false;
         fixture = TestBed.createComponent(TestHostComponent);
         component = fixture.componentInstance;
         fixture.detectChanges();
@@ -208,6 +232,43 @@ describe('ProjectPolicyConfigComponent', () => {
         // modal should be closed
         expect(component.projectPolicyConfigComponent.cveIds).toBeNull();
         expect(component.projectPolicyConfigComponent.showAddModal).toBeFalse();
+    });
+    it('should not list registries for a project admin', () => {
+        const list = spyOn(
+            registryService,
+            'listRegistriesResponse'
+        ).and.callThrough();
+        const summary = spyOn(
+            projectService,
+            'getProjectSummary'
+        ).and.callThrough();
+        fixture = TestBed.createComponent(TestHostComponent);
+        fixture.detectChanges();
+
+        expect(list).not.toHaveBeenCalled();
+        expect(summary).toHaveBeenCalledWith(1);
+        expect(
+            fixture.componentInstance.projectPolicyConfigComponent.registries
+        ).toEqual([mockRegistry]);
+    });
+    it('should list registries for a system admin', () => {
+        isSystemAdmin = true;
+        const list = spyOn(
+            registryService,
+            'listRegistriesResponse'
+        ).and.callThrough();
+        const summary = spyOn(
+            projectService,
+            'getProjectSummary'
+        ).and.callThrough();
+        fixture = TestBed.createComponent(TestHostComponent);
+        fixture.detectChanges();
+
+        expect(list).toHaveBeenCalled();
+        expect(summary).not.toHaveBeenCalled();
+        expect(
+            fixture.componentInstance.projectPolicyConfigComponent.registries
+        ).toEqual([mockRegistry]);
     });
     it('should get hasChangeConfigRole', () => {
         expect(
