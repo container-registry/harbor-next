@@ -2,6 +2,13 @@ name: Release Please
 
 on:
   workflow_dispatch:
+    inputs:
+      recover_tag:
+        # Finishes the post-release jobs of a release whose own run died after tagging.
+        description: Published vX.Y.Z release to finish; blank runs release-please
+        required: false
+        default: ''
+        type: string
   push:
     branches:
       - main
@@ -63,12 +70,12 @@ jobs:
       # opens and updates the release PR
       pull-requests: write
     outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
-      version: ${{ steps.release.outputs.version }}
-      major: ${{ steps.release.outputs.major }}
-      minor: ${{ steps.release.outputs.minor }}
-      patch: ${{ steps.release.outputs.patch }}
+      release_created: ${{ steps.release.outputs.release_created || steps.recover.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name || steps.recover.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version || steps.recover.outputs.version }}
+      major: ${{ steps.release.outputs.major || steps.recover.outputs.major }}
+      minor: ${{ steps.release.outputs.minor || steps.recover.outputs.minor }}
+      patch: ${{ steps.release.outputs.patch || steps.recover.outputs.patch }}
       prs_created: ${{ steps.release.outputs.prs_created }}
       prs: ${{ steps.release.outputs.prs }}
     env:
@@ -76,11 +83,45 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
+        if: ${{ inputs.recover_tag == '' }}
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           target-branch: ${{ github.ref_name }}
           config-file: ${{ github.ref_name == 'main' && 'release-please-config.json' || 'release-please-config-maintenance.json' }}
           manifest-file: .release-please-manifest.json
+
+      - name: Resolve the release to finish
+        id: recover
+        if: ${{ inputs.recover_tag != '' }}
+        env:
+          TAG_NAME: ${{ inputs.recover_tag }}
+        run: |
+          if [[ ! "${TAG_NAME}" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "::error::recover_tag must be a vX.Y.Z release tag, got: ${TAG_NAME}"
+            exit 1
+          fi
+
+          if [ "$(gh release view "${TAG_NAME}" --repo "${GITHUB_REPOSITORY}" --json isDraft --jq .isDraft)" != "false" ]; then
+            echo "::error::${TAG_NAME} has no published release"
+            exit 1
+          fi
+
+          # The tag must be on this branch, or the jobs below would act on the wrong line.
+          tag_sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${TAG_NAME}" --jq .sha)
+          status=$(gh api "repos/${GITHUB_REPOSITORY}/compare/${tag_sha}...${GITHUB_SHA}" --jq .status)
+          if [ "${status}" != "identical" ] && [ "${status}" != "ahead" ]; then
+            echo "::error::${TAG_NAME} (${tag_sha}) is not on ${GITHUB_REF_NAME}"
+            exit 1
+          fi
+
+          {
+            echo "release_created=true"
+            echo "tag_name=${TAG_NAME}"
+            echo "version=${TAG_NAME#v}"
+            echo "major=${BASH_REMATCH[1]}"
+            echo "minor=${BASH_REMATCH[2]}"
+            echo "patch=${BASH_REMATCH[3]}"
+          } >> "${GITHUB_OUTPUT}"
 
       - name: Check out release PR branch
         if: ${{ github.ref_name == 'main' && steps.release.outputs.prs_created == 'true' && steps.release.outputs.release_created != 'true' }}
@@ -115,7 +156,8 @@ jobs:
       - name: Advance main development version
         if: ${{ github.ref_name == 'main' && steps.release.outputs.prs_created == 'true' && steps.release.outputs.release_created != 'true' }}
         env:
-          RELEASE_BRANCH: ${{ fromJSON(steps.release.outputs.prs)[0].headBranchName }}
+          # Step env is evaluated before its if, and prs is empty once a release is created.
+          RELEASE_BRANCH: ${{ fromJSON(steps.release.outputs.prs || '[]')[0].headBranchName }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
