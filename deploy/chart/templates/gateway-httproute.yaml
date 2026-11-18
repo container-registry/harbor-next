@@ -19,7 +19,7 @@ spec:
     {{- toYaml . | nindent 4 }}
   {{- end }}
   {{- /* Harbor's path-routing contract lives here, in-chart, so users can't
-         break it: /api/, /service/, /v2/, /chartrepo/, /c/ must reach core;
+         break it: /api/, /pkg/, /service/, /v2/, /chartrepo/, /c/ must reach core;
          / reaches the portal (or core when the portal is disabled). Users tune
          cross-cutting fields via gateway.timeouts / .filters / .routeOverrides
          / .extraRules — never the routing itself. Group keys are `core` and
@@ -29,7 +29,7 @@ spec:
   {{- $default := printf "%s-%s" (include "harbor.fullname" .) (ternary "portal" "core" .Values.portal.enabled) }}
   {{- $defaultPort := ternary "80" $corePort .Values.portal.enabled }}
   {{- $rules := list
-        (dict "key" "core"    "paths" (list "/api/" "/service/" "/v2/" "/chartrepo/" "/c/") "backend" $core    "port" $corePort)
+        (dict "key" "core"    "paths" (list "/api/" "/pkg/" "/service/" "/v2/" "/chartrepo/" "/c/") "backend" $core    "port" $corePort)
         (dict "key" "default" "paths" (list "/")                                             "backend" $default "port" $defaultPort) }}
   {{- $overrides := .Values.gateway.routeOverrides | default dict }}
   rules:
