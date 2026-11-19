@@ -882,6 +882,74 @@
         }
       }
     },
+    "harbor-scanner-grype": {
+      "type": "object",
+      "description": "harbor-scanner-grype subchart values (subcharts/harbor-scanner-grype/values.yaml)",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "harbor-scanner-snyk": {
+      "type": "object",
+      "description": "harbor-scanner-snyk subchart values (subcharts/harbor-scanner-snyk/values.yaml)",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "scannerRegistration": {
+      "type": "object",
+      "description": "Job that registers scanner adapters through the Harbor scanner API",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "username": { "type": "string", "minLength": 1 },
+        "existingSecret": { "type": "string" },
+        "existingSecretPasswordKey": { "type": "string", "minLength": 1 },
+        "extra": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "url"],
+            "properties": {
+              "name": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]*$" },
+              "url": { "type": "string", "pattern": "^https?://" },
+              "description": { "type": "string" },
+              "default": { "type": "boolean" },
+              "useInternalAddr": { "type": "boolean" },
+              "skipCertVerify": { "type": "boolean" }
+            }
+          }
+        },
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "registry": { "type": "string" },
+            "repository": { "type": "string" },
+            "tag": { "type": "string" },
+            "digest": { "type": "string" }
+          }
+        },
+        "prune": { "type": "boolean", "default": true },
+        "backoffLimit": { "type": "integer", "minimum": 0 },
+        "activeDeadlineSeconds": { "type": "integer", "minimum": 1 },
+        "podAnnotations": { "type": "object", "additionalProperties": { "type": "string" } },
+        "podLabels": { "type": "object", "additionalProperties": { "type": "string" } },
+        "nodeSelector": { "type": "object", "additionalProperties": { "type": "string" } },
+        "tolerations": { "type": "array" },
+        "affinity": { "type": "object" },
+        "podSecurityContext": { "type": "object" },
+        "securityContext": { "type": "object" },
+        "resources": { "type": "object" }
+      }
+    },
     "tls": {
       "type": "object",
       "description": "TLS configuration",

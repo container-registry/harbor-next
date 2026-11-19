@@ -5,5 +5,11 @@ dependencies:
 - name: postgres
   repository: oci://registry-1.docker.io/cloudpirates
   version: 0.21.2
-digest: sha256:658b500a1da7908e16f867fa1d37b3409f2685fb4957b3654bdb712451295672
-generated: "2026-11-06T14:46:28.51679177+05:30"
+- name: harbor-scanner-grype
+  repository: file://subcharts/harbor-scanner-grype
+  version: 0.1.0
+- name: harbor-scanner-snyk
+  repository: file://subcharts/harbor-scanner-snyk
+  version: 0.1.0
+digest: sha256:e6efd6710f11b7eb4c5cbd09208dae9b0f8672a0a44e241dd31cd76c2a42ba2b
+generated: "2026-11-19T07:33:26.746680072+05:30"

@@ -1,0 +1,832 @@
+suite: scanner subcharts and registration
+templates:
+  - templates/scanner-registration.job.yaml
+  - templates/core.configmap.yaml
+  - charts/harbor-scanner-grype/templates/deployment.yaml
+  - charts/harbor-scanner-grype/templates/service.yaml
+  - charts/harbor-scanner-snyk/templates/deployment.yaml
+  - charts/harbor-scanner-snyk/templates/service.yaml
+# Pinned so a release PR restamping Chart.yaml does not invalidate the snapshot.
+chart:
+  version: 9.9.9-test
+  appVersion: v9.9.9-test
+release:
+  name: harbor
+set:
+  externalURL: https://harbor.example.com
+  database.host: postgres.example.com
+  harborAdminPassword: Harbor12345
+tests:
+  # A disabled subchart's templates are not selectable; the full-chart
+  # snapshots pin that the default render carries no scanner resources.
+  - it: should render no registration Job by default
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/scanner-registration.job.yaml
+
+  - it: should deploy Grype pinned by digest behind its Service
+    set:
+      harbor-scanner-grype.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: 8gears.container-registry.com/8gcr/harbor-grype-adapter@sha256:3255d97c62e6e638e6786eae2fc1635059c014c4de57d067b66d16cdeed289dc
+        template: charts/harbor-scanner-grype/templates/deployment.yaml
+      - equal:
+          path: spec.replicas
+          value: 1
+        template: charts/harbor-scanner-grype/templates/deployment.yaml
+      - equal:
+          path: metadata.name
+          value: harbor-harbor-scanner-grype
+        template: charts/harbor-scanner-grype/templates/service.yaml
+
+  - it: should keep selector labels and inherit the global priority class
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-grype.podLabels:
+        app.kubernetes.io/name: hijacked
+        team: security
+      global.priorityClassName: platform-critical
+    asserts:
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/name"]
+          value: harbor-scanner-grype
+        template: charts/harbor-scanner-grype/templates/deployment.yaml
+      - equal:
+          path: spec.template.metadata.labels.team
+          value: security
+        template: charts/harbor-scanner-grype/templates/deployment.yaml
+      - equal:
+          path: spec.template.spec.priorityClassName
+          value: platform-critical
+        template: charts/harbor-scanner-grype/templates/deployment.yaml
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.timeoutSeconds
+          value: 3
+        template: charts/harbor-scanner-grype/templates/deployment.yaml
+
+  - it: should register Grype and remove a disabled Snyk
+    set:
+      harbor-scanner-grype.enabled: true
+    asserts:
+      - isKind:
+          of: Job
+        template: templates/scanner-registration.job.yaml
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: post-install,post-upgrade,post-rollback
+        template: templates/scanner-registration.job.yaml
+      - equal:
+          path: spec.activeDeadlineSeconds
+          value: 270
+        template: templates/scanner-registration.job.yaml
+      - equal:
+          path: spec.template.spec.containers[0].env[0].value
+          value: http://harbor-core:80/api/v2.0
+        template: templates/scanner-registration.job.yaml
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: register 'Grype' '\{"description":"Grype scanner adapter","name":"Grype","skip_certVerify":false,"url":"http://harbor-harbor-scanner-grype:8080","use_internal_addr":true\}' false 'http://harbor-harbor-scanner-grype:8080' true '\{"name":"Grype","url":"http://harbor-harbor-scanner-grype:8080"\}' '"description":"Grype scanner adapter"' '"name":"Grype"' '"skip_certVerify":false' '"url":"http://harbor-harbor-scanner-grype:8080"' '"use_internal_addr":true'\n
+        template: templates/scanner-registration.job.yaml
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: unregister 'Snyk' 'http://harbor-harbor-scanner-snyk:8080'
+        template: templates/scanner-registration.job.yaml
+
+  - it: should mark the scanner as default when asked
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-grype.registration.default: true
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: register 'Grype' '.*' true
+        template: templates/scanner-registration.job.yaml
+
+  - it: should follow the subchart Service name and port
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-grype.fullnameOverride: my-grype
+      harbor-scanner-grype.service.port: 9090
+    asserts:
+      - equal:
+          path: metadata.name
+          value: my-grype
+        template: charts/harbor-scanner-grype/templates/service.yaml
+      - equal:
+          path: spec.ports[0].port
+          value: 9090
+        template: charts/harbor-scanner-grype/templates/service.yaml
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: '"url":"http://my-grype:9090"'
+        template: templates/scanner-registration.job.yaml
+
+  - it: should deploy Snyk with the token from the existing Secret
+    set:
+      harbor-scanner-snyk.enabled: true
+      harbor-scanner-snyk.snyk.existingSecret: snyk-token
+      harbor-scanner-snyk.snyk.org: acme
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SNYK_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: snyk-token
+                key: SNYK_TOKEN
+        template: charts/harbor-scanner-snyk/templates/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SNYK_ORG
+            value: acme
+        template: charts/harbor-scanner-snyk/templates/deployment.yaml
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: register 'Snyk' '.*"url":"http://harbor-harbor-scanner-snyk:8080".*' false
+        template: templates/scanner-registration.job.yaml
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: unregister 'Grype' 'http://harbor-harbor-scanner-grype:8080'
+        template: templates/scanner-registration.job.yaml
+
+  - it: should fail when Snyk is enabled without a token Secret
+    set:
+      harbor-scanner-snyk.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: harbor-scanner-snyk.snyk.existingSecret is required
+        template: charts/harbor-scanner-snyk/templates/deployment.yaml
+
+  - it: should register an adapter deployed outside the chart
+    set:
+      scannerRegistration.extra:
+        - name: Clair
+          url: https://clair.example.com:8443
+          default: true
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: register 'Clair' '\{"description":"","name":"Clair","skip_certVerify":false,"url":"https://clair.example.com:8443","use_internal_addr":false\}' true
+        template: templates/scanner-registration.job.yaml
+
+  - it: should store the adapter URL the way Harbor normalizes it
+    set:
+      scannerRegistration.extra:
+        - name: Clair
+          url: https://Clair.Example.com:8443/adapter///
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: register 'Clair' '.*"url":"https://clair.example.com:8443/adapter".*' false 'https://clair.example.com:8443/adapter' false 
+        template: templates/scanner-registration.job.yaml
+
+  - it: should fail on an adapter URL with credentials or a query
+    set:
+      scannerRegistration.extra:
+        - name: Clair
+          url: https://user:pass@clair.example.com/adapter?token=secret
+    asserts:
+      - failedTemplate:
+          errorPattern: 'unsupported adapter URL "https://\*\*\*@clair.example.com/adapter\?\*\*\*"'
+        template: templates/scanner-registration.job.yaml
+
+  - it: should accept an IPv6 adapter address
+    set:
+      scannerRegistration.extra:
+        - name: Clair
+          url: http://[fd00::1]:8080
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: '"url":"http://\[fd00::1\]:8080"'
+        template: templates/scanner-registration.job.yaml
+
+  - it: should keep scanner names apart under a long release name
+    release:
+      name: a-release-name-that-is-exactly-fifty-characters-xx
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-snyk.enabled: true
+      harbor-scanner-snyk.snyk.existingSecret: snyk-token
+    asserts:
+      - equal:
+          path: metadata.name
+          value: a-release-name-that-is-exactly-fi-he8302d8-harbor-scanner-grype
+        template: charts/harbor-scanner-grype/templates/service.yaml
+      - equal:
+          path: metadata.name
+          value: a-release-name-that-is-exactly-fif-he8302d8-harbor-scanner-snyk
+        template: charts/harbor-scanner-snyk/templates/service.yaml
+      - equal:
+          path: metadata.name
+          value: a-release-name-that-is-exactly-fi-e8302d82-scanner-registration
+        template: templates/scanner-registration.job.yaml
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: '"url":"http://a-release-name-that-is-exactly-fi-he8302d8-harbor-scanner-grype:8080"'
+        template: templates/scanner-registration.job.yaml
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: '"url":"http://a-release-name-that-is-exactly-fif-he8302d8-harbor-scanner-snyk:8080"'
+        template: templates/scanner-registration.job.yaml
+
+  - it: should skip the Job when registration is switched off
+    set:
+      harbor-scanner-grype.enabled: true
+      scannerRegistration.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/scanner-registration.job.yaml
+      - hasDocuments:
+          count: 1
+        template: charts/harbor-scanner-grype/templates/deployment.yaml
+
+  - it: should leave a scanner unregistered when its registration is off
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-grype.registration.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/scanner-registration.job.yaml
+
+  - it: should not touch an unmanaged registration while another scanner keeps the Job
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-grype.registration.enabled: false
+      harbor-scanner-snyk.enabled: true
+      harbor-scanner-snyk.snyk.existingSecret: snyk-token
+      proxy.httpProxy: http://proxy.example.com:3128
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: register 'Snyk'
+        template: templates/scanner-registration.job.yaml
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: register 'Grype'
+        template: templates/scanner-registration.job.yaml
+      - matchRegex:
+          path: data.NO_PROXY
+          pattern: harbor-exporter,harbor-harbor-scanner-grype,harbor-harbor-scanner-grype.NAMESPACE,harbor-harbor-scanner-grype.NAMESPACE.svc,harbor-harbor-scanner-snyk,
+        template: templates/core.configmap.yaml
+
+  - it: should keep a disabled scanner registered when pruning is off
+    set:
+      harbor-scanner-grype.enabled: true
+      scannerRegistration.prune: false
+    asserts:
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: unregister 'Snyk'
+        template: templates/scanner-registration.job.yaml
+
+  - it: should not remove the registration of a disabled scanner with its own URL
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-snyk.registration.url: https://snyk.example.com
+    asserts:
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: unregister 'Snyk'
+        template: templates/scanner-registration.job.yaml
+
+  - it: should not validate a scanner the Job leaves alone
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-grype.registration.enabled: false
+      harbor-scanner-grype.registration.name: "a'b"
+      harbor-scanner-snyk.enabled: true
+      harbor-scanner-snyk.snyk.existingSecret: snyk-token
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: register 'Snyk'
+        template: templates/scanner-registration.job.yaml
+
+  - it: should fail when a deployed scanner has no registration name
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-grype.registration.name: ""
+    asserts:
+      - failedTemplate:
+          errorPattern: scanner name "" is invalid
+        template: templates/scanner-registration.job.yaml
+
+  - it: should put common labels on the scanner Deployment and Service
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-grype.commonLabels:
+        cost-center: platform
+        tier: 2
+        app.kubernetes.io/name: hijacked
+        app.kubernetes.io/component: hijacked
+    asserts:
+      - equal:
+          path: metadata.labels.cost-center
+          value: platform
+        template: charts/harbor-scanner-grype/templates/deployment.yaml
+      - equal:
+          path: metadata.labels.cost-center
+          value: platform
+        template: charts/harbor-scanner-grype/templates/service.yaml
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: harbor-scanner-grype
+        template: charts/harbor-scanner-grype/templates/service.yaml
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: scanner
+        template: charts/harbor-scanner-grype/templates/service.yaml
+      - equal:
+          path: metadata.labels.tier
+          value: "2"
+        template: charts/harbor-scanner-grype/templates/deployment.yaml
+
+  - it: should render core when reused values carry no scannerRegistration block
+    set:
+      scannerRegistration: null
+    asserts:
+      - notFailedTemplate: {}
+        template: templates/core.configmap.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/scanner-registration.job.yaml
+
+  - it: should mount extra volumes into the scanner
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-grype.extraVolumes:
+        - name: ca
+          secret:
+            secretName: private-ca
+      harbor-scanner-grype.extraVolumeMounts:
+        - name: ca
+          mountPath: /etc/ssl/private-ca
+          readOnly: true
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: ca
+            secret:
+              secretName: private-ca
+        template: charts/harbor-scanner-grype/templates/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: ca
+            mountPath: /etc/ssl/private-ca
+            readOnly: true
+        template: charts/harbor-scanner-grype/templates/deployment.yaml
+
+  - it: should fail on reused values that carry only part of the registration block
+    set:
+      harbor-scanner-grype.enabled: true
+      scannerRegistration:
+        enabled: null
+        image:
+          registry: mirror.example.com
+          repository: null
+    asserts:
+      - failedTemplate:
+          errorPattern: scannerRegistration defaults are missing
+        template: templates/scanner-registration.job.yaml
+
+  - it: should skip the reused-values guard when registration is switched off
+    set:
+      harbor-scanner-grype.enabled: true
+      scannerRegistration:
+        enabled: false
+        image: null
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/scanner-registration.job.yaml
+
+  - it: should leave core NO_PROXY alone without a proxy
+    set:
+      harbor-scanner-grype.enabled: true
+    asserts:
+      - notMatchRegex:
+          path: data.NO_PROXY
+          pattern: scanner-grype
+        template: templates/core.configmap.yaml
+
+  - it: should fail when a scanner is enabled on reused values without the registration defaults
+    set:
+      harbor-scanner-grype.enabled: true
+      scannerRegistration: null
+    asserts:
+      - failedTemplate:
+          errorPattern: scannerRegistration defaults are missing
+        template: templates/scanner-registration.job.yaml
+
+  - it: should not validate a disabled scanner when pruning is off
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-snyk.registration.name: Snyk (production)
+      scannerRegistration.prune: false
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: register 'Grype'
+        template: templates/scanner-registration.job.yaml
+
+  - it: should keep Kubernetes from expanding variables in a description
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-grype.registration.description: leak $(HARBOR_PASSWORD) $$(HARBOR_PASSWORD) cost $$5
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: '"description":"leak \$\$\(HARBOR_PASSWORD\) \$\$\$\$\(HARBOR_PASSWORD\) cost \$\$\$\$5"'
+        template: templates/scanner-registration.job.yaml
+
+  - it: should accept a Job image pinned by digest without a tag
+    set:
+      harbor-scanner-grype.enabled: true
+      scannerRegistration.image.tag: ""
+      scannerRegistration.image.digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: curlimages/curl@sha256:0123
+        template: templates/scanner-registration.job.yaml
+
+  - it: should fail on reused values that lack the Job defaults
+    set:
+      harbor-scanner-grype.enabled: true
+      scannerRegistration.username: null
+    asserts:
+      - failedTemplate:
+          errorPattern: scannerRegistration defaults are missing
+        template: templates/scanner-registration.job.yaml
+
+  - it: should not parse the URL of a scanner the Job leaves alone
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-grype.registration.enabled: false
+      harbor-scanner-grype.registration.url: http://[bad
+      harbor-scanner-snyk.enabled: true
+      harbor-scanner-snyk.snyk.existingSecret: snyk-token
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: register 'Snyk'
+        template: templates/scanner-registration.job.yaml
+
+  - it: should render a numeric-looking name override as a string label
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-grype.nameOverride: "123"
+    asserts:
+      - equal:
+          path: spec.selector["app.kubernetes.io/name"]
+          value: "123"
+        template: charts/harbor-scanner-grype/templates/service.yaml
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/name"]
+          value: "123"
+        template: charts/harbor-scanner-grype/templates/deployment.yaml
+
+  - it: should fail when two deployed scanners share a name override
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-grype.nameOverride: scanner
+      harbor-scanner-grype.fullnameOverride: grype
+      harbor-scanner-snyk.enabled: true
+      harbor-scanner-snyk.snyk.existingSecret: snyk-token
+      harbor-scanner-snyk.nameOverride: scanner
+      harbor-scanner-snyk.fullnameOverride: snyk
+    asserts:
+      - failedTemplate:
+          errorPattern: share the name "scanner"
+        template: templates/scanner-registration.job.yaml
+
+  - it: should fail when a scanner takes the name of the harbor chart
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-grype.nameOverride: harbor
+    asserts:
+      - failedTemplate:
+          errorPattern: the harbor chart and harbor-scanner-grype share the name "harbor"
+        template: templates/scanner-registration.job.yaml
+
+  - it: should bypass the proxy for a Service URL with its cluster domain
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-grype.registration.url: http://harbor-harbor-scanner-grype.NAMESPACE.svc.cluster.example:8080
+      proxy.httpProxy: http://proxy.example.com:3128
+    asserts:
+      - matchRegex:
+          path: data.NO_PROXY
+          pattern: harbor-harbor-scanner-grype.NAMESPACE.svc,harbor-harbor-scanner-grype.namespace.svc.cluster.example,
+        template: templates/core.configmap.yaml
+
+  - it: should quote names and Secret references that look like booleans or numbers
+    set:
+      harbor-scanner-snyk.enabled: true
+      harbor-scanner-snyk.fullnameOverride: "true"
+      harbor-scanner-snyk.snyk.existingSecret: "456"
+      harbor-scanner-snyk.snyk.tokenKey: "789"
+      scannerRegistration.existingSecret: "321"
+      scannerRegistration.existingSecretPasswordKey: "654"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "true"
+        template: charts/harbor-scanner-snyk/templates/service.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SNYK_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: "456"
+                key: "789"
+        template: charts/harbor-scanner-snyk/templates/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: "321"
+                key: "654"
+        template: templates/scanner-registration.job.yaml
+
+  - it: should take probe overrides and quote pull Secret names
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-grype.probes.startup.failureThreshold: 120
+      harbor-scanner-grype.probes.liveness: null
+      harbor-scanner-snyk.enabled: true
+      harbor-scanner-snyk.snyk.existingSecret: snyk-token
+      harbor-scanner-snyk.probes: null
+      harbor-scanner-grype.imagePullSecrets:
+        - "123"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.failureThreshold
+          value: 120
+        template: charts/harbor-scanner-grype/templates/deployment.yaml
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.httpGet.path
+          value: /probe/ready
+        template: charts/harbor-scanner-grype/templates/deployment.yaml
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.periodSeconds
+          value: 5
+        template: charts/harbor-scanner-grype/templates/deployment.yaml
+      - notExists:
+          path: spec.template.spec.containers[0].livenessProbe
+        template: charts/harbor-scanner-grype/templates/deployment.yaml
+      - equal:
+          path: spec.template.spec.imagePullSecrets[0].name
+          value: "123"
+        template: charts/harbor-scanner-grype/templates/deployment.yaml
+      - notExists:
+          path: spec.template.spec.containers[0].startupProbe
+        template: charts/harbor-scanner-snyk/templates/deployment.yaml
+
+  - it: should move the default after every registration and before removals
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-grype.registration.default: true
+      scannerRegistration.extra:
+        - name: Clair
+          url: http://clair:8080
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: register 'Grype' [^\n]*\n\s*register 'Clair' [^\n]*\n\s*if \[ -n "\$defid" \]; then\n[^\n]*PATCH[\s\S]*\n\s*fi\n\s*unregister 'Snyk'
+        template: templates/scanner-registration.job.yaml
+
+  - it: should register before it removes
+    set:
+      harbor-scanner-snyk.enabled: true
+      harbor-scanner-snyk.snyk.existingSecret: snyk-token
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: register 'Snyk' [^\n]*\n[\s\S]*\n\s*unregister 'Grype'
+        template: templates/scanner-registration.job.yaml
+
+  - it: should not adopt by URL or ping when the scanner sets its own URL and skips certificate checks
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-grype.registration.url: https://grype.example.com
+      harbor-scanner-grype.registration.skipCertVerify: true
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: register 'Grype' '[^']*"url":"https://grype.example.com"[^']*' false 'https://grype.example.com' false '' '
+        template: templates/scanner-registration.job.yaml
+
+  - it: should carry the stored auth type and ping before an update
+    set:
+      harbor-scanner-grype.enabled: true
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: body="\$\{body%\?\},\\"auth\\":\\"\$auth\\"\}"
+        template: templates/scanner-registration.job.yaml
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: 'elif \[ -n "\$ping" \] && \[ "\$url" != "\$want" \]; then'
+        template: templates/scanner-registration.job.yaml
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: reach POST /scanners/ping "\$ping"
+        template: templates/scanner-registration.job.yaml
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: for f in "\$@"; do
+        template: templates/scanner-registration.job.yaml
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: body="\$\{body%\?\},\\"disabled\\":\$\{disabled:-false\}\}"
+        template: templates/scanner-registration.job.yaml
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: grep|curl -f?sS -o
+        template: templates/scanner-registration.job.yaml
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: has credentials stored for \$url
+        template: templates/scanner-registration.job.yaml
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: 'if \[ "\$mkdefault" = true \] && \[ "\$default" != true \]; then defid=\$id defname=\$name; fi'
+        template: templates/scanner-registration.job.yaml
+
+  - it: should schedule the Job and take security context overrides
+    set:
+      harbor-scanner-grype.enabled: true
+      scannerRegistration.nodeSelector:
+        pool: harbor
+      scannerRegistration.tolerations:
+        - key: dedicated
+          operator: Exists
+          effect: NoSchedule
+      scannerRegistration.affinity:
+        nodeAffinity: {}
+      scannerRegistration.podAnnotations:
+        sidecar.istio.io/inject: "false"
+      commonAnnotations:
+        sidecar.istio.io/inject: "true"
+        team: platform
+      scannerRegistration.podLabels:
+        team: security
+      global.priorityClassName: platform-critical
+      scannerRegistration.podSecurityContext.runAsUser: null
+      scannerRegistration.podSecurityContext.runAsGroup: null
+    asserts:
+      - equal:
+          path: spec.template.spec.nodeSelector.pool
+          value: harbor
+        template: templates/scanner-registration.job.yaml
+      - equal:
+          path: spec.template.spec.tolerations[0].key
+          value: dedicated
+        template: templates/scanner-registration.job.yaml
+      - equal:
+          path: spec.template.metadata.annotations["sidecar.istio.io/inject"]
+          value: "false"
+        template: templates/scanner-registration.job.yaml
+      - equal:
+          path: spec.template.metadata.annotations.team
+          value: platform
+        template: templates/scanner-registration.job.yaml
+      - equal:
+          path: spec.template.metadata.labels.team
+          value: security
+        template: templates/scanner-registration.job.yaml
+      - equal:
+          path: spec.template.spec.priorityClassName
+          value: platform-critical
+        template: templates/scanner-registration.job.yaml
+      - exists:
+          path: spec.template.spec.affinity.nodeAffinity
+        template: templates/scanner-registration.job.yaml
+      - notExists:
+          path: spec.template.spec.securityContext.runAsUser
+        template: templates/scanner-registration.job.yaml
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+        template: templates/scanner-registration.job.yaml
+
+  - it: should keep both scanners apart when the release name contains their names
+    release:
+      name: harbor-scanner-grype-harbor-scanner-snyk
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-snyk.enabled: true
+      harbor-scanner-snyk.snyk.existingSecret: snyk-token
+    asserts:
+      - equal:
+          path: metadata.name
+          value: harbor-scanner-grype-harbor-scanner-snyk-harbor-scanner-grype
+        template: charts/harbor-scanner-grype/templates/service.yaml
+      - equal:
+          path: metadata.name
+          value: harbor-scanner-grype-harbor-scanner-snyk-harbor-scanner-snyk
+        template: charts/harbor-scanner-snyk/templates/service.yaml
+      - matchRegex:
+          path: spec.template.spec.containers[0].args[0]
+          pattern: '"url":"http://harbor-scanner-grype-harbor-scanner-snyk-harbor-scanner-grype:8080"'
+        template: templates/scanner-registration.job.yaml
+
+  - it: should authenticate with the admin Secret by default and an override when set
+    set:
+      harbor-scanner-grype.enabled: true
+      scannerRegistration.username: robot$registrar
+      scannerRegistration.existingSecret: registrar
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_USERNAME
+            value: robot$registrar
+        template: templates/scanner-registration.job.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: registrar
+                key: password
+        template: templates/scanner-registration.job.yaml
+
+  - it: should read the admin password from the chart Secret
+    set:
+      harbor-scanner-grype.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HARBOR_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: harbor-core
+                key: HARBOR_ADMIN_PASSWORD
+        template: templates/scanner-registration.job.yaml
+
+  - it: should fail on two default scanners
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-grype.registration.default: true
+      harbor-scanner-snyk.enabled: true
+      harbor-scanner-snyk.snyk.existingSecret: snyk-token
+      harbor-scanner-snyk.registration.default: true
+    asserts:
+      - failedTemplate:
+          errorPattern: more than one scanner asks to be the default
+        template: templates/scanner-registration.job.yaml
+
+  - it: should fail on a duplicate scanner name
+    set:
+      harbor-scanner-grype.enabled: true
+      scannerRegistration.extra:
+        - name: Grype
+          url: http://other:8080
+    asserts:
+      - failedTemplate:
+          errorPattern: registered twice
+        template: templates/scanner-registration.job.yaml
+
+  - it: should fail on a scanner name the shell could not quote
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-grype.registration.name: "a'b"
+    asserts:
+      - failedTemplate:
+          errorPattern: is invalid
+        template: templates/scanner-registration.job.yaml
+
+  - it: should add enabled scanners to core NO_PROXY
+    set:
+      harbor-scanner-grype.enabled: true
+      proxy.httpProxy: http://proxy.example.com:3128
+    asserts:
+      - matchRegex:
+          path: data.NO_PROXY
+          pattern: harbor-exporter,harbor-harbor-scanner-grype,harbor-harbor-scanner-grype.NAMESPACE,harbor-harbor-scanner-grype.NAMESPACE.svc,
+        template: templates/core.configmap.yaml
+
+  - it: should match the registration Job snapshot
+    set:
+      harbor-scanner-grype.enabled: true
+      harbor-scanner-grype.registration.default: true
+    asserts:
+      - matchSnapshot: {}
+        template: templates/scanner-registration.job.yaml

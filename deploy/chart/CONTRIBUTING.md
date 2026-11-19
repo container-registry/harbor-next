@@ -44,6 +44,7 @@ Smoke-check your setup on an untouched tree first: `task helm:lint` must pass be
 - `values.yaml` — the chart's public API; helm-docs `# --` annotations feed the README. Mirrored by the hand-maintained `values.schema.json`.
 - `README.md` — **generated** by helm-docs from `README.md.gotmpl` + values annotations; never edit directly.
 - `templates/` — `{component}.{kind}.yaml` naming; shared logic in `_helpers.tpl` and per-domain `_helpers-{database,redis,tls,trace,urls,jobservice}.tpl`.
+- `subcharts/` — sources of the opt-in scanner subcharts (`harbor-scanner-grype`, `harbor-scanner-snyk`), wired in as `file://` dependencies. `charts/` holds their packaged copies, so rerun `task helm:deps:build` after editing one.
 - `tests/` — helm unittest suites (`{component}_test.yaml` + snapshots); golden fixtures for the migrator (`migrate/`) and values doctor (`lint/`).
 - `ci/` — values for ct lint and the GitOps determinism gate; `example/` — one directory per example, every `values*.yaml` render-checked in CI; `docs/` — migration docs and platform guides.
 

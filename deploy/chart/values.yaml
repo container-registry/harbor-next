@@ -1901,6 +1901,108 @@ trivy:
     # -- Annotations for PVC
     annotations: {}
 
+# Opt-in scanner subcharts. Each one deploys a scanner adapter and is registered
+# in Harbor by the `scannerRegistration` Job; nothing in Harbor core is
+# scanner-specific. Values pass through to the subchart, see
+# `subcharts/<name>/values.yaml` for the full list.
+harbor-scanner-grype:
+  # -- Deploy the Grype scanner adapter and register it in Harbor
+  enabled: false
+  registration:
+    # -- Scanner name shown in Harbor. Also names the registration the Job
+    # removes once this subchart is disabled again
+    name: Grype
+    # -- Make Grype the system default scanner
+    default: false
+
+harbor-scanner-snyk:
+  # -- Deploy the Snyk scanner adapter and register it in Harbor. Requires
+  # `harbor-scanner-snyk.snyk.existingSecret`
+  enabled: false
+  snyk:
+    # -- Existing Secret holding the Snyk API token under `tokenKey` (default `SNYK_TOKEN`)
+    existingSecret: ""
+  registration:
+    # -- Scanner name shown in Harbor. Also names the registration the Job
+    # removes once this subchart is disabled again
+    name: Snyk
+    # -- Make Snyk the system default scanner
+    default: false
+
+# -- Post-install/post-upgrade Job that registers scanner adapters through
+# `POST /api/v2.0/scanners`. It renders only when a scanner subchart is enabled
+# or `extra` lists an adapter, updates registrations it finds by name, and
+# removes the registration of a scanner subchart that was switched off while
+# another scanner stays registered. Remove the last one by hand.
+# @default -- See [values.yaml](values.yaml)
+scannerRegistration:
+  # -- Run the registration Job when there is a scanner to register
+  enabled: true
+  # -- Harbor user the Job authenticates as; needs permission to manage scanners
+  username: admin
+  # -- Existing Secret with that user's password. Empty uses the chart's admin
+  # password (`existingSecretAdminPassword` or `harborAdminPassword`), so set it
+  # once the admin password is rotated in the UI
+  existingSecret: ""
+  # -- Key of the password inside `existingSecret`
+  existingSecretPasswordKey: password
+  # -- Adapters deployed outside this chart to register as well. Each entry
+  # takes `name`, `url`, and optional `description`, `default`,
+  # `useInternalAddr` and `skipCertVerify`. Use `useInternalAddr: true` only
+  # for an adapter in Harbor's namespace; elsewhere the internal core address
+  # does not resolve, so leave it `false` and let the adapter use `externalURL`
+  extra: []
+  image:
+    # -- Registry host of the Job image (`global.imageRegistry` wins)
+    registry: docker.io
+    # -- Repository of the Job image; any image with `sh`, `curl`, `sed`, `tr` and `sleep` works
+    repository: curlimages/curl
+    # -- Job image tag
+    tag: 8.23.0
+    # -- Pin by digest (sha256:...); used instead of tag when set
+    digest: ""
+  # -- Retries before the Job, and with it the release, is marked failed
+  backoffLimit: 6
+  # -- Remove the registration of a disabled scanner subchart. Harbor drops
+  # that scanner's stored vulnerability records with it
+  prune: true
+  # -- Deadline for the whole Job in seconds. Keep it below the Helm
+  # `--timeout` (5m by default), or Helm gives up while the Job still runs
+  activeDeadlineSeconds: 270
+  # -- Job pod annotations, for example to keep a service mesh sidecar out
+  # (`sidecar.istio.io/inject: "false"`) where core accepts non-mesh traffic,
+  # or to switch on the mesh's native sidecar mode under strict mutual TLS
+  podAnnotations: {}
+  # -- Job pod labels
+  podLabels: {}
+  # -- Node selector for the Job pod
+  nodeSelector: {}
+  # -- Tolerations for the Job pod
+  tolerations: []
+  # -- Affinity for the Job pod
+  affinity: {}
+  # -- Job pod security context. On OpenShift set `runAsUser` and `runAsGroup`
+  # to `null` so the SCC assigns them
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
+    runAsGroup: 65534
+    seccompProfile:
+      type: RuntimeDefault
+  # -- Job container security context
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: ["ALL"]
+  # -- Job resource requests and limits
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 64Mi
+
 # ============================================================================
 # 5. TLS CONFIGURATION
 # ============================================================================

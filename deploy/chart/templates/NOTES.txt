@@ -55,6 +55,11 @@ Harbor has been installed!
 {{- if .Values.trivy.enabled }}
    - Trivy Scanner: {{ include "harbor.fullname" . }}-trivy
 {{- end }}
+{{- range (fromYaml (include "harbor.scannerRegistrations" .)).items }}
+{{- if and .deployed .host }}
+   - {{ .name }} Scanner: {{ .host }}
+{{- end }}
+{{- end }}
 
 5. For more information:
    - Harbor documentation: https://goharbor.io/docs/

@@ -1,0 +1,218 @@
+{{- if eq (include "harbor.scannerRegistration.enabled" .) "true" }}
+{{- $reg := .Values.scannerRegistration }}
+{{- $names := dict }}
+{{- $defaults := 0 }}
+{{- $items := (fromYaml (include "harbor.scannerRegistrations" .)).items }}
+{{- range $items }}
+{{- if or .present (and .stale $reg.prune) }}
+{{- if not (regexMatch "^[A-Za-z0-9][A-Za-z0-9 ._-]*$" (toString .name)) }}
+{{- fail (printf "scanner name %q is invalid: use letters, digits, spaces, dots, underscores and dashes" (toString .name)) }}
+{{- end }}
+{{- if not (regexMatch "^https?://([a-z0-9.-]+|\\[[0-9a-f:]+\\])(:[0-9]+)?(/[A-Za-z0-9._~/-]*)?$" (toString .url)) }}
+{{- fail (printf "scanner %q has an unsupported adapter URL %q: use http(s)://host[:port][/path] without credentials, query or special characters" .name (regexReplaceAll "[?#].*$" (regexReplaceAll "//[^/@]*@" (toString .url) "//***@") "?***")) }}
+{{- end }}
+{{- end }}
+{{- if .present }}
+{{- if hasKey $names .name }}
+{{- fail (printf "scanner name %q is registered twice: scanner subcharts and scannerRegistration.extra need unique names" .name) }}
+{{- end }}
+{{- $_ := set $names .name true }}
+{{- if .default }}{{ $defaults = add1 $defaults }}{{ end }}
+{{- end }}
+{{- end }}
+{{- if gt (int $defaults) 1 }}
+{{- fail "more than one scanner asks to be the default: set registration.default on a single scanner" }}
+{{- end }}
+{{- $full := include "harbor.fullname" . }}
+{{- $jobName := printf "%s-scanner-registration" $full }}
+{{- if gt (len $jobName) 63 }}
+{{- $jobName = printf "%s-%s-scanner-registration" ($full | trunc 33 | trimSuffix "-") (sha256sum .Release.Name | trunc 8) }}
+{{- end }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $jobName }}
+  labels:
+    {{- include "harbor.componentLabels" (dict "root" . "component" "scanner-registration") | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade,post-rollback
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    {{- with (include "harbor.annotations" (dict "root" . "local" dict)) }}
+    {{- . | nindent 4 }}
+    {{- end }}
+spec:
+  backoffLimit: {{ $reg.backoffLimit }}
+  activeDeadlineSeconds: {{ $reg.activeDeadlineSeconds }}
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        {{- with .Values.commonLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with $reg.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- include "harbor.componentSelectorLabels" (dict "root" . "component" "scanner-registration") | nindent 8 }}
+      {{- with (include "harbor.annotations" (dict "root" . "local" $reg.podAnnotations)) }}
+      annotations:
+        {{- . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- include "harbor.imagePullSecrets" . | nindent 6 }}
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      {{- with (.Values.global).priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      securityContext:
+        {{- toYaml $reg.podSecurityContext | nindent 8 }}
+      {{- with $reg.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $reg.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $reg.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: register
+          image: {{ include "harbor.image" (dict "imageRoot" $reg.image "component" "scannerRegistration" "root" .) }}
+          imagePullPolicy: {{ include "harbor.imagePullPolicy" . }}
+          securityContext:
+            {{- toYaml $reg.securityContext | nindent 12 }}
+          env:
+            - name: HARBOR_API
+              value: {{ include "harbor.core.url" . }}/api/v2.0
+            - name: HARBOR_USERNAME
+              value: {{ $reg.username | quote }}
+            - name: HARBOR_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  {{- if $reg.existingSecret }}
+                  name: {{ $reg.existingSecret | quote }}
+                  key: {{ $reg.existingSecretPasswordKey | quote }}
+                  {{- else if .Values.existingSecretAdminPassword }}
+                  name: {{ .Values.existingSecretAdminPassword | quote }}
+                  key: {{ .Values.existingSecretAdminPasswordKey | default "HARBOR_ADMIN_PASSWORD" | quote }}
+                  {{- else }}
+                  name: {{ include "harbor.core" . }}
+                  key: HARBOR_ADMIN_PASSWORD
+                  {{- end }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              call() { # method path [json body]; prints the HTTP status, body lands in /tmp/body
+                curl -sS --connect-timeout 5 --max-time 60 -o /tmp/body -w '%{http_code}' -u "${HARBOR_USERNAME}:${HARBOR_PASSWORD}" \
+                  -X "$1" -H 'Content-Type: application/json' ${3:+-d "$3"} "${HARBOR_API}$2"
+              }
+              die() { # prints Harbor's answer with URL credentials masked
+                echo "$1" >&2
+                [ ! -f /tmp/body ] || { sed 's#//[^/@ "]*@#//***@#g' /tmp/body >&2; echo >&2; }
+                exit 1
+              }
+              field() { tr -d '\n' < /tmp/body | sed -n "s/.*\"$1\": *\"\([^\"]*\)\".*/\1/p"; }
+              reach() { # method path body; sets code, retrying while Harbor cannot reach the adapter yet
+                n=0
+                while code=$(call "$@"); do
+                  case "$code" in 5??) ;; *) break ;; esac
+                  n=$((n + 1))
+                  [ "$n" -lt 24 ] || break
+                  echo "adapter not reachable yet (HTTP $code), retrying"
+                  sleep 10
+                done
+              }
+              flag() { tr -d '\n' < /tmp/body | sed -n "s/.*\"$1\": *true.*/true/p"; }
+              find() { # value [field]; sets id, url, auth and default of the registration with exactly that name (or url)
+                code=$(curl -sS --connect-timeout 5 --max-time 60 -o /tmp/body -w '%{http_code}' -u "${HARBOR_USERNAME}:${HARBOR_PASSWORD}" \
+                  -G --data-urlencode "ex_${2:-name}=$1" "${HARBOR_API}/scanners")
+                [ "$code" = 200 ] || die "listing scanners failed with HTTP $code"
+                id=$(field uuid); url=$(field url); auth=$(field auth)
+                default=$(flag is_default); disabled=$(flag disabled)
+              }
+              register() { # name body default url adopt ping-body field...
+                name=$1 body=$2 mkdefault=$3 want=$4 adopt=$5 ping=$6
+                shift 6
+                find "$name"
+                # A renamed subchart scanner still owns its Service URL, which Harbor keeps unique.
+                [ -n "$id" ] || [ "$adopt" = false ] || find "$want" url
+                # Skip the update when every field is already stored, so a read-only Harbor does not fail the release.
+                same=$id; stored=$(tr -d '\n' < /tmp/body)
+                for f in "$@"; do
+                  case "$stored" in *"$f"*) ;; *) same= ;; esac
+                done
+                if [ -n "$same" ]; then
+                  echo "scanner $name unchanged"
+                elif [ -n "$id" ]; then
+                  # An update resets what it leaves out, so repeat the deactivated state and the auth type.
+                  body="${body%?},\"disabled\":${disabled:-false}}"
+                  if [ -n "$auth" ]; then
+                    # The stored credential must not follow the registration to another adapter.
+                    [ "$url" = "$want" ] || { rm -f /tmp/body; die "scanner $name has credentials stored for $url: update or remove that registration in Harbor first"; }
+                    body="${body%?},\"auth\":\"$auth\"}"
+                  elif [ -n "$ping" ] && [ "$url" != "$want" ]; then
+                    # Harbor pings an adapter on create only, so check a changed URL before the update.
+                    reach POST /scanners/ping "$ping"
+                    [ "$code" = 200 ] || die "scanner $name does not answer at its adapter URL (HTTP $code)"
+                  fi
+                  code=$(call PUT "/scanners/$id" "$body")
+                  [ "$code" = 200 ] || die "updating scanner $name failed with HTTP $code"
+                  echo "scanner $name updated"
+                else
+                  reach POST /scanners "$body"
+                  [ "$code" = 201 ] || die "registering scanner $name failed with HTTP $code"
+                  echo "scanner $name registered"
+                  find "$name"
+                fi
+                # The default only moves once every scanner is registered.
+                if [ "$mkdefault" = true ] && [ "$default" != true ]; then defid=$id defname=$name; fi
+              }
+              unregister() { # name url; only removes the registration this chart created
+                find "$1"
+                if [ -n "$id" ] && [ "$url" = "$2" ]; then
+                  code=$(call DELETE "/scanners/$id")
+                  [ "$code" = 200 ] || die "removing scanner $1 failed with HTTP $code"
+                  echo "scanner $1 removed"
+                  [ "$default" != true ] || echo "warning: scanner $1 was the default; choose a new default scanner in Harbor" >&2
+                fi
+              }
+              defid=
+              n=0
+              until curl -fsS --connect-timeout 5 --max-time 10 -o /dev/null "${HARBOR_API}/ping"; do
+                n=$((n + 1))
+                [ "$n" -lt 60 ] || die "Harbor core did not answer at ${HARBOR_API}"
+                sleep 5
+              done
+              {{- range $items }}
+              {{- if .present }}
+              {{- $body := dict "name" .name "description" .description "url" .url "use_internal_addr" .useInternalAddr "skip_certVerify" .skipCertVerify }}
+              {{- /* The ping API cannot skip certificate checks, so those adapters go unpinged. */}}
+              {{- $ping := ternary "" (dict "name" .name "url" .url | toJson) .skipCertVerify }}
+              {{- /* Kubernetes expands $(VAR) and collapses $$ in args before the shell runs, so every $ is doubled. */}}
+              register {{ .name | squote }} {{ $body | toJson | replace "'" "'\\''" | replace "$" "$$" | squote }} {{ .default }} {{ .url | squote }} {{ .adopt }} {{ $ping | squote }}{{ range $k, $v := $body }} {{ printf "%s:%s" (toJson $k) (toJson $v) | replace "'" "'\\''" | replace "$" "$$" | squote }}{{ end }}
+              {{- end }}
+              {{- end }}
+              if [ -n "$defid" ]; then
+                code=$(call PATCH "/scanners/$defid" '{"is_default":true}')
+                [ "$code" = 200 ] || die "setting scanner $defname as default failed with HTTP $code"
+                echo "scanner $defname set as default"
+              fi
+              {{- /* Removals run last, so a failed registration leaves the old scanner in place. */}}
+              {{- range $items }}
+              {{- if and .stale $reg.prune (not (hasKey $names .name)) }}
+              unregister {{ .name | squote }} {{ .url | squote }}
+              {{- end }}
+              {{- end }}
+          resources:
+            {{- toYaml $reg.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- end }}

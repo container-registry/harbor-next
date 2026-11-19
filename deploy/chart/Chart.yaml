@@ -42,6 +42,14 @@ dependencies:
     version: "0.21.2"
     repository: "oci://registry-1.docker.io/cloudpirates"
     condition: postgresql.enabled
+  - name: harbor-scanner-grype
+    version: "0.1.0"
+    repository: "file://subcharts/harbor-scanner-grype"
+    condition: harbor-scanner-grype.enabled
+  - name: harbor-scanner-snyk
+    version: "0.1.0"
+    repository: "file://subcharts/harbor-scanner-snyk"
+    condition: harbor-scanner-snyk.enabled
 
 # Artifact Hub metadata (https://artifacthub.io/docs/topics/annotations/helm/).
 # Keep this the LAST top-level key: the release pipeline appends the
