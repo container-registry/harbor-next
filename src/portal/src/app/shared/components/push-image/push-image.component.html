@@ -73,13 +73,15 @@
 <ng-template #links let-sections>
     <a
         clrVerticalNavLink
+        role="button"
         tabindex="0"
         *ngFor="let section of sections"
         [id]="'push-tab-' + section.id"
         [class.active]="section.id === activeId"
         [attr.aria-current]="section.id === activeId ? 'true' : null"
         (click)="activeId = section.id"
-        (keydown.enter)="activeId = section.id">
+        (keydown.enter)="activeId = section.id"
+        (keydown.space)="$event.preventDefault(); activeId = section.id">
         {{ section.titleKey | translate }}
     </a>
 </ng-template>

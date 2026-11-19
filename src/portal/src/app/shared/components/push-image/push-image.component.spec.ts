@@ -212,6 +212,24 @@ describe('PushImageButtonComponent (inline template)', () => {
         ]);
     });
 
+    it('should switch sections with Enter and Space', async () => {
+        await settle();
+        component.pushButton.open();
+        await settle();
+        const space = new KeyboardEvent('keydown', {
+            key: ' ',
+            cancelable: true,
+        });
+        tabs()[1].dispatchEvent(space);
+        await settle();
+        expect(commands()[0]).toContain('podman push');
+        // Space must not scroll the dialog.
+        expect(space.defaultPrevented).toBeTrue();
+        tabs()[2].dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+        await settle();
+        expect(commands()[0]).toContain('helm package');
+    });
+
     it('should fall back to the first tab for an unknown section', async () => {
         await settle();
         component.pushButton.open('homebrew');
