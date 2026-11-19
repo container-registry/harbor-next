@@ -267,7 +267,6 @@ Each release publishes `linux/amd64` and `linux/arm64` images:
 - `harbor-exporter`
 - `harbor-portal`
 - `harbor-registry`
-- `trivy-adapter`
 
 Default registry path: `8gears.container-registry.com/8gcr`.
 

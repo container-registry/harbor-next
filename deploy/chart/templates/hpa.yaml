@@ -27,7 +27,7 @@ The Chart.yaml minimum kubeVersion (`>=1.28.0-0`) covers it.
 {{- if and $vals.autoscaling $vals.autoscaling.enabled }}
 {{- /* Skip trivy HPA when trivy itself is disabled — otherwise the HPA
        targets a controller that doesn't exist. */}}
-{{- if not (and (eq $c.name "trivy") (not $.Values.trivy.enabled)) }}
+{{- if not (and (eq $c.name "trivy") (ne (include "harbor.trivy.builtin" $) "true")) }}
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler

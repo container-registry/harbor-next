@@ -1,4 +1,4 @@
-{{- if .Values.trivy.enabled }}
+{{- if eq (include "harbor.trivy.builtin" .) "true" }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:

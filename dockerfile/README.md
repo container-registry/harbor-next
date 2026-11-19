@@ -12,7 +12,6 @@ All Dockerfiles support multi-architecture builds (linux/amd64, linux/arm64). Bu
 | exporter | `exporter.dockerfile` | scratch | Pre-built binary |
 | portal | `portal.dockerfile` | [DHI](#docker-hardened-images-dhi) nginx (debian13) | Multi-stage: Bun/Node Angular build → nginx |
 | registry | `registry.dockerfile` | scratch | Multi-stage: Go build of distribution/distribution |
-| trivy-adapter | `trivy-adapter.dockerfile` | aquasec/trivy | Multi-stage: Go build of harbor-scanner-trivy |
 
 Dev Dockerfiles (`dev.core.dockerfile`, `dev.portal.dockerfile`) are used by the dev environment for hot reload.
 

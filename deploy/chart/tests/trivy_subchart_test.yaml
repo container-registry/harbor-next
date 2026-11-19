@@ -1,0 +1,121 @@
+suite: trivy subchart mode
+templates:
+  - templates/trivy.statefulset.yaml
+  - templates/trivy.secret.yaml
+  - templates/trivy.configmap-env.yaml
+  - templates/trivy.secret-env.yaml
+  - templates/core.configmap.yaml
+  - templates/pdbs.yaml
+  - templates/serviceaccounts.yaml
+  - templates/hpa.yaml
+  - charts/harbor-scanner-trivy/templates/service.yaml
+  - templates/validate-values.yaml
+release:
+  name: harbor
+set:
+  externalURL: https://harbor.example.com
+  database.host: postgres.example.com
+  harborAdminPassword: Harbor12345
+  trivy.enabled: true
+  trivy.pdb.enabled: true
+  trivy.pdb.maxUnavailable: 1
+  trivy.serviceAccount.create: true
+  trivy.autoscaling.enabled: true
+  trivy.autoscaling.maxReplicas: 3
+tests:
+  - it: built-in mode should render the trivy StatefulSet, PDB and ServiceAccount
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: templates/trivy.statefulset.yaml
+      - hasDocuments:
+          count: 1
+        template: templates/pdbs.yaml
+      - isKind:
+          of: ServiceAccount
+        template: templates/serviceaccounts.yaml
+        documentSelector:
+          path: metadata.name
+          value: harbor-trivy
+      - equal:
+          path: data.TRIVY_ADAPTER_URL
+          value: "http://harbor-trivy:8080"
+        template: templates/core.configmap.yaml
+
+  - it: subchart should win over built-in mode
+    set:
+      harbor-scanner-trivy.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/trivy.statefulset.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/pdbs.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/hpa.yaml
+      - containsDocument:
+          kind: ServiceAccount
+          apiVersion: v1
+          name: harbor-trivy
+        template: templates/serviceaccounts.yaml
+        not: true
+      - equal:
+          path: data.WITH_TRIVY
+          value: "true"
+        template: templates/core.configmap.yaml
+      - equal:
+          path: data.TRIVY_ADAPTER_URL
+          value: "http://harbor-trivy:8080"
+        template: templates/core.configmap.yaml
+
+  - it: core URL should match the subchart Service name and port
+    set:
+      harbor-scanner-trivy.enabled: true
+      harbor-scanner-trivy.fullnameOverride: my-scanner
+      harbor-scanner-trivy.service.port: 9090
+    asserts:
+      - equal:
+          path: metadata.name
+          value: my-scanner
+        template: charts/harbor-scanner-trivy/templates/service.yaml
+      - equal:
+          path: spec.ports[0].port
+          value: 9090
+        template: charts/harbor-scanner-trivy/templates/service.yaml
+      - equal:
+          path: data.TRIVY_ADAPTER_URL
+          value: "http://my-scanner:9090"
+        template: templates/core.configmap.yaml
+
+  - it: core URL should use https when the subchart serves TLS
+    set:
+      harbor-scanner-trivy.enabled: true
+      harbor-scanner-trivy.api.tls.enabled: true
+      harbor-scanner-trivy.api.tls.existingSecret: trivy-tls
+    asserts:
+      - equal:
+          path: data.TRIVY_ADAPTER_URL
+          value: "https://harbor-trivy:8080"
+        template: templates/core.configmap.yaml
+
+  - it: should fail on the default redis URL without the bundled Valkey
+    set:
+      harbor-scanner-trivy.enabled: true
+      valkey.enabled: false
+      externalRedis.host: redis.example.com
+    asserts:
+      - failedTemplate:
+          errorPattern: "harbor-scanner-trivy cannot inherit"
+        template: templates/validate-values.yaml
+
+  - it: should render with Valkey auth once the subchart redis secret is set
+    set:
+      harbor-scanner-trivy.enabled: true
+      valkey.auth.enabled: true
+      valkey.auth.password: s3cret
+      harbor-scanner-trivy.redis.existingSecret: trivy-redis
+    asserts:
+      - notFailedTemplate: {}
+        template: templates/validate-values.yaml
