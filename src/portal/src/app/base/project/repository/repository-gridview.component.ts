@@ -57,6 +57,13 @@ import {
     setPageSizeToLocalStorage,
 } from '../../../shared/units/utils';
 import { ErrorHandler } from '../../../shared/units/error-handler';
+import { PushImageButtonComponent } from '../../../shared/components/push-image/push-image.component';
+import {
+    groupPushSections,
+    PushSectionGroup,
+    pushSections,
+} from '../../../shared/components/push-image/push-sections';
+import { AppConfigService } from '../../../services/app-config.service';
 import {
     CARD_VIEW_LOCALSTORAGE_KEY,
     ConfirmationButtons,
@@ -144,6 +151,10 @@ export class RepositoryGridviewComponent
     filterComponent: FilterComponent;
     searchSub: Subscription;
     isProxyCacheProject: boolean = false;
+    @ViewChild(PushImageButtonComponent) pushButton: PushImageButtonComponent;
+    pushGuideGroups: PushSectionGroup[] = [];
+    // True while the latest list request has been answered by the server.
+    private listLoaded = false;
     filterBookmark: BookmarkTarget;
     private queryParamSub: Subscription;
     // Only the latest list request may fill the grid.
@@ -163,7 +174,8 @@ export class RepositoryGridviewComponent
         private session: SessionService,
         private router: Router,
         private event: EventService,
-        private cd: ChangeDetectorRef
+        private cd: ChangeDetectorRef,
+        private appConfigService: AppConfigService
     ) {
         if (localStorage) {
             this.isCardView =
@@ -216,6 +228,7 @@ export class RepositoryGridviewComponent
                 this.isProxyCacheProject = true;
             }
         }
+        this.pushGuideGroups = this.buildPushGuideGroups();
         this.hasSignedIn = this.session.getCurrentUser() !== null;
         // Get system info for tag views
         this.getSystemInfo();
@@ -266,6 +279,7 @@ export class RepositoryGridviewComponent
                             );
                         }
                         this.loading = true;
+                        this.listLoaded = false;
                         return this.newRepoService
                             .listRepositoriesResponse(params)
                             .pipe(finalize(() => (this.loading = false)));
@@ -277,6 +291,7 @@ export class RepositoryGridviewComponent
                 .subscribe(
                     (repo: __StrictHttpResponse<Array<NewRepository>>) => {
                         this.totalCount = +repo.headers.get('x-total-count');
+                        this.listLoaded = true;
                         this.repositories = repo.body;
                     },
                     error => {
@@ -499,12 +514,14 @@ export class RepositoryGridviewComponent
         }
         this.nextPageSub?.unsubscribe();
         this.loading = true;
+        this.listLoaded = false;
         this.nextPageSub = this.newRepoService
             .listRepositoriesResponse(params)
             .pipe(finalize(() => (this.loading = false)))
             .subscribe(
                 (repo: __StrictHttpResponse<Array<NewRepository>>) => {
                     this.totalCount = +repo.headers.get('x-total-count');
+                    this.listLoaded = true;
                     this.repositoriesCopy = repo.body;
                     this.repositories = this.repositories.concat(
                         this.repositoriesCopy
@@ -562,6 +579,7 @@ export class RepositoryGridviewComponent
             params.sort = getSortingString(state);
         }
         this.loading = true;
+        this.listLoaded = false;
         if (isFirstLoadingGridView) {
             this.isFirstLoadingGridView = true;
         }
@@ -576,6 +594,7 @@ export class RepositoryGridviewComponent
             .subscribe(
                 (repo: __StrictHttpResponse<Array<NewRepository>>) => {
                     this.totalCount = +repo.headers.get('x-total-count');
+                    this.listLoaded = true;
                     this.repositories = repo.body;
                     // Do customising filtering and sorting
                     this.repositories = doFiltering<NewRepository>(
@@ -658,6 +677,31 @@ export class RepositoryGridviewComponent
         } else {
             return this.listHover;
         }
+    }
+
+    // The guide shows only for a project the server reported as empty, unfiltered.
+    get showPushGuide(): boolean {
+        return (
+            !!this.hasCreateRepositoryPermission &&
+            !this.isProxyCacheProject &&
+            this.listLoaded &&
+            this.totalCount === 0 &&
+            !this.lastFilteredRepoName &&
+            !this.currentState?.filters?.length
+        );
+    }
+
+    // Same sections and order as the push dialog; only ids and titles are used.
+    private buildPushGuideGroups(): PushSectionGroup[] {
+        return groupPushSections(
+            pushSections('', this.projectName, key =>
+                this.appConfigService.featureEnabled(key)
+            )
+        );
+    }
+
+    openPushDialog(id: string): void {
+        this.pushButton?.open(id);
     }
 
     getHelmChartVersionPermission(projectId: number): void {

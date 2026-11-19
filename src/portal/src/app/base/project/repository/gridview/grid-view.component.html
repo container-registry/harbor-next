@@ -13,7 +13,12 @@
             </ng-template>
         </span>
         <span *ngIf="items.length === 0 && !loading" class="content-empty">
-            {{ 'REPOSITORY.NO_ITEMS' | translate }}
+            <ng-container *ngIf="emptyTmpl; else noItems">
+                <ng-container [ngTemplateOutlet]="emptyTmpl"></ng-container>
+            </ng-container>
+            <ng-template #noItems>{{
+                'REPOSITORY.NO_ITEMS' | translate
+            }}</ng-template>
         </span>
     </div>
     <div

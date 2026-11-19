@@ -11,10 +11,15 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import { Component, Input, OnChanges, ViewChild } from '@angular/core';
+import { Component, Input, OnChanges, OnInit, ViewChild } from '@angular/core';
 import { InlineAlertComponent } from '../inline-alert/inline-alert.component';
 import { AppConfigService } from '../../../services/app-config.service';
-import { PushSection, pushSections } from './push-sections';
+import {
+    groupPushSections,
+    PushSection,
+    PushSectionGroup,
+    pushSections,
+} from './push-sections';
 
 @Component({
     selector: 'hbr-push-image-button',
@@ -23,11 +28,12 @@ import { PushSection, pushSections } from './push-sections';
 
     providers: [],
 })
-export class PushImageButtonComponent implements OnChanges {
+export class PushImageButtonComponent implements OnChanges, OnInit {
     @Input() registryUrl: string = 'unknown';
     @Input() projectName: string = 'unknown';
 
     sections: PushSection[] = [];
+    groups: PushSectionGroup[] = [];
     opened: boolean = false;
     activeId: string;
 
@@ -35,10 +41,16 @@ export class PushImageButtonComponent implements OnChanges {
 
     constructor(private appConfigService: AppConfigService) {}
 
+    // Covers a button used without bound inputs, where ngOnChanges never runs.
+    ngOnInit(): void {
+        this.ngOnChanges();
+    }
+
     ngOnChanges(): void {
         this.sections = pushSections(this.registryUrl, this.projectName, key =>
             this.appConfigService.featureEnabled(key)
         );
+        this.groups = groupPushSections(this.sections);
     }
 
     // Opens the dialog on the given section, or on the first one.
@@ -50,6 +62,10 @@ export class PushImageButtonComponent implements OnChanges {
             this.copyAlert.close();
         }
         this.opened = true;
+    }
+
+    get activeSection(): PushSection {
+        return this.sections.find(s => s.id === this.activeId);
     }
 
     onCpError($event: any): void {
