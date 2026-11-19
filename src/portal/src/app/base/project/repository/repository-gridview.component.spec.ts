@@ -374,6 +374,23 @@ describe('RepositoryComponentGridview (inline template)', () => {
             ).toContain('REPOSITORY.PLACEHOLDER');
         });
 
+        it('drops the guide when a later load fails', async () => {
+            await createEmpty();
+            expect(guide()).toBeTruthy();
+            spyOn(
+                fakedRepositoryService,
+                'listRepositoriesResponse'
+            ).and.returnValue(
+                timer(0).pipe(
+                    switchMap(() => throwError(() => new Error('down')))
+                )
+            );
+            compRepo.refresh();
+            await new Promise(resolve => setTimeout(resolve, 10));
+            await settle();
+            expect(guide()).toBeNull();
+        });
+
         it('keeps the plain text on a proxy cache project', async () => {
             await createEmpty();
             compRepo.isProxyCacheProject = true;

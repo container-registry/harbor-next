@@ -153,7 +153,7 @@ export class RepositoryGridviewComponent
     isProxyCacheProject: boolean = false;
     @ViewChild(PushImageButtonComponent) pushButton: PushImageButtonComponent;
     pushGuideGroups: PushSectionGroup[] = [];
-    // Set once the server has answered a list request.
+    // True while the latest list request has been answered by the server.
     private listLoaded = false;
     filterBookmark: BookmarkTarget;
     private queryParamSub: Subscription;
@@ -279,6 +279,7 @@ export class RepositoryGridviewComponent
                             );
                         }
                         this.loading = true;
+                        this.listLoaded = false;
                         return this.newRepoService
                             .listRepositoriesResponse(params)
                             .pipe(finalize(() => (this.loading = false)));
@@ -513,6 +514,7 @@ export class RepositoryGridviewComponent
         }
         this.nextPageSub?.unsubscribe();
         this.loading = true;
+        this.listLoaded = false;
         this.nextPageSub = this.newRepoService
             .listRepositoriesResponse(params)
             .pipe(finalize(() => (this.loading = false)))
@@ -577,6 +579,7 @@ export class RepositoryGridviewComponent
             params.sort = getSortingString(state);
         }
         this.loading = true;
+        this.listLoaded = false;
         if (isFirstLoadingGridView) {
             this.isFirstLoadingGridView = true;
         }
