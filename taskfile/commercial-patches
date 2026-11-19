@@ -1,8 +1,8 @@
-# Ordered commercial patches for Harbor Next main.
-0002-branding
-0003-sftp-replication
-0004-federated-robot-accounts
-0005-pgx-monitoring
-0006-aws-rds-iam-auth
-0007-multi-format-artifacts
-0008-audit-log-otel
+# Ordered commercial patches for Harbor Next release-2.16.
+release-2.16/0002-branding
+release-2.16/0003-sftp-replication
+release-2.16/0004-federated-robot-accounts
+release-2.16/0005-pgx-monitoring
+release-2.16/0006-aws-rds-iam-auth
+release-2.16/0007-multi-format-artifacts
+release-2.16/0008-audit-log-otel

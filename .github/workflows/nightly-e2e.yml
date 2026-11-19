@@ -2,7 +2,7 @@ name: E2E
 
 # The end-to-end suite, run against a published image set.
 #
-# The suite does not live in this repository. It lives on the `dev` overlay
+# The suite does not live in this repository. It lives on the `release-2.16/dev` overlay
 # branch in container-registry/8gcr, alongside the taskfile that drives it,
 # and it is brought here the same way the commercial patches are: octopused
 # onto this commit by `task apply-patches`. A run therefore stands in the
@@ -49,7 +49,7 @@ on:
       scenarios_failed:
         value: ${{ jobs.report.outputs.scenarios_failed }}
     secrets:
-      # Reads the commercial patch branches and the dev overlay out of 8gcr,
+      # Reads the commercial patch branches and the release-2.16/dev overlay out of 8gcr,
       # the same way the image build reads the patches.
       SYNC_APP_PRIVATE_KEY:
         required: true
@@ -74,10 +74,10 @@ on:
         options: [images, nightly]
       overlay:
         # Lets a suite change on an 8gcr branch run against published images
-        # before it reaches dev. Scheduled and release runs always use dev.
+        # before it reaches release-2.16/dev. Release runs always use that branch.
         description: 8gcr overlay branch that carries the suite
         required: false
-        default: dev
+        default: release-2.16/dev
         type: string
       godog_tags:
         description: Optional godog tag expression (images only)
@@ -113,7 +113,7 @@ jobs:
     env:
       TAG: ${{ inputs.tag }}
       SUITE: ${{ inputs.suite || 'images' }}
-      OVERLAY: ${{ inputs.overlay || 'dev' }}
+      OVERLAY: ${{ inputs.overlay || 'release-2.16/dev' }}
       GODOG_TAGS: ${{ inputs.godog_tags }}
       REGISTRY_ADDRESS: ${{ inputs.registry_address || vars.REGISTRY_ADDRESS || '8gears.container-registry.com' }}
       REGISTRY_PROJECT: ${{ inputs.registry_project || vars.REGISTRY_PROJECT || '8gcr' }}
@@ -161,7 +161,7 @@ jobs:
       - name: Build the megamerge
         env:
           PATCHES_TOKEN: ${{ steps.app-token.outputs.token }}
-        # The declared commercial patches plus the dev overlay that carries
+        # The declared commercial patches plus the release-2.16/dev overlay that carries
         # the suite. Same task the release build uses; the overlay is the
         # only difference, and it is never part of a release.
         # apply-patches checks the branch name with git check-ref-format.
