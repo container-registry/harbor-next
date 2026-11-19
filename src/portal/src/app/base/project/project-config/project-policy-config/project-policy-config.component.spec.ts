@@ -233,7 +233,7 @@ describe('ProjectPolicyConfigComponent', () => {
         expect(component.projectPolicyConfigComponent.cveIds).toBeNull();
         expect(component.projectPolicyConfigComponent.showAddModal).toBeFalse();
     });
-    it('should not list registries for a project admin', () => {
+    it('should hide proxy cache settings from a project admin', () => {
         const list = spyOn(
             registryService,
             'listRegistriesResponse'
@@ -244,31 +244,60 @@ describe('ProjectPolicyConfigComponent', () => {
         ).and.callThrough();
         fixture = TestBed.createComponent(TestHostComponent);
         fixture.detectChanges();
+        const el: HTMLElement = fixture.nativeElement;
 
         expect(list).not.toHaveBeenCalled();
-        expect(summary).toHaveBeenCalledWith(1);
+        expect(summary).not.toHaveBeenCalled();
         expect(
-            fixture.componentInstance.projectPolicyConfigComponent.registries
-        ).toEqual([mockRegistry]);
+            el.querySelector('[name="project-proxy-cache-enabled"]')
+        ).toBeNull();
+        expect(el.querySelector('#registry')).toBeNull();
+        expect(el.querySelector('#bandwidth')).toBeNull();
+        expect(el.querySelector('#repositoryFilter')).toBeNull();
     });
-    it('should list registries for a system admin', () => {
+    it('should show a read-only repository filter to a project admin', () => {
+        spyOn(projectService, 'getProject').and.returnValue(
+            of({
+                ...mockProjectPolicies[1],
+                metadata: {
+                    ...mockProjectPolicies[1].metadata,
+                    proxy_cache_filter_pattern: 'library/**',
+                },
+            })
+        );
+        fixture = TestBed.createComponent(TestHostComponent);
+        fixture.componentInstance.isProxyCacheProject = true;
+        fixture.detectChanges();
+        const filter: HTMLInputElement =
+            fixture.nativeElement.querySelector('input.width-492');
+
+        expect(filter.value).toBe('library/**');
+        expect(filter.disabled).toBeTrue();
+    });
+    it('should lock the proxy cache switch and endpoint for a system admin', async () => {
         isSystemAdmin = true;
         const list = spyOn(
             registryService,
             'listRegistriesResponse'
         ).and.callThrough();
-        const summary = spyOn(
-            projectService,
-            'getProjectSummary'
-        ).and.callThrough();
         fixture = TestBed.createComponent(TestHostComponent);
         fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const el: HTMLElement = fixture.nativeElement;
+        const proxyCache: HTMLInputElement = el.querySelector(
+            '[name="project-proxy-cache-enabled"]'
+        );
+        const endpoint: HTMLSelectElement = el.querySelector('#registry');
+        const bandwidth: HTMLInputElement = el.querySelector('#bandwidth');
 
         expect(list).toHaveBeenCalled();
-        expect(summary).not.toHaveBeenCalled();
         expect(
             fixture.componentInstance.projectPolicyConfigComponent.registries
         ).toEqual([mockRegistry]);
+        expect(proxyCache.disabled).toBeTrue();
+        expect(endpoint.disabled).toBeTrue();
+        expect(bandwidth.disabled).toBeFalse();
     });
     it('should get hasChangeConfigRole', () => {
         expect(
@@ -281,10 +310,12 @@ describe('ProjectPolicyConfigComponent', () => {
 @Component({
     template: ` <hbr-project-policy-config
         [projectName]="'testing'"
+        [isProxyCacheProject]="isProxyCacheProject"
         [projectId]="1">
     </hbr-project-policy-config>`,
 })
 class TestHostComponent {
+    isProxyCacheProject = false;
     @ViewChild(ProjectPolicyConfigComponent)
     projectPolicyConfigComponent: ProjectPolicyConfigComponent;
 }
