@@ -45,6 +45,8 @@ export class GridViewComponent implements AfterViewInit {
     @Input() pageSize: number;
     @Input() expectScrollPercent = 70;
     @Input() withAdmiral: boolean;
+    // Replaces the "no items" text when set.
+    @Input() emptyTmpl: TemplateRef<any>;
     @Input()
     set items(value: any[]) {
         let newCardStyles = value.map((d, index) => {
