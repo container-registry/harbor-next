@@ -1160,6 +1160,7 @@
         "HELM": "헬름",
         "CNAB": "CNAB",
         "TAG_COMMAND_CHART": "이 프로젝트에 대한 차트 패키징:",
+        "DIALOG_TITLE": "Push to {{project}}",
         "PUSH_COMMAND_CHART": "이 프로젝트에 차트 푸시:",
         "PUSH_COMMAND_CNAB": "CNAB를 이 프로젝트에 푸시:",
         "TOOLTIP": "이 프로젝트에 아티팩트를 푸시하기 위한 명령 참조입니다.",
