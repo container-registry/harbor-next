@@ -1,3 +1,4 @@
+{{- if include "harbor.registryctl.enabled" . }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -11,3 +12,4 @@ metadata:
 data:
   _PLACEHOLDER: "true"
   {{- template "harbor.trace.envs.registryctl" . }}
+{{- end }}

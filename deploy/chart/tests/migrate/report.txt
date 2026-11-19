@@ -5,7 +5,7 @@
   tables: docs/MIGRATION-REFERENCE.md
 ============================================================
 
-WARN — migrated, but review the changed behavior (6)
+WARN — migrated, but review the changed behavior (7)
   * nginx.*
       The nginx reverse proxy deployment is gone — Ingress/Gateway/ expose Services route to core directly (core proxies the portal). Use ingress.annotations for body-size or ssl-redirect tuning and portal.existingConfigMap for custom portal nginx config.
   * core.secret
@@ -14,6 +14,8 @@ WARN — migrated, but review the changed behavior (6)
   * core probe overrides
       -> core.probes
       Probe tuning is not auto-migrated. Probes are now full Kubernetes probe specs under <component>.probes.{startup,liveness,readiness} with retuned defaults (fast 2s startup polling instead of fixed initialDelay) — review those before carrying old timings over.
+  * registry.controller.*
+      The migrated values target Harbor Next images (image.source 8gcr), whose registry serves the GC deletion API itself, so no controller sidecar runs. Controller image and resources were dropped; controller.extraEnvVars moved to registry.extraEnv. Only if you switch to image.source upstream, set registry.controller again.
   * registry.credentials.password
       -> registry.credentials.password
       Carried over, but this is the publicly known 2.x default — change it.

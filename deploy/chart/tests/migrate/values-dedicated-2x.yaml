@@ -35,7 +35,8 @@ registry:
       tag: v2.14.4
     # NOTE: nested under registry.registry in the generator — the legacy
     # chart expected registry.controller, so this block was silently
-    # ignored there too (default registryctl image was used).
+    # ignored there too (default controller image was used). The
+    # migrator ignores it as well; this chart has no controller sidecar.
     controller:
       image:
         repository: 8gears.container-registry.com/8gcr/harbor-registryctl

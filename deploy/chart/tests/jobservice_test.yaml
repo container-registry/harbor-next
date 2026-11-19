@@ -11,6 +11,10 @@ templates:
   - templates/jobservice.configmap-env.yaml
   - templates/jobservice.secret.yaml
   - templates/jobservice.pvc.yaml
+# Pinned so the default registry image is one that serves the GC API;
+# pre-2.17 tags keep the registryctl sidecar (see harbor.registry.preGCAPI).
+chart:
+  appVersion: v2.17.0
 tests:
   # Pins fullname helper: deployment name = <release>-<chart>-jobservice
   - it: should compute jobservice deployment name from fullname helper
@@ -512,3 +516,82 @@ tests:
       - equal:
           path: data.CORE_URL
           value: "http://RELEASE-NAME-harbor-core:8081"
+
+  # GC deletes blobs/manifests through REGISTRY_CONTROLLER_URL; the registry
+  # serves that API itself, so it must be the registry URL.
+  - it: should point REGISTRY_CONTROLLER_URL at the registry
+    template: templates/jobservice.configmap-env.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+    asserts:
+      - equal:
+          path: data.REGISTRY_CONTROLLER_URL
+          value: http://RELEASE-NAME-harbor-registry:5000
+
+  - it: upstream should point REGISTRY_CONTROLLER_URL at the registryctl sidecar
+    template: templates/jobservice.configmap-env.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      image.source: upstream
+    asserts:
+      - equal:
+          path: data.REGISTRY_CONTROLLER_URL
+          value: http://RELEASE-NAME-harbor-registry:8080
+
+  - it: pre-2.17 8gcr registry tag points REGISTRY_CONTROLLER_URL at the sidecar
+    template: templates/jobservice.configmap-env.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.image.tag: v2.16.3
+    asserts:
+      - equal:
+          path: data.REGISTRY_CONTROLLER_URL
+          value: http://RELEASE-NAME-harbor-registry:8080
+
+  - it: registry tag v2.17.0-rc.1 points REGISTRY_CONTROLLER_URL at the registry
+    template: templates/jobservice.configmap-env.yaml
+    chart:
+      appVersion: v2.16.0
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.image.tag: v2.17.0-rc.1
+    asserts:
+      - equal:
+          path: data.REGISTRY_CONTROLLER_URL
+          value: http://RELEASE-NAME-harbor-registry:5000
+
+  - it: registry tag main points REGISTRY_CONTROLLER_URL at the registry
+    template: templates/jobservice.configmap-env.yaml
+    chart:
+      appVersion: v2.16.0
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.image.tag: main
+    asserts:
+      - equal:
+          path: data.REGISTRY_CONTROLLER_URL
+          value: http://RELEASE-NAME-harbor-registry:5000
+
+  - it: digest-pinned registry points REGISTRY_CONTROLLER_URL at the registry
+    template: templates/jobservice.configmap-env.yaml
+    chart:
+      appVersion: v2.16.0
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      registry.image.digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    asserts:
+      - equal:
+          path: data.REGISTRY_CONTROLLER_URL
+          value: http://RELEASE-NAME-harbor-registry:5000

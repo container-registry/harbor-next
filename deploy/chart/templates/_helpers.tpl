@@ -272,8 +272,8 @@ http:
 {{- end }}
 
 {{/*
-Filesystem rootdirectory honored by the storage volumeMount on the
-registry/registryctl containers. Reads from .Values.registry.config.storage.filesystem.rootdirectory
+Filesystem rootdirectory honored by the storage volumeMount on
+the registry container. Reads from .Values.registry.config.storage.filesystem.rootdirectory
 with fallback to /storage.
 */}}
 {{- define "harbor.registry.storageMountPath" -}}

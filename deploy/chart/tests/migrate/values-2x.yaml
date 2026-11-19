@@ -51,6 +51,15 @@ registry:
     extraEnvVars:
       - name: OTEL_TRACES_EXPORTER
         value: none
+  controller:
+    image:
+      tag: v2.11.0
+    resources:
+      requests:
+        memory: 64Mi
+    extraEnvVars:
+      - name: GC_LOG_LEVEL
+        value: debug
   credentials:
     username: harbor_registry_user
     password: harbor_registry_password
