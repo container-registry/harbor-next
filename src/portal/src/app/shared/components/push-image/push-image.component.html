@@ -10,44 +10,76 @@
         </h3>
         <div class="modal-body">
             <inline-alert #copyAlert></inline-alert>
-            <clr-tabs *ngIf="opened" clrLayout="vertical">
-                <clr-tab *ngFor="let section of sections">
-                    <button clrTabLink [id]="'push-tab-' + section.id">
-                        {{ section.titleKey | translate }}
-                        <span
-                            *ngIf="section.badgeKey"
-                            class="label label-blue"
-                            >{{ section.badgeKey | translate }}</span
-                        >
-                    </button>
-                    <clr-tab-content *clrIfActive="section.id === activeId">
-                        <ol class="list">
-                            <li *ngFor="let step of section.steps">
-                                <hbr-copy-input
-                                    (onCopyError)="onCpError($event)"
-                                    inputSize="55"
-                                    headerTitle="{{
-                                        step.labelKey | translate
-                                    }}"
-                                    defaultValue="{{
-                                        step.command
-                                    }}"></hbr-copy-input>
-                            </li>
-                        </ol>
-                        <clr-alert
-                            *ngIf="section.hintKey"
-                            clrAlertType="info"
-                            [clrAlertSizeSmall]="true"
-                            [clrAlertClosable]="false">
-                            <clr-alert-item>
-                                <span class="alert-text">{{
-                                    section.hintKey | translate
-                                }}</span>
-                            </clr-alert-item>
-                        </clr-alert>
-                    </clr-tab-content>
-                </clr-tab>
-            </clr-tabs>
+            <div class="clr-row" *ngIf="opened">
+                <div class="clr-col-4">
+                    <clr-vertical-nav>
+                        <ng-container *ngFor="let group of groups">
+                            <!-- A lone group needs no heading. -->
+                            <ng-container *ngIf="groups.length === 1">
+                                <ng-container
+                                    [ngTemplateOutlet]="links"
+                                    [ngTemplateOutletContext]="{
+                                        $implicit: group.sections
+                                    }"></ng-container>
+                            </ng-container>
+                            <clr-vertical-nav-group
+                                *ngIf="groups.length > 1"
+                                [clrVerticalNavGroupExpanded]="true">
+                                {{ group.titleKey | translate }}
+                                <span
+                                    *ngIf="group.badgeKey"
+                                    class="label label-blue"
+                                    >{{ group.badgeKey | translate }}</span
+                                >
+                                <clr-vertical-nav-group-children>
+                                    <ng-container
+                                        [ngTemplateOutlet]="links"
+                                        [ngTemplateOutletContext]="{
+                                            $implicit: group.sections
+                                        }"></ng-container>
+                                </clr-vertical-nav-group-children>
+                            </clr-vertical-nav-group>
+                        </ng-container>
+                    </clr-vertical-nav>
+                </div>
+                <div class="clr-col-8" *ngIf="activeSection as section">
+                    <ol class="list">
+                        <li *ngFor="let step of section.steps">
+                            <hbr-copy-input
+                                (onCopyError)="onCpError($event)"
+                                inputSize="55"
+                                headerTitle="{{ step.labelKey | translate }}"
+                                defaultValue="{{
+                                    step.command
+                                }}"></hbr-copy-input>
+                        </li>
+                    </ol>
+                    <clr-alert
+                        *ngIf="section.hintKey"
+                        clrAlertType="info"
+                        [clrAlertSizeSmall]="true"
+                        [clrAlertClosable]="false">
+                        <clr-alert-item>
+                            <span class="alert-text">{{
+                                section.hintKey | translate
+                            }}</span>
+                        </clr-alert-item>
+                    </clr-alert>
+                </div>
+            </div>
         </div>
     </clr-modal>
 </div>
+<ng-template #links let-sections>
+    <a
+        clrVerticalNavLink
+        tabindex="0"
+        *ngFor="let section of sections"
+        [id]="'push-tab-' + section.id"
+        [class.active]="section.id === activeId"
+        [attr.aria-current]="section.id === activeId ? 'true' : null"
+        (click)="activeId = section.id"
+        (keydown.enter)="activeId = section.id">
+        {{ section.titleKey | translate }}
+    </a>
+</ng-template>

@@ -11,6 +11,10 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+import {
+    PUSH_SECTION_SOURCES,
+    PushSection,
+} from '../../../shared/components/push-image/push-sections';
 import { AppConfigService } from '../../../services/app-config.service';
 import {
     ComponentFixture,
@@ -276,9 +280,36 @@ describe('RepositoryComponentGridview (inline template)', () => {
                 'PUSH_IMAGE.HELM',
                 'PUSH_IMAGE.CNAB',
             ]);
-            expect(guide().textContent).toContain(
-                'REPOSITORY.EMPTY_CONTAINERS'
-            );
+            // A lone group gets no heading.
+            expect(guide().textContent).not.toContain('PUSH_IMAGE.GROUP_OCI');
+        });
+
+        it('heads each group and shows its badge once there are several', async () => {
+            const packages = (): PushSection[] => [
+                {
+                    id: 'pkg',
+                    titleKey: 'PKG',
+                    group: {
+                        id: 'packages',
+                        titleKey: 'PACKAGES',
+                        badgeKey: 'BETA',
+                    },
+                    steps: [],
+                },
+            ];
+            PUSH_SECTION_SOURCES.unshift(packages);
+            try {
+                await createEmpty();
+                const heads = Array.from(
+                    guide().querySelectorAll('p') as NodeListOf<HTMLElement>
+                ).map(p => p.textContent.replace(/\s+/g, ' ').trim());
+                expect(heads).toContain('PACKAGES BETA');
+                expect(heads).toContain('PUSH_IMAGE.GROUP_OCI');
+                expect(guide().querySelectorAll('.label').length).toEqual(1);
+                expect(formats()[0]).toEqual('PKG');
+            } finally {
+                PUSH_SECTION_SOURCES.shift();
+            }
         });
 
         it('opens the push dialog on the picked format', async () => {

@@ -16,24 +16,29 @@ export interface PushStep {
     command: string;
 }
 
+// A labelled group of sections, e.g. every OCI client.
+export interface PushGroup {
+    id: string;
+    titleKey: string;
+    // i18n key of a label shown next to the group title.
+    badgeKey?: string;
+}
+
 // One client's push flow: the steps a user copies, in order.
 export interface PushSection {
     id: string;
     titleKey: string;
-    // i18n key of the heading the section is listed under outside the dialog.
-    groupKey: string;
+    // Heading the section is listed under, in the dialog and the guide.
+    group: PushGroup;
     steps: PushStep[];
-    // i18n key of a label shown next to the tab title.
-    badgeKey?: string;
     // i18n key of a note shown under the steps.
     hintKey?: string;
     // Feature key the section needs; always shown when unset.
     feature?: string;
 }
 
-// Sections that share a heading, in list order.
-export interface PushSectionGroup {
-    titleKey: string;
+// A group with its sections, in list order.
+export interface PushSectionGroup extends PushGroup {
     sections: PushSection[];
 }
 
@@ -42,7 +47,10 @@ export type PushSectionSource = (
     project: string
 ) => PushSection[];
 
-const CONTAINER_GROUP = 'REPOSITORY.EMPTY_CONTAINERS';
+export const OCI_PUSH_GROUP: PushGroup = {
+    id: 'oci',
+    titleKey: 'PUSH_IMAGE.GROUP_OCI',
+};
 
 // Push commands for the OCI clients, one section per client.
 export function containerPushSections(
@@ -54,7 +62,7 @@ export function containerPushSections(
         {
             id: 'docker',
             titleKey: 'PUSH_IMAGE.DOCKER',
-            groupKey: CONTAINER_GROUP,
+            group: OCI_PUSH_GROUP,
             steps: [
                 {
                     labelKey: 'PUSH_IMAGE.TAG_COMMAND',
@@ -69,7 +77,7 @@ export function containerPushSections(
         {
             id: 'podman',
             titleKey: 'PUSH_IMAGE.PODMAN',
-            groupKey: CONTAINER_GROUP,
+            group: OCI_PUSH_GROUP,
             steps: [
                 {
                     labelKey: 'PUSH_IMAGE.PUSH_COMMAND',
@@ -80,7 +88,7 @@ export function containerPushSections(
         {
             id: 'helm',
             titleKey: 'PUSH_IMAGE.HELM',
-            groupKey: CONTAINER_GROUP,
+            group: OCI_PUSH_GROUP,
             steps: [
                 {
                     labelKey: 'PUSH_IMAGE.TAG_COMMAND_CHART',
@@ -95,7 +103,7 @@ export function containerPushSections(
         {
             id: 'cnab',
             titleKey: 'PUSH_IMAGE.CNAB',
-            groupKey: CONTAINER_GROUP,
+            group: OCI_PUSH_GROUP,
             steps: [
                 {
                     labelKey: 'PUSH_IMAGE.PUSH_COMMAND_CNAB',
@@ -123,13 +131,13 @@ export function pushSections(
     ).filter(section => !section.feature || featureEnabled(section.feature));
 }
 
-// Groups sections by heading; groups keep the order they first appear in.
+// Collects sections under their group; groups keep the order they first appear in.
 export function groupPushSections(sections: PushSection[]): PushSectionGroup[] {
     const groups: PushSectionGroup[] = [];
     for (const section of sections) {
-        let group = groups.find(g => g.titleKey === section.groupKey);
+        let group = groups.find(g => g.id === section.group.id);
         if (!group) {
-            group = { titleKey: section.groupKey, sections: [] };
+            group = { ...section.group, sections: [] };
             groups.push(group);
         }
         group.sections.push(section);

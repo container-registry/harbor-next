@@ -274,7 +274,12 @@
             </h4>
             <p class="mt-0">{{ 'REPOSITORY.EMPTY_HINT' | translate }}</p>
             <ng-container *ngFor="let group of pushGuideGroups">
-                <p>{{ group.titleKey | translate }}</p>
+                <p *ngIf="pushGuideGroups.length > 1">
+                    {{ group.titleKey | translate }}
+                    <span *ngIf="group.badgeKey" class="label label-blue">{{
+                        group.badgeKey | translate
+                    }}</span>
+                </p>
                 <div class="btn-group btn-outline btn-sm">
                     <button
                         type="button"

@@ -54,10 +54,10 @@ describe('containerPushSections', () => {
 
 describe('groupPushSections', () => {
     it('keeps sections under their heading in list order', () => {
-        const section = (id: string, groupKey: string): PushSection => ({
+        const section = (id: string, group: string): PushSection => ({
             id,
             titleKey: id,
-            groupKey,
+            group: { id: group, titleKey: group, badgeKey: `${group}-badge` },
             steps: [],
         });
         const groups = groupPushSections([
@@ -66,6 +66,7 @@ describe('groupPushSections', () => {
             section('c', 'first'),
         ]);
         expect(groups.map(g => g.titleKey)).toEqual(['first', 'second']);
+        expect(groups[0].badgeKey).toEqual('first-badge');
         expect(groups.map(g => g.sections.map(s => s.id))).toEqual([
             ['a', 'c'],
             ['b'],
@@ -95,19 +96,27 @@ describe('PushImageButtonComponent (inline template)', () => {
     const extra = (id: string, more: Partial<PushSection>): PushSection => ({
         id,
         titleKey: id,
-        groupKey: 'extra',
+        group: { id: 'extra', titleKey: 'EXTRA', badgeKey: 'BADGE' },
         steps: [{ labelKey: 'step', command: `${id} publish` }],
         ...more,
     });
     const extraSource = () => [
         extra('gated', { feature: 'gated_feature' }),
-        extra('labelled', { badgeKey: 'BADGE', hintKey: 'HINT' }),
+        extra('hinted', { hintKey: 'HINT' }),
     ];
 
-    function tabs(): HTMLButtonElement[] {
+    function tabs(): HTMLElement[] {
         return Array.from(
-            fixture.nativeElement.querySelectorAll('button[clrTabLink]')
+            fixture.nativeElement.querySelectorAll('a[clrVerticalNavLink]')
         );
+    }
+
+    function headings(): string[] {
+        return Array.from(
+            fixture.nativeElement.querySelectorAll(
+                '.nav-group-text'
+            ) as NodeListOf<HTMLElement>
+        ).map(heading => heading.textContent.replace(/\s+/g, ' ').trim());
     }
 
     beforeEach(async () => {
@@ -174,6 +183,14 @@ describe('PushImageButtonComponent (inline template)', () => {
         ]);
     });
 
+    it('should show no heading for a single group', async () => {
+        await settle();
+        component.pushButton.open();
+        await settle();
+        expect(tabs().length).toEqual(4);
+        expect(headings()).toEqual([]);
+    });
+
     it('should open on the requested tab', async () => {
         await settle();
         component.pushButton.open('helm');
@@ -220,10 +237,12 @@ describe('PushImageButtonComponent (inline template)', () => {
         await settle();
         expect(tabs().length).toEqual(6);
         expect(commands()).toEqual(['gated publish']);
-        expect(tabs()[1].querySelector('.label').textContent.trim()).toEqual(
-            'BADGE'
-        );
-        expect(tabs()[0].querySelector('.label')).toBeNull();
+        expect(headings()).toEqual(['EXTRA BADGE', 'PUSH_IMAGE.GROUP_OCI']);
+        expect(
+            fixture.nativeElement.querySelectorAll('.nav-group-text .label')
+                .length
+        ).toEqual(1);
+        expect(tabs().some(tab => !!tab.querySelector('.label'))).toBeFalse();
         tabs()[1].click();
         await settle();
         expect(
@@ -239,7 +258,7 @@ describe('PushImageButtonComponent (inline template)', () => {
         component.pushButton.open();
         await settle();
         expect(tabs().length).toEqual(5);
-        expect(commands()).toEqual(['labelled publish']);
+        expect(commands()).toEqual(['hinted publish']);
     });
 });
 
