@@ -10,4 +10,3 @@ resources:
   - image-tracking.yaml
   - rollout-sync.yaml
   - helmrelease.yaml
-  - ingress-packages.yaml
