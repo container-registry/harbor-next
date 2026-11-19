@@ -46,6 +46,14 @@ spec:
                 name: {{ include "harbor.fullname" $ }}-core
                 port:
                   number: {{ include "harbor.core.service.port" $ }}
+          # Native package registries: /pkg/<format>/<project>/
+          - path: /pkg/
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "harbor.fullname" $ }}-core
+                port:
+                  number: {{ include "harbor.core.service.port" $ }}
           - path: /service/
             pathType: Prefix
             backend:

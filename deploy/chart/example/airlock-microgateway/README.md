@@ -63,7 +63,7 @@ kubectl -n harbor get gateway harbor -w
 
 The operator provisions an Envoy Deployment and a `LoadBalancer` Service named
 `harbor` in the `harbor` namespace. The chart's HTTPRoute (`harbor`)
-attaches to it and routes `/api/`, `/service/`, `/v2/`, `/c/`, `/chartrepo/` and `/`
+attaches to it and routes `/api/`, `/pkg/`, `/service/`, `/v2/`, `/c/`, `/chartrepo/` and `/`
 to `harbor-core`.
 
 ## Test push / pull
