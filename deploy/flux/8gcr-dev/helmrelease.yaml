@@ -43,6 +43,9 @@ spec:
             - 8gcr.container-registry.dev
       annotations:
         nginx.ingress.kubernetes.io/proxy-body-size: "0"
+        # A /pkg/ proxy-cache miss fetches upstream while the client waits.
+        nginx.ingress.kubernetes.io/proxy-send-timeout: "900"
+        nginx.ingress.kubernetes.io/proxy-read-timeout: "900"
         nginx.ingress.kubernetes.io/ssl-redirect: "true"
         cert-manager.io/cluster-issuer: letsencrypt-prod
         # Demo-only config lock: every user on this tenant is a system admin
