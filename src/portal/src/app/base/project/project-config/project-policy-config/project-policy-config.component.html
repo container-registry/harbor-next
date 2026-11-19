@@ -16,7 +16,7 @@
                 {{ 'PROJECT_CONFIG.PUBLIC_POLICY' | translate }}
             </clr-control-helper>
         </clr-checkbox-container>
-        <clr-checkbox-container *ngIf="hasChangeConfigRole" clrInline>
+        <clr-checkbox-container *ngIf="isSystemAdmin" clrInline>
             <label class="label-color-input">
                 {{ 'PROJECT.PROXY_CACHE' | translate }}
             </label>
@@ -24,7 +24,7 @@
                 <input
                     type="checkbox"
                     clrCheckbox
-                    [disabled]="!allowUpdateProxyCacheConfiguration"
+                    disabled
                     [(ngModel)]="projectPolicy.ProxyCacheEnabled"
                     name="project-proxy-cache-enabled" />
             </clr-checkbox-wrapper>
@@ -33,7 +33,7 @@
             </clr-control-helper>
         </clr-checkbox-container>
         <div
-            *ngIf="hasChangeConfigRole && projectPolicy.ProxyCacheEnabled"
+            *ngIf="isSystemAdmin && projectPolicy.ProxyCacheEnabled"
             class="clr-form-control mt-0 mb-2">
             <label class="clr-control-label"></label>
             <div class="clr-select-wrapper row-inline">
@@ -44,7 +44,7 @@
                     class="width-164 ml-1"
                     id="registry"
                     name="registry"
-                    [disabled]="!allowUpdateProxyCacheConfiguration"
+                    disabled
                     [(ngModel)]="projectPolicy.RegistryId">
                     <option class="display-none" value=""></option>
                     <option *ngFor="let r of registries" [value]="r.id">
@@ -210,7 +210,7 @@
         </clr-checkbox-container>
         <div
             *ngIf="
-                !hasChangeConfigRole &&
+                !isSystemAdmin &&
                 isProxyCacheProject &&
                 projectPolicy.ProxyCacheFilterPattern
             "
