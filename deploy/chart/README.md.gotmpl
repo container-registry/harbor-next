@@ -662,6 +662,23 @@ metrics:
       grafana_folder: Harbor  # Optional, sidecar folder annotation
 ```
 
+#### Security Hub dashboards
+
+`metrics.grafanaDashboard.securityHub.enabled: true` ships three linked vulnerability
+dashboards (`dashboards/harbor-security-hub*.json`) in a second ConfigMap with the same
+namespace, labels and annotations. They query the Harbor Security Hub API through the
+Infinity datasource plugin instead of Prometheus, so they need neither `metrics.enabled`
+nor a ServiceMonitor. They do need the plugin installed in Grafana and an Infinity
+datasource that authenticates as a robot account with Security Hub read access; the chart
+creates neither. See the [Security Hub dashboard guide](../../contrib/grafana-dashboard/security-hub.md).
+
+```yaml
+metrics:
+  grafanaDashboard:
+    securityHub:
+      enabled: true
+```
+
 ### CloudNativePG via extraManifests
 
 ```yaml

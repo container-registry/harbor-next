@@ -1,0 +1,1289 @@
+{
+  "uid": "harbor-security-hub-project",
+  "title": "Harbor Security Hub - Project",
+  "tags": [
+    "harbor",
+    "security",
+    "cve",
+    "harbor-security-hub"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "editable": true,
+  "description": "CVEs and repositories of one project at one severity.",
+  "graphTooltip": 0,
+  "timepicker": {
+    "hidden": true
+  },
+  "links": [
+    {
+      "title": "Security Hub",
+      "type": "dashboards",
+      "tags": [
+        "harbor-security-hub"
+      ],
+      "asDropdown": false,
+      "includeVars": false,
+      "keepTime": false
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Data source",
+        "type": "datasource",
+        "query": "yesoreyeram-infinity-datasource",
+        "current": {},
+        "options": [],
+        "hide": 0,
+        "refresh": 1,
+        "regex": "",
+        "multi": false,
+        "includeAll": false,
+        "allowCustomValue": false,
+        "skipUrlSync": false
+      },
+      {
+        "name": "project",
+        "label": "Project",
+        "type": "query",
+        "datasource": {
+          "type": "yesoreyeram-infinity-datasource",
+          "uid": "${datasource}"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "current": {},
+        "options": [],
+        "multi": false,
+        "includeAll": false,
+        "query": {
+          "queryType": "infinity",
+          "refId": "variable",
+          "infinityQuery": {
+            "refId": "A",
+            "datasource": {
+              "type": "yesoreyeram-infinity-datasource",
+              "uid": "${datasource}"
+            },
+            "type": "json",
+            "source": "url",
+            "format": "table",
+            "parser": "backend",
+            "url": "/projects?page_size=100",
+            "root_selector": "",
+            "columns": [
+              {
+                "selector": "name",
+                "text": "__text",
+                "type": "string"
+              },
+              {
+                "selector": "project_id",
+                "text": "__value",
+                "type": "string"
+              }
+            ],
+            "url_options": {
+              "method": "GET",
+              "data": ""
+            }
+          }
+        }
+      },
+      {
+        "name": "severity",
+        "label": "Severity",
+        "type": "custom",
+        "query": "Critical,High,Medium,Low,Unknown",
+        "current": {},
+        "options": [],
+        "multi": false,
+        "includeAll": false
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "CVEs in ${project:text} ($severity)",
+      "description": "Sorted by artifacts affected: fixing the top rows cleans the most artifacts. Capped at 1000 findings.",
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 10,
+        "h": 20
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "${datasource}"
+          },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "parser": "backend",
+          "url": "/security/vul?page_size=100&page=1&tune_count=true&q=project_id=${project},severity=${severity}",
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "cve_id",
+              "text": "CVE",
+              "type": "string"
+            },
+            {
+              "selector": "severity",
+              "text": "Severity",
+              "type": "string"
+            },
+            {
+              "selector": "cvss_v3_score",
+              "text": "CVSS",
+              "type": "number"
+            },
+            {
+              "selector": "project_id",
+              "text": "project_id",
+              "type": "number"
+            },
+            {
+              "selector": "repository_name",
+              "text": "Repository",
+              "type": "string"
+            },
+            {
+              "selector": "digest",
+              "text": "Digest",
+              "type": "string"
+            },
+            {
+              "selector": "package",
+              "text": "Package",
+              "type": "string"
+            },
+            {
+              "selector": "version",
+              "text": "Version",
+              "type": "string"
+            },
+            {
+              "selector": "fixed_version",
+              "text": "Fixed in",
+              "type": "string"
+            },
+            {
+              "selector": "status",
+              "text": "Status",
+              "type": "string"
+            }
+          ],
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          }
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "${datasource}"
+          },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "parser": "backend",
+          "url": "/security/vul?page_size=100&page=2&tune_count=true&q=project_id=${project},severity=${severity}",
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "cve_id",
+              "text": "CVE",
+              "type": "string"
+            },
+            {
+              "selector": "severity",
+              "text": "Severity",
+              "type": "string"
+            },
+            {
+              "selector": "cvss_v3_score",
+              "text": "CVSS",
+              "type": "number"
+            },
+            {
+              "selector": "project_id",
+              "text": "project_id",
+              "type": "number"
+            },
+            {
+              "selector": "repository_name",
+              "text": "Repository",
+              "type": "string"
+            },
+            {
+              "selector": "digest",
+              "text": "Digest",
+              "type": "string"
+            },
+            {
+              "selector": "package",
+              "text": "Package",
+              "type": "string"
+            },
+            {
+              "selector": "version",
+              "text": "Version",
+              "type": "string"
+            },
+            {
+              "selector": "fixed_version",
+              "text": "Fixed in",
+              "type": "string"
+            },
+            {
+              "selector": "status",
+              "text": "Status",
+              "type": "string"
+            }
+          ],
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          }
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "${datasource}"
+          },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "parser": "backend",
+          "url": "/security/vul?page_size=100&page=3&tune_count=true&q=project_id=${project},severity=${severity}",
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "cve_id",
+              "text": "CVE",
+              "type": "string"
+            },
+            {
+              "selector": "severity",
+              "text": "Severity",
+              "type": "string"
+            },
+            {
+              "selector": "cvss_v3_score",
+              "text": "CVSS",
+              "type": "number"
+            },
+            {
+              "selector": "project_id",
+              "text": "project_id",
+              "type": "number"
+            },
+            {
+              "selector": "repository_name",
+              "text": "Repository",
+              "type": "string"
+            },
+            {
+              "selector": "digest",
+              "text": "Digest",
+              "type": "string"
+            },
+            {
+              "selector": "package",
+              "text": "Package",
+              "type": "string"
+            },
+            {
+              "selector": "version",
+              "text": "Version",
+              "type": "string"
+            },
+            {
+              "selector": "fixed_version",
+              "text": "Fixed in",
+              "type": "string"
+            },
+            {
+              "selector": "status",
+              "text": "Status",
+              "type": "string"
+            }
+          ],
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          }
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "${datasource}"
+          },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "parser": "backend",
+          "url": "/security/vul?page_size=100&page=4&tune_count=true&q=project_id=${project},severity=${severity}",
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "cve_id",
+              "text": "CVE",
+              "type": "string"
+            },
+            {
+              "selector": "severity",
+              "text": "Severity",
+              "type": "string"
+            },
+            {
+              "selector": "cvss_v3_score",
+              "text": "CVSS",
+              "type": "number"
+            },
+            {
+              "selector": "project_id",
+              "text": "project_id",
+              "type": "number"
+            },
+            {
+              "selector": "repository_name",
+              "text": "Repository",
+              "type": "string"
+            },
+            {
+              "selector": "digest",
+              "text": "Digest",
+              "type": "string"
+            },
+            {
+              "selector": "package",
+              "text": "Package",
+              "type": "string"
+            },
+            {
+              "selector": "version",
+              "text": "Version",
+              "type": "string"
+            },
+            {
+              "selector": "fixed_version",
+              "text": "Fixed in",
+              "type": "string"
+            },
+            {
+              "selector": "status",
+              "text": "Status",
+              "type": "string"
+            }
+          ],
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          }
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "${datasource}"
+          },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "parser": "backend",
+          "url": "/security/vul?page_size=100&page=5&tune_count=true&q=project_id=${project},severity=${severity}",
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "cve_id",
+              "text": "CVE",
+              "type": "string"
+            },
+            {
+              "selector": "severity",
+              "text": "Severity",
+              "type": "string"
+            },
+            {
+              "selector": "cvss_v3_score",
+              "text": "CVSS",
+              "type": "number"
+            },
+            {
+              "selector": "project_id",
+              "text": "project_id",
+              "type": "number"
+            },
+            {
+              "selector": "repository_name",
+              "text": "Repository",
+              "type": "string"
+            },
+            {
+              "selector": "digest",
+              "text": "Digest",
+              "type": "string"
+            },
+            {
+              "selector": "package",
+              "text": "Package",
+              "type": "string"
+            },
+            {
+              "selector": "version",
+              "text": "Version",
+              "type": "string"
+            },
+            {
+              "selector": "fixed_version",
+              "text": "Fixed in",
+              "type": "string"
+            },
+            {
+              "selector": "status",
+              "text": "Status",
+              "type": "string"
+            }
+          ],
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          }
+        },
+        {
+          "refId": "F",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "${datasource}"
+          },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "parser": "backend",
+          "url": "/security/vul?page_size=100&page=6&tune_count=true&q=project_id=${project},severity=${severity}",
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "cve_id",
+              "text": "CVE",
+              "type": "string"
+            },
+            {
+              "selector": "severity",
+              "text": "Severity",
+              "type": "string"
+            },
+            {
+              "selector": "cvss_v3_score",
+              "text": "CVSS",
+              "type": "number"
+            },
+            {
+              "selector": "project_id",
+              "text": "project_id",
+              "type": "number"
+            },
+            {
+              "selector": "repository_name",
+              "text": "Repository",
+              "type": "string"
+            },
+            {
+              "selector": "digest",
+              "text": "Digest",
+              "type": "string"
+            },
+            {
+              "selector": "package",
+              "text": "Package",
+              "type": "string"
+            },
+            {
+              "selector": "version",
+              "text": "Version",
+              "type": "string"
+            },
+            {
+              "selector": "fixed_version",
+              "text": "Fixed in",
+              "type": "string"
+            },
+            {
+              "selector": "status",
+              "text": "Status",
+              "type": "string"
+            }
+          ],
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          }
+        },
+        {
+          "refId": "G",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "${datasource}"
+          },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "parser": "backend",
+          "url": "/security/vul?page_size=100&page=7&tune_count=true&q=project_id=${project},severity=${severity}",
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "cve_id",
+              "text": "CVE",
+              "type": "string"
+            },
+            {
+              "selector": "severity",
+              "text": "Severity",
+              "type": "string"
+            },
+            {
+              "selector": "cvss_v3_score",
+              "text": "CVSS",
+              "type": "number"
+            },
+            {
+              "selector": "project_id",
+              "text": "project_id",
+              "type": "number"
+            },
+            {
+              "selector": "repository_name",
+              "text": "Repository",
+              "type": "string"
+            },
+            {
+              "selector": "digest",
+              "text": "Digest",
+              "type": "string"
+            },
+            {
+              "selector": "package",
+              "text": "Package",
+              "type": "string"
+            },
+            {
+              "selector": "version",
+              "text": "Version",
+              "type": "string"
+            },
+            {
+              "selector": "fixed_version",
+              "text": "Fixed in",
+              "type": "string"
+            },
+            {
+              "selector": "status",
+              "text": "Status",
+              "type": "string"
+            }
+          ],
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          }
+        },
+        {
+          "refId": "H",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "${datasource}"
+          },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "parser": "backend",
+          "url": "/security/vul?page_size=100&page=8&tune_count=true&q=project_id=${project},severity=${severity}",
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "cve_id",
+              "text": "CVE",
+              "type": "string"
+            },
+            {
+              "selector": "severity",
+              "text": "Severity",
+              "type": "string"
+            },
+            {
+              "selector": "cvss_v3_score",
+              "text": "CVSS",
+              "type": "number"
+            },
+            {
+              "selector": "project_id",
+              "text": "project_id",
+              "type": "number"
+            },
+            {
+              "selector": "repository_name",
+              "text": "Repository",
+              "type": "string"
+            },
+            {
+              "selector": "digest",
+              "text": "Digest",
+              "type": "string"
+            },
+            {
+              "selector": "package",
+              "text": "Package",
+              "type": "string"
+            },
+            {
+              "selector": "version",
+              "text": "Version",
+              "type": "string"
+            },
+            {
+              "selector": "fixed_version",
+              "text": "Fixed in",
+              "type": "string"
+            },
+            {
+              "selector": "status",
+              "text": "Status",
+              "type": "string"
+            }
+          ],
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          }
+        },
+        {
+          "refId": "I",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "${datasource}"
+          },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "parser": "backend",
+          "url": "/security/vul?page_size=100&page=9&tune_count=true&q=project_id=${project},severity=${severity}",
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "cve_id",
+              "text": "CVE",
+              "type": "string"
+            },
+            {
+              "selector": "severity",
+              "text": "Severity",
+              "type": "string"
+            },
+            {
+              "selector": "cvss_v3_score",
+              "text": "CVSS",
+              "type": "number"
+            },
+            {
+              "selector": "project_id",
+              "text": "project_id",
+              "type": "number"
+            },
+            {
+              "selector": "repository_name",
+              "text": "Repository",
+              "type": "string"
+            },
+            {
+              "selector": "digest",
+              "text": "Digest",
+              "type": "string"
+            },
+            {
+              "selector": "package",
+              "text": "Package",
+              "type": "string"
+            },
+            {
+              "selector": "version",
+              "text": "Version",
+              "type": "string"
+            },
+            {
+              "selector": "fixed_version",
+              "text": "Fixed in",
+              "type": "string"
+            },
+            {
+              "selector": "status",
+              "text": "Status",
+              "type": "string"
+            }
+          ],
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          }
+        },
+        {
+          "refId": "J",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "${datasource}"
+          },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "parser": "backend",
+          "url": "/security/vul?page_size=100&page=10&tune_count=true&q=project_id=${project},severity=${severity}",
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "cve_id",
+              "text": "CVE",
+              "type": "string"
+            },
+            {
+              "selector": "severity",
+              "text": "Severity",
+              "type": "string"
+            },
+            {
+              "selector": "cvss_v3_score",
+              "text": "CVSS",
+              "type": "number"
+            },
+            {
+              "selector": "project_id",
+              "text": "project_id",
+              "type": "number"
+            },
+            {
+              "selector": "repository_name",
+              "text": "Repository",
+              "type": "string"
+            },
+            {
+              "selector": "digest",
+              "text": "Digest",
+              "type": "string"
+            },
+            {
+              "selector": "package",
+              "text": "Package",
+              "type": "string"
+            },
+            {
+              "selector": "version",
+              "text": "Version",
+              "type": "string"
+            },
+            {
+              "selector": "fixed_version",
+              "text": "Fixed in",
+              "type": "string"
+            },
+            {
+              "selector": "status",
+              "text": "Status",
+              "type": "string"
+            }
+          ],
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          }
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "CVE": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "Repository": {
+                "aggregations": [
+                  "distinctCount"
+                ],
+                "operation": "aggregate"
+              },
+              "Digest": {
+                "aggregations": [
+                  "distinctCount"
+                ],
+                "operation": "aggregate"
+              },
+              "CVSS": {
+                "aggregations": [
+                  "max"
+                ],
+                "operation": "aggregate"
+              },
+              "Fixed in": {
+                "aggregations": [
+                  "firstNotNull"
+                ],
+                "operation": "aggregate"
+              }
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Repository (distinctCount)": "Repositories",
+              "Digest (distinctCount)": "Artifacts",
+              "CVSS (max)": "CVSS",
+              "Fixed in (firstNotNull)": "Fixed in"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "Artifacts",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": true,
+          "reducer": [
+            "count"
+          ],
+          "countRows": true
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Severity"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Critical": {
+                        "color": "dark-red",
+                        "index": 0
+                      },
+                      "High": {
+                        "color": "red",
+                        "index": 1
+                      },
+                      "Medium": {
+                        "color": "orange",
+                        "index": 2
+                      },
+                      "Low": {
+                        "color": "yellow",
+                        "index": 3
+                      },
+                      "Unknown": {
+                        "color": "gray",
+                        "index": 4
+                      },
+                      "None": {
+                        "color": "green",
+                        "index": 5
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^(Max )?CVSS$"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 0.1
+                    },
+                    {
+                      "color": "orange",
+                      "value": 4
+                    },
+                    {
+                      "color": "red",
+                      "value": 7
+                    },
+                    {
+                      "color": "dark-red",
+                      "value": 9
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "project_id"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repository"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 300
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CVE"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 160
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CVE"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Where is this CVE?",
+                    "url": "/d/harbor-security-hub-cve?var-datasource=${datasource}&var-cve=${__value.raw}"
+                  },
+                  {
+                    "title": "Open in NVD",
+                    "url": "https://nvd.nist.gov/vuln/detail/${__value.raw}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "Repositories in ${project:text} ($severity)",
+      "description": "",
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Dashboard --"
+      },
+      "gridPos": {
+        "x": 10,
+        "y": 0,
+        "w": 14,
+        "h": 20
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          },
+          "panelId": 1,
+          "withTransforms": false
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "Repository": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "CVE": {
+                "aggregations": [
+                  "distinctCount"
+                ],
+                "operation": "aggregate"
+              },
+              "Digest": {
+                "aggregations": [
+                  "distinctCount"
+                ],
+                "operation": "aggregate"
+              },
+              "CVSS": {
+                "aggregations": [
+                  "max"
+                ],
+                "operation": "aggregate"
+              }
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "CVE (distinctCount)": "CVEs",
+              "Digest (distinctCount)": "Artifacts",
+              "CVSS (max)": "Max CVSS"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "CVEs",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": true,
+          "reducer": [
+            "count"
+          ],
+          "countRows": true
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Severity"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Critical": {
+                        "color": "dark-red",
+                        "index": 0
+                      },
+                      "High": {
+                        "color": "red",
+                        "index": 1
+                      },
+                      "Medium": {
+                        "color": "orange",
+                        "index": 2
+                      },
+                      "Low": {
+                        "color": "yellow",
+                        "index": 3
+                      },
+                      "Unknown": {
+                        "color": "gray",
+                        "index": 4
+                      },
+                      "None": {
+                        "color": "green",
+                        "index": 5
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^(Max )?CVSS$"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 0.1
+                    },
+                    {
+                      "color": "orange",
+                      "value": 4
+                    },
+                    {
+                      "color": "red",
+                      "value": 7
+                    },
+                    {
+                      "color": "dark-red",
+                      "value": 9
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "project_id"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Repository"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 300
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CVE"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 160
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

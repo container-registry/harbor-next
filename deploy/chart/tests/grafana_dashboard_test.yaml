@@ -4,6 +4,7 @@
 suite: Grafana dashboard ConfigMap tests
 templates:
   - templates/grafana-dashboard.configmap.yaml
+  - templates/grafana-security-hub-dashboards.configmap.yaml
   - templates/validate-values.yaml
 tests:
   - it: should not create the dashboard ConfigMap by default
@@ -58,3 +59,50 @@ tests:
       - equal:
           path: metadata.annotations.grafana_folder
           value: Harbor
+
+  - it: should not create the Security Hub dashboards ConfigMap by default
+    template: templates/grafana-security-hub-dashboards.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      metrics.grafanaDashboard.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should ship all three Security Hub dashboards with the shared sidecar settings
+    template: templates/grafana-security-hub-dashboards.configmap.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      metrics.grafanaDashboard.securityHub.enabled: true
+      metrics.grafanaDashboard.namespace: monitoring
+      metrics.grafanaDashboard.annotations.grafana_folder: Harbor
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-harbor-grafana-security-hub-dashboards
+      - equal:
+          path: metadata.namespace
+          value: monitoring
+      - equal:
+          path: metadata.labels.grafana_dashboard
+          value: "1"
+      - equal:
+          path: metadata.annotations.grafana_folder
+          value: Harbor
+      - matchRegex:
+          path: data["harbor-security-hub.json"]
+          pattern: '"uid": "harbor-security-hub"'
+      - matchRegex:
+          path: data["harbor-security-hub-cve.json"]
+          pattern: '"uid": "harbor-security-hub-cve"'
+      - matchRegex:
+          path: data["harbor-security-hub-project.json"]
+          pattern: '"uid": "harbor-security-hub-project"'
+      - notExists:
+          path: data["harbor.json"]

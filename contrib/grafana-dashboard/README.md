@@ -10,6 +10,10 @@ and jobservice. It also includes PostgreSQL/pgx monitoring available in the
 [8gcr Harbor distribution](https://container-registry.com/8gcr/), with a visible
 feature note and panel tooltips explaining empty results on standard Harbor.
 
+For vulnerability data per CVE, project and repository, see the
+[Security Hub dashboards](security-hub.md). They use the Infinity datasource
+instead of Prometheus.
+
 ## Preview
 
 Overview and Runtime, with shared datasource, cluster and namespace selectors:
