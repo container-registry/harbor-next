@@ -28,7 +28,7 @@ README.md.gotmpl
 # Contributor-facing, not chart content
 CONTRIBUTING.md
 # Artifact Hub repo metadata — pushed as a separate OCI artifact, not chart content
-artifacthub-repo.yml
+artifacthub-repo-*.yml
 # CI/CD
 .github/
 .gitlab-ci.yml

@@ -1,0 +1,13 @@
+# Artifact Hub repository metadata for the 8gcr chart
+# (https://artifacthub.io/docs/topics/repositories/, Helm OCI section).
+#
+# NOT part of the chart package (.helmignore). The release pipeline pushes
+# it as oci://8gears.container-registry.com/8gcr/charts/8gcr:artifacthub.io.
+# Each Artifact Hub repository has its own ID, hence one file per chart.
+#
+# Set repositoryID once oci://8gears.container-registry.com/8gcr/charts/8gcr
+# is added on artifacthub.io under the container-registry organization.
+# repositoryID: <uuid>
+owners:
+  - name: 8gears
+    email: vadim@8gears.com
