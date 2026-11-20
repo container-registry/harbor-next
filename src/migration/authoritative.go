@@ -88,16 +88,16 @@ func authoritativeSchemaPath() string {
 func applyAuthoritativeSchema(ctx context.Context, db schemaDB, path string) error {
 	schema, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("read authoritative Harbor Next schema %q: %w", path, err)
+		return fmt.Errorf("read authoritative 8gcr schema %q: %w", path, err)
 	}
 	if strings.TrimSpace(string(schema)) == "" {
-		return fmt.Errorf("authoritative Harbor Next schema %q is empty", path)
+		return fmt.Errorf("authoritative 8gcr schema %q is empty", path)
 	}
 
-	log.Infof("Applying authoritative Harbor Next schema from %s ...", path)
+	log.Infof("Applying authoritative 8gcr schema from %s ...", path)
 	tx, err := db.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("begin authoritative Harbor Next schema transaction: %w", err)
+		return fmt.Errorf("begin authoritative 8gcr schema transaction: %w", err)
 	}
 	committed := false
 	defer func() {
@@ -107,15 +107,15 @@ func applyAuthoritativeSchema(ctx context.Context, db schemaDB, path string) err
 	}()
 
 	if err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", authoritativeSchemaLockID); err != nil {
-		return fmt.Errorf("lock authoritative Harbor Next schema: %w", err)
+		return fmt.Errorf("lock authoritative 8gcr schema: %w", err)
 	}
 	if err := tx.Exec(ctx, string(schema)); err != nil {
-		return fmt.Errorf("apply authoritative Harbor Next schema: %w", err)
+		return fmt.Errorf("apply authoritative 8gcr schema: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit authoritative Harbor Next schema: %w", err)
+		return fmt.Errorf("commit authoritative 8gcr schema: %w", err)
 	}
 	committed = true
-	log.Info("Authoritative Harbor Next schema applied successfully")
+	log.Info("Authoritative 8gcr schema applied successfully")
 	return nil
 }

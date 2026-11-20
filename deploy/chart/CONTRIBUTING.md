@@ -1,4 +1,4 @@
-# Contributing to the Harbor Next Helm Chart
+# Contributing to the 8gcr Helm Chart
 
 This guide covers everything specific to working on the chart in
 `deploy/chart/`. Repo-wide rules — Conventional Commits, DCO sign-off,

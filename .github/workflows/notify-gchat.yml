@@ -24,7 +24,7 @@ on:
         description: Card title, followed by the tag
         required: false
         type: string
-        default: Harbor Next nightly
+        default: 8gcr nightly
       version:
         required: false
         type: string

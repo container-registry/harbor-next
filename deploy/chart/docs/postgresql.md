@@ -153,9 +153,9 @@ helm install harbor harbor/harbor --version <old chart> -n harbor -f old-values.
 
 Moving the directory back only works while the Harbor schema is still the
 old release's. Check it with `SELECT version FROM schema_migrations` before
-you uninstall this chart. Harbor Next 2.15 keeps schema 181, the same as
+you uninstall this chart. 8gcr 2.15 keeps schema 181, the same as
 upstream 2.15.3, and upstream core starts on it with `No change in schema,
-skip.`. Harbor Next 2.16 migrates to 190, and upstream 2.15 core then exits
+skip.`. 8gcr 2.16 migrates to 190, and upstream 2.15 core then exits
 with `failed to migrate the database, error: no migration found for version
-190`. Then the dump is the only way back. Tables that Harbor Next adds stay in the
+190`. Then the dump is the only way back. Tables that 8gcr adds stay in the
 database and upstream ignores them.

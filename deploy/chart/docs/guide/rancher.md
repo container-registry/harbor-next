@@ -79,7 +79,7 @@ CREATE DATABASE
 postgres=# exit
 ```
 
-## Deploy Harbor next
+## Deploy 8gcr
 
 We pull the Helm chart from the OCI repository. First, log in to the registry if authentication is required:
 
@@ -90,14 +90,14 @@ helm registry login 8gears.container-registry.com
 We pull the chart using the OCI reference:
 
 ```bash
-helm pull oci://8gears.container-registry.com/8gcr/charts/harbor
+helm pull oci://8gears.container-registry.com/8gcr/charts/8gcr
 ```
 
 Decompress the downloaded chart:
 
 ```bash
-tar xzvf harbor-*.tgz
-cd harbor
+tar xzvf 8gcr-*.tgz
+cd 8gcr
 ```
 
 The chart ships an RKE2/Rancher values file at

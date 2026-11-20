@@ -6,7 +6,8 @@ Expand the name of the chart.
 {{- end }}
 
 {{- define "harbor.name" -}}
-{{- include "harbor.dnsSafeName" (default .Chart.Name .Values.nameOverride) | trunc 63 | trimSuffix "-" }}
+{{- /* Not .Chart.Name: resource names and the immutable selectors must not follow the package name (charts/harbor vs charts/8gcr). */ -}}
+{{- include "harbor.dnsSafeName" (default "harbor" .Values.nameOverride) | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*

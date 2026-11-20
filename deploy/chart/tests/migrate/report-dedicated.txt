@@ -1,5 +1,5 @@
 ============================================================
-  harbor-migrate: tests/migrate/values-dedicated-2x.yaml -> Harbor Next chart values
+  harbor-migrate: tests/migrate/values-dedicated-2x.yaml -> 8gcr chart values
   This chart is NOT a drop-in upgrade. Plan a new install
   plus data migration (docs/MIGRATION.md). Full mapping
   tables: docs/MIGRATION-REFERENCE.md
@@ -33,7 +33,7 @@ INFO — mapped automatically (12)
       Default flipped to false in this chart — kept enabled because your 2.x values had it on.
   * image.repository/tag (core, portal, registry, jobservice, exporter, trivy)
       -> chart image defaults
-      Legacy stock image references dropped — images default to Harbor Next builds (8gears.container-registry.com/8gcr/harbor-*, tag = chart appVersion). Set <component>.image.* only for mirrors.
+      Legacy stock image references dropped — images default to 8gcr builds (8gears.container-registry.com/8gcr/harbor-*, tag = chart appVersion). Set <component>.image.* only for mirrors.
   * persistence.imageChartStorage.s3
       -> registry.config.storage.s3
       registry.config is the verbatim distribution config.yml — every s3 field passes through unchanged. For MinIO / Ceph RGW / SeaweedFS also set forcepathstyle true.

@@ -11,7 +11,7 @@ jobs:
   cleanup-github-cache:
     name: Purge stale GitHub Actions caches
     # Do not run the upstream maintenance schedule in forks.
-    if: github.event_name != 'schedule' || github.repository == 'container-registry/harbor-next'
+    if: github.event_name != 'schedule' || github.repository == 'container-registry/8gcr'
     runs-on: ubuntu-26.04
     permissions:
       # gh cache list/delete; no checkout, so no contents

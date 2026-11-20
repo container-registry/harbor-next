@@ -363,7 +363,7 @@ jobs:
       SYNC_APP_PRIVATE_KEY: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
 
   mark-commercial-release:
-    # Stamp the release marker into each 8gcr patch branch's changelog file.
+    # Stamp the release marker into each 8gcr-ee patch branch's changelog file.
     # Runs strictly AFTER the notes job: notes render the entries above the
     # newest marker, then this marks them as shipped in this tag. Manual
     # re-renders of old tags never dispatch (this job only runs on a fresh
@@ -374,7 +374,7 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
-      # checkout of this repo (the app token below is scoped to 8gcr only)
+      # checkout of this repo (the app token below is scoped to 8gcr-ee only)
       contents: read
     steps:
       - name: Generate GitHub App token
@@ -384,7 +384,7 @@ jobs:
           app-id: ${{ vars.SYNC_APP_ID }}
           private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
           owner: container-registry
-          repositories: 8gcr
+          repositories: 8gcr-ee
           # repository_dispatch needs contents write; request nothing else
           permission-contents: write
 
