@@ -6,6 +6,17 @@ This changelog mirrors [GitHub Releases](https://github.com/container-registry/h
 
 ---
 
+## [2.15.16](https://github.com/container-registry/8gcr/compare/v2.15.15...v2.15.16) (2026-11-20)
+
+
+### Bug Fixes
+
+* Add Int64FromAny Task Helper Missing From release-2.15 ([#1397](https://github.com/container-registry/8gcr/issues/1397)) ([83955f8](https://github.com/container-registry/8gcr/commit/83955f8ca76747b26a389e176768eb1da93a522a))
+* Let Registry Tokens Read The Catalog When The Principal Holds catalog:read (backport [#1384](https://github.com/container-registry/8gcr/issues/1384)) ([#1389](https://github.com/container-registry/8gcr/issues/1389)) ([3cad56e](https://github.com/container-registry/8gcr/commit/3cad56e18b56e7580a1f8fb366cc8b7fcc63b721))
+* Let Robot Accounts Export And Read CVE Reports (backport [#1385](https://github.com/container-registry/8gcr/issues/1385)) ([#1390](https://github.com/container-registry/8gcr/issues/1390)) ([1e5c116](https://github.com/container-registry/8gcr/commit/1e5c11680e1ba607d082279aca976499b06ca1e6))
+* **portal:** Show Proxy Cache Settings Only To System Admins (backport [#1501](https://github.com/container-registry/8gcr/issues/1501)) ([#1506](https://github.com/container-registry/8gcr/issues/1506)) ([a8e7901](https://github.com/container-registry/8gcr/commit/a8e79010ae399548ad4e2a54a276c75eea44cf0d))
+* **portal:** Stop Listing Registries For Project Admins On Project Configuration (backport [#1489](https://github.com/container-registry/8gcr/issues/1489)) ([#1502](https://github.com/container-registry/8gcr/issues/1502)) ([0acf89e](https://github.com/container-registry/8gcr/commit/0acf89e6605aa969ebf0d8d9f9fc62d78a256c00))
+
 ## [2.15.15](https://github.com/container-registry/harbor-next/compare/v2.15.14...v2.15.15) (2026-11-02)
 
 
