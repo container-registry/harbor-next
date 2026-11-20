@@ -1,4 +1,4 @@
-# 8gcr
+# harbor
 
 A modern, production-ready Helm chart for [8gcr](https://github.com/container-registry/8gcr) - the cloud-native container registry for Kubernetes.
 
@@ -9,15 +9,11 @@ A modern, production-ready Helm chart for [8gcr](https://github.com/container-re
 kubectl create secret generic my-harbor-db \
   --from-literal=POSTGRESQL_PASSWORD='your-strong-password'
 
-helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/8gcr \
+helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor \
   --set externalURL=https://harbor.example.com \
   --set database.host=my-postgres.example.com \
   --set database.existingSecret=my-harbor-db
 ```
-
-> **Coming from `charts/harbor`?** The same chart is now published as
-> `charts/8gcr` and, for now, still under the old name. Switching needs no values
-> changes, see [MIGRATION.md](docs/MIGRATION.md#chart-renamed-to-8gcr).
 
 > **⚠️ Security:** Harbor's default admin credentials (`admin` / `Harbor12345`) are
 > publicly known. Set a strong password via `harborAdminPassword` (or, better, a
@@ -149,7 +145,7 @@ kubectl -n harbor create secret generic my-harbor-db \
 kubectl -n harbor create secret generic my-harbor-admin \
   --from-literal=HARBOR_ADMIN_PASSWORD='your-strong-admin-password'
 
-helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/8gcr \
+helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor \
   --namespace harbor \
   --set externalURL=https://harbor.example.com \
   --set database.host=postgres.example.com \
@@ -160,7 +156,7 @@ helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/8gcr \
 ### With Values File
 
 ```bash
-helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/8gcr \
+helm install my-harbor oci://8gears.container-registry.com/8gcr/charts/harbor \
   --namespace harbor \
   --create-namespace \
   -f values-production.yaml
