@@ -53,7 +53,7 @@ The cluster needs an initial pointer that says "follow this OCI artifact". That 
 
 ```sh
 kubectl apply -f \
-  https://raw.githubusercontent.com/container-registry/harbor-next/main/deploy/flux/8gcr-dev/bootstrap.yaml
+  https://raw.githubusercontent.com/container-registry/8gcr/main/deploy/flux/8gcr-dev/bootstrap.yaml
 ```
 
 This creates an `OCIRepository` and a `Kustomization` in `flux-system` that reconcile the published bundle. After this single `kubectl apply`, every subsequent change reaches the cluster via OCI → Flux. The bootstrap file is idempotent — re-applying it is a no-op.

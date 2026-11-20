@@ -1,7 +1,7 @@
 # Upstream goharbor images
 
 Run the chart against the upstream goharbor images on Docker Hub
-(`docker.io/goharbor/*`) instead of the default 8gcr Harbor Next builds.
+(`docker.io/goharbor/*`) instead of the default 8gcr builds.
 [`values.yaml`](values.yaml) carries the full configuration.
 
 The whole switch is one value:

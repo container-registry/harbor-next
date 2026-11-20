@@ -1,19 +1,19 @@
 apiVersion: v2
-name: harbor
-description: A modern, production-ready Helm chart for [Harbor
-  Next](https://github.com/container-registry/harbor-next) - the cloud-native
+name: 8gcr
+description: A modern, production-ready Helm chart for
+  [8gcr](https://github.com/container-registry/8gcr) - the cloud-native
   container registry for Kubernetes.
 type: application
 version: 2.2.0
 # appVersion is stamped by the app release commit through the marker below;
 # version is stamped by the chart release PR on the same release branch.
-appVersion: "v2.16.0" # x-release-please-version
+appVersion: "v2.16.0"  # x-release-please-version
 kubeVersion: ">=1.28.0-0"
 
-home: https://github.com/container-registry/harbor-next
-icon: https://raw.githubusercontent.com/container-registry/harbor-next/refs/heads/main/docs/img/harbor-next-logo.svg
+home: https://github.com/container-registry/8gcr
+icon: https://raw.githubusercontent.com/container-registry/8gcr/refs/heads/main/docs/img/8gcr-logo.svg
 sources:
-  - https://github.com/container-registry/harbor-next
+  - https://github.com/container-registry/8gcr
 
 keywords:
   - harbor
@@ -29,8 +29,8 @@ keywords:
   - helm
 
 maintainers:
-  - name: Harbor Next Authors
-    url: https://github.com/container-registry/harbor-next
+  - name: 8gcr Authors
+    url: https://github.com/container-registry/8gcr
 
 dependencies:
   - name: valkey
@@ -53,10 +53,10 @@ annotations:
   artifacthub.io/operator: "false"
   artifacthub.io/links: |
     - name: Documentation
-      url: https://github.com/container-registry/harbor-next
+      url: https://github.com/container-registry/8gcr
     - name: Source Helm Chart
-      url: https://github.com/container-registry/harbor-next/tree/main/deploy/chart
+      url: https://github.com/container-registry/8gcr/tree/main/deploy/chart
     - name: Migration from goharbor/harbor-helm
-      url: https://github.com/container-registry/harbor-next/blob/main/deploy/chart/docs/MIGRATION.md
+      url: https://github.com/container-registry/8gcr/blob/main/deploy/chart/docs/MIGRATION.md
     - name: Upstream Harbor
       url: https://goharbor.io

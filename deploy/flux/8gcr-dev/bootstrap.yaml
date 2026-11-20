@@ -1,7 +1,7 @@
 # One-time bootstrap for the 8gcr Harbor deployment on hz-hopper.
 #
 # Apply once per cluster:
-#   kubectl apply -f https://raw.githubusercontent.com/container-registry/harbor-next/main/deploy/flux/8gcr-dev/bootstrap.yaml
+#   kubectl apply -f https://raw.githubusercontent.com/container-registry/8gcr/main/deploy/flux/8gcr-dev/bootstrap.yaml
 #
 # This creates the OCIRepository + Kustomization in flux-system that fetches
 # the deploy bundle at

@@ -38,7 +38,7 @@ tasks:
     # left out.
     env:
       RESULTS_VALUE: '{{.RESULTS}}'
-      TITLE_VALUE: '{{.TITLE | default "Harbor Next nightly"}}'
+      TITLE_VALUE: '{{.TITLE | default "8gcr nightly"}}'
       VERSION_VALUE: '{{.NIGHTLY_VERSION | default ""}}'
       BETA_TAG_VALUE: '{{.NIGHTLY_TAG | default ""}}'
       HEAD_SHA_VALUE: '{{.HEAD_SHA | default ""}}'
@@ -304,8 +304,8 @@ tasks:
           bad "success failed: ${out}"
         fi
         says 'success reports the post' 'posted the nightly outcome to Google Chat (HTTP 200)'
-        card 'success headline' '.text == "Harbor Next nightly v9.9.0-beta: published, e2e passed"'
-        card 'success header' '.cardsV2[0].card.header == {title: "Harbor Next nightly v9.9.0-beta: Passed", subtitle: "Version 9.9.0-beta"}'
+        card 'success headline' '.text == "8gcr nightly v9.9.0-beta: published, e2e passed"'
+        card 'success header' '.cardsV2[0].card.header == {title: "8gcr nightly v9.9.0-beta: Passed", subtitle: "Version 9.9.0-beta"}'
         card 'success carries the counts' "$(row 'End-to-end suite') == [\"12/12 passed, 0 failed\"]"
         card 'success names no failed job' "$(row 'Failed jobs') == []"
         card 'success links the main commit' "$(row 'Built from main') == [\"<a href=\\\"${repo}/commit/${sha_main}\\\">0123456</a>\"]"
@@ -327,7 +327,7 @@ tasks:
 
         # --- e2e-only failure, with and without a report -----------------------
         out=$(night 200 RESULTS="${e2e_bad}" E2E_PASSED=10 E2E_FAILED=2 E2E_TOTAL=12) || bad "e2e failure failed: ${out}"
-        card 'e2e failure status' '.cardsV2[0].card.header.title == "Harbor Next nightly v9.9.0-beta: E2E failed"'
+        card 'e2e failure status' '.cardsV2[0].card.header.title == "8gcr nightly v9.9.0-beta: E2E failed"'
         card 'e2e failure headline' '.text | endswith("published, e2e failed")'
         card 'e2e failure carries the counts' "$(row 'End-to-end suite') == [\"10/12 passed, 2 failed\"]"
         card 'e2e failure names e2e' "$(row 'Failed jobs') == [\"e2e\"]"
@@ -338,22 +338,22 @@ tasks:
 
         # --- another job failing ----------------------------------------------
         out=$(night 200 RESULTS="${build_bad}") || bad "build failure failed: ${out}"
-        card 'build failure status' '.cardsV2[0].card.header.title == "Harbor Next nightly v9.9.0-beta: Failed"'
-        card 'build failure names the job' '.text == "Harbor Next nightly v9.9.0-beta: failed in publish-images"'
+        card 'build failure status' '.cardsV2[0].card.header.title == "8gcr nightly v9.9.0-beta: Failed"'
+        card 'build failure names the job' '.text == "8gcr nightly v9.9.0-beta: failed in publish-images"'
         card 'build failure row' "$(row 'Failed jobs') == [\"publish-images\"]"
         card 'build failure skipped e2e is not run' "$(row 'End-to-end suite') == [\"not run\"]"
         card 'build failure has no release notes button' "${buttons} == [\"Open run\"]"
 
         # --- cancellation -----------------------------------------------------
         out=$(night 200 RESULTS="${cancelled}") || bad "cancellation failed: ${out}"
-        card 'cancelled status' '.cardsV2[0].card.header.title == "Harbor Next nightly v9.9.0-beta: Cancelled"'
+        card 'cancelled status' '.cardsV2[0].card.header.title == "8gcr nightly v9.9.0-beta: Cancelled"'
         card 'cancelled names the job' "$(row 'Cancelled jobs') == [\"publish-images\"]"
         card 'cancelled has no release notes button' "${buttons} == [\"Open run\"]"
 
         # --- no links at all: the empty button section is dropped ------------
         out=$(post 200 RESULTS="${all_ok}") || bad "bare card failed: ${out}"
         card 'bare card has a single section' '(.cardsV2[0].card.sections | length) == 1'
-        card 'bare card title has no tag' '.cardsV2[0].card.header == {title: "Harbor Next nightly: Passed"}'
+        card 'bare card title has no tag' '.cardsV2[0].card.header == {title: "8gcr nightly: Passed"}'
 
         # --- webhook errors: a warning with the code, never a failure ---------
         body='{"error":{"code":400,"message":"Invalid JSON payload"}}'

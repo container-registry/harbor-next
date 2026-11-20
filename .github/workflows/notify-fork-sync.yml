@@ -19,7 +19,7 @@ jobs:
           app-id: ${{ vars.SYNC_APP_ID }}
           private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
           owner: container-registry
-          repositories: 8gcr
+          repositories: 8gcr-ee
           # repository_dispatch needs contents write; request nothing else
           permission-contents: write
 
@@ -37,5 +37,5 @@ jobs:
             -H "Content-Type: application/json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             -H "Authorization: Bearer ${DISPATCH_TOKEN}" \
-            "https://api.github.com/repos/container-registry/8gcr/dispatches" \
+            "https://api.github.com/repos/container-registry/8gcr-ee/dispatches" \
             -d "${payload}"

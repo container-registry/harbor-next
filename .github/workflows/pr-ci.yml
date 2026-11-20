@@ -59,7 +59,7 @@ jobs:
           # dockerfile COPY/build-arg or by the task build steps (gen-apis /
           # build:binary). Anything not listed (docs, tests, lint config, dev
           # taskfiles, other workflows) cannot change an image. Commercial code
-          # from 8gcr isn't applied for PR previews at all, see publish-images.yml.
+          # from 8gcr-ee isn't applied for PR previews at all, see publish-images.yml.
           IMAGE_INPUTS: |
             ^src/
             ^api/v2\.0/swagger\.yaml$

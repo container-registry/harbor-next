@@ -1,10 +1,10 @@
 # Release Process
 
-Harbor Next releases are automated with [release-please](https://github.com/googleapis/release-please). Do not create normal release tags or GitHub Releases manually.
+8gcr releases are automated with [release-please](https://github.com/googleapis/release-please). Do not create normal release tags or GitHub Releases manually.
 
 Release state is defined by:
 
-- The target branch: `harbor-next/main` or `harbor-next/release-X.Y`
+- The target branch: `8gcr/main` or `8gcr/release-X.Y`
 - Conventional squash commit titles
 - `release-please-config.json`
 - `release-please-config-maintenance.json`
@@ -21,11 +21,11 @@ On `main`, release-please uses the Go strategy and does not own `VERSION`; the w
 ```mermaid
 flowchart LR
   upstream["goharbor/harbor\nupstream/main"]
-  harborMain["container-registry/harbor-next\nharbor-next/main"]
-  harborRelease["container-registry/harbor-next\nharbor-next/release-X.Y"]
-  harborTag["container-registry/harbor-next\nvX.Y.Z tag + GitHub Release"]
-  patchManifest["harbor-next branch\ntaskfile/commercial-patches"]
-  gcrPatches["container-registry/8gcr\ndeclared patch branches"]
+  harborMain["container-registry/8gcr\n8gcr/main"]
+  harborRelease["container-registry/8gcr\n8gcr/release-X.Y"]
+  harborTag["container-registry/8gcr\nvX.Y.Z tag + GitHub Release"]
+  patchManifest["8gcr branch\ntaskfile/commercial-patches"]
+  gcrPatches["container-registry/8gcr-ee\ndeclared patch branches"]
   images["8gears.container-registry.com/8gcr\nrelease images"]
 
   upstream -->|selected fixes as upstream: commits| harborMain
@@ -42,26 +42,26 @@ flowchart LR
 Rules:
 
 - `upstream/main` is the upstream Harbor source.
-- `harbor-next/main` is active Harbor Next development.
-- `harbor-next/release-X.Y` is a maintenance branch for patch releases.
-- Each Harbor Next branch owns its ordered commercial patch list in `taskfile/commercial-patches`.
-- The release fetches only those named branches from `8gcr`; it never reads or imports `8gcr/main`.
-- Release images are built by checking out the Harbor Next release source, applying 8gcr patches during the workflow run, and building images from that patched working tree.
+- `8gcr/main` is active 8gcr development.
+- `8gcr/release-X.Y` is a maintenance branch for patch releases.
+- Each 8gcr branch owns its ordered commercial patch list in `taskfile/commercial-patches`.
+- The release fetches only those named branches from `8gcr-ee`; it never reads or imports `8gcr-ee/main`.
+- Release images are built by checking out the 8gcr release source, applying 8gcr-ee patches during the workflow run, and building images from that patched working tree.
 
 ## Branch Movement
 
 ```mermaid
 flowchart LR
-  a["harbor-next/main\nVERSION 2.16.0\nmanifest 2.15.0"]
-  b["harbor-next/main\nfeat: new capability"]
-  c["harbor-next/main\nfix: bug fix"]
+  a["8gcr/main\nVERSION 2.16.0\nmanifest 2.15.0"]
+  b["8gcr/main\nfeat: new capability"]
+  c["8gcr/main\nfix: bug fix"]
   d["release PR\nchore: release 2.16.0\nVERSION 2.17.0"]
   e["tag\nv2.16.0"]
-  f["harbor-next/release-2.16\nVERSION reset to 2.16.0"]
-  g["harbor-next/main\nfix: later main fix"]
+  f["8gcr/release-2.16\nVERSION reset to 2.16.0"]
+  g["8gcr/main\nfix: later main fix"]
   h["backport PR\n/backport v2.16"]
-  i["harbor-next/release-2.16\nfix: later main fix"]
-  j["harbor-next/release-2.16\nchore: release 2.16.1"]
+  i["8gcr/release-2.16\nfix: later main fix"]
+  j["8gcr/release-2.16\nchore: release 2.16.1"]
   k["tag\nv2.16.1"]
 
   a --> b --> c --> d --> e --> f
@@ -76,7 +76,7 @@ sequenceDiagram
   participant GitHub
   participant RP as release-please
   participant Actions as GitHub Actions
-  participant GCR as container-registry/8gcr
+  participant GCR as container-registry/8gcr-ee
   participant Registry as Container Registry
   participant Cosign
 
@@ -95,7 +95,7 @@ sequenceDiagram
   GitHub->>Actions: Push starts Release Please workflow again
   RP->>GitHub: Create vX.Y.Z tag and GitHub Release
   Actions->>GCR: Fetch Harbor-declared patch branches
-  Actions->>Actions: Apply patches to Harbor Next release source
+  Actions->>Actions: Apply patches to 8gcr release source
   Actions->>Registry: Build and push release images
   Actions->>Cosign: Sign release images
   Actions->>GitHub: Rewrite GitHub Release notes
@@ -144,8 +144,8 @@ Use `ci:` for workflow-only changes.
 4. Review `.release-please-manifest.json` and `CHANGELOG.md` for the released `X.Y.0` version, and review `VERSION` for the next development target.
 5. Squash-merge the release PR.
 6. Release-please creates the `vX.Y.0` tag and GitHub Release from the manifest version, not from `VERSION`.
-7. The release workflow checks out the Harbor Next release source.
-8. The workflow applies 8gcr patches at release runtime.
+7. The release workflow checks out the 8gcr release source.
+8. The workflow applies 8gcr-ee patches at release runtime.
 9. The workflow builds and pushes multi-arch images with the release-please output version.
 10. The workflow signs images with cosign.
 11. The workflow rewrites the GitHub Release notes.
@@ -193,7 +193,7 @@ Digests are what the signature is made against, so a pinned digest is also the v
 
 Tags named `vX.Y.Z-beta.YYYYMMDD` are from before the channel settled on one moving tag. They still resolve, and the tag guard still accepts them, but nothing creates new ones.
 
-Every published image set is then handed to the end-to-end suite by the `E2E` workflow, which nightlies and releases both call. The suite does not live in this repository: it lives on the `dev` overlay branch in `container-registry/8gcr`, and the run brings it here the way the commercial patches are brought here — `task apply-patches OVERLAY_BRANCHES=dev` octopuses the declared patch series plus the overlay onto the commit under test. The run therefore stands in the megamerge the images were built from.
+Every published image set is then handed to the end-to-end suite by the `E2E` workflow, which nightlies and releases both call. The suite does not live in this repository: it lives on the `dev` overlay branch in `container-registry/8gcr-ee`, and the run brings it here the way the commercial patches are brought here — `task apply-patches OVERLAY_BRANCHES=dev` octopuses the declared patch series plus the overlay onto the commit under test. The run therefore stands in the megamerge the images were built from.
 
 The published tag's own tree cannot stand in for that. A nightly's tag sits on the throwaway `nightly` branch, which carries neither the commercial patches (they are applied when the images are built and never committed) nor the suite. `OVERLAY_BRANCHES` is deliberately not the patch series file: a branch listed there would be built into released images, and the overlay must never be.
 
@@ -226,7 +226,7 @@ Nightly notes are the upcoming release's notes as they stand tonight, not a sepa
 Two things make that true:
 
 - The channel accumulates from the last published release, so release-please renders the whole in-progress release into the nightly `CHANGELOG.md` section, and `What's Changed` spans the same range.
-- The nightly workflow does not dispatch `release-cut` to `8gcr`. The commercial entries stay in the unreleased block of each `changelogs/<branch>.md`, so every nightly renders the same commercial features the real release will, and the real release still finds them when it ships.
+- The nightly workflow does not dispatch `release-cut` to `8gcr-ee`. The commercial entries stay in the unreleased block of each `changelogs/<branch>.md`, so every nightly renders the same commercial features the real release will, and the real release still finds them when it ships.
 
 A nightly's notes therefore read as a preview of the release: the same sections, the same commercial features, the same contributors, with the image references pointing at the pointer tag.
 
@@ -271,7 +271,7 @@ Each release publishes `linux/amd64` and `linux/arm64` images:
 
 Default registry path: `8gears.container-registry.com/8gcr`.
 
-At release runtime, the workflow reads `taskfile/commercial-patches` from the checked-out Harbor Next branch, fetches only those branches from `container-registry/8gcr`, applies their declared commit deltas, and builds the images. The workflow never fetches `8gcr/main` or an 8gcr-owned series file.
+At release runtime, the workflow reads `taskfile/commercial-patches` from the checked-out 8gcr branch, fetches only those branches from `container-registry/8gcr-ee`, applies their declared commit deltas, and builds the images. The workflow never fetches `8gcr-ee/main` or an 8gcr-ee-owned series file.
 
 Use `task apply-patches` to apply that manifest to a clean checkout and `task release-ready` to validate it against a disposable clean clone. For a local unsigned build and push to the PR registry project (`8gcr-pr` by default), authenticate the container engine and run `task release-images-local RELEASE_VERSION=X.Y.Z IMAGE_TAG=<tag>`; the local task verifies both published architectures after pushing. Main and maintenance-release workflows publish to `8gcr`.
 
@@ -282,7 +282,7 @@ Release notes include:
 - Release-please changelog entries
 - GitHub-generated PR links and authors
 - PR `## Release Notes` highlights
-- Commercial patch descriptions from the 8gcr patch series
+- Commercial patch descriptions from the 8gcr-ee patch series
 - Container image references
 - Cosign verification commands
 
@@ -301,8 +301,8 @@ Upstream-Author: @original-author
 | `REGISTRY_PROJECT` | Variable | No | Registry project, defaults to `8gcr` |
 | `REGISTRY_USERNAME` | Variable | Yes | Registry push username |
 | `REGISTRY_PASSWORD` | Secret | Yes | Registry push password/token |
-| `SYNC_APP_ID` | Variable | Yes | GitHub App ID for 8gcr access |
-| `SYNC_APP_PRIVATE_KEY` | Secret | Yes | GitHub App private key for 8gcr access |
+| `SYNC_APP_ID` | Variable | Yes | GitHub App ID for 8gcr-ee access |
+| `SYNC_APP_PRIVATE_KEY` | Secret | Yes | GitHub App private key for 8gcr-ee access |
 | `BUILDX_HOST` | Runner environment | No | Remote BuildKit endpoint |
 | `NIGHTLY_CHANNEL_TOKEN` | Secret | No | Only needed if a ruleset ever covers the `nightly` branch; the nightly channel push and merge fall back to `GITHUB_TOKEN` |
 | `GCHAT_WEBHOOK_URL` | Secret | No | Google Chat incoming webhook the nightly posts its outcome to; without it the notification is skipped |
