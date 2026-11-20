@@ -35,6 +35,7 @@ vars:
     - patches/distribution/0001-s3-bound-pooled-part-buffer-growth-to-chunk-size.patch
     - patches/distribution/0002-s3-add-spooldir-to-buffer-upload-parts-on-disk.patch
     - patches/distribution/0003-storage-close-file-writer-when-hash-state-save-fails.patch
+    - patches/distribution/0004-registry-add-harbor-gc-delete-endpoints.patch
   NPM_REGISTRY: "https://registry.npmjs.org/"
 
   # Multi-arch image build configuration

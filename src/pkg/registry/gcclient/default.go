@@ -12,18 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package api
+package gcclient
 
 import (
-	"net/http"
+	"os"
 
+	"github.com/goharbor/harbor/src/lib/config"
 	"github.com/goharbor/harbor/src/lib/log"
+	"github.com/goharbor/harbor/src/pkg/registry/interceptor/readonly"
 )
 
-// Health ...
-func Health(w http.ResponseWriter, _ *http.Request) {
-	if err := WriteJSON(w, "healthy"); err != nil {
-		log.Errorf("Failed to write response: %v", err)
-		return
+// Default is the client used by the GC job.
+var Default Client
+
+// Init points Default at the registry. REGISTRY_CONTROLLER_URL still wins so
+// deployments that set it explicitly keep working.
+func Init() {
+	url := os.Getenv("REGISTRY_CONTROLLER_URL")
+	if url == "" {
+		url, _ = config.RegistryURL()
 	}
+	log.Infof("initializing registry GC client for %s ...", url)
+	Default = NewClient(url, &Config{Secret: os.Getenv("JOBSERVICE_SECRET")}, readonly.NewInterceptor())
 }

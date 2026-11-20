@@ -21,11 +21,10 @@ task dev:infra:up
 All services run in containers:
 - **Core** - Harbor API with Air hot reload (port 8080, Delve 2345)
 - **JobService** - Background jobs with Air hot reload (port 8888, Delve 2346)
-- **RegistryCtl** - Registry controller with Air hot reload (port 8085, Delve 2347)
 - **Trivy Adapter** - Vulnerability scanner (port 8081)
 - **PostgreSQL** - Database (port 5432)
 - **Redis/Valkey** - Cache/queue (port 6379)
-- **Distribution** - Docker Registry (port 50000)
+- **Distribution** - Patched registry binary from `patches/distribution`, also serves the GC delete API (port 50000)
 
 <!--
 ```SVGBob
@@ -47,15 +46,15 @@ All services run in containers:
                         │    │       "Redis"       │                     │
                         │    │       ":6379"       │                     │
                         │    └─────────────────────┘                     │
-                        │    ┌─────────────────────┐  ┌──────────────┐   │
-                        │    │     "Registry"      │<-│"RegistryCtl" │   │
-                        │    │      ":50000"       │  │   ":8085"    │   │
-                        │    └─────────────────────┘  └──────────────┘   │
+                        │    ┌─────────────────────┐                     │
+                        │    │     "Registry"      │                     │
+                        │    │      ":50000"       │                     │
+                        │    └─────────────────────┘                     │
                         │                                                │
                         └────────────────────────────────────────────────┘
 ```
 -->
-![Diagram](https://kroki.io/svgbob/svg/eNp7NKXn0ZQGitGER9Qxh7poAtejKU0KUKDkkV9cogTjASWQ5OBqXPKTs1OLFPxSS8rzi7KV0OWBWriwaMNnJCGAYiTeUJyAag1htSTGyQQitEzAcHCTUkB-UUlijhLYXZg69gCRrh1Ig5JzflGqEkiLja6uLljEKz8pOLWoLDMZLg4WDinKLKsEi2CxzsrEyMAAKokaHkA5CwMLhByEAgoCgRJCAGwFSKUhdium4Pb-DHQrkdWuwaIWh2lr8JiP1wEQNUQnQyyK8CRRiLFTqJHzZhAXnmvwhzN2J-KRQxeZtoeY7EfAQGoUbRPItxxMATNZcUl6UWpwoI8S3mgk3khw1jA1MTZSIpAyiDKS8lQzYyjHDygwg1JTMoupEpiI-DEzNrccjR9ovUNGbUZ0YANjLz2zuKSoUgkubQOqjODiziU5SogKhOg4BGYxAwNQfYUkDa-XDCxMUeslOsUjicbMILngVaCs2J0y-JqSMwBBj8jF)
+![Diagram](https://kroki.io/svgbob/svg/eNp7NKXn0ZQGitGER9Qxh7poAtejKU0KUKDkkV9cogTjASWQ5OBqXPKTs1OLFPxSS8rzi7KV0OWBWriwaMNnJCGAYiTeUJyAag1htSTGyQQitEzAcHCTUkB-UUlijhLYXZg69gCRrh1Ig5JzflGqEkiLja6uLljEKz8pOLWoLDMZLg4WDinKLKsEi2CxzsrEyMAAKokaHkA5CwMLhByEAgoCgRJCAGwFSKUhdium4Pb-DHQrkdWuwaIWh2lr8JiP1wEQNUQnQyyK8CRRiLFTqJHzZhAXnmvwhzN2J-KRQxeZtoeY7EfAQGoUbRPItxxMATNZcUl6UWpwoI8S3mgk3khw1jA1MTZSIpAyiDKS8lQzYyjHDygwg1JTMoupEpiI-DEzNrccjR8qxA8wdtIzi0uKKpWoFz_A7GNgAKqLhnb8kNpawS03ZfA1AWcAAEmUgqE=)
 
 ## Directory Structure
 
@@ -64,7 +63,6 @@ devenv/
 ├── docker-compose.yml         # All services (infra + backend + trivy)
 ├── air.core.toml              # Air hot-reload config for Core
 ├── air.jobservice.toml        # Air hot-reload config for JobService
-├── air.registryctl.toml       # Air hot-reload config for RegistryCtl
 ├── registry.passwd            # Registry HTTP basic auth credentials
 ├── token_service_key.pem      # Generated RSA key for token signing
 ├── secret_key                 # Generated key core encrypts secrets with
@@ -73,7 +71,6 @@ devenv/
 config/                        # Canonical service configs (shared by dev + compose)
 ├── jobservice.yml             # JobService configuration
 ├── registry.yml               # Docker Registry config
-├── registryctl.yml            # RegistryCtl configuration
 ├── nginx/                     # Reverse proxy + TLS (compose only)
 └── portal/nginx.conf          # Baked into portal image at build time
 
@@ -97,7 +94,7 @@ task dev:clean           # Stop everything and remove volumes
 task dev:backend:up              # Start Core + JobService containers
 task dev:backend:down            # Stop backend containers
 task dev:backend:logs            # View backend logs
-task dev:backend:logs:<service>  # View logs for core, jobservice, or registryctl
+task dev:backend:logs:<service>  # View logs for core or jobservice
 task dev:backend:restart         # Restart backend containers
 ```
 
@@ -155,7 +152,6 @@ All Go services run under Delve with `--continue` (no need to wait for debugger 
 
 - **Core**: container `:2345` → host `${PORT_DEBUG_CORE:-2345}` (commented out)
 - **JobService**: container `:2346` → host `:2346` (commented out)
-- **RegistryCtl**: container `:2347` → host `${PORT_DEBUG_REGISTRYCTL:-2347}` (active)
 
 To enable Core/JobService debugging, uncomment the port mappings in `devenv/docker-compose.yml` and restart.
 
