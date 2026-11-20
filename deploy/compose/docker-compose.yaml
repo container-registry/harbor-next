@@ -222,7 +222,7 @@ services:
 
   postgresql:
     # Pinned: an older image on this mount starts an empty database. See README.
-    image: docker.io/library/postgres:18-alpine
+    image: docker.io/library/postgres:19-alpine
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD}

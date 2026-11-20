@@ -59,34 +59,35 @@ tests:
                 name: my-pg
                 key: pw
 
-  - it: should run pgautoupgrade once on the main container's data volume and PGDATA
+  - it: should guard the main container's data volume and run PostgreSQL 19
     template: charts/postgresql/templates/statefulset.yaml
     asserts:
       - equal:
           path: spec.template.spec.initContainers[0].name
-          value: pgautoupgrade
+          value: pgdata-guard
+      - equal:
+          path: spec.template.spec.initContainers[0].image
+          value: docker.io/library/postgres:19.0@sha256:bb6e70add742cd868fb62cb3b2f67d1dd2bdd2b65a521e778420748753687c60
       - equal:
           path: spec.template.spec.initContainers[0].volumeMounts[0]
           value:
             name: data
             mountPath: /var/lib/postgresql
-      - contains:
-          path: spec.template.spec.initContainers[0].env
-          content:
-            name: PGAUTO_ONESHOT
-            value: "yes"
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: docker.io/postgres:19.0@sha256:bb6e70add742cd868fb62cb3b2f67d1dd2bdd2b65a521e778420748753687c60
       - contains:
           path: spec.template.spec.containers[0].env
           content:
             name: PGDATA
-            value: /var/lib/postgresql/18/docker
+            value: /var/lib/postgresql/19/docker
       - contains:
           path: spec.template.spec.containers[0].volumeMounts
           content:
             name: data
             mountPath: /var/lib/postgresql
 
-  - it: should refuse a subPath the upgrader does not mount
+  - it: should refuse a subPath the guard does not mount
     template: templates/validate-values.yaml
     set:
       postgresql.persistence.subPath: pg
