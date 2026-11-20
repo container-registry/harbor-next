@@ -36,7 +36,7 @@ the default.
 | `expose.type: route` (Gateway API HTTPRoute) | `gateway.enabled: true` + `ingress.enabled: false` | 2.x reused the name "route" for Gateway API. Here `expose.route` is an **OpenShift Route** instead |
 | `expose.ingress.hosts.core` | `externalURL` hostname (and optionally `ingress.hosts[].host`) | Ingress host defaults to the `externalURL` hostname |
 | `expose.ingress.className` | `ingress.className` | |
-| `expose.ingress.annotations` | `ingress.annotations` | ssl-redirect / proxy-body-size annotations are no longer pre-set — add the ones your controller needs |
+| `expose.ingress.annotations` | `ingress.annotations` | only proxy-body-size `"0"` is pre-set; ssl-redirect is not, add the annotations your controller needs |
 | `expose.ingress.labels` | `ingress.labels` | |
 | `expose.ingress.controller` | *N/A* | No controller-specific template logic remains |
 | `expose.ingress.kubeVersionOverride` | *N/A* | |

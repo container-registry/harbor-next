@@ -284,10 +284,9 @@ defn map-expose-ingress(legacy expose):
     add-warn old nil: 'No equivalent — dropped.'
   when bad?(ing.annotations):
     add-info 'expose.ingress.annotations' 'ingress.annotations':
-      'This chart pre-sets NO ingress annotations (2.x shipped
-       ssl-redirect + proxy-body-size). Add what your controller needs,
-       e.g. nginx.ingress.kubernetes.io/proxy-body-size "0" so large
-       image layers can be pushed.'
+      'This chart pre-sets only nginx.ingress.kubernetes.io/proxy-body-size
+       "0" (2.x also shipped ssl-redirect). Add what else your controller
+       needs; your annotations merge over the default.'
 
   host-differs =: present?(host) && (host != ext-host)
   when host-differs:
