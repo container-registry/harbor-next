@@ -1,6 +1,6 @@
-# AWS EKS with IRSA — Harbor Next Example
+# AWS EKS with IRSA — 8gcr Example
 
-Deploy Harbor Next on AWS EKS using IAM Roles for Service Accounts (IRSA) for zero-static-credential access to S3 (registry storage) and Aurora PostgreSQL (RDS IAM Auth).
+Deploy 8gcr on AWS EKS using IAM Roles for Service Accounts (IRSA) for zero-static-credential access to S3 (registry storage) and Aurora PostgreSQL (RDS IAM Auth).
 
 ## Architecture
 
@@ -39,7 +39,7 @@ Deploy Harbor Next on AWS EKS using IAM Roles for Service Accounts (IRSA) for ze
 - `helm` >= 3.14
 - `kubectl`
 - `docker` (for push/pull verification)
-- Harbor Next `v2.15.0` or later — RDS IAM Auth is built in.
+- 8gcr `v2.15.0` or later — RDS IAM Auth is built in.
   Public images: `8gears.container-registry.com/8gcr/harbor-{core,jobservice,registry,portal}:v2.15.0`
 
 ## Environment Variables

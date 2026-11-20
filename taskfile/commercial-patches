@@ -1,4 +1,4 @@
-# Ordered commercial patches for Harbor Next release-2.15.
+# Ordered commercial patches for 8gcr release-2.15.
 release-2.15/0001-commercial-feature-gate
 release-2.15/0002-branding
 release-2.15/0003-sftp-replication

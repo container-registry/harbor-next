@@ -58,4 +58,4 @@ Harbor has been installed!
 
 5. For more information:
    - Harbor documentation: https://goharbor.io/docs/
-   - Chart source: https://github.com/container-registry/harbor-next
+   - Chart source: https://github.com/container-registry/8gcr

@@ -1,4 +1,4 @@
-# Contributing to Harbor Next
+# Contributing to 8gcr
 
 Thank you for contributing! This guide explains how to open PRs and merge them correctly so the automated release pipeline works as expected.
 
@@ -242,7 +242,7 @@ Commercial patches can use a simple subject instead of a conventional commit. Th
 Subject: [PATCH] Branding customization
 
 Allows operators to configure product branding for the portal without rebuilding
-the Harbor Next image.
+the 8gcr image.
 
 Supports custom names, logos, and landing page copy from deployment
 configuration.
@@ -255,7 +255,7 @@ This renders in the release notes as:
 - **Branding customization**
 
   Allows operators to configure product branding for the portal without rebuilding
-  the Harbor Next image.
+  the 8gcr image.
 
   Supports custom names, logos, and landing page copy from deployment
   configuration.

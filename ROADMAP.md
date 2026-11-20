@@ -1,8 +1,8 @@
-# Harbor Next Roadmap
+# 8gcr Roadmap
 
 A high-level roadmap giving users an idea of where the next-generation **Harbor** is headed.
 
-Harbor Next focuses on three areas:
+8gcr focuses on three areas:
 
 - Ease of development, deployment, and operation with minimal resource utilization (compute and dependencies)
 - User-driven extensibility of Harbor

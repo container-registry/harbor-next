@@ -1,5 +1,5 @@
 # ============================================================================
-# HARBOR NEXT HELM CHART - VALUES
+# 8GCR HELM CHART - VALUES
 # ============================================================================
 # This chart uses the `toEnvVars` pattern for configuration.
 # Any Harbor config option can be set via component config/secret sections
@@ -42,7 +42,7 @@ imageCredentials: {}
 
 # -- Global image settings
 image:
-  # -- Image source preset: `8gcr` (Harbor Next builds, default) or `upstream`
+  # -- Image source preset: `8gcr` (8gcr builds, default) or `upstream`
   # (docker.io/goharbor/*). Selects the registry + per-component repository for
   # every component. Per-component `image.registry`/`image.repository` override
   # it; `global.imageRegistry` overrides the registry on top. See the

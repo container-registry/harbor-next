@@ -116,7 +116,7 @@ jobs:
           app-id: ${{ vars.SYNC_APP_ID }}
           private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
           owner: container-registry
-          repositories: 8gcr
+          repositories: 8gcr-ee
           permission-contents: read
 
       - name: Apply commercial patches

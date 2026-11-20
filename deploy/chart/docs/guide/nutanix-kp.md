@@ -131,13 +131,13 @@ helm registry login 8gears.container-registry.com
 Pull the chart using the OCI reference:
 
 ```bash
-helm pull oci://8gears.container-registry.com/8gcr/charts/harbor
+helm pull oci://8gears.container-registry.com/8gcr/charts/8gcr
 ```
 
 Decompress the downloaded chart:
 
 ```bash
-tar xzvf harbor-*.tgz
+tar xzvf 8gcr-*.tgz
 ```
 
 ### Edit Values

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup.sh — Provision AWS infrastructure for Harbor Next with IRSA
+# setup.sh — Provision AWS infrastructure for 8gcr with IRSA
 #
 # Creates: EKS cluster, S3 bucket, IAM policy/role (IRSA), Aurora PostgreSQL,
 #          IAM DB user, and deploys Harbor via Helm.
@@ -166,7 +166,7 @@ else
   echo "Creating DB subnet group..."
   aws rds create-db-subnet-group \
     --db-subnet-group-name "${DB_SUBNET_GROUP}" \
-    --db-subnet-group-description "Harbor Next Aurora" \
+    --db-subnet-group-description "8gcr Aurora" \
     --subnet-ids ${SUBNET_IDS//,/ } \
     --region "${AWS_REGION}"
 fi
@@ -180,7 +180,7 @@ if [ "${SG_ID}" = "None" ] || [ -z "${SG_ID}" ]; then
   echo "Creating security group ${SG_NAME}..."
   SG_ID="$(aws ec2 create-security-group --region "${AWS_REGION}" \
     --group-name "${SG_NAME}" \
-    --description "Harbor Next Aurora access" \
+    --description "8gcr Aurora access" \
     --vpc-id "${VPC_ID}" \
     --query 'GroupId' --output text)"
   aws ec2 authorize-security-group-ingress --region "${AWS_REGION}" \

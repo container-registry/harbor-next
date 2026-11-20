@@ -1,4 +1,4 @@
 # Release
 
 
-- See https://github.com/container-registry/harbor-next/releases
+- See https://github.com/container-registry/8gcr/releases

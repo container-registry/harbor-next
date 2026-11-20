@@ -1,4 +1,4 @@
-# Harbor Next — AWS EKS with IRSA (S3 + RDS IAM Auth)
+# 8gcr — AWS EKS with IRSA (S3 + RDS IAM Auth)
 #
 # Prerequisites:
 #   - EKS cluster with OIDC provider (see cluster.yaml)
