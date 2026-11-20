@@ -64,7 +64,6 @@ jobs:
             ^deploy/chart/
             ^\.github/workflows/pr-chart\.yml$
             ^\.github/scripts/chart-annotate-images\.sh$
-            ^\.github/scripts/chart-package\.sh$
         run: |
           echo "event=${EVENT_ACTION} stack=${STACK_NUMBER:-none}"
           base="${STACK_BASE_SHA:-${PR_BASE_SHA}}"
@@ -99,7 +98,6 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       app_version: ${{ steps.version.outputs.app_version }}
       digest: ${{ steps.push.outputs.digest }}
-      legacy_digest: ${{ steps.push.outputs.legacy_digest }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -166,9 +164,9 @@ jobs:
 
       - name: Package chart
         # appVersion stays as committed, so default image tags resolve to a
-        # published Harbor release. chart-package.sh comes from the pull
-        # request, so like the annotation script it runs before the login.
-        run: .github/scripts/chart-package.sh deploy/chart "${PREVIEW_VERSION}" dist
+        # published Harbor release. Packaging reads the pull request's chart, so
+        # like the annotation step it runs before the login.
+        run: helm package deploy/chart --version "${PREVIEW_VERSION}" --destination dist
 
       - name: Log in to registry
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
@@ -177,21 +175,28 @@ jobs:
           username: ${{ vars.PR_REGISTRY_USERNAME }}
           password: ${{ secrets.PR_REGISTRY_PASSWORD }}
 
-      - name: Push and sign charts
+      - name: Push chart
         id: push
         # pipefail: GitHub's default shell is `bash -e` without it, so a
         # failing helm push would be masked by tee, and its error message can
         # itself contain a sha256 digest the capture below would match.
         run: |
           set -euo pipefail
-          for chart in 8gcr harbor; do
-            helm push "dist/${chart}-${PREVIEW_VERSION}.tgz" \
-              "oci://${REGISTRY_ADDRESS}/${PR_REGISTRY_PROJECT}/charts" 2>&1 | tee "push-${chart}.log"
-            digest=$(grep -o 'sha256:[a-f0-9]\{64\}' "push-${chart}.log" | head -1 || true)
-            [ -n "$digest" ] || { echo "::error::Failed to capture the ${chart} chart digest from helm push output"; exit 1; }
-            cosign sign --yes "${REGISTRY_ADDRESS}/${PR_REGISTRY_PROJECT}/charts/${chart}@${digest}"
-            if [ "${chart}" = 8gcr ]; then echo "digest=${digest}"; else echo "legacy_digest=${digest}"; fi >> "$GITHUB_OUTPUT"
-          done
+          helm push "dist/harbor-${PREVIEW_VERSION}.tgz" \
+            "oci://${REGISTRY_ADDRESS}/${PR_REGISTRY_PROJECT}/charts" 2>&1 | tee push.log
+          digest=$(grep -o 'sha256:[a-f0-9]\{64\}' push.log | head -1 || true)
+          if [ -z "$digest" ]; then
+            echo "::error::Failed to capture the chart digest from helm push output"
+            exit 1
+          fi
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+
+      - name: Sign chart
+        env:
+          CHART_DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          cosign sign --yes \
+            "${REGISTRY_ADDRESS}/${PR_REGISTRY_PROJECT}/charts/harbor@${CHART_DIGEST}"
 
   pr-comment:
     name: Comment preview chart ref
@@ -211,7 +216,6 @@ jobs:
       PREVIEW_VERSION: ${{ needs.preview-chart.outputs.version }}
       APP_VERSION: ${{ needs.preview-chart.outputs.app_version }}
       DIGEST: ${{ needs.preview-chart.outputs.digest }}
-      LEGACY_DIGEST: ${{ needs.preview-chart.outputs.legacy_digest }}
       HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       STACK_NUMBER: ${{ github.event.pull_request.stack.number || '' }}
       MATCHED: ${{ needs.changes.outputs.matched }}
@@ -236,9 +240,7 @@ jobs:
             const issueNumber = context.payload.pull_request.number;
             const { owner, repo } = context.repo;
             const previewProject = process.env.PR_REGISTRY_PROJECT;
-            const chart = `${process.env.REGISTRY_ADDRESS}/${previewProject}/charts/8gcr`;
-            const legacyChart = `${process.env.REGISTRY_ADDRESS}/${previewProject}/charts/harbor`;
-            const legacyDigest = process.env.LEGACY_DIGEST;
+            const chart = `${process.env.REGISTRY_ADDRESS}/${previewProject}/charts/harbor`;
             const previewVersion = process.env.PREVIEW_VERSION;
             const appVersion = process.env.APP_VERSION;
             const digest = process.env.DIGEST;
@@ -349,8 +351,6 @@ jobs:
               '```',
               '',
               `Digest: \`${digest}\`. The chart installs Harbor \`${appVersion}\` as committed. This PR's \`pr-${issueNumber}\` images, when published, live in \`${previewProject}\` and are not selected by this command: point the chart at them with per-component \`image.registry\` and \`image.repository\` values.`,
-              '',
-              `The same chart is also published under its former name as \`oci://${legacyChart}\` (digest \`${legacyDigest}\`). Both render the same manifests; switching needs no values changes.`,
               ...stackSection,
               ...siblingSection,
               '',
