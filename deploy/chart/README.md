@@ -927,8 +927,8 @@ Kubernetes: `>=1.28.0-0`
 | image.source | string | `"8gcr"` | Image source preset: `8gcr` (Harbor Next builds, default) or `upstream` (docker.io/goharbor/*). Selects the registry + per-component repository for every component. Per-component `image.registry`/`image.repository` override it; `global.imageRegistry` overrides the registry on top. See the `harbor.image.sourceMap` helper for the exact map (upstream renames the registry image to `registry-photon` and trivy to `trivy-adapter-photon`). |
 | imageCredentials | object | `{}` | Credentials to pull images imageCredentials:   registry: xyz.com   username: xxx   password: yyy   email: zzz@xyz.com |
 | imagePullSecrets | list | [] | List of image pull secrets |
-| ingress | object | `{"annotations":{},"autoGenCert":true,"className":"","core":"","enabled":true,"hosts":[],"labels":{},"tls":[]}` | Ingress configuration |
-| ingress.annotations | object | `{}` | Ingress annotations |
+| ingress | object | `{"annotations":{"nginx.ingress.kubernetes.io/proxy-body-size":"0"},"autoGenCert":true,"className":"","core":"","enabled":true,"hosts":[],"labels":{},"tls":[]}` | Ingress configuration |
+| ingress.annotations | object | `{"nginx.ingress.kubernetes.io/proxy-body-size":"0"}` | Ingress annotations. proxy-body-size "0" lifts the ingress-nginx upload limit; set it to null to drop it |
 | ingress.className | string | `""` | Ingress class name |
 | ingress.core | string | `""` | Hostname override used by auto-generated ingress certificate Defaults to first ingress host, or externalURL hostname when ingress.hosts is empty |
 | ingress.enabled | bool | `true` | Enable ingress |
