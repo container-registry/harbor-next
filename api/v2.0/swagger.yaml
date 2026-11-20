@@ -6649,7 +6649,7 @@ paths:
         - $ref: '#/parameters/pageSize'
         - name: tune_count
           in: query
-          description: Enable to ignore X-Total-Count when the total count > 1000, if the total count is less than 1000, the real total count is returned, else -1.
+          description: Enable to ignore X-Total-Count when the total count > 1000, if the total count is at most 1000, the real total count is returned, else -1.
           type: boolean
           required: false
           default: false
