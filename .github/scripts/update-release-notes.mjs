@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 const IMAGES = ['core', 'jobservice', 'registryctl', 'exporter', 'portal', 'registry', 'trivy-adapter'];
 const IMAGE_NAMES = { 'trivy-adapter': 'trivy-adapter', 'grype-scanner': 'harbor-grype-adapter', 'snyk-scanner': 'harbor-snyk-adapter' };
 const SERIES = 'taskfile/commercial-patches';
-const PATCHES_REMOTE = 'https://x-access-token@github.com/container-registry/8gcr';
+const PATCHES_REMOTE = 'https://x-access-token@github.com/container-registry/8gcr-ee';
 const FENCE = '```';
 const OIDC_ISSUER = '  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \\';
 // The token stays in the environment: never in a URL, argument or Git config.
@@ -252,7 +252,7 @@ export function releaseEntries(changelog, tag) {
 }
 
 // Notes per commercial patch branch listed in the series. The Harbor branch
-// owns the ordered list; 8gcr only stores the branch commits. Nothing here
+// owns the ordered list; 8gcr-ee only stores the branch commits. Nothing here
 // reads a commit subject: under merge-sync every patch branch tip is a
 // "sync: merge ..." commit, never a feature name.
 function commercialNotes(tag, tmp, token) {
@@ -318,6 +318,12 @@ function render(ctx) {
       FENCE,
       '',
     ));
+    if (ctx.chartName === '8gcr') {
+      parts.push(lines(
+        `The chart is also published under its former name \`oci://${registry}/charts/harbor\`. Both render the same manifests, so switching needs no values changes, see [MIGRATION.md](https://github.com/${repo}/blob/main/deploy/chart/docs/MIGRATION.md#chart-renamed-to-8gcr).`,
+        '',
+      ));
+    }
     if (chartMode) {
       parts.push(lines(
         'Signed with [cosign](https://github.com/sigstore/cosign). **Verify the chart signature:**',
@@ -414,7 +420,7 @@ async function main() {
       summary: optional('summary.md'),
       formatted: read(file('formatted-notes.md')),
       contributors: optional('contributors.md'),
-      chartName: chartField(chartYaml, 'name') || 'harbor-next',
+      chartName: chartField(chartYaml, 'name') || '8gcr',
       chartVersion: chartMode ? version : '',
     });
     const notesPath = file('release-notes.md');

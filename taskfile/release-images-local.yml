@@ -1,7 +1,7 @@
 version: '3'
 
 vars:
-  PATCHES_CLONE_URL: '{{.PATCHES_CLONE_URL | default "git@github.com:container-registry/8gcr.git"}}'
+  PATCHES_CLONE_URL: '{{.PATCHES_CLONE_URL | default "git@github.com:container-registry/8gcr-ee.git"}}'
   LOCAL_REGISTRY_ADDRESS: '{{.LOCAL_REGISTRY_ADDRESS | default "8gears.container-registry.com"}}'
   LOCAL_REGISTRY_PROJECT: '{{.LOCAL_REGISTRY_PROJECT | default "8gcr-pr"}}'
   LOCAL_PLATFORMS: '{{.LOCAL_PLATFORMS | default "linux/amd64,linux/arm64"}}'

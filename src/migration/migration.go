@@ -66,7 +66,7 @@ func Migrate(database *models.Database) error {
 
 	pool := dao.GetPool()
 	if pool == nil {
-		return fmt.Errorf("apply authoritative Harbor Next schema: database pool is not initialized")
+		return fmt.Errorf("apply authoritative 8gcr schema: database pool is not initialized")
 	}
 	start = time.Now()
 	if err := applyAuthoritativeSchema(context.Background(), sqlSchemaDB{db: pool.DB()}, authoritativeSchemaPath()); err != nil {

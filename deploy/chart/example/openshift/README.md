@@ -1,6 +1,6 @@
-# Harbor Next on OpenShift
+# 8gcr on OpenShift
 
-Deploy Harbor Next to an OpenShift cluster using ephemeral images from [ttl.sh](https://ttl.sh).
+Deploy 8gcr to an OpenShift cluster using ephemeral images from [ttl.sh](https://ttl.sh).
 
 ## Prerequisites
 

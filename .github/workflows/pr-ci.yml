@@ -8,7 +8,7 @@ on:
     # COPY/build-arg or by the task build steps (gen-apis / build:binary).
     # Anything not listed (docs, tests, lint config, dev taskfiles, other
     # workflows) cannot change an image, so it is skipped. Commercial code
-    # from 8gcr isn't applied for PR previews at all — see publish-images.yml.
+    # from 8gcr-ee isn't applied for PR previews at all — see publish-images.yml.
     paths:
       - "src/**"                             # Go components + portal sources
       - "api/v2.0/swagger.yaml"              # gen-apis (core) + portal API client

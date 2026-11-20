@@ -1,4 +1,4 @@
-# Harbor Next behind Airlock Microgateway 5.1
+# 8gcr behind Airlock Microgateway 5.1
 
 Front Harbor with [Airlock Microgateway](https://github.com/airlock/microgateway)
 5.1 using the Kubernetes **Gateway API**. Airlock 5.x dropped the sidecar model

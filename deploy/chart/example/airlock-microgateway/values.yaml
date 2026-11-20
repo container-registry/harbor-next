@@ -1,4 +1,4 @@
-# Harbor Next behind Airlock Microgateway 5.1 (Gateway API)
+# 8gcr behind Airlock Microgateway 5.1 (Gateway API)
 # Usage: helm install harbor . -n harbor -f example/airlock-microgateway/values.yaml
 #
 # Airlock Microgateway 5.x is a Gateway API implementation (the sidecar model was

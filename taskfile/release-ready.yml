@@ -1,8 +1,8 @@
 version: '3'
 
 vars:
-  PATCHES_REPO: '{{.PATCHES_REPO | default "github.com/container-registry/8gcr"}}'
-  PATCHES_CLONE_URL: '{{.PATCHES_CLONE_URL | default "git@github.com:container-registry/8gcr.git"}}'
+  PATCHES_REPO: '{{.PATCHES_REPO | default "github.com/container-registry/8gcr-ee"}}'
+  PATCHES_CLONE_URL: '{{.PATCHES_CLONE_URL | default "git@github.com:container-registry/8gcr-ee.git"}}'
   PATCHES_SERIES: '{{.PATCHES_SERIES | default (printf "%s/taskfile/commercial-patches" .ROOT_DIR)}}'
   PATCH_AUTH_DIR: '{{.PATCH_AUTH_DIR | default ".opencode/tmp/patch-auth"}}'
   RELEASE_READY_DIR: '{{.RELEASE_READY_DIR | default ".opencode/tmp/release-ready"}}'
