@@ -817,6 +817,18 @@ Common issues:
 - Database connection failed — verify `database.host` and credentials
 - Redis connection failed — verify Valkey is running or `externalRedis` config
 
+### Switching to Recreate fails with `spec.strategy.rollingUpdate: Forbidden`
+
+The chart renders every Deployment strategy explicitly, so helm owns
+`rollingUpdate` and drops it when you set `deploymentStrategy.type: Recreate`.
+Releases installed with an older chart under server-side apply (the helm 4
+default) that left `maxSurge` or `maxUnavailable` to the API defaults never
+owned those fields, so the API keeps them. Upgrade to this chart once with the
+RollingUpdate strategy, then switch to Recreate in a second upgrade. If your
+values already set both keys, a single upgrade is enough. A single
+`helm upgrade --server-side=false` also works, but the release then stays on
+client-side apply.
+
 ### Permission Denied Errors
 
 The chart uses `readOnlyRootFilesystem: true`. If a component needs to write:
