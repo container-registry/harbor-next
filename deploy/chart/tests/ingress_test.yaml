@@ -278,3 +278,44 @@ tests:
       - equal:
           path: spec.rules[1].backendRefs[0].port
           value: 80
+
+  # Pins the default proxy-body-size so large pushes through
+  # ingress-nginx don't hit 413, and that users can override it.
+  - it: should default proxy-body-size to 0
+    template: templates/ingress.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      ingress.enabled: true
+    asserts:
+      - equal:
+          path: metadata.annotations["nginx.ingress.kubernetes.io/proxy-body-size"]
+          value: "0"
+
+  - it: should let users override proxy-body-size
+    template: templates/ingress.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      ingress.enabled: true
+      ingress.annotations:
+        nginx.ingress.kubernetes.io/proxy-body-size: 512m
+    asserts:
+      - equal:
+          path: metadata.annotations["nginx.ingress.kubernetes.io/proxy-body-size"]
+          value: 512m
+
+  - it: should drop proxy-body-size when set to null
+    template: templates/ingress.yaml
+    set:
+      externalURL: https://harbor.example.com
+      database.host: postgres.example.com
+      harborAdminPassword: Harbor12345
+      ingress.enabled: true
+      ingress.annotations:
+        nginx.ingress.kubernetes.io/proxy-body-size: null
+    asserts:
+      - notExists:
+          path: metadata.annotations["nginx.ingress.kubernetes.io/proxy-body-size"]
