@@ -9,7 +9,6 @@ on:
       - ".github/workflows/chart-ci.yml"
       - ".github/actions/setup-task/**"
       - ".github/scripts/chart-annotate-images.sh"
-      - ".github/scripts/chart-package.sh"
   merge_group:
 
 permissions: {}
@@ -197,6 +196,6 @@ jobs:
             "${work}/chart" "${REGISTRY_ADDRESS}" "${REGISTRY_PROJECT}"
           ah lint --kind helm --path "${work}/chart"
           helm dependency build "${work}/chart"
-          .github/scripts/chart-package.sh "${work}/chart" 0.0.0-ci "${work}/dist"
+          helm package "${work}/chart" --version 0.0.0-ci --destination "${work}/dist"
           ls -l "${work}/dist"
-          test -f "${work}/dist/8gcr-0.0.0-ci.tgz" && test -f "${work}/dist/harbor-0.0.0-ci.tgz"
+          test -f "${work}/dist/harbor-0.0.0-ci.tgz"

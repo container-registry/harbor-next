@@ -201,7 +201,7 @@ The component set above is identical across deployments. What changes is how ser
 - **RegistryCtl runs as a sidecar container in the registry pod** (it has no Deployment of its own; only its config/secret are templated).
 - **Redis/Valkey** ships as an **in-cluster subchart** (`valkey.enabled`, on by default; bundled `valkey` dependency in `Chart.yaml`) or can be pointed at an external instance (`externalRedis`). **PostgreSQL is external** — the chart has no Postgres workload, so you supply it (the 8gcr GitOps bundle provisions one via CloudNativePG through the chart's `extraManifests` hook).
 - Persistence is via **PVCs** (registry, jobservice); the chart adds Kubernetes-native resources: ServiceAccounts, PodDisruptionBudgets, and a Prometheus `ServiceMonitor`.
-- The chart (`8gcr`, also published under its former name `harbor` during the rename transition) is published as an OCI artifact and supports GitOps delivery via FluxCD (`deploy/flux/`), with platform guides for k3s, OpenShift, Rancher, Nutanix, and AWS EKS (IRSA).
+- The chart (`harbor`) is published as an OCI artifact and supports GitOps delivery via FluxCD (`deploy/flux/`), with platform guides for k3s, OpenShift, Rancher, Nutanix, and AWS EKS (IRSA).
 
 > The Helm chart details reflect the in-progress chart and may change before it lands.
 
