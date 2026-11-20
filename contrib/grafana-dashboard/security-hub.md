@@ -142,6 +142,27 @@ files in a second ConfigMap with the namespace, labels and annotations of
 - Project members without system access cannot use these dashboards with their
   own credentials: the Security Hub API requires system-level access.
 
+## Load on Harbor
+
+The dashboards do not refresh on their own. Harbor only receives requests
+when someone opens a dashboard or changes a selector:
+
+| Dashboard | Requests per load |
+|-----------|-------------------|
+| Overview | 1 × `/security/summary` |
+| CVE lookup | 10 × `/security/vul` |
+| Project | 10 × `/security/vul`, 1 × `/projects` |
+
+Each `/security/vul` page runs its own database query, including the pages
+after the last result. CVE lookups use the `cve_id` index and are fast.
+Project and severity filters scan more rows.
+
+Enable [query caching](https://grafana.com/docs/grafana/latest/administration/data-source-management/#query-and-resource-caching)
+on the Infinity datasource where your Grafana supports it (Grafana Cloud,
+Grafana Enterprise). Scan results only change when artifacts are scanned, so
+the default TTL of five minutes is safe, and repeated views within the TTL
+send no requests to Harbor.
+
 ## Why not Prometheus metrics
 
 Per-CVE metrics need one series per project, repository and CVE. That grows
@@ -163,6 +184,10 @@ classic dashboard JSON back. Before saving an export:
   lookup and Project dashboards. The second table reuses them through the
   `-- Dashboard --` datasource, so each dashboard fetches every page once. Keep
   the `merge` transformation in both tables.
+- Keep the single `/security/summary` query in panel 1 of the overview. Its
+  JSONata root selector turns the response into rows tagged `summary`, `cve` and
+  `artifact`; the other panels reuse it through `-- Dashboard --` and keep
+  their rows with a `filterByValue` transformation on `kind`.
 - Keep `${cve:percentencode}` in the CVE lookup URLs.
 - Remove the Grafana database `id` and revision `version`, and clear every
   variable's `current` to `{}` and `options` to `[]`.

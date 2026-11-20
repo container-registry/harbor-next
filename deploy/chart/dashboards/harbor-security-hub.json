@@ -73,12 +73,138 @@
           "source": "url",
           "format": "table",
           "parser": "backend",
-          "url": "/security/summary",
-          "root_selector": "",
-          "columns": [],
+          "url": "/security/summary?with_dangerous_cve=true&with_dangerous_artifact=true",
+          "root_selector": "$append([{\"kind\": \"summary\", \"critical_cnt\": critical_cnt, \"high_cnt\": high_cnt, \"medium_cnt\": medium_cnt, \"low_cnt\": low_cnt, \"fixable_cnt\": fixable_cnt, \"scanned_cnt\": scanned_cnt, \"total_artifact\": total_artifact}], $append(dangerous_cves.{\"kind\": \"cve\", \"cve_id\": cve_id, \"severity\": severity, \"cvss_score_v3\": cvss_score_v3, \"package\": package, \"version\": version}, dangerous_artifacts.{\"kind\": \"artifact\", \"project_id\": project_id, \"repository_name\": repository_name, \"digest\": digest, \"a_critical\": critical_cnt, \"a_high\": high_cnt, \"a_medium\": medium_cnt}))",
+          "columns": [
+            {
+              "selector": "kind",
+              "text": "kind",
+              "type": "string"
+            },
+            {
+              "selector": "critical_cnt",
+              "text": "critical_cnt",
+              "type": "number"
+            },
+            {
+              "selector": "high_cnt",
+              "text": "high_cnt",
+              "type": "number"
+            },
+            {
+              "selector": "medium_cnt",
+              "text": "medium_cnt",
+              "type": "number"
+            },
+            {
+              "selector": "low_cnt",
+              "text": "low_cnt",
+              "type": "number"
+            },
+            {
+              "selector": "fixable_cnt",
+              "text": "fixable_cnt",
+              "type": "number"
+            },
+            {
+              "selector": "scanned_cnt",
+              "text": "scanned_cnt",
+              "type": "number"
+            },
+            {
+              "selector": "total_artifact",
+              "text": "total_artifact",
+              "type": "number"
+            },
+            {
+              "selector": "cve_id",
+              "text": "CVE",
+              "type": "string"
+            },
+            {
+              "selector": "severity",
+              "text": "Severity",
+              "type": "string"
+            },
+            {
+              "selector": "cvss_score_v3",
+              "text": "CVSS",
+              "type": "number"
+            },
+            {
+              "selector": "package",
+              "text": "Package",
+              "type": "string"
+            },
+            {
+              "selector": "version",
+              "text": "Version",
+              "type": "string"
+            },
+            {
+              "selector": "project_id",
+              "text": "project_id",
+              "type": "number"
+            },
+            {
+              "selector": "repository_name",
+              "text": "Repository",
+              "type": "string"
+            },
+            {
+              "selector": "digest",
+              "text": "Digest",
+              "type": "string"
+            },
+            {
+              "selector": "a_critical",
+              "text": "Critical",
+              "type": "number"
+            },
+            {
+              "selector": "a_high",
+              "text": "High",
+              "type": "number"
+            },
+            {
+              "selector": "a_medium",
+              "text": "Medium",
+              "type": "number"
+            }
+          ],
           "url_options": {
             "method": "GET",
             "data": ""
+          }
+        }
+      ],
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "type": "include",
+            "match": "any",
+            "filters": [
+              {
+                "fieldName": "kind",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "summary"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "critical_cnt"
+              ]
+            }
           }
         }
       ],
@@ -109,8 +235,8 @@
       "type": "stat",
       "title": "High findings",
       "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "${datasource}"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
       "gridPos": {
         "x": 4,
@@ -123,19 +249,40 @@
         {
           "refId": "A",
           "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "${datasource}"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "type": "json",
-          "source": "url",
-          "format": "table",
-          "parser": "backend",
-          "url": "/security/summary",
-          "root_selector": "",
-          "columns": [],
-          "url_options": {
-            "method": "GET",
-            "data": ""
+          "panelId": 1,
+          "withTransforms": false
+        }
+      ],
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "type": "include",
+            "match": "any",
+            "filters": [
+              {
+                "fieldName": "kind",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "summary"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "high_cnt"
+              ]
+            }
           }
         }
       ],
@@ -166,8 +313,8 @@
       "type": "stat",
       "title": "Medium findings",
       "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "${datasource}"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
       "gridPos": {
         "x": 8,
@@ -180,19 +327,40 @@
         {
           "refId": "A",
           "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "${datasource}"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "type": "json",
-          "source": "url",
-          "format": "table",
-          "parser": "backend",
-          "url": "/security/summary",
-          "root_selector": "",
-          "columns": [],
-          "url_options": {
-            "method": "GET",
-            "data": ""
+          "panelId": 1,
+          "withTransforms": false
+        }
+      ],
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "type": "include",
+            "match": "any",
+            "filters": [
+              {
+                "fieldName": "kind",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "summary"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "medium_cnt"
+              ]
+            }
           }
         }
       ],
@@ -223,8 +391,8 @@
       "type": "stat",
       "title": "Low findings",
       "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "${datasource}"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
       "gridPos": {
         "x": 12,
@@ -237,19 +405,40 @@
         {
           "refId": "A",
           "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "${datasource}"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "type": "json",
-          "source": "url",
-          "format": "table",
-          "parser": "backend",
-          "url": "/security/summary",
-          "root_selector": "",
-          "columns": [],
-          "url_options": {
-            "method": "GET",
-            "data": ""
+          "panelId": 1,
+          "withTransforms": false
+        }
+      ],
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "type": "include",
+            "match": "any",
+            "filters": [
+              {
+                "fieldName": "kind",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "summary"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "low_cnt"
+              ]
+            }
           }
         }
       ],
@@ -280,8 +469,8 @@
       "type": "stat",
       "title": "Fixable findings",
       "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "${datasource}"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
       "gridPos": {
         "x": 16,
@@ -294,19 +483,40 @@
         {
           "refId": "A",
           "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "${datasource}"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "type": "json",
-          "source": "url",
-          "format": "table",
-          "parser": "backend",
-          "url": "/security/summary",
-          "root_selector": "",
-          "columns": [],
-          "url_options": {
-            "method": "GET",
-            "data": ""
+          "panelId": 1,
+          "withTransforms": false
+        }
+      ],
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "type": "include",
+            "match": "any",
+            "filters": [
+              {
+                "fieldName": "kind",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "summary"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "fixable_cnt"
+              ]
+            }
           }
         }
       ],
@@ -337,8 +547,8 @@
       "type": "gauge",
       "title": "Scan coverage",
       "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "${datasource}"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
       "gridPos": {
         "x": 20,
@@ -351,23 +561,43 @@
         {
           "refId": "A",
           "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "${datasource}"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "type": "json",
-          "source": "url",
-          "format": "table",
-          "parser": "backend",
-          "url": "/security/summary",
-          "root_selector": "",
-          "columns": [],
-          "url_options": {
-            "method": "GET",
-            "data": ""
-          }
+          "panelId": 1,
+          "withTransforms": false
         }
       ],
       "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "type": "include",
+            "match": "any",
+            "filters": [
+              {
+                "fieldName": "kind",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "summary"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "scanned_cnt",
+                "total_artifact"
+              ]
+            }
+          }
+        },
         {
           "id": "calculateField",
           "options": {
@@ -414,8 +644,8 @@
       "title": "Top 5 dangerous CVEs",
       "description": "Click a CVE to see every repository it affects.",
       "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "${datasource}"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
       "gridPos": {
         "x": 0,
@@ -427,49 +657,47 @@
         {
           "refId": "A",
           "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "${datasource}"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "type": "json",
-          "source": "url",
-          "format": "table",
-          "parser": "backend",
-          "url": "/security/summary?with_dangerous_cve=true",
-          "root_selector": "dangerous_cves",
-          "columns": [
-            {
-              "selector": "cve_id",
-              "text": "CVE",
-              "type": "string"
-            },
-            {
-              "selector": "severity",
-              "text": "Severity",
-              "type": "string"
-            },
-            {
-              "selector": "cvss_score_v3",
-              "text": "CVSS",
-              "type": "number"
-            },
-            {
-              "selector": "package",
-              "text": "Package",
-              "type": "string"
-            },
-            {
-              "selector": "version",
-              "text": "Version",
-              "type": "string"
+          "panelId": 1,
+          "withTransforms": false
+        }
+      ],
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "type": "include",
+            "match": "any",
+            "filters": [
+              {
+                "fieldName": "kind",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "cve"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "CVE",
+                "Severity",
+                "CVSS",
+                "Package",
+                "Version"
+              ]
             }
-          ],
-          "url_options": {
-            "method": "GET",
-            "data": ""
           }
         }
       ],
-      "transformations": [],
       "options": {
         "showHeader": true,
         "cellHeight": "sm",
@@ -603,8 +831,8 @@
       "title": "Top 5 dangerous artifacts",
       "description": "Click a repository to open its project.",
       "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "${datasource}"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
       "gridPos": {
         "x": 12,
@@ -616,54 +844,47 @@
         {
           "refId": "A",
           "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "${datasource}"
+            "type": "datasource",
+            "uid": "-- Dashboard --"
           },
-          "type": "json",
-          "source": "url",
-          "format": "table",
-          "parser": "backend",
-          "url": "/security/summary?with_dangerous_artifact=true",
-          "root_selector": "dangerous_artifacts",
-          "columns": [
-            {
-              "selector": "project_id",
-              "text": "project_id",
-              "type": "number"
-            },
-            {
-              "selector": "repository_name",
-              "text": "Repository",
-              "type": "string"
-            },
-            {
-              "selector": "digest",
-              "text": "Digest",
-              "type": "string"
-            },
-            {
-              "selector": "critical_cnt",
-              "text": "Critical",
-              "type": "number"
-            },
-            {
-              "selector": "high_cnt",
-              "text": "High",
-              "type": "number"
-            },
-            {
-              "selector": "medium_cnt",
-              "text": "Medium",
-              "type": "number"
-            }
-          ],
-          "url_options": {
-            "method": "GET",
-            "data": ""
-          }
+          "panelId": 1,
+          "withTransforms": false
         }
       ],
       "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "type": "include",
+            "match": "any",
+            "filters": [
+              {
+                "fieldName": "kind",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "artifact"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "project_id",
+                "Repository",
+                "Digest",
+                "Critical",
+                "High",
+                "Medium"
+              ]
+            }
+          }
+        },
         {
           "id": "organize",
           "options": {
