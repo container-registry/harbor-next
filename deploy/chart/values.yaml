@@ -1590,37 +1590,26 @@ postgresql:
   auth:
     # -- Database created at initialisation
     database: registry
-  # -- Runs pg_upgrade when the data is an older major, else exits at once.
-  # Keep its tag and PGDATA on the same major as `postgresql.image.tag`.
-  # @default -- pgautoupgrade 18, see values.yaml
+  image:
+    # -- PostgreSQL image tag. The data lives in `<major>/docker` on the volume.
+    tag: "19.0@sha256:bb6e70add742cd868fb62cb3b2f67d1dd2bdd2b65a521e778420748753687c60"
+  # -- Refuses to start when the volume holds data of an older major, which
+  # PostgreSQL 19 would otherwise skip and start empty. pgautoupgrade has no
+  # 19 image yet, so the upgrade is manual. See docs/postgresql.md.
+  # @default -- data guard, see values.yaml
   initContainers:
-    - name: pgautoupgrade
-      image: docker.io/pgautoupgrade/pgautoupgrade:18-trixie@sha256:45057d4974340c88a88c807e1a425f48e944cd78b1e01bd0951137153a3abf70
+    - name: pgdata-guard
+      image: docker.io/library/postgres:19.0@sha256:bb6e70add742cd868fb62cb3b2f67d1dd2bdd2b65a521e778420748753687c60
       workingDir: /var/lib/postgresql
-      command: ["bash", "-c"]
-      # Moves a pre-18 layout (pgdata, or harbor-helm pgdata/pgNN) to PGDATA
-      # first, then rebuilds indexes once if the data came from another glibc
+      command: ["sh", "-c"]
       args:
         - |
-          for d in pgdata pgdata/pg[0-9]*; do
-            if [ ! -e 18/docker ] && [ -s "$d/PG_VERSION" ]; then mkdir -p 18 && mv "$d" 18/docker || exit 1; fi
+          [ -s 19/docker/PG_VERSION ] && exit 0
+          for d in [0-9]*/docker pgdata pgdata/pg[0-9]*; do
+            [ -s "$d/PG_VERSION" ] || continue
+            echo "found PostgreSQL $(cat "$d/PG_VERSION") data in $d; upgrade it to 19 first, see the chart's docs/postgresql.md" >&2
+            exit 1
           done
-          docker-entrypoint.sh postgres || exit 1
-          [ -s "$PGDATA/PG_VERSION" ] || exit 0
-          echo 'local all all trust' > /tmp/hba
-          pg_ctl -w -o "-c listen_addresses= -k /tmp -c hba_file=/tmp/hba" start || exit 1
-          q() { psql -h /tmp -U "${POSTGRES_USER:-postgres}" -d postgres -Atc "$1"; }
-          dbs=$(q "SELECT datname FROM pg_database WHERE datcollversion <> pg_database_collation_actual_version(oid)") || exit 1
-          if [ -n "$dbs" ]; then
-            reindexdb -h /tmp -U "${POSTGRES_USER:-postgres}" --all || exit 1
-            printf '%s\n' "$dbs" | while IFS= read -r d; do q "ALTER DATABASE \"${d//\"/\"\"}\" REFRESH COLLATION VERSION" || exit 1; done || exit 1
-          fi
-          pg_ctl -w -m fast stop
-      env:
-        - name: PGDATA
-          value: /var/lib/postgresql/18/docker
-        - name: PGAUTO_ONESHOT
-          value: "yes"
       securityContext:
         allowPrivilegeEscalation: false
         runAsNonRoot: true

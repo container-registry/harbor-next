@@ -5,7 +5,7 @@
 
 services:
   postgresql:
-    image: ${REGISTRY_ADDRESS:-docker.io}/${REGISTRY_PROJECT:-library}/postgres:18-alpine
+    image: ${REGISTRY_ADDRESS:-docker.io}/${REGISTRY_PROJECT:-library}/postgres:19-alpine
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: root123
@@ -19,7 +19,7 @@ services:
       retries: 15
       start_period: 5s
     volumes:
-      - harbor-postgres-18-data:/var/lib/postgresql
+      - harbor-postgres-19-data:/var/lib/postgresql
       - ../make/migrations:/migrations
 
   redis:
@@ -271,8 +271,8 @@ services:
       - core
 
 volumes:
-  harbor-postgres-18-data:
-    name: ${PROJECT_PREFIX:-harbor}-postgres-18-data
+  harbor-postgres-19-data:
+    name: ${PROJECT_PREFIX:-harbor}-postgres-19-data
   harbor-redis-data:
     name: ${PROJECT_PREFIX:-harbor}-redis-data
   harbor-registry-data:

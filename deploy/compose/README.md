@@ -50,18 +50,19 @@ with step 3 above before the first `docker compose up` on the new version, then
 keep it. The mount is declared with `create_host_path: false`, so a missing
 file fails the start instead of being created as an empty directory.
 
-## PostgreSQL 18
+## PostgreSQL 19
 
-The bundled database runs `postgres:18-alpine`. The `postgres-data` volume is
-mounted at `/var/lib/postgresql` and the data lives in `18/docker` inside it,
-the layout the PostgreSQL 18 image expects. The version is fixed in the compose
-file and `POSTGRES_VERSION` is no longer read, because an older image on this
-mount would ignore the existing data and start an empty database.
+The bundled database runs `postgres:19-alpine`. The `postgres-data` volume is
+mounted at `/var/lib/postgresql` and the data lives in `19/docker` inside it,
+the layout the PostgreSQL 19 image expects. The version is fixed in the
+compose file and `POSTGRES_VERSION` is not read, because an older image on
+this mount would ignore the existing data and start an empty database.
 
 Swapping the image does not upgrade a data directory. On a volume created by an
-earlier compose file (PostgreSQL 16, or 15 if you pinned it), the PostgreSQL 18
-container refuses to start and logs that it found data from an older version.
-Move the data over with a dump and restore before you update the compose file:
+earlier compose file (PostgreSQL 18, 16, or 15 if you pinned it), the
+PostgreSQL 19 container refuses to start and logs that it found data from an
+older version. Move the data over with a dump and restore before you update
+the compose file:
 
 ```bash
 cd deploy/compose
@@ -81,7 +82,7 @@ docker compose down
 grep -q -- '-- PostgreSQL database dump complete' harbor.sql \
   && docker volume rm "${project}_postgres-data"
 
-# 4. Update to the new compose file, then restore into the fresh PostgreSQL 18
+# 4. Update to the new compose file, then restore into the fresh PostgreSQL 19
 docker compose up -d --wait postgresql
 docker compose exec -T postgresql \
   sh -c 'psql -v ON_ERROR_STOP=1 -q -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < harbor.sql > /dev/null \
