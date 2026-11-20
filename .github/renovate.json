@@ -76,6 +76,16 @@
       "enabled": false
     },
     {
+      "description": "distribution v2.8.3, the last v2 release, forwards its deprecated reference package to github.com/distribution/reference and still calls SplitHostname, which v0.6.0 removed. src/go.mod replaces the module with v0.5.0; moving that replace to v0.6.0 breaks every package that imports docker/distribution (#1469). Drop this rule together with the replace once docker/distribution v2 is gone from the module graph.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "github.com/distribution/reference"
+      ],
+      "allowedVersions": "<0.6.0"
+    },
+    {
       "description": "A Go module pinned to a -patch suffixed version is a fork carrying fixes on top of that release; semver ranks it below the plain tag, so any update Renovate proposes from it is a downgrade.",
       "matchManagers": [
         "gomod"
