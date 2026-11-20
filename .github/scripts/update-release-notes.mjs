@@ -340,12 +340,6 @@ function render(ctx) {
       FENCE,
       '',
     ));
-    if (ctx.chartName === '8gcr') {
-      parts.push(lines(
-        `The chart is also published under its former name \`oci://${registry}/charts/harbor\`. Both render the same manifests, so switching needs no values changes, see [MIGRATION.md](https://github.com/${repo}/blob/main/deploy/chart/docs/MIGRATION.md#chart-renamed-to-8gcr).`,
-        '',
-      ));
-    }
     if (chartMode) {
       parts.push(lines(
         'Signed with [cosign](https://github.com/sigstore/cosign). **Verify the chart signature:**',
@@ -443,7 +437,7 @@ async function main() {
       summary: optional('summary.md'),
       formatted: read(file('formatted-notes.md')),
       contributors: optional('contributors.md'),
-      chartName: chartField(chartYaml, 'name') || '8gcr',
+      chartName: chartField(chartYaml, 'name') || 'harbor',
       chartVersion: chartMode ? version : chartField(chartYaml, 'version'),
     });
     const notesPath = file('release-notes.md');

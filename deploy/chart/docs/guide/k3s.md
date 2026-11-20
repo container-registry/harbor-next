@@ -21,14 +21,14 @@ Pull the Harbor Helm chart from the OCI registry.
 1. Pull the chart:
 
    ```bash
-   helm pull oci://8gears.container-registry.com/8gcr/charts/8gcr
+   helm pull oci://8gears.container-registry.com/8gcr/charts/harbor
    ```
 
 2. Decompress the downloaded chart:
 
    ```bash
-   tar xzvf 8gcr-*.tgz
-   cd 8gcr
+   tar xzvf harbor-*.tgz
+   cd harbor
    ```
 
 ## Prepare a Values File

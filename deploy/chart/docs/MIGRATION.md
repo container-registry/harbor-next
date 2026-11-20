@@ -1,8 +1,5 @@
 # Migrating from goharbor/harbor-helm (v1.x)
 
-> Moving from `charts/harbor` to `charts/8gcr`? See
-> [Chart renamed to 8gcr](#chart-renamed-to-8gcr) at the end of this page.
-
 This guide covers migrating from the legacy
 [goharbor/harbor-helm](https://github.com/goharbor/harbor-helm/blob/main/values.yaml)
 chart, referred to as "2.x" below (chart v1.x, Harbor app v2.x). The
@@ -247,16 +244,3 @@ jobservice:
 5. If Trivy is enabled, trigger a scan and confirm it completes.
 6. Confirm replication endpoints and scanner credentials still decrypt
    (path B — this is the `secretKey` carry-over test).
-
-## Chart renamed to 8gcr
-
-The chart is published as `oci://8gears.container-registry.com/8gcr/charts/8gcr`.
-During a transition period every release is also published, signed, under the
-old name `oci://8gears.container-registry.com/8gcr/charts/harbor`. Both
-packages contain the same templates and values; only the package name in
-`Chart.yaml` differs.
-
-Resource names, labels and selectors do not depend on the package name:
-`nameOverride` still defaults to `harbor`. Switching a release from
-`charts/harbor` to `charts/8gcr` therefore renders the same manifests and
-needs no values changes.
