@@ -240,9 +240,9 @@ ingress:
   enabled: true
   # -- Ingress class name
   className: ""
-  # -- Ingress annotations
-  annotations: {}
-    # nginx.ingress.kubernetes.io/proxy-body-size: "0"
+  # -- Ingress annotations. proxy-body-size "0" lifts the ingress-nginx upload limit; set it to null to drop it
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
     # nginx.ingress.kubernetes.io/ssl-redirect: "true"
   # -- Ingress labels
   labels: {}
